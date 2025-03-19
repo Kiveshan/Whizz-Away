@@ -1,1 +1,1 @@
-# Whiz Away
+# Whizz Away
