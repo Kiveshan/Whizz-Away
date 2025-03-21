@@ -1,0 +1,233 @@
+.invoice-page {
+    padding: 20px;
+    font-family: Arial, sans-serif;
+  }
+  
+  .back-button {
+    background-color: #28a745;
+    color: white;
+    border: none;
+    padding: 8px 20px;
+    border-radius: 5px;
+    font-size: 16px;
+    cursor: pointer;
+    margin-bottom: 20px;
+  }
+  
+  .back-button:hover {
+    background-color: #218838;
+  }
+  
+  .invoice-paper {
+    max-width: 800px;
+    margin: 0 auto;
+    background-color: white;
+  }
+  
+  /* Transport and Logistics section */
+  .transport-section {
+    border-top: 1px solid #000;
+    border-bottom: 1px solid #000;
+    padding: 10px 0;
+  }
+  
+  .section-title {
+    text-align: center;
+    font-size: 16px;
+    font-weight: bold;
+  }
+  
+  /* Middle section with company details */
+  .middle-section {
+    position: relative;
+    height: 120px; /* Increased height to provide more space */
+    border-bottom: 1px solid #000;
+  }
+  
+  .company-info {
+    position: absolute;
+    top: 10px;
+    right: 0;
+    text-align: left;
+    font-size: 14px;
+    line-height: 1.4;
+    margin-bottom: 15px; /* Added margin to ensure space between text and bottom border */
+    margin-right: 10px;
+  }
+  
+  /* Invoice Title section */
+  .invoice-title-section {
+    position: relative;
+    border-bottom: 1px solid #000;
+    padding: 10px 0;
+  }
+  
+  .invoice-title {
+    text-align: center;
+    font-size: 16px;
+    font-weight: bold;
+  }
+  
+  .document-number {
+    position: absolute;
+    top: 50%;
+    right: 0;
+    transform: translateY(-50%);
+    font-size: 14px;
+    margin-right: 10px;
+  }
+  
+  /* Sender Details */
+  .sender-details {
+    padding: 10px 0;
+    font-size: 14px;
+    line-height: 1.4;
+    margin-left: 10px;
+  }
+  
+  .sender-details div {
+    margin: 0;
+  }
+  
+  /* Vessel/Destination */
+  .vessel-destination {
+    display: flex;
+    border-top: 1px solid #000;
+    border-bottom: 1px solid #000;
+    margin-top: 20px;
+  }
+  
+  .vessel,
+  .destination {
+    flex: 1;
+    padding: 12px;
+    text-align: center;
+    font-size: 16px;
+    font-weight: bold;
+  }
+  
+  .vessel {
+    border-right: 1px solid #000;
+  }
+  
+  /* Invoice Details */
+  .invoice-details {
+    margin: 15px 0 0 0; /* Added top margin to move table down */
+    padding: 0;
+    
+  }
+  
+  .details-table {
+    width: 760px;
+    border-collapse: separate;
+    border-spacing: 0;
+    border-radius: 8px;
+    overflow: hidden;
+    border: 1px solid #ddd;
+    margin-left: 20px;
+  }
+  
+  .details-table tr {
+    border-bottom: 1px solid #ddd;
+  }
+  
+  .details-table tr:last-child {
+    border-bottom: none;
+  }
+  
+  .details-table .label,
+  .details-table .value {
+    padding: 8px 12px;
+    font-size: 14px;
+  }
+  
+  .details-table .label {
+    width: 50%;
+    border-right: 1px solid #ddd;
+    font-weight: normal;
+  }
+  
+  .details-table .value {
+    width: 50%;
+  }
+  
+  /* Container Details */
+  .container-section {
+    position: relative;
+    margin-top: 30px; /* Increased top margin */
+    padding-top: 20px; /* Added padding to make space for the border */
+    border-top: 1px solid #000; /* Added border between tables */
+    padding-bottom: 20px; /* Added padding to make space for the bottom border */
+    border-bottom: 1px solid #000; /* Added border below container table */
+    margin-bottom: 20px; /* Added margin below the section */;
+  
+  }
+  
+  .container-table {
+    width: 770px;
+    border-collapse: separate;
+    border-spacing: 0;
+    border-radius: 8px;
+    overflow: hidden;
+    border: 1px solid #ddd;
+    margin-left: 14px;
+  }
+  
+  .container-table th {
+    background-color: #b8d1f3;
+    padding: 8px 12px;
+    text-align: left;
+    font-size: 14px;
+    font-weight: normal;
+    border-right: 1px solid #ddd;
+  }
+  
+  .container-table th:last-child {
+    border-right: none;
+  }
+  
+  .container-table td {
+    padding: 8px 12px;
+    font-size: 14px;
+    border-right: 1px solid #ddd;
+    border-top: 1px solid #ddd;
+  }
+  
+  .container-table td:last-child {
+    border-right: none;
+  }
+  
+  .container-number {
+    text-align: left;
+  }
+  
+  .weight,
+  .amount,
+  .vat,
+  .total {
+    text-align: left;
+  }
+  
+  /* Banking Details */
+  .banking-details {
+    font-size: 14px;
+    line-height: 1.4;
+    margin-left: 10px;
+  }
+  
+  .banking-details div {
+    margin: 0;
+  }
+  
+  .payment-note {
+    margin-top: 10px;
+  }
+  
+  .thank-you {
+    color: #ff0000;
+    text-align: center;
+    margin-top: 15px;
+    font-style: italic;
+  }
+  
+  
