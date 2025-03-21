@@ -40,6 +40,7 @@ const ControllerTrackInstruction = ({ setCurrentPage }) => {
                 <th>Type</th>
                 <th>Status</th>
                 <th>File No</th>
+                <th>Instruction</th>
                 <th>Assignment</th>
               </tr>
             </thead>
@@ -49,6 +50,14 @@ const ControllerTrackInstruction = ({ setCurrentPage }) => {
                 <td>Import</td>
                 <td>In-Progress</td>
                 <td>77002</td>
+                <td>
+                <button 
+                    className="view-buttons" 
+                    onClick={() => navigate("")}
+                  >
+                    View
+                  </button>
+                  </td>
                 <td>
                   <button 
                     className="view-buttons" 
@@ -64,6 +73,14 @@ const ControllerTrackInstruction = ({ setCurrentPage }) => {
                 <td>In-Progress</td>
                 <td>10014</td>
                 <td>
+                <button 
+                    className="view-buttons" 
+                    onClick={() => navigate("")}
+                  >
+                    View
+                  </button>
+                  </td>
+                <td>
                   <button 
                     className="view-buttons" 
                     onClick={() => navigate("/ControllerViewAssignment")}
@@ -77,6 +94,14 @@ const ControllerTrackInstruction = ({ setCurrentPage }) => {
                 <td>Import</td>
                 <td>Complete</td>
                 <td>93301</td>
+                <td>
+                <button 
+                    className="view-buttons" 
+                    onClick={() => navigate("")}
+                  >
+                    View
+                  </button>
+                  </td>
                 <td>
                   <button 
                     className="view-buttons" 
