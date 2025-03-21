@@ -1,0 +1,248 @@
+
+/* Main container holding all content */
+.instruction-container1 {
+  font-family: Arial, sans-serif;
+  max-width: 1200px;
+  margin: 0 auto;
+  position: relative;
+  /* min-height: 100vh; */
+  padding: 10px; /* Reduced padding to make it more compact */
+  margin-top: 10px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center; /* Centers content vertically */
+  align-items: center; /* Centers content horizontally */
+}
+
+/* Content area with white background and slight shadow */
+.content {
+  padding: 10px; /* Reduced padding */
+  border-radius: 5px;
+  margin: 5px 0; /* Reduced margin */
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+ 
+  box-sizing: border-box;
+  text-align: center; /* Centers text inside */
+}
+
+
+/* Title of the content */
+.content-title {
+  text-align: center;
+  font-size: 26px; /* Reduced font size slightly */
+  text-decoration: underline;
+  margin: 0 0 15px; /* Reduced margin */
+}
+
+/* Navigation buttons (Back and Logout) */
+.navigation-buttons {
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 15px; /* Reduced margin */
+}
+
+
+
+.back-button {
+  background-color: #8de0a6;
+}
+
+.logout-button {
+  background-color: #f89999;
+  color: white;
+}
+
+/* Form sections */
+/* Form sections */
+.form-section {
+  background-color: #f5f5f5;
+  padding: 1px; /* Slightly reduced padding */
+  margin-bottom: 1px; /* Further reduced margin */
+  border-radius: 1px;
+  border-bottom: 1px solid blue;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+
+/* Remove the blue line after the last form section */
+.form-section:last-child {
+  border-bottom: none;
+}
+
+/* Flex container for form rows */
+.form-row {
+  display: flex;
+  gap: 10px; /* Reduced gap */
+  margin-bottom: 2px; /* Reduced margin */
+  flex-wrap: wrap;
+}
+
+/* Form group styling */
+.form-group {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start; /* Ensures the label stays on the left */
+}
+
+.form-group label {
+  display: block;
+  margin-bottom: 4px; /* Reduced margin */
+  font-weight: bold;
+}
+
+
+.form-group.wide {
+  flex: 2;
+}
+
+.form-group.full-width {
+  width: 100%;
+}
+
+
+
+/* Form inputs and text areas */
+.form-input,
+.form-select,
+.form-textarea {
+  width: 100%;
+  padding: 6px 4px; /* Reduced padding */
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  box-sizing: border-box;
+}
+
+.form-textarea {
+  min-height: 40px; /* Reduced height */
+  resize: vertical;
+}
+
+/* Select wrapper */
+.select-wrapper {
+  position: relative;
+}
+
+.select-wrapper.small {
+  width: 80px;
+}
+
+/* Date, rate, trailer input groups */
+.date-input-group,
+.rates-input-group,
+.trailer-input-group {
+  display: flex;
+  align-items: center;
+  gap: 4px; /* Reduced gap */
+}
+
+/* Calendar button styling */
+.calendar-button {
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-size: 18px; /* Reduced font size */
+}
+
+/* Number input styling */
+.number-input-group {
+  display: flex;
+  align-items: center;
+}
+
+.number-controls {
+  display: flex;
+  flex-direction: column;
+  margin-left: 4px; /* Reduced margin */
+}
+
+.number-up,
+.number-down {
+  background: none;
+  border: 1px solid #ddd;
+  cursor: pointer;
+  font-size: 9px; /* Reduced font size */
+  padding: 0;
+  width: 18px; /* Reduced width */
+  height: 12px; /* Reduced height */
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.form-input.small {
+  width: 50px;
+}
+
+/* Add button styling */
+.add-button {
+  background-color: #8cc7f0;
+  border: none;
+  width: 22px; /* Reduced width */
+  height: 22px; /* Reduced height */
+  border-radius: 50%;
+  color: white;
+  font-weight: bold;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* Checkbox group styling */
+.checkboxes {
+  display: flex;
+  gap: 15px; /* Reduced gap */
+}
+
+.checkbox-group {
+  display: flex;
+  align-items: center;
+  gap: 4px; /* Reduced gap */
+}
+
+/* Button container styling */
+.button-container {
+  display: flex;
+  justify-content: center;
+  margin-top: 15px; /* Reduced margin */
+}
+
+.add-container-button {
+  background-color: #8cc7f0;
+  border: none;
+  padding: 8px 15px; /* Reduced padding */
+  border-radius: 5px;
+  cursor: pointer;
+  font-weight: bold;
+  color: black;
+}
+
+/* Visily logo styling (fixed at bottom left) */
+.visily-logo {
+  position: absolute;
+  bottom: 10px;
+  left: 10px;
+  font-size: 12px;
+  color: #666;
+}
+
+/* Responsive styles for smaller screens */
+@media (max-width: 768px) {
+  .form-row {
+    flex-direction: column;
+  }
+
+  .form-group {
+    width: 100%;
+  }
+}
+.back-button2 {
+  background-color: #90ee90;
+  border: none;
+  padding: 10px 20px;
+  border-radius: 6px;
+  cursor: pointer;
+  margin-top: -35px;
+  color: white;
+}

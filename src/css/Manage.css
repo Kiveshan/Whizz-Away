@@ -1,0 +1,349 @@
+.manage-container {
+  width: 100%;
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.manage-button-row {
+  display: flex;
+  gap: 10px;
+  margin-bottom: 20px;
+  justify-content: center;
+  flex-wrap: wrap;
+  margin-top: 40px;
+}
+
+.manage-button {
+  background-color: #4169e1;
+  color: white;
+  border: none;
+  padding: 10px 20px;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 14px;
+}
+
+.manage-button:hover {
+  background-color: #3158c9;
+}
+
+.manage-button.active {
+  background-color: #2ecc71;
+}
+
+/* Tabs styling */
+.manage-tabs-container {
+  display: flex;
+  gap: 10px;
+  margin-bottom: 20px;
+  overflow-x: auto;
+}
+
+.manage-tab-button {
+  background-color: #e6e6fa;
+  border: none;
+  padding: 10px 20px;
+  border-radius: 4px;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background-color 0.3s;
+}
+
+.manage-tab-button.active {
+  background-color: #4169e1;
+  color: white;
+}
+
+/* Tables */
+.manage-employees-table,
+.manage-clients-table,
+.manage-trucks-table {
+  overflow-x: auto;
+  margin-bottom: 20px;
+}
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+  background-color: white;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+
+th,
+td {
+  padding: 12px 15px;
+  text-align: left;
+  border-bottom: 1px solid #eee;
+}
+
+th {
+  background-color: #e6e6fa;
+  font-weight: 500;
+  color: #333;
+}
+
+tr:hover {
+  background-color: #f5f5f5;
+}
+
+/* Buttons inside tables */
+.manage-view-button,
+.manage-edit-button {
+  background-color: #4169e1;
+  color: white;
+  border: none;
+  padding: 6px 12px;
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+/* Optionally, style delete buttons if used */
+.manage-delete-button {
+  background-color: #e74c3c;
+  color: white;
+  border: none;
+  cursor: pointer;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  padding: 8px 12px;
+  border-radius: 4px;
+  font-size: 14px;
+  transition: background-color 0.3s, transform 0.2s;
+}
+
+.manage-delete-button:hover {
+  background-color: #c0392b;
+  transform: scale(1.05);
+}
+
+.manage-delete-button:active {
+  background-color: #a93226;
+  transform: scale(0.95);
+}
+
+
+.trash-icon {
+  font-size: 18px;
+}
+
+/* Add buttons */
+.manage-add-employee-button,
+.manage-add-client-button,
+.manage-add-truck-button,
+.manage-add-subcontractor-button,
+.manage-add-driver-rate-button {
+  background-color: #4169e1;
+  color: white;
+  border: none;
+  padding: 10px 20px;
+  border-radius: 4px;
+  cursor: pointer;
+  margin-top: 15px;
+  align-self: center;
+  width: fit-content;
+  margin: 20px auto;
+  display: block;
+}
+
+.manage-add-employee-button:hover,
+.manage-add-client-button:hover,
+.manage-add-truck-button:hover,
+.manage-add-subcontractor-button:hover,
+.manage-add-driver-rate-button:hover {
+  background-color: #3158c9;
+}
+
+/* Forms */
+.manage-add-client-form,
+.manage-add-truck-form,
+.manage-add-employee-form {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 5px;
+  max-width: 800px;
+  margin: 20px auto;
+  padding: 5px;
+  border-radius: 10px;
+  background: white;
+  box-shadow: 0px 4px 6px rgba(0, 0, 0, 0.1);
+}
+
+.manage-add-client-form h2,
+.manage-add-truck-form h2,
+.manage-add-employee-form h2 {
+  text-align: center;
+  margin-bottom: 20px;
+  color: #333;
+}
+
+/* Form grids */
+.manage-form-grid,
+.manage-truck-form-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 15px;
+  width: 100%;
+}
+
+.manage-truck-form-grid .manage-full-width {
+  grid-column: span 2;
+}
+
+/* Form groups */
+.manage-form-group {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+
+}
+
+.manage-form-group label {
+  font-weight: 500;
+  color: #333;
+  margin-bottom: 5px;
+}
+
+.manage-form-grid input,
+.manage-form-grid select,
+.manage-truck-form-grid input {
+  width: 100%;
+  padding: 12px;
+  font-size: 16px;
+  border: 1px solid #ddd;
+  border-radius: 5px;
+  outline: none;
+  transition: border-color 0.3s;
+}
+
+.manage-form-grid input:focus,
+.manage-form-grid select:focus,
+.manage-truck-form-grid input:focus {
+  border-color: #4169e1;
+  box-shadow: 0 0 0 2px rgba(65, 105, 225, 0.2);
+}
+
+/* Button container for forms */
+.manage-button-container {
+  display: flex;
+  justify-content: space-between;
+  width: 100%;
+  margin-top: 15px;
+}
+
+.manage-save-button,
+.manage-cancel-button {
+  width: 48%;
+  padding: 12px;
+  border: none;
+  border-radius: 5px;
+  cursor: pointer;
+  font-size: 16px;
+  font-weight: 500;
+  transition: background-color 0.3s;
+}
+
+.manage-save-button {
+  background: #2ecc71;
+  color: white;
+}
+
+.manage-save-button:hover {
+  background: #27ae60;
+}
+
+.manage-cancel-button {
+  background: #e74c3c;
+  color: black;
+}
+
+.manage-cancel-button:hover {
+  background: #c0392b;
+  color: white;
+}
+
+/* Additional truck button */
+.manage-add-truck-button {
+  background-color: #4169e1;
+  color: white;
+  border: none;
+  padding: 10px 20px;
+  border-radius: 4px;
+  cursor: pointer;
+  margin-top: 25px;
+  font-size: 16px;
+  transition: background-color 0.3s;
+}
+
+.manage-add-truck-button:hover {
+  background-color: #3158c9;
+}
+
+/* Media queries */
+@media (max-width: 768px) {
+  .manage-form-grid,
+  .manage-truck-form-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .manage-truck-form-grid .manage-full-width {
+    grid-column: 1;
+  }
+
+  .manage-button-container {
+    flex-direction: column;
+    gap: 10px;
+  }
+
+  .manage-save-button,
+  .manage-cancel-button {
+    width: 100%;
+  }
+
+  .manage-button-row {
+    flex-direction: column;
+    align-items: center;
+  }
+
+  .manage-button {
+    width: 100%;
+  }
+}
+
+/* Driver rate form */
+.manage-driver-rate-form {
+  width: 100%;
+  max-width: 800px;
+  margin: auto;
+  padding: 20px;
+  background: #f9f9f9;
+  border-radius: 8px;
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+  display: flex;
+  flex-direction: column;
+  gap: 15px;
+}
+
+/* Subcontractor form */
+.manage-subcontractor-form {
+  width: 100%;
+  max-width: 800px;
+  margin: auto;
+  padding: 20px;
+  background: #f9f9f9;
+  border-radius: 8px;
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+ 
+}
+
+.manage-subform-group {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
