@@ -80,7 +80,7 @@ const UploadProof = () => {
       <div className="upload-content">
         <div className="upload-form">
           <div className="amount-field">
-            <label>Amount Paid</label>
+            <label>Amount Paid2</label>
             <input type="text" value={amount} onChange={(e) => setAmount(e.target.value)} placeholder="R0000" />
           </div>
 
