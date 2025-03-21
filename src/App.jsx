@@ -35,6 +35,9 @@ import FinanceClerkWageDetails from "./finance clerkpages/finance-clerk-wage-det
 import FinanceClerkWageSlip from "./finance clerkpages/finance-clerk-wage-slip"
 import ClientInvoice from "./finance clerkpages/ClientInvoice"
 import ClientStatement from "./finance clerkpages/ClientStatement"
+import ViewExpense from "./finance clerkpages/ViewExpense"
+import ExpenseDetails from "./finance clerkpages/ExpenseDetails"
+import ExpenseSubmission from "./finance clerkpages/ExpenseSubmission"
 import "./css/card.css";
 import "./css/components.css";
 // import "./css/dashboard.css";
@@ -76,10 +79,13 @@ function DynamicHeader() {
 
     "/wages": "Wages",
     "/finance-clerk-wage" : "Wages",
-    "/finance-clerk-wage-details/:id": "Wages",
-    "/finance-clerk-wage-slip/:id" :"Wages",
+    "/finance-clerk-wage-details/": "Wages",
+    "/finance-clerk-wage-slip/" :"Wages",
                 
-    "/Fexpenses": "Expenses",
+    "/FExpenses": "Expenses",
+    "/ViewExpense": "Truck Expenses",
+    "/ExpenseDetails": "Truck Expenses",
+    "/ExpenseSubmission": "Truck Expenses",
     // finacance clerk
     "/manage":"Manage"
   };
@@ -154,6 +160,9 @@ function ContentWrapper() {
             <Route path="/finance-clerk-wage-details/:id" element={<FinanceClerkWageDetails />} />
             <Route path="/finance-clerk-wage-slip/:id" element={<FinanceClerkWageSlip />} />
             <Route path="/client-statement" element={<ClientStatement />} />
+            <Route path="/ViewExpense" element={<ViewExpense />} />
+            <Route path="/ExpenseDetails" element={<ExpenseDetails />} />
+            <Route path="/ExpenseSubmission" element={<ExpenseSubmission />} />
       </Routes>
     </div>
   );
