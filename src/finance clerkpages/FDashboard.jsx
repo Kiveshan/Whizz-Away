@@ -10,7 +10,7 @@ const dashboardData = [
   { title: "Expenses", image: "/images/expenses.jpeg", path: "/expenses" },
  
 ];
-
+// sbusiso
 const FDashboard = () => {
   const navigate = useNavigate();
 
