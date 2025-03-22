@@ -6,7 +6,7 @@ const Debtors = () => {
   const navigate = useNavigate(); 
 
   const handleBack = () => {
-    navigate("/");
+    navigate("/Dashboard");
   };
   const handlePaymentClick=()=>{
     navigate("/client-payments");

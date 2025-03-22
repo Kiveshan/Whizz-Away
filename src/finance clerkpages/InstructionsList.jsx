@@ -7,7 +7,7 @@ const Instructions = ({ setCurrentPage }) => {
   return (
     <div>
       <div className="client-payments-header">
-        <button className="back-button" onClick={() => navigate("/")}>
+        <button className="back-button" onClick={() => navigate("/FDashboard")}>
           Back
         </button>
       </div>
@@ -31,6 +31,7 @@ const Instructions = ({ setCurrentPage }) => {
                                 <th>Type</th>
                                 <th>Status</th>
                                 <th>File No</th>
+                                <th>Instruction</th>
                                 <th>Assignment</th>
                             </tr>
                         </thead>
@@ -45,6 +46,9 @@ const Instructions = ({ setCurrentPage }) => {
                                     <td>{item.type}</td>
                                     <td>{item.status}</td>
                                     <td>{item.fileNo}</td>
+                                    <td>
+                                        <button className="view-btn"onClick={() => navigate("")}>View</button>
+                                    </td>
                                     <td>
                                         <button className="view-btn"onClick={() => navigate("/update-instructions")}>View</button>
                                     </td>

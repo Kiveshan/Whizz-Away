@@ -5,7 +5,7 @@ const Header = ({ onLoginClick, onRegisterClick }) => {
   return (
     <header className="header2">
       <div className="logo-container">
-        <img src="/images/whizz-away.png" className="logo-img" alt="Business Logo" />
+        <img src="/images/whizz-awaylogo.png" className="logo-img" alt="Business Logo" />
       </div>
       <h1 style={{ fontSize: "2.5rem", fontWeight: "bold", textAlign: "center", color: "black" }}>
   Whizz-Away

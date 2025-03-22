@@ -57,7 +57,7 @@ const DriverWage = () => {
 
   const handleBack = () => {
     if (activeView === "list") {
-      navigate("/")
+      navigate("/Dashboard")
     } else if (activeView === "details") {
       setActiveView("list")
     } else if (activeView === "slip") {

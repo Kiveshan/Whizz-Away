@@ -237,7 +237,7 @@ export default function Analytics() {
   }
 
   const handleBack = () => {
-    navigate("/")
+    navigate("/Dashboard")
   }
 
   return (
@@ -305,3 +305,4 @@ export default function Analytics() {
   )
 }
 
+// kayleen
