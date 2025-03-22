@@ -74,7 +74,8 @@ body {
 }
 
 .logo-img {
-  height: 220px;
+  height: 120px;
+  width: 120px;
   object-fit: contain;
   transition: transform 0.3s ease-in-out;
   margin-top: 20px;

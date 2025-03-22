@@ -39,7 +39,7 @@ const MonitorInstructions = () => {
   ]
 
   const handleBack = () => {
-    navigate("/")
+    navigate("/Dashboard")
   }
   const handleV=()=>{
     navigate("/ControllerViewAssignment");

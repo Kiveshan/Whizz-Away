@@ -17,7 +17,7 @@ const FinanceClerkWage = () => {
     <div className="wage-container">
 
       <div className="button-container">
-        <button onClick={() => navigate("/")} className="back-btn">
+        <button onClick={() => navigate("/FDashboard")} className="back-btn">
           Back
         </button>
       </div>

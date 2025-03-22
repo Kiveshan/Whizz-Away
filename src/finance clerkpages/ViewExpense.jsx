@@ -38,6 +38,18 @@ const ViewExpense = ({ onViewTruck }) => {
             <option value="12">December</option>
           </select>
         </div>
+        <div className="filter-group">
+          <select className="filter-select">
+            <option value="">Current Year</option>
+            <option value="1">2025</option>
+            <option value="2">2024</option>
+            <option value="3">2023</option>
+            <option value="4">2022</option>
+            <option value="5">2021</option>
+            <option value="6">2020</option>
+            <option value="7">2019</option>
+          </select>
+        </div>
       </div>
 
       <div className="expenses-table">
