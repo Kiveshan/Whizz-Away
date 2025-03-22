@@ -48,9 +48,11 @@
   }
   
   .logo-img {
-    width: 70px;
-    height: 70px;
-    border-radius: 5%;
+  height: 110px;
+  width: 110px;
+  object-fit: contain;
+  transition: transform 0.3s ease-in-out;
+  margin-top: 20px;
   }
   
   .user-info {
@@ -349,3 +351,21 @@
     border-radius: 4px;
     background-color: white;
   }
+
+    /* footer css */
+    .footer {
+      background: #bae6fd;
+      color: #333;
+      text-align: center;
+      padding: 15px 0;  /* Remove horizontal padding to allow full width */
+      display: flex;
+      justify-content: center; /* Center text */
+      align-items: center;
+      font-size: 14px;
+      position: relative;
+      bottom: 0;
+      width: 100%;
+      left: 0; /* Ensure it touches both sides */
+      position: fixed;
+  }
+  

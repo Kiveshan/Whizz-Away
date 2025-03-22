@@ -7,7 +7,7 @@ const Instructions = ({ setCurrentPage }) => {
   return (
     <div>
       <div className="client-payments-header">
-        <button className="back-button" onClick={() => navigate("/")}>
+        <button className="back-button" onClick={() => navigate("/FDashboard")}>
           Back
         </button>
       </div>

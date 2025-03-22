@@ -198,7 +198,7 @@ const Manage = () => {
     } else if (showSubcontractorForm) {
       setShowSubcontractorForm(false)
     } else {
-      navigate("/")
+      navigate("/Dashboard")
     }
   }
 
