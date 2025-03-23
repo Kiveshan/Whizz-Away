@@ -1,15 +1,42 @@
-import React, { useState } from 'react';
+import React, { useState } from "react";
 import "../css/login.css";
+import { useNavigate } from "react-router-dom";
 
 const Login = ({ switchToRegister }) => {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [error, setError] = useState(""); // For handling login errors
+  const navigate = useNavigate();
 
-  const handleLogin = (e) => {
+  const handleLogin = async (e) => {
     e.preventDefault();
-    // Implement login logic here
-    console.log("Logging in with", email, password);
+  
+    try {
+      const response = await fetch("http://localhost:5000/login", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ email, password }),
+      });
+  
+      if (response.ok) {
+        const data = await response.json();
+        console.log("Redirect data:", data);  // Log the response data
+        navigate(data.redirectUrl);
+      } else {
+        const errorData = await response.json();
+        console.log("Error from server:", errorData);  // Log server error data
+        setError(errorData.message || "Login failed. Please try again.");
+      }
+    } catch (err) {
+      console.error("Login Error:", err);  // Log any other errors
+      setError("An error occurred. Please try again.");
+    }
   };
+  
+  
+
 
   return (
     <div className="login-container">
@@ -20,6 +47,8 @@ const Login = ({ switchToRegister }) => {
           </div>
         </center>
         <center><h2>Login</h2></center>
+
+        {error && <div className="error-message">{error}</div>}
 
         <form onSubmit={handleLogin}>
           <div className="form-group">
@@ -46,20 +75,17 @@ const Login = ({ switchToRegister }) => {
             />
           </div>
 
-          {/* <div className="forgot-password">
-            <a href="#">Forgot your password? Click Here</a>
-          </div> */}
-
           <button type="submit" className="login-button">Login</button>
         </form>
+
         <div className="new-profile">
-        <button onClick={switchToRegister} className="link-button">
-          New Profile? Register Here
-        </button>
-      </div>
+          <button onClick={switchToRegister} className="link-button">
+            New Profile? Register Here
+          </button>
+        </div>
       </div>
     </div>
   );
-}
+};
 
 export default Login;
