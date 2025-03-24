@@ -17,15 +17,15 @@
     max-width: 400px;
   }
   
-  .logo-container {
+  .logo-container1 {
     display: flex;
     justify-content: center;
     margin-bottom: 2rem;
   }
   
-  .logo-image {
-    width: 100px;
-    height: 100px;
+  .logo-image1 {
+    width: 120px;
+    height: 120px;
  
     object-fit: cover;
   }

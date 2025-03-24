@@ -71,11 +71,9 @@ const ClientInvoice = () => {
               </tr>
             </tbody>
           </table>
-        </div>
-
-        {/* Container Details */}
+           {/* Container Details */}
         <div className="container-section">
-          <table className="container-table">
+          <table className="container-table5">
             <thead>
               <tr>
                 <th className="container-number-header">Container Number</th>
@@ -96,6 +94,9 @@ const ClientInvoice = () => {
             </tbody>
           </table>
         </div>
+        </div>
+
+       
 
         {/* Banking Details */}
         <div className="banking-details">

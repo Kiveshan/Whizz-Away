@@ -19,7 +19,7 @@ const clients = [
   },
 ];
 
-const ViewClientStatement = () => {
+const ViewClientInstruction = () => {
   const navigate = useNavigate();
   const [selectedMonth, setSelectedMonth] = useState("");
   const [selectedYear, setSelectedYear] = useState("");
@@ -101,4 +101,4 @@ const ViewClientStatement = () => {
   );
 };
 
-export default ViewClientStatement;
+export default ViewClientInstruction;
