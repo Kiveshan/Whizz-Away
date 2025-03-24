@@ -15,8 +15,8 @@ const Login = ({ switchToRegister }) => {
     <div className="login-container">
       <div className="login-form">
         <center>
-          <div className="logo-container">
-            <img src="/images/whizz-away.png" alt="LOGITECH FLOW Logo" className="logo-image1" />
+          <div className="logo-container1">
+            <img src="/images/whizz-away.jpeg" alt="LOGITECH FLOW Logo" className="logo-image1" />
           </div>
         </center>
         <center><h2>Login</h2></center>

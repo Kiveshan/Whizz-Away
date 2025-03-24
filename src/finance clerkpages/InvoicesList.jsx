@@ -18,15 +18,15 @@ const InvoicesList = () => {
       </div>
       <div className="action-bar">
         <div className="filter-section">
-          <div className="filter-group">
-            <select className="filter-select">
+          <div className="dropdown-container">
+            <select className="dropdown">
               <option>Year</option>
               <option>2025</option>
               <option>2024</option>
               <option>2023</option>
               <option>2022</option>
             </select>
-            <select className="filter-select">
+            <select className="dropdown">
               <option>Month</option>
               <option>January</option>
               <option>February</option>
@@ -65,7 +65,7 @@ const InvoicesList = () => {
                 <th>Type</th>
                 <th>File No</th>
                 <th>Date</th>
-                <th>Assignment</th>
+          
                 <th>Details</th>
                 <th>Invoice</th>
               </tr>
@@ -76,9 +76,7 @@ const InvoicesList = () => {
                 <td>Import</td>
                 <td>77002</td>
                 <td>21/12/2020</td>
-                <td>
-                  <button className="small-btn"onClick={() => navigate("/")}>Display</button>
-                </td>
+               
                 <td>
                   <button className="small-btn"onClick={() => navigate("/client-invoice")}>View</button>
                 </td>
@@ -91,9 +89,7 @@ const InvoicesList = () => {
                 <td>Export</td>
                 <td>10014</td>
                 <td>15/10/2023</td>
-                <td>
-                  <button className="small-btn">Display</button>
-                </td>
+                
                 <td>
                   <button className="small-btn">View</button>
                 </td>
@@ -106,9 +102,7 @@ const InvoicesList = () => {
                 <td>Import</td>
                 <td>93301</td>
                 <td>01/08/2021</td>
-                <td>
-                  <button className="small-btn">Display</button>
-                </td>
+              
                 <td>
                   <button className="small-btn">View</button>
                 </td>

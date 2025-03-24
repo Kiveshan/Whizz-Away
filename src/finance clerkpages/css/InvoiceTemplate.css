@@ -164,11 +164,11 @@
   }
   
   .container-table {
-    width: 770px;
+    width: 500px;
     border-collapse: separate;
     border-spacing: 0;
     border-radius: 8px;
-    overflow: hidden;
+    overflow: none;
     border: 1px solid #ddd;
     margin-left: 14px;
   }
@@ -180,6 +180,7 @@
     font-size: 14px;
     font-weight: normal;
     border-right: 1px solid #ddd;
+    
   }
   
   .container-table th:last-child {

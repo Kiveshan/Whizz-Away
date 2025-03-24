@@ -42,6 +42,7 @@ import ClientStatement from "./finance clerkpages/ClientStatement";
 import ViewExpense from "./finance clerkpages/ViewExpense";
 import ExpenseDetails from "./finance clerkpages/ExpenseDetails";
 import ExpenseSubmission from "./finance clerkpages/ExpenseSubmission";
+import ViewClientInstruction from "./finance clerkpages/ViewClientInstruction";
 
 // CSS Imports
 import "./css/card.css";
@@ -83,7 +84,8 @@ function DynamicHeader() {
     "/ViewExpense": "Truck Expenses",
     "/ExpenseDetails": "Truck Expenses",
     "/ExpenseSubmission": "Truck Expenses",
-    "/manage": "Manage"
+    "/manage": "Manage",
+    "/ViewClientInstruction": "Instructions"
   };
 
   const getTitle = () => {
@@ -150,6 +152,7 @@ function ContentWrapper() {
         <Route path="/ViewExpense" element={<ViewExpense />} />
         <Route path="/ExpenseDetails" element={<ExpenseDetails />} />
         <Route path="/ExpenseSubmission" element={<ExpenseSubmission />} />
+        <Route path="/ViewClientInstruction" element={<ViewClientInstruction />} />
       </Routes>
       {shouldShowFooter && <Footer />} {/* Conditionally render footer */}
     </div>
