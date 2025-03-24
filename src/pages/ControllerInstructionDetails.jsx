@@ -11,7 +11,7 @@ const ContainerDetailsPage = () => {
       <div className="container-details-wrapper">
         <div className="content">
           <div className="add-container-section">
-            <button className="add-container-button">Add Container</button>
+            {/* <button className="add-container-button">Add Container</button> */}
           </div>
 
           <br />

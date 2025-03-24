@@ -19,7 +19,7 @@ const clients = [
   },
 ];
 
-const ViewClientStatement = () => {
+const MonitorInstructionView = () => {
   const navigate = useNavigate();
   const [selectedMonth, setSelectedMonth] = useState("");
   const [selectedYear, setSelectedYear] = useState("");
@@ -88,7 +88,7 @@ const ViewClientStatement = () => {
                 <td className="p-3">{client.email}</td>
                 <td className="p-3">{client.date}</td>
                 <td className="p-3">
-                  <button className="view-butn" onClick={() => navigate("/instructions")}>
+                  <button className="view-butn" onClick={() => navigate("/monitor-instructions")}>
                     View
                   </button>
                 </td>
@@ -101,4 +101,4 @@ const ViewClientStatement = () => {
   );
 };
 
-export default ViewClientStatement;
+export default MonitorInstructionView;

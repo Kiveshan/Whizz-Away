@@ -3,7 +3,7 @@ import { useNavigate } from "react-router-dom";
 import Card from "../components/Card";
 
 const dashboardData = [
-  { title: "Instructions", image: "/images/pexels-photo-7947758.jpeg", path: "/instructions" },
+  { title: "Instructions", image: "/images/pexels-photo-7947758.jpeg", path: "/ViewClientInstruction" },
   { title: "Invoices", image: "/images/payments.jpeg", path: "/invoices" },
   { title: "Statements", image: "/images/clientDocs.jpeg", path: "/view-client-statements" },
   { title: "Wages", image: "/images/wages.jpeg", path: "/finance-clerk-wage" },

@@ -14,6 +14,7 @@ import DriverWage from "./pages/DriverWage";
 import Expenses from "./pages/Expenses";
 import Analytics from "./pages/Analytics";
 import Debtors from "./pages/Debtors";
+import MonitorInstructionView from "./pages/MonitorInstructionView";
 import Manage from "./pages/Manage";
 import Landing from "./pages/Landing";
 import Login from "./pages/Login";
@@ -42,6 +43,7 @@ import ClientStatement from "./finance clerkpages/ClientStatement";
 import ViewExpense from "./finance clerkpages/ViewExpense";
 import ExpenseDetails from "./finance clerkpages/ExpenseDetails";
 import ExpenseSubmission from "./finance clerkpages/ExpenseSubmission";
+import ViewClientInstruction from "./finance clerkpages/ViewClientInstruction";
 
 // CSS Imports
 import "./css/card.css";
@@ -54,6 +56,7 @@ function DynamicHeader() {
   const titleMap = {
     "/Dashboard": "Dashboard",
     "/monitor-instructions": "Instructions",
+    "/MonitorInstructionView": "MonitorInstructionView",
     "/client-payments": "Client Payments",
     "/client-documents": "Client Documents",
     "/driver-wage": "Wages",
@@ -83,7 +86,8 @@ function DynamicHeader() {
     "/ViewExpense": "Truck Expenses",
     "/ExpenseDetails": "Truck Expenses",
     "/ExpenseSubmission": "Truck Expenses",
-    "/manage": "Manage"
+    "/manage": "Manage",
+    "/ViewClientInstruction": "Instructions"
   };
 
   const getTitle = () => {
@@ -116,6 +120,7 @@ function ContentWrapper() {
       <Routes>
         <Route path="/" element={<Landing />} />
         <Route path="/monitor-instructions" element={<MonitorInstructions />} />
+        <Route path="/MonitorInstructionView" element={<MonitorInstructionView />} />
         <Route path="/client-payments" element={<ClientPayments />} />
         <Route path="/driver-wage" element={<DriverWage />} />
         <Route path="/client-documents" element={<ClientDocuments />} />
@@ -150,6 +155,7 @@ function ContentWrapper() {
         <Route path="/ViewExpense" element={<ViewExpense />} />
         <Route path="/ExpenseDetails" element={<ExpenseDetails />} />
         <Route path="/ExpenseSubmission" element={<ExpenseSubmission />} />
+        <Route path="/ViewClientInstruction" element={<ViewClientInstruction />} />
       </Routes>
       {shouldShowFooter && <Footer />} {/* Conditionally render footer */}
     </div>
