@@ -58,7 +58,7 @@ const ExpenseSubmission = ({ onBack }) => {
       <div className="form-row">
         <div className="form-group">
           <label>Select Type</label>
-          <select name="type" value={formData.type} onChange={handleInputChange} className="form-select">
+          <select name="type" value={formData.type} onChange={handleInputChange} className="dropdown">
             <option value="Diesel">Diesel</option>
             <option value="Petrol">Petrol</option>
             <option value="Maintenance">Maintenance</option>
@@ -72,7 +72,7 @@ const ExpenseSubmission = ({ onBack }) => {
             name="documentFrom"
             value={formData.documentFrom}
             onChange={handleInputChange}
-            className="form-select"
+            className="dropdown"
           >
             <option value="Controller">Controller</option>
             <option value="Driver">Driver</option>

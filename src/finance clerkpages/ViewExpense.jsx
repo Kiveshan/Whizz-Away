@@ -22,7 +22,7 @@ const ViewExpense = ({ onViewTruck }) => {
 
       <div className="filter-section">
         <div className="filter-group">
-          <select className="filter-select">
+          <select className="dropdown">
             <option value="">Current Month</option>
             <option value="1">January</option>
             <option value="2">February</option>
@@ -39,7 +39,7 @@ const ViewExpense = ({ onViewTruck }) => {
           </select>
         </div>
         <div className="filter-group">
-          <select className="filter-select">
+          <select className="dropdown">
             <option value="">Current Year</option>
             <option value="1">2025</option>
             <option value="2">2024</option>

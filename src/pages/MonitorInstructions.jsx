@@ -78,14 +78,14 @@ const MonitorInstructions = () => {
       <div className="action-bar">
         <div className="filter-section">
           <div className="filter-group">
-            <select className="filter-select">
+            <select className="dropdown">
               <option>Year</option>
               <option>2025</option>
               <option>2024</option>
               <option>2023</option>
               <option>2022</option>
             </select>
-            <select className="filter-select">
+            <select className="dropdown">
               <option>Month</option>
               <option>January</option>
               <option>February</option>

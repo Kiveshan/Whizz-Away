@@ -163,12 +163,12 @@
   
   }
   
-  .container-table {
-    width: 500px;
+  .container-table5 {
+    width: 770px;
     border-collapse: separate;
     border-spacing: 0;
     border-radius: 8px;
-    overflow: none;
+    overflow: hidden;
     border: 1px solid #ddd;
     margin-left: 14px;
   }

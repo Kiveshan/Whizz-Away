@@ -73,7 +73,7 @@ const ClientInvoice = () => {
           </table>
            {/* Container Details */}
         <div className="container-section">
-          <table className="container-table">
+          <table className="container-table5">
             <thead>
               <tr>
                 <th className="container-number-header">Container Number</th>
