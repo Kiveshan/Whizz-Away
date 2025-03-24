@@ -43,7 +43,7 @@ import ViewExpense from "./finance clerkpages/ViewExpense";
 import ExpenseDetails from "./finance clerkpages/ExpenseDetails";
 import ExpenseSubmission from "./finance clerkpages/ExpenseSubmission";
 
-
+// CSS Imports
 import "./css/card.css";
 import "./css/components.css";
 import "./css/layout.css";
@@ -132,7 +132,7 @@ function ContentWrapper() {
         <Route path="/ControllerTrackInstruction" element={<ControllerTrackInstruction />} />
         <Route path="/ControllerViewAssignment" element={<ControllerViewAssignment />} />
         <Route path="/ControllerInstructionDetails" element={<ControllerInstructionDetails />} />
-  
+        {/* Finance Clerk Routes */}
         <Route path="/instructions" element={<InstructionsList />} />
         <Route path="/update-instructions" element={<UpdateInstruction />} />
         <Route path="/Upload-Instruction-Documents" element={<UploadInstructionDocuments />} />
@@ -151,7 +151,7 @@ function ContentWrapper() {
         <Route path="/ExpenseDetails" element={<ExpenseDetails />} />
         <Route path="/ExpenseSubmission" element={<ExpenseSubmission />} />
       </Routes>
-      {shouldShowFooter && <Footer />}
+      {shouldShowFooter && <Footer />} {/* Conditionally render footer */}
     </div>
   );
 }
