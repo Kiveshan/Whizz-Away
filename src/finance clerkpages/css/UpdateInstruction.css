@@ -1,5 +1,5 @@
 
-.back-button {
+/* .back-button {
     background-color: #86efac;
     color: #1f2937;
     padding: 0.5rem 1.5rem;
@@ -13,10 +13,10 @@
   .back-button:hover {
     background-color: #4ade80;
   }
-  
+   */
   /* Tailwind-like utility classes */
   /* .min-h-screen { min-height: 100vh; margin-top: 10px;width: 1200px; margin-left: 150px; } */
-  .bg-white { background-color: white; }
+  .bg-white { background-color: white; margin-top: 15px;}
   .bg-blue-200 { background-color: #bfdbfe; }
   .bg-blue-50 { background-color: #eff6ff; }
   .bg-blue-500 { background-color: #3b82f6; }
@@ -39,8 +39,8 @@
   .font-medium { font-weight: 500; }
   .p-2 { padding: 0.5rem; }
   .p-4 { padding: 1rem; }
-  .p-6 { padding: 1.5rem; }
-  .px-4 { padding-left: 1rem; padding-right: 1rem; }
+  .p-6 { padding: 1.5rem;margin-top: 20px; }
+  .px-4 { padding-left: 1rem; padding-right: 1rem;}
   .px-6 { padding-left: 1.5rem; padding-right: 1.5rem; }
   .px-8 { padding-left: 2rem; padding-right: 2rem; }
   .py-2 { padding-top: 0.5rem; padding-bottom: 0.5rem; }
@@ -168,4 +168,38 @@ width: 100%;
     background: #fffdf7;
     box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1);
     position: relative;
+  }
+  .finalise-btn {
+    display: flex;
+    justify-content: flex-end; /* Aligns content to the right */
+    margin-top: -60px;
+    margin-right: 20px; /* Adjust spacing from the right edge */
+  }
+  
+  .finalise-btn2 {
+    background-color: green; /* Primary blue color */
+    color: white;
+    border: none;
+    padding: 10px 16px;
+    border-radius: 5px;
+    cursor: pointer;
+    font-size: 14px;
+    transition: background 0.3s ease-in-out;
+  }
+  
+  .finalise-btn2:hover {
+    background-color: rgb(4, 87, 4); /* Darker blue on hover */
+  }
+  .save-btn{
+    background-color: #3b82f6;; /* Primary blue color */
+    color: white;
+    border: none;
+    padding: 10px 16px;
+    border-radius: 5px;
+    cursor: pointer;
+    font-size: 14px;
+    transition: background 0.3s ease-in-out;
+  }
+  .save-btn:hover {
+    background-color: #0b59d7;; /* Darker blue on hover */
   }

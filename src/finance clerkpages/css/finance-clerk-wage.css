@@ -369,22 +369,22 @@
 /* Table styling to match screenshot */
 .wage-table-container {
   padding: 0 20px;
-  margin-top: 30px; /* Added margin to move the table down */
+  margin-top: 5px; /* Added margin to move the table down */
 }
 
 .wage-table1 {
-  width: 750px;
+  width: 600px;
   border-collapse: collapse;
   border: 2px solid #87ceeb; /* Changed border color to match finance-clerk-wage-details.jsx */
   border-radius: 8px;
   overflow: hidden;
-  margin-left: 350px;
+  margin-left: 460px;
 }
-.wage-table thead{
+.wage-table1 thead{
   text-align: center;
 }
 
-.wage-table th {
+.wage-table1 th {
   background-color: #87ceeb; /* Changed header background color to match finance-clerk-wage-details.jsx */
   padding: 12px 20px;
   text-align: left;
@@ -393,21 +393,21 @@
   border-right: 1px solid #a8d8f0; /* Adjusted border color to match new header color */
 }
 
-.wage-table th.details-header {
-  text-align: left; /* Center the Delivery Details header */
+.wage-table1 th.details-header {
+  text-align: center; /* Center the Delivery Details header */
 }
 
-.wage-table th:last-child {
+.wage-table1 th:last-child {
   border-right: none;
 }
 
-.wage-table td {
-  padding: 12px 20px;
+.wage-table1 td {
+  padding: 5px 10px;
   border-bottom: 1px solid #eee;
   background-color: white;
 }
 
-.wage-table tr:last-child td {
+.wage-table1 tr:last-child td {
   border-bottom: none;
 }
 
@@ -419,7 +419,7 @@
   background-color: #3498db;
   color: white;
   border: none;
-  padding: 8px 20px;
+  /* padding: 8px 20px; */
   border-radius: 5px;
   cursor: pointer;
   font-size: 14px;
@@ -437,19 +437,14 @@
 }
 
 /* Dropdown container styling */
-.dropdown-container {
-  display: flex;
-  gap: 10px; /* Adds space between the dropdowns */
-  align-items: center; /* Aligns dropdowns vertically */
-  margin: 20px; /* Adds space around the container */
-  
-}
 
-.dropdown-container {
+
+.dropdown-container24 {
   display: flex;
   justify-content: center;
   gap: 10px;
-  margin-bottom: 20px;
+  margin-bottom: 40px;
+  margin-top: -60px;
 }
 
 .dropdown {
@@ -469,4 +464,13 @@
   background-position: right 10px center;
   background-size: 14px;
 }
-
+.downloadwage1{
+  background-color: #3498db;
+  color: white;
+  border: none;
+  padding: 8px 10px;
+  border-radius: 5px;
+  cursor: pointer;
+  font-size: 16px;
+  font-weight: normal;
+}

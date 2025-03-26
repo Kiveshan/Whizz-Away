@@ -16,8 +16,8 @@ const Instructions = ({ setCurrentPage }) => {
       </div>
 
       {/* Dropdown Filters */}
-      <div className="dropdown-container">
-        <select value={selectedMonth} onChange={(e) => setSelectedMonth(e.target.value)} className="dropdown">
+      <div className="dropdown-container74">
+        <select value={selectedMonth} onChange={(e) => setSelectedMonth(e.target.value)} className="dropdown74">
           <option value="">Select Month</option>
           <option value="January">January</option>
           <option value="February">February</option>
@@ -33,7 +33,7 @@ const Instructions = ({ setCurrentPage }) => {
           <option value="December">December</option>
         </select>
 
-        <select value={selectedYear} onChange={(e) => setSelectedYear(e.target.value)} className="dropdown">
+        <select value={selectedYear} onChange={(e) => setSelectedYear(e.target.value)} className="dropdown74">
           <option value="">Select Year</option>
           <option value="2023">2023</option>
           <option value="2024">2024</option>
@@ -44,12 +44,13 @@ const Instructions = ({ setCurrentPage }) => {
 
       <div className="content1">
         <div className="button-group">
-          <div className="filter-buttons">
+          <div className="filter-buttons85">
             <button className="btn btn-blue">Import</button>
             <button className="btn btn-blue">Export</button>
             <button className="btn btn-blue">All</button>
             <button className="btn btn-blue">In-Progress</button>
             <button className="btn btn-blue">Complete</button>
+            <button className="btn btn-blue">New</button>
           </div>
         </div>
 
@@ -58,24 +59,26 @@ const Instructions = ({ setCurrentPage }) => {
             <thead>
               <tr>
                 <th>Instruction No</th>
+                <th>File No</th>
                 <th>Type</th>
                 <th>Status</th>
-                <th>File No</th>
+                <th>Starting Date</th>
                 <th>Instruction</th>
                 <th>Assignment</th>
               </tr>
             </thead>
             <tbody>
               {[
-                { id: 1, type: "Import", status: "New", fileNo: "77002" },
-                { id: 2, type: "Export", status: "New", fileNo: "10014" },
-                { id: 3, type: "Import", status: "In-Progress", fileNo: "93301" },
+                { id: 1, type: "Import", status: "New", fileNo: "77002", date: "2023-09-01" },
+                { id: 2, type: "Export", status: "New", fileNo: "10014", date: "2023-09-01" },
+                { id: 3, type: "Import", status: "In-Progress", fileNo: "93301" , date: "2023-09-01"},
               ].map((item) => (
                 <tr key={item.id}>
                   <td>Instruction {item.id}</td>
+                  <td>{item.fileNo}</td>
                   <td>{item.type}</td>
                   <td>{item.status}</td>
-                  <td>{item.fileNo}</td>
+                  <td>{item.date}</td>
                   <td>
                     <button className="view-btn" onClick={() => navigate("")}>View</button>
                   </td>

@@ -151,10 +151,11 @@
 .instructions-table {
   padding: 0 20px 20px;
   overflow-x: auto;
+  margin-top: -30px;
 }
 
 table {
-  width: 100%;
+  width: 90%;
   border-collapse: collapse;
   background-color: white;
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
@@ -191,3 +192,12 @@ tr.selected {
   font-size: 14px;
 }
 
+.filter-section10 {
+  display: flex;
+  justify-content: center; /* Centers buttons */
+  flex-wrap: wrap;
+  gap: 20px;
+  width: 100%;
+  margin-bottom: 40px;
+  margin-top: -50px;
+}

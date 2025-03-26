@@ -26,7 +26,7 @@ const ControllerInstructions = ({ setCurrentPage }) => {
       <div className="instruction-container1">
         <div className="content">
           <div className="form-section">
-            <div className="form-row">
+            <div className="form-row1">
               <div className="form-group">
                 <label>Client</label>
                 <div className="select-wrapper">
@@ -63,7 +63,7 @@ const ControllerInstructions = ({ setCurrentPage }) => {
           </div>
 
           <div className="form-section">
-            <div className="form-row">
+            <div className="form-row1">
               <div className="form-group">
                 <label>Shipment Type</label>
                 <div className="select-wrapper">
@@ -72,7 +72,7 @@ const ControllerInstructions = ({ setCurrentPage }) => {
                   </select>
                 </div>
               </div>
-              <div className="form-group wide">
+              <div className="form-group">
                 <label>Name of Task</label>
                 <input
                   type="text"
@@ -82,7 +82,7 @@ const ControllerInstructions = ({ setCurrentPage }) => {
               </div>
             </div>
 
-            <div className="form-row">
+            <div className="form-row1">
               <div className="form-group">
                 <label>Pick-Up Location</label>
                 <div className="select-wrapper">
@@ -112,7 +112,7 @@ const ControllerInstructions = ({ setCurrentPage }) => {
             </div>
 
             {/* Date Inputs with functional calendar buttons */}
-            <div className="form-row">
+            <div className="form-row1">
               <div className="form-group">
                 <label>Pick-up Time</label>
                 <div className="date-input-group">
@@ -178,7 +178,7 @@ const ControllerInstructions = ({ setCurrentPage }) => {
 
           {/* Additional form sections */}
           <div className="form-section">
-            <div className="form-row">
+            <div className="form-row1">
               <div className="form-group">
                 <label>File Ref</label>
                 <input
@@ -209,7 +209,7 @@ const ControllerInstructions = ({ setCurrentPage }) => {
               </div>
             </div>
 
-            <div className="form-row">
+            <div className="form-row1">
               <div className="form-group" style={{ flex: "0 0 150px" }}>
                 <label>No. of Containers</label>
                 <div className="number-input-group" style={{ gap: "10px" }}>
@@ -239,11 +239,22 @@ const ControllerInstructions = ({ setCurrentPage }) => {
                   </select>
                 </div>
               </div>
+              <div className="form-group">
+                <label>VAT Rate</label>
+                <input
+                  type="text"
+                  className="form-input"
+                  placeholder="Vat Rate"
+                  defaultValue="15%"
+                  style={{ width: "60%" }}
+                />
+              </div>
             </div>
           </div>
+          
          
           <div className="form-section">
-            <div className="form-row">
+            <div className="form-row1">
               <div className="form-group full-width">
                 <label>Description from client</label>
                 <textarea
@@ -253,6 +264,7 @@ const ControllerInstructions = ({ setCurrentPage }) => {
               </div>
             </div>
           </div>
+         
 
           <div className="button-container1">
             <button

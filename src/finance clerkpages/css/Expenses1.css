@@ -8,30 +8,50 @@
   margin-bottom: 20px;
 }
 
-.expenses-table {
-  width: 100%;
+.expenses-table1 {
+  width: 40%;
   border-collapse: collapse;
   background-color: white;
   border-radius: 4px;
   overflow: hidden;
+  margin-left: 450px;
+  margin-top: -55px;
 }
-
+.expenses-table2 {
+  width: 80%;
+  border-collapse: collapse;
+  background-color: white;
+  border-radius: 4px;
+  overflow: hidden;
+  margin-left: 150px;
+  margin-top: -70px;
+}
+/* Centers filter buttons */
+.filter-section7 {
+  display: flex;
+  justify-content: center; /* Centers buttons */
+  flex-wrap: wrap;
+  gap: 20px;
+  width: 100%;
+  margin-bottom: 40px;
+  margin-top: -130px;
+}
 .table-header {
   display: flex;
   background-color: #bae6fd;
-  padding: 10px 0;
+  padding: 5px;
 }
 
 .table-row {
   display: flex;
   border-bottom: 1px solid #ddd;
-  padding: 10px 0;
+  padding: 5px;
 }
 
 .header-cell,
 .table-cell {
   flex: 1;
-  padding: 8px 16px;
+  padding: 4px 8px;
   text-align: left;
 }
 
@@ -61,7 +81,7 @@
   margin-bottom: 20px;
 }
 
-.filter-group {
+.filter-group78 {
   display: flex;
   gap: 15px;
   margin-bottom: 15px;

@@ -110,20 +110,12 @@ const ClientInvoice = () => {
           <div className="thank-you">Thank you for choosing [Your Company Name].</div>
         </div>
       </div>
-      <button
-                onClick={() => navigate("/")}
-                style={{
-                  backgroundColor: "#8ee4a6",
-                  color: "black",
-                  padding: "8px 24px",
-                  borderRadius: "4px",
-                  fontSize: "14px",
-                  border: "none",
-                  cursor: "pointer",
-                }}
-              >
-                Back
-              </button>
+      <div className="invoicedownloadbtn1">
+  <button className="back-btn" onClick={() => navigate("/invoices")}>Back</button>
+  <button className="download-btn">Download</button>
+</div>
+
+
     </div>
   )
 }

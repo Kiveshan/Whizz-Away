@@ -31,6 +31,7 @@ html {
     font-family: Arial, sans-serif;
     background: #eef5fa;
     min-height: 100vh;
+    height: auto;
 }
 
 .container {
@@ -38,7 +39,7 @@ html {
     min-height: 100vh; /* Ensures it grows with content */
     display: flex;
     flex-direction: column;
-    box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1);
+    
 }
 
   

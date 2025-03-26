@@ -19,9 +19,9 @@ const ViewExpense = ({ onViewTruck }) => {
           Back
         </button>
       </div>
-
+{/* 
       <div className="filter-section">
-        <div className="filter-group">
+        <div className="filter-group78">
           <select className="dropdown">
             <option value="">Current Month</option>
             <option value="1">January</option>
@@ -50,9 +50,9 @@ const ViewExpense = ({ onViewTruck }) => {
             <option value="7">2019</option>
           </select>
         </div>
-      </div>
+      </div> */}
 
-      <div className="expenses-table">
+      <div className="expenses-table1">
         <div className="table-header">
           <div className="header-cell">Truck Reg</div>
           <div className="header-cell">Monthly Expense</div>

@@ -18,9 +18,17 @@
 }
 
 
-.filter-buttons {
+/* .filter-buttons {
   display: flex;
   gap: 10px;
+  margin-top: -25px;
+} */
+.filter-buttons55 {
+  display: flex;
+  gap: 10px;
+  justify-content: center; /* Center the filter buttons */
+  align-items: center;
+  margin-top: -25px;
 }
 
 /* Buttons */
@@ -68,4 +76,13 @@
 
 .instruction-table tbody tr:nth-child(even) {
   background-color: #f9f9f9;
+}
+/* Centers filter buttons */
+.filter-section46 {
+  display: flex;
+  justify-content: center; /* Centers buttons */
+  flex-wrap: wrap;
+  gap: 20px;
+  width: 100%;
+  margin-top: -45px;
 }
