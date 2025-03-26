@@ -25,20 +25,7 @@ const Modal = ({ isOpen, onClose, initialForm }) => {
     <div id="modal-popup" className="modal-popup" onClick={handleBackgroundClick}>
       <div className="modal-content" onClick={(e) => e.stopPropagation()}>
         <button className="close-btn" onClick={onClose}>X</button>
-        {/* <div className="modal-header">
-          <button 
-            onClick={() => setIsLogin(true)} 
-            className={`tab-btn ${isLogin ? "active" : ""}`}
-          >
-            Login
-          </button>
-          <button 
-            onClick={() => setIsLogin(false)} 
-            className={`tab-btn ${!isLogin ? "active" : ""}`}
-          >
-            Register
-          </button>
-        </div> */}
+        
         {isLogin ? (
           <Login switchToRegister={() => setIsLogin(false)} />
         ) : (

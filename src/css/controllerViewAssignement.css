@@ -7,13 +7,13 @@ html, body {
     background-color: white; /* White background for entire page */
   }
   
-.view-assignment-wrapper {
+.view-assignment-wrapper1 {
     font-family: Arial, sans-serif;
     max-width: 1200px;
     margin: 0 auto;
     background: #eef5fa;
     position: relative;
-    
+    margin-left: 300px;
     
   }
   

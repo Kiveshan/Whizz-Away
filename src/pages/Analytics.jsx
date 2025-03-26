@@ -6,19 +6,22 @@ import "../css/Analytics.css"
 import { useNavigate } from "react-router-dom"
 
 export default function Analytics() {
-  const [activePeriod, setActivePeriod] = useState("30")
+  // Replace period filter with month and year filters
+  const [activeMonth, setActiveMonth] = useState("August")
+  const [activeYear, setActiveYear] = useState("2023")
   const [activeFilter, setActiveFilter] = useState("fuel")
   const [chartData, setChartData] = useState([])
-  const navigate=useNavigate();
+  const navigate = useNavigate()
+
   const fuelData = {
-    30: [
+    "30": [
       { month: "April", value: 25, status: "good" },
       { month: "May", value: 45, status: "bad" },
       { month: "June", value: 30, status: "good" },
       { month: "July", value: 38, status: "warning" },
       { month: "August", value: 32, status: "good" },
     ],
-    60: [
+    "60": [
       { month: "March", value: 28, status: "good" },
       { month: "April", value: 25, status: "good" },
       { month: "May", value: 45, status: "bad" },
@@ -26,7 +29,7 @@ export default function Analytics() {
       { month: "July", value: 38, status: "warning" },
       { month: "August", value: 32, status: "good" },
     ],
-    90: [
+    "90": [
       { month: "February", value: 35, status: "warning" },
       { month: "March", value: 28, status: "good" },
       { month: "April", value: 25, status: "good" },
@@ -38,19 +41,19 @@ export default function Analytics() {
   }
 
   const instructionsData = {
-    30: [
+    "30": [
       { name: "Truck 1", value: 45 },
       { name: "Truck 2", value: 38 },
       { name: "Truck 3", value: 52 },
       { name: "Truck 4", value: 30 },
     ],
-    60: [
+    "60": [
       { name: "Truck 1", value: 85 },
       { name: "Truck 2", value: 72 },
       { name: "Truck 3", value: 93 },
       { name: "Truck 4", value: 65 },
     ],
-    90: [
+    "90": [
       { name: "Truck 1", value: 120 },
       { name: "Truck 2", value: 105 },
       { name: "Truck 3", value: 145 },
@@ -59,21 +62,21 @@ export default function Analytics() {
   }
 
   const subContractorsData = {
-    30: [
+    "30": [
       { name: "ABCDE", value: 65 },
       { name: "FGHU", value: 85 },
       { name: "KLMNO", value: 75 },
       { name: "QRSTU", value: 55 },
       { name: "VWXYZ", value: 15 },
     ],
-    60: [
+    "60": [
       { name: "ABCDE", value: 120 },
       { name: "FGHU", value: 150 },
       { name: "KLMNO", value: 135 },
       { name: "QRSTU", value: 95 },
       { name: "VWXYZ", value: 30 },
     ],
-    90: [
+    "90": [
       { name: "ABCDE", value: 180 },
       { name: "FGHU", value: 220 },
       { name: "KLMNO", value: 195 },
@@ -83,19 +86,19 @@ export default function Analytics() {
   }
 
   const profitTurnoverData = {
-    30: [
+    "30": [
       { name: "Client 1", debtors: 45, payments: 40 },
       { name: "Client 2", debtors: 65, payments: 30 },
       { name: "Client 3", debtors: 55, payments: 50 },
       { name: "Client 4", debtors: 35, payments: 75 },
     ],
-    60: [
+    "60": [
       { name: "Client 1", debtors: 85, payments: 75 },
       { name: "Client 2", debtors: 120, payments: 60 },
       { name: "Client 3", debtors: 95, payments: 90 },
       { name: "Client 4", debtors: 70, payments: 140 },
     ],
-    90: [
+    "90": [
       { name: "Client 1", debtors: 130, payments: 110 },
       { name: "Client 2", debtors: 180, payments: 90 },
       { name: "Client 3", debtors: 150, payments: 135 },
@@ -103,25 +106,34 @@ export default function Analytics() {
     ],
   }
 
-  // Update chart data when filter or period changes
+  // Update chart data when filter, month, or year changes.
+  // For this example, we default to using the "30" data set.
   useEffect(() => {
+    let baseData
     switch (activeFilter) {
       case "fuel":
-        setChartData(fuelData[activePeriod])
+        baseData = fuelData["30"]
+        // Filter fuel data by the selected month.
+        baseData = baseData.filter(item => item.month === activeMonth)
+        setChartData(baseData)
         break
       case "instructions":
-        setChartData(instructionsData[activePeriod])
+        baseData = instructionsData["30"]
+        setChartData(baseData)
         break
       case "subcontractors":
-        setChartData(subContractorsData[activePeriod])
+        baseData = subContractorsData["30"]
+        setChartData(baseData)
         break
       case "profit":
-        setChartData(profitTurnoverData[activePeriod])
+        baseData = profitTurnoverData["30"]
+        setChartData(baseData)
         break
       default:
-        setChartData(fuelData[activePeriod])
+        baseData = fuelData["30"]
+        setChartData(baseData)
     }
-  }, [activeFilter, activePeriod])
+  }, [activeFilter, activeMonth, activeYear])
 
   // Custom tooltip component for charts
   const CustomTooltip = ({ active, payload, label }) => {
@@ -248,17 +260,39 @@ export default function Analytics() {
         </button>
       </div>
 
-      {/* Period filters */}
-      <div className="period-filters">
-        {["30", "60", "90"].map((period) => (
-          <button
-            key={period}
-            className={`period-button ${activePeriod === period ? "active" : ""}`}
-            onClick={() => setActivePeriod(period)}
-          >
-            {period} Days{period === "90" ? "+" : ""}
-          </button>
-        ))}
+      {/* Month and Year Filters */}
+      <div className="date-filters">
+        <select value={activeMonth} onChange={(e) => setActiveMonth(e.target.value)}>
+          {[
+            "January",
+            "February",
+            "March",
+            "April",
+            "May",
+            "June",
+            "July",
+            "August",
+            "September",
+            "October",
+            "November",
+            "December",
+          ].map((month) => (
+            <option key={month} value={month}>
+              {month}
+            </option>
+          ))}
+        </select>
+        <select 
+  className="year-select"
+  value={activeYear} 
+  onChange={(e) => setActiveYear(e.target.value)}>
+  {["2022", "2023", "2024"].map((year) => (
+    <option key={year} value={year}>
+      {year}
+    </option>
+  ))}
+</select>
+
       </div>
 
       <div className="analytics-content">
@@ -304,5 +338,3 @@ export default function Analytics() {
     </div>
   )
 }
-
-// kayleen

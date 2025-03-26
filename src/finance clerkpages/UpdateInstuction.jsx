@@ -88,7 +88,14 @@ const navigate = useNavigate()
         ))}
         <Plus onClick={handleAddLeg} />
       </div>
-
+      {drivers.length > 0 && (
+            <div className="finalise-btn">
+              <button className="finalise-btn2" onClick={() => navigate("/Upload-Instruction-Documents")}>
+                Finalise
+              </button>
+            </div>
+          )}
+      
 
 
       {/* Main Form */}
@@ -217,8 +224,8 @@ const navigate = useNavigate()
           
           {drivers.length > 0 && (
             <div className="flex justify-center mt-6">
-              <button className="bg-green-300 text-gray-800 px-8 py-2 rounded-md hover:bg-green-400 transition-colors" onClick={() => navigate("/Upload-Instruction-Documents")}>
-                Complete
+              <button className="save-btn" onClick={() => navigate("")}>
+                Save
               </button>
             </div>
           )}

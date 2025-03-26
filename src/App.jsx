@@ -11,11 +11,13 @@ import ClientPayments from "./pages/ClientPaymentList";
 import UploadProof from "./pages/UploadProof";
 import ClientDocuments from "./pages/ClientDocuments";
 import DriverWage from "./pages/DriverWage";
+import DriverWageList from "./pages/DriverWageList";
 import Expenses from "./pages/Expenses";
 import Analytics from "./pages/Analytics";
 import Debtors from "./pages/Debtors";
 import MonitorInstructionView from "./pages/MonitorInstructionView";
 import Manage from "./pages/Manage";
+import DriverWageSlip from "./pages/DriverWageSlip";
 import Landing from "./pages/Landing";
 import Login from "./pages/Login";
 import Register from "./pages/Register";
@@ -44,6 +46,7 @@ import ViewExpense from "./finance clerkpages/ViewExpense";
 import ExpenseDetails from "./finance clerkpages/ExpenseDetails";
 import ExpenseSubmission from "./finance clerkpages/ExpenseSubmission";
 import ViewClientInstruction from "./finance clerkpages/ViewClientInstruction";
+import ViewClientInvoice from "./finance clerkpages/ViewClientInvoice";
 
 // CSS Imports
 import "./css/card.css";
@@ -60,6 +63,8 @@ function DynamicHeader() {
     "/client-payments": "Client Payments",
     "/client-documents": "Client Documents",
     "/driver-wage": "Wages",
+    "/DriverWageSlip": "Wages",
+    "/DriverWageList": "Wages",
     "/ControllerInstructions": "Instruction",
     "/ControllerTrackInstruction": "Tracking",
     "/ControllerViewAssignment": "View Assignment",
@@ -80,14 +85,15 @@ function DynamicHeader() {
     "/client-statement": "Statements",
     "/wages": "Wages",
     "/finance-clerk-wage": "Wages",
-    "/finance-clerk-wage-details/": "Wages",
-    "/finance-clerk-wage-slip/": "Wages",
+    "/finance-clerk-wage-details/1": "Wages",
+    "/finance-clerk-wage-slip/1": "Wages",
     "/FExpenses": "Expenses",
     "/ViewExpense": "Truck Expenses",
     "/ExpenseDetails": "Truck Expenses",
     "/ExpenseSubmission": "Truck Expenses",
     "/manage": "Manage",
-    "/ViewClientInstruction": "Instructions"
+    "/ViewClientInstruction": "Instructions",
+    "/ViewClientInvoice": "Invoice",
   };
 
   const getTitle = () => {
@@ -123,6 +129,8 @@ function ContentWrapper() {
         <Route path="/MonitorInstructionView" element={<MonitorInstructionView />} />
         <Route path="/client-payments" element={<ClientPayments />} />
         <Route path="/driver-wage" element={<DriverWage />} />
+        <Route path="/DriverWageSlip" element={<DriverWageSlip />} />
+        <Route path="/DriverWageList" element={<DriverWageList />} />
         <Route path="/client-documents" element={<ClientDocuments />} />
         <Route path="/expenses" element={<Expenses />} />
         <Route path="/upload/:companyName/:balance" element={<UploadProof />} />
@@ -156,6 +164,7 @@ function ContentWrapper() {
         <Route path="/ExpenseDetails" element={<ExpenseDetails />} />
         <Route path="/ExpenseSubmission" element={<ExpenseSubmission />} />
         <Route path="/ViewClientInstruction" element={<ViewClientInstruction />} />
+        <Route path="/ViewClientInvoice" element={<ViewClientInvoice />} />
       </Routes>
       {shouldShowFooter && <Footer />} {/* Conditionally render footer */}
     </div>

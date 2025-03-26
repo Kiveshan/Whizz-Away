@@ -19,14 +19,14 @@ const clients = [
   },
 ];
 
-const MonitorInstructionView = () => {
+const ViewClientInvoice = () => {
   const navigate = useNavigate();
 
   return (
     <div className="">
       {/* Back Button */}
       <div className="client-payments-header">
-        <button className="back-button" onClick={() => navigate("/Dashboard")}>
+        <button className="back-button" onClick={() => navigate("/FDashboard")}>
           Back
         </button>
       </div>
@@ -55,7 +55,7 @@ const MonitorInstructionView = () => {
                 <td className="p-3">10</td>
                 <td className="p-3">5</td>
                 <td className="p-3">
-                  <button className="view-butn" onClick={() => navigate("/monitor-instructions")}>
+                  <button className="view-butn" onClick={() => navigate("/invoices")}>
                     View
                   </button>
                 </td>
@@ -68,4 +68,4 @@ const MonitorInstructionView = () => {
   );
 };
 
-export default MonitorInstructionView;
+export default ViewClientInvoice;

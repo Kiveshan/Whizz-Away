@@ -4,6 +4,7 @@
   display: flex;
   flex-direction: column;
   align-items: center;
+  margin-top: -50px;
 }
 
 .manage-button-row {
@@ -37,7 +38,7 @@
 .manage-tabs-container {
   display: flex;
   gap: 10px;
-  margin-bottom: 20px;
+  margin-bottom: 10px;
   overflow-x: auto;
 }
 
@@ -59,9 +60,12 @@
 /* Tables */
 .manage-employees-table,
 .manage-clients-table,
-.manage-trucks-table {
+.manage-trucks-table,
+.manage-DriverRates-table,
+.manage-subcontractor-table {
   overflow-x: auto;
   margin-bottom: 20px;
+  margin-top: -30px;
 }
 
 table {

@@ -31,8 +31,36 @@ const navigate = useNavigate()
        <button onClick={() => navigate("/view-client-statements")} className="back-button">
           Back
         </button>
+        <div className="action-bar">
+        <div className="filter-section46">
+          <div className="dropdown-container">
+            <select className="dropdown">
+              <option>Year</option>
+              <option>2025</option>
+              <option>2024</option>
+              <option>2023</option>
+              <option>2022</option>
+            </select>
+            <select className="dropdown">
+              <option>Month</option>
+              <option>January</option>
+              <option>February</option>
+              <option>March</option>
+              <option>April</option>
+              <option>May</option>
+              <option>June</option>
+              <option>July</option>
+              <option>August</option>
+              <option>September</option>
+              <option>October</option>
+              <option>November</option>
+              <option>December</option>
+            </select>
+          </div>
+        </div>
+      </div>
    
-         <div className="filter-buttons">
+         <div className="filter-buttons55">
           <button className="view-btn">Import</button>
           <button className="view-btn">Export</button>
           <button className="view-btn">All</button>
@@ -44,9 +72,9 @@ const navigate = useNavigate()
         <thead>
           <tr>
             <th>Instruction No</th>
+            <th>File No</th>
             <th>Type</th>
             <th>Date</th>
-            <th>File No</th>
             <th>Display</th>
             <th>Statement</th>
           </tr>
@@ -55,9 +83,9 @@ const navigate = useNavigate()
           {instructions.map((item, index) => (
             <tr key={index}>
               <td>{item.instructionNo}</td>
+              <td>{item.fileNo}</td>
               <td>{item.type}</td>
               <td>{item.date}</td>
-              <td>{item.fileNo}</td>
               <td><button className="view-btn"onClick={() => navigate("/client-statement")}>View</button></td>
               <td><button className="download-btn">Download</button></td>
             </tr>
