@@ -1,61 +1,60 @@
-import React from "react";
-import { BrowserRouter as Router, Routes, Route, useLocation } from "react-router-dom";
-import Header from "./components/Header";
-import Footer from "./components/Footer"; // Import the Footer component
-import LogoutButton from "./components/LogoutButton";
+import { BrowserRouter as Router, Routes, Route, useLocation, Navigate } from "react-router-dom"
+import Header from "./components/Header"
+import Footer from "./components/Footer" // Import the Footer component
+import LogoutButton from "./components/LogoutButton"
 
 // Import pages
-import MonitorInstructions from "./pages/MonitorInstructions";
-import Dashboard from "./pages/Dashboard";
-import ClientPayments from "./pages/ClientPaymentList";
-import UploadProof from "./pages/UploadProof";
-import ClientDocuments from "./pages/ClientDocuments";
-import DriverWage from "./pages/DriverWage";
-import DriverWageList from "./pages/DriverWageList";
-import Expenses from "./pages/Expenses";
-import Analytics from "./pages/Analytics";
-import Debtors from "./pages/Debtors";
-import MonitorInstructionView from "./pages/MonitorInstructionView";
-import Manage from "./pages/Manage";
-import DriverWageSlip from "./pages/DriverWageSlip";
-import Landing from "./pages/Landing";
-import Login from "./pages/Login";
-import Register from "./pages/Register";
-import Controller_Dashboard from "./pages/Controller_Dashboard";
-import ControllerInstructions from "./pages/ControllerInstructions";
-import ControllerTrackInstruction from "./pages/ControllerTrackInstruction";
-import ControllerViewAssignment from "./pages/ControllerViewAssignment";
-import ControllerInstructionDetails from "./pages/ControllerInstructionDetails";
+import MonitorInstructions from "./pages/MonitorInstructions"
+import Dashboard from "./pages/Dashboard"
+import ClientPayments from "./pages/ClientPaymentList"
+import UploadProof from "./pages/UploadProof"
+import ClientDocuments from "./pages/ClientDocuments"
+import DriverWage from "./pages/DriverWage"
+import DriverWageList from "./pages/DriverWageList"
+import Expenses from "./pages/Expenses"
+import Analytics from "./pages/Analytics"
+import Debtors from "./pages/Debtors"
+import MonitorInstructionView from "./pages/MonitorInstructionView"
+import Manage from "./pages/Manage"
+import DriverWageSlip from "./pages/DriverWageSlip"
+import Landing from "./pages/Landing"
+import Login from "./pages/Login"
+import Register from "./pages/Register"
+import Controller_Dashboard from "./pages/Controller_Dashboard"
+import ControllerInstructions from "./pages/ControllerInstructions"
+import ControllerTrackInstruction from "./pages/ControllerTrackInstruction"
+import ControllerViewAssignment from "./pages/ControllerViewAssignment"
+import ControllerInstructionDetails from "./pages/ControllerInstructionDetails"
 
 // Finance Clerk Pages
-import FDashboard from "./finance clerkpages/FDashboard";
-import InstructionsList from "./finance clerkpages/InstructionsList";
-import UpdateInstruction from "./finance clerkpages/UpdateInstuction";
-import UploadInstructionDocuments from "./finance clerkpages/UploadInstructionDocuments";
-import InvoicesList from "./finance clerkpages/InvoicesList";
-import ViewClientStatement from "./finance clerkpages/ViewClientStatements";
-import StatementsList from "./finance clerkpages/StatementsList";
-import Wages from "./finance clerkpages/Wages";
-import FExpenses from "./finance clerkpages/FExpenses";
-import FinanceClerkWage from "./finance clerkpages/finance-clerk-wage";
-import FinanceClerkWageDetails from "./finance clerkpages/finance-clerk-wage-details";
-import FinanceClerkWageSlip from "./finance clerkpages/finance-clerk-wage-slip";
-import ClientInvoice from "./finance clerkpages/ClientInvoice";
-import ClientStatement from "./finance clerkpages/ClientStatement";
-import ViewExpense from "./finance clerkpages/ViewExpense";
-import ExpenseDetails from "./finance clerkpages/ExpenseDetails";
-import ExpenseSubmission from "./finance clerkpages/ExpenseSubmission";
-import ViewClientInstruction from "./finance clerkpages/ViewClientInstruction";
-import ViewClientInvoice from "./finance clerkpages/ViewClientInvoice";
+import FDashboard from "./finance clerkpages/FDashboard"
+import InstructionsList from "./finance clerkpages/InstructionsList"
+import UpdateInstruction from "./finance clerkpages/UpdateInstuction"
+import UploadInstructionDocuments from "./finance clerkpages/UploadInstructionDocuments"
+import InvoicesList from "./finance clerkpages/InvoicesList"
+import ViewClientStatement from "./finance clerkpages/ViewClientStatements"
+import StatementsList from "./finance clerkpages/StatementsList"
+import Wages from "./finance clerkpages/Wages"
+import FExpenses from "./finance clerkpages/FExpenses"
+import FinanceClerkWage from "./finance clerkpages/finance-clerk-wage"
+import FinanceClerkWageDetails from "./finance clerkpages/finance-clerk-wage-details"
+import FinanceClerkWageSlip from "./finance clerkpages/finance-clerk-wage-slip"
+import ClientInvoice from "./finance clerkpages/ClientInvoice"
+import ClientStatement from "./finance clerkpages/ClientStatement"
+import ViewExpense from "./finance clerkpages/ViewExpense"
+import ExpenseDetails from "./finance clerkpages/ExpenseDetails"
+import ExpenseSubmission from "./finance clerkpages/ExpenseSubmission"
+import ViewClientInstruction from "./finance clerkpages/ViewClientInstruction"
+import ViewClientInvoice from "./finance clerkpages/ViewClientInvoice"
 
 // CSS Imports
-import "./css/card.css";
-import "./css/components.css";
-import "./css/layout.css";
-import "./css/MonitorInstructions.css";
+import "./css/card.css"
+import "./css/components.css"
+import "./css/layout.css"
+import "./css/MonitorInstructions.css"
 
 function DynamicHeader() {
-  const location = useLocation();
+  const location = useLocation()
   const titleMap = {
     "/Dashboard": "Dashboard",
     "/monitor-instructions": "Instructions",
@@ -94,27 +93,28 @@ function DynamicHeader() {
     "/manage": "Manage",
     "/ViewClientInstruction": "Instructions",
     "/ViewClientInvoice": "Invoice",
-  };
-
-  const getTitle = () => {
-    if (location.pathname.startsWith("/upload")) return "Upload Proof of Payment";
-    return titleMap[location.pathname] || "Unknown Page";
-  };
-
-  if (["/login", "/register", "/", "/new-landing"].includes(location.pathname)) {
-    return null;
   }
 
-  return <Header title={getTitle()} />;
+  const getTitle = () => {
+    if (location.pathname.startsWith("/upload")) return "Upload Proof of Payment"
+    if (location.pathname.startsWith("/invoice/")) return "Tax Invoice"
+    return titleMap[location.pathname] || "Unknown Page"
+  }
+
+  if (["/login", "/register", "/", "/new-landing"].includes(location.pathname)) {
+    return null
+  }
+
+  return <Header title={getTitle()} />
 }
 
 function ContentWrapper() {
-  const location = useLocation();
-  const hideFooterOn = ["/login", "/register"];
-  const hideLogoutOn = ["/login", "/register", "/landing", "/new-landing"];
+  const location = useLocation()
+  const hideFooterOn = ["/login", "/register"]
+  const hideLogoutOn = ["/login", "/register", "/landing", "/new-landing"]
 
-  const shouldShowFooter = !hideFooterOn.includes(location.pathname);
-  const shouldShowLogout = !hideLogoutOn.includes(location.pathname);
+  const shouldShowFooter = !hideFooterOn.includes(location.pathname)
+  const shouldShowLogout = !hideLogoutOn.includes(location.pathname)
 
   return (
     <div className="content-area">
@@ -165,10 +165,17 @@ function ContentWrapper() {
         <Route path="/ExpenseSubmission" element={<ExpenseSubmission />} />
         <Route path="/ViewClientInstruction" element={<ViewClientInstruction />} />
         <Route path="/ViewClientInvoice" element={<ViewClientInvoice />} />
+
+        {/* Add this route to handle /invoice without an ID */}
+        <Route path="/invoice" element={<Navigate to="/invoices" replace />} />
+
+        {/* Add the routes for invoice viewing and downloading */}
+        <Route path="/invoice/:id" element={<ClientInvoice />} />
+        <Route path="/invoice/:id/download" element={<ClientInvoice />} />
       </Routes>
       {shouldShowFooter && <Footer />} {/* Conditionally render footer */}
     </div>
-  );
+  )
 }
 
 function App() {
@@ -179,7 +186,8 @@ function App() {
         <ContentWrapper />
       </div>
     </Router>
-  );
+  )
 }
 
-export default App;
+export default App
+
