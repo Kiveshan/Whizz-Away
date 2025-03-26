@@ -29,7 +29,7 @@ const Debtors = () => {
             <img src="/images/Payment.jpg" alt="Payment" />
           </div>
           <div className="card-title">
-            <h3>Payments</h3>
+            <h3>Payment Received</h3>
           </div>
         </div>
         <div className="card" onClick={handleStatementClick}>

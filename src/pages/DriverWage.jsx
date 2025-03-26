@@ -20,7 +20,7 @@ const FinanceClerkWageDetails = () => {
         }}
       >
         <button
-          onClick={() => navigate("/finance-clerk-wage")}
+          onClick={() => navigate("/DriverWageList")}
           className="back-button"
         >
           Back

@@ -10,11 +10,13 @@
 
 
   .expenses-table {
-    width: 100%;
+    width: 80%;
     border-collapse: collapse;
     background-color: white;
     border-radius: 4px;
     overflow: hidden;
+    margin-left: 145px;
+    margin-top: -30px;
   }
   
   .table-header {
@@ -66,5 +68,14 @@
       min-width: 800px;
     }
   }
-  
+  /* Centers filter buttons */
+.filter-section37 {
+  display: flex;
+  justify-content: center; /* Centers buttons */
+  flex-wrap: wrap;
+  gap: 20px;
+  width: 100%;
+  margin-bottom: 40px;
+  margin-top: -71px;
+}
   
