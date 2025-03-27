@@ -2,7 +2,7 @@
 
 import { useState } from "react"
 import { useNavigate } from "react-router-dom"
-import "../css/MonitorInstructions.css"
+import "../css/ClientDocuments.css"
 
 const MonitorInstructions = () => {
   const navigate = useNavigate()
@@ -73,16 +73,16 @@ const MonitorInstructions = () => {
       </div>
 
       <div className="action-bar">
-        <div className="filter-section">
+        <div className="filter-section9">
           <div className="filter-group">
-            <select className="filter-select">
+            <select className="dropdown">
               <option>Year</option>
               <option>2025</option>
               <option>2024</option>
               <option>2023</option>
               <option>2022</option>
             </select>
-            <select className="filter-select">
+            <select className="dropdown">
               <option>Month</option>
               <option>January</option>
               <option>February</option>
@@ -100,7 +100,7 @@ const MonitorInstructions = () => {
           </div>
         </div>
       </div>
-      <div className="filter-section">
+      <div className="filter-section9">
         <div className="filter-group">
           <button className={`filter-button ${filter === "Import" ? "active" : ""}`} onClick={() => handleFilterChange("Import")}>
             Import
@@ -128,9 +128,9 @@ const MonitorInstructions = () => {
           <thead>
             <tr>
               <th>Instruction No.</th>
+              <th>File No.</th>
               <th>Type</th>
               <th>Status</th>
-              <th>File No.</th>
               <th>Invoice</th>
               <th>Statement</th>
             </tr>
@@ -139,9 +139,9 @@ const MonitorInstructions = () => {
             {filteredInstructions.map((instruction) => (
               <tr key={instruction.id}>
                 <td>{instruction.instructionNo}</td>
+                <td>{instruction.fileNo}</td>
                 <td>{instruction.type}</td>
                 <td>{instruction.status}</td>
-                <td>{instruction.fileNo}</td>
                 <td>
                   <button className="view-button" onClick={() => handleView(instruction.id)}>View</button>
                 </td>

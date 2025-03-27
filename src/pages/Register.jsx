@@ -52,9 +52,9 @@ const Register = ({ switchToLogin, closePopup }) => {
     <div className="register-container">
       <div className="register-form">
         <center>
-          <div className="logo-container">
+          <div className="logo-container1">
             <img
-              src="/images/whizz-away.png"
+              src="/images/whizz-away.jpeg"
               alt="LOGITECH FLOW Logo"
               className="logo-image1"
             />

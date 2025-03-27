@@ -26,11 +26,11 @@ const ControllerInstructions = ({ setCurrentPage }) => {
       <div className="instruction-container1">
         <div className="content">
           <div className="form-section">
-            <div className="form-row">
+            <div className="form-row1">
               <div className="form-group">
                 <label>Client</label>
                 <div className="select-wrapper">
-                  <select className="form-select">
+                  <select className="dropdown">
                     <option>Select Client</option>
                   </select>
                 </div>
@@ -63,16 +63,16 @@ const ControllerInstructions = ({ setCurrentPage }) => {
           </div>
 
           <div className="form-section">
-            <div className="form-row">
+            <div className="form-row1">
               <div className="form-group">
                 <label>Shipment Type</label>
                 <div className="select-wrapper">
-                  <select className="form-select">
-                    <option>Select Shipment Type</option>
+                  <select className="dropdown">
+                    <option>Select Shipment</option>
                   </select>
                 </div>
               </div>
-              <div className="form-group wide">
+              <div className="form-group">
                 <label>Name of Task</label>
                 <input
                   type="text"
@@ -82,19 +82,19 @@ const ControllerInstructions = ({ setCurrentPage }) => {
               </div>
             </div>
 
-            <div className="form-row">
+            <div className="form-row1">
               <div className="form-group">
                 <label>Pick-Up Location</label>
                 <div className="select-wrapper">
-                  <select className="form-select">
-                    <option>Input pick-up location here</option>
+                  <select className="dropdown">
+                    <option>Input pick-up</option>
                   </select>
                 </div>
               </div>
               <div className="form-group">
                 <label>Drop-off</label>
                 <div className="select-wrapper">
-                  <select className="form-select">
+                  <select className="dropdown">
                     <option>Port - Pier 1</option>
                   </select>
                 </div>
@@ -112,7 +112,7 @@ const ControllerInstructions = ({ setCurrentPage }) => {
             </div>
 
             {/* Date Inputs with functional calendar buttons */}
-            <div className="form-row">
+            <div className="form-row1">
               <div className="form-group">
                 <label>Pick-up Time</label>
                 <div className="date-input-group">
@@ -178,7 +178,7 @@ const ControllerInstructions = ({ setCurrentPage }) => {
 
           {/* Additional form sections */}
           <div className="form-section">
-            <div className="form-row">
+            <div className="form-row1">
               <div className="form-group">
                 <label>File Ref</label>
                 <input
@@ -192,7 +192,7 @@ const ControllerInstructions = ({ setCurrentPage }) => {
                 <label>Rates per</label>
                 <div className="rates-input-group">
                   <div className="select-wrapper small">
-                    <select className="form-select" style={{ width: "100px" }}>
+                    <select className="dropdown" style={{ width: "100px" }}>
                       <option>kg</option>
                       <option>m&sup3;</option>
                       <option>Container</option>
@@ -209,7 +209,7 @@ const ControllerInstructions = ({ setCurrentPage }) => {
               </div>
             </div>
 
-            <div className="form-row">
+            <div className="form-row1">
               <div className="form-group" style={{ flex: "0 0 150px" }}>
                 <label>No. of Containers</label>
                 <div className="number-input-group" style={{ gap: "10px" }}>
@@ -223,32 +223,38 @@ const ControllerInstructions = ({ setCurrentPage }) => {
                     className="number-controls"
                     style={{ display: "flex", flexDirection: "column", alignItems: "center" }}
                   >
-                    <button className="number-up" style={{ fontSize: "12px", padding: "2px" }}>
-                      ▲
-                    </button>
-                    <button className="number-down" style={{ fontSize: "12px", padding: "2px" }}>
-                      ▼
-                    </button>
+              
                   </div>
                 </div>
               </div>
 
               <div className="form-group">
                 {/* Trailer Size Dropdown */}
-                <div className="form-group">
+                <div className="dropdown-container">
                   <label>Trailer Size</label>
-                  <select className="form-select">
+                  <select className="dropdown">
                     <option value="6m">6m</option>
                     <option value="12m">12m</option>
                     <option value="abnormal">Abnormal</option>
                   </select>
                 </div>
               </div>
+              <div className="form-group">
+                <label>VAT Rate</label>
+                <input
+                  type="text"
+                  className="form-input"
+                  placeholder="Vat Rate"
+                  defaultValue="15%"
+                  style={{ width: "60%" }}
+                />
+              </div>
             </div>
           </div>
-
+          
+         
           <div className="form-section">
-            <div className="form-row">
+            <div className="form-row1">
               <div className="form-group full-width">
                 <label>Description from client</label>
                 <textarea
@@ -258,6 +264,7 @@ const ControllerInstructions = ({ setCurrentPage }) => {
               </div>
             </div>
           </div>
+         
 
           <div className="button-container1">
             <button

@@ -225,12 +225,13 @@
   }
   
   /* Header */
-  .statement-header {
+  .statement-header1 {
     padding: 20px 0 40px 0;
     text-align: center;
+    background-color: #b8d1f3;
   }
   
-  .statement-header h1 {
+  .statement-header1 h1 {
     margin: 0;
     font-size: 24px;
     font-weight: bold;
@@ -265,4 +266,41 @@
     box-shadow: 0 3px 6px rgba(0, 0, 0, 0.15);
   }
   
+  .statementdownloadbtn1 {
+    display: flex;
+    justify-content: center;  /* Centers buttons horizontally */
+    gap: 20px;  /* Space between buttons */
+    margin-top: 20px; /* Adds spacing above */
+    margin-bottom: 30px;
+  }
+  
+  .statementdownloadbtn1 .back-btn {
+    background-color: #28a745; /* Green */
+    color: white;
+    border: none;
+    padding: 10px 25px;
+    border-radius: 5px;
+    font-size: 16px;
+    cursor: pointer;
+    transition: background 0.3s ease;
+  }
+  
+  .statementdownloadbtn1 .back-btn:hover {
+    background-color: #218838; /* Darker green on hover */
+  }
+  
+  .statementdownloadbtn1 .download-btn {
+    background-color: #007bff; /* Blue */
+    color: white;
+    border: none;
+    padding: 10px 25px;
+    border-radius: 5px;
+    font-size: 16px;
+    cursor: pointer;
+    transition: background 0.3s ease;
+  }
+  
+  .statementdownloadbtn1 .download-btn:hover {
+    background-color: #0056b3; /* Darker blue on hover */
+  }
   

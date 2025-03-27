@@ -156,3 +156,52 @@
   }
 }
 
+/* Styling for Date Filters (Month & Year) */
+.date-filters {
+  display: flex;
+  justify-content: center;
+  gap: 15px;
+  margin: 20px 0;
+  margin-left: 250px;
+}
+
+.date-filters select {
+  /* Remove default styling and arrow */
+  -webkit-appearance: none;
+  -moz-appearance: none;
+  appearance: none;
+  
+  padding: 8px 12px;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+  background-color: #fff;
+  font-size: 1rem;
+  outline: none;
+  transition: border-color 0.2s ease;
+  
+  /* Add a custom arrow icon */
+  background-image: url("data:image/svg+xml;utf8,<svg fill='%236169e1' height='16' viewBox='0 0 20 20' width='16' xmlns='http://www.w3.org/2000/svg'><path d='M5.516 7.548l4.484 4.482 4.484-4.482 1.516 1.516-6 6-6-6z'/></svg>");
+  background-repeat: no-repeat;
+  background-position: right 10px center;
+  background-size: 12px;
+}
+
+.date-filters select:focus {
+  border-color: #4169e1;
+}
+
+/* Make the year dropdown wider */
+.date-filters select.year-select {
+  width: 100px; /* Adjust as needed */
+}
+
+
+
+/* Optional: Styling for Sidebar Filter Buttons */
+/* .sidebar-filters {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+} */
+
+

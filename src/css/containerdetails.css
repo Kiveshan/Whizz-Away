@@ -12,7 +12,6 @@
 
 .content {
   padding: 20px;
-  
   border-radius: 5px;
   margin: 10px;
   box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
@@ -21,6 +20,7 @@
   align-items: center;
   width: 95%; /* Increased width */
   max-width: 1200px; /* Ensure wider content */
+  margin-left: -55px;
 }
 
 .content-title {
@@ -74,14 +74,7 @@
   font-weight: bold;
 }
 
-.container-table-wrapper {
-  width: 100%;
-  max-width: 1200px; /* Ensure table takes full width */
-  margin-bottom: 20px;
-  border-radius: 5px;
-  overflow-x: auto;
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
-}
+
 
 .container-table {
   width: 100%;
@@ -98,6 +91,7 @@
   text-align: left;
   font-weight: bold;
   border-bottom: 1px solid  #8cc7f0;
+  align-items: center;
 }
 
 .container-table .even-row {

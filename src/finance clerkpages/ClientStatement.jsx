@@ -11,7 +11,7 @@ const ClientStatement = () => {
     <div className="statement-page">
       <div className="statement-paper">
         {/* Header */}
-        <div className="statement-header">
+        <div className="statement-header1">
           <h1>Transport and Logistics</h1>
         </div>
 
@@ -150,11 +150,10 @@ const ClientStatement = () => {
       </div>
 
       {/* Back Button positioned at bottom left */}
-      <div className="back-button-container">
-        <button className="professional-back-button" onClick={() => navigate("/statements-list")}>
-          Back
-        </button>
-      </div>
+     <div className="statementdownloadbtn1">
+  <button className="back-btn" onClick={() => navigate("/statements-list")}>Back</button>
+  <button className="download-btn">Download</button>
+</div>
     </div>
   )
 }

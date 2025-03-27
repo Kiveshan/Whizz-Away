@@ -120,3 +120,13 @@
   }
   
  
+/* Centers filter buttons */
+.filter-section9 {
+  display: flex;
+  justify-content: center; /* Centers buttons */
+  flex-wrap: wrap;
+  gap: 20px;
+  width: 100%;
+  margin-bottom: 40px;
+  margin-top: -50px;
+}
