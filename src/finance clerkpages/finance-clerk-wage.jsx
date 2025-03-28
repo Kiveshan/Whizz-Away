@@ -66,16 +66,15 @@ const FinanceClerkWage = () => {
             <tr>
               <th>Driver Name</th>
               <th>Wage</th>
-              <th>Details</th>
             </tr>
           </thead>
           <tbody>
             {drivers.map((driver) => (
               <tr key={driver.id}>
                 <td>{driver.name}</td>
-                <td>{driver.wage}</td>
+              
                 <td >
-                  <button onClick={() => navigate(`/finance-clerk-wage-details/${driver.id}`)} className="view-btn">
+                  <button onClick={() => navigate(`/finance-clerk-wage-details`)} className="view-btn">
                     View
                   </button>
                 </td>

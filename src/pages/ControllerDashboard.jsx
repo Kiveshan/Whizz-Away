@@ -5,10 +5,10 @@ import "../css/controllerDashboard.css";
 
 const dashboardData = [
   { title: "New Instruction", image: "/images/newinstruction.jpeg", path: "/ControllerInstructions" },
-  { title: "Track Instruction", image: "/images/trackinstruction.jpg", path: "/ControllerTrackInstruction" },
+  { title: "Track Instruction", image: "/images/trackinstruction.jpg", path: "/ControllerClientTrackInstruction" },
 ];
 
-const Controller_Dashboard = () => {
+const ControllerDashboard = () => {
   const navigate = useNavigate();
 
   return (
@@ -27,4 +27,4 @@ const Controller_Dashboard = () => {
   );
 };
 
-export default Controller_Dashboard;
+export default ControllerDashboard;

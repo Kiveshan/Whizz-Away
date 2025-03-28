@@ -5,7 +5,7 @@ import { useNavigate, useParams } from "react-router-dom"
 import "../css/ClientPayments.css"
 import { source } from "framer-motion/client"
 
-const UploadProof = () => {
+const DirectorUploadProof = () => {
   const navigate = useNavigate()
   const { companyName, balance } = useParams()
   const [dragActive, setDragActive] = useState(false)
@@ -73,7 +73,7 @@ const UploadProof = () => {
   }
 
   const handleBack = () => {
-    navigate("/client-payments")
+    navigate("/DirectorClientPaymentList")
   }
 
   return (
@@ -113,5 +113,5 @@ const UploadProof = () => {
   )
 }
 
-export default UploadProof
+export default DirectorUploadProof
 

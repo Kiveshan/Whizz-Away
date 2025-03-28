@@ -2,7 +2,7 @@
 import { useNavigate } from "react-router-dom"
 import "../css/Expenses1.css"
 
-const Expenses = () => {
+const DirectorExpenses = () => {
   const navigate = useNavigate()
 
   const expenses = [
@@ -25,7 +25,7 @@ const Expenses = () => {
   ]
 
   const handleBack = () => {
-    navigate("/ManagerViewFuelExpence")
+    navigate("/DirectorManagerViewFuelExpence")
   }
 
   const handleView = (expense) => {
@@ -109,5 +109,5 @@ const Expenses = () => {
   )
 }
 
-export default Expenses
+export default DirectorExpenses
 

@@ -1,8 +1,9 @@
 "use client";
+import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import "../finance clerkpages/css/Expenses1.css";
 
-const ViewExpense = () => {
+const ManagerViewFuelExpence = ({ onViewTruck }) => {
   const navigate = useNavigate();
   const trucks = [
     { regNo: "ND 30", monthlyExpense: "R 8870" },
@@ -14,14 +15,16 @@ const ViewExpense = () => {
   return (
     <div className="expenses-container">
       <div className="client-payments-header">
-        <button className="back-button" onClick={() => navigate(-1)}>Back</button>
+        <button className="back-button" onClick={() => navigate("/ManagerCreditorsDash")}>
+          Back
+        </button>
       </div>
 
-      <table className="expenses-table" style={{ width: "30%",marginLeft:"540px" }}>
+      <table className="expenses-table"style={{width:"30%",marginLeft:"530px"}}>
         <thead>
           <tr>
             <th>Truck Registration</th>
-            <th>Actions</th>
+            <th>Expenses</th>
           </tr>
         </thead>
         <tbody>
@@ -29,7 +32,10 @@ const ViewExpense = () => {
             <tr key={index}>
               <td>{truck.regNo}</td>
               <td>
-                <button className="view-button" onClick={() => navigate("/ExpenseDetails")}>
+                <button
+                  className="view-button"
+                  onClick={() => navigate("/expenses")}
+                >
                   View
                 </button>
               </td>
@@ -41,4 +47,4 @@ const ViewExpense = () => {
   );
 };
 
-export default ViewExpense;
+export default ManagerViewFuelExpence;

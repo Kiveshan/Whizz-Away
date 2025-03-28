@@ -2,17 +2,18 @@ import React from "react";
 import { useNavigate } from "react-router-dom";
 import "../css/Debtors.css";
 import "../css/card.css";
-const Debtors = () => {
+
+const DirectorDabtors = () => {
   const navigate = useNavigate(); 
 
   const handleBack = () => {
-    navigate("/Dashboard");
+    navigate("/DirectorDashboard");
   };
   const handlePaymentClick=()=>{
-    navigate("/client-payments");
+    navigate("/DirectorClientPaymentList");
   }
   const handleStatementClick=()=>{
-    navigate("/FinancialDocumentsView");
+    navigate("/DirectorFinancialDocumentsView");
   }
 
   return (
@@ -45,4 +46,4 @@ const Debtors = () => {
   );
 };
 
-export default Debtors;
+export default DirectorDabtors;
