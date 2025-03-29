@@ -1,7 +1,7 @@
 "use client"
 import { useNavigate, useParams } from "react-router-dom"
 
-const FinanceClerkWageSlip = () => {
+const DirectorDriverWageSlip = () => {
   const navigate = useNavigate()
   const { id } = useParams()
 
@@ -22,7 +22,12 @@ const FinanceClerkWageSlip = () => {
 
   return (
     <div
-
+    //   style={{
+    //     display: "flex",
+    //     flexDirection: "column",
+    //     minHeight: "100vh",
+    //     backgroundColor: "white",
+    //   }}
     >
       <div
         style={{
@@ -161,7 +166,7 @@ const FinanceClerkWageSlip = () => {
         </div>
       </div>
        <button
-                onClick={() => navigate(`/finance-clerk-wage-details`)}
+                onClick={() => navigate(`/DirectorDriverWage`)}
                 style={{
                   backgroundColor: "#8ee4a6",
                   color: "black",
@@ -180,5 +185,5 @@ const FinanceClerkWageSlip = () => {
   )
 }
 
-export default FinanceClerkWageSlip
+export default DirectorDriverWageSlip
 

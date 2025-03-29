@@ -3,7 +3,7 @@ import { useNavigate } from "react-router-dom"
 import "../finance clerkpages/css/finance-clerk-wage.css"
 import { useState } from "react"
 
-const DriverWageList = () => {
+const DirectorDriverWageList = () => {
   const navigate = useNavigate()
 
   // Mock data for drivers
@@ -21,7 +21,7 @@ const DriverWageList = () => {
   return (
     <div className="wage-container">
       <div className="button-container">
-        <button onClick={() => navigate("/Dashboard")} className="back-button">
+        <button onClick={() => navigate("/DirectorDashboard")} className="back-button">
           Back
         </button>
       </div>
@@ -40,7 +40,7 @@ const DriverWageList = () => {
               <tr key={driver.id}>
                 <td>{driver.name}</td>
                 <td >
-                  <button onClick={() => navigate(`/driver-wage`)} className="view-btn">
+                  <button onClick={() => navigate(`/DirectorDriverWage`)} className="view-btn">
                     View
                   </button>
                 </td>
@@ -53,4 +53,4 @@ const DriverWageList = () => {
   )
 }
 
-export default DriverWageList
+export default DirectorDriverWageList

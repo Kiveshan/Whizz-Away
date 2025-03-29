@@ -4,48 +4,75 @@ import Footer from "./components/Footer" // Import the Footer component
 import LogoutButton from "./components/LogoutButton"
 
 // Import pages
-import MonitorInstructions from "./pages/MonitorInstructions"
-import Dashboard from "./pages/Dashboard"
-import ClientPayments from "./pages/ClientPaymentList"
-import UploadProof from "./pages/UploadProof"
-import ClientDocuments from "./pages/ClientDocuments"
-import DriverWage from "./pages/DriverWage"
-import DriverWageList from "./pages/DriverWageList"
-import Expenses from "./pages/Expenses"
-import Analytics from "./pages/Analytics"
-import Debtors from "./pages/Debtors"
-import MonitorInstructionView from "./pages/MonitorInstructionView"
-import Manage from "./pages/Manage"
-import DriverWageSlip from "./pages/DriverWageSlip"
-import Landing from "./pages/Landing"
-import Login from "./pages/Login"
-import Register from "./pages/Register"
-import Controller_Dashboard from "./pages/Controller_Dashboard"
-import ControllerInstructions from "./pages/ControllerInstructions"
-import ControllerTrackInstruction from "./pages/ControllerTrackInstruction"
-import ControllerViewAssignment from "./pages/ControllerViewAssignment"
-import ControllerInstructionDetails from "./pages/ControllerInstructionDetails"
+import MonitorInstructions from "./pages/MonitorInstructions";
+import Dashboard from "./pages/Dashboard";
+import ManagerCreditorsDash from "./pages/ManagerCreditorsDash";
+import ManagerViewFuelExpence from "./pages/ManagerViewFuelExpence";
+import DirectorDashboard from "./pages/DirectorDashboard";
+import ClientPayments from "./pages/ClientPaymentList";
+import UploadProof from "./pages/UploadProof";
+import ClientDocuments from "./pages/ClientDocuments";
+import DriverWage from "./pages/DriverWage";
+import DriverWageList from "./pages/DriverWageList";
+import Expenses from "./pages/Expenses";
+import Analytics from "./pages/Analytics";
+import Debtors from "./pages/Debtors";
+import MonitorInstructionView from "./pages/MonitorInstructionView";
+import Manage from "./pages/Manage";
+import DriverWageSlip from "./pages/DriverWageSlip";
+import Landing from "./pages/Landing";
+import Login from "./pages/Login";
+import Register from "./pages/Register";
+import ControllerDashboard from "./pages/ControllerDashboard";
+import ControllerInstructions from "./pages/ControllerInstructions";
+import ControllerTrackInstruction from "./pages/ControllerTrackInstruction";
+import ControllerViewAssignment from "./pages/ControllerViewAssignment";
+import ControllerInstructionDetails from "./pages/ControllerInstructionDetails";
+import ControllerClientTrackInstruction from "./pages/ControllerClientTrackInstruction";
+import ManagerLegDetails from "./pages/ManagerLegDetails";
+import ManagerViewAssignment from "./pages/ManagerViewAssignment";
+import FinancialDocumentsView from "./pages/FinancialDocumentsView";
+import DirectorMonitorInstructionView from "./pages/DirectorMonitorInstructionView";
+import DirectorMonitorInstructions from "./pages/DirectorMonitorInstructions";
+import DirectorManagerViewAssignment from "./pages/DirectorManagerViewAssignment";
+import DirectorAnalytics from "./pages/DirectorAnalytics";
+import DirectorDabtors from "./pages/DirectorDabtors";
+import DirectorClientPaymentList from "./pages/DirectorClientPaymentList";
+import DirectorUploadProof from "./pages/DirectorUploadProof";
+import DirectorFinancialDocumentsView from "./pages/DirectorFinancialDocumentsView";
+import DirectorClientDocuments from "./pages/DirectorClientDocuments";
+import DirectorDriverWageList from "./pages/DirectorDriverWageList";
+import DirectorDriverWage from "./pages/DirectorDriverWage";
+import DirectorManagerLegDetails from "./pages/DirectorManagerLegDetails";
+import DirectorDriverWageSlip from "./pages/DirectorDriverWageSlip";
+import DirectorCreditorsDash from "./pages/DirectorCreditorsDash";
+import DirectorManagerViewFuelExpence from "./pages/DirectorManagerViewFuelExpence";
+import DirectorExpenses from "./pages/DirectorExpenses";
 
 // Finance Clerk Pages
-import FDashboard from "./finance clerkpages/FDashboard"
-import InstructionsList from "./finance clerkpages/InstructionsList"
-import UpdateInstruction from "./finance clerkpages/UpdateInstuction"
-import UploadInstructionDocuments from "./finance clerkpages/UploadInstructionDocuments"
-import InvoicesList from "./finance clerkpages/InvoicesList"
-import ViewClientStatement from "./finance clerkpages/ViewClientStatements"
-import StatementsList from "./finance clerkpages/StatementsList"
-import Wages from "./finance clerkpages/Wages"
-import FExpenses from "./finance clerkpages/FExpenses"
-import FinanceClerkWage from "./finance clerkpages/finance-clerk-wage"
-import FinanceClerkWageDetails from "./finance clerkpages/finance-clerk-wage-details"
-import FinanceClerkWageSlip from "./finance clerkpages/finance-clerk-wage-slip"
-import ClientInvoice from "./finance clerkpages/ClientInvoice"
-import ClientStatement from "./finance clerkpages/ClientStatement"
-import ViewExpense from "./finance clerkpages/ViewExpense"
-import ExpenseDetails from "./finance clerkpages/ExpenseDetails"
-import ExpenseSubmission from "./finance clerkpages/ExpenseSubmission"
-import ViewClientInstruction from "./finance clerkpages/ViewClientInstruction"
-import ViewClientInvoice from "./finance clerkpages/ViewClientInvoice"
+import FDashboard from "./finance clerkpages/FDashboard";
+import InstructionsList from "./finance clerkpages/InstructionsList";
+import UpdateInstruction from "./finance clerkpages/UpdateInstuction";
+import UploadInstructionDocuments from "./finance clerkpages/UploadInstructionDocuments";
+import InvoicesList from "./finance clerkpages/InvoicesList";
+import ViewClientStatement from "./finance clerkpages/ViewClientStatements";
+import StatementsList from "./finance clerkpages/StatementsList";
+import Wages from "./finance clerkpages/Wages";
+import FExpenses from "./finance clerkpages/FExpenses";
+import FinanceClerkWage from "./finance clerkpages/finance-clerk-wage";
+import FinanceClerkWageDetails from "./finance clerkpages/finance-clerk-wage-details";
+import FinanceClerkWageSlip from "./finance clerkpages/finance-clerk-wage-slip";
+import ClientInvoice from "./finance clerkpages/ClientInvoice";
+import ClientStatement from "./finance clerkpages/ClientStatement";
+import ViewExpense from "./finance clerkpages/ViewExpense";
+import ExpenseDetails from "./finance clerkpages/ExpenseDetails";
+import ExpenseSubmission from "./finance clerkpages/ExpenseSubmission";
+import ViewClientInstruction from "./finance clerkpages/ViewClientInstruction";
+import ViewClientInvoice from "./finance clerkpages/ViewClientInvoice";
+import DebtorsDashboard from "./finance clerkpages/DebtorsDashboard";
+import CreditorsDashboard from "./finance clerkpages/CreditorsDashboard";
+import FClerkLegDetails from "./finance clerkpages/FClerkLegDetails";
+
 
 // CSS Imports
 import "./css/card.css"
@@ -56,9 +83,9 @@ import "./css/MonitorInstructions.css"
 function DynamicHeader() {
   const location = useLocation()
   const titleMap = {
-    "/Dashboard": "Dashboard",
+    "/Dashboard": "Business Manager",
     "/monitor-instructions": "Instructions",
-    "/MonitorInstructionView": "MonitorInstructionView",
+    "/MonitorInstructionView": "Instructions",
     "/client-payments": "Client Payments",
     "/client-documents": "Client Documents",
     "/driver-wage": "Wages",
@@ -66,12 +93,12 @@ function DynamicHeader() {
     "/DriverWageList": "Wages",
     "/ControllerInstructions": "Instruction",
     "/ControllerTrackInstruction": "Tracking",
+    "/ControllerClientTrackInstruction": "Tracking",
     "/ControllerViewAssignment": "View Assignment",
     "/ControllerInstructionDetails": "Container Details",
-    "/controllerDashboard": "Controller",
+    
     "/expenses": "Truck Expenses",
     "/analytics": "Analytics",
-    "/Controller_Dashboard": "Controller",
     "/debtors": "Debtors",
     "/FDashboard": "Finance Clerk",
     "/instructions": "Instructions",
@@ -84,8 +111,8 @@ function DynamicHeader() {
     "/client-statement": "Statements",
     "/wages": "Wages",
     "/finance-clerk-wage": "Wages",
-    "/finance-clerk-wage-details/1": "Wages",
-    "/finance-clerk-wage-slip/1": "Wages",
+    "/finance-clerk-wage-details": "Wages",
+    "/finance-clerk-wage-slip": "Wages",
     "/FExpenses": "Expenses",
     "/ViewExpense": "Truck Expenses",
     "/ExpenseDetails": "Truck Expenses",
@@ -93,7 +120,33 @@ function DynamicHeader() {
     "/manage": "Manage",
     "/ViewClientInstruction": "Instructions",
     "/ViewClientInvoice": "Invoice",
-  }
+    "/DebtorsDashboard": "Debtors",
+    "/CreditorsDashboard": "Creditors",
+    "/DirectorDashboard": "Director",
+    "/ManagerCreditorsDash": "Creditors",
+    "/ManagerViewFuelExpence": "Truck Expenses",
+    "/FClerkLegDetails": "Wages",
+    "/ManagerLegDetails": "Wages",
+    "/ManagerViewAssignment": "View Assignment",
+    "/FinancialDocumentsView": "Client Documents",
+    "/DirectorMonitorInstructionView": "Instructions ",
+    "/DirectorMonitorInstructions": "Instructions ",
+    "/DirectorManagerViewAssignment": "View Assignment",
+    "/DirectorAnalytics": "Analytics",
+    "/DirectorDabtors": "Debtors",
+    "/DirectorClientPaymentList": "Debtors",
+    "/DirectorUploadProof": "Proof of Payment",
+    "/DirectorFinancialDocumentsView": "Client Documents",
+    "/DirectorClientDocuments": "Client Documents",
+    "/DirectorDriverWageList": "Wages",
+    "/DirectorDriverWage": "Wages",
+    "/DirectorManagerLegDetails": "Wages",
+    "/DirectorDriverWageSlip": "Wages",
+    "/DirectorCreditorsDash": "Creditors",
+    "/DirectorManagerViewFuelExpence": "Truck Expenses",
+    "/DirectorExpenses": "Truck Expenses",
+    "/ControllerDashboard": "Controller",
+  };
 
   const getTitle = () => {
     if (location.pathname.startsWith("/upload")) return "Upload Proof of Payment"
@@ -132,6 +185,7 @@ function ContentWrapper() {
         <Route path="/DriverWageSlip" element={<DriverWageSlip />} />
         <Route path="/DriverWageList" element={<DriverWageList />} />
         <Route path="/client-documents" element={<ClientDocuments />} />
+        <Route path="/ManagerViewFuelExpence" element={<ManagerViewFuelExpence />} />
         <Route path="/expenses" element={<Expenses />} />
         <Route path="/upload/:companyName/:balance" element={<UploadProof />} />
         <Route path="/debtors" element={<Debtors />} />
@@ -140,11 +194,35 @@ function ContentWrapper() {
         <Route path="/login" element={<Login />} />
         <Route path="/Dashboard" element={<Dashboard />} />
         <Route path="/register" element={<Register />} />
-        <Route path="/Controller_Dashboard" element={<Controller_Dashboard />} />
+        <Route path="/ControllerDashboard" element={<ControllerDashboard/>} />
+        <Route path="/DirectorDashboard" element={<DirectorDashboard/>} />
+        <Route path="/ManagerCreditorsDash" element={<ManagerCreditorsDash/>} />
         <Route path="/ControllerInstructions" element={<ControllerInstructions />} />
         <Route path="/ControllerTrackInstruction" element={<ControllerTrackInstruction />} />
         <Route path="/ControllerViewAssignment" element={<ControllerViewAssignment />} />
         <Route path="/ControllerInstructionDetails" element={<ControllerInstructionDetails />} />
+        <Route path="/ControllerClientTrackInstruction" element={<ControllerClientTrackInstruction />} />
+        <Route path="/ManagerLegDetails" element={<ManagerLegDetails />} />
+        <Route path="/ManagerViewAssignment" element={<ManagerViewAssignment />} />
+        <Route path="/FinancialDocumentsView" element={<FinancialDocumentsView />} />
+        <Route path="/DirectorMonitorInstructionView" element={<DirectorMonitorInstructionView />} />
+        <Route path="/DirectorMonitorInstructions" element={<DirectorMonitorInstructions />} />
+        <Route path="/DirectorManagerViewAssignment" element={<DirectorManagerViewAssignment />} />
+        <Route path="/DirectorAnalytics" element={<DirectorAnalytics />} />
+        <Route path="/DirectorDabtors" element={<DirectorDabtors />} />
+        <Route path="/DirectorClientPaymentList" element={<DirectorClientPaymentList />} />
+        <Route path="/DirectorUploadProof" element={<DirectorUploadProof />} />
+        <Route path="/DirectorUploadProof" element={<DirectorUploadProof />} />
+        <Route path="/DirectorFinancialDocumentsView" element={<DirectorFinancialDocumentsView />} />
+        <Route path="/DirectorClientDocuments" element={<DirectorClientDocuments />} />
+        <Route path="/DirectorDriverWageList" element={<DirectorDriverWageList />} />
+        <Route path="/DirectorDriverWage" element={<DirectorDriverWage />} />
+        <Route path="/DirectorManagerLegDetails" element={<DirectorManagerLegDetails />} />
+        <Route path="/DirectorDriverWageSlip" element={<DirectorDriverWageSlip />} />
+        <Route path="/DirectorCreditorsDash" element={<DirectorCreditorsDash />} />
+        <Route path="/DirectorManagerViewFuelExpence" element={<DirectorManagerViewFuelExpence />} />
+        <Route path="/DirectorExpenses" element={<DirectorExpenses />} />
+
         {/* Finance Clerk Routes */}
         <Route path="/instructions" element={<InstructionsList />} />
         <Route path="/update-instructions" element={<UpdateInstruction />} />
@@ -157,8 +235,8 @@ function ContentWrapper() {
         <Route path="/client-invoice" element={<ClientInvoice />} />
         <Route path="/FDashboard" element={<FDashboard />} />
         <Route path="/finance-clerk-wage" element={<FinanceClerkWage />} />
-        <Route path="/finance-clerk-wage-details/:id" element={<FinanceClerkWageDetails />} />
-        <Route path="/finance-clerk-wage-slip/:id" element={<FinanceClerkWageSlip />} />
+        <Route path="/finance-clerk-wage-details" element={<FinanceClerkWageDetails />} />
+        <Route path="/finance-clerk-wage-slip" element={<FinanceClerkWageSlip />} />
         <Route path="/client-statement" element={<ClientStatement />} />
         <Route path="/ViewExpense" element={<ViewExpense />} />
         <Route path="/ExpenseDetails" element={<ExpenseDetails />} />
@@ -172,6 +250,9 @@ function ContentWrapper() {
         {/* Add the routes for invoice viewing and downloading */}
         <Route path="/invoice/:id" element={<ClientInvoice />} />
         <Route path="/invoice/:id/download" element={<ClientInvoice />} />
+        <Route path="/DebtorsDashboard" element={<DebtorsDashboard />} />
+        <Route path="/CreditorsDashboard" element={<CreditorsDashboard />} />
+        <Route path="/FClerkLegDetails" element={<FClerkLegDetails />} />
       </Routes>
       {shouldShowFooter && <Footer />} {/* Conditionally render footer */}
     </div>

@@ -4,7 +4,7 @@ import { useState, useEffect } from "react"
 import { useNavigate, useLocation } from "react-router-dom"
 import "../css/ClientPayments.css"
 
-const ClientPaymentList = () => {
+const DirectorClientPaymentList = () => {
   const navigate = useNavigate()
   const location = useLocation()
 
@@ -33,11 +33,12 @@ const ClientPaymentList = () => {
   }, [location.state])
 
   const handleUpload = (company, balance) => {
-    navigate(`/upload/${encodeURIComponent(company)}/${encodeURIComponent(balance)}`)
+    // navigate(`/upload/${encodeURIComponent(company)}/${encodeURIComponent(balance)}`)
+    navigate(`/DirectorUploadProof`)
   }
 
   const handleBack = () => {
-    navigate("/debtors")
+    navigate("/DirectorDabtors")
   }
 
   const handleViewProof = (company) => {
@@ -131,4 +132,4 @@ const ClientPaymentList = () => {
   )
 }
 
-export default ClientPaymentList
+export default DirectorClientPaymentList

@@ -26,7 +26,7 @@ const ViewClientInvoice = () => {
     <div className="">
       {/* Back Button */}
       <div className="client-payments-header">
-        <button className="back-button" onClick={() => navigate("/FDashboard")}>
+        <button className="back-button" onClick={() => navigate("/DebtorsDashboard")}>
           Back
         </button>
       </div>
@@ -35,14 +35,12 @@ const ViewClientInvoice = () => {
 
       {/* Table */}
       <div className="clientinstructiontable">
-        <table className="t1">
+        <table className="t1" style={{width: "70%", marginLeft:"350px"}}>
           <thead className="bg-blue-300">
             <tr>
               <th className="p-3">Company</th>
               <th className="p-3">Representative</th>
               <th className="p-3">Email</th>
-              <th className="p-3">New</th>
-              <th className="p-3">In progress</th>
               <th className="p-3">Instructions</th>
             </tr>
           </thead>
@@ -52,8 +50,6 @@ const ViewClientInvoice = () => {
                 <td className="p-3">{client.company}</td>
                 <td className="p-3">{client.representative}</td>
                 <td className="p-3">{client.email}</td>
-                <td className="p-3">10</td>
-                <td className="p-3">5</td>
                 <td className="p-3">
                   <button className="view-butn" onClick={() => navigate("/invoices")}>
                     View

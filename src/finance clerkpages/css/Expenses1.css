@@ -9,12 +9,12 @@
 }
 
 .expenses-table1 {
-  width: 40%;
+  width: 30%;
   border-collapse: collapse;
   background-color: white;
   border-radius: 4px;
   overflow: hidden;
-  margin-left: 450px;
+  margin-left: 530px;
   margin-top: -55px;
 }
 .expenses-table2 {
