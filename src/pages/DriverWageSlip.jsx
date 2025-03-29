@@ -14,9 +14,10 @@ const DriverWageSlip = () => {
     payDate: "30 March",
     earnings: [
       { description: "Base Salary", amount: "R 5000" },
-      { description: "All Legs", amount: "R 2500" },
+      { description: "Leg 1", amount: "R 350" },
+      { description: "Leg 2", amount: "R 250" },
     ],
-    netPay: "R 7500",
+    netPay: "R 5600",
   }
 
   return (

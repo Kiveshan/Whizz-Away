@@ -3,7 +3,7 @@ import { useState } from "react"
 import { useNavigate, useParams } from "react-router-dom"
 import "../finance clerkpages/css/finance-clerk-wage.css"
 
-const FinanceClerkWageDetails = () => {
+const DirectorDriverWage = () => {
   const navigate = useNavigate()
   const { id } = useParams()
  // State for dropdown selections
@@ -20,7 +20,7 @@ const FinanceClerkWageDetails = () => {
         }}
       >
         <button
-          onClick={() => navigate("/finance-clerk-wage")}
+          onClick={() => navigate("/DirectorDriverWageList")}
           className="back-button"
         >
           Back
@@ -99,12 +99,12 @@ const FinanceClerkWageDetails = () => {
             <td >33614</td>
             <td >2</td>
             <td >
-            <button className="downloadwage1"  onClick={() => navigate(`/FClerkLegDetails`)}>View</button>
+            <button className="downloadwage1"  onClick={() => navigate(`/DirectorManagerLegDetails`)}>View</button>
             </td>
             <td>22/10/2020</td>
             <td>
             <button
-          onClick={() => navigate(`/finance-clerk-wage-slip`)}
+          onClick={() => navigate(`/DirectorDriverWageSlip`)}
           style={{
             backgroundColor: "green",
             color: "white",
@@ -154,4 +154,4 @@ const FinanceClerkWageDetails = () => {
   )
 }
 
-export default FinanceClerkWageDetails
+export default DirectorDriverWage

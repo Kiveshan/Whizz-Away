@@ -17,29 +17,33 @@ const ContainerDetailsPage = () => {
           <br />
 
           <div className="container-table-wrapper">
-            <table className="container-table1">
-              <thead>
+            <table className="container-table1" >
+              <thead style={{ width: "250px" }}>
                 <tr>
                   <th>#</th>
                   <th>Container Number</th>
+                  <th>Trailer Size</th>
                   <th>Weight (if Import)</th>
                 </tr>
               </thead>
               <tbody>
                 <tr>
                   <td>1</td>
-                  <td>1245</td>
-                  <td>150,000</td>
+                  <td><input type="text" defaultValue="1245" /></td>
+                  <td>12m</td> {/* Static text for trailer size */}
+                  <td><input type="number" defaultValue="150000" /></td>
                 </tr>
                 <tr className="even-row">
                   <td>2</td>
-                  <td>1258</td>
-                  <td>145,000</td>
+                  <td><input type="text" defaultValue="1258"  /></td>
+                  <td>6m</td> {/* Static text for trailer size */}
+                  <td><input type="number" defaultValue="145000" /></td>
                 </tr>
                 <tr>
                   <td>3</td>
-                  <td>1254</td>
-                  <td>150,789</td>
+                  <td><input type="text" defaultValue="1254" /></td>
+                  <td>6m</td> {/* Static text for trailer size */}
+                  <td><input type="number" defaultValue="150789" /></td>
                 </tr>
               </tbody>
             </table>

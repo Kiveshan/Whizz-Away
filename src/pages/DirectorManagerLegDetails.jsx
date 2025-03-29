@@ -3,7 +3,7 @@ import { useState } from "react"
 import { useNavigate, useParams } from "react-router-dom"
 import "../finance clerkpages/css/finance-clerk-wage.css"
 
-const FinanceClerkWageDetails = () => {
+const DirectorManagerLegDetails = () => {
   const navigate = useNavigate()
   const { id } = useParams()
  // State for dropdown selections
@@ -20,7 +20,7 @@ const FinanceClerkWageDetails = () => {
         }}
       >
         <button
-          onClick={() => navigate("/finance-clerk-wage")}
+          onClick={() => navigate("/DirectorDriverWage")}
           className="back-button"
         >
           Back
@@ -69,7 +69,7 @@ const FinanceClerkWageDetails = () => {
           marginTop:"-35px",
         }}
       >
-        Wage for Driver {id}
+        Wage for Driver
       </h2>
 
       <table
@@ -87,42 +87,33 @@ const FinanceClerkWageDetails = () => {
         <thead>
           <tr style={{ backgroundColor: "#87CEEB", padding: "12px 10px", textAlign: "left" }}>
             <th >Instruction ID</th>
-            <th>Legs</th>
-            <th>View Legs</th>
+            <th>Truck Reg</th>
+            <th >Starting Point</th>
+            <th >Ending Point</th>
+            <th>Trailer</th>
             <th >Date</th>
-            <th>Action</th>
-            <th></th>
+            <th>Amount</th>
+          
           </tr>
         </thead>
         <tbody>
           <tr style={{ backgroundColor: "white",padding: "12px 10px", borderBottom: "1px solid #eee" } }>
             <td >33614</td>
-            <td >2</td>
-            <td >
-            <button className="downloadwage1"  onClick={() => navigate(`/FClerkLegDetails`)}>View</button>
-            </td>
-            <td>22/10/2020</td>
-            <td>
-            <button
-          onClick={() => navigate(`/finance-clerk-wage-slip`)}
-          style={{
-            backgroundColor: "green",
-            color: "white",
-            border: "none",
-            padding: "8px 20px",
-            borderRadius: "5px",
-            cursor: "pointer",
-            fontSize: "16px",
-            fontWeight: "normal",
-          }}
-        >
-          View
-        </button>
-            </td>
-            <td >
-            <button className="downloadwage1" >Download</button>
-            </td>
-            
+            <td >33614</td>
+            <td>Port</td>
+            <td>Warehouse</td>
+            <td>12m</td>
+            <td>22/1/2025</td>
+            <td>R350</td>
+          </tr>
+          <tr style={{ backgroundColor: "white",padding: "12px 10px", borderBottom: "1px solid #eee" } }>
+            <td >45675</td>
+            <td >85514</td>
+            <td>Warehouse</td>
+            <td>Port</td>
+            <td>6m</td>
+            <td>30/1/2025</td>
+            <td>R250</td>
           </tr>
         </tbody>
       </table>
@@ -154,4 +145,4 @@ const FinanceClerkWageDetails = () => {
   )
 }
 
-export default FinanceClerkWageDetails
+export default DirectorManagerLegDetails

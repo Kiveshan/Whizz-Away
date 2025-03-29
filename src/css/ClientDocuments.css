@@ -130,3 +130,29 @@
   margin-bottom: 40px;
   margin-top: -50px;
 }
+.instructions-table table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.instructions-table th, .instructions-table td {
+  padding: 20px;
+  text-align: left;
+  font-size: 14px;
+  white-space: nowrap; /* Prevent text from wrapping */
+}
+
+/* .instructions-table th {
+  background-color: #f4f4f4;
+} */
+
+.instructions-table td {
+  max-width: 150px; /* Adjust as needed */
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.view-button {
+  padding: 5px 10px;
+  font-size: 12px;
+}
