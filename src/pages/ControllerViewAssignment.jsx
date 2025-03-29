@@ -8,7 +8,7 @@ const ViewAssignmentPage = () => {
   return (
     <>
       <button className="back-button" onClick={() => navigate(-1)}> Back</button>
-      <div className="view-assignment-wrapper">
+      <div className="view-assignment-wrapper1">
         <div className="content">
           <div className="progress-tracker">
             <div className="leg-button">Leg 1</div>
@@ -23,11 +23,7 @@ const ViewAssignmentPage = () => {
             <div className="form-row">
               <div className="form-group">
                 <label>Starting Point</label>
-                <div className="select-wrapper">
-                  <select className="form-select">
-                    <option>Yard</option>
-                  </select>
-                </div>
+                <input type="text" className="form-input"  defaultValue="port 1" readOnly/>
               </div>
               {/* <div className="form-group">
                 <label>Driver Rate</label>
@@ -35,11 +31,7 @@ const ViewAssignmentPage = () => {
               </div> */}
               <div className="form-group">
                 <label>Destination</label>
-                <div className="select-wrapper">
-                  <select className="form-select">
-                    <option>Port- Pier 1</option>
-                  </select>
-                </div>
+                <input type="text" className="form-input"  defaultValue="port 2" readOnly/>
               </div>
             </div>
           </div>
@@ -55,53 +47,37 @@ const ViewAssignmentPage = () => {
 
             <div className="details-row">
               <div className="details-cell">
-                <div className="select-wrapper">
-                  <select className="form-select">
-                    <option>Albert</option>
-                  </select>
-                </div>
+              <input type="text" className="form-input"  defaultValue="Albert" readOnly/>
               </div>
               <div className="details-cell">
-                <div className="select-wrapper">
-                  <select className="form-select">
-                    <option>147</option>
-                  </select>
-                </div>
+              <input type="text" className="form-input"  defaultValue="147" readOnly/>
               </div>
               <div className="details-cell">
-                <input type="text" className="form-input" defaultValue="01234567" />
+                <input type="text" className="form-input" defaultValue="01234567" readOnly/>
               </div>
               <div className="details-cell">
-                <input type="text" className="form-input" defaultValue="11/2/2025" />
+                <input type="text" className="form-input" defaultValue="11/2/2025" readOnly/>
               </div>
               <div className="details-cell">
-                <input type="text" className="form-input" defaultValue="150000kg" />
+                <input type="text" className="form-input" defaultValue="150000kg" readOnly/>
               </div>
             </div>
 
             <div className="details-row">
               <div className="details-cell">
-                <div className="select-wrapper">
-                  <select className="form-select">
-                    <option>Hilbert</option>
-                  </select>
-                </div>
+              <input type="text" className="form-input"  defaultValue="Hilbert" readOnly/>
               </div>
               <div className="details-cell">
-                <div className="select-wrapper">
-                  <select className="form-select">
-                    <option>152</option>
-                  </select>
-                </div>
+              <input type="text" className="form-input"  defaultValue="152" readOnly/>
               </div>
               <div className="details-cell">
-                <input type="text" className="form-input" defaultValue="15423698" />
+                <input type="text" className="form-input" defaultValue="15423698" readOnly/>
               </div>
               <div className="details-cell">
-                <input type="text" className="form-input" defaultValue="12/2/2025" />
+                <input type="text" className="form-input" defaultValue="12/2/2025" readOnly/>
               </div>
               <div className="details-cell">
-                <input type="text" className="form-input" defaultValue="145000kg" />
+                <input type="text" className="form-input" defaultValue="145000kg" readOnly/>
               </div>
             </div>
           </div>

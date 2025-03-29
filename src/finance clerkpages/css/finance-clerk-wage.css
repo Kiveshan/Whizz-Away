@@ -369,22 +369,23 @@
 /* Table styling to match screenshot */
 .wage-table-container {
   padding: 0 20px;
-  margin-top: 30px; /* Added margin to move the table down */
+  margin-top: 5px; /* Added margin to move the table down */
 }
 
 .wage-table1 {
-  width: 750px;
+  width: 600px;
   border-collapse: collapse;
   border: 2px solid #87ceeb; /* Changed border color to match finance-clerk-wage-details.jsx */
   border-radius: 8px;
   overflow: hidden;
-  margin-left: 350px;
+  margin-left: 460px;
+  margin-top: -30px;
 }
-.wage-table thead{
+.wage-table1 thead{
   text-align: center;
 }
 
-.wage-table th {
+.wage-table1 th {
   background-color: #87ceeb; /* Changed header background color to match finance-clerk-wage-details.jsx */
   padding: 12px 20px;
   text-align: left;
@@ -393,21 +394,21 @@
   border-right: 1px solid #a8d8f0; /* Adjusted border color to match new header color */
 }
 
-.wage-table th.details-header {
-  text-align: left; /* Center the Delivery Details header */
+.wage-table1 th.details-header {
+  text-align: center; /* Center the Delivery Details header */
 }
 
-.wage-table th:last-child {
+.wage-table1 th:last-child {
   border-right: none;
 }
 
-.wage-table td {
-  padding: 12px 20px;
+.wage-table1 td {
+  padding: 5px 10px;
   border-bottom: 1px solid #eee;
   background-color: white;
 }
 
-.wage-table tr:last-child td {
+.wage-table1 tr:last-child td {
   border-bottom: none;
 }
 
@@ -419,7 +420,7 @@
   background-color: #3498db;
   color: white;
   border: none;
-  padding: 8px 20px;
+  /* padding: 8px 20px; */
   border-radius: 5px;
   cursor: pointer;
   font-size: 14px;
@@ -436,3 +437,41 @@
   
 }
 
+/* Dropdown container styling */
+
+
+.dropdown-container24 {
+  display: flex;
+  justify-content: center;
+  gap: 10px;
+  margin-bottom: 40px;
+  margin-top: -60px;
+}
+
+.dropdown {
+  width: 150px;
+  padding: 8px;
+  font-size: 14px;
+  border: 1px solid #d1d5db;
+  border-radius: 4px;
+  background-color: #f8f9fa;
+  cursor: pointer;
+  appearance: none; /* Hides the default arrow */
+  -webkit-appearance: none; /* For Safari */
+  -moz-appearance: none; /* For Firefox */
+  padding-right: 25px; /* Adds space for custom icon */
+  background-image: url("data:image/svg+xml;charset=UTF-8,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20' fill='gray'%3E%3Cpath fill-rule='evenodd' d='M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z' clip-rule='evenodd'/%3E%3C/svg%3E"); /* Custom dropdown icon */
+  background-repeat: no-repeat;
+  background-position: right 10px center;
+  background-size: 14px;
+}
+.downloadwage1{
+  background-color: #3498db;
+  color: white;
+  border: none;
+  padding: 8px 10px;
+  border-radius: 5px;
+  cursor: pointer;
+  font-size: 16px;
+  font-weight: normal;
+}

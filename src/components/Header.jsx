@@ -5,7 +5,7 @@ const Header = ({ title }) => {
   return (
     <header className="header">
       <div className="logo-container">
-        <img src="/images/whizz-awaylogo.png" className="logo-img" alt="Business Logo" />
+        <img src="/images/whizz-away.jpeg" className="logo-img" alt="Business Logo" />
       </div>
       <h1>{title}</h1>  
       <div className="user-info">

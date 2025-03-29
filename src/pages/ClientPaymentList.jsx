@@ -100,7 +100,7 @@ const ClientPaymentList = () => {
           Back
         </button>
       </div>
-      <div className="payment-table">
+      <div className="payment-table1">
         <div className="table-header">
           <div className="header-cell">Company</div>
           <div className="header-cell">Balance</div>

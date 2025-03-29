@@ -9,7 +9,7 @@ const port = process.env.PORT || 5000
 const pool = new Pool({
   user: process.env.PG_USER || "postgres",
   host: process.env.PG_HOST || "localhost",
-  database: process.env.PG_DATABASE || "Transport",
+  database: process.env.PG_DATABASE || "Transport1",
   password: process.env.PG_PASSWORD || "123456",
   port: process.env.PG_PORT || 5432,
 })
@@ -26,7 +26,6 @@ pool
     console.error("Error connecting to PostgreSQL database:", err)
   })
 
-// Get all driver rates
 app.get("/drivers", async (req, res) => {
   console.log("Route /drivers was accessed")
 

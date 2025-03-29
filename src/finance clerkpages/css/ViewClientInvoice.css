@@ -27,14 +27,13 @@
     margin-left: 208px;
     
   }
-  .clientstatementtable {
+  .clientinstructiontable {
     width: 1000px;
     border-collapse: collapse;
     margin-top: -35px;
     margin-left: 60px;
     align-items: center;
   }
-  
   
   thead {
     background-color: #9ecbf3;

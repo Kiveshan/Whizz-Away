@@ -250,7 +250,7 @@
   margin: 15px auto 0;
 } */
 
-/* .client-payment-container {
+.client-payment-container {
   font-family: Arial, sans-serif;
   max-width: 1200px;
   margin: 0 auto;
@@ -267,24 +267,25 @@
   padding-bottom: 20px;
   border-bottom: 1px solid #eee;
   margin-bottom: 20px;
-} */
+}
 
 /* .header-buttons {
   display: flex;
   gap: 10px;
 } */
 
-/* .payment-table {
-  width: 100%;
+.payment-table1 {
+  width: 50%;
   border-collapse: collapse;
   margin-top: 20px;
+  margin-left: 380px;
 }
 
 .table-header {
   display: flex;
   background-color: #e6e6fa;
   padding: 10px 0;
-} */
+}
 
 /* .table-row {
   display: flex;

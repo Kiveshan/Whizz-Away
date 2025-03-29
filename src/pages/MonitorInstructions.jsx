@@ -76,16 +76,16 @@ const MonitorInstructions = () => {
       </div>
 
       <div className="action-bar">
-        <div className="filter-section">
+        <div className="filter-section10">
           <div className="filter-group">
-            <select className="filter-select">
+            <select className="dropdown">
               <option>Year</option>
               <option>2025</option>
               <option>2024</option>
               <option>2023</option>
               <option>2022</option>
             </select>
-            <select className="filter-select">
+            <select className="dropdown">
               <option>Month</option>
               <option>January</option>
               <option>February</option>
@@ -103,13 +103,14 @@ const MonitorInstructions = () => {
           </div>
         </div>
       </div>
-      <div className="filter-section">
+      <div className="filter-section10">
         <div className="filter-group">
           <button className={`filter-button ${filter === "Import" ? "active" : ""}`} onClick={() => handleFilterChange("Import")}>Import</button>
           <button className={`filter-button ${filter === "Export" ? "active" : ""}`} onClick={() => handleFilterChange("Export")}>Export</button>
           <button className={`filter-button ${filter === "All" ? "active" : ""}`} onClick={() => handleFilterChange("All")}>All</button>
         </div>
         <div className="filter-group">
+        <button className={`filter-button ${statusFilter === "In-progress" ? "active" : ""}`} onClick={() => handleStatusFilterChange("In-progress")}>New</button>
           <button className={`filter-button ${statusFilter === "In-progress" ? "active" : ""}`} onClick={() => handleStatusFilterChange("In-progress")}>In-progress</button>
           <button className={`filter-button ${statusFilter === "Completed" ? "active" : ""}`} onClick={() => handleStatusFilterChange("Completed")}>Completed</button>
       
@@ -128,9 +129,9 @@ const MonitorInstructions = () => {
           <thead>
             <tr>
               <th>Instruction No.</th>
+              <th>File No.</th>
               <th>Type</th>
               <th>Status</th>
-              <th>File No.</th>
               <th>Assignment</th>
             </tr>
           </thead>
@@ -138,9 +139,9 @@ const MonitorInstructions = () => {
             {filteredInstructions.map((instruction) => (
               <tr key={instruction.id}>
                 <td>{instruction.instructionNo}</td>
+                <td>{instruction.fileNo}</td>
                 <td>{instruction.type}</td>
                 <td>{instruction.status}</td>
-                <td>{instruction.fileNo}</td>
                 <td>
                   <button className="view-button" onClick={() => handleV(instruction.id)}>View</button>
                 </td>

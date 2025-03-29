@@ -287,7 +287,7 @@ const Manage = () => {
   )
 
   const renderDriverRatesTable = () => (
-    <div className="manage-table-container">
+    <div className="manage-DriverRates-table">
       <table>
         <thead>
           <tr>
@@ -337,7 +337,7 @@ const Manage = () => {
   )
 
   const renderSubcontractorsTable = () => (
-    <div className="manage-table-container">
+    <div className="manage-subcontractor-table">
       <table>
         <thead>
           <tr>
@@ -469,7 +469,7 @@ const Manage = () => {
           />
         </div>
         <div className="manage-form-group">
-          <select
+          <select className="dropdown"
             value={newEmployee.companyRole}
             onChange={(e) => setNewEmployee({ ...newEmployee, companyRole: e.target.value })}
           >
@@ -478,6 +478,7 @@ const Manage = () => {
             <option value="Manager">Manager</option>
             <option value="Driver">Driver</option>
             <option value="Admin">Finance Clerk</option>
+            <option value="Admin">Yard Staff</option>
           </select>
         </div>
         <div className="manage-form-group">

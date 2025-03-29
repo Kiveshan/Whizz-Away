@@ -71,7 +71,7 @@ const Instructions = ({ setCurrentPage }) => {
   return (
     <div>
       <div className="client-payments-header">
-        <button className="back-button" onClick={() => navigate("/FDashboard")}>
+        <button className="back-button" onClick={() => navigate("/ViewClientInstruction")}>
           Back
         </button>
       </div>
@@ -165,5 +165,6 @@ const Instructions = ({ setCurrentPage }) => {
   )
 }
 
-export default Instructions
+export default Instructions;
+
 

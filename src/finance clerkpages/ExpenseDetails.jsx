@@ -31,8 +31,35 @@ const ExpenseDetails = ({ selectedTruck, onBack, onAddExpense }) => {
         </button>
         {selectedTruck && <h2>Expenses for {selectedTruck}</h2>}
       </div>
-
-      <div className="expenses-table">
+      <div className="action-bar">
+        <div className="filter-section7">
+          <div className="dropdown-container">
+            <select className="dropdown">
+              <option>Year</option>
+              <option>2025</option>
+              <option>2024</option>
+              <option>2023</option>
+              <option>2022</option>
+            </select>
+            <select className="dropdown">
+              <option>Month</option>
+              <option>January</option>
+              <option>February</option>
+              <option>March</option>
+              <option>April</option>
+              <option>May</option>
+              <option>June</option>
+              <option>July</option>
+              <option>August</option>
+              <option>September</option>
+              <option>October</option>
+              <option>November</option>
+              <option>December</option>
+            </select>
+          </div>
+        </div>
+      </div>
+      <div className="expenses-table2">
         <div className="table-header">
           <div className="header-cell">Type of Expense</div>
           <div className="header-cell">Description</div>
