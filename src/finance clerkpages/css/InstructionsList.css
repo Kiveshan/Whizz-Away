@@ -44,6 +44,12 @@ body {
     color: white;
 }
 
+.btn.active {
+    background-color: #0056b3;
+    color: white;
+    font-weight: bold;
+  }
+
 .btn:hover {
     opacity: 0.8;
 }

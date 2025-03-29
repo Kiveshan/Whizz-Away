@@ -1,9 +1,73 @@
-import React from "react";
-import {useNavigate } from "react-router-dom";
-import '../finance clerkpages/css/InstructionsList.css';
+"use client"
+
+import { useState, useEffect } from "react"
+import { useNavigate } from "react-router-dom"
+import "../finance clerkpages/css/InstructionsList.css"
 
 const Instructions = ({ setCurrentPage }) => {
-    const navigate = useNavigate();
+  const navigate = useNavigate()
+  const [instructions, setInstructions] = useState([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState(null)
+  const [statusFilter, setStatusFilter] = useState("All")
+  const [typeFilter, setTypeFilter] = useState("All")
+
+  useEffect(() => {
+    fetchInstructions()
+  }, [])
+
+  const fetchInstructions = async () => {
+    try {
+      setLoading(true)
+      const response = await fetch("http://localhost:5000/instructions")
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! Status: ${response.status}`)
+      }
+
+      const data = await response.json()
+      setInstructions(data)
+      setLoading(false)
+    } catch (err) {
+      console.error("Error fetching instructions:", err)
+      setError("Failed to load instructions. Please try again later.")
+      setLoading(false)
+    }
+  }
+
+  const getShipmentType = (type) => {
+    return type === 1 ? "Import" : type === 2 ? "Export" : "Unknown"
+  }
+
+  // Filter instructions based on both status and type filters
+  const filteredInstructions = instructions.filter((item) => {
+    // Normalize status by trimming spaces and converting to lowercase
+    const normalizedStatus = item.status ? item.status.trim().toLowerCase() : "new";
+    const normalizedFilterStatus = statusFilter.trim().toLowerCase();
+  
+    // Check if the item passes the status filter
+    const passesStatusFilter = 
+      normalizedFilterStatus === "all" || 
+      normalizedStatus === normalizedFilterStatus;
+  
+    // Check if the item passes the type filter
+    const passesTypeFilter =
+      typeFilter === "All" ||
+      (typeFilter === "Import" && item.shipment_type === 1) ||
+      (typeFilter === "Export" && item.shipment_type === 2);
+  
+    // Return true only if the item passes both filters
+    return passesStatusFilter && passesTypeFilter;
+  });
+
+  const handleStatusFilterClick = (filterType) => {
+    setStatusFilter(filterType)
+  }
+
+  const handleTypeFilterClick = (filterType) => {
+    setTypeFilter(filterType)
+  }
+
   return (
     <div>
       <div className="client-payments-header">
@@ -11,56 +75,95 @@ const Instructions = ({ setCurrentPage }) => {
           Back
         </button>
       </div>
-      
-            <div className="content1">
-                <div className="button-group">
-                  
-                    <div className="filter-buttons">
-                        <button className="btn btn-blue">Import</button>
-                        <button className="btn btn-blue">Export</button>
-                        <button className="btn btn-blue">All</button>
-                        <button className="btn btn-blue">In-Progress</button>
-                        <button className="btn btn-blue">Complete</button>
-                    </div>
-                    </div>
-                <div className="tables-container">
-                    <table className="t2">
-                        <thead>
-                            <tr>
-                                <th>Instruction No</th>
-                                <th>Type</th>
-                                <th>Status</th>
-                                <th>File No</th>
-                                <th>Instruction</th>
-                                <th>Assignment</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {[
-                                { id: 1, type: "Import", status: "New", fileNo: "77002" },
-                                { id: 2, type: "Export", status: "New", fileNo: "10014" },
-                                { id: 3, type: "Import", status: "In-Progress", fileNo: "93301" },
-                            ].map((item) => (
-                                <tr key={item.id}>
-                                    <td>Instruction {item.id}</td>
-                                    <td>{item.type}</td>
-                                    <td>{item.status}</td>
-                                    <td>{item.fileNo}</td>
-                                    <td>
-                                        <button className="view-btn"onClick={() => navigate("")}>View</button>
-                                    </td>
-                                    <td>
-                                        <button className="view-btn"onClick={() => navigate("/update-instructions")}>View</button>
-                                    </td>
-                                </tr>
-                            ))}
-                        </tbody>
-                    </table>
-                </div>
-            </div>
+
+      <div className="content1">
+        <div className="button-group">
+          <div className="filter-buttons">
+            <button
+              className={`btn btn-blue ${typeFilter === "Import" ? "active" : ""}`}
+              onClick={() => handleTypeFilterClick("Import")}
+            >
+              Import
+            </button>
+            <button
+              className={`btn btn-blue ${typeFilter === "Export" ? "active" : ""}`}
+              onClick={() => handleTypeFilterClick("Export")}
+            >
+              Export
+            </button>
+            <button
+              className={`btn btn-blue ${statusFilter === "All" && typeFilter === "All" ? "active" : ""}`}
+              onClick={() => {
+                handleStatusFilterClick("All")
+                handleTypeFilterClick("All")
+              }}
+            >
+              All
+            </button>
+            <button
+              className={`btn btn-blue ${statusFilter === "In Progress" ? "active" : ""}`}
+              onClick={() => handleStatusFilterClick("In Progress")}
+            >
+              In-Progress
+            </button>
+            <button
+              className={`btn btn-blue ${statusFilter === "Completed" ? "active" : ""}`}
+              onClick={() => handleStatusFilterClick("Completed")}
+            >
+              Complete
+            </button>
+          </div>
         </div>
-  );
-};
+        <div className="tables-container">
+          {loading ? (
+            <p>Loading instructions...</p>
+          ) : error ? (
+            <p className="error-message">{error}</p>
+          ) : (
+            <table className="t2">
+              <thead>
+                <tr>
+                  <th>Instruction No</th>
+                  <th>Type</th>
+                  <th>Status</th>
+                  <th>File No</th>
+                  <th>Instruction</th>
+                  <th>Assignment</th>
+                </tr>
+              </thead>
+              <tbody>
+                {filteredInstructions.length === 0 ? (
+                  <tr>
+                    <td colSpan="6">No instructions found</td>
+                  </tr>
+                ) : (
+                  filteredInstructions.map((item) => (
+                    <tr key={item.m1key}>
+                      <td>{item.m1key}</td>
+                      <td>{getShipmentType(item.shipment_type)}</td>
+                      <td>{item.status || "New"}</td>
+                      <td>{item.fileref || "N/A"}</td>
+                      <td>
+                        <button className="view-btn" onClick={() => navigate("")}>
+                          View
+                        </button>
+                      </td>
+                      <td>
+                        <button className="view-btn" onClick={() => navigate("/update-instructions")}>
+                          View
+                        </button>
+                      </td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          )}
+        </div>
+      </div>
+    </div>
+  )
+}
 
+export default Instructions
 
-export default Instructions;
