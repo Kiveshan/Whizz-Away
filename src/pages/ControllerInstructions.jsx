@@ -19,7 +19,7 @@ const ControllerInstructions = ({ setCurrentPage }) => {
     <div>
       {/* Back Button */}
       <div className="client-payments-header">
-        <button className="back-button" onClick={() => navigate(-1)}>
+        <button className="back-button" onClick={() => navigate("/ControllerDashboard")}>
           Back
         </button>
       </div>
@@ -210,35 +210,27 @@ const ControllerInstructions = ({ setCurrentPage }) => {
             </div>
 
             <div className="form-row1">
-              <div className="form-group" style={{ flex: "0 0 150px" }}>
-                <label>No. of Containers</label>
-                <div className="number-input-group" style={{ gap: "10px" }}>
-                  <input
-                    type="number"
-                    className="form-input"
-                    defaultValue="10"
-                    style={{ width: "60%" }} // Adjusted width for the input field
-                  />
-                  <div
-                    className="number-controls"
-                    style={{ display: "flex", flexDirection: "column", alignItems: "center" }}
-                  >
-              
-                  </div>
-                </div>
-              </div>
-
+          
               <div className="form-group">
-                {/* Trailer Size Dropdown */}
-                <div className="dropdown-container">
-                  <label>Trailer Size</label>
-                  <select className="dropdown">
-                    <option value="6m">6m</option>
-                    <option value="12m">12m</option>
-                    <option value="abnormal">Abnormal</option>
-                  </select>
-                </div>
-              </div>
+  <label style={{marginLeft:"281px"}}>Trailer Size</label>
+  <div className="counter-container">
+  <label style={{ marginTop: "40px" }}>No. of Containers</label>
+    <div className="counter">
+      <span>6m</span>
+      <input type="number" defaultValue="0" min="0" />
+    </div>
+    <div className="counter">
+      <span>12m</span>
+      <input type="number" defaultValue="0" min="0" />
+    </div>
+    <div className="counter">
+      <span>Abnormal</span>
+      <input type="number" defaultValue="0" min="0" />
+    </div>
+  </div>
+</div>
+
+
               <div className="form-group">
                 <label>VAT Rate</label>
                 <input
@@ -246,7 +238,8 @@ const ControllerInstructions = ({ setCurrentPage }) => {
                   className="form-input"
                   placeholder="Vat Rate"
                   defaultValue="15%"
-                  style={{ width: "60%" }}
+                  style={{ width: "20%" }}
+                  readOnly
                 />
               </div>
             </div>

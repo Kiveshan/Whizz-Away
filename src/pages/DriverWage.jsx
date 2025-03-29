@@ -85,27 +85,23 @@ const FinanceClerkWageDetails = () => {
       >
         
         <thead>
-          <tr style={{ backgroundColor: "#87CEEB" }}>
-            <th style={{ padding: "12px 10px", textAlign: "left" }}>Instruction ID</th>
-            <th style={{ padding: "12px 10px", textAlign: "left" }}>Truck Reg</th>
-            <th style={{ padding: "12px 10px", textAlign: "left" }}>Start</th>
-            <th style={{ padding: "12px 10px", textAlign: "left" }}>End</th>
-            <th style={{ padding: "12px 10px", textAlign: "left" }}>Trailer</th>
-            <th style={{ padding: "12px 10px", textAlign: "left" }}>Date</th>
-            <th style={{ padding: "12px 10px", textAlign: "left" }}>Amount</th>
-            <th style={{ padding: "12px 10px", textAlign: "left" }}>Action</th>
-            <th style={{ padding: "12px 10px", textAlign: "left" }}></th>
+          <tr style={{ backgroundColor: "#87CEEB", padding: "12px 10px", textAlign: "left" }}>
+            <th >Instruction ID</th>
+            <th>Legs</th>
+            <th>View Legs</th>
+            <th >Date</th>
+            <th>Action</th>
+            <th></th>
           </tr>
         </thead>
         <tbody>
-          <tr style={{ backgroundColor: "white" }}>
-            <td style={{ padding: "12px 10px", borderBottom: "1px solid #eee" }}>33614</td>
-            <td style={{ padding: "12px 10px", borderBottom: "1px solid #eee" }}>33614</td>
-            <td style={{ padding: "12px 10px", borderBottom: "1px solid #eee" }}>A</td>
-            <td style={{ padding: "12px 10px", borderBottom: "1px solid #eee" }}>B</td>
-            <td style={{ padding: "12px 10px", borderBottom: "1px solid #eee" }}>12m</td>
-            <td style={{ padding: "12px 10px", borderBottom: "1px solid #eee" }}>22/10/2020</td>
-            <td style={{ padding: "12px 10px", borderBottom: "1px solid #eee" }}>R 46</td>
+          <tr style={{ backgroundColor: "white",padding: "12px 10px", borderBottom: "1px solid #eee" } }>
+            <td >33614</td>
+            <td >2</td>
+            <td >
+            <button className="downloadwage1"  onClick={() => navigate(`/ManagerLegDetails`)}>View</button>
+            </td>
+            <td>22/10/2020</td>
             <td>
             <button
           onClick={() => navigate(`/DriverWageSlip`)}
