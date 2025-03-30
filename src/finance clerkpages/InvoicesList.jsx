@@ -12,7 +12,7 @@ const InvoicesList = () => {
       <main className="main">
         {/* Back Button */}
         <div className="">
-        <button className="back-button" onClick={() => navigate("/FDashboard")}>
+        <button className="back-button" onClick={() => navigate("/ViewClientInvoice")}>
           Back
         </button>
       </div>

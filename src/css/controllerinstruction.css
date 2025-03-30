@@ -273,3 +273,44 @@
   background-position: right 10px center;
   background-size: 14px;
 }
+
+/* Align all counters in a single row */
+.counter-container {
+  display: flex;
+  gap: 20px; /* Adds space between the counters */
+}
+
+.counter {
+  display: flex;
+  flex-direction: column; /* Keeps label above the input */
+  align-items: center;
+  background: white;
+  padding: 10px;
+  border-radius: 8px;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  width: 100px;
+}
+
+.counter span {
+  font-size: 14px;
+  font-weight: 600;
+  margin-bottom: 5px;
+}
+
+.counter input {
+  width: 50px;
+  padding: 5px;
+  font-size: 14px;
+  text-align: center;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+  outline: none;
+  -moz-appearance: textfield;
+}
+
+/* Restore up/down arrows in WebKit browsers */
+.counter input::-webkit-inner-spin-button,
+.counter input::-webkit-outer-spin-button {
+  -webkit-appearance: auto;
+  margin: 0;
+}

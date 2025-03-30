@@ -2,9 +2,9 @@
 
 import { useState } from "react"
 import { useNavigate } from "react-router-dom"
-import "../css/ClientDocuments.css"
+import "../css/MonitorInstructions.css"
 
-const MonitorInstructions = () => {
+const DirectorMonitorInstructions = () => {
   const navigate = useNavigate()
   const [selectedRows, setSelectedRows] = useState([])
   const [filter, setFilter] = useState("All")
@@ -39,7 +39,10 @@ const MonitorInstructions = () => {
   ]
 
   const handleBack = () => {
-    navigate("/FinancialDocumentsView")
+    navigate(-1)
+  }
+  const handleV=()=>{
+    navigate("/DirectorManagerViewAssignment");
   }
 
   const handleFilterChange = (type) => {
@@ -73,7 +76,7 @@ const MonitorInstructions = () => {
       </div>
 
       <div className="action-bar">
-        <div className="filter-section9">
+        <div className="filter-section10">
           <div className="filter-group">
             <select className="dropdown">
               <option>Year</option>
@@ -100,28 +103,26 @@ const MonitorInstructions = () => {
           </div>
         </div>
       </div>
-      <div className="filter-section9">
+      <div className="filter-section10">
         <div className="filter-group">
-          <button className={`filter-button ${filter === "Import" ? "active" : ""}`} onClick={() => handleFilterChange("Import")}>
-            Import
-          </button>
-          <button className={`filter-button ${filter === "Export" ? "active" : ""}`} onClick={() => handleFilterChange("Export")}>
-            Export
-          </button>
-          <button className={`filter-button ${filter === "All" ? "active" : ""}`} onClick={() => handleFilterChange("All")}>
-            All
-          </button>
+          <button className={`filter-button ${filter === "Import" ? "active" : ""}`} onClick={() => handleFilterChange("Import")}>Import</button>
+          <button className={`filter-button ${filter === "Export" ? "active" : ""}`} onClick={() => handleFilterChange("Export")}>Export</button>
+          <button className={`filter-button ${filter === "All" ? "active" : ""}`} onClick={() => handleFilterChange("All")}>All</button>
         </div>
         <div className="filter-group">
-          {/* <button className={`filter-button ${statusFilter === "In-progress" ? "active" : ""}`} onClick={() => handleStatusFilterChange("In-progress")}>
-            In-progress
-          </button>
-          <button className={`filter-button ${statusFilter === "Completed" ? "active" : ""}`} onClick={() => handleStatusFilterChange("Completed")}>
-            Completed
-          </button> */}
+        <button className={`filter-button ${statusFilter === "In-progress" ? "active" : ""}`} onClick={() => handleStatusFilterChange("In-progress")}>New</button>
+          <button className={`filter-button ${statusFilter === "In-progress" ? "active" : ""}`} onClick={() => handleStatusFilterChange("In-progress")}>In-progress</button>
+          <button className={`filter-button ${statusFilter === "Completed" ? "active" : ""}`} onClick={() => handleStatusFilterChange("Completed")}>Completed</button>
+      
         </div>
       </div>
       <div className="search-bar">
+        {/* <input
+          type="text"
+          placeholder="Search by Instruction No. or File No."
+          value={searchQuery}
+          onChange={handleSearchChange}
+        /> */}
       </div>
       <div className="instructions-table">
         <table>
@@ -130,8 +131,8 @@ const MonitorInstructions = () => {
               <th>Instruction No.</th>
               <th>File No.</th>
               <th>Type</th>
-              <th>Invoice</th>
-              <th>Statement</th>
+              <th>Status</th>
+              <th>Assignment</th>
             </tr>
           </thead>
           <tbody>
@@ -140,11 +141,9 @@ const MonitorInstructions = () => {
                 <td>{instruction.instructionNo}</td>
                 <td>{instruction.fileNo}</td>
                 <td>{instruction.type}</td>
+                <td>{instruction.status}</td>
                 <td>
-                  <button className="view-button" onClick={() => handleView(instruction.id)}>View</button>
-                </td>
-                <td>
-                  <button className="view-button" onClick={() => handleView(instruction.id)}>View</button>
+                  <button className="view-button" onClick={() => handleV(instruction.id)}>View</button>
                 </td>
               </tr>
             ))}
@@ -155,4 +154,4 @@ const MonitorInstructions = () => {
   )
 }
 
-export default MonitorInstructions
+export default DirectorMonitorInstructions

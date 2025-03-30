@@ -4,16 +4,16 @@ import Card from "../components/Card";
 import "../css/card.css";
 import "../css/dashboard.css";
 const dashboardData = [
-  { title: "Instructions", image: "/images/monitor.jpeg", path: "/MonitorInstructionView" },
-  { title: "Analytics", image: "/images/analytics.jpg", path: "/analytics" },
-  { title: "Debtors", image: "/images/clientDocs.jpeg", path: "/debtors" },
-  { title: "Wages", image: "/images/wages.jpeg", path: "/DriverWageList" },
-  { title: "Creditors", image: "/images/expenses.jpeg", path: "/ManagerCreditorsDash" },
-  { title: "Manage", image: "/images/manage.jpg", path: "/manage" },                     
+  { title: "Instructions", image: "/images/monitor.jpeg", path: "/DirectorMonitorInstructionView" },
+  { title: "Analytics", image: "/images/analytics.jpg", path: "/DirectorAnalytics" },
+  { title: "Debtors", image: "/images/clientDocs.jpeg", path: "/DirectorDabtors" },
+  { title: "Wages", image: "/images/wages.jpeg", path: "/DirectorDriverWageList" },
+  { title: "Creditors", image: "/images/expenses.jpeg", path: "/DirectorCreditorsDash" },
+                  
   { title: "Analytics", image: "/images/analytics.jpg", path: "/analytics" },
 ];
 
-const Dashboard = () => {
+const DirectorDashboard = () => {
   const navigate = useNavigate();
 
   return (
@@ -24,7 +24,7 @@ const Dashboard = () => {
         ))}
       </div>
       <div className="dashboard-row bottom-row">
-        {dashboardData.slice(3, 6).map((item) => (
+        {dashboardData.slice(3, 5).map((item) => (
           <Card key={item.title} title={item.title} image={item.image} onClick={() => navigate(item.path)} />
         ))}
       </div>
@@ -32,4 +32,4 @@ const Dashboard = () => {
   );
 };
 
-export default Dashboard;
+export default DirectorDashboard;
