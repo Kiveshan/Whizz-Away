@@ -16,18 +16,19 @@
   
  
 /* Centers filter buttons */
-.filter-section {
+.filter-section6 {
   display: flex;
   justify-content: center; /* Centers buttons */
   flex-wrap: wrap;
   gap: 20px;
   width: 100%;
-  margin-bottom: 20px;
+  margin-top: -70px;
 }
  
 /* Styles for filter buttons */
-.filter-group {
+.filter-group1 {
   display: flex;
+  margin-top: -30px;
  
 }
  
@@ -57,9 +58,10 @@
 }
   
   /* Table */
-  .table-container2{
+  .table-container22{
     align-items:center;
-    margin-left: 195px;
+    margin-left: 230px;
+    
   }
   table {
     width: 1000px;

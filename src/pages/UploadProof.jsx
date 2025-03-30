@@ -3,6 +3,7 @@
 import { useState } from "react"
 import { useNavigate, useParams } from "react-router-dom"
 import "../css/ClientPayments.css"
+import { source } from "framer-motion/client"
 
 const UploadProof = () => {
   const navigate = useNavigate()
@@ -58,6 +59,12 @@ const UploadProof = () => {
             company: decodeURIComponent(companyName),
             proof: selectedFile,
             amount: amount,
+            sourceDocDetails: "Source Doc Details",
+            date: new Date().toLocaleDateString("en-ZA", {
+              year: "numeric",
+              month: "long",
+              day: "numeric",
+            }), // Format: 1 January 2022   (en-ZA locale)      
           },
         },
       })
@@ -77,34 +84,23 @@ const UploadProof = () => {
         </button>
       </div>
 
-      <div className="upload-content">
+      <div className="upload-content" style={{marginTop:"-120px"}}>
         <div className="upload-form">
           <div className="amount-field">
             <label>Amount Paid</label>
             <input type="text" value={amount} onChange={(e) => setAmount(e.target.value)} placeholder="R0000" />
           </div>
-
-          <div className="upload-area">
-            <div
-              className={`dropzone ${dragActive ? "active" : ""}`}
-              onDragEnter={handleDrag}
-              onDragLeave={handleDrag}
-              onDragOver={handleDrag}
-              onDrop={handleDrop}
-            >
-              <div className="upload-icon">↑</div>
-              <p>Drop files here</p>
-              <p className="supported-formats">Supported formats: PNG, JPG</p>
-              <p className="or-divider">or</p>
-              <label className="browse-button">
-                Browse files
-                <input type="file" onChange={handleFileSelect} accept=".png,.jpg,.jpeg" hidden />
-              </label>
-              {selectedFile && <p className="selected-file">Selected: {selectedFile.name}</p>}
-            </div>
+          <div className="amount-field">
+            <label>Payment Date</label>
+            <input type="Date"  />
+          </div>
+          <div className="amount-field">
+            <label>Source Doc Details</label>
+            <input type="text" placeholder="Bank Statement" />
           </div>
 
-          <button className="submit-button" onClick={handleSubmit} disabled={!selectedFile || !amount || isSubmitting}>
+
+          <button className="submit-button" onClick={handleSubmit} disabled={ !amount || isSubmitting}>
             {isSubmitting ? "Submitting..." : "Submit Proof of Payment"}
           </button>
         </div>

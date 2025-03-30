@@ -8,7 +8,7 @@ const ViewAssignmentPage = () => {
   return (
     <>
       <button className="back-button" onClick={() => navigate(-1)}> Back</button>
-      <div className="view-assignment-wrapper">
+      <div className="view-assignment-wrapper1">
         <div className="content">
           <div className="progress-tracker">
             <div className="leg-button">Leg 1</div>

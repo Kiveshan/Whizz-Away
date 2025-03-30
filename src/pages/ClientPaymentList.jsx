@@ -25,7 +25,6 @@ const ClientPaymentList = () => {
     },
   ])
 
-  // Check for uploaded proof when returning from upload page
   useEffect(() => {
     if (location.state && location.state.uploadedProof) {
       const { company, proof, amount } = location.state.uploadedProof
@@ -44,7 +43,6 @@ const ClientPaymentList = () => {
   const handleViewProof = (company) => {
     const payment = clientPayments.find((payment) => payment.company === company)
     if (payment && payment.proof) {
-      // Open a modal or dialog to show the image
       openImageViewer(payment.proof, payment.company)
     } else {
       alert("No proof of payment uploaded")
@@ -54,14 +52,12 @@ const ClientPaymentList = () => {
   const updatePaymentStatus = (company, proof, amount) => {
     setClientPayments((prevPayments) =>
       prevPayments.map((payment) =>
-        payment.company === company ? { ...payment, status: "Uploaded", proof, amount } : payment,
-      ),
+        payment.company === company ? { ...payment, status: "Uploaded", proof, amount } : payment
+      )
     )
   }
 
-  // Function to open image viewer
   const openImageViewer = (imageUrl, company) => {
-    // Create a modal to display the image
     const modal = document.createElement("div")
     modal.className = "proof-modal"
 
@@ -87,7 +83,6 @@ const ClientPaymentList = () => {
 
     document.body.appendChild(modal)
 
-    // Clean up object URL when modal is closed
     if (imageUrl instanceof File) {
       modal.addEventListener("remove", () => URL.revokeObjectURL(img.src))
     }
@@ -100,37 +95,40 @@ const ClientPaymentList = () => {
           Back
         </button>
       </div>
-      <div className="payment-table">
-        <div className="table-header">
-          <div className="header-cell">Company</div>
-          <div className="header-cell">Balance</div>
-          <div className="header-cell">Latest date</div>
-          <div className="header-cell">Status</div>
-          <div className="header-cell">Proof of Payment</div>
-        </div>
-        {clientPayments.map((payment, index) => (
-          <div key={index} className="table-row">
-            <div className="table-cell">{payment.company}</div>
-            <div className="table-cell">{payment.balance}</div>
-            <div className="table-cell">{payment.latestDate}</div>
-            <div className="table-cell">{payment.status}</div>
-            <div className="table-cell">
-              {payment.status === "Uploaded" ? (
-                <button className="view-button" onClick={() => handleViewProof(payment.company)}>
-                  View
-                </button>
-              ) : (
-                <button className="upload-button" onClick={() => handleUpload(payment.company, payment.balance)}>
-                  Upload
-                </button>
-              )}
-            </div>
-          </div>
-        ))}
-      </div>
+      <table className="payment-table1" >
+        <thead>
+          <tr>
+            <th>Company</th>
+            <th>Balance</th>
+            <th>Latest Date</th>
+            <th>Status</th>
+            <th>Proof of Payment</th>
+          </tr>
+        </thead>
+        <tbody>
+          {clientPayments.map((payment, index) => (
+            <tr key={index}>
+              <td>{payment.company}</td>
+              <td>{payment.balance}</td>
+              <td>{payment.latestDate}</td>
+              <td>{payment.status}</td>
+              <td>
+                {payment.status === "Uploaded" ? (
+                  <button className="view-button" onClick={() => handleViewProof(payment.company)}>
+                    View
+                  </button>
+                ) : (
+                  <button className="upload-button" onClick={() => handleUpload(payment.company, payment.balance)}>
+                    Upload
+                  </button>
+                )}
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
     </div>
   )
 }
 
 export default ClientPaymentList
-

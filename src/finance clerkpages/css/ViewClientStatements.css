@@ -27,13 +27,14 @@
     margin-left: 208px;
     
   }
-  .table3 {
+  .clientstatementtable {
     width: 1000px;
     border-collapse: collapse;
-    margin-top: 5px;
-    margin-left: 10px;
+    margin-top: -35px;
+    margin-left: 60px;
     align-items: center;
   }
+  
   
   thead {
     background-color: #9ecbf3;
@@ -56,4 +57,18 @@
     cursor: pointer;
   }
 
+  /* Dropdown container styling */
+.dropdown-container1 {
+  display: flex;
+  gap: 10px; /* Adds space between the dropdowns */
+  align-items: center; /* Aligns dropdowns vertically */
+  margin: 20px; /* Adds space around the container */
   
+}
+
+.dropdown-container1 {
+  display: flex;
+  justify-content: center;
+  gap: 10px;
+  margin-bottom: 20px;
+}

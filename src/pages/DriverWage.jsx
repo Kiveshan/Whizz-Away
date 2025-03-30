@@ -1,264 +1,157 @@
 "use client"
-
 import { useState } from "react"
-import { useNavigate } from "react-router-dom"
-import "../css/DriverWage.css"
+import { useNavigate, useParams } from "react-router-dom"
+import "../finance clerkpages/css/finance-clerk-wage.css"
 
-const DriverWage = () => {
+const FinanceClerkWageDetails = () => {
   const navigate = useNavigate()
-  const [activeView, setActiveView] = useState("list")
-  const [selectedDriver, setSelectedDriver] = useState(null)
-  const [selectedDelivery, setSelectedDelivery] = useState(null)
-
-  const drivers = [
-    { name: "Doge Patel", wage: "R 5,434" },
-    { name: "Sherman ", wage: "R 8,923" },
-    { name: "John Cena", wage: "R 6,448" },
-    { name: "Ukant Seemee", wage: "R 3,235" },
-  ]
-
-  const deliveries = [
-    {
-      instructionId: "53474",
-      truckReg: "53474",
-      start: "A",
-      end: "B",
-      trailer: "6m",
-      date: "22/10/2020",
-      amount: "R 45",
-    },
-    {
-      instructionId: "38591",
-      truckReg: "38591",
-      start: "B",
-      end: "C",
-      trailer: "6m",
-      date: "18/03/2024",
-      amount: "R 74",
-    },
-    {
-      instructionId: "70157",
-      truckReg: "70157",
-      start: "A",
-      end: "C",
-      trailer: "12m",
-      date: "16/10/2024",
-      amount: "R 85",
-    },
-    {
-      instructionId: "75746",
-      truckReg: "75746",
-      start: "A",
-      end: "D",
-      trailer: "6m",
-      date: "24/07/2020",
-      amount: "R 55",
-    },
-  ]
-
-  const handleBack = () => {
-    if (activeView === "list") {
-      navigate("/")
-    } else if (activeView === "details") {
-      setActiveView("list")
-    } else if (activeView === "slip") {
-      setActiveView("details")
-    }
-  }
-
-  const handleViewDriver = (driver) => {
-    setSelectedDriver(driver)
-    setActiveView("details")
-  }
-
-  const handleViewSlip = (delivery) => {
-    setSelectedDelivery(delivery)
-    setActiveView("slip")
-  }
-
-  const renderList = () => (
-    
-    <div className="wage-table">
-       <div className="action-bar">
-        <div className="filter-section">
-          <div className="filter-group">
-            <select className="filter-select">
-              <option>Year</option>
-              <option>2025</option>
-              <option>2024</option>
-              <option>2023</option>
-              <option>2022</option>
-            </select>
-            <select className="filter-select">
-              <option>Month</option>
-              <option>January</option>
-              <option>February</option>
-              <option>March</option>
-              <option>April</option>
-              <option>May</option>
-              <option>June</option>
-              <option>July</option>
-              <option>August</option>
-              <option>September</option>
-              <option>October</option>
-              <option>November</option>
-              <option>December</option>
-            </select>
-          </div>
-        </div>
-      </div>
-      <div className="table-header">
-        <div className="header-cell">Driver Name</div>
-        <div className="header-cell">Wage</div>
-        <div className="header-cell">Delivery Details</div>
-      </div>
-      {drivers.map((driver, index) => (
-        <div key={index} className="table-row">
-          <div className="table-cell">{driver.name}</div>
-          <div className="table-cell">{driver.wage}</div>
-          <div className="table-cell">
-            <button className="drview-button" onClick={() => handleViewDriver(driver)}>
-              View
-            </button>
-          </div>
-        </div>
-      ))}
-    </div>
-  )
-
-  const renderDetails = () => (
-    <div className="details-container">
-       <div className="action-bar">
-        <div className="filter-section">
-          <div className="filter-group">
-            <select className="filter-select">
-              <option>Year</option>
-              <option>2025</option>
-              <option>2024</option>
-              <option>2023</option>
-              <option>2022</option>
-            </select>
-            <select className="filter-select">
-              <option>Month</option>
-              <option>January</option>
-              <option>February</option>
-              <option>March</option>
-              <option>April</option>
-              <option>May</option>
-              <option>June</option>
-              <option>July</option>
-              <option>August</option>
-              <option>September</option>
-              <option>October</option>
-              <option>November</option>
-              <option>December</option>
-            </select>
-          </div>
-        </div>
-      </div>
-      <h2>Wage for {selectedDriver?.name}</h2>
-      <div className="details-table">
-        <div className="table-header">
-          <div className="header-cell">Instruction ID</div>
-          <div className="header-cell">Truck Reg</div>
-          <div className="header-cell">Start</div>
-          <div className="header-cell">End</div>
-          <div className="header-cell">Trailer</div>
-          <div className="header-cell">Date</div>
-          <div className="header-cell">Amount</div>
-          <div className="header-cell">Actions</div>
-        </div>
-        {deliveries.map((delivery, index) => (
-          <div key={index} className="table-row">
-            <div className="table-cell">{delivery.instructionId}</div>
-            <div className="table-cell">{delivery.truckReg}</div>
-            <div className="table-cell">{delivery.start}</div>
-            <div className="table-cell">{delivery.end}</div>
-            <div className="table-cell">{delivery.trailer}</div>
-            <div className="table-cell">{delivery.date}</div>
-            <div className="table-cell">{delivery.amount}</div>
-            <div className="table-cell actions">
-              <button className="drview-button" onClick={() => handleViewSlip(delivery)}>
-                View
-              </button>
-              <button className="download-button">Download</button>
-            </div>
-          </div>
-        ))}
-      </div>
-    </div>
-  )
-
-  const renderSlip = () => (
-    <div className="wage-slip">
-      <div className="slip-header">
-        <div className="company-info">
-          <h2>Company Name</h2>
-          <p>Company Contact Details</p>
-        </div>
-        <h1>Wage Slip</h1>
-      </div>
-
-      <div className="slip-details">
-        <div className="pay-period">
-          <p>
-            <strong>Pay Period:</strong> 1 March 2023 - 25 March 2023
-          </p>
-          <p>
-            <strong>Pay Date:</strong> 25 March
-          </p>
-        </div>
-
-        <div className="employee-info">
-          <p>
-            <strong>Employee Name:</strong> {selectedDriver?.name}
-          </p>
-          <p>
-            <strong>Employee Contact:</strong> 087 555 5475
-          </p>
-          <p>
-            <strong>Position:</strong> Driver
-          </p>
-        </div>
-
-        <div className="earnings-section">
-          <h3>Earnings</h3>
-          <div className="earnings-table">
-            <div className="earnings-row">
-              <span>Basic Salary</span>
-              <span>R 5000</span>
-            </div>
-            <div className="earnings-row">
-              <span>All trips</span>
-              <span>R 2500</span>
-            </div>
-          </div>
-        </div>
-
-        <div className="net-pay-section">
-          <h3>Net Pay</h3>
-          <div className="net-pay-amount">R 7500</div>
-        </div>
-
-        <p className="slip-footer">For inquiries, please feel free to contact You Name at Your Email.</p>
-      </div>
-    </div>
-  )
-
+  const { id } = useParams()
+ // State for dropdown selections
+ const [selectedMonth, setSelectedMonth] = useState("")
+ const [selectedYear, setSelectedYear] = useState("")
   return (
-    <div className="driver-wage-container">
-      <div className="header-actions">
-        <button onClick={handleBack} className="back-button">
+    <>
+      <div
+        style={{
+          display: "flex",
+          justifyContent: "space-between",
+          padding: "5px",
+          marginBottom: "15px",
+        }}
+      >
+        <button
+          onClick={() => navigate("/DriverWageList")}
+          className="back-button"
+        >
           Back
         </button>
       </div>
+      
+      <div className="dropdown-container24">
+        <select 
+          value={selectedMonth} 
+          onChange={(e) => setSelectedMonth(e.target.value)} 
+          className="dropdown"
+        >
+          <option value="">Select Month</option>
+          <option value="January">January</option>
+          <option value="February">February</option>
+          <option value="March">March</option>
+          <option value="April">April</option>
+          <option value="May">May</option>
+          <option value="June">June</option>
+          <option value="July">July</option>
+          <option value="August">August</option>
+          <option value="September">September</option>
+          <option value="October">October</option>
+          <option value="November">November</option>
+          <option value="December">December</option>
+        </select>
 
-      {activeView === "list" && renderList()}
-      {activeView === "details" && renderDetails()}
-      {activeView === "slip" && renderSlip()}
-    </div>
+        <select 
+          value={selectedYear} 
+          onChange={(e) => setSelectedYear(e.target.value)} 
+          className="dropdown"
+        >
+          <option value="">Select Year</option>
+          <option value="2023">2023</option>
+          <option value="2024">2024</option>
+          <option value="2025">2025</option>
+          <option value="2026">2026</option>
+        </select>
+      </div>
+      <h2
+        style={{
+          textAlign: "center",
+          margin: "0 0 15px 0",
+          fontWeight: "normal",
+          fontSize: "24px",
+          marginTop:"-35px",
+        }}
+      >
+        Wage for Driver {id}
+      </h2>
+
+      <table
+        style={{
+          width: "1000px",
+          margin: "0 auto",
+          borderCollapse: "collapse",
+          fontSize: "16px",
+          boxShadow: "0 1px 3px rgba(0,0,0,0.1)",
+          borderRadius: "5px",
+          overflow: "hidden",
+        }}
+      >
+        
+        <thead>
+          <tr style={{ backgroundColor: "#87CEEB", padding: "12px 10px", textAlign: "left" }}>
+            <th >Instruction ID</th>
+            <th>Legs</th>
+            <th>View Legs</th>
+            <th >Date</th>
+            <th>Action</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr style={{ backgroundColor: "white",padding: "12px 10px", borderBottom: "1px solid #eee" } }>
+            <td >33614</td>
+            <td >2</td>
+            <td >
+            <button className="downloadwage1"  onClick={() => navigate(`/ManagerLegDetails`)}>View</button>
+            </td>
+            <td>22/10/2020</td>
+            <td>
+            <button
+          onClick={() => navigate(`/DriverWageSlip`)}
+          style={{
+            backgroundColor: "green",
+            color: "white",
+            border: "none",
+            padding: "8px 20px",
+            borderRadius: "5px",
+            cursor: "pointer",
+            fontSize: "16px",
+            fontWeight: "normal",
+          }}
+        >
+          View
+        </button>
+            </td>
+            <td >
+            <button className="downloadwage1" >Download</button>
+            </td>
+            
+          </tr>
+        </tbody>
+      </table>
+
+      <div
+        style={{
+          display: "flex",
+          justifyContent: "center",
+          marginTop: "15px",
+        }}
+      >
+        {/* <button
+          onClick={() => navigate(`/finance-clerk-wage-slip/${id}`)}
+          style={{
+            backgroundColor: "green",
+            color: "white",
+            border: "none",
+            padding: "8px 20px",
+            borderRadius: "5px",
+            cursor: "pointer",
+            fontSize: "16px",
+            fontWeight: "normal",
+          }}
+        >
+          Wage Slip
+        </button> */}
+      </div>
+    </>
   )
 }
 
-export default DriverWage
-
+export default FinanceClerkWageDetails

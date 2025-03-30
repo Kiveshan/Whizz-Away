@@ -12,7 +12,7 @@ const Debtors = () => {
     navigate("/client-payments");
   }
   const handleStatementClick=()=>{
-    navigate("/client-documents");
+    navigate("/FinancialDocumentsView");
   }
 
   return (
@@ -29,7 +29,7 @@ const Debtors = () => {
             <img src="/images/Payment.jpg" alt="Payment" />
           </div>
           <div className="card-title">
-            <h3>Payments</h3>
+            <h3>Payment Received</h3>
           </div>
         </div>
         <div className="card" onClick={handleStatementClick}>
@@ -37,7 +37,7 @@ const Debtors = () => {
             <img src="/images/Statements.jpg" alt="Statement" />
           </div>
           <div className="card-title">
-            <h3>Statements</h3>
+            <h3>Financial Documents</h3>
           </div>
         </div>
       </div>

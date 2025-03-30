@@ -17,7 +17,6 @@ const ControllerTrackInstruction = ({ setCurrentPage }) => {
           <div className="filter-group">
             <button className="filter-button active">Import</button>
             <button className="filter-button">Export</button>
-            <button className="filter-button outline">All</button>
           </div>
           <div className="filter-group">
             <button className="filter-button outline">All</button>

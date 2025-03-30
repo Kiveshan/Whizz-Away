@@ -12,12 +12,12 @@ const InvoicesList = () => {
       <main className="main">
         {/* Back Button */}
         <div className="">
-        <button className="back-button" onClick={() => navigate("/FDashboard")}>
+        <button className="back-button" onClick={() => navigate("/ViewClientInvoice")}>
           Back
         </button>
       </div>
       <div className="action-bar">
-        <div className="filter-section">
+        <div className="filter-section6">
           <div className="dropdown-container">
             <select className="dropdown">
               <option>Year</option>
@@ -46,7 +46,7 @@ const InvoicesList = () => {
       </div>
       <div className="filter-section">
         
-          <div className="filter-group">
+          <div className="filter-group1">
             <button className="filter-button active">Import</button>
             <button className="filter-button">Export</button>
             <button className="filter-button outline">All</button>
@@ -56,8 +56,7 @@ const InvoicesList = () => {
            
 
         {/* Table */}
-        <div className="table-container">
-          
+        <div className="table-container22">
           <table>
             <thead>
               <tr>

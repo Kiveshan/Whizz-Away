@@ -14,19 +14,15 @@ const FinanceClerkWageSlip = () => {
     payDate: "30 March",
     earnings: [
       { description: "Base Salary", amount: "R 5000" },
-      { description: "All Legs", amount: "R 2500" },
+      { description: "Leg 1", amount: "R 350" },
+      { description: "Leg 2", amount: "R 250" },
     ],
-    netPay: "R 7500",
+    netPay: "R 5600",
   }
 
   return (
     <div
-    //   style={{
-    //     display: "flex",
-    //     flexDirection: "column",
-    //     minHeight: "100vh",
-    //     backgroundColor: "white",
-    //   }}
+
     >
       <div
         style={{
@@ -165,7 +161,7 @@ const FinanceClerkWageSlip = () => {
         </div>
       </div>
        <button
-                onClick={() => navigate(`/finance-clerk-wage-details/${id}`)}
+                onClick={() => navigate(`/finance-clerk-wage-details`)}
                 style={{
                   backgroundColor: "#8ee4a6",
                   color: "black",
@@ -174,6 +170,8 @@ const FinanceClerkWageSlip = () => {
                   fontSize: "14px",
                   border: "none",
                   cursor: "pointer",
+                  marginBottom:"40px",
+                 
                 }}
               >
                 Back

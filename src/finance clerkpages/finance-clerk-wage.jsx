@@ -14,19 +14,19 @@ const FinanceClerkWage = () => {
     { id: 4, name: "Driver Name 4", wage: "R 1,295" },
   ]
 
-  // State for dropdown selections
-  const [selectedMonth, setSelectedMonth] = useState("")
-  const [selectedYear, setSelectedYear] = useState("")
+  // // State for dropdown selections
+  // const [selectedMonth, setSelectedMonth] = useState("")
+  // const [selectedYear, setSelectedYear] = useState("")
 
   return (
     <div className="wage-container">
       <div className="button-container">
-        <button onClick={() => navigate("/FDashboard")} className="back-btn">
+        <button onClick={() => navigate("/FDashboard")} className="back-button">
           Back
         </button>
       </div>
       
-      <div className="dropdown-container">
+      {/* <div className="dropdown-container24">
         <select 
           value={selectedMonth} 
           onChange={(e) => setSelectedMonth(e.target.value)} 
@@ -58,7 +58,7 @@ const FinanceClerkWage = () => {
           <option value="2025">2025</option>
           <option value="2026">2026</option>
         </select>
-      </div>
+      </div> */}
       
       <div className="wage-table-container">
         <table className="wage-table1">
@@ -66,16 +66,15 @@ const FinanceClerkWage = () => {
             <tr>
               <th>Driver Name</th>
               <th>Wage</th>
-              <th className="details-header">Delivery Details</th>
             </tr>
           </thead>
           <tbody>
             {drivers.map((driver) => (
               <tr key={driver.id}>
                 <td>{driver.name}</td>
-                <td>{driver.wage}</td>
-                <td className="view-cell">
-                  <button onClick={() => navigate(`/finance-clerk-wage-details/${driver.id}`)} className="view-btn">
+              
+                <td >
+                  <button onClick={() => navigate(`/finance-clerk-wage-details`)} className="view-btn">
                     View
                   </button>
                 </td>

@@ -9,11 +9,12 @@
   
   
   
-  .wage-table {
-    width: 100%;
+  .wage-table30 {
+    width: 50%;
     border-collapse: collapse;
     margin: 0 auto;
     text-align: center;
+    margin-top: -85px;
   }
   
   

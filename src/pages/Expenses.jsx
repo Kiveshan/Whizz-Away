@@ -1,6 +1,6 @@
 "use client"
 import { useNavigate } from "react-router-dom"
-import "../css/Expenses.css"
+import "../css/Expenses1.css"
 
 const Expenses = () => {
   const navigate = useNavigate()
@@ -25,7 +25,7 @@ const Expenses = () => {
   ]
 
   const handleBack = () => {
-    navigate("/")
+    navigate("/ManagerViewFuelExpence")
   }
 
   const handleView = (expense) => {
@@ -43,16 +43,16 @@ const Expenses = () => {
           Back
         </button>
       </div>
-      <div className="filter-section">
+      <div className="filter-section37">
       <div className="filter-group">
-        <select className="filter-select">
+        <select className="dropdown">
           <option value="">Year</option>
           <option value="2024">2024</option>
           <option value="2023">2023</option>
           <option value="2022">2022</option>
         </select>
 
-        <select className="filter-dropdown">
+        <select className="dropdown">
           <option value="">Month</option>
           <option value="1">January</option>
           <option value="2">February</option>
@@ -70,38 +70,41 @@ const Expenses = () => {
       </div>
       </div>
 
-      <div className="expenses-table">
-        <div className="table-header">
-          <div className="header-cell">Type of Expense</div>
-          <div className="header-cell">Description</div>
-          <div className="header-cell">Expense Cost</div>
-          <div className="header-cell">Document by</div>
-          <div className="header-cell">Date</div>
-          <div className="header-cell">Registration No.</div>
-          <div className="header-cell">Display</div>
-          <div className="header-cell">Petrol Slip</div>
-        </div>
-        {expenses.map((expense, index) => (
-          <div key={index} className="table-row">
-            <div className="table-cell">{expense.id}</div>
-            <div className="table-cell">{expense.description}</div>
-            <div className="table-cell">{expense.amount}</div>
-            <div className="table-cell">{expense.documentBy}</div>
-            <div className="table-cell">{expense.date}</div>
-            <div className="table-cell">{expense.regNo}</div>
-            <div className="table-cell">
-              <button className="view-button" onClick={() => handleView(expense)}>
-                View
-              </button>
-            </div>
-            <div className="table-cell">
-              <button className="download-button" onClick={() => handleDownload(expense)}>
-                Download
-              </button>
-            </div>
-          </div>
-        ))}
-      </div>
+      <table className="expenses-table">
+  <thead>
+    <tr>
+      <th>Type of Expense</th>
+      <th>Description</th>
+      <th>Expense Cost</th>
+      <th>Document by</th>
+      <th>Date</th>
+      <th>Display</th>
+      <th>Petrol Slip</th>
+    </tr>
+  </thead>
+  <tbody>
+    {expenses.map((expense, index) => (
+      <tr key={index}>
+        <td>{expense.id}</td>
+        <td>{expense.description}</td>
+        <td>{expense.amount}</td>
+        <td>{expense.documentBy}</td>
+        <td>{expense.date}</td>
+        <td>
+          <button className="view-button" onClick={() => handleView(expense)}>
+            View
+          </button>
+        </td>
+        <td>
+          <button className="download-button" onClick={() => handleDownload(expense)}>
+            Download
+          </button>
+        </td>
+      </tr>
+    ))}
+  </tbody>
+</table>
+
     </div>
   )
 }

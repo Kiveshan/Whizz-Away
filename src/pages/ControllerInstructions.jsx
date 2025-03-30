@@ -304,7 +304,7 @@ const ControllerInstructions = () => {
 
       {/* Back Button */}
       <div className="client-payments-header">
-        <button className="back-button" onClick={() => navigate(-1)}>
+        <button className="back-button" onClick={() => navigate("/ControllerDashboard")}>
           Back
         </button>
       </div>
@@ -336,7 +336,7 @@ const ControllerInstructions = () => {
           ) : null}
 
           <div className="form-section">
-            <div className="form-row">
+            <div className="form-row1">
               <div className="form-group">
                 <label>Client</label>
                 <div className="select-wrapper">
@@ -393,7 +393,7 @@ const ControllerInstructions = () => {
           </div>
 
           <div className="form-section">
-            <div className="form-row">
+            <div className="form-row1">
               <div className="form-group">
                 <label>Shipment Type</label>
                 <div className="select-wrapper">
@@ -413,7 +413,7 @@ const ControllerInstructions = () => {
                   </select>
                 </div>
               </div>
-              <div className="form-group wide">
+              <div className="form-group">
                 <label>Name of Task</label>
                 <input
                   type="text"
@@ -426,7 +426,7 @@ const ControllerInstructions = () => {
               </div>
             </div>
 
-            <div className="form-row">
+            <div className="form-row1">
               <div className="form-group">
                 <label>Pick-Up Location</label>
                 <input
@@ -474,7 +474,7 @@ const ControllerInstructions = () => {
             </div>
 
             {/* Date Inputs with functional calendar buttons */}
-            <div className="form-row">
+            <div className="form-row1">
               <div className="form-group">
                 <label>Pick-up Time</label>
                 <div className="date-input-group">
@@ -540,7 +540,7 @@ const ControllerInstructions = () => {
 
           {/* Additional form sections */}
           <div className="form-section">
-            <div className="form-row">
+            <div className="form-row1">
               <div className="form-group">
                 <label>File Ref</label>
                 <input
@@ -583,64 +583,45 @@ const ControllerInstructions = () => {
               </div>
             </div>
 
-            <div className="form-row">
-              <div className="form-group" style={{ flex: "0 0 150px" }}>
-                <label>No. of Containers</label>
-                <div className="number-input-group" style={{ gap: "10px" }}>
-                  <input
-                    type="number"
-                    className="form-input"
-                    value={formData.numContainers}
-                    name="numContainers"
-                    onChange={handleInputChange}
-                    min="1"
-                    style={{ width: "60%" }}
-                  />
-                  <div
-                    className="number-controls"
-                    style={{ display: "flex", flexDirection: "column", alignItems: "center" }}
-                  >
-                    <button
-                      className="number-up"
-                      style={{ fontSize: "12px", padding: "2px" }}
-                      onClick={() => handleContainerChange(1)}
-                      type="button"
-                    >
-                      ▲
-                    </button>
-                    <button
-                      className="number-down"
-                      style={{ fontSize: "12px", padding: "2px" }}
-                      onClick={() => handleContainerChange(-1)}
-                      type="button"
-                    >
-                      ▼
-                    </button>
-                  </div>
-                </div>
-              </div>
+            <div className="form-row1">
+          
+              <div className="form-group">
+  <label style={{marginLeft:"281px"}}>Trailer Size</label>
+  <div className="counter-container">
+  <label style={{ marginTop: "40px" }}>No. of Containers</label>
+    <div className="counter">
+      <span>6m</span>
+      <input type="number" defaultValue="0" min="0" />
+    </div>
+    <div className="counter">
+      <span>12m</span>
+      <input type="number" defaultValue="0" min="0" />
+    </div>
+    <div className="counter">
+      <span>Abnormal</span>
+      <input type="number" defaultValue="0" min="0" />
+    </div>
+  </div>
+</div>
+
 
               <div className="form-group">
-                {/* Trailer Size Dropdown */}
-                <div className="form-group">
-                  <label>Trailer Size</label>
-                  <select
-                    className="dropdown"
-                    name="trailerSize"
-                    value={formData.trailerSize}
-                    onChange={handleInputChange}
-                  >
-                    <option value="6m">6m</option>
-                    <option value="12m">12m</option>
-                    <option value="abnormal">Abnormal</option>
-                  </select>
-                </div>
+                <label>VAT Rate</label>
+                <input
+                  type="text"
+                  className="form-input"
+                  placeholder="Vat Rate"
+                  defaultValue="15%"
+                  style={{ width: "20%" }}
+                  readOnly
+                />
               </div>
             </div>
           </div>
-
+          
+         
           <div className="form-section">
-            <div className="form-row">
+            <div className="form-row1">
               <div className="form-group full-width">
                 <label>Description from client</label>
                 <textarea
@@ -653,6 +634,7 @@ const ControllerInstructions = () => {
               </div>
             </div>
           </div>
+         
 
           <div className="button-container1">
             <button

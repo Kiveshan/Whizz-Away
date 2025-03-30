@@ -187,38 +187,34 @@ const ContainerDetailsPage = () => {
           <br />
 
           <div className="container-table-wrapper">
-            <table className="container-table1">
-              <thead>
+            <table className="container-table1" >
+              <thead style={{ width: "250px" }}>
                 <tr>
                   <th>#</th>
                   <th>Container Number</th>
-                  {isImport && <th>Weight</th>}
+                  <th>Trailer Size</th>
+                  <th>Weight (if Import)</th>
                 </tr>
               </thead>
               <tbody>
-                {containers.map((container, index) => (
-                  <tr key={container.id} className={index % 2 === 1 ? "even-row" : ""}>
-                    <td>{container.id}</td>
-                    <td>
-                      <input
-                        type="text"
-                        value={container.containerNum}
-                        onChange={(e) => handleContainerChange(container.id, "containerNum", e.target.value)}
-                        className="container-input"
-                      />
-                    </td>
-                    {isImport && (
-                      <td>
-                        <input
-                          type="text"
-                          value={container.weight}
-                          onChange={(e) => handleContainerChange(container.id, "weight", e.target.value)}
-                          className="container-input"
-                        />
-                      </td>
-                    )}
-                  </tr>
-                ))}
+                <tr>
+                  <td>1</td>
+                  <td><input type="text" defaultValue="1245" /></td>
+                  <td>12m</td> {/* Static text for trailer size */}
+                  <td><input type="number" defaultValue="150000" /></td>
+                </tr>
+                <tr className="even-row">
+                  <td>2</td>
+                  <td><input type="text" defaultValue="1258"  /></td>
+                  <td>6m</td> {/* Static text for trailer size */}
+                  <td><input type="number" defaultValue="145000" /></td>
+                </tr>
+                <tr>
+                  <td>3</td>
+                  <td><input type="text" defaultValue="1254" /></td>
+                  <td>6m</td> {/* Static text for trailer size */}
+                  <td><input type="number" defaultValue="150789" /></td>
+                </tr>
               </tbody>
             </table>
           </div>
