@@ -1,7 +1,8 @@
 "use client"
-import { useState, useEffect } from "react"
+import { useState, useEffect, useRef } from "react"
 import { useNavigate, useParams, useLocation } from "react-router-dom"
 import "../finance clerkpages/css/InvoiceTemplate.css"
+import html2pdf from "html2pdf.js"
 
 const ClientInvoice = () => {
   const navigate = useNavigate()
@@ -14,6 +15,10 @@ const ClientInvoice = () => {
   const [invoiceData, setInvoiceData] = useState(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
+  const [pdfLoading, setPdfLoading] = useState(false)
+  const [isPrinting, setIsPrinting] = useState(false)
+
+  const invoiceRef = useRef(null)
 
   useEffect(() => {
     const fetchInvoiceData = async () => {
@@ -78,6 +83,53 @@ const ClientInvoice = () => {
     return `R ${Number(amount).toLocaleString("en-ZA", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
   }
 
+  const generatePDF = () => {
+    // Set printing mode before generating
+    setIsPrinting(true)
+    setPdfLoading(true)
+
+    // Short delay to ensure CSS changes are applied
+    setTimeout(() => {
+      const element = invoiceRef.current
+      const filename = `Invoice-${invoiceNumber}.pdf`
+
+      const opt = {
+        margin: [10, 10, 10, 10],
+        filename: filename,
+        image: { type: "png", quality: 1.0 }, // PNG for better quality
+        html2canvas: {
+          scale: 3, // Balance between quality and performance
+          useCORS: true,
+          letterRendering: true,
+          allowTaint: true,
+          backgroundColor: "#FFFFFF",
+        },
+        jsPDF: {
+          unit: "mm",
+          format: "a4",
+          orientation: "portrait",
+          compress: false,
+          precision: 16,
+          putOnlyUsedFonts: true,
+        },
+      }
+
+      html2pdf()
+        .set(opt)
+        .from(element)
+        .save()
+        .then(() => {
+          setPdfLoading(false)
+          setIsPrinting(false) // Reset printing mode
+        })
+        .catch((error) => {
+          console.error("PDF generation error:", error)
+          setPdfLoading(false)
+          setIsPrinting(false)
+        })
+    }, 100)
+  }
+
   // Loading, error, and no data states
   if (loading) {
     return (
@@ -129,7 +181,7 @@ const ClientInvoice = () => {
 
   return (
     <div className="invoice-page">
-      <div className="invoice-paper">
+      <div className={`invoice-paper ${isPrinting ? "printing-mode" : ""}`} ref={invoiceRef}>
         {/* Transport and Logistics section */}
         <div className="transport-section">
           <div className="section-title">Transport and Logistics</div>
@@ -252,8 +304,8 @@ const ClientInvoice = () => {
         <button className="back-btn" onClick={() => navigate("/invoices")}>
           Back
         </button>
-        <button className="download-btn" onClick={() => window.print()}>
-          Download
+        <button className="download-btn" onClick={generatePDF} disabled={pdfLoading}>
+          {pdfLoading ? "Generating PDF..." : "Download PDF"}
         </button>
       </div>
     </div>
