@@ -39,7 +39,7 @@ const MonitorInstructions = () => {
   ]
 
   const handleBack = () => {
-    navigate("/FinancialDocumentsView")
+    navigate("/")
   }
 
   const handleFilterChange = (type) => {

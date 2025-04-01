@@ -31,7 +31,7 @@ app.use(passport.session());
 const client = new pg.Client({
   user: process.env.RDS_USERNAME || "postgres",
   host: process.env.RDS_HOSTNAME || "localhost",
-  database: process.env.RDS_DB_NAME || "Whizz22March",
+  database: process.env.RDS_DB_NAME || "Whizz30March",
   password: process.env.RDS_PASSWORD || "123456",
   port: process.env.RDS_PORT || 5433,
   ssl: process.env.DB_SSL ? { rejectUnauthorized: false } : false
@@ -44,67 +44,130 @@ async function connectDb() {
 }
 
 // Passport Local Strategy for Authentication
+// passport.use(new LocalStrategy(
+//     { usernameField: "email" }, // Tell Passport to use "email" instead of "username"
+//     async (email, password, done) => {
+//       try {
+//         const result = await client.query("SELECT * FROM usertable WHERE email = $1", [email]);
+  
+//         if (result.rows.length === 0) {
+//           console.log("No user found with email:", email);
+//           return done(null, false, { message: "Invalid email or password" });
+//         }
+  
+//         const user = result.rows[0];
+//         console.log("Fetched user:", user);
+  
+//         const passwordMatch = await bcrypt.compare(password, user.password);
+  
+//         if (!passwordMatch) {
+//           console.log("Password mismatch for user:", email);
+//           return done(null, false, { message: "Invalid email or password" });
+//         }
+  
+//         return done(null, user);
+//       } catch (err) {
+//         console.error("Error during authentication:", err);
+//         return done(err);
+//       }
+//     }
+//   ));
 passport.use(new LocalStrategy(
-    { usernameField: "email" }, // Tell Passport to use "email" instead of "username"
-    async (email, password, done) => {
-      try {
-        const result = await client.query("SELECT * FROM usertable WHERE email = $1", [email]);
-  
+  { usernameField: "email" }, 
+  async (email, password, done) => {
+    try {
+      // Check usertable first
+      let result = await client.query("SELECT * FROM usertable WHERE email = $1", [email]);
+      
+      if (result.rows.length === 0) {
+        // If not found in usertable, check m5_employee
+        result = await client.query("SELECT * FROM m5_employee WHERE email = $1", [email]);
+
         if (result.rows.length === 0) {
-          console.log("No user found with email:", email);
+          console.log("No user found in both tables with email:", email);
           return done(null, false, { message: "Invalid email or password" });
         }
-  
-        const user = result.rows[0];
-        console.log("Fetched user:", user);
-  
-        const passwordMatch = await bcrypt.compare(password, user.password);
-  
-        if (!passwordMatch) {
-          console.log("Password mismatch for user:", email);
-          return done(null, false, { message: "Invalid email or password" });
-        }
-  
-        return done(null, user);
-      } catch (err) {
-        console.error("Error during authentication:", err);
-        return done(err);
       }
+
+      const user = result.rows[0];
+      console.log("Fetched user:", user);
+
+      // Compare the provided password with the hashed password
+      const passwordMatch = await bcrypt.compare(password, user.password);
+
+      if (!passwordMatch) {
+        console.log("Password mismatch for user:", email);
+        return done(null, false, { message: "Invalid email or password" });
+      }
+
+      // Add a custom field to indicate which table the user is from
+      user.table = result.fields[0].table; // This stores the table name for later use
+
+      return done(null, user);
+    } catch (err) {
+      console.error("Error during authentication:", err);
+      return done(err);
     }
-  ));
+  }
+));
+
   
 
-// Serialize and deserialize user to store user ID in session
 passport.serializeUser((user, done) => {
-  done(null, user.userid);
+  done(null, { userid: user.userid, table: user.table });
 });
 
-passport.deserializeUser(async (userid, done) => {
+passport.deserializeUser(async (sessionUser, done) => {
   try {
-    const result = await client.query("SELECT * FROM usertable WHERE userid = $1", [userid]);
+    const { userid, table } = sessionUser;
+    let result;
+
+    if (table === "usertable") {
+      result = await client.query("SELECT * FROM usertable WHERE userid = $1", [userid]);
+    } else if (table === "m5_employee") {
+      result = await client.query("SELECT * FROM m5_employee WHERE userid = $1", [userid]);
+    }
+
+    if (result.rows.length === 0) {
+      return done(null, false);
+    }
+
     done(null, result.rows[0]);
   } catch (err) {
     done(err);
   }
 });
 
+
 // Register User
 app.post("/register", async (req, res) => {
   const { name, surname, email, password, companyname, roleid } = req.body;
 
   try {
+    // Check if the email already exists
+    const existingUser = await client.query("SELECT * FROM usertable WHERE email = $1", [email]);
+
+    if (existingUser.rows.length > 0) {
+      return res.status(400).json({ error: "Email already registered" });
+    }
+
+    // Hash password
     const hashedPassword = await bcrypt.hash(password, 10);
 
+    // Insert new user into usertable
     const result = await client.query(
-      "INSERT INTO usertable (name, surname, email, password, companyname, dateofreg, roleid, status) VALUES ($1, $2, $3, $4, $5, NOW(), $6, 'active') RETURNING *",
+      `INSERT INTO usertable (name, surname, email, password, companyname, dateofreg, roleid, status) 
+       VALUES ($1, $2, $3, $4, $5, NOW(), $6, 'active') RETURNING *`,
       [name, surname, email, hashedPassword, companyname, roleid]
     );
 
     res.json({ message: "User registered successfully", user: result.rows[0] });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    console.error("Registration error:", err);
+    res.status(500).json({ error: "Internal Server Error" });
   }
 });
+
 
 app.post("/login", async (req, res, next) => {
     passport.authenticate("local", async (err, user, info) => {
@@ -129,11 +192,11 @@ app.post("/login", async (req, res, next) => {
         if (roleid === 1) {
           redirectUrl = "/Dashboard";
         } else if (roleid === 2) {
-          redirectUrl = "/Controller_Dashboard";
+          redirectUrl = "/ControllerDashboard";
         } else if (roleid === 3) {
           redirectUrl = "/FDashboard";
         } else if (roleid === 4) {
-            redirectUrl = "/Dashboard";
+            redirectUrl = "/DirectorDashboard";
           }
         
   
