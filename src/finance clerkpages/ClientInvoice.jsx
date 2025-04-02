@@ -246,42 +246,54 @@ const ClientInvoice = () => {
 
           {/* Container Details */}
           <div className="container-section">
+            {/* Container Table */}
+            <h3 className="table-heading">Container Details</h3>
             <table className="container-table5">
               <thead>
                 <tr>
                   <th className="container-number-header">Container Number</th>
                   <th className="weight-header">Weight</th>
-                  <th className="amount-header">Amount</th>
-                  <th className="vat-header">VAT</th>
-                  <th className="total-header">Total</th>
                 </tr>
               </thead>
               <tbody>
                 {containers.length > 0 ? (
-                  containers.map((container, index) => {
-                    const containerAmount = amount / (containers.length || 1)
-                    const containerVAT = calculateVAT(containerAmount)
-                    const containerTotal = containerAmount + containerVAT
-
-                    return (
-                      <tr key={index}>
-                        <td className="container-number">{container.container_number || `Container ${index + 1}`}</td>
-                        <td className="weight">{container.weight || "N/A"}</td>
-                        <td className="amount">{formatCurrency(containerAmount)}</td>
-                        <td className="vat">{formatCurrency(containerVAT)}</td>
-                        <td className="total">{formatCurrency(containerTotal)}</td>
-                      </tr>
-                    )
-                  })
+                  containers.map((container, index) => (
+                    <tr key={index}>
+                      <td className="container-number">{container.container_number || `Container ${index + 1}`}</td>
+                      <td className="weight">{container.weight || "N/A"}</td>
+                    </tr>
+                  ))
                 ) : (
                   <tr>
                     <td className="container-number">No container information</td>
                     <td className="weight">N/A</td>
-                    <td className="amount">{formatCurrency(amount)}</td>
-                    <td className="vat">{formatCurrency(vat)}</td>
-                    <td className="total">{formatCurrency(total)}</td>
                   </tr>
                 )}
+              </tbody>
+            </table>
+
+            {/* Totals Table */}
+            <h3 className="table-heading">Invoice Summary</h3>
+            <table className="container-table5">
+              <thead>
+                <tr>
+                  <th className="description-header">Description</th>
+                  <th className="amount-header">Amount</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td className="description">Amount</td>
+                  <td className="amount">{formatCurrency(amount)}</td>
+                </tr>
+                <tr>
+                  <td className="description">VAT (15%)</td>
+                  <td className="amount">{formatCurrency(vat)}</td>
+                </tr>
+                <tr className="total-row">
+                  <td className="description">Total</td>
+                  <td className="amount">{formatCurrency(total)}</td>
+                </tr>
               </tbody>
             </table>
           </div>
@@ -305,7 +317,7 @@ const ClientInvoice = () => {
           Back
         </button>
         <button className="download-btn" onClick={generatePDF} disabled={pdfLoading}>
-          {pdfLoading ? "Generating PDF..." : "Download PDF"}
+          {pdfLoading ? "Generating High-Quality PDF..." : "Download PDF"}
         </button>
       </div>
     </div>

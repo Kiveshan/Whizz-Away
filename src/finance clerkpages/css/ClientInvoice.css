@@ -491,3 +491,97 @@
   margin-top: 20px !important;
 }
 
+/* Totals row styling */
+.totals-row {
+  font-weight: bold;
+  background-color: #f2f2f2;
+}
+
+.totals-row .totals-label {
+  text-align: right;
+  padding-right: 15px;
+}
+
+.totals-row .amount,
+.totals-row .vat,
+.totals-row .total {
+  font-weight: bold;
+}
+
+/* Improve print styling for totals row */
+.printing-mode .totals-row {
+  background-color: #e6e6e6 !important;
+  font-weight: bold !important;
+}
+
+.printing-mode .totals-row td {
+  border: 1px solid #000000 !important;
+}
+
+/* Table headings */
+.table-heading {
+  font-size: 16px;
+  font-weight: bold;
+  margin: 20px 0 10px 0;
+  color: #333;
+}
+
+/* Totals Table */
+.totals-table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-top: 20px;
+  min-width: 600px;
+}
+
+.totals-table th {
+  background-color: #b8cce4;
+  font-weight: bold;
+  font-size: 14px;
+  padding: 8px 10px;
+  border: 1px solid #000;
+  text-align: center;
+}
+
+.totals-table td {
+  font-size: 14px;
+  padding: 8px 10px;
+  border: 1px solid #000;
+}
+
+.description-header {
+  width: 70%;
+  text-align: left;
+}
+
+.description {
+  text-align: left;
+  padding-left: 20px;
+}
+
+.total-row {
+  font-weight: bold;
+  background-color: #f2f2f2;
+}
+
+.total-row .description,
+.total-row .amount {
+  font-weight: bold;
+}
+
+/* Print-specific styles for totals table */
+.printing-mode .totals-table th,
+.printing-mode .totals-table td {
+  border: 1px solid #000000 !important;
+}
+
+.printing-mode .total-row {
+  background-color: #e6e6e6 !important;
+}
+
+.printing-mode .table-heading {
+  margin-top: 25px !important;
+  margin-bottom: 10px !important;
+  color: #000000 !important;
+}
+
