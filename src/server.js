@@ -43,64 +43,39 @@ app.use(
 app.use(passport.initialize())
 app.use(passport.session())
 
-// Database client setup with multiple connection options
-const dbConfigs = [
-  {
-    name: "Primary Config",
-    config: {
-      user: process.env.RDS_USERNAME || "postgres",
-      host: process.env.RDS_HOSTNAME || "localhost",
-      database: process.env.RDS_DB_NAME || "Whizz-Away",
-      password: process.env.RDS_PASSWORD || "123456",
-      port: process.env.RDS_PORT || 5433,
-      ssl: process.env.DB_SSL ? { rejectUnauthorized: false } : false,
-    },
-  },
-  {
-    name: "Fallback Config (Port 5432)",
-    config: {
-      user: process.env.PGUSER || "postgres",
-      host: process.env.PGHOST || "localhost",
-      database: process.env.PGDATABASE || "Whizz-Away",
-      password: process.env.PGPASSWORD || "123456",
-      port: 5432,
-      ssl: process.env.DB_SSL ? { rejectUnauthorized: false } : false,
-    },
-  },
-]
+// Database client setup
+const dbConfig = {
+  user: process.env.PGUSER || "postgres",
+  host: process.env.PGHOST || "localhost",
+  database: process.env.PGDATABASE || "Whizz-Away",
+  password: process.env.PGPASSWORD || "123456",
+  port: process.env.PGPORT || 5432,
+  ssl: process.env.DB_SSL ? { rejectUnauthorized: false } : false,
+}
 
 let pool = null
 
-// Function to connect to the database with fallback options
+// Function to connect to the database
 async function connectDb() {
-  for (const dbConfig of dbConfigs) {
-    try {
-      console.log(`Trying database connection with ${dbConfig.name}...`)
-      pool = new Pool(dbConfig.config)
+  try {
+    console.log("Connecting to database...")
+    pool = new Pool(dbConfig)
 
-      // Test the connection
-      const client = await pool.connect()
-      const result = await client.query("SELECT NOW()")
-      client.release()
+    // Test the connection
+    const client = await pool.connect()
+    const result = await client.query("SELECT NOW()")
+    client.release()
 
-      console.log(`✅ Database Connected Successfully using ${dbConfig.name}`)
-      console.log(`Database server time:`, result.rows[0].now)
+    console.log("✅ Database Connected Successfully")
+    console.log(`Database server time:`, result.rows[0].now)
+  } catch (err) {
+    console.error("❌ Database connection failed:", err.message)
+    console.error("Please check your database configuration and ensure PostgreSQL is running")
 
-      // If we get here, connection was successful
-      return
-    } catch (err) {
-      console.error(`Failed to connect with ${dbConfig.name}:`, err.message)
-      // Continue to the next configuration
-    }
+    // Don't exit the process, allow the server to start anyway
+    // This way API endpoints that don't require DB can still work
+    console.log("Starting server without database connection...")
   }
-
-  // If we get here, all connection attempts failed
-  console.error("❌ All database connection attempts failed")
-  console.error("Please check your database configuration and ensure PostgreSQL is running")
-
-  // Don't exit the process, allow the server to start anyway
-  // This way API endpoints that don't require DB can still work
-  console.log("Starting server without database connection...")
 }
 
 // Helper function to execute database queries
@@ -354,7 +329,7 @@ app.get("/api/invoices/:id", async (req, res) => {
         m1.description,
         m1.rate,
         m1.rateweight,
-        m1.num_containers
+        COALESCE(m1.num_six_meters, 0) + COALESCE(m1.num_twelve_meters, 0) + COALESCE(m1.num_abnormal, 0) as num_containers
       FROM 
         public.m1_controller m1
       LEFT JOIN 
