@@ -15,10 +15,12 @@ const BMcontrollerInstructionDetails = () => {
   const API_BASE_URL = API_CONFIG.BASE_URL
 
   // Get data from location state
-  const { controllerData, isImport, instructionId } = location.state || {
+  const { controllerData, isImport, instructionId, clientId, clientName } = location.state || {
     controllerData: null,
     isImport: false,
     instructionId: null,
+    clientId: null,
+    clientName: null,
   }
 
   // State for container data
@@ -245,10 +247,12 @@ const BMcontrollerInstructionDetails = () => {
 
   // Handle back button click
   const handleBackClick = () => {
-    // Navigate back to BMcontrollerinstructions with the instructionId
+    // Navigate back to BMcontrollerinstructions with the instructionId, clientId, and clientName
     navigate("/BMcontrollerinstructions", {
       state: {
         instructionId: instructionId,
+        clientId: clientId,
+        clientName: clientName,
       },
     })
   }

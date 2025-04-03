@@ -1,7 +1,10 @@
 {
   "name": "trucking_app",
   "version": "0.1.0",
+  "type": "module",
   "private": true,
+
+
   "dependencies": {
     "@testing-library/dom": "^10.4.0",
     "@testing-library/jest-dom": "^6.6.3",
@@ -62,6 +65,7 @@
   },
   "devDependencies": {
     "concurrently": "^9.1.2"
+    
   },
   "proxy": "http://localhost:5000"
 }

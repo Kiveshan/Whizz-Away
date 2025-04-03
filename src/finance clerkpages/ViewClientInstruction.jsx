@@ -62,6 +62,17 @@ const ViewClientInstruction = () => {
     return centeredCellStyle
   }
 
+  // Handle view instructions click - explicitly pass clientId and clientName
+  const handleViewInstructions = (clientId, clientName) => {
+    console.log("Navigating to instructions with clientId:", clientId, "and clientName:", clientName)
+    navigate("/instructions", {
+      state: {
+        clientId: clientId,
+        clientName: clientName,
+      },
+    })
+  }
+
   return (
     <div className="">
       {/* Back Button */}
@@ -72,13 +83,13 @@ const ViewClientInstruction = () => {
       </div>
 
       {/* Table */}
-      <div className="table3">
+      <div className="table3" style={{ display: "flex", justifyContent: "center" }}>
         {loading ? (
           <p>Loading client data...</p>
         ) : error ? (
           <p className="error-message">{error}</p>
         ) : (
-          <table className="t1">
+          <table className="t1" style={{ marginLeft: "auto", marginRight: "auto" }}>
             <thead className="bg-blue-300">
               <tr>
                 <th className="p-3">Company</th>
@@ -121,11 +132,7 @@ const ViewClientInstruction = () => {
                     <td className="p-3">
                       <button
                         className={`view-butn ${client.new_count > 0 ? "bg-red-500" : ""}`}
-                        onClick={() =>
-                          navigate("/instructions", {
-                            state: { clientId: client.m5clientkey, clientName: client.companyname },
-                          })
-                        }
+                        onClick={() => handleViewInstructions(client.m5clientkey, client.companyname)}
                       >
                         View
                       </button>

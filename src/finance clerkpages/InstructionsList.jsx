@@ -8,14 +8,29 @@ import API_CONFIG from "../utils/api-config"
 const Instructions = () => {
   const navigate = useNavigate()
   const location = useLocation()
-  const { clientId, clientName } = location.state || {}
 
-  const [selectedMonth, setSelectedMonth] = useState("")
-  const [selectedYear, setSelectedYear] = useState("")
+  // Extract state from location
+  const clientId = location.state?.clientId
+  const clientName = location.state?.clientName
+
+  // Initialize state with values from location state if available
+  const [selectedMonth, setSelectedMonth] = useState(location.state?.selectedMonth || "")
+  const [selectedYear, setSelectedYear] = useState(location.state?.selectedYear || "")
+  const [activeFilter, setActiveFilter] = useState(location.state?.activeFilter || "All")
+
   const [instructions, setInstructions] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
-  const [activeFilter, setActiveFilter] = useState("All")
+
+  // Log when component mounts and what state it receives
+  useEffect(() => {
+    console.log("InstructionsList mounted with state:", location.state)
+    console.log("clientId:", clientId)
+    console.log("clientName:", clientName)
+    console.log("selectedMonth:", selectedMonth)
+    console.log("selectedYear:", selectedYear)
+    console.log("activeFilter:", activeFilter)
+  }, [location.state, clientId, clientName, selectedMonth, selectedYear, activeFilter])
 
   useEffect(() => {
     const fetchInstructions = async () => {
@@ -25,9 +40,13 @@ const Instructions = () => {
 
         // Add client filter if clientId is provided
         if (clientId) {
+          console.log("Fetching instructions for clientId:", clientId)
           url += `?clientId=${clientId}`
+        } else {
+          console.log("No clientId provided, fetching all instructions")
         }
 
+        console.log("Fetching from URL:", url)
         const response = await fetch(url)
 
         if (!response.ok) {
@@ -35,7 +54,7 @@ const Instructions = () => {
         }
 
         const data = await response.json()
-        console.log("Instructions data:", data) // Debug log
+        console.log("Instructions data received:", data.length, "records")
         setInstructions(data)
         setLoading(false)
       } catch (error) {
@@ -45,8 +64,12 @@ const Instructions = () => {
       }
     }
 
+    // Log the clientId to verify it's being received correctly
+    console.log("InstructionsList - clientId for fetching:", clientId)
+
+    // Only fetch instructions if component is mounted
     fetchInstructions()
-  }, [clientId])
+  }, [clientId]) // Make sure clientId is in the dependency array
 
   const handleFilterClick = (filter) => {
     setActiveFilter(filter)
@@ -98,11 +121,22 @@ const Instructions = () => {
     return filtered
   }
 
-  // Handle view instruction click
+  // Handle view instruction click - explicitly pass all state to FCcontrollerinstructions
   const handleViewInstruction = (instructionId) => {
-    navigate("/FCcontrollerinstructions", {
-      state: { instructionId },
-    })
+    // Create state object with all necessary parameters
+    const stateToPass = {
+      instructionId,
+      clientId,
+      clientName,
+      selectedMonth,
+      selectedYear,
+      activeFilter,
+    }
+
+    // Log the state being passed to FCcontrollerinstructions
+    console.log("Navigating to FCcontrollerinstructions with state:", stateToPass)
+
+    navigate("/FCcontrollerinstructions", { state: stateToPass })
   }
 
   return (
@@ -145,22 +179,40 @@ const Instructions = () => {
       <div className="content1">
         <div className="button-group">
           <div className="filter-buttons">
-            <button className="btn btn-blue" onClick={() => handleFilterClick("import")}>
+            <button
+              className={`btn btn-blue ${activeFilter === "import" ? "active" : ""}`}
+              onClick={() => handleFilterClick("import")}
+            >
               Import
             </button>
-            <button className="btn btn-blue" onClick={() => handleFilterClick("export")}>
+            <button
+              className={`btn btn-blue ${activeFilter === "export" ? "active" : ""}`}
+              onClick={() => handleFilterClick("export")}
+            >
               Export
             </button>
-            <button className="btn btn-blue" onClick={() => handleFilterClick("All")}>
+            <button
+              className={`btn btn-blue ${activeFilter === "All" ? "active" : ""}`}
+              onClick={() => handleFilterClick("All")}
+            >
               All
             </button>
-            <button className="btn btn-blue" onClick={() => handleFilterClick("In progress")}>
+            <button
+              className={`btn btn-blue ${activeFilter === "In progress" ? "active" : ""}`}
+              onClick={() => handleFilterClick("In progress")}
+            >
               In-Progress
             </button>
-            <button className="btn btn-blue" onClick={() => handleFilterClick("Completed")}>
+            <button
+              className={`btn btn-blue ${activeFilter === "Completed" ? "active" : ""}`}
+              onClick={() => handleFilterClick("Completed")}
+            >
               Complete
             </button>
-            <button className="btn btn-blue" onClick={() => handleFilterClick("New")}>
+            <button
+              className={`btn btn-blue ${activeFilter === "New" ? "active" : ""}`}
+              onClick={() => handleFilterClick("New")}
+            >
               New
             </button>
           </div>

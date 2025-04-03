@@ -10,6 +10,8 @@ const BMcontrollerinstructions = () => {
   const navigate = useNavigate()
   const location = useLocation()
   const instructionId = location.state?.instructionId
+  const clientId = location.state?.clientId
+  const clientName = location.state?.clientName
   const preservedFormData = location.state?.preservedFormData
 
   // API base URL from config
@@ -40,6 +42,7 @@ const BMcontrollerinstructions = () => {
     fileRef: "",
     rateWeight: "kg",
     rate: "",
+    weight: "", // Added weight field
     num_six_meters: 0,
     num_twelve_meters: 0,
     num_abnormal: 0,
@@ -95,6 +98,14 @@ const BMcontrollerinstructions = () => {
     const ampm = hour >= 12 ? "PM" : "AM"
     const hour12 = hour % 12 || 12
     return `${hour12}:${minutes} ${ampm}`
+  }
+
+  // Format weight to 2 decimal places
+  const formatWeightForDisplay = (weight) => {
+    if (weight === null || weight === undefined || weight === "") {
+      return "No Weight Amount Provided"
+    }
+    return Number.parseFloat(weight).toFixed(2)
   }
 
   // Fetch clients, shipment types, and instruction data on component mount
@@ -157,6 +168,7 @@ const BMcontrollerinstructions = () => {
         fileRef: data.fileref || "",
         rateWeight: data.rateweight || "kg",
         rate: data.rate ? data.rate.toString() : "",
+        weight: data.weight ? formatWeightForDisplay(data.weight) : "No Weight Amount Provided", // Format weight
         num_six_meters: data.num_six_meters || 0,
         num_twelve_meters: data.num_twelve_meters || 0,
         num_abnormal: data.num_abnormal || 0,
@@ -261,6 +273,19 @@ const BMcontrollerinstructions = () => {
         isImport: isImport,
         totalContainers: totalContainers,
         instructionId: instructionId,
+        clientId: clientId,
+        clientName: clientName,
+      },
+    })
+  }
+
+  // Handle back button click
+  const handleBackClick = () => {
+    // Navigate back to MonitorInstructions with the clientId and clientName
+    navigate("/monitor-instructions", {
+      state: {
+        clientId: clientId,
+        clientName: clientName,
       },
     })
   }
@@ -296,7 +321,7 @@ const BMcontrollerinstructions = () => {
 
       {/* Back Button */}
       <div className="client-payments-header">
-        <button className="back-button" onClick={() => navigate(-1)}>
+        <button className="back-button" onClick={handleBackClick}>
           Back
         </button>
       </div>
@@ -602,6 +627,24 @@ const BMcontrollerinstructions = () => {
                     style={{ ...nonEditableStyle, width: "60%" }}
                   />
                 </div>
+                {/* Add weight field display for kg or m³ */}
+                {(formData.rateWeight === "kg" || formData.rateWeight === "m³") && (
+                  <div
+                    className="weight-input-group"
+                    style={{ marginTop: "10px", display: "flex", alignItems: "center" }}
+                  >
+                    <label style={{ marginRight: "10px" }}>{formData.rateWeight}</label>
+                    <input
+                      type="text"
+                      className="form-input"
+                      placeholder={`Weight in ${formData.rateWeight}`}
+                      style={{ ...nonEditableStyle, width: "60%" }}
+                      name="weight"
+                      value={formData.weight}
+                      readOnly
+                    />
+                  </div>
+                )}
               </div>
             </div>
 

@@ -101,7 +101,11 @@ const MonitorInstructions = () => {
   // Handle view instruction click
   const handleViewInstruction = (instructionId) => {
     navigate("/BMcontrollerinstructions", {
-      state: { instructionId },
+      state: {
+        instructionId,
+        clientId,
+        clientName,
+      },
     })
   }
 

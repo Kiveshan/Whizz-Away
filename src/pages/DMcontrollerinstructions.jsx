@@ -57,6 +57,7 @@ const DMcontrollerinstructions = () => {
     fileRef: "",
     rateWeight: "kg",
     rate: "",
+    weight: "", // Added weight field
     num_six_meters: 0,
     num_twelve_meters: 0,
     num_abnormal: 0,
@@ -114,9 +115,17 @@ const DMcontrollerinstructions = () => {
     return `${hour12}:${minutes} ${ampm}`
   }
 
+  // Format weight to 2 decimal places
+  const formatWeightForDisplay = (weight) => {
+    if (weight === null || weight === undefined || weight === "") {
+      return "No Weight Amount Provided"
+    }
+    return Number.parseFloat(weight).toFixed(2)
+  }
+
   // Handle back button click - fixed to ensure clientId is passed correctly
   const handleBackClick = () => {
-    console.log("Navigating back with state:", {
+    console.log("Navigating back to DirectorMonitorInstructions with state:", {
       clientId,
       clientName,
       selectedMonth,
@@ -195,6 +204,7 @@ const DMcontrollerinstructions = () => {
         fileRef: data.fileref || "",
         rateWeight: data.rateweight || "kg",
         rate: data.rate ? data.rate.toString() : "",
+        weight: data.weight ? formatWeightForDisplay(data.weight) : "No Weight Amount Provided", // Format weight
         num_six_meters: data.num_six_meters || 0,
         num_twelve_meters: data.num_twelve_meters || 0,
         num_abnormal: data.num_abnormal || 0,
@@ -650,6 +660,24 @@ const DMcontrollerinstructions = () => {
                     style={{ ...nonEditableStyle, width: "60%" }}
                   />
                 </div>
+                {/* Add weight field display for kg or m³ */}
+                {(formData.rateWeight === "kg" || formData.rateWeight === "m³") && (
+                  <div
+                    className="weight-input-group"
+                    style={{ marginTop: "10px", display: "flex", alignItems: "center" }}
+                  >
+                    <label style={{ marginRight: "10px" }}>{formData.rateWeight}</label>
+                    <input
+                      type="text"
+                      className="form-input"
+                      placeholder={`Weight in ${formData.rateWeight}`}
+                      style={{ ...nonEditableStyle, width: "60%" }}
+                      name="weight"
+                      value={formData.weight}
+                      readOnly
+                    />
+                  </div>
+                )}
               </div>
             </div>
 

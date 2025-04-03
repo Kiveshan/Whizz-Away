@@ -9,8 +9,26 @@ import API_CONFIG from "../utils/api-config"
 const FCcontrollerinstructions = () => {
   const navigate = useNavigate()
   const location = useLocation()
+
+  // Extract all state from location
   const instructionId = location.state?.instructionId
   const preservedFormData = location.state?.preservedFormData
+  const containerCounts = location.state?.containerCounts
+  const clientId = location.state?.clientId
+  const clientName = location.state?.clientName
+  const selectedMonth = location.state?.selectedMonth
+  const selectedYear = location.state?.selectedYear
+  const activeFilter = location.state?.activeFilter
+
+  // Log the received state for debugging
+  console.log("FCcontrollerinstructions received state:", location.state)
+  console.log("FCcontrollerinstructions - clientId:", clientId)
+  console.log("FCcontrollerinstructions - clientName:", clientName)
+  console.log("FCcontrollerinstructions - selectedMonth:", selectedMonth)
+  console.log("FCcontrollerinstructions - selectedYear:", selectedYear)
+  console.log("FCcontrollerinstructions - activeFilter:", activeFilter)
+  console.log("FCcontrollerinstructions - preservedFormData:", preservedFormData)
+  console.log("FCcontrollerinstructions - containerCounts:", containerCounts)
 
   // API base URL from config
   const API_BASE_URL = API_CONFIG.BASE_URL
@@ -22,7 +40,7 @@ const FCcontrollerinstructions = () => {
 
   // State for form data
   const [formData, setFormData] = useState({
-    clientId: "",
+    clientId: clientId || "", // Initialize with clientId from location state
     representative: "",
     contactDetails: "",
     email: "",
@@ -40,13 +58,18 @@ const FCcontrollerinstructions = () => {
     fileRef: "",
     rateWeight: "kg",
     rate: "",
+    weight: "", // Added weight field
     num_six_meters: 0,
     num_twelve_meters: 0,
     num_abnormal: 0,
     vat: 15,
     description: "",
     status: "",
+    total_cost: 0, // Added total_cost field
   })
+
+  // State to track if data has been modified
+  const [isDataModified, setIsDataModified] = useState(false)
 
   // State to track if shipment type is Import
   const [isImport, setIsImport] = useState(false)
@@ -69,6 +92,42 @@ const FCcontrollerinstructions = () => {
   // State for success message
   const [successMessage, setSuccessMessage] = useState("")
 
+  // Updated handleBackClick function - ensure all state is passed back
+  const handleBackClick = async () => {
+    // If data has been modified and we have an instructionId, save changes before navigating back
+    if (isDataModified && instructionId) {
+      try {
+        await saveChangesToDatabase()
+        setSuccessMessage("Changes saved successfully!")
+
+        // Short delay to show success message
+        await new Promise((resolve) => setTimeout(resolve, 1000))
+      } catch (error) {
+        console.error("Error saving changes before navigating back:", error)
+        setErrorModal({
+          isOpen: true,
+          message: "Failed to save changes before navigating back. Please try again.",
+        })
+        return
+      }
+    }
+
+    // Create state object with all necessary parameters
+    const stateToPass = {
+      clientId,
+      clientName,
+      selectedMonth,
+      selectedYear,
+      activeFilter,
+    }
+
+    // Log the state being passed back
+    console.log("Navigating back to instructions with state:", stateToPass)
+
+    // Navigate to instructions with state
+    navigate("/instructions", { state: stateToPass })
+  }
+
   // Function to open calendar
   const openCalendar = (ref) => {
     ref.current.click()
@@ -87,7 +146,7 @@ const FCcontrollerinstructions = () => {
 
   // Format date from MM/DD/YYYY to ISO
   const formatDateForSubmission = (displayDate) => {
-    if (!displayDate) return ""
+    if (!displayDate) return null
     const [month, day, year] = displayDate.split("/")
     return `${year}-${month}-${day}`
   }
@@ -104,7 +163,7 @@ const FCcontrollerinstructions = () => {
 
   // Format time from hh:mm AM/PM to HH:MM:SS
   const formatTimeForSubmission = (displayTime) => {
-    if (!displayTime) return ""
+    if (!displayTime) return null
     const [timePart, ampm] = displayTime.split(" ")
     let [hours, minutes] = timePart.split(":")
     hours = Number.parseInt(hours, 10)
@@ -118,6 +177,80 @@ const FCcontrollerinstructions = () => {
     return `${hours.toString().padStart(2, "0")}:${minutes}:00`
   }
 
+  // Format weight to 2 decimal places
+  const formatWeightForDisplay = (weight) => {
+    if (weight === null || weight === undefined || weight === "") {
+      return "No Weight Amount Provided"
+    }
+    return Number.parseFloat(weight).toFixed(2)
+  }
+
+  // Function to save changes to the database
+  const saveChangesToDatabase = async () => {
+    if (!instructionId) {
+      throw new Error("No instruction ID provided")
+    }
+
+    // Calculate total cost
+    const totalCost = calculateTotalCost()
+
+    // Prepare weight value based on selection
+    let weightValue = null
+    if (formData.rateWeight === "kg" || formData.rateWeight === "m³") {
+      weightValue = Number.parseFloat(formData.weight)
+      if (isNaN(weightValue)) {
+        throw new Error(`Please enter a valid weight for ${formData.rateWeight} rate`)
+      }
+    }
+
+    // Prepare instruction data for API
+    const instructionData = {
+      client: Number.parseInt(formData.clientId),
+      task: formData.task,
+      shipment_type: Number.parseInt(formData.shipmentTypeId),
+      pickup: formData.pickup,
+      dropoff: formData.dropoff,
+      hazardous: formData.hazardous,
+      surchages: formData.surcharges,
+      pickuptime: formatTimeForSubmission(formData.pickupTime),
+      pickupdate: formatDateForSubmission(formData.pickupDate),
+      stackdate: formatDateForSubmission(formData.stackDate),
+      deadline: formatDateForSubmission(formData.deadline),
+      fileref: formData.fileRef,
+      rateweight: formData.rateWeight,
+      rate: Number.parseFloat(formData.rate),
+      description: formData.description,
+      status: formData.status || "In Progress",
+      vat: formData.vat,
+      num_six_meters: formData.num_six_meters,
+      num_twelve_meters: formData.num_twelve_meters,
+      num_abnormal: formData.num_abnormal,
+      weight: weightValue,
+      total_cost: totalCost,
+    }
+
+    console.log("Updating instruction data:", instructionData)
+
+    // Update instruction
+    const instructionResponse = await fetch(`${API_BASE_URL}/api/instruction/${instructionId}`, {
+      method: "PUT",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(instructionData),
+    })
+
+    if (!instructionResponse.ok) {
+      const errorData = await instructionResponse.json()
+      throw new Error(errorData.error || "Failed to update instruction")
+    }
+
+    console.log("Instruction updated successfully")
+    setIsDataModified(false)
+
+    return instructionResponse.json()
+  }
+
   // Fetch clients, shipment types, and instruction data on component mount
   useEffect(() => {
     fetchClients()
@@ -125,7 +258,10 @@ const FCcontrollerinstructions = () => {
 
     if (preservedFormData) {
       // Use preserved form data if available (coming back from container details)
-      setFormData(preservedFormData)
+      setFormData({
+        ...preservedFormData,
+        clientId: clientId || preservedFormData.clientId, // Ensure clientId is set
+      })
       // Set isImport based on the preserved shipment type
       const shipmentTypeName = preservedFormData.shipmentTypeName || ""
       setIsImport(shipmentTypeName.toLowerCase() === "import")
@@ -133,8 +269,29 @@ const FCcontrollerinstructions = () => {
     } else if (instructionId) {
       // Otherwise fetch instruction data if ID is provided
       fetchInstructionData(instructionId)
+    } else if (clientId) {
+      // If we have a clientId but no instruction, update the form with the clientId
+      setFormData((prev) => ({
+        ...prev,
+        clientId: clientId,
+      }))
     }
-  }, [instructionId, preservedFormData])
+
+    // If we have container counts from FCcontrollerInstructionDetails, update the form
+    if (containerCounts) {
+      setFormData((prev) => ({
+        ...prev,
+        num_six_meters: containerCounts.num_six_meters || prev.num_six_meters,
+        num_twelve_meters: containerCounts.num_twelve_meters || prev.num_twelve_meters,
+        num_abnormal: containerCounts.num_abnormal || prev.num_abnormal,
+      }))
+
+      // Recalculate total cost after updating container counts
+      setTimeout(() => {
+        updateTotalCost()
+      }, 0)
+    }
+  }, [instructionId, preservedFormData, clientId, containerCounts])
 
   // Fetch instruction data by ID
   const fetchInstructionData = async (id) => {
@@ -160,7 +317,7 @@ const FCcontrollerinstructions = () => {
 
       // Format dates and times for display
       const formattedData = {
-        clientId: data.client.toString(),
+        clientId: clientId || data.client.toString(), // Use passed clientId if available
         representative: data.representative || "",
         contactDetails: data.cellnum || "",
         email: data.email || "",
@@ -178,12 +335,14 @@ const FCcontrollerinstructions = () => {
         fileRef: data.fileref || "",
         rateWeight: data.rateweight || "kg",
         rate: data.rate ? data.rate.toString() : "",
+        weight: data.weight ? formatWeightForDisplay(data.weight) : "", // Format weight
         num_six_meters: data.num_six_meters || 0,
         num_twelve_meters: data.num_twelve_meters || 0,
         num_abnormal: data.num_abnormal || 0,
         vat: data.vat || 15,
         description: data.description || "",
         status: data.status || "",
+        total_cost: data.total_cost || 0, // Include total_cost
       }
 
       setFormData(formattedData)
@@ -224,6 +383,21 @@ const FCcontrollerinstructions = () => {
       const data = await response.json()
       console.log("Clients data received:", data.length, "records")
       setClients(data)
+
+      // If we have a clientId, update the form with client details
+      if (clientId) {
+        const selectedClient = data.find((client) => client.m5clientkey.toString() === clientId.toString())
+        if (selectedClient) {
+          console.log("Found matching client:", selectedClient)
+          setFormData((prev) => ({
+            ...prev,
+            clientId: clientId,
+            representative: selectedClient.representative || "",
+            contactDetails: selectedClient.cellnum || "",
+            email: selectedClient.email || "",
+          }))
+        }
+      }
     } catch (error) {
       console.error("Error fetching clients:", error)
       setErrorModal({
@@ -292,6 +466,8 @@ const FCcontrollerinstructions = () => {
         email: "",
       })
     }
+
+    setIsDataModified(true)
   }
 
   // Handle shipment type selection
@@ -310,6 +486,39 @@ const FCcontrollerinstructions = () => {
       shipmentTypeId,
       shipmentTypeName,
     })
+
+    // Recalculate total cost after shipment type change
+    setTimeout(() => {
+      updateTotalCost()
+    }, 0)
+
+    setIsDataModified(true)
+  }
+
+  // Add this function to calculate total cost
+  const calculateTotalCost = () => {
+    const rate = Number.parseFloat(formData.rate)
+    if (isNaN(rate)) return 0
+
+    if (formData.rateWeight === "Container") {
+      // For Container: rate × total_number_of_containers
+      const totalContainers = formData.num_six_meters + formData.num_twelve_meters + formData.num_abnormal
+      return rate * totalContainers
+    } else {
+      // For kg or m³: rate × weight_value
+      const weight = Number.parseFloat(formData.weight)
+      if (isNaN(weight)) return 0
+      return rate * weight
+    }
+  }
+
+  // Function to update total cost in form data
+  const updateTotalCost = () => {
+    const totalCost = calculateTotalCost()
+    setFormData((prev) => ({
+      ...prev,
+      total_cost: totalCost,
+    }))
   }
 
   // Handle form input changes
@@ -321,31 +530,123 @@ const FCcontrollerinstructions = () => {
         ...formData,
         [name]: checked,
       })
+      setIsDataModified(true)
     } else if (name === "num_six_meters" || name === "num_twelve_meters" || name === "num_abnormal") {
       // Ensure container counts are at least 0
       const numValue = Number.parseInt(value)
-      setFormData({
+      const validValue = isNaN(numValue) || numValue < 0 ? 0 : numValue
+
+      // Update form data with new container count
+      const updatedFormData = {
         ...formData,
-        [name]: isNaN(numValue) || numValue < 0 ? 0 : numValue,
-      })
+        [name]: validValue,
+      }
+
+      // If rate weight is "Container", recalculate total_cost
+      if (formData.rateWeight === "Container") {
+        const rate = Number.parseFloat(formData.rate)
+        if (!isNaN(rate)) {
+          // Calculate new total containers
+          const totalContainers =
+            (name === "num_six_meters" ? validValue : updatedFormData.num_six_meters) +
+            (name === "num_twelve_meters" ? validValue : updatedFormData.num_twelve_meters) +
+            (name === "num_abnormal" ? validValue : updatedFormData.num_abnormal)
+          updatedFormData.total_cost = rate * totalContainers
+        }
+      }
+
+      setFormData(updatedFormData)
+      setIsDataModified(true)
+    } else if (name === "rateWeight") {
+      // Handle rate weight change
+      const updatedFormData = {
+        ...formData,
+        [name]: value,
+      }
+
+      // If changing to "Container", set weight to null and recalculate total_cost
+      if (value === "Container") {
+        updatedFormData.weight = null
+
+        const rate = Number.parseFloat(formData.rate)
+        if (!isNaN(rate)) {
+          const totalContainers = formData.num_six_meters + formData.num_twelve_meters + formData.num_abnormal
+          updatedFormData.total_cost = rate * totalContainers
+        }
+      }
+      // If changing from "Container" to kg or m³, reset total_cost until weight is entered
+      else {
+        updatedFormData.weight = ""
+        updatedFormData.total_cost = 0
+      }
+
+      setFormData(updatedFormData)
+      setIsDataModified(true)
+    } else if (name === "rate" || name === "weight") {
+      // Allow only numbers and decimal point
+      if (value === "" || /^[0-9]*\.?[0-9]*$/.test(value)) {
+        const updatedFormData = {
+          ...formData,
+          [name]: value,
+        }
+
+        // Recalculate total_cost if both rate and required values are present
+        const rate = name === "rate" ? Number.parseFloat(value) : Number.parseFloat(formData.rate)
+
+        if (!isNaN(rate)) {
+          if (formData.rateWeight === "Container") {
+            const totalContainers = formData.num_six_meters + formData.num_twelve_meters + formData.num_abnormal
+            updatedFormData.total_cost = rate * totalContainers
+          } else if (
+            (name === "weight" || formData.weight) &&
+            (formData.rateWeight === "kg" || formData.rateWeight === "m³")
+          ) {
+            const weight = name === "weight" ? Number.parseFloat(value) : Number.parseFloat(formData.weight)
+            if (!isNaN(weight)) {
+              updatedFormData.total_cost = rate * weight
+            }
+          }
+        }
+
+        setFormData(updatedFormData)
+        setIsDataModified(true)
+      }
     } else {
       setFormData({
         ...formData,
         [name]: value,
       })
+      setIsDataModified(true)
     }
   }
 
-  // Handle container count changes
+  // Update the handleContainerCountChange function to recalculate total_cost
   const handleContainerCountChange = (type, value) => {
     // Ensure value is a number and not negative
     const numValue = Number.parseInt(value)
     const validValue = isNaN(numValue) || numValue < 0 ? 0 : numValue
 
-    setFormData({
+    // Update form data with new container count
+    const updatedFormData = {
       ...formData,
       [type]: validValue,
-    })
+    }
+
+    // If rate weight is "Container", recalculate total_cost
+    if (formData.rateWeight === "Container") {
+      const rate = Number.parseFloat(formData.rate)
+      if (!isNaN(rate)) {
+        // Calculate new total containers
+        const totalContainers =
+          (type === "num_six_meters" ? validValue : updatedFormData.num_six_meters) +
+          (type === "num_twelve_meters" ? validValue : updatedFormData.num_twelve_meters) +
+          (type === "num_abnormal" ? validValue : updatedFormData.num_abnormal)
+        updatedFormData.total_cost = rate * totalContainers
+      }
+    }
+
+    setFormData(updatedFormData)
+    setIsDataModified(true)
   }
 
   // Validate form
@@ -384,6 +685,27 @@ const FCcontrollerinstructions = () => {
       return false
     }
 
+    // Validate weight if kg or m³ is selected
+    if ((formData.rateWeight === "kg" || formData.rateWeight === "m³") && !formData.weight) {
+      setErrorModal({
+        isOpen: true,
+        message: `Please enter the weight in ${formData.rateWeight}`,
+      })
+      return false
+    }
+
+    // Validate weight is a number
+    if (
+      (formData.rateWeight === "kg" || formData.rateWeight === "m³") &&
+      (formData.weight === "" || isNaN(Number.parseFloat(formData.weight)))
+    ) {
+      setErrorModal({
+        isOpen: true,
+        message: `Weight must be a valid number`,
+      })
+      return false
+    }
+
     // Validate at least one container is added
     const totalContainers = formData.num_six_meters + formData.num_twelve_meters + formData.num_abnormal
     if (totalContainers <= 0) {
@@ -403,24 +725,64 @@ const FCcontrollerinstructions = () => {
     return selectedShipmentType && selectedShipmentType.shipmenttype.toLowerCase() === "import"
   }
 
-  // Handle form submission
-  const handleSubmit = () => {
+  // Update the handleSubmit function to ensure total_cost is calculated and saved
+  const handleSubmit = async () => {
     if (!validateForm()) {
       return
+    }
+
+    // If we have an instructionId and data has been modified, save changes first
+    if (instructionId && isDataModified) {
+      try {
+        await saveChangesToDatabase()
+      } catch (error) {
+        console.error("Error saving changes before navigating to container details:", error)
+        setErrorModal({
+          isOpen: true,
+          message: error.message || "Failed to save changes. Please try again.",
+        })
+        return
+      }
     }
 
     // Calculate total containers
     const totalContainers = formData.num_six_meters + formData.num_twelve_meters + formData.num_abnormal
 
+    // Calculate total cost
+    const totalCost = calculateTotalCost()
+
+    // Prepare weight value based on selection
+    let weightValue = null
+    if (formData.rateWeight === "kg" || formData.rateWeight === "m³") {
+      weightValue = Number.parseFloat(formData.weight)
+    }
+
+    // Create updated form data with total_cost and weight
+    const updatedFormData = {
+      ...formData,
+      total_cost: totalCost,
+      weight: weightValue,
+    }
+
+    // Create state object with all necessary parameters
+    const stateToPass = {
+      controllerData: updatedFormData,
+      isImport: isImportShipment(),
+      totalContainers: totalContainers,
+      instructionId: instructionId,
+      // Pass through the original navigation state for when we return
+      clientId: clientId,
+      clientName: clientName,
+      selectedMonth: selectedMonth,
+      selectedYear: selectedYear,
+      activeFilter: activeFilter,
+    }
+
+    // Log the state being passed to FCcontrollerInstructionDetails
+    console.log("Navigating to FCcontrollerInstructionDetails with state:", stateToPass)
+
     // Navigate to container details page with state
-    navigate("/FCcontrollerInstructionDetails", {
-      state: {
-        controllerData: formData,
-        isImport: isImportShipment(),
-        totalContainers: totalContainers,
-        instructionId: instructionId,
-      },
-    })
+    navigate("/FCcontrollerInstructionDetails", { state: stateToPass })
   }
 
   // Retry fetching data
@@ -449,7 +811,7 @@ const FCcontrollerinstructions = () => {
   }
 
   return (
-    <div>
+    <div className="min-h-screen bg-white" style={{ paddingBottom: 200 }}>
       {/* Error Modal */}
       {errorModal.isOpen && (
         <ErrorModal
@@ -459,9 +821,9 @@ const FCcontrollerinstructions = () => {
         />
       )}
 
-      {/* Back Button */}
-      <div className="client-payments-header">
-        <button className="back-button" onClick={() => navigate(-1)}>
+      {/* Back Button - Updated to match the requested structure */}
+      <div className="">
+        <button className="back-button" onClick={handleBackClick}>
           Back
         </button>
       </div>
@@ -483,7 +845,10 @@ const FCcontrollerinstructions = () => {
         </div>
       )}
 
-      <div className="instruction-container1">
+      {/* Added spacing to bring the form lower on the page */}
+      <div style={{ height: "30px" }}></div>
+
+      <div className="instruction-container1" style={{ marginTop: "20px" }}>
         <div className="content">
           {/* Loading indicator or retry button */}
           {isLoading.clients || isLoading.shipmentTypes || isLoading.instruction ? (
@@ -759,6 +1124,30 @@ const FCcontrollerinstructions = () => {
                     onChange={handleInputChange}
                   />
                 </div>
+                {/* Add weight field for kg or m³ */}
+                {(formData.rateWeight === "kg" || formData.rateWeight === "m³") && (
+                  <div
+                    className="weight-input-group"
+                    style={{ marginTop: "10px", display: "flex", alignItems: "center" }}
+                  >
+                    <label style={{ marginRight: "10px" }}>{formData.rateWeight}</label>
+                    <input
+                      type="text"
+                      className="form-input"
+                      placeholder={`Enter weight in ${formData.rateWeight}`}
+                      style={{ width: "60%" }}
+                      name="weight"
+                      value={formData.weight}
+                      onChange={(e) => {
+                        // Allow only numbers and decimal point
+                        const value = e.target.value
+                        if (value === "" || /^[0-9]*\.?[0-9]*$/.test(value)) {
+                          handleInputChange(e)
+                        }
+                      }}
+                    />
+                  </div>
+                )}
               </div>
             </div>
 

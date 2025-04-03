@@ -49,11 +49,13 @@ const ControllerInstructions = () => {
       fileRef: "",
       rateWeight: "kg",
       rate: "",
+      weight: "", // Add this new field
       num_six_meters: 0,
       num_twelve_meters: 0,
       num_abnormal: 0,
       vat: 15,
       description: "",
+      total_cost: 0, // Add total_cost field
     }
   })
 
@@ -203,10 +205,80 @@ const ControllerInstructions = () => {
     } else if (name === "num_six_meters" || name === "num_twelve_meters" || name === "num_abnormal") {
       // Ensure container counts are at least 0
       const numValue = Number.parseInt(value)
-      setFormData({
+      const validValue = isNaN(numValue) || numValue < 0 ? 0 : numValue
+
+      // Update the form data with the new container count
+      const updatedFormData = {
         ...formData,
-        [name]: isNaN(numValue) || numValue < 0 ? 0 : numValue,
-      })
+        [name]: validValue,
+      }
+
+      // If rate weight is "Container", recalculate total_cost
+      if (formData.rateWeight === "Container") {
+        const rate = Number.parseFloat(formData.rate)
+        if (!isNaN(rate)) {
+          // Calculate new total containers
+          const totalContainers =
+            (name === "num_six_meters" ? validValue : updatedFormData.num_six_meters) +
+            (name === "num_twelve_meters" ? validValue : updatedFormData.num_twelve_meters) +
+            (name === "num_abnormal" ? validValue : updatedFormData.num_abnormal)
+          updatedFormData.total_cost = rate * totalContainers
+        }
+      }
+
+      setFormData(updatedFormData)
+    } else if (name === "rateWeight") {
+      // Handle rate weight change
+      const updatedFormData = {
+        ...formData,
+        [name]: value,
+      }
+
+      // If changing to "Container", set weight to null and recalculate total_cost
+      if (value === "Container") {
+        updatedFormData.weight = null
+
+        const rate = Number.parseFloat(formData.rate)
+        if (!isNaN(rate)) {
+          const totalContainers = formData.num_six_meters + formData.num_twelve_meters + formData.num_abnormal
+          updatedFormData.total_cost = rate * totalContainers
+        }
+      }
+      // If changing from "Container" to kg or m³, reset total_cost until weight is entered
+      else {
+        updatedFormData.weight = ""
+        updatedFormData.total_cost = 0
+      }
+
+      setFormData(updatedFormData)
+    } else if (name === "rate" || name === "weight") {
+      // Allow only numbers and decimal point
+      if (value === "" || /^[0-9]*\.?[0-9]*$/.test(value)) {
+        const updatedFormData = {
+          ...formData,
+          [name]: value,
+        }
+
+        // Recalculate total_cost if both rate and required values are present
+        const rate = name === "rate" ? Number.parseFloat(value) : Number.parseFloat(formData.rate)
+
+        if (!isNaN(rate)) {
+          if (formData.rateWeight === "Container") {
+            const totalContainers = formData.num_six_meters + formData.num_twelve_meters + formData.num_abnormal
+            updatedFormData.total_cost = rate * totalContainers
+          } else if (
+            (name === "weight" || formData.weight) &&
+            (formData.rateWeight === "kg" || formData.rateWeight === "m³")
+          ) {
+            const weight = name === "weight" ? Number.parseFloat(value) : Number.parseFloat(formData.weight)
+            if (!isNaN(weight)) {
+              updatedFormData.total_cost = rate * weight
+            }
+          }
+        }
+
+        setFormData(updatedFormData)
+      }
     } else {
       setFormData({
         ...formData,
@@ -221,10 +293,43 @@ const ControllerInstructions = () => {
     const numValue = Number.parseInt(value)
     const validValue = isNaN(numValue) || numValue < 0 ? 0 : numValue
 
-    setFormData({
+    // Update form data with new container count
+    const updatedFormData = {
       ...formData,
       [type]: validValue,
-    })
+    }
+
+    // If rate weight is "Container", recalculate total_cost
+    if (formData.rateWeight === "Container") {
+      const rate = Number.parseFloat(formData.rate)
+      if (!isNaN(rate)) {
+        // Calculate new total containers
+        const totalContainers =
+          (type === "num_six_meters" ? validValue : updatedFormData.num_six_meters) +
+          (type === "num_twelve_meters" ? validValue : updatedFormData.num_twelve_meters) +
+          (type === "num_abnormal" ? validValue : updatedFormData.num_abnormal)
+        updatedFormData.total_cost = rate * totalContainers
+      }
+    }
+
+    setFormData(updatedFormData)
+  }
+
+  // Calculate total cost based on rate, weight, and container counts
+  const calculateTotalCost = () => {
+    const rate = Number.parseFloat(formData.rate)
+    if (isNaN(rate)) return 0
+
+    if (formData.rateWeight === "Container") {
+      // For Container: rate × total_number_of_containers
+      const totalContainers = formData.num_six_meters + formData.num_twelve_meters + formData.num_abnormal
+      return rate * totalContainers
+    } else {
+      // For kg or m³: rate × weight_value
+      const weight = Number.parseFloat(formData.weight)
+      if (isNaN(weight)) return 0
+      return rate * weight
+    }
   }
 
   // Validate form
@@ -263,6 +368,27 @@ const ControllerInstructions = () => {
       return false
     }
 
+    // Validate weight if kg or m³ is selected
+    if ((formData.rateWeight === "kg" || formData.rateWeight === "m³") && !formData.weight) {
+      setErrorModal({
+        isOpen: true,
+        message: `Please enter the weight in ${formData.rateWeight}`,
+      })
+      return false
+    }
+
+    // Validate weight is a number
+    if (
+      (formData.rateWeight === "kg" || formData.rateWeight === "m³") &&
+      (formData.weight === "" || isNaN(Number.parseFloat(formData.weight)))
+    ) {
+      setErrorModal({
+        isOpen: true,
+        message: `Weight must be a valid number`,
+      })
+      return false
+    }
+
     // Validate at least one container is added
     const totalContainers = formData.num_six_meters + formData.num_twelve_meters + formData.num_abnormal
     if (totalContainers <= 0) {
@@ -285,10 +411,26 @@ const ControllerInstructions = () => {
     // Calculate total containers
     const totalContainers = formData.num_six_meters + formData.num_twelve_meters + formData.num_abnormal
 
+    // Calculate total cost
+    const totalCost = calculateTotalCost()
+
+    // Prepare weight value based on selection
+    let weightValue = null
+    if (formData.rateWeight === "kg" || formData.rateWeight === "m³") {
+      weightValue = Number.parseFloat(formData.weight)
+    }
+
+    // Create updated form data with total_cost and weight
+    const updatedFormData = {
+      ...formData,
+      total_cost: totalCost,
+      weight: weightValue,
+    }
+
     // Navigate to container details page with state
     navigate("/ControllerInstructionDetails", {
       state: {
-        controllerData: formData,
+        controllerData: updatedFormData,
         isImport: formData.shipmentTypeName.toLowerCase() === "import",
         totalContainers: totalContainers,
       },
@@ -605,9 +747,38 @@ const ControllerInstructions = () => {
                     style={{ width: "60%" }}
                     name="rate"
                     value={formData.rate}
-                    onChange={handleInputChange}
+                    onChange={(e) => {
+                      // Allow only numbers and decimal point
+                      const value = e.target.value
+                      if (value === "" || /^[0-9]*\.?[0-9]*$/.test(value)) {
+                        handleInputChange(e)
+                      }
+                    }}
                   />
                 </div>
+                {(formData.rateWeight === "kg" || formData.rateWeight === "m³") && (
+                  <div
+                    className="weight-input-group"
+                    style={{ marginTop: "10px", display: "flex", alignItems: "center" }}
+                  >
+                    <label style={{ marginRight: "10px" }}>{formData.rateWeight}</label>
+                    <input
+                      type="text"
+                      className="form-input"
+                      placeholder={`Enter weight in ${formData.rateWeight}`}
+                      style={{ width: "60%" }}
+                      name="weight"
+                      value={formData.weight}
+                      onChange={(e) => {
+                        // Allow only numbers and decimal point
+                        const value = e.target.value
+                        if (value === "" || /^[0-9]*\.?[0-9]*$/.test(value)) {
+                          handleInputChange(e)
+                        }
+                      }}
+                    />
+                  </div>
+                )}
               </div>
             </div>
 

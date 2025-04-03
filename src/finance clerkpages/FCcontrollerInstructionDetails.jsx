@@ -14,12 +14,26 @@ const FCcontrollerInstructionDetails = () => {
   // API base URL from config
   const API_BASE_URL = API_CONFIG.BASE_URL
 
-  // Get data from location state
-  const { controllerData, isImport, instructionId } = location.state || {
-    controllerData: null,
-    isImport: false,
-    instructionId: null,
-  }
+  // Get data from location state - extract ALL parameters
+  const { controllerData, isImport, instructionId, clientId, clientName, selectedMonth, selectedYear, activeFilter } =
+    location.state || {
+      controllerData: null,
+      isImport: false,
+      instructionId: null,
+      clientId: null,
+      clientName: null,
+      selectedMonth: null,
+      selectedYear: null,
+      activeFilter: null,
+    }
+
+  // Log the received state for debugging
+  console.log("FCcontrollerInstructionDetails received state:", location.state)
+  console.log("FCcontrollerInstructionDetails - clientId:", clientId)
+  console.log("FCcontrollerInstructionDetails - clientName:", clientName)
+  console.log("FCcontrollerInstructionDetails - selectedMonth:", selectedMonth)
+  console.log("FCcontrollerInstructionDetails - selectedYear:", selectedYear)
+  console.log("FCcontrollerInstructionDetails - activeFilter:", activeFilter)
 
   // State for container data
   const [containers, setContainers] = useState([])
@@ -27,11 +41,83 @@ const FCcontrollerInstructionDetails = () => {
   const [isLoading, setIsLoading] = useState(true)
   const [successMessage, setSuccessMessage] = useState("")
 
+  // State to track if data has been modified
+  const [isDataModified, setIsDataModified] = useState(false)
+
+  // State to store the updated controller data
+  const [updatedControllerData, setUpdatedControllerData] = useState(controllerData || {})
+
   // State for error modal
   const [errorModal, setErrorModal] = useState({
     isOpen: false,
     message: "",
   })
+
+  // Mock functions for now - replace with actual implementations
+  const validateContainers = () => {
+    // Implement your validation logic here
+    return true // Placeholder
+  }
+
+  const formatTimeForSubmission = (time) => {
+    if (!time) return null
+    const [timePart, ampm] = time.split(" ")
+    let [hours, minutes] = timePart.split(":")
+    hours = Number.parseInt(hours, 10)
+
+    if (ampm === "PM" && hours < 12) {
+      hours += 12
+    } else if (ampm === "AM" && hours === 12) {
+      hours = 0
+    }
+
+    return `${hours.toString().padStart(2, "0")}:${minutes}:00`
+  }
+
+  const formatDateForSubmission = (displayDate) => {
+    if (!displayDate) return null
+    const [month, day, year] = displayDate.split("/")
+    return `${year}-${month}-${day}`
+  }
+
+  // Updated handleBackClick to pass back the modified data
+  const handleBackClick = async () => {
+    // If data has been modified, save it to the database before navigating back
+    if (isDataModified && instructionId) {
+      try {
+        await saveChangesToDatabase()
+      } catch (error) {
+        console.error("Error saving changes before navigating back:", error)
+        setErrorModal({
+          isOpen: true,
+          message: "Failed to save changes before navigating back. Please try again.",
+        })
+        return
+      }
+    }
+
+    // Create state object with all necessary parameters including the updated data
+    const stateToPass = {
+      preservedFormData: updatedControllerData,
+      instructionId: instructionId,
+      clientId: clientId,
+      clientName: clientName,
+      selectedMonth: selectedMonth,
+      selectedYear: selectedYear,
+      activeFilter: activeFilter,
+      // Pass the updated container counts
+      containerCounts: {
+        num_six_meters: updatedControllerData.num_six_meters,
+        num_twelve_meters: updatedControllerData.num_twelve_meters,
+        num_abnormal: updatedControllerData.num_abnormal,
+      },
+    }
+
+    console.log("Navigating back to FCcontrollerinstructions with state:", stateToPass)
+
+    // Navigate back to the form with the updated state
+    navigate("/FCcontrollerinstructions", { state: stateToPass })
+  }
 
   // Fetch existing containers if instructionId is provided
   useEffect(() => {
@@ -40,10 +126,23 @@ const FCcontrollerInstructionDetails = () => {
     } else if (controllerData) {
       initializeContainers()
     } else {
-      // Redirect back if no data
-      navigate("/FCcontrollerinstructions")
+      // Redirect back if no data - pass all state back
+      navigate("/FCcontrollerinstructions", {
+        state: {
+          clientId,
+          clientName,
+          selectedMonth,
+          selectedYear,
+          activeFilter,
+        },
+      })
     }
-  }, [instructionId, controllerData, navigate])
+
+    // Initialize the updatedControllerData with the received controllerData
+    if (controllerData) {
+      setUpdatedControllerData(controllerData)
+    }
+  }, [instructionId, controllerData, navigate, clientId, clientName, selectedMonth, selectedYear, activeFilter])
 
   // Fetch containers for the given instruction ID
   const fetchContainers = async (id) => {
@@ -104,11 +203,11 @@ const FCcontrollerInstructionDetails = () => {
 
   // Sync containers with the counts from controllerData
   const syncContainersWithCounts = (containersList) => {
-    if (!controllerData) return containersList
+    if (!updatedControllerData) return containersList
 
-    const sixMCount = controllerData.num_six_meters || 0
-    const twelveMCount = controllerData.num_twelve_meters || 0
-    const abnormalCount = controllerData.num_abnormal || 0
+    const sixMCount = updatedControllerData.num_six_meters || 0
+    const twelveMCount = updatedControllerData.num_twelve_meters || 0
+    const abnormalCount = updatedControllerData.num_abnormal || 0
 
     // Count current containers by type
     const currentCounts = {
@@ -203,12 +302,12 @@ const FCcontrollerInstructionDetails = () => {
 
   // Initialize containers based on container counts
   const initializeContainers = () => {
-    if (controllerData) {
+    if (updatedControllerData) {
       const containersList = []
       let containerId = 1
 
       // Add 6m containers
-      for (let i = 0; i < (controllerData.num_six_meters || 0); i++) {
+      for (let i = 0; i < (updatedControllerData.num_six_meters || 0); i++) {
         containersList.push({
           id: containerId++,
           containerKey: null, // New container, no key yet
@@ -219,7 +318,7 @@ const FCcontrollerInstructionDetails = () => {
       }
 
       // Add 12m containers
-      for (let i = 0; i < (controllerData.num_twelve_meters || 0); i++) {
+      for (let i = 0; i < (updatedControllerData.num_twelve_meters || 0); i++) {
         containersList.push({
           id: containerId++,
           containerKey: null, // New container, no key yet
@@ -230,7 +329,7 @@ const FCcontrollerInstructionDetails = () => {
       }
 
       // Add abnormal containers
-      for (let i = 0; i < (controllerData.num_abnormal || 0); i++) {
+      for (let i = 0; i < (updatedControllerData.num_abnormal || 0); i++) {
         containersList.push({
           id: containerId++,
           containerKey: null, // New container, no key yet
@@ -266,9 +365,32 @@ const FCcontrollerInstructionDetails = () => {
     setContainers((prevContainers) =>
       prevContainers.map((container) => (container.id === id ? { ...container, [field]: value } : container)),
     )
+    setIsDataModified(true)
   }
 
-  // Add a new container (with specified type)
+  // Add this function to calculate total cost
+  const calculateTotalCost = () => {
+    if (!updatedControllerData || !updatedControllerData.rate) return 0
+
+    const rate = Number.parseFloat(updatedControllerData.rate)
+    if (isNaN(rate)) return 0
+
+    if (updatedControllerData.rateWeight === "Container") {
+      // For Container: rate × total_number_of_containers
+      const totalContainers =
+        updatedControllerData.num_six_meters +
+        updatedControllerData.num_twelve_meters +
+        updatedControllerData.num_abnormal
+      return rate * totalContainers
+    } else {
+      // For kg or m³: rate × weight_value
+      const weight = Number.parseFloat(updatedControllerData.weight)
+      if (isNaN(weight)) return 0
+      return rate * weight
+    }
+  }
+
+  // Update the handleAddContainer function to recalculate total_cost
   const handleAddContainer = (containerType) => {
     setContainers((prevContainers) => [
       ...prevContainers,
@@ -281,19 +403,34 @@ const FCcontrollerInstructionDetails = () => {
       },
     ])
 
-    // Update container counts in controllerData
-    if (controllerData) {
+    // Update container counts in updatedControllerData
+    setUpdatedControllerData((prevData) => {
+      const newData = { ...prevData }
+
       if (containerType === "6m") {
-        controllerData.num_six_meters = (controllerData.num_six_meters || 0) + 1
+        newData.num_six_meters = (newData.num_six_meters || 0) + 1
       } else if (containerType === "12m") {
-        controllerData.num_twelve_meters = (controllerData.num_twelve_meters || 0) + 1
+        newData.num_twelve_meters = (newData.num_twelve_meters || 0) + 1
       } else if (containerType === "Abnormal") {
-        controllerData.num_abnormal = (controllerData.num_abnormal || 0) + 1
+        newData.num_abnormal = (newData.num_abnormal || 0) + 1
       }
-    }
+
+      // Recalculate total_cost if rateWeight is Container
+      if (newData.rateWeight === "Container") {
+        const rate = Number.parseFloat(newData.rate)
+        if (!isNaN(rate)) {
+          const totalContainers = newData.num_six_meters + newData.num_twelve_meters + newData.num_abnormal
+          newData.total_cost = rate * totalContainers
+        }
+      }
+
+      return newData
+    })
+
+    setIsDataModified(true)
   }
 
-  // Delete a container
+  // Update the handleDeleteContainer function to recalculate total_cost
   const handleDeleteContainer = (id) => {
     const containerToDelete = containers.find((container) => container.id === id)
 
@@ -307,197 +444,158 @@ const FCcontrollerInstructionDetails = () => {
       }))
     })
 
-    // Update container counts in controllerData
-    if (controllerData && containerToDelete) {
-      if (containerToDelete.containerType === "6m") {
-        controllerData.num_six_meters = Math.max(0, (controllerData.num_six_meters || 0) - 1)
-      } else if (containerToDelete.containerType === "12m") {
-        controllerData.num_twelve_meters = Math.max(0, (controllerData.num_twelve_meters || 0) - 1)
-      } else if (containerToDelete.containerType === "Abnormal") {
-        controllerData.num_abnormal = Math.max(0, (controllerData.num_abnormal || 0) - 1)
-      }
+    // Update container counts in updatedControllerData
+    if (containerToDelete) {
+      setUpdatedControllerData((prevData) => {
+        const newData = { ...prevData }
+
+        if (containerToDelete.containerType === "6m") {
+          newData.num_six_meters = Math.max(0, (newData.num_six_meters || 0) - 1)
+        } else if (containerToDelete.containerType === "12m") {
+          newData.num_twelve_meters = Math.max(0, (newData.num_twelve_meters || 0) - 1)
+        } else if (containerToDelete.containerType === "Abnormal") {
+          newData.num_abnormal = Math.max(0, (newData.num_abnormal || 0) - 1)
+        }
+
+        // Recalculate total_cost if rateWeight is Container
+        if (newData.rateWeight === "Container") {
+          const rate = Number.parseFloat(newData.rate)
+          if (!isNaN(rate)) {
+            const totalContainers = newData.num_six_meters + newData.num_twelve_meters + newData.num_abnormal
+            newData.total_cost = rate * totalContainers
+          }
+        }
+
+        return newData
+      })
     }
+
+    setIsDataModified(true)
   }
 
-  // Validate containers
-  const validateContainers = () => {
-    // Validate container counts match the specified counts in controllerData
-    const counts = countContainersByType()
-
-    if (counts["6m"] !== (controllerData.num_six_meters || 0)) {
-      setErrorModal({
-        isOpen: true,
-        message: `The number of 6m containers (${counts["6m"]}) does not match the specified count (${controllerData.num_six_meters || 0}).`,
-      })
-      return false
+  // Function to save changes to the database
+  const saveChangesToDatabase = async () => {
+    if (!instructionId) {
+      throw new Error("No instruction ID provided")
     }
 
-    if (counts["12m"] !== (controllerData.num_twelve_meters || 0)) {
-      setErrorModal({
-        isOpen: true,
-        message: `The number of 12m containers (${counts["12m"]}) does not match the specified count (${controllerData.num_twelve_meters || 0}).`,
-      })
-      return false
-    }
+    // Ensure total_cost is calculated
+    const finalControllerData = { ...updatedControllerData }
 
-    if (counts["Abnormal"] !== (controllerData.num_abnormal || 0)) {
-      setErrorModal({
-        isOpen: true,
-        message: `The number of Abnormal containers (${counts["Abnormal"]}) does not match the specified count (${controllerData.num_abnormal || 0}).`,
-      })
-      return false
-    }
-
-    // Validate container numbers
-    for (const container of containers) {
-      if (!container.containerNum) {
-        setErrorModal({
-          isOpen: true,
-          message: `Please enter a container number for container #${container.id} (${container.containerType})`,
-        })
-        return false
+    if (finalControllerData.rateWeight === "Container") {
+      finalControllerData.total_cost = calculateTotalCost()
+      finalControllerData.weight = null // Set weight to null for Container rate
+    } else {
+      // For kg or m³, ensure weight is a valid number
+      if (!finalControllerData.weight || isNaN(Number.parseFloat(finalControllerData.weight))) {
+        throw new Error(`Please enter a valid weight for ${finalControllerData.rateWeight} rate`)
       }
-
-      if (isImport && (container.weight === "" || isNaN(Number.parseFloat(container.weight)))) {
-        setErrorModal({
-          isOpen: true,
-          message: `Please enter a valid weight for container #${container.id} (${container.containerType})`,
-        })
-        return false
-      }
+      finalControllerData.total_cost = calculateTotalCost()
     }
 
-    return true
-  }
-
-  // Handle back button click - preserve form data
-  const handleBackClick = () => {
-    // Update container counts in controllerData based on actual containers
-    if (controllerData) {
-      const counts = countContainersByType()
-      controllerData.num_six_meters = counts["6m"]
-      controllerData.num_twelve_meters = counts["12m"]
-      controllerData.num_abnormal = counts["Abnormal"]
+    // First, update the instruction data
+    const instructionData = {
+      client: Number.parseInt(finalControllerData.clientId),
+      task: finalControllerData.task,
+      shipment_type: Number.parseInt(finalControllerData.shipmentTypeId),
+      pickup: finalControllerData.pickup,
+      dropoff: finalControllerData.dropoff,
+      hazardous: finalControllerData.hazardous,
+      surchages: finalControllerData.surcharges,
+      pickuptime: formatTimeForSubmission(finalControllerData.pickupTime),
+      pickupdate: formatDateForSubmission(finalControllerData.pickupDate),
+      stackdate: formatDateForSubmission(finalControllerData.stackDate),
+      deadline: formatDateForSubmission(finalControllerData.deadline),
+      fileref: finalControllerData.fileRef,
+      rateweight: finalControllerData.rateWeight,
+      rate: Number.parseFloat(finalControllerData.rate),
+      description: finalControllerData.description,
+      status: finalControllerData.status || "In Progress",
+      vat: finalControllerData.vat,
+      num_six_meters: finalControllerData.num_six_meters,
+      num_twelve_meters: finalControllerData.num_twelve_meters,
+      num_abnormal: finalControllerData.num_abnormal,
+      weight: finalControllerData.rateWeight === "Container" ? null : Number.parseFloat(finalControllerData.weight),
+      total_cost: Number.parseFloat(finalControllerData.total_cost),
     }
 
-    // Navigate back to FCcontrollerinstructions with the updated form data
-    navigate("/FCcontrollerinstructions", {
-      state: {
-        preservedFormData: controllerData,
-        instructionId: instructionId,
+    console.log("Updating instruction data:", instructionData)
+
+    // Update instruction
+    const instructionResponse = await fetch(`${API_BASE_URL}/api/instruction/${instructionId}`, {
+      method: "PUT",
+      headers: {
+        "Content-Type": "application/json",
       },
+      body: JSON.stringify(instructionData),
     })
-  }
 
-  // Format date from MM/DD/YYYY to ISO
-  const formatDateForSubmission = (displayDate) => {
-    if (!displayDate) return ""
-    const [month, day, year] = displayDate.split("/")
-    return `${year}-${month}-${day}`
-  }
-
-  // Format time from hh:mm AM/PM to HH:MM:SS
-  const formatTimeForSubmission = (displayTime) => {
-    if (!displayTime) return ""
-    const [timePart, ampm] = displayTime.split(" ")
-    let [hours, minutes] = timePart.split(":")
-    hours = Number.parseInt(hours, 10)
-
-    if (ampm === "PM" && hours < 12) {
-      hours += 12
-    } else if (ampm === "AM" && hours === 12) {
-      hours = 0
+    if (!instructionResponse.ok) {
+      const errorData = await instructionResponse.json()
+      throw new Error(errorData.error || "Failed to update instruction")
     }
 
-    return `${hours.toString().padStart(2, "0")}:${minutes}:00`
+    console.log("Instruction updated successfully")
+
+    // Now handle container data
+    // Prepare container data for API
+    const containerData = containers.map((container) => ({
+      containerkey: container.containerKey, // Will be null for new containers
+      containernum: Number.parseInt(container.containerNum) || 0,
+      weight: isImport ? (container.weight ? Number.parseFloat(container.weight) : null) : null,
+      m1key: instructionId,
+    }))
+
+    console.log("Sending container data to API:", containerData)
+
+    // Send container data to API
+    const containerResponse = await fetch(`${API_BASE_URL}/api/containers/${instructionId}`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(containerData),
+    })
+
+    if (!containerResponse.ok) {
+      const errorText = await containerResponse.text()
+      console.error("API error response:", errorText)
+      throw new Error(`Failed to save containers: ${containerResponse.status} ${containerResponse.statusText}`)
+    }
+
+    const result = await containerResponse.json()
+    console.log("API response:", result)
+
+    // Update the updatedControllerData with the final values
+    setUpdatedControllerData(finalControllerData)
+    setIsDataModified(false)
+
+    return result
   }
 
-  // Submit form
+  // Update the handleSubmit function to ensure total_cost is calculated
   const handleSubmit = async () => {
     if (!validateContainers()) {
       return
     }
 
     try {
-      // First, update the instruction data
-      const instructionData = {
-        client: Number.parseInt(controllerData.clientId),
-        task: controllerData.task,
-        shipment_type: Number.parseInt(controllerData.shipmentTypeId),
-        pickup: controllerData.pickup,
-        dropoff: controllerData.dropoff,
-        hazardous: controllerData.hazardous,
-        surchages: controllerData.surcharges,
-        pickuptime: formatTimeForSubmission(controllerData.pickupTime),
-        pickupdate: formatDateForSubmission(controllerData.pickupDate),
-        stackdate: formatDateForSubmission(controllerData.stackDate),
-        deadline: formatDateForSubmission(controllerData.deadline),
-        fileref: controllerData.fileRef,
-        rateweight: controllerData.rateWeight,
-        rate: Number.parseFloat(controllerData.rate),
-        description: controllerData.description,
-        status: controllerData.status || "In Progress",
-        vat: controllerData.vat,
-        num_six_meters: controllerData.num_six_meters,
-        num_twelve_meters: controllerData.num_twelve_meters,
-        num_abnormal: controllerData.num_abnormal,
-      }
-
-      console.log("Updating instruction data:", instructionData)
-
-      // Update instruction if instructionId exists
-      if (instructionId) {
-        const instructionResponse = await fetch(`${API_BASE_URL}/api/instruction/${instructionId}`, {
-          method: "PUT",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify(instructionData),
-        })
-
-        if (!instructionResponse.ok) {
-          const errorData = await instructionResponse.json()
-          throw new Error(errorData.error || "Failed to update instruction")
-        }
-
-        console.log("Instruction updated successfully")
-      }
-
-      // Now handle container data
-      // Prepare container data for API
-      const containerData = containers.map((container) => ({
-        containerkey: container.containerKey, // Will be null for new containers
-        containernum: Number.parseInt(container.containerNum),
-        weight: isImport ? (container.weight ? Number.parseFloat(container.weight) : null) : null,
-        m1key: instructionId,
-      }))
-
-      console.log("Sending container data to API:", containerData)
-
-      // Send container data to API
-      const containerResponse = await fetch(`${API_BASE_URL}/api/containers/${instructionId}`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(containerData),
-      })
-
-      if (!containerResponse.ok) {
-        const errorText = await containerResponse.text()
-        console.error("API error response:", errorText)
-        throw new Error(`Failed to save containers: ${containerResponse.status} ${containerResponse.statusText}`)
-      }
-
-      const result = await containerResponse.json()
-      console.log("API response:", result)
+      const result = await saveChangesToDatabase()
 
       setSuccessMessage("Changes saved successfully!")
 
-      // Clear success message after 3 seconds and navigate back
+      // Clear success message after 3 seconds and navigate back to instructions with all state
       setTimeout(() => {
         setSuccessMessage("")
-        navigate("/ViewClientInstruction")
+        navigate("/instructions", {
+          state: {
+            clientId,
+            clientName,
+            selectedMonth,
+            selectedYear,
+            activeFilter,
+          },
+        })
       }, 3000)
     } catch (error) {
       console.error("Error saving data:", error)
