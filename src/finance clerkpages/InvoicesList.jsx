@@ -1,11 +1,16 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { useNavigate } from "react-router-dom"
+import { useNavigate, useLocation } from "react-router-dom"
 import "../finance clerkpages/css/InvoicesList.css"
 
 const InvoicesList = () => {
   const navigate = useNavigate()
+  const location = useLocation()
+
+  // Get client information from location state (if available)
+  const clientInfo = location.state || {}
+  const { clientId, clientName, clientEmail, clientRepresentative } = clientInfo
 
   // Add state for instructions, loading, and error
   const [instructions, setInstructions] = useState([])
@@ -14,7 +19,8 @@ const InvoicesList = () => {
   const [filters, setFilters] = useState({
     year: new Date().getFullYear().toString(),
     month: (new Date().getMonth() + 1).toString(),
-    type: "All", // Default to Import since it's active in the UI
+    type: "import", // Default to import since it's active in the UI
+    clientId: clientId || null, // Add clientId to filters
   })
 
   // Fetch instructions when component mounts or filters change
@@ -28,6 +34,7 @@ const InvoicesList = () => {
         if (filters.year) params.append("year", filters.year)
         if (filters.month) params.append("month", filters.month)
         if (filters.type !== "All") params.append("type", filters.type)
+        if (filters.clientId) params.append("clientId", filters.clientId)
 
         // Use a relative URL - the proxy will forward this to your API server
         const requestUrl = `/api/invoices/completed?${params.toString()}`
@@ -75,7 +82,7 @@ const InvoicesList = () => {
     }
 
     fetchInstructions()
-  }, [filters]) // filters is the only dependency
+  }, [filters]) // filters is the dependency
 
   // Handle year and month filter changes
   const handleFilterChange = (e) => {
@@ -101,17 +108,46 @@ const InvoicesList = () => {
     return `${date.getDate().toString().padStart(2, "0")}/${(date.getMonth() + 1).toString().padStart(2, "0")}/${date.getFullYear()}`
   }
 
+  // Determine the back button destination
+  const handleBackClick = () => {
+    // If we came from client selection, go back to that page
+    if (clientId) {
+      navigate("/ViewClientInvoice")
+    } else {
+      // Otherwise go to the default dashboard
+      navigate("/FDashboard")
+    }
+  }
+
   return (
     <div className="app">
       {/* Main */}
       <main className="main">
         {/* Back Button */}
         <div className="">
-          <button className="back-button" onClick={() => navigate("/FDashboard")}>
+          <button className="back-button" onClick={handleBackClick}>
             Back
           </button>
         </div>
-        <div className="action-bar">
+
+        {/* Client Info Section - Only show if client info is available */}
+        {/* Remove the client info section that displays client details */}
+        {/* Delete or comment out this block:
+        {clientName && (
+          <div className="client-info-section">
+            <h2 className="client-name">{clientName}</h2>
+            <div className="client-details">
+              <p>
+                <strong>Representative:</strong> {clientRepresentative}
+              </p>
+              <p>
+                <strong>Email:</strong> {clientEmail}
+              </p>
+            </div>
+          </div>
+        )} */}
+
+        <div className="action-bar" style={{ display: "flex", justifyContent: "center", width: "100%" }}>
           <div className="filter-section6">
             <div className="dropdown-container">
               <select className="dropdown" name="year" value={filters.year} onChange={handleFilterChange}>
@@ -142,14 +178,14 @@ const InvoicesList = () => {
         <div className="filter-section">
           <div className="filter-group1">
             <button
-              className={`filter-button ${filters.type === "Import" ? "active" : ""}`}
-              onClick={() => handleTypeFilter("Import")}
+              className={`filter-button ${filters.type === "import" ? "active" : ""}`}
+              onClick={() => handleTypeFilter("import")}
             >
               Import
             </button>
             <button
-              className={`filter-button ${filters.type === "Export" ? "active" : ""}`}
-              onClick={() => handleTypeFilter("Export")}
+              className={`filter-button ${filters.type === "export" ? "active" : ""}`}
+              onClick={() => handleTypeFilter("export")}
             >
               Export
             </button>
@@ -179,7 +215,9 @@ const InvoicesList = () => {
               </div>
             </div>
           ) : instructions.length === 0 ? (
-            <div className="no-data-message">No completed instructions found.</div>
+            <div className="no-data-message">
+              {clientName ? `No completed instructions found for ${clientName}.` : "No completed instructions found."}
+            </div>
           ) : (
             <table>
               <thead>
@@ -204,7 +242,13 @@ const InvoicesList = () => {
                         className="small-btn"
                         onClick={() => {
                           console.log(`Navigating to invoice view for ID: ${instruction.m1key}`)
-                          navigate(`/invoice/${instruction.m1key}`)
+                          navigate(`/invoice/${instruction.m1key}`, {
+                            state: {
+                              clientId,
+                              clientName,
+                              returnToClientView: !!clientId,
+                            },
+                          })
                         }}
                       >
                         View
@@ -215,7 +259,13 @@ const InvoicesList = () => {
                         className="small-btn"
                         onClick={() => {
                           console.log(`Navigating to invoice download for ID: ${instruction.m1key}`)
-                          navigate(`/invoice/${instruction.m1key}/download`)
+                          navigate(`/invoice/${instruction.m1key}/download`, {
+                            state: {
+                              clientId,
+                              clientName,
+                              returnToClientView: !!clientId,
+                            },
+                          })
                         }}
                       >
                         Download

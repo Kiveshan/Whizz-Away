@@ -1,13 +1,19 @@
-const express = require("express")
-const cors = require("cors")
-const { Pool } = require("pg")
-const bcrypt = require("bcrypt")
-const expressSession = require("express-session")
-const passport = require("passport")
-const LocalStrategy = require("passport-local").Strategy
-const crypto = require("crypto")
-const jwt = require("jsonwebtoken")
-const path = require("path")
+import express from "express"
+import cors from "cors"
+import pkg from "pg"
+const { Pool } = pkg
+import bcrypt from "bcrypt"
+import expressSession from "express-session"
+import passport from "passport"
+import { Strategy as LocalStrategy } from "passport-local"
+import crypto from "crypto"
+import jwt from "jsonwebtoken"
+import path from "path"
+import { fileURLToPath } from "url"
+import puppeteer from "puppeteer"
+
+const __filename = fileURLToPath(import.meta.url)
+const __dirname = path.dirname(__filename)
 
 const app = express()
 const PORT = process.env.PORT || 5000
@@ -43,7 +49,7 @@ app.use(
 app.use(passport.initialize())
 app.use(passport.session())
 
-// Database client setup
+// Database client setup - single configuration for Whizz-Away database
 const dbConfig = {
   user: process.env.PGUSER || "postgres",
   host: process.env.PGHOST || "localhost",
@@ -58,7 +64,13 @@ let pool = null
 // Function to connect to the database
 async function connectDb() {
   try {
-    console.log("Connecting to database...")
+    console.log("Connecting to database with configuration:", {
+      host: dbConfig.host,
+      database: dbConfig.database,
+      port: dbConfig.port,
+      user: dbConfig.user,
+    })
+
     pool = new Pool(dbConfig)
 
     // Test the connection
@@ -66,10 +78,12 @@ async function connectDb() {
     const result = await client.query("SELECT NOW()")
     client.release()
 
-    console.log("✅ Database Connected Successfully")
+    console.log(`✅ Database Connected Successfully to ${dbConfig.database}`)
     console.log(`Database server time:`, result.rows[0].now)
+
+    return
   } catch (err) {
-    console.error("❌ Database connection failed:", err.message)
+    console.error(`Failed to connect to database:`, err.message)
     console.error("Please check your database configuration and ensure PostgreSQL is running")
 
     // Don't exit the process, allow the server to start anyway
@@ -172,6 +186,7 @@ app.get("/api/health", (req, res) => {
     status: "OK",
     message: "Whizz-Away API is running",
     database: dbStatus,
+    databaseName: dbConfig.database,
   })
 })
 
@@ -241,9 +256,10 @@ app.get("/api/invoices/completed", async (req, res) => {
 
     console.log("Received request for completed invoices with query:", req.query)
 
-    // Filter by year and month if provided
-    const { year, month, type } = req.query
+    // Filter by year, month, type, and clientId if provided
+    const { year, month, type, clientId } = req.query
 
+    // Updated query to match the database schema from the SQL file
     let queryText = `
       SELECT 
         m1.m1key, 
@@ -261,20 +277,30 @@ app.get("/api/invoices/completed", async (req, res) => {
     `
 
     const queryParams = []
+    let paramIndex = 1
 
     // Add filters if provided
+    if (clientId) {
+      queryText += ` AND m1.client = $${paramIndex}`
+      queryParams.push(clientId)
+      paramIndex++
+    }
+
     if (year && month) {
-      queryText += ` AND EXTRACT(YEAR FROM m1.pickupdate) = $1 
-                    AND EXTRACT(MONTH FROM m1.pickupdate) = $2`
+      queryText += ` AND EXTRACT(YEAR FROM m1.pickupdate) = $${paramIndex} 
+                    AND EXTRACT(MONTH FROM m1.pickupdate) = $${paramIndex + 1}`
       queryParams.push(year, month)
+      paramIndex += 2
 
       if (type && type !== "All") {
-        queryText += ` AND s.shipmenttype = $3`
+        queryText += ` AND s.shipmenttype = $${paramIndex}`
         queryParams.push(type)
+        paramIndex++
       }
     } else if (type && type !== "All") {
-      queryText += ` AND s.shipmenttype = $1`
+      queryText += ` AND s.shipmenttype = $${paramIndex}`
       queryParams.push(type)
+      paramIndex++
     }
 
     queryText += ` ORDER BY m1.pickupdate DESC`
@@ -312,6 +338,7 @@ app.get("/api/invoices/:id", async (req, res) => {
 
     const { id } = req.params
 
+    // Updated query to include total_amount instead of rate
     const queryText = `
       SELECT 
         m1.m1key,
@@ -327,6 +354,7 @@ app.get("/api/invoices/:id", async (req, res) => {
         m1.dropoff,
         m1.pickupdate,
         m1.description,
+        m1.total_cost,  
         m1.rate,
         m1.rateweight,
         COALESCE(m1.num_six_meters, 0) + COALESCE(m1.num_twelve_meters, 0) + COALESCE(m1.num_abnormal, 0) as num_containers
@@ -352,9 +380,10 @@ app.get("/api/invoices/:id", async (req, res) => {
     }
 
     // Get container details if available
+    // Updated query to match the database schema from the SQL file
     const containerQuery = `
       SELECT 
-        containernum, 
+        containernum as container_number, 
         weight
       FROM 
         public.container
@@ -393,6 +422,140 @@ app.get("/api/invoices/:id", async (req, res) => {
   }
 })
 
+// GET clients with invoice counts
+app.get("/api/clients", async (req, res) => {
+  try {
+    if (!pool) {
+      return res.status(503).json({
+        success: false,
+        message: "Database connection not established. Please try again later.",
+      })
+    }
+
+    console.log("Received request for clients with invoice counts")
+
+    // Updated query to match the database schema from the SQL file
+    const queryText = `
+      SELECT 
+        c.m5clientkey,
+        c.companyname,
+        c.representative,
+        c.email,
+        COUNT(m1.m1key) FILTER (WHERE m1.status = 'Completed') AS invoice_count
+      FROM 
+        public.m5_client c
+      LEFT JOIN 
+        public.m1_controller m1 ON c.m5clientkey = m1.client
+      GROUP BY 
+        c.m5clientkey, c.companyname, c.representative, c.email
+      ORDER BY 
+        c.companyname
+    `
+
+    const result = await query(queryText, [])
+    console.log(`Query returned ${result.rows.length} clients`)
+
+    res.json({
+      success: true,
+      data: result.rows,
+    })
+  } catch (error) {
+    console.error("Error fetching clients:", error)
+    res.status(500).json({
+      success: false,
+      message: error.message,
+      stack: process.env.NODE_ENV === "production" ? null : error.stack,
+    })
+  }
+})
+
+// Generate PDF with Puppeteer
+app.post("/api/generate-pdf", async (req, res) => {
+  try {
+    console.log("Received request to generate PDF")
+
+    const { invoiceHtml, filename } = req.body
+
+    if (!invoiceHtml) {
+      return res.status(400).json({
+        success: false,
+        message: "Invoice HTML content is required",
+      })
+    }
+
+    // Launch a headless browser
+    const browser = await puppeteer.launch({
+      headless: true,
+      args: ["--no-sandbox", "--disable-setuid-sandbox"],
+    })
+
+    // Create a new page
+    const page = await browser.newPage()
+
+    // Set the content of the page to the invoice HTML
+    await page.setContent(invoiceHtml, {
+      waitUntil: "networkidle0",
+    })
+
+    // Add custom styles for better PDF rendering
+    await page.addStyleTag({
+      content: `
+        @page {
+          margin: 15mm;
+          size: A4;
+        }
+        body {
+          font-family: Arial, sans-serif;
+          color: #000;
+          margin: 0;
+          padding: 0;
+        }
+        table { page-break-inside: auto; }
+        tr { page-break-inside: avoid; page-break-after: auto; }
+        thead { display: table-header-group; }
+        tfoot { display: table-footer-group; }
+      `,
+    })
+
+    // Generate PDF
+    const pdfBuffer = await page.pdf({
+      format: "A4",
+      printBackground: true,
+      margin: {
+        top: "15mm",
+        right: "15mm",
+        bottom: "15mm",
+        left: "15mm",
+      },
+      displayHeaderFooter: true,
+      headerTemplate: "<div></div>",
+      footerTemplate: `
+        <div style="width: 100%; font-size: 10px; text-align: right; padding-right: 15mm; color: #444;">
+          <span>Page <span class="pageNumber"></span> of <span class="totalPages"></span></span>
+        </div>
+      `,
+      footerHeight: 30,
+    })
+
+    // Close the browser
+    await browser.close()
+
+    // Set response headers
+    res.setHeader("Content-Type", "application/pdf")
+    res.setHeader("Content-Disposition", `attachment; filename="${filename || "invoice.pdf"}"`)
+
+    // Send the PDF buffer
+    res.send(pdfBuffer)
+  } catch (error) {
+    console.error("Error generating PDF:", error)
+    res.status(500).json({
+      success: false,
+      message: error.message,
+      stack: process.env.NODE_ENV === "production" ? null : error.stack,
+    })
+  }
+})
+
 // Add a catch-all route for debugging
 app.use((req, res, next) => {
   console.log(`Unhandled request: ${req.method} ${req.url}`)
@@ -412,5 +575,5 @@ startServer().catch((err) => {
   console.error("Failed to start server:", err)
 })
 
-module.exports = app
+export default app
 

@@ -12,6 +12,10 @@ const ClientInvoice = () => {
   // Extract ID from URL or location state
   const id = params.id || (location.state && location.state.id)
 
+  // Get client information if available
+  const clientInfo = location.state || {}
+  const { clientId, clientName, returnToClientView } = clientInfo
+
   const [invoiceData, setInvoiceData] = useState(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
@@ -46,10 +50,10 @@ const ClientInvoice = () => {
         const result = await response.json()
         console.log("Received invoice data:", result)
 
-        // Map container fields to match the expected format
+        // Map container fields to match the expected format if needed
         if (result.data && result.data.containers) {
           result.data.containers = result.data.containers.map((container) => ({
-            container_number: container.containernum || container.container_number,
+            container_number: container.container_number || container.containernum,
             weight: container.weight,
           }))
         }
@@ -170,9 +174,9 @@ const ClientInvoice = () => {
     )
   }
 
-  // Calculate invoice values
+  // Calculate invoice values - use total_amount instead of rate
   const invoiceNumber = `INV-${invoiceData.m1key}-${new Date().getFullYear()}`
-  const amount = invoiceData.rate || 0
+  const amount = invoiceData.total_cost
   const vat = calculateVAT(amount)
   const total = amount + vat
 
@@ -246,8 +250,6 @@ const ClientInvoice = () => {
 
           {/* Container Details */}
           <div className="container-section">
-            {/* Container Table */}
-            <h3 className="table-heading">Container Details</h3>
             <table className="container-table5">
               <thead>
                 <tr>
@@ -257,12 +259,18 @@ const ClientInvoice = () => {
               </thead>
               <tbody>
                 {containers.length > 0 ? (
-                  containers.map((container, index) => (
-                    <tr key={index}>
-                      <td className="container-number">{container.container_number || `Container ${index + 1}`}</td>
-                      <td className="weight">{container.weight || "N/A"}</td>
-                    </tr>
-                  ))
+                  containers.map((container, index) => {
+                    const containerAmount = amount / (containers.length || 1)
+                    const containerVAT = calculateVAT(containerAmount)
+                    const containerTotal = containerAmount + containerVAT
+
+                    return (
+                      <tr key={index}>
+                        <td className="container-number">{container.container_number || `Container ${index + 1}`}</td>
+                        <td className="weight">{container.weight || "N/A"}</td>
+                      </tr>
+                    )
+                  })
                 ) : (
                   <tr>
                     <td className="container-number">No container information</td>
@@ -271,32 +279,35 @@ const ClientInvoice = () => {
                 )}
               </tbody>
             </table>
-
-            {/* Totals Table */}
-            <h3 className="table-heading">Invoice Summary</h3>
+                      {/* Summary Table */}
+          <div className="summary-section">
             <table className="container-table5">
               <thead>
                 <tr>
-                  <th className="description-header">Description</th>
-                  <th className="amount-header">Amount</th>
+                  <th className="summary-header" colSpan="2">
+                    Invoice Summary
+                  </th>
                 </tr>
               </thead>
               <tbody>
                 <tr>
-                  <td className="description">Amount</td>
-                  <td className="amount">{formatCurrency(amount)}</td>
+                  <td className="summary-label">Amount (excl. VAT)</td>
+                  <td className="summary-value">{formatCurrency(amount)}</td>
                 </tr>
                 <tr>
-                  <td className="description">VAT (15%)</td>
-                  <td className="amount">{formatCurrency(vat)}</td>
+                  <td className="summary-label">VAT (15%)</td>
+                  <td className="summary-value">{formatCurrency(vat)}</td>
                 </tr>
-                <tr className="total-row">
-                  <td className="description">Total</td>
-                  <td className="amount">{formatCurrency(total)}</td>
+                <tr className="summary-total-row">
+                  <td className="summary-total-label">Total Amount</td>
+                  <td className="summary-total-value">{formatCurrency(total)}</td>
                 </tr>
               </tbody>
             </table>
           </div>
+          </div>
+
+
         </div>
 
         {/* Banking Details */}
@@ -313,7 +324,23 @@ const ClientInvoice = () => {
       </div>
 
       <div className="invoicedownloadbtn1">
-        <button className="back-btn" onClick={() => navigate("/invoices")}>
+        <button
+          className="back-btn"
+          onClick={() => {
+            if (returnToClientView) {
+              // If we came from client view, go back to the filtered invoices list
+              navigate("/invoices", {
+                state: {
+                  clientId,
+                  clientName,
+                },
+              })
+            } else {
+              // Otherwise go to the regular invoices list
+              navigate("/invoices")
+            }
+          }}
+        >
           Back
         </button>
         <button className="download-btn" onClick={generatePDF} disabled={pdfLoading}>
