@@ -20,7 +20,7 @@ const FClerkLegDetails = () => {
         }}
       >
         <button
-          onClick={() => navigate("/finance-clerk-wage-details")}
+          onClick={() => navigate(`/finance-clerk-wage-details/${id}`)}
           className="back-button"
         >
           Back

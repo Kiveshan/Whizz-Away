@@ -161,7 +161,7 @@ const FinanceClerkWageSlip = () => {
         </div>
       </div>
        <button
-                onClick={() => navigate(`/finance-clerk-wage-details`)}
+                onClick={() => navigate(`/finance-clerk-wage-details/{id}`)}
                 style={{
                   backgroundColor: "#8ee4a6",
                   color: "black",

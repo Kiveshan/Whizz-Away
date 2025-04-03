@@ -151,6 +151,8 @@ function DynamicHeader() {
 
   const getTitle = () => {
     if (location.pathname.startsWith("/upload")) return "Proof of Payment";
+    if (location.pathname.startsWith("/ExpenseDetails/")) return "Truck Expenses";
+    if (location.pathname.startsWith("/finance-clerk-wage-details/")) return "Wages";
     return titleMap[location.pathname] || "Unknown Page";
   };
 
@@ -235,11 +237,11 @@ function ContentWrapper() {
         <Route path="/client-invoice" element={<ClientInvoice />} />
         <Route path="/FDashboard" element={<FDashboard />} />
         <Route path="/finance-clerk-wage" element={<FinanceClerkWage />} />
-        <Route path="/finance-clerk-wage-details" element={<FinanceClerkWageDetails />} />
+        <Route path="/finance-clerk-wage-details/:userid" element={<FinanceClerkWageDetails />} />
         <Route path="/finance-clerk-wage-slip" element={<FinanceClerkWageSlip />} />
         <Route path="/client-statement" element={<ClientStatement />} />
         <Route path="/ViewExpense" element={<ViewExpense />} />
-        <Route path="/ExpenseDetails" element={<ExpenseDetails />} />
+        <Route path="/ExpenseDetails/:truckId" element={<ExpenseDetails />} />
         <Route path="/ExpenseSubmission" element={<ExpenseSubmission />} />
         <Route path="/ViewClientInstruction" element={<ViewClientInstruction />} />
         <Route path="/ViewClientInvoice" element={<ViewClientInvoice />} />

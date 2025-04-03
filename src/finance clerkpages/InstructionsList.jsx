@@ -1,25 +1,32 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { useNavigate } from "react-router-dom"
+import { useLocation, useNavigate } from "react-router-dom"
 import "../finance clerkpages/css/InstructionsList.css"
 
 const Instructions = ({ setCurrentPage }) => {
   const navigate = useNavigate()
+  const location = useLocation()
   const [instructions, setInstructions] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
   const [statusFilter, setStatusFilter] = useState("All")
   const [typeFilter, setTypeFilter] = useState("All")
+  const clientId = location.state?.clientId
 
   useEffect(() => {
-    fetchInstructions()
-  }, [])
+    if (clientId) {
+      fetchInstructions()
+    } else {
+      setError("Client ID is missing. Please go back to the client list.")
+      setLoading(false)
+    }
+  }, [clientId])
 
   const fetchInstructions = async () => {
     try {
       setLoading(true)
-      const response = await fetch("http://localhost:5000/instructions")
+      const response = await fetch(`http://localhost:5000/client-instructions-details/${clientId}`)
 
       if (!response.ok) {
         throw new Error(`HTTP error! Status: ${response.status}`)
@@ -36,29 +43,28 @@ const Instructions = ({ setCurrentPage }) => {
   }
 
   const getShipmentType = (type) => {
+    console.log("getShipmentType received:", type)
     return type === 1 ? "Import" : type === 2 ? "Export" : "Unknown"
   }
 
   // Filter instructions based on both status and type filters
   const filteredInstructions = instructions.filter((item) => {
     // Normalize status by trimming spaces and converting to lowercase
-    const normalizedStatus = item.status ? item.status.trim().toLowerCase() : "new";
-    const normalizedFilterStatus = statusFilter.trim().toLowerCase();
-  
+    const normalizedStatus = item.status ? item.status.trim().toLowerCase() : "new"
+    const normalizedFilterStatus = statusFilter.trim().toLowerCase()
+
     // Check if the item passes the status filter
-    const passesStatusFilter = 
-      normalizedFilterStatus === "all" || 
-      normalizedStatus === normalizedFilterStatus;
-  
+    const passesStatusFilter = normalizedFilterStatus === "all" || normalizedStatus === normalizedFilterStatus
+
     // Check if the item passes the type filter
     const passesTypeFilter =
       typeFilter === "All" ||
-      (typeFilter === "Import" && item.shipment_type === 1) ||
-      (typeFilter === "Export" && item.shipment_type === 2);
-  
+      (typeFilter === "Import" && item.shippy === 1) ||
+      (typeFilter === "Export" && item.shippy === 2)
+
     // Return true only if the item passes both filters
-    return passesStatusFilter && passesTypeFilter;
-  });
+    return passesStatusFilter && passesTypeFilter
+  })
 
   const handleStatusFilterClick = (filterType) => {
     setStatusFilter(filterType)
@@ -66,6 +72,15 @@ const Instructions = ({ setCurrentPage }) => {
 
   const handleTypeFilterClick = (filterType) => {
     setTypeFilter(filterType)
+  }
+
+  const handleViewAssignment = (item) => {
+    navigate("/update-instructions", {
+      state: {
+        clientId: clientId,
+        instructionId: item.m1key,
+      },
+    })
   }
 
   return (
@@ -140,7 +155,7 @@ const Instructions = ({ setCurrentPage }) => {
                   filteredInstructions.map((item) => (
                     <tr key={item.m1key}>
                       <td>{item.m1key}</td>
-                      <td>{getShipmentType(item.shipment_type)}</td>
+                      <td>{getShipmentType(item.shippy)}</td>
                       <td>{item.status || "New"}</td>
                       <td>{item.fileref || "N/A"}</td>
                       <td>
@@ -149,7 +164,7 @@ const Instructions = ({ setCurrentPage }) => {
                         </button>
                       </td>
                       <td>
-                        <button className="view-btn" onClick={() => navigate("/update-instructions")}>
+                        <button className="view-btn" onClick={() => handleViewAssignment(item)}>
                           View
                         </button>
                       </td>
@@ -165,6 +180,5 @@ const Instructions = ({ setCurrentPage }) => {
   )
 }
 
-export default Instructions;
-
+export default Instructions
 
