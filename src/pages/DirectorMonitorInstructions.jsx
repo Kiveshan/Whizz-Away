@@ -1,157 +1,310 @@
 "use client"
 
-import { useState } from "react"
-import { useNavigate } from "react-router-dom"
-import "../css/MonitorInstructions.css"
+import { useState, useEffect } from "react"
+import { useNavigate, useLocation } from "react-router-dom"
+import "../finance clerkpages/css/InstructionsList.css"
+import API_CONFIG from "../utils/api-config"
 
 const DirectorMonitorInstructions = () => {
   const navigate = useNavigate()
-  const [selectedRows, setSelectedRows] = useState([])
-  const [filter, setFilter] = useState("All")
-  const [statusFilter, setStatusFilter] = useState("All")
-  const [searchQuery, setSearchQuery] = useState("")
+  const location = useLocation()
+  const {
+    clientId,
+    clientName,
+    selectedMonth: initialMonth,
+    selectedYear: initialYear,
+    activeFilter: initialFilter,
+  } = location.state || {}
 
-  const instructions = [
-    {
-      id: 1,
-      instructionNo: "Instruction 1",
-      type: "Import",
-      status: "Completed",
-      assignment: "",
-      fileNo: "F12345"
-    },
-    {
-      id: 2,
-      instructionNo: "Instruction 2",
-      type: "Export",
-      status: "Completed",
-      assignment: "",
-      fileNo: "F67890"
-    },
-    {
-      id: 3,
-      instructionNo: "Instruction 3",
-      type: "Import",
-      status: "In-progress",
-      assignment: "",
-      fileNo: "F11223"
-    },
-  ]
+  // Debug log to check what state is being received
+  console.log("DirectorMonitorInstructions received state:", {
+    clientId,
+    clientName,
+    selectedMonth: initialMonth,
+    selectedYear: initialYear,
+    activeFilter: initialFilter,
+  })
 
-  const handleBack = () => {
-    navigate(-1)
+  const [selectedMonth, setSelectedMonth] = useState(initialMonth || "")
+  const [selectedYear, setSelectedYear] = useState(initialYear || "")
+  const [instructions, setInstructions] = useState([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState(null)
+  const [activeFilter, setActiveFilter] = useState(initialFilter || "All")
+
+  useEffect(() => {
+    const fetchInstructions = async () => {
+      try {
+        setLoading(true)
+        console.log("Fetching instructions with clientId:", clientId) // Debug log
+
+        // Fetch all instructions first
+        const response = await fetch(`${API_CONFIG.BASE_URL}/api/instructions`)
+
+        if (!response.ok) {
+          throw new Error(`HTTP error! Status: ${response.status}`)
+        }
+
+        const data = await response.json()
+        console.log("All instructions fetched:", data.length)
+
+        // Apply client filtering in the component
+        let filteredData = data
+
+        if (clientId) {
+          // Convert clientId to string for consistent comparison
+          const clientIdStr = String(clientId)
+
+          // Apply strict filtering
+          filteredData = data.filter((item) => {
+            // Convert all possible client ID fields to strings for comparison
+            const itemClientId = String(item.client || item.clientid || item.m5clientkey || item.client_id || "")
+            const matches = itemClientId === clientIdStr
+
+            // Log each comparison for debugging
+            if (matches) {
+              console.log(`Found matching item: ${JSON.stringify(item)}`)
+            }
+
+            return matches
+          })
+
+          console.log(`Filtered to ${filteredData.length} instructions for clientId: ${clientId}`)
+        }
+
+        setInstructions(filteredData)
+        setLoading(false)
+      } catch (error) {
+        console.error("Error fetching instructions:", error)
+        setError(`Failed to load instructions: ${error.message}`)
+        setLoading(false)
+      }
+    }
+
+    fetchInstructions()
+  }, [clientId])
+
+  const handleFilterClick = (filter) => {
+    setActiveFilter(filter)
   }
-  const handleV=()=>{
-    navigate("/DirectorManagerViewAssignment");
+
+  const getFilteredInstructions = () => {
+    let filtered = [...instructions]
+
+    // Filter by month and year if selected
+    if (selectedMonth) {
+      filtered = filtered.filter((item) => {
+        const date = new Date(item.startingdate || item.pickupdate)
+        const monthNames = [
+          "January",
+          "February",
+          "March",
+          "April",
+          "May",
+          "June",
+          "July",
+          "August",
+          "September",
+          "October",
+          "November",
+          "December",
+        ]
+        return monthNames[date.getMonth()] === selectedMonth
+      })
+    }
+
+    if (selectedYear) {
+      filtered = filtered.filter((item) => {
+        const date = new Date(item.startingdate || item.pickupdate)
+        return date.getFullYear().toString() === selectedYear
+      })
+    }
+
+    // Filter by status or type
+    if (activeFilter !== "All") {
+      if (["New", "In progress", "Completed"].includes(activeFilter)) {
+        filtered = filtered.filter((item) => item.status === activeFilter)
+      } else if (activeFilter === "import") {
+        filtered = filtered.filter(
+          (item) =>
+            item.type_text === "import" ||
+            item.type === "import" ||
+            item.shipment_type === 1 ||
+            item.shipment_type === "1",
+        )
+      } else if (activeFilter === "export") {
+        filtered = filtered.filter(
+          (item) =>
+            item.type_text === "export" ||
+            item.type === "export" ||
+            item.shipment_type === 2 ||
+            item.shipment_type === "2",
+        )
+      }
+    }
+
+    return filtered
   }
 
-  const handleFilterChange = (type) => {
-    setFilter(type)
-  }
-
-  const handleStatusFilterChange = (status) => {
-    setStatusFilter(status)
-  }
-
-  const handleSearchChange = (event) => {
-    setSearchQuery(event.target.value)
-  }
-
-  const filteredInstructions = instructions.filter(instruction => 
-    (filter === "All" || instruction.type === filter) && 
-    (statusFilter === "All" || instruction.status === statusFilter) &&
-    (searchQuery === "" || 
-      instruction.instructionNo.toLowerCase().includes(searchQuery.toLowerCase()) || 
-      instruction.fileNo.toLowerCase().includes(searchQuery.toLowerCase()))
-  )
-
-  const handleView = (id) => {
-    console.log("Viewing instruction:", id)
+  // Handle view instruction click
+  const handleViewInstruction = (instructionId) => {
+    navigate("/DMcontrollerinstructions", {
+      state: {
+        instructionId,
+        clientId,
+        clientName,
+        selectedMonth,
+        selectedYear,
+        activeFilter,
+      },
+    })
   }
 
   return (
-    <div className="monitor-instructions-container">
-      <div className="user-profile">
-        <button className="back-button" onClick={handleBack}>Back</button>
+    <div>
+      {/* Centered company name heading */}
+      <div className="client-payments-header">
+        <button className="back-button" onClick={() => navigate("/DirectorMonitorInstructionView")}>
+          Back
+        </button>
+        {clientName && (
+          <span className="client-name">
+            {clientName} <span style={{ display: "none" }}>{clientId ? `(Client ID: ${clientId})` : ""}</span>
+          </span>
+        )}
       </div>
 
-      <div className="action-bar">
-        <div className="filter-section10">
-          <div className="filter-group">
-            <select className="dropdown">
-              <option>Year</option>
-              <option>2025</option>
-              <option>2024</option>
-              <option>2023</option>
-              <option>2022</option>
-            </select>
-            <select className="dropdown">
-              <option>Month</option>
-              <option>January</option>
-              <option>February</option>
-              <option>March</option>
-              <option>April</option>
-              <option>May</option>
-              <option>June</option>
-              <option>July</option>
-              <option>August</option>
-              <option>September</option>
-              <option>October</option>
-              <option>November</option>
-              <option>December</option>
-            </select>
+      {/* Centered month and year filters */}
+      <div className="dropdown-container74">
+        <select value={selectedMonth} onChange={(e) => setSelectedMonth(e.target.value)} className="dropdown">
+          <option value="">Select Month</option>
+          <option value="January">January</option>
+          <option value="February">February</option>
+          <option value="March">March</option>
+          <option value="April">April</option>
+          <option value="May">May</option>
+          <option value="June">June</option>
+          <option value="July">July</option>
+          <option value="August">August</option>
+          <option value="September">September</option>
+          <option value="October">October</option>
+          <option value="November">November</option>
+          <option value="December">December</option>
+        </select>
+
+        <select value={selectedYear} onChange={(e) => setSelectedYear(e.target.value)} className="dropdown">
+          <option value="">Select Year</option>
+          <option value="2023">2023</option>
+          <option value="2024">2024</option>
+          <option value="2025">2025</option>
+          <option value="2026">2026</option>
+        </select>
+      </div>
+
+      <div className="content1">
+        <div className="button-group">
+          <div className="filter-buttons">
+            <button
+              className={`btn btn-blue ${activeFilter === "import" ? "active" : ""}`}
+              onClick={() => handleFilterClick("import")}
+            >
+              Import
+            </button>
+            <button
+              className={`btn btn-blue ${activeFilter === "export" ? "active" : ""}`}
+              onClick={() => handleFilterClick("export")}
+            >
+              Export
+            </button>
+            <button
+              className={`btn btn-blue ${activeFilter === "All" ? "active" : ""}`}
+              onClick={() => handleFilterClick("All")}
+            >
+              All
+            </button>
+            <button
+              className={`btn btn-blue ${activeFilter === "In progress" ? "active" : ""}`}
+              onClick={() => handleFilterClick("In progress")}
+            >
+              In-Progress
+            </button>
+            <button
+              className={`btn btn-blue ${activeFilter === "Completed" ? "active" : ""}`}
+              onClick={() => handleFilterClick("Completed")}
+            >
+              Complete
+            </button>
+            <button
+              className={`btn btn-blue ${activeFilter === "New" ? "active" : ""}`}
+              onClick={() => handleFilterClick("New")}
+            >
+              New
+            </button>
           </div>
         </div>
-      </div>
-      <div className="filter-section10">
-        <div className="filter-group">
-          <button className={`filter-button ${filter === "Import" ? "active" : ""}`} onClick={() => handleFilterChange("Import")}>Import</button>
-          <button className={`filter-button ${filter === "Export" ? "active" : ""}`} onClick={() => handleFilterChange("Export")}>Export</button>
-          <button className={`filter-button ${filter === "All" ? "active" : ""}`} onClick={() => handleFilterChange("All")}>All</button>
+
+        <div className="tables-container">
+          {loading ? (
+            <p>Loading instructions...</p>
+          ) : error ? (
+            <p className="error-message">{error}</p>
+          ) : (
+            <table className="t2">
+              <thead>
+                <tr>
+                  <th>Instruction No</th>
+                  <th>File No</th>
+                  <th>Type</th>
+                  <th>Status</th>
+                  <th>Starting Date</th>
+                  <th>Instruction</th>
+                  <th>Assignment</th>
+                </tr>
+              </thead>
+              <tbody>
+                {getFilteredInstructions().length === 0 ? (
+                  <tr>
+                    <td colSpan="7">No instructions found</td>
+                  </tr>
+                ) : (
+                  getFilteredInstructions().map((item) => (
+                    <tr key={item.m1controllerkey || item.m1key}>
+                      <td>Instruction {item.m1controllerkey || item.m1key}</td>
+                      <td>{item.fileno}</td>
+                      <td>
+                        {item.type_text ||
+                          (item.shipment_type === 1 || item.shipment_type === "1"
+                            ? "import"
+                            : item.shipment_type === 2 || item.shipment_type === "2"
+                              ? "export"
+                              : item.type)}
+                      </td>
+                      <td>{item.status}</td>
+                      <td>{new Date(item.startingdate || item.pickupdate).toLocaleDateString()}</td>
+                      <td>
+                        <button
+                          className="view-btn"
+                          onClick={() => handleViewInstruction(item.m1controllerkey || item.m1key)}
+                        >
+                          View
+                        </button>
+                      </td>
+                      <td>
+                        <button className="view-btn" onClick={() => navigate("/DirectorManagerViewAssignment")}>
+                          View
+                        </button>
+                      </td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          )}
         </div>
-        <div className="filter-group">
-        <button className={`filter-button ${statusFilter === "In-progress" ? "active" : ""}`} onClick={() => handleStatusFilterChange("In-progress")}>New</button>
-          <button className={`filter-button ${statusFilter === "In-progress" ? "active" : ""}`} onClick={() => handleStatusFilterChange("In-progress")}>In-progress</button>
-          <button className={`filter-button ${statusFilter === "Completed" ? "active" : ""}`} onClick={() => handleStatusFilterChange("Completed")}>Completed</button>
-      
-        </div>
-      </div>
-      <div className="search-bar">
-        {/* <input
-          type="text"
-          placeholder="Search by Instruction No. or File No."
-          value={searchQuery}
-          onChange={handleSearchChange}
-        /> */}
-      </div>
-      <div className="instructions-table">
-        <table>
-          <thead>
-            <tr>
-              <th>Instruction No.</th>
-              <th>File No.</th>
-              <th>Type</th>
-              <th>Status</th>
-              <th>Assignment</th>
-            </tr>
-          </thead>
-          <tbody>
-            {filteredInstructions.map((instruction) => (
-              <tr key={instruction.id}>
-                <td>{instruction.instructionNo}</td>
-                <td>{instruction.fileNo}</td>
-                <td>{instruction.type}</td>
-                <td>{instruction.status}</td>
-                <td>
-                  <button className="view-button" onClick={() => handleV(instruction.id)}>View</button>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
       </div>
     </div>
   )
 }
 
 export default DirectorMonitorInstructions
+

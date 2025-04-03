@@ -15,7 +15,10 @@ const ContainerDetailsPage = () => {
   const API_BASE_URL = API_CONFIG.BASE_URL
 
   // Get data from location state
-  const { controllerData, isImport } = location.state || { controllerData: null, isImport: false }
+  const { controllerData, isImport } = location.state || {
+    controllerData: null,
+    isImport: false,
+  }
 
   // State for container data
   const [containers, setContainers] = useState([])
@@ -26,17 +29,43 @@ const ContainerDetailsPage = () => {
     message: "",
   })
 
-  // Initialize containers based on numContainers
+  // Initialize containers based on container counts
   useEffect(() => {
     if (controllerData) {
-      const initialContainers = Array(controllerData.numContainers)
-        .fill()
-        .map((_, index) => ({
-          id: index + 1,
+      const containersList = []
+      let containerId = 1
+
+      // Add 6m containers
+      for (let i = 0; i < (controllerData.num_six_meters || 0); i++) {
+        containersList.push({
+          id: containerId++,
           containerNum: "",
           weight: isImport ? "" : null,
-        }))
-      setContainers(initialContainers)
+          containerType: "6m",
+        })
+      }
+
+      // Add 12m containers
+      for (let i = 0; i < (controllerData.num_twelve_meters || 0); i++) {
+        containersList.push({
+          id: containerId++,
+          containerNum: "",
+          weight: isImport ? "" : null,
+          containerType: "12m",
+        })
+      }
+
+      // Add abnormal containers
+      for (let i = 0; i < (controllerData.num_abnormal || 0); i++) {
+        containersList.push({
+          id: containerId++,
+          containerNum: "",
+          weight: isImport ? "" : null,
+          containerType: "Abnormal",
+        })
+      }
+
+      setContainers(containersList)
     } else {
       // Redirect back if no data
       navigate("/ControllerInstructions")
@@ -50,20 +79,27 @@ const ContainerDetailsPage = () => {
     )
   }
 
-  // Add a new container
-  const handleAddContainer = () => {
+  // Add a new container (with specified type)
+  const handleAddContainer = (containerType) => {
     setContainers((prevContainers) => [
       ...prevContainers,
       {
         id: prevContainers.length + 1,
         containerNum: "",
         weight: isImport ? "" : null,
+        containerType: containerType,
       },
     ])
 
-    // Update numContainers in controllerData
+    // Update container counts in controllerData
     if (controllerData) {
-      controllerData.numContainers += 1
+      if (containerType === "6m") {
+        controllerData.num_six_meters = (controllerData.num_six_meters || 0) + 1
+      } else if (containerType === "12m") {
+        controllerData.num_twelve_meters = (controllerData.num_twelve_meters || 0) + 1
+      } else if (containerType === "Abnormal") {
+        controllerData.num_abnormal = (controllerData.num_abnormal || 0) + 1
+      }
     }
   }
 
@@ -73,7 +109,7 @@ const ContainerDetailsPage = () => {
       if (!container.containerNum) {
         setErrorModal({
           isOpen: true,
-          message: `Please enter a container number for container #${container.id}`,
+          message: `Please enter a container number for container #${container.id} (${container.containerType})`,
         })
         return false
       }
@@ -81,7 +117,7 @@ const ContainerDetailsPage = () => {
       if (isImport && (container.weight === "" || isNaN(Number.parseFloat(container.weight)))) {
         setErrorModal({
           isOpen: true,
-          message: `Please enter a valid weight for container #${container.id}`,
+          message: `Please enter a valid weight for container #${container.id} (${container.containerType})`,
         })
         return false
       }
@@ -113,6 +149,7 @@ const ContainerDetailsPage = () => {
         containerData: containers.map((container) => ({
           containerNum: container.containerNum,
           weight: isImport ? Number.parseFloat(container.weight) : null,
+          // No need to include containerType as it's not saved in the container table
         })),
       }
 
@@ -142,14 +179,15 @@ const ContainerDetailsPage = () => {
           setErrorModal({
             isOpen: true,
             message: "Success! (Using mock data: " + result.message + ")",
+            onClose: () => {
+              // Navigate to ControllerDashboard immediately after closing the modal
+              setErrorModal({ isOpen: false, message: "" })
+              navigate("/ControllerDashboard")
+            },
           })
-          // Navigate after user closes the modal
-          setTimeout(() => {
-            navigate("/Controller_Dashboard")
-          }, 3000)
         } else {
-          // Navigate back to controller dashboard or another page
-          navigate("/Controller_Dashboard")
+          // Navigate to ControllerDashboard immediately
+          navigate("/ControllerDashboard")
         }
       } else {
         throw new Error("Failed to save instruction: " + (result.message || "Unknown error"))
@@ -166,55 +204,83 @@ const ContainerDetailsPage = () => {
   return (
     <>
       {/* Error Modal */}
-      <ErrorModal
-        isOpen={errorModal.isOpen}
-        onClose={() => setErrorModal({ ...errorModal, isOpen: false })}
-        message={errorModal.message}
-      />
+      {errorModal.isOpen && (
+        <ErrorModal
+          isOpen={errorModal.isOpen}
+          onClose={() => {
+            // Check if we have a custom onClose function
+            if (errorModal.onClose) {
+              errorModal.onClose()
+            } else {
+              setErrorModal({ ...errorModal, isOpen: false })
+            }
+          }}
+          message={errorModal.message}
+        />
+      )}
 
       <button className="back-button" onClick={handleBackClick}>
-        {" "}
         Back
       </button>
       <div className="container-details-wrapper">
         <div className="content">
           <div className="add-container-section">
-            <button className="add-container-button" onClick={handleAddContainer}>
-              Add Container
+            <button
+              className="add-container-button"
+              onClick={() => handleAddContainer("6m")}
+              style={{ marginRight: "10px" }}
+            >
+              Add 6m Container
+            </button>
+            <button
+              className="add-container-button"
+              onClick={() => handleAddContainer("12m")}
+              style={{ marginRight: "10px" }}
+            >
+              Add 12m Container
+            </button>
+            <button className="add-container-button" onClick={() => handleAddContainer("Abnormal")}>
+              Add Abnormal Container
             </button>
           </div>
 
           <br />
 
           <div className="container-table-wrapper">
-            <table className="container-table1" >
-              <thead style={{ width: "250px" }}>
+            <table className="container-table1">
+              <thead>
                 <tr>
                   <th>#</th>
+                  <th>Container Type</th>
                   <th>Container Number</th>
-                  <th>Trailer Size</th>
-                  <th>Weight (if Import)</th>
+                  {isImport && <th>Weight</th>}
                 </tr>
               </thead>
               <tbody>
-                <tr>
-                  <td>1</td>
-                  <td><input type="text" defaultValue="1245" /></td>
-                  <td>12m</td> {/* Static text for trailer size */}
-                  <td><input type="number" defaultValue="150000" /></td>
-                </tr>
-                <tr className="even-row">
-                  <td>2</td>
-                  <td><input type="text" defaultValue="1258"  /></td>
-                  <td>6m</td> {/* Static text for trailer size */}
-                  <td><input type="number" defaultValue="145000" /></td>
-                </tr>
-                <tr>
-                  <td>3</td>
-                  <td><input type="text" defaultValue="1254" /></td>
-                  <td>6m</td> {/* Static text for trailer size */}
-                  <td><input type="number" defaultValue="150789" /></td>
-                </tr>
+                {containers.map((container, index) => (
+                  <tr key={container.id} className={index % 2 === 1 ? "even-row" : ""}>
+                    <td>{container.id}</td>
+                    <td>{container.containerType}</td>
+                    <td>
+                      <input
+                        type="text"
+                        value={container.containerNum}
+                        onChange={(e) => handleContainerChange(container.id, "containerNum", e.target.value)}
+                        className="container-input"
+                      />
+                    </td>
+                    {isImport && (
+                      <td>
+                        <input
+                          type="text"
+                          value={container.weight}
+                          onChange={(e) => handleContainerChange(container.id, "weight", e.target.value)}
+                          className="container-input"
+                        />
+                      </td>
+                    )}
+                  </tr>
+                ))}
               </tbody>
             </table>
           </div>

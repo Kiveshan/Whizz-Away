@@ -6,11 +6,10 @@ import { useNavigate, useLocation } from "react-router-dom"
 import ErrorModal from "../components/ErrorModal"
 import API_CONFIG from "../utils/api-config"
 
-const ControllerInstructions = () => {
+const BMcontrollerinstructions = () => {
   const navigate = useNavigate()
   const location = useLocation()
-
-  // Check if we have preserved form data from coming back
+  const instructionId = location.state?.instructionId
   const preservedFormData = location.state?.preservedFormData
 
   // API base URL from config
@@ -21,41 +20,36 @@ const ControllerInstructions = () => {
   const etaDateRef = useRef(null)
   const deadlineDateRef = useRef(null)
 
-  // State to track if shipment type is import
-  const [isImport, setIsImport] = useState(false)
-
-  // State for form data - initialize with preserved data if available
-  const [formData, setFormData] = useState(() => {
-    if (preservedFormData) {
-      return preservedFormData
-    }
-
-    return {
-      clientId: "",
-      representative: "",
-      contactDetails: "",
-      email: "",
-      shipmentTypeId: "",
-      shipmentTypeName: "",
-      task: "",
-      pickup: "",
-      dropoff: "",
-      hazardous: false,
-      surcharges: false,
-      pickupTime: "",
-      pickupDate: "",
-      stackDate: "",
-      deadline: "",
-      fileRef: "",
-      rateWeight: "kg",
-      rate: "",
-      num_six_meters: 0,
-      num_twelve_meters: 0,
-      num_abnormal: 0,
-      vat: 15,
-      description: "",
-    }
+  // State for form data
+  const [formData, setFormData] = useState({
+    clientId: "",
+    representative: "",
+    contactDetails: "",
+    email: "",
+    shipmentTypeId: "",
+    shipmentTypeName: "",
+    task: "",
+    pickup: "",
+    dropoff: "",
+    hazardous: false,
+    surcharges: false,
+    pickupTime: "",
+    pickupDate: "",
+    stackDate: "",
+    deadline: "",
+    fileRef: "",
+    rateWeight: "kg",
+    rate: "",
+    num_six_meters: 0,
+    num_twelve_meters: 0,
+    num_abnormal: 0,
+    vat: 15,
+    description: "",
+    status: "",
   })
+
+  // State to track if shipment type is Import
+  const [isImport, setIsImport] = useState(false)
 
   // State for clients and shipment types
   const [clients, setClients] = useState([])
@@ -63,6 +57,7 @@ const ControllerInstructions = () => {
   const [isLoading, setIsLoading] = useState({
     clients: true,
     shipmentTypes: true,
+    instruction: instructionId ? true : false,
   })
 
   // State for error modal
@@ -71,16 +66,120 @@ const ControllerInstructions = () => {
     message: "",
   })
 
-  // Function to open calendar
-  const openCalendar = (ref) => {
-    ref.current.click()
+  // State for success message
+  const [successMessage, setSuccessMessage] = useState("")
+
+  // Style for non-editable fields - applied to ALL fields
+  const nonEditableStyle = {
+    backgroundColor: "#f0f0f0",
+    cursor: "not-allowed",
+    opacity: 0.7,
   }
 
-  // Fetch clients and shipment types on component mount
+  // Format date from ISO to MM/DD/YYYY
+  const formatDateForDisplay = (isoDate) => {
+    if (!isoDate) return ""
+    const date = new Date(isoDate)
+    return date.toLocaleDateString("en-US", {
+      month: "2-digit",
+      day: "2-digit",
+      year: "numeric",
+    })
+  }
+
+  // Format time from HH:MM:SS to hh:mm AM/PM
+  const formatTimeForDisplay = (time) => {
+    if (!time) return ""
+    const [hours, minutes] = time.split(":")
+    const hour = Number.parseInt(hours, 10)
+    const ampm = hour >= 12 ? "PM" : "AM"
+    const hour12 = hour % 12 || 12
+    return `${hour12}:${minutes} ${ampm}`
+  }
+
+  // Fetch clients, shipment types, and instruction data on component mount
   useEffect(() => {
     fetchClients()
     fetchShipmentTypes()
-  }, [])
+
+    if (preservedFormData) {
+      // Use preserved form data if available (coming back from container details)
+      setFormData(preservedFormData)
+      // Set isImport based on the preserved shipment type
+      const shipmentTypeName = preservedFormData.shipmentTypeName || ""
+      setIsImport(shipmentTypeName.toLowerCase() === "import")
+      setIsLoading((prev) => ({ ...prev, instruction: false }))
+    } else if (instructionId) {
+      // Otherwise fetch instruction data if ID is provided
+      fetchInstructionData(instructionId)
+    }
+  }, [instructionId, preservedFormData])
+
+  // Fetch instruction data by ID
+  const fetchInstructionData = async (id) => {
+    setIsLoading((prev) => ({ ...prev, instruction: true }))
+    try {
+      console.log(`Fetching instruction data for ID: ${id}`)
+      const response = await fetch(`${API_BASE_URL}/api/instruction/${id}`, {
+        method: "GET",
+        headers: {
+          Accept: "application/json",
+          "Content-Type": "application/json",
+        },
+      })
+
+      if (!response.ok) {
+        const text = await response.text()
+        console.error("Response not OK:", text)
+        throw new Error(`Failed to fetch instruction: ${response.status} ${response.statusText}`)
+      }
+
+      const data = await response.json()
+      console.log("Instruction data received:", data)
+
+      // Format dates and times for display
+      const formattedData = {
+        clientId: data.client.toString(),
+        representative: data.representative || "",
+        contactDetails: data.cellnum || "",
+        email: data.email || "",
+        shipmentTypeId: data.shipment_type.toString(),
+        shipmentTypeName: data.shipmenttype || "",
+        task: data.task || "",
+        pickup: data.pickup || "",
+        dropoff: data.dropoff || "",
+        hazardous: data.hazardous || false,
+        surcharges: data.surchages || false,
+        pickupTime: formatTimeForDisplay(data.pickuptime) || "",
+        pickupDate: formatDateForDisplay(data.pickupdate) || "",
+        stackDate: formatDateForDisplay(data.stackdate) || "",
+        deadline: formatDateForDisplay(data.deadline) || "",
+        fileRef: data.fileref || "",
+        rateWeight: data.rateweight || "kg",
+        rate: data.rate ? data.rate.toString() : "",
+        num_six_meters: data.num_six_meters || 0,
+        num_twelve_meters: data.num_twelve_meters || 0,
+        num_abnormal: data.num_abnormal || 0,
+        vat: data.vat || 15,
+        description: data.description || "",
+        status: data.status || "",
+      }
+
+      setFormData(formattedData)
+
+      // Set isImport based on the fetched shipment type
+      const shipmentTypeName = data.shipmenttype || ""
+      setIsImport(shipmentTypeName.toLowerCase() === "import")
+    } catch (error) {
+      console.error("Error fetching instruction data:", error)
+      setErrorModal({
+        isOpen: true,
+        message: "Failed to fetch instruction data. Please try again.",
+      })
+    } finally {
+      setIsLoading((prev) => ({ ...prev, instruction: false }))
+    }
+  }
 
   // Fetch clients from API
   const fetchClients = async () => {
@@ -150,147 +249,18 @@ const ControllerInstructions = () => {
     }
   }
 
-  // Handle client selection
-  const handleClientChange = (e) => {
-    const clientId = e.target.value
-    const selectedClient = clients.find((client) => client.m5clientkey.toString() === clientId)
-
-    if (selectedClient) {
-      setFormData({
-        ...formData,
-        clientId,
-        representative: selectedClient.representative || "",
-        contactDetails: selectedClient.cellnum || "",
-        email: selectedClient.email || "",
-      })
-    } else {
-      setFormData({
-        ...formData,
-        clientId,
-        representative: "",
-        contactDetails: "",
-        email: "",
-      })
-    }
-  }
-
-  // Handle shipment type selection
-  const handleShipmentTypeChange = (e) => {
-    const shipmentTypeId = e.target.value
-    const selectedShipmentType = shipmentTypes.find((type) => type.shipkey.toString() === shipmentTypeId)
-
-    const shipmentTypeName = selectedShipmentType ? selectedShipmentType.shipmenttype : ""
-    const isImportType = shipmentTypeName.toLowerCase() === "import"
-
-    setIsImport(isImportType)
-
-    setFormData({
-      ...formData,
-      shipmentTypeId,
-      shipmentTypeName,
-    })
-  }
-
-  // Handle form input changes
-  const handleInputChange = (e) => {
-    const { name, value, type, checked } = e.target
-
-    if (type === "checkbox") {
-      setFormData({
-        ...formData,
-        [name]: checked,
-      })
-    } else if (name === "num_six_meters" || name === "num_twelve_meters" || name === "num_abnormal") {
-      // Ensure container counts are at least 0
-      const numValue = Number.parseInt(value)
-      setFormData({
-        ...formData,
-        [name]: isNaN(numValue) || numValue < 0 ? 0 : numValue,
-      })
-    } else {
-      setFormData({
-        ...formData,
-        [name]: value,
-      })
-    }
-  }
-
-  // Handle container count changes
-  const handleContainerCountChange = (type, value) => {
-    // Ensure value is a number and not negative
-    const numValue = Number.parseInt(value)
-    const validValue = isNaN(numValue) || numValue < 0 ? 0 : numValue
-
-    setFormData({
-      ...formData,
-      [type]: validValue,
-    })
-  }
-
-  // Validate form
-  const validateForm = () => {
-    const requiredFields = [
-      "clientId",
-      "shipmentTypeId",
-      "task",
-      "pickup",
-      "dropoff",
-      "pickupTime",
-      "pickupDate",
-      "stackDate",
-      "deadline",
-      "fileRef",
-      "rate",
-      "description",
-    ]
-
-    for (const field of requiredFields) {
-      if (!formData[field]) {
-        setErrorModal({
-          isOpen: true,
-          message: `Please fill in all required fields. Missing: ${field.replace(/([A-Z])/g, " $1").toLowerCase()}`,
-        })
-        return false
-      }
-    }
-
-    // Validate rate is a number
-    if (isNaN(Number.parseFloat(formData.rate))) {
-      setErrorModal({
-        isOpen: true,
-        message: "Rate must be a valid number",
-      })
-      return false
-    }
-
-    // Validate at least one container is added
-    const totalContainers = formData.num_six_meters + formData.num_twelve_meters + formData.num_abnormal
-    if (totalContainers <= 0) {
-      setErrorModal({
-        isOpen: true,
-        message: "Please add at least one container",
-      })
-      return false
-    }
-
-    return true
-  }
-
-  // Handle form submission
-  const handleSubmit = () => {
-    if (!validateForm()) {
-      return
-    }
-
+  // Handle view container details
+  const handleViewContainerDetails = () => {
     // Calculate total containers
     const totalContainers = formData.num_six_meters + formData.num_twelve_meters + formData.num_abnormal
 
     // Navigate to container details page with state
-    navigate("/ControllerInstructionDetails", {
+    navigate("/BMcontrollerInstructionDetails", {
       state: {
         controllerData: formData,
-        isImport: formData.shipmentTypeName.toLowerCase() === "import",
+        isImport: isImport,
         totalContainers: totalContainers,
+        instructionId: instructionId,
       },
     })
   }
@@ -303,17 +273,14 @@ const ControllerInstructions = () => {
 
     fetchClients()
     fetchShipmentTypes()
+    if (instructionId) {
+      fetchInstructionData(instructionId)
+    }
 
     setErrorModal({
       isOpen: false,
       message: "",
     })
-  }
-
-  // Style for non-editable fields
-  const nonEditableStyle = {
-    backgroundColor: "#f0f0f0",
-    cursor: "not-allowed",
   }
 
   return (
@@ -329,14 +296,32 @@ const ControllerInstructions = () => {
 
       {/* Back Button */}
       <div className="client-payments-header">
-        <button className="back-button" onClick={() => navigate("/ControllerDashboard")}>
+        <button className="back-button" onClick={() => navigate(-1)}>
           Back
         </button>
       </div>
+
+      {/* Success Message */}
+      {successMessage && (
+        <div
+          className="success-message"
+          style={{
+            backgroundColor: "#d4edda",
+            color: "#155724",
+            padding: "10px",
+            borderRadius: "4px",
+            margin: "10px 0",
+            textAlign: "center",
+          }}
+        >
+          {successMessage}
+        </div>
+      )}
+
       <div className="instruction-container1">
         <div className="content">
           {/* Loading indicator or retry button */}
-          {isLoading.clients || isLoading.shipmentTypes ? (
+          {isLoading.clients || isLoading.shipmentTypes || isLoading.instruction ? (
             <div style={{ textAlign: "center", padding: "20px" }}>
               <p>Loading data...</p>
             </div>
@@ -369,8 +354,8 @@ const ControllerInstructions = () => {
                     className="dropdown"
                     name="clientId"
                     value={formData.clientId}
-                    onChange={handleClientChange}
-                    disabled={isLoading.clients || clients.length === 0}
+                    disabled={true}
+                    style={nonEditableStyle}
                   >
                     <option value="">Select Client</option>
                     {clients.map((client) => (
@@ -429,8 +414,8 @@ const ControllerInstructions = () => {
                     className="dropdown"
                     name="shipmentTypeId"
                     value={formData.shipmentTypeId}
-                    onChange={handleShipmentTypeChange}
-                    disabled={isLoading.shipmentTypes || shipmentTypes.length === 0}
+                    disabled={true}
+                    style={nonEditableStyle}
                   >
                     <option value="">Select Shipment</option>
                     {shipmentTypes.map((type) => (
@@ -449,7 +434,8 @@ const ControllerInstructions = () => {
                   placeholder="Input Name of Task"
                   name="task"
                   value={formData.task}
-                  onChange={handleInputChange}
+                  readOnly
+                  style={nonEditableStyle}
                 />
               </div>
             </div>
@@ -463,7 +449,8 @@ const ControllerInstructions = () => {
                   placeholder="Input pick-up location here"
                   name="pickup"
                   value={formData.pickup}
-                  onChange={handleInputChange}
+                  readOnly
+                  style={nonEditableStyle}
                 />
               </div>
               <div className="form-group">
@@ -474,7 +461,8 @@ const ControllerInstructions = () => {
                   placeholder="Input drop-off location here"
                   name="dropoff"
                   value={formData.dropoff}
-                  onChange={handleInputChange}
+                  readOnly
+                  style={nonEditableStyle}
                 />
               </div>
               <div className="form-group checkboxes">
@@ -484,7 +472,8 @@ const ControllerInstructions = () => {
                     id="hazardous"
                     name="hazardous"
                     checked={formData.hazardous}
-                    onChange={handleInputChange}
+                    disabled={true}
+                    style={nonEditableStyle}
                   />
                   <label htmlFor="hazardous">Hazardous Materials</label>
                 </div>
@@ -494,7 +483,8 @@ const ControllerInstructions = () => {
                     id="surcharges"
                     name="surcharges"
                     checked={formData.surcharges}
-                    onChange={handleInputChange}
+                    disabled={true}
+                    style={nonEditableStyle}
                   />
                   <label htmlFor="surcharges">Add Surcharges</label>
                 </div>
@@ -507,14 +497,15 @@ const ControllerInstructions = () => {
                 <label>Pick-up Time</label>
                 <div className="date-input-group">
                   <input
-                    type="time"
+                    type="text"
                     className="form-input"
-                    placeholder="Time here"
+                    placeholder="hh:mm AM/PM"
                     name="pickupTime"
                     value={formData.pickupTime}
-                    onChange={handleInputChange}
+                    readOnly
+                    style={nonEditableStyle}
                   />
-                  <button className="calendar-button"></button>
+                  <button className="calendar-button" style={{ visibility: "hidden" }}></button>
                 </div>
               </div>
 
@@ -522,45 +513,48 @@ const ControllerInstructions = () => {
                 <label>Pick-up Date</label>
                 <div className="date-input-group">
                   <input
-                    type="date"
+                    type="text"
                     className="form-input"
                     ref={pickupDateRef}
-                    placeholder="Date here"
+                    placeholder="MM/DD/YYYY"
                     name="pickupDate"
                     value={formData.pickupDate}
-                    onChange={handleInputChange}
+                    readOnly
+                    style={nonEditableStyle}
                   />
-                  <button className="calendar-button" onClick={() => openCalendar(pickupDateRef)}></button>
+                  <button className="calendar-button" style={{ visibility: "hidden" }}></button>
                 </div>
               </div>
               <div className="form-group">
                 <label>{isImport ? "ETA" : "Stack Date"}</label>
                 <div className="date-input-group">
                   <input
-                    type="date"
+                    type="text"
                     className="form-input"
                     ref={etaDateRef}
-                    placeholder="Date here"
+                    placeholder="MM/DD/YYYY"
                     name="stackDate"
                     value={formData.stackDate}
-                    onChange={handleInputChange}
+                    readOnly
+                    style={nonEditableStyle}
                   />
-                  <button className="calendar-button" onClick={() => openCalendar(etaDateRef)}></button>
+                  <button className="calendar-button" style={{ visibility: "hidden" }}></button>
                 </div>
               </div>
               <div className="form-group">
                 <label>Deadline</label>
                 <div className="date-input-group">
                   <input
-                    type="date"
+                    type="text"
                     className="form-input"
                     ref={deadlineDateRef}
-                    placeholder="Date here"
+                    placeholder="MM/DD/YYYY"
                     name="deadline"
                     value={formData.deadline}
-                    onChange={handleInputChange}
+                    readOnly
+                    style={nonEditableStyle}
                   />
-                  <button className="calendar-button" onClick={() => openCalendar(deadlineDateRef)}></button>
+                  <button className="calendar-button" style={{ visibility: "hidden" }}></button>
                 </div>
               </div>
             </div>
@@ -575,10 +569,10 @@ const ControllerInstructions = () => {
                   type="text"
                   className="form-input"
                   placeholder="Upload file number here"
-                  style={{ width: "60%" }}
                   name="fileRef"
                   value={formData.fileRef}
-                  onChange={handleInputChange}
+                  readOnly
+                  style={{ ...nonEditableStyle, width: "60%" }}
                 />
               </div>
               <div className="form-group rates-group">
@@ -587,10 +581,10 @@ const ControllerInstructions = () => {
                   <div className="select-wrapper small">
                     <select
                       className="dropdown"
-                      style={{ width: "100px" }}
                       name="rateWeight"
                       value={formData.rateWeight}
-                      onChange={handleInputChange}
+                      disabled={true}
+                      style={{ ...nonEditableStyle, width: "100px" }}
                     >
                       <option value="kg">kg</option>
                       <option value="m³">m³</option>
@@ -602,10 +596,10 @@ const ControllerInstructions = () => {
                     type="text"
                     className="form-input"
                     placeholder="R 1000000/ton"
-                    style={{ width: "60%" }}
                     name="rate"
                     value={formData.rate}
-                    onChange={handleInputChange}
+                    readOnly
+                    style={{ ...nonEditableStyle, width: "60%" }}
                   />
                 </div>
               </div>
@@ -623,7 +617,8 @@ const ControllerInstructions = () => {
                       value={formData.num_six_meters}
                       min="0"
                       name="num_six_meters"
-                      onChange={(e) => handleContainerCountChange("num_six_meters", e.target.value)}
+                      readOnly
+                      style={nonEditableStyle}
                     />
                   </div>
                   <div className="counter">
@@ -633,7 +628,8 @@ const ControllerInstructions = () => {
                       value={formData.num_twelve_meters}
                       min="0"
                       name="num_twelve_meters"
-                      onChange={(e) => handleContainerCountChange("num_twelve_meters", e.target.value)}
+                      readOnly
+                      style={nonEditableStyle}
                     />
                   </div>
                   <div className="counter">
@@ -643,7 +639,8 @@ const ControllerInstructions = () => {
                       value={formData.num_abnormal}
                       min="0"
                       name="num_abnormal"
-                      onChange={(e) => handleContainerCountChange("num_abnormal", e.target.value)}
+                      readOnly
+                      style={nonEditableStyle}
                     />
                   </div>
                 </div>
@@ -657,8 +654,8 @@ const ControllerInstructions = () => {
                   placeholder="Vat Rate"
                   value={`${formData.vat}%`}
                   name="vat"
-                  style={{ width: "20%" }}
                   readOnly
+                  style={{ ...nonEditableStyle, width: "20%" }}
                 />
               </div>
             </div>
@@ -673,7 +670,8 @@ const ControllerInstructions = () => {
                   placeholder="Description from client, like type of goods etc"
                   name="description"
                   value={formData.description}
-                  onChange={handleInputChange}
+                  readOnly
+                  style={nonEditableStyle}
                 ></textarea>
               </div>
             </div>
@@ -682,12 +680,16 @@ const ControllerInstructions = () => {
           <div className="button-container1">
             <button
               className="add-container-button"
-              onClick={handleSubmit}
+              onClick={handleViewContainerDetails}
               disabled={
-                isLoading.clients || isLoading.shipmentTypes || clients.length === 0 || shipmentTypes.length === 0
+                isLoading.clients ||
+                isLoading.shipmentTypes ||
+                isLoading.instruction ||
+                clients.length === 0 ||
+                shipmentTypes.length === 0
               }
             >
-              Add Container Details
+              See Container Details
             </button>
           </div>
         </div>
@@ -696,5 +698,5 @@ const ControllerInstructions = () => {
   )
 }
 
-export default ControllerInstructions
+export default BMcontrollerinstructions
 

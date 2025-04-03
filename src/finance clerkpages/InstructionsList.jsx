@@ -1,23 +1,123 @@
-import React, { useState } from "react";
-import { useNavigate } from "react-router-dom";
-import "../finance clerkpages/css/InstructionsList.css";
+"use client"
 
-const Instructions = ({ setCurrentPage }) => {
-  const navigate = useNavigate();
-  const [selectedMonth, setSelectedMonth] = useState("");
-  const [selectedYear, setSelectedYear] = useState("");
+import { useState, useEffect } from "react"
+import { useNavigate, useLocation } from "react-router-dom"
+import "../finance clerkpages/css/InstructionsList.css"
+import API_CONFIG from "../utils/api-config"
+
+const Instructions = () => {
+  const navigate = useNavigate()
+  const location = useLocation()
+  const { clientId, clientName } = location.state || {}
+
+  const [selectedMonth, setSelectedMonth] = useState("")
+  const [selectedYear, setSelectedYear] = useState("")
+  const [instructions, setInstructions] = useState([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState(null)
+  const [activeFilter, setActiveFilter] = useState("All")
+
+  useEffect(() => {
+    const fetchInstructions = async () => {
+      try {
+        setLoading(true)
+        let url = `${API_CONFIG.BASE_URL}/api/instructions`
+
+        // Add client filter if clientId is provided
+        if (clientId) {
+          url += `?clientId=${clientId}`
+        }
+
+        const response = await fetch(url)
+
+        if (!response.ok) {
+          throw new Error(`HTTP error! Status: ${response.status}`)
+        }
+
+        const data = await response.json()
+        console.log("Instructions data:", data) // Debug log
+        setInstructions(data)
+        setLoading(false)
+      } catch (error) {
+        console.error("Error fetching instructions:", error)
+        setError("Failed to load instructions. Please try again later.")
+        setLoading(false)
+      }
+    }
+
+    fetchInstructions()
+  }, [clientId])
+
+  const handleFilterClick = (filter) => {
+    setActiveFilter(filter)
+  }
+
+  const getFilteredInstructions = () => {
+    let filtered = [...instructions]
+
+    // Filter by month and year if selected
+    if (selectedMonth) {
+      filtered = filtered.filter((item) => {
+        const date = new Date(item.startingdate || item.pickupdate)
+        const monthNames = [
+          "January",
+          "February",
+          "March",
+          "April",
+          "May",
+          "June",
+          "July",
+          "August",
+          "September",
+          "October",
+          "November",
+          "December",
+        ]
+        return monthNames[date.getMonth()] === selectedMonth
+      })
+    }
+
+    if (selectedYear) {
+      filtered = filtered.filter((item) => {
+        const date = new Date(item.startingdate || item.pickupdate)
+        return date.getFullYear().toString() === selectedYear
+      })
+    }
+
+    // Filter by status or type
+    if (activeFilter !== "All") {
+      if (["New", "In progress", "Completed"].includes(activeFilter)) {
+        filtered = filtered.filter((item) => item.status === activeFilter)
+      } else if (activeFilter === "import") {
+        filtered = filtered.filter((item) => item.type_text === "import" || item.type === "import")
+      } else if (activeFilter === "export") {
+        filtered = filtered.filter((item) => item.type_text === "export" || item.type === "export")
+      }
+    }
+
+    return filtered
+  }
+
+  // Handle view instruction click
+  const handleViewInstruction = (instructionId) => {
+    navigate("/FCcontrollerinstructions", {
+      state: { instructionId },
+    })
+  }
 
   return (
     <div>
+      {/* Centered company name heading */}
       <div className="client-payments-header">
         <button className="back-button" onClick={() => navigate("/ViewClientInstruction")}>
           Back
         </button>
+        {clientName && <span className="client-name">{clientName}</span>}
       </div>
 
-      {/* Dropdown Filters */}
+      {/* Centered month and year filters */}
       <div className="dropdown-container74">
-        <select value={selectedMonth} onChange={(e) => setSelectedMonth(e.target.value)} className="dropdown74">
+        <select value={selectedMonth} onChange={(e) => setSelectedMonth(e.target.value)} className="dropdown">
           <option value="">Select Month</option>
           <option value="January">January</option>
           <option value="February">February</option>
@@ -33,7 +133,7 @@ const Instructions = ({ setCurrentPage }) => {
           <option value="December">December</option>
         </select>
 
-        <select value={selectedYear} onChange={(e) => setSelectedYear(e.target.value)} className="dropdown74">
+        <select value={selectedYear} onChange={(e) => setSelectedYear(e.target.value)} className="dropdown">
           <option value="">Select Year</option>
           <option value="2023">2023</option>
           <option value="2024">2024</option>
@@ -44,55 +144,90 @@ const Instructions = ({ setCurrentPage }) => {
 
       <div className="content1">
         <div className="button-group">
-          <div className="filter-buttons85">
-            <button className="btn btn-blue">Import</button>
-            <button className="btn btn-blue">Export</button>
-            <button className="btn btn-blue">All</button>
-            <button className="btn btn-blue">In-Progress</button>
-            <button className="btn btn-blue">Complete</button>
-            <button className="btn btn-blue">New</button>
+          <div className="filter-buttons">
+            <button className="btn btn-blue" onClick={() => handleFilterClick("import")}>
+              Import
+            </button>
+            <button className="btn btn-blue" onClick={() => handleFilterClick("export")}>
+              Export
+            </button>
+            <button className="btn btn-blue" onClick={() => handleFilterClick("All")}>
+              All
+            </button>
+            <button className="btn btn-blue" onClick={() => handleFilterClick("In progress")}>
+              In-Progress
+            </button>
+            <button className="btn btn-blue" onClick={() => handleFilterClick("Completed")}>
+              Complete
+            </button>
+            <button className="btn btn-blue" onClick={() => handleFilterClick("New")}>
+              New
+            </button>
           </div>
         </div>
 
         <div className="tables-container">
-          <table className="t2">
-            <thead>
-              <tr>
-                <th>Instruction No</th>
-                <th>File No</th>
-                <th>Type</th>
-                <th>Status</th>
-                <th>Starting Date</th>
-                <th>Instruction</th>
-                <th>Assignment</th>
-              </tr>
-            </thead>
-            <tbody>
-              {[
-                { id: 1, type: "Import", status: "New", fileNo: "77002", date: "2023-09-01" },
-                { id: 2, type: "Export", status: "New", fileNo: "10014", date: "2023-09-01" },
-                { id: 3, type: "Import", status: "In-Progress", fileNo: "93301" , date: "2023-09-01"},
-              ].map((item) => (
-                <tr key={item.id}>
-                  <td>Instruction {item.id}</td>
-                  <td>{item.fileNo}</td>
-                  <td>{item.type}</td>
-                  <td>{item.status}</td>
-                  <td>{item.date}</td>
-                  <td>
-                    <button className="view-btn" onClick={() => navigate("")}>View</button>
-                  </td>
-                  <td>
-                    <button className="view-btn" onClick={() => navigate("/update-instructions")}>View</button>
-                  </td>
+          {loading ? (
+            <p>Loading instructions...</p>
+          ) : error ? (
+            <p className="error-message">{error}</p>
+          ) : (
+            <table className="t2">
+              <thead>
+                <tr>
+                  <th>Instruction No</th>
+                  <th>File No</th>
+                  <th>Type</th>
+                  <th>Status</th>
+                  <th>Starting Date</th>
+                  <th>Instruction</th>
+                  <th>Assignment</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody>
+                {getFilteredInstructions().length === 0 ? (
+                  <tr>
+                    <td colSpan="7">No instructions found</td>
+                  </tr>
+                ) : (
+                  getFilteredInstructions().map((item) => (
+                    <tr key={item.m1controllerkey || item.m1key}>
+                      <td>Instruction {item.m1controllerkey || item.m1key}</td>
+                      <td>{item.fileno}</td>
+                      <td>
+                        {item.type_text ||
+                          (item.shipment_type === 1 || item.shipment_type === "1"
+                            ? "import"
+                            : item.shipment_type === 2 || item.shipment_type === "2"
+                              ? "export"
+                              : item.type)}
+                      </td>
+                      <td>{item.status}</td>
+                      <td>{new Date(item.startingdate || item.pickupdate).toLocaleDateString()}</td>
+                      <td>
+                        <button
+                          className="view-btn"
+                          onClick={() => handleViewInstruction(item.m1controllerkey || item.m1key)}
+                        >
+                          View
+                        </button>
+                      </td>
+                      <td>
+                        <button className="view-btn" onClick={() => navigate("/update-instructions")}>
+                          View
+                        </button>
+                      </td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          )}
         </div>
       </div>
     </div>
-  );
-};
+  )
+}
 
-export default Instructions;
+export default Instructions
+

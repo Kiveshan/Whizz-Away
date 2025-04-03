@@ -6,11 +6,10 @@ import { useNavigate, useLocation } from "react-router-dom"
 import ErrorModal from "../components/ErrorModal"
 import API_CONFIG from "../utils/api-config"
 
-const ControllerInstructions = () => {
+const FCcontrollerinstructions = () => {
   const navigate = useNavigate()
   const location = useLocation()
-
-  // Check if we have preserved form data from coming back
+  const instructionId = location.state?.instructionId
   const preservedFormData = location.state?.preservedFormData
 
   // API base URL from config
@@ -21,41 +20,36 @@ const ControllerInstructions = () => {
   const etaDateRef = useRef(null)
   const deadlineDateRef = useRef(null)
 
-  // State to track if shipment type is import
-  const [isImport, setIsImport] = useState(false)
-
-  // State for form data - initialize with preserved data if available
-  const [formData, setFormData] = useState(() => {
-    if (preservedFormData) {
-      return preservedFormData
-    }
-
-    return {
-      clientId: "",
-      representative: "",
-      contactDetails: "",
-      email: "",
-      shipmentTypeId: "",
-      shipmentTypeName: "",
-      task: "",
-      pickup: "",
-      dropoff: "",
-      hazardous: false,
-      surcharges: false,
-      pickupTime: "",
-      pickupDate: "",
-      stackDate: "",
-      deadline: "",
-      fileRef: "",
-      rateWeight: "kg",
-      rate: "",
-      num_six_meters: 0,
-      num_twelve_meters: 0,
-      num_abnormal: 0,
-      vat: 15,
-      description: "",
-    }
+  // State for form data
+  const [formData, setFormData] = useState({
+    clientId: "",
+    representative: "",
+    contactDetails: "",
+    email: "",
+    shipmentTypeId: "",
+    shipmentTypeName: "",
+    task: "",
+    pickup: "",
+    dropoff: "",
+    hazardous: false,
+    surcharges: false,
+    pickupTime: "",
+    pickupDate: "",
+    stackDate: "",
+    deadline: "",
+    fileRef: "",
+    rateWeight: "kg",
+    rate: "",
+    num_six_meters: 0,
+    num_twelve_meters: 0,
+    num_abnormal: 0,
+    vat: 15,
+    description: "",
+    status: "",
   })
+
+  // State to track if shipment type is Import
+  const [isImport, setIsImport] = useState(false)
 
   // State for clients and shipment types
   const [clients, setClients] = useState([])
@@ -63,6 +57,7 @@ const ControllerInstructions = () => {
   const [isLoading, setIsLoading] = useState({
     clients: true,
     shipmentTypes: true,
+    instruction: instructionId ? true : false,
   })
 
   // State for error modal
@@ -71,16 +66,141 @@ const ControllerInstructions = () => {
     message: "",
   })
 
+  // State for success message
+  const [successMessage, setSuccessMessage] = useState("")
+
   // Function to open calendar
   const openCalendar = (ref) => {
     ref.current.click()
   }
 
-  // Fetch clients and shipment types on component mount
+  // Format date from ISO to MM/DD/YYYY
+  const formatDateForDisplay = (isoDate) => {
+    if (!isoDate) return ""
+    const date = new Date(isoDate)
+    return date.toLocaleDateString("en-US", {
+      month: "2-digit",
+      day: "2-digit",
+      year: "numeric",
+    })
+  }
+
+  // Format date from MM/DD/YYYY to ISO
+  const formatDateForSubmission = (displayDate) => {
+    if (!displayDate) return ""
+    const [month, day, year] = displayDate.split("/")
+    return `${year}-${month}-${day}`
+  }
+
+  // Format time from HH:MM:SS to hh:mm AM/PM
+  const formatTimeForDisplay = (time) => {
+    if (!time) return ""
+    const [hours, minutes] = time.split(":")
+    const hour = Number.parseInt(hours, 10)
+    const ampm = hour >= 12 ? "PM" : "AM"
+    const hour12 = hour % 12 || 12
+    return `${hour12}:${minutes} ${ampm}`
+  }
+
+  // Format time from hh:mm AM/PM to HH:MM:SS
+  const formatTimeForSubmission = (displayTime) => {
+    if (!displayTime) return ""
+    const [timePart, ampm] = displayTime.split(" ")
+    let [hours, minutes] = timePart.split(":")
+    hours = Number.parseInt(hours, 10)
+
+    if (ampm === "PM" && hours < 12) {
+      hours += 12
+    } else if (ampm === "AM" && hours === 12) {
+      hours = 0
+    }
+
+    return `${hours.toString().padStart(2, "0")}:${minutes}:00`
+  }
+
+  // Fetch clients, shipment types, and instruction data on component mount
   useEffect(() => {
     fetchClients()
     fetchShipmentTypes()
-  }, [])
+
+    if (preservedFormData) {
+      // Use preserved form data if available (coming back from container details)
+      setFormData(preservedFormData)
+      // Set isImport based on the preserved shipment type
+      const shipmentTypeName = preservedFormData.shipmentTypeName || ""
+      setIsImport(shipmentTypeName.toLowerCase() === "import")
+      setIsLoading((prev) => ({ ...prev, instruction: false }))
+    } else if (instructionId) {
+      // Otherwise fetch instruction data if ID is provided
+      fetchInstructionData(instructionId)
+    }
+  }, [instructionId, preservedFormData])
+
+  // Fetch instruction data by ID
+  const fetchInstructionData = async (id) => {
+    setIsLoading((prev) => ({ ...prev, instruction: true }))
+    try {
+      console.log(`Fetching instruction data for ID: ${id}`)
+      const response = await fetch(`${API_BASE_URL}/api/instruction/${id}`, {
+        method: "GET",
+        headers: {
+          Accept: "application/json",
+          "Content-Type": "application/json",
+        },
+      })
+
+      if (!response.ok) {
+        const text = await response.text()
+        console.error("Response not OK:", text)
+        throw new Error(`Failed to fetch instruction: ${response.status} ${response.statusText}`)
+      }
+
+      const data = await response.json()
+      console.log("Instruction data received:", data)
+
+      // Format dates and times for display
+      const formattedData = {
+        clientId: data.client.toString(),
+        representative: data.representative || "",
+        contactDetails: data.cellnum || "",
+        email: data.email || "",
+        shipmentTypeId: data.shipment_type.toString(),
+        shipmentTypeName: data.shipmenttype || "",
+        task: data.task || "",
+        pickup: data.pickup || "",
+        dropoff: data.dropoff || "",
+        hazardous: data.hazardous || false,
+        surcharges: data.surchages || false,
+        pickupTime: formatTimeForDisplay(data.pickuptime) || "",
+        pickupDate: formatDateForDisplay(data.pickupdate) || "",
+        stackDate: formatDateForDisplay(data.stackdate) || "",
+        deadline: formatDateForDisplay(data.deadline) || "",
+        fileRef: data.fileref || "",
+        rateWeight: data.rateweight || "kg",
+        rate: data.rate ? data.rate.toString() : "",
+        num_six_meters: data.num_six_meters || 0,
+        num_twelve_meters: data.num_twelve_meters || 0,
+        num_abnormal: data.num_abnormal || 0,
+        vat: data.vat || 15,
+        description: data.description || "",
+        status: data.status || "",
+      }
+
+      setFormData(formattedData)
+
+      // Set isImport based on the fetched shipment type
+      const shipmentTypeName = data.shipmenttype || ""
+      setIsImport(shipmentTypeName.toLowerCase() === "import")
+    } catch (error) {
+      console.error("Error fetching instruction data:", error)
+      setErrorModal({
+        isOpen: true,
+        message: "Failed to fetch instruction data. Please try again.",
+      })
+    } finally {
+      setIsLoading((prev) => ({ ...prev, instruction: false }))
+    }
+  }
 
   // Fetch clients from API
   const fetchClients = async () => {
@@ -182,6 +302,7 @@ const ControllerInstructions = () => {
     const shipmentTypeName = selectedShipmentType ? selectedShipmentType.shipmenttype : ""
     const isImportType = shipmentTypeName.toLowerCase() === "import"
 
+    // Update isImport state
     setIsImport(isImportType)
 
     setFormData({
@@ -276,6 +397,12 @@ const ControllerInstructions = () => {
     return true
   }
 
+  // Check if shipment type is Import
+  const isImportShipment = () => {
+    const selectedShipmentType = shipmentTypes.find((type) => type.shipkey.toString() === formData.shipmentTypeId)
+    return selectedShipmentType && selectedShipmentType.shipmenttype.toLowerCase() === "import"
+  }
+
   // Handle form submission
   const handleSubmit = () => {
     if (!validateForm()) {
@@ -286,11 +413,12 @@ const ControllerInstructions = () => {
     const totalContainers = formData.num_six_meters + formData.num_twelve_meters + formData.num_abnormal
 
     // Navigate to container details page with state
-    navigate("/ControllerInstructionDetails", {
+    navigate("/FCcontrollerInstructionDetails", {
       state: {
         controllerData: formData,
-        isImport: formData.shipmentTypeName.toLowerCase() === "import",
+        isImport: isImportShipment(),
         totalContainers: totalContainers,
+        instructionId: instructionId,
       },
     })
   }
@@ -303,6 +431,9 @@ const ControllerInstructions = () => {
 
     fetchClients()
     fetchShipmentTypes()
+    if (instructionId) {
+      fetchInstructionData(instructionId)
+    }
 
     setErrorModal({
       isOpen: false,
@@ -314,6 +445,7 @@ const ControllerInstructions = () => {
   const nonEditableStyle = {
     backgroundColor: "#f0f0f0",
     cursor: "not-allowed",
+    opacity: 0.7,
   }
 
   return (
@@ -329,14 +461,32 @@ const ControllerInstructions = () => {
 
       {/* Back Button */}
       <div className="client-payments-header">
-        <button className="back-button" onClick={() => navigate("/ControllerDashboard")}>
+        <button className="back-button" onClick={() => navigate(-1)}>
           Back
         </button>
       </div>
+
+      {/* Success Message */}
+      {successMessage && (
+        <div
+          className="success-message"
+          style={{
+            backgroundColor: "#d4edda",
+            color: "#155724",
+            padding: "10px",
+            borderRadius: "4px",
+            margin: "10px 0",
+            textAlign: "center",
+          }}
+        >
+          {successMessage}
+        </div>
+      )}
+
       <div className="instruction-container1">
         <div className="content">
           {/* Loading indicator or retry button */}
-          {isLoading.clients || isLoading.shipmentTypes ? (
+          {isLoading.clients || isLoading.shipmentTypes || isLoading.instruction ? (
             <div style={{ textAlign: "center", padding: "20px" }}>
               <p>Loading data...</p>
             </div>
@@ -370,7 +520,8 @@ const ControllerInstructions = () => {
                     name="clientId"
                     value={formData.clientId}
                     onChange={handleClientChange}
-                    disabled={isLoading.clients || clients.length === 0}
+                    disabled={true}
+                    style={nonEditableStyle}
                   >
                     <option value="">Select Client</option>
                     {clients.map((client) => (
@@ -507,9 +658,9 @@ const ControllerInstructions = () => {
                 <label>Pick-up Time</label>
                 <div className="date-input-group">
                   <input
-                    type="time"
+                    type="text"
                     className="form-input"
-                    placeholder="Time here"
+                    placeholder="hh:mm AM/PM"
                     name="pickupTime"
                     value={formData.pickupTime}
                     onChange={handleInputChange}
@@ -522,10 +673,10 @@ const ControllerInstructions = () => {
                 <label>Pick-up Date</label>
                 <div className="date-input-group">
                   <input
-                    type="date"
+                    type="text"
                     className="form-input"
                     ref={pickupDateRef}
-                    placeholder="Date here"
+                    placeholder="MM/DD/YYYY"
                     name="pickupDate"
                     value={formData.pickupDate}
                     onChange={handleInputChange}
@@ -537,10 +688,10 @@ const ControllerInstructions = () => {
                 <label>{isImport ? "ETA" : "Stack Date"}</label>
                 <div className="date-input-group">
                   <input
-                    type="date"
+                    type="text"
                     className="form-input"
                     ref={etaDateRef}
-                    placeholder="Date here"
+                    placeholder="MM/DD/YYYY"
                     name="stackDate"
                     value={formData.stackDate}
                     onChange={handleInputChange}
@@ -552,10 +703,10 @@ const ControllerInstructions = () => {
                 <label>Deadline</label>
                 <div className="date-input-group">
                   <input
-                    type="date"
+                    type="text"
                     className="form-input"
                     ref={deadlineDateRef}
-                    placeholder="Date here"
+                    placeholder="MM/DD/YYYY"
                     name="deadline"
                     value={formData.deadline}
                     onChange={handleInputChange}
@@ -684,7 +835,11 @@ const ControllerInstructions = () => {
               className="add-container-button"
               onClick={handleSubmit}
               disabled={
-                isLoading.clients || isLoading.shipmentTypes || clients.length === 0 || shipmentTypes.length === 0
+                isLoading.clients ||
+                isLoading.shipmentTypes ||
+                isLoading.instruction ||
+                clients.length === 0 ||
+                shipmentTypes.length === 0
               }
             >
               Add Container Details
@@ -696,5 +851,5 @@ const ControllerInstructions = () => {
   )
 }
 
-export default ControllerInstructions
+export default FCcontrollerinstructions
 
