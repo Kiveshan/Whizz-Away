@@ -77,9 +77,16 @@ const ClientInvoice = () => {
     return `${date.getDate().toString().padStart(2, "0")}/${(date.getMonth() + 1).toString().padStart(2, "0")}/${date.getFullYear()}`
   }
 
+  // Calculate VAT based on percentage from database
   const calculateVAT = (amount) => {
-    if (!amount) return 0
-    return amount * 0.15
+    // If VAT percentage exists in the database, calculate VAT amount
+    if (invoiceData.vat !== undefined && invoiceData.vat !== null && amount) {
+      // Convert percentage to decimal (e.g., 15 becomes 0.15)
+      const vatRate = Number(invoiceData.vat) / 100
+      return amount * vatRate
+    }
+    // If no VAT value is provided or amount is 0, return 0 (no VAT)
+    return 0
   }
 
   const formatCurrency = (amount) => {
@@ -174,10 +181,10 @@ const ClientInvoice = () => {
     )
   }
 
-  // Calculate invoice values - use total_amount instead of rate
+  // Calculate invoice values - use total_cost from the database
   const invoiceNumber = `INV-${invoiceData.m1key}-${new Date().getFullYear()}`
-  const amount = invoiceData.total_cost
-  const vat = calculateVAT(amount)
+  const amount = invoiceData.total_cost || 0
+  const vat = calculateVAT(amount) // Calculate VAT based on percentage
   const total = amount + vat
 
   // Ensure containers exist
@@ -260,10 +267,6 @@ const ClientInvoice = () => {
               <tbody>
                 {containers.length > 0 ? (
                   containers.map((container, index) => {
-                    const containerAmount = amount / (containers.length || 1)
-                    const containerVAT = calculateVAT(containerAmount)
-                    const containerTotal = containerAmount + containerVAT
-
                     return (
                       <tr key={index}>
                         <td className="container-number">{container.container_number || `Container ${index + 1}`}</td>
@@ -279,35 +282,36 @@ const ClientInvoice = () => {
                 )}
               </tbody>
             </table>
-                      {/* Summary Table */}
-          <div className="summary-section">
-            <table className="container-table5">
-              <thead>
-                <tr>
-                  <th className="summary-header" colSpan="2">
-                    Invoice Summary
-                  </th>
-                </tr>
-              </thead>
-              <tbody>
-                <tr>
-                  <td className="summary-label">Amount (excl. VAT)</td>
-                  <td className="summary-value">{formatCurrency(amount)}</td>
-                </tr>
-                <tr>
-                  <td className="summary-label">VAT (15%)</td>
-                  <td className="summary-value">{formatCurrency(vat)}</td>
-                </tr>
-                <tr className="summary-total-row">
-                  <td className="summary-total-label">Total Amount</td>
-                  <td className="summary-total-value">{formatCurrency(total)}</td>
-                </tr>
-              </tbody>
-            </table>
+            {/* Summary Table */}
+            <div className="summary-section">
+              <table className="container-table5">
+                <thead>
+                  <tr>
+                    <th className="summary-header" colSpan="2">
+                      Invoice Summary
+                    </th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr>
+                    <td className="summary-label">Amount (excl. VAT)</td>
+                    <td className="summary-value">{formatCurrency(amount)}</td>
+                  </tr>
+                  {/* Only show VAT row if VAT exists */}
+                  {vat > 0 && (
+                    <tr>
+                      <td className="summary-label">VAT ({invoiceData.vat}%)</td>
+                      <td className="summary-value">{formatCurrency(vat)}</td>
+                    </tr>
+                  )}
+                  <tr className="summary-total-row">
+                    <td className="summary-total-label">Total Amount</td>
+                    <td className="summary-total-value">{formatCurrency(total)}</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
           </div>
-          </div>
-
-
         </div>
 
         {/* Banking Details */}

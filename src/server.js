@@ -338,7 +338,7 @@ app.get("/api/invoices/:id", async (req, res) => {
 
     const { id } = req.params
 
-    // Updated query to include total_amount instead of rate
+    // Updated query to include vat field from the database
     const queryText = `
       SELECT 
         m1.m1key,
@@ -356,6 +356,7 @@ app.get("/api/invoices/:id", async (req, res) => {
         m1.description,
         m1.total_cost,  
         m1.rate,
+        m1.vat,
         m1.rateweight,
         COALESCE(m1.num_six_meters, 0) + COALESCE(m1.num_twelve_meters, 0) + COALESCE(m1.num_abnormal, 0) as num_containers
       FROM 
