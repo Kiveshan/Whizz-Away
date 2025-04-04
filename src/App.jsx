@@ -161,8 +161,8 @@ function DynamicHeader() {
     "/ControllerDashboard": "Controller",
     "/FCcontrollerinstructions": "Instructions",
     // Add these entries to the titleMap object in the DynamicHeader function
-    "/DMcontrollerinstructions": "DMcontrollerinstructions",
-    "/DMcontrollerInstructionDetails": "DMcontrollerInstructionDetails",
+    "/DMcontrollerinstructions": "Instructions",
+    "/DMcontrollerInstructionDetails": "Container Details",
   }
 
   const getTitle = () => {
