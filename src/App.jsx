@@ -115,7 +115,7 @@ function DynamicHeader() {
     "/debtors": "Debtors",
     "/FDashboard": "Finance Clerk",
     "/instructions": "Instructions",
-    "/update-instructions": "Instructions",
+    "/update-instructions": "Assignment",
     "/Upload-Instruction-Documents": "Instructions",
     "/invoices": "Invoices",
     "/client-invoice": "Invoices",
