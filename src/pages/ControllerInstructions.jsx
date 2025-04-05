@@ -24,6 +24,9 @@ const ControllerInstructions = () => {
   // State to track if shipment type is import
   const [isImport, setIsImport] = useState(false)
 
+  // Get today's date in YYYY-MM-DD format for min date validation
+  const today = new Date().toISOString().split("T")[0]
+
   // State for form data - initialize with preserved data if available
   const [formData, setFormData] = useState(() => {
     if (preservedFormData) {
@@ -279,6 +282,77 @@ const ControllerInstructions = () => {
 
         setFormData(updatedFormData)
       }
+    } else if (name === "pickupDate") {
+      // For pickup date, just update the value
+      setFormData({
+        ...formData,
+        [name]: value,
+        // Reset stack date and deadline if they're now invalid
+        stackDate: formData.stackDate && formData.stackDate <= value ? "" : formData.stackDate,
+        deadline: formData.deadline && formData.deadline <= value ? "" : formData.deadline,
+      })
+    } else if (name === "stackDate") {
+      // For stack date, ensure it's after pickup date
+      if (!formData.pickupDate) {
+        setErrorModal({
+          isOpen: true,
+          message: "Please select a pickup date first",
+        })
+        return
+      }
+
+      if (value < formData.pickupDate) {
+        setErrorModal({
+          isOpen: true,
+          message: `${isImport ? "ETA" : "Stack date"} cannot be before pickup date`,
+        })
+        return
+      }
+
+      setFormData({
+        ...formData,
+        [name]: value,
+        // Reset deadline if it's now invalid
+        deadline: formData.deadline && formData.deadline <= value ? "" : formData.deadline,
+      })
+    } else if (name === "deadline") {
+      // For deadline, ensure it's after pickup date and stack date
+      if (!formData.pickupDate) {
+        setErrorModal({
+          isOpen: true,
+          message: "Please select a pickup date first",
+        })
+        return
+      }
+
+      if (!formData.stackDate) {
+        setErrorModal({
+          isOpen: true,
+          message: `Please select ${isImport ? "an ETA" : "a stack date"} first`,
+        })
+        return
+      }
+
+      if (value < formData.pickupDate) {
+        setErrorModal({
+          isOpen: true,
+          message: "Deadline cannot be before pickup date",
+        })
+        return
+      }
+
+      if (value < formData.stackDate) {
+        setErrorModal({
+          isOpen: true,
+          message: `Deadline cannot be before ${isImport ? "ETA" : "stack date"}`,
+        })
+        return
+      }
+
+      setFormData({
+        ...formData,
+        [name]: value,
+      })
     } else {
       setFormData({
         ...formData,
@@ -399,6 +473,31 @@ const ControllerInstructions = () => {
       return false
     }
 
+    // Validate date order
+    if (formData.stackDate < formData.pickupDate) {
+      setErrorModal({
+        isOpen: true,
+        message: `${isImport ? "ETA" : "Stack date"} cannot be before pickup date`,
+      })
+      return false
+    }
+
+    if (formData.deadline < formData.pickupDate) {
+      setErrorModal({
+        isOpen: true,
+        message: "Deadline cannot be before pickup date",
+      })
+      return false
+    }
+
+    if (formData.deadline < formData.stackDate) {
+      setErrorModal({
+        isOpen: true,
+        message: `Deadline cannot be before ${isImport ? "ETA" : "stack date"}`,
+      })
+      return false
+    }
+
     return true
   }
 
@@ -427,12 +526,22 @@ const ControllerInstructions = () => {
       weight: weightValue,
     }
 
+    // Check if we have preserved containers from a previous visit to ControllerInstructionDetails
+    const preservedContainers = location.state?.preservedContainers
+
     // Navigate to container details page with state
     navigate("/ControllerInstructionDetails", {
       state: {
         controllerData: updatedFormData,
         isImport: formData.shipmentTypeName.toLowerCase() === "import",
         totalContainers: totalContainers,
+        preservedContainers: preservedContainers, // Pass preserved containers if available
+        instructionId: location.state?.instructionId,
+        clientId: location.state?.clientId,
+        clientName: location.state?.clientName,
+        selectedMonth: location.state?.selectedMonth,
+        selectedYear: location.state?.selectedYear,
+        activeFilter: location.state?.activeFilter,
       },
     })
   }
@@ -671,6 +780,7 @@ const ControllerInstructions = () => {
                     name="pickupDate"
                     value={formData.pickupDate}
                     onChange={handleInputChange}
+                    min={today} // Block past dates
                   />
                   <button className="calendar-button" onClick={() => openCalendar(pickupDateRef)}></button>
                 </div>
@@ -686,8 +796,20 @@ const ControllerInstructions = () => {
                     name="stackDate"
                     value={formData.stackDate}
                     onChange={handleInputChange}
+                    min={formData.pickupDate || today} // Block past dates and pickup date
+                    disabled={!formData.pickupDate} // Disable until pickup date is selected
                   />
-                  <button className="calendar-button" onClick={() => openCalendar(etaDateRef)}></button>
+                  <button
+                    className="calendar-button"
+                    onClick={() =>
+                      formData.pickupDate
+                        ? openCalendar(etaDateRef)
+                        : setErrorModal({
+                            isOpen: true,
+                            message: "Please select a pickup date first",
+                          })
+                    }
+                  ></button>
                 </div>
               </div>
               <div className="form-group">
@@ -701,8 +823,27 @@ const ControllerInstructions = () => {
                     name="deadline"
                     value={formData.deadline}
                     onChange={handleInputChange}
+                    min={formData.stackDate || formData.pickupDate || today} // Block past dates, pickup date, and stack date
+                    disabled={!formData.stackDate} // Disable until stack date is selected
                   />
-                  <button className="calendar-button" onClick={() => openCalendar(deadlineDateRef)}></button>
+                  <button
+                    className="calendar-button"
+                    onClick={() => {
+                      if (!formData.pickupDate) {
+                        setErrorModal({
+                          isOpen: true,
+                          message: "Please select a pickup date first",
+                        })
+                      } else if (!formData.stackDate) {
+                        setErrorModal({
+                          isOpen: true,
+                          message: `Please select ${isImport ? "an ETA" : "a stack date"} first`,
+                        })
+                      } else {
+                        openCalendar(deadlineDateRef)
+                      }
+                    }}
+                  ></button>
                 </div>
               </div>
             </div>

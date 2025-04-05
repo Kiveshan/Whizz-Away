@@ -4,7 +4,7 @@ import Card from "../components/Card";
 import "../css/card.css";
 import "../css/dashboard.css";
 const dashboardData = [
-  { title: "Instructions", image: "/images/monitor.jpeg", path: "/DirectorMonitorInstructionView" },
+  { title: "Instructions", image: "/images/monitor.jpeg", path: "/CompanyInstructionView" },
   { title: "Analytics", image: "/images/analytics.jpg", path: "/DirectorAnalytics" },
   { title: "Debtors", image: "/images/clientDocs.jpeg", path: "/DirectorDabtors" },
   { title: "Wages", image: "/images/wages.jpeg", path: "/DirectorDriverWageList" },

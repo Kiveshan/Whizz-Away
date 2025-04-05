@@ -7,14 +7,14 @@ import "../css/components.css"
 import ErrorModal from "../components/ErrorModal"
 import API_CONFIG from "../utils/api-config"
 
-const DMcontrollerInstructionDetails = () => {
+const ViewcontrollerInstructionDetails = () => {
   const navigate = useNavigate()
   const location = useLocation()
   const { controllerData, isImport, instructionId, clientId, clientName, selectedMonth, selectedYear, activeFilter } =
     location.state || {}
 
   // Debug log to verify state is being passed correctly
-  console.log("DMcontrollerInstructionDetails received state:", {
+  console.log("ViewcontrollerInstructionDetails received state:", {
     instructionId,
     clientId,
     clientName,
@@ -25,7 +25,7 @@ const DMcontrollerInstructionDetails = () => {
 
   // Handle back button click - ensure we pass all state back
   const handleBackClick = () => {
-    navigate("/DMcontrollerinstructions", {
+    navigate("/Viewcontrollerinstructions", {
       state: {
         instructionId,
         clientId,
@@ -60,7 +60,7 @@ const DMcontrollerInstructionDetails = () => {
       initializeContainers()
     } else {
       // Redirect back if no data
-      navigate("/DMcontrollerinstructions")
+      navigate("/Viewcontrollerinstructions")
     }
   }, [instructionId, controllerData, navigate])
 
@@ -372,5 +372,5 @@ const DMcontrollerInstructionDetails = () => {
   )
 }
 
-export default DMcontrollerInstructionDetails
+export default ViewcontrollerInstructionDetails
 

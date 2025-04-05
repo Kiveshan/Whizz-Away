@@ -6,13 +6,28 @@ import { useNavigate, useLocation } from "react-router-dom"
 import ErrorModal from "../components/ErrorModal"
 import API_CONFIG from "../utils/api-config"
 
-const BMcontrollerinstructions = () => {
+const Viewcontrollerinstructions = () => {
   const navigate = useNavigate()
   const location = useLocation()
   const instructionId = location.state?.instructionId
+  const preservedFormData = location.state?.preservedFormData
+
+  // Extract any additional state that was passed from DirectorMonitorInstructions
   const clientId = location.state?.clientId
   const clientName = location.state?.clientName
-  const preservedFormData = location.state?.preservedFormData
+  const selectedMonth = location.state?.selectedMonth
+  const selectedYear = location.state?.selectedYear
+  const activeFilter = location.state?.activeFilter
+
+  // Log the received state for debugging
+  console.log("Viewcontrollerinstructions received state:", {
+    instructionId,
+    clientId,
+    clientName,
+    selectedMonth,
+    selectedYear,
+    activeFilter,
+  })
 
   // API base URL from config
   const API_BASE_URL = API_CONFIG.BASE_URL
@@ -106,6 +121,27 @@ const BMcontrollerinstructions = () => {
       return "No Weight Amount Provided"
     }
     return Number.parseFloat(weight).toFixed(2)
+  }
+
+  // Handle back button click - fixed to ensure clientId is passed correctly
+  const handleBackClick = () => {
+    console.log("Navigating back to DirectorMonitorInstructions with state:", {
+      clientId,
+      clientName,
+      selectedMonth,
+      selectedYear,
+      activeFilter,
+    })
+
+    navigate("/CompanyInstructions", {
+      state: {
+        clientId: clientId,
+        clientName: clientName,
+        selectedMonth: selectedMonth,
+        selectedYear: selectedYear,
+        activeFilter: activeFilter,
+      },
+    })
   }
 
   // Fetch clients, shipment types, and instruction data on component mount
@@ -267,25 +303,18 @@ const BMcontrollerinstructions = () => {
     const totalContainers = formData.num_six_meters + formData.num_twelve_meters + formData.num_abnormal
 
     // Navigate to container details page with state
-    navigate("/BMcontrollerInstructionDetails", {
+    navigate("/ViewcontrollerInstructionDetails", {
       state: {
         controllerData: formData,
         isImport: isImport,
         totalContainers: totalContainers,
         instructionId: instructionId,
+        // Pass through the original navigation state for when we return
         clientId: clientId,
         clientName: clientName,
-      },
-    })
-  }
-
-  // Handle back button click
-  const handleBackClick = () => {
-    // Navigate back to MonitorInstructions with the clientId and clientName
-    navigate("/monitor-instructions", {
-      state: {
-        clientId: clientId,
-        clientName: clientName,
+        selectedMonth: selectedMonth,
+        selectedYear: selectedYear,
+        activeFilter: activeFilter,
       },
     })
   }
@@ -309,7 +338,18 @@ const BMcontrollerinstructions = () => {
   }
 
   return (
-    <div>
+    <div className="min-h-screen bg-white" style={{ paddingBottom: 200 }}>
+      <div className="">
+        <button className="back-button" onClick={handleBackClick}>
+          Back
+        </button>
+        {clientName && (
+          <span className="client-name" style={{ fontWeight: "bold", marginLeft: "10px", display: "none" }}>
+            {clientName} {clientId ? `(Client ID: ${clientId})` : ""}
+          </span>
+        )}
+      </div>
+
       {/* Error Modal */}
       {errorModal.isOpen && (
         <ErrorModal
@@ -318,13 +358,6 @@ const BMcontrollerinstructions = () => {
           message={errorModal.message}
         />
       )}
-
-      {/* Back Button */}
-      <div className="client-payments-header">
-        <button className="back-button" onClick={handleBackClick}>
-          Back
-        </button>
-      </div>
 
       {/* Success Message */}
       {successMessage && (
@@ -343,7 +376,7 @@ const BMcontrollerinstructions = () => {
         </div>
       )}
 
-      <div className="instruction-container1">
+      <div className="instruction-container1" style={{ marginTop: "50px" }}>
         <div className="content">
           {/* Loading indicator or retry button */}
           {isLoading.clients || isLoading.shipmentTypes || isLoading.instruction ? (
@@ -741,5 +774,5 @@ const BMcontrollerinstructions = () => {
   )
 }
 
-export default BMcontrollerinstructions
+export default Viewcontrollerinstructions
 

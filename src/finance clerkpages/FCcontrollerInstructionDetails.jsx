@@ -15,17 +15,27 @@ const FCcontrollerInstructionDetails = () => {
   const API_BASE_URL = API_CONFIG.BASE_URL
 
   // Get data from location state - extract ALL parameters
-  const { controllerData, isImport, instructionId, clientId, clientName, selectedMonth, selectedYear, activeFilter } =
-    location.state || {
-      controllerData: null,
-      isImport: false,
-      instructionId: null,
-      clientId: null,
-      clientName: null,
-      selectedMonth: null,
-      selectedYear: null,
-      activeFilter: null,
-    }
+  const {
+    controllerData,
+    isImport,
+    instructionId,
+    clientId,
+    clientName,
+    selectedMonth,
+    selectedYear,
+    activeFilter,
+    preservedContainers, // Add this to receive preserved containers when coming back
+  } = location.state || {
+    controllerData: null,
+    isImport: false,
+    instructionId: null,
+    clientId: null,
+    clientName: null,
+    selectedMonth: null,
+    selectedYear: null,
+    activeFilter: null,
+    preservedContainers: null,
+  }
 
   // Log the received state for debugging
   console.log("FCcontrollerInstructionDetails received state:", location.state)
@@ -34,6 +44,7 @@ const FCcontrollerInstructionDetails = () => {
   console.log("FCcontrollerInstructionDetails - selectedMonth:", selectedMonth)
   console.log("FCcontrollerInstructionDetails - selectedYear:", selectedYear)
   console.log("FCcontrollerInstructionDetails - activeFilter:", activeFilter)
+  console.log("FCcontrollerInstructionDetails - preservedContainers:", preservedContainers)
 
   // State for container data
   const [containers, setContainers] = useState([])
@@ -80,23 +91,28 @@ const FCcontrollerInstructionDetails = () => {
     return `${year}-${month}-${day}`
   }
 
-  // Updated handleBackClick to pass back the modified data
-  const handleBackClick = async () => {
-    // If data has been modified, save it to the database before navigating back
-    if (isDataModified && instructionId) {
-      try {
-        await saveChangesToDatabase()
-      } catch (error) {
-        console.error("Error saving changes before navigating back:", error)
-        setErrorModal({
-          isOpen: true,
-          message: "Failed to save changes before navigating back. Please try again.",
-        })
-        return
+  // Add beforeunload event listener to warn when navigating away with unsaved changes
+  useEffect(() => {
+    const handleBeforeUnload = (e) => {
+      if (isDataModified) {
+        // Standard way of showing a confirmation dialog
+        e.preventDefault()
+        e.returnValue = "You have unsaved changes. Are you sure you want to leave?"
+        return "You have unsaved changes. Are you sure you want to leave?"
       }
     }
 
+    window.addEventListener("beforeunload", handleBeforeUnload)
+
+    return () => {
+      window.removeEventListener("beforeunload", handleBeforeUnload)
+    }
+  }, [isDataModified])
+
+  // Updated handleBackClick to NOT save changes to the database, but pass the full container data
+  const handleBackClick = () => {
     // Create state object with all necessary parameters including the updated data
+    // but DO NOT save to database
     const stateToPass = {
       preservedFormData: updatedControllerData,
       instructionId: instructionId,
@@ -111,6 +127,8 @@ const FCcontrollerInstructionDetails = () => {
         num_twelve_meters: updatedControllerData.num_twelve_meters,
         num_abnormal: updatedControllerData.num_abnormal,
       },
+      // Pass the full container data to preserve it
+      preservedContainers: containers,
     }
 
     console.log("Navigating back to FCcontrollerinstructions with state:", stateToPass)
@@ -121,10 +139,26 @@ const FCcontrollerInstructionDetails = () => {
 
   // Fetch existing containers if instructionId is provided
   useEffect(() => {
-    if (instructionId) {
+    // If we have preserved containers from navigation, use those but sync with current counts
+    if (preservedContainers && preservedContainers.length > 0) {
+      console.log("Using preserved containers from navigation:", preservedContainers)
+      // Sync preserved containers with the current container counts
+      const syncedContainers = syncContainersWithCounts(preservedContainers)
+      setContainers(syncedContainers)
+      setOriginalContainers([...syncedContainers])
+      setIsLoading(false)
+      // Mark data as modified if container counts have changed
+      if (hasContainerCountsChanged(preservedContainers, controllerData)) {
+        setIsDataModified(true)
+      }
+    }
+    // Otherwise, fetch from database or initialize
+    else if (instructionId) {
       fetchContainers(instructionId)
     } else if (controllerData) {
       initializeContainers()
+      // Mark data as modified if this is a new set of containers
+      setIsDataModified(true)
     } else {
       // Redirect back if no data - pass all state back
       navigate("/FCcontrollerinstructions", {
@@ -142,7 +176,38 @@ const FCcontrollerInstructionDetails = () => {
     if (controllerData) {
       setUpdatedControllerData(controllerData)
     }
-  }, [instructionId, controllerData, navigate, clientId, clientName, selectedMonth, selectedYear, activeFilter])
+  }, [
+    instructionId,
+    controllerData,
+    navigate,
+    clientId,
+    clientName,
+    selectedMonth,
+    selectedYear,
+    activeFilter,
+    preservedContainers,
+  ])
+
+  // Check if container counts have changed
+  const hasContainerCountsChanged = (containers, controllerData) => {
+    if (!controllerData) return false
+
+    const counts = {
+      "6m": 0,
+      "12m": 0,
+      Abnormal: 0,
+    }
+
+    containers.forEach((container) => {
+      counts[container.containerType]++
+    })
+
+    return (
+      counts["6m"] !== (controllerData.num_six_meters || 0) ||
+      counts["12m"] !== (controllerData.num_twelve_meters || 0) ||
+      counts["Abnormal"] !== (controllerData.num_abnormal || 0)
+    )
+  }
 
   // Fetch containers for the given instruction ID
   const fetchContainers = async (id) => {
@@ -188,14 +253,23 @@ const FCcontrollerInstructionDetails = () => {
 
         setContainers(updatedContainersList)
         setOriginalContainers([...updatedContainersList])
+
+        // Check if container counts have changed from what's in the database
+        if (hasContainerCountsChanged(updatedContainersList, controllerData)) {
+          setIsDataModified(true)
+        }
       } else {
         // If no containers found, initialize based on controllerData
         initializeContainers()
+        // Mark as modified since we're creating new containers
+        setIsDataModified(true)
       }
     } catch (error) {
       console.error("Error fetching containers:", error)
       // If error, initialize based on controllerData
       initializeContainers()
+      // Mark as modified since we're creating new containers
+      setIsDataModified(true)
     } finally {
       setIsLoading(false)
     }
@@ -254,38 +328,51 @@ const FCcontrollerInstructionDetails = () => {
       })
     }
 
-    // Remove excess containers
+    // Remove excess containers if needed
     if (
       currentCounts["6m"] > sixMCount ||
       currentCounts["12m"] > twelveMCount ||
       currentCounts["Abnormal"] > abnormalCount
     ) {
-      // Filter containers to keep only the required number of each type
-      const filteredContainers = []
-      const typeCounts = { "6m": 0, "12m": 0, Abnormal: 0 }
-
-      for (const container of result) {
-        if (
-          typeCounts[container.containerType] <
-          (container.containerType === "6m"
-            ? sixMCount
-            : container.containerType === "12m"
-              ? twelveMCount
-              : abnormalCount)
-        ) {
-          filteredContainers.push(container)
-          typeCounts[container.containerType]++
-        }
+      // First, separate containers by type
+      const containersByType = {
+        "6m": [],
+        "12m": [],
+        Abnormal: [],
       }
 
-      // Reassign IDs to maintain sequential order
-      result = filteredContainers.map((container, index) => ({
-        ...container,
-        id: index + 1,
-      }))
+      result.forEach((container) => {
+        containersByType[container.containerType].push(container)
+      })
+
+      // For each type, sort by empty first, then remove excess
+      const processContainerType = (type, targetCount) => {
+        // Sort containers: empty ones first
+        containersByType[type].sort((a, b) => {
+          const aEmpty = !a.containerNum && !a.weight
+          const bEmpty = !b.containerNum && !b.weight
+          if (aEmpty && !bEmpty) return -1
+          if (!aEmpty && bEmpty) return 1
+          return 0
+        })
+
+        // Keep only the target count
+        containersByType[type] = containersByType[type].slice(0, targetCount)
+      }
+
+      processContainerType("6m", sixMCount)
+      processContainerType("12m", twelveMCount)
+      processContainerType("Abnormal", abnormalCount)
+
+      // Combine all containers back together
+      result = [...containersByType["6m"], ...containersByType["12m"], ...containersByType["Abnormal"]]
     }
 
-    return result
+    // Reassign IDs to maintain sequential order
+    return result.map((container, index) => ({
+      ...container,
+      id: index + 1,
+    }))
   }
 
   // Determine container type based on index and controller data
@@ -390,8 +477,9 @@ const FCcontrollerInstructionDetails = () => {
     }
   }
 
-  // Update the handleAddContainer function to recalculate total_cost
+  // Update the handleAddContainer function to only update local state, not the database
   const handleAddContainer = (containerType) => {
+    // Add container to local state
     setContainers((prevContainers) => [
       ...prevContainers,
       {
@@ -430,7 +518,7 @@ const FCcontrollerInstructionDetails = () => {
     setIsDataModified(true)
   }
 
-  // Update the handleDeleteContainer function to recalculate total_cost
+  // Update the handleDeleteContainer function to only update local state, not the database
   const handleDeleteContainer = (id) => {
     const containerToDelete = containers.find((container) => container.id === id)
 
@@ -645,6 +733,8 @@ const FCcontrollerInstructionDetails = () => {
         </div>
       )}
 
+      {/* Removed the unsaved changes notification as requested */}
+
       <div className="container-details-wrapper">
         <div className="content">
           <div className="add-container-section">
@@ -732,7 +822,20 @@ const FCcontrollerInstructionDetails = () => {
           )}
 
           <div className="submit-section">
-            <button className="submit-button" onClick={handleSubmit}>
+            <button
+              className="submit-button"
+              onClick={handleSubmit}
+              style={{
+                backgroundColor: "#28a745", // Always green as requested
+                color: "white",
+                border: "none",
+                borderRadius: "4px",
+                padding: "10px 20px",
+                fontSize: "16px",
+                cursor: "pointer",
+                transition: "background-color 0.3s ease",
+              }}
+            >
               Save Changes
             </button>
           </div>

@@ -10,6 +10,7 @@ const ViewClientInstruction = () => {
   const [clients, setClients] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
+  const [totalNewInstructions, setTotalNewInstructions] = useState(0)
 
   useEffect(() => {
     const fetchClientStats = async () => {
@@ -31,6 +32,10 @@ const ViewClientInstruction = () => {
           in_progress_count: Number.parseInt(client.in_progress_count) || 0,
           completed_count: Number.parseInt(client.completed_count) || 0,
         }))
+
+        // Calculate total new instructions
+        const totalNew = processedData.reduce((sum, client) => sum + client.new_count, 0)
+        setTotalNewInstructions(totalNew)
 
         setClients(processedData)
         setLoading(false)
@@ -60,6 +65,62 @@ const ViewClientInstruction = () => {
       }
     }
     return centeredCellStyle
+  }
+
+  // Bell icon styles
+  const bellContainerStyle = {
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: "5px",
+  }
+
+  // Bell animation keyframes
+  const bellKeyframes = `
+    @keyframes bellShake {
+      0% { transform: rotate(0); }
+      15% { transform: rotate(5deg); }
+      30% { transform: rotate(-5deg); }
+      45% { transform: rotate(4deg); }
+      60% { transform: rotate(-4deg); }
+      75% { transform: rotate(2deg); }
+      85% { transform: rotate(-2deg); }
+      92% { transform: rotate(1deg); }
+      100% { transform: rotate(0); }
+    }
+  `
+
+  // Bell icon component
+  const BellIcon = ({ count }) => {
+    const hasNewInstructions = count > 0
+
+    const bellStyle = {
+      width: "24px",
+      height: "24px",
+      fill: hasNewInstructions ? "#ff0000" : "#00cc00",
+      animation: hasNewInstructions ? "bellShake 2s infinite" : "none",
+      position: "relative",
+    }
+
+    const countStyle = {
+      position: "absolute",
+      top: "50%",
+      left: "50%",
+      transform: "translate(-50%, -50%)",
+      fontSize: "10px",
+      fontWeight: "bold",
+      color: "black",
+    }
+
+    return (
+      <div style={{ position: "relative", display: "inline-block" }}>
+        <style>{bellKeyframes}</style>
+        <svg style={bellStyle} viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+          <path d="M12 22c1.1 0 2-.9 2-2h-4c0 1.1.9 2 2 2zm6-6v-5c0-3.07-1.63-5.64-4.5-6.32V4c0-.83-.67-1.5-1.5-1.5s-1.5.67-1.5 1.5v.68C7.64 5.36 6 7.92 6 11v5l-2 2v1h16v-1l-2-2zm-2 1H8v-6c0-2.48 1.51-4.5 4-4.5s4 2.02 4 4.5v6z" />
+        </svg>
+        <span style={countStyle}>{count}</span>
+      </div>
+    )
   }
 
   // Handle view instructions click - explicitly pass clientId and clientName
@@ -96,7 +157,9 @@ const ViewClientInstruction = () => {
                 <th className="p-3">Representative</th>
                 <th className="p-3">Email</th>
                 <th className="p-3" style={centeredCellStyle}>
-                  New
+                  <div style={bellContainerStyle}>
+                    New <BellIcon count={totalNewInstructions} />
+                  </div>
                 </th>
                 <th className="p-3" style={centeredCellStyle}>
                   In Progress

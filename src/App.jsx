@@ -7,7 +7,7 @@ import Footer from "./components/Footer" // Import the Footer component
 import LogoutButton from "./components/LogoutButton"
 
 // Import pages
-import MonitorInstructions from "./pages/MonitorInstructions"
+
 import Dashboard from "./pages/Dashboard"
 import ManagerCreditorsDash from "./pages/ManagerCreditorsDash"
 import ManagerViewFuelExpence from "./pages/ManagerViewFuelExpence"
@@ -20,7 +20,7 @@ import DriverWageList from "./pages/DriverWageList"
 import Expenses from "./pages/Expenses"
 import Analytics from "./pages/Analytics"
 import Debtors from "./pages/Debtors"
-import MonitorInstructionView from "./pages/MonitorInstructionView"
+
 import Manage from "./pages/Manage"
 import DriverWageSlip from "./pages/DriverWageSlip"
 import Landing from "./pages/Landing"
@@ -28,15 +28,19 @@ import Login from "./pages/Login"
 import Register from "./pages/Register"
 import ControllerDashboard from "./pages/ControllerDashboard"
 import ControllerInstructions from "./pages/ControllerInstructions"
-import ControllerTrackInstruction from "./pages/ControllerTrackInstruction"
+
 import ControllerViewAssignment from "./pages/ControllerViewAssignment"
 import ControllerInstructionDetails from "./pages/ControllerInstructionDetails"
-import ControllerClientTrackInstruction from "./pages/ControllerClientTrackInstruction"
+
 import ManagerLegDetails from "./pages/ManagerLegDetails"
 import ManagerViewAssignment from "./pages/ManagerViewAssignment"
 import FinancialDocumentsView from "./pages/FinancialDocumentsView"
-import DirectorMonitorInstructionView from "./pages/DirectorMonitorInstructionView"
-import DirectorMonitorInstructions from "./pages/DirectorMonitorInstructions"
+
+
+import CompanyInstructionView from "./pages/CompanyInstructionView"
+import CompanyInstructions from "./pages/CompanyInstructions"
+
+
 import DirectorManagerViewAssignment from "./pages/DirectorManagerViewAssignment"
 import DirectorAnalytics from "./pages/DirectorAnalytics"
 import DirectorDabtors from "./pages/DirectorDabtors"
@@ -52,8 +56,8 @@ import DirectorCreditorsDash from "./pages/DirectorCreditorsDash"
 import DirectorManagerViewFuelExpence from "./pages/DirectorManagerViewFuelExpence"
 import DirectorExpenses from "./pages/DirectorExpenses"
 // Add these imports at the appropriate location in the import section, with the other Director pages
-import DMcontrollerinstructions from "./pages/DMcontrollerinstructions"
-import DMcontrollerInstructionDetails from "./pages/DMcontrollerInstructionDetails"
+import Viewcontrollerinstructions from "./pages/Viewcontrollerinstructions"
+import ViewcontrollerInstructionDetails from "./pages/ViewcontrollerInstructionDetails"
 
 // Finance Clerk Pages
 import FDashboard from "./finance clerkpages/FDashboard"
@@ -81,9 +85,6 @@ import FClerkLegDetails from "./finance clerkpages/FClerkLegDetails"
 import FCcontrollerinstructions from "./finance clerkpages/FCcontrollerinstructions"
 import FCcontrollerInstructionDetails from "./finance clerkpages/FCcontrollerInstructionDetails"
 
-// Business Manager Pages
-import BMcontrollerinstructions from "./pages/BMcontrollerinstructions"
-import BMcontrollerInstructionDetails from "./pages/BMcontrollerInstructionDetails"
 
 // CSS Imports
 import "./css/card.css"
@@ -95,21 +96,19 @@ function DynamicHeader() {
   const location = useLocation()
   const titleMap = {
     "/Dashboard": "Business Manager",
-    "/monitor-instructions": "Instructions",
-    "/MonitorInstructionView": "Instructions",
+   
     "/client-payments": "Client Payments",
     "/client-documents": "Client Documents",
     "/driver-wage": "Wages",
     "/DriverWageSlip": "Wages",
     "/DriverWageList": "Wages",
     "/ControllerInstructions": "Instruction",
-    "/ControllerTrackInstruction": "Tracking",
-    "/ControllerClientTrackInstruction": "Tracking",
+    
+   
     "/ControllerViewAssignment": "View Assignment",
     "/ControllerInstructionDetails": "Container Details",
     "/FCcontrollerInstructionDetails": "Container Details",
-    "/BMcontrollerinstructions": "Instructions",
-    "/BMcontrollerInstructionDetails": "Container Details",
+    
     "/expenses": "Truck Expenses",
     "/analytics": "Analytics",
     "/debtors": "Debtors",
@@ -140,10 +139,12 @@ function DynamicHeader() {
     "/ManagerViewFuelExpence": "Truck Expenses",
     "/FClerkLegDetails": "Wages",
     "/ManagerLegDetails": "Wages",
-    "/ManagerViewAssignment": "View Assignment",
+    "/ManagerViewAssignment": "View Assignment",  
     "/FinancialDocumentsView": "Client Documents",
-    "/DirectorMonitorInstructionView": "Instructions ",
-    "/DirectorMonitorInstructions": "Instructions ",
+    
+    "/CompanyInstructionView": "Instructions ",
+    "/CompanyInstructions": "Instructions ",
+    
     "/DirectorManagerViewAssignment": "View Assignment",
     "/DirectorAnalytics": "Analytics",
     "/DirectorDabtors": "Debtors",
@@ -161,8 +162,8 @@ function DynamicHeader() {
     "/ControllerDashboard": "Controller",
     "/FCcontrollerinstructions": "Instructions",
     // Add these entries to the titleMap object in the DynamicHeader function
-    "/DMcontrollerinstructions": "Instructions",
-    "/DMcontrollerInstructionDetails": "Container Details",
+    "/Viewcontrollerinstructions": "Instructions",
+    "/ViewcontrollerInstructionDetails": "Container Details",
   }
 
   const getTitle = () => {
@@ -194,8 +195,7 @@ function ContentWrapper() {
       )}
       <Routes>
         <Route path="/" element={<Landing />} />
-        <Route path="/monitor-instructions" element={<MonitorInstructions />} />
-        <Route path="/MonitorInstructionView" element={<MonitorInstructionView />} />
+        
         <Route path="/client-payments" element={<ClientPayments />} />
         <Route path="/driver-wage" element={<DriverWage />} />
         <Route path="/DriverWageSlip" element={<DriverWageSlip />} />
@@ -214,15 +214,21 @@ function ContentWrapper() {
         <Route path="/DirectorDashboard" element={<DirectorDashboard />} />
         <Route path="/ManagerCreditorsDash" element={<ManagerCreditorsDash />} />
         <Route path="/ControllerInstructions" element={<ControllerInstructions />} />
-        <Route path="/ControllerTrackInstruction" element={<ControllerTrackInstruction />} />
+      
         <Route path="/ControllerViewAssignment" element={<ControllerViewAssignment />} />
         <Route path="/ControllerInstructionDetails" element={<ControllerInstructionDetails />} />
-        <Route path="/ControllerClientTrackInstruction" element={<ControllerClientTrackInstruction />} />
+
         <Route path="/ManagerLegDetails" element={<ManagerLegDetails />} />
         <Route path="/ManagerViewAssignment" element={<ManagerViewAssignment />} />
         <Route path="/FinancialDocumentsView" element={<FinancialDocumentsView />} />
-        <Route path="/DirectorMonitorInstructionView" element={<DirectorMonitorInstructionView />} />
-        <Route path="/DirectorMonitorInstructions" element={<DirectorMonitorInstructions />} />
+       
+       
+        <Route path="/CompanyInstructionView" element={<CompanyInstructionView />} />
+       
+       
+        <Route path="/CompanyInstructions" element={<CompanyInstructions />} />
+        
+        
         <Route path="/DirectorManagerViewAssignment" element={<DirectorManagerViewAssignment />} />
         <Route path="/DirectorAnalytics" element={<DirectorAnalytics />} />
         <Route path="/DirectorDabtors" element={<DirectorDabtors />} />
@@ -239,8 +245,8 @@ function ContentWrapper() {
         <Route path="/DirectorManagerViewFuelExpence" element={<DirectorManagerViewFuelExpence />} />
         <Route path="/DirectorExpenses" element={<DirectorExpenses />} />
         // Add these routes in the ContentWrapper function, with the other Director routes
-        <Route path="/DMcontrollerinstructions" element={<DMcontrollerinstructions />} />
-        <Route path="/DMcontrollerInstructionDetails" element={<DMcontrollerInstructionDetails />} />
+        <Route path="/Viewcontrollerinstructions" element={<Viewcontrollerinstructions />} />
+        <Route path="/ViewcontrollerInstructionDetails" element={<ViewcontrollerInstructionDetails />} />
         {/* Finance Clerk Routes */}
         <Route path="/instructions" element={<InstructionsList />} />
         <Route path="/update-instructions" element={<UpdateInstruction />} />
@@ -266,9 +272,7 @@ function ContentWrapper() {
         <Route path="/FClerkLegDetails" element={<FClerkLegDetails />} />
         <Route path="/FCcontrollerinstructions" element={<FCcontrollerinstructions />} />
         <Route path="/FCcontrollerInstructionDetails" element={<FCcontrollerInstructionDetails />} />
-        {/* Business Manager Routes */}
-        <Route path="/BMcontrollerinstructions" element={<BMcontrollerinstructions />} />
-        <Route path="/BMcontrollerInstructionDetails" element={<BMcontrollerInstructionDetails />} />
+       
       </Routes>
       {shouldShowFooter && <Footer />} {/* Conditionally render footer */}
     </div>
@@ -281,18 +285,17 @@ function App() {
     "/": "Controller Dashboard",
     "/ControllerInstructions": "Controller Instructions",
     "/ControllerInstructionDetails": "Container Details",
-    "/ControllerTrackInstruction": "Track Instructions",
+   
     "/ControllerViewAssignment": "View Assignment",
     "/FDashboard": "Finance Clerk Dashboard",
     "/ViewClientInstruction": "View Client Instructions",
     "/FCcontrollerinstructions": "Finance Clerk Instructions",
     "/FCcontrollerInstructionDetails": "Finance Clerk Container Details",
-    "/BMcontrollerinstructions": "Business Manager Instructions",
-    "/BMcontrollerInstructionDetails": "Business Manager Container Details",
+
     "/InstructionsList": "Instructions List",
     // Add these entries to the pageTitles object in the App function
-    "/DMcontrollerinstructions": "DMcontrollerinstructions",
-    "/DMcontrollerInstructionDetails": "DMcontrollerInstructionDetails",
+    "/Viewcontrollerinstructions": "Viewcontrollerinstructions",
+    "/ViewcontrollerInstructionDetails": "ViewcontrollerInstructionDetails",
   }
 
   // Set page title based on current route

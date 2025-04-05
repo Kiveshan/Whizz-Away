@@ -1,125 +1,3 @@
-// import React from "react";
-// import { useNavigate } from "react-router-dom";
-// import "../css/trackinginstruction.css";
-
-// const ControllerTrackInstruction = ({ setCurrentPage }) => {
-//   const navigate = useNavigate();
-
-//   return (
-//     <div className="tracking-wrapper">
-//       <div className="content">
-//         {/* Back Button */}
-//         <button className="back-button" onClick={() => navigate(-1)}>
-//          Back
-//         </button>
-
-//         <div className="filter-section">
-//           <div className="filter-group">
-//             <button className="filter-button active">Import</button>
-//             <button className="filter-button">Export</button>
-//           </div>
-//           <div className="filter-group">
-//             <button className="filter-button outline">All</button>
-//             <button className="filter-button active">In-Progress</button>
-//             <button className="filter-button">Complete</button>
-//           </div>
-//         </div>
-
-//         {/* <div className="pagination">
-//           <button className="pagination-arrow">←</button>
-//           <span className="pagination-text">1 of 10</span>
-//           <button className="pagination-arrow">→</button>
-//         </div> */}
-
-//         <div className="tracking-table-wrapper">
-//           <table className="tracking-table">
-//             <thead>
-//               <tr>
-//                 <th>Instruction No</th>
-//                 <th>Type</th>
-//                 <th>Status</th>
-//                 <th>File No</th>
-//                 <th>Instruction</th>
-//                 <th>Assignment</th>
-//               </tr>
-//             </thead>
-//             <tbody>
-//               <tr>
-//                 <td>Instruction 1</td>
-//                 <td>Import</td>
-//                 <td>In-Progress</td>
-//                 <td>77002</td>
-//                 <td>
-//                 <button 
-//                     className="view-buttons" 
-//                     onClick={() => navigate("")}
-//                   >
-//                     View
-//                   </button>
-//                   </td>
-//                 <td>
-//                   <button 
-//                     className="view-buttons" 
-//                     onClick={() => navigate("/ControllerViewAssignment")}
-//                   >
-//                     View
-//                   </button>
-//                 </td>
-//               </tr>
-//               <tr className="even-row">
-//                 <td>Instruction 2</td>
-//                 <td>Export</td>
-//                 <td>In-Progress</td>
-//                 <td>10014</td>
-//                 <td>
-//                 <button 
-//                     className="view-buttons" 
-//                     onClick={() => navigate("")}
-//                   >
-//                     View
-//                   </button>
-//                   </td>
-//                 <td>
-//                   <button 
-//                     className="view-buttons" 
-//                     onClick={() => navigate("/ControllerViewAssignment")}
-//                   >
-//                     View
-//                   </button>
-//                 </td>
-//               </tr>
-//               <tr>
-//                 <td>Instruction 3</td>
-//                 <td>Import</td>
-//                 <td>Complete</td>
-//                 <td>93301</td>
-//                 <td>
-//                 <button 
-//                     className="view-buttons" 
-//                     onClick={() => navigate("")}
-//                   >
-//                     View
-//                   </button>
-//                   </td>
-//                 <td>
-//                   <button 
-//                     className="view-buttons" 
-//                     onClick={() => navigate("/ControllerViewAssignment")}
-//                   >
-//                     View
-//                   </button>
-//                 </td>
-//               </tr>
-//             </tbody>
-//           </table>
-//         </div>
-//       </div>
-//     </div>
-//   );
-// };
-
-// export default ControllerTrackInstruction;
-
 "use client"
 
 import { useState, useEffect } from "react"
@@ -127,7 +5,52 @@ import { useNavigate, useLocation } from "react-router-dom"
 import "../finance clerkpages/css/InstructionsList.css"
 import API_CONFIG from "../utils/api-config"
 
-const ControllerTrackInstruction = () => {
+// Bell icon component with shake animation using SVG
+const BellIcon = () => {
+  return (
+    <span
+      className="bell-icon-status"
+      style={{
+        display: "inline-block",
+        marginRight: "5px",
+        animation: "shake 0.5s infinite",
+        verticalAlign: "middle",
+      }}
+    >
+      <svg
+        width="16"
+        height="16"
+        viewBox="0 0 24 24"
+        fill="none"
+        xmlns="http://www.w3.org/2000/svg"
+        style={{ fill: "red" }}
+      >
+        <path d="M12 22C13.1 22 14 21.1 14 20H10C10 21.1 10.9 22 12 22ZM18 16V11C18 7.93 16.36 5.36 13.5 4.68V4C13.5 3.17 12.83 2.5 12 2.5C11.17 2.5 10.5 3.17 10.5 4V4.68C7.63 5.36 6 7.92 6 11V16L4 18V19H20V18L18 16Z" />
+      </svg>
+    </span>
+  )
+}
+
+// Add the CSS animation for the shake effect
+const addShakeAnimation = () => {
+  const styleSheet = document.createElement("style")
+  styleSheet.textContent = `
+    @keyframes shake {
+      0% { transform: rotate(0deg); }
+      25% { transform: rotate(5deg); }
+      50% { transform: rotate(0deg); }
+      75% { transform: rotate(-5deg); }
+      100% { transform: rotate(0deg); }
+    }
+    
+    .bell-icon-status {
+      display: inline-block;
+    }
+  `
+  document.head.appendChild(styleSheet)
+}
+
+const CompanyInstructions = () => {
   const navigate = useNavigate()
   const location = useLocation()
   const {
@@ -139,7 +62,7 @@ const ControllerTrackInstruction = () => {
   } = location.state || {}
 
   // Debug log to check what state is being received
-  console.log("DirectorMonitorInstructions received state:", {
+  console.log("CompanyInstructions received state:", {
     clientId,
     clientName,
     selectedMonth: initialMonth,
@@ -153,6 +76,11 @@ const ControllerTrackInstruction = () => {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
   const [activeFilter, setActiveFilter] = useState(initialFilter || "All")
+
+  // Add the shake animation when component mounts
+  useEffect(() => {
+    addShakeAnimation()
+  }, [])
 
   useEffect(() => {
     const fetchInstructions = async () => {
@@ -270,7 +198,7 @@ const ControllerTrackInstruction = () => {
 
   // Handle view instruction click
   const handleViewInstruction = (instructionId) => {
-    navigate("/DMcontrollerinstructions", {
+    navigate("/Viewcontrollerinstructions", {
       state: {
         instructionId,
         clientId,
@@ -282,11 +210,23 @@ const ControllerTrackInstruction = () => {
     })
   }
 
+  // Function to render status with bell for "New" status
+  const renderStatus = (status) => {
+    if (status === "New") {
+      return (
+        <>
+          <BellIcon /> {status}
+        </>
+      )
+    }
+    return status
+  }
+
   return (
     <div>
       {/* Centered company name heading */}
       <div className="client-payments-header">
-        <button className="back-button" onClick={() => navigate("/ControllerClientTrackInstruction")}>
+        <button className="back-button" onClick={() => navigate("/CompanyInstructionView")}>
           Back
         </button>
         {clientName && (
@@ -401,10 +341,10 @@ const ControllerTrackInstruction = () => {
                               ? "export"
                               : item.type)}
                       </td>
-                      <td>{item.status}</td>
+                      <td>{renderStatus(item.status)}</td>
                       <td>{new Date(item.startingdate || item.pickupdate).toLocaleDateString()}</td>
                       <td>
-                        <button  disabled
+                        <button
                           className="view-btn"
                           onClick={() => handleViewInstruction(item.m1controllerkey || item.m1key)}
                         >
@@ -412,7 +352,7 @@ const ControllerTrackInstruction = () => {
                         </button>
                       </td>
                       <td>
-                        <button className="view-btn" onClick={() => navigate("/ControllerViewAssignment")}>
+                        <button className="view-btn" onClick={() => navigate("/DirectorManagerViewAssignment")}>
                           View
                         </button>
                       </td>
@@ -428,5 +368,5 @@ const ControllerTrackInstruction = () => {
   )
 }
 
-export default ControllerTrackInstruction;
+export default CompanyInstructions
 

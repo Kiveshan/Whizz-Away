@@ -5,11 +5,12 @@ import { useNavigate } from "react-router-dom"
 import "../finance clerkpages/css/ViewClientStatements.css"
 import API_CONFIG from "../utils/api-config"
 
-const MonitorInstructionView = () => {
+const CompanyInstructionView = () => {
   const navigate = useNavigate()
   const [clients, setClients] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
+  const [totalNewInstructions, setTotalNewInstructions] = useState(0)
 
   useEffect(() => {
     const fetchClientStats = async () => {
@@ -31,6 +32,10 @@ const MonitorInstructionView = () => {
           in_progress_count: Number.parseInt(client.in_progress_count) || 0,
           completed_count: Number.parseInt(client.completed_count) || 0,
         }))
+
+        // Calculate total new instructions
+        const totalNew = processedData.reduce((sum, client) => sum + client.new_count, 0)
+        setTotalNewInstructions(totalNew)
 
         setClients(processedData)
         setLoading(false)
@@ -62,30 +67,120 @@ const MonitorInstructionView = () => {
     return centeredCellStyle
   }
 
+  // Table style to override any existing CSS
+  const tableStyle = {
+    width: "100%",
+    maxWidth: "1000px",
+    marginLeft: "auto",
+    marginRight: "auto",
+    marginTop: "20px",
+    borderCollapse: "collapse",
+  }
+
+  // Bell icon styles
+  const bellContainerStyle = {
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: "5px",
+  }
+
+  // Bell animation keyframes
+  const bellKeyframes = `
+  @keyframes bellShake {
+    0% { transform: rotate(0); }
+    15% { transform: rotate(5deg); }
+    30% { transform: rotate(-5deg); }
+    45% { transform: rotate(4deg); }
+    60% { transform: rotate(-4deg); }
+    75% { transform: rotate(2deg); }
+    85% { transform: rotate(-2deg); }
+    92% { transform: rotate(1deg); }
+    100% { transform: rotate(0); }
+  }
+`
+
+  const handleBackClick = () => {
+    // Get the roleid from localStorage
+    const userRoleId = Number.parseInt(localStorage.getItem("userRoleId"), 10)
+    console.log("Back button clicked, user role from localStorage:", userRoleId)
+
+    if (userRoleId === 1) {
+      navigate("/Dashboard")
+    } else if (userRoleId === 2) {
+      navigate("/ControllerDashboard")
+    } else if (userRoleId === 4) {
+      navigate("/DirectorDashboard")
+    } else if (userRoleId === 3) {
+      navigate("/FDashboard")
+    } else {
+      // Default fallback if role is not recognized
+      console.log("No valid role found in localStorage, navigating to landing page")
+      navigate("/")
+    }
+  }
+
+  // Bell icon component
+  const BellIcon = ({ count }) => {
+    const hasNewInstructions = count > 0
+
+    const bellStyle = {
+      width: "24px",
+      height: "24px",
+      fill: hasNewInstructions ? "#ff0000" : "#00cc00",
+      animation: hasNewInstructions ? "bellShake 2s infinite" : "none",
+      position: "relative",
+    }
+
+    const countStyle = {
+      position: "absolute",
+      top: "50%",
+      left: "50%",
+      transform: "translate(-50%, -50%)",
+      fontSize: "10px",
+      fontWeight: "bold",
+      color: "black", // Changed from white to black
+    }
+
+    return (
+      <div style={{ position: "relative", display: "inline-block" }}>
+        <style>{bellKeyframes}</style>
+        <svg style={bellStyle} viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+          <path d="M12 22c1.1 0 2-.9 2-2h-4c0 1.1.9 2 2 2zm6-6v-5c0-3.07-1.63-5.64-4.5-6.32V4c0-.83-.67-1.5-1.5-1.5s-1.5.67-1.5 1.5v.68C7.64 5.36 6 7.92 6 11v5l-2 2v1h16v-1l-2-2zm-2 1H8v-6c0-2.48 1.51-4.5 4-4.5s4 2.02 4 4.5v6z" />
+        </svg>
+        <span style={countStyle}>{count}</span>
+      </div>
+    )
+  }
+
   return (
-    <div className="">
+    <div className="" style={{ textAlign: "center" }}>
       {/* Back Button */}
-      <div className="client-payments-header">
-        <button className="back-button" onClick={() => navigate("/Dashboard")}>
-          Back
-        </button>
+      <div className="client-payments-header" style={{ display: "flex", justifyContent: "center", padding: "20px" }}>
+        <div style={{ width: "100%", maxWidth: "1000px", textAlign: "left" }}>
+          <button className="back-button" onClick={handleBackClick}>
+            Back
+          </button>
+        </div>
       </div>
 
       {/* Table */}
-      <div className="table3">
+      <div className="table3" style={{ display: "flex", justifyContent: "center" }}>
         {loading ? (
           <p>Loading client data...</p>
         ) : error ? (
           <p className="error-message">{error}</p>
         ) : (
-          <table className="t1">
+          <table style={tableStyle}>
             <thead className="bg-blue-300">
               <tr>
                 <th className="p-3">Company</th>
                 <th className="p-3">Representative</th>
                 <th className="p-3">Email</th>
                 <th className="p-3" style={centeredCellStyle}>
-                  New
+                  <div style={bellContainerStyle}>
+                    New <BellIcon count={totalNewInstructions} />
+                  </div>
                 </th>
                 <th className="p-3" style={centeredCellStyle}>
                   In Progress
@@ -122,7 +217,7 @@ const MonitorInstructionView = () => {
                       <button
                         className={`view-butn ${client.new_count > 0 ? "bg-red-500" : ""}`}
                         onClick={() =>
-                          navigate("/monitor-instructions", {
+                          navigate("/CompanyInstructions", {
                             state: { clientId: client.m5clientkey, clientName: client.companyname },
                           })
                         }
@@ -141,5 +236,5 @@ const MonitorInstructionView = () => {
   )
 }
 
-export default MonitorInstructionView
+export default CompanyInstructionView
 

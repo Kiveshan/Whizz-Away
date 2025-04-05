@@ -15,17 +15,27 @@ const ContainerDetailsPage = () => {
   const API_BASE_URL = API_CONFIG.BASE_URL
 
   // Get data from location state
-  const { controllerData, isImport, instructionId, clientId, clientName, selectedMonth, selectedYear, activeFilter } =
-    location.state || {
-      controllerData: null,
-      isImport: false,
-      instructionId: null,
-      clientId: null,
-      clientName: null,
-      selectedMonth: null,
-      selectedYear: null,
-      activeFilter: null,
-    }
+  const {
+    controllerData,
+    isImport,
+    instructionId,
+    clientId,
+    clientName,
+    selectedMonth,
+    selectedYear,
+    activeFilter,
+    preservedContainers, // Check for preserved containers
+  } = location.state || {
+    controllerData: null,
+    isImport: false,
+    instructionId: null,
+    clientId: null,
+    clientName: null,
+    selectedMonth: null,
+    selectedYear: null,
+    activeFilter: null,
+    preservedContainers: null,
+  }
 
   // Log the received state for debugging
   console.log("ControllerInstructionDetails received state:", location.state)
@@ -34,6 +44,7 @@ const ContainerDetailsPage = () => {
   console.log("ControllerInstructionDetails - selectedMonth:", selectedMonth)
   console.log("ControllerInstructionDetails - selectedYear:", selectedYear)
   console.log("ControllerInstructionDetails - activeFilter:", activeFilter)
+  console.log("ControllerInstructionDetails - preservedContainers:", preservedContainers)
 
   // State for container data
   const [containers, setContainers] = useState([])
@@ -69,7 +80,13 @@ const ContainerDetailsPage = () => {
 
   // Fetch existing containers if instructionId is provided
   useEffect(() => {
-    if (instructionId) {
+    if (preservedContainers) {
+      // Use preserved containers if available
+      console.log("Using preserved containers:", preservedContainers)
+      setContainers(preservedContainers)
+      setOriginalContainers([...preservedContainers])
+      setIsLoading(false)
+    } else if (instructionId) {
       fetchContainers(instructionId)
     } else if (controllerData) {
       initializeContainers()
@@ -85,7 +102,17 @@ const ContainerDetailsPage = () => {
         },
       })
     }
-  }, [instructionId, controllerData, navigate, clientId, clientName, selectedMonth, selectedYear, activeFilter])
+  }, [
+    instructionId,
+    controllerData,
+    navigate,
+    clientId,
+    clientName,
+    selectedMonth,
+    selectedYear,
+    activeFilter,
+    preservedContainers,
+  ])
 
   // Fetch containers for the given instruction ID
   const fetchContainers = async (id) => {
@@ -436,9 +463,11 @@ const ContainerDetailsPage = () => {
     }
 
     // Navigate back to ControllerInstructions with the updated form data and all state parameters
+    // Include the current containers state to preserve container details
     navigate("/ControllerInstructions", {
       state: {
         preservedFormData: controllerData,
+        preservedContainers: containers, // Add containers to state
         instructionId: instructionId,
         clientId: clientId,
         clientName: clientName,

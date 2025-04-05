@@ -19,6 +19,7 @@ const FCcontrollerinstructions = () => {
   const selectedMonth = location.state?.selectedMonth
   const selectedYear = location.state?.selectedYear
   const activeFilter = location.state?.activeFilter
+  const preservedContainers = location.state?.preservedContainers // Add this to receive preserved containers
 
   // Log the received state for debugging
   console.log("FCcontrollerinstructions received state:", location.state)
@@ -29,6 +30,7 @@ const FCcontrollerinstructions = () => {
   console.log("FCcontrollerinstructions - activeFilter:", activeFilter)
   console.log("FCcontrollerinstructions - preservedFormData:", preservedFormData)
   console.log("FCcontrollerinstructions - containerCounts:", containerCounts)
+  console.log("FCcontrollerinstructions - preservedContainers:", preservedContainers)
 
   // API base URL from config
   const API_BASE_URL = API_CONFIG.BASE_URL
@@ -557,6 +559,17 @@ const FCcontrollerinstructions = () => {
 
       setFormData(updatedFormData)
       setIsDataModified(true)
+    } else if (name === "vat") {
+      // Handle VAT input - ensure it's an integer
+      const vatValue = value.replace(/[^0-9]/g, "") // Remove non-numeric characters
+
+      if (vatValue === "" || /^\d+$/.test(vatValue)) {
+        setFormData({
+          ...formData,
+          [name]: vatValue === "" ? "" : Number.parseInt(vatValue, 10),
+        })
+        setIsDataModified(true)
+      }
     } else if (name === "rateWeight") {
       // Handle rate weight change
       const updatedFormData = {
@@ -716,6 +729,15 @@ const FCcontrollerinstructions = () => {
       return false
     }
 
+    // Validate VAT is a number
+    if (formData.vat === "" || isNaN(Number.parseInt(formData.vat))) {
+      setErrorModal({
+        isOpen: true,
+        message: "VAT must be a valid integer",
+      })
+      return false
+    }
+
     return true
   }
 
@@ -725,24 +747,10 @@ const FCcontrollerinstructions = () => {
     return selectedShipmentType && selectedShipmentType.shipmenttype.toLowerCase() === "import"
   }
 
-  // Update the handleSubmit function to ensure total_cost is calculated and saved
+  // Update the handleSubmit function to NOT save to database and only pass data to FCcontrollerInstructionDetails
   const handleSubmit = async () => {
     if (!validateForm()) {
       return
-    }
-
-    // If we have an instructionId and data has been modified, save changes first
-    if (instructionId && isDataModified) {
-      try {
-        await saveChangesToDatabase()
-      } catch (error) {
-        console.error("Error saving changes before navigating to container details:", error)
-        setErrorModal({
-          isOpen: true,
-          message: error.message || "Failed to save changes. Please try again.",
-        })
-        return
-      }
     }
 
     // Calculate total containers
@@ -776,6 +784,8 @@ const FCcontrollerinstructions = () => {
       selectedMonth: selectedMonth,
       selectedYear: selectedYear,
       activeFilter: activeFilter,
+      // Pass the preserved containers if available
+      preservedContainers: preservedContainers,
     }
 
     // Log the state being passed to FCcontrollerInstructionDetails
@@ -1195,11 +1205,12 @@ const FCcontrollerinstructions = () => {
                   type="text"
                   className="form-input"
                   placeholder="Vat Rate"
-                  value={`${formData.vat}%`}
+                  value={formData.vat}
                   name="vat"
                   style={{ width: "20%" }}
-                  readOnly
+                  onChange={handleInputChange}
                 />
+                <span>%</span>
               </div>
             </div>
           </div>
