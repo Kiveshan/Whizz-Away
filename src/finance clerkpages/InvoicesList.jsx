@@ -1,8 +1,22 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useCallback } from "react"
 import { useNavigate, useLocation } from "react-router-dom"
 import "../finance clerkpages/css/InvoicesList.css"
+
+// Utility function for formatting dates
+const formatDate = (dateString) => {
+  if (!dateString) return ""
+  const date = new Date(dateString)
+  return `${date.getDate().toString().padStart(2, "0")}/${(date.getMonth() + 1).toString().padStart(2, "0")}/${date.getFullYear()}`
+}
+
+// Debug utility
+const debug = (message, data) => {
+  if (process.env.NODE_ENV !== 'production') {
+    console.log(message, data)
+  }
+}
 
 const InvoicesList = () => {
   const navigate = useNavigate()
@@ -14,20 +28,34 @@ const InvoicesList = () => {
 
   // Add state for instructions, loading, and error
   const [instructions, setInstructions] = useState([])
-  const [loading, setLoading] = useState(true)
+  const [loading, setLoading] = useState(false)
   const [error, setError] = useState(null)
+  
+  // Changed initial state to have empty values for year and month
   const [filters, setFilters] = useState({
-    year: new Date().getFullYear().toString(),
-    month: (new Date().getMonth() + 1).toString(),
-    type: "import", // Default to import since it's active in the UI
+    year: "",
+    month: "",
+    type: "All", // Default to import since it's active in the UI
     clientId: clientId || null, // Add clientId to filters
   })
 
+  // Skip initial render to prevent auto-filtering on page load
+  const [isInitialRender, setIsInitialRender] = useState(true)
+
   // Fetch instructions when component mounts or filters change
   useEffect(() => {
+    let isMounted = true
+    
+    // Skip the initial render to prevent auto-filtering on page load
+    if (isInitialRender) {
+      setIsInitialRender(false)
+      return
+    }
+    
     const fetchInstructions = async () => {
       try {
         setLoading(true)
+        setError(null)
 
         // Build query parameters
         const params = new URLSearchParams()
@@ -38,78 +66,90 @@ const InvoicesList = () => {
 
         // Use a relative URL - the proxy will forward this to your API server
         const requestUrl = `/api/invoices/completed?${params.toString()}`
-        console.log("Fetching from:", requestUrl)
+        debug("Fetching from:", requestUrl)
 
         const response = await fetch(requestUrl)
-
-        // Log the response status for debugging
-        console.log("Response status:", response.status)
+        debug("Response status:", response.status)
 
         if (!response.ok) {
-          // Try to get the response text for better error debugging
-          const text = await response.text()
-          console.error("Error response text:", text)
-
-          // Check if the response is HTML (which would indicate a proxy issue)
-          if (text.trim().startsWith("<!DOCTYPE") || text.trim().startsWith("<html")) {
-            throw new Error(
-              `Received HTML instead of JSON. This may indicate a proxy configuration issue. Status: ${response.status}`,
-            )
-          } else {
-            throw new Error(`HTTP error! Status: ${response.status}`)
+          let errorMessage = `HTTP error! Status: ${response.status}`
+          
+          try {
+            const errorText = await response.text()
+            debug("Error response text:", errorText)
+            
+            if (errorText.trim().startsWith("<!DOCTYPE") || errorText.trim().startsWith("<html")) {
+              errorMessage = "Received HTML instead of JSON. This may indicate a proxy configuration issue."
+            } else {
+              errorMessage += ` Details: ${errorText}`
+            }
+          } catch (textError) {
+            console.error("Error getting response text:", textError)
           }
+          
+          throw new Error(errorMessage)
         }
 
         // Try to parse the response as JSON
         let data
         try {
           const text = await response.text()
-          console.log("Raw response:", text.substring(0, 200)) // Log first 200 chars for debugging
+          debug("Raw response:", text.substring(0, 200)) // Log first 200 chars for debugging
           data = JSON.parse(text)
         } catch (parseError) {
           console.error("JSON parse error:", parseError)
           throw new Error(`Failed to parse response as JSON: ${parseError.message}`)
         }
 
-        console.log("Received data:", data)
-        setInstructions(data.data || [])
+        debug("Received data:", data)
+        
+        if (isMounted) {
+          setInstructions(data.data || [])
+          setLoading(false)
+        }
       } catch (err) {
         console.error("Error fetching instructions:", err)
-        setError(`Failed to load instructions: ${err.message}`)
-      } finally {
-        setLoading(false)
+        if (isMounted) {
+          setError(`Failed to load instructions: ${err.message}`)
+          setLoading(false)
+        }
       }
     }
 
-    fetchInstructions()
-  }, [filters]) // filters is the dependency
+    // Only fetch if at least one filter is set (year, month, or clientId)
+    if (filters.year || filters.month || filters.clientId) {
+      fetchInstructions()
+    } else {
+      // If no filters are set, clear the instructions and show a message
+      setInstructions([])
+      setLoading(false)
+    }
+    
+    // Cleanup function
+    return () => {
+      isMounted = false
+    }
+  }, [filters, isInitialRender]) // dependencies include isInitialRender
 
-  // Handle year and month filter changes
-  const handleFilterChange = (e) => {
+  // Handle year and month filter changes - use useCallback to memoize
+  const handleFilterChange = useCallback((e) => {
     const { name, value } = e.target
     setFilters((prev) => ({
       ...prev,
       [name]: value,
     }))
-  }
+  }, [])
 
-  // Handle type filter changes
-  const handleTypeFilter = (type) => {
+  // Handle type filter changes - use useCallback to memoize
+  const handleTypeFilter = useCallback((type) => {
     setFilters((prev) => ({
       ...prev,
       type,
     }))
-  }
-
-  // Format date from ISO to DD/MM/YYYY
-  const formatDate = (dateString) => {
-    if (!dateString) return ""
-    const date = new Date(dateString)
-    return `${date.getDate().toString().padStart(2, "0")}/${(date.getMonth() + 1).toString().padStart(2, "0")}/${date.getFullYear()}`
-  }
+  }, [])
 
   // Determine the back button destination
-  const handleBackClick = () => {
+  const handleBackClick = useCallback(() => {
     // If we came from client selection, go back to that page
     if (clientId) {
       navigate("/ViewClientInvoice")
@@ -117,7 +157,7 @@ const InvoicesList = () => {
       // Otherwise go to the default dashboard
       navigate("/FDashboard")
     }
-  }
+  }, [clientId, navigate])
 
   return (
     <div className="app">
@@ -129,23 +169,6 @@ const InvoicesList = () => {
             Back
           </button>
         </div>
-
-        {/* Client Info Section - Only show if client info is available */}
-        {/* Remove the client info section that displays client details */}
-        {/* Delete or comment out this block:
-        {clientName && (
-          <div className="client-info-section">
-            <h2 className="client-name">{clientName}</h2>
-            <div className="client-details">
-              <p>
-                <strong>Representative:</strong> {clientRepresentative}
-              </p>
-              <p>
-                <strong>Email:</strong> {clientEmail}
-              </p>
-            </div>
-          </div>
-        )} */}
 
         <div className="action-bar" style={{ display: "flex", justifyContent: "center", width: "100%" }}>
           <div className="filter-section6">
@@ -216,7 +239,9 @@ const InvoicesList = () => {
             </div>
           ) : instructions.length === 0 ? (
             <div className="no-data-message">
-              {clientName ? `No completed instructions found for ${clientName}.` : "No completed instructions found."}
+              {clientName 
+                ? `Please select a filter to view invoices for ${clientName}.` 
+                : "Please select a filter to view invoices."}
             </div>
           ) : (
             <table>
@@ -241,7 +266,7 @@ const InvoicesList = () => {
                       <button
                         className="small-btn"
                         onClick={() => {
-                          console.log(`Navigating to invoice view for ID: ${instruction.m1key}`)
+                          debug(`Navigating to invoice view for ID: ${instruction.m1key}`)
                           navigate(`/invoice/${instruction.m1key}`, {
                             state: {
                               clientId,
@@ -258,7 +283,7 @@ const InvoicesList = () => {
                       <button
                         className="small-btn"
                         onClick={() => {
-                          console.log(`Navigating to invoice download for ID: ${instruction.m1key}`)
+                          debug(`Navigating to invoice download for ID: ${instruction.m1key}`)
                           navigate(`/invoice/${instruction.m1key}/download`, {
                             state: {
                               clientId,
@@ -283,4 +308,3 @@ const InvoicesList = () => {
 }
 
 export default InvoicesList
-

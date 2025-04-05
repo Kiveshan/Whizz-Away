@@ -4,6 +4,26 @@ import { useNavigate, useParams, useLocation } from "react-router-dom"
 import "../finance clerkpages/css/InvoiceTemplate.css"
 import html2pdf from "html2pdf.js"
 
+// Utility function for formatting dates
+const formatDate = (dateString) => {
+  if (!dateString) return ""
+  const date = new Date(dateString)
+  return `${date.getDate().toString().padStart(2, "0")}/${(date.getMonth() + 1).toString().padStart(2, "0")}/${date.getFullYear()}`
+}
+
+// Utility function for formatting currency
+const formatCurrency = (amount) => {
+  if (!amount) return "R 0.00"
+  return `R ${Number(amount).toLocaleString("en-ZA", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+}
+
+// Debug utility
+const debug = (message, data) => {
+  if (process.env.NODE_ENV !== 'production') {
+    console.log(message, data)
+  }
+}
+
 const ClientInvoice = () => {
   const navigate = useNavigate()
   const location = useLocation()
@@ -25,62 +45,79 @@ const ClientInvoice = () => {
   const invoiceRef = useRef(null)
 
   useEffect(() => {
+    let isMounted = true
+    
     const fetchInvoiceData = async () => {
       try {
-        setLoading(true)
-
         if (!id) {
-          setError("No invoice ID provided")
-          setLoading(false)
+          if (isMounted) {
+            setError("No invoice ID provided")
+            setLoading(false)
+          }
           return
         }
 
         const requestUrl = `/api/invoices/${id}`
-        console.log("Fetching invoice data from:", requestUrl)
+        debug("Fetching invoice data from:", requestUrl)
 
         const response = await fetch(requestUrl)
-        console.log("Response status:", response.status)
+        debug("Response status:", response.status)
 
         if (!response.ok) {
-          const text = await response.text()
-          console.error("Error response text:", text)
-          throw new Error(`HTTP error! Status: ${response.status}`)
+          let errorMessage = `HTTP error! Status: ${response.status}`
+          
+          try {
+            const errorText = await response.text()
+            debug("Error response text:", errorText)
+            
+            if (errorText.trim().startsWith("<!DOCTYPE") || errorText.trim().startsWith("<html")) {
+              errorMessage = "Received HTML instead of JSON. This may indicate a proxy configuration issue."
+            } else {
+              errorMessage += ` Details: ${errorText}`
+            }
+          } catch (textError) {
+            console.error("Error getting response text:", textError)
+          }
+          
+          throw new Error(errorMessage)
         }
 
         const result = await response.json()
-        console.log("Received invoice data:", result)
+        debug("Received invoice data:", result)
 
-        // Map container fields to match the expected format if needed
+        // Normalize container data
         if (result.data && result.data.containers) {
           result.data.containers = result.data.containers.map((container) => ({
-            container_number: container.container_number || container.containernum,
-            weight: container.weight,
+            container_number: container.container_number || container.containernum || '',
+            weight: container.weight || 'N/A',
           }))
         }
 
-        setInvoiceData(result.data)
+        if (isMounted) {
+          setInvoiceData(result.data)
+          setLoading(false)
+        }
       } catch (err) {
         console.error("Error fetching invoice data:", err)
-        setError(`Failed to load invoice data: ${err.message}`)
-      } finally {
-        setLoading(false)
+        if (isMounted) {
+          setError(`Failed to load invoice data: ${err.message}`)
+          setLoading(false)
+        }
       }
     }
 
     fetchInvoiceData()
+    
+    // Cleanup function
+    return () => {
+      isMounted = false
+    }
   }, [id])
-
-  // Helper functions
-  const formatDate = (dateString) => {
-    if (!dateString) return ""
-    const date = new Date(dateString)
-    return `${date.getDate().toString().padStart(2, "0")}/${(date.getMonth() + 1).toString().padStart(2, "0")}/${date.getFullYear()}`
-  }
 
   // Calculate VAT based on percentage from database
   const calculateVAT = (amount) => {
     // If VAT percentage exists in the database, calculate VAT amount
-    if (invoiceData.vat !== undefined && invoiceData.vat !== null && amount) {
+    if (invoiceData?.vat !== undefined && invoiceData?.vat !== null && amount) {
       // Convert percentage to decimal (e.g., 15 becomes 0.15)
       const vatRate = Number(invoiceData.vat) / 100
       return amount * vatRate
@@ -89,18 +126,13 @@ const ClientInvoice = () => {
     return 0
   }
 
-  const formatCurrency = (amount) => {
-    if (!amount) return "R 0.00"
-    return `R ${Number(amount).toLocaleString("en-ZA", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
-  }
-
   const generatePDF = () => {
     // Set printing mode before generating
     setIsPrinting(true)
     setPdfLoading(true)
 
-    // Short delay to ensure CSS changes are applied
-    setTimeout(() => {
+    // Use requestAnimationFrame instead of setTimeout for better browser compatibility
+    requestAnimationFrame(() => {
       const element = invoiceRef.current
       const filename = `Invoice-${invoiceNumber}.pdf`
 
@@ -138,7 +170,7 @@ const ClientInvoice = () => {
           setPdfLoading(false)
           setIsPrinting(false)
         })
-    }, 100)
+    })
   }
 
   // Loading, error, and no data states
@@ -356,4 +388,3 @@ const ClientInvoice = () => {
 }
 
 export default ClientInvoice
-
