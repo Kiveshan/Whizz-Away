@@ -1,71 +1,53 @@
-import React, { useState, useEffect } from 'react';
-import axios from 'axios';
+"use client"
 
-const AdminDashboard = () => {
-  const [users, setUsers] = useState([]);
-  const [loading, setLoading] = useState(true);
+import { useState } from "react"
+import UserApprovalList from "./UserApprovalList"
+import CompanyManagement from "./CompanyManagement"
+import "../css/AdminDashboard.css"
+// Import the TestConnection component
+import TestConnection from "./TestConnection"
 
-  useEffect(() => {
-    // Fetch pending users from the backend
-    axios.get('http://localhost:5000/api/users/pending')
-      .then(response => {
-        setUsers(response.data);
-        setLoading(false);
-      })
-      .catch(error => {
-        console.error("There was an error fetching the users!", error);
-        setLoading(false);
-      });
-  }, []);
-
-  const handleApprove = (userId) => {
-    // Approve user by updating their roleid to 1
-    axios.put(`http://localhost:5000/api/users/approve/${userId}`)
-      .then(response => {
-        console.log(response.data.message);
-        setUsers(users.filter(user => user.userid !== userId)); // Remove approved user from the list
-      })
-      .catch(error => {
-        console.error("There was an error approving the user!", error);
-      });
-  };
-
-  const handleReject = (userId) => {
-    // Reject the user (you can implement further logic here)
-    setUsers(users.filter(user => user.userid !== userId)); // Remove rejected user from the list
-    console.log(`User with ID ${userId} rejected.`);
-  };
+function AdminDashboard() {
+  const [activeTab, setActiveTab] = useState("users")
+  // Add a state to control showing the test connection
+  const [showConnectionTest, setShowConnectionTest] = useState(false)
 
   return (
-    <div>
-      <h1>Admin Dashboard</h1>
-      {loading ? (
-        <p>Loading...</p>
-      ) : (
-        <table>
-          <thead>
-            <tr>
-              <th>Name</th>
-              <th>Email</th>
-              <th>Actions</th>
-            </tr>
-          </thead>
-          <tbody>
-            {users.map(user => (
-              <tr key={user.userid}>
-                <td>{user.name}</td>
-                <td>{user.email}</td>
-                <td>
-                  <button onClick={() => handleApprove(user.userid)}>Approve</button>
-                  <button onClick={() => handleReject(user.userid)}>Reject</button>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      )}
-    </div>
-  );
-};
+    <div className="admin-dashboard">
+      <div className="admin-header">
+        {/* <h1>System Administration</h1> */}
+        <div className="admin-tabs">
+          <button
+            className={`tab-button ${activeTab === "users" ? "active" : ""}`}
+            onClick={() => setActiveTab("users")}
+          >
+            User Approval
+          </button>
+          <button
+            className={`tab-button ${activeTab === "companies" ? "active" : ""}`}
+            onClick={() => setActiveTab("companies")}
+          >
+            Company Management
+          </button>
+        </div>
+        {/* Add this button after the admin-tabs div */}
+        <div className="admin-debug">
+          <button className="debug-button" onClick={() => setShowConnectionTest(!showConnectionTest)}>
+            {showConnectionTest ? "Hide" : "Show"} Connection Test
+          </button>
+        </div>
+      </div>
 
-export default AdminDashboard;
+      {/* Add this before the admin-content div */}
+      {showConnectionTest && <TestConnection />}
+
+      <div className="admin-content">
+        {activeTab === "users" && <UserApprovalList />}
+        {activeTab === "companies" && <CompanyManagement />}
+      </div>
+    </div>
+  )
+}
+
+export default AdminDashboard
+

@@ -5,48 +5,49 @@ const Register = ({ switchToLogin, closePopup }) => {
   const [name, setFirstName] = useState("");
   const [surname, setLastName] = useState("");
   const [companyname, setCompanyName] = useState("");
+  const [company_reg_num, setCompanyRegNum] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [confirmPassword, setConfirmPassword] = useState("");
   const [errorMessage, setErrorMessage] = useState("");
   const [isLoading, setIsLoading] = useState(false);
 
   const handleRegister = async (e) => {
     e.preventDefault();
-    if (password === confirmPassword) {
-      setIsLoading(true);
-      try {
-        const response = await fetch("http://localhost:5000/register", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            name,
-            surname,
-            companyname,
-            email,
-            password,
-          }),
-        });
-
-        const data = await response.json();
-        if (response.ok) {
-          alert("Registration successful! Please login.");
-          closePopup(); // Close the register popup
-          switchToLogin(); // Optionally, switch to the login view if needed
-        } else {
-          setErrorMessage(data.message || "Registration failed");
-        }
-      } catch (error) {
-        setErrorMessage("An error occurred. Please try again later.");
-      } finally {
-        setIsLoading(false);
+    setIsLoading(true);
+  
+    console.log("Company Reg Num:", company_reg_num); // Log the value
+  
+    try {
+      const response = await fetch("http://localhost:5000/register", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          name,
+          surname,
+          companyname,
+          company_reg_num,
+          email,
+          password,
+        }),
+      });
+  
+      const data = await response.json();
+      if (response.ok) {
+        alert("Registration successful! Please login.");
+        closePopup();
+        switchToLogin();
+      } else {
+        setErrorMessage(data.message || "Registration failed");
       }
-    } else {
-      alert("Passwords do not match");
+    } catch (error) {
+      setErrorMessage("An error occurred. Please try again later.");
+    } finally {
+      setIsLoading(false);
     }
   };
+  
 
   return (
     <div className="register-container">
@@ -97,13 +98,27 @@ const Register = ({ switchToLogin, closePopup }) => {
               <input
                 type="text"
                 id="companyName"
-                placeholder="Input Name"
+                placeholder="Input Company Name"
                 className="form-input"
                 value={companyname}
                 onChange={(e) => setCompanyName(e.target.value)}
               />
             </div>
 
+            <div className="form-group">
+              <label htmlFor="companyRegNum">Company Reg. Number</label>
+              <input
+                type="text"
+                id="companyRegNum"
+                placeholder="Registration Number"
+                className="form-input"
+                value={company_reg_num}
+                onChange={(e) => setCompanyRegNum(e.target.value)}
+              />
+            </div>
+          </div>
+
+          <div className="form-row">
             <div className="form-group">
               <label htmlFor="email">Email</label>
               <input
@@ -115,9 +130,7 @@ const Register = ({ switchToLogin, closePopup }) => {
                 onChange={(e) => setEmail(e.target.value)}
               />
             </div>
-          </div>
 
-          <div className="form-row">
             <div className="form-group">
               <label htmlFor="password">Password</label>
               <input
@@ -127,18 +140,6 @@ const Register = ({ switchToLogin, closePopup }) => {
                 className="form-input"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-              />
-            </div>
-
-            <div className="form-group">
-              <label htmlFor="confirmPassword">Confirm Password</label>
-              <input
-                type="password"
-                id="confirmPassword"
-                placeholder="Confirm Password"
-                className="form-input"
-                value={confirmPassword}
-                onChange={(e) => setConfirmPassword(e.target.value)}
               />
             </div>
           </div>
