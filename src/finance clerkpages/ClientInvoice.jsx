@@ -130,18 +130,18 @@ const ClientInvoice = () => {
     // Set printing mode before generating
     setIsPrinting(true)
     setPdfLoading(true)
-
+  
     // Use requestAnimationFrame instead of setTimeout for better browser compatibility
     requestAnimationFrame(() => {
       const element = invoiceRef.current
       const filename = `Invoice-${invoiceNumber}.pdf`
-
+  
       const opt = {
-        margin: [10, 10, 10, 10],
+        margin: [15, 15, 15, 15], // Slightly increased margins from your current 10
         filename: filename,
-        image: { type: "png", quality: 1.0 }, // PNG for better quality
+        image: { type: "png", quality: 1.0 },
         html2canvas: {
-          scale: 3, // Balance between quality and performance
+          scale: 2, // Balance between quality and performance
           useCORS: true,
           letterRendering: true,
           allowTaint: true,
@@ -153,19 +153,36 @@ const ClientInvoice = () => {
           orientation: "portrait",
           compress: false,
           precision: 16,
-          putOnlyUsedFonts: true,
+          putOnlyUsedFonts: true
         },
+        pagebreak: { mode: ['avoid-all', 'css', 'legacy'] } // Add this line to improve page breaks
       }
-
+  
+      // Add CSS to handle page breaks properly
+      const style = document.createElement('style')
+      style.innerHTML = `
+        @media print {
+          .container-section { page-break-inside: avoid; }
+          .banking-details { page-break-inside: avoid; }
+          table { page-break-inside: avoid; }
+          tr { page-break-inside: avoid; }
+          td { page-break-inside: avoid; }
+          th { page-break-inside: avoid; }
+        }
+      `
+      document.head.appendChild(style)
+  
       html2pdf()
         .set(opt)
         .from(element)
         .save()
         .then(() => {
+          document.head.removeChild(style) // Clean up the added style
           setPdfLoading(false)
           setIsPrinting(false) // Reset printing mode
         })
         .catch((error) => {
+          document.head.removeChild(style) // Clean up the added style
           console.error("PDF generation error:", error)
           setPdfLoading(false)
           setIsPrinting(false)
