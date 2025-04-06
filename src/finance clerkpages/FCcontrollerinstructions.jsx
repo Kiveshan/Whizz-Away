@@ -158,8 +158,17 @@ const FCcontrollerinstructions = () => {
   // Function to open calendar
   const openCalendar = (ref) => {
     if (ref && ref.current) {
-      // Programmatically click the input to open the date picker
-      ref.current.click()
+      // Instead of trying to click the input directly, use the DatePicker's setOpen method
+      // or focus the input which will trigger the calendar to open
+      try {
+        // Try to focus the input element which should open the calendar
+        const inputElement = ref.current.input || ref.current
+        if (inputElement && typeof inputElement.focus === "function") {
+          inputElement.focus()
+        }
+      } catch (error) {
+        console.error("Error opening calendar:", error)
+      }
     }
   }
 
@@ -1582,7 +1591,14 @@ const FCcontrollerinstructions = () => {
                   <button
                     type="button"
                     className="calendar-button"
-                    onClick={() => openCalendar(pickupDateRef)}
+                    onClick={() => {
+                      if (pickupDateRef.current) {
+                        const datePickerInput = pickupDateRef.current.input || pickupDateRef.current
+                        if (datePickerInput && typeof datePickerInput.focus === "function") {
+                          datePickerInput.focus()
+                        }
+                      }
+                    }}
                   ></button>
                   <ErrorTooltip message={fieldErrors.pickupDate} />
                 </div>
@@ -1622,8 +1638,11 @@ const FCcontrollerinstructions = () => {
                           isOpen: true,
                           message: "Please select a pickup date first",
                         })
-                      } else {
-                        openCalendar(etaDateRef)
+                      } else if (etaDateRef.current) {
+                        const datePickerInput = etaDateRef.current.input || etaDateRef.current
+                        if (datePickerInput && typeof datePickerInput.focus === "function") {
+                          datePickerInput.focus()
+                        }
                       }
                     }}
                   ></button>
@@ -1670,8 +1689,11 @@ const FCcontrollerinstructions = () => {
                           isOpen: true,
                           message: `Please select ${isImport ? "an ETA" : "a stack date"} first`,
                         })
-                      } else {
-                        openCalendar(deadlineDateRef)
+                      } else if (deadlineDateRef.current) {
+                        const datePickerInput = deadlineDateRef.current.input || deadlineDateRef.current
+                        if (datePickerInput && typeof datePickerInput.focus === "function") {
+                          datePickerInput.focus()
+                        }
                       }
                     }}
                   ></button>
