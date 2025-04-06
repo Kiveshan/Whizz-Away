@@ -327,7 +327,7 @@ const Instructions = () => {
                         </button>
                       </td>
                       <td>
-                        <button className="view-btn" onClick={() => navigate("/update-instructions")}>
+                        <button  className="view-btn" onClick={() => navigate("/update-instructions")}>
                           View
                         </button>
                       </td>

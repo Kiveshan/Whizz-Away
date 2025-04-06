@@ -21,6 +21,24 @@ const ControllerInstructions = () => {
   const etaDateRef = useRef(null)
   const deadlineDateRef = useRef(null)
 
+  // Refs for form fields to scroll to on error
+  const fieldRefs = {
+    clientId: useRef(null),
+    shipmentTypeId: useRef(null),
+    task: useRef(null),
+    pickup: useRef(null),
+    dropoff: useRef(null),
+    pickupTime: useRef(null),
+    pickupDate: useRef(null),
+    stackDate: useRef(null),
+    deadline: useRef(null),
+    fileRef: useRef(null),
+    rate: useRef(null),
+    weight: useRef(null),
+    num_six_meters: useRef(null),
+    description: useRef(null),
+  }
+
   // State to track if shipment type is import
   const [isImport, setIsImport] = useState(false)
 
@@ -50,7 +68,7 @@ const ControllerInstructions = () => {
       stackDate: "",
       deadline: "",
       fileRef: "",
-      rateWeight: "kg",
+      rateWeight: "Container",
       rate: "",
       weight: "", // Add this new field
       num_six_meters: 0,
@@ -75,6 +93,26 @@ const ControllerInstructions = () => {
     isOpen: false,
     message: "",
   })
+
+  // State to track field validation errors
+  const [fieldErrors, setFieldErrors] = useState({})
+
+  // Function to scroll to a field with error
+  const scrollToField = (fieldName) => {
+    const fieldRef = fieldRefs[fieldName]
+    if (fieldRef && fieldRef.current) {
+      fieldRef.current.scrollIntoView({
+        behavior: "smooth",
+        block: "center",
+      })
+      // Focus the field
+      setTimeout(() => {
+        if (fieldRef.current.focus) {
+          fieldRef.current.focus()
+        }
+      }, 500)
+    }
+  }
 
   // Function to open calendar
   const openCalendar = (ref) => {
@@ -177,6 +215,9 @@ const ControllerInstructions = () => {
         email: "",
       })
     }
+
+    // Clear any error for this field
+    setFieldErrors((prev) => ({ ...prev, clientId: "" }))
   }
 
   // Handle shipment type selection
@@ -194,6 +235,9 @@ const ControllerInstructions = () => {
       shipmentTypeId,
       shipmentTypeName,
     })
+
+    // Clear any error for this field
+    setFieldErrors((prev) => ({ ...prev, shipmentTypeId: "" }))
   }
 
   // Handle form input changes
@@ -208,9 +252,9 @@ const ControllerInstructions = () => {
     } else if (name === "num_six_meters" || name === "num_twelve_meters" || name === "num_abnormal") {
       // Ensure container counts are at least 0
       const numValue = Number.parseInt(value)
-      const validValue = isNaN(numValue) || numValue < 0 ? 0 : numValue
+      const validValue = isNaN(numValue) ? 0 : Math.max(0, numValue)
 
-      // Update the form data with the new container count
+      // Update form data with new container count
       const updatedFormData = {
         ...formData,
         [name]: validValue,
@@ -230,6 +274,9 @@ const ControllerInstructions = () => {
       }
 
       setFormData(updatedFormData)
+
+      // Clear any error for this field
+      setFieldErrors((prev) => ({ ...prev, containers: "" }))
     } else if (name === "rateWeight") {
       // Handle rate weight change
       const updatedFormData = {
@@ -254,8 +301,11 @@ const ControllerInstructions = () => {
       }
 
       setFormData(updatedFormData)
-    } else if (name === "rate" || name === "weight") {
-      // Allow only numbers and decimal point
+
+      // Clear any error for this field
+      setFieldErrors((prev) => ({ ...prev, rateWeight: "" }))
+    } else if (name === "rate") {
+      // Allow only positive numbers and decimal point
       if (value === "" || /^[0-9]*\.?[0-9]*$/.test(value)) {
         const updatedFormData = {
           ...formData,
@@ -263,24 +313,45 @@ const ControllerInstructions = () => {
         }
 
         // Recalculate total_cost if both rate and required values are present
-        const rate = name === "rate" ? Number.parseFloat(value) : Number.parseFloat(formData.rate)
+        const rate = Number.parseFloat(value)
 
-        if (!isNaN(rate)) {
+        if (!isNaN(rate) && rate > 0) {
           if (formData.rateWeight === "Container") {
             const totalContainers = formData.num_six_meters + formData.num_twelve_meters + formData.num_abnormal
             updatedFormData.total_cost = rate * totalContainers
-          } else if (
-            (name === "weight" || formData.weight) &&
-            (formData.rateWeight === "kg" || formData.rateWeight === "m³")
-          ) {
-            const weight = name === "weight" ? Number.parseFloat(value) : Number.parseFloat(formData.weight)
-            if (!isNaN(weight)) {
+          } else if (formData.weight && (formData.rateWeight === "kg" || formData.rateWeight === "m³")) {
+            const weight = Number.parseFloat(formData.weight)
+            if (!isNaN(weight) && weight > 0) {
               updatedFormData.total_cost = rate * weight
             }
           }
         }
 
         setFormData(updatedFormData)
+
+        // Clear any error for this field
+        setFieldErrors((prev) => ({ ...prev, [name]: "" }))
+      }
+    } else if (name === "weight") {
+      // Allow only positive numbers and decimal point
+      if (value === "" || /^[0-9]*\.?[0-9]*$/.test(value)) {
+        const updatedFormData = {
+          ...formData,
+          [name]: value,
+        }
+
+        // Recalculate total_cost if both rate and weight are valid
+        const weight = Number.parseFloat(value)
+        const rate = Number.parseFloat(formData.rate)
+
+        if (!isNaN(weight) && weight > 0 && !isNaN(rate) && rate > 0) {
+          updatedFormData.total_cost = rate * weight
+        }
+
+        setFormData(updatedFormData)
+
+        // Clear any error for this field
+        setFieldErrors((prev) => ({ ...prev, [name]: "" }))
       }
     } else if (name === "pickupDate") {
       // For pickup date, just update the value
@@ -288,76 +359,20 @@ const ControllerInstructions = () => {
         ...formData,
         [name]: value,
         // Reset stack date and deadline if they're now invalid
-        stackDate: formData.stackDate && formData.stackDate <= value ? "" : formData.stackDate,
-        deadline: formData.deadline && formData.deadline <= value ? "" : formData.deadline,
+        stackDate: formData.stackDate && new Date(formData.stackDate) <= new Date(value) ? "" : formData.stackDate,
+        deadline: formData.deadline && new Date(formData.deadline) <= new Date(value) ? "" : formData.deadline,
       })
-    } else if (name === "stackDate") {
-      // For stack date, ensure it's after pickup date
-      if (!formData.pickupDate) {
-        setErrorModal({
-          isOpen: true,
-          message: "Please select a pickup date first",
-        })
-        return
-      }
 
-      if (value < formData.pickupDate) {
-        setErrorModal({
-          isOpen: true,
-          message: `${isImport ? "ETA" : "Stack date"} cannot be before pickup date`,
-        })
-        return
-      }
-
-      setFormData({
-        ...formData,
-        [name]: value,
-        // Reset deadline if it's now invalid
-        deadline: formData.deadline && formData.deadline <= value ? "" : formData.deadline,
-      })
-    } else if (name === "deadline") {
-      // For deadline, ensure it's after pickup date and stack date
-      if (!formData.pickupDate) {
-        setErrorModal({
-          isOpen: true,
-          message: "Please select a pickup date first",
-        })
-        return
-      }
-
-      if (!formData.stackDate) {
-        setErrorModal({
-          isOpen: true,
-          message: `Please select ${isImport ? "an ETA" : "a stack date"} first`,
-        })
-        return
-      }
-
-      if (value < formData.pickupDate) {
-        setErrorModal({
-          isOpen: true,
-          message: "Deadline cannot be before pickup date",
-        })
-        return
-      }
-
-      if (value < formData.stackDate) {
-        setErrorModal({
-          isOpen: true,
-          message: `Deadline cannot be before ${isImport ? "ETA" : "stack date"}`,
-        })
-        return
-      }
-
-      setFormData({
-        ...formData,
-        [name]: value,
-      })
+      // Clear any error for this field
+      setFieldErrors((prev) => ({ ...prev, pickupDate: "" }))
     } else {
       setFormData({
         ...formData,
         [name]: value,
       })
+
+      // Clear any error for this field
+      setFieldErrors((prev) => ({ ...prev, [name]: "" }))
     }
   }
 
@@ -365,7 +380,7 @@ const ControllerInstructions = () => {
   const handleContainerCountChange = (type, value) => {
     // Ensure value is a number and not negative
     const numValue = Number.parseInt(value)
-    const validValue = isNaN(numValue) || numValue < 0 ? 0 : numValue
+    const validValue = isNaN(numValue) ? 0 : Math.max(0, numValue)
 
     // Update form data with new container count
     const updatedFormData = {
@@ -387,6 +402,9 @@ const ControllerInstructions = () => {
     }
 
     setFormData(updatedFormData)
+
+    // Clear any error for this field
+    setFieldErrors((prev) => ({ ...prev, containers: "" }))
   }
 
   // Calculate total cost based on rate, weight, and container counts
@@ -423,82 +441,93 @@ const ControllerInstructions = () => {
       "description",
     ]
 
+    let isValid = true
+    const errors = {}
+
+    // Check all required fields
     for (const field of requiredFields) {
       if (!formData[field]) {
-        setErrorModal({
-          isOpen: true,
-          message: `Please fill in all required fields. Missing: ${field.replace(/([A-Z])/g, " $1").toLowerCase()}`,
-        })
-        return false
+        errors[field] = `This field is required`
+        isValid = false
       }
     }
 
-    // Validate rate is a number
-    if (isNaN(Number.parseFloat(formData.rate))) {
-      setErrorModal({
-        isOpen: true,
-        message: "Rate must be a valid number",
-      })
-      return false
+    // Validate shipment type - only allow import or export
+    if (formData.shipmentTypeId) {
+      const selectedShipmentType = shipmentTypes.find((type) => type.shipkey.toString() === formData.shipmentTypeId)
+      if (selectedShipmentType) {
+        const shipmentTypeName = selectedShipmentType.shipmenttype.toLowerCase()
+        if (shipmentTypeName !== "import" && shipmentTypeName !== "export") {
+          errors.shipmentTypeId = "Please select either Import or Export"
+          isValid = false
+        }
+      }
+    }
+
+    // Validate rate is a positive number
+    if (formData.rate) {
+      const rateValue = Number.parseFloat(formData.rate)
+      if (isNaN(rateValue) || rateValue <= 0) {
+        errors.rate = "Rate must be a positive number"
+        isValid = false
+      }
     }
 
     // Validate weight if kg or m³ is selected
     if ((formData.rateWeight === "kg" || formData.rateWeight === "m³") && !formData.weight) {
-      setErrorModal({
-        isOpen: true,
-        message: `Please enter the weight in ${formData.rateWeight}`,
-      })
-      return false
+      errors.weight = `Please enter the weight in ${formData.rateWeight}`
+      isValid = false
     }
 
-    // Validate weight is a number
-    if (
-      (formData.rateWeight === "kg" || formData.rateWeight === "m³") &&
-      (formData.weight === "" || isNaN(Number.parseFloat(formData.weight)))
-    ) {
-      setErrorModal({
-        isOpen: true,
-        message: `Weight must be a valid number`,
-      })
-      return false
+    // Validate weight is a positive number
+    if ((formData.rateWeight === "kg" || formData.rateWeight === "m³") && formData.weight) {
+      const weightValue = Number.parseFloat(formData.weight)
+      if (isNaN(weightValue) || weightValue <= 0) {
+        errors.weight = `Weight must be a positive number`
+        isValid = false
+      }
     }
 
     // Validate at least one container is added
     const totalContainers = formData.num_six_meters + formData.num_twelve_meters + formData.num_abnormal
     if (totalContainers <= 0) {
-      setErrorModal({
-        isOpen: true,
-        message: "Please add at least one container",
-      })
-      return false
+      // Changed from num_six_meters to containers for the error key
+      errors.containers = "Please add at least one container"
+      isValid = false
     }
 
     // Validate date order
-    if (formData.stackDate < formData.pickupDate) {
-      setErrorModal({
-        isOpen: true,
-        message: `${isImport ? "ETA" : "Stack date"} cannot be before pickup date`,
-      })
-      return false
+    if (formData.stackDate && formData.pickupDate && new Date(formData.stackDate) < new Date(formData.pickupDate)) {
+      errors.stackDate = `${isImport ? "ETA" : "Stack date"} cannot be before pickup date`
+      isValid = false
     }
 
-    if (formData.deadline < formData.pickupDate) {
-      setErrorModal({
-        isOpen: true,
-        message: "Deadline cannot be before pickup date",
-      })
-      return false
+    if (formData.deadline && formData.pickupDate && new Date(formData.deadline) < new Date(formData.pickupDate)) {
+      errors.deadline = "Deadline cannot be before pickup date"
+      isValid = false
     }
 
-    if (formData.deadline < formData.stackDate) {
-      setErrorModal({
-        isOpen: true,
-        message: `Deadline cannot be before ${isImport ? "ETA" : "stack date"}`,
-      })
-      return false
+    if (formData.deadline && formData.stackDate && new Date(formData.deadline) < new Date(formData.stackDate)) {
+      errors.deadline = `Deadline cannot be before ${isImport ? "ETA" : "stack date"}`
+      isValid = false
     }
 
-    return true
+    // Set all errors
+    setFieldErrors(errors)
+
+    // If not valid, scroll to the first field with an error
+    if (!isValid) {
+      const firstErrorField = Object.keys(errors)[0]
+      scrollToField(firstErrorField)
+
+      // Show error in modal
+      setErrorModal({
+        isOpen: true,
+        message: `Please fill in all required fields before proceeding.`,
+      })
+    }
+
+    return isValid
   }
 
   // Handle form submission
@@ -567,6 +596,18 @@ const ControllerInstructions = () => {
     cursor: "not-allowed",
   }
 
+  // Tooltip component for field errors
+  const ErrorTooltip = ({ message }) => {
+    if (!message) return null
+
+    return (
+      <div className="error-tooltip">
+        {message}
+        <div className="tooltip-arrow"></div>
+      </div>
+    )
+  }
+
   return (
     <div>
       {/* Error Modal */}
@@ -615,21 +656,24 @@ const ControllerInstructions = () => {
             <div className="form-row1">
               <div className="form-group">
                 <label>Client</label>
-                <div className="select-wrapper">
+                <div className="select-wrapper" ref={fieldRefs.clientId}>
                   <select
-                    className="dropdown"
+                    className={`dropdown ${fieldErrors.clientId ? "error-field" : ""}`}
                     name="clientId"
                     value={formData.clientId}
                     onChange={handleClientChange}
                     disabled={isLoading.clients || clients.length === 0}
                   >
-                    <option value="">Select Client</option>
+                    <option value="" disabled>
+                      Select Client
+                    </option>
                     {clients.map((client) => (
                       <option key={client.m5clientkey} value={client.m5clientkey}>
                         {client.companyname}
                       </option>
                     ))}
                   </select>
+                  <ErrorTooltip message={fieldErrors.clientId} />
                 </div>
               </div>
               <div className="form-group">
@@ -675,58 +719,70 @@ const ControllerInstructions = () => {
             <div className="form-row1">
               <div className="form-group">
                 <label>Shipment Type</label>
-                <div className="select-wrapper">
+                <div className="select-wrapper" ref={fieldRefs.shipmentTypeId}>
                   <select
-                    className="dropdown"
+                    className={`dropdown ${fieldErrors.shipmentTypeId ? "error-field" : ""}`}
                     name="shipmentTypeId"
                     value={formData.shipmentTypeId}
                     onChange={handleShipmentTypeChange}
                     disabled={isLoading.shipmentTypes || shipmentTypes.length === 0}
                   >
-                    <option value="">Select Shipment</option>
+                    <option value="" disabled>
+                      Select Shipment
+                    </option>
                     {shipmentTypes.map((type) => (
                       <option key={type.shipkey} value={type.shipkey}>
                         {type.shipmenttype}
                       </option>
                     ))}
                   </select>
+                  <ErrorTooltip message={fieldErrors.shipmentTypeId} />
                 </div>
               </div>
               <div className="form-group">
                 <label>Name of Task</label>
-                <input
-                  type="text"
-                  className="form-input"
-                  placeholder="Input Name of Task"
-                  name="task"
-                  value={formData.task}
-                  onChange={handleInputChange}
-                />
+                <div className="input-wrapper" ref={fieldRefs.task}>
+                  <input
+                    type="text"
+                    className={`form-input ${fieldErrors.task ? "error-field" : ""}`}
+                    placeholder="Input Name of Task"
+                    name="task"
+                    value={formData.task}
+                    onChange={handleInputChange}
+                  />
+                  <ErrorTooltip message={fieldErrors.task} />
+                </div>
               </div>
             </div>
 
             <div className="form-row1">
               <div className="form-group">
                 <label>Pick-Up Location</label>
-                <input
-                  type="text"
-                  className="form-input"
-                  placeholder="Input pick-up location here"
-                  name="pickup"
-                  value={formData.pickup}
-                  onChange={handleInputChange}
-                />
+                <div className="input-wrapper" ref={fieldRefs.pickup}>
+                  <input
+                    type="text"
+                    className={`form-input ${fieldErrors.pickup ? "error-field" : ""}`}
+                    placeholder="Input pick-up location here"
+                    name="pickup"
+                    value={formData.pickup}
+                    onChange={handleInputChange}
+                  />
+                  <ErrorTooltip message={fieldErrors.pickup} />
+                </div>
               </div>
               <div className="form-group">
                 <label>Drop-off</label>
-                <input
-                  type="text"
-                  className="form-input"
-                  placeholder="Input drop-off location here"
-                  name="dropoff"
-                  value={formData.dropoff}
-                  onChange={handleInputChange}
-                />
+                <div className="input-wrapper" ref={fieldRefs.dropoff}>
+                  <input
+                    type="text"
+                    className={`form-input ${fieldErrors.dropoff ? "error-field" : ""}`}
+                    placeholder="Input drop-off location here"
+                    name="dropoff"
+                    value={formData.dropoff}
+                    onChange={handleInputChange}
+                  />
+                  <ErrorTooltip message={fieldErrors.dropoff} />
+                </div>
               </div>
               <div className="form-group checkboxes">
                 <div className="checkbox-group">
@@ -756,25 +812,26 @@ const ControllerInstructions = () => {
             <div className="form-row1">
               <div className="form-group">
                 <label>Pick-up Time</label>
-                <div className="date-input-group">
+                <div className="date-input-group" ref={fieldRefs.pickupTime}>
                   <input
                     type="time"
-                    className="form-input"
+                    className={`form-input ${fieldErrors.pickupTime ? "error-field" : ""}`}
                     placeholder="Time here"
                     name="pickupTime"
                     value={formData.pickupTime}
                     onChange={handleInputChange}
                   />
                   <button className="calendar-button"></button>
+                  <ErrorTooltip message={fieldErrors.pickupTime} />
                 </div>
               </div>
 
               <div className="form-group">
                 <label>Pick-up Date</label>
-                <div className="date-input-group">
+                <div className="date-input-group" ref={fieldRefs.pickupDate}>
                   <input
                     type="date"
-                    className="form-input"
+                    className={`form-input ${fieldErrors.pickupDate ? "error-field" : ""}`}
                     ref={pickupDateRef}
                     placeholder="Date here"
                     name="pickupDate"
@@ -783,14 +840,15 @@ const ControllerInstructions = () => {
                     min={today} // Block past dates
                   />
                   <button className="calendar-button" onClick={() => openCalendar(pickupDateRef)}></button>
+                  <ErrorTooltip message={fieldErrors.pickupDate} />
                 </div>
               </div>
               <div className="form-group">
                 <label>{isImport ? "ETA" : "Stack Date"}</label>
-                <div className="date-input-group">
+                <div className="date-input-group" ref={fieldRefs.stackDate}>
                   <input
                     type="date"
-                    className="form-input"
+                    className={`form-input ${fieldErrors.stackDate ? "error-field" : ""}`}
                     ref={etaDateRef}
                     placeholder="Date here"
                     name="stackDate"
@@ -810,14 +868,15 @@ const ControllerInstructions = () => {
                           })
                     }
                   ></button>
+                  <ErrorTooltip message={fieldErrors.stackDate} />
                 </div>
               </div>
               <div className="form-group">
                 <label>Deadline</label>
-                <div className="date-input-group">
+                <div className="date-input-group" ref={fieldRefs.deadline}>
                   <input
                     type="date"
-                    className="form-input"
+                    className={`form-input ${fieldErrors.deadline ? "error-field" : ""}`}
                     ref={deadlineDateRef}
                     placeholder="Date here"
                     name="deadline"
@@ -844,33 +903,52 @@ const ControllerInstructions = () => {
                       }
                     }}
                   ></button>
+                  <ErrorTooltip message={fieldErrors.deadline} />
                 </div>
               </div>
             </div>
           </div>
 
-          {/* Additional form sections */}
-          <div className="form-section">
-            <div className="form-row1">
-              <div className="form-group">
+          {/* Additional form sections - Redesigned to match the screenshot */}
+          <div className="form-section" style={{ backgroundColor: "#e6f7ff", padding: "20px", borderRadius: "5px" }}>
+            <div className="form-row1" style={{ display: "flex", justifyContent: "space-between" }}>
+              {/* Left side - File Ref */}
+              <div className="form-group" style={{ width: "45%" }}>
                 <label>File Ref</label>
-                <input
-                  type="text"
-                  className="form-input"
-                  placeholder="Upload file number here"
-                  style={{ width: "60%" }}
-                  name="fileRef"
-                  value={formData.fileRef}
-                  onChange={handleInputChange}
-                />
+                <div className="input-wrapper" ref={fieldRefs.fileRef}>
+                  <input
+                    type="text"
+                    className={`form-input ${fieldErrors.fileRef ? "error-field" : ""}`}
+                    placeholder="Upload file number here"
+                    style={{
+                      width: "100%",
+                      backgroundColor: "white",
+                      border: "1px solid #d9d9d9",
+                      borderRadius: "4px",
+                      padding: "8px 12px",
+                    }}
+                    name="fileRef"
+                    value={formData.fileRef}
+                    onChange={handleInputChange}
+                  />
+                  <ErrorTooltip message={fieldErrors.fileRef} />
+                </div>
               </div>
-              <div className="form-group rates-group">
+
+              {/* Right side - Rates per */}
+              <div className="form-group rates-group" style={{ width: "45%" }}>
                 <label>Rates per</label>
-                <div className="rates-input-group">
-                  <div className="select-wrapper small">
+                <div className="rates-input-group" style={{ display: "flex", alignItems: "center" }}>
+                  <div className="select-wrapper small" style={{ width: "120px", marginRight: "10px" }}>
                     <select
                       className="dropdown"
-                      style={{ width: "100px" }}
+                      style={{
+                        width: "100%",
+                        backgroundColor: "white",
+                        border: "1px solid #d9d9d9",
+                        borderRadius: "4px",
+                        padding: "8px 12px",
+                      }}
                       name="rateWeight"
                       value={formData.rateWeight}
                       onChange={handleInputChange}
@@ -880,36 +958,23 @@ const ControllerInstructions = () => {
                       <option value="Container">Container</option>
                     </select>
                   </div>
-                  <span className="separator">-----</span>
-                  <input
-                    type="text"
-                    className="form-input"
-                    placeholder="R 1000000/ton"
-                    style={{ width: "60%" }}
-                    name="rate"
-                    value={formData.rate}
-                    onChange={(e) => {
-                      // Allow only numbers and decimal point
-                      const value = e.target.value
-                      if (value === "" || /^[0-9]*\.?[0-9]*$/.test(value)) {
-                        handleInputChange(e)
-                      }
-                    }}
-                  />
-                </div>
-                {(formData.rateWeight === "kg" || formData.rateWeight === "m³") && (
-                  <div
-                    className="weight-input-group"
-                    style={{ marginTop: "10px", display: "flex", alignItems: "center" }}
-                  >
-                    <label style={{ marginRight: "10px" }}>{formData.rateWeight}</label>
+                  <span className="separator" style={{ margin: "0 10px" }}>
+                    --
+                  </span>
+                  <div className="input-wrapper" ref={fieldRefs.rate} style={{ flex: 1 }}>
                     <input
                       type="text"
-                      className="form-input"
-                      placeholder={`Enter weight in ${formData.rateWeight}`}
-                      style={{ width: "60%" }}
-                      name="weight"
-                      value={formData.weight}
+                      className={`form-input ${fieldErrors.rate ? "error-field" : ""}`}
+                      placeholder="R 1000000/ton"
+                      style={{
+                        width: "100%",
+                        backgroundColor: "white",
+                        border: "1px solid #d9d9d9",
+                        borderRadius: "4px",
+                        padding: "8px 12px",
+                      }}
+                      name="rate"
+                      value={formData.rate}
                       onChange={(e) => {
                         // Allow only numbers and decimal point
                         const value = e.target.value
@@ -918,92 +983,316 @@ const ControllerInstructions = () => {
                         }
                       }}
                     />
+                    <ErrorTooltip message={fieldErrors.rate} />
+                  </div>
+                </div>
+                {(formData.rateWeight === "kg" || formData.rateWeight === "m³") && (
+                  <div
+                    className="weight-input-group"
+                    style={{ marginTop: "10px", display: "flex", alignItems: "center" }}
+                    ref={fieldRefs.weight}
+                  >
+                    <label style={{ marginRight: "10px" }}>{formData.rateWeight}</label>
+                    <div className="input-wrapper">
+                      <input
+                        type="text"
+                        className={`form-input ${fieldErrors.weight ? "error-field" : ""}`}
+                        placeholder={`Enter weight in ${formData.rateWeight}`}
+                        style={{
+                          width: "100%",
+                          backgroundColor: "white",
+                          border: "1px solid #d9d9d9",
+                          borderRadius: "4px",
+                          padding: "8px 12px",
+                        }}
+                        name="weight"
+                        value={formData.weight}
+                        onChange={(e) => {
+                          // Allow only numbers and decimal point
+                          const value = e.target.value
+                          if (value === "" || /^[0-9]*\.?[0-9]*$/.test(value)) {
+                            handleInputChange(e)
+                          }
+                        }}
+                      />
+                      <ErrorTooltip message={fieldErrors.weight} />
+                    </div>
                   </div>
                 )}
               </div>
             </div>
 
-            <div className="form-row1">
-              <div className="form-group">
-                <label style={{ marginLeft: "281px" }}>Trailer Size</label>
-                <div className="counter-container">
-                  <label style={{ marginTop: "40px" }}>No. of Containers</label>
-                  <div className="counter">
-                    <span>6m</span>
-                    <input
-                      type="number"
-                      value={formData.num_six_meters}
-                      min="0"
-                      name="num_six_meters"
-                      onChange={(e) => handleContainerCountChange("num_six_meters", e.target.value)}
-                    />
+            {/* Container section - Redesigned with smaller fields and repositioned labels */}
+            <div style={{ marginTop: "20px" }}>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
+                {/* Left side - Containers with repositioned labels */}
+                <div style={{ width: "70%", display: "flex", alignItems: "center" }}>
+                  {/* No. of Containers label on the left */}
+                  <div style={{ width: "25%", paddingRight: "10px" }}>
+                    <label style={{ fontWeight: "bold" }}>No. of Containers</label>
+                    {fieldErrors.containers && (
+                      <div className="container-error-message" style={{ marginTop: "5px", fontSize: "11px" }}>
+                        {fieldErrors.containers}
+                      </div>
+                    )}
                   </div>
-                  <div className="counter">
-                    <span>12m</span>
-                    <input
-                      type="number"
-                      value={formData.num_twelve_meters}
-                      min="0"
-                      name="num_twelve_meters"
-                      onChange={(e) => handleContainerCountChange("num_twelve_meters", e.target.value)}
-                    />
+
+                  {/* Container inputs */}
+                  <div style={{ width: "75%", display: "flex", justifyContent: "space-between" }}>
+                    <div
+                      className="container-box"
+                      style={{
+                        width: "30%",
+                        backgroundColor: "white",
+                        padding: "10px",
+                        borderRadius: "5px",
+                        textAlign: "center",
+                        boxShadow: "0 1px 3px rgba(0,0,0,0.1)",
+                      }}
+                    >
+                      <div style={{ fontWeight: "bold", marginBottom: "5px", fontSize: "14px" }}>6m</div>
+                      <input
+                        type="number"
+                        className={fieldErrors.containers ? "error-field" : ""}
+                        value={formData.num_six_meters}
+                        min="0"
+                        name="num_six_meters"
+                        onChange={(e) => handleContainerCountChange("num_six_meters", e.target.value)}
+                        style={{
+                          width: "90%",
+                          padding: "4px",
+                          textAlign: "center",
+                          border: "1px solid #d9d9d9",
+                          borderRadius: "4px",
+                          height: "30px",
+                          fontSize: "14px",
+                        }}
+                      />
+                    </div>
+                    <div
+                      className="container-box"
+                      style={{
+                        width: "30%",
+                        backgroundColor: "white",
+                        padding: "10px",
+                        borderRadius: "5px",
+                        textAlign: "center",
+                        boxShadow: "0 1px 3px rgba(0,0,0,0.1)",
+                        position: "relative",
+                      }}
+                    >
+                      {/* Trailer Size label positioned above 12m */}
+                      <div
+                        style={{
+                          position: "absolute",
+                          top: "-25px",
+                          left: "0",
+                          right: "0",
+                          textAlign: "center",
+                          fontWeight: "bold",
+                          fontSize: "16px",
+                        }}
+                      >
+                        Trailer Size
+                      </div>
+                      <div style={{ fontWeight: "bold", marginBottom: "5px", fontSize: "14px" }}>12m</div>
+                      <input
+                        type="number"
+                        value={formData.num_twelve_meters}
+                        min="0"
+                        name="num_twelve_meters"
+                        onChange={(e) => handleContainerCountChange("num_twelve_meters", e.target.value)}
+                        style={{
+                          width: "90%",
+                          padding: "4px",
+                          textAlign: "center",
+                          border: "1px solid #d9d9d9",
+                          borderRadius: "4px",
+                          height: "30px",
+                          fontSize: "14px",
+                        }}
+                      />
+                    </div>
+                    <div
+                      className="container-box"
+                      style={{
+                        width: "30%",
+                        backgroundColor: "white",
+                        padding: "10px",
+                        borderRadius: "5px",
+                        textAlign: "center",
+                        boxShadow: "0 1px 3px rgba(0,0,0,0.1)",
+                      }}
+                    >
+                      <div style={{ fontWeight: "bold", marginBottom: "5px", fontSize: "14px" }}>Abnormal</div>
+                      <input
+                        type="number"
+                        value={formData.num_abnormal}
+                        min="0"
+                        name="num_abnormal"
+                        onChange={(e) => handleContainerCountChange("num_abnormal", e.target.value)}
+                        style={{
+                          width: "90%",
+                          padding: "4px",
+                          textAlign: "center",
+                          border: "1px solid #d9d9d9",
+                          borderRadius: "4px",
+                          height: "30px",
+                          fontSize: "14px",
+                        }}
+                      />
+                    </div>
                   </div>
-                  <div className="counter">
-                    <span>Abnormal</span>
+                </div>
+
+                {/* Right side - VAT Rate */}
+                <div style={{ width: "25%" }}>
+                  <label style={{ fontWeight: "bold", display: "block", marginBottom: "5px", fontSize: "14px" }}>
+                    VAT Rate
+                  </label>
+                  <div
+                    className="vat-box"
+                    style={{
+                      backgroundColor: "white",
+                      padding: "10px",
+                      borderRadius: "5px",
+                      textAlign: "center",
+                      boxShadow: "0 1px 3px rgba(0,0,0,0.1)",
+                    }}
+                  >
                     <input
-                      type="number"
-                      value={formData.num_abnormal}
-                      min="0"
-                      name="num_abnormal"
-                      onChange={(e) => handleContainerCountChange("num_abnormal", e.target.value)}
+                      type="text"
+                      className="form-input"
+                      placeholder="Vat Rate"
+                      value={`${formData.vat}%`}
+                      name="vat"
+                      style={{
+                        width: "80%",
+                        padding: "4px",
+                        textAlign: "center",
+                        border: "1px solid #d9d9d9",
+                        borderRadius: "4px",
+                        height: "30px",
+                        fontSize: "14px",
+                      }}
+                      readOnly
                     />
                   </div>
                 </div>
               </div>
-
-              <div className="form-group">
-                <label>VAT Rate</label>
-                <input
-                  type="text"
-                  className="form-input"
-                  placeholder="Vat Rate"
-                  value={`${formData.vat}%`}
-                  name="vat"
-                  style={{ width: "20%" }}
-                  readOnly
-                />
-              </div>
             </div>
           </div>
 
-          <div className="form-section">
-            <div className="form-row1">
-              <div className="form-group full-width">
-                <label>Description from client</label>
-                <textarea
-                  className="form-textarea"
-                  placeholder="Description from client, like type of goods etc"
-                  name="description"
-                  value={formData.description}
-                  onChange={handleInputChange}
-                ></textarea>
-              </div>
+          {/* Description section - separate section with its own styling to match screenshot */}
+          <div
+            className="form-section description-section"
+            style={{
+              marginTop: "20px",
+              backgroundColor: "#e6f7ff",
+              padding: "20px",
+              borderRadius: "5px",
+              border: "1px solid #d9d9d9",
+            }}
+          >
+            <label
+              style={{
+                display: "block",
+                fontWeight: "bold",
+                marginBottom: "15px",
+              }}
+            >
+              Description from client
+            </label>
+            <div className="textarea-wrapper" ref={fieldRefs.description}>
+              <textarea
+                className={`form-textarea ${fieldErrors.description ? "error-field" : ""}`}
+                placeholder="Description from client, like type of goods etc"
+                name="description"
+                value={formData.description}
+                onChange={handleInputChange}
+                style={{
+                  width: "100%",
+                  minHeight: "80px",
+                  padding: "10px",
+                  border: "1px solid #d9d9d9",
+                  borderRadius: "4px",
+                  resize: "vertical",
+                  backgroundColor: "white",
+                }}
+              ></textarea>
+              <ErrorTooltip message={fieldErrors.description} />
             </div>
           </div>
 
-          <div className="button-container1">
+          <div className="button-container1" style={{ textAlign: "center", marginTop: "20px" }}>
             <button
               className="add-container-button"
               onClick={handleSubmit}
               disabled={
                 isLoading.clients || isLoading.shipmentTypes || clients.length === 0 || shipmentTypes.length === 0
               }
+              style={{
+                backgroundColor: "#5DADE2",
+                color: "white",
+                padding: "10px 20px",
+                border: "none",
+                borderRadius: "5px",
+                fontSize: "16px",
+                cursor: "pointer",
+              }}
             >
               Add Container Details
             </button>
           </div>
         </div>
       </div>
+
+      {/* CSS for error tooltips */}
+      <style jsx>{`
+        .input-wrapper, .select-wrapper, .date-input-group, .textarea-wrapper {
+          position: relative;
+        }
+        
+        .error-field {
+          border: 2px solid #ff4d4f !important;
+          background-color: #fff1f0 !important;
+        }
+        
+        .error-tooltip {
+          position: absolute;
+          top: -40px;
+          right: 0;
+          background-color: #ff4d4f;
+          color: white;
+          padding: 5px 10px;
+          border-radius: 4px;
+          font-size: 12px;
+          z-index: 100;
+          white-space: nowrap;
+          box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+        }
+        
+        .tooltip-arrow {
+          position: absolute;
+          bottom: -5px;
+          right: 10px;
+          width: 0;
+          height: 0;
+          border-left: 5px solid transparent;
+          border-right: 5px solid transparent;
+          border-top: 5px solid #ff4d4f;
+        }
+        
+        .container-error-message {
+          color: #ff4d4f;
+          font-size: 12px;
+          background-color: #fff1f0;
+          padding: 5px 10px;
+          border-radius: 4px;
+          border: 1px solid #ff4d4f;
+          display: inline-block;
+        }
+      `}</style>
     </div>
   )
 }

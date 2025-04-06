@@ -64,10 +64,48 @@ const FCcontrollerInstructionDetails = () => {
     message: "",
   })
 
-  // Mock functions for now - replace with actual implementations
+  // State for field validation errors
+  const [fieldErrors, setFieldErrors] = useState({})
+
+  // Tooltip component for field errors
+  const ErrorTooltip = ({ message }) => {
+    if (!message) return null
+
+    return (
+      <div className="error-tooltip">
+        {message}
+        <div className="tooltip-arrow"></div>
+      </div>
+    )
+  }
+
+  // Updated validation function to match ControllerInstructionDetails.jsx
   const validateContainers = () => {
-    // Implement your validation logic here
-    return true // Placeholder
+    let isValid = true
+    const errors = {}
+
+    containers.forEach((container) => {
+      // Check if container number is empty or not a valid positive integer
+      if (!container.containerNum) {
+        errors[`container-${container.id}`] = "Field is required"
+        isValid = false
+      } else if (!/^[0-9]+$/.test(container.containerNum)) {
+        errors[`container-${container.id}`] = "Numbers only"
+        isValid = false
+      }
+
+      // Check weight field if this is an import
+      if (isImport && (container.weight === "" || container.weight === null)) {
+        errors[`weight-${container.id}`] = "Field is required"
+        isValid = false
+      } else if (isImport && container.weight && !/^[0-9]*\.?[0-9]*$/.test(container.weight)) {
+        errors[`weight-${container.id}`] = "Numbers only"
+        isValid = false
+      }
+    })
+
+    setFieldErrors(errors)
+    return isValid
   }
 
   const formatTimeForSubmission = (time) => {
@@ -453,6 +491,17 @@ const FCcontrollerInstructionDetails = () => {
       prevContainers.map((container) => (container.id === id ? { ...container, [field]: value } : container)),
     )
     setIsDataModified(true)
+
+    // Clear any error for this container
+    setFieldErrors((prev) => {
+      const newErrors = { ...prev }
+      if (field === "containerNum") {
+        delete newErrors[`container-${id}`]
+      } else if (field === "weight") {
+        delete newErrors[`weight-${id}`]
+      }
+      return newErrors
+    })
   }
 
   // Add this function to calculate total cost
@@ -559,6 +608,14 @@ const FCcontrollerInstructionDetails = () => {
     }
 
     setIsDataModified(true)
+
+    // Clear any errors for this container
+    setFieldErrors((prev) => {
+      const newErrors = { ...prev }
+      delete newErrors[`container-${id}`]
+      delete newErrors[`weight-${id}`]
+      return newErrors
+    })
   }
 
   // Function to save changes to the database
@@ -664,6 +721,8 @@ const FCcontrollerInstructionDetails = () => {
   // Update the handleSubmit function to ensure total_cost is calculated
   const handleSubmit = async () => {
     if (!validateContainers()) {
+      // Don't show error modal for field validation errors
+      // The tooltips will be displayed instead
       return
     }
 
@@ -757,6 +816,13 @@ const FCcontrollerInstructionDetails = () => {
             </button>
           </div>
 
+          {/* Input requirements notice */}
+          <div className="input-requirements-notice">
+            <p>
+              <strong>Note:</strong> Please enter numeric values only. Letters and special characters are not allowed.
+            </p>
+          </div>
+
           <br />
 
           {isLoading ? (
@@ -781,21 +847,45 @@ const FCcontrollerInstructionDetails = () => {
                       <td>{container.id}</td>
                       <td>{container.containerType}</td>
                       <td>
-                        <input
-                          type="text"
-                          value={container.containerNum}
-                          onChange={(e) => handleContainerChange(container.id, "containerNum", e.target.value)}
-                          className="container-input"
-                        />
+                        <div className="input-wrapper">
+                          <input
+                            type="text"
+                            value={container.containerNum}
+                            onChange={(e) => {
+                              const value = e.target.value
+                              // Only allow positive integers
+                              if (value === "" || /^[0-9]+$/.test(value)) {
+                                handleContainerChange(container.id, "containerNum", value)
+                              }
+                            }}
+                            className={`container-input ${
+                              fieldErrors[`container-${container.id}`] ? "error-field" : ""
+                            }`}
+                            placeholder="Numbers only"
+                          />
+                          <ErrorTooltip message={fieldErrors[`container-${container.id}`]} />
+                        </div>
                       </td>
                       {isImport && (
                         <td>
-                          <input
-                            type="text"
-                            value={container.weight}
-                            onChange={(e) => handleContainerChange(container.id, "weight", e.target.value)}
-                            className="container-input"
-                          />
+                          <div className="input-wrapper">
+                            <input
+                              type="text"
+                              value={container.weight}
+                              onChange={(e) => {
+                                const value = e.target.value
+                                // Only allow numbers and decimal point
+                                if (value === "" || /^[0-9]*\.?[0-9]*$/.test(value)) {
+                                  handleContainerChange(container.id, "weight", value)
+                                }
+                              }}
+                              className={`container-input ${
+                                fieldErrors[`weight-${container.id}`] ? "error-field" : ""
+                              }`}
+                              placeholder="Numbers only"
+                            />
+                            <ErrorTooltip message={fieldErrors[`weight-${container.id}`]} />
+                          </div>
                         </td>
                       )}
                       <td>
@@ -841,6 +931,56 @@ const FCcontrollerInstructionDetails = () => {
           </div>
         </div>
       </div>
+      <style jsx>{`
+        /* Error styling */
+        .error-field {
+          border: 2px solid #ff4d4f !important;
+          background-color: #fff1f0 !important;
+        }
+
+        .input-wrapper {
+          position: relative;
+        }
+
+        .error-tooltip {
+          position: absolute;
+          top: -40px;
+          left: 0;
+          background-color: #ff4d4f;
+          color: white;
+          padding: 5px 10px;
+          border-radius: 4px;
+          font-size: 12px;
+          z-index: 100;
+          white-space: nowrap;
+          box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+        }
+
+        .tooltip-arrow {
+          position: absolute;
+          bottom: -5px;
+          left: 10px;
+          width: 0;
+          height: 0;
+          border-left: 5px solid transparent;
+          border-right: 5px solid transparent;
+          border-top: 5px solid #ff4d4f;
+        }
+        
+        .input-requirements-notice {
+          background-color: #e6f7ff;
+          border: 1px solid #91d5ff;
+          border-radius: 4px;
+          padding: 10px;
+          margin: 15px 0;
+          font-size: 14px;
+        }
+        
+        .input-requirements-notice p {
+          margin: 0;
+          color: #0050b3;
+        }
+      `}</style>
     </>
   )
 }

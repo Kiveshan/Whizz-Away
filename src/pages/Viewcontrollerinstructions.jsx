@@ -635,8 +635,8 @@ const Viewcontrollerinstructions = () => {
               </div>
               <div className="form-group rates-group">
                 <label>Rates per</label>
-                <div className="rates-input-group">
-                  <div className="select-wrapper small">
+                <div className="rates-input-group" style={{ display: "flex", alignItems: "center" }}>
+                  <div className="select-wrapper small" style={{ marginRight: "20px" }}>
                     <select
                       className="dropdown"
                       name="rateWeight"
@@ -649,7 +649,6 @@ const Viewcontrollerinstructions = () => {
                       <option value="Container">Container</option>
                     </select>
                   </div>
-                  <span className="separator">-----</span>
                   <input
                     type="text"
                     className="form-input"

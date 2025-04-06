@@ -58,6 +58,9 @@ const ContainerDetailsPage = () => {
     message: "",
   })
 
+  // State for field validation errors
+  const [fieldErrors, setFieldErrors] = useState({})
+
   // Add this function to calculate total cost
   const calculateTotalCost = () => {
     if (!controllerData || !controllerData.rate) return 0
@@ -338,6 +341,17 @@ const ContainerDetailsPage = () => {
     setContainers((prevContainers) =>
       prevContainers.map((container) => (container.id === id ? { ...container, [field]: value } : container)),
     )
+
+    // Clear any error for this container
+    setFieldErrors((prev) => {
+      const newErrors = { ...prev }
+      if (field === "containerNum") {
+        delete newErrors[`container-${id}`]
+      } else if (field === "weight") {
+        delete newErrors[`weight-${id}`]
+      }
+      return newErrors
+    })
   }
 
   // Update the handleAddContainer function to recalculate total_cost
@@ -399,12 +413,22 @@ const ContainerDetailsPage = () => {
         controllerData.total_cost = calculateTotalCost()
       }
     }
+
+    // Clear any errors for this container
+    setFieldErrors((prev) => {
+      const newErrors = { ...prev }
+      delete newErrors[`container-${id}`]
+      delete newErrors[`weight-${id}`]
+      return newErrors
+    })
   }
 
   // Validate containers
   const validateContainers = () => {
     // Validate container counts match the specified counts in controllerData
     const counts = countContainersByType()
+    const newErrors = {}
+    let isValid = true
 
     if (counts["6m"] !== (controllerData.num_six_meters || 0)) {
       setErrorModal({
@@ -430,26 +454,27 @@ const ContainerDetailsPage = () => {
       return false
     }
 
-    // Validate container numbers
+    // Validate container numbers and weights
     for (const container of containers) {
       if (!container.containerNum) {
-        setErrorModal({
-          isOpen: true,
-          message: `Please enter a container number for container #${container.id} (${container.containerType})`,
-        })
-        return false
+        newErrors[`container-${container.id}`] = "Field is required"
+        isValid = false
+      } else if (!/^[0-9]+$/.test(container.containerNum)) {
+        newErrors[`container-${container.id}`] = "Numbers only"
+        isValid = false
       }
 
-      if (isImport && (container.weight === "" || isNaN(Number.parseFloat(container.weight)))) {
-        setErrorModal({
-          isOpen: true,
-          message: `Please enter a valid weight for container #${container.id} (${container.containerType})`,
-        })
-        return false
+      if (isImport && (container.weight === "" || container.weight === null)) {
+        newErrors[`weight-${container.id}`] = "Field is required"
+        isValid = false
+      } else if (isImport && container.weight && !/^[0-9]*\.?[0-9]*$/.test(container.weight)) {
+        newErrors[`weight-${container.id}`] = "Numbers only"
+        isValid = false
       }
     }
 
-    return true
+    setFieldErrors(newErrors)
+    return isValid
   }
 
   // Handle back button click - preserve form data and pass all state back
@@ -511,7 +536,10 @@ const ContainerDetailsPage = () => {
 
   // Update the handleSubmit function to ensure total_cost is calculated and properly formatted
   const handleSubmit = async () => {
+    // Validate containers first
     if (!validateContainers()) {
+      // Don't show error modal for field validation errors
+      // The tooltips will be displayed instead
       return
     }
 
@@ -601,6 +629,18 @@ const ContainerDetailsPage = () => {
     }
   }
 
+  // Tooltip component for field errors
+  const ErrorTooltip = ({ message }) => {
+    if (!message) return null
+
+    return (
+      <div className="error-tooltip">
+        {message}
+        <div className="tooltip-arrow"></div>
+      </div>
+    )
+  }
+
   return (
     <>
       {/* Error Modal */}
@@ -662,6 +702,13 @@ const ContainerDetailsPage = () => {
             </button>
           </div>
 
+          {/* Input requirements notice */}
+          <div className="input-requirements-notice">
+            <p>
+              <strong>Note:</strong> Please enter numeric values only. Letters and special characters are not allowed.
+            </p>
+          </div>
+
           <br />
 
           {isLoading ? (
@@ -685,22 +732,46 @@ const ContainerDetailsPage = () => {
                     <tr key={container.id} className={index % 2 === 1 ? "even-row" : ""}>
                       <td>{container.id}</td>
                       <td>{container.containerType}</td>
-                      <td>
-                        <input
-                          type="text"
-                          value={container.containerNum}
-                          onChange={(e) => handleContainerChange(container.id, "containerNum", e.target.value)}
-                          className="container-input"
-                        />
-                      </td>
-                      {isImport && (
-                        <td>
+                      <td className="input-cell">
+                        <div className="input-wrapper">
                           <input
                             type="text"
-                            value={container.weight}
-                            onChange={(e) => handleContainerChange(container.id, "weight", e.target.value)}
-                            className="container-input"
+                            value={container.containerNum}
+                            onChange={(e) => {
+                              const value = e.target.value
+                              // Only allow positive integers
+                              if (value === "" || /^[0-9]+$/.test(value)) {
+                                handleContainerChange(container.id, "containerNum", value)
+                              }
+                            }}
+                            className={`container-input ${fieldErrors[`container-${container.id}`] ? "error-field" : ""}`}
+                            placeholder="Numbers only"
                           />
+                          {fieldErrors[`container-${container.id}`] && (
+                            <ErrorTooltip message={fieldErrors[`container-${container.id}`]} />
+                          )}
+                        </div>
+                      </td>
+                      {isImport && (
+                        <td className="input-cell">
+                          <div className="input-wrapper">
+                            <input
+                              type="text"
+                              value={container.weight}
+                              onChange={(e) => {
+                                const value = e.target.value
+                                // Only allow numbers and decimal point
+                                if (value === "" || /^[0-9]*\.?[0-9]*$/.test(value)) {
+                                  handleContainerChange(container.id, "weight", value)
+                                }
+                              }}
+                              className={`container-input ${fieldErrors[`weight-${container.id}`] ? "error-field" : ""}`}
+                              placeholder="Numbers only"
+                            />
+                            {fieldErrors[`weight-${container.id}`] && (
+                              <ErrorTooltip message={fieldErrors[`weight-${container.id}`]} />
+                            )}
+                          </div>
                         </td>
                       )}
                       <td>
@@ -733,6 +804,59 @@ const ContainerDetailsPage = () => {
           </div>
         </div>
       </div>
+      <style jsx>{`
+        .input-wrapper {
+          position: relative;
+        }
+        
+        .input-cell {
+          position: relative;
+        }
+        
+        .error-field {
+          border: 2px solid #ff4d4f !important;
+          background-color: #fff1f0 !important;
+        }
+        
+        .error-tooltip {
+          position: absolute;
+          top: -40px;
+          left: 0;
+          background-color: #ff4d4f;
+          color: white;
+          padding: 5px 10px;
+          border-radius: 4px;
+          font-size: 12px;
+          z-index: 100;
+          white-space: nowrap;
+          box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+        }
+        
+        .tooltip-arrow {
+          position: absolute;
+          bottom: -5px;
+          left: 10px;
+          width: 0;
+          height: 0;
+          border-left: 5px solid transparent;
+          border-right: 5px solid transparent;
+          border-top: 5px solid #ff4d4f;
+        }
+        
+        .input-requirements-notice {
+          background-color: #e6f7ff;
+          border: 1px solid #91d5ff;
+          border-radius: 4px;
+          padding: 10px;
+          margin: 15px 0;
+          font-size: 14px;
+        }
+        
+        .input-requirements-notice p {
+          margin: 0;
+          color: #0050b3;
+        }
+      `}</style>
     </>
   )
 }
