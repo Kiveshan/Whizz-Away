@@ -279,27 +279,36 @@ app.get("/api/invoices/completed", async (req, res) => {
     const queryParams = []
     let paramIndex = 1
 
-    // Add filters if provided
+    // Add client filter if provided
     if (clientId) {
       queryText += ` AND m1.client = $${paramIndex}`
       queryParams.push(clientId)
       paramIndex++
     }
 
+    // Add type filter if provided and not "All"
+    if (type && type !== "All") {
+      queryText += ` AND s.shipmenttype = $${paramIndex}`
+      queryParams.push(type)
+      paramIndex++
+    }
+
+    // Handle date filtering - now with separate conditions for year and month
     if (year && month) {
+      // Both year and month provided
       queryText += ` AND EXTRACT(YEAR FROM m1.pickupdate) = $${paramIndex} 
                     AND EXTRACT(MONTH FROM m1.pickupdate) = $${paramIndex + 1}`
       queryParams.push(year, month)
       paramIndex += 2
-
-      if (type && type !== "All") {
-        queryText += ` AND s.shipmenttype = $${paramIndex}`
-        queryParams.push(type)
-        paramIndex++
-      }
-    } else if (type && type !== "All") {
-      queryText += ` AND s.shipmenttype = $${paramIndex}`
-      queryParams.push(type)
+    } else if (year) {
+      // Only year provided
+      queryText += ` AND EXTRACT(YEAR FROM m1.pickupdate) = $${paramIndex}`
+      queryParams.push(year)
+      paramIndex++
+    } else if (month) {
+      // Only month provided
+      queryText += ` AND EXTRACT(MONTH FROM m1.pickupdate) = $${paramIndex}`
+      queryParams.push(month)
       paramIndex++
     }
 
