@@ -10,8 +10,6 @@ import TestConnection from "./TestConnection"
 function AdminDashboard() {
   const [activeTab, setActiveTab] = useState("users")
   // Add a state to control showing the test connection
-  const [showConnectionTest, setShowConnectionTest] = useState(false)
-
   return (
     <div className="admin-dashboard">
       <div className="admin-header">
@@ -30,21 +28,12 @@ function AdminDashboard() {
             Company Management
           </button>
         </div>
-        {/* Add this button after the admin-tabs div */}
-        <div className="admin-debug">
-          <button className="debug-button" onClick={() => setShowConnectionTest(!showConnectionTest)}>
-            {showConnectionTest ? "Hide" : "Show"} Connection Test
-          </button>
-        </div>
-      </div>
-
-      {/* Add this before the admin-content div */}
-      {showConnectionTest && <TestConnection />}
 
       <div className="admin-content">
         {activeTab === "users" && <UserApprovalList />}
         {activeTab === "companies" && <CompanyManagement />}
       </div>
+    </div>
     </div>
   )
 }

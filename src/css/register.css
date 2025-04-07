@@ -1,101 +1,117 @@
 .register-container {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    min-height: 100vh;
-    position: relative;
-  }
-  
-  .register-form {
-    background: #bae6fd;
-    padding: 2rem;
-    border-radius: 8px;
-    width: 100%;
-    max-width: 650px;
-    box-sizing: border-box;
-  }
-  
-  .logo-container {
-    width: 100px; /* Set your desired size */
-    height: 100px;
-    display: flex; /* Optional: for centering content */
-    align-items: center;
-    justify-content: center;
-  }
-  .logo-image1 {
-    max-width: 100%;
-    max-height: 100%;
-    object-fit: contain; /* Ensure the image fits nicely */
-  }
-  
-  .register-title {
-    text-align: center;
-    margin-bottom: 1.5rem;
-    margin-left: -10px;
-  }
-  
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+  margin-bottom: 20px; /* Reduced bottom margin */
+  margin-top: -40px;
+}
+
+.register-form {
+  background: #bae6fd;
+  padding: 1.5rem 2rem 1rem 2rem; /* Reduced bottom padding */
+  border-radius: 4px;
+  width: 100%;
+  max-width: 850px;
+  box-sizing: border-box;
+}
+
+.logo-container1 {
+  width: 100px;
+  height: 100px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: -5px;
+}
+
+.logo-image1 {
+  max-width: 100%;
+  max-height: 100%;
+  object-fit: contain;
+}
+
+.register-title {
+  text-align: center;
+  margin-bottom: -8px;
+  margin-left: 2px;
+}
+
+.form-row {
+  display: flex;
+  gap: 1rem;
+  margin-bottom: 0.5rem; /* Reduced from 1rem to 0.5rem */
+}
+
+.form-group {
+  flex: 1;
+  margin-bottom: 0.5rem;
+  min-width: 0;
+}
+
+.form-row.three-fields .form-group {
+  flex: 1 1 30%;
+}
+
+label {
+  display: block;
+  margin-bottom: 0.5rem;
+}
+
+.form-input {
+  width: 100%;
+  padding: 0.75rem;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  box-sizing: border-box;
+}
+
+.login-link {
+  margin: 0.5rem 0; /* Reduced top and bottom margin */
+  text-align: center;
+}
+
+.link-button {
+  background: none;
+  border: none;
+  color: #1e3a8a;
+  text-decoration: underline;
+  cursor: pointer;
+  font-size: 0.95rem;
+}
+
+.submit-button1 {
+  display: block;
+  width: 200px;
+  margin: 0.5rem auto; /* Reduced margin for compact spacing */
+  padding: 0.6rem; /* Slightly smaller padding */
+  background-color: #1e3a8a;
+  color: white;
+  border: none;
+  border-radius: 4px;
+  font-size: 1rem;
+  cursor: pointer;
+}
+
+.visily-logo {
+  position: absolute;
+  bottom: 1rem;
+  left: 1rem;
+  font-size: 0.75rem;
+  color: #666;
+}
+
+@media (max-width: 768px) {
   .form-row {
-    display: flex;
-    gap: 1rem;
-    margin-bottom: 1rem;
+    flex-direction: column;
   }
-  
-  .form-group {
-    flex: 1;
+
+  .form-row.three-fields .form-group {
+    flex: 1 1 100%;
   }
-  
-  label {
-    display: block;
-    margin-bottom: 0.5rem;
+
+  .register-form {
+    max-width: 90%;
   }
-  
-  .form-input {
-    width: 100%;
-    padding: 0.75rem;
-    border: 1px solid #ddd;
-    border-radius: 4px;
-    box-sizing: border-box;
-  }
-  
-  .login-link {
-    margin: 1rem 0;
-    text-align: center;
-  }
-  
-  .login-link a {
-    color: #3b82f6;
-    margin-left: 0.5rem;
-  }
-  
-  .submit-button1 {
-    display: block;
-    width: 200px;
-    margin: 1rem auto;
-    padding: 0.75rem;
-    background-color: #1e3a8a;
-    color: white;
-    border: none;
-    border-radius: 4px;
-    font-size: 1rem;
-    cursor: pointer;
-  }
-  
-  .visily-logo {
-    position: absolute;
-    bottom: 1rem;
-    left: 1rem;
-    font-size: 0.75rem;
-    color: #666;
-  }
-  
-  @media (max-width: 768px) {
-    .form-row {
-      flex-direction: column;
-    }
-  
-    .register-form {
-      max-width: 90%;
-    }
-  }
-  
+}

@@ -15,9 +15,12 @@ function CompanyManagement() {
   const fetchCompanies = async () => {
     try {
       setLoading(true)
-      // Assuming an endpoint exists to fetch companies
-      const response = await fetch("http://localhost:5000/admin/companies", {
-        credentials: "include",
+      const token = localStorage.getItem("token")
+
+      const response = await fetch("http://localhost:5000/api/admin/company-list", {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
       })
 
       if (!response.ok) {
@@ -33,28 +36,26 @@ function CompanyManagement() {
     }
   }
 
-  const toggleCompanyStatus = async (companyId, currentStatus) => {
+  const toggleCompanyStatus = async (company_reg_num, currentStatus) => {
     try {
-      const newStatus = currentStatus === "active" ? "disabled" : "active"
+      const token = localStorage.getItem("token")
+      const endpoint = currentStatus === "active" ? "/api/company/deactivate" : "/api/company/reactivate"
 
-      const response = await fetch(`http://localhost:5000/admin/toggle-company-status`, {
+      const response = await fetch(`http://localhost:5000${endpoint}`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
         },
-        credentials: "include",
-        body: JSON.stringify({
-          companyid: companyId,
-          status: newStatus,
-        }),
+        body: JSON.stringify({ company_reg_num }),
       })
 
       if (!response.ok) {
         throw new Error("Failed to update company status")
       }
 
-      // Update the local state to reflect the change
-      setCompanies(companies.map((company) => (company.id === companyId ? { ...company, status: newStatus } : company)))
+      // Refresh the company list
+      fetchCompanies()
     } catch (err) {
       setError(err.message)
     }
@@ -73,30 +74,34 @@ function CompanyManagement() {
         <table className="companies-table">
           <thead>
             <tr>
-              <th>ID</th>
               <th>Company Name</th>
-              <th>Contact Person</th>
-              <th>Email</th>
+              <th>Registration Number</th>
+              <th>Business Manager</th>
+              <th>Employees</th>
               <th>Status</th>
+              <th>Registration Date</th>
               <th>Actions</th>
             </tr>
           </thead>
           <tbody>
             {companies.map((company) => (
-              <tr key={company.id} className={company.status === "disabled" ? "disabled-row" : ""}>
-                <td>{company.id}</td>
-                <td>{company.name}</td>
-                <td>{company.contact_person}</td>
-                <td>{company.email}</td>
+              <tr key={company.company_reg_num} className={company.status === "inactive" ? "disabled-row" : ""}>
+                <td>{company.companyname}</td>
+                <td>{company.company_reg_num}</td>
+                <td>
+                  {company.name} {company.surname}
+                </td>
+                <td>{company.total_count}</td>
                 <td>
                   <span className={`status-badge ${company.status}`}>
-                    {company.status === "active" ? "Active" : "Disabled"}
+                    {company.status === "active" ? "Active" : "Inactive"}
                   </span>
                 </td>
+                <td>{new Date(company.dateofreg).toLocaleDateString()}</td>
                 <td>
                   <button
                     className={company.status === "active" ? "disable-button" : "enable-button"}
-                    onClick={() => toggleCompanyStatus(company.id, company.status)}
+                    onClick={() => toggleCompanyStatus(company.company_reg_num, company.status)}
                   >
                     {company.status === "active" ? "Disable" : "Enable"}
                   </button>
