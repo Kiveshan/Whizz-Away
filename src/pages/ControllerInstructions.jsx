@@ -33,10 +33,16 @@ const ControllerInstructions = () => {
     stackDate: useRef(null),
     deadline: useRef(null),
     fileRef: useRef(null),
+    bookingRef: useRef(null), // Add ref for bookingRef
     rate: useRef(null),
     weight: useRef(null),
     num_six_meters: useRef(null),
     description: useRef(null),
+    // Add refs for vessel information fields
+    vesselName: useRef(null),
+    voyageNo: useRef(null),
+    imoNo: useRef(null),
+    flagReg: useRef(null),
   }
 
   // State to track if shipment type is import
@@ -68,6 +74,11 @@ const ControllerInstructions = () => {
       stackDate: "",
       deadline: "",
       fileRef: "",
+      bookingRef: "", // Add new booking ref field
+      vesselName: "", // Add vessel information fields
+      voyageNo: "",
+      imoNo: "",
+      flagReg: "",
       rateWeight: "Container",
       rate: "",
       weight: "", // Add this new field
@@ -437,8 +448,14 @@ const ControllerInstructions = () => {
       "stackDate",
       "deadline",
       "fileRef",
+      "bookingRef", // Add bookingRef to required fields
       "rate",
       "description",
+      // Add vessel information fields as required
+      "vesselName",
+      "voyageNo",
+      "imoNo",
+      "flagReg",
     ]
 
     let isValid = true
@@ -561,7 +578,15 @@ const ControllerInstructions = () => {
     // Navigate to container details page with state
     navigate("/ControllerInstructionDetails", {
       state: {
-        controllerData: updatedFormData,
+        controllerData: {
+          ...updatedFormData,
+          // Explicitly include shipping fields with the correct field names for the database
+          booking_ref: formData.bookingRef,
+          vessel_name: formData.vesselName,
+          voyage_num: formData.voyageNo,
+          imo_num: formData.imoNo,
+          flag_reg: formData.flagReg,
+        },
         isImport: formData.shipmentTypeName.toLowerCase() === "import",
         totalContainers: totalContainers,
         preservedContainers: preservedContainers, // Pass preserved containers if available
@@ -837,7 +862,6 @@ const ControllerInstructions = () => {
                     name="pickupDate"
                     value={formData.pickupDate}
                     onChange={handleInputChange}
-                    min={today} // Block past dates
                   />
                   <button className="calendar-button" onClick={() => openCalendar(pickupDateRef)}></button>
                   <ErrorTooltip message={fieldErrors.pickupDate} />
@@ -910,10 +934,13 @@ const ControllerInstructions = () => {
           </div>
 
           {/* Additional form sections - Redesigned to match the screenshot */}
+          {/* File Ref, Booking Ref, and Rates Section */}
           <div className="form-section" style={{ backgroundColor: "#e6f7ff", padding: "20px", borderRadius: "5px" }}>
-            <div className="form-row1" style={{ display: "flex", justifyContent: "space-between" }}>
-              {/* Left side - File Ref */}
-              <div className="form-group" style={{ width: "45%" }}>
+            <div
+              className="file-rates-row"
+              style={{ display: "flex", justifyContent: "space-between", marginBottom: "20px" }}
+            >
+              <div className="file-ref-column" style={{ width: "32%" }}>
                 <label>File Ref</label>
                 <div className="input-wrapper" ref={fieldRefs.fileRef}>
                   <input
@@ -934,12 +961,31 @@ const ControllerInstructions = () => {
                   <ErrorTooltip message={fieldErrors.fileRef} />
                 </div>
               </div>
-
-              {/* Right side - Rates per */}
-              <div className="form-group rates-group" style={{ width: "45%" }}>
+              <div className="booking-ref-column" style={{ width: "32%" }}>
+                <label>Booking Ref</label>
+                <div className="input-wrapper" ref={fieldRefs.bookingRef}>
+                  <input
+                    type="text"
+                    className={`form-input ${fieldErrors.bookingRef ? "error-field" : ""}`}
+                    placeholder="Enter booking reference"
+                    style={{
+                      width: "100%",
+                      backgroundColor: "white",
+                      border: "1px solid #d9d9d9",
+                      borderRadius: "4px",
+                      padding: "8px 12px",
+                    }}
+                    name="bookingRef"
+                    value={formData.bookingRef}
+                    onChange={handleInputChange}
+                  />
+                  <ErrorTooltip message={fieldErrors.bookingRef} />
+                </div>
+              </div>
+              <div className="rates-column" style={{ width: "32%" }}>
                 <label>Rates per</label>
-                <div className="rates-input-group" style={{ display: "flex", alignItems: "center" }}>
-                  <div className="select-wrapper small" style={{ width: "120px", marginRight: "10px" }}>
+                <div className="rates-input-group" style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+                  <div className="select-wrapper small" style={{ width: "120px" }}>
                     <select
                       className="dropdown"
                       style={{
@@ -958,9 +1004,6 @@ const ControllerInstructions = () => {
                       <option value="Container">Container</option>
                     </select>
                   </div>
-                  <span className="separator" style={{ margin: "0 10px" }}>
-                    --
-                  </span>
                   <div className="input-wrapper" ref={fieldRefs.rate} style={{ flex: 1 }}>
                     <input
                       type="text"
@@ -1023,139 +1066,114 @@ const ControllerInstructions = () => {
             </div>
 
             {/* Container section - Redesigned with smaller fields and repositioned labels */}
-            <div style={{ marginTop: "20px" }}>
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
-                {/* Left side - Containers with repositioned labels */}
-                <div style={{ width: "70%", display: "flex", alignItems: "center" }}>
-                  {/* No. of Containers label on the left */}
-                  <div style={{ width: "25%", paddingRight: "10px" }}>
-                    <label style={{ fontWeight: "bold" }}>No. of Containers</label>
-                    {fieldErrors.containers && (
-                      <div className="container-error-message" style={{ marginTop: "5px", fontSize: "11px" }}>
-                        {fieldErrors.containers}
-                      </div>
-                    )}
+            <div className="trailer-section" style={{ marginTop: "20px" }}>
+              <div className="trailer-title" style={{ textAlign: "center", marginBottom: "15px" }}>
+                <h3 style={{ margin: 0, fontSize: "16px", fontWeight: "bold" }}>Trailer Size</h3>
+              </div>
+              <div className="container-row" style={{ display: "flex", alignItems: "flex-start" }}>
+                <div className="no-of-containers" style={{ width: "120px", paddingTop: "10px" }}>
+                  <label style={{ fontWeight: "bold" }}>No. of Containers</label>
+                  {fieldErrors.containers && (
+                    <div
+                      className="container-error-message"
+                      style={{ marginTop: "5px", fontSize: "11px", color: "#ff4d4f" }}
+                    >
+                      {fieldErrors.containers}
+                    </div>
+                  )}
+                </div>
+                <div className="container-boxes" style={{ display: "flex", flex: 1, gap: "10px", marginRight: "20px" }}>
+                  <div
+                    className="container-box"
+                    style={{
+                      backgroundColor: "white",
+                      borderRadius: "8px",
+                      padding: "10px",
+                      textAlign: "center",
+                      boxShadow: "0 1px 3px rgba(0,0,0,0.1)",
+                      flex: 1,
+                    }}
+                  >
+                    <div style={{ fontWeight: "bold", marginBottom: "5px" }}>6m</div>
+                    <input
+                      type="number"
+                      className={fieldErrors.containers ? "error-field" : ""}
+                      value={formData.num_six_meters}
+                      min="0"
+                      name="num_six_meters"
+                      onChange={(e) => handleContainerCountChange("num_six_meters", e.target.value)}
+                      style={{
+                        width: "90%",
+                        padding: "5px",
+                        textAlign: "center",
+                        border: "1px solid #d9d9d9",
+                        borderRadius: "4px",
+                      }}
+                    />
                   </div>
-
-                  {/* Container inputs */}
-                  <div style={{ width: "75%", display: "flex", justifyContent: "space-between" }}>
-                    <div
-                      className="container-box"
+                  <div
+                    className="container-box"
+                    style={{
+                      backgroundColor: "white",
+                      borderRadius: "8px",
+                      padding: "10px",
+                      textAlign: "center",
+                      boxShadow: "0 1px 3px rgba(0,0,0,0.1)",
+                      flex: 1,
+                    }}
+                  >
+                    <div style={{ fontWeight: "bold", marginBottom: "5px" }}>12m</div>
+                    <input
+                      type="number"
+                      value={formData.num_twelve_meters}
+                      min="0"
+                      name="num_twelve_meters"
+                      onChange={(e) => handleContainerCountChange("num_twelve_meters", e.target.value)}
                       style={{
-                        width: "30%",
-                        backgroundColor: "white",
-                        padding: "10px",
-                        borderRadius: "5px",
+                        width: "90%",
+                        padding: "5px",
                         textAlign: "center",
-                        boxShadow: "0 1px 3px rgba(0,0,0,0.1)",
+                        border: "1px solid #d9d9d9",
+                        borderRadius: "4px",
                       }}
-                    >
-                      <div style={{ fontWeight: "bold", marginBottom: "5px", fontSize: "14px" }}>6m</div>
-                      <input
-                        type="number"
-                        className={fieldErrors.containers ? "error-field" : ""}
-                        value={formData.num_six_meters}
-                        min="0"
-                        name="num_six_meters"
-                        onChange={(e) => handleContainerCountChange("num_six_meters", e.target.value)}
-                        style={{
-                          width: "90%",
-                          padding: "4px",
-                          textAlign: "center",
-                          border: "1px solid #d9d9d9",
-                          borderRadius: "4px",
-                          height: "30px",
-                          fontSize: "14px",
-                        }}
-                      />
-                    </div>
-                    <div
-                      className="container-box"
+                    />
+                  </div>
+                  <div
+                    className="container-box"
+                    style={{
+                      backgroundColor: "white",
+                      borderRadius: "8px",
+                      padding: "10px",
+                      textAlign: "center",
+                      boxShadow: "0 1px 3px rgba(0,0,0,0.1)",
+                      flex: 1,
+                    }}
+                  >
+                    <div style={{ fontWeight: "bold", marginBottom: "5px" }}>Abnormal</div>
+                    <input
+                      type="number"
+                      value={formData.num_abnormal}
+                      min="0"
+                      name="num_abnormal"
+                      onChange={(e) => handleContainerCountChange("num_abnormal", e.target.value)}
                       style={{
-                        width: "30%",
-                        backgroundColor: "white",
-                        padding: "10px",
-                        borderRadius: "5px",
+                        width: "90%",
+                        padding: "5px",
                         textAlign: "center",
-                        boxShadow: "0 1px 3px rgba(0,0,0,0.1)",
-                        position: "relative",
+                        border: "1px solid #d9d9d9",
+                        borderRadius: "4px",
                       }}
-                    >
-                      {/* Trailer Size label positioned above 12m */}
-                      <div
-                        style={{
-                          position: "absolute",
-                          top: "-25px",
-                          left: "0",
-                          right: "0",
-                          textAlign: "center",
-                          fontWeight: "bold",
-                          fontSize: "16px",
-                        }}
-                      >
-                        Trailer Size
-                      </div>
-                      <div style={{ fontWeight: "bold", marginBottom: "5px", fontSize: "14px" }}>12m</div>
-                      <input
-                        type="number"
-                        value={formData.num_twelve_meters}
-                        min="0"
-                        name="num_twelve_meters"
-                        onChange={(e) => handleContainerCountChange("num_twelve_meters", e.target.value)}
-                        style={{
-                          width: "90%",
-                          padding: "4px",
-                          textAlign: "center",
-                          border: "1px solid #d9d9d9",
-                          borderRadius: "4px",
-                          height: "30px",
-                          fontSize: "14px",
-                        }}
-                      />
-                    </div>
-                    <div
-                      className="container-box"
-                      style={{
-                        width: "30%",
-                        backgroundColor: "white",
-                        padding: "10px",
-                        borderRadius: "5px",
-                        textAlign: "center",
-                        boxShadow: "0 1px 3px rgba(0,0,0,0.1)",
-                      }}
-                    >
-                      <div style={{ fontWeight: "bold", marginBottom: "5px", fontSize: "14px" }}>Abnormal</div>
-                      <input
-                        type="number"
-                        value={formData.num_abnormal}
-                        min="0"
-                        name="num_abnormal"
-                        onChange={(e) => handleContainerCountChange("num_abnormal", e.target.value)}
-                        style={{
-                          width: "90%",
-                          padding: "4px",
-                          textAlign: "center",
-                          border: "1px solid #d9d9d9",
-                          borderRadius: "4px",
-                          height: "30px",
-                          fontSize: "14px",
-                        }}
-                      />
-                    </div>
+                    />
                   </div>
                 </div>
-
-                {/* Right side - VAT Rate */}
-                <div style={{ width: "25%" }}>
-                  <label style={{ fontWeight: "bold", display: "block", marginBottom: "5px", fontSize: "14px" }}>
-                    VAT Rate
-                  </label>
+                <div className="vat-rate" style={{ width: "150px" }}>
+                  <label style={{ fontWeight: "bold" }}>VAT Rate</label>
                   <div
                     className="vat-box"
                     style={{
                       backgroundColor: "white",
+                      borderRadius: "8px",
                       padding: "10px",
-                      borderRadius: "5px",
                       textAlign: "center",
                       boxShadow: "0 1px 3px rgba(0,0,0,0.1)",
                     }}
@@ -1163,17 +1181,14 @@ const ControllerInstructions = () => {
                     <input
                       type="text"
                       className="form-input"
-                      placeholder="Vat Rate"
                       value={`${formData.vat}%`}
                       name="vat"
                       style={{
                         width: "80%",
-                        padding: "4px",
+                        padding: "5px",
                         textAlign: "center",
                         border: "1px solid #d9d9d9",
                         borderRadius: "4px",
-                        height: "30px",
-                        fontSize: "14px",
                       }}
                       readOnly
                     />
@@ -1183,7 +1198,117 @@ const ControllerInstructions = () => {
             </div>
           </div>
 
-          {/* Description section - separate section with its own styling to match screenshot */}
+          {/* Vessel Information section */}
+          <div
+            className="form-section vessel-section"
+            style={{
+              marginTop: "20px",
+              backgroundColor: "#e6f7ff",
+              padding: "20px",
+              borderRadius: "5px",
+              border: "1px solid #d9d9d9",
+            }}
+          >
+            <div className="vessel-info-container" style={{ width: "100%" }}>
+              <div
+                className="vessel-info-row"
+                style={{ display: "flex", justifyContent: "space-between", marginBottom: "20px" }}
+              >
+                <div className="vessel-info-field" style={{ width: "48%" }}>
+                  <label>Vessel Name</label>
+                  <div className="input-wrapper" ref={fieldRefs.vesselName}>
+                    <input
+                      type="text"
+                      className={`form-input vessel-input ${fieldErrors.vesselName ? "error-field" : ""}`}
+                      placeholder="Enter vessel name"
+                      style={{
+                        width: "100%",
+                        backgroundColor: "white",
+                        border: "1px solid #d9d9d9",
+                        borderRadius: "4px",
+                        padding: "10px 15px",
+                        fontSize: "15px",
+                      }}
+                      name="vesselName"
+                      value={formData.vesselName}
+                      onChange={handleInputChange}
+                    />
+                    <ErrorTooltip message={fieldErrors.vesselName} />
+                  </div>
+                </div>
+                <div className="vessel-info-field" style={{ width: "48%" }}>
+                  <label>Voyage No.</label>
+                  <div className="input-wrapper" ref={fieldRefs.voyageNo}>
+                    <input
+                      type="text"
+                      className={`form-input vessel-input ${fieldErrors.voyageNo ? "error-field" : ""}`}
+                      placeholder="Enter voyage number"
+                      style={{
+                        width: "100%",
+                        backgroundColor: "white",
+                        border: "1px solid #d9d9d9",
+                        borderRadius: "4px",
+                        padding: "10px 15px",
+                        fontSize: "15px",
+                      }}
+                      name="voyageNo"
+                      value={formData.voyageNo}
+                      onChange={handleInputChange}
+                    />
+                    <ErrorTooltip message={fieldErrors.voyageNo} />
+                  </div>
+                </div>
+              </div>
+              <div className="vessel-info-row" style={{ display: "flex", justifyContent: "space-between" }}>
+                <div className="vessel-info-field" style={{ width: "48%" }}>
+                  <label>IMO No.</label>
+                  <div className="input-wrapper" ref={fieldRefs.imoNo}>
+                    <input
+                      type="text"
+                      className={`form-input vessel-input ${fieldErrors.imoNo ? "error-field" : ""}`}
+                      placeholder="Enter IMO number"
+                      style={{
+                        width: "100%",
+                        backgroundColor: "white",
+                        border: "1px solid #d9d9d9",
+                        borderRadius: "4px",
+                        padding: "10px 15px",
+                        fontSize: "15px",
+                      }}
+                      name="imoNo"
+                      value={formData.imoNo}
+                      onChange={handleInputChange}
+                    />
+                    <ErrorTooltip message={fieldErrors.imoNo} />
+                  </div>
+                </div>
+                <div className="vessel-info-field" style={{ width: "48%" }}>
+                  <label>Flag Reg</label>
+                  <div className="input-wrapper" ref={fieldRefs.flagReg}>
+                    <input
+                      type="text"
+                      className={`form-input vessel-input ${fieldErrors.flagReg ? "error-field" : ""}`}
+                      placeholder="Enter flag registration"
+                      style={{
+                        width: "100%",
+                        backgroundColor: "white",
+                        border: "1px solid #d9d9d9",
+                        borderRadius: "4px",
+                        padding: "10px 15px",
+                        fontSize: "15px",
+                      }}
+                      name="flagReg"
+                      value={formData.flagReg}
+                      onChange={handleInputChange}
+                    />
+                    <ErrorTooltip message={fieldErrors.flagReg} />
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Description section */}
           <div
             className="form-section description-section"
             style={{
@@ -1194,13 +1319,7 @@ const ControllerInstructions = () => {
               border: "1px solid #d9d9d9",
             }}
           >
-            <label
-              style={{
-                display: "block",
-                fontWeight: "bold",
-                marginBottom: "15px",
-              }}
-            >
+            <label style={{ display: "block", fontWeight: "bold", marginBottom: "15px" }}>
               Description from client
             </label>
             <div className="textarea-wrapper" ref={fieldRefs.description}>
@@ -1291,6 +1410,99 @@ const ControllerInstructions = () => {
           border-radius: 4px;
           border: 1px solid #ff4d4f;
           display: inline-block;
+        }
+
+        .vessel-info-container {
+          width: 100%;
+        }
+
+        .vessel-info-row {
+          display: flex;
+          justify-content: space-between;
+          margin-bottom: 20px;
+        }
+
+        .vessel-info-row:last-child {
+          margin-bottom: 0;
+        }
+
+        .vessel-info-field {
+          width: 48%;
+        }
+
+        .vessel-input {
+          width: 100%;
+          padding: 10px 15px;
+          font-size: 15px;
+          border: 1px solid #d9d9d9;
+          border-radius: 4px;
+          background-color: white;
+        }
+
+        .file-rates-row {
+          display: flex;
+          justify-content: space-between;
+          margin-bottom: 20px;
+        }
+
+        .file-ref-column, .booking-ref-column, .rates-column {
+          width: 32%;
+        }
+
+        .rates-input-group {
+          display: flex;
+          align-items: center;
+          gap: 10px;
+        }
+
+        .weight-input-group {
+          display: flex;
+          align-items: center;
+          margin-top: 10px;
+        }
+
+        .weight-input-group label {
+          margin-right: 10px;
+          width: 30px;
+        }
+
+        .trailer-section {
+          margin-top: 20px;
+        }
+
+        .trailer-title {
+          text-align: center;
+          margin-bottom: 15px;
+        }
+
+        .container-row {
+          display: flex;
+          align-items: flex-start;
+        }
+
+        .no-of-containers {
+          width: 120px;
+          padding-top: 10px;
+        }
+
+        .container-boxes {
+          display: flex;
+          flex: 1;
+          gap: 10px;
+          margin-right: 20px;
+        }
+
+        .container-box {
+          background-color: white;
+          border-radius: 8px;
+          padding: 10px;
+          text-align: center;
+          box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+          flex: 1;
+        }
+
+        .vat-rate {
+          width: 150px;
         }
       `}</style>
     </div>

@@ -54,54 +54,33 @@ const ViewClientInstruction = () => {
     textAlign: "center",
   }
 
-  // Style for new count > 0
-  const newCountStyle = (count) => {
-    if (count > 0) {
-      return {
-        color: "fuchsia", // Bright fuchsia color
-        fontWeight: "900", // Maximum boldness
-        fontSize: "0.95em", // Smaller size
-        textAlign: "center",
-      }
-    }
-    return centeredCellStyle
-  }
-
-  // Bell icon styles
-  const bellContainerStyle = {
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: "5px",
-  }
-
   // Bell animation keyframes
   const bellKeyframes = `
-    @keyframes bellShake {
-      0% { transform: rotate(0); }
-      15% { transform: rotate(5deg); }
-      30% { transform: rotate(-5deg); }
-      45% { transform: rotate(4deg); }
-      60% { transform: rotate(-4deg); }
-      75% { transform: rotate(2deg); }
-      85% { transform: rotate(-2deg); }
-      92% { transform: rotate(1deg); }
-      100% { transform: rotate(0); }
-    }
-  `
+@keyframes bellShake {
+  0% { transform: rotate(0); }
+  15% { transform: rotate(5deg); }
+  30% { transform: rotate(-5deg); }
+  45% { transform: rotate(4deg); }
+  60% { transform: rotate(-4deg); }
+  75% { transform: rotate(2deg); }
+  85% { transform: rotate(-2deg); }
+  92% { transform: rotate(1deg); }
+  100% { transform: rotate(0); }
+}
+`
 
-  // Bell icon component
+  // Bell icon component for header
   const BellIcon = ({ count }) => {
     const hasNewInstructions = count > 0
-    
+
     const bellStyle = {
       width: "24px",
       height: "24px",
-      fill: "#ff0000", // Always red
+      fill: count > 0 ? "#ff0000" : "#00cc00", // Red if there are new instructions, green if zero
       animation: hasNewInstructions ? "bellShake 2s infinite" : "none",
       position: "relative",
     }
-    
+
     const countStyle = {
       position: "absolute",
       top: "-8px",
@@ -110,7 +89,7 @@ const ViewClientInstruction = () => {
       fontWeight: "bold",
       color: "black",
     }
-    
+
     return (
       <div style={{ position: "relative", display: "inline-block" }}>
         <style>{bellKeyframes}</style>
@@ -119,6 +98,40 @@ const ViewClientInstruction = () => {
           <path d="M12 22c1.1 0 2-.9 2-2h-4c0 1.1.9 2 2 2zm6-6v-5c0-3.07-1.63-5.64-4.5-6.32V4c0-.83-.67-1.5-1.5-1.5s-1.5.67-1.5 1.5v.68C7.64 5.36 6 7.92 6 11v5l-2 2v1h16v-1l-2-2z" />
         </svg>
         {count > 0 && <span style={countStyle}>{count}</span>}
+      </div>
+    )
+  }
+
+  // Bell icon component for table rows
+  const RowBellIcon = ({ count }) => {
+    // Only show bell if count > 0
+    if (count <= 0) return null
+
+    const bellStyle = {
+      width: "20px", // Slightly smaller than header bell
+      height: "20px",
+      fill: "#ff0000", // Red color
+      animation: "bellShake 2s infinite", // Always animate since we only show it when count > 0
+      display: "inline-block",
+      position: "relative",
+    }
+
+    const countStyle = {
+      position: "absolute",
+      top: "-8px",
+      right: "-8px",
+      fontSize: "10px",
+      fontWeight: "bold",
+      color: "black",
+    }
+
+    return (
+      <div style={{ position: "relative", display: "inline-block" }}>
+        <style>{bellKeyframes}</style>
+        <svg style={bellStyle} viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+          <path d="M12 22c1.1 0 2-.9 2-2h-4c0 1.1.9 2 2 2zm6-6v-5c0-3.07-1.63-5.64-4.5-6.32V4c0-.83-.67-1.5-1.5-1.5s-1.5.67-1.5 1.5v.68C7.64 5.36 6 7.92 6 11v5l-2 2v1h16v-1l-2-2z" />
+        </svg>
+        <span style={countStyle}>{count}</span>
       </div>
     )
   }
@@ -157,7 +170,7 @@ const ViewClientInstruction = () => {
                 <th className="p-3">Representative</th>
                 <th className="p-3">Email</th>
                 <th className="p-3" style={centeredCellStyle}>
-                  <div style={bellContainerStyle}>
+                  <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: "5px" }}>
                     New <BellIcon count={totalNewInstructions} />
                   </div>
                 </th>
@@ -183,8 +196,8 @@ const ViewClientInstruction = () => {
                     <td className="p-3">{client.companyname}</td>
                     <td className="p-3">{client.representative}</td>
                     <td className="p-3">{client.email}</td>
-                    <td className="p-3" style={newCountStyle(client.new_count)}>
-                      {client.new_count}
+                    <td className="p-3" style={{ textAlign: "center" }}>
+                      {client.new_count > 0 ? <RowBellIcon count={client.new_count} /> : "0"}
                     </td>
                     <td className="p-3" style={centeredCellStyle}>
                       {client.in_progress_count}

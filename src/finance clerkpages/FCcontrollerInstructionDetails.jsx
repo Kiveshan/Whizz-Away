@@ -51,6 +51,10 @@ const FCcontrollerInstructionDetails = () => {
   const [originalContainers, setOriginalContainers] = useState([])
   const [isLoading, setIsLoading] = useState(true)
   const [successMessage, setSuccessMessage] = useState("")
+  const [isSubmitting, setIsSubmitting] = useState(false) // Add state to track submission
+
+  // Remove the debug message state and all references to it
+  // const [debugMessage, setDebugMessage] = useState("") // REMOVED
 
   // State to track if data has been modified
   const [isDataModified, setIsDataModified] = useState(false)
@@ -79,18 +83,23 @@ const FCcontrollerInstructionDetails = () => {
     )
   }
 
-  // Updated validation function to match ControllerInstructionDetails.jsx
+  // Updated validation function to check container number format
   const validateContainers = () => {
     let isValid = true
     const errors = {}
 
     containers.forEach((container) => {
-      // Check if container number is empty or not a valid positive integer
+      // Check if container number is empty
       if (!container.containerNum) {
         errors[`container-${container.id}`] = "Field is required"
         isValid = false
-      } else if (!/^[0-9]+$/.test(container.containerNum)) {
-        errors[`container-${container.id}`] = "Numbers only"
+      }
+      // Check container number format (11 chars: 4 letters followed by 7 numbers)
+      else if (container.containerNum.length !== 11) {
+        errors[`container-${container.id}`] = "Does not match correct format (ABCD1234567)"
+        isValid = false
+      } else if (!/^[a-zA-Z]{4}[0-9]{7}$/.test(container.containerNum)) {
+        errors[`container-${container.id}`] = "Does not match correct format (ABCD1234567)"
         isValid = false
       }
 
@@ -110,23 +119,43 @@ const FCcontrollerInstructionDetails = () => {
 
   const formatTimeForSubmission = (time) => {
     if (!time) return null
-    const [timePart, ampm] = time.split(" ")
-    let [hours, minutes] = timePart.split(":")
-    hours = Number.parseInt(hours, 10)
+    try {
+      // Handle different time formats
+      if (time.includes(" ")) {
+        // Format with AM/PM
+        const [timePart, ampm] = time.split(" ")
+        let [hours, minutes] = timePart.split(":")
+        hours = Number.parseInt(hours, 10)
 
-    if (ampm === "PM" && hours < 12) {
-      hours += 12
-    } else if (ampm === "AM" && hours === 12) {
-      hours = 0
+        if (ampm === "PM" && hours < 12) {
+          hours += 12
+        } else if (ampm === "AM" && hours === 12) {
+          hours = 0
+        }
+
+        return `${hours.toString().padStart(2, "0")}:${minutes}:00`
+      } else {
+        // 24-hour format
+        const [hours, minutes] = time.split(":")
+        return `${hours}:${minutes}:00`
+      }
+    } catch (error) {
+      console.error("Error formatting time:", error, time)
+      return null
     }
-
-    return `${hours.toString().padStart(2, "0")}:${minutes}:00`
   }
 
   const formatDateForSubmission = (displayDate) => {
     if (!displayDate) return null
-    const [month, day, year] = displayDate.split("/")
-    return `${year}-${month}-${day}`
+    try {
+      const [month, day, year] = displayDate.split("/")
+      // Ensure all parts exist and are valid
+      if (!month || !day || !year) return null
+      return `${year}-${month.padStart(2, "0")}-${day.padStart(2, "0")}`
+    } catch (error) {
+      console.error("Error formatting date:", error, displayDate)
+      return null
+    }
   }
 
   // Add beforeunload event listener to warn when navigating away with unsaved changes
@@ -485,23 +514,70 @@ const FCcontrollerInstructionDetails = () => {
     return counts
   }
 
-  // Handle container input change
+  // Handle container input change with real-time validation
   const handleContainerChange = (id, field, value) => {
+    if (field === "containerNum") {
+      // Get the current container
+      const container = containers.find((c) => c.id === id)
+      const currentValue = container ? container.containerNum : ""
+
+      // For container numbers, enforce the format: 4 letters followed by 7 numbers
+      if (value.length > 11) {
+        // Prevent entering more than 11 characters
+        return
+      }
+
+      // Create a new value by validating each character
+      let newValue = ""
+      for (let i = 0; i < value.length; i++) {
+        const char = value[i]
+        if (i < 4) {
+          // First 4 positions: only allow letters
+          if (/^[a-zA-Z]$/.test(char)) {
+            newValue += char
+          }
+        } else {
+          // Positions 5-11: only allow numbers
+          if (/^[0-9]$/.test(char)) {
+            newValue += char
+          }
+        }
+      }
+
+      // Only update if the filtered value is different from the input
+      if (newValue !== value) {
+        return
+      }
+
+      // Real-time validation
+      let error = null
+      if (newValue.length > 0 && newValue.length < 11) {
+        error = "Does not match correct format (ABCD1234567)"
+      } else if (newValue.length === 11 && !/^[a-zA-Z]{4}[0-9]{7}$/.test(newValue)) {
+        error = "Does not match correct format (ABCD1234567)"
+      }
+
+      // Update field errors
+      setFieldErrors((prev) => ({
+        ...prev,
+        [`container-${id}`]: error,
+      }))
+    }
+
+    // Update the container value
     setContainers((prevContainers) =>
       prevContainers.map((container) => (container.id === id ? { ...container, [field]: value } : container)),
     )
     setIsDataModified(true)
 
-    // Clear any error for this container
-    setFieldErrors((prev) => {
-      const newErrors = { ...prev }
-      if (field === "containerNum") {
-        delete newErrors[`container-${id}`]
-      } else if (field === "weight") {
+    // Clear any error for weight field
+    if (field === "weight") {
+      setFieldErrors((prev) => {
+        const newErrors = { ...prev }
         delete newErrors[`weight-${id}`]
-      }
-      return newErrors
-    })
+        return newErrors
+      })
+    }
   }
 
   // Add this function to calculate total cost
@@ -514,9 +590,9 @@ const FCcontrollerInstructionDetails = () => {
     if (updatedControllerData.rateWeight === "Container") {
       // For Container: rate × total_number_of_containers
       const totalContainers =
-        updatedControllerData.num_six_meters +
-        updatedControllerData.num_twelve_meters +
-        updatedControllerData.num_abnormal
+        (updatedControllerData.num_six_meters || 0) +
+        (updatedControllerData.num_twelve_meters || 0) +
+        (updatedControllerData.num_abnormal || 0)
       return rate * totalContainers
     } else {
       // For kg or m³: rate × weight_value
@@ -556,7 +632,8 @@ const FCcontrollerInstructionDetails = () => {
       if (newData.rateWeight === "Container") {
         const rate = Number.parseFloat(newData.rate)
         if (!isNaN(rate)) {
-          const totalContainers = newData.num_six_meters + newData.num_twelve_meters + newData.num_abnormal
+          const totalContainers =
+            (newData.num_six_meters || 0) + (newData.num_twelve_meters || 0) + (newData.num_abnormal || 0)
           newData.total_cost = rate * totalContainers
         }
       }
@@ -598,7 +675,8 @@ const FCcontrollerInstructionDetails = () => {
         if (newData.rateWeight === "Container") {
           const rate = Number.parseFloat(newData.rate)
           if (!isNaN(rate)) {
-            const totalContainers = newData.num_six_meters + newData.num_twelve_meters + newData.num_abnormal
+            const totalContainers =
+              (newData.num_six_meters || 0) + (newData.num_twelve_meters || 0) + (newData.num_abnormal || 0)
             newData.total_cost = rate * totalContainers
           }
         }
@@ -620,116 +698,229 @@ const FCcontrollerInstructionDetails = () => {
 
   // Function to save changes to the database
   const saveChangesToDatabase = async () => {
-    if (!instructionId) {
-      throw new Error("No instruction ID provided")
-    }
-
-    // Ensure total_cost is calculated
-    const finalControllerData = { ...updatedControllerData }
-
-    if (finalControllerData.rateWeight === "Container") {
-      finalControllerData.total_cost = calculateTotalCost()
-      finalControllerData.weight = null // Set weight to null for Container rate
-    } else {
-      // For kg or m³, ensure weight is a valid number
-      if (!finalControllerData.weight || isNaN(Number.parseFloat(finalControllerData.weight))) {
-        throw new Error(`Please enter a valid weight for ${finalControllerData.rateWeight} rate`)
+    try {
+      if (!instructionId) {
+        throw new Error("No instruction ID provided")
       }
-      finalControllerData.total_cost = calculateTotalCost()
+
+      // Ensure total_cost is calculated
+      const finalControllerData = { ...updatedControllerData }
+
+      if (finalControllerData.rateWeight === "Container") {
+        finalControllerData.total_cost = calculateTotalCost()
+        finalControllerData.weight = null // Set weight to null for Container rate
+      } else {
+        // For kg or m³, ensure weight is a valid number
+        if (!finalControllerData.weight || isNaN(Number.parseFloat(finalControllerData.weight))) {
+          throw new Error(`Please enter a valid weight for ${finalControllerData.rateWeight} rate`)
+        }
+        finalControllerData.total_cost = calculateTotalCost()
+      }
+
+      // First, update the instruction data - with careful type handling
+      const instructionData = {
+        client: Number.parseInt(finalControllerData.clientId) || 0,
+        task: String(finalControllerData.task || ""),
+        shipment_type: Number.parseInt(finalControllerData.shipmentTypeId) || 0,
+        pickup: String(finalControllerData.pickup || ""),
+        dropoff: String(finalControllerData.dropoff || ""),
+        hazardous: Boolean(finalControllerData.hazardous),
+        surchages: Boolean(finalControllerData.surcharges),
+        pickuptime: finalControllerData.pickupTime ? formatTimeForSubmission(finalControllerData.pickupTime) : null,
+        pickupdate: finalControllerData.pickupDate ? formatDateForSubmission(finalControllerData.pickupDate) : null,
+        stackdate: finalControllerData.stackDate ? formatDateForSubmission(finalControllerData.stackDate) : null,
+        deadline: finalControllerData.deadline ? formatDateForSubmission(finalControllerData.deadline) : null,
+        fileref: String(finalControllerData.fileRef || ""),
+        rateweight: String(finalControllerData.rateWeight || ""),
+        rate: Number.parseFloat(finalControllerData.rate) || 0,
+        description: String(finalControllerData.description || ""),
+        status: String(finalControllerData.status || "In Progress"),
+        vat: Number.parseInt(finalControllerData.vat) || 15,
+        num_six_meters: Number.parseInt(finalControllerData.num_six_meters) || 0,
+        num_twelve_meters: Number.parseInt(finalControllerData.num_twelve_meters) || 0,
+        num_abnormal: Number.parseInt(finalControllerData.num_abnormal) || 0,
+        weight:
+          finalControllerData.rateWeight === "Container" ? null : Number.parseFloat(finalControllerData.weight) || 0,
+        total_cost: Number.parseFloat(finalControllerData.total_cost) || 0,
+        // Make sure field names match exactly what the server expects
+        booking_ref: String(finalControllerData.bookingRef || ""),
+        vessel_name: String(finalControllerData.vesselName || ""),
+        voyage_num: String(finalControllerData.voyageNo || ""),
+        imo_num: String(finalControllerData.imoNo || ""),
+        flag_reg: String(finalControllerData.flagReg || ""),
+      }
+
+      console.log("Updating instruction data:", instructionData)
+      // Remove debug message
+      // setDebugMessage("Sending instruction data to API...")
+
+      // Update instruction with better error handling
+      try {
+        const instructionResponse = await fetch(`${API_BASE_URL}/api/instruction/${instructionId}`, {
+          method: "PUT",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify(instructionData),
+        })
+
+        if (!instructionResponse.ok) {
+          const errorText = await instructionResponse.text()
+          console.error("API error response:", errorText)
+          // Remove debug message
+          // setDebugMessage(`API error: ${instructionResponse.status} ${instructionResponse.statusText} - ${errorText}`)
+          throw new Error(
+            `Failed to update instruction: ${instructionResponse.status} ${instructionResponse.statusText}`,
+          )
+        }
+
+        const instructionResult = await instructionResponse.json()
+        console.log("Instruction updated successfully:", instructionResult)
+        // Remove debug message
+        // setDebugMessage("Instruction updated successfully. Processing containers...")
+      } catch (error) {
+        console.error("Error updating instruction:", error)
+        // Remove debug message
+        // setDebugMessage(`Error updating instruction: ${error.message}`)
+        throw error
+      }
+
+      // Now handle container data
+      // Prepare container data for API with careful type handling
+      const containerData = containers.map((container) => ({
+        containernum: container.containerNum ? container.containerNum.toString() : "",
+        weight: isImport ? (container.weight ? Number.parseFloat(container.weight) : null) : null,
+        m1key: Number.parseInt(instructionId),
+      }))
+
+      console.log("Sending container data to API:", JSON.stringify(containerData, null, 2))
+      // Remove debug message
+      // setDebugMessage("Sending container data to API...")
+
+      // Send container data to API with better error handling
+      try {
+        const containerResponse = await fetch(`${API_BASE_URL}/api/containers/${instructionId}`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify(containerData),
+        })
+
+        if (!containerResponse.ok) {
+          const errorText = await containerResponse.text()
+          console.error("API error response:", errorText)
+          // Remove debug message
+          // setDebugMessage(
+          //   `Container API error: ${containerResponse.status} ${containerResponse.statusText} - ${errorText}`,
+          // )
+          throw new Error(`Failed to save containers: ${containerResponse.status} ${containerResponse.statusText}`)
+        }
+
+        const result = await containerResponse.json()
+        console.log("API response:", result)
+        // Remove debug message
+        // setDebugMessage("Containers saved successfully!")
+
+        // Update the updatedControllerData with the final values
+        setUpdatedControllerData(finalControllerData)
+        setIsDataModified(false)
+
+        return result
+      } catch (error) {
+        console.error("Error saving containers:", error)
+        // Remove debug message
+        // setDebugMessage(`Error saving containers: ${error.message}`)
+        throw error
+      }
+    } catch (error) {
+      console.error("Error in saveChangesToDatabase:", error)
+      // Remove debug message
+      // setDebugMessage(`Error: ${error.message}`)
+      throw error
     }
+  }
 
-    // First, update the instruction data
-    const instructionData = {
-      client: Number.parseInt(finalControllerData.clientId),
-      task: finalControllerData.task,
-      shipment_type: Number.parseInt(finalControllerData.shipmentTypeId),
-      pickup: finalControllerData.pickup,
-      dropoff: finalControllerData.dropoff,
-      hazardous: finalControllerData.hazardous,
-      surchages: finalControllerData.surcharges,
-      pickuptime: formatTimeForSubmission(finalControllerData.pickupTime),
-      pickupdate: formatDateForSubmission(finalControllerData.pickupDate),
-      stackdate: formatDateForSubmission(finalControllerData.stackDate),
-      deadline: formatDateForSubmission(finalControllerData.deadline),
-      fileref: finalControllerData.fileRef,
-      rateweight: finalControllerData.rateWeight,
-      rate: Number.parseFloat(finalControllerData.rate),
-      description: finalControllerData.description,
-      status: finalControllerData.status || "In Progress",
-      vat: finalControllerData.vat,
-      num_six_meters: finalControllerData.num_six_meters,
-      num_twelve_meters: finalControllerData.num_twelve_meters,
-      num_abnormal: finalControllerData.num_abnormal,
-      weight: finalControllerData.rateWeight === "Container" ? null : Number.parseFloat(finalControllerData.weight),
-      total_cost: Number.parseFloat(finalControllerData.total_cost),
-    }
+  // Direct click handler for the Save Changes button
+  const handleSaveButtonClick = () => {
+    console.log("Save button clicked directly")
+    // Remove debug message
+    // setDebugMessage("Save button clicked")
 
-    console.log("Updating instruction data:", instructionData)
-
-    // Update instruction
-    const instructionResponse = await fetch(`${API_BASE_URL}/api/instruction/${instructionId}`, {
-      method: "PUT",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify(instructionData),
-    })
-
-    if (!instructionResponse.ok) {
-      const errorData = await instructionResponse.json()
-      throw new Error(errorData.error || "Failed to update instruction")
-    }
-
-    console.log("Instruction updated successfully")
-
-    // Now handle container data
-    // Prepare container data for API
-    const containerData = containers.map((container) => ({
-      containerkey: container.containerKey, // Will be null for new containers
-      containernum: Number.parseInt(container.containerNum) || 0,
-      weight: isImport ? (container.weight ? Number.parseFloat(container.weight) : null) : null,
-      m1key: instructionId,
-    }))
-
-    console.log("Sending container data to API:", containerData)
-
-    // Send container data to API
-    const containerResponse = await fetch(`${API_BASE_URL}/api/containers/${instructionId}`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify(containerData),
-    })
-
-    if (!containerResponse.ok) {
-      const errorText = await containerResponse.text()
-      console.error("API error response:", errorText)
-      throw new Error(`Failed to save containers: ${containerResponse.status} ${containerResponse.statusText}`)
-    }
-
-    const result = await containerResponse.json()
-    console.log("API response:", result)
-
-    // Update the updatedControllerData with the final values
-    setUpdatedControllerData(finalControllerData)
-    setIsDataModified(false)
-
-    return result
+    // Call the submit handler
+    handleSubmit()
   }
 
   // Update the handleSubmit function to ensure total_cost is calculated
   const handleSubmit = async () => {
-    if (!validateContainers()) {
-      // Don't show error modal for field validation errors
-      // The tooltips will be displayed instead
+    console.log("handleSubmit function called")
+    // Remove debug message
+    // setDebugMessage("Starting submission process...")
+
+    // Prevent multiple submissions
+    if (isSubmitting) {
+      console.log("Already submitting, ignoring click")
+      // Remove debug message
+      // setDebugMessage("Already submitting, please wait...")
       return
     }
 
+    // Set submitting state to true
+    setIsSubmitting(true)
+
     try {
+      console.log("Validating containers...")
+      // Remove debug message
+      // setDebugMessage("Validating containers...")
+
+      // Validate containers
+      if (!validateContainers()) {
+        console.log("Container validation failed")
+        // Remove debug message
+        // setDebugMessage("Validation failed. Please check the form for errors.")
+        setIsSubmitting(false)
+        return
+      }
+
+      console.log("Validation passed, saving to database...")
+      // Remove debug message
+      // setDebugMessage("Validation passed, saving to database...")
+
+      // Save changes to database
       const result = await saveChangesToDatabase()
 
+      console.log("Save successful:", result)
+      // Remove debug message
+      // setDebugMessage("Save successful!")
+
+      // Show success message
       setSuccessMessage("Changes saved successfully!")
+
+      // Verify the data was saved by fetching it again
+      try {
+        const verifyResponse = await fetch(`${API_BASE_URL}/api/containers/${instructionId}`, {
+          method: "GET",
+          headers: {
+            Accept: "application/json",
+            "Content-Type": "application/json",
+          },
+        })
+
+        if (verifyResponse.ok) {
+          const verifyData = await verifyResponse.json()
+          console.log("Verification data:", verifyData)
+          // Remove debug message
+          // setDebugMessage(`Verification successful! Found ${verifyData.length} containers in database.`)
+        } else {
+          console.log("Verification failed:", verifyResponse.status)
+          // Remove debug message
+          // setDebugMessage(`Verification failed: ${verifyResponse.status}`)
+        }
+      } catch (error) {
+        console.error("Error verifying data:", error)
+        // Remove debug message
+        // setDebugMessage(`Error verifying data: ${error.message}`)
+      }
 
       // Clear success message after 3 seconds and navigate back to instructions with all state
       setTimeout(() => {
@@ -746,10 +937,17 @@ const FCcontrollerInstructionDetails = () => {
       }, 3000)
     } catch (error) {
       console.error("Error saving data:", error)
+      // Remove debug message
+      // setDebugMessage(`Error saving data: ${error.message}`)
+
+      // Show error modal
       setErrorModal({
         isOpen: true,
         message: error.message || "Failed to save changes. Please try again.",
       })
+    } finally {
+      // Reset submitting state
+      setIsSubmitting(false)
     }
   }
 
@@ -792,7 +990,22 @@ const FCcontrollerInstructionDetails = () => {
         </div>
       )}
 
-      {/* Removed the unsaved changes notification as requested */}
+      {/* Debug Message - REMOVED */}
+      {/* {debugMessage && (
+        <div
+          className="debug-message"
+          style={{
+            backgroundColor: "#e2f3fd",
+            color: "#0c5460",
+            padding: "10px",
+            borderRadius: "4px",
+            margin: "10px 0",
+            textAlign: "center",
+          }}
+        >
+          {debugMessage}
+        </div>
+      )} */}
 
       <div className="container-details-wrapper">
         <div className="content">
@@ -814,13 +1027,6 @@ const FCcontrollerInstructionDetails = () => {
             <button className="add-container-button" onClick={() => handleAddContainer("Abnormal")}>
               Add Abnormal Container
             </button>
-          </div>
-
-          {/* Input requirements notice */}
-          <div className="input-requirements-notice">
-            <p>
-              <strong>Note:</strong> Please enter numeric values only. Letters and special characters are not allowed.
-            </p>
           </div>
 
           <br />
@@ -853,15 +1059,13 @@ const FCcontrollerInstructionDetails = () => {
                             value={container.containerNum}
                             onChange={(e) => {
                               const value = e.target.value
-                              // Only allow positive integers
-                              if (value === "" || /^[0-9]+$/.test(value)) {
-                                handleContainerChange(container.id, "containerNum", value)
-                              }
+                              handleContainerChange(container.id, "containerNum", value)
                             }}
                             className={`container-input ${
                               fieldErrors[`container-${container.id}`] ? "error-field" : ""
                             }`}
-                            placeholder="Numbers only"
+                            placeholder="ABCD1234567"
+                            maxLength={11}
                           />
                           <ErrorTooltip message={fieldErrors[`container-${container.id}`]} />
                         </div>
@@ -911,10 +1115,25 @@ const FCcontrollerInstructionDetails = () => {
             </div>
           )}
 
+          <div
+            className="note-container"
+            style={{
+              backgroundColor: "#fff3cd",
+              border: "1px solid #ffeeba",
+              borderRadius: "4px",
+              padding: "10px",
+              margin: "15px 0",
+              textAlign: "center",
+            }}
+          >
+            <p style={{ margin: 0, color: "#856404" }}>Note: Click "Save Changes" to save all your modifications.</p>
+          </div>
+
           <div className="submit-section">
             <button
               className="submit-button"
-              onClick={handleSubmit}
+              onClick={handleSaveButtonClick} // Use the direct click handler
+              disabled={isSubmitting}
               style={{
                 backgroundColor: "#28a745", // Always green as requested
                 color: "white",
@@ -922,11 +1141,12 @@ const FCcontrollerInstructionDetails = () => {
                 borderRadius: "4px",
                 padding: "10px 20px",
                 fontSize: "16px",
-                cursor: "pointer",
+                cursor: isSubmitting ? "not-allowed" : "pointer",
                 transition: "background-color 0.3s ease",
+                opacity: isSubmitting ? 0.7 : 1,
               }}
             >
-              Save Changes
+              {isSubmitting ? "Saving..." : "Save Changes"}
             </button>
           </div>
         </div>

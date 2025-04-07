@@ -66,6 +66,7 @@ const FCcontrollerinstructions = () => {
     stackDate: "",
     deadline: "",
     fileRef: "",
+    bookingRef: "", // Add booking reference field
     rateWeight: "kg",
     rate: "",
     weight: "", // Added weight field
@@ -76,6 +77,11 @@ const FCcontrollerinstructions = () => {
     description: "",
     status: "",
     total_cost: 0, // Added total_cost field
+    // Add vessel information fields
+    vesselName: "",
+    voyageNo: "",
+    imoNo: "",
+    flagReg: "",
   })
 
   // State for calendar display
@@ -130,11 +136,17 @@ const FCcontrollerinstructions = () => {
     stackDate: useRef(null),
     deadline: useRef(null),
     fileRef: useRef(null),
+    bookingRef: useRef(null), // Add ref for bookingRef
     rate: useRef(null),
     weight: useRef(null),
     num_six_meters: useRef(null),
     vat: useRef(null),
     description: useRef(null),
+    // Add refs for vessel information fields
+    vesselName: useRef(null),
+    voyageNo: useRef(null),
+    imoNo: useRef(null),
+    flagReg: useRef(null),
   }
 
   // Updated handleBackClick function - ensure no database changes are made
@@ -533,6 +545,7 @@ const FCcontrollerinstructions = () => {
       stackdate: formatDateForAPI(formData.stackDate),
       deadline: formatDateForAPI(formData.deadline),
       fileref: formData.fileRef,
+      bookingRef: formData.bookingRef,
       rateweight: formData.rateWeight,
       rate: Number.parseFloat(formData.rate),
       description: formData.description,
@@ -543,6 +556,12 @@ const FCcontrollerinstructions = () => {
       num_abnormal: formData.num_abnormal,
       weight: weightValue,
       total_cost: totalCost,
+      // Add vessel information
+      booking_ref: formData.bookingRef,
+      vessel_name: formData.vesselName,
+      voyage_num: formData.voyageNo,
+      imo_num: formData.imoNo,
+      flag_reg: formData.flagReg,
     }
 
     console.log("Updating instruction data:", instructionData)
@@ -662,6 +681,7 @@ const FCcontrollerinstructions = () => {
         stackDate: formattedStackDate,
         deadline: formattedDeadlineDate,
         fileRef: data.fileref || "",
+        bookingRef: data.booking_ref || "",
         rateWeight: data.rateweight || "kg",
         rate: data.rate ? data.rate.toString() : "",
         weight: data.weight ? formatWeightForDisplay(data.weight) : "", // Format weight
@@ -672,6 +692,11 @@ const FCcontrollerinstructions = () => {
         description: data.description || "",
         status: data.status || "",
         total_cost: data.total_cost || 0, // Include total_cost
+        // Include vessel information
+        vesselName: data.vessel_name || "",
+        voyageNo: data.voyage_num || "",
+        imoNo: data.imo_num || "",
+        flagReg: data.flag_reg || "",
       }
 
       console.log("Formatted data for form:", formattedData)
@@ -1019,8 +1044,14 @@ const FCcontrollerinstructions = () => {
       "stackDate",
       "deadline",
       "fileRef",
+      "bookingRef", // Add bookingRef as a required field
       "rate",
       "description",
+      // Add vessel information fields as required
+      "vesselName",
+      "voyageNo",
+      "imoNo",
+      "flagReg",
     ]
 
     let isValid = true
@@ -1323,6 +1354,11 @@ const FCcontrollerinstructions = () => {
         </div>
       </div>
     )
+  }
+
+  // Declare seDate function
+  const seDate = (dateString) => {
+    return dateString
   }
 
   return (
@@ -1661,7 +1697,7 @@ const FCcontrollerinstructions = () => {
                     placeholderText="MM/DD/YYYY"
                     ref={deadlineDateRef}
                     disabled={!formData.stackDate}
-                    minDate={parseDate(formData.stackDate) || parseDate(formData.pickupDate)}
+                    minDate={parseDate(formData.stackDate) || seDate(formData.pickupDate)}
                     onFocus={(e) => e.target.blur()} // Prevent keyboard on mobile
                     customInput={
                       <input
@@ -1720,6 +1756,20 @@ const FCcontrollerinstructions = () => {
                   <ErrorTooltip message={fieldErrors.fileRef} />
                 </div>
               </div>
+              <div className="booking-ref-column">
+                <label>Booking Ref.</label>
+                <div className="input-wrapper" ref={fieldRefs.bookingRef}>
+                  <input
+                    type="text"
+                    className={`form-input ${fieldErrors.bookingRef ? "error-field" : ""}`}
+                    placeholder="Enter booking reference"
+                    name="bookingRef"
+                    value={formData.bookingRef}
+                    onChange={handleInputChange}
+                  />
+                  <ErrorTooltip message={fieldErrors.bookingRef} />
+                </div>
+              </div>
               <div className="rates-column">
                 <label>Rates per</label>
                 <div className="rates-input-group">
@@ -1735,7 +1785,6 @@ const FCcontrollerinstructions = () => {
                       <option value="Container">Container</option>
                     </select>
                   </div>
-                  <span className="rates-separator">--</span>
                   <div className="input-wrapper" ref={fieldRefs.rate}>
                     <input
                       type="text"
@@ -1851,6 +1900,72 @@ const FCcontrollerinstructions = () => {
             </div>
           </div>
 
+          {/* Vessel Information Section */}
+          <div className="form-section blue-bg">
+            <div className="vessel-info-container">
+              <div className="vessel-info-row">
+                <div className="vessel-info-field">
+                  <label>Vessel Name</label>
+                  <div className="input-wrapper" ref={fieldRefs.vesselName}>
+                    <input
+                      type="text"
+                      className={`form-input vessel-input ${fieldErrors.vesselName ? "error-field" : ""}`}
+                      placeholder="Enter vessel name"
+                      name="vesselName"
+                      value={formData.vesselName}
+                      onChange={handleInputChange}
+                    />
+                    <ErrorTooltip message={fieldErrors.vesselName} />
+                  </div>
+                </div>
+                <div className="vessel-info-field">
+                  <label>Voyage No.</label>
+                  <div className="input-wrapper" ref={fieldRefs.voyageNo}>
+                    <input
+                      type="text"
+                      className={`form-input vessel-input ${fieldErrors.voyageNo ? "error-field" : ""}`}
+                      placeholder="Enter voyage number"
+                      name="voyageNo"
+                      value={formData.voyageNo}
+                      onChange={handleInputChange}
+                    />
+                    <ErrorTooltip message={fieldErrors.voyageNo} />
+                  </div>
+                </div>
+              </div>
+              <div className="vessel-info-row">
+                <div className="vessel-info-field">
+                  <label>IMO No.</label>
+                  <div className="input-wrapper" ref={fieldRefs.imoNo}>
+                    <input
+                      type="text"
+                      className={`form-input vessel-input ${fieldErrors.imoNo ? "error-field" : ""}`}
+                      placeholder="Enter IMO number"
+                      name="imoNo"
+                      value={formData.imoNo}
+                      onChange={handleInputChange}
+                    />
+                    <ErrorTooltip message={fieldErrors.imoNo} />
+                  </div>
+                </div>
+                <div className="vessel-info-field">
+                  <label>Flag Reg</label>
+                  <div className="input-wrapper" ref={fieldRefs.flagReg}>
+                    <input
+                      type="text"
+                      className={`form-input vessel-input ${fieldErrors.flagReg ? "error-field" : ""}`}
+                      placeholder="Enter flag registration"
+                      name="flagReg"
+                      value={formData.flagReg}
+                      onChange={handleInputChange}
+                    />
+                    <ErrorTooltip message={fieldErrors.flagReg} />
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
           {/* Description Section */}
           <div className="form-section blue-bg">
             <div className="description-section">
@@ -1866,6 +1981,10 @@ const FCcontrollerinstructions = () => {
                 <ErrorTooltip message={fieldErrors.description} />
               </div>
             </div>
+          </div>
+
+          <div className="save-note">
+            <p>Note: To save changes, please proceed to the next page.</p>
           </div>
 
           <div className="button-container">
@@ -2074,11 +2193,15 @@ const FCcontrollerinstructions = () => {
         }
 
         .file-ref-column {
-          width: 48%;
+          width: 32%;
+        }
+
+        .booking-ref-column {
+          width: 32%;
         }
 
         .rates-column {
-          width: 48%;
+          width: 32%;
         }
 
         .description-section {
@@ -2146,11 +2269,7 @@ const FCcontrollerinstructions = () => {
         .rates-input-group {
           display: flex;
           align-items: center;
-        }
-
-        .rates-separator {
-          margin: 0 10px;
-          font-weight: bold;
+          gap: 10px; /* Add gap instead of separator */
         }
 
         .select-wrapper.small {
@@ -2264,6 +2383,50 @@ const FCcontrollerinstructions = () => {
           border: 1px solid #d9d9d9;
           border-radius: 4px;
           background-color: white;
+        }
+
+        /* Vessel Information styling */
+        .vessel-info-container {
+          width: 100%;
+        }
+
+        .vessel-info-row {
+          display: flex;
+          justify-content: space-between;
+          margin-bottom: 20px;
+        }
+
+        .vessel-info-row:last-child {
+          margin-bottom: 0;
+        }
+
+        .vessel-info-field {
+          width: 48%;
+        }
+
+        .vessel-input {
+          width: 100%;
+          padding: 10px 15px;
+          font-size: 15px;
+          border: 1px solid #d9d9d9;
+          border-radius: 4px;
+          background-color: white;
+        }
+
+        /* Save note styling */
+        .save-note {
+          text-align: center;
+          margin: 20px 0;
+          padding: 10px;
+          background-color: #fffbe6;
+          border: 1px solid #ffe58f;
+          border-radius: 4px;
+        }
+
+        .save-note p {
+          margin: 0;
+          color: #d48806;
+          font-weight: 500;
         }
       `}</style>
     </div>

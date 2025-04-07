@@ -55,6 +55,7 @@ const Viewcontrollerinstructions = () => {
     stackDate: "",
     deadline: "",
     fileRef: "",
+    bookingRef: "", // Added booking ref field
     rateWeight: "kg",
     rate: "",
     weight: "", // Added weight field
@@ -64,6 +65,10 @@ const Viewcontrollerinstructions = () => {
     vat: 15,
     description: "",
     status: "",
+    vesselName: "", // Added vessel name field
+    voyageNo: "", // Added voyage number field
+    imoNo: "", // Added IMO number field
+    flagReg: "", // Added flag registration field
   })
 
   // State to track if shipment type is Import
@@ -202,6 +207,7 @@ const Viewcontrollerinstructions = () => {
         stackDate: formatDateForDisplay(data.stackdate) || "",
         deadline: formatDateForDisplay(data.deadline) || "",
         fileRef: data.fileref || "",
+        bookingRef: data.booking_ref || "", // Added booking ref field
         rateWeight: data.rateweight || "kg",
         rate: data.rate ? data.rate.toString() : "",
         weight: data.weight ? formatWeightForDisplay(data.weight) : "No Weight Amount Provided", // Format weight
@@ -211,6 +217,10 @@ const Viewcontrollerinstructions = () => {
         vat: data.vat || 15,
         description: data.description || "",
         status: data.status || "",
+        vesselName: data.vessel_name || "", // Added vessel name field
+        voyageNo: data.voyage_num || "", // Added voyage number field
+        imoNo: data.imo_num || "", // Added IMO number field
+        flagReg: data.flag_reg || "", // Added flag registration field
       }
 
       setFormData(formattedData)
@@ -633,6 +643,18 @@ const Viewcontrollerinstructions = () => {
                   style={{ ...nonEditableStyle, width: "60%" }}
                 />
               </div>
+              <div className="form-group">
+                <label>Booking Ref</label>
+                <input
+                  type="text"
+                  className="form-input"
+                  placeholder="Enter booking reference"
+                  name="bookingRef"
+                  value={formData.bookingRef}
+                  readOnly
+                  style={{ ...nonEditableStyle, width: "60%" }}
+                />
+              </div>
               <div className="form-group rates-group">
                 <label>Rates per</label>
                 <div className="rates-input-group" style={{ display: "flex", alignItems: "center" }}>
@@ -738,8 +760,63 @@ const Viewcontrollerinstructions = () => {
 
           <div className="form-section">
             <div className="form-row1">
+              <div className="form-group" style={{ width: "48%" }}>
+                <label>Vessel Name</label>
+                <input
+                  type="text"
+                  className="form-input"
+                  placeholder="Enter vessel name"
+                  name="vesselName"
+                  value={formData.vesselName}
+                  readOnly
+                  style={nonEditableStyle}
+                />
+              </div>
+              <div className="form-group" style={{ width: "48%" }}>
+                <label>Voyage No</label>
+                <input
+                  type="text"
+                  className="form-input"
+                  placeholder="Enter voyage number"
+                  name="voyageNo"
+                  value={formData.voyageNo}
+                  readOnly
+                  style={nonEditableStyle}
+                />
+              </div>
+            </div>
+            <div className="form-row1">
+              <div className="form-group" style={{ width: "48%" }}>
+                <label>IMO No</label>
+                <input
+                  type="text"
+                  className="form-input"
+                  placeholder="Enter IMO number"
+                  name="imoNo"
+                  value={formData.imoNo}
+                  readOnly
+                  style={nonEditableStyle}
+                />
+              </div>
+              <div className="form-group" style={{ width: "48%" }}>
+                <label>Flag Reg</label>
+                <input
+                  type="text"
+                  className="form-input"
+                  placeholder="Enter flag registration"
+                  name="flagReg"
+                  value={formData.flagReg}
+                  readOnly
+                  style={nonEditableStyle}
+                />
+              </div>
+            </div>
+          </div>
+
+          <div className="form-section">
+            <div className="form-row1">
               <div className="form-group full-width">
-                <label>Description from client</label>
+                <label style={{ textAlign: "center", width: "100%", display: "block" }}>Description from client</label>
                 <textarea
                   className="form-textarea"
                   placeholder="Description from client, like type of goods etc"

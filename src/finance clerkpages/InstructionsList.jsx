@@ -35,18 +35,18 @@ const BellIcon = () => {
 const addShakeAnimation = () => {
   const styleSheet = document.createElement("style")
   styleSheet.textContent = `
-    @keyframes shake {
-      0% { transform: rotate(0deg); }
-      25% { transform: rotate(5deg); }
-      50% { transform: rotate(0deg); }
-      75% { transform: rotate(-5deg); }
-      100% { transform: rotate(0deg); }
-    }
-    
-    .bell-icon-status {
-      display: inline-block;
-    }
-  `
+  @keyframes shake {
+    0% { transform: rotate(0deg); }
+    25% { transform: rotate(5deg); }
+    50% { transform: rotate(0deg); }
+    75% { transform: rotate(-5deg); }
+    100% { transform: rotate(0deg); }
+  }
+  
+  .bell-icon-status {
+    display: inline-block;
+  }
+`
   document.head.appendChild(styleSheet)
 }
 
@@ -167,6 +167,18 @@ const Instructions = () => {
         filtered = filtered.filter((item) => item.type_text === "export" || item.type === "export")
       }
     }
+
+    // Sort instructions with "New" status to the top, then by date (most recent first)
+    filtered = filtered.sort((a, b) => {
+      // First, sort by status (New instructions at the top)
+      if (a.status === "New" && b.status !== "New") return -1
+      if (a.status !== "New" && b.status === "New") return 1
+
+      // Then, sort by date (most recent first)
+      const dateA = new Date(a.startingdate || a.pickupdate)
+      const dateB = new Date(b.startingdate || b.pickupdate)
+      return dateB - dateA
+    })
 
     return filtered
   }
@@ -327,7 +339,7 @@ const Instructions = () => {
                         </button>
                       </td>
                       <td>
-                        <button  className="view-btn" onClick={() => navigate("/update-instructions")}>
+                        <button className="view-btn" onClick={() => navigate("/update-instructions")}>
                           View
                         </button>
                       </td>

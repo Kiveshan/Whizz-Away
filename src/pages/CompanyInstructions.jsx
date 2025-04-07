@@ -193,6 +193,27 @@ const CompanyInstructions = () => {
       }
     }
 
+    // Sort instructions: "New" status at top, then by ID (descending) within "New" status
+    filtered.sort((a, b) => {
+      // First sort by status
+      if (a.status === "New" && b.status !== "New") {
+        return -1 // a comes before b
+      }
+      if (a.status !== "New" && b.status === "New") {
+        return 1 // b comes before a
+      }
+
+      // If both have "New" status, sort by ID (descending)
+      if (a.status === "New" && b.status === "New") {
+        const aId = Number.parseInt(a.m1controllerkey || a.m1key || 0)
+        const bId = Number.parseInt(b.m1controllerkey || b.m1key || 0)
+        return bId - aId // Higher IDs first
+      }
+
+      // For non-"New" status, maintain original order
+      return 0
+    })
+
     return filtered
   }
 

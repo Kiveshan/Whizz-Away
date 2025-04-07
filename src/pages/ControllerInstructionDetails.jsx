@@ -336,22 +336,68 @@ const ContainerDetailsPage = () => {
     return counts
   }
 
-  // Handle container input change
+  // Handle container input change with real-time validation
   const handleContainerChange = (id, field, value) => {
+    if (field === "containerNum") {
+      // Get the current container
+      const container = containers.find((c) => c.id === id)
+      const currentValue = container ? container.containerNum : ""
+
+      // For container numbers, enforce the format: 4 letters followed by 7 numbers
+      if (value.length > 11) {
+        // Prevent entering more than 11 characters
+        return
+      }
+
+      // Create a new value by validating each character
+      let newValue = ""
+      for (let i = 0; i < value.length; i++) {
+        const char = value[i]
+        if (i < 4) {
+          // First 4 positions: only allow letters
+          if (/^[a-zA-Z]$/.test(char)) {
+            newValue += char
+          }
+        } else {
+          // Positions 5-11: only allow numbers
+          if (/^[0-9]$/.test(char)) {
+            newValue += char
+          }
+        }
+      }
+
+      // Only update if the filtered value is different from the input
+      if (newValue !== value) {
+        return
+      }
+
+      // Real-time validation
+      let error = null
+      if (newValue.length > 0 && newValue.length < 11) {
+        error = "Does not match correct format (ABCD1234567)"
+      } else if (newValue.length === 11 && !/^[a-zA-Z]{4}[0-9]{7}$/.test(newValue)) {
+        error = "Does not match correct format (ABCD1234567)"
+      }
+
+      // Update field errors
+      setFieldErrors((prev) => ({
+        ...prev,
+        [`container-${id}`]: error,
+      }))
+    }
+
     setContainers((prevContainers) =>
       prevContainers.map((container) => (container.id === id ? { ...container, [field]: value } : container)),
     )
 
     // Clear any error for this container
-    setFieldErrors((prev) => {
-      const newErrors = { ...prev }
-      if (field === "containerNum") {
-        delete newErrors[`container-${id}`]
-      } else if (field === "weight") {
+    if (field === "weight") {
+      setFieldErrors((prev) => {
+        const newErrors = { ...prev }
         delete newErrors[`weight-${id}`]
-      }
-      return newErrors
-    })
+        return newErrors
+      })
+    }
   }
 
   // Update the handleAddContainer function to recalculate total_cost
@@ -423,7 +469,7 @@ const ContainerDetailsPage = () => {
     })
   }
 
-  // Validate containers
+  // Validate containers with updated container number format validation
   const validateContainers = () => {
     // Validate container counts match the specified counts in controllerData
     const counts = countContainersByType()
@@ -459,8 +505,13 @@ const ContainerDetailsPage = () => {
       if (!container.containerNum) {
         newErrors[`container-${container.id}`] = "Field is required"
         isValid = false
-      } else if (!/^[0-9]+$/.test(container.containerNum)) {
-        newErrors[`container-${container.id}`] = "Numbers only"
+      }
+      // Check container number format (11 chars: 4 letters followed by 7 numbers)
+      else if (container.containerNum.length !== 11) {
+        newErrors[`container-${container.id}`] = "Does not match correct format (ABCD1234567)"
+        isValid = false
+      } else if (!/^[a-zA-Z]{4}[0-9]{7}$/.test(container.containerNum)) {
+        newErrors[`container-${container.id}`] = "Does not match correct format (ABCD1234567)"
         isValid = false
       }
 
@@ -574,6 +625,12 @@ const ContainerDetailsPage = () => {
           // Ensure these fields are explicitly included and properly formatted
           total_cost: Number.parseFloat(controllerData.total_cost || 0),
           weight: controllerData.rateWeight !== "Container" ? Number.parseFloat(controllerData.weight || 0) : null,
+          // Make sure shipping fields are explicitly included
+          booking_ref: controllerData.bookingRef || "",
+          vessel_name: controllerData.vesselName || "",
+          voyage_num: controllerData.voyageNo || "",
+          imo_num: controllerData.imoNo || "",
+          flag_reg: controllerData.flagReg || "",
         },
         containerData: containers.map((container) => ({
           containerNum: container.containerNum,
@@ -702,13 +759,6 @@ const ContainerDetailsPage = () => {
             </button>
           </div>
 
-          {/* Input requirements notice */}
-          <div className="input-requirements-notice">
-            <p>
-              <strong>Note:</strong> Please enter numeric values only. Letters and special characters are not allowed.
-            </p>
-          </div>
-
           <br />
 
           {isLoading ? (
@@ -739,13 +789,11 @@ const ContainerDetailsPage = () => {
                             value={container.containerNum}
                             onChange={(e) => {
                               const value = e.target.value
-                              // Only allow positive integers
-                              if (value === "" || /^[0-9]+$/.test(value)) {
-                                handleContainerChange(container.id, "containerNum", value)
-                              }
+                              handleContainerChange(container.id, "containerNum", value)
                             }}
                             className={`container-input ${fieldErrors[`container-${container.id}`] ? "error-field" : ""}`}
-                            placeholder="Numbers only"
+                            placeholder="ABCD1234567"
+                            maxLength={11}
                           />
                           {fieldErrors[`container-${container.id}`] && (
                             <ErrorTooltip message={fieldErrors[`container-${container.id}`]} />
@@ -766,7 +814,7 @@ const ContainerDetailsPage = () => {
                                 }
                               }}
                               className={`container-input ${fieldErrors[`weight-${container.id}`] ? "error-field" : ""}`}
-                              placeholder="Numbers only"
+                              placeholder="Weight"
                             />
                             {fieldErrors[`weight-${container.id}`] && (
                               <ErrorTooltip message={fieldErrors[`weight-${container.id}`]} />
@@ -805,58 +853,44 @@ const ContainerDetailsPage = () => {
         </div>
       </div>
       <style jsx>{`
-        .input-wrapper {
-          position: relative;
-        }
-        
-        .input-cell {
-          position: relative;
-        }
-        
-        .error-field {
-          border: 2px solid #ff4d4f !important;
-          background-color: #fff1f0 !important;
-        }
-        
-        .error-tooltip {
-          position: absolute;
-          top: -40px;
-          left: 0;
-          background-color: #ff4d4f;
-          color: white;
-          padding: 5px 10px;
-          border-radius: 4px;
-          font-size: 12px;
-          z-index: 100;
-          white-space: nowrap;
-          box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
-        }
-        
-        .tooltip-arrow {
-          position: absolute;
-          bottom: -5px;
-          left: 10px;
-          width: 0;
-          height: 0;
-          border-left: 5px solid transparent;
-          border-right: 5px solid transparent;
-          border-top: 5px solid #ff4d4f;
-        }
-        
-        .input-requirements-notice {
-          background-color: #e6f7ff;
-          border: 1px solid #91d5ff;
-          border-radius: 4px;
-          padding: 10px;
-          margin: 15px 0;
-          font-size: 14px;
-        }
-        
-        .input-requirements-notice p {
-          margin: 0;
-          color: #0050b3;
-        }
-      `}</style>
+    .input-wrapper {
+      position: relative;
+    }
+    
+    .input-cell {
+      position: relative;
+    }
+    
+    .error-field {
+      border: 2px solid #ff4d4f !important;
+      background-color: #fff1f0 !important;
+    }
+    
+    .error-tooltip {
+      position: absolute;
+      top: -40px;
+      left: 0;
+      background-color: #ff4d4f;
+      color: white;
+      padding: 5px 10px;
+      border-radius: 4px;
+      font-size: 12px;
+      z-index: 100;
+      white-space: nowrap;
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+    }
+    
+    .tooltip-arrow {
+      position: absolute;
+      bottom: -5px;
+      left: 10px;
+      width: 0;
+      height: 0;
+      border-left: 5px solid transparent;
+      border-right: 5px solid transparent;
+      border-top: 5px solid #ff4d4f;
+    }
+  `}</style>
     </>
   )
 }
