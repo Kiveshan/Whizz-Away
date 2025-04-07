@@ -5,7 +5,7 @@ import UserApprovalList from "./UserApprovalList"
 import CompanyManagement from "./CompanyManagement"
 import "../css/AdminDashboard.css"
 // Import the TestConnection component
-import TestConnection from "./TestConnection"
+// import TestConnection from "./TestConnection"
 
 function AdminDashboard() {
   const [activeTab, setActiveTab] = useState("users")
