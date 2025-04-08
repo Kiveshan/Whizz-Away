@@ -8,7 +8,7 @@ const Register = ({ switchToLogin, closePopup }) => {
     email: "",
     password: "",
     companyname: "",
-    company_reg_number: "",
+    company_reg_num: "",
     cluster_box: "",
     street: "",
     cell_num: "",
@@ -97,7 +97,7 @@ const Register = ({ switchToLogin, closePopup }) => {
             </div>
             <div className="form-group">
               <label>Company Reg. No.</label>
-              <input type="text" name="company_reg_number" value={formData.company_reg_number} onChange={handleChange} placeholder="Reg. No." className="form-input" required/>
+              <input type="text" name="company_reg_num" value={formData.company_reg_num} onChange={handleChange} placeholder="Reg. No." className="form-input" required/>
             </div>
           </div>
 

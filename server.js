@@ -222,8 +222,7 @@ app.post("/register", async (req, res) => {
     name_of_acc,
     bank,
     branch,
-    branch_code,
-    status
+    branch_code
   } = req.body;
 
   try {
@@ -231,20 +230,20 @@ app.post("/register", async (req, res) => {
 
     const query = `
       INSERT INTO usertable (
-        name, surname, email, password, companyname, company_reg_number,
-        dateofreg, status, cluster_box, street, cell_num, cell_num2,
+        name, surname, email, password, companyname, company_reg_num,
+        dateofreg, cluster_box, street, cell_num, cell_num2,
         vat_reg_num, account_num, name_of_acc, bank, branch, branch_code
       )
       VALUES (
-        $1, $2, $3, $4, $5, $6, NOW(), $7, $8, $9, $10, $11,
-        $12, $13, $14, $15, $16, $17
+        $1, $2, $3, $4, $5, $6, NOW(), $7, $8, $9, $10,
+        $11, $12, $13, $14, $15, $16
       )
       RETURNING *;
     `;
 
     const values = [
       name, surname, email, hashedPassword, companyname, company_reg_num,
-      status, cluster_box, street, cell_num, cell_num2,
+      cluster_box, street, cell_num, cell_num2,
       vat_reg_num, account_num, name_of_acc, bank, branch, branch_code
     ];
 
@@ -252,6 +251,7 @@ app.post("/register", async (req, res) => {
 
     res.json({ message: "User registered successfully", user: result.rows[0] });
   } catch (err) {
+    console.error("Registration error:", err);
     res.status(500).json({ error: err.message });
   }
 });
