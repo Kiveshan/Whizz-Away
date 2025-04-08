@@ -260,6 +260,28 @@ const ControllerInstructions = () => {
         ...formData,
         [name]: checked,
       })
+    } else if (name === "imoNo") {
+      // For IMO No, allow only numbers
+      const numbersOnly = value.replace(/[^0-9]/g, "")
+
+      setFormData({
+        ...formData,
+        [name]: numbersOnly,
+      })
+
+      // Clear any error for this field
+      setFieldErrors((prev) => ({ ...prev, [name]: "" }))
+    } else if (name === "flagReg") {
+      // For Flag Reg, allow letters, spaces, hyphens, and apostrophes
+      const lettersAndSpecialChars = value.replace(/[^a-zA-Z\s\-']/g, "")
+
+      setFormData({
+        ...formData,
+        [name]: lettersAndSpecialChars,
+      })
+
+      // Clear any error for this field
+      setFieldErrors((prev) => ({ ...prev, [name]: "" }))
     } else if (name === "num_six_meters" || name === "num_twelve_meters" || name === "num_abnormal") {
       // Ensure container counts are at least 0
       const numValue = Number.parseInt(value)
@@ -503,6 +525,18 @@ const ControllerInstructions = () => {
         errors.weight = `Weight must be a positive number`
         isValid = false
       }
+    }
+
+    // Validate IMO No contains only numbers
+    if (formData.imoNo && !/^\d+$/.test(formData.imoNo)) {
+      errors.imoNo = "IMO Number must contain only numbers"
+      isValid = false
+    }
+
+    // Validate Flag Reg contains only letters, spaces, hyphens, and apostrophes
+    if (formData.flagReg && !/^[a-zA-Z\s\-']+$/.test(formData.flagReg)) {
+      errors.flagReg = "Flag Registration must contain only letters, spaces, hyphens, and apostrophes"
+      isValid = false
     }
 
     // Validate at least one container is added
@@ -1266,7 +1300,7 @@ const ControllerInstructions = () => {
                     <input
                       type="text"
                       className={`form-input vessel-input ${fieldErrors.imoNo ? "error-field" : ""}`}
-                      placeholder="Enter IMO number"
+                      placeholder="Enter IMO number (numbers only)"
                       style={{
                         width: "100%",
                         backgroundColor: "white",
@@ -1288,7 +1322,7 @@ const ControllerInstructions = () => {
                     <input
                       type="text"
                       className={`form-input vessel-input ${fieldErrors.flagReg ? "error-field" : ""}`}
-                      placeholder="Enter flag registration"
+                      placeholder="Enter flag registration (letters only)"
                       style={{
                         width: "100%",
                         backgroundColor: "white",
@@ -1510,4 +1544,3 @@ const ControllerInstructions = () => {
 }
 
 export default ControllerInstructions
-

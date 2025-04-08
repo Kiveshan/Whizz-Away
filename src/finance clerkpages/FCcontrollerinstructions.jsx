@@ -957,37 +957,42 @@ const FCcontrollerinstructions = () => {
       setFormData(updatedFormData)
       setIsDataModified(true)
       // Clear any error for this field
-      setFieldErrors((prev) => ({ ...prev, rateWeight: "" }))
-    } else if (name === "rate" || name === "weight") {
-      // Allow only numbers and decimal point
-      if (value === "" || /^[0-9]*\.?[0-9]*$/.test(value)) {
-        const updatedFormData = {
+      setFieldErrors((prev) => ({ ...prev, [name]: "" }))
+    } else if (name === "imoNo") {
+      // For IMO Number - allow only numbers
+      const numbersOnly = value.replace(/[^0-9]/g, "")
+
+      if (value === numbersOnly) {
+        setFormData({
           ...formData,
           [name]: value,
-        }
-
-        // Recalculate total_cost if both rate and required values are present
-        const rate = name === "rate" ? Number.parseFloat(value) : Number.parseFloat(formData.rate)
-
-        if (!isNaN(rate)) {
-          if (formData.rateWeight === "Container") {
-            const totalContainers = formData.num_six_meters + formData.num_twelve_meters + formData.num_abnormal
-            updatedFormData.total_cost = rate * totalContainers
-          } else if (
-            (name === "weight" || formData.weight) &&
-            (formData.rateWeight === "kg" || formData.rateWeight === "m³")
-          ) {
-            const weight = name === "weight" ? Number.parseFloat(value) : Number.parseFloat(formData.weight)
-            if (!isNaN(weight)) {
-              updatedFormData.total_cost = rate * weight
-            }
-          }
-        }
-
-        setFormData(updatedFormData)
+        })
         setIsDataModified(true)
         // Clear any error for this field
         setFieldErrors((prev) => ({ ...prev, [name]: "" }))
+      } else {
+        // If the input contains non-numeric characters, show error but don't update the field
+        setFieldErrors((prev) => ({
+          ...prev,
+          [name]: "IMO Number must contain only numbers",
+        }))
+      }
+    } else if (name === "flagReg") {
+      // For Flag Registration - don't allow numbers
+      if (!/\d/.test(value)) {
+        setFormData({
+          ...formData,
+          [name]: value,
+        })
+        setIsDataModified(true)
+        // Clear any error for this field
+        setFieldErrors((prev) => ({ ...prev, [name]: "" }))
+      } else {
+        // If the input contains numbers, show error but don't update the field
+        setFieldErrors((prev) => ({
+          ...prev,
+          [name]: "Flag Registration must not contain numbers",
+        }))
       }
     } else {
       setFormData({
@@ -1112,6 +1117,18 @@ const FCcontrollerinstructions = () => {
 
     if (formData.deadline && formData.stackDate && compareDates(formData.deadline, formData.stackDate) < 0) {
       errors.deadline = `Deadline cannot be before ${isImport ? "ETA" : "stack date"}`
+      isValid = false
+    }
+
+    // Validate IMO Number contains only numbers
+    if (formData.imoNo && /[^0-9]/.test(formData.imoNo)) {
+      errors.imoNo = "IMO Number must contain only numbers"
+      isValid = false
+    }
+
+    // Validate Flag Registration doesn't contain numbers
+    if (formData.flagReg && /\d/.test(formData.flagReg)) {
+      errors.flagReg = "Flag Registration must not contain numbers"
       isValid = false
     }
 
@@ -1940,7 +1957,7 @@ const FCcontrollerinstructions = () => {
                     <input
                       type="text"
                       className={`form-input vessel-input ${fieldErrors.imoNo ? "error-field" : ""}`}
-                      placeholder="Enter IMO number"
+                      placeholder="Numbers only"
                       name="imoNo"
                       value={formData.imoNo}
                       onChange={handleInputChange}
@@ -1954,7 +1971,7 @@ const FCcontrollerinstructions = () => {
                     <input
                       type="text"
                       className={`form-input vessel-input ${fieldErrors.flagReg ? "error-field" : ""}`}
-                      placeholder="Enter flag registration"
+                      placeholder="No numbers allowed"
                       name="flagReg"
                       value={formData.flagReg}
                       onChange={handleInputChange}
@@ -2434,4 +2451,3 @@ const FCcontrollerinstructions = () => {
 }
 
 export default FCcontrollerinstructions
-
