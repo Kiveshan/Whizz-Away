@@ -259,29 +259,31 @@ app.get("/api/invoices/completed", async (req, res) => {
     // Filter by year, month, type, and clientId if provided
     const { year, month, type, clientId } = req.query
 
-    // Updated query to match the database schema from the SQL file
+    // Updated query to join with invoice table and get invoice data
     let queryText = `
-      SELECT 
-        m1.m1key, 
-        m1.task as instruction_no, 
-        s.shipmenttype as shipment_type, 
-        m1.fileref as file_no, 
-        m1.pickupdate as date,
-        m1.status
-      FROM 
-        public.m1_controller m1
-      LEFT JOIN 
-        public.shipment s ON m1.shipment_type = s.shipkey
-      WHERE 
-        m1.status = 'Completed'
-    `
+   SELECT 
+    m1.m1key, 
+    m1.task as instruction_no, 
+    s.shipmenttype as shipment_type, 
+    m1.fileref as file_no, 
+    m1.status,
+    i.ikey,
+    i.date as date
+  FROM 
+    public.m1_controller m1
+  LEFT JOIN 
+    public.shipment s ON m1.shipment_type = s.shipkey
+  LEFT JOIN
+    public.invoice i ON m1.m1key = i.m1key
+
+`
 
     const queryParams = []
     let paramIndex = 1
 
     // Add client filter if provided
     if (clientId) {
-      queryText += ` AND m1.client = $${paramIndex}`
+      queryText += ` WHERE m1.client = $${paramIndex}`
       queryParams.push(clientId)
       paramIndex++
     }
@@ -347,7 +349,7 @@ app.get("/api/invoices/:id", async (req, res) => {
 
     const { id } = req.params
 
-    // Updated query to include vat field from the database
+    // Updated query to include invoice data
     const queryText = `
       SELECT 
         m1.m1key,
@@ -367,15 +369,19 @@ app.get("/api/invoices/:id", async (req, res) => {
         m1.rate,
         m1.vat,
         m1.rateweight,
+	    i.invoice_num,
+	    i.doc_num,
         COALESCE(m1.num_six_meters, 0) + COALESCE(m1.num_twelve_meters, 0) + COALESCE(m1.num_abnormal, 0) as num_containers
       FROM 
-        public.m1_controller m1
+        invoice i
+		  INNER JOIN
+	public.m1_controller m1 ON i.m1key = m1.m1key
       LEFT JOIN 
         public.shipment s ON m1.shipment_type = s.shipkey
       LEFT JOIN 
-        public.m5_client c ON m1.client = c.m5clientkey
+        public.m5_client c ON i.clientid = c.m5clientkey
       WHERE 
-        m1.m1key = $1
+        i.ikey = $1
     `
 
     const result = await query(queryText, [id])
@@ -389,8 +395,9 @@ app.get("/api/invoices/:id", async (req, res) => {
       })
     }
 
+  
+
     // Get container details if available
-    // Updated query to match the database schema from the SQL file
     const containerQuery = `
       SELECT 
         containernum as container_number, 
@@ -402,7 +409,6 @@ app.get("/api/invoices/:id", async (req, res) => {
     `
 
     const containerResult = await query(containerQuery, [id])
-
     console.log(`Container query returned ${containerResult.rows.length} rows for invoice ID ${id}`)
 
     // If no containers in database, create dummy data based on num_containers
@@ -432,7 +438,8 @@ app.get("/api/invoices/:id", async (req, res) => {
   }
 })
 
-// GET clients with invoice counts
+
+// GET clients (simplified - no invoice counts)
 app.get("/api/clients", async (req, res) => {
   try {
     if (!pool) {
@@ -442,22 +449,17 @@ app.get("/api/clients", async (req, res) => {
       })
     }
 
-    console.log("Received request for clients with invoice counts")
+    console.log("Received request for clients list")
 
-    // Updated query to match the database schema from the SQL file
+    // Simplified query without invoice counting
     const queryText = `
       SELECT 
         c.m5clientkey,
         c.companyname,
         c.representative,
-        c.email,
-        COUNT(m1.m1key) FILTER (WHERE m1.status = 'Completed') AS invoice_count
+        c.email
       FROM 
         public.m5_client c
-      LEFT JOIN 
-        public.m1_controller m1 ON c.m5clientkey = m1.client
-      GROUP BY 
-        c.m5clientkey, c.companyname, c.representative, c.email
       ORDER BY 
         c.companyname
     `
@@ -552,7 +554,7 @@ app.post("/api/generate-pdf", async (req, res) => {
 
     // Set response headers
     res.setHeader("Content-Type", "application/pdf")
-    res.setHeader("Content-Disposition", `attachment; filename="${filename || "invoice.pdf"}"`)
+    res.setHeader("Content-Disposition", `attachment; filename="${filename || "invoice.pdf"}"}`)
 
     // Send the PDF buffer
     res.send(pdfBuffer)

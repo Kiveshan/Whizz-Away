@@ -19,7 +19,7 @@ const formatCurrency = (amount) => {
 
 // Debug utility
 const debug = (message, data) => {
-  if (process.env.NODE_ENV !== 'production') {
+  if (process.env.NODE_ENV !== "production") {
     console.log(message, data)
   }
 }
@@ -46,7 +46,7 @@ const ClientInvoice = () => {
 
   useEffect(() => {
     let isMounted = true
-    
+
     const fetchInvoiceData = async () => {
       try {
         if (!id) {
@@ -65,11 +65,11 @@ const ClientInvoice = () => {
 
         if (!response.ok) {
           let errorMessage = `HTTP error! Status: ${response.status}`
-          
+
           try {
             const errorText = await response.text()
             debug("Error response text:", errorText)
-            
+
             if (errorText.trim().startsWith("<!DOCTYPE") || errorText.trim().startsWith("<html")) {
               errorMessage = "Received HTML instead of JSON. This may indicate a proxy configuration issue."
             } else {
@@ -78,7 +78,7 @@ const ClientInvoice = () => {
           } catch (textError) {
             console.error("Error getting response text:", textError)
           }
-          
+
           throw new Error(errorMessage)
         }
 
@@ -88,8 +88,8 @@ const ClientInvoice = () => {
         // Normalize container data
         if (result.data && result.data.containers) {
           result.data.containers = result.data.containers.map((container) => ({
-            container_number: container.container_number || container.containernum || '',
-            weight: container.weight || 'N/A',
+            container_number: container.container_number || container.containernum || "",
+            weight: container.weight || "N/A",
           }))
         }
 
@@ -107,21 +107,27 @@ const ClientInvoice = () => {
     }
 
     fetchInvoiceData()
-    
+
     // Cleanup function
     return () => {
       isMounted = false
     }
   }, [id])
 
-  // Calculate VAT based on percentage from database
+  // Calculate VAT based on percentage from database or use vat_amount if available
   const calculateVAT = (amount) => {
-    // If VAT percentage exists in the database, calculate VAT amount
+    // If we have a vat_amount from the invoice table, use that
+    if (invoiceData?.invoice?.vat_amount !== undefined) {
+      return Number(invoiceData.invoice.vat_amount)
+    }
+
+    // Otherwise calculate based on percentage
     if (invoiceData?.vat !== undefined && invoiceData?.vat !== null && amount) {
       // Convert percentage to decimal (e.g., 15 becomes 0.15)
       const vatRate = Number(invoiceData.vat) / 100
       return amount * vatRate
     }
+
     // If no VAT value is provided or amount is 0, return 0 (no VAT)
     return 0
   }
@@ -130,12 +136,12 @@ const ClientInvoice = () => {
     // Set printing mode before generating
     setIsPrinting(true)
     setPdfLoading(true)
-  
+
     // Use requestAnimationFrame instead of setTimeout for better browser compatibility
     requestAnimationFrame(() => {
       const element = invoiceRef.current
       const filename = `Invoice-${invoiceNumber}.pdf`
-  
+
       const opt = {
         margin: [15, 15, 15, 15], // Slightly increased margins from your current 10
         filename: filename,
@@ -153,13 +159,13 @@ const ClientInvoice = () => {
           orientation: "portrait",
           compress: false,
           precision: 16,
-          putOnlyUsedFonts: true
+          putOnlyUsedFonts: true,
         },
-        pagebreak: { mode: ['avoid-all', 'css', 'legacy'] } // Add this line to improve page breaks
+        pagebreak: { mode: ["avoid-all", "css", "legacy"] }, // Add this line to improve page breaks
       }
-  
+
       // Add CSS to handle page breaks properly
-      const style = document.createElement('style')
+      const style = document.createElement("style")
       style.innerHTML = `
         @media print {
           .container-section { page-break-inside: avoid; }
@@ -171,7 +177,7 @@ const ClientInvoice = () => {
         }
       `
       document.head.appendChild(style)
-  
+
       html2pdf()
         .set(opt)
         .from(element)
@@ -230,11 +236,11 @@ const ClientInvoice = () => {
     )
   }
 
-  // Calculate invoice values - use total_cost from the database
-  const invoiceNumber = `INV-${invoiceData.m1key}-${new Date().getFullYear()}`
-  const amount = invoiceData.total_cost || 0
-  const vat = calculateVAT(amount) // Calculate VAT based on percentage
-  const total = amount + vat
+  // Calculate invoice values - use values from invoice table if available
+  const invoiceNumber = invoiceData.invoice?.invoicenum || `INV-${invoiceData.m1key}-${new Date().getFullYear()}`
+  const amount = invoiceData.invoice?.amount || invoiceData.total_cost || 0
+  const vat = calculateVAT(amount)
+  const total = invoiceData.invoice?.total_amount || amount + vat
 
   // Ensure containers exist
   const containers = invoiceData.containers || []
@@ -405,3 +411,4 @@ const ClientInvoice = () => {
 }
 
 export default ClientInvoice
+

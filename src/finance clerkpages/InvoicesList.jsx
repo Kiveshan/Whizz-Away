@@ -13,7 +13,7 @@ const formatDate = (dateString) => {
 
 // Debug utility
 const debug = (message, data) => {
-  if (process.env.NODE_ENV !== 'production') {
+  if (process.env.NODE_ENV !== "production") {
     console.log(message, data)
   }
 }
@@ -30,7 +30,7 @@ const InvoicesList = () => {
   const [instructions, setInstructions] = useState([])
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState(null)
-  
+
   // Changed initial state to have empty values for year and month
   const [filters, setFilters] = useState({
     year: "",
@@ -45,13 +45,13 @@ const InvoicesList = () => {
   // Fetch instructions when component mounts or filters change
   useEffect(() => {
     let isMounted = true
-    
+
     // Skip the initial render to prevent auto-filtering on page load
     if (isInitialRender) {
       setIsInitialRender(false)
       return
     }
-    
+
     const fetchInstructions = async () => {
       try {
         setLoading(true)
@@ -73,11 +73,11 @@ const InvoicesList = () => {
 
         if (!response.ok) {
           let errorMessage = `HTTP error! Status: ${response.status}`
-          
+
           try {
             const errorText = await response.text()
             debug("Error response text:", errorText)
-            
+
             if (errorText.trim().startsWith("<!DOCTYPE") || errorText.trim().startsWith("<html")) {
               errorMessage = "Received HTML instead of JSON. This may indicate a proxy configuration issue."
             } else {
@@ -86,7 +86,7 @@ const InvoicesList = () => {
           } catch (textError) {
             console.error("Error getting response text:", textError)
           }
-          
+
           throw new Error(errorMessage)
         }
 
@@ -102,7 +102,7 @@ const InvoicesList = () => {
         }
 
         debug("Received data:", data)
-        
+
         if (isMounted) {
           setInstructions(data.data || [])
           setLoading(false)
@@ -124,7 +124,7 @@ const InvoicesList = () => {
       setInstructions([])
       setLoading(false)
     }
-    
+
     // Cleanup function
     return () => {
       isMounted = false
@@ -239,8 +239,8 @@ const InvoicesList = () => {
             </div>
           ) : instructions.length === 0 ? (
             <div className="no-data-message">
-              {clientName 
-                ? `Please select a filter to view invoices for ${clientName}.` 
+              {clientName
+                ? `Please select a filter to view invoices for ${clientName}.`
                 : "Please select a filter to view invoices."}
             </div>
           ) : (
@@ -258,7 +258,7 @@ const InvoicesList = () => {
               <tbody>
                 {instructions.map((instruction) => (
                   <tr key={instruction.m1key}>
-                    <td>{instruction.instruction_no}</td>
+                    <td>{instruction.m1key}</td>
                     <td>{instruction.shipment_type}</td>
                     <td>{instruction.file_no}</td>
                     <td>{formatDate(instruction.date)}</td>
@@ -266,8 +266,8 @@ const InvoicesList = () => {
                       <button
                         className="small-btn"
                         onClick={() => {
-                          debug(`Navigating to invoice view for ID: ${instruction.m1key}`)
-                          navigate(`/invoice/${instruction.m1key}`, {
+                          debug(`Navigating to invoice view for ID: ${instruction.ikey}`)
+                          navigate(`/invoice/${instruction.ikey}`, {
                             state: {
                               clientId,
                               clientName,
@@ -283,17 +283,47 @@ const InvoicesList = () => {
                       <button
                         className="small-btn"
                         onClick={() => {
-                          debug(`Navigating to invoice download for ID: ${instruction.m1key}`)
-                          navigate(`/invoice/${instruction.m1key}/download`, {
-                            state: {
-                              clientId,
-                              clientName,
-                              returnToClientView: !!clientId,
-                            },
-                          })
+                          if (!instruction.invoice_id) {
+                            debug(`Creating invoice for ID: ${instruction.m1key}`)
+                            fetch("/api/invoices/create", {
+                              method: "POST",
+                              headers: {
+                                "Content-Type": "application/json",
+                              },
+                              body: JSON.stringify({ m1key: instruction.m1key }),
+                            })
+                              .then((response) => response.json())
+                              .then((data) => {
+                                if (data.success) {
+                                  debug(`Invoice created, navigating to download for ID: ${instruction.m1key}`)
+                                  navigate(`/invoice/${instruction.m1key}/download`, {
+                                    state: {
+                                      clientId,
+                                      clientName,
+                                      returnToClientView: !!clientId,
+                                    },
+                                  })
+                                } else {
+                                  alert(`Error creating invoice: ${data.message}`)
+                                }
+                              })
+                              .catch((err) => {
+                                console.error("Error creating invoice:", err)
+                                alert("Failed to create invoice. Please try again.")
+                              })
+                          } else {
+                            debug(`Navigating to invoice download for ID: ${instruction.m1key}`)
+                            navigate(`/invoice/${instruction.m1key}/download`, {
+                              state: {
+                                clientId,
+                                clientName,
+                                returnToClientView: !!clientId,
+                              },
+                            })
+                          }
                         }}
                       >
-                        Download
+                        {instruction.invoice_id ? "Download" : "Generate"}
                       </button>
                     </td>
                   </tr>
@@ -308,3 +338,4 @@ const InvoicesList = () => {
 }
 
 export default InvoicesList
+
