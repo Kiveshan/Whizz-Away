@@ -321,6 +321,8 @@ app.post("/register", async (req, res) => {
 // });
 
 // Updated login route with company status check
+// Updated login route with company status check - FIXED for boolean status
+// Updated login status check to handle both TEXT and BOOLEAN status types
 app.post("/login", async (req, res, next) => {
   passport.authenticate("local", async (err, user, info) => {
     if (err) {
@@ -336,49 +338,42 @@ app.post("/login", async (req, res, next) => {
       return res.status(403).json({ message: "Access denied. No role assigned." })
     }
 
-    // Check if user's status is active (skip for admins)
-    if (user.status !== "active" && user.roleid !== 7) {
-      console.log(`User ${user.email} is not active (status: ${user.status})`)
-      return res.status(403).json({ message: "Your account is not active. Please contact an administrator." })
-    }
-
-    // Check if user's company is deactivated
-    try {
-      // For users in usertable, check if their company is deactivated
-      if (user.table === "usertable" && user.company_reg_num) {
-        const companyCheck = await client.query(
-          "SELECT * FROM usertable WHERE company_reg_num = $1 AND roleid = 1 AND status = 'active'",
-          [user.company_reg_num],
-        )
-
-        if (companyCheck.rows.length === 0) {
-          console.log(`No active company admin found for company_reg_num: ${user.company_reg_num}`)
-          return res
-            .status(403)
-            .json({ message: "Your company account is not active. Please contact an administrator." })
-        }
+    // Skip status checks for admins (roleid 7)
+    if (user.roleid !== 7) {
+      // Check status based on which table the user is from
+      if (user.table === "usertable" && user.status !== "active") {
+        // For usertable, status is TEXT, so we check for 'active'
+        console.log(`User ${user.email} is not active (status: ${user.status})`)
+        return res.status(403).json({ message: "Your account is not active. Please contact an administrator." })
+      } else if (user.table === "m5_employee" && user.status !== true) {
+        // For m5_employee, status is BOOLEAN, so we check for true
+        console.log(`Employee ${user.email} is not active (status: ${user.status})`)
+        return res.status(403).json({ message: "Your account is not active. Please contact an administrator." })
       }
 
-      // For employees in m5_employee, check if their company_reg_num matches a deactivated company
-      if (user.table === "m5_employee" && user.company_reg_num) {
-        const companyCheck = await client.query(
-          "SELECT * FROM usertable WHERE company_reg_num = $1 AND roleid = 1 AND status = 'active'",
-          [user.company_reg_num],
-        )
+      // Check if user's company is deactivated
+      try {
+        // For both usertable and m5_employee, check if their company admin is active
+        if (user.company_reg_num) {
+          const companyCheck = await client.query(
+            "SELECT * FROM usertable WHERE company_reg_num = $1 AND roleid = 1 AND status = 'active'",
+            [user.company_reg_num],
+          )
 
-        if (companyCheck.rows.length === 0) {
-          console.log(`No active company admin found for company_reg_num: ${user.company_reg_num}`)
-          return res
-            .status(403)
-            .json({ message: "Your company account is not active. Please contact an administrator." })
+          if (companyCheck.rows.length === 0) {
+            console.log(`No active company admin found for company_reg_num: ${user.company_reg_num}`)
+            return res
+              .status(403)
+              .json({ message: "Your company account is not active. Please contact an administrator." })
+          }
         }
+      } catch (error) {
+        console.error("Error checking company status:", error)
+        // Continue with login even if company check fails
       }
-    } catch (error) {
-      console.error("Error checking company status:", error)
-      // Continue with login even if company check fails
     }
 
-    // Create a comprehensive token with all necessary user data
+    // Rest of the login code remains the same...
     const token = jwt.sign(
       {
         userid: user.userid,
@@ -431,18 +426,27 @@ app.post("/login", async (req, res, next) => {
   })(req, res, next)
 })
 
-// User info route for session verification
-app.get("/user-info", (req, res) => {
-  console.log("Current user session:", req.session.user)
-  if (!req.session.user) {
-    return res.status(401).json({ error: "Please log in first" })
+// Logout endpoint
+app.post("/logout", (req, res) => {
+  // Clear the session
+  if (req.session) {
+    req.session.destroy((err) => {
+      if (err) {
+        console.error("Error destroying session:", err)
+        return res.status(500).json({ message: "Failed to logout" })
+      }
+
+      // Clear the session cookie
+      res.clearCookie("connect.sid")
+
+      return res.status(200).json({ message: "Logged out successfully" })
+    })
+  } else {
+    return res.status(200).json({ message: "Already logged out" })
   }
-  res.json({
-    name: req.session.user.name,
-    surname: req.session.user.surname,
-    roleid: req.session.user.roleid,
-  })
 })
+
+
 
 // Token verification middleware
 const verifyToken = (req, res, next) => {
@@ -488,6 +492,20 @@ const verifyToken = (req, res, next) => {
     })
   }
 }
+
+// Updated user-info endpoint to work with token-based authentication
+app.get("/user-info", verifyToken, (req, res) => {
+  // The user data is now available from the token verification
+  const { name, surname, roleid, email, userid } = req.user
+
+  res.json({
+    name,
+    surname,
+    roleid,
+    email,
+    userid,
+  })
+})
 
 // Admin verification middleware using token
 const verifyAdminAccess = (req, res, next) => {

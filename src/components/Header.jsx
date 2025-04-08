@@ -1,31 +1,72 @@
-import React, { useEffect, useState } from "react";
+"use client"
+import { useEffect, useState } from "react"
+import LogoutButton from "./LogoutButton" // Import the LogoutButton component
 
 const Header = ({ title }) => {
-  const [user, setUser] = useState({ name: "", surname: "" });
-  
+  const [user, setUser] = useState({ name: "", surname: "" })
+  const [isLoggedIn, setIsLoggedIn] = useState(false)
+
   useEffect(() => {
+    // Try to get user info from localStorage first (faster)
+    const storedUser = localStorage.getItem("user")
+    if (storedUser) {
+      try {
+        const parsedUser = JSON.parse(storedUser)
+        setUser({
+          name: parsedUser.name || "",
+          surname: parsedUser.surname || "",
+        })
+        setIsLoggedIn(true)
+        return // Exit early if we have user data in localStorage
+      } catch (error) {
+        console.error("Error parsing stored user data:", error)
+      }
+    }
+
+    // If no localStorage data, fetch from API using the token
     const fetchUserInfo = async () => {
       try {
-        const response = await fetch("http://localhost:5000/user-info", {
-          credentials: "include", // Ensure session cookie is sent
-        });
+        const token = localStorage.getItem("token")
+        if (!token) {
+          setUser({ name: "Guest", surname: "" })
+          setIsLoggedIn(false)
+          return
+        }
 
-        const data = await response.json();
+        const response = await fetch("http://localhost:5000/user-info", {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        })
 
         if (response.ok) {
-          setUser({ name: data.name, surname: data.surname });
+          const data = await response.json()
+          setUser({ name: data.name, surname: data.surname })
+          setIsLoggedIn(true)
+
+          // Store user info in localStorage for future use
+          localStorage.setItem(
+            "user",
+            JSON.stringify({
+              name: data.name,
+              surname: data.surname,
+              roleid: data.roleid,
+            }),
+          )
         } else {
-          setUser({ name: "Guest", surname: "" }); // Default to guest if no session
-          console.error("Error fetching user info:", data.error);
+          setUser({ name: "Guest", surname: "" })
+          setIsLoggedIn(false)
+          console.error("Error fetching user info:", await response.text())
         }
       } catch (error) {
-        console.error("Network error:", error);
-        setUser({ name: "Guest", surname: "" }); // Fallback to guest on error
+        console.error("Network error:", error)
+        setUser({ name: "Guest", surname: "" })
+        setIsLoggedIn(false)
       }
-    };
+    }
 
-    fetchUserInfo();
-  }, []); // Empty array ensures it runs only once when the component mounts
+    fetchUserInfo()
+  }, []) // Empty array ensures it runs only once when the component mounts
 
   return (
     <header className="header">
@@ -34,11 +75,11 @@ const Header = ({ title }) => {
       </div>
       <h1>{title}</h1>
       <div className="user-info">
-        <img src="/images/lady.jpg" className="user-img" alt={`${user.name} ${user.surname}`} />
-        <span>{user.name && user.surname ? `${user.name} ${user.surname}` : "Guest"}</span>
+        <span className="user-name">{user.name && user.surname ? `${user.name} ${user.surname}` : "Guest"}</span>
+        {/* {isLoggedIn && <LogoutButton />} */}
       </div>
     </header>
-  );
-};
+  )
+}
 
-export default Header;
+export default Header
