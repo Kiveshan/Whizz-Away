@@ -22,18 +22,24 @@ const Login = ({ switchToRegister }) => {
   
       if (response.ok) {
         const data = await response.json();
-        console.log("Redirect data:", data);  // Log the response data
+        console.log("Login successful. Token:", data.token); // Log the received token
+  
+        // Store token in localStorage
+        localStorage.setItem("token", data.token);
+  
+        // Redirect to the appropriate dashboard
         navigate(data.redirectUrl);
       } else {
         const errorData = await response.json();
-        console.log("Error from server:", errorData);  // Log server error data
+        console.log("Error from server:", errorData);
         setError(errorData.message || "Login failed. Please try again.");
       }
     } catch (err) {
-      console.error("Login Error:", err);  // Log any other errors
+      console.error("Login Error:", err);
       setError("An error occurred. Please try again.");
     }
   };
+  
   
   
 

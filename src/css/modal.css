@@ -18,11 +18,12 @@
 .modal-content {
     
     padding: 2rem;
-    border-radius: 8px;
+    border-radius: 4px;
     position: fixed;
-    top: 50%;
+    top: 53%;
     left: 50%;
     transform: translate(-50%, -50%);
+    max-height: 115vh;
     width: 900px; /* Made form wider */
     /* max-width: 95%;
     max-height: 85vh; */
