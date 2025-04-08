@@ -75,6 +75,11 @@ const Header = ({ title }) => {
       </div>
       <h1>{title}</h1>
       <div className="user-info">
+        <img
+          src={isLoggedIn ? "/images/lady.jpg" : "/images/guest-avatar.png"}
+          className="user-img"
+          alt={`${user.name} ${user.surname}`}
+        />
         <span className="user-name">{user.name && user.surname ? `${user.name} ${user.surname}` : "Guest"}</span>
         {/* {isLoggedIn && <LogoutButton />} */}
       </div>
