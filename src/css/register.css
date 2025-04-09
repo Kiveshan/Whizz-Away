@@ -1,101 +1,202 @@
 .register-container {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    min-height: 100vh;
-    position: relative;
-  }
-  
-  .register-form {
-    background: #bae6fd;
-    padding: 2rem;
-    border-radius: 8px;
-    width: 100%;
-    max-width: 650px;
-    box-sizing: border-box;
-  }
-  
-  .logo-container {
-    width: 100px; /* Set your desired size */
-    height: 100px;
-    display: flex; /* Optional: for centering content */
-    align-items: center;
-    justify-content: center;
-  }
-  .logo-image1 {
-    max-width: 100%;
-    max-height: 100%;
-    object-fit: contain; /* Ensure the image fits nicely */
-  }
-  
-  .register-title {
-    text-align: center;
-    margin-bottom: 1.5rem;
-    margin-left: -10px;
-  }
-  
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+  margin-bottom: 10px; /* Reduced bottom margin */
+  margin-top: -50px;
+}
+
+.register-form {
+  background: #bae6fd;
+  padding: 1.5rem 2rem 1rem 2rem; /* Reduced bottom padding */
+  border-radius: 4px;
+  width: 100%;
+  max-width: 850px;
+  box-sizing: border-box;
+}
+
+.logo-container1 {
+  width: 100px;
+  height: 100px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: -5px;
+}
+
+.logo-image1 {
+  max-width: 100%;
+  max-height: 100%;
+  object-fit: contain;
+}
+
+.register-title {
+  text-align: center;
+  margin-bottom: -8px;
+  margin-left: 2px;
+}
+
+.form-row {
+  display: flex;
+  gap: 1rem;
+  margin-bottom: 0.5rem; /* Reduced from 1rem to 0.5rem */
+}
+
+.form-group {
+  flex: 1;
+  margin-bottom: 0.5rem;
+  min-width: 0;
+}
+
+.form-row.three-fields .form-group {
+  flex: 1 1 30%;
+}
+
+label {
+  display: block;
+  margin-bottom: 0.5rem;
+}
+
+.form-input {
+  width: 100%;
+  padding: 0.75rem;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  box-sizing: border-box;
+}
+
+.login-link {
+  margin: 0.5rem 0; /* Reduced top and bottom margin */
+  text-align: center;
+}
+
+.link-button {
+  background: none;
+  border: none;
+  color: #1e3a8a;
+  text-decoration: underline;
+  cursor: pointer;
+  font-size: 0.95rem;
+}
+
+.submit-button1 {
+  display: block;
+  width: 200px;
+  margin: 0.5rem auto; /* Reduced margin for compact spacing */
+  padding: 0.6rem; /* Slightly smaller padding */
+  background-color: #1e3a8a;
+  color: white;
+  border: none;
+  border-radius: 4px;
+  font-size: 1rem;
+  cursor: pointer;
+}
+
+.visily-logo {
+  position: absolute;
+  bottom: 1rem;
+  left: 1rem;
+  font-size: 0.75rem;
+  color: #666;
+}
+
+@media (max-width: 768px) {
   .form-row {
-    display: flex;
-    gap: 1rem;
-    margin-bottom: 1rem;
+    flex-direction: column;
   }
-  
-  .form-group {
-    flex: 1;
+
+  .form-row.three-fields .form-group {
+    flex: 1 1 100%;
   }
-  
-  label {
-    display: block;
-    margin-bottom: 0.5rem;
+
+  .register-form {
+    max-width: 90%;
   }
-  
-  .form-input {
-    width: 100%;
-    padding: 0.75rem;
-    border: 1px solid #ddd;
-    border-radius: 4px;
-    box-sizing: border-box;
+}
+.input-error {
+  border: 1px solid red !important;
+}
+
+/* Error Popup Styles */
+.error-popup {
+  position: fixed;
+  top: 20px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 1000;
+  animation: slideDown 0.3s ease-out forwards;
+}
+
+@keyframes slideDown {
+  from {
+    top: -100px;
+    opacity: 0;
   }
-  
-  .login-link {
-    margin: 1rem 0;
-    text-align: center;
+  to {
+    top: 20px;
+    opacity: 1;
   }
-  
-  .login-link a {
-    color: #3b82f6;
-    margin-left: 0.5rem;
-  }
-  
-  .submit-button1 {
-    display: block;
-    width: 200px;
-    margin: 1rem auto;
-    padding: 0.75rem;
-    background-color: #1e3a8a;
-    color: white;
-    border: none;
-    border-radius: 4px;
-    font-size: 1rem;
-    cursor: pointer;
-  }
-  
-  .visily-logo {
-    position: absolute;
-    bottom: 1rem;
-    left: 1rem;
-    font-size: 0.75rem;
-    color: #666;
-  }
-  
-  @media (max-width: 768px) {
-    .form-row {
-      flex-direction: column;
-    }
-  
-    .register-form {
-      max-width: 90%;
-    }
-  }
-  
+}
+
+.error-popup-content {
+  background-color: #fff;
+  border-left: 4px solid #dc3545;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  padding: 15px 20px;
+  border-radius: 4px;
+  min-width: 300px;
+  max-width: 500px;
+  position: relative;
+}
+
+.close-popup {
+  position: absolute;
+  top: 10px;
+  right: 15px;
+  font-size: 18px;
+  font-weight: bold;
+  cursor: pointer;
+  color: #666;
+}
+
+.close-popup:hover {
+  color: #333;
+}
+
+.error-popup-content p {
+  margin: 0;
+  color: #dc3545;
+  font-weight: 500;
+}
+
+/* Password Input Styles */
+.password-input-container {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.valid-password {
+  border-color: #28a745 !important;
+}
+
+.invalid-password {
+  border-color: #dc3545 !important;
+}
+
+.password-indicator {
+  position: absolute;
+  right: 10px;
+  font-size: 14px;
+  font-weight: bold;
+}
+
+.password-indicator.valid {
+  color: #28a745;
+}
+
+.password-indicator.invalid {
+  color: #dc3545;
+}
