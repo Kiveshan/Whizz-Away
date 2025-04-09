@@ -4,8 +4,8 @@
   align-items: center;
   justify-content: center;
   position: relative;
-  margin-bottom: 20px; /* Reduced bottom margin */
-  margin-top: -40px;
+  margin-bottom: 10px; /* Reduced bottom margin */
+  margin-top: -50px;
 }
 
 .register-form {
@@ -114,4 +114,89 @@ label {
   .register-form {
     max-width: 90%;
   }
+}
+.input-error {
+  border: 1px solid red !important;
+}
+
+/* Error Popup Styles */
+.error-popup {
+  position: fixed;
+  top: 20px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 1000;
+  animation: slideDown 0.3s ease-out forwards;
+}
+
+@keyframes slideDown {
+  from {
+    top: -100px;
+    opacity: 0;
+  }
+  to {
+    top: 20px;
+    opacity: 1;
+  }
+}
+
+.error-popup-content {
+  background-color: #fff;
+  border-left: 4px solid #dc3545;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  padding: 15px 20px;
+  border-radius: 4px;
+  min-width: 300px;
+  max-width: 500px;
+  position: relative;
+}
+
+.close-popup {
+  position: absolute;
+  top: 10px;
+  right: 15px;
+  font-size: 18px;
+  font-weight: bold;
+  cursor: pointer;
+  color: #666;
+}
+
+.close-popup:hover {
+  color: #333;
+}
+
+.error-popup-content p {
+  margin: 0;
+  color: #dc3545;
+  font-weight: 500;
+}
+
+/* Password Input Styles */
+.password-input-container {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.valid-password {
+  border-color: #28a745 !important;
+}
+
+.invalid-password {
+  border-color: #dc3545 !important;
+}
+
+.password-indicator {
+  position: absolute;
+  right: 10px;
+  font-size: 14px;
+  font-weight: bold;
+}
+
+.password-indicator.valid {
+  color: #28a745;
+}
+
+.password-indicator.invalid {
+  color: #dc3545;
 }

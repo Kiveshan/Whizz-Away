@@ -57,7 +57,7 @@ app.use(passport.session())
 const client = new pg.Client({
   user: process.env.RDS_USERNAME || "postgres",
   host: process.env.RDS_HOSTNAME || "localhost",
-  database: process.env.RDS_DB_NAME || "7Aprilnew",
+  database: process.env.RDS_DB_NAME || "9April",
   password: process.env.RDS_PASSWORD || "123456",
   port: process.env.RDS_PORT || 5433,
   ssl: process.env.DB_SSL ? { rejectUnauthorized: false } : false,
@@ -205,6 +205,49 @@ passport.deserializeUser(async (sessionUser, done) => {
   }
 })
 
+// Enhanced registration endpoint with validation
+// Endpoint to check if email already exists
+app.get("/check-email", async (req, res) => {
+  const { email } = req.query;
+
+  if (!email) {
+    return res.status(400).json({ error: "Email parameter is required" });
+  }
+
+  try {
+    // Check in usertable
+    let result = await client.query("SELECT email FROM usertable WHERE email = $1", [email]);
+
+    if (result.rows.length > 0) {
+      return res.json({ exists: true });
+    }
+
+    // Check in m5_employee table if it exists
+    try {
+      result = await client.query("SELECT email FROM m5_employee WHERE email = $1", [email]);
+      if (result.rows.length > 0) {
+        return res.json({ exists: true });
+      }
+    } catch (err) {
+      // If table doesn't exist or other error, continue
+      console.log("Note: m5_employee table check failed, continuing...");
+    }
+
+    // Check any other tables where emails might be stored
+    // For example:
+    // result = await client.query("SELECT email FROM other_table WHERE email = $1", [email]);
+    // if (result.rows.length > 0) {
+    //   return res.json({ exists: true });
+    // }
+
+    return res.json({ exists: false });
+  } catch (error) {
+    console.error("Error checking email:", error);
+    return res.status(500).json({ error: "Server error" });
+  }
+});
+
+// Registration endpoint
 app.post("/register", async (req, res) => {
   const {
     name,
@@ -213,8 +256,6 @@ app.post("/register", async (req, res) => {
     password,
     companyname,
     company_reg_num,
-    cluster_box,
-    street,
     cell_num,
     cell_num2,
     vat_reg_num,
@@ -222,39 +263,161 @@ app.post("/register", async (req, res) => {
     name_of_acc,
     bank,
     branch,
-    branch_code
+    branch_code,
+    address,
+    suburb,
+    swift_code,
+    cluster_box,
   } = req.body;
 
   try {
+    // Check if email already exists in usertable
+    let result = await client.query("SELECT email FROM usertable WHERE email = $1", [email]);
+
+    if (result.rows.length > 0) {
+      return res.status(400).json({ message: "Email already registered" });
+    }
+
+    // Check if email exists in m5_employee table
+    try {
+      result = await client.query("SELECT email FROM m5_employee WHERE email = $1", [email]);
+      if (result.rows.length > 0) {
+        return res.status(400).json({ message: "Email already registered" });
+      }
+    } catch (err) {
+      // If table doesn't exist or other error, continue
+      console.log("Note: m5_employee table check failed, continuing...");
+    }
+
+    // Check if company registration number already exists
+    result = await client.query("SELECT company_reg_num FROM usertable WHERE company_reg_num = $1", [company_reg_num]);
+
+    if (result.rows.length > 0) {
+      return res.status(400).json({ message: "Company registration number already exists" });
+    }
+
+    // Hash password
     const hashedPassword = await bcrypt.hash(password, 10);
 
-    const query = `
-      INSERT INTO usertable (
-        name, surname, email, password, companyname, company_reg_num,
-        dateofreg, cluster_box, street, cell_num, cell_num2,
-        vat_reg_num, account_num, name_of_acc, bank, branch, branch_code
-      )
-      VALUES (
-        $1, $2, $3, $4, $5, $6, NOW(), $7, $8, $9, $10,
-        $11, $12, $13, $14, $15, $16
-      )
-      RETURNING *;
-    `;
+    // Insert new user
+    const insertResult = await client.query(
+      `INSERT INTO usertable (
+        name, 
+        surname, 
+        email, 
+        password, 
+        companyname, 
+        company_reg_num, 
+        dateofreg, 
+        status, 
+        cell_num, 
+        cell_num2, 
+        vat_reg_num, 
+        account_num, 
+        name_of_acc, 
+        bank, 
+        branch, 
+        branch_code, 
+        address, 
+        suburb, 
+        swift_code,
+        cluster_box
+      ) VALUES ($1, $2, $3, $4, $5, $6, CURRENT_DATE, 'pending', $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18) RETURNING *`,
+      [
+        name,
+        surname,
+        email,
+        hashedPassword,
+        companyname,
+        company_reg_num,
+        cell_num,
+        cell_num2 || null,
+        vat_reg_num || null,
+        account_num,
+        name_of_acc,
+        bank,
+        branch,
+        branch_code,
+        address,
+        suburb,
+        swift_code || null,
+        cluster_box || null,
+      ]
+    );
 
-    const values = [
-      name, surname, email, hashedPassword, companyname, company_reg_num,
-      cluster_box, street, cell_num, cell_num2,
-      vat_reg_num, account_num, name_of_acc, bank, branch, branch_code
-    ];
+    // Return success response without sensitive data
+    const user = insertResult.rows[0];
+    delete user.password;
 
-    const result = await client.query(query, values);
-
-    res.json({ message: "User registered successfully", user: result.rows[0] });
-  } catch (err) {
-    console.error("Registration error:", err);
-    res.status(500).json({ error: err.message });
+    return res.status(201).json({
+      message: "Registration successful! Your account is pending approval.",
+      user,
+    });
+  } catch (error) {
+    console.error("Registration error:", error);
+    
+    // Check for specific PostgreSQL error codes
+    if (error.code === '23505') { // Unique violation
+      if (error.constraint.includes('email')) {
+        return res.status(400).json({ message: "Email already registered" });
+      } else if (error.constraint.includes('company_reg_num')) {
+        return res.status(400).json({ message: "Company registration number already exists" });
+      }
+    }
+    
+    return res.status(500).json({ message: "Server error during registration" });
   }
 });
+// app.post("/register", async (req, res) => {
+//   const {
+//     name,
+//     surname,
+//     email,
+//     password,
+//     companyname,
+//     company_reg_num,
+//     cluster_box,
+//     street,
+//     cell_num,
+//     cell_num2,
+//     vat_reg_num,
+//     account_num,
+//     name_of_acc,
+//     bank,
+//     branch,
+//     branch_code
+//   } = req.body;
+
+//   try {
+//     const hashedPassword = await bcrypt.hash(password, 10);
+
+//     const query = `
+//       INSERT INTO usertable (
+//         name, surname, email, password, companyname, company_reg_num,
+//         dateofreg, cluster_box, street, cell_num, cell_num2,
+//         vat_reg_num, account_num, name_of_acc, bank, branch, branch_code
+//       )
+//       VALUES (
+//         $1, $2, $3, $4, $5, $6, NOW(), $7, $8, $9, $10,
+//         $11, $12, $13, $14, $15, $16
+//       )
+//       RETURNING *;
+//     `;
+
+//     const values = [
+//       name, surname, email, hashedPassword, companyname, company_reg_num,
+//       cluster_box, street, cell_num, cell_num2,
+//       vat_reg_num, account_num, name_of_acc, bank, branch, branch_code
+//     ];
+
+//     const result = await client.query(query, values);
+
+//     res.json({ message: "User registered successfully", user: result.rows[0] });
+//   } catch (err) {
+//     console.error("Registration error:", err);
+//     res.status(500).json({ error: err.message });
+//   }
+// });
 
 
 

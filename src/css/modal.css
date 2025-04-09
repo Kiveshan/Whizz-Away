@@ -35,18 +35,35 @@
 /* Close Button */
 .close-btn {
     position: absolute;
-    top: 100px;  /* Move closer to the top */
-    right: 100px; /* Move closer to the right */
+    top: 10px;  /* Move closer to the top */
+    right: 50px; /* Move closer to the right */
     font-size: 1.5rem;
     background: none;
     border: none;
     cursor: pointer;
-    color: whitesmoke;
+    color: black;
     z-index: 10;  /* Ensure it's above other elements */
 }
 
 
 .close-btn:hover {
+    color: red;
+}
+/* Close Button */
+.close-btn-login {
+    position: absolute;
+    top: 210px;  /* Move closer to the top */
+    right: 260px; /* Move closer to the right */
+    font-size: 1.5rem;
+    background: none;
+    border: none;
+    cursor: pointer;
+    color: black;
+    z-index: 10;  /* Ensure it's above other elements */
+}
+
+
+.close-btn-login:hover {
     color: red;
 }
 
