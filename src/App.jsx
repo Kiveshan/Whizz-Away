@@ -49,7 +49,6 @@ import DirectorDriverWageSlip from "./pages/DirectorDriverWageSlip";
 import DirectorCreditorsDash from "./pages/DirectorCreditorsDash";
 import DirectorManagerViewFuelExpence from "./pages/DirectorManagerViewFuelExpence";
 import DirectorExpenses from "./pages/DirectorExpenses";
-import AdminDashboard from "./pages/AdminDashboard";
 
 // Finance Clerk Pages
 import FDashboard from "./finance clerkpages/FDashboard";
@@ -148,7 +147,6 @@ function DynamicHeader() {
     "/DirectorManagerViewFuelExpence": "Truck Expenses",
     "/DirectorExpenses": "Truck Expenses",
     "/ControllerDashboard": "Controller",
-    "/AdminDashboard": "Admin",
   };
 
   const getTitle = () => {
@@ -224,7 +222,6 @@ function ContentWrapper() {
         <Route path="/DirectorCreditorsDash" element={<DirectorCreditorsDash />} />
         <Route path="/DirectorManagerViewFuelExpence" element={<DirectorManagerViewFuelExpence />} />
         <Route path="/DirectorExpenses" element={<DirectorExpenses />} />
-        <Route path="/AdminDashboard" element={<AdminDashboard />} />
 
         {/* Finance Clerk Routes */}
         <Route path="/instructions" element={<InstructionsList />} />
