@@ -89,7 +89,7 @@ const ClientInvoice = () => {
         if (result.data && result.data.containers) {
           result.data.containers = result.data.containers.map((container) => ({
             container_number: container.container_number || container.containernum || "",
-            weight: container.weight || "N/A",
+            weight: container.weight || null,
           }))
         }
 
@@ -140,7 +140,7 @@ const ClientInvoice = () => {
     // Use requestAnimationFrame instead of setTimeout for better browser compatibility
     requestAnimationFrame(() => {
       const element = invoiceRef.current
-      const filename = `Invoice-${invoiceNumber}.pdf`
+      const filename = `Invoice-${invoiceData.invoice_num}.pdf`
 
       const opt = {
         margin: [15, 15, 15, 15], // Slightly increased margins from your current 10
@@ -237,7 +237,6 @@ const ClientInvoice = () => {
   }
 
   // Calculate invoice values - use values from invoice table if available
-  const invoiceNumber = invoiceData.invoice?.invoicenum || `INV-${invoiceData.m1key}-${new Date().getFullYear()}`
   const amount = invoiceData.invoice?.amount || invoiceData.total_cost || 0
   const vat = calculateVAT(amount)
   const total = invoiceData.invoice?.total_amount || amount + vat
@@ -256,39 +255,39 @@ const ClientInvoice = () => {
         {/* Middle section with company details */}
         <div className="middle-section">
           <div className="company-info">
-            Cluster Box 2020
+            {invoiceData.cluster_box}
             <br />
-            Magicland
+            {invoiceData.address}
             <br />
-            Umhlanga
+            {invoiceData.suburb}
             <br />
-            VAT Reg No: 00000
+            VAT Reg No: {invoiceData.vat_reg_num}
             <br />
-            Cellphone: 021457853
+            Cellphone: {invoiceData.phonenumber}
           </div>
         </div>
 
         {/* Invoice Title section */}
         <div className="invoice-title-section">
           <div className="invoice-title">Tax Invoice</div>
-          <div className="document-number">Document No: {invoiceNumber}</div>
+          <div className="document-number">Document No: {invoiceData.doc_num}</div>
         </div>
 
         {/* Sender Details */}
         <div className="sender-details">
-          <div>{invoiceData.client_name || "Specialised International Freight"}</div>
-          <div>{invoiceData.client_address || "28 Winbury Lane"}</div>
-          <div>Fairy Land</div>
-          <div>Telephone: {invoiceData.client_telephone || "031 000 0000"}</div>
-          <div>Date: {formatDate(new Date())}</div>
-          <div>Email: {invoiceData.client_email || "someone@srfreight.com"}</div>
-          <div>VAT Reg No: {invoiceData.client_vat || "25640"}</div>
+          <div>{invoiceData.client_name}</div>
+          <div>{invoiceData.client_address}</div>
+          <div>{invoiceData.client_suburb}</div>
+          <div>Telephone: {invoiceData.client_telephone}</div>
+          <div>Date: {formatDate(invoiceData.date)}</div>
+          <div>Email: {invoiceData.client_email}</div>
+          <div>VAT Reg No: {invoiceData.client_vat}</div>
         </div>
 
         {/* Vessel/Ref and Destination */}
         <div className="vessel-destination">
-          <div className="vessel">Vessel/Ref</div>
-          <div className="destination">Destination</div>
+          <div className="vessel">Vessel/Ref : {invoiceData.vessel_name}</div>
+          <div className="destination">Destination : {invoiceData.dropoff}</div>
         </div>
 
         {/* Invoice Details */}
@@ -297,46 +296,51 @@ const ClientInvoice = () => {
             <tbody>
               <tr>
                 <td className="label">Booking Ref</td>
-                <td className="value">{invoiceData.instruction_no || "N/A"}</td>
+                <td className="value">{invoiceData.booking_ref}</td>
               </tr>
               <tr>
                 <td className="label">File Number</td>
-                <td className="value">{invoiceData.file_no || "N/A"}</td>
+                <td className="value">{invoiceData.file_no}</td>
               </tr>
               <tr>
                 <td className="label">Description</td>
-                <td className="value">{invoiceData.description || "Exclusive"}</td>
+                <td className="value">{invoiceData.description}</td>
               </tr>
             </tbody>
           </table>
 
           {/* Container Details */}
-          <div className="container-section">
-            <table className="container-table5">
-              <thead>
-                <tr>
-                  <th className="container-number-header">Container Number</th>
-                  <th className="weight-header">Weight</th>
-                </tr>
-              </thead>
-              <tbody>
-                {containers.length > 0 ? (
-                  containers.map((container, index) => {
-                    return (
-                      <tr key={index}>
-                        <td className="container-number">{container.container_number || `Container ${index + 1}`}</td>
-                        <td className="weight">{container.weight || "N/A"}</td>
-                      </tr>
-                    )
-                  })
-                ) : (
-                  <tr>
-                    <td className="container-number">No container information</td>
-                    <td className="weight">N/A</td>
-                  </tr>
-                )}
-              </tbody>
-            </table>
+{/* Container Details */}
+<div className="container-section">
+  <table className="container-table5">
+    <thead>
+      <tr>
+        <th className="container-number-header">Container Number</th>
+        {/* Only show weight header if at least one container has a non-empty weight */}
+        {containers.some(container => container.weight && container.weight !== "N/A") && (
+          <th className="weight-header">Weight</th>
+        )}
+      </tr>
+    </thead>
+    <tbody>
+    {containers.length > 0 ? (
+      containers.map((container, index) => {
+        return (
+          <tr key={index}>
+            <td className="container-number">{container.container_number || `Container ${index + 1}`}</td>
+            {container.weight && container.weight !== "N/A" && (
+              <td className="weight">{container.weight}</td>
+            )}
+          </tr>
+        )
+      })
+    ) : (
+      <tr>
+        <td className="container-number">No container information</td>
+      </tr>
+    )}
+    </tbody>
+  </table>
             {/* Summary Table */}
             <div className="summary-section">
               <table className="container-table5">
@@ -371,12 +375,12 @@ const ClientInvoice = () => {
 
         {/* Banking Details */}
         <div className="banking-details">
-          <div>Account Name: Transport and Logistics</div>
-          <div>Bank Name: First National Bank</div>
-          <div>Account Number: 123456789</div>
-          <div>Branch Code: 00234</div>
+          <div>Account Name: {invoiceData.name_of_acc}</div>
+          <div>Bank Name: {invoiceData.bank}</div>
+          <div>Account Number: {invoiceData.account_num}</div>
+          <div>Branch Code: {invoiceData.branch_code}</div>
           <div>SWIFT Code: ABCD0234</div>
-          <div>Reference: {invoiceNumber}</div>
+          <div>Reference: {invoiceData.invoice_num}</div>
           <div className="payment-note">Please ensure the invoice number is referenced when making payment.</div>
           <div className="thank-you">Thank you for choosing Transport and Logistics.</div>
         </div>

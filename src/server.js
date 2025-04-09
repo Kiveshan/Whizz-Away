@@ -53,7 +53,7 @@ app.use(passport.session())
 const dbConfig = {
   user: process.env.PGUSER || "postgres",
   host: process.env.PGHOST || "localhost",
-  database: process.env.PGDATABASE || "Whizz-Away",
+  database: process.env.PGDATABASE || "Whizz-Away-V2",
   password: process.env.PGPASSWORD || "123456",
   port: process.env.PGPORT || 5432,
   ssl: process.env.DB_SSL ? { rejectUnauthorized: false } : false,
@@ -348,10 +348,11 @@ app.get("/api/invoices/:id", async (req, res) => {
     console.log("Received request for invoice details with ID:", req.params.id)
 
     const { id } = req.params
+    console.log(id)
 
     // Updated query to include invoice data
     const queryText = `
-      SELECT 
+            SELECT 
         m1.m1key,
         m1.task as instruction_no,
         s.shipmenttype as shipment_type,
@@ -361,6 +362,7 @@ app.get("/api/invoices/:id", async (req, res) => {
         c.cellnum as client_telephone,
         c.email as client_email,
         c.vatregno as client_vat,
+        c.suburb as client_suburb,
         m1.pickup,
         m1.dropoff,
         m1.pickupdate,
@@ -369,8 +371,20 @@ app.get("/api/invoices/:id", async (req, res) => {
         m1.rate,
         m1.vat,
         m1.rateweight,
-	    i.invoice_num,
-	    i.doc_num,
+        m1.booking_ref,
+        m1.vessel_name,
+	      i.invoice_num,
+	      i.doc_num,
+        i.date,
+		    ut.cluster_box,
+		    ut.vat_reg_num,
+		    ut.address,
+		    ut.suburb,
+        ut.branch_code,
+        ut.bank,
+        ut.name_of_acc,
+        ut.account_num,
+        COALESCE(ut.cell_num, ut.cell_num2) AS phonenumber,
         COALESCE(m1.num_six_meters, 0) + COALESCE(m1.num_twelve_meters, 0) + COALESCE(m1.num_abnormal, 0) as num_containers
       FROM 
         invoice i
@@ -380,6 +394,8 @@ app.get("/api/invoices/:id", async (req, res) => {
         public.shipment s ON m1.shipment_type = s.shipkey
       LEFT JOIN 
         public.m5_client c ON i.clientid = c.m5clientkey
+      INNER JOIN
+		  usertable ut ON i.companyid = ut.userid
       WHERE 
         i.ikey = $1
     `
@@ -399,13 +415,15 @@ app.get("/api/invoices/:id", async (req, res) => {
 
     // Get container details if available
     const containerQuery = `
-      SELECT 
+     SELECT 
         containernum as container_number, 
         weight
       FROM 
-        public.container
-      WHERE 
-        m1key = $1
+        public.container c
+		 INNER JOIN
+		 invoice i ON i.m1key = c.m1key
+		 WHERE
+        i.ikey = $1
     `
 
     const containerResult = await query(containerQuery, [id])
