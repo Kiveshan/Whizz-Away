@@ -233,12 +233,6 @@ app.get("/check-email", async (req, res) => {
       console.log("Note: m5_employee table check failed, continuing...");
     }
 
-    // Check any other tables where emails might be stored
-    // For example:
-    // result = await client.query("SELECT email FROM other_table WHERE email = $1", [email]);
-    // if (result.rows.length > 0) {
-    //   return res.json({ exists: true });
-    // }
 
     return res.json({ exists: false });
   } catch (error) {
