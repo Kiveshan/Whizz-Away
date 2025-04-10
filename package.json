@@ -21,7 +21,6 @@
     "framer-motion": "^12.5.0",
     "jsonwebtoken": "^9.0.2",
     "jwt-decode": "^4.0.0",
-    "lucide-react": "^0.487.0",
     "method-override": "^3.0.0",
     "passport": "^0.7.0",
     "passport-local": "^1.0.0",
@@ -40,7 +39,7 @@
   },
   "scripts": {
     "start": "concurrently \"npm run server\" \"react-scripts start\"",
-    "server": "nodemon server.js",
+    "server": "node server.js",
     "build": "react-scripts build",
     "test": "react-scripts test",
     "eject": "react-scripts eject"

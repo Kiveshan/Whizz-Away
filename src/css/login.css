@@ -1,150 +1,100 @@
 .login-container {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  min-height: 100vh;
-  position: relative;
-}
-
-.login-form {
-  background: #bae6fd;
-  padding: 2rem;
-  border-radius: 8px;
-  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
-  width: 100%;
-  max-width: 400px;
-}
-
-.logo-container1 {
-  display: flex;
-  justify-content: center;
-  margin-bottom: 2rem;
-}
-
-.logo-image1 {
-  width: 120px;
-  height: 120px;
-  object-fit: cover;
-}
-
-.form-group {
-  margin-bottom: 1.5rem;
-}
-
-label {
-  display: block;
-  margin-bottom: 0.5rem;
-  font-weight: 500;
-}
-
-.form-input {
-  width: 100%;
-  padding: 0.75rem;
-  border: 1px solid #ddd;
-  border-radius: 4px;
-  font-size: 1rem;
-}
-
-/* Password input container and toggle button styles */
-.password-input-container {
-  position: relative;
-  display: flex;
-  align-items: center;
-  width: 100%; /* Ensure container takes full width */
-}
-
-.password-toggle-btn {
-  position: absolute;
-  right: 10px;
-  top: 50%;
-  transform: translateY(-50%);
-  background: none;
-  border: none;
-  cursor: pointer;
-  padding: 0;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  color: #1e3a8a; /* Match the button color */
-  z-index: 1; /* Ensure button appears above input */
-}
-
-.password-toggle-btn:hover {
-  color: #1e40af; /* Match the button hover color */
-}
-
-.password-toggle-btn:focus {
-  outline: none;
-}
-
-.password-eye-icon {
-  width: 18px;
-  height: 18px;
-}
-
-/* Make sure the password input has enough padding on the right but maintains full width */
-.password-input-container .form-input {
-  padding-right: 40px; /* Enough space for the eye icon */
-  width: 100%;
-  box-sizing: border-box; /* Include padding in width calculation */
-}
-
-.forgot-password {
-  text-align: left;
-  margin-bottom: 1.5rem;
-}
-
-.forgot-password a {
-  color: black;
-  text-decoration: none;
-  font-size: 0.875rem;
-}
-
-.login-button {
-  width: 100%;
-  padding: 0.75rem;
-  background-color: #1e3a8a;
-  color: white;
-  border: none;
-  border-radius: 4px;
-  font-size: 1rem;
-  cursor: pointer;
-  margin-bottom: 1.5rem;
-}
-
-.login-button:hover {
-  background-color: #1e40af;
-}
-
-.new-profile {
-  text-align: center;
-}
-
-.new-profile a {
-  color: #3b82f6;
-  text-decoration: none;
-  font-size: 0.875rem;
-}
-
-.link-button {
-  background: none;
-  border: none;
-  color: #007bff;
-  cursor: pointer;
-  font-size: 1rem;
-  text-decoration: underline;
-}
-
-.link-button:hover {
-  color: #0056b3;
-}
-
-.error-message {
-  background-color: #f8d7da;
-  color: #721c24;
-  padding: 10px;
-  border-radius: 4px;
-  margin-bottom: 20px;
-  text-align: center;
-}
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    min-height: 100vh;
+  
+    position: relative;
+  }
+  
+  .login-form {
+    background: #bae6fd;
+    padding: 2rem;
+    border-radius: 8px;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+    width: 100%;
+    max-width: 400px;
+  }
+  
+  .logo-container1 {
+    display: flex;
+    justify-content: center;
+    margin-bottom: 2rem;
+  }
+  
+  .logo-image1 {
+    width: 120px;
+    height: 120px;
+ 
+    object-fit: cover;
+  }
+  
+  .form-group {
+    margin-bottom: 1.5rem;
+  }
+  
+  label {
+    display: block;
+    margin-bottom: 0.5rem;
+    font-weight: 500;
+  }
+  
+  .form-input {
+    width: 100%;
+    padding: 0.75rem;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    font-size: 1rem;
+  }
+  
+  .forgot-password {
+    text-align: left;
+    margin-bottom: 1.5rem;
+  }
+  
+  .forgot-password a {
+    color: black;
+    text-decoration: none;
+    font-size: 0.875rem;
+  }
+  
+  .login-button {
+    width: 100%;
+    padding: 0.75rem;
+    background-color: #1e3a8a;
+    color: white;
+    border: none;
+    border-radius: 4px;
+    font-size: 1rem;
+    cursor: pointer;
+    margin-bottom: 1.5rem;
+  }
+  
+  .login-button:hover {
+    background-color: #1e40af;
+  }
+  
+  .new-profile {
+    text-align: center;
+  }
+  
+  .new-profile a {
+    color: #3b82f6;
+    text-decoration: none;
+    font-size: 0.875rem;
+  }
+  
+  .link-button {
+    background: none;
+    border: none;
+    color: #007bff;
+    cursor: pointer;
+    font-size: 1rem;
+    text-decoration: underline;
+  }
+  
+  .link-button:hover {
+    color: #0056b3;
+  }
+  

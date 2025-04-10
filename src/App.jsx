@@ -56,7 +56,6 @@ import DirectorExpenses from "./pages/DirectorExpenses"
 // Add these imports at the appropriate location in the import section, with the other Director pages
 import Viewcontrollerinstructions from "./pages/Viewcontrollerinstructions"
 import ViewcontrollerInstructionDetails from "./pages/ViewcontrollerInstructionDetails"
-import AdminDashboard from "./pages/AdminDashboard";
 
 // Finance Clerk Pages
 import FDashboard from "./finance clerkpages/FDashboard"
@@ -161,7 +160,6 @@ function DynamicHeader() {
     // Add these entries to the titleMap object in the DynamicHeader function
     "/Viewcontrollerinstructions": "Instructions",
     "/ViewcontrollerInstructionDetails": "Container Details",
-    "/AdminDashboard": "Admin",
   }
 
   const getTitle = () => {
@@ -235,8 +233,7 @@ function ContentWrapper() {
         <Route path="/DirectorExpenses" element={<DirectorExpenses />} />
         // Add these routes in the ContentWrapper function, with the other Director routes
         <Route path="/Viewcontrollerinstructions" element={<Viewcontrollerinstructions />} />
-        <Route path="/ViewcontrollerInstructionDetails" element={<ViewcontrollerInstructionDetails />} />        <Route path="/AdminDashboard" element={<AdminDashboard />} />
-
+        <Route path="/ViewcontrollerInstructionDetails" element={<ViewcontrollerInstructionDetails />} />
         {/* Finance Clerk Routes */}
         <Route path="/instructions" element={<InstructionsList />} />
         <Route path="/update-instructions" element={<UpdateInstruction />} />
