@@ -187,11 +187,44 @@ label {
   border-color: #dc3545 !important;
 }
 
+/* Password toggle button styles */
+.password-toggle-btn {
+  position: absolute;
+  right: 30px; /* Position to the left of the password strength indicator */
+  top: 50%;
+  transform: translateY(-50%);
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #1e3a8a;
+  z-index: 1;
+}
+
+.password-toggle-btn:hover {
+  color: #1e40af;
+}
+
+.password-toggle-btn:focus {
+  outline: none;
+}
+
+.password-eye-icon {
+  width: 18px;
+  height: 18px;
+}
+
 .password-indicator {
   position: absolute;
-  right: 2px;
+  right: 10px;
+  top: 50%;
+  transform: translateY(-50%);
   font-size: 14px;
   font-weight: bold;
+  z-index: 1;
 }
 
 .password-indicator.valid {
@@ -202,7 +235,12 @@ label {
   color: #dc3545;
 }
 
-/* Add these styles to your register.css file */
+/* Make sure the password input has enough padding on the right */
+.password-input-container .form-input {
+  padding-right: 60px; /* Enough space for both icons */
+  width: 100%;
+  box-sizing: border-box;
+}
 
 /* Success Popup Styles */
 .success-popup {
@@ -256,8 +294,6 @@ label {
 .close-popup:hover {
   color: #333;
 }
-
-/* Add these styles to your register.css file */
 
 /* Four fields per row layout */
 .form-row.four-fields {

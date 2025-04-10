@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react"
 import "../css/register.css"
+import { Eye, EyeOff } from "lucide-react" // Import Eye icons
 
 const Register = ({ switchToLogin, closePopup }) => {
   const [formData, setFormData] = useState({
@@ -31,6 +32,7 @@ const Register = ({ switchToLogin, closePopup }) => {
   const [showSuccessPopup, setShowSuccessPopup] = useState(false) // Add success popup state
   const [isLoading, setIsLoading] = useState(false)
   const [isCheckingEmail, setIsCheckingEmail] = useState(false)
+  const [showPassword, setShowPassword] = useState(false) // State for password visibility
   const [passwordStrength, setPasswordStrength] = useState({
     length: false,
     lowercase: false,
@@ -39,6 +41,11 @@ const Register = ({ switchToLogin, closePopup }) => {
     special: false,
     valid: false,
   })
+
+  // Toggle password visibility
+  const togglePasswordVisibility = () => {
+    setShowPassword(!showPassword)
+  }
 
   // Close error popup after 5 seconds
   useEffect(() => {
@@ -325,7 +332,6 @@ const Register = ({ switchToLogin, closePopup }) => {
       )}
 
       <div className="register-form">
-
         <h1 className="register-title" style={{ marginBottom: "10px", marginTop: "6px" }}>
           Register
         </h1>
@@ -374,7 +380,7 @@ const Register = ({ switchToLogin, closePopup }) => {
               <label>Password</label>
               <div className="password-input-container">
                 <input
-                  type="password"
+                  type={showPassword ? "text" : "password"}
                   name="password"
                   value={formData.password}
                   onChange={handleChange}
@@ -382,6 +388,19 @@ const Register = ({ switchToLogin, closePopup }) => {
                   className={`form-input ${formData.password ? (passwordStrength.valid ? "valid-password" : "invalid-password") : ""}`}
                   required
                 />
+                <button
+                  type="button"
+                  className="password-toggle-btn"
+                  onClick={togglePasswordVisibility}
+                  tabIndex="-1"
+                  aria-label={showPassword ? "Hide password" : "Show password"}
+                >
+                  {showPassword ? (
+                    <EyeOff className="password-eye-icon" size={18} />
+                  ) : (
+                    <Eye className="password-eye-icon" size={18} />
+                  )}
+                </button>
                 {formData.password && (
                   <span className={`password-indicator ${passwordStrength.valid ? "valid" : "invalid"}`}>
                     {passwordStrength.valid ? "✓" : "✕"}

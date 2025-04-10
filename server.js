@@ -215,7 +215,7 @@ app.get("/check-email", async (req, res) => {
   }
 
   try {
-    // Check in usertable
+    // Check in usertable (excluding rejected users)
     let result = await client.query("SELECT email FROM usertable WHERE email = $1", [email]);
 
     if (result.rows.length > 0) {
@@ -271,7 +271,7 @@ app.post("/register", async (req, res) => {
   } = req.body;
 
   try {
-    // Check if email already exists in usertable
+    // Check if email already exists in usertable (excluding rejected users)
     let result = await client.query("SELECT email FROM usertable WHERE email = $1", [email]);
 
     if (result.rows.length > 0) {
@@ -289,8 +289,11 @@ app.post("/register", async (req, res) => {
       console.log("Note: m5_employee table check failed, continuing...");
     }
 
-    // Check if company registration number already exists
-    result = await client.query("SELECT company_reg_num FROM usertable WHERE company_reg_num = $1", [company_reg_num]);
+    // Check if company registration number already exists (excluding rejected users)
+    result = await client.query(
+      "SELECT company_reg_num FROM usertable WHERE company_reg_num = $1 AND status != 'rejected'", 
+      [company_reg_num]
+    );
 
     if (result.rows.length > 0) {
       return res.status(400).json({ message: "Company registration number already exists" });
@@ -486,6 +489,108 @@ app.post("/register", async (req, res) => {
 // Updated login route with company status check
 // Updated login route with company status check - FIXED for boolean status
 // Updated login status check to handle both TEXT and BOOLEAN status types
+// app.post("/login", async (req, res, next) => {
+//   passport.authenticate("local", async (err, user, info) => {
+//     if (err) {
+//       console.error("Authentication error:", err)
+//       return res.status(500).json({ message: "Internal server error" })
+//     }
+//     if (!user) {
+//       return res.status(401).json({ message: info?.message || "Invalid email or password" })
+//     }
+
+//     // Check if user has a roleid
+//     if (!user.roleid) {
+//       return res.status(403).json({ message: "Access denied. No role assigned." })
+//     }
+
+//     // Skip status checks for admins (roleid 7)
+//     if (user.roleid !== 7) {
+//       // Check status based on which table the user is from
+//       if (user.table === "usertable" && user.status !== "active") {
+//         // For usertable, status is TEXT, so we check for 'active'
+//         console.log(`User ${user.email} is not active (status: ${user.status})`)
+//         return res.status(403).json({ message: "Your account is not active. Please contact an administrator." })
+//       } else if (user.table === "m5_employee" && user.status !== true) {
+//         // For m5_employee, status is BOOLEAN, so we check for true
+//         console.log(`Employee ${user.email} is not active (status: ${user.status})`)
+//         return res.status(403).json({ message: "Your account is not active. Please contact an administrator." })
+//       }
+
+//       // Check if user's company is deactivated
+//       try {
+//         // For both usertable and m5_employee, check if their company admin is active
+//         if (user.company_reg_num) {
+//           const companyCheck = await client.query(
+//             "SELECT * FROM usertable WHERE company_reg_num = $1 AND roleid = 1 AND status = 'active'",
+//             [user.company_reg_num],
+//           )
+
+//           if (companyCheck.rows.length === 0) {
+//             console.log(`No active company admin found for company_reg_num: ${user.company_reg_num}`)
+//             return res
+//               .status(403)
+//               .json({ message: "Your company account is not active. Please contact an administrator." })
+//           }
+//         }
+//       } catch (error) {
+//         console.error("Error checking company status:", error)
+//         // Continue with login even if company check fails
+//       }
+//     }
+
+//     // Rest of the login code remains the same...
+//     const token = jwt.sign(
+//       {
+//         userid: user.userid,
+//         name: user.name,
+//         surname: user.surname,
+//         email: user.email,
+//         roleid: user.roleid,
+//         table: user.table,
+//         company_reg_num: user.company_reg_num,
+//       },
+//       secretKey,
+//       { expiresIn: "1h" },
+//     )
+
+//     // Also store in session for backward compatibility
+//     req.session.user = {
+//       userid: user.userid,
+//       name: user.name,
+//       surname: user.surname,
+//       email: user.email,
+//       roleid: user.roleid,
+//       table: user.table,
+//       company_reg_num: user.company_reg_num,
+//     }
+
+//     console.log("User authenticated:", user.name, user.surname)
+//     console.log("Token generated for user")
+
+//     const { roleid } = user
+//     let redirectUrl = "/"
+
+//     if (roleid === 1) redirectUrl = "/Dashboard"
+//     else if (roleid === 2) redirectUrl = "/ControllerDashboard"
+//     else if (roleid === 3) redirectUrl = "/FDashboard"
+//     else if (roleid === 4) redirectUrl = "/DirectorDashboard"
+//     else if (roleid === 7) redirectUrl = "/AdminDashboard"
+
+//     return res.json({
+//       message: "Login successful",
+//       redirectUrl,
+//       token,
+//       user: {
+//         userid: user.userid,
+//         name: user.name,
+//         surname: user.surname,
+//         roleid: user.roleid,
+//         company_reg_num: user.company_reg_num,
+//       },
+//     })
+//   })(req, res, next)
+// })
 app.post("/login", async (req, res, next) => {
   passport.authenticate("local", async (err, user, info) => {
     if (err) {
@@ -496,16 +601,28 @@ app.post("/login", async (req, res, next) => {
       return res.status(401).json({ message: info?.message || "Invalid email or password" })
     }
 
-    // Check if user has a roleid
+    // Check for rejected status first
+    if (user.status === "rejected") {
+      console.log(`User ${user.email} was rejected (status: ${user.status})`)
+      return res.status(403).json({ message: "Your account was rejected." })
+    }
+
+    // Check for pending status
+    if (user.status === "pending") {
+      console.log(`User ${user.email} is pending approval (status: ${user.status})`)
+      return res.status(403).json({ message: "Your account is pending approval." })
+    }
+
+    // Check if user has a roleid (for active users)
     if (!user.roleid) {
-      return res.status(403).json({ message: "Access denied. No role assigned." })
+      return res.status(403).json({ message: "Access denied. Please contact an administrator." })
     }
 
     // Skip status checks for admins (roleid 7)
     if (user.roleid !== 7) {
       // Check status based on which table the user is from
       if (user.table === "usertable" && user.status !== "active") {
-        // For usertable, status is TEXT, so we check for 'active'
+        // For other non-active statuses
         console.log(`User ${user.email} is not active (status: ${user.status})`)
         return res.status(403).json({ message: "Your account is not active. Please contact an administrator." })
       } else if (user.table === "m5_employee" && user.status !== true) {
@@ -715,7 +832,7 @@ app.get("/admin/pending-users", verifyToken, verifyAdminAccess, async (req, res)
   try {
     console.log("Fetching pending users...")
     const result = await client.query(
-      "SELECT userid, name, surname, email, companyname, roleid, status, dateofreg FROM usertable WHERE roleid is NULL",
+      "SELECT userid, name, surname, email, companyname, roleid, status, dateofreg FROM usertable WHERE status = 'pending'",
     )
 
     console.log(`Found ${result.rows.length} pending users`)
