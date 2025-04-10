@@ -57,9 +57,9 @@ app.use(passport.session())
 const client = new pg.Client({
   user: process.env.RDS_USERNAME || "postgres",
   host: process.env.RDS_HOSTNAME || "localhost",
-  database: process.env.RDS_DB_NAME || "9April",
+  database: process.env.RDS_DB_NAME || "Whizz-Away-V2",
   password: process.env.RDS_PASSWORD || "123456",
-  port: process.env.RDS_PORT || 5433,
+  port: process.env.RDS_PORT || 5432,
   ssl: process.env.DB_SSL ? { rejectUnauthorized: false } : false,
 })
 
@@ -604,7 +604,7 @@ app.post("/login", async (req, res, next) => {
     // Check for rejected status first
     if (user.status === "rejected") {
       console.log(`User ${user.email} was rejected (status: ${user.status})`)
-      return res.status(403).json({ message: "Your account was rejected." })
+      return res.status(403).json({ message: "Your account was rejected. Please contact our admin"})
     }
 
     // Check for pending status

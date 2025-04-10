@@ -27,13 +27,31 @@ const Landing = () => {
   }
 
   const handleLoginClick = () => {
-    setModalForm("login")
-    setIsModalOpen(true)
+    // If modal is already open, close it briefly before changing form
+    if (isModalOpen && modalForm !== "login") {
+      setIsModalOpen(false)
+      setTimeout(() => {
+        setModalForm("login")
+        setIsModalOpen(true)
+      }, 50)
+    } else {
+      setModalForm("login")
+      setIsModalOpen(true)
+    }
   }
 
   const handleRegisterClick = () => {
-    setModalForm("register")
-    setIsModalOpen(true)
+    // If modal is already open, close it briefly before changing form
+    if (isModalOpen && modalForm !== "register") {
+      setIsModalOpen(false)
+      setTimeout(() => {
+        setModalForm("register")
+        setIsModalOpen(true)
+      }, 50)
+    } else {
+      setModalForm("register")
+      setIsModalOpen(true)
+    }
   }
 
   const closeModal = () => {
@@ -51,11 +69,10 @@ const Landing = () => {
         </div>
       </div>
 
-      {/* Modal for login/register */}
-      <Modal isOpen={isModalOpen} onClose={closeModal} initialForm={modalForm} />
+      {/* Modal for login/register - using key prop to force remount when form changes */}
+      <Modal key={modalForm} isOpen={isModalOpen} onClose={closeModal} initialForm={modalForm} />
     </div>
   )
 }
 
 export default Landing
-
