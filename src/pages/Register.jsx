@@ -26,7 +26,9 @@ const Register = ({ switchToLogin, closePopup }) => {
   })
 
   const [errorMessage, setErrorMessage] = useState("")
+  const [successMessage, setSuccessMessage] = useState("") // Add success message state
   const [showErrorPopup, setShowErrorPopup] = useState(false)
+  const [showSuccessPopup, setShowSuccessPopup] = useState(false) // Add success popup state
   const [isLoading, setIsLoading] = useState(false)
   const [isCheckingEmail, setIsCheckingEmail] = useState(false)
   const [passwordStrength, setPasswordStrength] = useState({
@@ -37,9 +39,6 @@ const Register = ({ switchToLogin, closePopup }) => {
     special: false,
     valid: false,
   })
-  const [
-    /* Remove the showPasswordRequirements state and the password requirements div */
-  ] = useState(false)
 
   // Close error popup after 5 seconds
   useEffect(() => {
@@ -51,6 +50,19 @@ const Register = ({ switchToLogin, closePopup }) => {
     }
     return () => clearTimeout(timer)
   }, [showErrorPopup])
+
+  // Handle success popup and redirect
+  useEffect(() => {
+    let timer
+    if (showSuccessPopup) {
+      timer = setTimeout(() => {
+        setShowSuccessPopup(false)
+        closePopup()
+        switchToLogin()
+      }, 3000) // Redirect after 3 seconds
+    }
+    return () => clearTimeout(timer)
+  }, [showSuccessPopup, closePopup, switchToLogin])
 
   // Handle input change with validation
   const handleChange = (e) => {
@@ -261,9 +273,10 @@ const Register = ({ switchToLogin, closePopup }) => {
       const data = await response.json()
 
       if (response.ok) {
-        alert("Registration successful! Please login.")
-        closePopup()
-        switchToLogin()
+        // Replace alert with success popup
+        setSuccessMessage("Registration successful! Your account is pending approval.")
+        setShowSuccessPopup(true)
+        // The redirect will happen automatically after the timeout
       } else {
         // Handle specific error for email already registered
         if (data.message === "Email already registered") {
@@ -287,6 +300,7 @@ const Register = ({ switchToLogin, closePopup }) => {
 
   return (
     <div className="register-container">
+      {/* Error Popup */}
       {showErrorPopup && errorMessage && (
         <div className="error-popup">
           <div className="error-popup-content">
@@ -298,13 +312,27 @@ const Register = ({ switchToLogin, closePopup }) => {
         </div>
       )}
 
+      {/* Success Popup */}
+      {showSuccessPopup && successMessage && (
+        <div className="success-popup">
+          <div className="success-popup-content">
+            <span className="close-popup" onClick={() => setShowSuccessPopup(false)}>
+              &times;
+            </span>
+            <p>{successMessage}</p>
+          </div>
+        </div>
+      )}
+
       <div className="register-form">
-        <h1 className="register-title" style={{ marginBottom: "5px", marginTop: "-10px" }}>
+
+        <h1 className="register-title" style={{ marginBottom: "10px", marginTop: "6px" }}>
           Register
         </h1>
 
         <form onSubmit={handleRegister}>
-          <div className="form-row three-fields">
+          {/* Row 1: Personal Information */}
+          <div className="form-row four-fields">
             <div className="form-group">
               <label>First Name</label>
               <input
@@ -342,9 +370,6 @@ const Register = ({ switchToLogin, closePopup }) => {
                 required
               />
             </div>
-          </div>
-
-          <div className="form-row three-fields">
             <div className="form-group">
               <label>Password</label>
               <div className="password-input-container">
@@ -367,6 +392,10 @@ const Register = ({ switchToLogin, closePopup }) => {
                 8+ chars with lowercase, uppercase, number & special char
               </small>
             </div>
+          </div>
+
+          {/* Row 2: Company Information */}
+          <div className="form-row four-fields">
             <div className="form-group">
               <label>Company Name</label>
               <input
@@ -386,25 +415,55 @@ const Register = ({ switchToLogin, closePopup }) => {
                 name="company_reg_num"
                 value={formData.company_reg_num}
                 onChange={handleChange}
-                placeholder="Reg. No. (numbers only)"
+                placeholder="Reg. No."
                 className="form-input"
                 required
               />
               <small style={{ color: "#666", fontSize: "11px" }}>Numbers only</small>
             </div>
-          </div>
-
-          <div className="form-row three-fields">
             <div className="form-group">
-              <label>Cluster Box</label>
+              <label>VAT Reg No.</label>
               <input
                 type="text"
-                name="cluster_box"
-                value={formData.cluster_box}
+                name="vat_reg_num"
+                value={formData.vat_reg_num}
                 onChange={handleChange}
-                placeholder="Cluster Box"
+                placeholder="VAT Number"
                 className="form-input"
+                maxLength={20}
               />
+              <small style={{ color: "#666", fontSize: "11px" }}>Numbers only</small>
+            </div>
+            <div className="form-group">
+              <label>Cell Number</label>
+              <input
+                type="text"
+                name="cell_num"
+                value={formData.cell_num}
+                onChange={handleChange}
+                placeholder="Cell Number"
+                className="form-input"
+                required
+                maxLength={10}
+              />
+              <small style={{ color: "#666", fontSize: "11px" }}>10 digits, numbers only</small>
+            </div>
+          </div>
+
+          {/* Row 3: Contact Information */}
+          <div className="form-row four-fields">
+            <div className="form-group">
+              <label>Alternate Cell</label>
+              <input
+                type="text"
+                name="cell_num2"
+                value={formData.cell_num2}
+                onChange={handleChange}
+                placeholder="Alternate Cell"
+                className="form-input"
+                maxLength={10}
+              />
+              <small style={{ color: "#666", fontSize: "11px" }}>10 digits, numbers only</small>
             </div>
             <div className="form-group">
               <label>Address</label>
@@ -430,51 +489,20 @@ const Register = ({ switchToLogin, closePopup }) => {
                 required
               />
             </div>
-          </div>
-
-          <div className="form-row three-fields">
             <div className="form-group">
-              <label>Cell Number</label>
+              <label>Cluster Box</label>
               <input
                 type="text"
-                name="cell_num"
-                value={formData.cell_num}
+                name="cluster_box"
+                value={formData.cluster_box}
                 onChange={handleChange}
-                placeholder="Cell Number (10 digits)"
+                placeholder="Cluster Box"
                 className="form-input"
-                required
-                maxLength={10}
               />
-              <small style={{ color: "#666", fontSize: "11px" }}>10 digits, numbers only</small>
-            </div>
-            <div className="form-group">
-              <label>Alternate Cell</label>
-              <input
-                type="text"
-                name="cell_num2"
-                value={formData.cell_num2}
-                onChange={handleChange}
-                placeholder="Alternate Cell (10 digits)"
-                className="form-input"
-                maxLength={10}
-              />
-              <small style={{ color: "#666", fontSize: "11px" }}>10 digits, numbers only</small>
-            </div>
-            <div className="form-group">
-              <label>VAT Reg No.</label>
-              <input
-                type="text"
-                name="vat_reg_num"
-                value={formData.vat_reg_num}
-                onChange={handleChange}
-                placeholder="VAT Number (numbers only)"
-                className="form-input"
-                maxLength={20}
-              />
-              <small style={{ color: "#666", fontSize: "11px" }}>Numbers only</small>
             </div>
           </div>
 
+          {/* Row 4: Banking Information */}
           <div className="form-row three-fields">
             <div className="form-group">
               <label>Account Number</label>
@@ -483,7 +511,7 @@ const Register = ({ switchToLogin, closePopup }) => {
                 name="account_num"
                 value={formData.account_num}
                 onChange={handleChange}
-                placeholder="Account Number (numbers only)"
+                placeholder="Account Number"
                 className="form-input"
                 required
               />
@@ -515,6 +543,7 @@ const Register = ({ switchToLogin, closePopup }) => {
             </div>
           </div>
 
+          {/* Row 5: Banking Information (continued) */}
           <div className="form-row three-fields">
             <div className="form-group">
               <label>Branch</label>
@@ -535,7 +564,7 @@ const Register = ({ switchToLogin, closePopup }) => {
                 name="branch_code"
                 value={formData.branch_code}
                 onChange={handleChange}
-                placeholder="Branch Code (numbers only)"
+                placeholder="Branch Code"
                 className="form-input"
                 required
               />
@@ -556,13 +585,13 @@ const Register = ({ switchToLogin, closePopup }) => {
             </div>
           </div>
 
-          <div className="form-actions" style={{ marginBottom: "-48px", marginTop: "-20px" }}>
+          <div className="form-actions" style={{ marginBottom: "-30px", marginTop: "-20px" }}>
             <button type="submit" className="submit-button1" disabled={isLoading || isCheckingEmail}>
               {isLoading ? "Submitting..." : isCheckingEmail ? "Checking..." : "Submit"}
             </button>
           </div>
 
-          <div className="login-link" style={{ marginTop: "40px" }}>
+          <div className="login-link" style={{ marginTop: "20px" }}>
             <button onClick={switchToLogin} className="link-button">
               Already have a profile? Login here
             </button>

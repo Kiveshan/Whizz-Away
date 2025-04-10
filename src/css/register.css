@@ -4,7 +4,7 @@
   align-items: center;
   justify-content: center;
   position: relative;
-  margin-bottom: 10px; /* Reduced bottom margin */
+  margin-bottom: -5px; /* Reduced bottom margin */
   margin-top: -50px;
 }
 
@@ -15,6 +15,7 @@
   width: 100%;
   max-width: 850px;
   box-sizing: border-box;
+  margin-bottom: 20px; /* Reduced bottom margin */
 }
 
 .logo-container1 {
@@ -188,7 +189,7 @@ label {
 
 .password-indicator {
   position: absolute;
-  right: 10px;
+  right: 2px;
   font-size: 14px;
   font-weight: bold;
 }
@@ -199,4 +200,104 @@ label {
 
 .password-indicator.invalid {
   color: #dc3545;
+}
+
+/* Add these styles to your register.css file */
+
+/* Success Popup Styles */
+.success-popup {
+  position: fixed;
+  top: 20px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 1000;
+  animation: slideDown 0.3s ease-out forwards;
+}
+
+.success-popup-content {
+  background-color: #fff;
+  border-left: 4px solid #28a745; /* Green border for success */
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  padding: 15px 20px;
+  border-radius: 4px;
+  min-width: 300px;
+  max-width: 500px;
+  position: relative;
+}
+
+.success-popup-content p {
+  margin: 0;
+  color: #28a745; /* Green text for success */
+  font-weight: 500;
+}
+
+/* Shared popup styles */
+@keyframes slideDown {
+  from {
+    top: -100px;
+    opacity: 0;
+  }
+  to {
+    top: 20px;
+    opacity: 1;
+  }
+}
+
+.close-popup {
+  position: absolute;
+  top: 10px;
+  right: 15px;
+  font-size: 18px;
+  font-weight: bold;
+  cursor: pointer;
+  color: #666;
+}
+
+.close-popup:hover {
+  color: #333;
+}
+
+/* Add these styles to your register.css file */
+
+/* Four fields per row layout */
+.form-row.four-fields {
+  display: flex;
+  gap: 10px;
+  margin-bottom: 1px;
+}
+
+.form-row.four-fields .form-group {
+  flex: 1;
+  min-width: 0; /* Allows flex items to shrink below content size */
+}
+
+/* Responsive adjustments */
+@media (max-width: 1200px) {
+  .form-row.four-fields {
+    flex-wrap: wrap;
+  }
+
+  .form-row.four-fields .form-group {
+    flex-basis: calc(50% - 5px);
+  }
+}
+
+@media (max-width: 768px) {
+  .form-row.four-fields .form-group {
+    flex-basis: 100%;
+  }
+}
+
+/* Make inputs and labels fit better in narrower containers */
+.form-row.four-fields .form-input {
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.form-row.four-fields label {
+  font-size: 0.9rem;
+}
+
+.form-row.four-fields small {
+  font-size: 10px !important;
 }
