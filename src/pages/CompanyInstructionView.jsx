@@ -171,7 +171,7 @@ const CompanyInstructionView = () => {
     maxWidth: "1000px",
     marginLeft: "auto",
     marginRight: "auto",
-    marginTop: "20px",
+    marginTop: "-80px",
     borderCollapse: "collapse",
   }
 

@@ -163,7 +163,7 @@ const ViewClientInstruction = () => {
         ) : error ? (
           <p className="error-message">{error}</p>
         ) : (
-          <table className="t1" style={{ marginLeft: "auto", marginRight: "auto" }}>
+          <table className="t1" style={{ marginLeft: "auto", marginRight: "auto" , marginTop: "-20px"}}>
             <thead className="bg-blue-300">
               <tr>
                 <th className="p-3">Company</th>

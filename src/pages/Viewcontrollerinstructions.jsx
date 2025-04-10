@@ -348,7 +348,7 @@ const Viewcontrollerinstructions = () => {
   }
 
   return (
-    <div className="min-h-screen bg-white" style={{ paddingBottom: 200 }}>
+    <div >
       <div className="">
         <button className="back-button" onClick={handleBackClick}>
           Back
@@ -386,7 +386,7 @@ const Viewcontrollerinstructions = () => {
         </div>
       )}
 
-      <div className="instruction-container1" style={{ marginTop: "50px" }}>
+      <div className="instruction-container1" style={{ marginTop: "-20px" }}>
         <div className="content">
           {/* Loading indicator or retry button */}
           {isLoading.clients || isLoading.shipmentTypes || isLoading.instruction ? (

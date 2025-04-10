@@ -70,8 +70,32 @@ const CompanyInstructions = () => {
     activeFilter: initialFilter,
   })
 
-  const [selectedMonth, setSelectedMonth] = useState(initialMonth || "")
-  const [selectedYear, setSelectedYear] = useState(initialYear || "")
+  // Get current month and year
+  const getCurrentMonthName = () => {
+    const monthNames = [
+      "January",
+      "February",
+      "March",
+      "April",
+      "May",
+      "June",
+      "July",
+      "August",
+      "September",
+      "October",
+      "November",
+      "December",
+    ]
+    return monthNames[new Date().getMonth()]
+  }
+
+  const getCurrentYear = () => {
+    return new Date().getFullYear().toString()
+  }
+
+  // Always default to current month and year regardless of passed values
+  const [selectedMonth, setSelectedMonth] = useState(getCurrentMonthName())
+  const [selectedYear, setSelectedYear] = useState(getCurrentYear())
   const [instructions, setInstructions] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
@@ -138,6 +162,20 @@ const CompanyInstructions = () => {
     setActiveFilter(filter)
   }
 
+  // Helper function to get status priority for sorting
+  const getStatusPriority = (status) => {
+    switch (status) {
+      case "New":
+        return 1
+      case "In progress":
+        return 2
+      case "Completed":
+        return 3
+      default:
+        return 4 // Any other status will come after the specified ones
+    }
+  }
+
   const getFilteredInstructions = () => {
     let filtered = [...instructions]
 
@@ -193,25 +231,11 @@ const CompanyInstructions = () => {
       }
     }
 
-    // Sort instructions: "New" status at top, then by ID (descending) within "New" status
+    // Sort by status priority: New -> In progress -> Completed
     filtered.sort((a, b) => {
-      // First sort by status
-      if (a.status === "New" && b.status !== "New") {
-        return -1 // a comes before b
-      }
-      if (a.status !== "New" && b.status === "New") {
-        return 1 // b comes before a
-      }
-
-      // If both have "New" status, sort by ID (descending)
-      if (a.status === "New" && b.status === "New") {
-        const aId = Number.parseInt(a.m1controllerkey || a.m1key || 0)
-        const bId = Number.parseInt(b.m1controllerkey || b.m1key || 0)
-        return bId - aId // Higher IDs first
-      }
-
-      // For non-"New" status, maintain original order
-      return 0
+      const priorityA = getStatusPriority(a.status)
+      const priorityB = getStatusPriority(b.status)
+      return priorityA - priorityB
     })
 
     return filtered
@@ -245,22 +269,9 @@ const CompanyInstructions = () => {
 
   return (
     <div>
-      {/* Centered company name heading */}
-      <div className="client-payments-header">
-        <button className="back-button" onClick={() => navigate("/CompanyInstructionView")}>
-          Back
-        </button>
-        {clientName && (
-          <span className="client-name">
-            {clientName} <span style={{ display: "none" }}>{clientId ? `(Client ID: ${clientId})` : ""}</span>
-          </span>
-        )}
-      </div>
-
-      {/* Centered month and year filters */}
+      {/* Centered month and year filters - MOVED ABOVE the company name */}
       <div className="dropdown-container74">
         <select value={selectedMonth} onChange={(e) => setSelectedMonth(e.target.value)} className="dropdown">
-          <option value="">Select Month</option>
           <option value="January">January</option>
           <option value="February">February</option>
           <option value="March">March</option>
@@ -276,12 +287,23 @@ const CompanyInstructions = () => {
         </select>
 
         <select value={selectedYear} onChange={(e) => setSelectedYear(e.target.value)} className="dropdown">
-          <option value="">Select Year</option>
           <option value="2023">2023</option>
           <option value="2024">2024</option>
           <option value="2025">2025</option>
           <option value="2026">2026</option>
         </select>
+      </div>
+
+      {/* Centered company name heading */}
+      <div className="client-payments-header">
+        <button className="back-button" onClick={() => navigate("/CompanyInstructionView")}>
+          Back
+        </button>
+        {clientName && (
+          <span className="client-name">
+            {clientName} <span style={{ display: "none" }}>{clientId ? `(Client ID: ${clientId})` : ""}</span>
+          </span>
+        )}
       </div>
 
       <div className="content1">
@@ -390,4 +412,3 @@ const CompanyInstructions = () => {
 }
 
 export default CompanyInstructions
-

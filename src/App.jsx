@@ -36,10 +36,8 @@ import ManagerLegDetails from "./pages/ManagerLegDetails"
 import ManagerViewAssignment from "./pages/ManagerViewAssignment"
 import FinancialDocumentsView from "./pages/FinancialDocumentsView"
 
-
 import CompanyInstructionView from "./pages/CompanyInstructionView"
 import CompanyInstructions from "./pages/CompanyInstructions"
-
 
 import DirectorManagerViewAssignment from "./pages/DirectorManagerViewAssignment"
 import DirectorAnalytics from "./pages/DirectorAnalytics"
@@ -85,7 +83,6 @@ import FClerkLegDetails from "./finance clerkpages/FClerkLegDetails"
 import FCcontrollerinstructions from "./finance clerkpages/FCcontrollerinstructions"
 import FCcontrollerInstructionDetails from "./finance clerkpages/FCcontrollerInstructionDetails"
 
-
 // CSS Imports
 import "./css/card.css"
 import "./css/components.css"
@@ -96,19 +93,18 @@ function DynamicHeader() {
   const location = useLocation()
   const titleMap = {
     "/Dashboard": "Business Manager",
-   
+
     "/client-payments": "Client Payments",
     "/client-documents": "Client Documents",
     "/driver-wage": "Wages",
     "/DriverWageSlip": "Wages",
     "/DriverWageList": "Wages",
     "/ControllerInstructions": "Instruction",
-    
-   
+
     "/ControllerViewAssignment": "View Assignment",
     "/ControllerInstructionDetails": "Container Details",
     "/FCcontrollerInstructionDetails": "Container Details",
-    
+
     "/expenses": "Truck Expenses",
     "/analytics": "Analytics",
     "/debtors": "Debtors",
@@ -139,12 +135,12 @@ function DynamicHeader() {
     "/ManagerViewFuelExpence": "Truck Expenses",
     "/FClerkLegDetails": "Wages",
     "/ManagerLegDetails": "Wages",
-    "/ManagerViewAssignment": "View Assignment",  
+    "/ManagerViewAssignment": "View Assignment",
     "/FinancialDocumentsView": "Client Documents",
-    
+
     "/CompanyInstructionView": "Instructions ",
     "/CompanyInstructions": "Instructions ",
-    
+
     "/DirectorManagerViewAssignment": "View Assignment",
     "/DirectorAnalytics": "Analytics",
     "/DirectorDabtors": "Debtors",
@@ -195,7 +191,6 @@ function ContentWrapper() {
       )}
       <Routes>
         <Route path="/" element={<Landing />} />
-        
         <Route path="/client-payments" element={<ClientPayments />} />
         <Route path="/driver-wage" element={<DriverWage />} />
         <Route path="/DriverWageSlip" element={<DriverWageSlip />} />
@@ -214,21 +209,13 @@ function ContentWrapper() {
         <Route path="/DirectorDashboard" element={<DirectorDashboard />} />
         <Route path="/ManagerCreditorsDash" element={<ManagerCreditorsDash />} />
         <Route path="/ControllerInstructions" element={<ControllerInstructions />} />
-      
         <Route path="/ControllerViewAssignment" element={<ControllerViewAssignment />} />
         <Route path="/ControllerInstructionDetails" element={<ControllerInstructionDetails />} />
-
         <Route path="/ManagerLegDetails" element={<ManagerLegDetails />} />
         <Route path="/ManagerViewAssignment" element={<ManagerViewAssignment />} />
         <Route path="/FinancialDocumentsView" element={<FinancialDocumentsView />} />
-       
-       
         <Route path="/CompanyInstructionView" element={<CompanyInstructionView />} />
-       
-       
         <Route path="/CompanyInstructions" element={<CompanyInstructions />} />
-        
-        
         <Route path="/DirectorManagerViewAssignment" element={<DirectorManagerViewAssignment />} />
         <Route path="/DirectorAnalytics" element={<DirectorAnalytics />} />
         <Route path="/DirectorDabtors" element={<DirectorDabtors />} />
@@ -272,7 +259,6 @@ function ContentWrapper() {
         <Route path="/FClerkLegDetails" element={<FClerkLegDetails />} />
         <Route path="/FCcontrollerinstructions" element={<FCcontrollerinstructions />} />
         <Route path="/FCcontrollerInstructionDetails" element={<FCcontrollerInstructionDetails />} />
-       
       </Routes>
       {shouldShowFooter && <Footer />} {/* Conditionally render footer */}
     </div>
@@ -285,7 +271,7 @@ function App() {
     "/": "Controller Dashboard",
     "/ControllerInstructions": "Controller Instructions",
     "/ControllerInstructionDetails": "Container Details",
-   
+
     "/ControllerViewAssignment": "View Assignment",
     "/FDashboard": "Finance Clerk Dashboard",
     "/ViewClientInstruction": "View Client Instructions",
@@ -316,4 +302,3 @@ function App() {
 }
 
 export default App
-

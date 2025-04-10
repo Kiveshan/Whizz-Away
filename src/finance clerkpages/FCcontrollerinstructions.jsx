@@ -1379,7 +1379,7 @@ const FCcontrollerinstructions = () => {
   }
 
   return (
-    <div className="min-h-screen bg-white" style={{ paddingBottom: 200 }}>
+    <div  >
       {/* Error Modal */}
       {errorModal.isOpen && (
         <ErrorModal
@@ -1419,9 +1419,9 @@ const FCcontrollerinstructions = () => {
       )}
 
       {/* Added spacing to bring the form lower on the page */}
-      <div style={{ height: "30px" }}></div>
+      {/* <div style={{ height: "0px" }}></div> */}
 
-      <div className="instruction-container1" style={{ marginTop: "20px" }}>
+      <div className="instruction-container1" style={{ marginTop: "-20px" }}>
         <div className="content">
           {/* Loading indicator or retry button */}
           {isLoading.clients || isLoading.shipmentTypes || isLoading.instruction ? (

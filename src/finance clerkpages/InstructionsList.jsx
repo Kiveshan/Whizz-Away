@@ -35,19 +35,44 @@ const BellIcon = () => {
 const addShakeAnimation = () => {
   const styleSheet = document.createElement("style")
   styleSheet.textContent = `
-  @keyframes shake {
-    0% { transform: rotate(0deg); }
-    25% { transform: rotate(5deg); }
-    50% { transform: rotate(0deg); }
-    75% { transform: rotate(-5deg); }
-    100% { transform: rotate(0deg); }
-  }
-  
-  .bell-icon-status {
-    display: inline-block;
-  }
-`
+    @keyframes shake {
+      0% { transform: rotate(0deg); }
+      25% { transform: rotate(5deg); }
+      50% { transform: rotate(0deg); }
+      75% { transform: rotate(-5deg); }
+      100% { transform: rotate(0deg); }
+    }
+    
+    .bell-icon-status {
+      display: inline-block;
+    }
+  `
   document.head.appendChild(styleSheet)
+}
+
+// Helper function to get current month name
+const getCurrentMonthName = () => {
+  const monthNames = [
+    "January",
+    "February",
+    "March",
+    "April",
+    "May",
+    "June",
+    "July",
+    "August",
+    "September",
+    "October",
+    "November",
+    "December",
+  ]
+  const currentMonth = new Date().getMonth() // 0-11
+  return monthNames[currentMonth]
+}
+
+// Helper function to get current year as string
+const getCurrentYear = () => {
+  return new Date().getFullYear().toString()
 }
 
 const Instructions = () => {
@@ -58,9 +83,9 @@ const Instructions = () => {
   const clientId = location.state?.clientId
   const clientName = location.state?.clientName
 
-  // Initialize state with values from location state if available
-  const [selectedMonth, setSelectedMonth] = useState(location.state?.selectedMonth || "")
-  const [selectedYear, setSelectedYear] = useState(location.state?.selectedYear || "")
+  // Initialize state with current month and year
+  const [selectedMonth, setSelectedMonth] = useState(getCurrentMonthName())
+  const [selectedYear, setSelectedYear] = useState(getCurrentYear())
   const [activeFilter, setActiveFilter] = useState(location.state?.activeFilter || "All")
 
   const [instructions, setInstructions] = useState([])
@@ -125,6 +150,20 @@ const Instructions = () => {
     setActiveFilter(filter)
   }
 
+  // Helper function to determine status priority for sorting
+  const getStatusPriority = (status) => {
+    switch (status) {
+      case "New":
+        return 1 // Highest priority
+      case "In progress":
+        return 2
+      case "Completed":
+        return 3
+      default:
+        return 4 // Lowest priority
+    }
+  }
+
   const getFilteredInstructions = () => {
     let filtered = [...instructions]
 
@@ -168,16 +207,11 @@ const Instructions = () => {
       }
     }
 
-    // Sort instructions with "New" status to the top, then by date (most recent first)
-    filtered = filtered.sort((a, b) => {
-      // First, sort by status (New instructions at the top)
-      if (a.status === "New" && b.status !== "New") return -1
-      if (a.status !== "New" && b.status === "New") return 1
-
-      // Then, sort by date (most recent first)
-      const dateA = new Date(a.startingdate || a.pickupdate)
-      const dateB = new Date(b.startingdate || b.pickupdate)
-      return dateB - dateA
+    // Sort by status priority: New -> In progress -> Completed
+    filtered.sort((a, b) => {
+      const priorityA = getStatusPriority(a.status)
+      const priorityB = getStatusPriority(b.status)
+      return priorityA - priorityB
     })
 
     return filtered
@@ -215,15 +249,7 @@ const Instructions = () => {
 
   return (
     <div>
-      {/* Centered company name heading */}
-      <div className="client-payments-header">
-        <button className="back-button" onClick={() => navigate("/ViewClientInstruction")}>
-          Back
-        </button>
-        {clientName && <span className="client-name">{clientName}</span>}
-      </div>
-
-      {/* Centered month and year filters */}
+      {/* Centered month and year filters - now positioned ABOVE the company name */}
       <div className="dropdown-container74">
         <select value={selectedMonth} onChange={(e) => setSelectedMonth(e.target.value)} className="dropdown">
           <option value="">Select Month</option>
@@ -248,6 +274,14 @@ const Instructions = () => {
           <option value="2025">2025</option>
           <option value="2026">2026</option>
         </select>
+      </div>
+
+      {/* Centered company name heading */}
+      <div className="client-payments-header">
+        <button className="back-button" onClick={() => navigate("/ViewClientInstruction")}>
+          Back
+        </button>
+        {clientName && <span className="client-name">{clientName}</span>}
       </div>
 
       <div className="content1">
@@ -356,4 +390,3 @@ const Instructions = () => {
 }
 
 export default Instructions
-
