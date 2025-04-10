@@ -11,6 +11,9 @@ import jwt from "jsonwebtoken"
 import path from "path"
 import { fileURLToPath } from "url"
 import puppeteer from "puppeteer"
+import cron from 'node-cron';
+
+
 
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = path.dirname(__filename)
@@ -585,6 +588,264 @@ app.post("/api/generate-pdf", async (req, res) => {
     })
   }
 })
+
+
+// Add this function to your server.js file
+
+/**
+ * Generates statements for invoice groups that don't have statements yet
+ */
+async function generateStatements() {
+  console.log('Statement generation started - invoices only');
+  
+  try {
+    // Get all unique invoice groupids that don't have statements yet
+    const groupsResult = await query(`
+      SELECT DISTINCT i.groupid, i.clientid
+      FROM invoice i
+      LEFT JOIN statements s ON i.groupid = s.groupid
+      WHERE i.groupid IS NOT NULL 
+      AND i.groupid != ''
+      AND s.statement_key IS NULL
+    `);
+    
+    const groups = groupsResult.rows;
+    console.log(`Found ${groups.length} invoice groups without statements`);
+    
+    // Process each group
+    for (const group of groups) {
+      await generateStatementForGroup(group.groupid, group.clientid);
+    }
+    
+    return {
+      success: true,
+      message: `Generated statements for ${groups.length} invoice groups`
+    };
+  } catch (error) {
+    console.error('Error generating statements:', error);
+    return {
+      success: false,
+      message: 'Error generating statements',
+      error: error.message
+    };
+  }
+}
+
+/**
+ * Generates a statement for a specific invoice group
+ */
+async function generateStatementForGroup(groupid, clientId) {
+  console.log(`Generating statement for group ${groupid}, client ${clientId}`);
+  
+  try {
+    // Get all invoices for this group
+    const invoicesResult = await query(`
+      SELECT i.*, m1.total_cost
+      FROM invoice i
+      JOIN m1_controller m1 ON i.m1key = m1.m1key
+      WHERE i.groupid = $1
+    `, [groupid]);
+    
+    const invoices = invoicesResult.rows;
+    
+    if (invoices.length === 0) {
+      console.log(`No invoices found for group ${groupid}, skipping`);
+      return;
+    }
+    
+    // Calculate total invoice amount for this group
+    const totalInvoiced = invoices.reduce((sum, inv) => sum + (parseFloat(inv.total_cost) || 0), 0);
+    
+    // Get date range for these invoices
+    const dates = invoices.map(inv => new Date(inv.date));
+    const minDate = new Date(Math.min(...dates));
+    
+    // For aging analysis, we need to determine how old these invoices are
+    const today = new Date();
+    const daysDiff = Math.floor((today - minDate) / (1000 * 60 * 60 * 24));
+    
+    // Simple aging logic based on the oldest invoice in the group
+    let current = 0, days30 = 0, days60 = 0, days90 = 0;
+    
+    if (daysDiff <= 30) {
+      current = totalInvoiced;
+    } else if (daysDiff <= 60) {
+      days30 = totalInvoiced;
+    } else if (daysDiff <= 90) {
+      days60 = totalInvoiced;
+    } else {
+      days90 = totalInvoiced;
+    }
+    
+    // Insert statement record
+    await query(`
+      INSERT INTO statements (groupid, current, days_30, days_60, days_90)
+      VALUES ($1, $2, $3, $4, $5)
+    `, [groupid, current, days30, days60, days90]);
+    
+    console.log(`Generated statement for group ${groupid} with total amount ${totalInvoiced}`);
+  } catch (error) {
+    console.error(`Error generating statement for group ${groupid}:`, error);
+    throw error;
+  }
+}
+
+
+// Add these endpoints to your server.js file
+
+// Generate statements manually
+app.post("/api/statements/generate", async (req, res) => {
+  try {
+    const result = await generateStatements();
+    res.json(result);
+  } catch (error) {
+    console.error("Error generating statements:", error);
+    res.status(500).json({
+      success: false,
+      message: error.message,
+    });
+  }
+});
+
+// Get all statements with filtering
+app.get('/api/statements', async (req, res) => {
+  try {
+    const { clientId, year, month } = req.query;
+    
+    let queryText = `
+      SELECT 
+        s.statement_key,
+        s.groupid,
+        s.current,
+        s.days_30,
+        s.days_60,
+        s.days_90,
+        (s.current + s.days_30 + s.days_60 + s.days_90) AS total_amount,
+        c.companyname,
+        MIN(i.date) AS period_start,
+        MAX(i.date) AS period_end
+      FROM 
+        statements s
+      JOIN
+        invoice i ON s.groupid = i.groupid
+      JOIN
+        m5_client c ON i.clientid = c.m5clientkey
+      WHERE 1=1
+    `;
+    
+    const queryParams = [];
+    let paramIndex = 1;
+    
+    if (clientId) {
+      queryText += ` AND i.clientid = $${paramIndex}`;
+      queryParams.push(clientId);
+      paramIndex++;
+    }
+    
+    if (year) {
+      queryText += ` AND EXTRACT(YEAR FROM i.date) = $${paramIndex}`;
+      queryParams.push(year);
+      paramIndex++;
+    }
+    
+    if (month) {
+      queryText += ` AND EXTRACT(MONTH FROM i.date) = $${paramIndex}`;
+      queryParams.push(month);
+      paramIndex++;
+    }
+    
+    queryText += ` GROUP BY s.statement_key, s.groupid, s.current, s.days_30, s.days_60, s.days_90, c.companyname`;
+    queryText += ` ORDER BY MAX(i.date) DESC`;
+    
+    const result = await query(queryText, queryParams);
+    
+    res.json({
+      success: true,
+      data: result.rows
+    });
+  } catch (error) {
+    console.error('Error fetching statements:', error);
+    res.status(500).json({
+      success: false,
+      message: error.message
+    });
+  }
+});
+
+// Get a specific statement
+app.get('/api/statements/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    
+    // Get statement details
+    const statementResult = await query(`
+      SELECT 
+        s.*,
+        (s.current + s.days_30 + s.days_60 + s.days_90) AS total_amount
+      FROM 
+        statements s
+      WHERE 
+        s.statement_key = $1
+    `, [id]);
+    
+    if (statementResult.rows.length === 0) {
+      return res.status(404).json({
+        success: false,
+        message: 'Statement not found'
+      });
+    }
+    
+    const statement = statementResult.rows[0];
+    
+    // Get invoices for this statement
+    const invoicesResult = await query(`
+      SELECT 
+        i.*,
+        m1.total_cost,
+        m1.task as instruction_no,
+        s.shipmenttype
+      FROM 
+        invoice i
+      JOIN
+        m1_controller m1 ON i.m1key = m1.m1key
+      LEFT JOIN
+        shipment s ON m1.shipment_type = s.shipkey
+      WHERE 
+        i.groupid = $1
+      ORDER BY
+        i.date
+    `, [statement.groupid]);
+    
+    res.json({
+      success: true,
+      data: {
+        statement,
+        invoices: invoicesResult.rows
+      }
+    });
+  } catch (error) {
+    console.error('Error fetching statement details:', error);
+    res.status(500).json({
+      success: false,
+      message: error.message
+    });
+  }
+});
+
+
+// Original production schedule (midnight on 1st of every month)
+// cron.schedule('0 0 1 * *', async () => { ... });
+
+// Testing schedule (runs every minute)
+cron.schedule('* * * * *', async () => {
+  console.log('Running scheduled statement generation');
+  try {
+    await generateStatements();
+    console.log('Scheduled statement generation completed successfully');
+  } catch (error) {
+    console.error('Error in scheduled statement generation:', error);
+  }
+});
 
 // Add a catch-all route for debugging
 app.use((req, res, next) => {
