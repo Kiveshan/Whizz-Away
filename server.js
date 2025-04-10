@@ -57,7 +57,7 @@ app.use(passport.session())
 const client = new pg.Client({
   user: process.env.RDS_USERNAME || "postgres",
   host: process.env.RDS_HOSTNAME || "localhost",
-  database: process.env.RDS_DB_NAME || "whizz-away",
+  database: process.env.RDS_DB_NAME || "Whizz-Away-V2",
   password: process.env.RDS_PASSWORD || "123456",
   port: process.env.RDS_PORT || 5434,
   ssl: process.env.DB_SSL ? { rejectUnauthorized: false } : false,
