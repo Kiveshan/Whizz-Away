@@ -52,7 +52,7 @@
 /* Close Button */
 .close-btn-login {
     position: absolute;
-    top: 210px;  /* Move closer to the top */
+    top: 220px;  /* Move closer to the top */
     right: 260px; /* Move closer to the right */
     font-size: 1.5rem;
     background: none;
