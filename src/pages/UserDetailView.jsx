@@ -115,7 +115,7 @@ function UserDetailView({ user, onBack }) {
 
         <div className="user-detail-row">
           <div className="detail-label">Registration Date:</div>
-          <div className="detail-value">{new Date(user.dateofreg).toLocaleString()}</div>
+          <div className="detail-value">{new Date(user.dateofreg).toISOString().split('T')[0]}</div>
         </div>
       </div>
 
