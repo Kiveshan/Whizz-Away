@@ -1,11 +1,56 @@
-"use client"
-import { useNavigate } from "react-router-dom"
-import { useState } from "react"
-import "../finance clerkpages/css/ClientStatement.css"
+"use client";
+import { useNavigate, useLocation } from "react-router-dom";
+import { useState, useEffect } from "react";
+import "../finance clerkpages/css/ClientStatement.css";
 
 const ClientStatement = () => {
-  const navigate = useNavigate()
-  const [isAgeAnalysisOpen, setIsAgeAnalysisOpen] = useState(true)
+  const navigate = useNavigate();
+  const location = useLocation();
+  const { statementId } = location.state || {};
+
+  const [statement, setStatement] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+  const [isAgeAnalysisOpen, setIsAgeAnalysisOpen] = useState(true);
+
+  useEffect(() => {
+    if (!statementId) {
+      setError("No statement selected");
+      setLoading(false);
+      return;
+    }
+
+    const fetchStatement = async () => {
+      try {
+        const response = await fetch(`/api/statement/${statementId}`);
+        if (!response.ok) throw new Error("Failed to fetch statement");
+        const data = await response.json();
+
+        if (data.success) {
+          setStatement(data.data);
+        } else {
+          throw new Error(data.message || "Failed to fetch statement");
+        }
+      } catch (err) {
+        console.error("Error fetching statement:", err);
+        setError(err.message);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchStatement();
+  }, [statementId]);
+
+  if (loading) return <div>Loading statement...</div>;
+  if (error) return <div className="error-message">Error: {error}</div>;
+  if (!statement) return <div>Please select a statement from the list.</div>;
+
+  // Calculate totals (invoices only for now)
+  const invoicedAmount = statement.invoices.reduce((sum, inv) => sum + inv.amount, 0);
+  const openingBalance = 0; // No payment data yet
+  const amountPaid = 0; // No payment data yet
+  const balanceDue = invoicedAmount;
 
   return (
     <div className="statement-page">
@@ -20,16 +65,18 @@ const ClientStatement = () => {
           {/* Client Info - Left Side */}
           <div className="client-info">
             <div className="to-label">To</div>
-            <div className="client-name">Matthew Moore</div>
-            <div className="client-email">sharris@yahoo.com</div>
-            <div className="client-phone">(719) 814-3786</div>
-            <div className="client-address">1020 West Street, Raleigh, NC 27601</div>
+            <div className="client-name">{statement.client.representative}</div>
+            <div className="client-email">{statement.client.email}</div>
+            <div className="client-phone">{statement.client.phone}</div>
+            <div className="client-address">{statement.client.address}</div>
           </div>
 
           {/* Statement Title and Account Summary - Right Side */}
           <div className="statement-title">
             <h2>Statement of Accounts</h2>
-            <div className="statement-date">01/02/2025-01/03/2025</div>
+            <div className="statement-date">
+              {new Date(statement.generation_date).toLocaleDateString()}
+            </div>
 
             <h3>Account Summary</h3>
 
@@ -37,19 +84,19 @@ const ClientStatement = () => {
               <tbody>
                 <tr>
                   <td className="summary-label">Opening Balance</td>
-                  <td className="summary-value">R0</td>
+                  <td className="summary-value">R{openingBalance.toFixed(2)}</td>
                 </tr>
                 <tr>
                   <td className="summary-label">Invoiced Amount</td>
-                  <td className="summary-value">R100 000</td>
+                  <td className="summary-value">R{invoicedAmount.toFixed(2)}</td>
                 </tr>
                 <tr>
                   <td className="summary-label">Amount Paid</td>
-                  <td className="summary-value">R5 000</td>
+                  <td className="summary-value">R{amountPaid.toFixed(2)}</td>
                 </tr>
                 <tr>
                   <td className="summary-label">Balance Due:</td>
-                  <td className="summary-value">R95 000</td>
+                  <td className="summary-value">R{balanceDue.toFixed(2)}</td>
                 </tr>
               </tbody>
             </table>
@@ -74,37 +121,27 @@ const ClientStatement = () => {
             </thead>
             <tbody>
               <tr>
-                <td>15/04/2021</td>
+                <td>{new Date(statement.generation_date).toLocaleDateString()}</td>
                 <td>Opening Balance</td>
                 <td></td>
                 <td>R0</td>
                 <td></td>
                 <td>R0</td>
               </tr>
-              <tr>
-                <td>24/10/2022</td>
-                <td>Invoice</td>
-                <td>Invoice due on 10/11/2025</td>
-                <td>R50 000</td>
-                <td></td>
-                <td>R50 000</td>
-              </tr>
-              <tr>
-                <td>15/12/2022</td>
-                <td>Invoice</td>
-                <td>Invoice due on 05/01/2025</td>
-                <td>R50 000</td>
-                <td></td>
-                <td>R100 000</td>
-              </tr>
-              <tr>
-                <td>14/01/2021</td>
-                <td>Payment Received</td>
-                <td>R5 000 payment for Invoice 02</td>
-                <td></td>
-                <td>R5 000</td>
-                <td>R95 000</td>
-              </tr>
+              {statement.invoices.map((invoice) => (
+                <tr key={invoice.ikey}>
+                  <td>{new Date(invoice.date).toLocaleDateString()}</td>
+                  <td>Invoice</td>
+                  <td>{invoice.task || invoice.invoice_num || `Invoice #${invoice.ikey}`}</td>
+                  <td>R{invoice.amount.toFixed(2)}</td>
+                  <td></td>
+                  <td>
+                    R{(statement.invoices
+                      .slice(0, statement.invoices.indexOf(invoice) + 1)
+                      .reduce((sum, inv) => sum + inv.amount, 0)).toFixed(2)}
+                  </td>
+                </tr>
+              ))}
             </tbody>
           </table>
         </div>
@@ -112,7 +149,7 @@ const ClientStatement = () => {
         {/* Balance Due Summary */}
         <div className="balance-due-summary">
           <div className="balance-due-label">Balance Due</div>
-          <div className="balance-due-amount">R95 000</div>
+          <div className="balance-due-amount">R{balanceDue.toFixed(2)}</div>
         </div>
 
         {/* Age Analysis */}
@@ -128,19 +165,17 @@ const ClientStatement = () => {
                 <thead>
                   <tr>
                     <th>Current</th>
-                    <th>30 days</th>
-                    <th>60 days</th>
-                    <th>90 days</th>
-                    <th>90+ days</th>
+                    <th>30 Days</th>
+                    <th>60 Days</th>
+                    <th>90 Days</th>
                   </tr>
                 </thead>
                 <tbody>
                   <tr>
-                    <td>R95 000</td>
-                    <td>R200 000</td>
-                    <td>R200 000</td>
-                    <td>R200 000</td>
-                    <td>R23 750</td>
+                    <td>R{statement.aging.current.toFixed(2)}</td>
+                    <td>R{statement.aging["30days"].toFixed(2)}</td>
+                    <td>R{statement.aging["60days"].toFixed(2)}</td>
+                    <td>R{statement.aging["90days"].toFixed(2)}</td>
                   </tr>
                 </tbody>
               </table>
@@ -149,14 +184,13 @@ const ClientStatement = () => {
         </div>
       </div>
 
-      {/* Back Button positioned at bottom left */}
-     <div className="statementdownloadbtn1">
-  <button className="back-btn" onClick={() => navigate("/statements-list")}>Back</button>
-  <button className="download-btn">Download</button>
-</div>
+      {/* Buttons */}
+      <div className="statementdownloadbtn1">
+        <button className="back-btn" onClick={() => navigate("/statements-list")}>Back</button>
+        <button className="download-btn">Download</button>
+      </div>
     </div>
-  )
-}
+  );
+};
 
-export default ClientStatement
-
+export default ClientStatement;

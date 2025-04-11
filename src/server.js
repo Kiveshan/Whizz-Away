@@ -1,7 +1,7 @@
 import express from "express"
 import cors from "cors"
 import pkg from "pg"
-const { Pool } = pkg
+const { Pool, types } = pkg
 import bcrypt from "bcrypt"
 import expressSession from "express-session"
 import passport from "passport"
@@ -63,6 +63,7 @@ const dbConfig = {
 }
 
 let pool = null
+
 
 // Function to connect to the database
 async function connectDb() {
@@ -679,10 +680,14 @@ async function generateMonthlyStatements() {
         const previousAging = agingResult.rows[0];
         
         // Aging roll-over (90 days is max)
-        const newCurrent = currentAmount;
-        const new30days = previousAging?.current || 0;
-        const new60days = previousAging?.["30days"] || 0;
-        const new90days = (previousAging?.["60days"] || 0) + (previousAging?.["90days"] || 0);
+// Aging roll-over with validation
+          const newCurrent = Math.max(parseFloat(currentAmount) || 0, 0);
+          const new30days = Math.max(parseFloat(previousAging?.current) || 0, 0);
+          const new60days = Math.max(parseFloat(previousAging?.["30days"]) || 0, 0);
+          const new90days = Math.max(
+            (parseFloat(previousAging?.["60days"]) || 0) + (parseFloat(previousAging?.["90days"]) || 0),
+            0
+          );
         
         // Insert new aging analysis
         const newAgingQuery = `
@@ -722,6 +727,161 @@ async function generateMonthlyStatements() {
   }
 }
 
+// GET statements for a specific client
+app.get("/api/statements/:clientId", async (req, res) => {
+  try {
+    if (!pool) {
+      return res.status(503).json({
+        success: false,
+        message: "Database connection not established. Please try again later.",
+      });
+    }
+
+    const { clientId } = req.params;
+    const { year, month } = req.query;
+
+    console.log(`Fetching statements for client ${clientId} with query:`, req.query);
+
+    let queryText = `
+      SELECT 
+        statement_key,
+        generation_date
+      FROM 
+        statements
+      WHERE 
+        clientid = $1
+    `;
+    const queryParams = [clientId];
+    let paramIndex = 2;
+
+    if (year) {
+      queryText += ` AND EXTRACT(YEAR FROM generation_date) = $${paramIndex}`;
+      queryParams.push(year);
+      paramIndex++;
+    }
+    if (month) {
+      queryText += ` AND EXTRACT(MONTH FROM generation_date) = $${paramIndex}`;
+      queryParams.push(month);
+      paramIndex++;
+    }
+
+    queryText += ` ORDER BY generation_date DESC`;
+
+    const result = await query(queryText, queryParams);
+    console.log(`Query returned ${result.rows.length} statements for client ${clientId}`);
+
+    res.json({
+      success: true,
+      data: result.rows,
+    });
+  } catch (error) {
+    console.error(`Error fetching statements for client ${clientId}:`, error);
+    res.status(500).json({
+      success: false,
+      message: error.message,
+      stack: process.env.NODE_ENV === "production" ? null : error.stack,
+    });
+  }
+});
+
+
+app.get("/api/statement/:statementId", async (req, res) => {
+  try {
+    if (!pool) {
+      return res.status(503).json({
+        success: false,
+        message: "Database connection not established. Please try again later.",
+      });
+    }
+
+    const { statementId } = req.params;
+    console.log(`Fetching statement details for statement ${statementId}`);
+
+    const queryText = `
+      SELECT 
+        s.statement_key,
+        s.groupid,
+        s.generation_date,
+        s.clientid,
+        c.companyname AS client_name,
+        c.representative AS client_representative,
+        c.email AS client_email,
+        c.cellnum AS client_phone,
+        c.companyaddress AS client_address,
+        a.current,
+        a."30days",
+        a."60days",
+        a."90days",
+        i.ikey,
+        i.date AS invoice_date,
+        m1.total_cost AS invoice_amount,
+        m1.task AS invoice_task,
+        i.invoice_num
+      FROM 
+        statements s
+      JOIN 
+        m5_client c ON s.clientid = c.m5clientkey
+      JOIN 
+        aging_analysis a ON s.agingid = a.aging_key
+      LEFT JOIN 
+        invoice i ON i.groupid = s.groupid
+      LEFT JOIN 
+        m1_controller m1 ON i.m1key = m1.m1key
+      WHERE 
+        s.statement_key = $1
+    `;
+    const result = await query(queryText, [statementId]);
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({
+        success: false,
+        message: "Statement not found",
+      });
+    }
+
+    // Group data for frontend
+    const statementData = {
+      statement_key: result.rows[0].statement_key,
+      groupid: result.rows[0].groupid,
+      generation_date: result.rows[0].generation_date,
+      client: {
+        name: result.rows[0].client_name,
+        representative: result.rows[0].client_representative,
+        email: result.rows[0].client_email,
+        phone: result.rows[0].client_phone,
+        address: result.rows[0].client_address,
+      },
+      aging: {
+        current: parseFloat(result.rows[0].current || 0),
+        "30days": parseFloat(result.rows[0]["30days"] || 0),
+        "60days": parseFloat(result.rows[0]["60days"] || 0),
+        "90days": parseFloat(result.rows[0]["90days"] || 0),
+      },
+      invoices: result.rows
+        .filter(row => row.ikey !== null) // Filter out rows with no invoice
+        .map(row => ({
+          ikey: row.ikey,
+          date: row.invoice_date,
+          amount: parseFloat(row.invoice_amount || 0),
+          task: row.invoice_task,
+          invoice_num: row.invoice_num,
+        })),
+    };
+
+    console.log(`Fetched statement ${statementId} with ${statementData.invoices.length} invoices`);
+    res.json({
+      success: true,
+      data: statementData,
+    });
+  } catch (error) {
+    console.error(`Error fetching statement ${statementId}:`, error);
+    res.status(500).json({
+      success: false,
+      message: error.message,
+      stack: process.env.NODE_ENV === "production" ? null : error.stack,
+    });
+  }
+});
 // Schedule the statement generation to run on the 2nd day of each month at 1:00 AM
 cron.schedule('0 1 2 * *', async () => {
   console.log('Running scheduled statement generation task');
@@ -751,7 +911,8 @@ app.use((req, res, next) => {
 // Start the server
 async function startServer() {
   await connectDb()
-  await generateMonthlyStatements()
+  types.setTypeParser(types.builtins.NUMERIC, (value) => parseFloat(value));
+  types.setTypeParser(types.builtins.FLOAT8, (value) => parseFloat(value));
   app.listen(PORT, () => {
     console.log(`🚀 Server running on port ${PORT}`)
     console.log(`API available at http://localhost:${PORT}/api/health`)
