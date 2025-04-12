@@ -6,7 +6,6 @@ const ViewClientInstruction=()=>{
   const navigate=useNavigate()
   const [clients,setClients]=useState([]);
 
-  useEffect(() => {
     const fetchClientInstructions = async () => {
       try {
         const response = await fetch("http://localhost:5000/client-instructions")
@@ -19,10 +18,16 @@ const ViewClientInstruction=()=>{
         console.error("Error fetching client instructions:", err)
       }
     }
-  
+  useEffect(()=>{
     fetchClientInstructions()
   }, [])
 
+  useEffect(() => {
+    const intervalId = setInterval(() => {
+      fetchClientInstructions()
+    }, 5000) 
+    return () => clearInterval(intervalId)
+  }, [])
   const handleViewClick=(client)=>{
     navigate("/instructions",{state:{clientId:client.m5clientkey}});
   }

@@ -9,15 +9,17 @@ const ExpenseDetails = () => {
   const location = useLocation()
 
   const truckId = params.truckId
-
-  // Get truck registration from location state or use default
   const truckRegNum = location.state?.truckRegNum || "Unknown Truck"
-
+    const currentDate = new Date()
+  const currentYear = currentDate.getFullYear().toString()
+  const currentMonth = (currentDate.getMonth() + 1).toString()
   const [expenses, setExpenses] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
-  const [year, setYear] = useState("all")
-  const [month, setMonth] = useState("all")
+  const [year, setYear] = useState(currentYear)
+  const [month, setMonth] = useState(currentMonth)
+  const [viewerOpen, setViewerOpen] = useState(false)
+  const [viewerUrl, setViewerUrl] = useState("")
 
   useEffect(() => {
     const fetchExpenses = async () => {
@@ -89,6 +91,108 @@ const ExpenseDetails = () => {
     }
   }
 
+  // Handle viewing a document - get a fresh pre-signed URL if possible
+  const handleViewDocument = async (expense) => {
+    try {
+      // If we have an expense ID, try to get a fresh pre-signed URL
+      if (expense.ekey) {
+        const response = await fetch(`http://localhost:5000/expenses/document/${expense.ekey}`)
+  
+        if (response.ok) {
+          const data = await response.json()
+          if (data.success && data.url) {
+            // Open in new tab
+            window.open(data.url, '_blank');
+            return
+          }
+        }
+      }
+  
+      // Fallback to using the stored URL
+      if (expense.slipurl) {
+        window.open(expense.slipurl, '_blank');
+      } else if (expense.slipname) {
+        const url = `http://localhost:5000/uploads/${expense.slipname}`;
+        window.open(url, '_blank');
+      } else {
+        alert("No document available to view")
+      }
+    } catch (err) {
+      console.error("Error viewing document:", err)
+      alert("Error viewing document. Please try again.")
+    }
+  }
+
+  // Handle downloading a document - get a fresh pre-signed URL if possible
+  const handleDownloadDocument = async (expense) => {
+    try {
+      // If we have an expense ID, try to get a fresh pre-signed URL
+      if (expense.ekey) {
+        const response = await fetch(`http://localhost:5000/expenses/document/${expense.ekey}`)
+  
+        if (response.ok) {
+          const data = await response.json()
+          if (data.success && data.url) {
+            // Extract original filename from the URL or use the provided name
+            let filename = expense.slipname;
+            if (!filename && data.name) {
+              filename = data.name;
+            }
+            if (!filename) {
+              // Try to extract filename from URL if no name is provided
+              const urlParts = data.url.split('/');
+              const lastPart = urlParts[urlParts.length - 1];
+              // Remove any query parameters
+              filename = lastPart.split('?')[0];
+            }
+            
+            // Fetch the file content first, then create a blob URL
+            fetch(data.url)
+              .then(res => res.blob())
+              .then(blob => {
+                const blobUrl = window.URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.style.display = 'none';
+                a.href = blobUrl;
+                a.download = filename;
+                document.body.appendChild(a);
+                a.click();
+                window.URL.revokeObjectURL(blobUrl);
+                document.body.removeChild(a);
+              });
+            return;
+          }
+        }
+      }
+  
+      // Fallback to using the stored URL
+      if (expense.slipurl || expense.slipname) {
+        const docUrl = expense.slipurl || `http://localhost:5000/uploads/${expense.slipname}`;
+        const filename = expense.slipname || "document";
+        
+        // Fetch the file content first, then create a blob URL
+        fetch(docUrl)
+          .then(res => res.blob())
+          .then(blob => {
+            const blobUrl = window.URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.style.display = 'none';
+            a.href = blobUrl;
+            a.download = filename;
+            document.body.appendChild(a);
+            a.click();
+            window.URL.revokeObjectURL(blobUrl);
+            document.body.removeChild(a);
+          });
+      } else {
+        alert("No document available to download");
+      }
+    } catch (err) {
+      console.error("Error downloading document:", err);
+      alert("Error downloading document. Please try again.");
+    }
+  }
+
   // Update this function to pass truck information to ExpenseSubmission
   const handleAddExpense = () => {
     navigate("/ExpenseSubmission", {
@@ -102,15 +206,19 @@ const ExpenseDetails = () => {
   return (
     <div className="expenses-container">
       <div className="client-payments-header">
-        <button className="back-button" onClick={() => navigate(-1)}>
+        <button className="back-button" onClick={() => navigate('/ViewExpense')}>
           Back
         </button>
-        <h2>Expenses for {truckRegNum}</h2>
       </div>
 
+      {/* Centered title - properly positioned above the filters */}
+      <h2 style={{ textAlign: "center", fontSize: "1.25rem", fontWeight: "600", marginBottom: "6.5rem" }}>
+         Expenses for {truckRegNum}
+      </h2>
+
       <div className="action-bar">
-        <div className="filter-section7">
-          <div className="dropdown-container">
+        <div className="filter-section7" style={{ display: "flex", justifyContent: "center", marginBottom: "1.5rem" }}>
+          <div className="dropdown-container" style={{ display: "flex", gap: "10px" }}>
             <select className="dropdown" value={year} onChange={handleYearChange}>
               <option value="all">All Years</option>
               <option value="2025">2025</option>
@@ -145,8 +253,6 @@ const ExpenseDetails = () => {
         <table className="expenses-table2">
           <thead>
             <tr>
-              <th>Type of Expense</th>
-              <th>Description</th>
               <th>Expense Cost</th>
               <th>Document by</th>
               <th>Date</th>
@@ -158,22 +264,23 @@ const ExpenseDetails = () => {
             {expenses.length > 0 ? (
               expenses.map((expense, index) => (
                 <tr key={expense.ekey || index}>
-                  <td>{expense.type}</td>
-                  <td>{expense.description || "-"}</td>
                   <td>
                     R {typeof expense.expensecost === "number" ? expense.expensecost.toFixed(2) : expense.expensecost}
                   </td>
                   <td>{expense.documentfrom}</td>
                   <td>{formatDate(expense.slipuploaddate)}</td>
                   <td>
-                    <button className="view-button" onClick={() => window.open(`http://localhost:5000/uploads/${expense.slipname}`, "_blank")}>View</button>
+                    <button
+                      className="view-button"
+                      onClick={() => handleViewDocument(expense)}
+                      disabled={!expense.slipurl && !expense.slipname}
+                    >
+                      View
+                    </button>
                   </td>
                   <td>
-                    {expense.slipname ? (
-                      <button
-                        className="download-button"
-                        onClick={() => window.open(`http://localhost:5000/uploads/${expense.slipname}`, "_blank")}
-                      >
+                    {expense.slipurl || expense.slipname ? (
+                      <button className="download-button" onClick={() => handleDownloadDocument(expense)}>
                         Download
                       </button>
                     ) : (
@@ -184,7 +291,7 @@ const ExpenseDetails = () => {
               ))
             ) : (
               <tr>
-                <td colSpan="7" style={{ textAlign: "center", padding: "20px" }}>
+                <td colSpan="5" style={{ textAlign: "center", padding: "20px" }}>
                   No expenses found for this truck
                 </td>
               </tr>
@@ -193,12 +300,30 @@ const ExpenseDetails = () => {
         </table>
       )}
 
-      <button className="add-btn" onClick={handleAddExpense}>
+      <button className="add-btn" onClick={handleAddExpense} style={{ marginBottom: "90px" }}>
         Add Fuel Expense
       </button>
+
+      {/* Full Screen Image/Document Viewer */}
+      {viewerOpen && (
+        <div className="fullscreen-viewer">
+          <div className="viewer-header">
+            <button className="close-button" onClick={() => setViewerOpen(false)}>
+              ×
+            </button>
+          </div>
+
+          <div className="viewer-content">
+            {viewerUrl.toLowerCase().endsWith(".pdf") ? (
+              <iframe src={viewerUrl} title="PDF Viewer" />
+            ) : (
+              <img src={viewerUrl || "/placeholder.svg"} alt="Expense Document" />
+            )}
+          </div>
+        </div>
+      )}
     </div>
   )
 }
 
 export default ExpenseDetails
-

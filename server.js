@@ -1,32 +1,165 @@
-// const express = require("express")
-// const { pg } = require("pg")
-const path = require("path")
-const fs = require("fs")
-const multer = require("multer")
-require("dotenv").config()
-// const cors = require("cors")
+import express from "express"
+import pg from "pg"
+import path from "path"
+import fs from "fs"
+import multer from "multer"
+import dotenv from "dotenv"
+import cors from "cors"
+import { fileURLToPath } from "url"
+const __filename = fileURLToPath(import.meta.url)
+const __dirname = path.dirname(__filename)
+import bcrypt from "bcrypt"
+import expressSession from "express-session"
+import passport from "passport"
+import LocalStrategy from "passport-local"
+import crypto from "crypto"
+import jwt from "jsonwebtoken"
+import { uploadInstructionToS3, getSignedUrl } from "./utils/s3-config.js"
+import expensesRoutes from "./routes/expenses.js"
+import documentsRoutes from "./routes/Documents.js"
 
-// const port = process.env.PORT || 5000
+dotenv.config()
 
-// const client = new Client({
-//   user: process.env.PG_USER || "postgres",
-//   host: process.env.PG_HOST || "localhost",
-//   database: process.env.PG_DATABASE || "Transport3",
-//   password: process.env.PG_PASSWORD || "123456",
-//   port: process.env.PG_PORT || 5432,
-// })
+const app = express()
+const PORT = 5000
+const secretKey = crypto.randomBytes(64).toString("hex")
+console.log("Generated secret key:", secretKey)
+const pool = new pg.Pool({
+  user: process.env.PG_USER || "postgres",
+  host: process.env.PG_HOST || "localhost",
+  database: process.env.PG_DATABASE || "Transport5",
+  password: process.env.PG_PASSWORD || "123456",
+  port: process.env.PG_PORT || 5432,
+  ssl: process.env.DB_SSL ? { rejectUnauthorized: false } : false,
+})
+app.use(
+  cors({
+    credentials: true,
+    origin: "http://localhost:3000",
+    methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+    allowedHeaders: ["Content-Type", "Authorization"],
+  }),
+) // Allow CORS for your frontend
+app.use(express.json())
+app.use(
+  expressSession({
+    secret: secretKey,
+    resave: false,
+    saveUninitialized: false,
+    cookie: {
+      secure: process.env.NODE_ENV === "production", // Set to true if using HTTPS
+      httpOnly: true,
+      maxAge: 3600000, // Session expiration (1 hour)
+    },
+  }),
+)
+app.use(passport.initialize())
+app.use(passport.session())
+passport.use(
+  new LocalStrategy({ usernameField: "email" }, async (email, password, done) => {
+    try {
+      let result = await pool.query("SELECT * FROM usertable WHERE email = $1", [email])
 
-// app.use(cors())
-// app.use(express.json())
+      if (result.rows.length === 0) {
+        result = await pool.query("SELECT * FROM m5_employee WHERE email = $1", [email])
+        if (result.rows.length === 0) {
+          console.log("No user found in both tables with email:", email)
+          return done(null, false, { message: "Invalid email or password" })
+        }
+      }
 
-// pool
-//   .connect()
-//   .then(() => {
-//     console.log("Connected to PostgreSQL database")
-//   })
-//   .catch((err) => {
-//     console.error("Error connecting to PostgreSQL database:", err)
-//   })
+      const user = result.rows[0]
+      console.log("Fetched user:", user)
+
+      const passwordMatch = await bcrypt.compare(password, user.password)
+      if (!passwordMatch) {
+        console.log("Password mismatch for user:", email)
+        return done(null, false, { message: "Invalid email or password" })
+      }
+
+      user.table = result.fields[0].table
+      return done(null, user)
+    } catch (err) {
+      console.error("Error during authentication:", err)
+      return done(err)
+    }
+  }),
+)
+passport.serializeUser((user, done) => {
+  done(null, { userid: user.userid, name: user.name, surname: user.surname, table: user.table })
+})
+passport.deserializeUser(async (sessionUser, done) => {
+  try {
+    const { userid, table } = sessionUser
+    let result
+
+    if (table === "usertable") {
+      result = await pool.query("SELECT * FROM usertable WHERE userid = $1", [userid])
+    } else if (table === "m5_employee") {
+      result = await pool.query("SELECT * FROM m5_employee WHERE userid = $1", [userid])
+    }
+
+    if (!result || result.rows.length === 0) {
+      console.log("User session not found in database")
+      return done(null, false)
+    }
+
+    console.log("Session user fetched:", result.rows[0])
+    done(null, result.rows[0])
+  } catch (err) {
+    done(err)
+  }
+})
+app.post("/login", async (req, res, next) => {
+  passport.authenticate("local", async (err, user, info) => {
+    if (err) {
+      return res.status(500).json({ message: "Internal server error" })
+    }
+    if (!user) {
+      return res.status(401).json({ message: "Invalid email or password" })
+    }
+
+    // Check if user has a roleid
+    if (!user.roleid) {
+      return res.status(403).json({ message: "Access denied. No role assigned." })
+    }
+
+    req.login(user, (err) => {
+      if (err) {
+        return res.status(500).json({ message: "Internal server error" })
+      }
+
+      req.session.user = user // Store user session manually
+      console.log("User stored in session:", req.session.user)
+
+      const token = jwt.sign({ userid: user.userid, roleid: user.roleid }, secretKey, { expiresIn: "1h" })
+      const { roleid } = user
+      let redirectUrl = "/"
+
+      if (roleid === 1) redirectUrl = "/Dashboard"
+      else if (roleid === 2) redirectUrl = "/ControllerDashboard"
+      else if (roleid === 3) redirectUrl = "/FDashboard"
+      else if (roleid === 4) redirectUrl = "/DirectorDashboard"
+
+      return res.json({ message: "Login successful", redirectUrl, token })
+    })
+  })(req, res, next)
+})
+app.get("/user-info", (req, res) => {
+  console.log("Current user session:", req.session.user)
+  if (!req.session.user) {
+    return res.status(401).json({ error: "Please log in first" })
+  }
+  res.json({ name: req.session.user.name, surname: req.session.user.surname })
+})
+pool
+  .connect()
+  .then(() => {
+    console.log("Connected to PostgreSQL database")
+  })
+  .catch((err) => {
+    console.error("Error connecting to PostgreSQL database:", err)
+  })
 
 app.get("/drivers", async (req, res) => {
   console.log("Route /drivers was accessed")
@@ -77,6 +210,28 @@ app.get("/destinations", async (req, res) => {
   } catch (err) {
     console.error("Error fetching destinations:", err)
     res.status(500).send("Server Error")
+  }
+})
+app.put("/instructions/:instructionId/status", async (req, res) => {
+  const { instructionId } = req.params
+  const { status } = req.body
+  console.log(`Route PUT /instructions/${instructionId}/status was accessed, setting status to ${status}`)
+
+  try {
+    await pool.query(`UPDATE m1_controller SET status = $1 WHERE m1key = $2`, [status, instructionId])
+
+    console.log(`Instruction ${instructionId} status updated to ${status}`)
+    res.status(200).json({
+      success: true,
+      message: `Instruction status updated to ${status} successfully`,
+    })
+  } catch (err) {
+    console.error(`Error updating instruction ${instructionId} status:`, err)
+    res.status(500).json({
+      success: false,
+      message: "Failed to update instruction status",
+      error: err.message,
+    })
   }
 })
 
@@ -130,7 +285,53 @@ app.get("/employees/drivers", async (req, res) => {
     res.status(500).send("Server Error")
   }
 })
+app.get("/instructions/:instructionId", async (req, res) => {
+  const { instructionId } = req.params
+  console.log(`Route /instructions/${instructionId} was accessed`)
 
+  try {
+    const result = await pool.query(`SELECT m1key, status FROM m1_controller WHERE m1key = $1`, [instructionId])
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: "Instruction not found" })
+    }
+
+    const instruction = result.rows[0]
+    const isCompleted = instruction.status === "Completed"
+
+    res.status(200).json({
+      id: instruction.m1key,
+      status: instruction.status,
+      is_completed: isCompleted,
+    })
+  } catch (err) {
+    console.error(`Error fetching instruction ${instructionId}:`, err)
+    res.status(500).json({ error: err.message })
+  }
+})
+// Add this endpoint to get the shipment type for an instruction
+app.get("/instructions/:instructionId/shipment-type", async (req, res) => {
+  const { instructionId } = req.params
+  console.log(`Route /instructions/${instructionId}/shipment-type was accessed`)
+
+  try {
+    const result = await pool.query(`SELECT shipment_type FROM m1_controller WHERE m1key = $1`, [instructionId])
+
+    if (result.rows.length === 0) {
+      console.log(`No instruction found with ID ${instructionId}`)
+      return res.status(404).json({ error: "Instruction not found" })
+    }
+
+    const shipmentType = result.rows[0].shipment_type
+    console.log(`Raw shipment type from database for instruction ID ${instructionId}:`, shipmentType)
+    console.log(`Type of shipment_type: ${typeof shipmentType}`)
+
+    res.status(200).json({ shipment_type: shipmentType })
+  } catch (err) {
+    console.error(`Error fetching shipment type for instruction ID ${instructionId}:`, err)
+    res.status(500).json({ error: err.message })
+  }
+})
 app.get("/instructions", async (req, res) => {
   console.log("Route /instructions was accessed")
 
@@ -174,13 +375,14 @@ app.get("/trucks/regnums", async (req, res) => {
     res.status(500).send("Server Error")
   }
 })
+// Update the trucks/fuel-expenses endpoint to include is_subcontractor field
 app.get("/trucks/fuel-expenses", async (req, res) => {
   console.log("Route /trucks/fuel-expenses was accessed")
 
   try {
-    // Revert to the original query that only returns trucks with fuel expenses
+    // Modified query to include is_subcontractor field
     const result = await pool.query(`
-        SELECT DISTINCT m.truckid, t.truckregnum 
+        SELECT DISTINCT m.truckid, t.truckregnum, t.is_subcontractor 
         FROM expenses_m2 m
         JOIN m5_trucks t ON m.truckid = t.m5truckskey
         WHERE m.truckid IS NOT NULL
@@ -195,7 +397,6 @@ app.get("/trucks/fuel-expenses", async (req, res) => {
       console.log(`Found ${result.rows.length} trucks with fuel expenses`)
     }
 
-    // Return just the trucks array, no fallback
     res.status(200).json(result.rows)
   } catch (err) {
     console.error("Error fetching trucks with fuel expenses:", err)
@@ -263,120 +464,6 @@ const upload = multer({
   },
 })
 
-// Update the expenses POST endpoint to properly handle driver information
-app.post("/expenses", upload.single("slip"), async (req, res) => {
-  console.log("Route POST /expenses was accessed")
-  console.log("Request body:", req.body)
-
-  try {
-    // Extract data from request
-    const { documentFrom, expenseCost } = req.body
-    let { driverId, truckId } = req.body
-
-    // Get current date for upload date
-    const uploadDate = new Date().toISOString().split("T")[0] // Format: YYYY-MM-DD
-
-    // Get filename if file was uploaded
-    const slipName = req.file ? req.file.filename : null
-
-    // Convert expense cost to a number
-    const cost = Number.parseFloat(expenseCost.trim())
-
-    if (isNaN(cost)) {
-      return res.status(400).json({
-        success: false,
-        message: "Invalid expense cost format",
-      })
-    }
-
-    if (truckId) {
-      truckId = Number.parseInt(truckId)
-      if (isNaN(truckId)) {
-        return res.status(400).json({
-          success: false,
-          message: "Invalid truck ID format",
-        })
-      }
-    }
-
-    if (driverId) {
-      driverId = Number.parseInt(driverId)
-      if (isNaN(driverId)) {
-        return res.status(400).json({
-          success: false,
-          message: "Invalid driver ID format",
-        })
-      }
-    }
-
-    let documentSource = documentFrom
-
-    if (documentFrom === "Driver" && driverId) {
-      try {
-        const driverResult = await pool.query(
-          "SELECT CONCAT(name, ' ', surname) as fullname FROM m5_employee WHERE userid = $1",
-          [driverId],
-        )
-
-        if (driverResult.rows.length > 0) {
-          documentSource = driverResult.rows[0].fullname
-        }
-      } catch (driverErr) {
-        console.error("Error fetching driver name:", driverErr)
-      }
-    }
-
-    console.log("Processed data:", {
-      type: "fuel",
-      documentFrom: documentSource,
-      cost,
-      slipName,
-      uploadDate,
-      truckId,
-      driverId,
-    })
-
-    // Insert data into database
-    const query = `
-      INSERT INTO public.expenses_m2 
-      (type, documentfrom, expensecost, description, slipname, slipuploaddate, truckid, driverid)
-      VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
-      RETURNING ekey
-    `
-
-    const values = [
-      "fuel", // Always "fuel" as per requirements
-      documentSource, // Use the driver's name if available
-      cost,
-      "", // Empty description as per requirements
-      slipName,
-      uploadDate,
-      truckId || null,
-      driverId || null,
-    ]
-
-    const result = await pool.query(query, values)
-
-    console.log("Expense created successfully with ID:", result.rows[0].ekey)
-
-    res.status(201).json({
-      success: true,
-      message: "Expense created successfully",
-      data: {
-        ekey: result.rows[0].ekey,
-        slipName: slipName,
-      },
-    })
-  } catch (error) {
-    console.error("Error creating expense:", error)
-    res.status(500).json({
-      success: false,
-      message: "Failed to create expense",
-      error: error.message,
-    })
-  }
-})
-
 // GET endpoint to retrieve all expenses
 app.get("/expenses", async (req, res) => {
   console.log("Route GET /expenses was accessed")
@@ -438,7 +525,7 @@ app.get("/client-instructions", async (req, res) => {
               c.representative, 
               c.email,
               COUNT(CASE WHEN m.status = 'New' THEN 1 ELSE NULL END) AS new_count,
-              COUNT(CASE WHEN m.status = 'In progress' THEN 1 ELSE NULL END) AS in_progress_count
+              COUNT(CASE WHEN LOWER(m.status) = 'in progress' THEN 1 ELSE NULL END) AS in_progress_count
           FROM 
               m5_client c
           LEFT JOIN 
@@ -796,6 +883,59 @@ app.get("/legs/:instructionId", async (req, res) => {
     res.status(500).json({ error: err.message })
   }
 })
+app.delete("/legs/:legId", async (req, res) => {
+  const { legId } = req.params
+  console.log(`Route DELETE /legs/${legId} was accessed`)
+
+  try {
+    // Begin transaction
+    await pool.query("BEGIN")
+
+    // First, get the leg information to log what we're deleting
+    const legInfo = await pool.query(`SELECT legkey, legnumber, m1key FROM legs_m2 WHERE legkey = $1`, [legId])
+
+    if (legInfo.rows.length === 0) {
+      await pool.query("ROLLBACK")
+      return res.status(404).json({
+        success: false,
+        message: `Leg with ID ${legId} not found`,
+      })
+    }
+
+    const { legnumber, m1key } = legInfo.rows[0]
+    console.log(`Deleting leg ${legId} (leg number ${legnumber}) from instruction ${m1key}`)
+
+    // Delete the leg from the database
+    const result = await pool.query(`DELETE FROM legs_m2 WHERE legkey = $1 RETURNING legkey`, [legId])
+
+    if (result.rowCount === 0) {
+      await pool.query("ROLLBACK")
+      return res.status(404).json({
+        success: false,
+        message: `Leg with ID ${legId} not found or could not be deleted`,
+      })
+    }
+
+    // Commit transaction
+    await pool.query("COMMIT")
+
+    console.log(`Successfully deleted leg with ID ${legId}`)
+    res.status(200).json({
+      success: true,
+      message: `Leg with ID ${legId} successfully deleted`,
+      deletedLegId: legId,
+    })
+  } catch (err) {
+    // Rollback transaction on error
+    await pool.query("ROLLBACK")
+    console.error(`Error deleting leg with ID ${legId}:`, err)
+    res.status(500).json({
+      success: false,
+      message: `Failed to delete leg: ${err.message}`,
+      error: err.message,
+    })
+  }
+})
 
 // Fetch containers for a specific instruction
 app.get("/containers/instruction/:instructionId", async (req, res) => {
@@ -836,7 +976,27 @@ app.put("/instructions/:instructionId/complete", async (req, res) => {
     })
   }
 })
+app.get("/instructions/:instructionId/details", async (req, res) => {
+  const { instructionId } = req.params
+  console.log(`Route /instructions/${instructionId}/details was accessed`)
 
+  try {
+    const result = await pool.query(
+      `SELECT m1key, client, pickup, dropoff, status FROM m1_controller WHERE m1key = $1`,
+      [instructionId],
+    )
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: "Instruction not found" })
+    }
+
+    console.log(`Instruction details for ID ${instructionId}:`, result.rows[0])
+    res.status(200).json(result.rows[0])
+  } catch (err) {
+    console.error(`Error fetching instruction details for ID ${instructionId}:`, err)
+    res.status(500).json({ error: err.message })
+  }
+})
 // Add an endpoint to get driver details by ID
 app.get("/driver/:driverId", async (req, res) => {
   const { driverId } = req.params
@@ -855,176 +1015,233 @@ app.get("/driver/:driverId", async (req, res) => {
     res.status(500).json({ error: err.message })
   }
 })
+// Get instructions for a specific driver with leg count
+app.get("/instructions/driver/:id", async (req, res) => {
+  const driverId = req.params.id
 
-// Start server
-// app.listen(port, () => {
-//   console.log(`Server running on http://localhost:${port}`)
-// })
-
-import express from "express";
-import cors from "cors";
-import pg from "pg";
-import bcrypt from "bcrypt";
-import expressSession from "express-session";
-import passport from "passport";
-import LocalStrategy from "passport-local";
-import crypto from "crypto";
-import jwt from "jsonwebtoken";
-
-const app = express();
-const PORT = 5000;
-
-// Generate a secure, random secret key
-const secretKey = crypto.randomBytes(64).toString('hex');
-console.log("Generated secret key:", secretKey); // Log the secret key (for debugging)
-
-// Middleware setup
-app.use(cors({ credentials: true, origin: "http://localhost:3000" })); // Allow CORS for your frontend
-app.use(express.json());
-app.use(expressSession({
-  secret: secretKey,
-  resave: false,
-  saveUninitialized: false,
-  cookie: { 
-    secure: process.env.NODE_ENV === "production", // Set to true if using HTTPS
-    httpOnly: true, 
-    maxAge: 3600000 // Session expiration (1 hour)
-  },
-}));
-
-app.use(passport.initialize());
-app.use(passport.session());
-
-// Database client setup (connecting only when needed)
-const pool = new pg.Client({
-  user: process.env.RDS_USERNAME || "postgres",
-  host: process.env.RDS_HOSTNAME || "localhost",
-  database: process.env.RDS_DB_NAME || "Transport3",
-  password: process.env.RDS_PASSWORD || "123456",
-  port: process.env.RDS_PORT || 5432,
-  ssl: process.env.DB_SSL ? { rejectUnauthorized: false } : false
-});
-
-// Function to connect to the database
-async function connectDb() {
   try {
-    await pool.connect();
-    console.log("✅ Database Connected Successfully");
+    // Query to get instructions with leg count for a specific driver
+    const query = `
+      SELECT 
+        m1.m1key, 
+        m1.pickupdate,
+        COUNT(l.legkey) as leg_count
+      FROM 
+        public.m1_controller m1
+      JOIN 
+        public.legs_m2 l ON m1.m1key = l.m1key
+      WHERE 
+        l.driverid = $1
+      GROUP BY 
+        m1.m1key, m1.pickupdate
+      ORDER BY 
+        m1.pickupdate DESC
+    `
+
+    const result = await pool.query(query, [driverId])
+    res.json(result.rows)
+  } catch (error) {
+    console.error("Error fetching driver instructions:", error)
+    res.status(500).json({ error: "An error occurred while fetching driver instructions" })
+  }
+})
+
+// Add this route to view leg details for a specific instruction
+app.get("/legs/instruction/:id/driver/:driverId", async (req, res) => {
+  const instructionId = req.params.id
+  const driverId = req.params.driverId
+
+  try {
+    const query = `
+      SELECT 
+        l.legkey,
+        l.legnumber,
+        l.startingpoint,
+        l.destination,
+        l.date,
+        l.driverrate,
+        l.legstatus
+      FROM 
+        public.legs_m2 l
+      WHERE 
+        l.m1key = $1 AND l.driverid = $2
+      ORDER BY 
+        l.legnumber
+    `
+
+    const result = await pool.query(query, [instructionId, driverId])
+    res.json(result.rows)
+  } catch (error) {
+    console.error("Error fetching leg details:", error)
+    res.status(500).json({ error: "An error occurred while fetching leg details" })
+  }
+})
+
+// Get wage details for a driver and instruction
+app.get("/wage-details/driver/:driverId/instruction/:instructionId", async (req, res) => {
+  const driverId = req.params.driverId
+  const instructionId = req.params.instructionId
+
+  try {
+    // First get the base salary from the employee table
+    const employeeQuery = `
+      SELECT base_salary
+      FROM public.m5_employee
+      WHERE userid = $1
+    `
+
+    const employeeResult = await pool.query(employeeQuery, [driverId])
+    const baseSalary = employeeResult.rows[0]?.base_salary || 0
+
+    // Get the sum of driver rates for all legs in this instruction
+    const legsQuery = `
+      SELECT 
+        SUM(driverrate) as leg_payments,
+        MAX(date) as date
+      FROM 
+        public.legs_m2
+      WHERE 
+        driverid = $1 AND m1key = $2
+    `
+
+    const legsResult = await pool.query(legsQuery, [driverId, instructionId])
+    const legPayments = legsResult.rows[0]?.leg_payments || 0
+    const date = legsResult.rows[0]?.date
+
+    // For this example, we'll set bonuses and deductions to 0
+    // In a real application, you would calculate these based on your business logic
+    const bonuses = 0
+    const deductions = 0
+
+    // Calculate total
+    const total = baseSalary + legPayments + bonuses - deductions
+
+    res.json({
+      base_salary: baseSalary,
+      leg_payments: legPayments,
+      bonuses: bonuses,
+      deductions: deductions,
+      total: total,
+      date: date,
+    })
+  } catch (error) {
+    console.error("Error fetching wage details:", error)
+    res.status(500).json({ error: "An error occurred while fetching wage details" })
+  }
+})
+
+// Add this with other app.use statements
+app.use("/expenses", expensesRoutes)
+app.use("/documents", documentsRoutes)
+
+// Add this to your documents route handler
+app.get("/documents/:instructionId", async (req, res) => {
+  const { instructionId } = req.params
+  console.log(`Route /documents/${instructionId} was accessed`)
+
+  try {
+    // Log the query we're about to execute
+    console.log(`Executing query to fetch documents for instruction ID: ${instructionId}`)
+
+    const result = await pool.query("SELECT * FROM documents WHERE m1key = $1", [instructionId])
+
+    // Log the result
+    console.log(`Found ${result.rows.length} documents for instruction ID ${instructionId}`)
+    res.status(200).json(result.rows)
   } catch (err) {
-    console.error("Database connection error:", err);
-    process.exit(1); // Terminate the process if the connection fails
+    console.error(`Error fetching documents for instruction ID ${instructionId}:`, err)
+    res.status(500).json({ error: err.message })
+  }
+})
+async function generateInvoice(instructionId) {
+  try {
+    const currentDate = new Date()
+    const currentYear = currentDate.getFullYear()
+    const currentMonth = currentDate.getMonth() + 1
+    
+    // Get month name in uppercase
+    const monthNames = [
+      "JANUARY", "FEBRUARY", "MARCH", "APRIL", "MAY", "JUNE",
+      "JULY", "AUGUST", "SEPTEMBER", "OCTOBER", "NOVEMBER", "DECEMBER"
+    ]
+    const monthName = monthNames[currentMonth - 1] // Adjust for 0-based index
+    
+    // Get the client ID and m1key from the instruction
+    const instructionResult = await pool.query(
+      "SELECT client, m1key FROM m1_controller WHERE m1key = $1", 
+      [instructionId]
+    )
+    
+    if (instructionResult.rows.length === 0) {
+      throw new Error(`Instruction with ID ${instructionId} not found`)
+    }
+    
+    const { client: clientId, m1key } = instructionResult.rows[0]
+    
+    // Get the next invoice number sequence
+    const sequenceResult = await pool.query(
+      "SELECT COALESCE(MAX(CAST(SUBSTRING(invoice_num FROM 'INV-\\d+-0*(\\d+)') AS INTEGER)), 0) + 1 AS next_invoice_num FROM invoice WHERE invoice_num LIKE $1",
+      [`INV-${currentYear}-%`]
+    )
+    const nextInvoiceNum = sequenceResult.rows[0].next_invoice_num
+    
+    // Get the next document number sequence
+    const docSequenceResult = await pool.query(
+      "SELECT COALESCE(MAX(CAST(SUBSTRING(doc_num FROM 'DOC-0*(\\d+)') AS INTEGER)), 0) + 1 AS next_doc_num FROM invoice"
+    )
+    const nextDocNum = docSequenceResult.rows[0].next_doc_num
+    
+    // Format the invoice number, doc number and group ID
+    const invoiceNum = `INV-${currentYear}-${nextInvoiceNum}` // No leading zeros
+    const docNum = `DOC-${nextDocNum}` // No leading zeros
+    const groupId = `${clientId}-${monthName}${currentYear}` // Format as 1-APRIL2025
+    
+    // Insert the new invoice
+    const insertResult = await pool.query(
+      "INSERT INTO invoice (clientid, m1key, invoice_num, doc_num, groupid, date) VALUES ($1, $2, $3, $4, $5, $6) RETURNING ikey",
+      [clientId, m1key, invoiceNum, docNum, groupId, currentDate]
+    )
+    
+    return {
+      success: true,
+      invoiceId: insertResult.rows[0].ikey,
+      invoiceNum,
+      docNum,
+      groupId,
+      date: currentDate
+    }
+  } catch (error) {
+    console.error("Error generating invoice:", error)
+    return {
+      success: false,
+      error: error.message
+    }
   }
 }
 
-// Passport Local Strategy for Authentication
-passport.use(new LocalStrategy(
-  { usernameField: "email" }, 
-  async (email, password, done) => {
-    try {
-      let result = await pool.query("SELECT * FROM usertable WHERE email = $1", [email]);
-      
-      if (result.rows.length === 0) {
-        result = await pool.query("SELECT * FROM m5_employee WHERE email = $1", [email]);
-        if (result.rows.length === 0) {
-          console.log("No user found in both tables with email:", email);
-          return done(null, false, { message: "Invalid email or password" });
-        }
-      }
+// Add this endpoint to your server.js file
+app.post("/generate-invoice/:instructionId", async (req, res) => {
+  const { instructionId } = req.params
+  console.log(`Route POST /generate-invoice/${instructionId} was accessed`)
 
-      const user = result.rows[0];
-      console.log("Fetched user:", user);
-
-      const passwordMatch = await bcrypt.compare(password, user.password);
-      if (!passwordMatch) {
-        console.log("Password mismatch for user:", email);
-        return done(null, false, { message: "Invalid email or password" });
-      }
-
-      user.table = result.fields[0].table;
-      return done(null, user);
-    } catch (err) {
-      console.error("Error during authentication:", err);
-      return done(err);
-    }
-  }
-));
-
-passport.serializeUser((user, done) => {
-  done(null, { userid: user.userid, name: user.name, surname: user.surname, table: user.table });
-});
-
-passport.deserializeUser(async (sessionUser, done) => {
   try {
-    const { userid, table } = sessionUser;
-    let result;
-
-    if (table === "usertable") {
-      result = await pool.query("SELECT * FROM usertable WHERE userid = $1", [userid]);
-    } else if (table === "m5_employee") {
-      result = await pool.query("SELECT * FROM m5_employee WHERE userid = $1", [userid]);
-    }
-
-    if (!result || result.rows.length === 0) {
-      console.log("User session not found in database");
-      return done(null, false);
-    }
+    const result = await generateInvoice(instructionId)
     
-    console.log("Session user fetched:", result.rows[0]);
-    done(null, result.rows[0]);
-  } catch (err) {
-    done(err);
+    if (result.success) {
+      res.status(201).json(result)
+    } else {
+      res.status(400).json(result)
+    }
+  } catch (error) {
+    console.error("Error in invoice generation route:", error)
+    res.status(500).json({ 
+      success: false, 
+      error: "Server error while generating invoice" 
+    })
   }
-});
+})
 
-// Login route to authenticate and set the session
-app.post("/login", async (req, res, next) => {
-  passport.authenticate("local", async (err, user, info) => {
-    if (err) {
-      return res.status(500).json({ message: "Internal server error" });
-    }
-    if (!user) {
-      return res.status(401).json({ message: "Invalid email or password" });
-    }
-    
-    // Check if user has a roleid
-    if (!user.roleid) {
-      return res.status(403).json({ message: "Access denied. No role assigned." });
-    }
-
-    req.login(user, (err) => {
-      if (err) {
-        return res.status(500).json({ message: "Internal server error" });
-      }
-
-      req.session.user = user; // Store user session manually
-      console.log("User stored in session:", req.session.user);
-
-      const token = jwt.sign({ userid: user.userid, roleid: user.roleid }, secretKey, { expiresIn: '1h' });
-      const { roleid } = user;
-      let redirectUrl = "/";
-
-      if (roleid === 1) redirectUrl = "/Dashboard";
-      else if (roleid === 2) redirectUrl = "/ControllerDashboard";
-      else if (roleid === 3) redirectUrl = "/FDashboard";
-      else if (roleid === 4) redirectUrl = "/DirectorDashboard";
-
-      return res.json({ message: "Login successful", redirectUrl, token });
-    });
-  })(req, res, next);
-});
-
-
-// User info route for session verification
-app.get("/user-info", (req, res) => {
-  console.log("Current user session:", req.session.user);
-  if (!req.session.user) {
-    return res.status(401).json({ error: "Please log in first" });
-  }
-  res.json({ name: req.session.user.name, surname: req.session.user.surname });
-});
-
-// Start the server
-app.listen(port, async () => {
-  await connectDb();
-  console.log(`🚀 Server running on port ${PORT}`);
-});
+// Start server
+app.listen(PORT, () => {
+  console.log(`Server running on http://localhost:${PORT}`)
+})

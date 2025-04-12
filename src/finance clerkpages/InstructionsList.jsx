@@ -43,8 +43,8 @@ const Instructions = ({ setCurrentPage }) => {
   }
 
   const getShipmentType = (type) => {
-    console.log("getShipmentType received:", type)
-    return type === 1 ? "Import" : type === 2 ? "Export" : "Unknown"
+  const shipmentType = typeof type === "string" ? Number.parseInt(type, 10) : type
+  return shipmentType === 1 ? "Import" : shipmentType === 2 ? "Export" : "Unknown"
   }
 
   // Filter instructions based on both status and type filters

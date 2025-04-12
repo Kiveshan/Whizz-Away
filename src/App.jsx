@@ -36,6 +36,7 @@ import FinancialDocumentsView from "./pages/FinancialDocumentsView";
 import DirectorMonitorInstructionView from "./pages/DirectorMonitorInstructionView";
 import DirectorMonitorInstructions from "./pages/DirectorMonitorInstructions";
 import DirectorManagerViewAssignment from "./pages/DirectorManagerViewAssignment";
+import DirectorDocs from "./pages/DirectorDocs";
 import DirectorAnalytics from "./pages/DirectorAnalytics";
 import DirectorDabtors from "./pages/DirectorDabtors";
 import DirectorClientPaymentList from "./pages/DirectorClientPaymentList";
@@ -103,8 +104,8 @@ function DynamicHeader() {
     "/debtors": "Debtors",
     "/FDashboard": "Finance Clerk",
     "/instructions": "Instructions",
-    "/update-instructions": "Instructions",
-    "/Upload-Instruction-Documents": "Instructions",
+    "/update-instructions": "Assignments",
+    "/Upload-Instruction-Documents": "Instruction Documents",
     "/invoices": "Invoices",
     "/client-invoice": "Invoices",
     "/view-client-statements": "Statements",
@@ -115,11 +116,11 @@ function DynamicHeader() {
     "/finance-clerk-wage-details": "Wages",
     "/finance-clerk-wage-slip": "Wages",
     "/FExpenses": "Expenses",
-    "/ViewExpense": "Truck Expenses",
-    "/ExpenseDetails": "Truck Expenses",
-    "/ExpenseSubmission": "Truck Expenses",
+    "/ViewExpense": "Fuel Expenses",
+    "/ExpenseDetails": "Fuel Expenses",
+    "/ExpenseSubmission": "Fuel Expense",
     "/manage": "Manage",
-    "/ViewClientInstruction": "Instructions",
+    "/ViewClientInstruction": "Clients",
     "/ViewClientInvoice": "Invoice",
     "/DebtorsDashboard": "Debtors",
     "/CreditorsDashboard": "Creditors",
@@ -133,6 +134,7 @@ function DynamicHeader() {
     "/DirectorMonitorInstructionView": "Instructions ",
     "/DirectorMonitorInstructions": "Instructions ",
     "/DirectorManagerViewAssignment": "View Assignment",
+    "/DirectorDocs":"Documents",
     "/DirectorAnalytics": "Analytics",
     "/DirectorDabtors": "Debtors",
     "/DirectorClientPaymentList": "Debtors",
@@ -151,8 +153,9 @@ function DynamicHeader() {
 
   const getTitle = () => {
     if (location.pathname.startsWith("/upload")) return "Proof of Payment";
-    if (location.pathname.startsWith("/ExpenseDetails/")) return "Truck Expenses";
+    if (location.pathname.startsWith("/ExpenseDetails/")) return "Fuel Expenses";
     if (location.pathname.startsWith("/finance-clerk-wage-details/")) return "Wages";
+    if (location.pathname.startsWith("/DirectorExpenses/")) return "Fuel Expenses";
     return titleMap[location.pathname] || "Unknown Page";
   };
 
@@ -210,6 +213,7 @@ function ContentWrapper() {
         <Route path="/DirectorMonitorInstructionView" element={<DirectorMonitorInstructionView />} />
         <Route path="/DirectorMonitorInstructions" element={<DirectorMonitorInstructions />} />
         <Route path="/DirectorManagerViewAssignment" element={<DirectorManagerViewAssignment />} />
+        <Route path="/DirectorDocs" element={<DirectorDocs />} />
         <Route path="/DirectorAnalytics" element={<DirectorAnalytics />} />
         <Route path="/DirectorDabtors" element={<DirectorDabtors />} />
         <Route path="/DirectorClientPaymentList" element={<DirectorClientPaymentList />} />
@@ -223,7 +227,7 @@ function ContentWrapper() {
         <Route path="/DirectorDriverWageSlip" element={<DirectorDriverWageSlip />} />
         <Route path="/DirectorCreditorsDash" element={<DirectorCreditorsDash />} />
         <Route path="/DirectorManagerViewFuelExpence" element={<DirectorManagerViewFuelExpence />} />
-        <Route path="/DirectorExpenses" element={<DirectorExpenses />} />
+        <Route path="/DirectorExpenses/:truckId" element={<DirectorExpenses />} />
 
         {/* Finance Clerk Routes */}
         <Route path="/instructions" element={<InstructionsList />} />

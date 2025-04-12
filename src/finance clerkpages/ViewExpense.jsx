@@ -20,7 +20,25 @@ const ViewExpense = () => {
 
         const data = await response.json()
         console.log("Truck data:", data)
-        setTrucks(data)
+
+        // Filter out trucks where is_subcontractor is true
+        const filteredTrucks = data.filter((truck) => {
+          // Handle different possible formats of is_subcontractor
+          const isSubcontractor =
+            truck.is_subcontractor === true ||
+            truck.is_subcontractor === "true" ||
+            truck.is_subcontractor === "t" ||
+            truck.is_subcontractor === 1
+
+          console.log(
+            `Truck ${truck.truckregnum}, is_subcontractor: ${truck.is_subcontractor} (${typeof truck.is_subcontractor}), filtered: ${!isSubcontractor}`,
+          )
+
+          return !isSubcontractor
+        })
+
+        console.log("Filtered trucks (company owned only):", filteredTrucks)
+        setTrucks(filteredTrucks)
       } catch (err) {
         console.error("Error fetching truck data:", err)
         setError("Failed to load truck data. Please try again later.")
@@ -45,7 +63,7 @@ const ViewExpense = () => {
   return (
     <div className="expenses-container">
       <div className="client-payments-header">
-        <button className="back-button" onClick={() => navigate(-1)}>
+        <button className="back-button" onClick={() => navigate('/FDashboard')}>
           Back
         </button>
       </div>
