@@ -12,6 +12,8 @@ const ClientStatement = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [isAgeAnalysisOpen, setIsAgeAnalysisOpen] = useState(true);
+  // NEW: Add state for PDF generation
+  const [isGenerating, setIsGenerating] = useState(false);
 
   useEffect(() => {
     if (!statementId) {
@@ -51,6 +53,36 @@ const ClientStatement = () => {
   const openingBalance = 0; // No payment data yet
   const amountPaid = 0; // No payment data yet
   const balanceDue = invoicedAmount;
+
+  const handleDownloadPDF = async () => {
+    // NEW: Prevent spam clicks
+    if (isGenerating) return;
+    setIsGenerating(true);
+    try {
+      const response = await fetch(`/api/statement/${statement.statement_key}/pdf`, {
+        method: 'GET',
+      });
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.message || `HTTP error ${response.status}`);
+      }
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `statement_${statement.statement_key}.pdf`;
+      document.body.appendChild(link); // Ensure link is in DOM
+      link.click();
+      document.body.removeChild(link); // Clean up
+      window.URL.revokeObjectURL(url);
+    } catch (error) {
+      console.error('Error downloading PDF:', error);
+      alert(`Failed to download PDF: ${error.message}`);
+    } finally {
+      // NEW: Reset generating state
+      setIsGenerating(false);
+    }
+  };
 
   return (
     <div className="statement-page">
@@ -187,7 +219,14 @@ const ClientStatement = () => {
       {/* Buttons */}
       <div className="statementdownloadbtn1">
         <button className="back-btn" onClick={() => navigate("/statements-list")}>Back</button>
-        <button className="download-btn">Download</button>
+        {/* MODIFIED: Add indicator and spam prevention */}
+        <button
+          className={`download-btn ${isGenerating ? 'generating' : ''}`}
+          onClick={handleDownloadPDF}
+          disabled={isGenerating}
+        >
+          {isGenerating ? 'Generating...' : 'Download'}
+        </button>
       </div>
     </div>
   );

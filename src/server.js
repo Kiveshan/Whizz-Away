@@ -882,20 +882,281 @@ cron.schedule('0 1 1 * *', async () => {
   await generateMonthlyStatements();
 });
 
-// Add an API endpoint to manually trigger statement generation (for testing)
-app.post('/api/generate-statements', async (req, res) => {
+import fs from "fs" // Add for local debugging
+
+
+
+
+app.get("/api/statement/:statementId/pdf", async (req, res) => {
+  let browser;
   try {
-    const result = await generateMonthlyStatements();
-    res.json(result);
-  } catch (error) {
-    console.error('Error generating statements:', error);
-    res.status(500).json({
-      success: false,
-      message: error.message
+    if (!pool) {
+      return res.status(503).json({ success: false, message: "Database connection not established." });
+    }
+
+    const { statementId } = req.params;
+    console.log(`Generating PDF for statement ${statementId}`);
+
+    // Cache check
+    const cacheDir = './pdf_cache';
+    if (!fs.existsSync(cacheDir)) fs.mkdirSync(cacheDir);
+    const cachePath = `${cacheDir}/statement_${statementId}.pdf`;
+    if (fs.existsSync(cachePath)) {
+      console.log(`Serving cached PDF for statement ${statementId}`);
+      const pdfBuffer = fs.readFileSync(cachePath);
+      res.set({
+        'Content-Type': 'application/pdf',
+        'Content-Disposition': `attachment; filename="statement_${statementId}.pdf"`,
+        'Content-Length': pdfBuffer.length,
+      });
+      return res.status(200).end(pdfBuffer, 'binary');
+    }
+
+    // Fetch statement data
+    const queryText = `
+      SELECT 
+        s.statement_key,
+        s.groupid,
+        s.generation_date,
+        s.clientid,
+        c.companyname AS client_name,
+        c.representative AS client_representative,
+        c.email AS client_email,
+        c.cellnum AS client_phone,
+        c.companyaddress AS client_address,
+        a.current,
+        a."30days",
+        a."60days",
+        a."90days",
+        i.ikey,
+        i.date AS invoice_date,
+        m1.total_cost AS invoice_amount,
+        m1.task AS invoice_task,
+        i.invoice_num
+      FROM 
+        statements s
+      JOIN 
+        m5_client c ON s.clientid = c.m5clientkey
+      JOIN 
+        aging_analysis a ON s.agingid = a.aging_key
+      LEFT JOIN 
+        invoice i ON i.groupid = s.groupid
+      LEFT JOIN 
+        m1_controller m1 ON i.m1key = m1.m1key
+      WHERE 
+        s.statement_key = $1
+    `;
+    const result = await query(queryText, [statementId]);
+    console.log(`Query returned ${result.rows.length} rows`);
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ success: false, message: "Statement not found" });
+    }
+
+    // Structure data
+    const statementData = {
+      statement_key: result.rows[0].statement_key,
+      groupid: result.rows[0].groupid,
+      generation_date: result.rows[0].generation_date,
+      client: {
+        name: result.rows[0].client_name,
+        representative: result.rows[0].client_representative,
+        email: result.rows[0].client_email,
+        phone: result.rows[0].client_phone,
+        address: result.rows[0].client_address,
+      },
+      aging: {
+        current: parseFloat(result.rows[0].current || 0),
+        "30days": parseFloat(result.rows[0]["30days"] || 0),
+        "60days": parseFloat(result.rows[0]["60days"] || 0),
+        "90days": parseFloat(result.rows[0]["90days"] || 0),
+      },
+      invoices: result.rows
+        .filter(row => row.ikey !== null)
+        .map(row => ({
+          ikey: row.ikey,
+          date: row.invoice_date,
+          amount: parseFloat(row.invoice_amount || 0),
+          task: row.invoice_task,
+          invoice_num: row.invoice_num,
+        })),
+    };
+
+    const invoicedAmount = statementData.invoices.reduce((sum, inv) => sum + inv.amount, 0);
+    const openingBalance = 0;
+    const amountPaid = 0;
+    const balanceDue = invoicedAmount;
+
+    // HTML with Age Analysis heading
+    const htmlContent = `
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <style>
+          body { font-family: Arial, sans-serif; margin: 0; padding: 0; }
+          .statement-paper { width: 190mm; margin: 10mm auto; }
+          .statement-header1 h1 { font-size: 24px; text-align: center; }
+          .statement-info-section { display: flex; justify-content: space-between; margin-bottom: 10mm; }
+          .client-info div { margin-bottom: 5px; }
+          .to-label { font-weight: bold; }
+          .statement-title h2 { font-size: 20px; }
+          .statement-date { margin: 5px 0; }
+          .summary-table { width: 100%; border-collapse: collapse; }
+          .summary-table td { padding: 5px; }
+          .summary-label { font-weight: bold; }
+          .summary-value { text-align: right; }
+          .statement-divider { border-top: 1px solid #ccc; margin: 10mm 0; }
+          .transactions-table { width: 100%; border-collapse: collapse; }
+          .transactions-table th, .transactions-table td { border: 1px solid #ccc; padding: 5px; }
+          .transactions-table th { background: #f5f5f5; }
+          .balance-due-summary { display: flex; justify-content: space-between; margin: 10mm 0; font-weight: bold; }
+          .age-analysis-section { margin-top: 10mm; }
+          .age-analysis-header { font-size: 16px; font-weight: bold; margin-bottom: 5px; }
+          .age-analysis-table { width: 100%; border-collapse: collapse; }
+          .age-analysis-table th, .age-analysis-table td { border: 1px solid #ccc; padding: 5px; }
+          .age-analysis-table th { background: #f5f5f5; }
+          @page { size: A4; margin: 10mm; }
+        </style>
+      </head>
+      <body>
+        <div class="statement-paper">
+          <div class="statement-header1">
+            <h1>Transport and Logistics</h1>
+          </div>
+          <div class="statement-info-section">
+            <div class="client-info">
+              <div class="to-label">To</div>
+              <div class="client-name">${statementData.client.representative}</div>
+              <div class="client-email">${statementData.client.email}</div>
+              <div class="client-phone">${statementData.client.phone}</div>
+              <div class="client-address">${statementData.client.address}</div>
+            </div>
+            <div class="statement-title">
+              <h2>Statement of Accounts</h2>
+              <div class="statement-date">${new Date(statementData.generation_date).toLocaleDateString()}</div>
+              <h3>Account Summary</h3>
+              <table class="summary-table">
+                <tbody>
+                  <tr><td class="summary-label">Opening Balance</td><td class="summary-value">R${openingBalance.toFixed(2)}</td></tr>
+                  <tr><td class="summary-label">Invoiced Amount</td><td class="summary-value">R${invoicedAmount.toFixed(2)}</td></tr>
+                  <tr><td class="summary-label">Amount Paid</td><td class="summary-value">R${amountPaid.toFixed(2)}</td></tr>
+                  <tr><td class="summary-label">Balance Due:</td><td class="summary-value">R${balanceDue.toFixed(2)}</td></tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+          <div class="statement-divider"></div>
+          <div class="transactions-section">
+            <table class="transactions-table">
+              <thead>
+                <tr>
+                  <th>Date</th>
+                  <th>Transactions</th>
+                  <th>Details</th>
+                  <th>Amount</th>
+                  <th>Payments</th>
+                  <th>Balance</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td>${new Date(statementData.generation_date).toLocaleDateString()}</td>
+                  <td>Opening Balance</td>
+                  <td></td>
+                  <td>R0</td>
+                  <td></td>
+                  <td>R0</td>
+                </tr>
+                ${statementData.invoices.map(invoice => `
+                  <tr>
+                    <td>${new Date(invoice.date).toLocaleDateString()}</td>
+                    <td>Invoice</td>
+                    <td>${invoice.task || invoice.invoice_num || `Invoice #${invoice.ikey}`}</td>
+                    <td>R${invoice.amount.toFixed(2)}</td>
+                    <td></td>
+                    <td>R${statementData.invoices
+                      .slice(0, statementData.invoices.indexOf(invoice) + 1)
+                      .reduce((sum, inv) => sum + inv.amount, 0).toFixed(2)}</td>
+                  </tr>
+                `).join('')}
+              </tbody>
+            </table>
+          </div>
+          <div class="balance-due-summary">
+            <div class="balance-due-label">Balance Due</div>
+            <div class="balance-due-amount">R${balanceDue.toFixed(2)}</div>
+          </div>
+          <div class="age-analysis-section">
+            <div class="age-analysis-header">Age Analysis</div>
+            <div class="age-analysis-content">
+              <table class="age-analysis-table">
+                <thead>
+                  <tr>
+                    <th>Current</th>
+                    <th>30 Days</th>
+                    <th>60 Days</th>
+                    <th>90 Days</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr>
+                    <td>R${statementData.aging.current.toFixed(2)}</td>
+                    <td>R${statementData.aging["30days"].toFixed(2)}</td>
+                    <td>R${statementData.aging["60days"].toFixed(2)}</td>
+                    <td>R${statementData.aging["90days"].toFixed(2)}</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </body>
+      </html>
+    `;
+
+    // Launch Puppeteer
+    browser = await puppeteer.launch({
+      headless: true,
+      args: ["--no-sandbox", "--disable-setuid-sandbox", "--font-render-hinting=none"],
     });
+    const page = await browser.newPage();
+
+    await page.setContent(htmlContent, { waitUntil: "domcontentloaded" });
+
+    // Generate PDF
+    const pdfBuffer = await page.pdf({
+      format: "A4",
+      printBackground: true,
+      margin: { top: "10mm", right: "10mm", bottom: "10mm", left: "10mm" },
+    });
+
+    // Cache PDF
+    fs.writeFileSync(cachePath, pdfBuffer);
+    console.log(`Cached PDF to ${cachePath}`);
+
+    // Debug
+    const debugPath = `./debug_statement_${statementId}.pdf`;
+    fs.writeFileSync(debugPath, pdfBuffer);
+    console.log(`Saved debug PDF to ${debugPath}`);
+    console.log(`PDF buffer size: ${pdfBuffer.length} bytes`);
+
+    // Send response
+    res.set({
+      'Content-Type': 'application/pdf',
+      'Content-Disposition': `attachment; filename="statement_${statementId}.pdf"`,
+      'Content-Length': pdfBuffer.length,
+      'Cache-Control': 'no-cache',
+    });
+    res.status(200).end(pdfBuffer, 'binary');
+  } catch (error) {
+    console.error(`Error generating PDF for statement ${statementId}:`, error);
+    res.status(500).json({ success: false, message: error.message });
+  } finally {
+    if (browser) {
+      await browser.close().catch(err => console.error("Error closing browser:", err));
+    }
   }
 });
-
 // Add a catch-all route for debugging
 app.use((req, res, next) => {
   console.log(`Unhandled request: ${req.method} ${req.url}`)
@@ -907,7 +1168,6 @@ async function startServer() {
   await connectDb()
   types.setTypeParser(types.builtins.NUMERIC, (value) => parseFloat(value));
   types.setTypeParser(types.builtins.FLOAT8, (value) => parseFloat(value));
-  await generateMonthlyStatements()
   app.listen(PORT, () => {
     console.log(`🚀 Server running on port ${PORT}`)
     console.log(`API available at http://localhost:${PORT}/api/health`)

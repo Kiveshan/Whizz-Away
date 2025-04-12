@@ -304,3 +304,47 @@
     background-color: #0056b3; /* Darker blue on hover */
   }
   
+  .statement-paper.printing-mode {
+    box-shadow: none; /* Remove shadow for PDF */
+    padding: 0;
+    margin: 0;
+    width: 100%;
+  }
+  
+  @media print {
+    .statement-page {
+      padding: 0;
+      margin: 0;
+    }
+    .statement-paper {
+      page-break-inside: avoid;
+      box-shadow: none;
+    }
+    .transactions-table,
+    .age-analysis-table {
+      page-break-inside: avoid;
+    }
+    tr {
+      page-break-inside: avoid;
+    }
+    .statementdownloadbtn1 {
+      display: none; /* Hide buttons in PDF */
+    }
+  }
+
+  /* Ensure download button styles */
+.download-btn {
+  /* Existing styles, e.g. */
+  background-color: #005566; /* Your theme color */
+  color: white;
+  padding: 8px 16px;
+  border: none;
+  cursor: pointer;
+}
+
+.download-btn.generating,
+.download-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+  background-color: #ccc; /* Greyed-out, adjust to your theme */
+}
