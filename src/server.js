@@ -1168,6 +1168,7 @@ async function startServer() {
   await connectDb()
   types.setTypeParser(types.builtins.NUMERIC, (value) => parseFloat(value));
   types.setTypeParser(types.builtins.FLOAT8, (value) => parseFloat(value));
+  await generateMonthlyStatements()
   app.listen(PORT, () => {
     console.log(`🚀 Server running on port ${PORT}`)
     console.log(`API available at http://localhost:${PORT}/api/health`)
