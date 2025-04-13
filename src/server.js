@@ -1157,6 +1157,108 @@ app.get("/api/statement/:statementId/pdf", async (req, res) => {
     }
   }
 });
+
+
+
+
+// GET all instructions for a specific client
+app.get("/api/client-instructions/:clientId", async (req, res) => {
+  try {
+    if (!pool) {
+      return res.status(503).json({
+        success: false,
+        message: "Database connection not established. Please try again later.",
+      })
+    }
+
+    const { clientId } = req.params
+    const { year, month, type } = req.query
+
+    console.log(`Fetching instructions for client ${clientId} with filters:`, req.query)
+
+    // Build the query with proper joins to get instruction data with invoice information
+    let queryText = `
+      SELECT 
+        m1.m1key, 
+        m1.task as instruction_no, 
+        s.shipmenttype as shipment_type, 
+        m1.fileref as file_no, 
+        m1.status,
+        m1.pickupdate,
+        m1.total_cost,
+        i.ikey,
+        i.invoice_num,
+        i.date as invoice_date,
+        i.groupid as invoice_group_id,
+        (SELECT statement_key FROM statements WHERE groupid = i.groupid LIMIT 1) as statement_id
+      FROM 
+        public.m1_controller m1
+      LEFT JOIN 
+        public.shipment s ON m1.shipment_type = s.shipkey
+      LEFT JOIN
+        public.invoice i ON m1.m1key = i.m1key
+      WHERE 
+        m1.client = $1
+    `
+
+    const queryParams = [clientId]
+    let paramIndex = 2
+
+    // Add type filter if provided and not "All"
+    if (type && type !== "All") {
+      queryText += ` AND s.shipmenttype = $${paramIndex}`
+      queryParams.push(type)
+      paramIndex++
+    }
+
+    // Handle date filtering - with separate conditions for year and month
+    if (year) {
+      queryText += ` AND EXTRACT(YEAR FROM m1.pickupdate) = $${paramIndex}`
+      queryParams.push(year)
+      paramIndex++
+    }
+    
+    if (month) {
+      queryText += ` AND EXTRACT(MONTH FROM m1.pickupdate) = $${paramIndex}`
+      queryParams.push(month)
+      paramIndex++
+    }
+
+    // Order by pickup date descending (newest first)
+    queryText += ` ORDER BY m1.pickupdate DESC`
+
+    console.log("Executing query:", queryText, "with params:", queryParams)
+
+    const result = await query(queryText, queryParams)
+    console.log(`Query returned ${result.rows.length} instructions for client ${clientId}`)
+
+    // Process the results to format dates and add additional information
+    const formattedResults = result.rows.map(row => ({
+      ...row,
+      pickupdate: row.pickupdate ? new Date(row.pickupdate).toISOString().split('T')[0] : null,
+      invoice_date: row.invoice_date ? new Date(row.invoice_date).toISOString().split('T')[0] : null,
+      has_invoice: !!row.ikey,
+      has_statement: !!row.statement_id,
+      total_cost: parseFloat(row.total_cost || 0).toFixed(2)
+    }))
+
+    res.json({
+      success: true,
+      data: formattedResults,
+    })
+  } catch (error) {
+    console.error(`Error fetching instructions for client ${req.params.clientId}:`, error)
+    res.status(500).json({
+      success: false,
+      message: error.message,
+      stack: process.env.NODE_ENV === "production" ? null : error.stack,
+    })
+  }
+})
+
+
+
+
 // Add a catch-all route for debugging
 app.use((req, res, next) => {
   console.log(`Unhandled request: ${req.method} ${req.url}`)
