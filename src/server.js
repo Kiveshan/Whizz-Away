@@ -895,21 +895,31 @@ app.get("/api/statement/:statementId/pdf", async (req, res) => {
     }
 
     const { statementId } = req.params;
-    console.log(`Generating PDF for statement ${statementId}`);
-
-    // Cache check
-    const cacheDir = './pdf_cache';
-    if (!fs.existsSync(cacheDir)) fs.mkdirSync(cacheDir);
-    const cachePath = `${cacheDir}/statement_${statementId}.pdf`;
+    
+    // Cache check - create directory if it doesn't exist
+    const cacheDir = path.join(process.cwd(), 'pdf_cache');
+    if (!fs.existsSync(cacheDir)) {
+      fs.mkdirSync(cacheDir, { recursive: true });
+    }
+    
+    const cachePath = path.join(cacheDir, `statement_${statementId}.pdf`);
+    
+    // Check if cached version exists and is not older than 24 hours
     if (fs.existsSync(cachePath)) {
-      console.log(`Serving cached PDF for statement ${statementId}`);
-      const pdfBuffer = fs.readFileSync(cachePath);
-      res.set({
-        'Content-Type': 'application/pdf',
-        'Content-Disposition': `attachment; filename="statement_${statementId}.pdf"`,
-        'Content-Length': pdfBuffer.length,
-      });
-      return res.status(200).end(pdfBuffer, 'binary');
+      const stats = fs.statSync(cachePath);
+      const fileAge = Date.now() - stats.mtimeMs;
+      const maxAge = 24 * 60 * 60 * 1000; // 24 hours in milliseconds
+      
+      if (fileAge < maxAge) {
+        const pdfBuffer = fs.readFileSync(cachePath);
+        res.set({
+          'Content-Type': 'application/pdf',
+          'Content-Disposition': `attachment; filename="statement_${statementId}.pdf"`,
+          'Content-Length': pdfBuffer.length,
+          'Cache-Control': 'private, max-age=86400', // 24 hours browser caching
+        });
+        return res.status(200).end(pdfBuffer, 'binary');
+      }
     }
 
     // Fetch statement data
@@ -947,7 +957,6 @@ app.get("/api/statement/:statementId/pdf", async (req, res) => {
         s.statement_key = $1
     `;
     const result = await query(queryText, [statementId]);
-    console.log(`Query returned ${result.rows.length} rows`);
 
     if (result.rows.length === 0) {
       return res.status(404).json({ success: false, message: "Statement not found" });
@@ -992,6 +1001,7 @@ app.get("/api/statement/:statementId/pdf", async (req, res) => {
       <!DOCTYPE html>
       <html>
       <head>
+        <meta charset="UTF-8">
         <style>
           body { font-family: Arial, sans-serif; margin: 0; padding: 0; }
           .statement-paper { width: 190mm; margin: 10mm auto; }
@@ -1114,46 +1124,52 @@ app.get("/api/statement/:statementId/pdf", async (req, res) => {
       </html>
     `;
 
-    // Launch Puppeteer
+    // Launch Puppeteer with optimized settings
     browser = await puppeteer.launch({
       headless: true,
-      args: ["--no-sandbox", "--disable-setuid-sandbox", "--font-render-hinting=none"],
+      args: [
+        "--no-sandbox", 
+        "--disable-setuid-sandbox",
+        "--disable-dev-shm-usage",
+        "--disable-accelerated-2d-canvas",
+        "--no-first-run",
+        "--no-zygote",
+        "--disable-gpu"
+      ],
     });
+    
     const page = await browser.newPage();
+    await page.setContent(htmlContent, { waitUntil: "networkidle0" });
 
-    await page.setContent(htmlContent, { waitUntil: "domcontentloaded" });
-
-    // Generate PDF
+    // Generate PDF with optimized settings
     const pdfBuffer = await page.pdf({
       format: "A4",
       printBackground: true,
       margin: { top: "10mm", right: "10mm", bottom: "10mm", left: "10mm" },
+      preferCSSPageSize: true,
     });
 
     // Cache PDF
     fs.writeFileSync(cachePath, pdfBuffer);
-    console.log(`Cached PDF to ${cachePath}`);
-
-    // Debug
-    const debugPath = `./debug_statement_${statementId}.pdf`;
-    fs.writeFileSync(debugPath, pdfBuffer);
-    console.log(`Saved debug PDF to ${debugPath}`);
-    console.log(`PDF buffer size: ${pdfBuffer.length} bytes`);
 
     // Send response
     res.set({
       'Content-Type': 'application/pdf',
       'Content-Disposition': `attachment; filename="statement_${statementId}.pdf"`,
       'Content-Length': pdfBuffer.length,
-      'Cache-Control': 'no-cache',
+      'Cache-Control': 'private, max-age=86400', // 24 hours browser caching
     });
-    res.status(200).end(pdfBuffer, 'binary');
+    
+    return res.status(200).end(pdfBuffer, 'binary');
   } catch (error) {
-    console.error(`Error generating PDF for statement ${statementId}:`, error);
-    res.status(500).json({ success: false, message: error.message });
+    console.error(`Error generating PDF for statement ${req.params.statementId}:`, error);
+    return res.status(500).json({ 
+      success: false, 
+      message: "Failed to generate statement PDF" 
+    });
   } finally {
     if (browser) {
-      await browser.close().catch(err => console.error("Error closing browser:", err));
+      await browser.close().catch(() => {});
     }
   }
 });
