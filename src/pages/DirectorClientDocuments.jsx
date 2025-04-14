@@ -95,9 +95,8 @@ const DirectorClientDocuments = () => {
       return
     }
     
-    // Open invoice in a new tab or navigate to invoice page
-    window.open(`/invoice/${ikey}`, '_blank')
-    // Alternatively: navigate(`/invoice/${ikey}`)
+    // Navigate to the invoice view in the same tab
+    navigate(`/invoice/${ikey}`)
   }
 
   const handleViewStatement = (statementId) => {
@@ -119,7 +118,6 @@ const DirectorClientDocuments = () => {
       {/* Header with back button and client name */}
       <div className="user-profile">
         <button className="back-button" onClick={handleBack}>Back</button>
-        
       </div>
 
       {/* Year and Month filters */}
@@ -156,14 +154,14 @@ const DirectorClientDocuments = () => {
       <div className="filter-section9">
         <div className="filter-group">
           <button 
-            className={`filter-button ${filter === "Import" ? "active" : ""}`} 
-            onClick={() => handleFilterChange("Import")}
+            className={`filter-button ${filter === "import" ? "active" : ""}`} 
+            onClick={() => handleFilterChange("import")}
           >
             Import
           </button>
           <button 
-            className={`filter-button ${filter === "Export" ? "active" : ""}`} 
-            onClick={() => handleFilterChange("Export")}
+            className={`filter-button ${filter === "export" ? "active" : ""}`} 
+            onClick={() => handleFilterChange("export")}
           >
             Export
           </button>
@@ -210,26 +208,26 @@ const DirectorClientDocuments = () => {
                     <td>{instruction.pickupdate}</td>
                     <td>R {instruction.total_cost}</td>
                     <td>
+                      {/* Always show View button for invoices since completed instructions should have invoices */}
                       <button 
                         className="view-button" 
                         onClick={() => handleViewInvoice(instruction.ikey)}
-                        disabled={!instruction.has_invoice}
                       >
                         View
                       </button>
                     </td>
                     <td>
-  {instruction.has_statement ? (
-    <button 
-      className="view-button" 
-      onClick={() => handleViewStatement(instruction.statement_id)}
-    >
-      View
-    </button>
-  ) : (
-    <span className="pending-status">Pending</span>
-  )}
-</td>
+                      {instruction.has_statement ? (
+                        <button 
+                          className="view-button" 
+                          onClick={() => handleViewStatement(instruction.statement_id)}
+                        >
+                          View
+                        </button>
+                      ) : (
+                        <span className="pending-status">Pending</span>
+                      )}
+                    </td>
                   </tr>
                 ))
               ) : (

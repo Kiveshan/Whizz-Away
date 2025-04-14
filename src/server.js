@@ -1199,6 +1199,7 @@ app.get("/api/client-instructions/:clientId", async (req, res) => {
         public.invoice i ON m1.m1key = i.m1key
       WHERE 
         m1.client = $1
+        AND m1.status = 'Completed'
     `
 
     const queryParams = [clientId]
