@@ -1,26 +1,35 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
+import axios from "axios";
 import "../finance clerkpages/css/ViewClientInstruction.css";
-
-const clients = [
-  {
-    company: "Company ABC",
-    representative: "Andrew Taylor",
-    email: "taylorandrew@yahoo.com",
-    balance: "R20 000",
-    date: "28/06/2025",
-  },
-  {
-    company: "Little Helpers LTD",
-    representative: "Brian Hall",
-    email: "brian_hall@yahoo.com",
-    balance: "R50 000",
-    date: "25/07/2025",
-  },
-];
 
 const FinancialDocumentsView = () => {
   const navigate = useNavigate();
+  const [clients, setClients] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+
+  useEffect(() => {
+    const fetchClients = async () => {
+      try {
+        setLoading(true);
+        const response = await axios.get("http://localhost:5000/api/clients");
+        
+        if (response.data.success) {
+          setClients(response.data.data);
+        } else {
+          setError("Failed to fetch clients");
+        }
+      } catch (err) {
+        console.error("Error fetching clients:", err);
+        setError("An error occurred while fetching clients");
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchClients();
+  }, []);
 
   return (
     <div className="">
@@ -31,35 +40,53 @@ const FinancialDocumentsView = () => {
         </button>
       </div>
 
-
+      {/* Loading and Error States */}
+      {loading && <div className="loading-message">Loading clients...</div>}
+      {error && <div className="error-message">{error}</div>}
 
       {/* Table */}
-      <div className="clientinstructiontable">
-        <table className="t1" style={{width: "70%", marginLeft:"350px"}}>
-          <thead className="bg-blue-300">
-            <tr>
-              <th className="p-3">Company</th>
-              <th className="p-3">Representative</th>
-              <th className="p-3">Email</th>
-              <th className="p-3">Instructions</th>
-            </tr>
-          </thead>
-          <tbody>
-            {clients.map((client, index) => (
-              <tr key={index} className="border-t">
-                <td className="p-3">{client.company}</td>
-                <td className="p-3">{client.representative}</td>
-                <td className="p-3">{client.email}</td>
-                <td className="p-3">
-                  <button className="view-butn" onClick={() => navigate("/client-documents")}>
-                    View
-                  </button>
-                </td>
+      {!loading && !error && (
+        <div className="clientinstructiontable">
+          <table className="t1" style={{width: "70%", marginLeft:"350px"}}>
+            <thead className="bg-blue-300">
+              <tr>
+                <th className="p-3">Company</th>
+                <th className="p-3">Representative</th>
+                <th className="p-3">Email</th>
+                <th className="p-3">Instructions</th>
               </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
+            </thead>
+            <tbody>
+              {clients.length > 0 ? (
+                clients.map((client, index) => (
+                  <tr key={client.m5clientkey || index} className="border-t">
+                    <td className="p-3">{client.companyname}</td>
+                    <td className="p-3">{client.representative}</td>
+                    <td className="p-3">{client.email}</td>
+                    <td className="p-3">
+                      <button 
+                        className="view-butn" 
+                        onClick={() => navigate("/client-documents", { 
+                          state: { 
+                            clientId: client.m5clientkey,
+                            clientName: client.companyname 
+                          } 
+                        })}
+                      >
+                        View
+                      </button>
+                    </td>
+                  </tr>
+                ))
+              ) : (
+                <tr>
+                  <td colSpan="4" className="p-3 text-center">No clients found</td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+      )}
     </div>
   );
 };

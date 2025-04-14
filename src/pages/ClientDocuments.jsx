@@ -1,88 +1,137 @@
 "use client"
 
-import { useState } from "react"
-import { useNavigate } from "react-router-dom"
+import { useState, useEffect } from "react"
+import { useNavigate, useLocation } from "react-router-dom"
+import axios from "axios"
 import "../css/ClientDocuments.css"
 
-const MonitorInstructions = () => {
+const ClientDocuments = () => {
   const navigate = useNavigate()
-  const [selectedRows, setSelectedRows] = useState([])
+  const location = useLocation()
+  const { clientId, clientName } = location.state || {}
+  
+  // State for instructions data
+  const [instructions, setInstructions] = useState([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState(null)
+  
+  // Filter states
   const [filter, setFilter] = useState("All")
-  const [statusFilter, setStatusFilter] = useState("All")
-  const [searchQuery, setSearchQuery] = useState("")
+  const [yearFilter, setYearFilter] = useState("")
+  const [monthFilter, setMonthFilter] = useState("")
 
-  const instructions = [
-    {
-      id: 1,
-      instructionNo: "Instruction 1",
-      type: "Import",
-      status: "Completed",
-      assignment: "",
-      fileNo: "F12345"
-    },
-    {
-      id: 2,
-      instructionNo: "Instruction 2",
-      type: "Export",
-      status: "Completed",
-      assignment: "",
-      fileNo: "F67890"
-    },
-    {
-      id: 3,
-      instructionNo: "Instruction 3",
-      type: "Import",
-      status: "In-progress",
-      assignment: "",
-      fileNo: "F11223"
-    },
-  ]
+  // Fetch instructions when filters change
+  useEffect(() => {
+    const fetchInstructions = async () => {
+      if (!clientId) {
+        setError("No client selected")
+        setLoading(false)
+        return
+      }
+      
+      try {
+        setLoading(true)
+        
+        // Convert month name to number if needed
+        let monthNumber = monthFilter
+        if (monthFilter && isNaN(monthFilter)) {
+          const monthNames = ["January", "February", "March", "April", "May", "June", 
+                             "July", "August", "September", "October", "November", "December"]
+          monthNumber = monthNames.indexOf(monthFilter) + 1
+        }
+        
+        // Call the API with filters
+        const response = await axios.get(`http://localhost:5000/api/client-instructions/${clientId}`, {
+          params: {
+            year: yearFilter || undefined,
+            month: monthNumber || undefined,
+            type: filter === "All" ? undefined : filter
+          }
+        })
+        
+        if (response.data.success) {
+          setInstructions(response.data.data)
+          setError(null)
+        } else {
+          setError(response.data.message || "Failed to fetch instructions")
+          setInstructions([])
+        }
+      } catch (err) {
+        console.error("Error fetching instructions:", err)
+        setError("An error occurred while fetching instructions")
+        setInstructions([])
+      } finally {
+        setLoading(false)
+      }
+    }
 
+    fetchInstructions()
+  }, [clientId, filter, yearFilter, monthFilter])
+
+  // Navigation handler
   const handleBack = () => {
-    navigate("/")
+    navigate("/FinancialDocumentsView")
   }
 
+  // Filter handlers
   const handleFilterChange = (type) => {
     setFilter(type)
   }
 
-  const handleStatusFilterChange = (status) => {
-    setStatusFilter(status)
+  const handleYearChange = (event) => {
+    const selectedYear = event.target.value
+    setYearFilter(selectedYear === "Year" ? "" : selectedYear)
   }
 
-  const handleSearchChange = (event) => {
-    setSearchQuery(event.target.value)
+  const handleMonthChange = (event) => {
+    const selectedMonth = event.target.value
+    setMonthFilter(selectedMonth === "Month" ? "" : selectedMonth)
   }
 
-  const filteredInstructions = instructions.filter(instruction => 
-    (filter === "All" || instruction.type === filter) && 
-    (statusFilter === "All" || instruction.status === statusFilter) &&
-    (searchQuery === "" || 
-      instruction.instructionNo.toLowerCase().includes(searchQuery.toLowerCase()) || 
-      instruction.fileNo.toLowerCase().includes(searchQuery.toLowerCase()))
-  )
+  // View handlers
+  const handleViewInvoice = (ikey) => {
+    if (!ikey) {
+      alert("No invoice available for this instruction")
+      return
+    }
+    
+    // Navigate to the invoice view in the same tab
+    navigate(`/invoice/${ikey}`)
+  }
 
-  const handleView = (id) => {
-    console.log("Viewing instruction:", id)
+  const handleViewStatement = (statementId) => {
+    if (!statementId) {
+      alert("No statement available for this instruction")
+      return
+    }
+    
+    // Navigate to the ClientStatement component with the statement ID
+    navigate("/client-statement", { 
+      state: { 
+        statementId: statementId 
+      } 
+    })
   }
 
   return (
     <div className="monitor-instructions-container">
+      {/* Header with back button and client name */}
       <div className="user-profile">
         <button className="back-button" onClick={handleBack}>Back</button>
       </div>
 
+      {/* Year and Month filters */}
       <div className="action-bar">
         <div className="filter-section9">
           <div className="filter-group">
-            <select className="dropdown">
+            <select className="dropdown" onChange={handleYearChange} value={yearFilter || "Year"}>
               <option>Year</option>
               <option>2025</option>
               <option>2024</option>
               <option>2023</option>
               <option>2022</option>
             </select>
-            <select className="dropdown">
+            <select className="dropdown" onChange={handleMonthChange} value={monthFilter || "Month"}>
               <option>Month</option>
               <option>January</option>
               <option>February</option>
@@ -100,59 +149,100 @@ const MonitorInstructions = () => {
           </div>
         </div>
       </div>
+      
+      {/* Type filters */}
       <div className="filter-section9">
         <div className="filter-group">
-          <button className={`filter-button ${filter === "Import" ? "active" : ""}`} onClick={() => handleFilterChange("Import")}>
+          <button 
+            className={`filter-button ${filter === "import" ? "active" : ""}`} 
+            onClick={() => handleFilterChange("import")}
+          >
             Import
           </button>
-          <button className={`filter-button ${filter === "Export" ? "active" : ""}`} onClick={() => handleFilterChange("Export")}>
+          <button 
+            className={`filter-button ${filter === "export" ? "active" : ""}`} 
+            onClick={() => handleFilterChange("export")}
+          >
             Export
           </button>
-          <button className={`filter-button ${filter === "All" ? "active" : ""}`} onClick={() => handleFilterChange("All")}>
+          <button 
+            className={`filter-button ${filter === "All" ? "active" : ""}`} 
+            onClick={() => handleFilterChange("All")}
+          >
             All
           </button>
         </div>
-        <div className="filter-group">
-          {/* <button className={`filter-button ${statusFilter === "In-progress" ? "active" : ""}`} onClick={() => handleStatusFilterChange("In-progress")}>
-            In-progress
-          </button>
-          <button className={`filter-button ${statusFilter === "Completed" ? "active" : ""}`} onClick={() => handleStatusFilterChange("Completed")}>
-            Completed
-          </button> */}
-        </div>
       </div>
-      <div className="search-bar">
-      </div>
-      <div className="instructions-table">
-        <table>
-          <thead>
-            <tr>
-              <th>Instruction No.</th>
-              <th>File No.</th>
-              <th>Type</th>
-              <th>Invoice</th>
-              <th>Statement</th>
-            </tr>
-          </thead>
-          <tbody>
-            {filteredInstructions.map((instruction) => (
-              <tr key={instruction.id}>
-                <td>{instruction.instructionNo}</td>
-                <td>{instruction.fileNo}</td>
-                <td>{instruction.type}</td>
-                <td>
-                  <button className="view-button" onClick={() => handleView(instruction.id)}>View</button>
-                </td>
-                <td>
-                  <button className="view-button" onClick={() => handleView(instruction.id)}>View</button>
-                </td>
+      
+      {/* Loading and error states */}
+      {loading && (
+        <div className="loading-message">Loading instructions...</div>
+      )}
+      
+      {error && (
+        <div className="error-message">{error}</div>
+      )}
+      
+      {/* Instructions table */}
+      {!loading && !error && (
+        <div className="instructions-table">
+          <table>
+            <thead>
+              <tr>
+                <th>Instruction No.</th>
+                <th>File No.</th>
+                <th>Type</th>
+                <th>Date</th>
+                <th>Amount</th>
+                <th>Invoice</th>
+                <th>Statement</th>
               </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
+            </thead>
+            <tbody>
+              {instructions.length > 0 ? (
+                instructions.map((instruction) => (
+                  <tr key={instruction.m1key}>
+                    <td>{instruction.instruction_no}</td>
+                    <td>{instruction.file_no}</td>
+                    <td>{instruction.shipment_type}</td>
+                    <td>{instruction.pickupdate}</td>
+                    <td>R {instruction.total_cost}</td>
+                    <td>
+                      {/* Always show View button for invoices since completed instructions should have invoices */}
+                      <button 
+                        className="view-button" 
+                        onClick={() => handleViewInvoice(instruction.ikey)}
+                      >
+                        View
+                      </button>
+                    </td>
+                    <td>
+                      {instruction.has_statement ? (
+                        <button 
+                          className="view-button" 
+                          onClick={() => handleViewStatement(instruction.statement_id)}
+                        >
+                          View
+                        </button>
+                      ) : (
+                        <span className="pending-status">Pending</span>
+                      )}
+                    </td>
+                  </tr>
+                ))
+              ) : (
+                <tr>
+                  <td colSpan="7" style={{textAlign: "center"}}>
+                    No instructions found for this client with the selected filters
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+      )}
     </div>
   )
 }
 
-export default MonitorInstructions
+export default ClientDocuments
