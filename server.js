@@ -1286,6 +1286,1004 @@ app.post("/api/company/reactivate", verifyToken, async (req, res) => {
 
 // ------------------------------------------Module 0 Ends here---------------------------------- //
 
+// ------------------------------------------Module 5 Starts here---------------------------------- //  
+
+// ---- Employee Management Routes ---- //
+
+// Get all employees
+app.get("/api/employees", verifyToken, async (req, res) => {
+  try {
+    const query = `
+      SELECT e.*, r.rolename 
+      FROM m5_employee e
+      JOIN roles r ON e.roleid = r.roleid
+      ORDER BY e.userid
+    `;
+
+    const result = await client.query(query);
+    res.json(result.rows);
+  } catch (err) {
+    console.error("Error fetching employees:", err);
+    res.status(500).json({ error: "Failed to fetch employees" });
+  }
+});
+
+
+// Get employee by ID
+app.get("/api/employees/:id", verifyToken, async (req, res) => {
+  try {
+    const { id } = req.params
+
+    // Simplified query without role checks
+    const query = "SELECT * FROM m5_employee WHERE userid = $1"
+    const result = await client.query(query, [id])
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ message: "Employee not found" })
+    }
+
+    res.json(result.rows[0])
+  } catch (err) {
+    console.error(`Error fetching employee ${req.params.id}:`, err)
+    res.status(500).json({ error: "Failed to fetch employee" })
+  }
+})
+
+// Create new employee
+app.post("/api/employees", verifyToken, async (req, res) => {
+  try {
+    const {
+      name,
+      surname,
+      telephonenum,
+      cellnum,
+      employeenum,
+      roleid,
+      email,
+      password,
+      base_salary,
+    } = req.body
+
+    // Get subei_reg_num (company_reg_num) from the logged-in user via token
+    const subei_reg_num = req.user.company_reg_num
+
+    if (!subei_reg_num) {
+      return res.status(400).json({ error: "Missing company registration number from token." })
+    }
+
+    // Hash the password
+    const hashedPassword = await bcrypt.hash(password, 10)
+
+    const result = await client.query(
+      `INSERT INTO m5_employee (
+        name, surname, telephonenum, cellnum, employeenum, roleid, email, password, 
+        base_salary, subei_reg_num, status
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11) RETURNING *`,
+      [
+        name,
+        surname,
+        telephonenum,
+        cellnum,
+        employeenum,
+        roleid,
+        email,
+        hashedPassword,
+        base_salary,
+        subei_reg_num,
+        true,
+      ],
+    )
+
+    res.status(201).json(result.rows[0])
+  } catch (err) {
+    console.error("Error creating employee:", err)
+    res.status(500).json({ error: "Failed to create employee" })
+  }
+})
+
+
+// Create new subcontractor employee
+app.post("/api/employees", verifyToken, async (req, res) => {
+  try {
+    // Removed role check
+    const {
+      name,
+      surname,
+      telephonenum,
+      cellnum,
+      employeenum,
+      roleid,
+      email,
+      password,
+      base_salary,
+      companyname,
+      location,
+      truckregnum,
+      contact_person,
+      subei_reg_num,
+      no_of_trucks,
+    } = req.body
+
+    // Hash the password
+    const hashedPassword = await bcrypt.hash(password, 10)
+
+    const result = await client.query(
+      `INSERT INTO m5_employee (
+        name, surname, telephonenum, cellnum, employeenum, roleid, email, password, 
+        base_salary, companyname, location, truckregnum, contact_person, 
+        subei_reg_num, no_of_trucks, status
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16) RETURNING *`,
+      [
+        name,
+        surname,
+        telephonenum,
+        cellnum,
+        employeenum,
+        roleid,
+        email,
+        hashedPassword,
+        base_salary,
+        companyname,
+        location,
+        truckregnum,
+        contact_person,
+        subei_reg_num,
+        no_of_trucks,
+        true,
+      ],
+    )
+
+    res.status(201).json(result.rows[0])
+  } catch (err) {
+    console.error("Error creating employee:", err)
+    res.status(500).json({ error: "Failed to create employee" })
+  }
+})
+
+// Update employee
+// app.put("/api/employees/:id", verifyToken, async (req, res) => {
+//   try {
+//     const { id } = req.params
+
+//     // Removed role check
+//     // Check if employee exists
+//     const checkResult = await client.query("SELECT * FROM m5_employee WHERE userid = $1", [id])
+
+//     if (checkResult.rows.length === 0) {
+//       return res.status(404).json({ message: "Employee not found" })
+//     }
+
+//     // Build the update query dynamically based on provided fields
+//     const updateFields = []
+//     const queryParams = []
+//     let paramCounter = 1
+
+//     const updateableFields = [
+//       "name",
+//       "surname",
+//       "telephonenum",
+//       "cellnum",
+//       "employeenum",
+//       "roleid",
+//       "email",
+//       "base_salary",
+//       "companyname",
+//       "location",
+//       "truckregnum",
+//       "contact_person",
+//       "no_of_trucks",
+//       "company_reg_num"
+//     ]
+
+//     // Add password to updateable fields if provided
+//     if (req.body.password) {
+//       updateableFields.push("password")
+//       req.body.password = await bcrypt.hash(req.body.password, 10)
+//     }
+
+//     // Build the SET clause
+//     for (const field of updateableFields) {
+//       if (req.body[field] !== undefined) {
+//         updateFields.push(`${field} = $${paramCounter}`)
+//         queryParams.push(req.body[field])
+//         paramCounter++
+//       }
+//     }
+
+//     // If no fields to update, return early
+//     if (updateFields.length === 0) {
+//       return res.status(400).json({ message: "No fields to update" })
+//     }
+
+//     // Add the employee ID as the last parameter
+//     queryParams.push(id)
+
+//     const updateQuery = `
+//       UPDATE m5_employee 
+//       SET ${updateFields.join(", ")} 
+//       WHERE userid = $${paramCounter} 
+//       RETURNING *
+//     `
+
+//     const result = await client.query(updateQuery, queryParams)
+
+//     res.json(result.rows[0])
+//   } catch (err) {
+//     console.error(`Error updating employee ${req.params.id}:`, err)
+//     res.status(500).json({ error: "Failed to update employee" })
+//   }
+// })
+// Update employee
+app.put("/api/employees/:id", verifyToken, async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    // Check if employee exists
+    const checkResult = await client.query("SELECT * FROM m5_employee WHERE userid = $1", [id]);
+
+    if (checkResult.rows.length === 0) {
+      return res.status(404).json({ message: "Employee not found" });
+    }
+
+    // Build the update query dynamically
+    const updateFields = [];
+    const queryParams = [];
+    let paramCounter = 1;
+
+    const updateableFields = [
+      "name",
+      "surname",
+      "telephonenum",
+      "cellnum",
+      "employeenum",
+      "roleid",
+      "email",
+      "base_salary",
+      "companyname",
+      "location",
+      "truckregnum",
+      "contact_person",
+      "no_of_trucks",
+      "company_reg_num"
+    ];
+
+    // Hash password if provided
+    if (req.body.password) {
+      updateableFields.push("password");
+      req.body.password = await bcrypt.hash(req.body.password, 10);
+    }
+
+    for (const field of updateableFields) {
+      if (req.body[field] !== undefined) {
+        updateFields.push(`${field} = $${paramCounter}`);
+        queryParams.push(req.body[field]);
+        paramCounter++;
+      }
+    }
+
+    if (updateFields.length === 0) {
+      return res.status(400).json({ message: "No fields to update" });
+    }
+
+    queryParams.push(id);
+
+    const updateQuery = `
+      UPDATE m5_employee 
+      SET ${updateFields.join(", ")} 
+      WHERE userid = $${paramCounter} 
+      RETURNING *
+    `;
+
+    await client.query(updateQuery, queryParams);
+
+    // Fetch updated employee WITH rolename
+    const employeeWithRole = await client.query(
+      `SELECT e.*, r.rolename 
+       FROM m5_employee e 
+       JOIN roles r ON e.roleid = r.roleid 
+       WHERE e.userid = $1`,
+      [id]
+    );
+
+    res.json(employeeWithRole.rows[0]);
+  } catch (err) {
+    console.error(`Error updating employee ${req.params.id}:`, err);
+    res.status(500).json({ error: "Failed to update employee" });
+  }
+});
+
+
+// Toggle employee status (enable/disable)
+app.put("/api/employees/:id/toggle-status", verifyToken, async (req, res) => {
+  try {
+    const { id } = req.params
+    const { status } = req.body
+
+    // Removed role check
+    // Check if employee exists
+    const checkResult = await client.query("SELECT * FROM m5_employee WHERE userid = $1", [id])
+
+    if (checkResult.rows.length === 0) {
+      return res.status(404).json({ message: "Employee not found" })
+    }
+
+    // Update the status
+    const updateResult = await client.query("UPDATE m5_employee SET status = $1 WHERE userid = $2 RETURNING *", [
+      status,
+      id,
+    ])
+
+    res.json(updateResult.rows[0])
+  } catch (err) {
+    console.error(`Error toggling employee ${req.params.id} status:`, err)
+    res.status(500).json({ error: "Failed to toggle employee status" })
+  }
+})
+
+// ---- Client Management Routes ---- //
+
+// Get all clients
+app.get("/api/clients", verifyToken, async (req, res) => {
+  try {
+    // Simplified query without role checks
+    const query = "SELECT * FROM m5_client ORDER BY m5clientkey"
+    
+    const result = await client.query(query)
+    res.json(result.rows)
+  } catch (err) {
+    console.error("Error fetching clients:", err)
+    res.status(500).json({ error: "Failed to fetch clients" })
+  }
+})
+
+// Get client by ID
+app.get("/api/clients/:id", verifyToken, async (req, res) => {
+  try {
+    const { id } = req.params
+
+    // Simplified query without role checks
+    const query = "SELECT * FROM m5_client WHERE m5clientkey = $1"
+    const result = await client.query(query, [id])
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ message: "Client not found" })
+    }
+
+    res.json(result.rows[0])
+  } catch (err) {
+    console.error(`Error fetching client ${req.params.id}:`, err)
+    res.status(500).json({ error: "Failed to fetch client" })
+  }
+})
+
+// Create new client
+app.post("/api/clients", verifyToken, async (req, res) => {
+  try {
+    // Renamed the variable to avoid conflict with the database client
+    const {
+      client: clientName,  // Renamed to clientName
+      representative,
+      companyaddress,
+      suburb,
+      postalcode,
+      email,
+      client_reg_num,
+      cellnum,
+      vatregno,
+      city,
+      streetaddress,
+    } = req.body
+    
+    const result = await client.query(
+      `INSERT INTO m5_client (
+        client, representative, companyaddress, suburb, postalcode, 
+        email, client_reg_num, cellnum, vatregno, city, streetaddress
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11) RETURNING *`,
+      [
+        clientName,  // Use the renamed variable
+        representative,
+        companyaddress,
+        suburb,
+        postalcode,
+        email,
+        client_reg_num,
+        cellnum,
+        vatregno,
+        city,
+        streetaddress,
+      ]
+    )
+
+    res.status(201).json(result.rows[0])
+  } catch (err) {
+    console.error("Error creating client:", err)
+    res.status(500).json({ error: "Failed to create client" })
+  }
+})
+
+// Update client
+app.put("/api/clients/:id", verifyToken, async (req, res) => {
+  try {
+    const { id } = req.params
+
+    // Removed role check
+    // Check if client exists
+    const checkResult = await client.query("SELECT * FROM m5_client WHERE m5clientkey = $1", [id])
+
+    if (checkResult.rows.length === 0) {
+      return res.status(404).json({ message: "Client not found" })
+    }
+
+    // Build the update query dynamically based on provided fields
+    const updateFields = []
+    const queryParams = []
+    let paramCounter = 1
+
+    const updateableFields = [
+      "client",
+      "representative",
+      "companyaddress",
+      "suburb",
+      "postalcode",
+      "email",
+      "companyregnum",
+      "cellnum",
+      "vatregno",
+      "city",
+      "streetaddress",
+      "payment_type",
+      "company_reg_num"
+    ]
+
+    // Build the SET clause
+    for (const field of updateableFields) {
+      if (req.body[field] !== undefined) {
+        updateFields.push(`${field} = $${paramCounter}`)
+        queryParams.push(req.body[field])
+        paramCounter++
+      }
+    }
+
+    // If no fields to update, return early
+    if (updateFields.length === 0) {
+      return res.status(400).json({ message: "No fields to update" })
+    }
+
+    // Add the client ID as the last parameter
+    queryParams.push(id)
+
+    const updateQuery = `
+      UPDATE m5_client 
+      SET ${updateFields.join(", ")} 
+      WHERE m5clientkey = $${paramCounter} 
+      RETURNING *
+    `
+
+    const result = await client.query(updateQuery, queryParams)
+
+    res.json(result.rows[0])
+  } catch (err) {
+    console.error(`Error updating client ${req.params.id}:`, err)
+    res.status(500).json({ error: "Failed to update client" })
+  }
+})
+
+// Delete client
+app.delete("/api/clients/:id", verifyToken, async (req, res) => {
+  try {
+    const { id } = req.params
+
+    // Removed role check
+    // Check if client exists
+    const checkResult = await client.query("SELECT * FROM m5_client WHERE m5clientkey = $1", [id])
+
+    if (checkResult.rows.length === 0) {
+      return res.status(404).json({ message: "Client not found" })
+    }
+
+    // Delete the client
+    await client.query("DELETE FROM m5_client WHERE m5clientkey = $1", [id])
+
+    res.json({ message: "Client deleted successfully" })
+  } catch (err) {
+    console.error(`Error deleting client ${req.params.id}:`, err)
+    res.status(500).json({ error: "Failed to delete client" })
+  }
+})
+
+// ---- Truck Management Routes ---- //
+
+// Get all trucks
+app.get("/api/trucks", verifyToken, async (req, res) => {
+  try {
+    // Simplified query without role checks
+    const query = "SELECT * FROM m5_trucks ORDER BY m5truckskey"
+    
+    const result = await client.query(query)
+    res.json(result.rows)
+  } catch (err) {
+    console.error("Error fetching trucks:", err)
+    res.status(500).json({ error: "Failed to fetch trucks" })
+  }
+})
+
+// Get truck by ID
+app.get("/api/trucks/:id", verifyToken, async (req, res) => {
+  try {
+    const { id } = req.params
+
+    // Simplified query without role checks
+    const query = "SELECT * FROM m5_trucks WHERE m5truckskey = $1"
+    const result = await client.query(query, [id])
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ message: "Truck not found" })
+    }
+
+    res.json(result.rows[0])
+  } catch (err) {
+    console.error(`Error fetching truck ${req.params.id}:`, err)
+    res.status(500).json({ error: "Failed to fetch truck" })
+  }
+})
+
+// Create new truck
+app.post("/api/trucks", verifyToken, async (req, res) => {
+  try {
+    // Removed role check
+    const {
+      truckregnum,
+      trailersize,
+      truckpurchasedate,
+      year,
+      model,
+      purchase_price,
+      current_evaluation,
+      vin_num,
+      is_subcontractor
+    } = req.body
+
+    const result = await client.query(
+      `INSERT INTO m5_trucks (
+        truckregnum, trailersize, truckpurchasedate, year, model,
+        purchase_price, current_evaluation, vin_num, is_subcontractor
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) RETURNING *`,
+      [
+        truckregnum,
+        trailersize,
+        truckpurchasedate,
+        year,
+        model,
+        purchase_price,
+        current_evaluation,
+        vin_num,
+        is_subcontractor
+      ],
+    )
+
+    res.status(201).json(result.rows[0])
+  } catch (err) {
+    console.error("Error creating truck:", err)
+    res.status(500).json({ error: "Failed to create truck" })
+  }
+})
+
+// Update truck
+app.put("/api/trucks/:id", verifyToken, async (req, res) => {
+  try {
+    const { id } = req.params
+
+    // Removed role check
+    // Check if truck exists
+    const checkResult = await client.query("SELECT * FROM m5_trucks WHERE m5truckskey = $1", [id])
+
+    if (checkResult.rows.length === 0) {
+      return res.status(404).json({ message: "Truck not found" })
+    }
+
+    // Build the update query dynamically based on provided fields
+    const updateFields = []
+    const queryParams = []
+    let paramCounter = 1
+
+    const updateableFields = [
+      "truckregnum",
+      "trailersize",
+      "truckpurchasedate",
+      "year",
+      "model",
+      "purchase_price",
+      "current_evaluation",
+      "vin_num",
+      "is_subcontractor",
+      "company_reg_num"
+    ]
+
+    // Build the SET clause
+    for (const field of updateableFields) {
+      if (req.body[field] !== undefined) {
+        updateFields.push(`${field} = $${paramCounter}`)
+        queryParams.push(req.body[field])
+        paramCounter++
+      }
+    }
+
+    // If no fields to update, return early
+    if (updateFields.length === 0) {
+      return res.status(400).json({ message: "No fields to update" })
+    }
+
+    // Add the truck ID as the last parameter
+    queryParams.push(id)
+
+    const updateQuery = `
+      UPDATE m5_trucks 
+      SET ${updateFields.join(", ")} 
+      WHERE m5truckskey = $${paramCounter} 
+      RETURNING *
+    `
+
+    const result = await client.query(updateQuery, queryParams)
+
+    res.json(result.rows[0])
+  } catch (err) {
+    console.error(`Error updating truck ${req.params.id}:`, err)
+    res.status(500).json({ error: "Failed to update truck" })
+  }
+})
+
+// Delete truck
+app.delete("/api/trucks/:id", verifyToken, async (req, res) => {
+  try {
+    const { id } = req.params
+
+    // Removed role check
+    // Check if truck exists
+    const checkResult = await client.query("SELECT * FROM m5_trucks WHERE m5truckskey = $1", [id])
+
+    if (checkResult.rows.length === 0) {
+      return res.status(404).json({ message: "Truck not found" })
+    }
+
+    // Delete the truck
+    await client.query("DELETE FROM m5_trucks WHERE m5truckskey = $1", [id])
+
+    res.json({ message: "Truck deleted successfully" })
+  } catch (err) {
+    console.error(`Error deleting truck ${req.params.id}:`, err)
+    res.status(500).json({ error: "Failed to delete truck" })
+  }
+})
+
+// ---- Driver Rate Management Routes ---- //
+
+// Get all driver rates
+app.get("/api/driver-rates", verifyToken, async (req, res) => {
+  try {
+    // Simplified query without role checks
+    const query = `
+      SELECT dr.*, e.name, e.surname 
+      FROM m5_driver_rate dr
+      LEFT JOIN m5_employee e ON dr.driverid = e.userid
+      ORDER BY dr.m5ratekey
+    `
+    
+    const result = await client.query(query)
+    res.json(result.rows)
+  } catch (err) {
+    console.error("Error fetching driver rates:", err)
+    res.status(500).json({ error: "Failed to fetch driver rates" })
+  }
+})
+
+// Get driver rate by ID
+app.get("/api/driver-rates/:id", verifyToken, async (req, res) => {
+  try {
+    const { id } = req.params
+
+    // Simplified query without role checks
+    const query = `
+      SELECT dr.*, e.name, e.surname 
+      FROM m5_driver_rate dr
+      LEFT JOIN m5_employee e ON dr.driverid = e.userid
+      WHERE dr.m5ratekey = $1
+    `
+    const result = await client.query(query, [id])
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ message: "Driver rate not found" })
+    }
+
+    res.json(result.rows[0])
+  } catch (err) {
+    console.error(`Error fetching driver rate ${req.params.id}:`, err)
+    res.status(500).json({ error: "Failed to fetch driver rate" })
+  }
+})
+
+// Add new driver rate
+app.post("/api/driver-rates", verifyToken, async (req, res) => {
+  try {
+    // Removed role check
+    const { startingpoint, destination, rate } = req.body
+
+    const result = await client.query(
+      `INSERT INTO m5_driver_rate (startingpoint, destination, rate)
+       VALUES ($1, $2, $3) RETURNING *`,
+      [startingpoint, destination, rate],
+    )
+
+    res.status(201).json(result.rows[0])
+  } catch (err) {
+    console.error("Error creating driver rate:", err)
+    res.status(500).json({ error: "Failed to create driver rate" })
+  }
+})
+
+// Update driver rate
+app.put("/api/driver-rates/:id", verifyToken, async (req, res) => {
+  try {
+    const { id } = req.params
+
+    // Removed role check
+    // Check if driver rate exists
+    const checkResult = await client.query("SELECT * FROM m5_driver_rate WHERE m5ratekey = $1", [id])
+
+    if (checkResult.rows.length === 0) {
+      return res.status(404).json({ message: "Driver rate not found" })
+    }
+
+    // Build the update query dynamically based on provided fields
+    const updateFields = []
+    const queryParams = []
+    let paramCounter = 1
+
+    const updateableFields = ["startingpoint", "destination", "rate", "driverid"]
+
+    // Build the SET clause
+    for (const field of updateableFields) {
+      if (req.body[field] !== undefined) {
+        updateFields.push(`${field} = $${paramCounter}`)
+        queryParams.push(req.body[field])
+        paramCounter++
+      }
+    }
+
+    // If no fields to update, return early
+    if (updateFields.length === 0) {
+      return res.status(400).json({ message: "No fields to update" })
+    }
+
+    // Add the rate ID as the last parameter
+    queryParams.push(id)
+
+    const updateQuery = `
+      UPDATE m5_driver_rate 
+      SET ${updateFields.join(", ")} 
+      WHERE m5ratekey = $${paramCounter} 
+      RETURNING *
+    `
+
+    const result = await client.query(updateQuery, queryParams)
+
+    res.json(result.rows[0])
+  } catch (err) {
+    console.error(`Error updating driver rate ${req.params.id}:`, err)
+    res.status(500).json({ error: "Failed to update driver rate" })
+  }
+})
+
+// Delete driver rate
+app.delete("/api/driver-rates/:id", verifyToken, async (req, res) => {
+  try {
+    const { id } = req.params
+
+    // Removed role check
+    // Check if driver rate exists
+    const checkResult = await client.query("SELECT * FROM m5_driver_rate WHERE m5ratekey = $1", [id])
+
+    if (checkResult.rows.length === 0) {
+      return res.status(404).json({ message: "Driver rate not found" })
+    }
+
+    // Delete the driver rate
+    await client.query("DELETE FROM m5_driver_rate WHERE m5ratekey = $1", [id])
+
+    res.json({ message: "Driver rate deleted successfully" })
+  } catch (err) {
+    console.error(`Error deleting driver rate ${req.params.id}:`, err)
+    res.status(500).json({ error: "Failed to delete driver rate" })
+  }
+})
+
+// ---- Subcontractor Management Routes ---- //
+
+// Get all subcontractors
+app.get("/api/subcontractors", verifyToken, async (req, res) => {
+  try {
+    // Simplified query without role checks
+    const query = "SELECT * FROM m5_employee WHERE roleid = 6 ORDER BY userid" // Assuming roleid 4 is for subcontractors
+    
+    const result = await client.query(query)
+    res.json(result.rows)
+  } catch (err) {
+    console.error("Error fetching subcontractors:", err)
+    res.status(500).json({ error: "Failed to fetch subcontractors" })
+  }
+})
+
+// Get subcontractor by ID
+app.get("/api/subcontractors/:id", verifyToken, async (req, res) => {
+  try {
+    const { id } = req.params
+
+    // Simplified query without role checks
+    const query = "SELECT * FROM m5_employee WHERE userid = $1 AND roleid = 6"
+    const result = await client.query(query, [id])
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ message: "Subcontractor not found" })
+    }
+
+    res.json(result.rows[0])
+  } catch (err) {
+    console.error(`Error fetching subcontractor ${req.params.id}:`, err)
+    res.status(500).json({ error: "Failed to fetch subcontractor" })
+  }
+})
+
+// Create new subcontractor
+app.post("/api/subcontractors", verifyToken, async (req, res) => {
+  try {
+    // Removed role check
+    const {
+      name,
+      surname,
+      telephonenum,
+      cellnum,
+      email,
+      password,
+      companyname,
+      location,
+      truckregnum,
+      contact_person,
+      company_reg_num,
+      no_of_trucks,
+    } = req.body
+
+    // Hash the password
+    const hashedPassword = await bcrypt.hash(password || "defaultpassword", 10)
+
+    const result = await client.query(
+      `INSERT INTO m5_employee (
+        name, surname, telephonenum, cellnum, email, password, 
+        companyname, location, truckregnum, contact_person, 
+        company_reg_num, no_of_trucks, roleid, status
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14) RETURNING *`,
+      [
+        name,
+        surname,
+        telephonenum,
+        cellnum,
+        email,
+        hashedPassword,
+        companyname,
+        location,
+        truckregnum,
+        contact_person,
+        company_reg_num,
+        no_of_trucks,
+        4,
+        true, // roleid 4 for subcontractors
+      ],
+    )
+
+    res.status(201).json(result.rows[0])
+  } catch (err) {
+    console.error("Error creating subcontractor:", err)
+    res.status(500).json({ error: "Failed to create subcontractor" })
+  }
+})
+
+// Update subcontractor
+app.put("/api/subcontractors/:id", verifyToken, async (req, res) => {
+  try {
+    const { id } = req.params
+
+    // Removed role check
+    // Check if subcontractor exists
+    const checkResult = await client.query("SELECT * FROM m5_employee WHERE userid = $1 AND roleid = 4", [id])
+
+    if (checkResult.rows.length === 0) {
+      return res.status(404).json({ message: "Subcontractor not found" })
+    }
+
+    // Build the update query dynamically based on provided fields
+    const updateFields = []
+    const queryParams = []
+    let paramCounter = 1
+
+    const updateableFields = [
+      "name",
+      "surname",
+      "telephonenum",
+      "cellnum",
+      "email",
+      "companyname",
+      "location",
+      "truckregnum",
+      "contact_person",
+      "no_of_trucks",
+      "company_reg_num"
+    ]
+
+    // Add password to updateable fields if provided
+    if (req.body.password) {
+      updateableFields.push("password")
+      req.body.password = await bcrypt.hash(req.body.password, 10)
+    }
+
+    // Build the SET clause
+    for (const field of updateableFields) {
+      if (req.body[field] !== undefined) {
+        updateFields.push(`${field} = $${paramCounter}`)
+        queryParams.push(req.body[field])
+        paramCounter++
+      }
+    }
+
+    // If no fields to update, return early
+    if (updateFields.length === 0) {
+      return res.status(400).json({ message: "No fields to update" })
+    }
+
+    // Add the subcontractor ID as the last parameter
+    queryParams.push(id)
+
+    const updateQuery = `
+      UPDATE m5_employee 
+      SET ${updateFields.join(", ")} 
+      WHERE userid = $${paramCounter} AND roleid = 4
+      RETURNING *
+    `
+
+    const result = await client.query(updateQuery, queryParams)
+
+    res.json(result.rows[0])
+  } catch (err) {
+    console.error(`Error updating subcontractor ${req.params.id}:`, err)
+    res.status(500).json({ error: "Failed to update subcontractor" })
+  }
+})
+
+// Toggle subcontractor status (enable/disable)
+app.put("/api/subcontractors/:id/toggle-status", verifyToken, async (req, res) => {
+  try {
+    const { id } = req.params
+    const { status } = req.body
+
+    // Removed role check
+    // Check if subcontractor exists
+    const checkResult = await client.query("SELECT * FROM m5_employee WHERE userid = $1 AND roleid = 4", [id])
+
+    if (checkResult.rows.length === 0) {
+      return res.status(404).json({ message: "Subcontractor not found" })
+    }
+
+    // Update the status
+    const updateResult = await client.query(
+      "UPDATE m5_employee SET status = $1 WHERE userid = $2 AND roleid = 4 RETURNING *",
+      [status, id],
+    )
+
+    res.json(updateResult.rows[0])
+  } catch (err) {
+    console.error(`Error toggling subcontractor ${req.params.id} status:`, err)
+    res.status(500).json({ error: "Failed to toggle subcontractor status" })
+  }
+})
+
+// ------------------------------------------Module 5 Ends here---------------------------------- //
 
 
 // Start the server

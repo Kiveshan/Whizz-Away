@@ -42,13 +42,13 @@ const Manage = () => {
   })
 
   const [newClient, setNewClient] = useState({
-    companyname: "",
+    client: "",
     representative: "",
     companyaddress: "",
     suburb: "",
     postalcode: "",
     email: "",
-    companyregnum: "",
+    client_reg_num: "",
     cellnum: "",
     vatregno: "",
     city: "",
@@ -161,7 +161,7 @@ const Manage = () => {
         telephonenum: "",
         cellnum: "",
         employeenum: "",
-        roleid: "",
+        rolename: "",
         email: "",
         password: "",
         base_salary: "",
@@ -177,7 +177,7 @@ const Manage = () => {
   }
 
   const handleSaveClient = async () => {
-    if (!newClient.companyname || !newClient.representative || !newClient.email) {
+    if (!newClient.client || !newClient.representative || !newClient.email) {
       alert("Please fill in all required fields.")
       return
     }
@@ -192,18 +192,17 @@ const Manage = () => {
 
       // Reset form
       setNewClient({
-        companyname: "",
+        client: "",
         representative: "",
         companyaddress: "",
         suburb: "",
         postalcode: "",
         email: "",
-        companyregnum: "",
+        client_reg_num: "",
         cellnum: "",
         vatregno: "",
         city: "",
         streetaddress: "",
-        payment_type: "",
       })
       setShowClientForm(false)
     } catch (err) {
@@ -435,10 +434,10 @@ const Manage = () => {
           <table>
             <thead>
               <tr>
-                <th>Role</th>
                 <th>Name</th>
                 <th>Status</th>
                 <th>Employee No</th>
+                <th>Role</th>
                 <th>Actions</th>
                 <th></th>
               </tr>
@@ -446,10 +445,10 @@ const Manage = () => {
             <tbody>
               {employees.map((employee) => (
                 <tr key={employee.userid}>
-                  <td>{employee.roleid}</td>
                   <td>{`${employee.name} ${employee.surname}`}</td>
                   <td>{employee.status ? "Active" : "Inactive"}</td>
                   <td>{employee.employeenum}</td>
+                  <td>{employee.rolename}</td>
                   <td>
                     <button className="manage-view-button" onClick={() => handleEditEmployee(employee.userid)}>
                       Edit
@@ -483,7 +482,7 @@ const Manage = () => {
           <table>
             <thead>
               <tr>
-                <th>Company</th>
+                <th>Client</th>
                 <th>Representative</th>
                 <th>Email</th>
                 <th>Action</th>
@@ -493,7 +492,7 @@ const Manage = () => {
             <tbody>
               {clients.map((client) => (
                 <tr key={client.m5clientkey}>
-                  <td>{client.companyname}</td>
+                  <td>{client.client}</td>
                   <td>{client.representative}</td>
                   <td>{client.email}</td>
                   <td>
@@ -528,12 +527,13 @@ const Manage = () => {
         <table>
           <thead>
             <tr>
-              <th>Starting Point</th>
-              <th>Destination</th>
-              <th>Rate</th>
-              <th>Driver</th>
-              <th>Edit</th>
-              <th>Delete</th>
+               <th>Starting Point</th>
+            <th>Ending Point</th>
+            <th>Current</th>
+            <th>Updated at</th>
+            <th>Old</th>
+            <th>Changes</th>
+            <th>Delete</th>
             </tr>
           </thead>
           <tbody>
@@ -542,7 +542,8 @@ const Manage = () => {
                 <td>{rate.startingpoint}</td>
                 <td>{rate.destination}</td>
                 <td>{rate.rate}</td>
-                <td>{rate.name ? `${rate.name} ${rate.surname}` : "N/A"}</td>
+                <td>{ "N/A"}</td>
+                <td>{ "N/A"}</td>
                 <td>
                   <button className="manage-edit-button" onClick={() => handleEditDriverRate(rate.m5ratekey)}>
                     Edit
@@ -717,8 +718,10 @@ const Manage = () => {
         <div className="manage-form-group">
           <select
             className="dropdown"
-            value={newEmployee.roleid}
-            onChange={(e) => setNewEmployee({ ...newEmployee, roleid: e.target.value })}
+            value={newEmployee.roleid || ""}
+            onChange={(e) =>
+              setNewEmployee({ ...newEmployee, roleid: parseInt(e.target.value) })
+            }
           >
             <option value="">Select Role</option>
             <option value="2">Controller</option>
@@ -745,7 +748,7 @@ const Manage = () => {
           />
         </div>
       </div>
-
+  
       <div className="manage-button-container">
         <button onClick={handleSaveEmployee} className="manage-save-button" disabled={loading}>
           {loading ? "Saving..." : "Confirm Employee Register"}
@@ -756,6 +759,7 @@ const Manage = () => {
       </div>
     </div>
   )
+  
 
   const renderClientForm = () => (
     <div className="manage-add-client-form">
@@ -764,8 +768,8 @@ const Manage = () => {
         <input
           type="text"
           placeholder="Company Name"
-          value={newClient.companyname}
-          onChange={(e) => setNewClient({ ...newClient, companyname: e.target.value })}
+          value={newClient.client}
+          onChange={(e) => setNewClient({ ...newClient, client: e.target.value })}
         />
         <input
           type="text"
@@ -787,9 +791,15 @@ const Manage = () => {
         />
         <input
           type="text"
-          placeholder="Company Address"
-          value={newClient.companyaddress}
-          onChange={(e) => setNewClient({ ...newClient, companyaddress: e.target.value })}
+          placeholder="Street Address"
+          value={newClient.streetaddress}
+          onChange={(e) => setNewClient({ ...newClient, streetaddress: e.target.value })}
+        />
+        <input
+          type="text"
+          placeholder="City"
+          value={newClient.city}
+          onChange={(e) => setNewClient({ ...newClient, city: e.target.value })}
         />
         <input
           type="text"
@@ -805,12 +815,24 @@ const Manage = () => {
         />
         <input
           type="text"
+          placeholder="Company Address"
+          value={newClient.companyaddress}
+          onChange={(e) => setNewClient({ ...newClient, companyaddress: e.target.value })}
+        />
+        <input
+          type="text"
           placeholder="Company Reg. Number"
-          value={newClient.companyregnum}
-          onChange={(e) => setNewClient({ ...newClient, companyregnum: e.target.value })}
+          value={newClient.client_reg_num}
+          onChange={(e) => setNewClient({ ...newClient, client_reg_num: e.target.value })}
+        />
+        <input
+          type="text"
+          placeholder="VAT Reg. Number"
+          value={newClient.vatregno}
+          onChange={(e) => setNewClient({ ...newClient, vatregno: e.target.value })}
         />
       </div>
-
+  
       <div className="manage-button-container">
         <button onClick={handleSaveClient} className="manage-save-button" disabled={loading}>
           {loading ? "Saving..." : "Save Client"}
@@ -821,6 +843,7 @@ const Manage = () => {
       </div>
     </div>
   )
+  
 
   const renderTruckForm = () => (
     <div className="manage-add-truck-form">
@@ -942,21 +965,6 @@ const Manage = () => {
           value={newDriverRate.destination}
           onChange={(e) => setNewDriverRate({ ...newDriverRate, destination: e.target.value })}
         />
-
-        <select
-          className="form-input"
-          value={newDriverRate.driverid}
-          onChange={(e) => setNewDriverRate({ ...newDriverRate, driverid: e.target.value })}
-        >
-          <option value="">Select Driver (Optional)</option>
-          {employees
-            .filter((emp) => emp.roleid === 5) // Assuming roleid 5 is for drivers
-            .map((driver) => (
-              <option key={driver.userid} value={driver.userid}>
-                {driver.name} {driver.surname}
-              </option>
-            ))}
-        </select>
       </div>
 
       <div className="manage-form-actions">
@@ -969,104 +977,162 @@ const Manage = () => {
       </div>
     </form>
   )
-
-  const RenderSubcontractorForm = () => {
-    const [numTrucks, setNumTrucks] = useState(0)
-
+  const RenderSubcontractorForm = ({ setShowSubcontractorForm }) => {
+    const [numTrucks, setNumTrucks] = useState(0);
+  
     const handleTrucksChange = (e) => {
-      const value = Number.parseInt(e.target.value, 10)
-      setNumTrucks(isNaN(value) ? 0 : value)
-      setNewSubcontractor({ ...newSubcontractor, no_of_trucks: isNaN(value) ? 0 : value })
-    }
-
+      const value = parseInt(e.target.value, 10);
+      setNumTrucks(isNaN(value) ? 0 : value); // Ensure it's a valid number
+    };
+  
     return (
       <form onSubmit={(e) => e.preventDefault()} className="manage-subcontractor-form">
-        <h2 className="manage-form-title" style={{ alignItems: "center" }}>
-          Add Subcontractor
-        </h2>
-
+        <h2 className="manage-form-title" style={{alignItems:"center"}}>Add Subcontractor</h2>
+  
         <div className="manage-subform-group">
-          <input
-            type="text"
-            placeholder="Name"
-            className="form-input"
-            value={newSubcontractor.name}
-            onChange={(e) => setNewSubcontractor({ ...newSubcontractor, name: e.target.value })}
-          />
-          <input
-            type="text"
-            placeholder="Company Name"
-            className="form-input"
-            value={newSubcontractor.companyname}
-            onChange={(e) => setNewSubcontractor({ ...newSubcontractor, companyname: e.target.value })}
-          />
-          <input
-            type="text"
-            placeholder="Location"
-            className="form-input"
-            value={newSubcontractor.location}
-            onChange={(e) => setNewSubcontractor({ ...newSubcontractor, location: e.target.value })}
-          />
-          <input
-            type="text"
-            placeholder="Contact Person"
-            className="form-input"
-            value={newSubcontractor.contact_person}
-            onChange={(e) => setNewSubcontractor({ ...newSubcontractor, contact_person: e.target.value })}
-          />
-          <input
-            type="text"
-            placeholder="Phone Number"
-            className="form-input"
-            value={newSubcontractor.cellnum}
-            onChange={(e) => setNewSubcontractor({ ...newSubcontractor, cellnum: e.target.value })}
-          />
-          <input
-            type="email"
-            placeholder="Email"
-            className="form-input"
-            value={newSubcontractor.email}
-            onChange={(e) => setNewSubcontractor({ ...newSubcontractor, email: e.target.value })}
-          />
-          <input
-            type="text"
-            placeholder="Company Reg number"
-            className="form-input"
-            value={newSubcontractor.company_reg_num}
-            onChange={(e) => setNewSubcontractor({ ...newSubcontractor, company_reg_num: e.target.value })}
-          />
-
+          <input type="text" placeholder="Company Name" className="form-input" />
+          <input type="text" placeholder="Location" className="form-input" />
+          <input type="text" placeholder="Contact Person" className="form-input" />
+          <input type="text" placeholder="Phone Number" className="form-input" />
+          <input type="email" placeholder="Email" className="form-input" />
+          <input type="text" placeholder="Company Reg number" className="form-input" />
+  
           {/* Input for Number of Trucks */}
-          <input
-            type="number"
-            placeholder="No. of Trucks"
-            className="form-input"
+          <input 
+            type="number" 
+            placeholder="No. of Trucks" 
+            className="form-input" 
             min="0"
-            value={newSubcontractor.no_of_trucks}
             onChange={handleTrucksChange}
           />
-
-          {/* Main truck registration */}
-          <input
-            type="text"
-            placeholder="Main Truck Registration"
-            className="form-input"
-            value={newSubcontractor.truckregnum}
-            onChange={(e) => setNewSubcontractor({ ...newSubcontractor, truckregnum: e.target.value })}
-          />
+  
+          {/* Dynamically Generated Truck Inputs */}
+          {Array.from({ length: numTrucks }, (_, i) => (
+            <div key={i} className="truck-entry">
+              <input 
+                type="text" 
+                placeholder={`Truck ${i + 1} Reg Number`} 
+                className="form-input"
+              />
+              <input 
+                type="text" 
+                placeholder={`Driver ${i + 1} Name`} 
+                className="form-input"
+              />
+            </div>
+          ))}
         </div>
-
+  
         <div className="manage-form-actions">
-          <button type="button" className="manage-save-button" onClick={handleSaveSubcontractor} disabled={loading}>
-            {loading ? "Saving..." : "Add Subcontractor"}
+        <button type="button" className="manage-save-button" onClick={handleSaveSubcontractor} disabled={loading}>
+           {loading ? "Saving..." : "Add Subcontractor"}
           </button>
           <button type="button" className="manage-cancel-button" onClick={() => setShowSubcontractorForm(false)}>
             Cancel
           </button>
         </div>
       </form>
-    )
-  }
+    );
+  };
+  
+
+  // const RenderSubcontractorForm = () => {
+  //   const [numTrucks, setNumTrucks] = useState(0)
+
+  //   const handleTrucksChange = (e) => {
+  //     const value = Number.parseInt(e.target.value, 10)
+  //     setNumTrucks(isNaN(value) ? 0 : value)
+  //     setNewSubcontractor({ ...newSubcontractor, no_of_trucks: isNaN(value) ? 0 : value })
+  //   }
+
+  //   return (
+  //     <form onSubmit={(e) => e.preventDefault()} className="manage-subcontractor-form">
+  //       <h2 className="manage-form-title" style={{ alignItems: "center" }}>
+  //         Add Subcontractor
+  //       </h2>
+
+  //       <div className="manage-subform-group">
+  //         <input
+  //           type="text"
+  //           placeholder="Name"
+  //           className="form-input"
+  //           value={newSubcontractor.name}
+  //           onChange={(e) => setNewSubcontractor({ ...newSubcontractor, name: e.target.value })}
+  //         />
+  //         <input
+  //           type="text"
+  //           placeholder="Company Name"
+  //           className="form-input"
+  //           value={newSubcontractor.companyname}
+  //           onChange={(e) => setNewSubcontractor({ ...newSubcontractor, companyname: e.target.value })}
+  //         />
+  //         <input
+  //           type="text"
+  //           placeholder="Location"
+  //           className="form-input"
+  //           value={newSubcontractor.location}
+  //           onChange={(e) => setNewSubcontractor({ ...newSubcontractor, location: e.target.value })}
+  //         />
+  //         <input
+  //           type="text"
+  //           placeholder="Contact Person"
+  //           className="form-input"
+  //           value={newSubcontractor.contact_person}
+  //           onChange={(e) => setNewSubcontractor({ ...newSubcontractor, contact_person: e.target.value })}
+  //         />
+  //         <input
+  //           type="text"
+  //           placeholder="Phone Number"
+  //           className="form-input"
+  //           value={newSubcontractor.cellnum}
+  //           onChange={(e) => setNewSubcontractor({ ...newSubcontractor, cellnum: e.target.value })}
+  //         />
+  //         <input
+  //           type="email"
+  //           placeholder="Email"
+  //           className="form-input"
+  //           value={newSubcontractor.email}
+  //           onChange={(e) => setNewSubcontractor({ ...newSubcontractor, email: e.target.value })}
+  //         />
+  //         <input
+  //           type="text"
+  //           placeholder="Company Reg number"
+  //           className="form-input"
+  //           value={newSubcontractor.company_reg_num}
+  //           onChange={(e) => setNewSubcontractor({ ...newSubcontractor, company_reg_num: e.target.value })}
+  //         />
+
+  //         {/* Input for Number of Trucks */}
+  //         <input
+  //           type="number"
+  //           placeholder="No. of Trucks"
+  //           className="form-input"
+  //           min="0"
+  //           value={newSubcontractor.no_of_trucks}
+  //           onChange={handleTrucksChange}
+  //         />
+
+  //         {/* Main truck registration */}
+  //         <input
+  //           type="text"
+  //           placeholder="Main Truck Registration"
+  //           className="form-input"
+  //           value={newSubcontractor.truckregnum}
+  //           onChange={(e) => setNewSubcontractor({ ...newSubcontractor, truckregnum: e.target.value })}
+  //         />
+  //       </div>
+
+  //       <div className="manage-form-actions">
+  //         <button type="button" className="manage-save-button" onClick={handleSaveSubcontractor} disabled={loading}>
+  //           {loading ? "Saving..." : "Add Subcontractor"}
+  //         </button>
+  //         <button type="button" className="manage-cancel-button" onClick={() => setShowSubcontractorForm(false)}>
+  //           Cancel
+  //         </button>
+  //       </div>
+  //     </form>
+  //   )
+  // }
 
   // Edit handlers (placeholders - would need to be implemented)
   const handleEditEmployee = (id) => {
