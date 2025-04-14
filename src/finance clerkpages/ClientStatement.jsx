@@ -1,7 +1,8 @@
 "use client";
 import { useNavigate, useLocation } from "react-router-dom";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import "../finance clerkpages/css/ClientStatement.css";
+import html2pdf from "html2pdf.js";
 
 const ClientStatement = () => {
   const navigate = useNavigate();
@@ -12,8 +13,10 @@ const ClientStatement = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [isAgeAnalysisOpen, setIsAgeAnalysisOpen] = useState(true);
-  // NEW: Add state for PDF generation
   const [isGenerating, setIsGenerating] = useState(false);
+  
+  // Add ref for PDF generation
+  const statementRef = useRef(null);
 
   useEffect(() => {
     if (!statementId) {
@@ -44,6 +47,69 @@ const ClientStatement = () => {
     fetchStatement();
   }, [statementId]);
 
+  // Client-side PDF generation function
+  const generatePDF = () => {
+    if (isGenerating) return;
+    setIsGenerating(true);
+
+    // Use requestAnimationFrame for better browser compatibility
+    requestAnimationFrame(() => {
+      const element = statementRef.current;
+      const filename = `Statement-${statement.statement_key}.pdf`;
+
+      const opt = {
+        margin: [15, 15, 15, 15],
+        filename: filename,
+        image: { type: "png", quality: 1.0 },
+        html2canvas: {
+          scale: 2, // Balance between quality and performance
+          useCORS: true,
+          letterRendering: true,
+          allowTaint: true,
+          backgroundColor: "#FFFFFF",
+        },
+        jsPDF: {
+          unit: "mm",
+          format: "a4",
+          orientation: "portrait",
+          compress: false,
+          precision: 16,
+          putOnlyUsedFonts: true,
+        },
+        pagebreak: { mode: ["avoid-all", "css", "legacy"] },
+      };
+
+      // Add CSS to handle page breaks properly
+      const style = document.createElement("style");
+      style.innerHTML = `
+        @media print {
+          .statement-info-section { page-break-inside: avoid; }
+          .transactions-section { page-break-inside: avoid; }
+          .age-analysis-section { page-break-inside: avoid; }
+          table { page-break-inside: avoid; }
+          tr { page-break-inside: avoid; }
+          td { page-break-inside: avoid; }
+          th { page-break-inside: avoid; }
+        }
+      `;
+      document.head.appendChild(style);
+
+      html2pdf()
+        .set(opt)
+        .from(element)
+        .save()
+        .then(() => {
+          document.head.removeChild(style); // Clean up the added style
+          setIsGenerating(false);
+        })
+        .catch((error) => {
+          document.head.removeChild(style); // Clean up the added style
+          console.error("PDF generation error:", error);
+          setIsGenerating(false);
+        });
+    });
+  };
+
   if (loading) return <div>Loading statement...</div>;
   if (error) return <div className="error-message">Error: {error}</div>;
   if (!statement) return <div>Please select a statement from the list.</div>;
@@ -54,39 +120,9 @@ const ClientStatement = () => {
   const amountPaid = 0; // No payment data yet
   const balanceDue = invoicedAmount;
 
-  const handleDownloadPDF = async () => {
-    // NEW: Prevent spam clicks
-    if (isGenerating) return;
-    setIsGenerating(true);
-    try {
-      const response = await fetch(`/api/statement/${statement.statement_key}/pdf`, {
-        method: 'GET',
-      });
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}));
-        throw new Error(errorData.message || `HTTP error ${response.status}`);
-      }
-      const blob = await response.blob();
-      const url = window.URL.createObjectURL(blob);
-      const link = document.createElement('a');
-      link.href = url;
-      link.download = `statement_${statement.statement_key}.pdf`;
-      document.body.appendChild(link); // Ensure link is in DOM
-      link.click();
-      document.body.removeChild(link); // Clean up
-      window.URL.revokeObjectURL(url);
-    } catch (error) {
-      console.error('Error downloading PDF:', error);
-      alert(`Failed to download PDF: ${error.message}`);
-    } finally {
-      // NEW: Reset generating state
-      setIsGenerating(false);
-    }
-  };
-
   return (
     <div className="statement-page">
-      <div className="statement-paper">
+      <div className="statement-paper" ref={statementRef}>
         {/* Header */}
         <div className="statement-header1">
           <h1>Transport and Logistics</h1>
@@ -219,13 +255,12 @@ const ClientStatement = () => {
       {/* Buttons */}
       <div className="statementdownloadbtn1">
         <button className="back-btn" onClick={() => navigate("/statements-list")}>Back</button>
-        {/* MODIFIED: Add indicator and spam prevention */}
         <button
           className={`download-btn ${isGenerating ? 'generating' : ''}`}
-          onClick={handleDownloadPDF}
+          onClick={generatePDF}
           disabled={isGenerating}
         >
-          {isGenerating ? 'Generating...' : 'Download'}
+          {isGenerating ? 'Generating PDF...' : 'Download PDF'}
         </button>
       </div>
     </div>
