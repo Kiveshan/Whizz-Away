@@ -58,6 +58,9 @@ const ClientStatement = () => {
       const element = statementRef.current
       const filename = `Statement-${statement.statement_key}.pdf`
 
+      // Check if the table is small (few rows) to determine if we need page breaks
+      const isSmallTable = statement.invoices.length <= 3
+
       const opt = {
         margin: [20, 15, 20, 15],
         filename: filename,
@@ -78,8 +81,8 @@ const ClientStatement = () => {
         },
         pagebreak: {
           mode: ["avoid-all", "css", "legacy"],
-          before: ".page-break-before",
-          after: [".transactions-section"],
+          // Only add page breaks for large tables
+          after: isSmallTable ? [] : [".transactions-section"],
         },
       }
 
@@ -94,7 +97,21 @@ const ClientStatement = () => {
         tr { page-break-inside: avoid; }
         td { page-break-inside: avoid; }
         th { page-break-inside: avoid; }
-        .transactions-table { font-size: 11px; } /* Slightly larger font for better readability */
+        .transactions-table { font-size: 11px; }
+        
+        /* Remove forced page breaks for small tables */
+        ${
+          isSmallTable
+            ? `
+        .transactions-section {
+          page-break-after: auto !important;
+        }
+        .age-analysis-section {
+          page-break-before: auto !important;
+        }
+        `
+            : ""
+        }
       }
     `
       document.head.appendChild(style)
@@ -125,6 +142,9 @@ const ClientStatement = () => {
   const amountPaid = 0 // No payment data yet
   const balanceDue = invoicedAmount
 
+  // Determine if this is a small table that should fit on one page
+  const isSmallTable = statement.invoices.length <= 3
+
   // Update the date formatting in the transactions table to ensure it fits in the column
   return (
     <div className="statement-page">
@@ -148,7 +168,7 @@ const ClientStatement = () => {
           {/* Statement Title and Account Summary - Right Side */}
           <div className="statement-title">
             <h2>Statement of Accounts</h2>
-            <div className="statement-date">{new Date(statement.generation_date).toLocaleDateString()}</div>
+            <div className="statement-date">{new Date(statement.generation_date).toLocaleDateString("en-GB")}</div>
 
             <h3>Account Summary</h3>
 
@@ -179,7 +199,7 @@ const ClientStatement = () => {
         <div className="statement-divider"></div>
 
         {/* Transactions Table - Now wrapped with TransactionsTableWrapper */}
-        <div className="transactions-section">
+        <div className={`transactions-section ${isSmallTable ? "small-table" : ""}`}>
           <TransactionsTableWrapper>
             <table className="transactions-table">
               <thead>
@@ -229,7 +249,7 @@ const ClientStatement = () => {
         </div>
 
         {/* Age Analysis */}
-        <div className="age-analysis-section">
+        <div className={`age-analysis-section ${isSmallTable ? "small-table" : ""}`}>
           <div className="age-analysis-header" onClick={() => setIsAgeAnalysisOpen(!isAgeAnalysisOpen)}>
             <span>Age Analysis</span>
             <span className={`dropdown-arrow ${isAgeAnalysisOpen ? "open" : ""}`}>▼</span>
@@ -265,7 +285,7 @@ const ClientStatement = () => {
         <button
           className="back-btn"
           onClick={() =>
-            navigate("/statements-list", { state: { clientId: statement.client.id || statement.clientid } })
+            navigate("/statements-list", { state: { clientId: statement.client.clientid || statement.clientid } })
           }
         >
           Back

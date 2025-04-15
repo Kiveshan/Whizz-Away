@@ -142,6 +142,15 @@ body {
   overflow-x: auto; /* Enable horizontal scrolling if needed */
 }
 
+/* Special handling for small tables */
+.transactions-section.small-table {
+  margin-bottom: 10px;
+}
+
+.age-analysis-section.small-table {
+  margin-top: 10px;
+}
+
 .transactions-table {
   width: 100%;
   border-collapse: collapse;
@@ -383,6 +392,15 @@ body {
   .transactions-section,
   .age-analysis-section {
     page-break-inside: avoid;
+  }
+
+  /* Special handling for small tables - keep everything on one page */
+  .transactions-section.small-table {
+    page-break-after: auto !important;
+  }
+
+  .age-analysis-section.small-table {
+    page-break-before: auto !important;
   }
 
   /* Keep age analysis on same page as balance due if possible */

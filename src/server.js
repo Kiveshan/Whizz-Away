@@ -56,7 +56,7 @@ app.use(passport.session())
 const dbConfig = {
   user: process.env.PGUSER || "postgres",
   host: process.env.PGHOST || "localhost",
-  database: process.env.PGDATABASE || "Whizz-Away-V2",
+  database: process.env.PGDATABASE || "Whizz-Away-Tester",
   password: process.env.PGPASSWORD || "123456",
   port: process.env.PGPORT || 5432,
   ssl: process.env.DB_SSL ? { rejectUnauthorized: false } : false,
@@ -361,7 +361,7 @@ app.get("/api/invoices/:id", async (req, res) => {
         m1.task as instruction_no,
         s.shipmenttype as shipment_type,
         m1.fileref as file_no,
-        c.companyname as client_name,
+        c.client as client_name,
         c.companyaddress as client_address,
         c.cellnum as client_telephone,
         c.email as client_email,
@@ -479,13 +479,13 @@ app.get("/api/clients", async (req, res) => {
     const queryText = `
       SELECT 
         c.m5clientkey,
-        c.companyname,
+        c.client AS companyname,
         c.representative,
         c.email
       FROM 
         public.m5_client c
       ORDER BY 
-        c.companyname
+        c.client
     `
 
     const result = await query(queryText, [])
@@ -801,7 +801,7 @@ app.get("/api/statement/:statementId", async (req, res) => {
         s.groupid,
         s.generation_date,
         s.clientid,
-        c.companyname AS client_name,
+        c.client AS client_name,
         c.representative AS client_representative,
         c.email AS client_email,
         c.cellnum AS client_phone,
