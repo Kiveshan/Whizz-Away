@@ -1,68 +1,69 @@
-"use client";
-import { useNavigate, useLocation } from "react-router-dom";
-import { useState, useEffect, useRef } from "react";
-import "../finance clerkpages/css/ClientStatement.css";
-import html2pdf from "html2pdf.js";
+"use client"
+import { useNavigate, useLocation } from "react-router-dom"
+import { useState, useEffect, useRef } from "react"
+import "../finance clerkpages/css/ClientStatement.css"
+import html2pdf from "html2pdf.js"
+import TransactionsTableWrapper from "./TransactionsTableWrapper"
 
 const ClientStatement = () => {
-  const navigate = useNavigate();
-  const location = useLocation();
-  const { statementId } = location.state || {};
+  const navigate = useNavigate()
+  const location = useLocation()
+  const { statementId } = location.state || {}
 
-  const [statement, setStatement] = useState(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
-  const [isAgeAnalysisOpen, setIsAgeAnalysisOpen] = useState(true);
-  const [isGenerating, setIsGenerating] = useState(false);
-  
+  const [statement, setStatement] = useState(null)
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState(null)
+  const [isAgeAnalysisOpen, setIsAgeAnalysisOpen] = useState(true)
+  const [isGenerating, setIsGenerating] = useState(false)
+
   // Add ref for PDF generation
-  const statementRef = useRef(null);
+  const statementRef = useRef(null)
 
   useEffect(() => {
     if (!statementId) {
-      setError("No statement selected");
-      setLoading(false);
-      return;
+      setError("No statement selected")
+      setLoading(false)
+      return
     }
 
     const fetchStatement = async () => {
       try {
-        const response = await fetch(`/api/statement/${statementId}`);
-        if (!response.ok) throw new Error("Failed to fetch statement");
-        const data = await response.json();
+        const response = await fetch(`/api/statement/${statementId}`)
+        if (!response.ok) throw new Error("Failed to fetch statement")
+        const data = await response.json()
 
         if (data.success) {
-          setStatement(data.data);
+          setStatement(data.data)
         } else {
-          throw new Error(data.message || "Failed to fetch statement");
+          throw new Error(data.message || "Failed to fetch statement")
         }
       } catch (err) {
-        console.error("Error fetching statement:", err);
-        setError(err.message);
+        console.error("Error fetching statement:", err)
+        setError(err.message)
       } finally {
-        setLoading(false);
+        setLoading(false)
       }
-    };
+    }
 
-    fetchStatement();
-  }, [statementId]);
+    fetchStatement()
+  }, [statementId])
 
-  // Client-side PDF generation function
+  // Update the generatePDF function to better handle page breaks and avoid blank pages
   const generatePDF = () => {
-    if (isGenerating) return;
-    setIsGenerating(true);
+    if (isGenerating) return
+    setIsGenerating(true)
 
     // Use requestAnimationFrame for better browser compatibility
     requestAnimationFrame(() => {
-      const element = statementRef.current;
-      const filename = `Statement-${statement.statement_key}.pdf`;
+      const element = statementRef.current
+      const filename = `Statement-${statement.statement_key}.pdf`
 
       const opt = {
-        margin: [20, 15, 20, 15], // Increase top/bottom margins
+        margin: [20, 15, 20, 15],
         filename: filename,
         image: { type: "png", quality: 0.98 },
         html2canvas: {
-          scale: 1.5, // Reduce scale from 2 to 1.5
+          scale: 1.2, // Reduced scale for better fit
           useCORS: true,
           scrollY: 0,
           scrollX: 0,
@@ -73,52 +74,58 @@ const ClientStatement = () => {
           unit: "mm",
           format: "a4",
           orientation: "portrait",
-          compress: true, // Enable compression
+          compress: true,
         },
-        pagebreak: { mode: ["avoid-all", "css", "legacy"], before: '.page-break-before' },
-      };
+        pagebreak: {
+          mode: ["avoid-all", "css", "legacy"],
+          before: ".page-break-before",
+          after: [".transactions-section"],
+        },
+      }
 
       // Add CSS to handle page breaks properly
-      const style = document.createElement("style");
+      const style = document.createElement("style")
       style.innerHTML = `
-        @media print {
-          .statement-info-section { page-break-inside: avoid; }
-          .transactions-section { page-break-inside: avoid; }
-          .age-analysis-section { page-break-inside: avoid; }
-          table { page-break-inside: avoid; }
-          tr { page-break-inside: avoid; }
-          td { page-break-inside: avoid; }
-          th { page-break-inside: avoid; }
-        }
-      `;
-      document.head.appendChild(style);
+      @media print {
+        .statement-info-section { page-break-inside: avoid; }
+        .transactions-section { page-break-inside: avoid; }
+        .age-analysis-section { page-break-inside: avoid; }
+        table { page-break-inside: avoid; }
+        tr { page-break-inside: avoid; }
+        td { page-break-inside: avoid; }
+        th { page-break-inside: avoid; }
+        .transactions-table { font-size: 11px; } /* Slightly larger font for better readability */
+      }
+    `
+      document.head.appendChild(style)
 
       html2pdf()
         .set(opt)
         .from(element)
         .save()
         .then(() => {
-          document.head.removeChild(style); // Clean up the added style
-          setIsGenerating(false);
+          document.head.removeChild(style) // Clean up the added style
+          setIsGenerating(false)
         })
         .catch((error) => {
-          document.head.removeChild(style); // Clean up the added style
-          console.error("PDF generation error:", error);
-          setIsGenerating(false);
-        });
-    });
-  };
+          document.head.removeChild(style) // Clean up the added style
+          console.error("PDF generation error:", error)
+          setIsGenerating(false)
+        })
+    })
+  }
 
-  if (loading) return <div>Loading statement...</div>;
-  if (error) return <div className="error-message">Error: {error}</div>;
-  if (!statement) return <div>Please select a statement from the list.</div>;
+  if (loading) return <div>Loading statement...</div>
+  if (error) return <div className="error-message">Error: {error}</div>
+  if (!statement) return <div>Please select a statement from the list.</div>
 
   // Calculate totals (invoices only for now)
-  const invoicedAmount = statement.invoices.reduce((sum, inv) => sum + inv.amount, 0);
-  const openingBalance = 0; // No payment data yet
-  const amountPaid = 0; // No payment data yet
-  const balanceDue = invoicedAmount;
+  const invoicedAmount = statement.invoices.reduce((sum, inv) => sum + inv.amount, 0)
+  const openingBalance = 0 // No payment data yet
+  const amountPaid = 0 // No payment data yet
+  const balanceDue = invoicedAmount
 
+  // Update the date formatting in the transactions table to ensure it fits in the column
   return (
     <div className="statement-page">
       <div className="statement-paper" ref={statementRef}>
@@ -141,9 +148,7 @@ const ClientStatement = () => {
           {/* Statement Title and Account Summary - Right Side */}
           <div className="statement-title">
             <h2>Statement of Accounts</h2>
-            <div className="statement-date">
-              {new Date(statement.generation_date).toLocaleDateString()}
-            </div>
+            <div className="statement-date">{new Date(statement.generation_date).toLocaleDateString()}</div>
 
             <h3>Account Summary</h3>
 
@@ -173,44 +178,48 @@ const ClientStatement = () => {
         {/* Horizontal Line */}
         <div className="statement-divider"></div>
 
-        {/* Transactions Table */}
+        {/* Transactions Table - Now wrapped with TransactionsTableWrapper */}
         <div className="transactions-section">
-          <table className="transactions-table">
-            <thead>
-              <tr>
-                <th>Date</th>
-                <th>Transactions</th>
-                <th>Details</th>
-                <th>Amount</th>
-                <th>Payments</th>
-                <th>Balance</th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr>
-                <td>{new Date(statement.generation_date).toLocaleDateString()}</td>
-                <td>Opening Balance</td>
-                <td></td>
-                <td>R0</td>
-                <td></td>
-                <td>R0</td>
-              </tr>
-              {statement.invoices.map((invoice) => (
-                <tr key={invoice.ikey}>
-                  <td>{new Date(invoice.date).toLocaleDateString()}</td>
-                  <td>Invoice</td>
-                  <td>{invoice.task || invoice.invoice_num || `Invoice #${invoice.ikey}`}</td>
-                  <td>R{invoice.amount.toFixed(2)}</td>
-                  <td></td>
-                  <td>
-                    R{(statement.invoices
-                      .slice(0, statement.invoices.indexOf(invoice) + 1)
-                      .reduce((sum, inv) => sum + inv.amount, 0)).toFixed(2)}
-                  </td>
+          <TransactionsTableWrapper>
+            <table className="transactions-table">
+              <thead>
+                <tr>
+                  <th>Date</th>
+                  <th>Transactions</th>
+                  <th>Details</th>
+                  <th>Amount</th>
+                  <th>Payments</th>
+                  <th>Balance</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody>
+                <tr>
+                  <td>{new Date(statement.generation_date).toLocaleDateString("en-GB")}</td>
+                  <td>Opening Balance</td>
+                  <td></td>
+                  <td>R0</td>
+                  <td></td>
+                  <td>R0</td>
+                </tr>
+                {statement.invoices.map((invoice) => (
+                  <tr key={invoice.ikey}>
+                    <td>{new Date(invoice.date).toLocaleDateString("en-GB")}</td>
+                    <td>Invoice</td>
+                    <td>{invoice.task || invoice.invoice_num || `Invoice #${invoice.ikey}`}</td>
+                    <td>R{invoice.amount.toFixed(2)}</td>
+                    <td></td>
+                    <td>
+                      R
+                      {statement.invoices
+                        .slice(0, statement.invoices.indexOf(invoice) + 1)
+                        .reduce((sum, inv) => sum + inv.amount, 0)
+                        .toFixed(2)}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </TransactionsTableWrapper>
         </div>
 
         {/* Balance Due Summary */}
@@ -253,22 +262,24 @@ const ClientStatement = () => {
 
       {/* Buttons */}
       <div className="statementdownloadbtn1">
-      <button 
-  className="back-btn" 
-  onClick={() => navigate("/statements-list", { state: { clientId: statement.client.id || statement.clientid } })}
->
-  Back
-</button>
         <button
-          className={`download-btn ${isGenerating ? 'generating' : ''}`}
+          className="back-btn"
+          onClick={() =>
+            navigate("/statements-list", { state: { clientId: statement.client.id || statement.clientid } })
+          }
+        >
+          Back
+        </button>
+        <button
+          className={`download-btn ${isGenerating ? "generating" : ""}`}
           onClick={generatePDF}
           disabled={isGenerating}
         >
-          {isGenerating ? 'Generating PDF...' : 'Download PDF'}
+          {isGenerating ? "Generating PDF..." : "Download PDF"}
         </button>
       </div>
     </div>
-  );
-};
+  )
+}
 
-export default ClientStatement;
+export default ClientStatement
