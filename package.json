@@ -31,6 +31,7 @@
     "node-cron": "^3.0.3",
     "passport": "^0.7.0",
     "passport-local": "^1.0.0",
+    "pdfmake": "^0.2.18",
     "pg": "^8.14.1",
     "puppeteer": "^24.5.0",
     "react": "^19.0.0",

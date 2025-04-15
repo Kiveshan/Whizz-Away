@@ -58,25 +58,24 @@ const ClientStatement = () => {
       const filename = `Statement-${statement.statement_key}.pdf`;
 
       const opt = {
-        margin: [15, 15, 15, 15],
+        margin: [20, 15, 20, 15], // Increase top/bottom margins
         filename: filename,
-        image: { type: "png", quality: 1.0 },
+        image: { type: "png", quality: 0.98 },
         html2canvas: {
-          scale: 2, // Balance between quality and performance
+          scale: 1.5, // Reduce scale from 2 to 1.5
           useCORS: true,
-          letterRendering: true,
-          allowTaint: true,
-          backgroundColor: "#FFFFFF",
+          scrollY: 0,
+          scrollX: 0,
+          windowWidth: document.documentElement.offsetWidth,
+          windowHeight: document.documentElement.offsetHeight,
         },
         jsPDF: {
           unit: "mm",
           format: "a4",
           orientation: "portrait",
-          compress: false,
-          precision: 16,
-          putOnlyUsedFonts: true,
+          compress: true, // Enable compression
         },
-        pagebreak: { mode: ["avoid-all", "css", "legacy"] },
+        pagebreak: { mode: ["avoid-all", "css", "legacy"], before: '.page-break-before' },
       };
 
       // Add CSS to handle page breaks properly
@@ -125,7 +124,7 @@ const ClientStatement = () => {
       <div className="statement-paper" ref={statementRef}>
         {/* Header */}
         <div className="statement-header1">
-          <h1>Transport and Logistics</h1>
+          <h1>{statement.company_name}</h1>
         </div>
 
         {/* Statement Info and Client Info Section */}
@@ -254,7 +253,12 @@ const ClientStatement = () => {
 
       {/* Buttons */}
       <div className="statementdownloadbtn1">
-        <button className="back-btn" onClick={() => navigate("/statements-list")}>Back</button>
+      <button 
+  className="back-btn" 
+  onClick={() => navigate("/statements-list", { state: { clientId: statement.client.id || statement.clientid } })}
+>
+  Back
+</button>
         <button
           className={`download-btn ${isGenerating ? 'generating' : ''}`}
           onClick={generatePDF}

@@ -606,6 +606,8 @@ async function generateMonthlyStatements() {
   const today = new Date(); // 2025-04-11
   const currentMonth = today.getMonth(); // 3 (April)
   const currentYear = today.getFullYear(); // 2025
+  const generationDate = new Date(currentYear,currentMonth,1,12,0,0)
+  const formattedGenDate = generationDate.toISOString().split('T')[0]
   
   const previousMonth = currentMonth === 0 ? 11 : currentMonth - 1; // 2 (March)
   const previousYear = currentMonth === 0 ? currentYear - 1 : currentYear; // 2025
@@ -700,10 +702,10 @@ async function generateMonthlyStatements() {
 
         const insertStatementQuery = `
           INSERT INTO statements (groupid, generation_date, clientid, agingid)
-          VALUES ($1, CURRENT_DATE, $2, $3)
+          VALUES ($1, $4, $2, $3)
           RETURNING statement_key
         `;
-        const statementResult = await dbClient.query(insertStatementQuery, [invoice_group_id, clientId, newAgingId]);
+        const statementResult = await dbClient.query(insertStatementQuery, [invoice_group_id, clientId, newAgingId,formattedGenDate]);
         const newStatementId = statementResult.rows[0].statement_key;
 
         console.log(`Generated statement #${newStatementId} for group ${invoice_group_id}`);
@@ -812,7 +814,8 @@ app.get("/api/statement/:statementId", async (req, res) => {
         i.date AS invoice_date,
         m1.total_cost AS invoice_amount,
         m1.task AS invoice_task,
-        i.invoice_num
+        i.invoice_num,
+        ut.companyname
       FROM 
         statements s
       JOIN 
@@ -823,6 +826,8 @@ app.get("/api/statement/:statementId", async (req, res) => {
         invoice i ON i.groupid = s.groupid
       LEFT JOIN 
         m1_controller m1 ON i.m1key = m1.m1key
+      INNER JOIN
+        usertable ut ON ut.userid = 1
       WHERE 
         s.statement_key = $1
     `;
@@ -840,7 +845,9 @@ app.get("/api/statement/:statementId", async (req, res) => {
       statement_key: result.rows[0].statement_key,
       groupid: result.rows[0].groupid,
       generation_date: result.rows[0].generation_date,
+      company_name: result.rows[0].companyname,
       client: {
+        id : result.rows[0].clientid,
         name: result.rows[0].client_name,
         representative: result.rows[0].client_representative,
         email: result.rows[0].client_email,
@@ -862,6 +869,7 @@ app.get("/api/statement/:statementId", async (req, res) => {
           task: row.invoice_task,
           invoice_num: row.invoice_num,
         })),
+
     };
 
     console.log(`Fetched statement ${statementId} with ${statementData.invoices.length} invoices`);
