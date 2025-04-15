@@ -40,6 +40,7 @@ import CompanyInstructionView from "./pages/CompanyInstructionView"
 import CompanyInstructions from "./pages/CompanyInstructions"
 
 import DirectorManagerViewAssignment from "./pages/DirectorManagerViewAssignment"
+import DirectorDocs from "./pages/DirectorDocs";
 import DirectorAnalytics from "./pages/DirectorAnalytics"
 import DirectorDabtors from "./pages/DirectorDabtors"
 import DirectorClientPaymentList from "./pages/DirectorClientPaymentList"
@@ -111,8 +112,8 @@ function DynamicHeader() {
     "/debtors": "Debtors",
     "/FDashboard": "Finance Clerk",
     "/instructions": "Instructions",
-    "/update-instructions": "Assignment",
-    "/Upload-Instruction-Documents": "Instructions",
+    "/update-instructions": "Assignments",
+    "/Upload-Instruction-Documents": "Instruction Documents",
     "/invoices": "Invoices",
     "/client-invoice": "Invoices",
     "/view-client-statements": "Statements",
@@ -123,11 +124,11 @@ function DynamicHeader() {
     "/finance-clerk-wage-details": "Wages",
     "/finance-clerk-wage-slip": "Wages",
     "/FExpenses": "Expenses",
-    "/ViewExpense": "Truck Expenses",
-    "/ExpenseDetails": "Truck Expenses",
-    "/ExpenseSubmission": "Truck Expenses",
+    "/ViewExpense": "Fuel Expenses",
+    "/ExpenseDetails": "Fuel Expenses",
+    "/ExpenseSubmission": "Fuel Expense",
     "/manage": "Manage",
-    "/ViewClientInstruction": "Instructions",
+    "/ViewClientInstruction": "Clients",
     "/ViewClientInvoice": "Invoice",
     "/DebtorsDashboard": "Debtors",
     "/CreditorsDashboard": "Creditors",
@@ -143,6 +144,7 @@ function DynamicHeader() {
     "/CompanyInstructions": "Instructions ",
 
     "/DirectorManagerViewAssignment": "View Assignment",
+    "/DirectorDocs":"Documents",
     "/DirectorAnalytics": "Analytics",
     "/DirectorDabtors": "Debtors",
     "/DirectorClientPaymentList": "Debtors",
@@ -165,9 +167,12 @@ function DynamicHeader() {
   }
 
   const getTitle = () => {
-    if (location.pathname.startsWith("/upload")) return "Proof of Payment"
-    return titleMap[location.pathname] || "Unknown Page"
-  }
+    if (location.pathname.startsWith("/upload")) return "Proof of Payment";
+    if (location.pathname.startsWith("/ExpenseDetails/")) return "Fuel Expenses";
+    if (location.pathname.startsWith("/finance-clerk-wage-details/")) return "Wages";
+    if (location.pathname.startsWith("/DirectorExpenses/")) return "Fuel Expenses";
+    return titleMap[location.pathname] || "Unknown Page";
+  };
 
   if (["/login", "/register", "/", "/new-landing"].includes(location.pathname)) {
     return null
@@ -219,6 +224,7 @@ function ContentWrapper() {
         <Route path="/CompanyInstructionView" element={<CompanyInstructionView />} />
         <Route path="/CompanyInstructions" element={<CompanyInstructions />} />
         <Route path="/DirectorManagerViewAssignment" element={<DirectorManagerViewAssignment />} />
+        <Route path="/DirectorDocs" element={<DirectorDocs />} />
         <Route path="/DirectorAnalytics" element={<DirectorAnalytics />} />
         <Route path="/DirectorDabtors" element={<DirectorDabtors />} />
         <Route path="/DirectorClientPaymentList" element={<DirectorClientPaymentList />} />
@@ -232,7 +238,7 @@ function ContentWrapper() {
         <Route path="/DirectorDriverWageSlip" element={<DirectorDriverWageSlip />} />
         <Route path="/DirectorCreditorsDash" element={<DirectorCreditorsDash />} />
         <Route path="/DirectorManagerViewFuelExpence" element={<DirectorManagerViewFuelExpence />} />
-        <Route path="/DirectorExpenses" element={<DirectorExpenses />} />
+        <Route path="/DirectorExpenses/:truckId" element={<DirectorExpenses />} />
         // Add these routes in the ContentWrapper function, with the other Director routes
         <Route path="/Viewcontrollerinstructions" element={<Viewcontrollerinstructions />} />
         <Route path="/ViewcontrollerInstructionDetails" element={<ViewcontrollerInstructionDetails />} />        <Route path="/AdminDashboard" element={<AdminDashboard />} />
@@ -249,11 +255,11 @@ function ContentWrapper() {
         <Route path="/client-invoice" element={<ClientInvoice />} />
         <Route path="/FDashboard" element={<FDashboard />} />
         <Route path="/finance-clerk-wage" element={<FinanceClerkWage />} />
-        <Route path="/finance-clerk-wage-details" element={<FinanceClerkWageDetails />} />
-        <Route path="/finance-clerk-wage-slip" element={<FinanceClerkWageSlip />} />
+        <Route path="/finance-clerk-wage-details/:userid" element={<FinanceClerkWageDetails />} />
+        <Route path="/finance-clerk-wage-slip/:id" element={<FinanceClerkWageSlip />} />
         <Route path="/client-statement" element={<ClientStatement />} />
         <Route path="/ViewExpense" element={<ViewExpense />} />
-        <Route path="/ExpenseDetails" element={<ExpenseDetails />} />
+        <Route path="/ExpenseDetails/:truckId" element={<ExpenseDetails />} />
         <Route path="/ExpenseSubmission" element={<ExpenseSubmission />} />
         <Route path="/ViewClientInstruction" element={<ViewClientInstruction />} />
         <Route path="/ViewClientInvoice" element={<ViewClientInvoice />} />

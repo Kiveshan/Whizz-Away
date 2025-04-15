@@ -1,44 +1,108 @@
-"use client";
-import { useNavigate } from "react-router-dom";
-import "../finance clerkpages/css/Expenses1.css";
+"use client"
+import { useState, useEffect } from "react"
+import { useNavigate } from "react-router-dom"
+import "../finance clerkpages/css/Expenses1.css"
 
 const ViewExpense = () => {
-  const navigate = useNavigate();
-  const trucks = [
-    { regNo: "ND 30", monthlyExpense: "R 8870" },
-    { regNo: "ND 35", monthlyExpense: "R 778" },
-    { regNo: "ND 65", monthlyExpense: "R 890" },
-    { regNo: "ND 57", monthlyExpense: "R 568" },
-  ];
+  const navigate = useNavigate()
+  const [trucks, setTrucks] = useState([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState(null)
+
+  useEffect(() => {
+    const fetchTrucks = async () => {
+      try {
+        const response = await fetch("http://localhost:5000/trucks/fuel-expenses")
+
+        if (!response.ok) {
+          throw new Error(`HTTP error! Status: ${response.status}`)
+        }
+
+        const data = await response.json()
+        console.log("Truck data:", data)
+
+        // Filter out trucks where is_subcontractor is true
+        const filteredTrucks = data.filter((truck) => {
+          // Handle different possible formats of is_subcontractor
+          const isSubcontractor =
+            truck.is_subcontractor === true ||
+            truck.is_subcontractor === "true" ||
+            truck.is_subcontractor === "t" ||
+            truck.is_subcontractor === 1
+
+          console.log(
+            `Truck ${truck.truckregnum}, is_subcontractor: ${truck.is_subcontractor} (${typeof truck.is_subcontractor}), filtered: ${!isSubcontractor}`,
+          )
+
+          return !isSubcontractor
+        })
+
+        console.log("Filtered trucks (company owned only):", filteredTrucks)
+        setTrucks(filteredTrucks)
+      } catch (err) {
+        console.error("Error fetching truck data:", err)
+        setError("Failed to load truck data. Please try again later.")
+      } finally {
+        setLoading(false)
+      }
+    }
+
+    fetchTrucks()
+  }, [])
+
+  // Fix the handleViewClick function to properly pass the truck registration number
+  const handleViewClick = (truck) => {
+    navigate(`/ExpenseDetails/${truck.truckid}`, {
+      state: {
+        truckId: truck.truckid,
+        truckRegNum: truck.truckregnum || "Unknown Truck",
+      },
+    })
+  }
 
   return (
     <div className="expenses-container">
       <div className="client-payments-header">
-        <button className="back-button" onClick={() => navigate(-1)}>Back</button>
+        <button className="back-button" onClick={() => navigate('/FDashboard')}>
+          Back
+        </button>
       </div>
 
-      <table className="expenses-table" style={{ width: "30%",marginLeft:"540px" }}>
-        <thead>
-          <tr>
-            <th>Truck Registration</th>
-            <th>Actions</th>
-          </tr>
-        </thead>
-        <tbody>
-          {trucks.map((truck, index) => (
-            <tr key={index}>
-              <td>{truck.regNo}</td>
-              <td>
-                <button className="view-button" onClick={() => navigate("/ExpenseDetails")}>
-                  View
-                </button>
-              </td>
+      {loading ? (
+        <p>Loading trucks...</p>
+      ) : error ? (
+        <p>{error}</p>
+      ) : (
+        <table className="expenses-table" style={{ width: "30%", marginLeft: "540px" }}>
+          <thead>
+            <tr>
+              <th>Truck Registration</th>
+              <th>Actions</th>
             </tr>
-          ))}
-        </tbody>
-      </table>
+          </thead>
+          <tbody>
+            {trucks.length > 0 ? (
+              trucks.map((truck, index) => (
+                <tr key={index}>
+                  <td>{truck.truckregnum || "Unknown"}</td>
+                  <td>
+                    <button className="view-button" onClick={() => handleViewClick(truck)}>
+                      View
+                    </button>
+                  </td>
+                </tr>
+              ))
+            ) : (
+              <tr>
+                <td colSpan="2">No trucks found</td>
+              </tr>
+            )}
+          </tbody>
+        </table>
+      )}
     </div>
-  );
-};
+  )
+}
 
-export default ViewExpense;
+export default ViewExpense
+

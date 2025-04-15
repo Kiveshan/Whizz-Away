@@ -149,7 +149,6 @@ const ViewClientInstruction = () => {
 
   return (
     <div className="">
-      {/* Back Button */}
       <div className="client-payments-header">
         <button className="back-button" onClick={() => navigate("/FDashboard")}>
           Back

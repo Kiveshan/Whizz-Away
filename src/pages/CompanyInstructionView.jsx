@@ -368,7 +368,7 @@ const CompanyInstructionView = () => {
     } else if (userRoleId === 3) {
       navigate("/FDashboard")
     } else {
-      // Default fallback if role is not recognized
+
       console.log("No valid role found, navigating to landing page")
       navigate("/")
     }
