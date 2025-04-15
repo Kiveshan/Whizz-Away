@@ -249,7 +249,7 @@ const ClientInvoice = () => {
       <div className={`invoice-paper ${isPrinting ? "printing-mode" : ""}`} ref={invoiceRef}>
         {/* Transport and Logistics section */}
         <div className="transport-section">
-          <div className="section-title">Transport and Logistics</div>
+          <div className="section-title">{invoiceData.companyname}</div>
         </div>
 
         {/* Middle section with company details */}
@@ -379,10 +379,10 @@ const ClientInvoice = () => {
           <div>Bank Name: {invoiceData.bank}</div>
           <div>Account Number: {invoiceData.account_num}</div>
           <div>Branch Code: {invoiceData.branch_code}</div>
-          <div>SWIFT Code: ABCD0234</div>
+          <div>SWIFT Code: {invoiceData.swift_code}</div>
           <div>Reference: {invoiceData.invoice_num}</div>
           <div className="payment-note">Please ensure the invoice number is referenced when making payment.</div>
-          <div className="thank-you">Thank you for choosing Transport and Logistics.</div>
+          <div className="thank-you">Thank you for choosing {invoiceData.companyname}.</div>
         </div>
       </div>
 

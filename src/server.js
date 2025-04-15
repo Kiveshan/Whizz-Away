@@ -387,6 +387,8 @@ app.get("/api/invoices/:id", async (req, res) => {
         ut.branch_code,
         ut.bank,
         ut.name_of_acc,
+        ut.companyname,
+        ut.swift_code,
         ut.account_num,
         COALESCE(ut.cell_num, ut.cell_num2) AS phonenumber,
         COALESCE(m1.num_six_meters, 0) + COALESCE(m1.num_twelve_meters, 0) + COALESCE(m1.num_abnormal, 0) as num_containers
@@ -399,7 +401,7 @@ app.get("/api/invoices/:id", async (req, res) => {
       LEFT JOIN 
         public.m5_client c ON i.clientid = c.m5clientkey
       INNER JOIN
-		  usertable ut ON i.companyid = ut.userid
+		  usertable ut ON ut.userid = 1
       WHERE 
         i.ikey = $1
     `

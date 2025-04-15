@@ -252,7 +252,6 @@ const InvoicesList = () => {
                   <th>File No</th>
                   <th>Date</th>
                   <th>Details</th>
-                  <th>Invoice</th>
                 </tr>
               </thead>
               <tbody>
@@ -279,53 +278,7 @@ const InvoicesList = () => {
                         View
                       </button>
                     </td>
-                    <td>
-                      <button
-                        className="small-btn"
-                        onClick={() => {
-                          if (!instruction.invoice_id) {
-                            debug(`Creating invoice for ID: ${instruction.m1key}`)
-                            fetch("/api/invoices/create", {
-                              method: "POST",
-                              headers: {
-                                "Content-Type": "application/json",
-                              },
-                              body: JSON.stringify({ m1key: instruction.m1key }),
-                            })
-                              .then((response) => response.json())
-                              .then((data) => {
-                                if (data.success) {
-                                  debug(`Invoice created, navigating to download for ID: ${instruction.m1key}`)
-                                  navigate(`/invoice/${instruction.m1key}/download`, {
-                                    state: {
-                                      clientId,
-                                      clientName,
-                                      returnToClientView: !!clientId,
-                                    },
-                                  })
-                                } else {
-                                  alert(`Error creating invoice: ${data.message}`)
-                                }
-                              })
-                              .catch((err) => {
-                                console.error("Error creating invoice:", err)
-                                alert("Failed to create invoice. Please try again.")
-                              })
-                          } else {
-                            debug(`Navigating to invoice download for ID: ${instruction.m1key}`)
-                            navigate(`/invoice/${instruction.m1key}/download`, {
-                              state: {
-                                clientId,
-                                clientName,
-                                returnToClientView: !!clientId,
-                              },
-                            })
-                          }
-                        }}
-                      >
-                        {instruction.invoice_id ? "Download" : "Generate"}
-                      </button>
-                    </td>
+                   
                   </tr>
                 ))}
               </tbody>

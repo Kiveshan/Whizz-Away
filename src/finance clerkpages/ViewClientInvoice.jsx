@@ -119,7 +119,7 @@ const ViewClientInvoice = () => {
                   <td className="p-3">{client.email}</td>
                   <td className="p-3">
                     <button className="view-butn" onClick={() => handleViewInvoices(client)}>
-                      View Invoices
+                      View
                     </button>
                   </td>
                 </tr>
