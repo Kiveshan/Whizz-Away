@@ -5,7 +5,7 @@ import { useNavigate, useLocation } from "react-router-dom"
 import "../finance clerkpages/css/InstructionsList.css"
 import API_CONFIG from "../utils/api-config"
 
-// Bell icon component with shake animation using SVG - exactly like in CompanyInstructions.jsx
+// Bell icon component with shake animation using SVG
 const BellIcon = () => {
   return (
     <span
@@ -31,7 +31,7 @@ const BellIcon = () => {
   )
 }
 
-// Add the CSS animation for the shake effect - exactly like in CompanyInstructions.jsx
+// Add the CSS animation for the shake effect
 const addShakeAnimation = () => {
   const styleSheet = document.createElement("style")
   styleSheet.textContent = `
@@ -50,117 +50,129 @@ const addShakeAnimation = () => {
   document.head.appendChild(styleSheet)
 }
 
-// Helper function to get current month name
-const getCurrentMonthName = () => {
-  const monthNames = [
-    "January",
-    "February",
-    "March",
-    "April",
-    "May",
-    "June",
-    "July",
-    "August",
-    "September",
-    "October",
-    "November",
-    "December",
-  ]
-  const currentMonth = new Date().getMonth() // 0-11
-  return monthNames[currentMonth]
-}
-
-// Helper function to get current year as string
-const getCurrentYear = () => {
-  return new Date().getFullYear().toString()
-}
-
-const Instructions = () => {
+const CompanyInstructions = () => {
   const navigate = useNavigate()
   const location = useLocation()
+  const {
+    clientId,
+    clientName,
+    selectedMonth: initialMonth,
+    selectedYear: initialYear,
+    activeFilter: initialFilter,
+  } = location.state || {}
 
-  // Extract state from location
-  const clientId = location.state?.clientId
-  const clientName = location.state?.clientName
+  // Debug log to check what state is being received
+  console.log("CompanyInstructions received state:", {
+    clientId,
+    clientName,
+    selectedMonth: initialMonth,
+    selectedYear: initialYear,
+    activeFilter: initialFilter,
+  })
 
-  // Initialize state with current month and year
+  // Get current month and year
+  const getCurrentMonthName = () => {
+    const monthNames = [
+      "January",
+      "February",
+      "March",
+      "April",
+      "May",
+      "June",
+      "July",
+      "August",
+      "September",
+      "October",
+      "November",
+      "December",
+    ]
+    return monthNames[new Date().getMonth()]
+  }
+
+  const getCurrentYear = () => {
+    return new Date().getFullYear().toString()
+  }
+
+  // Always default to current month and year regardless of passed values
   const [selectedMonth, setSelectedMonth] = useState(getCurrentMonthName())
   const [selectedYear, setSelectedYear] = useState(getCurrentYear())
-  const [activeFilter, setActiveFilter] = useState(location.state?.activeFilter || "All")
-
   const [instructions, setInstructions] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
+  const [activeFilter, setActiveFilter] = useState(initialFilter || "All")
 
-  // Add the shake animation when component mounts - exactly like in CompanyInstructions.jsx
+  // Add the shake animation when component mounts
   useEffect(() => {
     addShakeAnimation()
   }, [])
-
-  // Log when component mounts and what state it receives
-  useEffect(() => {
-    console.log("InstructionsList mounted with state:", location.state)
-    console.log("clientId:", clientId)
-    console.log("clientName:", clientName)
-    console.log("selectedMonth:", selectedMonth)
-    console.log("selectedYear:", selectedYear)
-    console.log("activeFilter:", activeFilter)
-  }, [location.state, clientId, clientName, selectedMonth, selectedYear, activeFilter])
 
   useEffect(() => {
     const fetchInstructions = async () => {
       try {
         setLoading(true)
-        let url = `${API_CONFIG.BASE_URL}/api/instructions`
+        console.log("Fetching instructions with clientId:", clientId) // Debug log
 
-        // Add client filter if clientId is provided
-        if (clientId) {
-          console.log("Fetching instructions for clientId:", clientId)
-          url += `?clientId=${clientId}`
-        } else {
-          console.log("No clientId provided, fetching all instructions")
-        }
-
-        console.log("Fetching from URL:", url)
-        const response = await fetch(url)
+        // Fetch all instructions first
+        const response = await fetch(`${API_CONFIG.BASE_URL}/api/instructions`)
 
         if (!response.ok) {
           throw new Error(`HTTP error! Status: ${response.status}`)
         }
 
         const data = await response.json()
-        console.log("Instructions data received:", data.length, "records")
-        setInstructions(data)
+        console.log("All instructions fetched:", data.length)
+
+        // Apply client filtering in the component
+        let filteredData = data
+
+        if (clientId) {
+          // Convert clientId to string for consistent comparison
+          const clientIdStr = String(clientId)
+
+          // Apply strict filtering
+          filteredData = data.filter((item) => {
+            // Convert all possible client ID fields to strings for comparison
+            const itemClientId = String(item.client || item.clientid || item.m5clientkey || item.client_id || "")
+            const matches = itemClientId === clientIdStr
+
+            // Log each comparison for debugging
+            if (matches) {
+              console.log(`Found matching item: ${JSON.stringify(item)}`)
+            }
+
+            return matches
+          })
+
+          console.log(`Filtered to ${filteredData.length} instructions for clientId: ${clientId}`)
+        }
+
+        setInstructions(filteredData)
         setLoading(false)
       } catch (error) {
         console.error("Error fetching instructions:", error)
-        setError("Failed to load instructions. Please try again later.")
+        setError(`Failed to load instructions: ${error.message}`)
         setLoading(false)
       }
     }
 
-    // Log the clientId to verify it's being received correctly
-    console.log("InstructionsList - clientId for fetching:", clientId)
-
-    // Only fetch instructions if component is mounted
     fetchInstructions()
-  }, [clientId]) // Make sure clientId is in the dependency array
+  }, [clientId])
 
   const handleFilterClick = (filter) => {
     setActiveFilter(filter)
   }
 
-  // Helper function to determine status priority for sorting
+  // Helper function to get status priority for sorting
   const getStatusPriority = (status) => {
     switch (status) {
       case "New":
-        return 1 // Highest priority
+        return 1
       case "In progress":
         return 2
       case "Completed":
         return 3
       default:
-        return 4 // Lowest priority
+        return 4 // Any other status will come after the specified ones
     }
   }
 
@@ -201,9 +213,21 @@ const Instructions = () => {
       if (["New", "In progress", "Completed"].includes(activeFilter)) {
         filtered = filtered.filter((item) => item.status === activeFilter)
       } else if (activeFilter === "import") {
-        filtered = filtered.filter((item) => item.type_text === "import" || item.type === "import")
+        filtered = filtered.filter(
+          (item) =>
+            item.type_text === "import" ||
+            item.type === "import" ||
+            item.shipment_type === 1 ||
+            item.shipment_type === "1",
+        )
       } else if (activeFilter === "export") {
-        filtered = filtered.filter((item) => item.type_text === "export" || item.type === "export")
+        filtered = filtered.filter(
+          (item) =>
+            item.type_text === "export" ||
+            item.type === "export" ||
+            item.shipment_type === 2 ||
+            item.shipment_type === "2",
+        )
       }
     }
 
@@ -217,7 +241,21 @@ const Instructions = () => {
     return filtered
   }
 
-  // Function to render status with bell for "New" status - exactly like in CompanyInstructions.jsx
+  // Handle view instruction click
+  const handleViewInstruction = (instructionId) => {
+    navigate("/Viewcontrollerinstructions", {
+      state: {
+        instructionId,
+        clientId,
+        clientName,
+        selectedMonth,
+        selectedYear,
+        activeFilter,
+      },
+    })
+  }
+
+  // Function to render status with bell for "New" status
   const renderStatus = (status) => {
     if (status === "New") {
       return (
@@ -229,30 +267,11 @@ const Instructions = () => {
     return status
   }
 
-  // Handle view instruction click - explicitly pass all state to FCcontrollerinstructions
-  const handleViewInstruction = (instructionId) => {
-    // Create state object with all necessary parameters
-    const stateToPass = {
-      instructionId,
-      clientId,
-      clientName,
-      selectedMonth,
-      selectedYear,
-      activeFilter,
-    }
-
-    // Log the state being passed to FCcontrollerinstructions
-    console.log("Navigating to FCcontrollerinstructions with state:", stateToPass)
-
-    navigate("/FCcontrollerinstructions", { state: stateToPass })
-  }
-
   return (
     <div>
-      {/* Centered month and year filters - now positioned ABOVE the company name */}
+      {/* Centered month and year filters - MOVED ABOVE the company name */}
       <div className="dropdown-container74">
         <select value={selectedMonth} onChange={(e) => setSelectedMonth(e.target.value)} className="dropdown">
-          <option value="">Select Month</option>
           <option value="January">January</option>
           <option value="February">February</option>
           <option value="March">March</option>
@@ -268,7 +287,6 @@ const Instructions = () => {
         </select>
 
         <select value={selectedYear} onChange={(e) => setSelectedYear(e.target.value)} className="dropdown">
-          <option value="">Select Year</option>
           <option value="2023">2023</option>
           <option value="2024">2024</option>
           <option value="2025">2025</option>
@@ -278,10 +296,14 @@ const Instructions = () => {
 
       {/* Centered company name heading */}
       <div className="client-payments-header">
-        <button className="back-button" onClick={() => navigate("/ViewClientInstruction")}>
+        <button className="back-button" onClick={() => navigate("/CompanyInstructionView")}>
           Back
         </button>
-        {clientName && <span className="client-name">{clientName}</span>}
+        {clientName && (
+          <span className="client-name">
+            {clientName} <span style={{ display: "none" }}>{clientId ? `(Client ID: ${clientId})` : ""}</span>
+          </span>
+        )}
       </div>
 
       <div className="content1">
@@ -325,6 +347,7 @@ const Instructions = () => {
             </button>
           </div>
         </div>
+
         <div className="tables-container">
           {loading ? (
             <p>Loading instructions...</p>
@@ -372,7 +395,7 @@ const Instructions = () => {
                         </button>
                       </td>
                       <td>
-                        <button className="view-btn" onClick={() => navigate("/update-instructions")}>
+                        <button className="view-btn" onClick={() => navigate("/DirectorManagerViewAssignment")}>
                           View
                         </button>
                       </td>
@@ -388,4 +411,4 @@ const Instructions = () => {
   )
 }
 
-export default Instructions
+export default CompanyInstructions

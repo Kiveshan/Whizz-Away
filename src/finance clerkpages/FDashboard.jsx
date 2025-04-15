@@ -1,6 +1,6 @@
-import React from "react";
-import { useNavigate } from "react-router-dom";
-import Card from "../components/Card";
+"use client"
+import { useNavigate } from "react-router-dom"
+import Card from "../components/Card"
 
 const dashboardData = [
   { title: "Instructions", image: "/images/pexels-photo-7947758.jpeg", path: "/ViewClientInstruction" },
@@ -10,16 +10,15 @@ const dashboardData = [
   // { title: "Statements", image: "/images/clientDocs.jpeg", path: "/view-client-statements" },
   { title: "Wages", image: "/images/wages.jpeg", path: "/finance-clerk-wage" },
   // { title: "Expenses", image: "/images/expenses.jpeg", path: "/ViewExpense" },
- 
-];
+]
 
 const FDashboard = () => {
-  const navigate = useNavigate();
+  const navigate = useNavigate()
 
   return (
     <div className="dashboard">
       <div className="dashboard-row top-row">
-        {dashboardData.slice(0,2 ).map((item) => (
+        {dashboardData.slice(0, 2).map((item) => (
           <Card key={item.title} title={item.title} image={item.image} onClick={() => navigate(item.path)} />
         ))}
       </div>
@@ -29,7 +28,8 @@ const FDashboard = () => {
         ))}
       </div>
     </div>
-  );
-};
+  )
+}
 
-export default FDashboard;
+export default FDashboard
+
