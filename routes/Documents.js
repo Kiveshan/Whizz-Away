@@ -255,6 +255,45 @@ router.get("/client/:clientId", async (req, res) => {
     })
   }
 })
+router.delete("/:documentId", async (req, res) => {
+  try {
+    const documentId = req.params.documentId
+    console.log(`Deleting document with ID: ${documentId}`)
+    const keyResult = await pool.query("SELECT s3key FROM documents WHERE document_id = $1", [documentId])
+
+    if (keyResult.rows.length === 0) {
+      return res.status(404).json({
+        success: false,
+        message: "Document not found",
+      })
+    }
+
+    const s3Key = keyResult.rows[0].s3key
+    await s3Client
+      .deleteObject({
+        Bucket: process.env.S3_BUCKET_NAME || "sherwyn-whizz-away",
+        Key: s3Key,
+      })
+      .promise()
+
+    console.log(`Deleted file from S3: ${s3Key}`)
+
+
+    await pool.query("DELETE FROM documents WHERE document_id = $1", [documentId])
+
+    res.status(200).json({
+      success: true,
+      message: "Document deleted successfully",
+    })
+  } catch (error) {
+    console.error("Error deleting document:", error)
+    res.status(500).json({
+      success: false,
+      message: "Failed to delete document",
+      error: error.message,
+    })
+  }
+})
 
 // Test the router
 console.log("Document routes loaded successfully")

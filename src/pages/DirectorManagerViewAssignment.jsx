@@ -230,20 +230,18 @@ function DirectorManagerViewAssignment() {
         await fetchTruckRegNums()
         await fetchShipmentType()
 
-        // If we have an instructionId, fetch containers for this instruction
         if (instructionId) {
           await fetchContainersForInstruction(instructionId)
           await fetchLegsForInstruction(instructionId)
           setInitialDataLoaded(true)
         } else {
-          // Fallback to all containers if no specific instruction
           await fetchAllContainers()
           setInitialDataLoaded(true)
         }
       } catch (error) {
         console.error("Error fetching initial data:", error)
         setError("Failed to load data. Please try again.")
-        setInitialDataLoaded(true) // Set to true even on error to prevent infinite loading
+        setInitialDataLoaded(true) 
       } finally {
         setLoading(false)
       }
@@ -550,8 +548,15 @@ function DirectorManagerViewAssignment() {
   }
 
   const handleBackClick = () => {
-    // Force a clean navigation state
-    navigate("/DirectorDashboard", {
+    // Always navigate back to CompanyInstructions with the preserved state
+    navigate("/CompanyInstructions", {
+      state: {
+        clientId,
+        clientName: location.state?.clientName,
+        selectedMonth: location.state?.selectedMonth,
+        selectedYear: location.state?.selectedYear,
+        activeFilter: location.state?.activeFilter,
+      },
       replace: true,
     })
   }

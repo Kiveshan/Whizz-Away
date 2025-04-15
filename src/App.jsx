@@ -256,7 +256,7 @@ function ContentWrapper() {
         <Route path="/FDashboard" element={<FDashboard />} />
         <Route path="/finance-clerk-wage" element={<FinanceClerkWage />} />
         <Route path="/finance-clerk-wage-details/:userid" element={<FinanceClerkWageDetails />} />
-        <Route path="/finance-clerk-wage-slip" element={<FinanceClerkWageSlip />} />
+        <Route path="/finance-clerk-wage-slip/:id" element={<FinanceClerkWageSlip />} />
         <Route path="/client-statement" element={<ClientStatement />} />
         <Route path="/ViewExpense" element={<ViewExpense />} />
         <Route path="/ExpenseDetails/:truckId" element={<ExpenseDetails />} />

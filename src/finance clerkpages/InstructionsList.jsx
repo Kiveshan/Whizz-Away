@@ -246,7 +246,23 @@ const Instructions = () => {
 
     navigate("/FCcontrollerinstructions", { state: stateToPass })
   }
+// Added this new function
+const handleViewAssignment = (instructionId) => {
+  // Create state object with all necessary parameters
+  const stateToPass = {
+    instructionId,
+    clientId,
+    clientName,
+    selectedMonth,
+    selectedYear,
+    activeFilter,
+  }
 
+  // Log the state being passed to update-instructions
+  console.log("Navigating to update-instructions with state:", stateToPass)
+
+  navigate("/update-instructions", { state: stateToPass })
+}
   return (
     <div>
       {/* Centered month and year filters - now positioned ABOVE the company name */}
@@ -366,16 +382,36 @@ const Instructions = () => {
                       <td>
                         <button
                           className="view-btn"
-                          onClick={() => handleViewInstruction(item.m1controllerkey || item.m1key)}
+                          onClick={() => handleViewInstruction(item.m1key)} //item.m1controllerkey
                         >
                           View
                         </button>
                       </td>
                       <td>
-                        <button className="view-btn" onClick={() => navigate("/update-instructions")}>
-                          View
-                        </button>
-                      </td>
+                        <button className="view-btn" onClick={() => {
+      // Create state object with all necessary parameters
+      const stateToPass = {
+        instructionId: item.m1key || item.m1controllerkey,
+        clientId,
+        clientName,
+        selectedMonth,
+        selectedYear,
+        activeFilter,
+      }
+
+      // Log the state being passed to update-instructions
+      console.log("Navigating to update-instructions with state:", stateToPass)
+
+      // Use replace: true to ensure a clean navigation
+      navigate("/update-instructions", {
+        state: stateToPass,
+        replace: true,
+      })
+    }}
+  >
+    View
+  </button>
+</td>
                     </tr>
                   ))
                 )}

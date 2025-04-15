@@ -332,7 +332,7 @@ const UploadInstructionDocuments = () => {
       setIsSubmitting(false)
       return
     }
-
+    let progressInterval;
     try {
       // Create FormData object for the server request
       const formData = new FormData()
@@ -350,9 +350,26 @@ const UploadInstructionDocuments = () => {
       }
 
       // Simulate upload progress
-      setUploadProgress(10)
-      setTimeout(() => setUploadProgress(30), 300)
-      setTimeout(() => setUploadProgress(50), 600)
+      // setUploadProgress(10)
+      // setTimeout(() => setUploadProgress(30), 300)
+      // setTimeout(() => setUploadProgress(50), 600)
+      const simulateProgress = () => {
+        let progress = 0
+        const interval = setInterval(() => {
+          progress += 5
+          if (progress >= 90) {
+            clearInterval(interval)
+          } else {
+            setUploadProgress(progress)
+          }
+        }, 200)
+
+        // Store the interval ID to clear it when upload completes or fails
+        return interval
+      }
+
+      const progressInterval = simulateProgress()
+
 
       console.log("Sending document upload request with data:", {
         name: docName,
@@ -380,6 +397,8 @@ const UploadInstructionDocuments = () => {
         throw new Error(result.message || "Failed to upload document")
       }
 
+      // setUploadProgress(100)
+      clearInterval(progressInterval)
       setUploadProgress(100)
       console.log("Upload successful:", result)
 
@@ -411,6 +430,8 @@ const UploadInstructionDocuments = () => {
     } catch (error) {
       console.error("Error uploading document:", error)
       setSubmitMessage(`Error: ${error.message}`)
+      // setUploadProgress(0)
+      clearInterval(progressInterval)
       setUploadProgress(0)
     } finally {
       setIsSubmitting(false)

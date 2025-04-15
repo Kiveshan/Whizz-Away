@@ -406,11 +406,11 @@ const router = express.Router()
 
 // Create a PostgreSQL connection pool
 const pool = new pg.Pool({
-  user: process.env.PG_USER || "postgres",
-  host: process.env.PG_HOST || "localhost",
-  database: process.env.PG_DATABASE || "Transport5",
-  password: process.env.PG_PASSWORD || "123456",
-  port: process.env.PG_PORT || 5432,
+  user: "postgres",
+  host: "localhost",
+  database: "Transport5",
+  password:  "123456",
+  port:  5432,
   ssl: process.env.DB_SSL ? { rejectUnauthorized: false } : false,
 })
 
@@ -537,12 +537,38 @@ router.post("/", (req, res) => {
             "SELECT CONCAT(name, ' ', surname) as fullname FROM m5_employee WHERE userid = $1",
             [driverId],
           )
-
+      
           if (driverResult.rows.length > 0) {
             documentSource = driverResult.rows[0].fullname
           }
         } catch (driverErr) {
           console.error("Error fetching driver name:", driverErr)
+        }
+      } else if (documentFrom === "Manager") {
+        try {
+          // Get the first manager (roleid 1) from usertable
+          const managerResult = await pool.query(
+            "SELECT CONCAT(name, ' ', surname) as fullname FROM usertable WHERE roleid = 1 LIMIT 1",
+          )
+      
+          if (managerResult.rows.length > 0) {
+            documentSource = managerResult.rows[0].fullname
+          }
+        } catch (managerErr) {
+          console.error("Error fetching manager name:", managerErr)
+        }
+      } else if (documentFrom === "Controller") {
+        try {
+          // Get the first controller (roleid 2) from m5_employee
+          const controllerResult = await pool.query(
+            "SELECT CONCAT(name, ' ', surname) as fullname FROM m5_employee WHERE roleid = 2 LIMIT 1",
+          )
+      
+          if (controllerResult.rows.length > 0) {
+            documentSource = controllerResult.rows[0].fullname
+          }
+        } catch (controllerErr) {
+          console.error("Error fetching controller name:", controllerErr)
         }
       }
 

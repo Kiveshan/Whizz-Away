@@ -254,6 +254,19 @@ const CompanyInstructions = () => {
       },
     })
   }
+  const handleViewAssignment = (instructionId) => {
+    console.log(`Navigating to DirectorManagerViewAssignment with instructionId: ${instructionId}`)
+    navigate("/DirectorManagerViewAssignment", {
+      state: {
+        instructionId,
+        clientId,
+        clientName,
+        selectedMonth,
+        selectedYear,
+        activeFilter,
+      },
+    })
+  }
 
   // Function to render status with bell for "New" status
   const renderStatus = (status) => {
@@ -395,7 +408,7 @@ const CompanyInstructions = () => {
                         </button>
                       </td>
                       <td>
-                        <button className="view-btn" onClick={() => navigate("/DirectorManagerViewAssignment")}>
+                        <button className="view-btn" onClick={() => handleViewAssignment(item.m1controllerkey || item.m1key)}>
                           View
                         </button>
                       </td>

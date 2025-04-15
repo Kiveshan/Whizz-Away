@@ -8,7 +8,7 @@ const dashboardData = [
   { title: "Analytics", image: "/images/analytics.jpg", path: "/analytics" },
   { title: "Debtors", image: "/images/clientDocs.jpeg", path: "/debtors" },
   { title: "Wages", image: "/images/wages.jpeg", path: "/DriverWageList" },
-  { title: "Creditors", image: "/images/expenses.jpeg", path: "/ManagerCreditorsDash" },
+  { title: "Creditors", image: "/images/expenses.jpeg", path: "/DirectorCreditorsDash" },
   { title: "Manage", image: "/images/manage.jpg", path: "/manage" },                     
   { title: "Analytics", image: "/images/analytics.jpg", path: "/analytics" },
 ];

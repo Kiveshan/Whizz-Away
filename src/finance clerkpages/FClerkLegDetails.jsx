@@ -1,14 +1,94 @@
 "use client"
-import { useState } from "react"
-import { useNavigate, useParams } from "react-router-dom"
+import { useState, useEffect } from "react"
+import { useNavigate, useLocation } from "react-router-dom"
 import "../finance clerkpages/css/finance-clerk-wage.css"
 
 const FClerkLegDetails = () => {
   const navigate = useNavigate()
-  const { id } = useParams()
- // State for dropdown selections
- const [selectedMonth, setSelectedMonth] = useState("")
- const [selectedYear, setSelectedYear] = useState("")
+  const location = useLocation()
+
+  // Get data from location state
+  const { instructionId, driverId, driverName } = location.state || {}
+
+  // State for dropdown selections
+  const [selectedMonth, setSelectedMonth] = useState("")
+  const [selectedYear, setSelectedYear] = useState("")
+  const [legs, setLegs] = useState([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState(null)
+
+  useEffect(() => {
+    const fetchLegDetails = async () => {
+      if (!instructionId || !driverId) {
+        setError("Missing instruction ID or driver ID")
+        setLoading(false)
+        return
+      }
+    
+      try {
+        setLoading(true)
+        console.log(`Fetching leg details for instruction ID: ${instructionId} and driver ID: ${driverId}`)
+    
+        // Use the new endpoint URL
+        const url = `http://localhost:5000/api/driver-legs/${driverId}?instructionId=${instructionId}`
+        console.log("Fetching from URL:", url)
+    
+        const response = await fetch(url)
+        console.log("Response status:", response.status)
+    
+        if (!response.ok) {
+          const errorText = await response.text()
+          console.error("Error response text:", errorText)
+          throw new Error(`Failed to fetch leg details: ${response.status}${errorText ? ` - ${errorText}` : ""}`)
+        }
+    
+        const data = await response.json()
+        console.log("Leg details data:", data)
+        setLegs(data)
+        setLoading(false)
+      } catch (error) {
+        console.error("Error fetching leg details:", error)
+        setError(`Failed to load leg details: ${error.message}`)
+        setLoading(false)
+      }
+    }
+    fetchLegDetails()
+  }, [instructionId, driverId])
+
+  // Filter legs based on selected month and year
+  const filteredLegs = legs.filter((leg) => {
+    if (!selectedMonth && !selectedYear) return true
+
+    if (!leg.date) return false
+
+    const legDate = new Date(leg.date)
+    const monthNames = [
+      "January",
+      "February",
+      "March",
+      "April",
+      "May",
+      "June",
+      "July",
+      "August",
+      "September",
+      "October",
+      "November",
+      "December",
+    ]
+
+    const matchesMonth = !selectedMonth || monthNames[legDate.getMonth()] === selectedMonth
+    const matchesYear = !selectedYear || legDate.getFullYear().toString() === selectedYear
+
+    return matchesMonth && matchesYear
+  })
+
+  const formatDate = (dateString) => {
+    if (!dateString) return "N/A"
+    const date = new Date(dateString)
+    return date.toLocaleDateString()
+  }
+
   return (
     <>
       <div
@@ -20,19 +100,19 @@ const FClerkLegDetails = () => {
         }}
       >
         <button
-          onClick={() => navigate(`/finance-clerk-wage-details/${id}`)}
+          onClick={() =>
+            navigate(`/finance-clerk-wage-details/${driverId}`, {
+              state: { name: driverName },
+            })
+          }
           className="back-button"
         >
           Back
         </button>
       </div>
-      
+
       <div className="dropdown-container24">
-        <select 
-          value={selectedMonth} 
-          onChange={(e) => setSelectedMonth(e.target.value)} 
-          className="dropdown"
-        >
+        <select value={selectedMonth} onChange={(e) => setSelectedMonth(e.target.value)} className="dropdown">
           <option value="">Select Month</option>
           <option value="January">January</option>
           <option value="February">February</option>
@@ -48,11 +128,7 @@ const FClerkLegDetails = () => {
           <option value="December">December</option>
         </select>
 
-        <select 
-          value={selectedYear} 
-          onChange={(e) => setSelectedYear(e.target.value)} 
-          className="dropdown"
-        >
+        <select value={selectedYear} onChange={(e) => setSelectedYear(e.target.value)} className="dropdown">
           <option value="">Select Year</option>
           <option value="2023">2023</option>
           <option value="2024">2024</option>
@@ -66,81 +142,61 @@ const FClerkLegDetails = () => {
           margin: "0 0 15px 0",
           fontWeight: "normal",
           fontSize: "24px",
-          marginTop:"-35px",
+          marginTop: "-35px",
         }}
       >
-        Wage for Driver
+        Wage for {driverName || `Driver ${driverId}`}
       </h2>
 
-      <table
-        style={{
-          width: "1000px",
-          margin: "0 auto",
-          borderCollapse: "collapse",
-          fontSize: "16px",
-          boxShadow: "0 1px 3px rgba(0,0,0,0.1)",
-          borderRadius: "5px",
-          overflow: "hidden",
-        }}
-      >
-        
-        <thead>
-          <tr style={{ backgroundColor: "#87CEEB", padding: "12px 10px", textAlign: "left" }}>
-            <th >Instruction ID</th>
-            <th>Truck Reg</th>
-            <th >Starting Point</th>
-            <th >Ending Point</th>
-            <th>Trailer</th>
-            <th >Date</th>
-            <th>Amount</th>
-          
-          </tr>
-        </thead>
-        <tbody>
-          <tr style={{ backgroundColor: "white",padding: "12px 10px", borderBottom: "1px solid #eee" } }>
-            <td >33614</td>
-            <td >33614</td>
-            <td>Port</td>
-            <td>Warehouse</td>
-            <td>12m</td>
-            <td>22/1/2025</td>
-            <td>R350</td>
-          </tr>
-          <tr style={{ backgroundColor: "white",padding: "12px 10px", borderBottom: "1px solid #eee" } }>
-            <td >45675</td>
-            <td >85514</td>
-            <td>Warehouse</td>
-            <td>Port</td>
-            <td>6m</td>
-            <td>30/1/2025</td>
-            <td>R250</td>
-          </tr>
-        </tbody>
-      </table>
-
-      <div
-        style={{
-          display: "flex",
-          justifyContent: "center",
-          marginTop: "15px",
-        }}
-      >
-        {/* <button
-          onClick={() => navigate(`/finance-clerk-wage-slip/${id}`)}
+      {loading ? (
+        <div style={{ textAlign: "center", padding: "20px" }}>Loading leg details...</div>
+      ) : error ? (
+        <div style={{ textAlign: "center", padding: "20px", color: "red" }}>{error}</div>
+      ) : (
+        <table
           style={{
-            backgroundColor: "green",
-            color: "white",
-            border: "none",
-            padding: "8px 20px",
-            borderRadius: "5px",
-            cursor: "pointer",
+            width: "1000px",
+            margin: "0 auto",
+            borderCollapse: "collapse",
             fontSize: "16px",
-            fontWeight: "normal",
+            boxShadow: "0 1px 3px rgba(0,0,0,0.1)",
+            borderRadius: "5px",
+            overflow: "hidden",
           }}
         >
-          Wage Slip
-        </button> */}
-      </div>
+          <thead>
+            <tr style={{ backgroundColor: "#87CEEB", padding: "12px 10px", textAlign: "left" }}>
+              <th>Truck Reg</th>
+              <th>Starting Point</th>
+              <th>Ending Point</th>
+              <th>Date</th>
+              <th>Amount</th>
+            </tr>
+          </thead>
+          <tbody>
+            {filteredLegs.length === 0 ? (
+              <tr>
+                <td colSpan="5" style={{ textAlign: "center", padding: "15px" }}>
+                  No leg details found
+                </td>
+              </tr>
+            ) : (
+              filteredLegs.map((leg) => (
+                <tr
+                  key={leg.legkey}
+                  style={{ backgroundColor: "white", padding: "12px 10px", borderBottom: "1px solid #eee" }}
+                >
+                  <td>{leg.truckregnumber || "N/A"}</td>
+                  <td>{leg.startingpoint || "N/A"}</td>
+                  <td>{leg.destination || "N/A"}</td>
+                  <td>{formatDate(leg.date)}</td>
+                  <td>R{leg.driverrate ? leg.driverrate.toFixed(2) : "0.00"}</td>
+                </tr>
+              ))
+            )}
+          </tbody>
+        </table>
+      )}
     </>
   )
 }

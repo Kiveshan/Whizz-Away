@@ -26,7 +26,6 @@ const ExpenseSubmission = ({ onBack }) => {
   const [uploadProgress, setUploadProgress] = useState(0)
   const [filePreview, setFilePreview] = useState(null)
 
-  // Redirect if no truck ID is provided
   useEffect(() => {
     if (!truckId) {
       console.warn("No truck ID provided, redirecting to truck selection")
@@ -39,7 +38,6 @@ const ExpenseSubmission = ({ onBack }) => {
   }, [truckId, navigate])
 
   useEffect(() => {
-    // Fetch drivers
     const fetchDrivers = async () => {
       try {
         const response = await fetch("http://localhost:5000/employees/drivers")
@@ -69,7 +67,6 @@ const ExpenseSubmission = ({ onBack }) => {
       [name]: value,
     })
 
-    // Reset driver selection if document from is changed
     if (name === "documentFrom" && value !== "Driver") {
       setFormData((prev) => ({
         ...prev,
@@ -92,7 +89,6 @@ const ExpenseSubmission = ({ onBack }) => {
       const selectedFile = e.target.files[0]
       setFile(selectedFile)
 
-      // Generate a preview of the selected image
       if (selectedFile.type.startsWith("image/")) {
         const reader = new FileReader()
         reader.onload = (event) => {
@@ -147,13 +143,12 @@ const ExpenseSubmission = ({ onBack }) => {
       if (formData.documentFrom === "Driver" && formData.driverName) {
         formDataToSend.append("driverId", formData.driverName)
       }
-
+    
       // Simulate upload progress
       setUploadProgress(10)
       setTimeout(() => setUploadProgress(30), 300)
       setTimeout(() => setUploadProgress(50), 600)
 
-      // Send data to server - this will now use the S3 upload middleware
       console.log("Sending expense data to server with S3 upload...")
       try {
         const response = await fetch("http://localhost:5000/expenses", {
@@ -182,8 +177,6 @@ const ExpenseSubmission = ({ onBack }) => {
         } else {
           setSubmitMessage("Expense submitted successfully!")
         }
-
-        // Reset form after successful submission
         setFormData({
           documentFrom: "Controller",
           expenseCost: "",

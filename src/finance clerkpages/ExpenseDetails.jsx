@@ -267,7 +267,7 @@ const ExpenseDetails = () => {
                   <td>
                     R {typeof expense.expensecost === "number" ? expense.expensecost.toFixed(2) : expense.expensecost}
                   </td>
-                  <td>{expense.documentfrom}</td>
+                  <td>{expense.documentfrom_display || expense.documentfrom}</td>
                   <td>{formatDate(expense.slipuploaddate)}</td>
                   <td>
                     <button
