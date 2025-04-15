@@ -203,3 +203,32 @@ width: 100%;
   .save-btn:hover {
     background-color: #0b59d7;; /* Darker blue on hover */
   }
+
+  .remove-driver-btn {
+    background-color: #ef4444; /* Red-500 */
+    color: white;
+    border: none;
+    padding: 6px 12px;
+    border-radius: 5px;
+    cursor: pointer;
+    font-size: 14px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin-left: auto;
+    transition: background-color 0.3s ease-in-out;
+  }
+  
+  .remove-driver-btn:hover {
+    background-color: #b91c1c; /* Red-700 */
+  }
+  
+  .remove-driver-btn:disabled {
+    background-color: #9ca3af; /* Gray-400 */
+    cursor: not-allowed;
+  }
+  
+  .remove-driver-btn svg {
+    width: 16px;
+    height: 16px;
+  }

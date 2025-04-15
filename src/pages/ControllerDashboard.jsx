@@ -5,7 +5,7 @@ import "../css/controllerDashboard.css";
 
 const dashboardData = [
   { title: "New Instruction", image: "/images/newinstruction.jpeg", path: "/ControllerInstructions" },
-  { title: "Track Instruction", image: "/images/trackinstruction.jpg", path: "/ControllerClientTrackInstruction" },
+  { title: "Track Instruction", image: "/images/trackinstruction.jpg", path: "/CompanyInstructionView" },
 ];
 
 const ControllerDashboard = () => {

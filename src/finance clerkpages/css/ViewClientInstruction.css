@@ -1,68 +1,67 @@
+/* Buttons */
+.button-section,
+.logout-section {
+  margin: 20px;
+}
 
-  /* Buttons */
-  .button-section,
-  .logout-section {
-    margin: 20px;
-  }
-  
-  .back-btn {
-    background-color: #90ee90;
-    border: none;
-    padding: 10px 20px;
-    border-radius: 6px;
-    cursor: pointer;
-  }
-  
-  .logout-btn {
-    background-color: #f9a6a6;
-    border: none;
-    padding: 10px 20px;
-    border-radius: 6px;
-    cursor: pointer;
-  }
-  
-  /* Table */
+.back-btn {
+  background-color: #90ee90;
+  border: none;
+  padding: 10px 20px;
+  border-radius: 6px;
+  cursor: pointer;
+}
 
-  .t1{
-    margin-left: 208px;
-    
-  }
-  .clientinstructiontable {
-    width: 1000px;
-    border-collapse: collapse;
-    margin-top: -35px;
-    margin-left: 60px;
-    align-items: center;
-  }
-  
-  thead {
-    background-color: #9ecbf3;
-  }
-  
-  th,
-  td {
-  
+.logout-btn {
+  background-color: #f9a6a6;
+  border: none;
+  padding: 10px 20px;
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+/* Table */
+
+.t1 {
+  width: 1000px;
+  border-collapse: collapse;
+  margin-left: auto;
+  margin-right: auto;
+}
+
+.clientinstructiontable {
+  width: 1000px;
+  border-collapse: collapse;
+  margin-top: -35px;
+  align-items: center;
+}
+
+thead {
+  background-color: #9ecbf3;
+}
+
+th,
+td {
   text-align: center;
-  padding:-70px;
+  padding: -70px;
   border-bottom: 1px solid #ddd;
-  }
-  
-  .view-butn {
-    background-color: #339af0;
-    color: white;
-    border: none;
-    padding: 8px 14px;
-    border-radius: 6px;
-    cursor: pointer;
-  }
+}
 
-  /* Dropdown container styling */
+.view-butn {
+  background-color: #339af0;
+  color: white;
+  border: none;
+  padding: 8px 14px;
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+/* Dropdown container styling */
 .dropdown-container1 {
   display: flex;
   gap: 10px; /* Adds space between the dropdowns */
   align-items: center; /* Aligns dropdowns vertically */
   margin: 20px; /* Adds space around the container */
-  
 }
 
 .dropdown-container1 {
@@ -71,3 +70,4 @@
   gap: 10px;
   margin-bottom: 20px;
 }
+

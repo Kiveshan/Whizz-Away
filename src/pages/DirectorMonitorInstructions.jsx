@@ -1,157 +1,187 @@
 "use client"
 
-import { useState } from "react"
-import { useNavigate } from "react-router-dom"
-import "../css/MonitorInstructions.css"
+import { useState, useEffect } from "react"
+import { useLocation, useNavigate } from "react-router-dom"
+import "../finance clerkpages/css/InstructionsList.css"
 
 const DirectorMonitorInstructions = () => {
   const navigate = useNavigate()
-  const [selectedRows, setSelectedRows] = useState([])
-  const [filter, setFilter] = useState("All")
+  const location = useLocation()
+  const [instructions, setInstructions] = useState([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState(null)
   const [statusFilter, setStatusFilter] = useState("All")
-  const [searchQuery, setSearchQuery] = useState("")
+  const [typeFilter, setTypeFilter] = useState("All")
+  const clientId = location.state?.clientId
 
-  const instructions = [
-    {
-      id: 1,
-      instructionNo: "Instruction 1",
-      type: "Import",
-      status: "Completed",
-      assignment: "",
-      fileNo: "F12345"
-    },
-    {
-      id: 2,
-      instructionNo: "Instruction 2",
-      type: "Export",
-      status: "Completed",
-      assignment: "",
-      fileNo: "F67890"
-    },
-    {
-      id: 3,
-      instructionNo: "Instruction 3",
-      type: "Import",
-      status: "In-progress",
-      assignment: "",
-      fileNo: "F11223"
-    },
-  ]
+  useEffect(() => {
+    if (clientId) {
+      fetchInstructions()
+    } else {
+      setError("Client ID is missing. Please go back to the client list.")
+      setLoading(false)
+    }
+  }, [clientId])
 
-  const handleBack = () => {
-    navigate(-1)
-  }
-  const handleV=()=>{
-    navigate("/DirectorManagerViewAssignment");
+  const fetchInstructions = async () => {
+    try {
+      setLoading(true)
+      const response = await fetch(`http://localhost:5000/client-instructions-details/${clientId}`)
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! Status: ${response.status}`)
+      }
+
+      const data = await response.json()
+      setInstructions(data)
+      setLoading(false)
+    } catch (err) {
+      console.error("Error fetching instructions:", err)
+      setError("Failed to load instructions. Please try again later.")
+      setLoading(false)
+    }
   }
 
-  const handleFilterChange = (type) => {
-    setFilter(type)
+  const getShipmentType = (type) => {
+    console.log("getShipmentType received:", type)
+    return type === 1 ? "Import" : type === 2 ? "Export" : "Unknown"
   }
 
-  const handleStatusFilterChange = (status) => {
-    setStatusFilter(status)
+  // Filter instructions based on both status and type filters
+  const filteredInstructions = instructions.filter((item) => {
+    // Normalize status by trimming spaces and converting to lowercase
+    const normalizedStatus = item.status ? item.status.trim().toLowerCase() : "new"
+    const normalizedFilterStatus = statusFilter.trim().toLowerCase()
+
+    // Check if the item passes the status filter
+    const passesStatusFilter = normalizedFilterStatus === "all" || normalizedStatus === normalizedFilterStatus
+
+    // Check if the item passes the type filter
+    const passesTypeFilter =
+      typeFilter === "All" ||
+      (typeFilter === "Import" && item.shippy === 1) ||
+      (typeFilter === "Export" && item.shippy === 2)
+
+    // Return true only if the item passes both filters
+    return passesStatusFilter && passesTypeFilter
+  })
+
+  const handleStatusFilterClick = (filterType) => {
+    setStatusFilter(filterType)
   }
 
-  const handleSearchChange = (event) => {
-    setSearchQuery(event.target.value)
+  const handleTypeFilterClick = (filterType) => {
+    setTypeFilter(filterType)
   }
 
-  const filteredInstructions = instructions.filter(instruction => 
-    (filter === "All" || instruction.type === filter) && 
-    (statusFilter === "All" || instruction.status === statusFilter) &&
-    (searchQuery === "" || 
-      instruction.instructionNo.toLowerCase().includes(searchQuery.toLowerCase()) || 
-      instruction.fileNo.toLowerCase().includes(searchQuery.toLowerCase()))
-  )
-
-  const handleView = (id) => {
-    console.log("Viewing instruction:", id)
+  const handleViewAssignment = (item) => {
+    // Navigate to DirectorManagerViewAssignment instead of update-instructions
+    navigate("/DirectorManagerViewAssignment", {
+      state: {
+        clientId: clientId,
+        instructionId: item.m1key,
+        isCompleted: item.status === "Completed",
+      },
+    })
   }
 
   return (
-    <div className="monitor-instructions-container">
-      <div className="user-profile">
-        <button className="back-button" onClick={handleBack}>Back</button>
+    <div>
+      <div className="client-payments-header">
+        {/* Navigate back to DirectorMonitorInstructionsView instead of ViewClientInstruction */}
+        <button className="back-button" onClick={() => navigate("/DirectorMonitorInstructionView")}>
+          Back
+        </button>
       </div>
 
-      <div className="action-bar">
-        <div className="filter-section10">
-          <div className="filter-group">
-            <select className="dropdown">
-              <option>Year</option>
-              <option>2025</option>
-              <option>2024</option>
-              <option>2023</option>
-              <option>2022</option>
-            </select>
-            <select className="dropdown">
-              <option>Month</option>
-              <option>January</option>
-              <option>February</option>
-              <option>March</option>
-              <option>April</option>
-              <option>May</option>
-              <option>June</option>
-              <option>July</option>
-              <option>August</option>
-              <option>September</option>
-              <option>October</option>
-              <option>November</option>
-              <option>December</option>
-            </select>
+      <div className="content1">
+        <div className="button-group">
+          <div className="filter-buttons">
+            <button
+              className={`btn btn-blue ${typeFilter === "Import" ? "active" : ""}`}
+              onClick={() => handleTypeFilterClick("Import")}
+            >
+              Import
+            </button>
+            <button
+              className={`btn btn-blue ${typeFilter === "Export" ? "active" : ""}`}
+              onClick={() => handleTypeFilterClick("Export")}
+            >
+              Export
+            </button>
+            <button
+              className={`btn btn-blue ${statusFilter === "All" && typeFilter === "All" ? "active" : ""}`}
+              onClick={() => {
+                handleStatusFilterClick("All")
+                handleTypeFilterClick("All")
+              }}
+            >
+              All
+            </button>
+            <button
+              className={`btn btn-blue ${statusFilter === "In Progress" ? "active" : ""}`}
+              onClick={() => handleStatusFilterClick("In Progress")}
+            >
+              In-Progress
+            </button>
+            <button
+              className={`btn btn-blue ${statusFilter === "Completed" ? "active" : ""}`}
+              onClick={() => handleStatusFilterClick("Completed")}
+            >
+              Complete
+            </button>
           </div>
         </div>
-      </div>
-      <div className="filter-section10">
-        <div className="filter-group">
-          <button className={`filter-button ${filter === "Import" ? "active" : ""}`} onClick={() => handleFilterChange("Import")}>Import</button>
-          <button className={`filter-button ${filter === "Export" ? "active" : ""}`} onClick={() => handleFilterChange("Export")}>Export</button>
-          <button className={`filter-button ${filter === "All" ? "active" : ""}`} onClick={() => handleFilterChange("All")}>All</button>
+        <div className="tables-container">
+          {loading ? (
+            <p>Loading instructions...</p>
+          ) : error ? (
+            <p className="error-message">{error}</p>
+          ) : (
+            <table className="t2">
+              <thead>
+                <tr>
+                  <th>Instruction No</th>
+                  <th>Type</th>
+                  <th>Status</th>
+                  <th>File No</th>
+                  <th>Instruction</th>
+                  <th>Assignment</th>
+                </tr>
+              </thead>
+              <tbody>
+                {filteredInstructions.length === 0 ? (
+                  <tr>
+                    <td colSpan="6">No instructions found</td>
+                  </tr>
+                ) : (
+                  filteredInstructions.map((item) => (
+                    <tr key={item.m1key}>
+                      <td>{item.m1key}</td>
+                      <td>{getShipmentType(item.shippy)}</td>
+                      <td>{item.status || "New"}</td>
+                      <td>{item.fileref || "N/A"}</td>
+                      <td>
+                        <button className="view-btn" onClick={() => navigate("")}>
+                          View
+                        </button>
+                      </td>
+                      <td>
+                        <button className="view-btn" onClick={() => handleViewAssignment(item)}>
+                          View
+                        </button>
+                      </td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          )}
         </div>
-        <div className="filter-group">
-        <button className={`filter-button ${statusFilter === "In-progress" ? "active" : ""}`} onClick={() => handleStatusFilterChange("In-progress")}>New</button>
-          <button className={`filter-button ${statusFilter === "In-progress" ? "active" : ""}`} onClick={() => handleStatusFilterChange("In-progress")}>In-progress</button>
-          <button className={`filter-button ${statusFilter === "Completed" ? "active" : ""}`} onClick={() => handleStatusFilterChange("Completed")}>Completed</button>
-      
-        </div>
-      </div>
-      <div className="search-bar">
-        {/* <input
-          type="text"
-          placeholder="Search by Instruction No. or File No."
-          value={searchQuery}
-          onChange={handleSearchChange}
-        /> */}
-      </div>
-      <div className="instructions-table">
-        <table>
-          <thead>
-            <tr>
-              <th>Instruction No.</th>
-              <th>File No.</th>
-              <th>Type</th>
-              <th>Status</th>
-              <th>Assignment</th>
-            </tr>
-          </thead>
-          <tbody>
-            {filteredInstructions.map((instruction) => (
-              <tr key={instruction.id}>
-                <td>{instruction.instructionNo}</td>
-                <td>{instruction.fileNo}</td>
-                <td>{instruction.type}</td>
-                <td>{instruction.status}</td>
-                <td>
-                  <button className="view-button" onClick={() => handleV(instruction.id)}>View</button>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
       </div>
     </div>
   )
 }
 
 export default DirectorMonitorInstructions
+
