@@ -401,7 +401,7 @@ app.get("/api/invoices/:id", async (req, res) => {
       LEFT JOIN 
         public.m5_client c ON i.clientid = c.m5clientkey
       INNER JOIN
-		  usertable ut ON ut.userid = 1
+		  usertable ut ON ut.roleid = 1 AND ut.status = 'active'
       WHERE 
         i.ikey = $1
     `
@@ -827,7 +827,7 @@ app.get("/api/statement/:statementId", async (req, res) => {
       LEFT JOIN 
         m1_controller m1 ON i.m1key = m1.m1key
       INNER JOIN
-        usertable ut ON ut.userid = 1
+        usertable ut ON ut.roleid = 1 AND ut.status = 'active'
       WHERE 
         s.statement_key = $1
     `;
