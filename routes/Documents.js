@@ -11,7 +11,7 @@ const router = express.Router()
 const pool = new pg.Pool({
   user: process.env.PG_USER || "postgres",
   host: process.env.PG_HOST || "localhost",
-  database: process.env.PG_DATABASE || "Transport5",
+  database: process.env.PG_DB || "Whizz-Away-Tester",
   password: process.env.PG_PASSWORD || "123456",
   port: process.env.PG_PORT || 5432,
   ssl: process.env.DB_SSL ? { rejectUnauthorized: false } : false,
