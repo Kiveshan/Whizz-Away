@@ -530,7 +530,8 @@ router.post("/", (req, res) => {
 
       // Get driver name if documentFrom is "Driver"
       let documentSource = documentFrom
-
+      let userId = null;  // Default to null, will be set in specific cases
+      
       if (documentFrom === "Driver" && driverId) {
         try {
           const driverResult = await pool.query(
@@ -540,38 +541,39 @@ router.post("/", (req, res) => {
       
           if (driverResult.rows.length > 0) {
             documentSource = driverResult.rows[0].fullname
+            userId = driverId  // Correct assignment here
           }
         } catch (driverErr) {
           console.error("Error fetching driver name:", driverErr)
         }
       } else if (documentFrom === "Manager") {
         try {
-          // Get the first manager (roleid 1) from usertable
           const managerResult = await pool.query(
-            "SELECT CONCAT(name, ' ', surname) as fullname FROM usertable WHERE roleid = 1 LIMIT 1",
+            "SELECT userid, CONCAT(name, ' ', surname) as fullname FROM usertable WHERE roleid = 1 AND userid = 1"
           )
       
           if (managerResult.rows.length > 0) {
             documentSource = managerResult.rows[0].fullname
+            userId = managerResult.rows[0].userid  // This will be from usertable
           }
         } catch (managerErr) {
           console.error("Error fetching manager name:", managerErr)
         }
       } else if (documentFrom === "Controller") {
         try {
-          // Get the first controller (roleid 2) from m5_employee
           const controllerResult = await pool.query(
-            "SELECT CONCAT(name, ' ', surname) as fullname FROM m5_employee WHERE roleid = 2 LIMIT 1",
+            "SELECT userid, CONCAT(name, ' ', surname) as fullname FROM m5_employee WHERE roleid = 2 LIMIT 1",
           )
       
           if (controllerResult.rows.length > 0) {
             documentSource = controllerResult.rows[0].fullname
+            userId = controllerResult.rows[0].userid
           }
         } catch (controllerErr) {
           console.error("Error fetching controller name:", controllerErr)
         }
       }
-
+      
       // Check if the slipurl column exists
       try {
         // First, try to insert with slipurl and s3key
@@ -592,7 +594,7 @@ router.post("/", (req, res) => {
           s3Key, // Store the S3 key for future URL generation
           uploadDate,
           truckId || null,
-          driverId || null,
+          userId || null,
         ]
 
         const result = await pool.query(query, values)
