@@ -25,7 +25,7 @@ const ViewClientInvoice = () => {
         setError(null)
 
         // Fetch clients from the database
-        const response = await fetch("/api/clients")
+        const response = await fetch("/api/clients-list")
 
         if (!response.ok) {
           let errorMessage = `HTTP error! Status: ${response.status}`

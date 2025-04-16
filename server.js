@@ -14,7 +14,7 @@ import { fileURLToPath } from "url"
 import dotenv from "dotenv"
 import fs from "fs"
 import pkg from "pg"
-const { Pool } = pkg
+const { Pool, types } = pkg
 import cron from "node-cron"
 
 // Load environment variables
@@ -3566,7 +3566,7 @@ app.get("/api/invoices/:id", async (req, res) => {
 
 
 // GET clients (simplified - no invoice counts)
-app.get("/api/clients", async (req, res) => {
+app.get("/api/clients-list", async (req, res) => {
   try {
     if (!pool) {
       return res.status(503).json({
@@ -4096,12 +4096,17 @@ app.get("/api/client-instructions/:clientId", async (req, res) => {
   }
 })
 
-
+app.use((req, res, next) => {
+  console.log(`Unhandled request: ${req.method} ${req.url}`)
+  next()
+})
 
 app.listen(PORT, async () => {
   try {
     // Test database connection on startup
     const dbTest = await testConnection()
+    types.setTypeParser(types.builtins.NUMERIC, (value) => parseFloat(value));
+    types.setTypeParser(types.builtins.FLOAT8, (value) => parseFloat(value));
     if (dbTest.success) {
       console.log(`✅ Database Connected Successfully at ${dbTest.time}`)
     } else {
