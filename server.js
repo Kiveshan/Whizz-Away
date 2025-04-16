@@ -1330,9 +1330,11 @@ app.get("/api/employees/:id", verifyToken, async (req, res) => {
 })
 
 // Create new employee
+// Create new employee
 app.post("/api/employees", verifyToken, async (req, res) => {
   try {
     const {
+      // Employee fields
       name,
       surname,
       telephonenum,
@@ -1342,6 +1344,15 @@ app.post("/api/employees", verifyToken, async (req, res) => {
       email,
       password,
       base_salary,
+      
+      // Deduction fields
+      deduction_income_tax,
+      deduction_other_deductions,
+      deduction_uif,
+      deduction_bonus,
+      deduction_savings,
+      deduction_loan,
+      deduction_damage
     } = req.body
 
     // Get subei_reg_num (company_reg_num) from the logged-in user via token
@@ -1351,30 +1362,88 @@ app.post("/api/employees", verifyToken, async (req, res) => {
       return res.status(400).json({ error: "Missing company registration number from token." })
     }
 
-    // Hash the password
-    const hashedPassword = await bcrypt.hash(password, 10)
+    // Start a transaction
+    await client.query('BEGIN')
 
-    const result = await client.query(
-      `INSERT INTO m5_employee (
-        name, surname, telephonenum, cellnum, employeenum, roleid, email, password, 
-        base_salary, subei_reg_num, status
-      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11) RETURNING *`,
-      [
-        name,
-        surname,
-        telephonenum,
-        cellnum,
-        employeenum,
-        roleid,
-        email,
-        hashedPassword,
-        base_salary,
-        subei_reg_num,
-        true,
-      ],
-    )
+    try {
+      // Hash the password
+      const hashedPassword = await bcrypt.hash(password, 10)
 
-    res.status(201).json(result.rows[0])
+      // Insert employee data and get the new userid
+      const employeeResult = await client.query(
+        `INSERT INTO m5_employee (
+          name, surname, telephonenum, cellnum, employeenum, roleid, email, password, 
+          base_salary, subei_reg_num, status
+        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11) RETURNING userid`,
+        [
+          name,
+          surname,
+          telephonenum,
+          cellnum,
+          employeenum,
+          roleid,
+          email,
+          hashedPassword,
+          base_salary,
+          subei_reg_num,
+          true,
+        ]
+      )
+
+      const newEmployeeId = employeeResult.rows[0].userid
+
+      // Calculate total deductions
+      const totalDeductions = parseFloat(deduction_income_tax || 0) +
+                             parseFloat(deduction_other_deductions || 0) +
+                             parseFloat(deduction_uif || 0) +
+                             parseFloat(deduction_bonus || 0) +
+                             parseFloat(deduction_savings || 0) +
+                             parseFloat(deduction_loan || 0) +
+                             parseFloat(deduction_damage || 0)
+
+      // Insert into wages table
+      await client.query(
+        `INSERT INTO wages (
+          deduction_income_tax, 
+          deduction_other_deductions, 
+          deduction_uif, 
+          deduction_bonus, 
+          deduction_savings, 
+          deduction_loan, 
+          deduction_damage,
+          total_deductions,
+          employeeid,
+          employee_date
+        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)`,
+        [
+          deduction_income_tax || 0,
+          deduction_other_deductions || 0,
+          deduction_uif || 0,
+          deduction_bonus || 0,
+          deduction_savings || 0,
+          deduction_loan || 0,
+          deduction_damage || 0,
+          totalDeductions,
+          newEmployeeId,
+          new Date()
+        ]
+      )
+
+      // Commit the transaction
+      await client.query('COMMIT')
+
+      // Get the complete employee data to return
+      const completeEmployeeResult = await client.query(
+        `SELECT * FROM m5_employee WHERE userid = $1`,
+        [newEmployeeId]
+      )
+
+      res.status(201).json(completeEmployeeResult.rows[0])
+    } catch (err) {
+      // If anything goes wrong, roll back the transaction
+      await client.query('ROLLBACK')
+      throw err
+    }
   } catch (err) {
     console.error("Error creating employee:", err)
     res.status(500).json({ error: "Failed to create employee" })
@@ -2135,55 +2204,79 @@ app.get("/api/subcontractors/:id", verifyToken, async (req, res) => {
 // Create new subcontractor
 app.post("/api/subcontractors", verifyToken, async (req, res) => {
   try {
-    // Removed role check
+    console.log("➡️ Incoming request body:", req.body);
+
     const {
-      name,
-      surname,
-      telephonenum,
       cellnum,
       email,
-      password,
       companyname,
       location,
       truckregnum,
       contact_person,
-      company_reg_num,
+      subei_reg_num,
       no_of_trucks,
-    } = req.body
+      subdrivername
+    } = req.body;
 
-    // Hash the password
-    const hashedPassword = await bcrypt.hash(password || "defaultpassword", 10)
+    // Server-side validation
+    if (!companyname || !location || !contact_person || !cellnum || !email) {
+      return res.status(400).json({ error: 'Please fill in all the required fields.' });
+    }
 
-    const result = await client.query(
-      `INSERT INTO m5_employee (
-        name, surname, telephonenum, cellnum, email, password, 
-        companyname, location, truckregnum, contact_person, 
-        company_reg_num, no_of_trucks, roleid, status
-      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14) RETURNING *`,
-      [
-        name,
-        surname,
-        telephonenum,
-        cellnum,
-        email,
-        hashedPassword,
-        companyname,
-        location,
-        truckregnum,
-        contact_person,
-        company_reg_num,
-        no_of_trucks,
-        4,
-        true, // roleid 4 for subcontractors
-      ],
-    )
+    console.log("🔍 Raw subdrivername value:", subdrivername);
 
-    res.status(201).json(result.rows[0])
-  } catch (err) {
-    console.error("Error creating subcontractor:", err)
-    res.status(500).json({ error: "Failed to create subcontractor" })
+    // Convert to array if necessary
+    const subdriverArray = Array.isArray(subdrivername)
+      ? subdrivername
+      : typeof subdrivername === "string"
+      ? subdrivername.split(",").map(name => name.trim()).filter(Boolean) // Filter out empty values
+      : [];
+
+    if (subdriverArray.length === 0) {
+      return res.status(400).json({ error: 'At least one driver name is required.' });
+    }
+
+    console.log("✅ Final subdriverArray for insertion:", subdriverArray);
+
+    const insertQuery = `
+      INSERT INTO m5_employee (
+        cellnum, email, companyname, location, truckregnum,
+        contact_person, subei_reg_num, no_of_trucks, 
+        roleid, status, subdrivername
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+      RETURNING *;
+    `;
+
+    const values = [
+      cellnum,
+      email,
+      companyname,
+      location,
+      truckregnum,
+      contact_person,
+      subei_reg_num,
+      no_of_trucks,
+      6,            // roleid for subcontractor
+      true,         // status
+      subdriverArray
+    ];
+
+    console.log("📦 Insert values:", values);
+
+    const result = await client.query(insertQuery, values);
+
+    console.log("✅ Insert result:", result.rows[0]);
+
+    res.status(201).json(result.rows[0]);
+  } catch (error) {
+    console.error("❌ Insert error:", error.message);
+    res.status(500).json({ error: "Failed to insert subcontractor" });
   }
-})
+});
+
+
+
+
 
 // Update subcontractor
 app.put("/api/subcontractors/:id", verifyToken, async (req, res) => {
@@ -2192,7 +2285,7 @@ app.put("/api/subcontractors/:id", verifyToken, async (req, res) => {
 
     // Removed role check
     // Check if subcontractor exists
-    const checkResult = await client.query("SELECT * FROM m5_employee WHERE userid = $1 AND roleid = 4", [id])
+    const checkResult = await client.query("SELECT * FROM m5_employee WHERE userid = $1 AND roleid = 6", [id])
 
     if (checkResult.rows.length === 0) {
       return res.status(404).json({ message: "Subcontractor not found" })
@@ -2243,7 +2336,7 @@ app.put("/api/subcontractors/:id", verifyToken, async (req, res) => {
     const updateQuery = `
       UPDATE m5_employee 
       SET ${updateFields.join(", ")} 
-      WHERE userid = $${paramCounter} AND roleid = 4
+      WHERE userid = $${paramCounter} AND roleid = 6
       RETURNING *
     `
 
