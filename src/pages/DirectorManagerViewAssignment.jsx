@@ -188,13 +188,13 @@ const debugDriverData = (drivers) => {
 }
 
 function DirectorManagerViewAssignment() {
+  
   const navigate = useNavigate()
   const location = useLocation()
   const clientId = location.state?.clientId
   const instructionId = location.state?.instructionId || null
   const selectedLegIndex = location.state?.selectedLegIndex
 
-  // Add a ref to track if we're coming from the documents page
   const isFromDocumentsPage = useRef(selectedLegIndex !== undefined)
 
   const [drivers, setDrivers] = useState([])
@@ -212,12 +212,12 @@ function DirectorManagerViewAssignment() {
   const [truckRegOptions, setTruckRegOptions] = useState([])
   const [containerOptions, setContainerOptions] = useState([])
   const [existingDrivers, setExistingDrivers] = useState([])
-  // Flag to track if initial data has been loaded
   const [initialDataLoaded, setInitialDataLoaded] = useState(false)
   const [shipmentType, setShipmentType] = useState(null)
   const [instructionContainers, setInstructionContainers] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
+  const [isControllerRole, setIsControllerRole] = useState(false)
 
   // Replace the useEffect that fetches legs with this updated version
   useEffect(() => {
@@ -230,18 +230,20 @@ function DirectorManagerViewAssignment() {
         await fetchTruckRegNums()
         await fetchShipmentType()
 
+        // If we have an instructionId, fetch containers for this instruction
         if (instructionId) {
           await fetchContainersForInstruction(instructionId)
           await fetchLegsForInstruction(instructionId)
           setInitialDataLoaded(true)
         } else {
+          // Fallback to all containers if no specific instruction
           await fetchAllContainers()
           setInitialDataLoaded(true)
         }
       } catch (error) {
         console.error("Error fetching initial data:", error)
         setError("Failed to load data. Please try again.")
-        setInitialDataLoaded(true) 
+        setInitialDataLoaded(true) // Set to true even on error to prevent infinite loading
       } finally {
         setLoading(false)
       }
@@ -253,8 +255,44 @@ function DirectorManagerViewAssignment() {
     return () => {
       isFromDocumentsPage.current = false
     }
-  }, [instructionId]) // Only depend on instructionId
-
+  }, [instructionId]) 
+  //////////////////////////////////////////////////////////////////////////////////////////
+  useEffect(() => {
+    
+    const checkUserRole = () => {
+      // Try to get role from localStorage
+      let userRoleId = null;
+      
+      // Method 1: Try to get from "user" object
+      const userData = localStorage.getItem("user");
+      if (userData) {
+        try {
+          const parsedUserData = JSON.parse(userData);
+          userRoleId = parsedUserData.roleid;
+          console.log("Found role in user object:", userRoleId);
+        } catch (error) {
+          console.error("Error parsing user data:", error);
+        }
+      }
+      
+      // Method 2: Try direct roleId keys if method 1 failed
+      if (!userRoleId) {
+        userRoleId = localStorage.getItem("roleId") || 
+                     localStorage.getItem("userRoleId");
+        console.log("Found role in direct keys:", userRoleId);
+      }
+      
+      // Convert to number if it's a string
+      userRoleId = Number(userRoleId);
+      
+      // Check if user is a controller (roleid = 2)
+      const isController = userRoleId === 2;
+      console.log("User is controller:", isController);
+      setIsControllerRole(isController);
+    };
+    
+    checkUserRole();
+  }, []);
   // Add a useEffect to log driver data whenever it changes
   useEffect(() => {
     if (drivers && drivers.length > 0) {
@@ -271,7 +309,6 @@ function DirectorManagerViewAssignment() {
     }
   }, [drivers])
 
-  // Replace the entire useEffect that handles the selectedLegIndex with this version
   useEffect(() => {
     // Only run this effect once when the component mounts with a selectedLegIndex
     if (initialDataLoaded && selectedLegIndex !== undefined && legs.length > 0) {
@@ -547,6 +584,7 @@ function DirectorManagerViewAssignment() {
     setCurrentLagIndex(index)
   }
 
+  // Replace the handleBackClick function with this updated version
   const handleBackClick = () => {
     // Always navigate back to CompanyInstructions with the preserved state
     navigate("/CompanyInstructions", {
@@ -659,8 +697,9 @@ function DirectorManagerViewAssignment() {
               </div>
             </div>
 
+            {!isControllerRole && (
             <div className="w-[100px]">
-              <label className="block text-gray-700 mb-2">Driver Rate</label>
+              <label className="block text-gray-700 mb-2">Driver Rate</label> 
               <input
                 type="text"
                 className="w-full p-2 border rounded-md bg-gray-100"
@@ -668,6 +707,7 @@ function DirectorManagerViewAssignment() {
                 readOnly
               />
             </div>
+            )}
 
             <div className="flex-1 min-w-[100px]">
               <label className="block text-gray-700 mb-2">Destination</label>
