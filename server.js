@@ -102,7 +102,7 @@ const testConnection = async () => {
 app.use(
   cors({
     credentials: true,
-    origin: ["http://localhost:3000", "http://127.0.0.1:3000"],
+    origin: ["http://localhost:3000", "http://localhost:5000", "http://127.0.0.1:3000", "http://127.0.0.1:5000"],
     methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
     allowedHeaders: ["Content-Type", "Authorization", "Cache-Control"],
     exposedHeaders: ["Authorization"],
@@ -3350,6 +3350,25 @@ app.get("/api/employee/:id", async (req, res) => {
 
 // INVOICE AND STATMENT //
 
+// Helper function to execute database queries
+async function query(text, params) {
+  if (!pool) {
+    throw new Error("Database connection not established")
+  }
+
+  try {
+    const start = Date.now()
+    const res = await pool.query(text, params)
+    const duration = Date.now() - start
+    console.log("Executed query", { text, duration, rows: res.rowCount })
+    return res
+  } catch (error) {
+    console.error("Error executing query", { text, error })
+    throw error
+  }
+}
+
+
 // GET all completed instructions for invoices
 app.get("/api/invoices/completed", async (req, res) => {
   try {
@@ -3566,7 +3585,7 @@ app.get("/api/invoices/:id", async (req, res) => {
 
 
 // GET clients (simplified - no invoice counts)
-app.get("/api/clients-list", async (req, res) => {
+app.get("/api/clients", async (req, res) => {
   try {
     if (!pool) {
       return res.status(503).json({
@@ -4094,6 +4113,15 @@ app.get("/api/client-instructions/:clientId", async (req, res) => {
       stack: process.env.NODE_ENV === "production" ? null : error.stack,
     })
   }
+})
+
+
+
+
+// Add a catch-all route for debugging
+app.use((req, res, next) => {
+  console.log(`Unhandled request: ${req.method} ${req.url}`)
+  next()
 })
 
 app.use((req, res, next) => {
