@@ -1294,9 +1294,12 @@ app.post("/api/company/reactivate", verifyToken, async (req, res) => {
 app.get("/api/employees", verifyToken, async (req, res) => {
   try {
     const query = `
-      SELECT e.*, r.rolename 
+      SELECT e.*, r.rolename, w.deduction_income_tax, w.deduction_other_deductions, 
+             w.deduction_uif, w.deduction_bonus, w.deduction_savings, 
+             w.deduction_loan, w.deduction_damage
       FROM m5_employee e
       JOIN roles r ON e.roleid = r.roleid
+      LEFT JOIN wages w ON e.userid = w.employeeid
       ORDER BY e.userid
     `;
 
@@ -1307,6 +1310,7 @@ app.get("/api/employees", verifyToken, async (req, res) => {
     res.status(500).json({ error: "Failed to fetch employees" });
   }
 });
+
 
 
 // Get employee by ID
@@ -1331,6 +1335,42 @@ app.get("/api/employees/:id", verifyToken, async (req, res) => {
 
 // Create new employee
 // Create new employee
+// app.get("/api/employees", verifyToken, async (req, res) => {
+//   try {
+//     const subei_reg_num = req.user.company_reg_num;
+
+//     const result = await client.query(
+//       `SELECT 
+//         e.userid,
+//         e.name,
+//         e.surname,
+//         e.telephonenum,
+//         e.cellnum,
+//         e.employeenum,
+//         e.roleid,
+//         e.email,
+//         e.base_salary,
+//         e.status,
+//         w.deduction_income_tax,
+//         w.deduction_other_deductions,
+//         w.deduction_uif,
+//         w.deduction_bonus,
+//         w.deduction_savings,
+//         w.deduction_loan,
+//         w.deduction_damage
+//       FROM m5_employee e
+//       LEFT JOIN wages w ON e.userid = w.employeeid
+//       WHERE e.subei_reg_num = $1`,
+//       [subei_reg_num]
+//     );
+
+//     res.status(200).json(result.rows);
+//   } catch (err) {
+//     console.error("Error fetching employees:", err);
+//     res.status(500).json({ error: "Failed to fetch employees" });
+//   }
+// });
+
 app.post("/api/employees", verifyToken, async (req, res) => {
   try {
     const {
@@ -1433,10 +1473,32 @@ app.post("/api/employees", verifyToken, async (req, res) => {
       await client.query('COMMIT')
 
       // Get the complete employee data to return
-      const completeEmployeeResult = await client.query(
-        `SELECT * FROM m5_employee WHERE userid = $1`,
-        [newEmployeeId]
-      )
+     // Get the complete employee data with wages to return
+const completeEmployeeResult = await client.query(
+  `SELECT 
+      e.userid,
+      e.name,
+      e.surname,
+      e.telephonenum,
+      e.cellnum,
+      e.employeenum,
+      e.roleid,
+      e.email,
+      e.base_salary,
+      e.status,
+      w.deduction_income_tax,
+      w.deduction_other_deductions,
+      w.deduction_uif,
+      w.deduction_bonus,
+      w.deduction_savings,
+      w.deduction_loan,
+      w.deduction_damage
+    FROM m5_employee e
+    LEFT JOIN wages w ON e.userid = w.employeeid
+    WHERE e.userid = $1`,
+  [newEmployeeId]
+);
+
 
       res.status(201).json(completeEmployeeResult.rows[0])
     } catch (err) {
@@ -1450,64 +1512,149 @@ app.post("/api/employees", verifyToken, async (req, res) => {
   }
 })
 
+app.put("/api/employees/:id", verifyToken, async (req, res) => {
+  const { id } = req.params;
+  const {
+    name,
+    surname,
+    telephonenum,
+    cellnum,
+    employeenum,
+    roleid,
+    email,
+    password,
+    base_salary,
+    deduction_income_tax,
+    deduction_other_deductions,
+    deduction_uif,
+    deduction_bonus,
+    deduction_savings,
+    deduction_loan,
+    deduction_damage
+  } = req.body;
+
+  try {
+    await client.query("BEGIN");
+
+    if (password) {
+      const hashedPassword = await bcrypt.hash(password, 10);
+      await client.query(
+        `UPDATE m5_employee SET 
+          name = $1, surname = $2, telephonenum = $3, cellnum = $4, employeenum = $5,
+          roleid = $6, email = $7, password = $8, base_salary = $9
+        WHERE userid = $10`,
+        [
+          name, surname, telephonenum, cellnum, employeenum,
+          roleid, email, hashedPassword, base_salary, id
+        ]
+      );
+    } else {
+      await client.query(
+        `UPDATE m5_employee SET 
+          name = $1, surname = $2, telephonenum = $3, cellnum = $4, employeenum = $5,
+          roleid = $6, email = $7, base_salary = $8
+        WHERE userid = $9`,
+        [
+          name, surname, telephonenum, cellnum, employeenum,
+          roleid, email, base_salary, id
+        ]
+      );
+    }
+
+    const totalDeductions = parseFloat(deduction_income_tax || 0) +
+      parseFloat(deduction_other_deductions || 0) +
+      parseFloat(deduction_uif || 0) +
+      parseFloat(deduction_bonus || 0) +
+      parseFloat(deduction_savings || 0) +
+      parseFloat(deduction_loan || 0) +
+      parseFloat(deduction_damage || 0);
+
+    await client.query(
+      `UPDATE wages SET 
+        deduction_income_tax = $1,
+        deduction_other_deductions = $2,
+        deduction_uif = $3,
+        deduction_bonus = $4,
+        deduction_savings = $5,
+        deduction_loan = $6,
+        deduction_damage = $7,
+        total_deductions = $8
+      WHERE employeeid = $9`,
+      [
+        deduction_income_tax, deduction_other_deductions,
+        deduction_uif, deduction_bonus, deduction_savings,
+        deduction_loan, deduction_damage,
+        totalDeductions, id
+      ]
+    );
+
+    await client.query("COMMIT");
+    res.status(200).json({ message: "Employee updated successfully." });
+  } catch (err) {
+    await client.query("ROLLBACK");
+    console.error(err);
+    res.status(500).json({ error: "Internal server error." });
+  }
+});
+
 
 // Create new subcontractor employee
-app.post("/api/employees", verifyToken, async (req, res) => {
-  try {
-    // Removed role check
-    const {
-      name,
-      surname,
-      telephonenum,
-      cellnum,
-      employeenum,
-      roleid,
-      email,
-      password,
-      base_salary,
-      companyname,
-      location,
-      truckregnum,
-      contact_person,
-      subei_reg_num,
-      no_of_trucks,
-    } = req.body
+// app.post("/api/employees", verifyToken, async (req, res) => {
+//   try {
+//     // Removed role check
+//     const {
+//       name,
+//       surname,
+//       telephonenum,
+//       cellnum,
+//       employeenum,
+//       roleid,
+//       email,
+//       password,
+//       base_salary,
+//       companyname,
+//       location,
+//       truckregnum,
+//       contact_person,
+//       subei_reg_num,
+//       no_of_trucks,
+//     } = req.body
 
-    // Hash the password
-    const hashedPassword = await bcrypt.hash(password, 10)
+//     // Hash the password
+//     const hashedPassword = await bcrypt.hash(password, 10)
 
-    const result = await client.query(
-      `INSERT INTO m5_employee (
-        name, surname, telephonenum, cellnum, employeenum, roleid, email, password, 
-        base_salary, companyname, location, truckregnum, contact_person, 
-        subei_reg_num, no_of_trucks, status
-      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16) RETURNING *`,
-      [
-        name,
-        surname,
-        telephonenum,
-        cellnum,
-        employeenum,
-        roleid,
-        email,
-        hashedPassword,
-        base_salary,
-        companyname,
-        location,
-        truckregnum,
-        contact_person,
-        subei_reg_num,
-        no_of_trucks,
-        true,
-      ],
-    )
+//     const result = await client.query(
+//       `INSERT INTO m5_employee (
+//         name, surname, telephonenum, cellnum, employeenum, roleid, email, password, 
+//         base_salary, companyname, location, truckregnum, contact_person, 
+//         subei_reg_num, no_of_trucks, status
+//       ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16) RETURNING *`,
+//       [
+//         name,
+//         surname,
+//         telephonenum,
+//         cellnum,
+//         employeenum,
+//         roleid,
+//         email,
+//         hashedPassword,
+//         base_salary,
+//         companyname,
+//         location,
+//         truckregnum,
+//         contact_person,
+//         subei_reg_num,
+//         no_of_trucks,
+//         true,
+//       ],
+//     )
 
-    res.status(201).json(result.rows[0])
-  } catch (err) {
-    console.error("Error creating employee:", err)
-    res.status(500).json({ error: "Failed to create employee" })
-  }
-})
+//     res.status(201).json(result.rows[0])
+//   } catch (err) {
+//     console.error("Error creating employee:", err)
+//     res.status(500).json({ error: "Failed to create employee" })
+//   }
+// })
 
 // Update employee
 // app.put("/api/employees/:id", verifyToken, async (req, res) => {
@@ -1769,6 +1916,50 @@ app.post("/api/clients", verifyToken, async (req, res) => {
     res.status(500).json({ error: "Failed to create client" })
   }
 })
+
+app.put("/api/clients/:id", verifyToken, async (req, res) => {
+  try {
+    const { id } = req.params
+    const {
+      client: clientName,
+      representative,
+      companyaddress,
+      suburb,
+      postalcode,
+      email,
+      client_reg_num,
+      cellnum,
+      vatregno,
+      city,
+      streetaddress,
+    } = req.body
+
+    const query = `
+      UPDATE m5_client
+      SET client = $1, representative = $2, companyaddress = $3, suburb = $4,
+          postalcode = $5, email = $6, client_reg_num = $7, cellnum = $8,
+          vatregno = $9, city = $10, streetaddress = $11
+      WHERE m5clientkey = $12
+      RETURNING *`
+      
+    const values = [
+      clientName, representative, companyaddress, suburb, postalcode, email,
+      client_reg_num, cellnum, vatregno, city, streetaddress, id,
+    ]
+
+    const result = await client.query(query, values)
+
+    if (result.rowCount === 0) {
+      return res.status(404).json({ error: "Client not found" })
+    }
+
+    res.json(result.rows[0])
+  } catch (err) {
+    console.error(`Error updating client ${req.params.id}:`, err)
+    res.status(500).json({ error: "Failed to update client" })
+  }
+})
+
 
 // Update client
 app.put("/api/clients/:id", verifyToken, async (req, res) => {
@@ -2045,6 +2236,36 @@ app.get("/api/driver-rates", verifyToken, async (req, res) => {
   }
 })
 
+app.put("/api/driver-rates/:id", verifyToken, async (req, res) => {
+  try {
+    const { id } = req.params
+    const { startingpoint, destination, driver_rate, subie_rate } = req.body
+
+    const query = `
+      UPDATE m5_driver_rate
+      SET startingpoint = $1,
+          destination = $2,
+          driver_rate = $3,
+          subie_rate = $4
+      WHERE m5ratekey = $5
+      RETURNING *`
+      
+    const values = [startingpoint, destination, driver_rate, subie_rate, id]
+
+    const result = await client.query(query, values)
+
+    if (result.rowCount === 0) {
+      return res.status(404).json({ error: "Driver rate not found" })
+    }
+
+    res.json(result.rows[0])
+  } catch (err) {
+    console.error(`Error updating driver rate ${req.params.id}:`, err)
+    res.status(500).json({ error: "Failed to update driver rate" })
+  }
+})
+
+
 // Get driver rate by ID
 app.get("/api/driver-rates/:id", verifyToken, async (req, res) => {
   try {
@@ -2074,12 +2295,12 @@ app.get("/api/driver-rates/:id", verifyToken, async (req, res) => {
 app.post("/api/driver-rates", verifyToken, async (req, res) => {
   try {
     // Removed role check
-    const { startingpoint, destination, rate } = req.body
+    const { startingpoint, destination, driver_rate, subie_rate } = req.body
 
     const result = await client.query(
-      `INSERT INTO m5_driver_rate (startingpoint, destination, rate)
-       VALUES ($1, $2, $3) RETURNING *`,
-      [startingpoint, destination, rate],
+      `INSERT INTO m5_driver_rate (startingpoint, destination, driver_rate, subie_rate)
+       VALUES ($1, $2, $3, $4) RETURNING *`,
+      [startingpoint, destination, driver_rate, subie_rate],
     )
 
     res.status(201).json(result.rows[0])

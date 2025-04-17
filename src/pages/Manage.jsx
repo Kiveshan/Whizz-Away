@@ -19,6 +19,14 @@ const Manage = () => {
   const [trucks, setTrucks] = useState([])
   const [driverRates, setDriverRates] = useState([])
   const [subcontractors, setSubcontractors] = useState([])
+  const [editingEmployeeId, setEditingEmployeeId] = useState(null);
+  const [isEditing, setIsEditing] = useState(false)
+const [editingClientId, setEditingClientId] = useState(null)
+const [isEditingRate, setIsEditingRate] = useState(false)
+const [editingRateId, setEditingRateId] = useState(null)
+
+
+
 
   // State for forms
   const [showEmployeeForm, setShowEmployeeForm] = useState(false)
@@ -80,8 +88,8 @@ const [newEmployee, setNewEmployee] = useState({
   const [newDriverRate, setNewDriverRate] = useState({
     startingpoint: "",
     destination: "",
-    rate: "",
-    driverid: "",
+    driver_rate: "",
+    subie_rate: "",
   })
 
   const [newSubcontractor, setNewSubcontractor] = useState({
@@ -152,19 +160,26 @@ const [newEmployee, setNewEmployee] = useState({
   // Handle form submissions
   const handleSaveEmployee = async () => {
     if (!newEmployee.name || !newEmployee.surname || !newEmployee.email || !newEmployee.password) {
-      alert("Please fill in all required fields.")
-      return
+      alert("Please fill in all required fields.");
+      return;
     }
-
-    setLoading(true)
+  
+    setLoading(true);
+  
     try {
-      const response = await axios.post(`${API_URL}/employees`, newEmployee, getAuthHeaders())
-
+      if (editingEmployeeId) {
+        // Update existing employee
+        await axios.put(`${API_URL}/employees/${editingEmployeeId}`, newEmployee, getAuthHeaders());
+      } else {
+        // Create new employee
+        await axios.post(`${API_URL}/employees`, newEmployee, getAuthHeaders());
+      }
+  
       // Refresh employee list
-      const employeesResponse = await axios.get(`${API_URL}/employees`, getAuthHeaders())
-      setEmployees(employeesResponse.data)
-
-      // Reset form
+      const employeesResponse = await axios.get(`${API_URL}/employees`, getAuthHeaders());
+      setEmployees(employeesResponse.data);
+  
+      // Reset form and editing state
       setNewEmployee({
         name: "",
         surname: "",
@@ -183,30 +198,37 @@ const [newEmployee, setNewEmployee] = useState({
         deduction_savings: "",
         deduction_loan: "",
         deduction_damage: "",
-      })
-      setShowEmployeeForm(false)
+      });
+      setEditingEmployeeId(null); // Clear editing state
+      setShowEmployeeForm(false);
     } catch (err) {
-      console.error("Error creating employee:", err)
-      alert(`Error creating employee: ${err.response?.data?.error || err.message}`)
+      console.error("Error saving employee:", err);
+      alert(`Error saving employee: ${err.response?.data?.error || err.message}`);
     } finally {
-      setLoading(false)
+      setLoading(false);
     }
-  }
-
+  };
+  
   const handleSaveClient = async () => {
     if (!newClient.client || !newClient.representative || !newClient.email) {
       alert("Please fill in all required fields.")
       return
     }
-
+  
     setLoading(true)
     try {
-      const response = await axios.post(`${API_URL}/clients`, newClient, getAuthHeaders())
-
+      if (isEditing) {
+        // PUT request to update client
+        await axios.put(`${API_URL}/clients/${editingClientId}`, newClient, getAuthHeaders())
+      } else {
+        // POST request to create client
+        await axios.post(`${API_URL}/clients`, newClient, getAuthHeaders())
+      }
+  
       // Refresh client list
       const clientsResponse = await axios.get(`${API_URL}/clients`, getAuthHeaders())
       setClients(clientsResponse.data)
-
+  
       // Reset form
       setNewClient({
         client: "",
@@ -221,14 +243,17 @@ const [newEmployee, setNewEmployee] = useState({
         city: "",
         streetaddress: "",
       })
+      setEditingClientId(null)
+      setIsEditing(false)
       setShowClientForm(false)
     } catch (err) {
-      console.error("Error creating client:", err)
-      alert(`Error creating client: ${err.response?.data?.error || err.message}`)
+      console.error("Error saving client:", err)
+      alert(`Error saving client: ${err.response?.data?.error || err.message}`)
     } finally {
       setLoading(false)
     }
   }
+  
 
   const handleSaveTruck = async () => {
     if (!newTruck.truckregnum || !newTruck.trailersize) {
@@ -266,35 +291,43 @@ const [newEmployee, setNewEmployee] = useState({
   }
 
   const handleSaveDriverRate = async () => {
-    if (!newDriverRate.startingpoint || !newDriverRate.destination || !newDriverRate.rate) {
+    if (!newDriverRate.startingpoint || !newDriverRate.destination || !newDriverRate.driver_rate || !newDriverRate.subie_rate) {
       alert("Please fill in all required fields.")
       return
     }
-
+  
     setLoading(true)
     try {
-      const response = await axios.post(`${API_URL}/driver-rates`, newDriverRate, getAuthHeaders())
-
-      // Refresh driver rate list
+      if (isEditingRate) {
+        // PUT request for updating
+        await axios.put(`${API_URL}/driver-rates/${editingRateId}`, newDriverRate, getAuthHeaders())
+      } else {
+        // POST request for creating
+        await axios.post(`${API_URL}/driver-rates`, newDriverRate, getAuthHeaders())
+      }
+  
+      // Refresh rate list
       const ratesResponse = await axios.get(`${API_URL}/driver-rates`, getAuthHeaders())
       setDriverRates(ratesResponse.data)
-
+  
       // Reset form
       setNewDriverRate({
         startingpoint: "",
         destination: "",
-        rate: "",
-        driverid: "",
+        driver_rate: "",
+        subie_rate: "",
       })
+      setIsEditingRate(false)
+      setEditingRateId(null)
       setShowDriverRateForm(false)
     } catch (err) {
-      console.error("Error creating driver rate:", err)
-      alert(`Error creating driver rate: ${err.response?.data?.error || err.message}`)
+      console.error("Error saving driver rate:", err)
+      alert(`Error saving driver rate: ${err.response?.data?.error || err.message}`)
     } finally {
       setLoading(false)
     }
   }
-
+  
   const handleSaveSubcontractor = async () => {
     // if (!newSubcontractor.companyname || !newSubcontractor.cellnum) {
     //   alert("Please fill in all required fields.")
@@ -566,9 +599,9 @@ const [newEmployee, setNewEmployee] = useState({
             <tr>
                <th>Starting Point</th>
             <th>Ending Point</th>
-            <th>Current</th>
+            <th>Driver Rate</th>
+            <th>Subie Rate</th>
             <th>Updated at</th>
-            <th>Old</th>
             <th>Changes</th>
             <th>Delete</th>
             </tr>
@@ -578,8 +611,8 @@ const [newEmployee, setNewEmployee] = useState({
               <tr key={rate.m5ratekey}>
                 <td>{rate.startingpoint}</td>
                 <td>{rate.destination}</td>
-                <td>{rate.rate}</td>
-                <td>{ "N/A"}</td>
+                <td>{rate.driver_rate}</td>
+                <td>{rate.subie_rate}</td>
                 <td>{ "N/A"}</td>
                 <td>
                   <button className="manage-edit-button" onClick={() => handleEditDriverRate(rate.m5ratekey)}>
@@ -1099,8 +1132,17 @@ const [newEmployee, setNewEmployee] = useState({
           <input
             type="number"
             className="form-input"
-            value={newDriverRate.rate}
-            onChange={(e) => setNewDriverRate({ ...newDriverRate, rate: e.target.value })}
+            value={newDriverRate.driver_rate}
+            onChange={(e) => setNewDriverRate({ ...newDriverRate, driver_rate: e.target.value })}
+          />
+        </div>
+        <div className="form-field">
+          <label><strong>Subie Rate</strong></label>
+          <input
+            type="number"
+            className="form-input"
+            value={newDriverRate.subie_rate}
+            onChange={(e) => setNewDriverRate({ ...newDriverRate, subie_rate: e.target.value })}
           />
         </div>
   
@@ -1443,25 +1485,64 @@ const RenderSubcontractorForm = ({ setShowSubcontractorForm }) => {
 
   // Edit handlers (placeholders - would need to be implemented)
   const handleEditEmployee = (id) => {
-    console.log(`Edit employee with ID: ${id}`)
-    // Implementation would fetch the employee data and populate a form
-  }
+    const employee = employees.find((e) => e.userid === id);
+    if (employee) {
+      setNewEmployee({
+        name: employee.name,
+        surname: employee.surname,
+        telephonenum: employee.telephonenum,
+        cellnum: employee.cellnum,
+        employeenum: employee.employeenum,
+        roleid: employee.roleid,
+        email: employee.email,
+        password: "", // leave empty for security
+        base_salary: employee.base_salary,
+        deduction_income_tax: employee.deduction_income_tax,
+        deduction_uif: employee.deduction_uif,
+        deduction_bonus: employee.deduction_bonus,
+        deduction_savings: employee.deduction_savings,
+        deduction_loan: employee.deduction_loan,
+        deduction_damage: employee.deduction_damage,
+        deduction_other_deductions: employee.deduction_other_deductions,
+      });
+      setEditingEmployeeId(id);
+      setShowEmployeeForm(true);
+    }
+  };
+  
 
-  const handleEditClient = (id) => {
-    console.log(`Edit client with ID: ${id}`)
-    // Implementation would fetch the client data and populate a form
+  const handleEditClient = async (id) => {
+    try {
+      const response = await axios.get(`${API_URL}/clients/${id}`, getAuthHeaders())
+      setNewClient(response.data)
+      setEditingClientId(id)
+      setIsEditing(true)
+      setShowClientForm(true)
+    } catch (err) {
+      console.error(`Error fetching client ${id}:`, err)
+      alert("Failed to load client for editing.")
+    }
   }
+  
 
   const handleEditTruck = (id) => {
     console.log(`Edit truck with ID: ${id}`)
     // Implementation would fetch the truck data and populate a form
   }
 
-  const handleEditDriverRate = (id) => {
-    console.log(`Edit driver rate with ID: ${id}`)
-    // Implementation would fetch the driver rate data and populate a form
+  const handleEditDriverRate = async (id) => {
+    try {
+      const response = await axios.get(`${API_URL}/driver-rates/${id}`, getAuthHeaders())
+      setNewDriverRate(response.data)
+      setEditingRateId(id)
+      setIsEditingRate(true)
+      setShowDriverRateForm(true)
+    } catch (err) {
+      console.error(`Error fetching driver rate ${id}:`, err)
+      alert("Failed to load driver rate for editing.")
+    }
   }
-
+  
   const handleEditSubcontractor = (id) => {
     console.log(`Edit subcontractor with ID: ${id}`)
     // Implementation would fetch the subcontractor data and populate a form
