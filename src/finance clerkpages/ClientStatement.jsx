@@ -285,7 +285,7 @@ const ClientStatement = () => {
         <button
           className="back-btn"
           onClick={() =>
-            navigate("/statements-list", { state: { clientId: statement.client.clientid || statement.clientid } })
+            navigate("/statements-list", { state: { clientId: statement.client.id } })
           }
         >
           Back
