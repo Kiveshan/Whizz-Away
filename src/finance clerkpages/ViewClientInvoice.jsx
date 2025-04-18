@@ -25,7 +25,7 @@ const ViewClientInvoice = () => {
         setError(null)
 
         // Fetch clients from the database
-        const response = await fetch("/api/clients-list")
+        const response = await fetch("/api/clients")
 
         if (!response.ok) {
           let errorMessage = `HTTP error! Status: ${response.status}`
@@ -48,8 +48,30 @@ const ViewClientInvoice = () => {
 
         const data = await response.json()
 
+        // Debug the response to see its structure
+        debug("API Response:", data)
+
         if (isMounted) {
-          setClients(data.data || [])
+          // Handle different response formats
+          // If data is an object with a rows property (like result.rows)
+          if (data && data.rows) {
+            setClients(data.rows)
+          }
+          // If data is already an array
+          else if (Array.isArray(data)) {
+            setClients(data)
+          }
+          // If data has a data property that is an array
+          else if (data && data.data && Array.isArray(data.data)) {
+            setClients(data.data)
+          }
+          // If we can't determine the format, set an empty array
+          else {
+            console.error("Unexpected data format:", data)
+            setClients([])
+            setError("Received data in an unexpected format. Check console for details.")
+          }
+
           setLoading(false)
         }
       } catch (err) {
@@ -133,4 +155,3 @@ const ViewClientInvoice = () => {
 }
 
 export default ViewClientInvoice
-
