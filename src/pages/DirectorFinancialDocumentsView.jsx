@@ -1,35 +1,42 @@
-import React, { useState, useEffect } from "react";
-import { useNavigate } from "react-router-dom";
-import axios from "axios";
-import "../finance clerkpages/css/ViewClientInstruction.css";
+"use client"
+
+import { useState, useEffect } from "react"
+import { useNavigate } from "react-router-dom"
+import axios from "axios"
+import "../finance clerkpages/css/ViewClientInstruction.css"
 
 const DirectorFinancialDocumentsView = () => {
-  const navigate = useNavigate();
-  const [clients, setClients] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
+  const navigate = useNavigate()
+  const [clients, setClients] = useState([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState(null)
 
   useEffect(() => {
     const fetchClients = async () => {
       try {
-        setLoading(true);
-        const response = await axios.get("http://localhost:5000/api/clients");
-        
-        if (response.data.success) {
-          setClients(response.data.data);
+        setLoading(true)
+        const response = await axios.get("http://localhost:5000/api/clients")
+
+        // Handle both response formats - either an object with success/data or direct array
+        const clientsData = response.data.data || response.data
+
+        // Ensure we have an array before setting state
+        if (Array.isArray(clientsData)) {
+          setClients(clientsData)
         } else {
-          setError("Failed to fetch clients");
+          console.error("Unexpected response format:", response.data)
+          setError("Received invalid data format from server")
         }
       } catch (err) {
-        console.error("Error fetching clients:", err);
-        setError("An error occurred while fetching clients");
+        console.error("Error fetching clients:", err)
+        setError("An error occurred while fetching clients")
       } finally {
-        setLoading(false);
+        setLoading(false)
       }
-    };
+    }
 
-    fetchClients();
-  }, []);
+    fetchClients()
+  }, [])
 
   return (
     <div className="">
@@ -47,7 +54,7 @@ const DirectorFinancialDocumentsView = () => {
       {/* Table */}
       {!loading && !error && (
         <div className="clientinstructiontable">
-          <table className="t1" style={{width: "70%", marginLeft:"350px"}}>
+          <table className="t1" style={{ width: "70%", marginLeft: "350px" }}>
             <thead className="bg-blue-300">
               <tr>
                 <th className="p-3">Company</th>
@@ -64,14 +71,16 @@ const DirectorFinancialDocumentsView = () => {
                     <td className="p-3">{client.representative}</td>
                     <td className="p-3">{client.email}</td>
                     <td className="p-3">
-                      <button 
-                        className="view-butn" 
-                        onClick={() => navigate("/DirectorClientDocuments", { 
-                          state: { 
-                            clientId: client.m5clientkey,
-                            clientName: client.companyname 
-                          } 
-                        })}
+                      <button
+                        className="view-butn"
+                        onClick={() =>
+                          navigate("/DirectorClientDocuments", {
+                            state: {
+                              clientId: client.m5clientkey,
+                              clientName: client.companyname,
+                            },
+                          })
+                        }
                       >
                         View
                       </button>
@@ -80,7 +89,9 @@ const DirectorFinancialDocumentsView = () => {
                 ))
               ) : (
                 <tr>
-                  <td colSpan="4" className="p-3 text-center">No clients found</td>
+                  <td colSpan="4" className="p-3 text-center">
+                    No clients found
+                  </td>
                 </tr>
               )}
             </tbody>
@@ -88,7 +99,7 @@ const DirectorFinancialDocumentsView = () => {
         </div>
       )}
     </div>
-  );
-};
+  )
+}
 
-export default DirectorFinancialDocumentsView;
+export default DirectorFinancialDocumentsView
