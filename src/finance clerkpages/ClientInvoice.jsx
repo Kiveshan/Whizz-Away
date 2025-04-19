@@ -44,6 +44,12 @@ const ClientInvoice = () => {
 
   const invoiceRef = useRef(null)
 
+  // Auth helper function to get token from localStorage
+  const getAuthHeader = () => {
+    const token = localStorage.getItem("token");
+    return token ? { "Authorization": `Bearer ${token}` } : {};
+  };
+
   useEffect(() => {
     let isMounted = true
 
@@ -60,8 +66,17 @@ const ClientInvoice = () => {
         const requestUrl = `/api/invoices/${id}`
         debug("Fetching invoice data from:", requestUrl)
 
-        const response = await fetch(requestUrl)
+        const response = await fetch(requestUrl, {
+          headers: getAuthHeader()
+        })
+        
         debug("Response status:", response.status)
+
+        if (response.status === 401 || response.status === 403) {
+          // Handle unauthorized or forbidden
+          navigate("/login");
+          return;
+        }
 
         if (!response.ok) {
           let errorMessage = `HTTP error! Status: ${response.status}`
@@ -112,7 +127,7 @@ const ClientInvoice = () => {
     return () => {
       isMounted = false
     }
-  }, [id])
+  }, [id, navigate])
 
   // Calculate VAT based on percentage from database or use vat_amount if available
   const calculateVAT = (amount) => {
@@ -310,37 +325,36 @@ const ClientInvoice = () => {
           </table>
 
           {/* Container Details */}
-{/* Container Details */}
-<div className="container-section">
-  <table className="container-table5">
-    <thead>
-      <tr>
-        <th className="container-number-header">Container Number</th>
-        {/* Only show weight header if at least one container has a non-empty weight */}
-        {containers.some(container => container.weight && container.weight !== "N/A") && (
-          <th className="weight-header">Weight</th>
-        )}
-      </tr>
-    </thead>
-    <tbody>
-    {containers.length > 0 ? (
-      containers.map((container, index) => {
-        return (
-          <tr key={index}>
-            <td className="container-number">{container.container_number || `Container ${index + 1}`}</td>
-            {container.weight && container.weight !== "N/A" && (
-              <td className="weight">{container.weight}</td>
-            )}
-          </tr>
-        )
-      })
-    ) : (
-      <tr>
-        <td className="container-number">No container information</td>
-      </tr>
-    )}
-    </tbody>
-  </table>
+          <div className="container-section">
+            <table className="container-table5">
+              <thead>
+                <tr>
+                  <th className="container-number-header">Container Number</th>
+                  {/* Only show weight header if at least one container has a non-empty weight */}
+                  {containers.some(container => container.weight && container.weight !== "N/A") && (
+                    <th className="weight-header">Weight</th>
+                  )}
+                </tr>
+              </thead>
+              <tbody>
+              {containers.length > 0 ? (
+                containers.map((container, index) => {
+                  return (
+                    <tr key={index}>
+                      <td className="container-number">{container.container_number || `Container ${index + 1}`}</td>
+                      {container.weight && container.weight !== "N/A" && (
+                        <td className="weight">{container.weight}</td>
+                      )}
+                    </tr>
+                  )
+                })
+              ) : (
+                <tr>
+                  <td className="container-number">No container information</td>
+                </tr>
+              )}
+              </tbody>
+            </table>
             {/* Summary Table */}
             <div className="summary-section">
               <table className="container-table5">
@@ -415,4 +429,3 @@ const ClientInvoice = () => {
 }
 
 export default ClientInvoice
-

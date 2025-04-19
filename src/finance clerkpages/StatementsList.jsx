@@ -12,6 +12,12 @@ const StatementList = () => {
   const [error, setError] = useState(null);
   const [filters, setFilters] = useState({ year: "", month: "" });
 
+  // Auth helper function to get token from localStorage
+  const getAuthHeader = () => {
+    const token = localStorage.getItem("token");
+    return token ? { "Authorization": `Bearer ${token}` } : {};
+  };
+
   useEffect(() => {
     if (!clientId) {
       setError("No client selected");
@@ -25,7 +31,16 @@ const StatementList = () => {
         if (filters.year) url.searchParams.append("year", filters.year);
         if (filters.month) url.searchParams.append("month", filters.month);
 
-        const response = await fetch(url);
+        const response = await fetch(url, {
+          headers: getAuthHeader()
+        });
+        
+        if (response.status === 401 || response.status === 403) {
+          // Handle unauthorized or forbidden
+          navigate("/login");
+          return;
+        }
+        
         if (!response.ok) throw new Error("Failed to fetch statements");
         const data = await response.json();
 
@@ -43,7 +58,7 @@ const StatementList = () => {
     };
 
     fetchStatements();
-  }, [clientId, filters]);
+  }, [clientId, filters, navigate]);
 
   const handleFilterChange = (e) => {
     const { name, value } = e.target;
