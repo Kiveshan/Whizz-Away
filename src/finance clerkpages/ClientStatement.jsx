@@ -40,7 +40,7 @@ const ClientStatement = () => {
         
         if (response.status === 401 || response.status === 403) {
           // Handle unauthorized or forbidden
-          navigate("/login");
+          navigate("/");
           return;
         }
         
