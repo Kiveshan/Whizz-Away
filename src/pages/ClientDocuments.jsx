@@ -2,7 +2,6 @@
 
 import { useState, useEffect } from "react"
 import { useNavigate, useLocation } from "react-router-dom"
-import axios from "axios"
 import "../css/ClientDocuments.css"
 
 const ClientDocuments = () => {
@@ -19,6 +18,12 @@ const ClientDocuments = () => {
   const [filter, setFilter] = useState("All")
   const [yearFilter, setYearFilter] = useState("")
   const [monthFilter, setMonthFilter] = useState("")
+
+  // Auth helper function to get token from localStorage
+  const getAuthHeader = () => {
+    const token = localStorage.getItem("token");
+    return token ? { "Authorization": `Bearer ${token}` } : {};
+  };
 
   // Fetch instructions when filters change
   useEffect(() => {
@@ -40,20 +45,34 @@ const ClientDocuments = () => {
           monthNumber = monthNames.indexOf(monthFilter) + 1
         }
         
-        // Call the API with filters
-        const response = await axios.get(`http://localhost:5000/api/client-instructions/${clientId}`, {
-          params: {
-            year: yearFilter || undefined,
-            month: monthNumber || undefined,
-            type: filter === "All" ? undefined : filter
-          }
-        })
+        // Build query parameters
+        const params = new URLSearchParams()
+        if (yearFilter) params.append("year", yearFilter)
+        if (monthNumber) params.append("month", monthNumber)
+        if (filter !== "All") params.append("type", filter)
         
-        if (response.data.success) {
-          setInstructions(response.data.data)
+        // Call the API with filters using fetch instead of axios
+        const response = await fetch(`/api/client-instructions/${clientId}?${params.toString()}`, {
+          headers: getAuthHeader()
+        });
+        
+        if (response.status === 401 || response.status === 403) {
+          // Handle unauthorized or forbidden
+          navigate("/");
+          return;
+        }
+        
+        if (!response.ok) {
+          throw new Error(`HTTP error! Status: ${response.status}`);
+        }
+        
+        const data = await response.json();
+        
+        if (data.success) {
+          setInstructions(data.data)
           setError(null)
         } else {
-          setError(response.data.message || "Failed to fetch instructions")
+          setError(data.message || "Failed to fetch instructions")
           setInstructions([])
         }
       } catch (err) {
@@ -66,7 +85,7 @@ const ClientDocuments = () => {
     }
 
     fetchInstructions()
-  }, [clientId, filter, yearFilter, monthFilter])
+  }, [clientId, filter, yearFilter, monthFilter, navigate])
 
   // Navigation handler
   const handleBack = () => {
