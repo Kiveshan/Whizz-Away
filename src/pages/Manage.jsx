@@ -24,6 +24,8 @@ const Manage = () => {
 const [editingClientId, setEditingClientId] = useState(null)
 const [isEditingRate, setIsEditingRate] = useState(false)
 const [editingRateId, setEditingRateId] = useState(null)
+const [editTruckId, setEditTruckId] = useState(null)
+
 
 
 
@@ -260,16 +262,18 @@ const [newEmployee, setNewEmployee] = useState({
       alert("Please fill in all required fields.")
       return
     }
-
+  
     setLoading(true)
     try {
-      const response = await axios.post(`${API_URL}/trucks`, newTruck, getAuthHeaders())
-
-      // Refresh truck list
+      if (editTruckId) {
+        await axios.put(`${API_URL}/trucks/${editTruckId}`, newTruck, getAuthHeaders())
+      } else {
+        await axios.post(`${API_URL}/trucks`, newTruck, getAuthHeaders())
+      }
+  
       const trucksResponse = await axios.get(`${API_URL}/trucks`, getAuthHeaders())
       setTrucks(trucksResponse.data)
-
-      // Reset form
+  
       setNewTruck({
         truckregnum: "",
         trailersize: "",
@@ -281,14 +285,16 @@ const [newEmployee, setNewEmployee] = useState({
         vin_num: "",
         is_subcontractor: false,
       })
+      setEditTruckId(null)
       setShowTruckForm(false)
     } catch (err) {
-      console.error("Error creating truck:", err)
-      alert(`Error creating truck: ${err.response?.data?.error || err.message}`)
+      console.error(editTruckId ? "Error updating truck:" : "Error creating truck:", err)
+      alert(`Error: ${err.response?.data?.error || err.message}`)
     } finally {
       setLoading(false)
     }
   }
+  
 
   const handleSaveDriverRate = async () => {
     if (!newDriverRate.startingpoint || !newDriverRate.destination || !newDriverRate.driver_rate || !newDriverRate.subie_rate) {
@@ -1106,8 +1112,9 @@ const [newEmployee, setNewEmployee] = useState({
       </div>
   
       <button onClick={handleSaveTruck} className="manage-save-button" disabled={loading}>
-        {loading ? "Saving..." : "Add Truck"}
-      </button>
+  {loading ? "Saving..." : editTruckId ? "Update Truck" : "Add Truck"}
+</button>
+
     </div>
   );
   
@@ -1526,9 +1533,14 @@ const RenderSubcontractorForm = ({ setShowSubcontractorForm }) => {
   
 
   const handleEditTruck = (id) => {
-    console.log(`Edit truck with ID: ${id}`)
-    // Implementation would fetch the truck data and populate a form
+    const truckToEdit = trucks.find((t) => t.m5truckskey === id)
+    if (truckToEdit) {
+      setNewTruck(truckToEdit)
+      setEditTruckId(id)
+      setShowTruckForm(true)
+    }
   }
+  
 
   const handleEditDriverRate = async (id) => {
     try {

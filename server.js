@@ -2128,69 +2128,126 @@ app.post("/api/trucks", verifyToken, async (req, res) => {
   }
 })
 
-// Update truck
+// Update existing truck
 app.put("/api/trucks/:id", verifyToken, async (req, res) => {
   try {
     const { id } = req.params
+    const {
+      truckregnum,
+      trailersize,
+      truckpurchasedate,
+      year,
+      model,
+      purchase_price,
+      current_evaluation,
+      vin_num,
+      is_subcontractor
+    } = req.body
 
-    // Removed role check
-    // Check if truck exists
-    const checkResult = await client.query("SELECT * FROM m5_trucks WHERE m5truckskey = $1", [id])
+    const query = `
+      UPDATE m5_trucks SET
+        truckregnum = $1,
+        trailersize = $2,
+        truckpurchasedate = $3,
+        year = $4,
+        model = $5,
+        purchase_price = $6,
+        current_evaluation = $7,
+        vin_num = $8,
+        is_subcontractor = $9
+      WHERE m5truckskey = $10
+      RETURNING *`
 
-    if (checkResult.rows.length === 0) {
-      return res.status(404).json({ message: "Truck not found" })
-    }
-
-    // Build the update query dynamically based on provided fields
-    const updateFields = []
-    const queryParams = []
-    let paramCounter = 1
-
-    const updateableFields = [
-      "truckregnum",
-      "trailersize",
-      "truckpurchasedate",
-      "year",
-      "model",
-      "purchase_price",
-      "current_evaluation",
-      "vin_num",
-      "is_subcontractor",
-      "company_reg_num"
+    const values = [
+      truckregnum,
+      trailersize,
+      truckpurchasedate,
+      year,
+      model,
+      purchase_price,
+      current_evaluation,
+      vin_num,
+      is_subcontractor,
+      id
     ]
 
-    // Build the SET clause
-    for (const field of updateableFields) {
-      if (req.body[field] !== undefined) {
-        updateFields.push(`${field} = $${paramCounter}`)
-        queryParams.push(req.body[field])
-        paramCounter++
-      }
+    const result = await client.query(query, values)
+
+    if (result.rowCount === 0) {
+      return res.status(404).json({ error: "Truck not found" })
     }
-
-    // If no fields to update, return early
-    if (updateFields.length === 0) {
-      return res.status(400).json({ message: "No fields to update" })
-    }
-
-    // Add the truck ID as the last parameter
-    queryParams.push(id)
-
-    const updateQuery = `
-      UPDATE m5_trucks 
-      SET ${updateFields.join(", ")} 
-      WHERE m5truckskey = $${paramCounter} 
-      RETURNING *
-    `
-
-    const result = await client.query(updateQuery, queryParams)
 
     res.json(result.rows[0])
   } catch (err) {
-    console.error(`Error updating truck ${req.params.id}:`, err)
+    console.error("Error updating truck:", err)
     res.status(500).json({ error: "Failed to update truck" })
   }
 })
+
+
+// Update truck
+// app.put("/api/trucks/:id", verifyToken, async (req, res) => {
+//   try {
+//     const { id } = req.params
+
+//     // Removed role check
+//     // Check if truck exists
+//     const checkResult = await client.query("SELECT * FROM m5_trucks WHERE m5truckskey = $1", [id])
+
+//     if (checkResult.rows.length === 0) {
+//       return res.status(404).json({ message: "Truck not found" })
+//     }
+
+//     // Build the update query dynamically based on provided fields
+//     const updateFields = []
+//     const queryParams = []
+//     let paramCounter = 1
+
+//     const updateableFields = [
+//       "truckregnum",
+//       "trailersize",
+//       "truckpurchasedate",
+//       "year",
+//       "model",
+//       "purchase_price",
+//       "current_evaluation",
+//       "vin_num",
+//       "is_subcontractor",
+//       "company_reg_num"
+//     ]
+
+//     // Build the SET clause
+//     for (const field of updateableFields) {
+//       if (req.body[field] !== undefined) {
+//         updateFields.push(`${field} = $${paramCounter}`)
+//         queryParams.push(req.body[field])
+//         paramCounter++
+//       }
+//     }
+
+//     // If no fields to update, return early
+//     if (updateFields.length === 0) {
+//       return res.status(400).json({ message: "No fields to update" })
+//     }
+
+//     // Add the truck ID as the last parameter
+//     queryParams.push(id)
+
+//     const updateQuery = `
+//       UPDATE m5_trucks 
+//       SET ${updateFields.join(", ")} 
+//       WHERE m5truckskey = $${paramCounter} 
+//       RETURNING *
+//     `
+
+//     const result = await client.query(updateQuery, queryParams)
+
+//     res.json(result.rows[0])
+//   } catch (err) {
+//     console.error(`Error updating truck ${req.params.id}:`, err)
+//     res.status(500).json({ error: "Failed to update truck" })
+//   }
+// })
 
 // Delete truck
 app.delete("/api/trucks/:id", verifyToken, async (req, res) => {
