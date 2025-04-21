@@ -19,6 +19,12 @@ const ClientStatement = () => {
   // Add ref for PDF generation
   const statementRef = useRef(null)
 
+  // Auth helper function to get token from localStorage
+  const getAuthHeader = () => {
+    const token = localStorage.getItem("token");
+    return token ? { "Authorization": `Bearer ${token}` } : {};
+  };
+
   useEffect(() => {
     if (!statementId) {
       setError("No statement selected")
@@ -28,7 +34,16 @@ const ClientStatement = () => {
 
     const fetchStatement = async () => {
       try {
-        const response = await fetch(`/api/statement/${statementId}`)
+        const response = await fetch(`/api/statement/${statementId}`, {
+          headers: getAuthHeader()
+        })
+        
+        if (response.status === 401 || response.status === 403) {
+          // Handle unauthorized or forbidden
+          navigate("/");
+          return;
+        }
+        
         if (!response.ok) throw new Error("Failed to fetch statement")
         const data = await response.json()
 
@@ -46,7 +61,7 @@ const ClientStatement = () => {
     }
 
     fetchStatement()
-  }, [statementId])
+  }, [statementId, navigate])
 
   // Update the generatePDF function to better handle page breaks and avoid blank pages
   const generatePDF = () => {

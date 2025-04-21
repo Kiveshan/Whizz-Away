@@ -10,11 +10,26 @@ const ViewClientStatement = () => {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
 
+  // Auth helper function to get token from localStorage
+  const getAuthHeader = () => {
+    const token = localStorage.getItem("token");
+    return token ? { "Authorization": `Bearer ${token}` } : {};
+  };
+
   useEffect(() => {
     // Fetch clients when component mounts
     const fetchClients = async () => {
       try {
-        const response = await fetch("/api/clients")
+        const response = await fetch("/api/clients", {
+          headers: getAuthHeader()
+        })
+        
+        if (response.status === 401 || response.status === 403) {
+          // Handle unauthorized or forbidden
+          navigate("/");
+          return;
+        }
+        
         if (!response.ok) {
           throw new Error("Failed to fetch clients")
         }
@@ -39,7 +54,7 @@ const ViewClientStatement = () => {
     }
 
     fetchClients()
-  }, [])
+  }, [navigate])
 
   return (
     <div className="">

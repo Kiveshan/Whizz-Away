@@ -42,6 +42,12 @@ const InvoicesList = () => {
   // Skip initial render to prevent auto-filtering on page load
   const [isInitialRender, setIsInitialRender] = useState(true)
 
+  // Auth helper function to get token from localStorage
+  const getAuthHeader = () => {
+    const token = localStorage.getItem("token");
+    return token ? { "Authorization": `Bearer ${token}` } : {};
+  };
+
   // Fetch instructions when component mounts or filters change
   useEffect(() => {
     let isMounted = true
@@ -68,8 +74,17 @@ const InvoicesList = () => {
         const requestUrl = `/api/invoices/completed?${params.toString()}`
         debug("Fetching from:", requestUrl)
 
-        const response = await fetch(requestUrl)
+        const response = await fetch(requestUrl, {
+          headers: getAuthHeader()
+        })
+        
         debug("Response status:", response.status)
+
+        if (response.status === 401 || response.status === 403) {
+          // Handle unauthorized or forbidden
+          navigate("/");
+          return;
+        }
 
         if (!response.ok) {
           let errorMessage = `HTTP error! Status: ${response.status}`
@@ -129,7 +144,7 @@ const InvoicesList = () => {
     return () => {
       isMounted = false
     }
-  }, [filters, isInitialRender]) // dependencies include isInitialRender
+  }, [filters, isInitialRender, navigate]) // dependencies include isInitialRender
 
   // Handle year and month filter changes - use useCallback to memoize
   const handleFilterChange = useCallback((e) => {
@@ -291,4 +306,3 @@ const InvoicesList = () => {
 }
 
 export default InvoicesList
-

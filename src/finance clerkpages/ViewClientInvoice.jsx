@@ -16,6 +16,12 @@ const ViewClientInvoice = () => {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
 
+  // Auth helper function to get token from localStorage
+  const getAuthHeader = () => {
+    const token = localStorage.getItem("token");
+    return token ? { "Authorization": `Bearer ${token}` } : {};
+  };
+
   useEffect(() => {
     let isMounted = true
 
@@ -24,8 +30,16 @@ const ViewClientInvoice = () => {
         setLoading(true)
         setError(null)
 
-        // Fetch clients from the database
-        const response = await fetch("/api/clients")
+        // Fetch clients from the database with auth header
+        const response = await fetch("/api/clients", {
+          headers: getAuthHeader()
+        })
+
+        if (response.status === 401 || response.status === 403) {
+          // Handle unauthorized or forbidden
+          navigate("/");
+          return;
+        }
 
         if (!response.ok) {
           let errorMessage = `HTTP error! Status: ${response.status}`
@@ -89,7 +103,7 @@ const ViewClientInvoice = () => {
     return () => {
       isMounted = false
     }
-  }, [])
+  }, [navigate])
 
   const handleViewInvoices = useCallback(
     (client) => {

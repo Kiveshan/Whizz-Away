@@ -973,7 +973,7 @@ app.post("/api/admin/user-status", verifyToken, async (req, res) => {
 // === INVOICES ROUTES ===
 
 // GET all completed instructions for invoices
-app.get("/api/invoices/completed" , async (req, res) => {
+app.get("/api/invoices/completed" ,verifyToken , async (req, res) => {
   try {
     if (!pool) {
       return res.status(503).json({
@@ -1064,7 +1064,7 @@ app.get("/api/invoices/completed" , async (req, res) => {
 })
 
 // GET specific instruction details for invoice
-app.get("/api/invoices/:id" , async (req, res) => {
+app.get("/api/invoices/:id" ,verifyToken ,  async (req, res) => {
   try {
     if (!pool) {
       return res.status(503).json({
@@ -1410,7 +1410,7 @@ async function generateMonthlyStatements() {
   }
 }
 // GET statements for a specific client
-app.get("/api/statements/:clientId", async (req, res) => {
+app.get("/api/statements/:clientId", verifyToken ,async (req, res) => {
   try {
     if (!pool) {
       return res.status(503).json({
@@ -1467,7 +1467,7 @@ app.get("/api/statements/:clientId", async (req, res) => {
 });
 
 
-app.get("/api/statement/:statementId", async (req, res) => {
+app.get("/api/statement/:statementId", verifyToken ,async (req, res) => {
   try {
     if (!pool) {
       return res.status(503).json({
@@ -1583,7 +1583,7 @@ cron.schedule('0 1 1 * *', async () => {
 
 
 // GET all instructions for a specific client
-app.get("/api/client-instructions/:clientId", async (req, res) => {
+app.get("/api/client-instructions/:clientId", verifyToken ,async (req, res) => {
   try {
     if (!pool) {
       return res.status(503).json({
