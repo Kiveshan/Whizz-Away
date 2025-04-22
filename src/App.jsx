@@ -1,7 +1,7 @@
 "use client"
 
 import React from "react"
-import { BrowserRouter as Router, Routes, Route, useLocation } from "react-router-dom"
+import { BrowserRouter as Router, Routes, Route, useLocation, Navigate } from "react-router-dom"
 import Header from "./components/Header"
 import Footer from "./components/Footer" // Import the Footer component
 import LogoutButton from "./components/LogoutButton"
@@ -167,13 +167,14 @@ function DynamicHeader() {
   }
 
   const getTitle = () => {
-    if (location.pathname.startsWith("/upload")) return "Proof of Payment";
+    if (location.pathname.startsWith("/upload")) return "Upload Proof of Payment"
+    if (location.pathname.startsWith("/invoice/")) return "Tax Invoice"
     if (location.pathname.startsWith("/ExpenseDetails/")) return "Fuel Expenses";
     if (location.pathname.startsWith("/finance-clerk-wage-details/")) return "Wages";
     if (location.pathname.startsWith("/DirectorExpenses/")) return "Fuel Expenses";
     if (location.pathname.startsWith("/finance-clerk-wage-slip/")) return "Wages";
-    return titleMap[location.pathname] || "Unknown Page";
-  };
+    return titleMap[location.pathname] || "Unknown Page"
+  }
 
   if (["/login", "/register", "/", "/new-landing"].includes(location.pathname)) {
     return null
@@ -264,6 +265,13 @@ function ContentWrapper() {
         <Route path="/ExpenseSubmission" element={<ExpenseSubmission />} />
         <Route path="/ViewClientInstruction" element={<ViewClientInstruction />} />
         <Route path="/ViewClientInvoice" element={<ViewClientInvoice />} />
+
+        {/* Add this route to handle /invoice without an ID */}
+        <Route path="/invoice" element={<Navigate to="/invoices" replace />} />
+
+        {/* Add the routes for invoice viewing and downloading */}
+        <Route path="/invoice/:id" element={<ClientInvoice />} />
+        <Route path="/invoice/:id/download" element={<ClientInvoice />} />
         <Route path="/DebtorsDashboard" element={<DebtorsDashboard />} />
         <Route path="/CreditorsDashboard" element={<CreditorsDashboard />} />
         <Route path="/FClerkLegDetails" element={<FClerkLegDetails />} />
