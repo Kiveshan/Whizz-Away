@@ -2557,75 +2557,114 @@ app.post("/api/subcontractors", verifyToken, async (req, res) => {
 
 
 // Update subcontractor
+
 app.put("/api/subcontractors/:id", verifyToken, async (req, res) => {
   try {
-    const { id } = req.params
+    const { id } = req.params;
+    const {
+      cellnum, email, companyname, location,
+      truckregnum, contact_person, subei_reg_num,
+      no_of_trucks, subdrivername
+    } = req.body;
 
-    // Removed role check
-    // Check if subcontractor exists
-    const checkResult = await client.query("SELECT * FROM m5_employee WHERE userid = $1 AND roleid = 6", [id])
-
-    if (checkResult.rows.length === 0) {
-      return res.status(404).json({ message: "Subcontractor not found" })
-    }
-
-    // Build the update query dynamically based on provided fields
-    const updateFields = []
-    const queryParams = []
-    let paramCounter = 1
-
-    const updateableFields = [
-      "name",
-      "surname",
-      "telephonenum",
-      "cellnum",
-      "email",
-      "companyname",
-      "location",
-      "truckregnum",
-      "contact_person",
-      "no_of_trucks",
-      "company_reg_num"
-    ]
-
-    // Add password to updateable fields if provided
-    if (req.body.password) {
-      updateableFields.push("password")
-      req.body.password = await bcrypt.hash(req.body.password, 10)
-    }
-
-    // Build the SET clause
-    for (const field of updateableFields) {
-      if (req.body[field] !== undefined) {
-        updateFields.push(`${field} = $${paramCounter}`)
-        queryParams.push(req.body[field])
-        paramCounter++
-      }
-    }
-
-    // If no fields to update, return early
-    if (updateFields.length === 0) {
-      return res.status(400).json({ message: "No fields to update" })
-    }
-
-    // Add the subcontractor ID as the last parameter
-    queryParams.push(id)
+    // Validate input as needed...
 
     const updateQuery = `
-      UPDATE m5_employee 
-      SET ${updateFields.join(", ")} 
-      WHERE userid = $${paramCounter} AND roleid = 6
-      RETURNING *
-    `
+      UPDATE subcontractors SET
+        companyname = $1,
+        location = $2,
+        contact_person = $3,
+        cellnum = $4,
+        email = $5,
+        subei_reg_num = $6,
+        no_of_trucks = $7,
+        truckregnum = $8,
+        subdrivername = $9
+      WHERE id = $10
+    `;
 
-    const result = await client.query(updateQuery, queryParams)
+    await client.query(updateQuery, [
+      companyname, location, contact_person,
+      cellnum, email, subei_reg_num,
+      no_of_trucks, truckregnum, subdrivername, id
+    ]);
 
-    res.json(result.rows[0])
-  } catch (err) {
-    console.error(`Error updating subcontractor ${req.params.id}:`, err)
-    res.status(500).json({ error: "Failed to update subcontractor" })
+    res.status(200).json({ message: "Subcontractor updated successfully." });
+  } catch (error) {
+    console.error("Update error:", error);
+    res.status(500).json({ error: "Failed to update subcontractor." });
   }
-})
+});
+
+// app.put("/api/subcontractors/:id", verifyToken, async (req, res) => {
+//   try {
+//     const { id } = req.params
+
+//     // Removed role check
+//     // Check if subcontractor exists
+//     const checkResult = await client.query("SELECT * FROM m5_employee WHERE userid = $1 AND roleid = 6", [id])
+
+//     if (checkResult.rows.length === 0) {
+//       return res.status(404).json({ message: "Subcontractor not found" })
+//     }
+
+//     // Build the update query dynamically based on provided fields
+//     const updateFields = []
+//     const queryParams = []
+//     let paramCounter = 1
+
+//     const updateableFields = [
+//       "name",
+//       "surname",
+//       "telephonenum",
+//       "cellnum",
+//       "email",
+//       "companyname",
+//       "location",
+//       "truckregnum",
+//       "contact_person",
+//       "no_of_trucks",
+//       "company_reg_num"
+//     ]
+
+//     // Add password to updateable fields if provided
+//     if (req.body.password) {
+//       updateableFields.push("password")
+//       req.body.password = await bcrypt.hash(req.body.password, 10)
+//     }
+
+//     // Build the SET clause
+//     for (const field of updateableFields) {
+//       if (req.body[field] !== undefined) {
+//         updateFields.push(`${field} = $${paramCounter}`)
+//         queryParams.push(req.body[field])
+//         paramCounter++
+//       }
+//     }
+
+//     // If no fields to update, return early
+//     if (updateFields.length === 0) {
+//       return res.status(400).json({ message: "No fields to update" })
+//     }
+
+//     // Add the subcontractor ID as the last parameter
+//     queryParams.push(id)
+
+//     const updateQuery = `
+//       UPDATE m5_employee 
+//       SET ${updateFields.join(", ")} 
+//       WHERE userid = $${paramCounter} AND roleid = 6
+//       RETURNING *
+//     `
+
+//     const result = await client.query(updateQuery, queryParams)
+
+//     res.json(result.rows[0])
+//   } catch (err) {
+//     console.error(`Error updating subcontractor ${req.params.id}:`, err)
+//     res.status(500).json({ error: "Failed to update subcontractor" })
+//   }
+// })
 
 // Toggle subcontractor status (enable/disable)
 app.put("/api/subcontractors/:id/toggle-status", verifyToken, async (req, res) => {

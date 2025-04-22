@@ -334,61 +334,58 @@ const [newEmployee, setNewEmployee] = useState({
     }
   }
   
-  const handleSaveSubcontractor = async () => {
-    // if (!newSubcontractor.companyname || !newSubcontractor.cellnum) {
-    //   alert("Please fill in all required fields.")
-    //   return
-    // }
-  
-    setLoading(true)
-    try {
-      // Extract truck reg numbers and driver names from the trucks array
-      const truckRegNums = newSubcontractor.trucks
-        .map(truck => truck.reg.trim())
-        .filter(Boolean)
-        .join(',');
-        
-      const subDriverNames = newSubcontractor.trucks
-        .map(truck => truck.driver.trim())
-        .filter(Boolean)
-        .join(',');
-  
-      // Format the data before sending
-      const subcontractorData = {
-        ...newSubcontractor,
-        truckregnum: truckRegNums || newSubcontractor.truckregnum, // Use extracted values or main truck reg
-        SubDriverName: subDriverNames,
-        // We don't need to send the trucks array to the backend
-        trucks: undefined
-      };
-  
-      const response = await axios.post(`${API_URL}/subcontractors`, subcontractorData, getAuthHeaders())
-  
-      // Refresh subcontractor list
-      const subcontractorsResponse = await axios.get(`${API_URL}/subcontractors`, getAuthHeaders())
-      setSubcontractors(subcontractorsResponse.data)
-  
-      // Reset form
-      setNewSubcontractor({
-        companyname: "",
-        location: "",
-        contact_person: "",
-        cellnum: "",
-        email: "",
-        subei_reg_num: "",
-        no_of_trucks: 0,
-        truckregnum: "",
-        SubDriverName: "",
-        trucks: [],
-      })
-      setShowSubcontractorForm(false)
-    } catch (err) {
-      console.error("Error creating subcontractor:", err)
-      alert(`Error creating subcontractor: ${err.response?.data?.error || err.message}`)
-    } finally {
-      setLoading(false)
-    }
+const handleSaveSubcontractor = async () => {
+  setLoading(true);
+
+  try {
+    const truckRegNums = newSubcontractor.trucks
+      .map(truck => truck.reg.trim())
+      .filter(Boolean)
+      .join(',');
+
+    const subDriverNames = newSubcontractor.trucks
+      .map(truck => truck.driver.trim())
+      .filter(Boolean)
+      .join(',');
+
+    const payload = {
+      companyname: newSubcontractor.companyname,
+      location: newSubcontractor.location,
+      contact_person: newSubcontractor.contact_person,
+      cellnum: newSubcontractor.cellnum,
+      email: newSubcontractor.email,
+      subei_reg_num: newSubcontractor.subei_reg_num,
+      no_of_trucks: newSubcontractor.no_of_trucks,
+      truckregnum: truckRegNums,
+      subdrivername: subDriverNames
+    };
+
+    await axios.post(`${API_URL}/subcontractors`, payload, getAuthHeaders());
+
+    const subcontractorsResponse = await axios.get(`${API_URL}/subcontractors`, getAuthHeaders());
+    setSubcontractors(subcontractorsResponse.data);
+
+    setNewSubcontractor({
+      companyname: "",
+      location: "",
+      contact_person: "",
+      cellnum: "",
+      email: "",
+      subei_reg_num: "",
+      no_of_trucks: "",
+      trucks: [{ reg: "", driver: "" }]
+    });
+
+    setShowSubcontractorForm(false);
+  } catch (err) {
+    console.error("Error saving subcontractor:", err);
+    alert(`Error: ${err.response?.data?.error || err.message}`);
+  } finally {
+    setLoading(false);
   }
+};
+
+  
 
   // Handle disable/delete actions
   const handleDisableEmployee = async (id) => {
@@ -665,7 +662,7 @@ const [newEmployee, setNewEmployee] = useState({
           <tbody>
             {subcontractors.map((sub) => (
               <tr key={sub.userid}>
-                <td>{sub.name}</td>
+                <td>{sub.contact_person}</td>
                 <td>{sub.truckregnum}</td>
                 <td>{sub.companyname}</td>
                 <td>{sub.cellnum}</td>
@@ -1177,17 +1174,17 @@ const [newEmployee, setNewEmployee] = useState({
   
 const RenderSubcontractorForm = ({ setShowSubcontractorForm }) => {
   const [numTrucks, setNumTrucks] = useState(0);
-  const [newSubcontractor, setNewSubcontractor] = useState({
-    companyname: '',
-    location: '',
-    contact_person: '',
-    cellnum: '',
-    email: '',
-    subei_reg_num: '',
-    no_of_trucks: 0,
-    truckregnum: '',
-    trucks: [],
-  });
+  // const [newSubcontractor, setNewSubcontractor] = useState({
+  //   companyname: '',
+  //   location: '',
+  //   contact_person: '',
+  //   cellnum: '',
+  //   email: '',
+  //   subei_reg_num: '',
+  //   no_of_trucks: 0,
+  //   truckregnum: '',
+  //   trucks: [],
+  // });
 
   const handleTrucksChange = (e) => {
     const value = parseInt(e.target.value, 10);
