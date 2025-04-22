@@ -406,11 +406,11 @@ const router = express.Router()
 
 // Create a PostgreSQL connection pool
 const pool = new pg.Pool({
-  user: "postgres",
-  host: "localhost",
-  database: "Whizz-Away-Tester",
-  password:  "123456",
-  port:  5432,
+  user: process.env.POSTGRES_USER,
+  host: process.env.POSTGRES_HOST,
+  database: process.env.POSTGRES_DB,
+  password: process.env.POSTGRES_PASSWORD,
+  port:  process.env.POSTGRES_PORT,
   ssl: process.env.DB_SSL ? { rejectUnauthorized: false } : false,
 })
 
@@ -527,7 +527,7 @@ router.post("/", (req, res) => {
           })
         }
       }
-
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
       // Get driver name if documentFrom is "Driver"
       let documentSource = documentFrom
       let userId = null;  // Default to null, will be set in specific cases

@@ -2,6 +2,8 @@
 import { useState, useEffect } from "react"
 import { useNavigate, useParams, useLocation } from "react-router-dom"
 import "../finance clerkpages/css/finance-clerk-wage.css"
+import jsPDF from "jspdf"
+import "jspdf-autotable"
 
 const FinanceClerkWageDetails = () => {
   const navigate = useNavigate()
@@ -14,14 +16,58 @@ const FinanceClerkWageDetails = () => {
   // Get the driver name from location state or use a fallback
   const driverName = location.state?.name || `Driver ${id}`
 
-  // State for dropdown selections
-  const [selectedMonth, setSelectedMonth] = useState("")
-  const [selectedYear, setSelectedYear] = useState("")
+  // Get current month and year for default filter values
+  const currentDate = new Date()
+  const monthNames = [
+    "January",
+    "February",
+    "March",
+    "April",
+    "May",
+    "June",
+    "July",
+    "August",
+    "September",
+    "October",
+    "November",
+    "December",
+  ]
+
+  // State for dropdown selections - initialize with current month and year
+  const [selectedMonth, setSelectedMonth] = useState(monthNames[currentDate.getMonth()])
+  const [selectedYear, setSelectedYear] = useState(currentDate.getFullYear().toString())
   const [driverInstructions, setDriverInstructions] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
+  const [employeeData, setEmployeeData] = useState(null)
+  const [downloadingMonth, setDownloadingMonth] = useState(false)
+  const [hasLegsForMonth, setHasLegsForMonth] = useState(false)
 
   useEffect(() => {
+    // Fetch employee data
+    const fetchEmployeeData = async () => {
+      if (!id) return
+
+      try {
+        console.log(`Fetching employee data for ID: ${id}`)
+        // Extract just the numeric part of the ID if it contains a colon
+        const cleanId = id.toString().split(":")[0]
+
+        // Fetch employee details with the clean ID
+        const response = await fetch(`http://localhost:5000/api/employee/${cleanId}`)
+
+        if (response.ok) {
+          const data = await response.json()
+          console.log("Employee data:", data)
+          setEmployeeData(data)
+        } else {
+          console.error(`Failed to fetch employee data: ${response.status}`)
+        }
+      } catch (error) {
+        console.error("Error fetching employee data:", error)
+      }
+    }
+
     // Fetch instructions for this driver
     const fetchDriverInstructions = async () => {
       try {
@@ -85,73 +131,302 @@ const FinanceClerkWageDetails = () => {
       }
     }
 
+    // Check if there are legs for the selected month and year
+    const checkLegsForMonth = async () => {
+      if (!id) return
+
+      try {
+        const cleanId = id.toString().split(":")[0]
+
+        // Use the new endpoint to check if there are legs for the selected month and year
+        const url = `http://localhost:5000/api/all-driver-legs/${cleanId}/by-month?month=${encodeURIComponent(selectedMonth)}&year=${encodeURIComponent(selectedYear)}`
+        const response = await fetch(url)
+
+        if (response.ok) {
+          const data = await response.json()
+          setHasLegsForMonth(data.length > 0)
+        } else {
+          setHasLegsForMonth(false)
+        }
+      } catch (error) {
+        console.error("Error checking legs for month:", error)
+        setHasLegsForMonth(false)
+      }
+    }
+
     if (id) {
+      fetchEmployeeData()
       fetchDriverInstructions()
+      checkLegsForMonth()
     } else {
       console.error("No driver ID provided in URL params")
       setError("No driver ID provided in URL params")
       setLoading(false)
     }
-  }, [id])
+  }, [id, selectedMonth, selectedYear])
 
   // Filter instructions based on selected month and year
   const filteredInstructions = driverInstructions.filter((instruction) => {
-    if (!selectedMonth && !selectedYear) return true
-
     // Try to use deadline first, fall back to pickupdate if deadline is not available
     const dateToUse = instruction.deadline || instruction.pickupdate
-    if (!dateToUse) return true
+    if (!dateToUse) return false
 
     const instructionDate = new Date(dateToUse)
-    const monthNames = [
-      "January",
-      "February",
-      "March",
-      "April",
-      "May",
-      "June",
-      "July",
-      "August",
-      "September",
-      "October",
-      "November",
-      "December",
-    ]
 
-    const matchesMonth = !selectedMonth || monthNames[instructionDate.getMonth()] === selectedMonth
-    const matchesYear = !selectedYear || instructionDate.getFullYear().toString() === selectedYear
+    const matchesMonth = monthNames[instructionDate.getMonth()] === selectedMonth
+    const matchesYear = instructionDate.getFullYear().toString() === selectedYear
 
     return matchesMonth && matchesYear
   })
 
-  const handleViewLegs = (instructionId) => {
+  // Handle viewing all legs for the selected month and year
+  const handleViewLegs = () => {
     navigate(`/FClerkLegDetails`, {
       state: {
-        instructionId,
         driverId: id,
         driverName,
+        selectedMonth,
+        selectedYear,
       },
     })
   }
 
-  const handleViewWageSlip = (instructionId) => {
+  // Handle viewing wage slip for the selected month and year
+  const handleViewWageSlip = () => {
     navigate(`/finance-clerk-wage-slip/${id}`, {
       state: {
-        instructionId,
         driverId: id,
         driverName,
+        selectedMonth,
+        selectedYear,
       },
     })
   }
 
-  const handleDownload = (instructionId) => {
-    alert(`Downloading wage slip for Instruction ${instructionId}`)
+  // Function to handle downloading wage slip for the month
+  const handleDownloadMonthlyWageSlip = async () => {
+    if (!id) {
+      console.error("Missing driver ID for download")
+      return
+    }
+
+    setDownloadingMonth(true)
+
+    try {
+      console.log(`Generating monthly wage slip for Driver ID: ${id}, Month: ${selectedMonth}, Year: ${selectedYear}`)
+
+      // Extract just the numeric part of the ID if it contains a colon
+      const cleanId = id.toString().split(":")[0]
+
+      // Fetch employee details if not already available
+      let employeeInfo = employeeData
+      if (!employeeInfo) {
+        const empResponse = await fetch(`http://localhost:5000/api/employee/${cleanId}`)
+        if (empResponse.ok) {
+          employeeInfo = await empResponse.json()
+        }
+      }
+
+      // Fetch all legs for the driver for the selected month and year
+      let allLegs = []
+      try {
+        const legsResponse = await fetch(
+          `http://localhost:5000/api/all-driver-legs/${cleanId}/by-month?month=${encodeURIComponent(selectedMonth)}&year=${encodeURIComponent(selectedYear)}`,
+        )
+
+        if (legsResponse.ok) {
+          const legsData = await legsResponse.json()
+          allLegs = Array.isArray(legsData) ? legsData : legsData ? [legsData] : []
+        }
+      } catch (error) {
+        console.error("Error fetching legs data:", error)
+      }
+
+      // Group legs by instruction ID
+      const legsByInstruction = {}
+      allLegs.forEach((leg) => {
+        const instructionId = leg.m1key
+        if (!instructionId) return
+
+        if (!legsByInstruction[instructionId]) {
+          legsByInstruction[instructionId] = []
+        }
+        legsByInstruction[instructionId].push(leg)
+      })
+
+      // Calculate total earnings
+      const totalLegsAmount = allLegs.reduce((total, leg) => total + (Number.parseFloat(leg.driverrate) || 0), 0)
+
+      // Format earnings data
+      const earnings = []
+
+      // Add base salary if available
+      if (employeeInfo?.base_salary) {
+        earnings.push({
+          description: "Base Salary",
+          amount: `R ${Number.parseFloat(employeeInfo.base_salary).toFixed(2) || "0.00"}`,
+        })
+      }
+
+      // Add each leg as a separate earning, grouped by instruction
+      Object.keys(legsByInstruction).forEach((instructionId) => {
+        legsByInstruction[instructionId].forEach((leg, index) => {
+          earnings.push({
+            description: `INS${instructionId}-Leg${leg.legnumber || index + 1} (${leg.instruction_status || "Unknown"})`,
+            amount: `R ${Number.parseFloat(leg.driverrate).toFixed(2) || "0.00"}`,
+          })
+        })
+      })
+
+      // Calculate total amount
+      const totalAmount = (Number.parseFloat(employeeInfo?.base_salary) || 0) + totalLegsAmount
+
+      // Create a new PDF document
+      const doc = new jsPDF()
+
+      // Set document properties
+      doc.setProperties({
+        title: `Monthly Wage Slip - ${employeeInfo?.name || driverName} - ${selectedMonth} ${selectedYear}`,
+        subject: "Monthly Wage Slip",
+        author: "Whizz Away Logistics",
+        creator: "Whizz Away Logistics",
+      })
+
+      // Add company header
+      doc.setFillColor(184, 209, 243) // #b8d1f3
+      doc.rect(0, 0, 210, 20, "F")
+      doc.setTextColor(0, 0, 0)
+      doc.setFontSize(16)
+      doc.setFont("helvetica", "bold")
+      doc.text("Whizz Away Logistics", 150, 10, { align: "right" })
+      doc.setFontSize(10)
+      doc.setFont("helvetica", "normal")
+      doc.text("info@whizzaway.com", 150, 15, { align: "right" })
+      doc.text("+27 31 123 4567", 150, 20, { align: "right" })
+
+      // Add title
+      doc.setFontSize(18)
+      doc.setFont("helvetica", "bold")
+      doc.text("Monthly Wage Slip", 105, 35, { align: "center" })
+
+      // Add month and year
+      doc.setFillColor(249, 250, 251) // #f9fafb
+      doc.roundedRect(20, 40, 170, 10, 2, 2, "F")
+      doc.setFontSize(11)
+      doc.setFont("helvetica", "normal")
+      doc.text(`Month: ${selectedMonth} ${selectedYear}`, 105, 46, { align: "center" })
+
+      // Add pay period
+      const monthIndex = monthNames.indexOf(selectedMonth)
+      const firstDay = new Date(Number.parseInt(selectedYear), monthIndex, 1)
+      const lastDay = new Date(Number.parseInt(selectedYear), monthIndex + 1, 0)
+      const formattedFirstDay = firstDay.toLocaleDateString()
+      const formattedLastDay = lastDay.toLocaleDateString()
+
+      doc.setFillColor(249, 250, 251) // #f9fafb
+      doc.roundedRect(20, 55, 170, 10, 2, 2, "F")
+      doc.text(`Pay Period: ${formattedFirstDay} - ${formattedLastDay}`, 70, 61)
+      doc.text(`Pay Date: ${formattedLastDay}`, 140, 61)
+
+      // Add employee info
+      doc.setFillColor(249, 250, 251) // #f9fafb
+      doc.roundedRect(20, 70, 170, 20, 2, 2, "F")
+      doc.setFont("helvetica", "bold")
+      doc.text("Name:", 30, 78)
+      doc.setFont("helvetica", "normal")
+      doc.text(employeeInfo ? `${employeeInfo.name} ${employeeInfo.surname}` : driverName || "N/A", 60, 78)
+
+      doc.setFont("helvetica", "bold")
+      doc.text("Contact:", 110, 78)
+      doc.setFont("helvetica", "normal")
+      doc.text(employeeInfo ? employeeInfo.cellnum : "N/A", 140, 78)
+
+      doc.setFont("helvetica", "bold")
+      doc.text("Role:", 30, 86)
+      doc.setFont("helvetica", "normal")
+      doc.text(employeeInfo ? employeeInfo.rolename : "Driver", 60, 86)
+
+      // Add note about including all instructions
+      doc.setFontSize(10)
+      doc.setFont("helvetica", "italic")
+      doc.setTextColor(100, 100, 100)
+      doc.text("Note: This wage slip includes all legs regardless of instruction status.", 105, 95, { align: "center" })
+      doc.setTextColor(0, 0, 0)
+      doc.setFont("helvetica", "normal")
+
+      // Add earnings table
+      doc.setFontSize(12)
+      doc.setFont("helvetica", "bold")
+
+      // Earnings table header
+      doc.setFillColor(184, 209, 243) // #b8d1f3
+      doc.rect(20, 105, 85, 10, "F")
+      doc.rect(105, 105, 85, 10, "F")
+      doc.text("Earnings", 25, 112)
+      doc.text("Amount", 180, 112, { align: "right" })
+
+      // Earnings table rows
+      let yPos = 115
+      earnings.forEach((item, index) => {
+        const rowColor = index % 2 === 0 ? 255 : 249 // Alternate white and light gray
+        doc.setFillColor(rowColor, rowColor, rowColor)
+        doc.rect(20, yPos, 85, 10, "F")
+        doc.rect(105, yPos, 85, 10, "F")
+
+        doc.setFont("helvetica", "normal")
+        doc.text(item.description, 25, yPos + 7)
+        doc.text(item.amount, 180, yPos + 7, { align: "right" })
+
+        yPos += 10
+      })
+
+      // Net Pay table
+      yPos += 5
+
+      // Net Pay header
+      doc.setFillColor(184, 209, 243) // #b8d1f3
+      doc.rect(20, yPos, 85, 10, "F")
+      doc.rect(105, yPos, 85, 10, "F")
+      doc.setFont("helvetica", "bold")
+      doc.text("Net Pay", 25, yPos + 7)
+      doc.text("Amount", 180, yPos + 7, { align: "right" })
+
+      // Net Pay row
+      yPos += 10
+      doc.setFillColor(249, 250, 251) // #f9fafb
+      doc.rect(20, yPos, 85, 10, "F")
+      doc.rect(105, yPos, 85, 10, "F")
+      doc.setFont("helvetica", "bold")
+      doc.text("Net Pay", 25, yPos + 7)
+      doc.text(`R ${totalAmount.toFixed(2)}`, 180, yPos + 7, { align: "right" })
+
+      // Footer
+      yPos += 20
+      doc.setFontSize(10)
+      doc.setFont("helvetica", "normal")
+      doc.setTextColor(107, 114, 128) // #6b7280
+      doc.text("For Inquiries, please feel free to contact HR Department at hr@whizzaway.com.", 105, yPos, {
+        align: "center",
+      })
+
+      // Save the PDF
+      const driverNameForFile = employeeInfo
+        ? `${employeeInfo.name}-${employeeInfo.surname}`.replace(/\s+/g, "-")
+        : driverName?.replace(/\s+/g, "-") || `driver-${id}`
+
+      doc.save(`monthly-wage-slip-${driverNameForFile}-${selectedMonth}-${selectedYear}.pdf`)
+
+      console.log(`Successfully generated and downloaded monthly wage slip for Driver ID: ${id}`)
+    } catch (error) {
+      console.error("Error generating monthly wage slip:", error)
+      alert("Failed to generate monthly wage slip. Please try again later.")
+    }
+
+    setDownloadingMonth(false)
   }
 
-  const formatDate = (dateString) => {
-    if (!dateString) return "N/A"
-    const date = new Date(dateString)
-    return date.toLocaleDateString()
+  const formatDate = (month, year) => {
+    return `${month} ${year}`
   }
 
   return (
@@ -224,59 +499,47 @@ const FinanceClerkWageDetails = () => {
         >
           <thead>
             <tr style={{ backgroundColor: "#87CEEB", padding: "12px 10px", textAlign: "left" }}>
-              <th>Instruction ID</th>
-              <th>Legs</th>
               <th>View Legs</th>
               <th>Date</th>
               <th>Action</th>
-              <th></th>
             </tr>
           </thead>
           <tbody>
-            {filteredInstructions.length === 0 ? (
+            {filteredInstructions.length === 0 && !hasLegsForMonth ? (
               <tr>
-                <td colSpan="6" style={{ textAlign: "center", padding: "15px" }}>
-                  No instructions found for this driver
+                <td colSpan="3" style={{ textAlign: "center", padding: "15px" }}>
+                  No instructions or legs found for this driver in {selectedMonth} {selectedYear}
                 </td>
               </tr>
             ) : (
-              filteredInstructions.map((instruction) => (
-                <tr
-                  key={instruction.m1key}
-                  style={{ backgroundColor: "white", padding: "12px 10px", borderBottom: "1px solid #eee" }}
-                >
-                  <td>{instruction.m1key}</td>
-                  <td>{instruction.leg_count}</td>
-                  <td>
-                    <button className="downloadwage1" onClick={() => handleViewLegs(instruction.m1key)}>
-                      View
-                    </button>
-                  </td>
-                  <td>{formatDate(instruction.deadline || instruction.pickupdate)}</td>
-                  <td>
-                    <button
-                      onClick={() => handleViewWageSlip(instruction.m1key)}
-                      style={{
-                        backgroundColor: "green",
-                        color: "white",
-                        border: "none",
-                        padding: "8px 20px",
-                        borderRadius: "5px",
-                        cursor: "pointer",
-                        fontSize: "16px",
-                        fontWeight: "normal",
-                      }}
-                    >
-                      View
-                    </button>
-                  </td>
-                  <td>
-                    <button className="downloadwage1" onClick={() => handleDownload(instruction.m1key)}>
-                      Download
-                    </button>
-                  </td>
-                </tr>
-              ))
+              <tr style={{ backgroundColor: "white", padding: "12px 10px", borderBottom: "1px solid #eee" }}>
+                <td>
+                  <button className="downloadwage1" onClick={handleViewLegs}>
+                    View
+                  </button>
+                </td>
+                <td>{formatDate(selectedMonth, selectedYear)}</td>
+                <td style={{ display: "flex", gap: "10px" }}>
+                  <button
+                    onClick={handleViewWageSlip}
+                    style={{
+                      backgroundColor: "green",
+                      color: "white",
+                      border: "none",
+                      padding: "8px 20px",
+                      borderRadius: "5px",
+                      cursor: "pointer",
+                      fontSize: "16px",
+                      fontWeight: "normal",
+                    }}
+                  >
+                    View
+                  </button>
+                  <button className="downloadwage1" onClick={handleDownloadMonthlyWageSlip} disabled={downloadingMonth}>
+                    {downloadingMonth ? "Downloading..." : "Download"}
+                  </button>
+                </td>
+              </tr>
             )}
           </tbody>
         </table>
