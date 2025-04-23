@@ -18,6 +18,8 @@ const ClientStatement = () => {
 
   // Add ref for PDF generation
   const statementRef = useRef(null)
+  const roleId = JSON.parse(localStorage.getItem('user')).roleid;
+  console.log(roleId)
 
   // Auth helper function to get token from localStorage
   const getAuthHeader = () => {
@@ -299,9 +301,28 @@ const ClientStatement = () => {
       <div className="statementdownloadbtn1">
         <button
           className="back-btn"
-          onClick={() =>
+          onClick={() =>{
+            if (roleId == 3) {
             navigate("/statements-list", { state: { clientId: statement.client.id } })
-          }
+            }else if (roleId == 4){
+              navigate("/DirectorClientDocuments", {
+                state: {
+                  clientId : statement.client.id,
+                  clientName : statement.client.name,
+                },
+              })
+            } else if (roleId == 1){
+              navigate("/client-documents", {
+                state : {
+
+                  clientId : statement.client.id,
+                  clientName : statement.client.name,
+
+                }
+              })
+            }
+             
+          }}
         >
           Back
         </button>
