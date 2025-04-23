@@ -1086,6 +1086,7 @@ app.get("/api/invoices/:id" ,verifyToken ,  async (req, res) => {
         s.shipmenttype as shipment_type,
         m1.fileref as file_no,
         c.client as client_name,
+        c.m5clientkey,
         c.companyaddress as client_address,
         c.cellnum as client_telephone,
         c.email as client_email,
