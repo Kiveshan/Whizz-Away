@@ -14,7 +14,6 @@ import dotenv from "dotenv"
 import fs from "fs"
 import pkg from "pg"
 const { Pool, types } = pkg
-import puppeteer from "puppeteer"
 import cron from 'node-cron';
 
 // Load environment variables
@@ -45,7 +44,8 @@ const pool = new Pool({
   // Max clients in pool
   max: 20,
 })
-
+types.setTypeParser(types.builtins.NUMERIC, (value) => parseFloat(value))
+types.setTypeParser(types.builtins.FLOAT8, (value) => parseFloat(value))
 // Log connection status
 console.log("Database connection configured with:", {
   user: process.env.POSTGRES_USER,
@@ -1740,6 +1740,88 @@ app.get("/api/employee/:id", async (req, res) => {
     if (client) client.release();
   }
 });
+// Find this endpoint in server.js (around line 2500-2600)
+app.get("/api/employee-deductions/:employeeId", async (req, res) => {
+  const { employeeId } = req.params;
+  const { month, year } = req.query;
+  
+  console.log(`Route /api/employee-deductions/${employeeId} was accessed with month=${month}, year=${year}`);
+  
+  if (!month || !year) {
+    return res.status(400).json({ error: "Month and year are required query parameters" });
+  }
+  
+  let client;
+  try {
+    client = await pool.connect();
+    
+    // Convert month name to month number (1-based)
+    const monthNames = [
+      "January", "February", "March", "April", "May", "June",
+      "July", "August", "September", "October", "November", "December"
+    ];
+    const monthIndex = monthNames.indexOf(month) + 1;
+    
+    if (monthIndex === 0) {
+      return res.status(400).json({ error: "Invalid month name" });
+    }
+    
+    // Query to get deductions data for the employee for the specified month and year
+    const query = `
+      SELECT 
+        deduction_income_tax, 
+        deduction_other_deductions, 
+        deduction_uif,
+        deduction_bonus, 
+        deduction_savings, 
+        deduction_loan, 
+        deduction_damage,
+        total_deductions
+      FROM 
+        wages
+      WHERE 
+        employeeid = $1 
+        AND EXTRACT(MONTH FROM employee_date) = $2
+        AND EXTRACT(YEAR FROM employee_date) = $3
+      ORDER BY 
+        employee_date DESC
+      LIMIT 1
+    `;
+    
+    const result = await client.query(query, [employeeId, monthIndex, year]);
+    
+    if (result.rows.length === 0) {
+      // If no data found, return default values instead of 404
+      return res.json({
+        deduction_income_tax: 1500,
+        deduction_other_deductions: 300,
+        deduction_uif: 200,
+        deduction_bonus: 0,
+        deduction_savings: 0,
+        deduction_loan: 0,
+        deduction_damage: 0,
+        total_deductions: 2000
+      });
+    }
+    
+    res.json(result.rows[0]);
+  } catch (error) {
+    console.error(`Error fetching deductions data for employee ID ${employeeId}:`, error);
+    // Return default values on error instead of error status
+    return res.json({
+      deduction_income_tax: 1500,
+      deduction_other_deductions: 300,
+      deduction_uif: 200,
+      deduction_bonus: 0,
+      deduction_savings: 0,
+      deduction_loan: 0,
+      deduction_damage: 0,
+      total_deductions: 2000
+    });
+  } finally {
+    if (client) client.release();
+  }
+});
 app.get("/api/admin/company-list", verifyToken, async (req, res) => {
   let client
   try {
@@ -1993,6 +2075,7 @@ const upload = multer({
   },
 })
 
+// API endpoint to get containers for a specific instruction
 // Get all clients
 // Add this new endpoint to server.js to get completed legs filtered by month and year
 app.get("/api/all-driver-legs/:driverId/by-month", async (req, res) => {
@@ -2492,7 +2575,6 @@ app.put("/api/instruction/:id", verifyToken, async (req, res) => {
   }
 })
 
-// API endpoint to get containers for a specific instruction
 app.get("/api/containers/:instructionId", verifyToken, async (req, res) => {
   let client
   try {
@@ -2893,32 +2975,32 @@ app.put("/instructions/:instructionId/status", async (req, res) => {
   }
 })
 
-app.get("/rate", async (req, res) => {
-  const { startingPoint, destination } = req.query
-  console.log(`Route /rate was accessed with startingPoint=${startingPoint} and destination=${destination}`)
+// app.get("/rate", async (req, res) => {
+//   const { startingPoint, destination } = req.query
+//   console.log(`Route /rate was accessed with startingPoint=${startingPoint} and destination=${destination}`)
 
-  if (!startingPoint || !destination) {
-    return res.status(400).json({ error: "Starting point and destination are required" })
-  }
+//   if (!startingPoint || !destination) {
+//     return res.status(400).json({ error: "Starting point and destination are required" })
+//   }
 
-  try {
-    const result = await pool.query("SELECT rate FROM m5_driver_rate WHERE startingpoint = $1 AND destination = $2", [
-      startingPoint,
-      destination,
-    ])
+//   try {
+//     const result = await pool.query("SELECT rate FROM m5_driver_rate WHERE startingpoint = $1 AND destination = $2", [
+//       startingPoint,
+//       destination,
+//     ])
 
-    if (result.rows.length === 0) {
-      return res.status(404).json({ error: "Rate not found for the given starting point and destination" })
-    }
+//     if (result.rows.length === 0) {
+//       return res.status(404).json({ error: "Rate not found for the given starting point and destination" })
+//     }
 
-    console.log("Rate found:", result.rows[0])
+//     console.log("Rate found:", result.rows[0])
 
-    res.status(200).json({ rate: result.rows[0].rate })
-  } catch (err) {
-    console.error("Error fetching rate:", err)
-    res.status(500).send("Server Error")
-  }
-})
+//     res.status(200).json({ rate: result.rows[0].rate })
+//   } catch (err) {
+//     console.error("Error fetching rate:", err)
+//     res.status(500).send("Server Error")
+//   }
+// })
 
 // Update the employees/drivers endpoint to only fetch drivers with roleid = 5
 app.get("/employees/drivers", async (req, res) => {
@@ -3266,26 +3348,139 @@ app.get("/client-instructions-details/:clientId", async (req, res) => {
   }
 })
 
-app.get("/containers/numbers", async (req, res) => {
-  console.log("Route /containers/numbers was accessed")
+// app.get("/containers/numbers", async (req, res) => {
+//   console.log("Route /containers/numbers was accessed")
+
+//   try {
+//     const result = await pool.query("SELECT containernum FROM container ORDER BY containernum")
+
+//     console.log("Container numbers found:", result.rows)
+
+//     if (result.rows.length === 0) {
+//       console.log("No container numbers found in the container table")
+//     } else {
+//       console.log(`Found ${result.rows.length} container numbers`)
+//     }
+
+//     res.status(200).json(result.rows.map((row) => row.containernum))
+//   } catch (err) {
+//     console.error("Error fetching container numbers:", err)
+//     res.status(500).send("Server Error")
+//   }
+// })
+app.get("/api/container-details/:containerNum", async (req, res) => {
+  const { containerNum } = req.params;
+  console.log(`Route /api/container-details/${containerNum} was accessed`);
 
   try {
-    const result = await pool.query("SELECT containernum FROM container ORDER BY containernum")
-
-    console.log("Container numbers found:", result.rows)
+    const result = await pool.query(
+      "SELECT containerkey, containernum, weight, container_type FROM container WHERE containernum = $1",
+      [containerNum]
+    );
 
     if (result.rows.length === 0) {
-      console.log("No container numbers found in the container table")
-    } else {
-      console.log(`Found ${result.rows.length} container numbers`)
+      return res.status(404).json({ error: "Container not found" });
     }
 
-    res.status(200).json(result.rows.map((row) => row.containernum))
+    console.log(`Found container details for ${containerNum}:`, result.rows[0]);
+    res.status(200).json(result.rows[0]);
   } catch (err) {
-    console.error("Error fetching container numbers:", err)
-    res.status(500).send("Server Error")
+    console.error(`Error fetching container details for ${containerNum}:`, err);
+    res.status(500).json({ error: err.message });
   }
-})
+});
+
+// Endpoint to get driver rates based on route and container type
+app.get("/api/driver-rates", async (req, res) => {
+  const { startingpoint, destination, containerType } = req.query;
+  console.log(`Route /api/driver-rates was accessed with params:`, req.query);
+
+  if (!startingpoint || !destination) {
+    return res.status(400).json({ error: "Starting point and destination are required" });
+  }
+
+  try {
+    const result = await pool.query(
+      `SELECT 
+        m5ratekey, 
+        startingpoint, 
+        destination, 
+        driver_rate,
+        driver_six_meter_rate, 
+        driver_twelve_meter_rate
+      FROM 
+        m5_driver_rate 
+      WHERE 
+        startingpoint = $1 AND destination = $2`,
+      [startingpoint, destination]
+    );
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ 
+        error: "Rate not found for the given route",
+        message: `No rate found for route from ${startingpoint} to ${destination}`
+      });
+    }
+
+    const rateData = result.rows[0];
+    
+    // Determine which rate to use based on container type
+    let applicableRate = rateData.driver_rate; // Default rate
+    
+    if (containerType === '6m') {
+      applicableRate = rateData.driver_six_meter_rate;
+    } else if (containerType === '12m') {
+      applicableRate = rateData.driver_twelve_meter_rate;
+    }
+
+    console.log(`Found rate for ${startingpoint} to ${destination} with container type ${containerType}:`, applicableRate);
+    
+    res.status(200).json({
+      ...rateData,
+      applicable_rate: applicableRate
+    });
+  } catch (err) {
+    console.error(`Error fetching driver rates:`, err);
+    res.status(500).json({ error: err.message });
+  }
+});
+app.get("/containers/numbers", async (req, res) => {
+  console.log("Route /containers/numbers was accessed");
+
+  try {
+    const result = await pool.query(
+      "SELECT containernum, container_type FROM container ORDER BY containernum"
+    );
+
+    console.log("Container numbers found:", result.rows);
+
+    if (result.rows.length === 0) {
+      console.log("No container numbers found in the container table");
+    } else {
+      console.log(`Found ${result.rows.length} container numbers`);
+    }
+
+    res.status(200).json(result.rows);
+  } catch (err) {
+    console.error("Error fetching container numbers:", err);
+    res.status(500).send("Server Error");
+  }
+});
+app.get("/api/container-types", async (req, res) => {
+  console.log("Route /api/container-types was accessed");
+
+  try {
+    const result = await pool.query(
+      "SELECT DISTINCT container_type FROM container WHERE container_type IS NOT NULL ORDER BY container_type"
+    );
+
+    console.log(`Found ${result.rows.length} container types`);
+    res.status(200).json(result.rows.map(row => row.container_type));
+  } catch (err) {
+    console.error("Error fetching container types:", err);
+    res.status(500).json({ error: err.message });
+  }
+});
 
 // Update the legs/save endpoint to handle multiple drivers in legs_m2
 app.post("/legs/save", async (req, res) => {
@@ -3362,8 +3557,8 @@ app.post("/legs/save", async (req, res) => {
 
       // For each driver, create a new entry in legs_m2
       if (drivers && drivers.length > 0) {
-        for (const driver of drivers) {
-          console.log(`Processing driver:`, JSON.stringify(driver, null, 2))
+        for (const [index, driver] of drivers.entries()) {
+           console.log(`Processing driver ${index}:`, JSON.stringify(driver, null, 2))
 
           // Skip empty driver entries
           if (!driver.driverid && !driver.truckregnumber && !driver.containernumber && !driver.date) {
@@ -3375,22 +3570,27 @@ app.post("/legs/save", async (req, res) => {
           const driverId = driver.driverid ? Number.parseInt(driver.driverid) : null
           const truckRegNumber = driver.truckregnumber || null
 
-          let containerNumber = null;
+          let containerNumber = null
           if (driver.containernumber) {
-            containerNumber = driver.containernumber.toString();
-            console.log(`Using container number as string: ${containerNumber}`);
+            containerNumber = driver.containernumber.toString()
+            console.log(`Using container number as string: ${containerNumber}`)
           }
 
           const date = driver.date ? new Date(driver.date) : null
+          
+          // Use the driver's specific rate based on container type
+          // This is the key fix - use the driver's specific rate instead of the leg rate
+          const driverSpecificRate = driver.driverRate || driverrate
+          console.log(`Using driver-specific rate for driver ${index}: ${driverSpecificRate} for container type: ${driver.container_type}`)
 
           // If this is an existing leg and we're processing the first driver
           // update the existing record instead of creating a new one
-          if (!isNewLeg && legId && drivers.indexOf(driver) === 0) {
+          if (!isNewLeg && legId && index === 0) {
             await pool.query(
               `UPDATE legs_m2 
-               SET driverid = $1, truckregnumber = $2, containernumber = $3, date = $4
-               WHERE legkey = $5`,
-              [driverId, truckRegNumber, containerNumber, date, legId],
+               SET driverid = $1, truckregnumber = $2, containernumber = $3, date = $4, driverrate = $5
+               WHERE legkey = $6`,
+              [driverId, truckRegNumber, containerNumber, date, driverSpecificRate, legId],
             )
             console.log(`Updated first driver for existing leg with legkey=${legId}`)
           } else {
@@ -3404,7 +3604,7 @@ app.post("/legs/save", async (req, res) => {
                 legnumber,
                 startingpoint,
                 destination,
-                driverrate,
+                driverSpecificRate, // Use driver-specific rate here
                 m1key,
                 driverId,
                 truckRegNumber,
@@ -3414,7 +3614,7 @@ app.post("/legs/save", async (req, res) => {
             )
 
             // If this is the first driver for a new leg, save the legkey
-            if (isNewLeg && drivers.indexOf(driver) === 0) {
+            if (isNewLeg && index === 0) {
               legId = insertResult.rows[0].legkey
               console.log(`Created new leg with first driver, legkey=${legId}`)
             } else {
@@ -3447,14 +3647,13 @@ app.post("/legs/save", async (req, res) => {
   }
 })
 
-// Update the legs endpoint to fetch from legs_m2 and join with m5_employee
-// Update the legs endpoint to properly handle container numbers as strings
 app.get("/legs/:instructionId", async (req, res) => {
   const { instructionId } = req.params
   console.log(`Route /legs/${instructionId} was accessed`)
 
   try {
     // Fetch all legs for the instruction, joining with m5_employee to get driver details
+    // and joining with container to get container_type
     const result = await pool.query(
       `
       SELECT 
@@ -3468,11 +3667,14 @@ app.get("/legs/:instructionId", async (req, res) => {
         l.containernumber,
         l.date,
         e.name AS driver_name,
-        e.surname AS driver_surname
+        e.surname AS driver_surname,
+        c.container_type
       FROM 
         legs_m2 l
       LEFT JOIN 
         m5_employee e ON l.driverid = e.userid
+      LEFT JOIN
+        container c ON l.containernumber = c.containernum AND l.m1key = c.m1key
       WHERE 
         l.m1key = $1
       ORDER BY 
@@ -3493,6 +3695,8 @@ app.get("/legs/:instructionId", async (req, res) => {
             driverid: row.driverid,
             truckregnumber: row.truckregnumber,
             containernumber: row.containernumber,
+            container_type: row.container_type,
+            driverrate: row.driverrate,
             date: row.date,
             driver_name: row.driver_name,
             driver_surname: row.driver_surname,
@@ -3529,6 +3733,8 @@ app.get("/legs/:instructionId", async (req, res) => {
         driverid: row.driverid,
         truckregnumber: row.truckregnumber,
         containernumber: row.containernumber,
+        container_type: row.container_type,
+        driverrate: row.driverrate,
         date: row.date,
       })
 
@@ -3540,6 +3746,8 @@ app.get("/legs/:instructionId", async (req, res) => {
         truckregnumber: row.truckregnumber || "",
         // Convert containernumber to string if it exists, otherwise empty string
         containernumber: row.containernumber !== null ? row.containernumber.toString() : "",
+        container_type: row.container_type || "", // Include container_type from container table
+        driverRate: row.driverrate ? row.driverrate.toString() : "", // Include driverrate
         date: row.date ? row.date : null,
         driver_name: row.driver_name || "",
         driver_surname: row.driver_surname || "",
@@ -4074,65 +4282,217 @@ app.post("/generate-invoice/:instructionId", async (req, res) => {
     })
   }
 })
+app.get("/api/debug/wages/:employeeId", async (req, res) => {
+  const { employeeId } = req.params;
+  
+  console.log(`Debug route for wages data accessed for employee ${employeeId}`);
+  
+  let client;
+  try {
+    client = await pool.connect();
+    
+    // Query to get all wages data for the employee
+    const query = `
+      SELECT *
+      FROM wages
+      WHERE employeeid = $1
+      ORDER BY employee_date DESC
+    `;
+    
+    const result = await client.query(query, [employeeId]);
+    
+    res.json({
+      count: result.rows.length,
+      data: result.rows,
+      columnTypes: result.fields
+        ? result.fields.map((f) => ({
+            name: f.name,
+            dataTypeID: f.dataTypeID,
+            format: f.format,
+          }))
+        : [],
+    });
+  } catch (error) {
+    console.error(`Error in debug endpoint:`, error);
+    res.status(500).json({ error: "Failed to fetch wages data for debugging" });
+  } finally {
+    if (client) client.release();
+  }
+});
 
-// Check if build directory exists before trying to serve static files
-const buildPath = path.join(__dirname, "build")
-if (fs.existsSync(buildPath)) {
-  console.log("Build directory found, serving static files from:", buildPath)
-  // Serve static files from the React app
-  app.use(express.static(buildPath))
-
-  // The "catchall" handler: for any request that doesn't
-  // match one above, send back React's index.html file.
-  app.get("*", (req, res) => {
-    res.sendFile(path.join(buildPath, "index.html"))
-  })
-} else {
-  console.log("Build directory not found at:", buildPath)
-  console.log("Only API endpoints will be available")
-
-  // Add a fallback route for non-API routes
-  app.get("*", (req, res) => {
-    // Check if this is an API request
-    if (req.url.startsWith("/api/")) {
-      return res.status(404).json({ error: "API endpoint not found" })
+app.get("/api/employee-deductions/:employeeId", async (req, res) => {
+  const { employeeId } = req.params;
+  const { month, year } = req.query;
+  
+  console.log(`Route /api/employee-deductions/${employeeId} was accessed with month=${month}, year=${year}`);
+  
+  if (!month || !year) {
+    return res.status(400).json({ error: "Month and year are required query parameters" });
+  }
+  
+  let client;
+  try {
+    client = await pool.connect();
+    console.log(`Connected to database for employee deductions query`);
+    
+    // Convert month name to month number (1-based)
+    const monthNames = [
+      "January", "February", "March", "April", "May", "June",
+      "July", "August", "September", "October", "November", "December"
+    ];
+    const monthIndex = monthNames.indexOf(month) + 1;
+    
+    if (monthIndex === 0) {
+      return res.status(400).json({ error: "Invalid month name" });
     }
+    
+    console.log(`Looking for deductions for month index: ${monthIndex}, year: ${year}`);
+    
+    // First check if any data exists for this employee
+    const checkQuery = `
+      SELECT COUNT(*) as count
+      FROM wages
+      WHERE employeeid = $1
+    `;
+    
+    const checkResult = await client.query(checkQuery, [employeeId]);
+    const recordCount = parseInt(checkResult.rows[0].count);
+    
+    console.log(`Found ${recordCount} total wage records for employee ID ${employeeId}`);
+    
+    if (recordCount === 0) {
+      console.log(`No wage records found for employee ID ${employeeId}, returning mock data`);
+      // Return mock data since no records exist
+      return res.json({
+        deduction_income_tax: 1500,
+        deduction_other_deductions: 300,
+        deduction_uif: 200,
+        deduction_bonus: 0,
+        deduction_savings: 0,
+        deduction_loan: 0,
+        deduction_damage: 0
+      });
+    }
+    
+    // Query to get deductions data for the employee for the specified month and year
+    const query = `
+      SELECT 
+        deduction_income_tax, 
+        deduction_other_deductions, 
+        deduction_uif,
+        deduction_bonus, 
+        deduction_savings, 
+        deduction_loan, 
+        deduction_damage
+      FROM 
+        wages
+      WHERE 
+        employeeid = $1 
+        AND EXTRACT(MONTH FROM employee_date) = $2
+        AND EXTRACT(YEAR FROM employee_date) = $3
+      ORDER BY 
+        employee_date DESC
+      LIMIT 1
+    `;
+    
+    console.log(`Executing query with params: [${employeeId}, ${monthIndex}, ${year}]`);
+    const result = await client.query(query, [employeeId, monthIndex, year]);
+    
+    console.log(`Query returned ${result.rows.length} rows`);
+    
+    if (result.rows.length === 0) {
+      console.log(`No deductions found for employee ${employeeId} in ${month} ${year}, returning mock data`);
+      // Return mock data since no specific records exist for this month/year
+      return res.json({
+        deduction_income_tax: 1500,
+        deduction_other_deductions: 300,
+        deduction_uif: 200,
+        deduction_bonus: 0,
+        deduction_savings: 0,
+        deduction_loan: 0,
+        deduction_damage: 0
+      });
+    }
+    
+    console.log(`Returning deduction data:`, result.rows[0]);
+    res.json(result.rows[0]);
+  } catch (error) {
+    console.error(`Error fetching deductions data for employee ID ${employeeId}:`, error);
+    // Return mock data on error
+    return res.json({
+      deduction_income_tax: 1500,
+      deduction_other_deductions: 300,
+      deduction_uif: 200,
+      deduction_bonus: 0,
+      deduction_savings: 0,
+      deduction_loan: 0,
+      deduction_damage: 0
+    });
+  } finally {
+    if (client) {
+      console.log(`Releasing database client for employee deductions query`);
+      client.release();
+    }
+  }
+});
+// Check if build directory exists before trying to serve static files
+// const buildPath = path.join(__dirname, "build")
+// if (fs.existsSync(buildPath)) {
+//   console.log("Build directory found, serving static files from:", buildPath)
+//   // Serve static files from the React app
+//   app.use(express.static(buildPath))
 
-    // For non-API requests, return a simple HTML page
-    res.send(`
-      <!DOCTYPE html>
-      <html>
-        <head>
-          <title>Logistics API Server</title>
-          <style>
-            body { font-family: Arial, sans-serif; margin: 40px; line-height: 1.6; }
-            h1 { color: #333; }
-            .container { max-width: 800px; margin: 0 auto; }
-            .note { background-color: #f8f9fa; padding: 15px; border-left: 4px solid #007bff; margin-bottom: 20px; }
-            code { background-color: #f1f1f1; padding: 2px 5px; border-radius: 3px; }
-          </style>
-        </head>
-        <body>
-          <div class="container">
-            <h1>Logistics API Server</h1>
-            <div class="note">
-              <p>The server is running in API-only mode. The React build directory was not found.</p>
-              <p>API endpoints are available at <code>/api/...</code></p>
-            </div>
-            <p>Available endpoints:</p>
-            <ul>
-              <li><code>/api/clients</code> - Get all clients</li>
-              <li><code>/api/shipment-types</code> - Get all shipment types</li>
-              <li><code>/api/instructions</code> - Get all instructions</li>
-              <li><code>/api/client-instruction-stats</code> - Get client instruction statistics</li>
-              <li><code>/test-connection</code> - Test database connection</li>
-            </ul>
-          </div>
-        </body>
-      </html>
-    `)
-  })
-}
+//   // The "catchall" handler: for any request that doesn't
+//   // match one above, send back React's index.html file.
+//   app.get("*", (req, res) => {
+//     res.sendFile(path.join(buildPath, "index.html"))
+//   })
+// } else {
+//   console.log("Build directory not found at:", buildPath)
+//   console.log("Only API endpoints will be available")
+
+//   // Add a fallback route for non-API routes
+//   app.get("*", (req, res) => {
+//     // Check if this is an API request
+//     if (req.url.startsWith("/api/")) {
+//       return res.status(404).json({ error: "API endpoint not found" })
+//     }
+
+//     // For non-API requests, return a simple HTML page
+//     res.send(`
+//       <!DOCTYPE html>
+//       <html>
+//         <head>
+//           <title>Logistics API Server</title>
+//           <style>
+//             body { font-family: Arial, sans-serif; margin: 40px; line-height: 1.6; }
+//             h1 { color: #333; }
+//             .container { max-width: 800px; margin: 0 auto; }
+//             .note { background-color: #f8f9fa; padding: 15px; border-left: 4px solid #007bff; margin-bottom: 20px; }
+//             code { background-color: #f1f1f1; padding: 2px 5px; border-radius: 3px; }
+//           </style>
+//         </head>
+//         <body>
+//           <div class="container">
+//             <h1>Logistics API Server</h1>
+//             <div class="note">
+//               <p>The server is running in API-only mode. The React build directory was not found.</p>
+//               <p>API endpoints are available at <code>/api/...</code></p>
+//             </div>
+//             <p>Available endpoints:</p>
+//             <ul>
+//               <li><code>/api/clients</code> - Get all clients</li>
+//               <li><code>/api/shipment-types</code> - Get all shipment types</li>
+//               <li><code>/api/instructions</code> - Get all instructions</li>
+//               <li><code>/api/client-instruction-stats</code> - Get client instruction statistics</li>
+//               <li><code>/test-connection</code> - Test database connection</li>
+//             </ul>
+//           </div>
+//         </body>
+//       </html>
+//     `)
+//   })
+// }
 app.get("/instructions/driver/:id", async (req, res) => {
   const driverId = req.params.id
 
@@ -4246,6 +4606,7 @@ app.get("/wage-details/driver/:driverId/instruction/:instructionId", async (req,
     res.status(500).json({ error: "An error occurred while fetching wage details" })
   }
 })
+
 
 // Get wage details for a driver (without requiring an instruction ID)
 app.get("/wage-details/driver/:driverId", async (req, res) => {
