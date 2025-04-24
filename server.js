@@ -1,5 +1,4 @@
 
-// export default app
 import express from "express"
 import cors from "cors"
 import bcrypt from "bcrypt"
@@ -16,7 +15,7 @@ import fs from "fs"
 import pkg from "pg"
 const { Pool, types } = pkg
 import puppeteer from "puppeteer"
-import cron from 'node-cron';
+import cron from "node-cron"
 
 // Load environment variables
 dotenv.config()
@@ -101,7 +100,6 @@ async function query(text, params) {
     throw error
   }
 }
-
 // Try to connect to the database once at startup
 ;(async () => {
   try {
@@ -369,7 +367,7 @@ const verifyToken = (req, res, next) => {
       console.log("DEV MODE: Allowing unauthenticated access to:", req.url)
       req.user = {
         name: "Development",
-        surname: "User",
+        surnameee: "User",
         roleid: 1,
         userid: 0,
         email: "dev@example.com",
@@ -969,11 +967,78 @@ app.post("/api/admin/user-status", verifyToken, async (req, res) => {
   }
 })
 
+// For backward compatibility - these endpoints use the /api prefix
+// Get users pending approval - updated to use token verification
+app.get("/api/admin/pending-users", verifyToken, async (req, res) => {
+  let client
+  console.log("API endpoint for pending users hit")
+  // Check if user is authenticated and is an admin
+  if (req.user.roleid !== 7) {
+    console.log("Access denied - user is not admin")
+    return res.status(403).json({ message: "Access denied" })
+  }
+
+  try {
+    // Query for users with pending status
+    client = await pool.connect()
+    const result = await client.query("SELECT * FROM usertable WHERE status = 'pending' OR status IS NULL")
+
+    console.log(`Found ${result.rows.length} pending users`)
+    res.json(result.rows)
+  } catch (err) {
+    console.error("Error fetching pending users:", err)
+    res.status(500).json({ message: "Server error" })
+  } finally {
+    if (client) client.release()
+  }
+})
+
+// Update user status (approve/reject) - updated to use token verification
+app.post("/api/admin/user-status", verifyToken, async (req, res) => {
+  let client
+  console.log("API endpoint for user status update hit")
+  // Check if user is authenticated and is an admin
+  if (req.user.roleid !== 7) {
+    console.log("Access denied - user is not admin")
+    return res.status(403).json({ message: "Access denied" })
+  }
+
+  const { userid, action, roleid } = req.body
+  console.log(`Updating user ${userid} with action ${action}`)
+
+  try {
+    client = await pool.connect()
+    if (action === "approve") {
+      // Approve user by setting roleid to 1
+      await client.query("UPDATE usertable SET roleid = $1, status = 'active', approved_at = NOW() WHERE userid = $2", [
+        roleid,
+        userid,
+      ])
+
+      console.log(`User ${userid} approved successfully`)
+      res.json({ message: "User approved successfully" })
+    } else if (action === "reject") {
+      // Reject user by setting a rejected flag or deleting
+      await client.query("UPDATE usertable SET status = 'rejected', rejected_at = NOW() WHERE userid = $1", [userid])
+
+      console.log(`User ${userid} rejected successfully`)
+      res.json({ message: "User rejected successfully" })
+    } else {
+      console.log(`Invalid action: ${action}`)
+      res.status(400).json({ message: "Invalid action" })
+    }
+  } catch (err) {
+    console.error("Error updating user status:", err)
+    res.status(500).json({ message: "Server error" })
+  } finally {
+    if (client) client.release()
+  }
+})
 
 // === INVOICES ROUTES ===
 
 // GET all completed instructions for invoices
-app.get("/api/invoices/completed" ,verifyToken , async (req, res) => {
+app.get("/api/invoices/completed", verifyToken, async (req, res) => {
   try {
     if (!pool) {
       return res.status(503).json({
@@ -1064,7 +1129,7 @@ app.get("/api/invoices/completed" ,verifyToken , async (req, res) => {
 })
 
 // GET specific instruction details for invoice
-app.get("/api/invoices/:id" ,verifyToken ,  async (req, res) => {
+app.get("/api/invoices/:id", verifyToken, async (req, res) => {
   try {
     if (!pool) {
       return res.status(503).json({
@@ -1141,8 +1206,6 @@ app.get("/api/invoices/:id" ,verifyToken ,  async (req, res) => {
       })
     }
 
-  
-
     // Get container details if available
     const containerQuery = `
      SELECT 
@@ -1185,9 +1248,6 @@ app.get("/api/invoices/:id" ,verifyToken ,  async (req, res) => {
     })
   }
 })
-
-
-
 
 // Generate PDF with Puppeteer
 app.post("/api/generate-pdf", async (req, res) => {
@@ -1276,7 +1336,6 @@ app.post("/api/generate-pdf", async (req, res) => {
   }
 })
 
-
 // Add this function to your server.js file
 
 /**
@@ -1285,38 +1344,38 @@ app.post("/api/generate-pdf", async (req, res) => {
 
 // Function to generate statements for all clients
 async function generateMonthlyStatements() {
-  console.log('Starting monthly statement generation process...');
-  
-  const today = new Date(); // 2025-04-11
-  const currentMonth = today.getMonth(); // 3 (April)
-  const currentYear = today.getFullYear(); // 2025
-  const generationDate = new Date(currentYear,currentMonth,1,12,0,0)
-  const formattedGenDate = generationDate.toISOString().split('T')[0]
-  
-  const previousMonth = currentMonth === 0 ? 11 : currentMonth - 1; // 2 (March)
-  const previousYear = currentMonth === 0 ? currentYear - 1 : currentYear; // 2025
-  
-  const startDate = new Date(previousYear, previousMonth, 1, 12, 0, 0); // Set to noon
-  const endDate = new Date(previousYear, previousMonth + 1, 0, 12, 0, 0); // Set to noon
-  
-  const formattedStartDate = startDate.toISOString().split('T')[0]; // '2025-03-01'
-  const formattedEndDate = endDate.toISOString().split('T')[0]; // '2025-03-31'
-  
-  console.log(`Today: ${today.toISOString().split('T')[0]}`);
-  console.log(`Current Month: ${currentMonth}, Current Year: ${currentYear}`);
-  console.log(`Previous Month: ${previousMonth}, Previous Year: ${previousYear}`);
-  console.log(`Generating statements for invoices confirmed between ${formattedStartDate} and ${formattedEndDate}`);
+  console.log("Starting monthly statement generation process...")
 
-  let dbClient;
+  const today = new Date() // 2025-04-11
+  const currentMonth = today.getMonth() // 3 (April)
+  const currentYear = today.getFullYear() // 2025
+  const generationDate = new Date(currentYear, currentMonth, 1, 12, 0, 0)
+  const formattedGenDate = generationDate.toISOString().split("T")[0]
+
+  const previousMonth = currentMonth === 0 ? 11 : currentMonth - 1 // 2 (March)
+  const previousYear = currentMonth === 0 ? currentYear - 1 : currentYear // 2025
+
+  const startDate = new Date(previousYear, previousMonth, 1, 12, 0, 0) // Set to noon
+  const endDate = new Date(previousYear, previousMonth + 1, 0, 12, 0, 0) // Set to noon
+
+  const formattedStartDate = startDate.toISOString().split("T")[0] // '2025-03-01'
+  const formattedEndDate = endDate.toISOString().split("T")[0] // '2025-03-31'
+
+  console.log(`Today: ${today.toISOString().split("T")[0]}`)
+  console.log(`Current Month: ${currentMonth}, Current Year: ${currentYear}`)
+  console.log(`Previous Month: ${previousMonth}, Previous Year: ${previousYear}`)
+  console.log(`Generating statements for invoices confirmed between ${formattedStartDate} and ${formattedEndDate}`)
+
+  let dbClient
   try {
-    dbClient = await pool.connect();
-    await dbClient.query('BEGIN');
+    dbClient = await pool.connect()
+    await dbClient.query("BEGIN")
 
-    const clientsResult = await query('SELECT m5clientkey FROM m5_client', []);
-    const clients = clientsResult.rows;
+    const clientsResult = await query("SELECT m5clientkey FROM m5_client", [])
+    const clients = clientsResult.rows
 
     for (const client of clients) {
-      const clientId = client.m5clientkey;
+      const clientId = client.m5clientkey
 
       const invoicesQuery = `
         SELECT 
@@ -1326,27 +1385,31 @@ async function generateMonthlyStatements() {
         JOIN m1_controller m1 ON i.m1key = m1.m1key
         WHERE i.clientid = $1 AND i.date BETWEEN $2 AND $3
         GROUP BY i.groupid
-      `;
-      const invoicesResult = await dbClient.query(invoicesQuery, [clientId, formattedStartDate, formattedEndDate]);
-      const invoices = invoicesResult.rows;
+      `
+      const invoicesResult = await dbClient.query(invoicesQuery, [clientId, formattedStartDate, formattedEndDate])
+      const invoices = invoicesResult.rows
 
       if (invoices.length === 0) {
-        console.log(`Client ${clientId}: No confirmed invoices found between ${formattedStartDate} and ${formattedEndDate}, skipping`);
-        continue;
+        console.log(
+          `Client ${clientId}: No confirmed invoices found between ${formattedStartDate} and ${formattedEndDate}, skipping`,
+        )
+        continue
       }
 
       for (const invoice of invoices) {
-        const totalAmount = invoice.total_amount;
-        const invoice_group_id = invoice.invoice_group_id;
+        const totalAmount = invoice.total_amount
+        const invoice_group_id = invoice.invoice_group_id
 
         const existingStatement = await dbClient.query(
-          'SELECT statement_key FROM statements WHERE groupid = $1 AND clientid = $2',
-          [invoice_group_id, clientId]
-        );
+          "SELECT statement_key FROM statements WHERE groupid = $1 AND clientid = $2",
+          [invoice_group_id, clientId],
+        )
 
         if (existingStatement.rows.length > 0) {
-          console.log(`Client ${clientId}: Statement #${existingStatement.rows[0].statement_key} already exists for group ${invoice_group_id}, skipping`);
-          continue;
+          console.log(
+            `Client ${clientId}: Statement #${existingStatement.rows[0].statement_key} already exists for group ${invoice_group_id}, skipping`,
+          )
+          continue
         }
 
         const agingQuery = `
@@ -1355,74 +1418,79 @@ async function generateMonthlyStatements() {
           WHERE clientid = $1
           ORDER BY aging_key DESC
           LIMIT 1
-        `;
-        const agingResult = await dbClient.query(agingQuery, [clientId]);
-        let newCurrent, new30days, new60days, new90days;
+        `
+        const agingResult = await dbClient.query(agingQuery, [clientId])
+        let newCurrent, new30days, new60days, new90days
 
         if (agingResult.rows.length > 0) {
-          const previousAging = agingResult.rows[0];
-          newCurrent = Math.max(parseFloat(totalAmount) || 0, 0);
-          new30days = Math.max(parseFloat(previousAging.current) || 0, 0);
-          new60days = Math.max(parseFloat(previousAging["30days"]) || 0, 0);
+          const previousAging = agingResult.rows[0]
+          newCurrent = Math.max(Number.parseFloat(totalAmount) || 0, 0)
+          new30days = Math.max(Number.parseFloat(previousAging.current) || 0, 0)
+          new60days = Math.max(Number.parseFloat(previousAging["30days"]) || 0, 0)
           new90days = Math.max(
-            (parseFloat(previousAging["60days"]) || 0) + (parseFloat(previousAging["90days"]) || 0),
-            0
-          );
+            (Number.parseFloat(previousAging["60days"]) || 0) + (Number.parseFloat(previousAging["90days"]) || 0),
+            0,
+          )
         } else {
-          newCurrent = Math.max(parseFloat(totalAmount) || 0, 0);
-          new30days = 0;
-          new60days = 0;
-          new90days = 0;
+          newCurrent = Math.max(Number.parseFloat(totalAmount) || 0, 0)
+          new30days = 0
+          new60days = 0
+          new90days = 0
         }
 
         const insertAgingQuery = `
           INSERT INTO aging_analysis (clientid, current, "30days", "60days", "90days")
           VALUES ($1, $2, $3, $4, $5)
           RETURNING aging_key
-        `;
-        const agingValues = [clientId, newCurrent, new30days, new60days, new90days];
-        const agingInsertResult = await dbClient.query(insertAgingQuery, agingValues);
-        const newAgingId = agingInsertResult.rows[0].aging_key;
+        `
+        const agingValues = [clientId, newCurrent, new30days, new60days, new90days]
+        const agingInsertResult = await dbClient.query(insertAgingQuery, agingValues)
+        const newAgingId = agingInsertResult.rows[0].aging_key
 
         const insertStatementQuery = `
           INSERT INTO statements (groupid, generation_date, clientid, agingid)
           VALUES ($1, $4, $2, $3)
           RETURNING statement_key
-        `;
-        const statementResult = await dbClient.query(insertStatementQuery, [invoice_group_id, clientId, newAgingId,formattedGenDate]);
-        const newStatementId = statementResult.rows[0].statement_key;
+        `
+        const statementResult = await dbClient.query(insertStatementQuery, [
+          invoice_group_id,
+          clientId,
+          newAgingId,
+          formattedGenDate,
+        ])
+        const newStatementId = statementResult.rows[0].statement_key
 
-        console.log(`Generated statement #${newStatementId} for group ${invoice_group_id}`);
+        console.log(`Generated statement #${newStatementId} for group ${invoice_group_id}`)
       }
 
-      await dbClient.query('COMMIT');
+      await dbClient.query("COMMIT")
     }
   } catch (error) {
-    console.error('Error in statement generation:', error);
+    console.error("Error in statement generation:", error)
     if (dbClient) {
-      await dbClient.query('ROLLBACK');
+      await dbClient.query("ROLLBACK")
     }
   } finally {
     if (dbClient) {
-      dbClient.release();
+      dbClient.release()
     }
-    console.log('Monthly statement generation process completed.');
+    console.log("Monthly statement generation process completed.")
   }
 }
 // GET statements for a specific client
-app.get("/api/statements/:clientId", verifyToken ,async (req, res) => {
+app.get("/api/statements/:clientId", verifyToken, async (req, res) => {
   try {
     if (!pool) {
       return res.status(503).json({
         success: false,
         message: "Database connection not established. Please try again later.",
-      });
+      })
     }
 
-    const { clientId } = req.params;
-    const { year, month } = req.query;
+    const { clientId } = req.params
+    const { year, month } = req.query
 
-    console.log(`Fetching statements for client ${clientId} with query:`, req.query);
+    console.log(`Fetching statements for client ${clientId} with query:`, req.query)
 
     let queryText = `
       SELECT 
@@ -1432,52 +1500,51 @@ app.get("/api/statements/:clientId", verifyToken ,async (req, res) => {
         statements
       WHERE 
         clientid = $1
-    `;
-    const queryParams = [clientId];
-    let paramIndex = 2;
+    `
+    const queryParams = [clientId]
+    let paramIndex = 2
 
     if (year) {
-      queryText += ` AND EXTRACT(YEAR FROM generation_date) = $${paramIndex}`;
-      queryParams.push(year);
-      paramIndex++;
+      queryText += ` AND EXTRACT(YEAR FROM generation_date) = $${paramIndex}`
+      queryParams.push(year)
+      paramIndex++
     }
     if (month) {
-      queryText += ` AND EXTRACT(MONTH FROM generation_date) = $${paramIndex}`;
-      queryParams.push(month);
-      paramIndex++;
+      queryText += ` AND EXTRACT(MONTH FROM generation_date) = $${paramIndex}`
+      queryParams.push(month)
+      paramIndex++
     }
 
-    queryText += ` ORDER BY generation_date DESC`;
+    queryText += ` ORDER BY generation_date DESC`
 
-    const result = await query(queryText, queryParams);
-    console.log(`Query returned ${result.rows.length} statements for client ${clientId}`);
+    const result = await query(queryText, queryParams)
+    console.log(`Query returned ${result.rows.length} statements for client ${clientId}`)
 
     res.json({
       success: true,
       data: result.rows,
-    });
+    })
   } catch (error) {
-    console.error(`Error fetching statements for client ${clientId}:`, error);
+    console.error(`Error fetching statements for client ${clientId}:`, error)
     res.status(500).json({
       success: false,
       message: error.message,
       stack: process.env.NODE_ENV === "production" ? null : error.stack,
-    });
+    })
   }
-});
+})
 
-
-app.get("/api/statement/:statementId", verifyToken ,async (req, res) => {
+app.get("/api/statement/:statementId", verifyToken, async (req, res) => {
   try {
     if (!pool) {
       return res.status(503).json({
         success: false,
         message: "Database connection not established. Please try again later.",
-      });
+      })
     }
 
-    const { statementId } = req.params;
-    console.log(`Fetching statement details for statement ${statementId}`);
+    const { statementId } = req.params
+    console.log(`Fetching statement details for statement ${statementId}`)
 
     const queryText = `
       SELECT 
@@ -1514,14 +1581,14 @@ app.get("/api/statement/:statementId", verifyToken ,async (req, res) => {
         usertable ut ON ut.roleid = 1 AND ut.status = 'active'
       WHERE 
         s.statement_key = $1
-    `;
-    const result = await query(queryText, [statementId]);
+    `
+    const result = await query(queryText, [statementId])
 
     if (result.rows.length === 0) {
       return res.status(404).json({
         success: false,
         message: "Statement not found",
-      });
+      })
     }
 
     // Group data for frontend
@@ -1531,7 +1598,7 @@ app.get("/api/statement/:statementId", verifyToken ,async (req, res) => {
       generation_date: result.rows[0].generation_date,
       company_name: result.rows[0].companyname,
       client: {
-        id : result.rows[0].clientid,
+        id: result.rows[0].clientid,
         name: result.rows[0].client_name,
         representative: result.rows[0].client_representative,
         email: result.rows[0].client_email,
@@ -1539,51 +1606,44 @@ app.get("/api/statement/:statementId", verifyToken ,async (req, res) => {
         address: result.rows[0].client_address,
       },
       aging: {
-        current: parseFloat(result.rows[0].current || 0),
-        "30days": parseFloat(result.rows[0]["30days"] || 0),
-        "60days": parseFloat(result.rows[0]["60days"] || 0),
-        "90days": parseFloat(result.rows[0]["90days"] || 0),
+        current: Number.parseFloat(result.rows[0].current || 0),
+        "30days": Number.parseFloat(result.rows[0]["30days"] || 0),
+        "60days": Number.parseFloat(result.rows[0]["60days"] || 0),
+        "90days": Number.parseFloat(result.rows[0]["90days"] || 0),
       },
       invoices: result.rows
-        .filter(row => row.ikey !== null) // Filter out rows with no invoice
-        .map(row => ({
+        .filter((row) => row.ikey !== null) // Filter out rows with no invoice
+        .map((row) => ({
           ikey: row.ikey,
           date: row.invoice_date,
-          amount: parseFloat(row.invoice_amount || 0),
+          amount: Number.parseFloat(row.invoice_amount || 0),
           task: row.invoice_task,
           invoice_num: row.invoice_num,
         })),
+    }
 
-    };
-
-    console.log(`Fetched statement ${statementId} with ${statementData.invoices.length} invoices`);
+    console.log(`Fetched statement ${statementId} with ${statementData.invoices.length} invoices`)
     res.json({
       success: true,
       data: statementData,
-    });
+    })
   } catch (error) {
-    console.error(`Error fetching statement ${statementId}:`, error);
+    console.error(`Error fetching statement ${statementId}:`, error)
     res.status(500).json({
       success: false,
       message: error.message,
       stack: process.env.NODE_ENV === "production" ? null : error.stack,
-    });
+    })
   }
-});
+})
 // Schedule the statement generation to run on the 2nd day of each month at 1:00 AM
-cron.schedule('0 1 1 * *', async () => {
-  console.log('Running scheduled statement generation task');
-  await generateMonthlyStatements();
-});
-
-
-
-
-
-
+cron.schedule("0 1 1 * *", async () => {
+  console.log("Running scheduled statement generation task")
+  await generateMonthlyStatements()
+})
 
 // GET all instructions for a specific client
-app.get("/api/client-instructions/:clientId", verifyToken ,async (req, res) => {
+app.get("/api/client-instructions/:clientId", verifyToken, async (req, res) => {
   try {
     if (!pool) {
       return res.status(503).json({
@@ -1639,7 +1699,7 @@ app.get("/api/client-instructions/:clientId", verifyToken ,async (req, res) => {
       queryParams.push(year)
       paramIndex++
     }
-    
+
     if (month) {
       queryText += ` AND EXTRACT(MONTH FROM m1.pickupdate) = $${paramIndex}`
       queryParams.push(month)
@@ -1655,13 +1715,13 @@ app.get("/api/client-instructions/:clientId", verifyToken ,async (req, res) => {
     console.log(`Query returned ${result.rows.length} instructions for client ${clientId}`)
 
     // Process the results to format dates and add additional information
-    const formattedResults = result.rows.map(row => ({
+    const formattedResults = result.rows.map((row) => ({
       ...row,
-      pickupdate: row.pickupdate ? new Date(row.pickupdate).toISOString().split('T')[0] : null,
-      invoice_date: row.invoice_date ? new Date(row.invoice_date).toISOString().split('T')[0] : null,
+      pickupdate: row.pickupdate ? new Date(row.pickupdate).toISOString().split("T")[0] : null,
+      invoice_date: row.invoice_date ? new Date(row.invoice_date).toISOString().split("T")[0] : null,
       has_invoice: !!row.ikey,
       has_statement: !!row.statement_id,
-      total_cost: parseFloat(row.total_cost || 0).toFixed(2)
+      total_cost: Number.parseFloat(row.total_cost || 0).toFixed(2),
     }))
 
     res.json({
@@ -1829,62 +1889,6 @@ app.post("/api/company/deactivate", verifyToken, async (req, res) => {
       throw err
     }
   } catch (err) {
-    console.error("Error deactivating company:", err)
-    res.status(500).json({ error: "Failed to deactivate company" })
-  } finally {
-    if (client) client.release()
-  }
-})
-
-// Reactivate a company and all its users
-app.post("/api/company/reactivate", verifyToken, async (req, res) => {
-  let client
-  try {
-    const { company_reg_num } = req.body
-
-    if (!company_reg_num) {
-      return res.status(400).json({ error: "Company registration number is required" })
-    }
-
-    // Only admins (roleid 7) can reactivate companies
-    if (req.user.roleid !== 7) {
-      return res.status(403).json({ message: "You don't have permission to reactivate companies" })
-    }
-
-    // Start a transaction
-    client = await pool.connect()
-    await client.query("BEGIN")
-
-    try {
-      // Reactivate the company admin
-      const companyAdminResult = await client.query(
-        "UPDATE usertable SET status = 'active' WHERE company_reg_num = $1 AND roleid = 1 RETURNING *",
-        [company_reg_num],
-      )
-
-      if (companyAdminResult.rows.length === 0) {
-        await client.query("ROLLBACK")
-        return res.status(404).json({ message: "Company not found" })
-      }
-
-      // Reactivate all users from this company
-      await client.query("UPDATE usertable SET status = 'active' WHERE company_reg_num = $1", [company_reg_num])
-
-      // Reactivate all employees from this company
-      await client.query("UPDATE m5_employee SET status = TRUE WHERE company_reg_num = $1", [company_reg_num])
-
-      // Commit the transaction
-      await client.query("COMMIT")
-
-      res.json({
-        message: "Company and all associated users have been reactivated",
-        company: companyAdminResult.rows[0].companyname,
-      })
-    } catch (err) {
-      await client.query("ROLLBACK")
-      throw err
-    }
-  } catch (err) {
     console.error("Error reactivating company:", err)
     res.status(500).json({ error: "Failed to reactivate company" })
   } finally {
@@ -1898,9 +1902,6 @@ app.post("/api/company/reactivate", verifyToken, async (req, res) => {
 
 // Import additional modules needed for server2.js functionality
 import multer from "multer"
-import { uploadInstructionToS3, getSignedUrl } from "./utils/s3-config.js"
-import expensesRoutes from "./routes/expenses.js"
-import documentsRoutes from "./routes/Documents.js"
 
 // Set up multer for file uploads
 const uploadsDir = path.join(__dirname, "uploads")
@@ -2322,10 +2323,10 @@ app.get("/api/containers/:instructionId", verifyToken, async (req, res) => {
 
     // Query to get containers for the instruction
     const query = `
-      SELECT containerkey, containernum, weight, m1key
-      FROM public.container
-      WHERE m1key = $1
-    `
+  SELECT containerkey, containernum, weight, m1key, container_type
+  FROM public.container
+  WHERE m1key = $1
+`
 
     const result = await client.query(query, [instructionId])
     console.log(`Found ${result.rows.length} containers for instruction ID: ${instructionId}`)
@@ -2362,9 +2363,9 @@ app.post("/api/containers/:instructionId", verifyToken, async (req, res) => {
     try {
       // First, delete all existing containers for this instruction
       const deleteQuery = `
-        DELETE FROM public.container
-        WHERE m1key = $1
-      `
+       DELETE FROM public.container
+       WHERE m1key = $1
+     `
       const deleteResult = await client.query(deleteQuery, [instructionId])
       console.log(`Deleted ${deleteResult.rowCount} existing containers for instruction ID: ${instructionId}`)
 
@@ -2379,15 +2380,20 @@ app.post("/api/containers/:instructionId", verifyToken, async (req, res) => {
         const weight =
           container.weight !== null && container.weight !== undefined ? Number.parseFloat(container.weight) : null
 
+        // Get container type from either property name
+        const containerType = container.containerType || container.container_type || ""
+
         // Log each container being inserted
-        console.log(`Inserting container: containerNum=${containerNum}, weight=${weight}, m1key=${instructionId}`)
+        console.log(
+          `Inserting container: containerNum=${containerNum}, weight=${weight}, m1key=${instructionId}, container_type=${containerType}`,
+        )
 
         const insertQuery = `
-          INSERT INTO public.container (containernum, weight, m1key)
-          VALUES ($1, $2, $3)
-          RETURNING *
-        `
-        const values = [containerNum, weight, instructionId]
+         INSERT INTO public.container (containernum, weight, m1key, container_type)
+         VALUES ($1, $2, $3, $4)
+         RETURNING containerkey
+       `
+        const values = [containerNum, weight, instructionId, containerType]
 
         try {
           const result = await client.query(insertQuery, values)
@@ -2405,8 +2411,8 @@ app.post("/api/containers/:instructionId", verifyToken, async (req, res) => {
 
       // Verify the containers were inserted
       const verifyQuery = `
-        SELECT COUNT(*) FROM public.container WHERE m1key = $1
-      `
+       SELECT COUNT(*) FROM public.container WHERE m1key = $1
+     `
       const verifyResult = await client.query(verifyQuery, [instructionId])
       console.log(
         `Verification: ${verifyResult.rows[0].count} containers now exist for instruction ID: ${instructionId}`,
@@ -2505,15 +2511,16 @@ app.post("/api/save-instruction", verifyToken, async (req, res) => {
 
       // Insert container data
       for (const container of containerData) {
+        // In the containerQuery for saving containers with a new instruction:
         const containerQuery = `
           INSERT INTO public.container (
-            containernum, weight, m1key
+            containernum, weight, m1key, container_type
           ) VALUES (
-            $1, $2, $3
+            $1, $2, $3, $4
           )
         `
 
-        const containerValues = [container.containerNum, container.weight, m1key]
+        const containerValues = [container.containerNum, container.weight, m1key, container.container_type]
 
         await client.query(containerQuery, containerValues)
       }
@@ -2980,7 +2987,7 @@ app.get("/expenses", async (req, res) => {
 
   try {
     const result = await pool.query(`
-      SELECT e.*, t.truckregnum, CONCAT(emp.name, ' ', emp.surname) as driver_name
+      SELECT e.*, t.truckregnum, CONCAT(emp.name, ' ', surname) as driver_name
       FROM expenses_m2 e
       LEFT JOIN m5_trucks t ON e.truckid = t.m5truckskey
       LEFT JOIN m5_employee emp ON e.driverid = emp.userid
@@ -3194,10 +3201,10 @@ app.post("/legs/save", async (req, res) => {
           const driverId = driver.driverid ? Number.parseInt(driver.driverid) : null
           const truckRegNumber = driver.truckregnumber || null
 
-          let containerNumber = null;
+          let containerNumber = null
           if (driver.containernumber) {
-            containerNumber = driver.containernumber.toString();
-            console.log(`Using container number as string: ${containerNumber}`);
+            containerNumber = driver.containernumber.toString()
+            console.log(`Using container number as string: ${containerNumber}`)
           }
 
           const date = driver.date ? new Date(driver.date) : null
@@ -3410,64 +3417,64 @@ app.delete("/legs/:legId", async (req, res) => {
       })
     }
 
-    const { legnumber, m1key } = legInfo.rows[0];
-    console.log(`Deleting leg ${legId} (leg number ${legnumber}) from instruction ${m1key}`);
-    
+    const { legnumber, m1key } = legInfo.rows[0]
+    console.log(`Deleting leg ${legId} (leg number ${legnumber}) from instruction ${m1key}`)
+
     // Delete the leg from the database
-    const result = await pool.query(`DELETE FROM legs_m2 WHERE legkey = $1 RETURNING legkey`, [legId]);
-    
+    const result = await pool.query(`DELETE FROM legs_m2 WHERE legkey = $1 RETURNING legkey`, [legId])
+
     if (result.rowCount === 0) {
-      await pool.query("ROLLBACK");
+      await pool.query("ROLLBACK")
       return res.status(404).json({
         success: false,
         message: `Leg with ID ${legId} not found or could not be deleted`,
-      });
+      })
     }
-    
+
     // Commit transaction
-    await pool.query("COMMIT");
-    
-    console.log(`Successfully deleted leg with ID ${legId}`);
+    await pool.query("COMMIT")
+
+    console.log(`Successfully deleted leg with ID ${legId}`)
     res.status(200).json({
       success: true,
       message: `Leg with ID ${legId} successfully deleted`,
       deletedLegId: legId,
-    });
-    } catch (err) {
-      // Rollback transaction on error
-      await pool.query("ROLLBACK");
-      console.error(`Error deleting leg with ID ${legId}:`, err);
-      res.status(500).json({
-        success: false,
-        message: `Failed to delete leg: ${err.message}`,
-        error: err.message,
-      });
-    }
-    });
-    
-    // Fetch containers for a specific instruction
-    app.get("/containers/instruction/:instructionId", async (req, res) => {
-    const { instructionId } = req.params;
-    console.log(`Route /containers/instruction/${instructionId} was accessed`);
-    
-    try {
-      const result = await pool.query(`SELECT * FROM container WHERE m1key = $1`, [instructionId]);
-    
-      console.log(`Found ${result.rows.length} containers for instruction ID ${instructionId}`);
-      res.status(200).json(result.rows);
-    } catch (err) {
-      console.error(`Error fetching containers for instruction ID ${instructionId}:`, err);
-      res.status(500).json({ error: err.message });
-    }
-    });
-    
-    // Complete instruction
-    app.put("/instructions/:instructionId/complete", async (req, res) => {
-    const { instructionId } = req.params;
-    const { status } = req.body;
-    console.log(`Route PUT /instructions/${instructionId}/complete was accessed`);
-    
-    try {
+    })
+  } catch (err) {
+    // Rollback transaction on error
+    await pool.query("ROLLBACK")
+    console.error(`Error deleting leg with ID ${legId}:`, err)
+    res.status(500).json({
+      success: false,
+      message: `Failed to delete leg: ${err.message}`,
+      error: err.message,
+    })
+  }
+})
+
+// Fetch containers for a specific instruction
+app.get("/containers/instruction/:instructionId", async (req, res) => {
+  const { instructionId } = req.params
+  console.log(`Route /containers/instruction/${instructionId} was accessed`)
+
+  try {
+    const result = await pool.query(`SELECT * FROM container WHERE m1key = $1`, [instructionId])
+
+    console.log(`Found ${result.rows.length} containers for instruction ID ${instructionId}`)
+    res.status(200).json(result.rows)
+  } catch (err) {
+    console.error(`Error fetching containers for instruction ID ${instructionId}:`, err)
+    res.status(500).json({ error: err.message })
+  }
+})
+
+// Complete instruction
+app.put("/instructions/:instructionId/complete", async (req, res) => {
+  const { instructionId } = req.params
+  const { status } = req.body
+  console.log(`Route PUT /instructions/${instructionId}/complete was accessed`)
+
+  try {
     await pool.query(`UPDATE m1_controller SET status = $1 WHERE m1key = $2`, [status, instructionId])
 
     console.log(`Instruction ${instructionId} marked as ${status}`)
@@ -3589,316 +3596,8 @@ app.get("/legs/instruction/:id/driver/:driverId", async (req, res) => {
 })
 
 // Get wage details for a driver and instruction
-app.get("/api/driver-legs/:driverId", async (req, res) => {
-  const { driverId } = req.params;
-  const { instructionId } = req.query;
-  let client;
-
-  console.log(`Route /api/driver-legs/${driverId} was accessed with instructionId=${instructionId}`);
-
-  if (!driverId) {
-    return res.status(400).json({ error: "Driver ID is required" });
-  }
-
-  try {
-    console.log("Attempting to connect to database...");
-    client = await pool.connect();
-    console.log("Successfully connected to database");
-
-    // Build the query with explicit type casting
-    let query = `
-      SELECT 
-        l.legkey,
-        l.legnumber,
-        l.startingpoint,
-        l.destination,
-        l.date,
-        l.driverrate,
-        l.truckregnumber,
-        l.containernumber,
-        l.legstatus
-      FROM 
-        public.legs_m2 l
-      WHERE 
-        l.driverid = $1::integer
-    `;
-
-    const queryParams = [driverId];
-
-    // If instructionId is provided, add it to the query
-    if (instructionId) {
-      query += ` AND l.m1key = $2::integer`;
-      queryParams.push(instructionId);
-    }
-
-    query += ` ORDER BY l.date DESC, l.legnumber`;
-
-    console.log("Executing query:", query);
-    console.log("Query parameters:", queryParams);
-
-    const result = await client.query(query, queryParams);
-    console.log(`Found ${result.rows.length} legs for driver ID ${driverId}`);
-    
-    return res.status(200).json(result.rows);
-  } catch (error) {
-    console.error("Error in /api/driver-legs/:driverId endpoint:");
-    console.error("Error message:", error.message);
-    console.error("Error stack:", error.stack);
-    
-    return res.status(500).json({
-      error: "An error occurred while fetching leg details",
-      message: error.message,
-      stack: process.env.NODE_ENV === 'production' ? undefined : error.stack
-    });
-  } finally {
-    if (client) {
-      console.log("Releasing database client");
-      client.release();
-    }
-  }
-});
-// Add middleware to pass the pool to the imported routes
-app.use("/expenses", (req, res, next) => {
-  req.app.locals.pool = pool;
-  next();
-}, expensesRoutes);
-
-app.use("/documents", (req, res, next) => {
-  req.app.locals.pool = pool;
-  next();
-}, documentsRoutes);
-
-// Add this to your documents route handler
-app.get("/documents/:instructionId", async (req, res) => {
-  const { instructionId } = req.params
-  console.log(`Route /documents/${instructionId} was accessed`)
-
-  try {
-    // Log the query we're about to execute
-    console.log(`Executing query to fetch documents for instruction ID: ${instructionId}`)
-
-    const result = await pool.query("SELECT * FROM documents WHERE m1key = $1", [instructionId])
-
-    // Log the result
-    console.log(`Found ${result.rows.length} documents for instruction ID ${instructionId}`)
-    res.status(200).json(result.rows)
-  } catch (err) {
-    console.error(`Error fetching documents for instruction ID ${instructionId}:`, err)
-    res.status(500).json({ error: err.message })
-  }
-})
-
-async function generateInvoice(instructionId) {
-  try {
-    const currentDate = new Date()
-    const currentYear = currentDate.getFullYear()
-    const currentMonth = currentDate.getMonth() + 1
-    
-    // Get month name in uppercase
-    const monthNames = [
-      "JANUARY", "FEBRUARY", "MARCH", "APRIL", "MAY", "JUNE",
-      "JULY", "AUGUST", "SEPTEMBER", "OCTOBER", "NOVEMBER", "DECEMBER"
-    ]
-    const monthName = monthNames[currentMonth - 1] // Adjust for 0-based index
-    
-    // Get the client ID and m1key from the instruction
-    const instructionResult = await pool.query(
-      "SELECT client, m1key FROM m1_controller WHERE m1key = $1", 
-      [instructionId]
-    )
-    
-    if (instructionResult.rows.length === 0) {
-      throw new Error(`Instruction with ID ${instructionId} not found`)
-    }
-    
-    const { client: clientId, m1key } = instructionResult.rows[0]
-    
-    // Get the next invoice number sequence
-    const sequenceResult = await pool.query(
-      "SELECT COALESCE(MAX(CAST(SUBSTRING(invoice_num FROM 'INV-\\d+-0*(\\d+)') AS INTEGER)), 0) + 1 AS next_invoice_num FROM invoice WHERE invoice_num LIKE $1",
-      [`INV-${currentYear}-%`]
-    )
-    const nextInvoiceNum = sequenceResult.rows[0].next_invoice_num
-    
-    // Get the next document number sequence
-    const docSequenceResult = await pool.query(
-      "SELECT COALESCE(MAX(CAST(SUBSTRING(doc_num FROM 'DOC-0*(\\d+)') AS INTEGER)), 0) + 1 AS next_doc_num FROM invoice"
-    )
-    const nextDocNum = docSequenceResult.rows[0].next_doc_num
-    
-    // Format the invoice number, doc number and group ID
-    const invoiceNum = `INV-${currentYear}-${nextInvoiceNum}` // No leading zeros
-    const docNum = `DOC-${nextDocNum}` // No leading zeros
-    const groupId = `${clientId}-${monthName}${currentYear}` // Format as 1-APRIL2025
-    
-    // Insert the new invoice
-    const insertResult = await pool.query(
-      "INSERT INTO invoice (clientid, m1key, invoice_num, doc_num, groupid, date) VALUES ($1, $2, $3, $4, $5, $6) RETURNING ikey",
-      [clientId, m1key, invoiceNum, docNum, groupId, currentDate]
-    )
-    
-    return {
-      success: true,
-      invoiceId: insertResult.rows[0].ikey,
-      invoiceNum,
-      docNum,
-      groupId,
-      date: currentDate
-    }
-  } catch (error) {
-    console.error("Error generating invoice:", error)
-    return {
-      success: false,
-      error: error.message
-    }
-  }
-}
-
-// Add this endpoint to your server.js file
-app.post("/generate-invoice/:instructionId", async (req, res) => {
-  const { instructionId } = req.params
-  console.log(`Route POST /generate-invoice/${instructionId} was accessed`)
-
-  try {
-    const result = await generateInvoice(instructionId)
-    
-    if (result.success) {
-      res.status(201).json(result)
-    } else {
-      res.status(400).json(result)
-    }
-  } catch (error) {
-    console.error("Error in invoice generation route:", error)
-    res.status(500).json({ 
-      success: false, 
-      error: "Server error while generating invoice" 
-    })
-  }
-})
-
-// Check if build directory exists before trying to serve static files
-const buildPath = path.join(__dirname, "build")
-if (fs.existsSync(buildPath)) {
-  console.log("Build directory found, serving static files from:", buildPath)
-  // Serve static files from the React app
-  app.use(express.static(buildPath))
-
-  // The "catchall" handler: for any request that doesn't
-  // match one above, send back React's index.html file.
-  app.get("*", (req, res) => {
-    res.sendFile(path.join(buildPath, "index.html"))
-  })
-} else {
-  console.log("Build directory not found at:", buildPath)
-  console.log("Only API endpoints will be available")
-
-  // Add a fallback route for non-API routes
-  app.get("*", (req, res) => {
-    // Check if this is an API request
-    if (req.url.startsWith("/api/")) {
-      return res.status(404).json({ error: "API endpoint not found" })
-    }
-
-    // For non-API requests, return a simple HTML page
-    res.send(`
-      <!DOCTYPE html>
-      <html>
-        <head>
-          <title>Logistics API Server</title>
-          <style>
-            body { font-family: Arial, sans-serif; margin: 40px; line-height: 1.6; }
-            h1 { color: #333; }
-            .container { max-width: 800px; margin: 0 auto; }
-            .note { background-color: #f8f9fa; padding: 15px; border-left: 4px solid #007bff; margin-bottom: 20px; }
-            code { background-color: #f1f1f1; padding: 2px 5px; border-radius: 3px; }
-          </style>
-        </head>
-        <body>
-          <div class="container">
-            <h1>Logistics API Server</h1>
-            <div class="note">
-              <p>The server is running in API-only mode. The React build directory was not found.</p>
-              <p>API endpoints are available at <code>/api/...</code></p>
-            </div>
-            <p>Available endpoints:</p>
-            <ul>
-              <li><code>/api/clients</code> - Get all clients</li>
-              <li><code>/api/shipment-types</code> - Get all shipment types</li>
-              <li><code>/api/instructions</code> - Get all instructions</li>
-              <li><code>/api/client-instruction-stats</code> - Get client instruction statistics</li>
-              <li><code>/test-connection</code> - Test database connection</li>
-            </ul>
-          </div>
-        </body>
-      </html>
-    `)
-  })
-}
-app.get("/instructions/driver/:id", async (req, res) => {
-  const driverId = req.params.id
-
-  try {
-    // Query to get instructions with leg count for a specific driver
-    const query = `
-      SELECT 
-        m1.m1key, 
-        m1.pickupdate,
-        COUNT(l.legkey) as leg_count
-      FROM 
-        public.m1_controller m1
-      JOIN 
-        public.legs_m2 l ON m1.m1key = l.m1key
-      WHERE 
-        l.driverid = $1
-      GROUP BY 
-        m1.m1key, m1.pickupdate
-      ORDER BY 
-        m1.pickupdate DESC
-    `
-
-    const result = await pool.query(query, [driverId])
-    res.json(result.rows)
-  } catch (error) {
-    console.error("Error fetching driver instructions:", error)
-    res.status(500).json({ error: "An error occurred while fetching driver instructions" })
-  }
-})
-
-// Add this route to view leg details for a specific instruction
-app.get("/legs/instruction/:id/driver/:driverId", async (req, res) => {
-  const instructionId = req.params.id
-  const driverId = req.params.driverId
-
-  try {
-    const query = `
-      SELECT 
-        l.legkey,
-        l.legnumber,
-        l.startingpoint,
-        l.destination,
-        l.date,
-        l.driverrate,
-        l.legstatus
-      FROM 
-        public.legs_m2 l
-      WHERE 
-        l.m1key = $1 AND l.driverid = $2
-      ORDER BY 
-        l.legnumber
-    `
-
-    const result = await pool.query(query, [instructionId, driverId])
-    res.json(result.rows)
-  } catch (error) {
-    console.error("Error fetching leg details:", error)
-    res.status(500).json({ error: "An error occurred while fetching leg details" })
-  }
-})
-
-// Get wage details for a driver and instruction
 app.get("/wage-details/driver/:driverId/instruction/:instructionId", async (req, res) => {
   const driverId = req.params.driverId
-  const instructionId = req.params.instructionId
 
   try {
     // First get the base salary from the employee table
@@ -3948,47 +3647,6 @@ app.get("/wage-details/driver/:driverId/instruction/:instructionId", async (req,
   }
 })
 app.get("/api/driver-instructions/:driverId", async (req, res) => {
-  const driverId = req.params.driverId;
-  console.log(`Route /api/driver-instructions/${driverId} was accessed`);
-
-  let client;
-  try {
-    client = await pool.connect();
-    
-    // This query gets all instructions a driver was involved in, with leg counts
-    const query = `
-      SELECT 
-        m1.m1key, 
-        m1.deadline,
-        m1.pickupdate,
-        COUNT(l.legkey) as leg_count
-      FROM 
-        public.m1_controller m1
-      JOIN 
-        public.legs_m2 l ON m1.m1key = l.m1key
-      WHERE 
-        l.driverid = $1
-      GROUP BY 
-        m1.m1key, m1.deadline, m1.pickupdate
-      ORDER BY 
-        COALESCE(m1.deadline, m1.pickupdate) DESC
-    `;
-
-    const result = await client.query(query, [driverId]);
-    console.log(`Found ${result.rows.length} instructions for driver ID ${driverId}`);
-    
-    res.json(result.rows);
-  } catch (error) {
-    console.error(`Error fetching driver instructions for driver ID ${driverId}:`, error);
-    res.status(500).json({ 
-      error: "An error occurred while fetching driver instructions",
-      details: error.message
-    });
-  } finally {
-    if (client) client.release();
-  }
-});
-app.get("/api/driver-instructions/:driverId", async (req, res) => {
   const driverId = req.params.driverId
   console.log(`Route /api/driver-instructions/${driverId} was accessed`)
 
@@ -4031,15 +3689,15 @@ app.get("/api/driver-instructions/:driverId", async (req, res) => {
 })
 app.get("/api/employee/:id", async (req, res) => {
   // Extract the ID from the URL parameter, removing any colons if present
-  console.log('Employee route hit with ID:', req.params.id);
-  const id = req.params.id.split(':')[0]; // This will handle IDs like "1:1" by taking just the "1"
-  let client;
+  console.log("Employee route hit with ID:", req.params.id)
+  const id = req.params.id.split(":")[0] // This will handle IDs like "1:1" by taking just the "1"
+  let client
 
-  console.log(`Route /api/employee/${id} was accessed`);
+  console.log(`Route /api/employee/${id} was accessed`)
 
   try {
-    client = await pool.connect();
-    
+    client = await pool.connect()
+
     // Query to get employee details including role name
     const query = `
       SELECT 
@@ -4055,38 +3713,33 @@ app.get("/api/employee/:id", async (req, res) => {
         public.roles r ON e.roleid = r.roleid
       WHERE 
         e.userid = $1
-    `;
-    
-    const result = await client.query(query, [id]);
-    
+    `
+
+    const result = await client.query(query, [id])
+
     if (result.rows.length === 0) {
-      return res.status(404).json({ error: "Employee not found" });
+      return res.status(404).json({ error: "Employee not found" })
     }
-    
-    console.log(`Found employee data for ID ${id}:`, result.rows[0]);
-    res.json(result.rows[0]);
+
+    console.log(`Found employee data for ID ${id}:`, result.rows[0])
+    res.json(result.rows[0])
   } catch (error) {
-    console.error(`Error fetching employee data for ID ${id}:`, error);
+    console.error(`Error fetching employee data for ID ${id}:`, error)
     res.status(500).json({
       error: "An error occurred while fetching employee data",
-      message: error.message
-    });
+      message: error.message,
+    })
   } finally {
-    if (client) client.release();
+    if (client) client.release()
   }
-});
-
-
-
-
-
+})
 
 app.listen(PORT, async () => {
   try {
     // Test database connection on startup
     const dbTest = await testConnection()
-    types.setTypeParser(types.builtins.NUMERIC, (value) => parseFloat(value));
-    types.setTypeParser(types.builtins.FLOAT8, (value) => parseFloat(value));
+    types.setTypeParser(types.builtins.NUMERIC, (value) => Number.parseFloat(value))
+    types.setTypeParser(types.builtins.FLOAT8, (value) => Number.parseFloat(value))
     await generateMonthlyStatements()
     if (dbTest.success) {
       console.log(`✅ Database Connected Successfully at ${dbTest.time}`)
