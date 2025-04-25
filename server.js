@@ -2293,34 +2293,34 @@ app.get("/api/driver-rates", verifyToken, async (req, res) => {
   }
 })
 
-app.put("/api/driver-rates/:id", verifyToken, async (req, res) => {
-  try {
-    const { id } = req.params
-    const { startingpoint, destination, driver_rate, subie_rate } = req.body
+// app.put("/api/driver-rates/:id", verifyToken, async (req, res) => {
+//   try {
+//     const { id } = req.params
+//     const { startingpoint, destination, driver_rate, subie_rate } = req.body
 
-    const query = `
-      UPDATE m5_driver_rate
-      SET startingpoint = $1,
-          destination = $2,
-          driver_rate = $3,
-          subie_rate = $4
-      WHERE m5ratekey = $5
-      RETURNING *`
+//     const query = `
+//       UPDATE m5_driver_rate
+//       SET startingpoint = $1,
+//           destination = $2,
+//           driver_rate = $3,
+//           subie_rate = $4
+//       WHERE m5ratekey = $5
+//       RETURNING *`
       
-    const values = [startingpoint, destination, driver_rate, subie_rate, id]
+//     const values = [startingpoint, destination, driver_rate, subie_rate, id]
 
-    const result = await client.query(query, values)
+//     const result = await client.query(query, values)
 
-    if (result.rowCount === 0) {
-      return res.status(404).json({ error: "Driver rate not found" })
-    }
+//     if (result.rowCount === 0) {
+//       return res.status(404).json({ error: "Driver rate not found" })
+//     }
 
-    res.json(result.rows[0])
-  } catch (err) {
-    console.error(`Error updating driver rate ${req.params.id}:`, err)
-    res.status(500).json({ error: "Failed to update driver rate" })
-  }
-})
+//     res.json(result.rows[0])
+//   } catch (err) {
+//     console.error(`Error updating driver rate ${req.params.id}:`, err)
+//     res.status(500).json({ error: "Failed to update driver rate" })
+//   }
+// })
 
 
 // Get driver rate by ID
@@ -2351,74 +2351,91 @@ app.get("/api/driver-rates/:id", verifyToken, async (req, res) => {
 // Add new driver rate
 app.post("/api/driver-rates", verifyToken, async (req, res) => {
   try {
-    // Removed role check
-    const { startingpoint, destination, driver_rate, subie_rate } = req.body
+    const {
+      startingpoint,
+      destination,
+      driver_six_meter_rate,
+      driver_twelve_meter_rate,
+      subie_six_meter_rate,
+      subie_twelve_meter_rate
+    } = req.body;
 
     const result = await client.query(
-      `INSERT INTO m5_driver_rate (startingpoint, destination, driver_rate, subie_rate)
-       VALUES ($1, $2, $3, $4) RETURNING *`,
-      [startingpoint, destination, driver_rate, subie_rate],
-    )
+      `INSERT INTO m5_driver_rate (
+        startingpoint, destination,
+        driver_six_meter_rate, driver_twelve_meter_rate,
+        subie_six_meter_rate, subie_twelve_meter_rate
+      ) VALUES ($1, $2, $3, $4, $5, $6) RETURNING *`,
+      [startingpoint, destination, driver_six_meter_rate, driver_twelve_meter_rate, subie_six_meter_rate, subie_twelve_meter_rate]
+    );
 
-    res.status(201).json(result.rows[0])
+    res.status(201).json(result.rows[0]);
   } catch (err) {
-    console.error("Error creating driver rate:", err)
-    res.status(500).json({ error: "Failed to create driver rate" })
+    console.error("Error creating driver rate:", err);
+    res.status(500).json({ error: "Failed to create driver rate" });
   }
-})
+});
+
 
 // Update driver rate
 app.put("/api/driver-rates/:id", verifyToken, async (req, res) => {
   try {
-    const { id } = req.params
+    const { id } = req.params;
 
-    // Removed role check
     // Check if driver rate exists
-    const checkResult = await client.query("SELECT * FROM m5_driver_rate WHERE m5ratekey = $1", [id])
+    const checkResult = await client.query("SELECT * FROM m5_driver_rate WHERE m5ratekey = $1", [id]);
 
     if (checkResult.rows.length === 0) {
-      return res.status(404).json({ message: "Driver rate not found" })
+      return res.status(404).json({ message: "Driver rate not found" });
     }
 
-    // Build the update query dynamically based on provided fields
-    const updateFields = []
-    const queryParams = []
-    let paramCounter = 1
+    // Fields that can be updated
+    const updateableFields = [
+      "startingpoint",
+      "destination",
+      "driver_six_meter_rate",
+      "driver_twelve_meter_rate",
+      "subie_six_meter_rate",
+      "subie_twelve_meter_rate"
+    ];
 
-    const updateableFields = ["startingpoint", "destination", "rate", "driverid"]
+    const updateFields = [];
+    const queryParams = [];
+    let paramCounter = 1;
 
-    // Build the SET clause
     for (const field of updateableFields) {
       if (req.body[field] !== undefined) {
-        updateFields.push(`${field} = $${paramCounter}`)
-        queryParams.push(req.body[field])
-        paramCounter++
+        updateFields.push(`${field} = $${paramCounter}`);
+        queryParams.push(req.body[field]);
+        paramCounter++;
       }
     }
 
-    // If no fields to update, return early
     if (updateFields.length === 0) {
-      return res.status(400).json({ message: "No fields to update" })
+      return res.status(400).json({ message: "No fields to update" });
     }
 
-    // Add the rate ID as the last parameter
-    queryParams.push(id)
+    // Add updated_at timestamp
+    updateFields.push(`updated_at = CURRENT_TIMESTAMP`);
+
+    // Add id for WHERE clause
+    queryParams.push(id);
 
     const updateQuery = `
       UPDATE m5_driver_rate 
       SET ${updateFields.join(", ")} 
       WHERE m5ratekey = $${paramCounter} 
       RETURNING *
-    `
+    `;
 
-    const result = await client.query(updateQuery, queryParams)
+    const result = await client.query(updateQuery, queryParams);
 
-    res.json(result.rows[0])
+    res.json(result.rows[0]);
   } catch (err) {
-    console.error(`Error updating driver rate ${req.params.id}:`, err)
-    res.status(500).json({ error: "Failed to update driver rate" })
+    console.error(`Error updating driver rate ${req.params.id}:`, err);
+    res.status(500).json({ error: "Failed to update driver rate" });
   }
-})
+});
 
 // Delete driver rate
 app.delete("/api/driver-rates/:id", verifyToken, async (req, res) => {

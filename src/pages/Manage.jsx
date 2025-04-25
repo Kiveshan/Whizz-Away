@@ -86,13 +86,15 @@ const [newEmployee, setNewEmployee] = useState({
     vin_num: "",
     is_subcontractor: false,
   })
-
   const [newDriverRate, setNewDriverRate] = useState({
     startingpoint: "",
     destination: "",
-    driver_rate: "",
-    subie_rate: "",
+    driver_six_meter_rate: "",
+    driver_twelve_meter_rate: "",
+    subie_six_meter_rate: "",
+    subie_twelve_meter_rate: ""
   })
+  
 
   const [newSubcontractor, setNewSubcontractor] = useState({
     companyname: "",
@@ -297,42 +299,51 @@ const [newEmployee, setNewEmployee] = useState({
   
 
   const handleSaveDriverRate = async () => {
-    if (!newDriverRate.startingpoint || !newDriverRate.destination || !newDriverRate.driver_rate || !newDriverRate.subie_rate) {
-      alert("Please fill in all required fields.")
-      return
+    const {
+      startingpoint,
+      destination,
+      driver_six_meter_rate,
+      driver_twelve_meter_rate,
+      subie_six_meter_rate,
+      subie_twelve_meter_rate
+    } = newDriverRate;
+  
+    if (!startingpoint || !destination || !driver_six_meter_rate || !driver_twelve_meter_rate || !subie_six_meter_rate || !subie_twelve_meter_rate) {
+      alert("Please fill in all required fields.");
+      return;
     }
   
-    setLoading(true)
+    setLoading(true);
     try {
       if (isEditingRate) {
-        // PUT request for updating
-        await axios.put(`${API_URL}/driver-rates/${editingRateId}`, newDriverRate, getAuthHeaders())
+        await axios.put(`${API_URL}/driver-rates/${editingRateId}`, newDriverRate, getAuthHeaders());
       } else {
-        // POST request for creating
-        await axios.post(`${API_URL}/driver-rates`, newDriverRate, getAuthHeaders())
+        await axios.post(`${API_URL}/driver-rates`, newDriverRate, getAuthHeaders());
       }
   
-      // Refresh rate list
-      const ratesResponse = await axios.get(`${API_URL}/driver-rates`, getAuthHeaders())
-      setDriverRates(ratesResponse.data)
+      const ratesResponse = await axios.get(`${API_URL}/driver-rates`, getAuthHeaders());
+      setDriverRates(ratesResponse.data);
   
-      // Reset form
       setNewDriverRate({
         startingpoint: "",
         destination: "",
-        driver_rate: "",
-        subie_rate: "",
-      })
-      setIsEditingRate(false)
-      setEditingRateId(null)
-      setShowDriverRateForm(false)
+        driver_six_meter_rate: "",
+        driver_twelve_meter_rate: "",
+        subie_six_meter_rate: "",
+        subie_twelve_meter_rate: "",
+      });
+  
+      setIsEditingRate(false);
+      setEditingRateId(null);
+      setShowDriverRateForm(false);
     } catch (err) {
-      console.error("Error saving driver rate:", err)
-      alert(`Error saving driver rate: ${err.response?.data?.error || err.message}`)
+      console.error("Error saving driver rate:", err);
+      alert(`Error saving driver rate: ${err.response?.data?.error || err.message}`);
     } finally {
-      setLoading(false)
+      setLoading(false);
     }
   }
+  
   
 const handleSaveSubcontractor = async () => {
   setLoading(true);
@@ -600,13 +611,15 @@ const handleSaveSubcontractor = async () => {
         <table>
           <thead>
             <tr>
-               <th>Starting Point</th>
-            <th>Ending Point</th>
-            <th>Driver Rate</th>
-            <th>Subie Rate</th>
-            <th>Updated at</th>
-            <th>Changes</th>
-            <th>Delete</th>
+              <th>Starting Point</th>
+              <th>Ending Point</th>
+              <th>Driver Rate (6m)</th>
+              <th>Driver Rate (12m)</th>
+              <th>Subie Rate (6m)</th>
+              <th>Subie Rate (12m)</th>
+              <th>Updated at</th>
+              <th>Changes</th>
+              <th>Delete</th>
             </tr>
           </thead>
           <tbody>
@@ -614,9 +627,11 @@ const handleSaveSubcontractor = async () => {
               <tr key={rate.m5ratekey}>
                 <td>{rate.startingpoint}</td>
                 <td>{rate.destination}</td>
-                <td>{rate.driver_rate}</td>
-                <td>{rate.subie_rate}</td>
-                <td>{ "N/A"}</td>
+                <td>{rate.driver_six_meter_rate}</td>
+                <td>{rate.driver_twelve_meter_rate}</td>
+                <td>{rate.subie_six_meter_rate}</td>
+                <td>{rate.subie_twelve_meter_rate}</td>
+                <td>{rate.updated_at ? new Date(rate.updated_at).toLocaleDateString() : "N/A"}</td>
                 <td>
                   <button className="manage-edit-button" onClick={() => handleEditDriverRate(rate.m5ratekey)}>
                     Edit
@@ -638,7 +653,8 @@ const handleSaveSubcontractor = async () => {
         </button>
       </center>
     </div>
-  )
+  );
+  
 
   const renderSubcontractorsTable = () => (
     <div className="manage-subcontractor-table">
@@ -1121,43 +1137,71 @@ const handleSaveSubcontractor = async () => {
       <h2 className="manage-form-title">Add Driver Rate</h2>
   
       <div className="manage-form-group">
-        <div className="form-field">
-          <label><strong>Starting Point</strong></label>
-          <input
-            type="text"
-            className="form-input"
-            value={newDriverRate.startingpoint}
-            onChange={(e) => setNewDriverRate({ ...newDriverRate, startingpoint: e.target.value })}
-          />
+  
+        <div className="form-row">
+          <div className="form-field">
+            <label><strong>Starting Point</strong></label>
+            <input
+              type="text"
+              className="form-input"
+              value={newDriverRate.startingpoint}
+              onChange={(e) => setNewDriverRate({ ...newDriverRate, startingpoint: e.target.value })}
+            />
+          </div>
+  
+          <div className="form-field">
+            <label><strong>Destination</strong></label>
+            <input
+              type="text"
+              className="form-input"
+              value={newDriverRate.destination}
+              onChange={(e) => setNewDriverRate({ ...newDriverRate, destination: e.target.value })}
+            />
+          </div>
         </div>
   
-        <div className="form-field">
-          <label><strong>Driver Rate</strong></label>
-          <input
-            type="number"
-            className="form-input"
-            value={newDriverRate.driver_rate}
-            onChange={(e) => setNewDriverRate({ ...newDriverRate, driver_rate: e.target.value })}
-          />
-        </div>
-        <div className="form-field">
-          <label><strong>Subie Rate</strong></label>
-          <input
-            type="number"
-            className="form-input"
-            value={newDriverRate.subie_rate}
-            onChange={(e) => setNewDriverRate({ ...newDriverRate, subie_rate: e.target.value })}
-          />
+        <div className="form-row">
+          <div className="form-field">
+            <label><strong>Driver Rate (6m)</strong></label>
+            <input
+              type="number"
+              className="form-input"
+              value={newDriverRate.driver_six_meter_rate}
+              onChange={(e) => setNewDriverRate({ ...newDriverRate, driver_six_meter_rate: e.target.value })}
+            />
+          </div>
+  
+          <div className="form-field">
+            <label><strong>Driver Rate (12m)</strong></label>
+            <input
+              type="number"
+              className="form-input"
+              value={newDriverRate.driver_twelve_meter_rate}
+              onChange={(e) => setNewDriverRate({ ...newDriverRate, driver_twelve_meter_rate: e.target.value })}
+            />
+          </div>
         </div>
   
-        <div className="form-field">
-          <label><strong>Destination</strong></label>
-          <input
-            type="text"
-            className="form-input"
-            value={newDriverRate.destination}
-            onChange={(e) => setNewDriverRate({ ...newDriverRate, destination: e.target.value })}
-          />
+        <div className="form-row">
+          <div className="form-field">
+            <label><strong>Subie Rate (6m)</strong></label>
+            <input
+              type="number"
+              className="form-input"
+              value={newDriverRate.subie_six_meter_rate}
+              onChange={(e) => setNewDriverRate({ ...newDriverRate, subie_six_meter_rate: e.target.value })}
+            />
+          </div>
+  
+          <div className="form-field">
+            <label><strong>Subie Rate (12m)</strong></label>
+            <input
+              type="number"
+              className="form-input"
+              value={newDriverRate.subie_twelve_meter_rate}
+              onChange={(e) => setNewDriverRate({ ...newDriverRate, subie_twelve_meter_rate: e.target.value })}
+            />
+          </div>
         </div>
       </div>
   
@@ -1170,7 +1214,9 @@ const handleSaveSubcontractor = async () => {
         </button>
       </div>
     </form>
-  );
+  )
+  
+  
   
 const RenderSubcontractorForm = ({ setShowSubcontractorForm }) => {
   const [numTrucks, setNumTrucks] = useState(0);

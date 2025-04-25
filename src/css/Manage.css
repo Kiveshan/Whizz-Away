@@ -411,3 +411,11 @@ tr:hover {
   border-width: 0 2px 2px 0;
   transform: rotate(45deg);
 }
+
+.form-row {
+  display: flex;
+  gap: 1rem;
+}
+.form-field {
+  flex: 1;
+}
