@@ -88,7 +88,7 @@ const UploadProof = () => {
       );
 
       if (response.data.success) {
-        navigate(`/client-payments/${clientId}`, {
+        navigate(`/client-payments`, {
           state: { clientId, clientName },
         });
       } else {
