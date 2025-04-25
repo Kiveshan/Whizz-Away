@@ -153,14 +153,43 @@ const ClientStatement = () => {
   if (error) return <div className="error-message">Error: {error}</div>
   if (!statement) return <div>Please select a statement from the list.</div>
 
-  // Calculate totals (invoices only for now)
-  const invoicedAmount = statement.invoices.reduce((sum, inv) => sum + inv.amount, 0)
-  const openingBalance = 0 // No payment data yet
-  const amountPaid = 0 // No payment data yet
-  const balanceDue = invoicedAmount
+  // Calculate totals (include payments)
+  const invoicedAmount = statement.invoices.reduce((sum, inv) => sum + inv.amount, 0);
+  const amountPaid = statement.payments.reduce((sum, payment) => sum + payment.amount, 0);
+  const openingBalance = 0; // No change, as per original logic
+  const balanceDue = invoicedAmount - amountPaid;
+
+  // Combine invoices and payments into a single transactions array
+  const transactions = [
+    ...statement.invoices.map((invoice) => ({
+      type: "Invoice",
+      date: new Date(invoice.date),
+      details: invoice.task || invoice.invoice_num || `Invoice #${invoice.ikey}`,
+      amount: invoice.amount,
+      payment: null,
+    })),
+    ...statement.payments.map((payment) => ({
+      type: "Payment",
+      date: new Date(payment.date),
+      details: `Payment ID: ${payment.paykey}`,
+      amount: null,
+      payment: payment.amount,
+    })),
+  ].sort((a, b) => a.date - b.date); // Sort by date
+
+  // Calculate running balance
+  let runningBalance = 0; // Opening balance is 0
+  const transactionsWithBalance = transactions.map((tx) => {
+    if (tx.type === "Invoice") {
+      runningBalance += tx.amount;
+    } else {
+      runningBalance -= tx.payment;
+    }
+    return { ...tx, balance: runningBalance };
+  });
 
   // Determine if this is a small table that should fit on one page
-  const isSmallTable = statement.invoices.length <= 3
+  const isSmallTable = transactions.length <= 3; // Update to consider total transactions
 
   // Update the date formatting in the transactions table to ensure it fits in the column
   return (
@@ -238,20 +267,14 @@ const ClientStatement = () => {
                   <td></td>
                   <td>R0</td>
                 </tr>
-                {statement.invoices.map((invoice) => (
-                  <tr key={invoice.ikey}>
-                    <td>{new Date(invoice.date).toLocaleDateString("en-GB")}</td>
-                    <td>Invoice</td>
-                    <td>{invoice.task || invoice.invoice_num || `Invoice #${invoice.ikey}`}</td>
-                    <td>R{invoice.amount.toFixed(2)}</td>
-                    <td></td>
-                    <td>
-                      R
-                      {statement.invoices
-                        .slice(0, statement.invoices.indexOf(invoice) + 1)
-                        .reduce((sum, inv) => sum + inv.amount, 0)
-                        .toFixed(2)}
-                    </td>
+                {transactionsWithBalance.map((tx, index) => (
+                  <tr key={index}>
+                    <td>{tx.date.toLocaleDateString("en-GB")}</td>
+                    <td>{tx.type}</td>
+                    <td>{tx.details}</td>
+                    <td>{tx.amount ? `R${tx.amount.toFixed(2)}` : ""}</td>
+                    <td>{tx.payment ? `R${tx.payment.toFixed(2)}` : ""}</td>
+                    <td>R{tx.balance.toFixed(2)}</td>
                   </tr>
                 ))}
               </tbody>
@@ -301,27 +324,24 @@ const ClientStatement = () => {
       <div className="statementdownloadbtn1">
         <button
           className="back-btn"
-          onClick={() =>{
+          onClick={() => {
             if (roleId == 3) {
-            navigate("/statements-list", { state: { clientId: statement.client.id } })
-            }else if (roleId == 4){
+              navigate("/statements-list", { state: { clientId: statement.client.id } })
+            } else if (roleId == 4) {
               navigate("/DirectorClientDocuments", {
                 state: {
-                  clientId : statement.client.id,
-                  clientName : statement.client.name,
+                  clientId: statement.client.id,
+                  clientName: statement.client.name,
                 },
               })
-            } else if (roleId == 1){
+            } else if (roleId == 1) {
               navigate("/client-documents", {
-                state : {
-
-                  clientId : statement.client.id,
-                  clientName : statement.client.name,
-
+                state: {
+                  clientId: statement.client.id,
+                  clientName: statement.client.name,
                 }
               })
             }
-             
           }}
         >
           Back

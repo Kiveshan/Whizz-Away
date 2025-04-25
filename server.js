@@ -1514,39 +1514,63 @@ app.post("/api/generate-pdf", async (req, res) => {
 
 // Function to generate statements for all clients
 async function generateMonthlyStatements() {
-  console.log("Starting monthly statement generation process...")
+  console.log("Starting monthly statement generation process...");
 
-  const today = new Date() // 2025-04-11
-  const currentMonth = today.getMonth() // 3 (April)
-  const currentYear = today.getFullYear() // 2025
-  const generationDate = new Date(currentYear, currentMonth, 1, 12, 0, 0)
-  const formattedGenDate = generationDate.toISOString().split("T")[0]
+  const today = new Date(); // 2025-04-25
+  const currentMonth = today.getMonth(); // 3 (April)
+  const currentYear = today.getFullYear(); // 2025
+  const generationDate = new Date(currentYear, currentMonth, 1, 12, 0, 0);
+  const formattedGenDate = generationDate.toISOString().split("T")[0];
 
-  const previousMonth = currentMonth === 0 ? 11 : currentMonth - 1 // 2 (March)
-  const previousYear = currentMonth === 0 ? currentYear - 1 : currentYear // 2025
+  // Previous month (for invoices)
+  const previousMonth = currentMonth === 0 ? 11 : currentMonth - 1; // 2 (March)
+  const previousYear = currentMonth === 0 ? currentYear - 1 : currentYear; // 2025
 
-  const startDate = new Date(previousYear, previousMonth, 1, 12, 0, 0) // Set to noon
-  const endDate = new Date(previousYear, previousMonth + 1, 0, 12, 0, 0) // Set to noon
+  const invoiceStartDate = new Date(previousYear, previousMonth, 1, 12, 0, 0); // March 1, 2025
+  const invoiceEndDate = new Date(previousYear, previousMonth + 1, 0, 12, 0, 0); // March 31, 2025
+  const formattedInvoiceStartDate = invoiceStartDate.toISOString().split("T")[0]; // '2025-03-01'
+  const formattedInvoiceEndDate = invoiceEndDate.toISOString().split("T")[0]; // '2025-03-31'
 
-  const formattedStartDate = startDate.toISOString().split("T")[0] // '2025-03-01'
-  const formattedEndDate = endDate.toISOString().split("T")[0] // '2025-03-31'
+  // Two months prior (for payments)
+  const paymentMonth = previousMonth === 0 ? 11 : previousMonth - 1; // 1 (February)
+  const paymentYear = previousMonth === 0 ? previousYear - 1 : previousYear; // 2025
+  const paymentStartDate = new Date(paymentYear, paymentMonth, 1, 12, 0, 0); // February 1, 2025
+  const paymentEndDate = new Date(paymentYear, paymentMonth + 1, 0, 12, 0, 0); // February 28, 2025
+  const formattedPaymentStartDate = paymentStartDate.toISOString().split("T")[0]; // '2025-02-01'
+  const formattedPaymentEndDate = paymentEndDate.toISOString().split("T")[0]; // '2025-02-28'
 
-  console.log(`Today: ${today.toISOString().split("T")[0]}`)
-  console.log(`Current Month: ${currentMonth}, Current Year: ${currentYear}`)
-  console.log(`Previous Month: ${previousMonth}, Previous Year: ${previousYear}`)
-  console.log(`Generating statements for invoices confirmed between ${formattedStartDate} and ${formattedEndDate}`)
+  console.log(`Today: ${today.toISOString().split("T")[0]}`);
+  console.log(`Current Month: ${currentMonth}, Current Year: ${currentYear}`);
+  console.log(`Previous Month: ${previousMonth}, Previous Year: ${previousYear}`);
+  console.log(`Generating statements for invoices confirmed between ${formattedInvoiceStartDate} and ${formattedInvoiceEndDate}`);
+  console.log(`Fetching payments between ${formattedPaymentStartDate} and ${formattedPaymentEndDate}`);
 
-  let dbClient
+  let dbClient;
   try {
-    dbClient = await pool.connect()
-    await dbClient.query("BEGIN")
+    dbClient = await pool.connect();
+    await dbClient.query("BEGIN");
 
-    const clientsResult = await query("SELECT m5clientkey FROM m5_client", [])
-    const clients = clientsResult.rows
+    // Fetch all clients
+    const clientsResult = await query("SELECT m5clientkey FROM m5_client", []);
+    const clients = clientsResult.rows;
+
+    // Fetch payments for all clients two months prior
+    const paymentsResult = await dbClient.query(
+      `SELECT 
+         clientid,
+         SUM(amount) as total_payments
+       FROM payment_m3
+       WHERE fileupload BETWEEN $1 AND $2
+       GROUP BY clientid`,
+      [formattedPaymentStartDate, formattedPaymentEndDate]
+    );
+    const paymentsMap = new Map(paymentsResult.rows.map(row => [row.clientid, Number.parseFloat(row.total_payments) || 0]));
+    console.log(`Fetched payments for ${paymentsResult.rows.length} clients between ${formattedPaymentStartDate} and ${formattedPaymentEndDate}`);
 
     for (const client of clients) {
-      const clientId = client.m5clientkey
+      const clientId = client.m5clientkey;
 
+      // Fetch invoices for the previous month
       const invoicesQuery = `
         SELECT 
           SUM(m1.total_cost) as total_amount,
@@ -1555,98 +1579,108 @@ async function generateMonthlyStatements() {
         JOIN m1_controller m1 ON i.m1key = m1.m1key
         WHERE i.clientid = $1 AND i.date BETWEEN $2 AND $3
         GROUP BY i.groupid
-      `
-      const invoicesResult = await dbClient.query(invoicesQuery, [clientId, formattedStartDate, formattedEndDate])
-      const invoices = invoicesResult.rows
+      `;
+      const invoicesResult = await dbClient.query(invoicesQuery, [clientId, formattedInvoiceStartDate, formattedInvoiceEndDate]);
+      const invoices = invoicesResult.rows;
 
       if (invoices.length === 0) {
         console.log(
-          `Client ${clientId}: No confirmed invoices found between ${formattedStartDate} and ${formattedEndDate}, skipping`,
-        )
-        continue
+          `Client ${clientId}: No confirmed invoices found between ${formattedInvoiceStartDate} and ${formattedInvoiceEndDate}, skipping`
+        );
+        continue;
       }
 
-      for (const invoice of invoices) {
-        const totalAmount = invoice.total_amount
-        const invoice_group_id = invoice.invoice_group_id
+      // Get total payments for this client (default to 0 if none)
+      const totalPayments = paymentsMap.get(clientId) || 0;
+      console.log(`Client ${clientId}: Total payments from ${formattedPaymentStartDate} to ${formattedPaymentEndDate}: R${totalPayments}`);
 
+      for (const invoice of invoices) {
+        const totalAmount = invoice.total_amount;
+        const invoice_group_id = invoice.invoice_group_id;
+
+        // Check for existing statement
         const existingStatement = await dbClient.query(
           "SELECT statement_key FROM statements WHERE groupid = $1 AND clientid = $2",
-          [invoice_group_id, clientId],
-        )
+          [invoice_group_id, clientId]
+        );
 
         if (existingStatement.rows.length > 0) {
           console.log(
-            `Client ${clientId}: Statement #${existingStatement.rows[0].statement_key} already exists for group ${invoice_group_id}, skipping`,
-          )
-          continue
+            `Client ${clientId}: Statement #${existingStatement.rows[0].statement_key} already exists for group ${invoice_group_id}, skipping`
+          );
+          continue;
         }
 
+        // Fetch the most recent aging analysis
         const agingQuery = `
           SELECT aging_key, current, "30days", "60days", "90days"
           FROM aging_analysis
           WHERE clientid = $1
           ORDER BY aging_key DESC
           LIMIT 1
-        `
-        const agingResult = await dbClient.query(agingQuery, [clientId])
-        let newCurrent, new30days, new60days, new90days
+        `;
+        const agingResult = await dbClient.query(agingQuery, [clientId]);
+        let newCurrent, new30days, new60days, new90days;
 
         if (agingResult.rows.length > 0) {
-          const previousAging = agingResult.rows[0]
-          newCurrent = Math.max(Number.parseFloat(totalAmount) || 0, 0)
-          new30days = Math.max(Number.parseFloat(previousAging.current) || 0, 0)
-          new60days = Math.max(Number.parseFloat(previousAging["30days"]) || 0, 0)
+          const previousAging = agingResult.rows[0];
+          newCurrent = Math.max(Number.parseFloat(totalAmount) || 0, 0);
+          new30days = Math.max(Number.parseFloat(previousAging.current) || 0, 0);
+          // Apply payment deduction to 60days
+          const raw60days = Math.max(Number.parseFloat(previousAging["30days"]) || 0, 0);
+          new60days = Math.max(raw60days - totalPayments, 0); // Deduct payments, ensure >= 0
           new90days = Math.max(
             (Number.parseFloat(previousAging["60days"]) || 0) + (Number.parseFloat(previousAging["90days"]) || 0),
-            0,
-          )
+            0
+          );
+          console.log(
+            `Client ${clientId}: Aging update - Current: R${newCurrent}, 30days: R${new30days}, 60days: R${new60days} (after deducting R${totalPayments}), 90days: R${new90days}`
+          );
         } else {
-          newCurrent = Math.max(Number.parseFloat(totalAmount) || 0, 0)
-          new30days = 0
-          new60days = 0
-          new90days = 0
+          newCurrent = Math.max(Number.parseFloat(totalAmount) || 0, 0);
+          new30days = 0;
+          new60days = Math.max(0 - totalPayments, 0); // Deduct payments, ensure >= 0
+          new90days = 0;
+          console.log(
+            `Client ${clientId}: Initial aging - Current: R${newCurrent}, 30days: R${new30days}, 60days: R${new60days} (after deducting R${totalPayments}), 90days: R${new90days}`
+          );
         }
 
+        // Insert new aging analysis record
         const insertAgingQuery = `
           INSERT INTO aging_analysis (clientid, current, "30days", "60days", "90days")
           VALUES ($1, $2, $3, $4, $5)
           RETURNING aging_key
-        `
-        const agingValues = [clientId, newCurrent, new30days, new60days, new90days]
-        const agingInsertResult = await dbClient.query(insertAgingQuery, agingValues)
-        const newAgingId = agingInsertResult.rows[0].aging_key
+        `;
+        const agingValues = [clientId, newCurrent, new30days, new60days, new90days];
+        const agingInsertResult = await dbClient.query(insertAgingQuery, agingValues);
+        const newAgingId = agingInsertResult.rows[0].aging_key;
 
+        // Insert statement
         const insertStatementQuery = `
           INSERT INTO statements (groupid, generation_date, clientid, agingid)
-          VALUES ($1, $4, $2, $3)
+          VALUES ($1, $2, $3, $4)
           RETURNING statement_key
-        `
-        const statementResult = await dbClient.query(insertStatementQuery, [
-          invoice_group_id,
-          clientId,
-          newAgingId,
-          formattedGenDate,
-        ])
-        const newStatementId = statementResult.rows[0].statement_key
-
-        console.log(`Generated statement #${newStatementId} for group ${invoice_group_id}`)
+        `;
+        const statementValues = [invoice_group_id, formattedGenDate, clientId, newAgingId];
+        const statementInsertResult = await dbClient.query(insertStatementQuery, statementValues);
+        console.log(
+          `Client ${clientId}: Generated statement #${statementInsertResult.rows[0].statement_key} for group ${invoice_group_id}`
+        );
       }
+    }
 
-      await dbClient.query("COMMIT")
-    }
+    await dbClient.query("COMMIT");
+    console.log("Monthly statement generation completed successfully");
   } catch (error) {
-    console.error("Error in statement generation:", error)
-    if (dbClient) {
-      await dbClient.query("ROLLBACK")
-    }
+    await dbClient.query("ROLLBACK");
+    console.error("Error generating monthly statements:", error);
+    throw error;
   } finally {
-    if (dbClient) {
-      dbClient.release()
-    }
-    console.log("Monthly statement generation process completed.")
+    if (dbClient) dbClient.release();
   }
 }
+
 // GET statements for a specific client
 app.get("/api/statements/:clientId", verifyToken, async (req, res) => {
   try {
@@ -1710,12 +1744,13 @@ app.get("/api/statement/:statementId", verifyToken, async (req, res) => {
       return res.status(503).json({
         success: false,
         message: "Database connection not established. Please try again later.",
-      })
+      });
     }
 
-    const { statementId } = req.params
-    console.log(`Fetching statement details for statement ${statementId}`)
+    const { statementId } = req.params;
+    console.log(`Fetching statement details for statement ${statementId}`);
 
+    // Fetch statement details (invoices and client info)
     const queryText = `
       SELECT 
         s.statement_key,
@@ -1751,15 +1786,58 @@ app.get("/api/statement/:statementId", verifyToken, async (req, res) => {
         usertable ut ON ut.roleid = 1 AND ut.status = 'active'
       WHERE 
         s.statement_key = $1
-    `
-    const result = await query(queryText, [statementId])
+    `;
+    const result = await query(queryText, [statementId]);
 
     if (result.rows.length === 0) {
       return res.status(404).json({
         success: false,
         message: "Statement not found",
-      })
+      });
     }
+
+    // Determine the statement period (previous month based on generation_date)
+    const generationDate = new Date(result.rows[0].generation_date);
+    const statementMonth = generationDate.getMonth() === 0 ? 11 : generationDate.getMonth() - 1;
+    const statementYear = generationDate.getMonth() === 0 ? generationDate.getFullYear() - 1 : generationDate.getFullYear();
+    const statementStartDate = new Date(statementYear, statementMonth, 1, 12, 0, 0);
+    const statementEndDate = new Date(statementYear, statementMonth + 1, 0, 12, 0, 0);
+    const formattedStatementStartDate = statementStartDate.toISOString().split("T")[0];
+    const formattedStatementEndDate = statementEndDate.toISOString().split("T")[0];
+
+    console.log(`Statement period (invoices): ${formattedStatementStartDate} to ${formattedStatementEndDate}`);
+
+    // Determine the payment period (two months prior to generation_date)
+    const paymentMonth = statementMonth === 0 ? 11 : statementMonth - 1;
+    const paymentYear = statementMonth === 0 ? statementYear - 1 : statementYear;
+    const paymentStartDate = new Date(paymentYear, paymentMonth, 1, 12, 0, 0);
+    const paymentEndDate = new Date(paymentYear, paymentMonth + 1, 0, 12, 0, 0);
+    const formattedPaymentStartDate = paymentStartDate.toISOString().split("T")[0];
+    const formattedPaymentEndDate = paymentEndDate.toISOString().split("T")[0];
+
+    console.log(`Payment period: ${formattedPaymentStartDate} to ${formattedPaymentEndDate}`);
+
+    // Fetch payments for the client within the payment period
+    const clientId = result.rows[0].clientid;
+    const paymentsQuery = `
+      SELECT 
+        paykey,
+        fileupload AS date,
+        amount
+      FROM 
+        payment_m3
+      WHERE 
+        clientid = $1
+        AND fileupload BETWEEN $2 AND $3
+    `;
+    const paymentsResult = await query(paymentsQuery, [clientId, formattedPaymentStartDate, formattedPaymentEndDate]);
+    const payments = paymentsResult.rows.map((row) => ({
+      paymentid: row.paymentid,
+      date: row.date,
+      amount: Number.parseFloat(row.amount || 0),
+    }));
+
+    console.log(`Fetched ${payments.length} payments for client ${clientId} between ${formattedPaymentStartDate} and ${formattedPaymentEndDate}`);
 
     // Group data for frontend
     const statementData = {
@@ -1790,22 +1868,23 @@ app.get("/api/statement/:statementId", verifyToken, async (req, res) => {
           task: row.invoice_task,
           invoice_num: row.invoice_num,
         })),
-    }
+      payments: payments, // Add payments to the response
+    };
 
-    console.log(`Fetched statement ${statementId} with ${statementData.invoices.length} invoices`)
+    console.log(`Fetched statement ${statementId} with ${statementData.invoices.length} invoices and ${statementData.payments.length} payments`);
     res.json({
       success: true,
       data: statementData,
-    })
+    });
   } catch (error) {
-    console.error(`Error fetching statement ${statementId}:`, error)
+    console.error(`Error fetching statement ${statementId}:`, error);
     res.status(500).json({
       success: false,
       message: error.message,
       stack: process.env.NODE_ENV === "production" ? null : error.stack,
-    })
+    });
   }
-})
+});
 // Schedule the statement generation to run on the 2nd day of each month at 1:00 AM
 cron.schedule("0 1 1 * *", async () => {
   console.log("Running scheduled statement generation task")
