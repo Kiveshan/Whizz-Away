@@ -1089,6 +1089,58 @@ app.post("/api/payments/:clientId/upload", verifyToken, async (req, res) => {
   }
 })
 
+
+app.get("/api/payments/:clientId/:paymentId", verifyToken, async (req, res) => {
+  try {
+    if (!pool) {
+      return res.status(503).json({
+        success: false,
+        message: "Database connection not established. Please try again later.",
+      });
+    }
+
+    const { clientId, paymentId } = req.params;
+    console.log(`Fetching payment ${paymentId} for client ${clientId}`);
+
+    const queryText = `
+      SELECT 
+        fileupload,
+        amount,
+        filename
+      FROM 
+        payment_m3
+      WHERE 
+        clientid = $1 AND paykey = $2
+    `;
+    const queryParams = [clientId, paymentId];
+
+    const result = await query(queryText, queryParams);
+    console.log(`Query returned ${result.rows.length} payment for client ${clientId}, payment ${paymentId}`);
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({
+        success: false,
+        message: "Payment not found",
+      });
+    }
+
+    const payment = result.rows[0];
+    payment.fileurl = payment.filename ? `${req.protocol}://${req.get('host')}/uploads/${payment.filename}` : null;
+
+    res.json({
+      success: true,
+      data: payment,
+    });
+  } catch (error) {
+    console.error(`Error fetching payment ${paymentId} for client ${clientId}:`, error);
+    res.status(500).json({
+      success: false,
+      message: error.message,
+      stack: process.env.NODE_ENV === "production" ? null : error.stack,
+    });
+  }
+});
+
 // Updated endpoint for fetching client payments
 app.get("/api/payments/:clientId", verifyToken, async (req, res) => {
   try {
@@ -1106,6 +1158,7 @@ app.get("/api/payments/:clientId", verifyToken, async (req, res) => {
 
     let queryText = `
       SELECT 
+      paykey,
         fileupload,
         amount,
         filename

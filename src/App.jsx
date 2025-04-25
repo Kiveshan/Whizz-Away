@@ -209,6 +209,7 @@ function ContentWrapper() {
         <Route path="/ManagerViewFuelExpence" element={<ManagerViewFuelExpence />} />
         <Route path="/expenses" element={<Expenses />} />
         <Route path="/upload/:clientName" element={<UploadProof />} />
+        <Route path="/upload-proof/:clientName/:paymentId?" element={<UploadProof />} />
         <Route path="/debtors" element={<Debtors />} />
         <Route path="/analytics" element={<Analytics />} />
         <Route path="/manage" element={<Manage />} />
@@ -244,7 +245,8 @@ function ContentWrapper() {
         <Route path="/DirectorExpenses/:truckId" element={<DirectorExpenses />} />
         // Add these routes in the ContentWrapper function, with the other Director routes
         <Route path="/Viewcontrollerinstructions" element={<Viewcontrollerinstructions />} />
-        <Route path="/ViewcontrollerInstructionDetails" element={<ViewcontrollerInstructionDetails />} />        <Route path="/AdminDashboard" element={<AdminDashboard />} />
+        <Route path="/ViewcontrollerInstructionDetails" element={<ViewcontrollerInstructionDetails />} />        
+        <Route path="/AdminDashboard" element={<AdminDashboard />} />
 
         {/* Finance Clerk Routes */}
         <Route path="/instructions" element={<InstructionsList />} />

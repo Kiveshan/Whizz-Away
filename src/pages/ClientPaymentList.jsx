@@ -1,131 +1,131 @@
 "use client"
 
-import { useState, useEffect } from "react"
-import { useNavigate, useLocation } from "react-router-dom"
-import axios from "axios"
-import "../css/ClientPayments.css"
+import { useState, useEffect } from "react";
+import { useNavigate, useLocation } from "react-router-dom";
+import axios from "axios";
+import "../css/ClientPayments.css";
 
 const ClientPaymentList = () => {
-  const navigate = useNavigate()
-  const location = useLocation()
-  const { clientId, clientName } = location.state || {}
+  const navigate = useNavigate();
+  const location = useLocation();
+  const { clientId, clientName } = location.state || {};
 
-  const [clientPayments, setClientPayments] = useState([])
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState(null)
-  const [filters, setFilters] = useState({ year: "", month: "" })
+  const [clientPayments, setClientPayments] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+  const [filters, setFilters] = useState({ year: "", month: "" });
 
   const monthNames = [
     "January", "February", "March", "April", "May", "June",
-    "July", "August", "September", "October", "November", "December"
-  ]
+    "July", "August", "September", "October", "November", "December",
+  ];
 
   useEffect(() => {
     if (!clientId) {
-      setError("No client selected")
-      setLoading(false)
-      return
+      setError("No client selected");
+      setLoading(false);
+      return;
     }
 
     const fetchPayments = async () => {
       try {
-        setLoading(true)
-        const url = new URL(`/api/payments/${clientId}`, window.location.origin)
-        if (filters.year) url.searchParams.append("year", filters.year)
-        if (filters.month) url.searchParams.append("month", filters.month)
+        setLoading(true);
+        const url = new URL(`/api/payments/${clientId}`, window.location.origin);
+        if (filters.year) url.searchParams.append("year", filters.year);
+        if (filters.month) url.searchParams.append("month", filters.month);
 
         const response = await axios.get(url.toString(), {
           headers: {
-            "Authorization": `Bearer ${localStorage.getItem("token")}`
-          }
-        })
+            "Authorization": `Bearer ${localStorage.getItem("token")}`,
+          },
+        });
 
         if (response.data.success) {
-          setClientPayments(response.data.data)
+          setClientPayments(response.data.data);
         } else {
-          throw new Error(response.data.message || "Failed to fetch payments")
+          throw new Error(response.data.message || "Failed to fetch payments");
         }
       } catch (err) {
-        console.error("Error fetching payments:", err)
-        setError(err.message || "An error occurred while fetching payments")
+        console.error("Error fetching payments:", err);
+        setError(err.message || "An error occurred while fetching payments");
       } finally {
-        setLoading(false)
+        setLoading(false);
       }
-    }
+    };
 
-    fetchPayments()
-  }, [clientId, filters])
+    fetchPayments();
+  }, [clientId, filters]);
 
   const handleFilterChange = (e) => {
-    const { name, value } = e.target
+    const { name, value } = e.target;
     setFilters((prev) => ({
       ...prev,
       [name]: value === "Year" || value === "Month" ? "" : value,
-    }))
-  }
+    }));
+  };
 
   const handleUpload = () => {
     navigate(`/upload/${encodeURIComponent(clientName)}`, {
-      state: { clientId, clientName }
-    })
-  }
+      state: { clientId, clientName },
+    });
+  };
 
   const handleBack = () => {
-    navigate("/client-list-payments")
-  }
+    navigate("/client-list-payments");
+  };
 
   const handleViewProof = (fileUrl, date) => {
     if (fileUrl) {
-      openImageViewer(fileUrl, `${clientName} - ${new Date(date).toLocaleDateString()}`)
+      openImageViewer(fileUrl, `${clientName} - ${new Date(date).toLocaleDateString()}`);
     } else {
-      alert("No proof of payment uploaded")
+      alert("No proof of payment uploaded");
     }
-  }
+  };
 
   const openImageViewer = (fileUrl, titleText) => {
-    const modal = document.createElement("div")
-    modal.className = "proof-modal"
+    const modal = document.createElement("div");
+    modal.className = "proof-modal";
 
-    const modalContent = document.createElement("div")
-    modalContent.className = "proof-modal-content"
+    const modalContent = document.createElement("div");
+    modalContent.className = "proof-modal-content";
 
-    const closeBtn = document.createElement("span")
-    closeBtn.className = "proof-modal-close"
-    closeBtn.innerHTML = "×"
-    closeBtn.onclick = () => document.body.removeChild(modal)
+    const closeBtn = document.createElement("span");
+    closeBtn.className = "proof-modal-close";
+    closeBtn.innerHTML = "×";
+    closeBtn.onclick = () => document.body.removeChild(modal);
 
-    const title = document.createElement("h2")
-    title.textContent = `Proof of Payment - ${titleText}`
+    const title = document.createElement("h2");
+    title.textContent = `Proof of Payment - ${titleText}`;
 
-    const fileExtension = fileUrl.split('.').pop().toLowerCase()
-    let contentElement
+    const fileExtension = fileUrl.split('.').pop().toLowerCase();
+    let contentElement;
 
     if (['jpg', 'jpeg', 'png', 'gif'].includes(fileExtension)) {
-      contentElement = document.createElement("img")
-      contentElement.src = fileUrl
-      contentElement.className = "proof-image"
+      contentElement = document.createElement("img");
+      contentElement.src = fileUrl;
+      contentElement.className = "proof-image";
     } else if (fileExtension === 'pdf') {
-      contentElement = document.createElement("iframe")
-      contentElement.src = fileUrl
-      contentElement.className = "proof-pdf"
-      contentElement.style.width = "100%"
-      contentElement.style.height = "500px"
+      contentElement = document.createElement("iframe");
+      contentElement.src = fileUrl;
+      contentElement.className = "proof-pdf";
+      contentElement.style.width = "100%";
+      contentElement.style.height = "500px";
     } else {
-      contentElement = document.createElement("p")
-      contentElement.textContent = "Unsupported file format"
+      contentElement = document.createElement("p");
+      contentElement.textContent = "Unsupported file format";
     }
 
-    modalContent.appendChild(closeBtn)
-    modalContent.appendChild(title)
-    modalContent.appendChild(contentElement)
-    modal.appendChild(modalContent)
+    modalContent.appendChild(closeBtn);
+    modalContent.appendChild(title);
+    modalContent.appendChild(contentElement);
+    modal.appendChild(modalContent);
 
-    document.body.appendChild(modal)
-  }
+    document.body.appendChild(modal);
+  };
 
-  if (loading) return <div>Loading payments...</div>
-  if (error) return <div className="error-message">Error: {error}</div>
-  if (!clientId) return <div>Please select a client from the previous page.</div>
+  if (loading) return <div>Loading payments...</div>;
+  if (error) return <div className="error-message">Error: {error}</div>;
+  if (!clientId) return <div>Please select a client from the previous page.</div>;
 
   return (
     <div className="client-payment-container">
@@ -182,9 +182,12 @@ const ClientPaymentList = () => {
                 <td>{new Date(payment.fileupload).toLocaleDateString()}</td>
                 <td>{payment.amount}</td>
                 <td>
-                  <button
-                    className="view-button"
-                    onClick={() => handleViewProof(payment.fileurl, payment.fileupload)}
+                  <button className="view-button"
+                    onClick={() =>
+                      navigate(`/upload-proof/${clientName}/${payment.paykey}`, {
+                        state: { clientId, clientName },
+                      })
+                    }
                   >
                     View
                   </button>
@@ -207,7 +210,7 @@ const ClientPaymentList = () => {
         </button>
       </div>
     </div>
-  )
-}
+  );
+};
 
-export default ClientPaymentList
+export default ClientPaymentList;
