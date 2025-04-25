@@ -6,142 +6,142 @@ import "../finance clerkpages/css/UpdateInstruction.css"
 
 // Update the modal animation for a smoother appearance
 const modalAnimation = `
-  @keyframes fadeIn {
-    from { opacity: 0; }
-    to { opacity: 1; }
-  }
-  
-  @keyframes scaleIn {
-    from { transform: scale(0.95); opacity: 0; }
-    to { transform: scale(1); opacity: 1; }
-  }
-  
-  .animate-fadeIn {
-    animation: fadeIn 0.2s ease-out forwards;
-  }
-  
-  .animate-scaleIn {
-    animation: scaleIn 0.3s ease-out forwards;
-  }
-  
-  .modal-wrapper {
-    position: fixed;
-    top: 0;
-    left: 0;
-    right: 0;
-    bottom: 0;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    z-index: 50;
-  }
-  
-  .modal-backdrop {
-    position: fixed;
-    top: 0;
-    left: 0;
-    right: 0;
-    bottom: 0;
-    background: linear-gradient(135deg, rgba(37, 99, 235, 0.9) 0%, rgba(79, 70, 229, 0.9) 100%);
-    z-index: 40;
-  }
-  
-  .modal-container {
-    background: white;
-    border-radius: 12px;
-    width: 400px;
-    max-width: 90vw;
-    box-shadow: 0 10px 25px rgba(0, 0, 0, 0.1);
-    z-index: 50;
-    overflow: hidden;
-  }
-  
-  .modal-header {
-    padding: 20px 24px 0;
-  }
-  
-  .modal-title {
-    font-size: 18px;
-    font-weight: 600;
-    color: #111827;
-    margin-bottom: 8px;
-  }
-  
-  .modal-description {
-    font-size: 14px;
-    color: #6B7280;
-    margin-bottom: 16px;
-  }
-  
-  .modal-body {
-    padding: 0 24px 16px;
-  }
-  
-  .modal-item {
-    display: flex;
-    align-items: center;
-    padding: 8px 0;
-  }
-  
-  .modal-checkbox {
-    width: 18px;
-    height: 18px;
-    border-radius: 4px;
-    border: 2px solid #D1D5DB;
-    margin-right: 12px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-  }
-  
-  .modal-checkbox.checked {
-    background-color: #4F46E5;
-    border-color: #4F46E5;
-  }
-  
-  .modal-checkbox-icon {
-    color: white;
-    width: 12px;
-    height: 12px;
-  }
-  
-  .modal-item-text {
-    font-size: 14px;
-    color: #374151;
-  }
-  
-  .modal-footer {
-    padding: 16px 24px 20px;
-    display: flex;
-    justify-content: flex-end;
-    gap: 12px;
-  }
-  
-  .modal-btn {
-    padding: 8px 16px;
-    border-radius: 6px;
-    font-weight: 500;
-    font-size: 14px;
-    transition: all 0.2s;
-  }
-  
-  .modal-btn-secondary {
-    background-color: #F3F4F6;
-    color: #374151;
-  }
-  
-  .modal-btn-secondary:hover {
-    background-color: #E5E7EB;
-  }
-  
-  .modal-btn-primary {
-    background-color: #4F46E5;
-    color: white;
-  }
-  
-  .modal-btn-primary:hover {
-    background-color: #4338CA;
-  }
+ @keyframes fadeIn {
+   from { opacity: 0; }
+   to { opacity: 1; }
+ }
+ 
+ @keyframes scaleIn {
+   from { transform: scale(0.95); opacity: 0; }
+   to { transform: scale(1); opacity: 1; }
+ }
+ 
+ .animate-fadeIn {
+   animation: fadeIn 0.2s ease-out forwards;
+ }
+ 
+ .animate-scaleIn {
+   animation: scaleIn 0.3s ease-out forwards;
+ }
+ 
+ .modal-wrapper {
+   position: fixed;
+   top: 0;
+   left: 0;
+   right: 0;
+   bottom: 0;
+   display: flex;
+   align-items: center;
+   justify-content: center;
+   z-index: 50;
+ }
+ 
+ .modal-backdrop {
+   position: fixed;
+   top: 0;
+   left: 0;
+   right: 0;
+   bottom: 0;
+   background: linear-gradient(135deg, rgba(37, 99, 235, 0.9) 0%, rgba(79, 70, 229, 0.9) 100%);
+   z-index: 40;
+ }
+ 
+ .modal-container {
+   background: white;
+   border-radius: 12px;
+   width: 400px;
+   max-width: 90vw;
+   box-shadow: 0 10px 25px rgba(0, 0, 0, 0.1);
+   z-index: 50;
+   overflow: hidden;
+ }
+ 
+ .modal-header {
+   padding: 20px 24px 0;
+ }
+ 
+ .modal-title {
+   font-size: 18px;
+   font-weight: 600;
+   color: #111827;
+   margin-bottom: 8px;
+ }
+ 
+ .modal-description {
+   font-size: 14px;
+   color: #6B7280;
+   margin-bottom: 16px;
+ }
+ 
+ .modal-body {
+   padding: 0 24px 16px;
+ }
+ 
+ .modal-item {
+   display: flex;
+   align-items: center;
+   padding: 8px 0;
+ }
+ 
+ .modal-checkbox {
+   width: 18px;
+   height: 18px;
+   border-radius: 4px;
+   border: 2px solid #D1D5DB;
+   margin-right: 12px;
+   display: flex;
+   align-items: center;
+   justify-content: center;
+ }
+ 
+ .modal-checkbox.checked {
+   background-color: #4F46E5;
+   border-color: #4F46E5;
+ }
+ 
+ .modal-checkbox-icon {
+   color: white;
+   width: 12px;
+   height: 12px;
+ }
+ 
+ .modal-item-text {
+   font-size: 14px;
+   color: #374151;
+ }
+ 
+ .modal-footer {
+   padding: 16px 24px 20px;
+   display: flex;
+   justify-content: flex-end;
+   gap: 12px;
+ }
+ 
+ .modal-btn {
+   padding: 8px 16px;
+   border-radius: 6px;
+   font-weight: 500;
+   font-size: 14px;
+   transition: all 0.2s;
+ }
+ 
+ .modal-btn-secondary {
+   background-color: #F3F4F6;
+   color: #374151;
+ }
+ 
+ .modal-btn-secondary:hover {
+   background-color: #E5E7EB;
+ }
+ 
+ .modal-btn-primary {
+   background-color: #4F46E5;
+   color: white;
+ }
+ 
+ .modal-btn-primary:hover {
+   background-color: #4338CA;
+ }
 
 .toast-popup {
   position: fixed;
@@ -188,7 +188,6 @@ const debugDriverData = (drivers) => {
 }
 
 function DirectorManagerViewAssignment() {
-  
   const navigate = useNavigate()
   const location = useLocation()
   const clientId = location.state?.clientId
@@ -255,44 +254,42 @@ function DirectorManagerViewAssignment() {
     return () => {
       isFromDocumentsPage.current = false
     }
-  }, [instructionId]) 
+  }, [instructionId])
   //////////////////////////////////////////////////////////////////////////////////////////
   useEffect(() => {
-    
     const checkUserRole = () => {
       // Try to get role from localStorage
-      let userRoleId = null;
-      
+      let userRoleId = null
+
       // Method 1: Try to get from "user" object
-      const userData = localStorage.getItem("user");
+      const userData = localStorage.getItem("user")
       if (userData) {
         try {
-          const parsedUserData = JSON.parse(userData);
-          userRoleId = parsedUserData.roleid;
-          console.log("Found role in user object:", userRoleId);
+          const parsedUserData = JSON.parse(userData)
+          userRoleId = parsedUserData.roleid
+          console.log("Found role in user object:", userRoleId)
         } catch (error) {
-          console.error("Error parsing user data:", error);
+          console.error("Error parsing user data:", error)
         }
       }
-      
+
       // Method 2: Try direct roleId keys if method 1 failed
       if (!userRoleId) {
-        userRoleId = localStorage.getItem("roleId") || 
-                     localStorage.getItem("userRoleId");
-        console.log("Found role in direct keys:", userRoleId);
+        userRoleId = localStorage.getItem("roleId") || localStorage.getItem("userRoleId")
+        console.log("Direct role ID from localStorage:", userRoleId)
       }
-      
+
       // Convert to number if it's a string
-      userRoleId = Number(userRoleId);
-      
+      userRoleId = Number(userRoleId)
+
       // Check if user is a controller (roleid = 2)
-      const isController = userRoleId === 2;
-      console.log("User is controller:", isController);
-      setIsControllerRole(isController);
-    };
-    
-    checkUserRole();
-  }, []);
+      const isController = userRoleId === 2
+      console.log("User is controller:", isController)
+      setIsControllerRole(isController)
+    }
+
+    checkUserRole()
+  }, [])
   // Add a useEffect to log driver data whenever it changes
   useEffect(() => {
     if (drivers && drivers.length > 0) {
@@ -330,6 +327,7 @@ function DirectorManagerViewAssignment() {
     }
   }, [initialDataLoaded, legs.length, selectedLegIndex])
 
+  // Replace the fetchLegsForInstruction function with this updated version
   const fetchLegsForInstruction = async (instructionId) => {
     try {
       console.log(`Fetching legs for instruction ID: ${instructionId}`)
@@ -358,6 +356,8 @@ function DirectorManagerViewAssignment() {
               driverid: driver.driverid ? driver.driverid.toString() : "",
               truckregnumber: driver.truckregnumber || "",
               containernumber: driver.containernumber !== null ? driver.containernumber.toString() : "",
+              container_type: driver.container_type || "",
+              driverRate: driver.driverRate || driver.driverate || "",
               date: driver.date || "",
               driver_name: driver.driver_name || "",
               driver_surname: driver.driver_surname || "",
@@ -560,6 +560,8 @@ function DirectorManagerViewAssignment() {
           driverid: driver.driverid ? driver.driverid.toString() : "",
           truckregnumber: driver.truckregnumber || "",
           containernumber: driver.containernumber !== null ? driver.containernumber.toString() : "",
+          container_type: driver.container_type || "",
+          driverRate: driver.driverRate || driver.driverate || "",
           date: driver.date || "",
           driver_name: driver.driver_name || "",
           driver_surname: driver.driver_surname || "",
@@ -598,7 +600,6 @@ function DirectorManagerViewAssignment() {
       replace: true,
     })
   }
-
   const handleViewDocuments = () => {
     // Navigate to the director documents view
     navigate("/DirectorDocs", {
@@ -611,61 +612,35 @@ function DirectorManagerViewAssignment() {
     })
   }
 
-  if (loading) {
-    return (
-      <div className="min-h-screen bg-white flex items-center justify-center">
-        <div className="text-center">
-          <div className="spinner-border text-primary" role="status">
-            <span className="sr-only">Loading...</span>
-          </div>
-          <p className="mt-2">Loading instruction data...</p>
-        </div>
-      </div>
-    )
-  }
-
-  if (error) {
-    return (
-      <div className="min-h-screen bg-white p-4">
-        <div className="bg-red-100 border-l-4 border-red-500 text-red-700 p-4 mb-4" role="alert">
-          <p className="font-bold">Error</p>
-          <p>{error}</p>
-        </div>
-        <button className="back-button" onClick={handleBackClick}>
-          Back to Instructions
-        </button>
-      </div>
-    )
-  }
-
   return (
-    <div className="min-h-screen bg-white" style={{ paddingBottom: 200 }}>
+    <div style={{ minHeight: '100vh', backgroundColor: 'white', paddingBottom: '200px' }}>
       <style>{modalAnimation}</style>
-      <div className="">
+      <div>
         <button className="back-button" onClick={handleBackClick}>
           Back
         </button>
-
-        {/* <div className="bg-blue-100 border-l-4 border-blue-500 text-blue-700 p-4 mb-4 mt-4" role="alert">
-          <p className="font-bold">Director View Mode</p>
-          <p>You are viewing this instruction in read-only mode.</p>
-        </div> */}
       </div>
 
       <br />
       {/* Leg Buttons */}
-      <div className="flex gap-4 mb-4" style={{ marginLeft: "15px" }}>
+      <div style={{ display: 'flex', gap: '1rem', marginBottom: '1rem', marginLeft: '15px' }}>
         {legs.map((leg, index) => (
           <button
             key={leg.id || index}
-            className={`px-4 py-2 rounded-md ${
-              currentLagIndex === index ? "bg-green-500 text-white" : "bg-gray-200 text-gray-800"
-            }`}
+            style={{
+              padding: '0.5rem 1rem',
+              borderRadius: '0.375rem',
+              backgroundColor: currentLagIndex === index ? '#22c55e' : '#e5e7eb',
+              color: currentLagIndex === index ? 'white' : '#1f2937',
+              border: 'none',
+              cursor: 'pointer',
+              marginBottom:'15px'
+            }}
             onClick={() => handleSelectLeg(index)}
           >
             Leg {index + 1}
             {leg.drivers && leg.drivers.length > 0 && (
-              <span className="ml-2 text-xs">
+              <span style={{ marginLeft: '0.5rem', fontSize: '0.75rem' }}>
                 ({leg.drivers.length} driver{leg.drivers.length !== 1 ? "s" : ""})
               </span>
             )}
@@ -682,39 +657,39 @@ function DirectorManagerViewAssignment() {
       )}
 
       {/* Main Form */}
-      <div className="px-4">
-        <div className="bg-blue-50 p-6 rounded-md mb-4">
-          <div className="flex flex-wrap gap-6 items-center">
-            <div className="flex-1 min-w-[100px]">
-              <label className="block text-gray-700 mb-2">Starting Point</label>
-              <div className="relative">
+      <div style={{ padding: '0 1rem' }}>
+        <div style={{ backgroundColor: '#eff6ff', padding: '1.5rem', borderRadius: '0.375rem', marginBottom: '1rem' }}>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '1.5rem', alignItems: 'center' }}>
+            <div style={{ flex: '1', minWidth: '100px' }}>
+              <label style={{ display: 'block', color: '#374151', marginBottom: '0.5rem' }}>Starting Point</label>
+              <div style={{ position: 'relative' }}>
                 <input
                   type="text"
-                  className="w-full p-2 border rounded-md bg-gray-100"
+                  style={{ 
+                    width: '100%', 
+                    padding: '0.5rem', 
+                    border: '1px solid #d1d5db', 
+                    borderRadius: '0.375rem', 
+                    backgroundColor: '#f3f4f6' 
+                  }}
                   value={formData.startingPoint}
                   readOnly
                 />
               </div>
             </div>
 
-            {!isControllerRole && (
-            <div className="w-[100px]">
-              <label className="block text-gray-700 mb-2">Driver Rate</label> 
-              <input
-                type="text"
-                className="w-full p-2 border rounded-md bg-gray-100"
-                value={formData.driverRate}
-                readOnly
-              />
-            </div>
-            )}
-
-            <div className="flex-1 min-w-[100px]">
-              <label className="block text-gray-700 mb-2">Destination</label>
-              <div className="relative">
+            <div style={{ flex: '1', minWidth: '100px' }}>
+              <label style={{ display: 'block', color: '#374151', marginBottom: '0.5rem' }}>Destination</label>
+              <div style={{ position: 'relative' }}>
                 <input
                   type="text"
-                  className="w-full p-2 border rounded-md bg-gray-100"
+                  style={{ 
+                    width: '100%', 
+                    padding: '0.5rem', 
+                    border: '1px solid #d1d5db', 
+                    borderRadius: '0.375rem', 
+                    backgroundColor: '#f3f4f6' 
+                  }}
                   value={formData.destination}
                   readOnly
                 />
@@ -725,49 +700,115 @@ function DirectorManagerViewAssignment() {
 
         {/* Driver Entries - Always show this section if we're on a leg */}
         {currentLagIndex !== null && (
-          <div className="bg-blue-50 p-6 rounded-md mb-4">
-            <h3 className="text-lg font-medium mb-4">Driver Information</h3>
+          <div style={{ backgroundColor: '#eff6ff', padding: '1.5rem', borderRadius: '0.375rem', marginBottom: '1rem' }}>
+            <h3 style={{ fontSize: '1.125rem', fontWeight: '500', marginBottom: '1rem' }}>Driver Information</h3>
 
             {drivers && drivers.length > 0 ? (
               <>
                 {drivers.map((entry, index) => (
-                  <div key={entry.id || index} className="mb-6 p-4 border rounded-lg bg-white shadow-sm">
-                    <div className="grid grid-cols-4 gap-4">
-                      <div>
-                        <label className="block text-gray-700 mb-1">Driver</label>
+                  <div key={entry.id || index} style={{ 
+                    marginBottom: '1rem', 
+                    padding: '1rem', 
+                    border: '1px solid #e5e7eb', 
+                    borderRadius: '0.5rem', 
+                    backgroundColor: 'white', 
+                    boxShadow: '0 1px 2px 0 rgba(0, 0, 0, 0.05)' 
+                  }}>
+                    <div style={{ display: 'flex', flexWrap: 'wrap', margin: '0 -0.5rem' }}>
+                      {/* All fields in a single row with equal width */}
+                      <div style={{ width: '16.666%', padding: '0 0.5rem', marginBottom: '0.75rem' }}>
+                        <label style={{ display: 'block', color: '#374151', fontWeight: '500', marginBottom: '0.25rem' }}>Driver</label>
                         <input
                           type="text"
-                          className="w-full p-2 border rounded-md bg-gray-100"
+                          style={{ 
+                            width: '100%', 
+                            padding: '0.5rem', 
+                            border: '1px solid #d1d5db', 
+                            borderRadius: '0.375rem', 
+                            backgroundColor: '#f3f4f6' 
+                          }}
                           value={entry.full_name || "None"}
                           readOnly
                         />
                       </div>
 
-                      <div>
-                        <label className="block text-gray-700 mb-1">Truck Reg Number</label>
+                      <div style={{ width: '16.666%', padding: '0 0.5rem', marginBottom: '0.75rem' }}>
+                        <label style={{ display: 'block', color: '#374151', fontWeight: '500', marginBottom: '0.25rem' }}>Truck Reg Number</label>
                         <input
                           type="text"
-                          className="w-full p-2 border rounded-md bg-gray-100"
+                          style={{ 
+                            width: '100%', 
+                            padding: '0.5rem', 
+                            border: '1px solid #d1d5db', 
+                            borderRadius: '0.375rem', 
+                            backgroundColor: '#f3f4f6' 
+                          }}
                           value={entry.truckregnumber || "None"}
                           readOnly
                         />
                       </div>
 
-                      <div>
-                        <label className="block text-gray-700 mb-1">Container Number</label>
+                      <div style={{ width: '16.666%', padding: '0 0.5rem', marginBottom: '0.75rem' }}>
+                        <label style={{ display: 'block', color: '#374151', fontWeight: '500', marginBottom: '0.25rem' }}>Container Number</label>
                         <input
                           type="text"
-                          className="w-full p-2 border rounded-md bg-gray-100"
+                          style={{ 
+                            width: '100%', 
+                            padding: '0.5rem', 
+                            border: '1px solid #d1d5db', 
+                            borderRadius: '0.375rem', 
+                            backgroundColor: '#f3f4f6' 
+                          }}
                           value={entry.containernumber || "None"}
                           readOnly
                         />
                       </div>
 
-                      <div>
-                        <label className="block text-gray-700 mb-1">Date</label>
+                      <div style={{ width: '16.666%', padding: '0 0.5rem', marginBottom: '0.75rem' }}>
+                        <label style={{ display: 'block', color: '#374151', fontWeight: '500', marginBottom: '0.25rem' }}>Type</label>
                         <input
                           type="text"
-                          className="w-full p-2 border rounded-md bg-gray-100"
+                          style={{ 
+                            width: '100%', 
+                            padding: '0.5rem', 
+                            border: '1px solid #d1d5db', 
+                            borderRadius: '0.375rem', 
+                            backgroundColor: '#f3f4f6' 
+                          }}
+                          value={entry.container_type || "None"}
+                          readOnly
+                        />
+                      </div>
+
+                      {!isControllerRole && (
+                        <div style={{ width: '16.666%', padding: '0 0.5rem', marginBottom: '0.75rem' }}>
+                          <label style={{ display: 'block', color: '#374151', fontWeight: '500', marginBottom: '0.25rem' }}>Driver Rate</label>
+                          <input
+                            type="text"
+                            style={{ 
+                              width: '100%', 
+                              padding: '0.5rem', 
+                              border: '1px solid #d1d5db', 
+                              borderRadius: '0.375rem', 
+                              backgroundColor: '#f3f4f6' 
+                            }}
+                            value={entry.driverRate || "None"}
+                            readOnly
+                          />
+                        </div>
+                      )}
+
+                      <div style={{ width: '16.666%', padding: '0 0.5rem', marginBottom: '0.75rem' }}>
+                        <label style={{ display: 'block', color: '#374151', fontWeight: '500', marginBottom: '0.25rem' }}>Date</label>
+                        <input
+                          type="text"
+                          style={{ 
+                            width: '100%', 
+                            padding: '0.5rem', 
+                            border: '1px solid #d1d5db', 
+                            borderRadius: '0.375rem', 
+                            backgroundColor: '#f3f4f6' 
+                          }}
                           value={
                             entry.date
                               ? typeof entry.date === "string"
@@ -783,7 +824,7 @@ function DirectorManagerViewAssignment() {
                 ))}
               </>
             ) : (
-              <p className="text-gray-500 text-center py-4">No driver information available for this leg.</p>
+              <p style={{ color: '#6b7280', textAlign: 'center', padding: '1rem 0' }}>No driver information available for this leg.</p>
             )}
           </div>
         )}

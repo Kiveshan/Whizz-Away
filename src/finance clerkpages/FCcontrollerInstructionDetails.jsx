@@ -791,6 +791,7 @@ const FCcontrollerInstructionDetails = () => {
         containernum: container.containerNum ? container.containerNum.toString() : "",
         weight: isImport ? (container.weight ? Number.parseFloat(container.weight) : null) : null,
         m1key: Number.parseInt(instructionId),
+        container_type: container.containerType,
       }))
 
       console.log("Sending container data to API:", JSON.stringify(containerData, null, 2))

@@ -255,6 +255,8 @@ const ClientInvoice = () => {
   const amount = invoiceData.invoice?.amount || invoiceData.total_cost || 0
   const vat = calculateVAT(amount)
   const total = invoiceData.invoice?.total_amount || amount + vat
+  const roleId = JSON.parse(localStorage.getItem('user')).roleid;
+  console.log(roleId)
 
   // Ensure containers exist
   const containers = invoiceData.containers || []
@@ -404,7 +406,7 @@ const ClientInvoice = () => {
         <button
           className="back-btn"
           onClick={() => {
-            if (returnToClientView) {
+            if (roleId == 3) {
               // If we came from client view, go back to the filtered invoices list
               navigate("/invoices", {
                 state: {
@@ -412,10 +414,24 @@ const ClientInvoice = () => {
                   clientName,
                 },
               })
-            } else {
-              // Otherwise go to the regular invoices list
-              navigate("/invoices")
+            }else if (roleId == 4){
+              navigate("/DirectorClientDocuments", {
+                state: {
+                  clientId : invoiceData.m5clientkey,
+                  clientName : invoiceData.client_name,
+                },
+              })
+            } else if (roleId == 1){
+              navigate("/client-documents", {
+                state : {
+
+                  clientId : invoiceData.m5clientkey,
+                  clientName : invoiceData.client_name,
+
+                }
+              })
             }
+             
           }}
         >
           Back

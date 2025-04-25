@@ -7,7 +7,7 @@ const dashboardData = [
   { title: "Instructions", image: "/images/monitor.jpeg", path: "/CompanyInstructionView" },
   { title: "Analytics", image: "/images/analytics.jpg", path: "/analytics" },
   { title: "Debtors", image: "/images/clientDocs.jpeg", path: "/debtors" },
-  { title: "Wages", image: "/images/wages.jpeg", path: "/DriverWageList" },
+  { title: "Wages", image: "/images/wages.jpeg", path: "/finance-clerk-wage" },
   { title: "Creditors", image: "/images/expenses.jpeg", path: "/DirectorCreditorsDash" },
   { title: "Manage", image: "/images/manage.jpg", path: "/manage" },                     
   { title: "Analytics", image: "/images/analytics.jpg", path: "/analytics" },
@@ -15,21 +15,26 @@ const dashboardData = [
 
 const Dashboard = () => {
   const navigate = useNavigate();
-
+  const handleNavigation = (path) => {
+    if (path === "/finance-clerk-wage") {
+         localStorage.setItem("dashboardRoute", "/Dashboard")
+    }
+    navigate(path)
+  }
   return (
     <div className="dashboard">
       <div className="dashboard-row top-row">
         {dashboardData.slice(0, 3).map((item) => (
-          <Card key={item.title} title={item.title} image={item.image} onClick={() => navigate(item.path)} />
+          <Card key={item.title} title={item.title} image={item.image} onClick={() => handleNavigation(item.path)} />
         ))}
       </div>
       <div className="dashboard-row bottom-row">
         {dashboardData.slice(3, 6).map((item) => (
-          <Card key={item.title} title={item.title} image={item.image} onClick={() => navigate(item.path)} />
+          <Card key={item.title} title={item.title} image={item.image} onClick={() => handleNavigation(item.path)} />
         ))}
       </div>
     </div>
-  );
-};
+  )
+}
 
 export default Dashboard;

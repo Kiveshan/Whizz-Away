@@ -488,7 +488,7 @@ const FinanceClerkWageDetails = () => {
       ) : (
         <table
           style={{
-            width: "1000px",
+            width: "550px",
             margin: "0 auto",
             borderCollapse: "collapse",
             fontSize: "16px",
@@ -498,27 +498,27 @@ const FinanceClerkWageDetails = () => {
           }}
         >
           <thead>
-            <tr style={{ backgroundColor: "#87CEEB", padding: "12px 10px", textAlign: "left" }}>
-              <th>View Legs</th>
-              <th>Date</th>
-              <th>Action</th>
+            <tr style={{ backgroundColor: "#87CEEB", padding: "12px 10px", textAlign: "center" }}>
+              <th style={{textAlign:"center"}}>View Legs</th>
+              <th style={{textAlign:"center"}}>Date</th>
+              <th style={{textAlign:"center"}}>Action</th>
             </tr>
           </thead>
           <tbody>
             {filteredInstructions.length === 0 && !hasLegsForMonth ? (
               <tr>
-                <td colSpan="3" style={{ textAlign: "center", padding: "15px" }}>
+                <td colSpan="3" style={{ textAlign: "center", padding: "25px" }}>
                   No instructions or legs found for this driver in {selectedMonth} {selectedYear}
                 </td>
               </tr>
             ) : (
               <tr style={{ backgroundColor: "white", padding: "12px 10px", borderBottom: "1px solid #eee" }}>
                 <td>
-                  <button className="downloadwage1" onClick={handleViewLegs}>
+                  <button className="downloadwage1" onClick={handleViewLegs} >
                     View
                   </button>
                 </td>
-                <td>{formatDate(selectedMonth, selectedYear)}</td>
+                <td style={{textAlign:"center"}}>{formatDate(selectedMonth, selectedYear)}</td>
                 <td style={{ display: "flex", gap: "10px" }}>
                   <button
                     onClick={handleViewWageSlip}
@@ -526,7 +526,7 @@ const FinanceClerkWageDetails = () => {
                       backgroundColor: "green",
                       color: "white",
                       border: "none",
-                      padding: "8px 20px",
+                      padding: "9px 20px",
                       borderRadius: "5px",
                       cursor: "pointer",
                       fontSize: "16px",
