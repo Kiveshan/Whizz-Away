@@ -419,3 +419,54 @@ tr:hover {
 .form-field {
   flex: 1;
 }
+
+/* Employee file upload */
+/* Container for document upload section */
+.document-upload-section {
+  margin-top: 30px;
+}
+
+.document-upload-section h4 {
+  margin-bottom: 10px;
+  font-weight: 600;
+}
+
+/* File input */
+.document-upload-section input[type="file"] {
+  display: block;
+  margin-bottom: 12px;
+  font-size: 14px;
+}
+
+/* File entry display */
+.document-upload-section .file-entry {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 8px;
+  font-size: 14px;
+}
+
+/* Download link */
+.document-upload-section .file-entry a.download-link {
+  color: #007bff;
+  text-decoration: underline;
+  cursor: pointer;
+  font-size: 14px;
+}
+
+/* Delete button */
+.document-upload-section .file-entry button.delete-btn {
+  background-color: #dc3545;
+  color: white;
+  border: none;
+  padding: 4px 10px;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 13px;
+  transition: background-color 0.2s ease-in-out;
+}
+
+.document-upload-section .file-entry button.delete-btn:hover {
+  background-color: #c82333;
+}

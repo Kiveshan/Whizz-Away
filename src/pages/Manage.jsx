@@ -50,6 +50,7 @@ const [newEmployee, setNewEmployee] = useState({
   password: "",
   base_salary: "",
   status: true,
+  documents: [], // ✅ Initialize as empty array to avoid undefined
   // Deduction fields
   deduction_income_tax: "",
   deduction_other_deductions: "",
@@ -763,81 +764,72 @@ const handleSaveSubcontractor = async () => {
           gap: '16px',
         }}
       >
+        {/* Personal Details */}
         <div className="manage-form-group">
-          <label><strong>First Name</strong></label>
+          <label>Name</label>
           <input
             type="text"
             value={newEmployee.name}
             onChange={(e) => setNewEmployee({ ...newEmployee, name: e.target.value })}
           />
         </div>
+  
         <div className="manage-form-group">
-          <label><strong>Surname</strong></label>
+          <label>Surname</label>
           <input
             type="text"
             value={newEmployee.surname}
             onChange={(e) => setNewEmployee({ ...newEmployee, surname: e.target.value })}
           />
         </div>
+  
         <div className="manage-form-group">
-          <label><strong>Telephone</strong></label>
+          <label>Telephone Number</label>
           <input
             type="text"
             value={newEmployee.telephonenum}
             onChange={(e) => setNewEmployee({ ...newEmployee, telephonenum: e.target.value })}
           />
         </div>
+  
         <div className="manage-form-group">
-          <label><strong>Cell</strong></label>
+          <label>Cell Number</label>
           <input
             type="text"
             value={newEmployee.cellnum}
             onChange={(e) => setNewEmployee({ ...newEmployee, cellnum: e.target.value })}
           />
         </div>
+  
         <div className="manage-form-group">
-          <label><strong>Employee Number</strong></label>
+          <label>Employee Number</label>
           <input
             type="text"
             value={newEmployee.employeenum}
             onChange={(e) => setNewEmployee({ ...newEmployee, employeenum: e.target.value })}
           />
         </div>
+  
         <div className="manage-form-group">
-          <label><strong>Basic Salary</strong></label>
+          <label>Base Salary</label>
           <input
-            type="text"
+            type="number"
             value={newEmployee.base_salary}
             onChange={(e) => setNewEmployee({ ...newEmployee, base_salary: e.target.value })}
           />
         </div>
+  
         <div className="manage-form-group">
-          <label><strong>Role</strong></label>
-          <select
-            className="dropdown"
-            value={newEmployee.roleid || ""}
-            onChange={(e) =>
-              setNewEmployee({ ...newEmployee, roleid: parseInt(e.target.value) })
-            }
-          >
-            <option value="">Select Role</option>
-            <option value="2">Controller</option>
-            <option value="3">Manager</option>
-            <option value="5">Driver</option>
-            <option value="6">Finance Clerk</option>
-            <option value="8">Yard Staff</option>
-          </select>
-        </div>
-        <div className="manage-form-group">
-          <label><strong>Email</strong></label>
+          <label>Email</label>
           <input
             type="email"
             value={newEmployee.email}
             onChange={(e) => setNewEmployee({ ...newEmployee, email: e.target.value })}
           />
         </div>
+  
         <div className="manage-form-group">
-          <label><strong>Password</strong></label>
+          <label>Password</label>
           <input
             type="password"
             value={newEmployee.password}
@@ -845,76 +837,155 @@ const handleSaveSubcontractor = async () => {
           />
         </div>
   
-        <div style={{ gridColumn: '1 / span 3', marginTop: '20px' }}>
-          <h3 style={{ textAlign: 'center' }}>Deductions</h3>
-        </div>
+
   
+        {/* Deductions */}
         <div className="manage-form-group">
-          <label><strong>Income Tax</strong></label>
+          <label>Income Tax</label>
           <input
             type="number"
-            step="0.01"
             value={newEmployee.deduction_income_tax}
             onChange={(e) => setNewEmployee({ ...newEmployee, deduction_income_tax: e.target.value })}
           />
         </div>
+  
         <div className="manage-form-group">
-          <label><strong>UIF</strong></label>
+          <label>UIF</label>
           <input
             type="number"
-            step="0.01"
             value={newEmployee.deduction_uif}
             onChange={(e) => setNewEmployee({ ...newEmployee, deduction_uif: e.target.value })}
           />
         </div>
+  
         <div className="manage-form-group">
-          <label><strong>Bonus</strong></label>
+          <label>Loan</label>
           <input
             type="number"
-            step="0.01"
-            value={newEmployee.deduction_bonus}
-            onChange={(e) => setNewEmployee({ ...newEmployee, deduction_bonus: e.target.value })}
-          />
-        </div>
-        <div className="manage-form-group">
-          <label><strong>Savings</strong></label>
-          <input
-            type="number"
-            step="0.01"
-            value={newEmployee.deduction_savings}
-            onChange={(e) => setNewEmployee({ ...newEmployee, deduction_savings: e.target.value })}
-          />
-        </div>
-        <div className="manage-form-group">
-          <label><strong>Loan</strong></label>
-          <input
-            type="number"
-            step="0.01"
             value={newEmployee.deduction_loan}
             onChange={(e) => setNewEmployee({ ...newEmployee, deduction_loan: e.target.value })}
           />
         </div>
+  
         <div className="manage-form-group">
-          <label><strong>Damage</strong></label>
+          <label>Bonus</label>
           <input
             type="number"
-            step="0.01"
+            value={newEmployee.deduction_bonus}
+            onChange={(e) => setNewEmployee({ ...newEmployee, deduction_bonus: e.target.value })}
+          />
+        </div>
+  
+        <div className="manage-form-group">
+          <label>Savings</label>
+          <input
+            type="number"
+            value={newEmployee.deduction_savings}
+            onChange={(e) => setNewEmployee({ ...newEmployee, deduction_savings: e.target.value })}
+          />
+        </div>
+  
+        <div className="manage-form-group">
+          <label>Damage</label>
+          <input
+            type="number"
             value={newEmployee.deduction_damage}
             onChange={(e) => setNewEmployee({ ...newEmployee, deduction_damage: e.target.value })}
           />
         </div>
+  
         <div className="manage-form-group">
-          <label><strong>Other Deductions</strong></label>
+          <label>Other Deductions</label>
           <input
             type="number"
-            step="0.01"
             value={newEmployee.deduction_other_deductions}
-            onChange={(e) => setNewEmployee({ ...newEmployee, deduction_other_deductions: e.target.value })}
+            onChange={(e) =>
+              setNewEmployee({ ...newEmployee, deduction_other_deductions: e.target.value })
+            }
           />
+        </div>
+                {/* File upload section */}
+        <div className="manage-form-group" style={{ gridColumn: '1 / span 3' }}>
+          <label><strong>Upload Documents (PDF Only, Max 3)</strong></label>
+          <div
+            style={{
+              border: '2px dashed #ccc',
+              borderRadius: '12px',
+              padding: '20px',
+              textAlign: 'center',
+              backgroundColor: '#f9f9f9',
+            }}
+          >
+            <input
+              type="file"
+              accept=".pdf"
+              onChange={(e) => {
+                const file = e.target.files[0];
+                if (file && file.type === "application/pdf" && newEmployee.documents.length < 3) {
+                  setNewEmployee({
+                    ...newEmployee,
+                    documents: [...newEmployee.documents, file],
+                  });
+                }
+              }}
+              disabled={newEmployee.documents.length >= 3}
+            />
+            <small>
+              {newEmployee.documents.length >= 3
+                ? "Maximum of 3 PDF documents uploaded"
+                : "Upload PDF documents only"}
+            </small>
+          </div>
+  
+          {/* List uploaded files */}
+          <div style={{ marginTop: '10px' }}>
+            {newEmployee.documents.map((doc, index) => (
+              <div key={index} style={{ display: 'flex', alignItems: 'center', marginBottom: '8px' }}>
+                <span style={{ flexGrow: 1 }}>{doc.name}</span>
+                <a
+                  href={URL.createObjectURL(doc)}
+                  download={doc.name}
+                  style={{
+                    marginRight: '10px',
+                    backgroundColor: '#4CAF50',
+                    color: 'white',
+                    padding: '6px 12px',
+                    borderRadius: '4px',
+                    textDecoration: 'none',
+                    fontSize: '0.85rem',
+                  }}
+                >
+                  Download
+                </a>
+                <button
+                  onClick={() => {
+                    const updatedDocs = [...newEmployee.documents];
+                    updatedDocs.splice(index, 1);
+                    setNewEmployee({ ...newEmployee, documents: updatedDocs });
+                  }}
+                  style={{
+                    backgroundColor: '#f44336',
+                    color: 'white',
+                    border: 'none',
+                    padding: '6px 12px',
+                    borderRadius: '4px',
+                    cursor: 'pointer',
+                    fontSize: '0.85rem',
+                  }}
+                >
+                  Delete
+                </button>
+              </div>
+            ))}
+          </div>
         </div>
       </div>
   
-      <div className="manage-button-container">
+      {/* Submit / Cancel */}
+      <div
+        className="manage-button-container"
+        style={{ marginTop: '30px', display: 'flex', gap: '16px', justifyContent: 'center' }}
+      >
         <button onClick={handleSaveEmployee} className="manage-save-button" disabled={loading}>
           {loading ? "Saving..." : "Confirm Employee Register"}
         </button>
@@ -924,6 +995,7 @@ const handleSaveSubcontractor = async () => {
       </div>
     </div>
   );
+  
   
   
 
@@ -1091,7 +1163,7 @@ const handleSaveSubcontractor = async () => {
           />
         </div>
   
-        <div className="manage-form-group manage-full-width">
+        <div className="manage-form-group">
           <label style={{ fontWeight: 'bold' }}>VIN Number</label>
           <input
             type="text"
@@ -1100,7 +1172,7 @@ const handleSaveSubcontractor = async () => {
           />
         </div>
   
-        <div className="manage-form-group manage-full-width">
+        <div className="manage-form-group">
           <label style={{ fontWeight: 'bold' }}>Purchase Date</label>
           <input
             type="date"
@@ -1109,27 +1181,89 @@ const handleSaveSubcontractor = async () => {
           />
         </div>
   
-        {/* 
-        <div className="manage-form-group checkbox-container">
-          <label className="custom-checkbox">
+        {/* File upload section */}
+        <div className="manage-form-group" style={{ gridColumn: '1 / span 3' }}>
+          <label><strong>Upload Documents (PDF Only, Max 3)</strong></label>
+          <div
+            style={{
+              border: '2px dashed #ccc',
+              borderRadius: '12px',
+              padding: '20px',
+              textAlign: 'center',
+              backgroundColor: '#f9f9f9',
+            }}
+          >
             <input
-              type="checkbox"
-              checked={newTruck.is_subcontractor}
-              onChange={(e) => setNewTruck({ ...newTruck, is_subcontractor: e.target.checked })}
+              type="file"
+              accept=".pdf"
+              onChange={(e) => {
+                const file = e.target.files[0];
+                if (file && file.type === "application/pdf" && (newTruck.documents?.length || 0) < 3) {
+                  setNewTruck({
+                    ...newTruck,
+                    documents: [...(newTruck.documents || []), file],
+                  });
+                }
+              }}
+              disabled={(newTruck.documents?.length || 0) >= 3}
             />
-            <span className="checkmark"></span>
-            Sub-Constructor
-          </label>
-        </div> 
-        */}
+            <small>
+              {(newTruck.documents?.length || 0) >= 3
+                ? "Maximum of 3 PDF documents uploaded"
+                : "Upload PDF documents only"}
+            </small>
+          </div>
+  
+          {/* List uploaded files */}
+          <div style={{ marginTop: '10px' }}>
+            {(newTruck.documents || []).map((doc, index) => (
+              <div key={index} style={{ display: 'flex', alignItems: 'center', marginBottom: '8px' }}>
+                <span style={{ flexGrow: 1 }}>{doc.name}</span>
+                <a
+                  href={URL.createObjectURL(doc)}
+                  download={doc.name}
+                  style={{
+                    marginRight: '10px',
+                    backgroundColor: '#4CAF50',
+                    color: 'white',
+                    padding: '6px 12px',
+                    borderRadius: '4px',
+                    textDecoration: 'none',
+                    fontSize: '0.85rem',
+                  }}
+                >
+                  Download
+                </a>
+                <button
+                  onClick={() => {
+                    const updatedDocs = [...newTruck.documents];
+                    updatedDocs.splice(index, 1);
+                    setNewTruck({ ...newTruck, documents: updatedDocs });
+                  }}
+                  style={{
+                    backgroundColor: '#f44336',
+                    color: 'white',
+                    border: 'none',
+                    padding: '6px 12px',
+                    borderRadius: '4px',
+                    cursor: 'pointer',
+                    fontSize: '0.85rem',
+                  }}
+                >
+                  Delete
+                </button>
+              </div>
+            ))}
+          </div>
+        </div>
       </div>
   
       <button onClick={handleSaveTruck} className="manage-save-button" disabled={loading}>
-  {loading ? "Saving..." : editTruckId ? "Update Truck" : "Add Truck"}
-</button>
-
+        {loading ? "Saving..." : editTruckId ? "Update Truck" : "Add Truck"}
+      </button>
     </div>
   );
+  
   
 
   const renderDriverRateForm = () => (
