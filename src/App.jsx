@@ -58,7 +58,7 @@ import DirectorExpenses from "./pages/DirectorExpenses"
 import Viewcontrollerinstructions from "./pages/Viewcontrollerinstructions"
 import ViewcontrollerInstructionDetails from "./pages/ViewcontrollerInstructionDetails"
 import AdminDashboard from "./pages/AdminDashboard";
-
+import ClientListPay from "./pages/ClientListPay"
 // Finance Clerk Pages
 import FDashboard from "./finance clerkpages/FDashboard"
 import InstructionsList from "./finance clerkpages/InstructionsList"
@@ -97,6 +97,7 @@ function DynamicHeader() {
     "/Dashboard": "Business Manager",
 
     "/client-payments": "Client Payments",
+    "/client-list-payments": "Client Payments",
     "/client-documents": "Client Documents",
     "/driver-wage": "Wages",
     "/DriverWageSlip": "Wages",
@@ -200,13 +201,14 @@ function ContentWrapper() {
       <Routes>
         <Route path="/" element={<Landing />} />
         <Route path="/client-payments" element={<ClientPayments />} />
+        <Route path="/client-list-payments" element={<ClientListPay />} />
         <Route path="/driver-wage" element={<DriverWage />} />
         <Route path="/DriverWageSlip" element={<DriverWageSlip />} />
         <Route path="/DriverWageList" element={<DriverWageList />} />
         <Route path="/client-documents" element={<ClientDocuments />} />
         <Route path="/ManagerViewFuelExpence" element={<ManagerViewFuelExpence />} />
         <Route path="/expenses" element={<Expenses />} />
-        <Route path="/upload/:companyName/:balance" element={<UploadProof />} />
+        <Route path="/upload/:clientName" element={<UploadProof />} />
         <Route path="/debtors" element={<Debtors />} />
         <Route path="/analytics" element={<Analytics />} />
         <Route path="/manage" element={<Manage />} />

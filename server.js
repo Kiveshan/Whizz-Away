@@ -1037,6 +1037,122 @@ app.post("/api/admin/user-status", verifyToken, async (req, res) => {
 
 // === INVOICES ROUTES ===
 
+app.use('/uploads', express.static('uploads'))
+
+app.post("/api/payments/:clientId/upload", verifyToken, async (req, res) => {
+  try {
+    if (!pool) {
+      return res.status(503).json({
+        success: false,
+        message: "Database connection not established. Please try again later.",
+      })
+    }
+
+    const { clientId } = req.params
+    const { amount, fileupload } = req.body
+
+    if (!amount || isNaN(amount)) {
+      return res.status(400).json({
+        success: false,
+        message: "Amount is required and must be a number",
+      })
+    }
+
+    if (!fileupload) {
+      return res.status(400).json({
+        success: false,
+        message: "Payment date (fileupload) is required",
+      })
+    }
+
+    const queryText = `
+      INSERT INTO payment_m3 (clientid, amount, filename, fileupload)
+      VALUES ($1, $2, $3, $4)
+      RETURNING *
+    `
+    const queryParams = [clientId, amount, null, fileupload] // filename is null since no file upload
+
+    const result = await query(queryText, queryParams)
+    console.log(`Inserted payment for client ${clientId}:`, result.rows[0])
+
+    res.json({
+      success: true,
+      data: result.rows[0],
+    })
+  } catch (error) {
+    console.error(`Error uploading payment for client ${clientId}:`, error)
+    res.status(500).json({
+      success: false,
+      message: error.message,
+      stack: process.env.NODE_ENV === "production" ? null : error.stack,
+    })
+  }
+})
+
+// Updated endpoint for fetching client payments
+app.get("/api/payments/:clientId", verifyToken, async (req, res) => {
+  try {
+    if (!pool) {
+      return res.status(503).json({
+        success: false,
+        message: "Database connection not established. Please try again later.",
+      })
+    }
+
+    const { clientId } = req.params
+    const { year, month } = req.query
+
+    console.log(`Fetching payments for client ${clientId} with query:`, req.query)
+
+    let queryText = `
+      SELECT 
+        fileupload,
+        amount,
+        filename
+      FROM 
+        payment_m3
+      WHERE 
+        clientid = $1
+    `
+    const queryParams = [clientId]
+    let paramIndex = 2
+
+    if (year) {
+      queryText += ` AND EXTRACT(YEAR FROM fileupload) = $${paramIndex}`
+      queryParams.push(year)
+      paramIndex++
+    }
+    if (month) {
+      queryText += ` AND EXTRACT(MONTH FROM fileupload) = $${paramIndex}`
+      queryParams.push(month)
+      paramIndex++
+    }
+
+    queryText += ` ORDER BY fileupload DESC`
+
+    const result = await query(queryText, queryParams)
+    console.log(`Query returned ${result.rows.length} payments for client ${clientId}`)
+
+    // Map the results to include the file URL
+    const payments = result.rows.map(payment => ({
+      ...payment,
+      fileurl: payment.filename ? `${req.protocol}://${req.get('host')}/uploads/${payment.filename}` : null
+    }))
+
+    res.json({
+      success: true,
+      data: payments,
+    })
+  } catch (error) {
+    console.error(`Error fetching payments for client ${clientId}:`, error)
+    res.status(500).json({
+      success: false,
+      message: error.message,
+      stack: process.env.NODE_ENV === "production" ? null : error.stack,
+    })
+  }
+})
+
 // GET all completed instructions for invoices
 app.get("/api/invoices/completed", verifyToken, async (req, res) => {
   try {
@@ -3734,6 +3850,11 @@ app.get("/api/employee/:id", async (req, res) => {
     if (client) client.release()
   }
 })
+
+
+
+
+
 
 app.listen(PORT, async () => {
   try {
