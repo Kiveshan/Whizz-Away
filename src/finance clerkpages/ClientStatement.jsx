@@ -152,12 +152,13 @@ const ClientStatement = () => {
   if (loading) return <div>Loading statement...</div>
   if (error) return <div className="error-message">Error: {error}</div>
   if (!statement) return <div>Please select a statement from the list.</div>
+  if (statement.invoices.length === 0 && statement.payments.length === 0) return <div>No transactions for this statement period.</div>
 
   // Calculate totals (include payments)
   const invoicedAmount = statement.invoices.reduce((sum, inv) => sum + inv.amount, 0);
   const amountPaid = statement.payments.reduce((sum, payment) => sum + payment.amount, 0);
-  const openingBalance = 0; // No change, as per original logic
-  const balanceDue = invoicedAmount - amountPaid;
+  const openingBalance = statement.opening_balance; // Use the stored opening balance
+  const balanceDue = openingBalance - amountPaid + invoicedAmount;
 
   // Combine invoices and payments into a single transactions array
   const transactions = [
@@ -178,7 +179,7 @@ const ClientStatement = () => {
   ].sort((a, b) => a.date - b.date); // Sort by date
 
   // Calculate running balance
-  let runningBalance = 0; // Opening balance is 0
+  let runningBalance = openingBalance; // Start with the opening balance
   const transactionsWithBalance = transactions.map((tx) => {
     if (tx.type === "Invoice") {
       runningBalance += tx.amount;
@@ -265,7 +266,7 @@ const ClientStatement = () => {
                   <td></td>
                   <td>R0</td>
                   <td></td>
-                  <td>R0</td>
+                  <td>R{openingBalance.toFixed(2)}</td>
                 </tr>
                 {transactionsWithBalance.map((tx, index) => (
                   <tr key={index}>
