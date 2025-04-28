@@ -110,7 +110,7 @@ const UploadInstructionDocuments = () => {
       return
     }
 
-    // Otherwise fetch from API
+    // fetch from API
     try {
       const response = await fetch(`http://localhost:5000/instructions/${instructionId}`)
       if (!response.ok) {
@@ -482,6 +482,7 @@ const UploadInstructionDocuments = () => {
   // New function to actually complete the instruction after confirmation
   const completeInstruction = async () => {
     try {
+      // First complete the instruction
       const response = await fetch(`http://localhost:5000/instructions/${instructionId}/complete`, {
         method: "PUT",
         headers: {
@@ -489,17 +490,21 @@ const UploadInstructionDocuments = () => {
         },
         body: JSON.stringify({ status: "Completed" }),
       })
-
+  
       if (!response.ok) {
         throw new Error("Failed to complete instruction")
       }
+      
+      console.log("Instruction marked as completed, now generating invoice...")
+      
+      // Then generate the invoice
       const invoiceResponse = await fetch(`http://localhost:5000/generate-invoice/${instructionId}`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
         },
       })
-
+  
       if (!invoiceResponse.ok) {
         const errorData = await invoiceResponse.json()
         console.error("Invoice generation failed:", errorData)
@@ -508,9 +513,9 @@ const UploadInstructionDocuments = () => {
         const invoiceData = await invoiceResponse.json()
         console.log("Invoice generated successfully:", invoiceData)
       }
-
+  
       setShowSuccessPopup(true)
-
+  
       setTimeout(() => {
         setShowSuccessPopup(false)
         navigate("/instructions", {
