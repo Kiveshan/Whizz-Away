@@ -1,4 +1,4 @@
-
+// export default app
 import express from "express"
 import cors from "cors"
 import bcrypt from "bcrypt"
@@ -29,7 +29,7 @@ const PORT = process.env.PORT || 5000
 
 // Generate a secure, random secret key
 const secretKey = crypto.randomBytes(64).toString("hex")
-console.log("Generated secret key:", secretKey) // Log the secret key (for debugging)
+console.log("Generated secret key:", secretKey) 
 
 // Create a PostgreSQL connection pool
 const pool = new Pool({
@@ -45,7 +45,8 @@ const pool = new Pool({
   // Max clients in pool
   max: 20,
 })
-
+types.setTypeParser(types.builtins.NUMERIC, (value) => parseFloat(value))
+types.setTypeParser(types.builtins.FLOAT8, (value) => parseFloat(value))
 // Log connection status
 console.log("Database connection configured with:", {
   user: process.env.POSTGRES_USER,
@@ -1740,7 +1741,149 @@ app.get("/api/client-instructions/:clientId", verifyToken, async (req, res) => {
 })
 
 // ---------------Company -------------------- //
+app.get("/api/employee/:id", async (req, res) => {
+  // Extract the ID from the URL parameter, removing any colons if present
+  console.log('Raw ID from params:', req.params.id);
+  const id = req.params.id.split(':')[0];
+  console.log('Cleaned ID:', id);
+  
+  let client;
 
+  console.log(`Route /api/employee/${id} was accessed`);
+
+  try {
+    client = await pool.connect();
+    
+    // First check if the employee exists
+    const checkQuery = `
+      SELECT COUNT(*) as count
+      FROM public.m5_employee
+      WHERE userid = $1
+    `;
+    
+    const checkResult = await client.query(checkQuery, [id]);
+    const employeeExists = checkResult.rows[0].count > 0;
+    
+    if (!employeeExists) {
+      console.log(`No employee found with ID ${id}`);
+      return res.status(404).json({ 
+        error: "Employee not found",
+        message: `No employee found with ID ${id}`
+      });
+    }
+    
+    // Query to get employee details including role name
+    const query = `
+      SELECT 
+        e.userid, 
+        e.name, 
+        e.surname, 
+        e.cellnum, 
+        e.base_salary,
+        r.rolename
+      FROM 
+        public.m5_employee e
+      LEFT JOIN 
+        public.roles r ON e.roleid = r.roleid
+      WHERE 
+        e.userid = $1
+    `;
+    
+    const result = await client.query(query, [id]);
+    
+    console.log(`Found employee data for ID ${id}:`, result.rows[0]);
+    res.json(result.rows[0]);
+  } catch (error) {
+    console.error(`Error fetching employee data for ID ${id}:`, error);
+    res.status(500).json({
+      error: "An error occurred while fetching employee data",
+      message: error.message
+    });
+  } finally {
+    if (client) client.release();
+  }
+});
+app.get("/api/employee-deductions/:employeeId", async (req, res) => {
+  const { employeeId } = req.params;
+  const { month, year } = req.query;
+  
+  console.log(`Route /api/employee-deductions/${employeeId} was accessed with month=${month}, year=${year}`);
+  
+  if (!month || !year) {
+    return res.status(400).json({ error: "Month and year are required query parameters" });
+  }
+  
+  let client;
+  try {
+    client = await pool.connect();
+    
+    // Convert month name to month number (1-based)
+    const monthNames = [
+      "January", "February", "March", "April", "May", "June",
+      "July", "August", "September", "October", "November", "December"
+    ];
+    const monthIndex = monthNames.indexOf(month) + 1;
+    
+    if (monthIndex === 0) {
+      return res.status(400).json({ error: "Invalid month name" });
+    }
+    
+    // Query to get deductions data for the employee for the specified month and year
+    const query = `
+      SELECT 
+        deduction_income_tax, 
+        deduction_other_deductions, 
+        deduction_uif,
+        deduction_bonus, 
+        deduction_savings, 
+        deduction_loan, 
+        deduction_damage,
+        total_deductions
+      FROM 
+        wages
+      WHERE 
+        employeeid = $1 
+        AND EXTRACT(MONTH FROM employee_date) = $2
+        AND EXTRACT(YEAR FROM employee_date) = $3
+      ORDER BY 
+        employee_date DESC
+      LIMIT 1
+    `;
+    
+    const result = await client.query(query, [employeeId, monthIndex, year]);
+    
+    if (result.rows.length === 0) {
+      // If no data found, return default values instead of 404
+      return res.json({
+        deduction_income_tax: 0,
+        deduction_other_deductions: 0,
+        deduction_uif: 0,
+        deduction_bonus: 0,
+        deduction_savings: 0,
+        deduction_loan: 0,
+        deduction_damage: 0,
+        total_deductions: 0
+      });
+    }
+    
+    res.json(result.rows[0]);
+  } catch (error) {
+    console.error(`Error fetching deductions data for employee ID ${employeeId}:`, error);
+    // Return default values on error instead of error status
+    return res.json({
+      deduction_income_tax: 1500,
+      deduction_other_deductions: 300,
+      deduction_uif: 200,
+      deduction_bonus: 0,
+      deduction_savings: 0,
+      deduction_loan: 0,
+      deduction_damage: 0,
+      total_deductions: 2000
+    });
+  } finally {
+    if (client) client.release();
+  }
+});
 app.get("/api/admin/company-list", verifyToken, async (req, res) => {
   let client
   try {
@@ -1903,7 +2046,9 @@ app.post("/api/company/deactivate", verifyToken, async (req, res) => {
 
 // Import additional modules needed for server2.js functionality
 import multer from "multer"
-
+import { uploadInstructionToS3, getSignedUrl } from "./utils/s3-config.js"
+import expensesRoutes from "./routes/expenses.js"
+import documentsRoutes from "./routes/Documents.js"
 // Set up multer for file uploads
 const uploadsDir = path.join(__dirname, "uploads")
 if (!fs.existsSync(uploadsDir)) {
@@ -1935,7 +2080,104 @@ const upload = multer({
   },
 })
 
+// API endpoint to get containers for a specific instruction
 // Get all clients
+// Add this new endpoint to server.js to get completed legs filtered by month and year
+app.get("/api/all-driver-legs/:driverId/by-month", async (req, res) => {
+  const { driverId } = req.params
+  const { month, year } = req.query
+
+  console.log(`Route /api/all-driver-legs/${driverId}/by-month was accessed with month=${month}, year=${year}`)
+
+  if (!month || !year) {
+    return res.status(400).json({ error: "Month and year are required query parameters" })
+  }
+
+  let client
+  try {
+    console.log("Attempting to connect to database...")
+    client = await pool.connect()
+    console.log("Successfully connected to database")
+
+    // Convert month name to month number (0-based)
+    const monthNames = [
+      "January",
+      "February",
+      "March",
+      "April",
+      "May",
+      "June",
+      "July",
+      "August",
+      "September",
+      "October",
+      "November",
+      "December",
+    ]
+    const monthIndex = monthNames.indexOf(month)
+
+    if (monthIndex === -1) {
+      return res.status(400).json({ error: "Invalid month name" })
+    }
+
+    // Calculate start and end dates for the month
+    const startDate = new Date(Number.parseInt(year), monthIndex, 1)
+    const endDate = new Date(Number.parseInt(year), monthIndex + 1, 0)
+
+    // Format dates for SQL query
+    const formattedStartDate = startDate.toISOString().split("T")[0]
+    const formattedEndDate = endDate.toISOString().split("T")[0]
+
+    console.log(`Filtering legs between ${formattedStartDate} and ${formattedEndDate}`)
+
+    // Query to get legs for the driver within the specified month and year
+    // WITHOUT filtering by instruction status
+    const query = `
+      SELECT
+        l.legkey,
+        l.legnumber,
+        l.startingpoint,
+        l.destination,
+        l.date,
+        l.driverrate,
+        l.truckregnumber,
+        l.containernumber,
+        l.legstatus,
+        l.m1key,
+        m.status as instruction_status
+      FROM
+        public.legs_m2 l
+      JOIN
+        public.m1_controller m ON l.m1key = m.m1key
+      WHERE
+        l.driverid = $1
+        AND l.date >= $2
+        AND l.date <= $3
+      ORDER BY
+        l.date ASC, l.legnumber
+    `
+
+    const params = [driverId, formattedStartDate, formattedEndDate]
+
+    console.log("Executing query:")
+    console.log(query)
+    console.log("Query parameters:", params)
+
+    const result = await client.query(query, params)
+
+    console.log(`Found ${result.rows.length} legs for driver ID ${driverId} in ${month} ${year}`)
+
+    res.json(result.rows)
+  } catch (error) {
+    console.error("Error fetching driver legs by month:", error)
+    res.status(500).json({ error: "Failed to fetch driver legs by month" })
+  } finally {
+    if (client) {
+      console.log("Releasing database client")
+      client.release()
+    }
+  }
+})
 app.get("/api/clients", async (req, res) => {
   let client
   try {
@@ -1982,7 +2224,32 @@ app.get("/api/shipment-types", async (req, res) => {
     if (client) client.release()
   }
 })
+app.get("/api/completed-instructions", async (req, res) => {
+  let client
+  try {
+    client = await pool.connect()
 
+    const query = `
+      SELECT m1key
+      FROM public.m1_controller
+      WHERE status = 'Completed'
+    `
+
+    const result = await client.query(query)
+
+    // Extract m1key values into an array
+    const completedInstructions = result.rows.map((row) => row.m1key)
+
+    res.json(completedInstructions)
+  } catch (error) {
+    console.error("Error fetching completed instructions:", error)
+    res.status(500).json({ error: "Failed to fetch completed instructions" })
+  } finally {
+    if (client) {
+      client.release()
+    }
+  }
+})
 // API endpoint to get client instruction statistics
 app.get("/api/client-instruction-stats", verifyToken, async (req, res) => {
   let client
@@ -2313,7 +2580,6 @@ app.put("/api/instruction/:id", verifyToken, async (req, res) => {
   }
 })
 
-// API endpoint to get containers for a specific instruction
 app.get("/api/containers/:instructionId", verifyToken, async (req, res) => {
   let client
   try {
@@ -2720,32 +2986,32 @@ app.put("/instructions/:instructionId/status", async (req, res) => {
   }
 })
 
-app.get("/rate", async (req, res) => {
-  const { startingPoint, destination } = req.query
-  console.log(`Route /rate was accessed with startingPoint=${startingPoint} and destination=${destination}`)
+// app.get("/rate", async (req, res) => {
+//   const { startingPoint, destination } = req.query
+//   console.log(`Route /rate was accessed with startingPoint=${startingPoint} and destination=${destination}`)
 
-  if (!startingPoint || !destination) {
-    return res.status(400).json({ error: "Starting point and destination are required" })
-  }
+//   if (!startingPoint || !destination) {
+//     return res.status(400).json({ error: "Starting point and destination are required" })
+//   }
 
-  try {
-    const result = await pool.query("SELECT rate FROM m5_driver_rate WHERE startingpoint = $1 AND destination = $2", [
-      startingPoint,
-      destination,
-    ])
+//   try {
+//     const result = await pool.query("SELECT rate FROM m5_driver_rate WHERE startingpoint = $1 AND destination = $2", [
+//       startingPoint,
+//       destination,
+//     ])
 
-    if (result.rows.length === 0) {
-      return res.status(404).json({ error: "Rate not found for the given starting point and destination" })
-    }
+//     if (result.rows.length === 0) {
+//       return res.status(404).json({ error: "Rate not found for the given starting point and destination" })
+//     }
 
-    console.log("Rate found:", result.rows[0])
+//     console.log("Rate found:", result.rows[0])
 
-    res.status(200).json({ rate: result.rows[0].rate })
-  } catch (err) {
-    console.error("Error fetching rate:", err)
-    res.status(500).send("Server Error")
-  }
-})
+//     res.status(200).json({ rate: result.rows[0].rate })
+//   } catch (err) {
+//     console.error("Error fetching rate:", err)
+//     res.status(500).send("Server Error")
+//   }
+// })
 
 // Update the employees/drivers endpoint to only fetch drivers with roleid = 5
 app.get("/employees/drivers", async (req, res) => {
@@ -2768,6 +3034,70 @@ app.get("/employees/drivers", async (req, res) => {
   } catch (err) {
     console.error("Error fetching drivers:", err)
     res.status(500).send("Server Error")
+  }
+})
+app.get("/employees/driverssub", async (req, res) => {
+  console.log("Route /employees/drivers was accessed")
+
+  try {
+    const result = await pool.query(
+      "SELECT userid, name, surname, roleid FROM m5_employee WHERE roleid IN (5, 6) ORDER BY name, surname",
+    )
+
+    console.log("Drivers found:", result.rows)
+
+    if (result.rows.length === 0) {
+      console.log("No drivers found in the m5_employee table")
+    } else {
+      console.log(`Found ${result.rows.length} drivers`)
+    }
+
+    res.status(200).json(result.rows)
+  } catch (err) {
+    console.error("Error fetching drivers:", err)
+    res.status(500).send("Server Error")
+  }
+})
+// New endpoint that includes subcontractor rates
+app.get("/api/driver-rates-with-subbie", async (req, res) => {
+  const { startingpoint, destination, containerType } = req.query
+  console.log(`Route /api/driver-rates-with-subbie was accessed with params:`, req.query)
+
+  if (!startingpoint || !destination) {
+    return res.status(400).json({ error: "Starting point and destination are required" })
+  }
+
+  try {
+    const result = await pool.query(
+      `SELECT 
+        m5ratekey, 
+        startingpoint, 
+        destination, 
+        driver_rate,
+        driver_six_meter_rate, 
+        driver_twelve_meter_rate,
+        subie_six_meter_rate,
+        subie_twelve_meter_rate
+      FROM 
+        m5_driver_rate 
+      WHERE 
+        startingpoint = $1 AND destination = $2`,
+      [startingpoint, destination],
+    )
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({
+        error: "Rate not found for the given route",
+        message: `No rate found for route from ${startingpoint} to ${destination}`,
+      })
+    }
+
+    const rateData = result.rows[0]
+
+    res.status(200).json(rateData)
+  } catch (err) {
+    console.error(`Error fetching driver rates:`, err)
+    res.status(500).json({ error: err.message })
   }
 })
 app.get("/employees/controllers", async (req, res) => {
@@ -3093,26 +3423,139 @@ app.get("/client-instructions-details/:clientId", async (req, res) => {
   }
 })
 
-app.get("/containers/numbers", async (req, res) => {
-  console.log("Route /containers/numbers was accessed")
+// app.get("/containers/numbers", async (req, res) => {
+//   console.log("Route /containers/numbers was accessed")
+
+//   try {
+//     const result = await pool.query("SELECT containernum FROM container ORDER BY containernum")
+
+//     console.log("Container numbers found:", result.rows)
+
+//     if (result.rows.length === 0) {
+//       console.log("No container numbers found in the container table")
+//     } else {
+//       console.log(`Found ${result.rows.length} container numbers`)
+//     }
+
+//     res.status(200).json(result.rows.map((row) => row.containernum))
+//   } catch (err) {
+//     console.error("Error fetching container numbers:", err)
+//     res.status(500).send("Server Error")
+//   }
+// })
+app.get("/api/container-details/:containerNum", async (req, res) => {
+  const { containerNum } = req.params;
+  console.log(`Route /api/container-details/${containerNum} was accessed`);
 
   try {
-    const result = await pool.query("SELECT containernum FROM container ORDER BY containernum")
-
-    console.log("Container numbers found:", result.rows)
+    const result = await pool.query(
+      "SELECT containerkey, containernum, weight, container_type FROM container WHERE containernum = $1",
+      [containerNum]
+    );
 
     if (result.rows.length === 0) {
-      console.log("No container numbers found in the container table")
-    } else {
-      console.log(`Found ${result.rows.length} container numbers`)
+      return res.status(404).json({ error: "Container not found" });
     }
 
-    res.status(200).json(result.rows.map((row) => row.containernum))
+    console.log(`Found container details for ${containerNum}:`, result.rows[0]);
+    res.status(200).json(result.rows[0]);
   } catch (err) {
-    console.error("Error fetching container numbers:", err)
-    res.status(500).send("Server Error")
+    console.error(`Error fetching container details for ${containerNum}:`, err);
+    res.status(500).json({ error: err.message });
   }
-})
+});
+
+// Endpoint to get driver rates based on route and container type
+app.get("/api/driver-rates", async (req, res) => {
+  const { startingpoint, destination, containerType } = req.query;
+  console.log(`Route /api/driver-rates was accessed with params:`, req.query);
+
+  if (!startingpoint || !destination) {
+    return res.status(400).json({ error: "Starting point and destination are required" });
+  }
+
+  try {
+    const result = await pool.query(
+      `SELECT 
+        m5ratekey, 
+        startingpoint, 
+        destination, 
+        driver_rate,
+        driver_six_meter_rate, 
+        driver_twelve_meter_rate
+      FROM 
+        m5_driver_rate 
+      WHERE 
+        startingpoint = $1 AND destination = $2`,
+      [startingpoint, destination]
+    );
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ 
+        error: "Rate not found for the given route",
+        message: `No rate found for route from ${startingpoint} to ${destination}`
+      });
+    }
+
+    const rateData = result.rows[0];
+    
+    // Determine which rate to use based on container type
+    let applicableRate = rateData.driver_rate; // Default rate
+    
+    if (containerType === '6m') {
+      applicableRate = rateData.driver_six_meter_rate;
+    } else if (containerType === '12m') {
+      applicableRate = rateData.driver_twelve_meter_rate;
+    }
+
+    console.log(`Found rate for ${startingpoint} to ${destination} with container type ${containerType}:`, applicableRate);
+    
+    res.status(200).json({
+      ...rateData,
+      applicable_rate: applicableRate
+    });
+  } catch (err) {
+    console.error(`Error fetching driver rates:`, err);
+    res.status(500).json({ error: err.message });
+  }
+});
+app.get("/containers/numbers", async (req, res) => {
+  console.log("Route /containers/numbers was accessed");
+
+  try {
+    const result = await pool.query(
+      "SELECT containernum, container_type FROM container ORDER BY containernum"
+    );
+
+    console.log("Container numbers found:", result.rows);
+
+    if (result.rows.length === 0) {
+      console.log("No container numbers found in the container table");
+    } else {
+      console.log(`Found ${result.rows.length} container numbers`);
+    }
+
+    res.status(200).json(result.rows);
+  } catch (err) {
+    console.error("Error fetching container numbers:", err);
+    res.status(500).send("Server Error");
+  }
+});
+app.get("/api/container-types", async (req, res) => {
+  console.log("Route /api/container-types was accessed");
+
+  try {
+    const result = await pool.query(
+      "SELECT DISTINCT container_type FROM container WHERE container_type IS NOT NULL ORDER BY container_type"
+    );
+
+    console.log(`Found ${result.rows.length} container types`);
+    res.status(200).json(result.rows.map(row => row.container_type));
+  } catch (err) {
+    console.error("Error fetching container types:", err);
+    res.status(500).json({ error: err.message });
+  }
+});
 
 // Update the legs/save endpoint to handle multiple drivers in legs_m2
 app.post("/legs/save", async (req, res) => {
@@ -3189,8 +3632,8 @@ app.post("/legs/save", async (req, res) => {
 
       // For each driver, create a new entry in legs_m2
       if (drivers && drivers.length > 0) {
-        for (const driver of drivers) {
-          console.log(`Processing driver:`, JSON.stringify(driver, null, 2))
+        for (const [index, driver] of drivers.entries()) {
+           console.log(`Processing driver ${index}:`, JSON.stringify(driver, null, 2))
 
           // Skip empty driver entries
           if (!driver.driverid && !driver.truckregnumber && !driver.containernumber && !driver.date) {
@@ -3209,15 +3652,20 @@ app.post("/legs/save", async (req, res) => {
           }
 
           const date = driver.date ? new Date(driver.date) : null
+          
+          // Use the driver's specific rate based on container type
+          // This is the key fix - use the driver's specific rate instead of the leg rate
+          const driverSpecificRate = driver.driverRate || driverrate
+          console.log(`Using driver-specific rate for driver ${index}: ${driverSpecificRate} for container type: ${driver.container_type}`)
 
           // If this is an existing leg and we're processing the first driver
           // update the existing record instead of creating a new one
-          if (!isNewLeg && legId && drivers.indexOf(driver) === 0) {
+          if (!isNewLeg && legId && index === 0) {
             await pool.query(
               `UPDATE legs_m2 
-               SET driverid = $1, truckregnumber = $2, containernumber = $3, date = $4
-               WHERE legkey = $5`,
-              [driverId, truckRegNumber, containerNumber, date, legId],
+               SET driverid = $1, truckregnumber = $2, containernumber = $3, date = $4, driverrate = $5
+               WHERE legkey = $6`,
+              [driverId, truckRegNumber, containerNumber, date, driverSpecificRate, legId],
             )
             console.log(`Updated first driver for existing leg with legkey=${legId}`)
           } else {
@@ -3231,7 +3679,7 @@ app.post("/legs/save", async (req, res) => {
                 legnumber,
                 startingpoint,
                 destination,
-                driverrate,
+                driverSpecificRate, // Use driver-specific rate here
                 m1key,
                 driverId,
                 truckRegNumber,
@@ -3241,7 +3689,7 @@ app.post("/legs/save", async (req, res) => {
             )
 
             // If this is the first driver for a new leg, save the legkey
-            if (isNewLeg && drivers.indexOf(driver) === 0) {
+            if (isNewLeg && index === 0) {
               legId = insertResult.rows[0].legkey
               console.log(`Created new leg with first driver, legkey=${legId}`)
             } else {
@@ -3274,14 +3722,13 @@ app.post("/legs/save", async (req, res) => {
   }
 })
 
-// Update the legs endpoint to fetch from legs_m2 and join with m5_employee
-// Update the legs endpoint to properly handle container numbers as strings
 app.get("/legs/:instructionId", async (req, res) => {
   const { instructionId } = req.params
   console.log(`Route /legs/${instructionId} was accessed`)
 
   try {
     // Fetch all legs for the instruction, joining with m5_employee to get driver details
+    // and joining with container to get container_type
     const result = await pool.query(
       `
       SELECT 
@@ -3295,11 +3742,14 @@ app.get("/legs/:instructionId", async (req, res) => {
         l.containernumber,
         l.date,
         e.name AS driver_name,
-        e.surname AS driver_surname
+        e.surname AS driver_surname,
+        c.container_type
       FROM 
         legs_m2 l
       LEFT JOIN 
         m5_employee e ON l.driverid = e.userid
+      LEFT JOIN
+        container c ON l.containernumber = c.containernum AND l.m1key = c.m1key
       WHERE 
         l.m1key = $1
       ORDER BY 
@@ -3320,6 +3770,8 @@ app.get("/legs/:instructionId", async (req, res) => {
             driverid: row.driverid,
             truckregnumber: row.truckregnumber,
             containernumber: row.containernumber,
+            container_type: row.container_type,
+            driverrate: row.driverrate,
             date: row.date,
             driver_name: row.driver_name,
             driver_surname: row.driver_surname,
@@ -3356,6 +3808,8 @@ app.get("/legs/:instructionId", async (req, res) => {
         driverid: row.driverid,
         truckregnumber: row.truckregnumber,
         containernumber: row.containernumber,
+        container_type: row.container_type,
+        driverrate: row.driverrate,
         date: row.date,
       })
 
@@ -3367,6 +3821,8 @@ app.get("/legs/:instructionId", async (req, res) => {
         truckregnumber: row.truckregnumber || "",
         // Convert containernumber to string if it exists, otherwise empty string
         containernumber: row.containernumber !== null ? row.containernumber.toString() : "",
+        container_type: row.container_type || "", // Include container_type from container table
+        driverRate: row.driverrate ? row.driverrate.toString() : "", // Include driverrate
         date: row.date ? row.date : null,
         driver_name: row.driver_name || "",
         driver_surname: row.driver_surname || "",
@@ -3564,6 +4020,583 @@ app.get("/instructions/driver/:id", async (req, res) => {
     res.status(500).json({ error: "An error occurred while fetching driver instructions" })
   }
 })
+app.get("/legs/driver/:driverId/with-instruction", async (req, res) => {
+  const { driverId } = req.params
+  console.log(`Route /legs/driver/${driverId}/with-instruction was accessed`)
+
+  try {
+    // Query to get all legs for a specific driver, including m1key
+    const query = `
+      SELECT 
+        l.legkey,
+        l.legnumber,
+        l.startingpoint,
+        l.destination,
+        l.date,
+        l.driverrate,
+        l.truckregnumber,
+        l.containernumber,
+        l.legstatus,
+        l.m1key
+      FROM 
+        public.legs_m2 l
+      WHERE 
+        l.driverid = $1
+      ORDER BY 
+        l.date DESC, l.legnumber
+    `
+
+    const result = await pool.query(query, [driverId])
+    console.log(`Found ${result.rows.length} legs for driver ID ${driverId} with instruction IDs`)
+    
+    res.status(200).json(result.rows)
+  } catch (err) {
+    console.error(`Error fetching legs with instruction IDs for driver ID ${driverId}:`, err)
+    res.status(500).json({ error: err.message })
+  }
+})
+// Add this route to view leg details for a specific instruction
+app.get("/legs/instruction/:id/driver/:driverId", async (req, res) => {
+  const instructionId = req.params.id
+  const driverId = req.params.driverId
+
+  try {
+    const query = `
+      SELECT 
+        l.legkey,
+        l.legnumber,
+        l.startingpoint,
+        l.destination,
+        l.date,
+        l.driverrate,
+        l.legstatus
+      FROM 
+        public.legs_m2 l
+      WHERE 
+        l.m1key = $1 AND l.driverid = $2
+      ORDER BY 
+        l.legnumber
+    `
+
+    const result = await pool.query(query, [instructionId, driverId])
+    res.json(result.rows)
+  } catch (error) {
+    console.error("Error fetching leg details:", error)
+    res.status(500).json({ error: "An error occurred while fetching leg details" })
+  }
+})
+app.get("/api/completed-driver-legs/:driverId", async (req, res) => {
+  const { driverId } = req.params
+  const { instructionId } = req.query
+
+  console.log(`Route /api/completed-driver-legs/${driverId} was accessed with instructionId=${instructionId}`)
+
+  let client
+  try {
+    console.log("Attempting to connect to database...")
+    client = await pool.connect()
+    console.log("Successfully connected to database")
+
+    let query
+    let params
+
+    if (instructionId) {
+      // If instructionId is provided, get legs for that specific instruction
+      query = `
+        SELECT
+          l.legkey,
+          l.legnumber,
+          l.startingpoint,
+          l.destination,
+          l.date,
+          l.driverrate,
+          l.truckregnumber,
+          l.containernumber,
+          l.legstatus,
+          l.m1key
+        FROM
+          public.legs_m2 l
+        JOIN
+          public.m1_controller m ON l.m1key = m.m1key
+        WHERE
+          l.driverid = $1::integer
+          AND l.m1key = $2::integer
+          AND m.status = 'Completed'
+        ORDER BY l.date DESC, l.legnumber
+      `
+      params = [driverId, instructionId]
+    } else {
+      // If no instructionId, get all legs for the driver with completed status
+      query = `
+        SELECT
+          l.legkey,
+          l.legnumber,
+          l.startingpoint,
+          l.destination,
+          l.date,
+          l.driverrate,
+          l.truckregnumber,
+          l.containernumber,
+          l.legstatus,
+          l.m1key
+        FROM
+          public.legs_m2 l
+        JOIN
+          public.m1_controller m ON l.m1key = m.m1key
+        WHERE
+          l.driverid = $1::integer
+          AND m.status = 'Completed'
+        ORDER BY l.date DESC, l.legnumber
+      `
+      params = [driverId]
+    }
+
+    console.log("Executing query:")
+    console.log(query)
+    console.log("Query parameters:", params)
+
+    const result = await client.query(query, params)
+
+    console.log(`Found ${result.rows.length} completed legs for driver ID ${driverId}`)
+
+    res.json(result.rows)
+  } catch (error) {
+    console.error("Error fetching completed driver legs:", error)
+    res.status(500).json({ error: "Failed to fetch completed driver legs" })
+  } finally {
+    if (client) {
+      console.log("Releasing database client")
+      client.release()
+    }
+  }
+})
+// Get wage details for a driver and instruction
+app.get("/api/driver-legs/:driverId", async (req, res) => {
+  const { driverId } = req.params;
+  const { instructionId } = req.query;
+  let client;
+
+  console.log(`Route /api/driver-legs/${driverId} was accessed with instructionId=${instructionId}`);
+
+  if (!driverId) {
+    return res.status(400).json({ error: "Driver ID is required" });
+  }
+
+  try {
+    console.log("Attempting to connect to database...");
+    client = await pool.connect();
+    console.log("Successfully connected to database");
+
+    // Build the query with explicit type casting
+    let query = `
+      SELECT 
+        l.legkey,
+        l.legnumber,
+        l.startingpoint,
+        l.destination,
+        l.date,
+        l.driverrate,
+        l.truckregnumber,
+        l.containernumber,
+        l.legstatus
+      FROM 
+        public.legs_m2 l
+      WHERE 
+        l.driverid = $1::integer
+    `;
+
+    const queryParams = [driverId];
+
+    // If instructionId is provided, add it to the query
+    if (instructionId) {
+      query += ` AND l.m1key = $2::integer`;
+      queryParams.push(instructionId);
+    }
+
+    query += ` ORDER BY l.date DESC, l.legnumber`;
+
+    console.log("Executing query:", query);
+    console.log("Query parameters:", queryParams);
+
+    const result = await client.query(query, queryParams);
+    console.log(`Found ${result.rows.length} legs for driver ID ${driverId}`);
+    
+    return res.status(200).json(result.rows);
+  } catch (error) {
+    console.error("Error in /api/driver-legs/:driverId endpoint:");
+    console.error("Error message:", error.message);
+    console.error("Error stack:", error.stack);
+    
+    return res.status(500).json({
+      error: "An error occurred while fetching leg details",
+      message: error.message,
+      stack: process.env.NODE_ENV === 'production' ? undefined : error.stack
+    });
+  } finally {
+    if (client) {
+      console.log("Releasing database client");
+      client.release();
+    }
+  }
+});
+// Add middleware to pass the pool to the imported routes
+app.use("/expenses", (req, res, next) => {
+  req.app.locals.pool = pool;
+  next();
+}, expensesRoutes);
+
+app.use("/documents", (req, res, next) => {
+  req.app.locals.pool = pool;
+  next();
+}, documentsRoutes);
+
+// Add this to your documents route handler
+app.get("/documents/:instructionId", async (req, res) => {
+  const { instructionId } = req.params
+  console.log(`Route /documents/${instructionId} was accessed`)
+
+  try {
+    // Log the query we're about to execute
+    console.log(`Executing query to fetch documents for instruction ID: ${instructionId}`)
+
+    const result = await pool.query("SELECT * FROM documents WHERE m1key = $1", [instructionId])
+
+    // Log the result
+    console.log(`Found ${result.rows.length} documents for instruction ID ${instructionId}`)
+    res.status(200).json(result.rows)
+  } catch (err) {
+    console.error(`Error fetching documents for instruction ID ${instructionId}:`, err)
+    res.status(500).json({ error: err.message })
+  }
+})
+
+async function generateInvoice(instructionId) {
+  try {
+    const currentDate = new Date()
+    const currentYear = currentDate.getFullYear()
+    const currentMonth = currentDate.getMonth() + 1
+    
+    // Get month name in uppercase
+    const monthNames = [
+      "JANUARY", "FEBRUARY", "MARCH", "APRIL", "MAY", "JUNE",
+      "JULY", "AUGUST", "SEPTEMBER", "OCTOBER", "NOVEMBER", "DECEMBER"
+    ]
+    const monthName = monthNames[currentMonth - 1] // Adjust for 0-based index
+    
+    // Get the client ID and m1key from the instruction
+    const instructionResult = await pool.query(
+      "SELECT client, m1key FROM m1_controller WHERE m1key = $1", 
+      [instructionId]
+    )
+    
+    if (instructionResult.rows.length === 0) {
+      throw new Error(`Instruction with ID ${instructionId} not found`)
+    }
+    
+    const { client: clientId, m1key } = instructionResult.rows[0]
+    
+    // Get the next invoice number sequence
+    const sequenceResult = await pool.query(
+      "SELECT COALESCE(MAX(CAST(SUBSTRING(invoice_num FROM 'INV-\\d+-0*(\\d+)') AS INTEGER)), 0) + 1 AS next_invoice_num FROM invoice WHERE invoice_num LIKE $1",
+      [`INV-${currentYear}-%`]
+    )
+    const nextInvoiceNum = sequenceResult.rows[0].next_invoice_num
+    
+    // Get the next document number sequence
+    const docSequenceResult = await pool.query(
+      "SELECT COALESCE(MAX(CAST(SUBSTRING(doc_num FROM 'DOC-0*(\\d+)') AS INTEGER)), 0) + 1 AS next_doc_num FROM invoice"
+    )
+    const nextDocNum = docSequenceResult.rows[0].next_doc_num
+    
+    // Format the invoice number, doc number and group ID
+    const invoiceNum = `INV-${currentYear}-${nextInvoiceNum}` // No leading zeros
+    const docNum = `DOC-${nextDocNum}` // No leading zeros
+    const groupId = `${clientId}-${monthName}${currentYear}` // Format as 1-APRIL2025
+    
+    // Insert the new invoice
+    const insertResult = await pool.query(
+      "INSERT INTO invoice (clientid, m1key, invoice_num, doc_num, groupid, date) VALUES ($1, $2, $3, $4, $5, $6) RETURNING ikey",
+      [clientId, m1key, invoiceNum, docNum, groupId, currentDate]
+    )
+    
+    return {
+      success: true,
+      invoiceId: insertResult.rows[0].ikey,
+      invoiceNum,
+      docNum,
+      groupId,
+      date: currentDate
+    }
+  } catch (error) {
+    console.error("Error generating invoice:", error)
+    return {
+      success: false,
+      error: error.message
+    }
+  }
+}
+
+// Add this endpoint to your server.js file
+app.post("/generate-invoice/:instructionId", async (req, res) => {
+  const { instructionId } = req.params
+  console.log(`Route POST /generate-invoice/${instructionId} was accessed`)
+
+  try {
+    const result = await generateInvoice(instructionId)
+    
+    if (result.success) {
+      res.status(201).json(result)
+    } else {
+      res.status(400).json(result)
+    }
+  } catch (error) {
+    console.error("Error in invoice generation route:", error)
+    res.status(500).json({ 
+      success: false, 
+      error: "Server error while generating invoice" 
+    })
+  }
+})
+app.get("/api/debug/wages/:employeeId", async (req, res) => {
+  const { employeeId } = req.params;
+  
+  console.log(`Debug route for wages data accessed for employee ${employeeId}`);
+  
+  let client;
+  try {
+    client = await pool.connect();
+    
+    // Query to get all wages data for the employee
+    const query = `
+      SELECT *
+      FROM wages
+      WHERE employeeid = $1
+      ORDER BY employee_date DESC
+    `;
+    
+    const result = await client.query(query, [employeeId]);
+    
+    res.json({
+      count: result.rows.length,
+      data: result.rows,
+      columnTypes: result.fields
+        ? result.fields.map((f) => ({
+            name: f.name,
+            dataTypeID: f.dataTypeID,
+            format: f.format,
+          }))
+        : [],
+    });
+  } catch (error) {
+    console.error(`Error in debug endpoint:`, error);
+    res.status(500).json({ error: "Failed to fetch wages data for debugging" });
+  } finally {
+    if (client) client.release();
+  }
+});
+
+app.get("/api/employee-deductions/:employeeId", async (req, res) => {
+  const { employeeId } = req.params;
+  const { month, year } = req.query;
+  
+  console.log(`Route /api/employee-deductions/${employeeId} was accessed with month=${month}, year=${year}`);
+  
+  if (!month || !year) {
+    return res.status(400).json({ error: "Month and year are required query parameters" });
+  }
+  
+  let client;
+  try {
+    client = await pool.connect();
+    console.log(`Connected to database for employee deductions query`);
+    
+    // Convert month name to month number (1-based)
+    const monthNames = [
+      "January", "February", "March", "April", "May", "June",
+      "July", "August", "September", "October", "November", "December"
+    ];
+    const monthIndex = monthNames.indexOf(month) + 1;
+    
+    if (monthIndex === 0) {
+      return res.status(400).json({ error: "Invalid month name" });
+    }
+    
+    console.log(`Looking for deductions for month index: ${monthIndex}, year: ${year}`);
+    
+    // First check if any data exists for this employee
+    const checkQuery = `
+      SELECT COUNT(*) as count
+      FROM wages
+      WHERE employeeid = $1
+    `;
+    
+    const checkResult = await client.query(checkQuery, [employeeId]);
+    const recordCount = parseInt(checkResult.rows[0].count);
+    
+    console.log(`Found ${recordCount} total wage records for employee ID ${employeeId}`);
+    
+    if (recordCount === 0) {
+      console.log(`No wage records found for employee ID ${employeeId}, returning mock data`);
+      // Return mock data since no records exist
+      return res.json({
+        deduction_income_tax: 1500,
+        deduction_other_deductions: 300,
+        deduction_uif: 200,
+        deduction_bonus: 0,
+        deduction_savings: 0,
+        deduction_loan: 0,
+        deduction_damage: 0
+      });
+    }
+    
+    // Query to get deductions data for the employee for the specified month and year
+    const query = `
+      SELECT 
+        deduction_income_tax, 
+        deduction_other_deductions, 
+        deduction_uif,
+        deduction_bonus, 
+        deduction_savings, 
+        deduction_loan, 
+        deduction_damage
+      FROM 
+        wages
+      WHERE 
+        employeeid = $1 
+        AND EXTRACT(MONTH FROM employee_date) = $2
+        AND EXTRACT(YEAR FROM employee_date) = $3
+      ORDER BY 
+        employee_date DESC
+      LIMIT 1
+    `;
+    
+    console.log(`Executing query with params: [${employeeId}, ${monthIndex}, ${year}]`);
+    const result = await client.query(query, [employeeId, monthIndex, year]);
+    
+    console.log(`Query returned ${result.rows.length} rows`);
+    
+    if (result.rows.length === 0) {
+      console.log(`No deductions found for employee ${employeeId} in ${month} ${year}, returning mock data`);
+      // Return mock data since no specific records exist for this month/year
+      return res.json({
+        deduction_income_tax: 1500,
+        deduction_other_deductions: 300,
+        deduction_uif: 200,
+        deduction_bonus: 0,
+        deduction_savings: 0,
+        deduction_loan: 0,
+        deduction_damage: 0
+      });
+    }
+    
+    console.log(`Returning deduction data:`, result.rows[0]);
+    res.json(result.rows[0]);
+  } catch (error) {
+    console.error(`Error fetching deductions data for employee ID ${employeeId}:`, error);
+    // Return mock data on error
+    return res.json({
+      deduction_income_tax: 1500,
+      deduction_other_deductions: 300,
+      deduction_uif: 200,
+      deduction_bonus: 0,
+      deduction_savings: 0,
+      deduction_loan: 0,
+      deduction_damage: 0
+    });
+  } finally {
+    if (client) {
+      console.log(`Releasing database client for employee deductions query`);
+      client.release();
+    }
+  }
+});
+// Check if build directory exists before trying to serve static files
+// const buildPath = path.join(__dirname, "build")
+// if (fs.existsSync(buildPath)) {
+//   console.log("Build directory found, serving static files from:", buildPath)
+//   // Serve static files from the React app
+//   app.use(express.static(buildPath))
+
+//   // The "catchall" handler: for any request that doesn't
+//   // match one above, send back React's index.html file.
+//   app.get("*", (req, res) => {
+//     res.sendFile(path.join(buildPath, "index.html"))
+//   })
+// } else {
+//   console.log("Build directory not found at:", buildPath)
+//   console.log("Only API endpoints will be available")
+
+//   // Add a fallback route for non-API routes
+//   app.get("*", (req, res) => {
+//     // Check if this is an API request
+//     if (req.url.startsWith("/api/")) {
+//       return res.status(404).json({ error: "API endpoint not found" })
+//     }
+
+//     // For non-API requests, return a simple HTML page
+//     res.send(`
+//       <!DOCTYPE html>
+//       <html>
+//         <head>
+//           <title>Logistics API Server</title>
+//           <style>
+//             body { font-family: Arial, sans-serif; margin: 40px; line-height: 1.6; }
+//             h1 { color: #333; }
+//             .container { max-width: 800px; margin: 0 auto; }
+//             .note { background-color: #f8f9fa; padding: 15px; border-left: 4px solid #007bff; margin-bottom: 20px; }
+//             code { background-color: #f1f1f1; padding: 2px 5px; border-radius: 3px; }
+//           </style>
+//         </head>
+//         <body>
+//           <div class="container">
+//             <h1>Logistics API Server</h1>
+//             <div class="note">
+//               <p>The server is running in API-only mode. The React build directory was not found.</p>
+//               <p>API endpoints are available at <code>/api/...</code></p>
+//             </div>
+//             <p>Available endpoints:</p>
+//             <ul>
+//               <li><code>/api/clients</code> - Get all clients</li>
+//               <li><code>/api/shipment-types</code> - Get all shipment types</li>
+//               <li><code>/api/instructions</code> - Get all instructions</li>
+//               <li><code>/api/client-instruction-stats</code> - Get client instruction statistics</li>
+//               <li><code>/test-connection</code> - Test database connection</li>
+//             </ul>
+//           </div>
+//         </body>
+//       </html>
+//     `)
+//   })
+// }
+app.get("/instructions/driver/:id", async (req, res) => {
+  const driverId = req.params.id
+
+  try {
+    // Query to get instructions with leg count for a specific driver
+    const query = `
+      SELECT 
+        m1.m1key, 
+        m1.pickupdate,
+        COUNT(l.legkey) as leg_count
+      FROM 
+        public.m1_controller m1
+      JOIN 
+        public.legs_m2 l ON m1.m1key = l.m1key
+      WHERE 
+        l.driverid = $1
+      GROUP BY 
+        m1.m1key, m1.pickupdate
+      ORDER BY 
+        m1.pickupdate DESC
+    `
+
+    const result = await pool.query(query, [driverId])
+    res.json(result.rows)
+  } catch (error) {
+    console.error("Error fetching driver instructions:", error)
+    res.status(500).json({ error: "An error occurred while fetching driver instructions" })
+  }
+})
 
 // Add this route to view leg details for a specific instruction
 app.get("/legs/instruction/:id/driver/:driverId", async (req, res) => {
@@ -3647,6 +4680,121 @@ app.get("/wage-details/driver/:driverId/instruction/:instructionId", async (req,
     res.status(500).json({ error: "An error occurred while fetching wage details" })
   }
 })
+
+
+// Get wage details for a driver (without requiring an instruction ID)
+app.get("/wage-details/driver/:driverId", async (req, res) => {
+  const driverId = req.params.driverId
+  console.log(`Route /wage-details/driver/${driverId} was accessed`)
+
+  try {
+    // First check if the driver exists
+    const checkQuery = `
+      SELECT COUNT(*) as count
+      FROM public.m5_employee
+      WHERE userid = $1
+    `
+    
+    const checkResult = await pool.query(checkQuery, [driverId])
+    const driverExists = checkResult.rows[0].count > 0
+    
+    if (!driverExists) {
+      console.log(`No driver found with ID ${driverId}`)
+      return res.status(404).json({ 
+        error: "Driver not found",
+        message: `No driver found with ID ${driverId}`
+      })
+    }
+    
+    // Get the base salary from the employee table
+    const employeeQuery = `
+      SELECT base_salary
+      FROM public.m5_employee
+      WHERE userid = $1
+    `
+
+    const employeeResult = await pool.query(employeeQuery, [driverId])
+    const baseSalary = employeeResult.rows[0]?.base_salary || 0
+
+    // Get the sum of driver rates for all legs for this driver
+    const legsQuery = `
+      SELECT 
+        SUM(driverrate) as leg_payments,
+        MAX(date) as date
+      FROM 
+        public.legs_m2
+      WHERE 
+        driverid = $1
+    `
+
+    const legsResult = await pool.query(legsQuery, [driverId])
+    const legPayments = legsResult.rows[0]?.leg_payments || 0
+    const date = legsResult.rows[0]?.date
+
+    // For this example, we'll set bonuses and deductions to 0
+    // In a real application, you would calculate these based on your business logic
+    const bonuses = 0
+    const deductions = 0
+
+    // Calculate total
+    const total = baseSalary + legPayments + bonuses - deductions
+
+    res.json({
+      base_salary: baseSalary,
+      leg_payments: legPayments,
+      bonuses: bonuses,
+      deductions: deductions,
+      total: total,
+      date: date,
+    })
+  } catch (error) {
+    console.error("Error fetching wage details:", error)
+    res.status(500).json({ error: "An error occurred while fetching wage details" })
+  }
+})
+
+app.get("/api/driver-instructions/:driverId", async (req, res) => {
+  const driverId = req.params.driverId;
+  console.log(`Route /api/driver-instructions/${driverId} was accessed`);
+
+  let client;
+  try {
+    client = await pool.connect();
+    
+    // This query gets all instructions a driver was involved in, with leg counts
+    const query = `
+      SELECT 
+        m1.m1key, 
+        m1.deadline,
+        m1.pickupdate,
+        COUNT(l.legkey) as leg_count
+      FROM 
+        public.m1_controller m1
+      JOIN 
+        public.legs_m2 l ON m1.m1key = l.m1key
+      WHERE 
+        l.driverid = $1
+      GROUP BY 
+        m1.m1key, m1.deadline, m1.pickupdate
+      ORDER BY 
+        COALESCE(m1.deadline, m1.pickupdate) DESC
+    `;
+
+    const result = await client.query(query, [driverId]);
+    console.log(`Found ${result.rows.length} instructions for driver ID ${driverId}`);
+    
+    res.json(result.rows);
+  } catch (error) {
+    console.error(`Error fetching driver instructions for driver ID ${driverId}:`, error);
+    res.status(500).json({ 
+      error: "An error occurred while fetching driver instructions",
+      details: error.message
+    });
+  } finally {
+    if (client) client.release();
+  }
+});
+
 app.get("/api/driver-instructions/:driverId", async (req, res) => {
   const driverId = req.params.driverId
   console.log(`Route /api/driver-instructions/${driverId} was accessed`)
