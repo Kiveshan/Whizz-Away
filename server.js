@@ -3073,7 +3073,6 @@ app.get("/api/driver-rates-with-subbie", async (req, res) => {
         m5ratekey, 
         startingpoint, 
         destination, 
-        driver_rate,
         driver_six_meter_rate, 
         driver_twelve_meter_rate,
         subie_six_meter_rate,
@@ -3093,7 +3092,7 @@ app.get("/api/driver-rates-with-subbie", async (req, res) => {
     }
 
     const rateData = result.rows[0]
-
+    rateData.driver_rate = rateData.driver_six_meter_rate
     res.status(200).json(rateData)
   } catch (err) {
     console.error(`Error fetching driver rates:`, err)
