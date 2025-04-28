@@ -1,4 +1,3 @@
-
 "use client"
 
 import { useState, useEffect, useRef } from "react"
@@ -232,6 +231,7 @@ function UpdateInstruction() {
   const [saving, setSaving] = useState(false)
   const [savedMessage, setSavedMessage] = useState("")
   const [existingDrivers, setExistingDrivers] = useState([])
+  const [noRatesRoutes, setNoRatesRoutes] = useState(new Set())
   // Add a visual indicator for edited fields
   const [editedFields, setEditedFields] = useState({
     startingPoint: false,
@@ -293,6 +293,8 @@ function UpdateInstruction() {
   const [rates, setRates] = useState({
     six_meter: 0,
     twelve_meter: 0,
+    subbie_six_meter: 0,
+    subbie_twelve_meter: 0,
   })
 
   // Improve the refreshLegData function to ensure data is properly refreshed
@@ -460,6 +462,12 @@ function UpdateInstruction() {
         // Use setTimeout to ensure this happens after the current render cycle
         setTimeout(() => {
           handleSelectLeg(selectedLegIndex)
+
+          // Ensure rates are fetched after selecting the leg
+          const selectedLeg = legs[selectedLegIndex]
+          if (selectedLeg.startingPoint && selectedLeg.destination) {
+            fetchRate(selectedLeg.startingPoint, selectedLeg.destination)
+          }
         }, 0)
       } else {
         console.error(`Selected leg index ${selectedLegIndex} is out of bounds (max: ${legs.length - 1})`)
@@ -507,22 +515,26 @@ function UpdateInstruction() {
         try {
           console.log("Fetching rates for route:", data[0].startingpoint, data[0].destination)
           const rateResponse = await fetch(
-            `http://localhost:5000/api/driver-rates?startingpoint=${encodeURIComponent(data[0].startingpoint)}&destination=${encodeURIComponent(data[0].destination)}`,
+            `http://localhost:5000/api/driver-rates-with-subbie?startingpoint=${encodeURIComponent(data[0].startingpoint)}&destination=${encodeURIComponent(data[0].destination)}`,
           )
 
           if (rateResponse.ok) {
             const rateData = await rateResponse.json()
             console.log("Fetched rates:", rateData)
 
-            // Update the rates state
+            // Update the rates state with ALL rates including subcontractor rates
             setRates({
               six_meter: rateData.driver_six_meter_rate || 0,
               twelve_meter: rateData.driver_twelve_meter_rate || 0,
+              subbie_six_meter: rateData.subie_six_meter_rate || 0,
+              subbie_twelve_meter: rateData.subie_twelve_meter_rate || 0,
             })
 
             console.log("Updated rates state:", {
               six_meter: rateData.driver_six_meter_rate || 0,
               twelve_meter: rateData.driver_twelve_meter_rate || 0,
+              subbie_six_meter: rateData.subie_six_meter_rate || 0,
+              subbie_twelve_meter: rateData.subie_twelve_meter_rate || 0,
             })
           }
         } catch (error) {
@@ -610,7 +622,7 @@ function UpdateInstruction() {
             destination: leg.destination,
             driverRate: leg.driverrate ? leg.driverrate.toString() : "",
             drivers: normalizedDrivers,
-          };
+          }
         })
 
         console.log("Transformed legs data:", JSON.stringify(fetchedLegs, null, 2))
@@ -706,7 +718,7 @@ function UpdateInstruction() {
 
   const fetchDrivers = async () => {
     try {
-      const response = await fetch(`http://localhost:5000/employees/drivers`)
+      const response = await fetch(`http://localhost:5000/employees/driverssub`)
       if (!response.ok) {
         throw new Error("Failed to fetch drivers")
       }
@@ -760,62 +772,139 @@ function UpdateInstruction() {
     }
   }
 
+  // Update the fetchRate function to return a Promise so we can chain .then() calls
   const fetchRate = async (startingPoint, destination) => {
-    if (!startingPoint || !destination) return
+    console.log(`fetchRate called with: startingPoint=${startingPoint}, destination=${destination}`)
+    if (!startingPoint || !destination) return Promise.resolve()
+
+    // Create a route key to track routes with no rates
+    const routeKey = `${startingPoint}-${destination}`
 
     try {
       setRateError("")
 
-      // Use the new API endpoint instead of the old /rate endpoint
+      // Reset rates to 0 immediately when fetching new rates
+      setRates({
+        six_meter: 0,
+        twelve_meter: 0,
+        subbie_six_meter: 0,
+        subbie_twelve_meter: 0,
+      })
+
+      // If we already know this route has no rates, don't fetch again
+      if (noRatesRoutes.has(routeKey)) {
+        console.log(`Route ${routeKey} is known to have no rates, skipping fetch`)
+
+        // Update form data to show 0
+        setFormData((prev) => ({
+          ...prev,
+          driverRate: "0",
+        }))
+
+        // Update driver rates to 0
+        if (drivers.length > 0) {
+          const updatedDrivers = drivers.map((driver) => ({
+            ...driver,
+            driverRate: "0",
+            isAbnormal: driver.container_type === "abnormal" ? true : driver.isAbnormal,
+          }))
+          setDrivers(updatedDrivers)
+        }
+
+        // Update leg data
+        if (currentLagIndex !== null) {
+          const updatedLegs = [...legs]
+          updatedLegs[currentLagIndex] = {
+            ...updatedLegs[currentLagIndex],
+            driverRate: "0",
+          }
+          setLegs(updatedLegs)
+        }
+
+        return Promise.resolve()
+      }
+
+      // Use the new API endpoint
       const response = await fetch(
-        `http://localhost:5000/api/driver-rates?startingpoint=${encodeURIComponent(startingPoint)}&destination=${encodeURIComponent(destination)}`,
+        `http://localhost:5000/api/driver-rates-with-subbie?startingpoint=${encodeURIComponent(
+          startingPoint,
+        )}&destination=${encodeURIComponent(destination)}`,
       )
 
       if (response.status === 404) {
         // No rate found for this combination
         setRateError("Driver rate not available for this route")
 
-        setFormData((prev) => ({
-          ...prev,
-          driverRate: "",
-        }))
-
-        setRates({
-          six_meter: 0,
-          twelve_meter: 0,
+        // Add this route to the set of routes with no rates
+        setNoRatesRoutes((prev) => {
+          const newSet = new Set(prev)
+          newSet.add(routeKey)
+          return newSet
         })
 
+        console.log(`Added route ${routeKey} to noRatesRoutes set`)
+
+        // Update form data to show 0
+        setFormData((prev) => ({
+          ...prev,
+          driverRate: "0",
+        }))
+
+        // Update driver rates to 0
+        if (drivers.length > 0) {
+          const updatedDrivers = drivers.map((driver) => ({
+            ...driver,
+            driverRate: "0",
+            isAbnormal: driver.container_type === "abnormal" ? true : driver.isAbnormal,
+          }))
+          setDrivers(updatedDrivers)
+        }
+
+        // Update leg data
         if (currentLagIndex !== null) {
           const updatedLegs = [...legs]
           updatedLegs[currentLagIndex] = {
             ...updatedLegs[currentLagIndex],
-            driverRate: "",
+            driverRate: "0",
           }
           setLegs(updatedLegs)
         }
-        return
+
+        return Promise.resolve()
       }
 
       if (!response.ok) {
         throw new Error("Failed to fetch rate")
       }
 
+      // If we get here, this route has rates, so remove it from the noRatesRoutes set
+      setNoRatesRoutes((prev) => {
+        const newSet = new Set(prev)
+        newSet.delete(routeKey)
+        return newSet
+      })
+
       const data = await response.json()
       console.log("Rates from backend:", data)
 
-      // Store both rates from the new API response format
-      setRates({
+      // Store all rates from the API response
+      const newRates = {
         six_meter: data.driver_six_meter_rate || 0,
         twelve_meter: data.driver_twelve_meter_rate || 0,
-      })
+        subbie_six_meter: data.subie_six_meter_rate || 0,
+        subbie_twelve_meter: data.subie_twelve_meter_rate || 0,
+      }
+
+      console.log("Setting new rates:", newRates)
+      setRates(newRates)
 
       // Update the form data with the default rate
       setFormData((prev) => ({
         ...prev,
-        driverRate: data.driver_rate ? data.driver_rate.toString() : "0",
+        driverRate: data.driver_rate !== null && data.driver_rate !== undefined ? data.driver_rate.toString() : "0",
       }))
 
-      // If we're editing a leg, update it with the new rate
+      // Update leg data
       if (currentLagIndex !== null) {
         const updatedLegs = [...legs]
         updatedLegs[currentLagIndex] = {
@@ -825,27 +914,84 @@ function UpdateInstruction() {
         setLegs(updatedLegs)
       }
 
-      // Update driver rates based on their container type
+      // Update driver rates based on their container type and driver type
       if (drivers.length > 0) {
-        const updatedDrivers = [...drivers]
-        updatedDrivers.forEach((driver) => {
+        const updatedDrivers = drivers.map((driver) => {
+          const isSubcontractor = employeeDrivers.find((d) => d.userid.toString() === driver.driverid)?.roleid === 6
+
           if (driver.container_type === "12m") {
-            driver.driverRate = data.driver_twelve_meter_rate ? data.driver_twelve_meter_rate.toString() : "0"
+            return {
+              ...driver,
+              driverRate: isSubcontractor
+                ? data.subie_twelve_meter_rate
+                  ? data.subie_twelve_meter_rate.toString()
+                  : "0"
+                : data.driver_twelve_meter_rate
+                  ? data.driver_twelve_meter_rate.toString()
+                  : "0",
+            }
           } else if (driver.container_type === "abnormal") {
-            // For abnormal container  : "0"
-          } else if (driver.container_type === "abnormal") {
-            // For abnormal container types, keep existing rate or set to 0
-            driver.driverRate = driver.driverRate || "0"
-            driver.isAbnormal = true // Mark as abnormal to allow editing
+            return {
+              ...driver,
+              driverRate: driver.driverRate || "0",
+              isAbnormal: true,
+            }
           } else {
-            driver.driverRate = data.driver_six_meter_rate ? data.driver_six_meter_rate.toString() : "0"
+            return {
+              ...driver,
+              driverRate: isSubcontractor
+                ? data.subie_six_meter_rate
+                  ? data.subie_six_meter_rate.toString()
+                  : "0"
+                : data.driver_six_meter_rate
+                  ? data.driver_six_meter_rate.toString()
+                  : "0",
+            }
           }
         })
         setDrivers(updatedDrivers)
       }
+
+      return Promise.resolve()
     } catch (error) {
       console.error("Error fetching rate:", error)
       setRateError("Error fetching driver rate")
+
+      // On error, ensure rates are set to 0
+      setRates({
+        six_meter: 0,
+        twelve_meter: 0,
+        subbie_six_meter: 0,
+        subbie_twelve_meter: 0,
+      })
+
+      // Update form data to show 0
+      setFormData((prev) => ({
+        ...prev,
+        driverRate: "0",
+      }))
+
+      // Update driver rates to 0
+      if (drivers.length > 0) {
+        const updatedDrivers = drivers.map((driver) => ({
+          ...driver,
+          driverRate: "0",
+          isAbnormal: driver.container_type === "abnormal" ? true : driver.isAbnormal,
+        }))
+        setDrivers(updatedDrivers)
+      }
+
+      // Update leg data
+      if (currentLagIndex !== null) {
+        const updatedLegs = [...legs]
+        updatedLegs[currentLagIndex] = {
+          ...updatedLegs[currentLagIndex],
+          driverRate: "0",
+        }
+        setLegs(updatedLegs)
+      }
+
+      return Promise.reject(error)
     }
   }
 
@@ -890,13 +1036,14 @@ function UpdateInstruction() {
     }
 
     // Create a new leg in local state only (not in database yet)
+    // IMPORTANT: Initialize with an empty drivers array
     const newLeg = {
       id: `temp-${Date.now()}`, // Temporary ID to indicate this is not saved to DB yet
       legnumber: legs.length + 1,
       startingPoint: "",
       driverRate: "",
       destination: "",
-      drivers: [],
+      drivers: [], // Always start with empty drivers array
       isNew: true, // Flag to indicate this is a new leg not yet saved to database
     }
 
@@ -907,7 +1054,7 @@ function UpdateInstruction() {
       driverRate: "",
       destination: "",
     })
-    setDrivers([])
+    setDrivers([]) // Explicitly clear the drivers state when adding a new leg
 
     // Make sure the new leg is NOT in the savedLegs set
     setSavedLegs((prevSavedLegs) => {
@@ -923,89 +1070,118 @@ function UpdateInstruction() {
   }
 
   // Replace the handleSelectLeg function with this updated version
+  // Replace the handleSelectLeg function with this updated version
   const handleSelectLeg = (index) => {
-    // Save current leg data before switching (only if not completed)
+    console.log(`Selecting leg at index ${index}`)
+
+    // First, save the current leg's data to the legs array if we're on a valid leg
     if (currentLagIndex !== null && !isCompleted) {
       const updatedLegs = [...legs]
 
-      // Make sure we're preserving all driver data
-      const currentDrivers = drivers.map((driver) => ({
-        ...driver,
-        // Ensure these fields are explicitly preserved
-        container_type: driver.container_type || "",
-        driverRate: driver.driverRate || "",
-        full_name: driver.full_name || "",
-        isAbnormal: driver.isAbnormal || false,
-      }))
-
+      // Save the current drivers to the current leg before switching
       updatedLegs[currentLagIndex] = {
         ...updatedLegs[currentLagIndex],
-        ...formData,
-        drivers: currentDrivers,
+        startingPoint: formData.startingPoint,
+        destination: formData.destination,
+        driverRate: formData.driverRate,
+        drivers: JSON.parse(JSON.stringify(drivers)), // Create a deep copy of the drivers array
       }
+
+      console.log(`Saving leg ${currentLagIndex} data before switching:`, updatedLegs[currentLagIndex])
+
+      // Update the legs state with the saved data
       setLegs(updatedLegs)
     }
 
-    // Load the selected leg data
+    // Now set the current leg index to the new index
+    setCurrentLagIndex(index)
+
+    // Get the selected leg data
     const selectedLeg = legs[index]
+
+    // Update the form data
     setFormData({
       startingPoint: selectedLeg.startingPoint || "",
       driverRate: selectedLeg.driverRate || "",
       destination: selectedLeg.destination || "",
     })
 
-    // Load drivers for this leg if any
-    console.log("Selected leg:", JSON.stringify(selectedLeg, null, 2))
-    console.log("Selected leg drivers:", JSON.stringify(selectedLeg.drivers, null, 2))
+    // IMPORTANT: Clear the drivers state first to avoid any state mixing
+    setDrivers([])
 
-    // Ensure we're setting the drivers state correctly
-    if (selectedLeg.drivers && selectedLeg.drivers.length > 0) {
-      console.log("Setting drivers for selected leg:", JSON.stringify(selectedLeg.drivers, null, 2))
+    // Then load the drivers for the selected leg after a delay to ensure state is properly cleared
+    setTimeout(() => {
+      // Ensure we're setting the drivers state correctly
+      if (selectedLeg.drivers && selectedLeg.drivers.length > 0) {
+        console.log("Setting drivers for selected leg:", JSON.stringify(selectedLeg.drivers, null, 2))
 
-      // Make sure all driver entries have string values for their properties
-      const normalizedDrivers = selectedLeg.drivers.map((driver) => {
-        // Ensure all fields are properly formatted
-        return {
-          id: driver.id || Date.now() + Math.random(),
-          driverid: driver.driverid ? driver.driverid.toString() : "",
-          truckregnumber: driver.truckregnumber || "",
-          containernumber: driver.containernumber !== null ? driver.containernumber.toString() : "",
-          container_type: driver.container_type || "",
-          driverRate: driver.driverRate || driver.driverate || "", // Add driverate as fallback
-          date: driver.date || "",
-          driver_name: driver.driver_name || "",
-          driver_surname: driver.driver_surname || "",
-          isAbnormal: driver.container_type === "abnormal" || driver.isAbnormal,
-          full_name:
-            driver.full_name ||
-            (driver.driver_name && driver.driver_surname
-              ? `${driver.driver_name} ${driver.driver_surname}`
-              : driver.driverid
-                ? `Driver ID: ${driver.driverid}`
-                : "Unknown Driver"),
-        }
-      })
+        // Make a deep copy of the driver data to ensure no references are shared between legs
+        const normalizedDrivers = JSON.parse(JSON.stringify(selectedLeg.drivers)).map((driver) => {
+          // Ensure all fields are properly formatted
+          return {
+            id: driver.id || Date.now() + Math.random(),
+            driverid: driver.driverid ? driver.driverid.toString() : "",
+            truckregnumber: driver.truckregnumber || "",
+            containernumber: driver.containernumber !== null ? driver.containernumber.toString() : "",
+            container_type: driver.container_type || "",
+            driverRate: driver.driverRate || driver.driverate || "", // Add driverate as fallback
+            date: driver.date || "",
+            driver_name: driver.driver_name || "",
+            driver_surname: driver.driver_surname || "",
+            isAbnormal: driver.container_type === "abnormal" || driver.isAbnormal,
+            full_name:
+              driver.full_name ||
+              (driver.driver_name && driver.driver_surname
+                ? `${driver.driver_name} ${driver.driver_surname}`
+                : driver.driverid
+                  ? `Driver ID: ${driver.driverid}`
+                  : "Unknown Driver"),
+          }
+        })
 
-      console.log("Normalized drivers:", JSON.stringify(normalizedDrivers, null, 2))
-      setDrivers(normalizedDrivers)
-      debugDriverData(normalizedDrivers)
-    } else {
-      console.log("No drivers for selected leg, setting empty array")
-      setDrivers([])
-    }
-
-    setCurrentLagIndex(index)
+        console.log("Normalized drivers:", JSON.stringify(normalizedDrivers, null, 2))
+        setDrivers(normalizedDrivers)
+        debugDriverData(normalizedDrivers)
+      } else {
+        console.log("No drivers for selected leg, setting empty array")
+        setDrivers([])
+      }
+    }, 100) // Increased timeout to ensure state updates are complete
 
     // Reset edited fields tracking
     setEditedFields({
       startingPoint: false,
       destination: false,
       driverRate: false,
-      drivers: {}, // Reset the drivers object
+      drivers: {},
     })
+
+    // Check if this route has no rates before fetching
+    if (selectedLeg.startingPoint && selectedLeg.destination) {
+      const routeKey = `${selectedLeg.startingPoint}-${selectedLeg.destination}`
+
+      if (noRatesRoutes.has(routeKey)) {
+        console.log(`Route ${routeKey} is known to have no rates, setting rates to 0`)
+
+        // Set rates to 0
+        setRates({
+          six_meter: 0,
+          twelve_meter: 0,
+          subbie_six_meter: 0,
+          subbie_twelve_meter: 0,
+        })
+
+        return
+      }
+
+      // Only fetch rates if the route is not known to have no rates
+      console.log("Fetching rates after selecting leg:", selectedLeg.startingPoint, selectedLeg.destination)
+      fetchRate(selectedLeg.startingPoint, selectedLeg.destination)
+    }
   }
 
-  // Update the handleStartingPointChange function to track edits
+  // Replace the handleStartingPointChange function with this updated version
+  // Replace the handleStartingPointChange function with this updated version
   const handleStartingPointChange = (e) => {
     if (isCompleted) return
 
@@ -1027,7 +1203,106 @@ function UpdateInstruction() {
 
     // If both starting point and destination are selected, fetch the rate
     if (startingPoint && formData.destination) {
-      fetchRate(startingPoint, formData.destination)
+      // Force a fresh rate fetch when route changes
+      console.log("Route changed, fetching new rates...")
+
+      // Reset rates to 0 immediately when changing route
+      setRates({
+        six_meter: 0,
+        twelve_meter: 0,
+        subbie_six_meter: 0,
+        subbie_twelve_meter: 0,
+      })
+
+      // Update driver rates to 0 immediately
+      // Force update driver rates based on the new rates
+      if (drivers.length > 0) {
+        const updatedDrivers = drivers.map((driver) => {
+          const newDriver = { ...driver }
+
+          // Check if driver is a subcontractor (roleid = 6)
+          const isSubcontractor = employeeDrivers.find((d) => d.userid.toString() === driver.driverid)?.roleid === 6
+
+          // Check if this route has no rates
+          const routeKey = `${startingPoint}-${formData.destination}`
+          if (noRatesRoutes.has(routeKey)) {
+            newDriver.driverRate = "0"
+            console.log(`Using 0 rate for driver ${driver.driverid} because route ${routeKey} has no rates`)
+            return newDriver
+          }
+
+          if (newDriver.container_type === "12m") {
+            newDriver.driverRate = isSubcontractor
+              ? rates.subbie_twelve_meter
+                ? rates.subbie_twelve_meter.toString()
+                : "0"
+              : rates.twelve_meter
+                ? rates.twelve_meter.toString()
+                : "0"
+          } else if (newDriver.container_type === "abnormal") {
+            // For abnormal container types, keep existing rate or set to 0
+            if (!newDriver.driverRate) {
+              newDriver.driverRate = "0"
+            }
+            newDriver.isAbnormal = true // Mark as abnormal to allow editing
+          } else {
+            newDriver.driverRate = isSubcontractor
+              ? rates.subbie_six_meter
+                ? rates.subbie_six_meter.toString()
+                : "0"
+              : rates.six_meter
+                ? rates.six_meter.toString()
+                : "0"
+          }
+
+          return newDriver
+        })
+
+        setDrivers(updatedDrivers)
+      }
+
+      // Then fetch new rates
+      fetchRate(startingPoint, formData.destination).then(() => {
+        console.log("Rates updated after starting point change")
+
+        // Force update driver rates based on the new rates
+        if (drivers.length > 0) {
+          const updatedDrivers = drivers.map((driver) => {
+            const newDriver = { ...driver }
+
+            // Check if driver is a subcontractor (roleid = 6)
+            const isSubcontractor = employeeDrivers.find((d) => d.userid.toString() === driver.driverid)?.roleid === 6
+
+            if (newDriver.container_type === "12m") {
+              newDriver.driverRate = isSubcontractor
+                ? rates.subbie_twelve_meter
+                  ? rates.subbie_twelve_meter.toString()
+                  : "0"
+                : rates.twelve_meter
+                  ? rates.twelve_meter.toString()
+                  : "0"
+            } else if (newDriver.container_type === "abnormal") {
+              // For abnormal container types, keep existing rate or set to 0
+              if (!newDriver.driverRate) {
+                newDriver.driverRate = "0"
+              }
+              newDriver.isAbnormal = true // Mark as abnormal to allow editing
+            } else {
+              newDriver.driverRate = isSubcontractor
+                ? rates.subbie_six_meter
+                  ? rates.subbie_six_meter.toString()
+                  : "0"
+                : rates.six_meter
+                  ? rates.six_meter.toString()
+                  : "0"
+            }
+
+            return newDriver
+          })
+
+          setDrivers(updatedDrivers)
+        }
+      })
     }
 
     // Update the current leg if one is selected
@@ -1041,7 +1316,8 @@ function UpdateInstruction() {
     }
   }
 
-  // Update the handleDestinationChange function to track edits
+  // Replace the handleDestinationChange function with this updated version
+  // Replace the handleDestinationChange function with this updated version
   const handleDestinationChange = (e) => {
     if (isCompleted) return
 
@@ -1062,7 +1338,105 @@ function UpdateInstruction() {
 
     // If both starting point and destination are selected, fetch the rate
     if (formData.startingPoint && destination) {
-      fetchRate(formData.startingPoint, destination)
+      // Force a fresh rate fetch when route changes
+      console.log("Route changed, fetching new rates...")
+
+      // Reset rates to 0 immediately when changing route
+      setRates({
+        six_meter: 0,
+        twelve_meter: 0,
+        subbie_six_meter: 0,
+        subbie_twelve_meter: 0,
+      })
+
+      // Update driver rates to 0 immediately
+      // Force update driver rates based on the new rates
+      if (drivers.length > 0) {
+        const updatedDrivers = drivers.map((driver) => {
+          const newDriver = { ...driver }
+
+          // Check if driver is a subcontractor (roleid = 6)
+          const isSubcontractor = employeeDrivers.find((d) => d.userid.toString() === driver.driverid)?.roleid === 6
+
+          // Check if this route has no rates
+          const routeKey = `${formData.startingPoint}-${destination}`
+          if (noRatesRoutes.has(routeKey)) {
+            newDriver.driverRate = "0"
+            console.log(`Using 0 rate for driver ${driver.driverid} because route ${routeKey} has no rates`)
+            return newDriver
+          }
+
+          if (newDriver.container_type === "12m") {
+            newDriver.driverRate = isSubcontractor
+              ? rates.subbie_twelve_meter
+                ? rates.subbie_twelve_meter.toString()
+                : "0"
+              : rates.twelve_meter
+                ? rates.twelve_meter.toString()
+                : "0"
+          } else if (newDriver.container_type === "abnormal") {
+            // For abnormal container types, keep existing rate or set to 0
+            if (!newDriver.driverRate) {
+              newDriver.driverRate = "0"
+            }
+            newDriver.isAbnormal = true // Mark as abnormal to allow editing
+          } else {
+            newDriver.driverRate = isSubcontractor
+              ? rates.subbie_six_meter
+                ? rates.subbie_six_meter.toString()
+                : "0"
+              : rates.six_meter
+                ? rates.six_meter.toString()
+                : "0"
+          }
+
+          return newDriver
+        })
+
+        setDrivers(updatedDrivers)
+      }
+
+      fetchRate(formData.startingPoint, destination).then(() => {
+        console.log("Rates updated after destination change")
+
+        // Force update driver rates based on the new rates
+        if (drivers.length > 0) {
+          const updatedDrivers = drivers.map((driver) => {
+            const newDriver = { ...driver }
+
+            // Check if driver is a subcontractor (roleid = 6)
+            const isSubcontractor = employeeDrivers.find((d) => d.userid.toString() === driver.driverid)?.roleid === 6
+
+            if (newDriver.container_type === "12m") {
+              newDriver.driverRate = isSubcontractor
+                ? rates.subbie_twelve_meter
+                  ? rates.subbie_twelve_meter.toString()
+                  : "0"
+                : rates.twelve_meter
+                  ? rates.twelve_meter.toString()
+                  : "0"
+            } else if (newDriver.container_type === "abnormal") {
+              // For abnormal container types, keep existing rate or set to 0
+              if (!newDriver.driverRate) {
+                newDriver.driverRate = "0"
+              }
+              newDriver.isAbnormal = true // Mark as abnormal to allow editing
+            } else {
+              newDriver.driverRate = isSubcontractor
+                ? rates.subbie_six_meter
+                  ? rates.subbie_six_meter.toString()
+                  : "0"
+                : rates.six_meter
+                  ? rates.six_meter.toString()
+                  : "0"
+            }
+
+            return newDriver
+          })
+
+          setDrivers(updatedDrivers)
+        }
+      })
     }
 
     // Update the current leg if one is selected
@@ -1217,7 +1591,7 @@ function UpdateInstruction() {
   }
 
   // Replace the handleFinalizeClick function with this updated version
-  const handleFinalizeClick = async () => {
+  const handleFinaliseClick = async () => {
     if (legs.length === 0) {
       // No legs, just proceed
       navigateToDocuments()
@@ -1407,7 +1781,14 @@ function UpdateInstruction() {
   //   console.log("Checking for duplicate driver:", driverToCheck)
 
   //   // Create a signature for the driver we're checking
-  //   const driverSignature = `${driverToCheck.driverid}-${driverToCheck.truckregnumber}-${driverToCheck.containernumber}-${driverToCheck.date}`
+  //   const driverSignature = `${driverToCheck.driverid}-${driverToCheck.truckregnumber}-${\
+  // driverToCheck.containernumber
+  // }
+  // ;-$
+  // {
+  //   driverToCheck.date
+  // }
+  // ;`
   //   console.log("Driver signature:", driverSignature)
 
   //   // First check within the current leg's drivers in memory
@@ -1415,7 +1796,9 @@ function UpdateInstruction() {
   //     // Skip the driver we're currently checking
   //     if (d.id === driverToCheck.id) return false
 
-  //     const existingSignature = `${d.driverid}-${d.truckregnumber}-${d.containernumber}-${d.date}`
+  //     const existingSignature = `
+  //     ${d.driverid}-${d.truckregnumber}-${d.containernumber}-${d.date}
+  //     `;
   //     const isDuplicate = existingSignature === driverSignature
 
   //     if (isDuplicate) {
@@ -1435,7 +1818,8 @@ function UpdateInstruction() {
   //   if (instructionId && currentLagIndex !== null && legs[currentLagIndex].id) {
   //     try {
   //       console.log("Checking database for duplicates in current leg...")
-  //       const response = await fetch(`http://localhost:5000/legs/${instructionId}`)
+  //       const response = await fetch(`
+  //       localhost:5000/legs/${instructionId}`)
 
   //       if (!response.ok) {
   //         console.error("Error fetching legs for duplicate check:", response.statusText)
@@ -1536,7 +1920,33 @@ function UpdateInstruction() {
       setTimeout(() => setSavedMessage(""), 5000)
       return
     }
+    if (instructionId) {
+      try {
+        const instructionResponse = await fetch(`http://localhost:5000/instructions/${instructionId}`)
+        if (instructionResponse.ok) {
+          const instructionData = await instructionResponse.json()
 
+          if (instructionData.status === "New") {
+            // Update the status to "In Progress"
+            const updateStatusResponse = await fetch(`http://localhost:5000/instructions/${instructionId}/status`, {
+              method: "PUT",
+              headers: {
+                "Content-Type": "application/json",
+              },
+              body: JSON.stringify({ status: "In Progress" }),
+            })
+
+            if (updateStatusResponse.ok) {
+              console.log(`Updated instruction ${instructionId} status from New to In Progress`)
+              setInstructionStatus("In Progress")
+            }
+          }
+        }
+      } catch (statusError) {
+        console.error("Error updating instruction status:", statusError)
+        // Don't throw the error, just log it to avoid interrupting the main flow
+      }
+    }
     // Validate required fields
     if (!formData.startingPoint || !formData.destination) {
       setSavedMessage("Starting point and destination are required")
@@ -1625,21 +2035,26 @@ function UpdateInstruction() {
         drivers: drivers.map((driver) => {
           let driverRateToSave = driver.driverRate || "0"
           if (!driver.driverRate || driver.driverRate === "") {
+            // Check if driver is a subcontractor (roleid = 6)
+            const isSubcontractor = employeeDrivers.find((d) => d.userid.toString() === driver.driverid)?.roleid === 6
+
             if (driver.container_type === "12m") {
-              driverRateToSave = rates.twelve_meter.toString()
+              driverRateToSave = isSubcontractor ? rates.subbie_twelve_meter.toString() : rates.twelve_meter.toString()
             } else if (driver.container_type === "abnormal") {
-              driverRateToSave = driver.driverRate || "0"
+              driverRateToSave = driver.driverRate || "0" // Use user input for abnormal
             } else {
-              driverRateToSave = rates.six_meter.toString()
+              // Default to appropriate 6m rate
+              driverRateToSave = isSubcontractor ? rates.subbie_six_meter.toString() : rates.six_meter.toString()
             }
           }
 
+          // Log individual driver rate for debugging
           console.log(
             `Driver ${driver.driverid} with container type ${driver.container_type} has rate: ${driverRateToSave}`,
           )
 
           return {
-            id: driver.id,
+            id: driver.id, // Include the driver ID if it exists
             driverid: driver.driverid || null,
             truckregnumber: driver.truckregnumber || null,
             containernumber: driver.containernumber || null,
@@ -1875,33 +2290,132 @@ function UpdateInstruction() {
   }, [legs, instructionContainers, instructionId])
 
   // Add this useEffect after the other useEffects
+  // useEffect(() => {
+  //   // This effect runs when currentLagIndex changes
+  //   if (currentLagIndex !== null && legs.length > 0 && legs[currentLagIndex]) {
+  //     const currentLeg = legs[currentLagIndex]
+
+  //     // If this leg has drivers, ensure they're properly loaded with all fields
+  //     if (currentLeg.drivers && currentLeg.drivers.length > 0) {
+  //       // Make a deep copy to ensure we don't lose any fields
+  //       const completeDrivers = currentLeg.drivers.map((driver) => ({
+  //         ...driver,
+  //         // Ensure these critical fields are preserved
+  //         container_type: driver.container_type || "",
+  //         driverRate: driver.driverRate || "",
+  //         full_name:
+  //           driver.full_name ||
+  //           (driver.driver_name && driver.driver_surname
+  //             ? `${driver.driver_name} ${driver.driver_surname}`
+  //             : driver.driverid
+  //               ? `Driver ID: ${driver.driverid}`
+  //               : "Unknown Driver"),
+  //         isAbnormal: driver.container_type === "abnormal" || driver.isAbnormal,
+  //       }))
+
+  //       setDrivers(completeDrivers)
+  //     }
+  //   }
+  // }, [currentLagIndex, legs])
+  // Add this useEffect to update driver rates whenever the rates state changes
   useEffect(() => {
-    // This effect runs when currentLagIndex changes
-    if (currentLagIndex !== null && legs.length > 0 && legs[currentLagIndex]) {
-      const currentLeg = legs[currentLagIndex]
+    // Only update if we have drivers and rates
+    if (drivers.length > 0 && (rates.six_meter !== undefined || rates.twelve_meter !== undefined)) {
+      console.log("Rates changed, updating driver rates:", rates)
 
-      // If this leg has drivers, ensure they're properly loaded with all fields
-      if (currentLeg.drivers && currentLeg.drivers.length > 0) {
-        // Make a deep copy to ensure we don't lose any fields
-        const completeDrivers = currentLeg.drivers.map((driver) => ({
-          ...driver,
-          // Ensure these critical fields are preserved
-          container_type: driver.container_type || "",
-          driverRate: driver.driverRate || "",
-          full_name:
-            driver.full_name ||
-            (driver.driver_name && driver.driver_surname
-              ? `${driver.driver_name} ${driver.driver_surname}`
-              : driver.driverid
-                ? `Driver ID: ${driver.driverid}`
-                : "Unknown Driver"),
-          isAbnormal: driver.container_type === "abnormal" || driver.isAbnormal,
-        }))
+      const updatedDrivers = [...drivers]
+      let ratesUpdated = false
 
-        setDrivers(completeDrivers)
+      updatedDrivers.forEach((driver) => {
+        if (driver.container_type === "12m") {
+          const newRate = rates.twelve_meter ? rates.twelve_meter.toString() : "0"
+          if (driver.driverRate !== newRate) {
+            driver.driverRate = newRate
+            ratesUpdated = true
+          }
+        } else if (driver.container_type === "abnormal") {
+          // For abnormal container types, keep existing rate or set to 0
+          if (!driver.driverRate) {
+            driver.driverRate = "0"
+            ratesUpdated = true
+          }
+          driver.isAbnormal = true // Mark as abnormal to allow editing
+        } else {
+          const newRate = rates.six_meter ? rates.six_meter.toString() : "0"
+          if (driver.driverRate !== newRate) {
+            driver.driverRate = newRate
+            ratesUpdated = true
+          }
+        }
+      })
+
+      if (ratesUpdated) {
+        console.log("Updated driver rates based on new rates:", updatedDrivers)
+        setDrivers(updatedDrivers)
       }
     }
-  }, [currentLagIndex, legs])
+  }, [rates])
+
+  // Add this useEffect to ensure driver rates are properly updated when rates change
+  // Replace the existing useEffect for rates with this one
+  useEffect(() => {
+    // Only update if we have drivers and rates
+    if (drivers.length > 0) {
+      console.log("Rates changed, updating driver rates:", rates)
+
+      // Create a new array instead of modifying the existing one
+      const updatedDrivers = drivers.map((driver) => {
+        const newDriver = { ...driver }
+
+        // Check if driver is a subcontractor (roleid = 6)
+        const isSubcontractor = employeeDrivers.find((d) => d.userid.toString() === driver.driverid)?.roleid === 6
+        console.log(`Driver ${driver.driverid} is subcontractor: ${isSubcontractor}`)
+
+        // Check if current route has no rates
+        if (formData.startingPoint && formData.destination) {
+          const routeKey = `${formData.startingPoint}-${formData.destination}`
+          if (noRatesRoutes.has(routeKey)) {
+            newDriver.driverRate = "0"
+            console.log(`Using 0 rate for driver ${driver.driverid} because route ${routeKey} has no rates`)
+            return newDriver
+          }
+        }
+
+        if (newDriver.container_type === "12m") {
+          newDriver.driverRate = isSubcontractor
+            ? rates.subbie_twelve_meter
+              ? rates.subbie_twelve_meter.toString()
+              : "0"
+            : rates.twelve_meter
+              ? rates.twelve_meter.toString()
+              : "0"
+        } else if (newDriver.container_type === "abnormal") {
+          // For abnormal container types, keep existing rate or set to 0
+          if (!newDriver.driverRate) {
+            newDriver.driverRate = "0"
+          }
+          newDriver.isAbnormal = true // Mark as abnormal to allow editing
+        } else {
+          newDriver.driverRate = isSubcontractor
+            ? rates.subbie_six_meter
+              ? rates.subbie_six_meter.toString()
+              : "0"
+            : rates.six_meter
+              ? rates.six_meter.toString()
+              : "0"
+        }
+
+        console.log(`Updated driver ${driver.driverid} rate to ${newDriver.driverRate}`)
+        return newDriver
+      })
+
+      // Only update state if there are actual changes
+      if (JSON.stringify(updatedDrivers) !== JSON.stringify(drivers)) {
+        console.log("Updated driver rates based on new rates:", updatedDrivers)
+        setDrivers(updatedDrivers)
+      }
+    }
+  }, [rates, employeeDrivers, formData.startingPoint, formData.destination, noRatesRoutes])
 
   return (
     <div className="min-h-screen bg-white" style={{ paddingBottom: 200 }}>
@@ -1942,7 +2456,7 @@ function UpdateInstruction() {
 
       {legs.length > 0 && (
         <div className="finalise-btn">
-          <button className="finalise-btn2" onClick={handleFinalizeClick}>
+          <button className="finalise-btn2" onClick={handleFinaliseClick}>
             {isCompleted ? "Documents" : "Finalise"}
           </button>
         </div>
@@ -2033,8 +2547,10 @@ function UpdateInstruction() {
 
             {drivers && drivers.length > 0 ? (
               <>
-                {drivers.map((entry, index) => (
-                  <div
+                {drivers.map(
+                  (entry, index) =>
+                    (
+                      <div
                     key={entry.id || index}
                     style={{
                       marginBottom: "1rem",
@@ -2064,6 +2580,7 @@ function UpdateInstruction() {
                           value={entry.driverid || ""}
                           onChange={(e) => {
                             if (isCompleted) return
+                            const driverId = e.target.value
                             const updatedDrivers = [...drivers]
                             updatedDrivers[index].driverid = e.target.value
 
@@ -2071,32 +2588,63 @@ function UpdateInstruction() {
                               const selectedDriver = employeeDrivers.find((d) => d.userid.toString() === e.target.value)
                               if (selectedDriver) {
                                 updatedDrivers[index].full_name = `${selectedDriver.name} ${selectedDriver.surname}`
+
+                                // Check if this is a subcontractor (roleid 6)
+                                const isSubcontractor = selectedDriver.roleid === 6
+                                console.log(`Selected driver ${driverId} is subcontractor: ${isSubcontractor}`)
+
+                                // If we already have a container type, update the rate based on the new driver type
+                                if (updatedDrivers[index].container_type) {
+                                  if (updatedDrivers[index].container_type === "12m") {
+                                    updatedDrivers[index].driverRate = isSubcontractor
+                                      ? rates.subbie_twelve_meter
+                                        ? rates.subbie_twelve_meter.toString()
+                                        : "0"
+                                      : rates.twelve_meter
+                                        ? rates.twelve_meter.toString()
+                                        : "0"
+                                  } else if (updatedDrivers[index].container_type === "abnormal") {
+                                    // For abnormal container types, keep existing rate or set to 0
+                                    if (!updatedDrivers[index].driverRate) {
+                                      updatedDrivers[index].driverRate = "0"
+                                    }
+                                    updatedDrivers[index].isAbnormal = true // Mark as abnormal to allow editing
+                                  } else {
+                                    updatedDrivers[index].driverRate = isSubcontractor
+                                      ? rates.subbie_six_meter
+                                        ? rates.subbie_six_meter.toString()
+                                        : "0"
+                                      : rates.six_meter
+                                        ? rates.six_meter.toString()
+                                        : "0"
+                                  }
+                                  console.log(`Updated rate for driver ${driverId} to ${updatedDrivers[index].driverRate}`)
+                                }
+                              } else {
+                                updatedDrivers[index].full_name = ""
                               }
-                            } else {
-                              updatedDrivers[index].full_name = ""
-                            }
 
-                            // Mark this driver field as edited
-                            setEditedFields((prev) => ({
-                              ...prev,
-                              drivers: {
-                                ...prev.drivers,
-                                [updatedDrivers[index].id]: true,
-                              },
-                            }))
+                              // Mark this driver field as edited
+                              setEditedFields((prev) => ({
+                                ...prev,
+                                drivers: {
+                                  ...prev.drivers,
+                                  [updatedDrivers[index].id]: true,
+                                },
+                              }))
 
-                            setDrivers(updatedDrivers)
-                            console.log(`Updated driver at index ${index}:`, updatedDrivers[index])
-                          }}
-                          disabled={isCompleted}
-                        >
-                          <option value="">Select driver</option>
-                          {employeeDrivers.map((driver) => (
-                            <option key={driver.userid} value={driver.userid.toString()}>
-                              {driver.name} {driver.surname}
-                            </option>
-                          ))}
-                        </select>
+                              setDrivers(updatedDrivers)
+                              console.log(`Updated driver at index ${index}:`, updatedDrivers[index])
+                            }}
+                             }   disabled={isCompleted}
+                          >
+                            <option value="">Select driver</option>
+                            {employeeDrivers.map((driver) => (
+                              <option key={driver.userid} value={driver.userid.toString()}>
+                                {driver.name} {driver.surname}
+                              </option>
+                            ))}
+                          </select>
                       </div>
 
                       <div style={{ width: "16.666%", padding: "0 0.5rem", marginBottom: "0.75rem" }}>
@@ -2200,27 +2748,35 @@ function UpdateInstruction() {
 
                             // Auto-fill container type from the container details map
                             if (containerValue && containerDetailsMap[containerValue]) {
-                              updatedDrivers[index].container_type = containerDetailsMap[containerValue].type || ""
+                              // Normalize container type by trimming spaces and converting to lowercase for comparison
+                              const containerType = (containerDetailsMap[containerValue].type || "").trim()
+                              updatedDrivers[index].container_type = containerType
 
-                              // Store current rates for debugging
-                              console.log("Current rates:", rates)
-                              console.log("Container type:", containerDetailsMap[containerValue].type)
+                              // Check if driver is a subcontractor (roleid = 6)
+                              const isSubcontractor = employeeDrivers.find((d) => d.userid.toString() === updatedDrivers[index].driverid)?.roleid === 6
+                              console.log(`Driver ${updatedDrivers[index].driverid} is subcontractor: ${isSubcontractor}`)
 
                               // Make sure rates are valid before using them
-                              const sixMeterRate = rates && rates.six_meter ? rates.six_meter.toString() : "0"
-                              const twelveMeterRate = rates && rates.twelve_meter ? rates.twelve_meter.toString() : "0"
+                              const sixMeterRate = isSubcontractor
+                                ? (rates && rates.subbie_six_meter ? rates.subbie_six_meter.toString() : "0")
+                                : (rates && rates.six_meter ? rates.six_meter.toString() : "0")
+
+                              const twelveMeterRate = isSubcontractor
+                                ? (rates && rates.subbie_twelve_meter ? rates.subbie_twelve_meter.toString() : "0")
+                                : (rates && rates.twelve_meter ? rates.twelve_meter.toString() : "0")
 
                               console.log("Using rates - 6m:", sixMeterRate, "12m:", twelveMeterRate)
 
-                              if (containerDetailsMap[containerValue].type === "12m") {
+                              // Check for "abnormal" with case-insensitive comparison and trim spaces
+                              if (containerType.toLowerCase() === "abnormal") {
+                                // For abnormal container types, keep existing rate if available
+                                updatedDrivers[index].driverRate = updatedDrivers[index].driverRate || twelveMeterRate
+                                updatedDrivers[index].isAbnormal = true
+                                console.log("Setting abnormal rate (editable):", updatedDrivers[index].driverRate)
+                              } else if (containerType === "12m") {
                                 updatedDrivers[index].driverRate = twelveMeterRate
                                 updatedDrivers[index].isAbnormal = false
                                 console.log("Setting 12m rate:", twelveMeterRate)
-                              } else if (containerDetailsMap[containerValue].type === "abnormal") {
-                                // For abnormal container types, keep existing rate if available
-                                updatedDrivers[index].driverRate = updatedDrivers[index].driverRate || "0"
-                                updatedDrivers[index].isAbnormal = true
-                                console.log("Setting abnormal rate (editable):", updatedDrivers[index].driverRate)
                               } else {
                                 // Default to 6m rate
                                 updatedDrivers[index].driverRate = sixMeterRate
@@ -2289,7 +2845,9 @@ function UpdateInstruction() {
                         <label
                           style={{ display: "block", color: "#374151", fontWeight: "500", marginBottom: "0.25rem" }}
                         >
-                          Driver Rate
+                          {employeeDrivers.find((d) => d.userid.toString() === entry.driverid)?.roleid === 6
+                            ? "Subbie Rate"
+                            : "Driver Rate"}
                         </label>
                         <input
                           type="text"
@@ -2345,15 +2903,15 @@ function UpdateInstruction() {
                             value={
                               entry.date
                                 ? (() => {
-                                    // Create a date object from the entry date
-                                    const date = new Date(entry.date)
-                                    // Get year, month, and day components
-                                    const year = date.getFullYear()
-                                    const month = String(date.getMonth() + 1).padStart(2, "0") // Months are 0-indexed
-                                    const day = String(date.getDate()).padStart(2, "0")
-                                    // Format as YYYY-MM-DD for the date input
-                                    return `${year}-${month}-${day}`
-                                  })()
+                                  // Create a date object from the entry date
+                                  const date = new Date(entry.date)
+                                  // Get year, month, and day components
+                                  const year = date.getFullYear()
+                                  const month = String(date.getMonth() + 1).padStart(2, "0") // Months are 0-indexed
+                                  const day = String(date.getDate()).padStart(2, "0")
+                                  // Format as YYYY-MM-DD for the date input
+                                  return `${year}-${month}-${day}`
+                                })()
                                 : ""
                             }
                             onChange={(e) => {
@@ -2417,7 +2975,8 @@ function UpdateInstruction() {
                       </div>
                     </div>
                   </div>
-                ))}
+                    ),
+                )}
               </>
             ) : (
               <p className="text-gray-500 text-center py-4">

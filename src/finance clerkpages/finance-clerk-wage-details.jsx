@@ -281,6 +281,53 @@ const FinanceClerkWageDetails = () => {
       // Calculate total amount
       const totalAmount = (Number.parseFloat(employeeInfo?.base_salary) || 0) + totalLegsAmount
 
+      // Fetch deductions data
+      const deductionsResponse = await fetch(
+        `http://localhost:5000/api/employee-deductions/${cleanId}?month=${encodeURIComponent(selectedMonth)}&year=${encodeURIComponent(selectedYear)}`,
+      )
+
+      let deductions = []
+      let totalDeductionsAmount = 0
+
+      if (deductionsResponse.ok) {
+        const deductionsData = await deductionsResponse.json()
+        console.log("Deductions data for PDF:", deductionsData)
+
+        // Process deductions data
+        const deductionFields = [
+          { key: "deduction_income_tax", label: "Income Tax" },
+          { key: "deduction_other_deductions", label: "Other Deductions" },
+          { key: "deduction_uif", label: "UIF" },
+          { key: "deduction_bonus", label: "Bonus" },
+          { key: "deduction_savings", label: "Savings" },
+          { key: "deduction_loan", label: "Loan Repayment" },
+          { key: "deduction_damage", label: "Damage Recovery" },
+        ]
+
+        deductionFields.forEach((field) => {
+          if (deductionsData && deductionsData[field.key]) {
+            const amount = Number.parseFloat(deductionsData[field.key]) || 0
+            if (amount > 0) {
+              totalDeductionsAmount += amount
+              deductions.push({
+                description: field.label,
+                amount: `R ${amount.toFixed(2)}`,
+              })
+            }
+          }
+        })
+      }
+
+      // If no deductions found, use default values
+      if (deductions.length === 0) {
+        deductions = [
+          { description: "Income Tax", amount: "R 1500.00" },
+          { description: "UIF", amount: "R 200.00" },
+          { description: "Other Deductions", amount: "R 300.00" },
+        ]
+        totalDeductionsAmount = 2000
+      }
+
       // Create a new PDF document
       const doc = new jsPDF()
 
@@ -298,10 +345,10 @@ const FinanceClerkWageDetails = () => {
       doc.setTextColor(0, 0, 0)
       doc.setFontSize(16)
       doc.setFont("helvetica", "bold")
-      doc.text("Whizz Away Logistics", 150, 10, { align: "right" })
+      doc.text("KSM Carriers", 150, 10, { align: "right" })
       doc.setFontSize(10)
       doc.setFont("helvetica", "normal")
-      doc.text("info@whizzaway.com", 150, 15, { align: "right" })
+      doc.text("accounts@ksmcarriers.co.za", 150, 15, { align: "right" })
       doc.text("+27 31 123 4567", 150, 20, { align: "right" })
 
       // Add title
@@ -380,8 +427,46 @@ const FinanceClerkWageDetails = () => {
         yPos += 10
       })
 
+      // Add deductions table to PDF
+      yPos += 20
+      doc.setFontSize(12)
+      doc.setFont("helvetica", "bold")
+
+      // Deductions table header
+      doc.setFillColor(184, 209, 243) // #b8d1f3
+      doc.rect(20, yPos, 85, 10, "F")
+      doc.rect(105, yPos, 85, 10, "F")
+      doc.text("Deductions", 25, yPos + 7)
+      doc.text("Amount", 180, yPos + 7, { align: "right" })
+
+      // Deductions table rows
+      yPos += 10
+      deductions.forEach((item, index) => {
+        const rowColor = index % 2 === 0 ? 255 : 249 // Alternate white and light gray
+        doc.setFillColor(rowColor, rowColor, rowColor)
+        doc.rect(20, yPos, 85, 10, "F")
+        doc.rect(105, yPos, 85, 10, "F")
+
+        doc.setFont("helvetica", "normal")
+        doc.text(item.description, 25, yPos + 7)
+        doc.text(item.amount, 180, yPos + 7, { align: "right" })
+
+        yPos += 10
+      })
+
+      // Total deductions row
+      doc.setFillColor(240, 240, 240) // #f0f0f0
+      doc.rect(20, yPos, 85, 10, "F")
+      doc.rect(105, yPos, 85, 10, "F")
+      doc.setFont("helvetica", "bold")
+      doc.text("Total Deductions", 25, yPos + 7)
+      doc.text(`R ${totalDeductionsAmount.toFixed(2)}`, 180, yPos + 7, { align: "right" })
+
       // Net Pay table
-      yPos += 5
+      yPos += 20
+
+      // Update the net pay calculation to include deductions
+      const netPayAmount = totalAmount - totalDeductionsAmount
 
       // Net Pay header
       doc.setFillColor(184, 209, 243) // #b8d1f3
@@ -398,7 +483,7 @@ const FinanceClerkWageDetails = () => {
       doc.rect(105, yPos, 85, 10, "F")
       doc.setFont("helvetica", "bold")
       doc.text("Net Pay", 25, yPos + 7)
-      doc.text(`R ${totalAmount.toFixed(2)}`, 180, yPos + 7, { align: "right" })
+      doc.text(`R ${netPayAmount.toFixed(2)}`, 180, yPos + 7, { align: "right" })
 
       // Footer
       yPos += 20
@@ -499,9 +584,9 @@ const FinanceClerkWageDetails = () => {
         >
           <thead>
             <tr style={{ backgroundColor: "#87CEEB", padding: "12px 10px", textAlign: "center" }}>
-              <th style={{textAlign:"center"}}>View Legs</th>
-              <th style={{textAlign:"center"}}>Date</th>
-              <th style={{textAlign:"center"}}>Action</th>
+              <th style={{ textAlign: "center" }}>View Legs</th>
+              <th style={{ textAlign: "center" }}>Date</th>
+              <th style={{ textAlign: "center" }}>Action</th>
             </tr>
           </thead>
           <tbody>
@@ -514,11 +599,11 @@ const FinanceClerkWageDetails = () => {
             ) : (
               <tr style={{ backgroundColor: "white", padding: "12px 10px", borderBottom: "1px solid #eee" }}>
                 <td>
-                  <button className="downloadwage1" onClick={handleViewLegs} >
+                  <button className="downloadwage1" onClick={handleViewLegs}>
                     View
                   </button>
                 </td>
-                <td style={{textAlign:"center"}}>{formatDate(selectedMonth, selectedYear)}</td>
+                <td style={{ textAlign: "center" }}>{formatDate(selectedMonth, selectedYear)}</td>
                 <td style={{ display: "flex", gap: "10px" }}>
                   <button
                     onClick={handleViewWageSlip}

@@ -5,9 +5,11 @@ import { useNavigate } from "react-router-dom"
 
 const FinanceClerkWage = () => {
   const [drivers, setDrivers] = useState([])
+  const [userRole, setUserRole] = useState(null)
   const navigate = useNavigate()
 
   useEffect(() => {
+    // Fetch drivers data
     fetch("http://localhost:5000/employees/drivers")
       .then((response) => response.json())
       .then((data) => {
@@ -15,6 +17,10 @@ const FinanceClerkWage = () => {
         console.log(data)
       })
       .catch((error) => console.error("Error fetching drivers:", error))
+    
+    // Get user role from localStorage if available
+    const roleId = localStorage.getItem("userRoleId")
+    setUserRole(roleId ? parseInt(roleId) : null)
   }, [])
 
   const handleViewClick = (driver) => {
@@ -22,15 +28,33 @@ const FinanceClerkWage = () => {
       state: {
         name: `${driver.name} ${driver.surname}`,
         // Pass the dashboard route to the details page
-        returnDashboard: localStorage.getItem("dashboardRoute") || "/FDashboard",
+        returnDashboard: getDashboardRouteByRole(),
       },
     })
   }
 
+  // Function to determine the correct dashboard based on role
+  const getDashboardRouteByRole = () => {
+    // Use the stored dashboard route if available
+    const storedDashboard = localStorage.getItem("dashboardRoute")
+    if (storedDashboard) return storedDashboard
+    
+    // Fallback to role-based routing if no stored route
+    switch (userRole) {
+      case 1:
+        return "/Dashboard" // Business Manager
+      case 3:
+        return "/FDashboard" // Finance Clerk
+      case 4:
+        return "/DirectorDashboard" // Director
+      default:
+        return "/FDashboard" // Default to Finance Dashboard
+    }
+  }
+
   const handleBackClick = () => {
-    // Get the dashboard route from localStorage, default to FDashboard if not found
-    const dashboardRoute = localStorage.getItem("dashboardRoute") || "/FDashboard"
-    navigate(dashboardRoute)
+    // Navigate to the appropriate dashboard based on role
+    navigate(getDashboardRouteByRole())
   }
 
   return (

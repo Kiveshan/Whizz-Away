@@ -29,7 +29,7 @@ const PORT = process.env.PORT || 5000
 
 // Generate a secure, random secret key
 const secretKey = crypto.randomBytes(64).toString("hex")
-console.log("Generated secret key:", secretKey) // Log the secret key (for debugging)
+console.log("Generated secret key:", secretKey) 
 
 // Create a PostgreSQL connection pool
 const pool = new Pool({
@@ -1803,7 +1803,6 @@ app.get("/api/employee/:id", async (req, res) => {
     if (client) client.release();
   }
 });
-// Find this endpoint in server.js (around line 2500-2600)
 app.get("/api/employee-deductions/:employeeId", async (req, res) => {
   const { employeeId } = req.params;
   const { month, year } = req.query;
@@ -1856,14 +1855,14 @@ app.get("/api/employee-deductions/:employeeId", async (req, res) => {
     if (result.rows.length === 0) {
       // If no data found, return default values instead of 404
       return res.json({
-        deduction_income_tax: 1500,
-        deduction_other_deductions: 300,
-        deduction_uif: 200,
+        deduction_income_tax: 0,
+        deduction_other_deductions: 0,
+        deduction_uif: 0,
         deduction_bonus: 0,
         deduction_savings: 0,
         deduction_loan: 0,
         deduction_damage: 0,
-        total_deductions: 2000
+        total_deductions: 0
       });
     }
     
@@ -3035,6 +3034,70 @@ app.get("/employees/drivers", async (req, res) => {
   } catch (err) {
     console.error("Error fetching drivers:", err)
     res.status(500).send("Server Error")
+  }
+})
+app.get("/employees/driverssub", async (req, res) => {
+  console.log("Route /employees/drivers was accessed")
+
+  try {
+    const result = await pool.query(
+      "SELECT userid, name, surname, roleid FROM m5_employee WHERE roleid IN (5, 6) ORDER BY name, surname",
+    )
+
+    console.log("Drivers found:", result.rows)
+
+    if (result.rows.length === 0) {
+      console.log("No drivers found in the m5_employee table")
+    } else {
+      console.log(`Found ${result.rows.length} drivers`)
+    }
+
+    res.status(200).json(result.rows)
+  } catch (err) {
+    console.error("Error fetching drivers:", err)
+    res.status(500).send("Server Error")
+  }
+})
+// New endpoint that includes subcontractor rates
+app.get("/api/driver-rates-with-subbie", async (req, res) => {
+  const { startingpoint, destination, containerType } = req.query
+  console.log(`Route /api/driver-rates-with-subbie was accessed with params:`, req.query)
+
+  if (!startingpoint || !destination) {
+    return res.status(400).json({ error: "Starting point and destination are required" })
+  }
+
+  try {
+    const result = await pool.query(
+      `SELECT 
+        m5ratekey, 
+        startingpoint, 
+        destination, 
+        driver_rate,
+        driver_six_meter_rate, 
+        driver_twelve_meter_rate,
+        subie_six_meter_rate,
+        subie_twelve_meter_rate
+      FROM 
+        m5_driver_rate 
+      WHERE 
+        startingpoint = $1 AND destination = $2`,
+      [startingpoint, destination],
+    )
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({
+        error: "Rate not found for the given route",
+        message: `No rate found for route from ${startingpoint} to ${destination}`,
+      })
+    }
+
+    const rateData = result.rows[0]
+
+    res.status(200).json(rateData)
+  } catch (err) {
+    console.error(`Error fetching driver rates:`, err)
+    res.status(500).json({ error: err.message })
   }
 })
 app.get("/employees/controllers", async (req, res) => {

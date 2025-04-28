@@ -464,7 +464,7 @@ function DirectorManagerViewAssignment() {
 
   const fetchDrivers = async () => {
     try {
-      const response = await fetch("http://localhost:5000/employees/drivers")
+      const response = await fetch("http://localhost:5000/employees/driverssub")
       if (!response.ok) {
         throw new Error("Failed to fetch drivers")
       }
@@ -613,7 +613,7 @@ function DirectorManagerViewAssignment() {
   }
 
   return (
-    <div style={{ minHeight: '100vh', backgroundColor: 'white', paddingBottom: '200px' }}>
+    <div style={{ minHeight: "100vh", backgroundColor: "white", paddingBottom: "200px" }}>
       <style>{modalAnimation}</style>
       <div>
         <button className="back-button" onClick={handleBackClick}>
@@ -623,24 +623,24 @@ function DirectorManagerViewAssignment() {
 
       <br />
       {/* Leg Buttons */}
-      <div style={{ display: 'flex', gap: '1rem', marginBottom: '1rem', marginLeft: '15px' }}>
+      <div style={{ display: "flex", gap: "1rem", marginBottom: "1rem", marginLeft: "15px" }}>
         {legs.map((leg, index) => (
           <button
             key={leg.id || index}
             style={{
-              padding: '0.5rem 1rem',
-              borderRadius: '0.375rem',
-              backgroundColor: currentLagIndex === index ? '#22c55e' : '#e5e7eb',
-              color: currentLagIndex === index ? 'white' : '#1f2937',
-              border: 'none',
-              cursor: 'pointer',
-              marginBottom:'15px'
+              padding: "0.5rem 1rem",
+              borderRadius: "0.375rem",
+              backgroundColor: currentLagIndex === index ? "#22c55e" : "#e5e7eb",
+              color: currentLagIndex === index ? "white" : "#1f2937",
+              border: "none",
+              cursor: "pointer",
+              marginBottom: "15px",
             }}
             onClick={() => handleSelectLeg(index)}
           >
             Leg {index + 1}
             {leg.drivers && leg.drivers.length > 0 && (
-              <span style={{ marginLeft: '0.5rem', fontSize: '0.75rem' }}>
+              <span style={{ marginLeft: "0.5rem", fontSize: "0.75rem" }}>
                 ({leg.drivers.length} driver{leg.drivers.length !== 1 ? "s" : ""})
               </span>
             )}
@@ -657,20 +657,20 @@ function DirectorManagerViewAssignment() {
       )}
 
       {/* Main Form */}
-      <div style={{ padding: '0 1rem' }}>
-        <div style={{ backgroundColor: '#eff6ff', padding: '1.5rem', borderRadius: '0.375rem', marginBottom: '1rem' }}>
-          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '1.5rem', alignItems: 'center' }}>
-            <div style={{ flex: '1', minWidth: '100px' }}>
-              <label style={{ display: 'block', color: '#374151', marginBottom: '0.5rem' }}>Starting Point</label>
-              <div style={{ position: 'relative' }}>
+      <div style={{ padding: "0 1rem" }}>
+        <div style={{ backgroundColor: "#eff6ff", padding: "1.5rem", borderRadius: "0.375rem", marginBottom: "1rem" }}>
+          <div style={{ display: "flex", flexWrap: "wrap", gap: "1.5rem", alignItems: "center" }}>
+            <div style={{ flex: "1", minWidth: "100px" }}>
+              <label style={{ display: "block", color: "#374151", marginBottom: "0.5rem" }}>Starting Point</label>
+              <div style={{ position: "relative" }}>
                 <input
                   type="text"
-                  style={{ 
-                    width: '100%', 
-                    padding: '0.5rem', 
-                    border: '1px solid #d1d5db', 
-                    borderRadius: '0.375rem', 
-                    backgroundColor: '#f3f4f6' 
+                  style={{
+                    width: "100%",
+                    padding: "0.5rem",
+                    border: "1px solid #d1d5db",
+                    borderRadius: "0.375rem",
+                    backgroundColor: "#f3f4f6",
                   }}
                   value={formData.startingPoint}
                   readOnly
@@ -678,17 +678,17 @@ function DirectorManagerViewAssignment() {
               </div>
             </div>
 
-            <div style={{ flex: '1', minWidth: '100px' }}>
-              <label style={{ display: 'block', color: '#374151', marginBottom: '0.5rem' }}>Destination</label>
-              <div style={{ position: 'relative' }}>
+            <div style={{ flex: "1", minWidth: "100px" }}>
+              <label style={{ display: "block", color: "#374151", marginBottom: "0.5rem" }}>Destination</label>
+              <div style={{ position: "relative" }}>
                 <input
                   type="text"
-                  style={{ 
-                    width: '100%', 
-                    padding: '0.5rem', 
-                    border: '1px solid #d1d5db', 
-                    borderRadius: '0.375rem', 
-                    backgroundColor: '#f3f4f6' 
+                  style={{
+                    width: "100%",
+                    padding: "0.5rem",
+                    border: "1px solid #d1d5db",
+                    borderRadius: "0.375rem",
+                    backgroundColor: "#f3f4f6",
                   }}
                   value={formData.destination}
                   readOnly
@@ -700,80 +700,101 @@ function DirectorManagerViewAssignment() {
 
         {/* Driver Entries - Always show this section if we're on a leg */}
         {currentLagIndex !== null && (
-          <div style={{ backgroundColor: '#eff6ff', padding: '1.5rem', borderRadius: '0.375rem', marginBottom: '1rem' }}>
-            <h3 style={{ fontSize: '1.125rem', fontWeight: '500', marginBottom: '1rem' }}>Driver Information</h3>
+          <div
+            style={{ backgroundColor: "#eff6ff", padding: "1.5rem", borderRadius: "0.375rem", marginBottom: "1rem" }}
+          >
+            <h3 style={{ fontSize: "1.125rem", fontWeight: "500", marginBottom: "1rem" }}>Driver Information</h3>
 
             {drivers && drivers.length > 0 ? (
               <>
                 {drivers.map((entry, index) => (
-                  <div key={entry.id || index} style={{ 
-                    marginBottom: '1rem', 
-                    padding: '1rem', 
-                    border: '1px solid #e5e7eb', 
-                    borderRadius: '0.5rem', 
-                    backgroundColor: 'white', 
-                    boxShadow: '0 1px 2px 0 rgba(0, 0, 0, 0.05)' 
-                  }}>
-                    <div style={{ display: 'flex', flexWrap: 'wrap', margin: '0 -0.5rem' }}>
+                  <div
+                    key={entry.id || index}
+                    style={{
+                      marginBottom: "1rem",
+                      padding: "1rem",
+                      border: "1px solid #e5e7eb",
+                      borderRadius: "0.5rem",
+                      backgroundColor: "white",
+                      boxShadow: "0 1px 2px 0 rgba(0, 0, 0, 0.05)",
+                    }}
+                  >
+                    <div style={{ display: "flex", flexWrap: "wrap", margin: "0 -0.5rem" }}>
                       {/* All fields in a single row with equal width */}
-                      <div style={{ width: '16.666%', padding: '0 0.5rem', marginBottom: '0.75rem' }}>
-                        <label style={{ display: 'block', color: '#374151', fontWeight: '500', marginBottom: '0.25rem' }}>Driver</label>
+                      <div style={{ width: "16.666%", padding: "0 0.5rem", marginBottom: "0.75rem" }}>
+                        <label
+                          style={{ display: "block", color: "#374151", fontWeight: "500", marginBottom: "0.25rem" }}
+                        >
+                          Driver
+                        </label>
                         <input
                           type="text"
-                          style={{ 
-                            width: '100%', 
-                            padding: '0.5rem', 
-                            border: '1px solid #d1d5db', 
-                            borderRadius: '0.375rem', 
-                            backgroundColor: '#f3f4f6' 
+                          style={{
+                            width: "100%",
+                            padding: "0.5rem",
+                            border: "1px solid #d1d5db",
+                            borderRadius: "0.375rem",
+                            backgroundColor: "#f3f4f6",
                           }}
                           value={entry.full_name || "None"}
                           readOnly
                         />
                       </div>
 
-                      <div style={{ width: '16.666%', padding: '0 0.5rem', marginBottom: '0.75rem' }}>
-                        <label style={{ display: 'block', color: '#374151', fontWeight: '500', marginBottom: '0.25rem' }}>Truck Reg Number</label>
+                      <div style={{ width: "16.666%", padding: "0 0.5rem", marginBottom: "0.75rem" }}>
+                        <label
+                          style={{ display: "block", color: "#374151", fontWeight: "500", marginBottom: "0.25rem" }}
+                        >
+                          Truck Reg Number
+                        </label>
                         <input
                           type="text"
-                          style={{ 
-                            width: '100%', 
-                            padding: '0.5rem', 
-                            border: '1px solid #d1d5db', 
-                            borderRadius: '0.375rem', 
-                            backgroundColor: '#f3f4f6' 
+                          style={{
+                            width: "100%",
+                            padding: "0.5rem",
+                            border: "1px solid #d1d5db",
+                            borderRadius: "0.375rem",
+                            backgroundColor: "#f3f4f6",
                           }}
                           value={entry.truckregnumber || "None"}
                           readOnly
                         />
                       </div>
 
-                      <div style={{ width: '16.666%', padding: '0 0.5rem', marginBottom: '0.75rem' }}>
-                        <label style={{ display: 'block', color: '#374151', fontWeight: '500', marginBottom: '0.25rem' }}>Container Number</label>
+                      <div style={{ width: "16.666%", padding: "0 0.5rem", marginBottom: "0.75rem" }}>
+                        <label
+                          style={{ display: "block", color: "#374151", fontWeight: "500", marginBottom: "0.25rem" }}
+                        >
+                          Container Number
+                        </label>
                         <input
                           type="text"
-                          style={{ 
-                            width: '100%', 
-                            padding: '0.5rem', 
-                            border: '1px solid #d1d5db', 
-                            borderRadius: '0.375rem', 
-                            backgroundColor: '#f3f4f6' 
+                          style={{
+                            width: "100%",
+                            padding: "0.5rem",
+                            border: "1px solid #d1d5db",
+                            borderRadius: "0.375rem",
+                            backgroundColor: "#f3f4f6",
                           }}
                           value={entry.containernumber || "None"}
                           readOnly
                         />
                       </div>
 
-                      <div style={{ width: '16.666%', padding: '0 0.5rem', marginBottom: '0.75rem' }}>
-                        <label style={{ display: 'block', color: '#374151', fontWeight: '500', marginBottom: '0.25rem' }}>Type</label>
+                      <div style={{ width: "16.666%", padding: "0 0.5rem", marginBottom: "0.75rem" }}>
+                        <label
+                          style={{ display: "block", color: "#374151", fontWeight: "500", marginBottom: "0.25rem" }}
+                        >
+                          Type
+                        </label>
                         <input
                           type="text"
-                          style={{ 
-                            width: '100%', 
-                            padding: '0.5rem', 
-                            border: '1px solid #d1d5db', 
-                            borderRadius: '0.375rem', 
-                            backgroundColor: '#f3f4f6' 
+                          style={{
+                            width: "100%",
+                            padding: "0.5rem",
+                            border: "1px solid #d1d5db",
+                            borderRadius: "0.375rem",
+                            backgroundColor: "#f3f4f6",
                           }}
                           value={entry.container_type || "None"}
                           readOnly
@@ -781,16 +802,24 @@ function DirectorManagerViewAssignment() {
                       </div>
 
                       {!isControllerRole && (
-                        <div style={{ width: '16.666%', padding: '0 0.5rem', marginBottom: '0.75rem' }}>
-                          <label style={{ display: 'block', color: '#374151', fontWeight: '500', marginBottom: '0.25rem' }}>Driver Rate</label>
+                        <div style={{ width: "16.666%", padding: "0 0.5rem", marginBottom: "0.75rem" }}>
+                          <label
+                            style={{ display: "block", color: "#374151", fontWeight: "500", marginBottom: "0.25rem" }}
+                          >
+                            {(() => {
+                              const driver = employeeDrivers.find((d) => d.userid.toString() === entry.driverid)
+                              console.log(`Driver ${entry.driverid} role:`, driver?.roleid)
+                              return driver?.roleid === 6 ? "Subbie Rate" : "Driver Rate"
+                            })()}
+                          </label>
                           <input
                             type="text"
-                            style={{ 
-                              width: '100%', 
-                              padding: '0.5rem', 
-                              border: '1px solid #d1d5db', 
-                              borderRadius: '0.375rem', 
-                              backgroundColor: '#f3f4f6' 
+                            style={{
+                              width: "100%",
+                              padding: "0.5rem",
+                              border: "1px solid #d1d5db",
+                              borderRadius: "0.375rem",
+                              backgroundColor: "#f3f4f6",
                             }}
                             value={entry.driverRate || "None"}
                             readOnly
@@ -798,16 +827,20 @@ function DirectorManagerViewAssignment() {
                         </div>
                       )}
 
-                      <div style={{ width: '16.666%', padding: '0 0.5rem', marginBottom: '0.75rem' }}>
-                        <label style={{ display: 'block', color: '#374151', fontWeight: '500', marginBottom: '0.25rem' }}>Date</label>
+                      <div style={{ width: "16.666%", padding: "0 0.5rem", marginBottom: "0.75rem" }}>
+                        <label
+                          style={{ display: "block", color: "#374151", fontWeight: "500", marginBottom: "0.25rem" }}
+                        >
+                          Date
+                        </label>
                         <input
                           type="text"
-                          style={{ 
-                            width: '100%', 
-                            padding: '0.5rem', 
-                            border: '1px solid #d1d5db', 
-                            borderRadius: '0.375rem', 
-                            backgroundColor: '#f3f4f6' 
+                          style={{
+                            width: "100%",
+                            padding: "0.5rem",
+                            border: "1px solid #d1d5db",
+                            borderRadius: "0.375rem",
+                            backgroundColor: "#f3f4f6",
                           }}
                           value={
                             entry.date
@@ -824,7 +857,9 @@ function DirectorManagerViewAssignment() {
                 ))}
               </>
             ) : (
-              <p style={{ color: '#6b7280', textAlign: 'center', padding: '1rem 0' }}>No driver information available for this leg.</p>
+              <p style={{ color: "#6b7280", textAlign: "center", padding: "1rem 0" }}>
+                No driver information available for this leg.
+              </p>
             )}
           </div>
         )}
