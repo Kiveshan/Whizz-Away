@@ -4334,14 +4334,66 @@ async function generateInvoice(instructionId) {
     }
   }
 }
-
+app.get("/api/debug/check-invoice-table", async (req, res) => {
+  let client
+  try {
+    client = await pool.connect()
+    
+    // Check if the invoice table exists
+    const tableCheck = await client.query(`
+      SELECT EXISTS (
+        SELECT FROM information_schema.tables 
+        WHERE table_schema = 'public' 
+        AND table_name = 'invoice'
+      );
+    `)
+    
+    const tableExists = tableCheck.rows[0].exists
+    
+    if (!tableExists) {
+      return res.status(404).json({
+        success: false,
+        message: "Invoice table does not exist"
+      })
+    }
+    
+    // Check the structure of the invoice table
+    const columnCheck = await client.query(`
+      SELECT column_name, data_type 
+      FROM information_schema.columns 
+      WHERE table_schema = 'public' 
+      AND table_name = 'invoice';
+    `)
+    
+    res.json({
+      success: true,
+      tableExists,
+      columns: columnCheck.rows
+    })
+  } catch (error) {
+    console.error("Error checking invoice table:", error)
+    res.status(500).json({
+      success: false,
+      message: "Error checking invoice table",
+      error: error.message
+    })
+  } finally {
+    if (client) client.release()
+  }
+})
 // Add this endpoint to your server.js file
 app.post("/generate-invoice/:instructionId", async (req, res) => {
   const { instructionId } = req.params
   console.log(`Route POST /generate-invoice/${instructionId} was accessed`)
 
   try {
+    // Log before generating invoice
+    console.log(`Attempting to generate invoice for instruction ID: ${instructionId}`)
+    
     const result = await generateInvoice(instructionId)
+    
+    // Log the result
+    console.log(`Invoice generation result:`, result)
     
     if (result.success) {
       res.status(201).json(result)
@@ -4356,6 +4408,50 @@ app.post("/generate-invoice/:instructionId", async (req, res) => {
     })
   }
 })
+async function fixInvoiceSequence() {
+  let client;
+  
+  try {
+    console.log("Checking and fixing invoice sequence...");
+    client = await pool.connect();
+    
+    // First, check the current sequence value
+    const currentSeqResult = await client.query(
+      "SELECT nextval(pg_get_serial_sequence('public.invoice', 'ikey'));"
+    );
+    console.log(`Current sequence value: ${currentSeqResult.rows[0].nextval}`);
+    
+    // Get the maximum ikey value from the invoice table
+    const maxKeyResult = await client.query(
+      "SELECT MAX(ikey) FROM public.invoice;"
+    );
+    const maxKey = maxKeyResult.rows[0].max || 0;
+    console.log(`Maximum ikey in table: ${maxKey}`);
+    
+    // Reset the sequence to be one more than the maximum value
+    const resetResult = await client.query(
+      "SELECT SETVAL('public.invoice_ikey_seq', (SELECT COALESCE(MAX(ikey), 0) FROM public.invoice)+1);"
+    );
+    console.log(`Sequence reset to: ${resetResult.rows[0].setval}`);
+    
+    return {
+      success: true,
+      message: "Invoice sequence has been successfully reset.",
+      oldValue: currentSeqResult.rows[0].nextval,
+      newValue: resetResult.rows[0].setval
+    };
+    
+  } catch (error) {
+    console.error("Error fixing invoice sequence:", error);
+    return {
+      success: false,
+      message: "Failed to fix invoice sequence",
+      error: error.message
+    };
+  } finally {
+    if (client) client.release();
+  }
+}
 app.get("/api/debug/wages/:employeeId", async (req, res) => {
   const { employeeId } = req.params;
   
@@ -4888,6 +4984,12 @@ app.listen(PORT, async () => {
     const dbTest = await testConnection()
     types.setTypeParser(types.builtins.NUMERIC, (value) => Number.parseFloat(value))
     types.setTypeParser(types.builtins.FLOAT8, (value) => Number.parseFloat(value))
+    const seqFixResult = await fixInvoiceSequence();
+    if (seqFixResult.success) {
+      console.log(`✅ Invoice sequence fixed: ${seqFixResult.oldValue} → ${seqFixResult.newValue}`);
+    } else {
+      console.error(`❌ Failed to fix invoice sequence: ${seqFixResult.error}`);
+    }
     await generateMonthlyStatements()
     if (dbTest.success) {
       console.log(`✅ Database Connected Successfully at ${dbTest.time}`)
