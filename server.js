@@ -4990,7 +4990,6 @@ app.listen(PORT, async () => {
     } else {
       console.error(`❌ Failed to fix invoice sequence: ${seqFixResult.error}`);
     }
-    await generateMonthlyStatements()
     if (dbTest.success) {
       console.log(`✅ Database Connected Successfully at ${dbTest.time}`)
     } else {
