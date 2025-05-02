@@ -156,3 +156,9 @@
   padding: 5px 10px;
   font-size: 12px;
 }
+
+.pending-status {
+  color: #f59e0b; /* Amber/yellow color for pending */
+  font-style: italic;
+  font-weight: 500;
+}
