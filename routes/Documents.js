@@ -58,7 +58,7 @@ router.get("/:instructionId", async (req, res) => {
 const getClientName = async (clientId) => {
   try {
     const result = await pool.query(
-      "SELECT companyname FROM m5_client WHERE m5clientkey = $1",
+      "SELECT client as companyname FROM m5_client WHERE m5clientkey = $1",
       [clientId]
     )
     if (result.rows.length > 0) {

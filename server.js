@@ -1803,87 +1803,490 @@ app.get("/api/employee/:id", async (req, res) => {
     if (client) client.release();
   }
 });
-app.get("/api/employee-deductions/:employeeId", async (req, res) => {
-  const { employeeId } = req.params;
-  const { month, year } = req.query;
-  
-  console.log(`Route /api/employee-deductions/${employeeId} was accessed with month=${month}, year=${year}`);
-  
-  if (!month || !year) {
-    return res.status(400).json({ error: "Month and year are required query parameters" });
-  }
-  
+app.post("/api/save-wage-data", async (req, res) => {
+  const { employeeId, month, year, totalEarnings, totalDeductions, netPay } = req.body;
+
+  console.log(`Route POST /api/save-wage-data accessed for employee ${employeeId}`);
+  console.log("Wage data:", { employeeId, month, year, totalEarnings, totalDeductions, netPay });
+
   let client;
   try {
     client = await pool.connect();
-    
-    // Convert month name to month number (1-based)
-    const monthNames = [
-      "January", "February", "March", "April", "May", "June",
-      "July", "August", "September", "October", "November", "December"
-    ];
-    const monthIndex = monthNames.indexOf(month) + 1;
-    
-    if (monthIndex === 0) {
-      return res.status(400).json({ error: "Invalid month name" });
-    }
-    
-    // Query to get deductions data for the employee for the specified month and year
-    const query = `
-      SELECT 
-        deduction_income_tax, 
-        deduction_other_deductions, 
-        deduction_uif,
-        deduction_bonus, 
-        deduction_savings, 
-        deduction_loan, 
-        deduction_damage,
-        total_deductions
-      FROM 
-        wages
-      WHERE 
-        employeeid = $1 
-        AND EXTRACT(MONTH FROM employee_date) = $2
-        AND EXTRACT(YEAR FROM employee_date) = $3
-      ORDER BY 
-        employee_date DESC
-      LIMIT 1
+    await client.query("BEGIN");
+
+    // Normalize employee_date to the last day of the month
+    const normalizedDate = new Date(year, month, 0).toISOString(); // Last day of the month
+
+    // Check if employee exists
+    const employeeQuery = `
+      SELECT *
+      FROM m5_employee
+      WHERE userid = $1
     `;
-    
-    const result = await client.query(query, [employeeId, monthIndex, year]);
-    
-    if (result.rows.length === 0) {
-      // If no data found, return default values instead of 404
-      return res.json({
-        deduction_income_tax: 0,
-        deduction_other_deductions: 0,
-        deduction_uif: 0,
-        deduction_bonus: 0,
-        deduction_savings: 0,
-        deduction_loan: 0,
-        deduction_damage: 0,
-        total_deductions: 0
-      });
+    const employeeResult = await client.query(employeeQuery, [employeeId]);
+
+    if (employeeResult.rows.length === 0) {
+      await client.query("ROLLBACK");
+      console.log(`Employee with ID ${employeeId} not found`);
+      return res.status(404).json({ error: "Employee not found" });
     }
-    
-    res.json(result.rows[0]);
+
+    // Insert or update wage record
+    const insertQuery = `
+      INSERT INTO wages (
+        employeeid,
+        total_earnings,
+        total_deductions,
+        net_pay,
+        employee_date
+      ) VALUES ($1, $2, $3, $4, $5)
+      ON CONFLICT ON CONSTRAINT unique_wage_per_employee_month_year
+      DO UPDATE SET
+        total_earnings = EXCLUDED.total_earnings,
+        total_deductions = EXCLUDED.total_deductions,
+        net_pay = EXCLUDED.net_pay
+      RETURNING wageskey
+    `;
+    const params = [employeeId, totalEarnings, totalDeductions, netPay, normalizedDate];
+
+    console.log(`Inserting/updating wage record for employee ${employeeId}`);
+    const result = await client.query(insertQuery, params);
+
+    await client.query("COMMIT");
+
+    res.status(200).json({
+      success: true,
+      message: "Wage data saved successfully",
+      wagesKey: result.rows[0].wageskey,
+    });
   } catch (error) {
-    console.error(`Error fetching deductions data for employee ID ${employeeId}:`, error);
-    // Return default values on error instead of error status
-    return res.json({
-      deduction_income_tax: 1500,
-      deduction_other_deductions: 300,
-      deduction_uif: 200,
-      deduction_bonus: 0,
-      deduction_savings: 0,
-      deduction_loan: 0,
-      deduction_damage: 0,
-      total_deductions: 2000
+    if (client) await client.query("ROLLBACK");
+    console.error(`Error saving wage data for employee ${employeeId}:`, error);
+    res.status(500).json({
+      success: false,
+      error: "Failed to save wage data",
+      message: error.message,
     });
   } finally {
     if (client) client.release();
   }
 });
+app.get("/api/check-wage-slip", async (req, res) => {
+  try {
+    const { employeeId, month, year } = req.query;
+
+    console.log(`Checking for existing wage slip: employeeId=${employeeId}, month=${month}, year=${year}`);
+
+    if (!employeeId || !month || !year) {
+      console.log("Missing required parameters in check-wage-slip request");
+      return res.status(400).json({ error: "Missing required parameters" });
+    }
+
+    // Normalize the date to the last day of the month
+    const targetDate = new Date(Number.parseInt(year), Number.parseInt(month), 0);
+
+    // Query the database to check if a wage slip already exists
+    const query = `
+      SELECT w.*, e.deduction_date 
+      FROM public.wages w
+      JOIN public.m5_employee e ON w.employeeid = e.userid
+      WHERE w.employeeid = $1 
+        AND w.employee_date = $2
+      ORDER BY w.wageskey
+      LIMIT 1
+    `;
+
+    console.log(`Executing query with params: employeeId=${employeeId}, month=${month}, year=${year}`);
+    const result = await pool.query(query, [employeeId, targetDate]);
+
+    if (result.rows.length > 0) {
+      const wageSlip = result.rows[0];
+      console.log(`Found existing wage slip with ID ${wageSlip.wageskey}`);
+
+      let useHistoricalValues = false;
+      if (wageSlip.deduction_date) {
+        const deductionDate = new Date(wageSlip.deduction_date);
+        useHistoricalValues = targetDate < deductionDate;
+        console.log(
+          `Target date: ${targetDate.toISOString()}, Deduction date: ${deductionDate.toISOString()}, Use historical values: ${useHistoricalValues}`
+        );
+      }
+
+      return res.json({
+        exists: true,
+        wageSlip,
+        useHistoricalValues,
+      });
+    } else {
+      console.log(`No existing wage slip found for employeeId=${employeeId}, month=${month}, year=${year}`);
+      return res.json({ exists: false });
+    }
+  } catch (error) {
+    console.error("Error checking existing wage slip:", error);
+    res.status(500).json({ error: "Failed to check existing wage slip" });
+  }
+});
+async function saveDeductionHistory(pool, employeeId) {
+  const client = await pool.connect()
+  try {
+    await client.query("BEGIN")
+
+    // Get current deduction values
+    const currentValues = await client.query(
+      `
+      SELECT 
+        income_tax_rate,
+        deduction_income_tax,
+        deduction_other_deductions,
+        deduction_uif,
+        deduction_bonus,
+        deduction_savings,
+        deduction_loan,
+        deduction_damage
+      FROM m5_employee
+      WHERE userid = $1
+    `,
+      [employeeId],
+    )
+
+    if (currentValues.rows.length === 0) {
+      await client.query("ROLLBACK")
+      return false
+    }
+
+    const deductions = currentValues.rows[0]
+    const today = new Date().toISOString().split("T")[0]
+
+    // Insert current values into history table
+    await client.query(
+      `
+      INSERT INTO employee_deduction_history (
+        employeeid,
+        effective_date,
+        income_tax_rate,
+        deduction_income_tax,
+        deduction_other_deductions,
+        deduction_uif,
+        deduction_bonus,
+        deduction_savings,
+        deduction_loan,
+        deduction_damage
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+    `,
+      [
+        employeeId,
+        today,
+        deductions.income_tax_rate,
+        deductions.deduction_income_tax,
+        deductions.deduction_other_deductions,
+        deductions.deduction_uif,
+        deductions.deduction_bonus,
+        deductions.deduction_savings,
+        deductions.deduction_loan,
+        deductions.deduction_damage,
+      ],
+    )
+
+    // Update deduction_date in employee record
+    await client.query(
+      `
+      UPDATE m5_employee
+      SET deduction_date = $1
+      WHERE userid = $2
+    `,
+      [today, employeeId],
+    )
+
+    await client.query("COMMIT")
+    return true
+  } catch (error) {
+    await client.query("ROLLBACK")
+    console.error(`Error saving deduction history for employee ${employeeId}:`, error)
+    throw error
+  } finally {
+    client.release()
+  }
+}
+
+
+// Function to get the appropriate deduction values for a specific date
+async function getDeductionsForDate(pool, employeeId, targetDate) {
+  const client = await pool.connect()
+  try {
+    // Convert targetDate to Date object if it's a string
+    const targetDateObj = typeof targetDate === "string" ? new Date(targetDate) : targetDate
+    const formattedTargetDate = targetDateObj.toISOString().split("T")[0]
+
+    // First check if employee exists
+    const employeeCheck = await client.query(
+      `
+      SELECT deduction_date FROM m5_employee WHERE userid = $1
+    `,
+      [employeeId],
+    )
+
+    if (employeeCheck.rows.length === 0) {
+      return null
+    }
+
+    const deductionDate = employeeCheck.rows[0].deduction_date
+
+    // If target date is after or equal to the most recent deduction update date,
+    // or if there's no deduction date, use current values
+    if (!deductionDate || targetDateObj >= new Date(deductionDate)) {
+      const currentValues = await client.query(
+        `
+        SELECT 
+          income_tax_rate,
+          deduction_income_tax,
+          deduction_other_deductions,
+          deduction_uif,
+          deduction_bonus,
+          deduction_savings,
+          deduction_loan,
+          deduction_damage
+        FROM m5_employee
+        WHERE userid = $1
+      `,
+        [employeeId],
+      )
+
+      return currentValues.rows[0]
+    }
+
+    // Otherwise, find the most recent historical values before the target date
+    const historicalValues = await client.query(
+      `
+      SELECT 
+        income_tax_rate,
+        deduction_income_tax,
+        deduction_other_deductions,
+        deduction_uif,
+        deduction_bonus,
+        deduction_savings,
+        deduction_loan,
+        deduction_damage
+      FROM employee_deduction_history
+      WHERE employeeid = $1
+        AND effective_date <= $2
+      ORDER BY effective_date DESC
+      LIMIT 1
+    `,
+      [employeeId, formattedTargetDate],
+    )
+
+    if (historicalValues.rows.length > 0) {
+      return historicalValues.rows[0]
+    }
+
+    // If no historical values found, fall back to current values
+    const fallbackValues = await client.query(
+      `
+      SELECT 
+        income_tax_rate,
+        deduction_income_tax,
+        deduction_other_deductions,
+        deduction_uif,
+        deduction_bonus,
+        deduction_savings,
+        deduction_loan,
+        deduction_damage
+      FROM m5_employee
+      WHERE userid = $1
+    `,
+      [employeeId],
+    )
+
+    return fallbackValues.rows[0]
+  } catch (error) {
+    console.error(`Error getting deductions for employee ${employeeId} for date ${targetDate}:`, error)
+    throw error
+  } finally {
+    client.release()
+  }
+}
+
+// app.get("/api/employee-deductions/:employeeId", async (req, res) => {
+//   const { employeeId } = req.params;
+//   const { month, year } = req.query;
+  
+//   console.log(`Route /api/employee-deductions/${employeeId} was accessed with month=${month}, year=${year}`);
+  
+//   if (!month || !year) {
+//     return res.status(400).json({ error: "Month and year are required query parameters" });
+//   }
+  
+//   let client;
+//   try {
+//     client = await pool.connect();
+    
+//     // Convert month name to month number (1-based)
+//     const monthNames = [
+//       "January", "February", "March", "April", "May", "June",
+//       "July", "August", "September", "October", "November", "December"
+//     ];
+//     const monthIndex = monthNames.indexOf(month) + 1;
+    
+//     if (monthIndex === 0) {
+//       return res.status(400).json({ error: "Invalid month name" });
+//     }
+    
+//     // Calculate the first day of the requested month/year
+//     const targetDate = new Date(parseInt(year), monthIndex - 1, 1);
+//     console.log(`Target date for wage slip: ${targetDate.toISOString()}`);
+    
+//     // First check if there's an existing wage record for this employee/month/year
+//     const wageQuery = `
+//       SELECT 
+//         wageskey,
+//         total_deductions,
+//         employee_date
+//       FROM 
+//         wages
+//       WHERE 
+//         employeeid = $1 
+//         AND EXTRACT(MONTH FROM employee_date) = $2
+//         AND EXTRACT(YEAR FROM employee_date) = $3
+//       ORDER BY 
+//         employee_date DESC
+//       LIMIT 1
+//     `;
+    
+//     const wageResult = await client.query(wageQuery, [employeeId, monthIndex, year]);
+    
+//     // Get the employee data including deduction_date
+//     const employeeQuery = `
+//       SELECT 
+//         income_tax_rate,
+//         deduction_income_tax, 
+//         deduction_other_deductions, 
+//         deduction_uif,
+//         deduction_bonus, 
+//         deduction_savings, 
+//         deduction_loan, 
+//         deduction_damage,
+//         deduction_date
+//       FROM 
+//         m5_employee
+//       WHERE 
+//         userid = $1
+//     `;
+    
+//     const employeeResult = await client.query(employeeQuery, [employeeId]);
+    
+//     if (employeeResult.rows.length === 0) {
+//       console.log(`No employee found with ID ${employeeId}`);
+//       return res.status(404).json({ error: "Employee not found" });
+//     }
+    
+//     const employeeData = employeeResult.rows[0];
+    
+//     // If we have an existing wage record, return that data
+//     if (wageResult.rows.length > 0) {
+//       console.log(`Found existing wage record for employee ${employeeId} in ${month} ${year}`);
+//       return res.json({
+//         ...employeeData,
+//         total_deductions: wageResult.rows[0].total_deductions
+//       });
+//     }
+    
+//     // Check if the target date is BEFORE the deduction update date
+//     if (employeeData.deduction_date) {
+//       // Ensure consistent date comparison by setting both to midnight
+//       const targetDateMidnight = new Date(targetDate);
+//       targetDateMidnight.setHours(0, 0, 0, 0);
+      
+//       const updateDate = new Date(employeeData.deduction_date);
+//       updateDate.setHours(0, 0, 0, 0);
+      
+//       if (targetDateMidnight < updateDate) {
+//         console.log(`Target date ${targetDateMidnight.toISOString()} is before deduction update date ${updateDate.toISOString()}`);
+        
+//         // For dates before the deduction update, we need to find historical deduction values
+//         // First try to find a wage slip from the same month/year but created before the deduction update
+//         const historicalQuery = `
+//           SELECT *
+//           FROM wages
+//           WHERE 
+//             employeeid = $1 
+//             AND EXTRACT(MONTH FROM employee_date) = $2
+//             AND EXTRACT(YEAR FROM employee_date) = $3
+//             AND employee_date < $4
+//           ORDER BY employee_date DESC
+//           LIMIT 1
+//         `;
+        
+//         const historicalResult = await client.query(historicalQuery, [
+//           employeeId, 
+//           monthIndex, 
+//           year, 
+//           employeeData.deduction_date
+//         ]);
+        
+//         if (historicalResult.rows.length > 0) {
+//           console.log(`Found historical wage slip for ${month} ${year} created before deduction update`);
+          
+//           return res.json({
+//             ...employeeData,
+//             // Use the historical total_deductions
+//             total_deductions: historicalResult.rows[0].total_deductions
+//           });
+//         }
+        
+//         // If we couldn't find a wage slip for this specific month/year created before
+//         // the deduction update, look for any wage slip created before the deduction update
+//         const anyHistoricalQuery = `
+//           SELECT *
+//           FROM wages
+//           WHERE 
+//             employeeid = $1 
+//             AND employee_date < $2
+//           ORDER BY employee_date DESC
+//           LIMIT 1
+//         `;
+        
+//         const anyHistoricalResult = await client.query(anyHistoricalQuery, [
+//           employeeId, 
+//           employeeData.deduction_date
+//         ]);
+        
+//         if (anyHistoricalResult.rows.length > 0) {
+//           console.log(`Found historical wage slip from another month created before deduction update`);
+          
+//           return res.json({
+//             ...employeeData,
+//             // Use the historical total_deductions
+//             total_deductions: anyHistoricalResult.rows[0].total_deductions
+//           });
+//         }
+        
+//         console.log(`No historical wage slips found, using current deduction values`);
+//       }
+//     }
+    
+//     // If we get here, either:
+//     // 1. The target date is AFTER or EQUAL TO the deduction update date (use current values)
+//     // 2. No deduction_update date exists (use current values)
+//     // 3. No historical data was found (use current values)
+//     console.log(`Using current deduction values from employee record`);
+//     res.json(employeeData);
+//   } catch (error) {
+//     console.error(`Error fetching deductions data for employee ID ${employeeId}:`, error);
+//     // Return default values on error
+//     return res.json({
+//       deduction_income_tax: 0,
+//       deduction_other_deductions: 0,
+//       deduction_uif: 0,
+//       deduction_bonus: 0,
+//       deduction_savings: 0,
+//       deduction_loan: 0,
+//       deduction_damage: 0,
+//       income_tax_rate: 0,
+//     });
+//   } finally {
+//     if (client) client.release();
+//   }
+// });
 app.get("/api/admin/company-list", verifyToken, async (req, res) => {
   let client
   try {
@@ -4491,120 +4894,140 @@ app.get("/api/debug/wages/:employeeId", async (req, res) => {
 });
 
 app.get("/api/employee-deductions/:employeeId", async (req, res) => {
-  const { employeeId } = req.params;
-  const { month, year } = req.query;
-  
-  console.log(`Route /api/employee-deductions/${employeeId} was accessed with month=${month}, year=${year}`);
-  
+  const { employeeId } = req.params
+  const { month, year } = req.query
+
+  console.log(`Route /api/employee-deductions/${employeeId} was accessed with month=${month}, year=${year}`)
+
   if (!month || !year) {
-    return res.status(400).json({ error: "Month and year are required query parameters" });
+    return res.status(400).json({ error: "Month and year are required query parameters" })
   }
-  
-  let client;
+
+  let client
   try {
-    client = await pool.connect();
-    console.log(`Connected to database for employee deductions query`);
-    
-    // Convert month name to month number (1-based)
+    client = await pool.connect()
+
+    // Convert month name to month number (0-based)
     const monthNames = [
-      "January", "February", "March", "April", "May", "June",
-      "July", "August", "September", "October", "November", "December"
-    ];
-    const monthIndex = monthNames.indexOf(month) + 1;
-    
-    if (monthIndex === 0) {
-      return res.status(400).json({ error: "Invalid month name" });
+      "January",
+      "February",
+      "March",
+      "April",
+      "May",
+      "June",
+      "July",
+      "August",
+      "September",
+      "October",
+      "November",
+      "December",
+    ]
+    const monthIndex = monthNames.indexOf(month)
+
+    if (monthIndex === -1) {
+      return res.status(400).json({ error: "Invalid month name" })
     }
-    
-    console.log(`Looking for deductions for month index: ${monthIndex}, year: ${year}`);
-    
-    // First check if any data exists for this employee
-    const checkQuery = `
-      SELECT COUNT(*) as count
-      FROM wages
-      WHERE employeeid = $1
-    `;
-    
-    const checkResult = await client.query(checkQuery, [employeeId]);
-    const recordCount = parseInt(checkResult.rows[0].count);
-    
-    console.log(`Found ${recordCount} total wage records for employee ID ${employeeId}`);
-    
-    if (recordCount === 0) {
-      console.log(`No wage records found for employee ID ${employeeId}, returning mock data`);
-      // Return mock data since no records exist
-      return res.json({
-        deduction_income_tax: 1500,
-        deduction_other_deductions: 300,
-        deduction_uif: 200,
-        deduction_bonus: 0,
-        deduction_savings: 0,
-        deduction_loan: 0,
-        deduction_damage: 0
-      });
+
+    // Create a date object for the middle of the specified month
+    const targetDate = new Date(Number.parseInt(year), monthIndex, 15)
+    console.log(`Target date for deductions: ${targetDate.toISOString()}`)
+
+    // Use the function to get the appropriate deductions for this date
+    const deductions = await getDeductionsForDate(pool, employeeId, targetDate)
+
+    if (!deductions) {
+      return res.status(404).json({ error: "Employee not found" })
     }
-    
-    // Query to get deductions data for the employee for the specified month and year
-    const query = `
-      SELECT 
-        deduction_income_tax, 
-        deduction_other_deductions, 
-        deduction_uif,
-        deduction_bonus, 
-        deduction_savings, 
-        deduction_loan, 
-        deduction_damage
-      FROM 
-        wages
-      WHERE 
-        employeeid = $1 
-        AND EXTRACT(MONTH FROM employee_date) = $2
-        AND EXTRACT(YEAR FROM employee_date) = $3
-      ORDER BY 
-        employee_date DESC
-      LIMIT 1
-    `;
-    
-    console.log(`Executing query with params: [${employeeId}, ${monthIndex}, ${year}]`);
-    const result = await client.query(query, [employeeId, monthIndex, year]);
-    
-    console.log(`Query returned ${result.rows.length} rows`);
-    
-    if (result.rows.length === 0) {
-      console.log(`No deductions found for employee ${employeeId} in ${month} ${year}, returning mock data`);
-      // Return mock data since no specific records exist for this month/year
-      return res.json({
-        deduction_income_tax: 1500,
-        deduction_other_deductions: 300,
-        deduction_uif: 200,
-        deduction_bonus: 0,
-        deduction_savings: 0,
-        deduction_loan: 0,
-        deduction_damage: 0
-      });
-    }
-    
-    console.log(`Returning deduction data:`, result.rows[0]);
-    res.json(result.rows[0]);
+
+    console.log(`Retrieved deductions for employee ${employeeId} for ${month} ${year}:`, deductions)
+    res.json(deductions)
   } catch (error) {
-    console.error(`Error fetching deductions data for employee ID ${employeeId}:`, error);
-    // Return mock data on error
+    console.error(`Error fetching deductions data for employee ID ${employeeId}:`, error)
+    // Return default values on error
     return res.json({
-      deduction_income_tax: 1500,
-      deduction_other_deductions: 300,
-      deduction_uif: 200,
+      deduction_income_tax: 0,
+      deduction_other_deductions: 0,
+      deduction_uif: 0,
       deduction_bonus: 0,
       deduction_savings: 0,
       deduction_loan: 0,
-      deduction_damage: 0
-    });
+      deduction_damage: 0,
+      income_tax_rate: 0,
+    })
   } finally {
-    if (client) {
-      console.log(`Releasing database client for employee deductions query`);
-      client.release();
-    }
+    if (client) client.release()
   }
-});
+})
+
+app.put("/api/employee-deductions/:employeeId", async (req, res) => {
+  const { employeeId } = req.params
+  const deductionData = req.body
+
+  console.log(`Route PUT /api/employee-deductions/${employeeId} was accessed`)
+  console.log("Deduction data:", deductionData)
+
+  let client
+  try {
+    client = await pool.connect()
+
+    // Start transaction
+    await client.query("BEGIN")
+
+    // First save current values to history
+    await saveDeductionHistory(pool, employeeId)
+
+    // Update the employee record with new deduction values
+    const updateQuery = `
+      UPDATE m5_employee
+      SET 
+        income_tax_rate = $1,
+        deduction_income_tax = $2,
+        deduction_other_deductions = $3,
+        deduction_uif = $4,
+        deduction_bonus = $5,
+        deduction_savings = $6,
+        deduction_loan = $7,
+        deduction_damage = $8,
+        deduction_date = CURRENT_DATE
+      WHERE userid = $9
+      RETURNING *
+    `
+
+    const updateResult = await client.query(updateQuery, [
+      deductionData.income_tax_rate,
+      deductionData.deduction_income_tax,
+      deductionData.deduction_other_deductions,
+      deductionData.deduction_uif,
+      deductionData.deduction_bonus,
+      deductionData.deduction_savings,
+      deductionData.deduction_loan,
+      deductionData.deduction_damage,
+      employeeId,
+    ])
+
+    if (updateResult.rows.length === 0) {
+      await client.query("ROLLBACK")
+      return res.status(404).json({ error: "Employee not found" })
+    }
+
+    // Commit transaction
+    await client.query("COMMIT")
+
+    console.log(`Updated deductions for employee ${employeeId}`)
+    res.json({
+      success: true,
+      message: "Deductions updated successfully",
+      data: updateResult.rows[0],
+    })
+  } catch (error) {
+    if (client) await client.query("ROLLBACK")
+    console.error(`Error updating deductions for employee ${employeeId}:`, error)
+    res.status(500).json({ error: "Failed to update deductions" })
+  } finally {
+    if (client) client.release()
+  }
+})
+
 // Check if build directory exists before trying to serve static files
 // const buildPath = path.join(__dirname, "build")
 // if (fs.existsSync(buildPath)) {
