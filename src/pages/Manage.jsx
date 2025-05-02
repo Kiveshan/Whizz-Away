@@ -576,6 +576,52 @@ const handleSaveEmployee = async () => {
   };
   
 
+  // const handleSaveDriverRate = async () => {
+  //   const {
+  //     startingpoint,
+  //     destination,
+  //     driver_six_meter_rate,
+  //     driver_twelve_meter_rate,
+  //     subie_six_meter_rate,
+  //     subie_twelve_meter_rate
+  //   } = newDriverRate;
+  
+  //   if (!startingpoint || !destination) {
+  //     alert("Please fill in all required fields.");
+  //     return;
+  //   }
+  
+  //   setLoading(true);
+  //   try {
+  //     if (isEditingRate) {
+  //       await axios.put(`${API_URL}/driver-rates/${editingRateId}`, newDriverRate, getAuthHeaders());
+  //     } else {
+  //       await axios.post(`${API_URL}/driver-rates`, newDriverRate, getAuthHeaders());
+  //     }
+  
+  //     const ratesResponse = await axios.get(`${API_URL}/driver-rates`, getAuthHeaders());
+  //     setDriverRates(ratesResponse.data);
+  
+  //     setNewDriverRate({
+  //       startingpoint: "",
+  //       destination: "",
+  //       driver_six_meter_rate: "",
+  //       driver_twelve_meter_rate: "",
+  //       subie_six_meter_rate: "",
+  //       subie_twelve_meter_rate: "",
+  //     });
+  
+  //     setIsEditingRate(false);
+  //     setEditingRateId(null);
+  //     setShowDriverRateForm(false);
+  //   } catch (err) {
+  //     console.error("Error saving driver rate:", err);
+  //     alert(`Error saving driver rate: ${err.response?.data?.error || err.message}`);
+  //   } finally {
+  //     setLoading(false);
+  //   }
+  // }
+
   const handleSaveDriverRate = async () => {
     const {
       startingpoint,
@@ -586,17 +632,27 @@ const handleSaveEmployee = async () => {
       subie_twelve_meter_rate
     } = newDriverRate;
   
-    if (!startingpoint || !destination || !driver_six_meter_rate || !driver_twelve_meter_rate || !subie_six_meter_rate || !subie_twelve_meter_rate) {
+    if (!startingpoint || !destination || !driver_six_meter_rate || !driver_twelve_meter_rate) {
       alert("Please fill in all required fields.");
       return;
     }
   
+    // Convert empty strings to null
+    const cleanedDriverRate = {
+      startingpoint,
+      destination,
+      driver_six_meter_rate: driver_six_meter_rate === "" ? null : Number(driver_six_meter_rate),
+      driver_twelve_meter_rate: driver_twelve_meter_rate === "" ? null : Number(driver_twelve_meter_rate),
+      subie_six_meter_rate: subie_six_meter_rate === "" ? null : Number(subie_six_meter_rate),
+      subie_twelve_meter_rate: subie_twelve_meter_rate === "" ? null : Number(subie_twelve_meter_rate),
+    };
+  
     setLoading(true);
     try {
       if (isEditingRate) {
-        await axios.put(`${API_URL}/driver-rates/${editingRateId}`, newDriverRate, getAuthHeaders());
+        await axios.put(`${API_URL}/driver-rates/${editingRateId}`, cleanedDriverRate, getAuthHeaders());
       } else {
-        await axios.post(`${API_URL}/driver-rates`, newDriverRate, getAuthHeaders());
+        await axios.post(`${API_URL}/driver-rates`, cleanedDriverRate, getAuthHeaders());
       }
   
       const ratesResponse = await axios.get(`${API_URL}/driver-rates`, getAuthHeaders());
@@ -620,7 +676,8 @@ const handleSaveEmployee = async () => {
     } finally {
       setLoading(false);
     }
-  }
+  };
+  
   
   
 // const handleSaveSubcontractor = async () => {
@@ -857,7 +914,7 @@ const handleSaveSubcontractor = async () => {
       ) : error ? (
         <div className="error">{error}</div>
       ) : (
-        <div className="manage-employees-table">
+        <div className="manage-employees-table1">
           <table>
             <thead>
               <tr>
@@ -920,7 +977,7 @@ const handleSaveSubcontractor = async () => {
       ) : error ? (
         <div className="error">{error}</div>
       ) : (
-        <div className="manage-clients-table">
+        <div className="manage-clients-table1">
           <table>
             <thead>
               <tr>
@@ -988,7 +1045,7 @@ const handleToggleEmployee = async (id, currentStatus) => {
   }
 }
   const renderDriverRatesTable = () => (
-    <div className="manage-DriverRates-table">
+    <div className="manage-DriverRates-table1">
       {loading ? (
         <div className="loading">Loading driver rates...</div>
       ) : error ? (
@@ -1043,7 +1100,7 @@ const handleToggleEmployee = async (id, currentStatus) => {
   
 
   const renderSubcontractorsTable = () => (
-    <div className="manage-subcontractor-table">
+    <div className="manage-subcontractor-table1">
       {loading ? (
         <div className="loading">Loading subcontractors...</div>
       ) : error ? (
@@ -1138,7 +1195,7 @@ const handleToggleEmployee = async (id, currentStatus) => {
       ) : error ? (
         <div className="error">{error}</div>
       ) : (
-        <div className="manage-trucks-table">
+        <div className="manage-trucks-table1">
           <table>
             <thead>
               <tr>

@@ -69,9 +69,11 @@
 }
 
 table {
-  width: 800px;
+  width: 100%;               /* Expanded table width to full container */
+  min-width: 800px;          /* Ensure minimum width for content */
+ 
   border-collapse: collapse;
-  background-color: white;
+  background-color: rgb(255, 255, 255);
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
 }
 
@@ -337,7 +339,7 @@ tr:hover {
   max-width: 800px;
   margin: auto;
   padding: 20px;
-  background: #f9f9f9;
+  background: white;
   border-radius: 8px;
   box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
   display: flex;
@@ -351,7 +353,7 @@ tr:hover {
   max-width: 800px;
   margin: auto;
   padding: 20px;
-  background: #f9f9f9;
+  background: white;
   border-radius: 8px;
   box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
   display: flex;
