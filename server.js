@@ -7,6 +7,12 @@ import passport from "passport"
 import LocalStrategy from "passport-local"
 import crypto from "crypto"
 import jwt from "jsonwebtoken"
+import AWS from 'aws-sdk';
+import multer from 'multer';
+import multerS3 from 'multer-s3';
+import dotenv from "dotenv";
+import { S3Client } from '@aws-sdk/client-s3'
+dotenv.config();
 
 const app = express()
 const PORT = 5000
@@ -1294,12 +1300,16 @@ app.post("/api/company/reactivate", verifyToken, async (req, res) => {
 app.get("/api/employees", verifyToken, async (req, res) => {
   try {
     const query = `
-      SELECT e.*, r.rolename, w.deduction_income_tax, w.deduction_other_deductions, 
-             w.deduction_uif, w.deduction_bonus, w.deduction_savings, 
-             w.deduction_loan, w.deduction_damage
+      SELECT
+        e.*,
+        r.rolename,
+        w.total_deductions
       FROM m5_employee e
-      JOIN roles r ON e.roleid = r.roleid
-      LEFT JOIN wages w ON e.userid = w.employeeid
+      JOIN roles r
+        ON e.roleid = r.roleid
+      LEFT JOIN wages w
+        ON e.userid = w.employeeid
+      WHERE e.roleid != 6
       ORDER BY e.userid
     `;
 
@@ -1319,7 +1329,8 @@ app.get("/api/employees/:id", verifyToken, async (req, res) => {
     const { id } = req.params
 
     // Simplified query without role checks
-    const query = "SELECT * FROM m5_employee WHERE userid = $1"
+    // const query = "SELECT * FROM m5_employee WHERE userid = $1"
+    const query = "SELECT * FROM m5_employee WHERE userid = $1 AND roleid != 6 ";
     const result = await client.query(query, [id])
 
     if (result.rows.length === 0) {
@@ -1333,48 +1344,170 @@ app.get("/api/employees/:id", verifyToken, async (req, res) => {
   }
 })
 
-// Create new employee
-// Create new employee
-// app.get("/api/employees", verifyToken, async (req, res) => {
-//   try {
-//     const subei_reg_num = req.user.company_reg_num;
 
-//     const result = await client.query(
-//       `SELECT 
-//         e.userid,
-//         e.name,
-//         e.surname,
-//         e.telephonenum,
-//         e.cellnum,
-//         e.employeenum,
-//         e.roleid,
-//         e.email,
-//         e.base_salary,
-//         e.status,
-//         w.deduction_income_tax,
-//         w.deduction_other_deductions,
-//         w.deduction_uif,
-//         w.deduction_bonus,
-//         w.deduction_savings,
-//         w.deduction_loan,
-//         w.deduction_damage
-//       FROM m5_employee e
-//       LEFT JOIN wages w ON e.userid = w.employeeid
-//       WHERE e.subei_reg_num = $1`,
-//       [subei_reg_num]
-//     );
+// ----- AWS S3 and Multer-S3 Setup for Employee Uploads ----- //
 
-//     res.status(200).json(result.rows);
-//   } catch (err) {
-//     console.error("Error fetching employees:", err);
-//     res.status(500).json({ error: "Failed to fetch employees" });
-//   }
-// });
 
-app.post("/api/employees", verifyToken, async (req, res) => {
-  try {
+// Create an S3 client using AWS SDK v3
+const s3Client2 = new S3Client({
+  region: process.env.AWS_REGION, 
+  credentials: {
+    accessKeyId: process.env.Employee_AWS_ACCESS_KEY_ID,
+    secretAccessKey: process.env.Employee_AWS_SECRET_ACCESS_KEY,
+  },
+});
+
+// Configure multer to upload files to S3 using multer-s3-v3.
+const upload = multer({
+  storage: multerS3({
+    s3: s3Client2, // Use the AWS SDK v3 client
+    bucket: process.env.Employee_AWS_BUCKET_NAME, // e.g., 'sherwyn-whizz-away'
+    // Do not include ACL if your bucket enforces no ACLs.
+    key: (req, file, cb) => {
+      // Extract employee number and name from the request body.
+      // Ensure these fields are sent as part of your form data.
+      const employeeNum = req.body.employeenum || "unknown";
+      const employeeName = req.body.name || "unknown";
+    
+      // Optionally sanitize the employee name (remove spaces, etc.)
+      const sanitizedEmployeeName = employeeName.trim().replace(/\s+/g, "_");
+    
+      // Create the folder name using employeenum and the sanitized name.
+      const folderName = `${employeeNum}_${sanitizedEmployeeName}`;
+    
+      // Generate a unique file name for the uploaded file.
+      const uniqueFileName = `${Date.now()}_${file.originalname}`;
+    
+      // Build the complete key (folder path + file name).
+      const key = `Employees/${folderName}/${uniqueFileName}`;
+    
+      console.log("Uploading to S3 key:", key);
+      cb(null, key);
+    }
+    
+  }),
+  limits: { fileSize: 5 * 1024 * 1024 }, // 5 MB file size limit
+  fileFilter: (req, file, cb) => {
+    if (file.mimetype === "application/pdf") {
+      return cb(null, true);
+    }
+    return cb(new Error("Only PDFs are allowed"), false);
+  },
+});
+
+// ----- Employee Route for Creating a New Employee ----- //
+
+// Updated with deducions in m5_employee table
+
+//updated 02 May
+app.post(
+  "/api/employees",
+  verifyToken,
+  upload.array("documents", 3),
+  async (req, res) => {
+    try {
+      console.log("req.files:", req.files);
+      console.log("req.body:", req.body);
+
+      const {
+        name,
+        surname,
+        telephonenum,
+        cellnum,
+        employeenum,
+        roleid,
+        email,
+        password,
+        base_salary,
+        deduction_income_tax,
+        deduction_other_deductions,
+        deduction_uif,
+        deduction_bonus,
+        deduction_savings,
+        deduction_loan,
+        deduction_damage,
+        loan_amount,
+      } = req.body;
+
+      if (!password) {
+        return res.status(400).json({ error: "Password is required" });
+      }
+
+      const company_reg_num = req.user.company_reg_num;
+      if (!company_reg_num) {
+        return res.status(400).json({ error: "Missing company registration number." });
+      }
+
+      const urls = (req.files || []).map((f) => f.location);
+      while (urls.length < 3) urls.push(null);
+
+      await client.query("BEGIN");
+
+      const hashedPassword = await bcrypt.hash(password, 10);
+
+      const insertEmployeeQuery = `
+        INSERT INTO m5_employee (
+          name, surname, telephonenum, cellnum, employeenum,
+          roleid, email, password, base_salary, company_reg_num, status,
+          document_url1, document_url2, document_url3,
+          deduction_income_tax, deduction_other_deductions, deduction_uif,
+          deduction_bonus, deduction_savings, deduction_loan, deduction_damage,
+          loan_amount, income_tax_rate, deduction_date
+        ) VALUES (
+          $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, true,
+          $11, $12, $13,
+          $14, $15, $16, $17, $18, $19, $20,
+          $21, 0, $22
+        ) RETURNING *
+      `;
+
+      const insertValues = [
+        name,
+        surname,
+        telephonenum,
+        cellnum,
+        employeenum,
+        roleid,
+        email,
+        hashedPassword,
+        base_salary,
+        company_reg_num,
+        urls[0],
+        urls[1],
+        urls[2],
+        deduction_income_tax || 0,
+        deduction_other_deductions || 0,
+        deduction_uif || 0,
+        deduction_bonus || 0,
+        deduction_savings || 0,
+        deduction_loan || 0,
+        deduction_damage || 0,
+        loan_amount || 0,
+        new Date(), // 🆕 deduction_date
+      ];
+
+      const result = await client.query(insertEmployeeQuery, insertValues);
+
+      await client.query("COMMIT");
+      return res.status(201).json(result.rows[0]);
+    } catch (err) {
+      await client.query("ROLLBACK");
+      console.error("Error in /api/employees:", err);
+      return res.status(500).json({ error: "Failed to create employee" });
+    }
+  }
+);
+
+
+// Updated 2 May
+app.put(
+  "/api/employees/:id",
+  verifyToken,
+  upload.array("documents", 3),
+  async (req, res) => {
+    const id = req.params.id;
+
     const {
-      // Employee fields
       name,
       surname,
       telephonenum,
@@ -1384,429 +1517,100 @@ app.post("/api/employees", verifyToken, async (req, res) => {
       email,
       password,
       base_salary,
-      
-      // Deduction fields
       deduction_income_tax,
       deduction_other_deductions,
       deduction_uif,
       deduction_bonus,
       deduction_savings,
       deduction_loan,
-      deduction_damage
-    } = req.body
+      deduction_damage,
+      loan_amount,
+    } = req.body;
 
-    // Get subei_reg_num (company_reg_num) from the logged-in user via token
-    const subei_reg_num = req.user.company_reg_num
-
-    if (!subei_reg_num) {
-      return res.status(400).json({ error: "Missing company registration number from token." })
-    }
-
-    // Start a transaction
-    await client.query('BEGIN')
+    const urls = (req.files || []).map((f) => f.location);
+    while (urls.length < 3) urls.push(null);
 
     try {
-      // Hash the password
-      const hashedPassword = await bcrypt.hash(password, 10)
+      await client.query("BEGIN");
 
-      // Insert employee data and get the new userid
-      const employeeResult = await client.query(
-        `INSERT INTO m5_employee (
-          name, surname, telephonenum, cellnum, employeenum, roleid, email, password, 
-          base_salary, subei_reg_num, status
-        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11) RETURNING userid`,
-        [
-          name,
-          surname,
-          telephonenum,
-          cellnum,
-          employeenum,
-          roleid,
-          email,
-          hashedPassword,
-          base_salary,
-          subei_reg_num,
-          true,
-        ]
-      )
+      let hashedPassword;
+      if (password) {
+        hashedPassword = await bcrypt.hash(password, 10);
+      } else {
+        const { rows } = await client.query(
+          "SELECT password FROM m5_employee WHERE userid = $1",
+          [id]
+        );
+        if (rows.length === 0) {
+          throw new Error("Employee not found");
+        }
+        hashedPassword = rows[0].password;
+      }
 
-      const newEmployeeId = employeeResult.rows[0].userid
+      const updateEmpQuery = `
+        UPDATE m5_employee SET
+          name                = $1,
+          surname             = $2,
+          telephonenum        = $3,
+          cellnum             = $4,
+          employeenum         = $5,
+          roleid              = $6,
+          email               = $7,
+          password            = $8,
+          base_salary         = $9,
+          document_url1       = $10,
+          document_url2       = $11,
+          document_url3       = $12,
+          deduction_income_tax        = $13,
+          deduction_other_deductions  = $14,
+          deduction_uif               = $15,
+          deduction_bonus             = $16,
+          deduction_savings           = $17,
+          deduction_loan              = $18,
+          deduction_damage            = $19,
+          loan_amount                 = $20,
+          deduction_date              = $21
+        WHERE userid = $22
+        RETURNING *
+      `;
 
-      // Calculate total deductions
-      const totalDeductions = parseFloat(deduction_income_tax || 0) +
-                             parseFloat(deduction_other_deductions || 0) +
-                             parseFloat(deduction_uif || 0) +
-                             parseFloat(deduction_bonus || 0) +
-                             parseFloat(deduction_savings || 0) +
-                             parseFloat(deduction_loan || 0) +
-                             parseFloat(deduction_damage || 0)
+      const updateEmpValues = [
+        name,
+        surname,
+        telephonenum,
+        cellnum,
+        employeenum,
+        roleid,
+        email,
+        hashedPassword,
+        base_salary,
+        urls[0],
+        urls[1],
+        urls[2],
+        parseFloat(deduction_income_tax || 0),
+        parseFloat(deduction_other_deductions || 0),
+        parseFloat(deduction_uif || 0),
+        parseFloat(deduction_bonus || 0),
+        parseFloat(deduction_savings || 0),
+        parseFloat(deduction_loan || 0),
+        parseFloat(deduction_damage || 0),
+        parseFloat(loan_amount || 0),
+        new Date(), // 🆕 update deduction_date
+        id,
+      ];
 
-      // Insert into wages table
-      await client.query(
-        `INSERT INTO wages (
-          deduction_income_tax, 
-          deduction_other_deductions, 
-          deduction_uif, 
-          deduction_bonus, 
-          deduction_savings, 
-          deduction_loan, 
-          deduction_damage,
-          total_deductions,
-          employeeid,
-          employee_date
-        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)`,
-        [
-          deduction_income_tax || 0,
-          deduction_other_deductions || 0,
-          deduction_uif || 0,
-          deduction_bonus || 0,
-          deduction_savings || 0,
-          deduction_loan || 0,
-          deduction_damage || 0,
-          totalDeductions,
-          newEmployeeId,
-          new Date()
-        ]
-      )
+      const result = await client.query(updateEmpQuery, updateEmpValues);
 
-      // Commit the transaction
-      await client.query('COMMIT')
-
-      // Get the complete employee data to return
-     // Get the complete employee data with wages to return
-const completeEmployeeResult = await client.query(
-  `SELECT 
-      e.userid,
-      e.name,
-      e.surname,
-      e.telephonenum,
-      e.cellnum,
-      e.employeenum,
-      e.roleid,
-      e.email,
-      e.base_salary,
-      e.status,
-      w.deduction_income_tax,
-      w.deduction_other_deductions,
-      w.deduction_uif,
-      w.deduction_bonus,
-      w.deduction_savings,
-      w.deduction_loan,
-      w.deduction_damage
-    FROM m5_employee e
-    LEFT JOIN wages w ON e.userid = w.employeeid
-    WHERE e.userid = $1`,
-  [newEmployeeId]
+      await client.query("COMMIT");
+      res.json(result.rows[0]);
+    } catch (err) {
+      await client.query("ROLLBACK");
+      console.error("Error updating employee:", err);
+      res.status(500).json({ error: err.message || "Failed to update employee" });
+    }
+  }
 );
 
-
-      res.status(201).json(completeEmployeeResult.rows[0])
-    } catch (err) {
-      // If anything goes wrong, roll back the transaction
-      await client.query('ROLLBACK')
-      throw err
-    }
-  } catch (err) {
-    console.error("Error creating employee:", err)
-    res.status(500).json({ error: "Failed to create employee" })
-  }
-})
-
-app.put("/api/employees/:id", verifyToken, async (req, res) => {
-  const { id } = req.params;
-  const {
-    name,
-    surname,
-    telephonenum,
-    cellnum,
-    employeenum,
-    roleid,
-    email,
-    password,
-    base_salary,
-    deduction_income_tax,
-    deduction_other_deductions,
-    deduction_uif,
-    deduction_bonus,
-    deduction_savings,
-    deduction_loan,
-    deduction_damage
-  } = req.body;
-
-  try {
-    await client.query("BEGIN");
-
-    if (password) {
-      const hashedPassword = await bcrypt.hash(password, 10);
-      await client.query(
-        `UPDATE m5_employee SET 
-          name = $1, surname = $2, telephonenum = $3, cellnum = $4, employeenum = $5,
-          roleid = $6, email = $7, password = $8, base_salary = $9
-        WHERE userid = $10`,
-        [
-          name, surname, telephonenum, cellnum, employeenum,
-          roleid, email, hashedPassword, base_salary, id
-        ]
-      );
-    } else {
-      await client.query(
-        `UPDATE m5_employee SET 
-          name = $1, surname = $2, telephonenum = $3, cellnum = $4, employeenum = $5,
-          roleid = $6, email = $7, base_salary = $8
-        WHERE userid = $9`,
-        [
-          name, surname, telephonenum, cellnum, employeenum,
-          roleid, email, base_salary, id
-        ]
-      );
-    }
-
-    const totalDeductions = parseFloat(deduction_income_tax || 0) +
-      parseFloat(deduction_other_deductions || 0) +
-      parseFloat(deduction_uif || 0) +
-      parseFloat(deduction_bonus || 0) +
-      parseFloat(deduction_savings || 0) +
-      parseFloat(deduction_loan || 0) +
-      parseFloat(deduction_damage || 0);
-
-    await client.query(
-      `UPDATE wages SET 
-        deduction_income_tax = $1,
-        deduction_other_deductions = $2,
-        deduction_uif = $3,
-        deduction_bonus = $4,
-        deduction_savings = $5,
-        deduction_loan = $6,
-        deduction_damage = $7,
-        total_deductions = $8
-      WHERE employeeid = $9`,
-      [
-        deduction_income_tax, deduction_other_deductions,
-        deduction_uif, deduction_bonus, deduction_savings,
-        deduction_loan, deduction_damage,
-        totalDeductions, id
-      ]
-    );
-
-    await client.query("COMMIT");
-    res.status(200).json({ message: "Employee updated successfully." });
-  } catch (err) {
-    await client.query("ROLLBACK");
-    console.error(err);
-    res.status(500).json({ error: "Internal server error." });
-  }
-});
-
-
-// Create new subcontractor employee
-// app.post("/api/employees", verifyToken, async (req, res) => {
-//   try {
-//     // Removed role check
-//     const {
-//       name,
-//       surname,
-//       telephonenum,
-//       cellnum,
-//       employeenum,
-//       roleid,
-//       email,
-//       password,
-//       base_salary,
-//       companyname,
-//       location,
-//       truckregnum,
-//       contact_person,
-//       subei_reg_num,
-//       no_of_trucks,
-//     } = req.body
-
-//     // Hash the password
-//     const hashedPassword = await bcrypt.hash(password, 10)
-
-//     const result = await client.query(
-//       `INSERT INTO m5_employee (
-//         name, surname, telephonenum, cellnum, employeenum, roleid, email, password, 
-//         base_salary, companyname, location, truckregnum, contact_person, 
-//         subei_reg_num, no_of_trucks, status
-//       ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16) RETURNING *`,
-//       [
-//         name,
-//         surname,
-//         telephonenum,
-//         cellnum,
-//         employeenum,
-//         roleid,
-//         email,
-//         hashedPassword,
-//         base_salary,
-//         companyname,
-//         location,
-//         truckregnum,
-//         contact_person,
-//         subei_reg_num,
-//         no_of_trucks,
-//         true,
-//       ],
-//     )
-
-//     res.status(201).json(result.rows[0])
-//   } catch (err) {
-//     console.error("Error creating employee:", err)
-//     res.status(500).json({ error: "Failed to create employee" })
-//   }
-// })
-
-// Update employee
-// app.put("/api/employees/:id", verifyToken, async (req, res) => {
-//   try {
-//     const { id } = req.params
-
-//     // Removed role check
-//     // Check if employee exists
-//     const checkResult = await client.query("SELECT * FROM m5_employee WHERE userid = $1", [id])
-
-//     if (checkResult.rows.length === 0) {
-//       return res.status(404).json({ message: "Employee not found" })
-//     }
-
-//     // Build the update query dynamically based on provided fields
-//     const updateFields = []
-//     const queryParams = []
-//     let paramCounter = 1
-
-//     const updateableFields = [
-//       "name",
-//       "surname",
-//       "telephonenum",
-//       "cellnum",
-//       "employeenum",
-//       "roleid",
-//       "email",
-//       "base_salary",
-//       "companyname",
-//       "location",
-//       "truckregnum",
-//       "contact_person",
-//       "no_of_trucks",
-//       "company_reg_num"
-//     ]
-
-//     // Add password to updateable fields if provided
-//     if (req.body.password) {
-//       updateableFields.push("password")
-//       req.body.password = await bcrypt.hash(req.body.password, 10)
-//     }
-
-//     // Build the SET clause
-//     for (const field of updateableFields) {
-//       if (req.body[field] !== undefined) {
-//         updateFields.push(`${field} = $${paramCounter}`)
-//         queryParams.push(req.body[field])
-//         paramCounter++
-//       }
-//     }
-
-//     // If no fields to update, return early
-//     if (updateFields.length === 0) {
-//       return res.status(400).json({ message: "No fields to update" })
-//     }
-
-//     // Add the employee ID as the last parameter
-//     queryParams.push(id)
-
-//     const updateQuery = `
-//       UPDATE m5_employee 
-//       SET ${updateFields.join(", ")} 
-//       WHERE userid = $${paramCounter} 
-//       RETURNING *
-//     `
-
-//     const result = await client.query(updateQuery, queryParams)
-
-//     res.json(result.rows[0])
-//   } catch (err) {
-//     console.error(`Error updating employee ${req.params.id}:`, err)
-//     res.status(500).json({ error: "Failed to update employee" })
-//   }
-// })
-// Update employee
-app.put("/api/employees/:id", verifyToken, async (req, res) => {
-  try {
-    const { id } = req.params;
-
-    // Check if employee exists
-    const checkResult = await client.query("SELECT * FROM m5_employee WHERE userid = $1", [id]);
-
-    if (checkResult.rows.length === 0) {
-      return res.status(404).json({ message: "Employee not found" });
-    }
-
-    // Build the update query dynamically
-    const updateFields = [];
-    const queryParams = [];
-    let paramCounter = 1;
-
-    const updateableFields = [
-      "name",
-      "surname",
-      "telephonenum",
-      "cellnum",
-      "employeenum",
-      "roleid",
-      "email",
-      "base_salary",
-      "companyname",
-      "location",
-      "truckregnum",
-      "contact_person",
-      "no_of_trucks",
-      "company_reg_num"
-    ];
-
-    // Hash password if provided
-    if (req.body.password) {
-      updateableFields.push("password");
-      req.body.password = await bcrypt.hash(req.body.password, 10);
-    }
-
-    for (const field of updateableFields) {
-      if (req.body[field] !== undefined) {
-        updateFields.push(`${field} = $${paramCounter}`);
-        queryParams.push(req.body[field]);
-        paramCounter++;
-      }
-    }
-
-    if (updateFields.length === 0) {
-      return res.status(400).json({ message: "No fields to update" });
-    }
-
-    queryParams.push(id);
-
-    const updateQuery = `
-      UPDATE m5_employee 
-      SET ${updateFields.join(", ")} 
-      WHERE userid = $${paramCounter} 
-      RETURNING *
-    `;
-
-    await client.query(updateQuery, queryParams);
-
-    // Fetch updated employee WITH rolename
-    const employeeWithRole = await client.query(
-      `SELECT e.*, r.rolename 
-       FROM m5_employee e 
-       JOIN roles r ON e.roleid = r.roleid 
-       WHERE e.userid = $1`,
-      [id]
-    );
-
-    res.json(employeeWithRole.rows[0]);
-  } catch (err) {
-    console.error(`Error updating employee ${req.params.id}:`, err);
-    res.status(500).json({ error: "Failed to update employee" });
-  }
-});
 
 
 // Toggle employee status (enable/disable)
@@ -1962,71 +1766,71 @@ app.put("/api/clients/:id", verifyToken, async (req, res) => {
 
 
 // Update client
-app.put("/api/clients/:id", verifyToken, async (req, res) => {
-  try {
-    const { id } = req.params
+// app.put("/api/clients/:id", verifyToken, async (req, res) => {
+//   try {
+//     const { id } = req.params
 
-    // Removed role check
-    // Check if client exists
-    const checkResult = await client.query("SELECT * FROM m5_client WHERE m5clientkey = $1", [id])
+//     // Removed role check
+//     // Check if client exists
+//     const checkResult = await client.query("SELECT * FROM m5_client WHERE m5clientkey = $1", [id])
 
-    if (checkResult.rows.length === 0) {
-      return res.status(404).json({ message: "Client not found" })
-    }
+//     if (checkResult.rows.length === 0) {
+//       return res.status(404).json({ message: "Client not found" })
+//     }
 
-    // Build the update query dynamically based on provided fields
-    const updateFields = []
-    const queryParams = []
-    let paramCounter = 1
+//     // Build the update query dynamically based on provided fields
+//     const updateFields = []
+//     const queryParams = []
+//     let paramCounter = 1
 
-    const updateableFields = [
-      "client",
-      "representative",
-      "companyaddress",
-      "suburb",
-      "postalcode",
-      "email",
-      "companyregnum",
-      "cellnum",
-      "vatregno",
-      "city",
-      "streetaddress",
-      "payment_type",
-      "company_reg_num"
-    ]
+//     const updateableFields = [
+//       "client",
+//       "representative",
+//       "companyaddress",
+//       "suburb",
+//       "postalcode",
+//       "email",
+//       "companyregnum",
+//       "cellnum",
+//       "vatregno",
+//       "city",
+//       "streetaddress",
+//       "payment_type",
+//       "company_reg_num"
+//     ]
 
-    // Build the SET clause
-    for (const field of updateableFields) {
-      if (req.body[field] !== undefined) {
-        updateFields.push(`${field} = $${paramCounter}`)
-        queryParams.push(req.body[field])
-        paramCounter++
-      }
-    }
+//     // Build the SET clause
+//     for (const field of updateableFields) {
+//       if (req.body[field] !== undefined) {
+//         updateFields.push(`${field} = $${paramCounter}`)
+//         queryParams.push(req.body[field])
+//         paramCounter++
+//       }
+//     }
 
-    // If no fields to update, return early
-    if (updateFields.length === 0) {
-      return res.status(400).json({ message: "No fields to update" })
-    }
+//     // If no fields to update, return early
+//     if (updateFields.length === 0) {
+//       return res.status(400).json({ message: "No fields to update" })
+//     }
 
-    // Add the client ID as the last parameter
-    queryParams.push(id)
+//     // Add the client ID as the last parameter
+//     queryParams.push(id)
 
-    const updateQuery = `
-      UPDATE m5_client 
-      SET ${updateFields.join(", ")} 
-      WHERE m5clientkey = $${paramCounter} 
-      RETURNING *
-    `
+//     const updateQuery = `
+//       UPDATE m5_client 
+//       SET ${updateFields.join(", ")} 
+//       WHERE m5clientkey = $${paramCounter} 
+//       RETURNING *
+//     `
 
-    const result = await client.query(updateQuery, queryParams)
+//     const result = await client.query(updateQuery, queryParams)
 
-    res.json(result.rows[0])
-  } catch (err) {
-    console.error(`Error updating client ${req.params.id}:`, err)
-    res.status(500).json({ error: "Failed to update client" })
-  }
-})
+//     res.json(result.rows[0])
+//   } catch (err) {
+//     console.error(`Error updating client ${req.params.id}:`, err)
+//     res.status(500).json({ error: "Failed to update client" })
+//   }
+// })
 
 // Delete client
 app.delete("/api/clients/:id", verifyToken, async (req, res) => {
@@ -2086,11 +1890,43 @@ app.get("/api/trucks/:id", verifyToken, async (req, res) => {
     res.status(500).json({ error: "Failed to fetch truck" })
   }
 })
+// Create the v3 S3 client
+const s3Client = new S3Client({
+  region: process.env.AWS_REGION, // e.g., 'us-east-1' or 'af-south-1'
+  credentials: {
+    accessKeyId: process.env.Trucks_AWS_ACCESS_KEY_ID,
+    secretAccessKey: process.env.Trucks_AWS_SECRET_ACCESS_KEY,
+  },
+});
 
-// Create new truck
-app.post("/api/trucks", verifyToken, async (req, res) => {
+// Configure multer to use multer-s3-v3 with the v3 S3 client
+const upload2 = multer({
+  storage: multerS3({
+    s3: s3Client, // using the v3 client from @aws-sdk/client-s3
+    bucket: process.env.Trucks_AWS_BUCKET_NAME, // your bucket name
+    key: (req, file, cb) => {
+      // In the form data, ensure 'truckregnum' is provided.
+      const truckregnum = req.body.truckregnum || 'default';
+      const uniqueName = `${Date.now()}_${file.originalname}`;
+      // Files are stored under a folder named after truckregnum.
+      cb(null, `Trucks/${truckregnum}/${uniqueName}`);
+    },
+  }),
+  limits: { fileSize: 10 * 1024 * 1024 }, // e.g., 10 MB limit
+  fileFilter: (req, file, cb) => {
+    // Allow only PDF files.
+    if (file.mimetype === 'application/pdf') {
+      cb(null, true);
+    } else {
+      cb(new Error('Invalid file type, only PDF documents are allowed!'), false);
+    }
+  },
+});
+
+// Use the correct upload instance (upload2) in your route:
+app.post('/api/trucks', verifyToken, upload2.array('documents', 3), async (req, res) => {
   try {
-    // Removed role check
+    // Destructure truck details from the request body.
     const {
       truckregnum,
       trailersize,
@@ -2100,14 +1936,36 @@ app.post("/api/trucks", verifyToken, async (req, res) => {
       purchase_price,
       current_evaluation,
       vin_num,
-      is_subcontractor
-    } = req.body
+      is_subcontractor,
+    } = req.body;
 
+    // Map the uploaded files to their S3 URLs.
+    const fileUrls = req.files && req.files.length
+      ? req.files.map(file => file.location)
+      : [];
+
+    // Map URLs to their corresponding database columns.
+    const document_url1 = fileUrls[0] || null;
+    const document_url2 = fileUrls[1] || null;
+    const document_url3 = fileUrls[2] || null;
+
+    // Insert truck and document details in the database.
     const result = await client.query(
       `INSERT INTO m5_trucks (
-        truckregnum, trailersize, truckpurchasedate, year, model,
-        purchase_price, current_evaluation, vin_num, is_subcontractor
-      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) RETURNING *`,
+         truckregnum,
+         trailersize,
+         truckpurchasedate,
+         year,
+         model,
+         purchase_price,
+         current_evaluation,
+         vin_num,
+         is_subcontractor,
+         document_url1,
+         document_url2,
+         document_url3
+       ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
+       RETURNING *`,
       [
         truckregnum,
         trailersize,
@@ -2117,21 +1975,25 @@ app.post("/api/trucks", verifyToken, async (req, res) => {
         purchase_price,
         current_evaluation,
         vin_num,
-        is_subcontractor
-      ],
-    )
+        is_subcontractor,
+        document_url1,
+        document_url2,
+        document_url3,
+      ]
+    );
 
-    res.status(201).json(result.rows[0])
+    res.status(201).json(result.rows[0]);
   } catch (err) {
-    console.error("Error creating truck:", err)
-    res.status(500).json({ error: "Failed to create truck" })
+    console.error("Error creating truck:", err);
+    res.status(500).json({ error: "Failed to create truck" });
   }
-})
+});
+
 
 // Update existing truck
-app.put("/api/trucks/:id", verifyToken, async (req, res) => {
+app.put("/api/trucks/:id", verifyToken, upload2.array('documents', 3), async (req, res) => {
   try {
-    const { id } = req.params
+    const { id } = req.params;
     const {
       truckregnum,
       trailersize,
@@ -2142,7 +2004,14 @@ app.put("/api/trucks/:id", verifyToken, async (req, res) => {
       current_evaluation,
       vin_num,
       is_subcontractor
-    } = req.body
+    } = req.body;
+
+    // If new documents are provided, process them.
+    let fileUrls = [];
+    if (req.files && req.files.length) {
+      fileUrls = req.files.map(file => file.location);
+      // Optionally merge these newly uploaded file URLs with any already stored.
+    }
 
     const query = `
       UPDATE m5_trucks SET
@@ -2156,7 +2025,7 @@ app.put("/api/trucks/:id", verifyToken, async (req, res) => {
         vin_num = $8,
         is_subcontractor = $9
       WHERE m5truckskey = $10
-      RETURNING *`
+      RETURNING *`;
 
     const values = [
       truckregnum,
@@ -2169,85 +2038,24 @@ app.put("/api/trucks/:id", verifyToken, async (req, res) => {
       vin_num,
       is_subcontractor,
       id
-    ]
+    ];
 
-    const result = await client.query(query, values)
+    const result = await client.query(query, values);
 
     if (result.rowCount === 0) {
-      return res.status(404).json({ error: "Truck not found" })
+      return res.status(404).json({ error: "Truck not found" });
     }
 
-    res.json(result.rows[0])
+    let truck = result.rows[0];
+    truck.documents = fileUrls; // update as needed – you may want to merge with previous docs.
+
+    res.json(truck);
   } catch (err) {
-    console.error("Error updating truck:", err)
-    res.status(500).json({ error: "Failed to update truck" })
+    console.error("Error updating truck:", err);
+    res.status(500).json({ error: "Failed to update truck" });
   }
-})
+});
 
-
-// Update truck
-// app.put("/api/trucks/:id", verifyToken, async (req, res) => {
-//   try {
-//     const { id } = req.params
-
-//     // Removed role check
-//     // Check if truck exists
-//     const checkResult = await client.query("SELECT * FROM m5_trucks WHERE m5truckskey = $1", [id])
-
-//     if (checkResult.rows.length === 0) {
-//       return res.status(404).json({ message: "Truck not found" })
-//     }
-
-//     // Build the update query dynamically based on provided fields
-//     const updateFields = []
-//     const queryParams = []
-//     let paramCounter = 1
-
-//     const updateableFields = [
-//       "truckregnum",
-//       "trailersize",
-//       "truckpurchasedate",
-//       "year",
-//       "model",
-//       "purchase_price",
-//       "current_evaluation",
-//       "vin_num",
-//       "is_subcontractor",
-//       "company_reg_num"
-//     ]
-
-//     // Build the SET clause
-//     for (const field of updateableFields) {
-//       if (req.body[field] !== undefined) {
-//         updateFields.push(`${field} = $${paramCounter}`)
-//         queryParams.push(req.body[field])
-//         paramCounter++
-//       }
-//     }
-
-//     // If no fields to update, return early
-//     if (updateFields.length === 0) {
-//       return res.status(400).json({ message: "No fields to update" })
-//     }
-
-//     // Add the truck ID as the last parameter
-//     queryParams.push(id)
-
-//     const updateQuery = `
-//       UPDATE m5_trucks 
-//       SET ${updateFields.join(", ")} 
-//       WHERE m5truckskey = $${paramCounter} 
-//       RETURNING *
-//     `
-
-//     const result = await client.query(updateQuery, queryParams)
-
-//     res.json(result.rows[0])
-//   } catch (err) {
-//     console.error(`Error updating truck ${req.params.id}:`, err)
-//     res.status(500).json({ error: "Failed to update truck" })
-//   }
-// })
 
 // Delete truck
 app.delete("/api/trucks/:id", verifyToken, async (req, res) => {
@@ -2569,49 +2377,62 @@ app.post("/api/subcontractors", verifyToken, async (req, res) => {
   }
 });
 
-
-
-
-
 // Update subcontractor
 
 app.put("/api/subcontractors/:id", verifyToken, async (req, res) => {
-  try {
-    const { id } = req.params;
-    const {
-      cellnum, email, companyname, location,
-      truckregnum, contact_person, subei_reg_num,
-      no_of_trucks, subdrivername
-    } = req.body;
+  const { id } = req.params;
+  const {
+    cellnum, email, companyname, location, truckregnum,
+    contact_person, subei_reg_num, no_of_trucks, subdrivername
+  } = req.body;
 
-    // Validate input as needed...
+  try {
+    console.log("🔍 Raw subdrivername value in PUT:", subdrivername);
+
+    // Convert subdrivername to array format - same as in POST endpoint
+    const subdriverArray = Array.isArray(subdrivername)
+      ? subdrivername
+      : typeof subdrivername === "string"
+      ? subdrivername.split(",").map(name => name.trim()).filter(Boolean)
+      : [];
+
+    console.log("✅ Final subdriverArray for update:", subdriverArray);
 
     const updateQuery = `
-      UPDATE subcontractors SET
-        companyname = $1,
-        location = $2,
-        contact_person = $3,
-        cellnum = $4,
-        email = $5,
-        subei_reg_num = $6,
-        no_of_trucks = $7,
-        truckregnum = $8,
+      UPDATE m5_employee SET
+        cellnum = $1,
+        email = $2,
+        companyname = $3,
+        location = $4,
+        truckregnum = $5,
+        contact_person = $6,
+        subei_reg_num = $7,
+        no_of_trucks = $8,
         subdrivername = $9
-      WHERE id = $10
+      WHERE userid = $10
+      RETURNING *;
     `;
+    const values = [
+      cellnum, email, companyname, location, truckregnum,
+      contact_person, subei_reg_num, no_of_trucks, subdriverArray, id
+    ];
 
-    await client.query(updateQuery, [
-      companyname, location, contact_person,
-      cellnum, email, subei_reg_num,
-      no_of_trucks, truckregnum, subdrivername, id
-    ]);
+    console.log("📦 Update values:", values);
 
-    res.status(200).json({ message: "Subcontractor updated successfully." });
+    const result = await client.query(updateQuery, values);
+
+    if (result.rowCount === 0) {
+      return res.status(404).json({ error: "Subcontractor not found" });
+    }
+
+    res.json(result.rows[0]);
   } catch (error) {
-    console.error("Update error:", error);
-    res.status(500).json({ error: "Failed to update subcontractor." });
+    console.error("❌ Update error:", error.message);
+    res.status(500).json({ error: "Failed to update subcontractor: " + error.message });
   }
 });
+
+
 
 // app.put("/api/subcontractors/:id", verifyToken, async (req, res) => {
 //   try {
@@ -2691,7 +2512,7 @@ app.put("/api/subcontractors/:id/toggle-status", verifyToken, async (req, res) =
 
     // Removed role check
     // Check if subcontractor exists
-    const checkResult = await client.query("SELECT * FROM m5_employee WHERE userid = $1 AND roleid = 4", [id])
+    const checkResult = await client.query("SELECT * FROM m5_employee WHERE userid = $1 AND roleid = 6", [id])
 
     if (checkResult.rows.length === 0) {
       return res.status(404).json({ message: "Subcontractor not found" })
@@ -2699,7 +2520,7 @@ app.put("/api/subcontractors/:id/toggle-status", verifyToken, async (req, res) =
 
     // Update the status
     const updateResult = await client.query(
-      "UPDATE m5_employee SET status = $1 WHERE userid = $2 AND roleid = 4 RETURNING *",
+      "UPDATE m5_employee SET status = $1 WHERE userid = $2 AND roleid =6  RETURNING *",
       [status, id],
     )
 

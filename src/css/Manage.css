@@ -117,6 +117,20 @@ tr:hover {
   font-size: 14px;
   transition: background-color 0.3s, transform 0.2s;
 }
+/* Optionally, style delete buttons if used */
+.manage-enable-button {
+  background-color: green;
+  color: white;
+  border: none;
+  cursor: pointer;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  padding: 8px 12px;
+  border-radius: 4px;
+  font-size: 14px;
+  transition: background-color 0.3s, transform 0.2s;
+}
 
 .manage-delete-button:hover {
   background-color: #c0392b;

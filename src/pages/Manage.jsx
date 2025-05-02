@@ -25,6 +25,12 @@ const [editingClientId, setEditingClientId] = useState(null)
 const [isEditingRate, setIsEditingRate] = useState(false)
 const [editingRateId, setEditingRateId] = useState(null)
 const [editTruckId, setEditTruckId] = useState(null)
+const [selectedFiles, setSelectedFiles] = useState([]);
+const [isEditMode, setIsEditMode] = useState(false);
+const [subcontractorId, setSubcontractorId] = useState(null);
+const [numTrucks, setNumTrucks] = useState(1);
+
+
 
 
 
@@ -49,17 +55,22 @@ const [newEmployee, setNewEmployee] = useState({
   email: "",
   password: "",
   base_salary: "",
-  status: true,
-  documents: [], // ✅ Initialize as empty array to avoid undefined
-  // Deduction fields
+  // we no longer send `status` in the body
+  documents: [],
+
+  // Deduction fields (now stored on m5_employee)
   deduction_income_tax: "",
   deduction_other_deductions: "",
   deduction_uif: "",
   deduction_bonus: "",
   deduction_savings: "",
   deduction_loan: "",
-  deduction_damage: ""
-})
+  deduction_damage: "",
+
+  // New loan_amount field (you added this column server-side)
+  loan_amount: "",
+});
+
 
   const [newClient, setNewClient] = useState({
     client: "",
@@ -97,6 +108,19 @@ const [newEmployee, setNewEmployee] = useState({
   })
   
 
+  // const [newSubcontractor, setNewSubcontractor] = useState({
+  //   companyname: "",
+  //   location: "",
+  //   contact_person: "",
+  //   cellnum: "",
+  //   email: "",
+  //   subei_reg_num: "",
+  //   no_of_trucks: 0,
+  //   truckregnum: "", // Will store comma-separated truck registration numbers
+  //   SubDriverName: "", // Will store comma-separated driver names
+  //   // Keep trucks array for UI management, but we'll extract values before sending
+  //   trucks: []
+  // })
   const [newSubcontractor, setNewSubcontractor] = useState({
     companyname: "",
     location: "",
@@ -105,11 +129,12 @@ const [newEmployee, setNewEmployee] = useState({
     email: "",
     subei_reg_num: "",
     no_of_trucks: 0,
-    truckregnum: "", // Will store comma-separated truck registration numbers
-    SubDriverName: "", // Will store comma-separated driver names
-    // Keep trucks array for UI management, but we'll extract values before sending
-    trucks: []
-  })
+    trucks: [{ reg: "", driver: "" }]  // always at least one for input visibility
+  });
+  
+
+ 
+  
 
   // Get auth token from localStorage
   const getAuthToken = () => {
@@ -162,57 +187,278 @@ const [newEmployee, setNewEmployee] = useState({
     }
   }
 
-  // Handle form submissions
-  const handleSaveEmployee = async () => {
-    if (!newEmployee.name || !newEmployee.surname || !newEmployee.email || !newEmployee.password) {
-      alert("Please fill in all required fields.");
-      return;
-    }
+// Handle form submissions
+// const handleSaveEmployee = async () => {
+//   if (
+//     !newEmployee.name ||
+//     !newEmployee.surname ||
+//     !newEmployee.email ||
+//     !newEmployee.password
+//   ) {
+//     alert("Please fill in all required fields.");
+//     return;
+//   }
+
+//   setLoading(true);
+
+//   try {
+//     const formData = new FormData();
+//     // Append text fields
+//     formData.append("name", newEmployee.name);
+//     formData.append("surname", newEmployee.surname);
+//     formData.append("telephonenum", newEmployee.telephonenum || "");
+//     formData.append("cellnum", newEmployee.cellnum || "");
+//     formData.append("employeenum", newEmployee.employeenum || "");
+//     formData.append("roleid", newEmployee.roleid || "");
+//     formData.append("email", newEmployee.email);
+//     formData.append("password", newEmployee.password);
+//     formData.append("base_salary", newEmployee.base_salary || "");
+//     formData.append("status", newEmployee.status);
+//     formData.append("deduction_income_tax", newEmployee.deduction_income_tax || "");
+//     formData.append("deduction_other_deductions", newEmployee.deduction_other_deductions || "");
+//     formData.append("deduction_uif", newEmployee.deduction_uif || "");
+//     formData.append("deduction_bonus", newEmployee.deduction_bonus || "");
+//     formData.append("deduction_savings", newEmployee.deduction_savings || "");
+//     formData.append("deduction_loan", newEmployee.deduction_loan || "");
+//     formData.append("deduction_damage", newEmployee.deduction_damage || "");
+
+//     // Append each file (make sure the file input is configured to pass valid File objects)
+//     // selectedFiles.forEach((file) => {
+//     //   formData.append("documents", file);
+//     // });
+//        // Append each file (using newEmployee.documents instead of selectedFiles)
+//        newEmployee.documents.forEach((file) => {
+//         formData.append("documents", file);
+//       });
+
+//     // Debug: log FormData entries (note: file objects only show the name property)
+//     for (let pair of formData.entries()) {
+//       console.log(pair[0] + ": " + (typeof pair[1] === 'object' ? pair[1].name : pair[1]));
+//     }
+
+//     await axios.post(`${API_URL}/employees`, formData, {
+//       headers: {
+//         "Content-Type": "multipart/form-data",
+//         ...getAuthHeaders().headers,
+//       },
+//     });
+
+//     // Refresh list and reset form state
+//     const employeesResponse = await axios.get(`${API_URL}/employees`, getAuthHeaders());
+//     setEmployees(employeesResponse.data);
+//     setNewEmployee({
+//       name: "",
+//       surname: "",
+//       telephonenum: "",
+//       cellnum: "",
+//       employeenum: "",
+//       roleid: "",
+//       email: "",
+//       password: "",
+//       base_salary: "",
+//       status: true,
+//       documents: [],
+//       deduction_income_tax: "",
+//       deduction_other_deductions: "",
+//       deduction_uif: "",
+//       deduction_bonus: "",
+//       deduction_savings: "",
+//       deduction_loan: "",
+//       deduction_damage: "",
+//     });
+//     setSelectedFiles([]);
+//     setShowEmployeeForm(false);
+//   } catch (err) {
+//     console.error("Error saving employee:", err);
+//     alert(`Error saving employee: ${err.response?.data?.error || err.message}`);
+//   } finally {
+//     setLoading(false);
+//   }
+// };
+// const handleSaveEmployee = async () => {
+//   if (
+//     !newEmployee.name ||
+//     !newEmployee.surname ||
+//     !newEmployee.email ||
+//     !newEmployee.password
+//   ) {
+//     alert("Please fill in all required fields.");
+//     return;
+//   }
+
+//   setLoading(true);
+
+//   try {
+//     const formData = new FormData();
+
+//     // Append text fields
+//     [
+//       "name","surname","telephonenum","cellnum","employeenum",
+//       "roleid","email","password","base_salary",
+//       "deduction_income_tax","deduction_other_deductions","deduction_uif",
+//       "deduction_bonus","deduction_savings","deduction_loan","deduction_damage",
+//       "loan_amount"           // ← new field
+//     ].forEach((field) => {
+//       formData.append(field, newEmployee[field] || "");
+//     });
+
+//     // Append files
+//     newEmployee.documents.forEach((file) => {
+//       formData.append("documents", file);
+//     });
+
+//     // Debug
+//     console.log("Posting to:", `${API_URL}/employees`);
+//     for (let [key, val] of formData.entries()) {
+//       console.log(key, val instanceof File ? val.name : val);
+//     }
+
+//     // POST to the working endpoint
+//     await axios.post(`${API_URL}/employees`, formData, {
+//       headers: {
+//         "Content-Type": "multipart/form-data",
+//         ...getAuthHeaders().headers,
+//       },
+//     });
+
+//     // Refresh list
+//     const employeesResponse = await axios.get(
+//       `${API_URL}/employees`,
+//       getAuthHeaders()
+//     );
+//     setEmployees(employeesResponse.data);
+
+//     // Reset form
+//     setNewEmployee({
+//       name: "",
+//       surname: "",
+//       telephonenum: "",
+//       cellnum: "",
+//       employeenum: "",
+//       roleid: "",
+//       email: "",
+//       password: "",
+//       base_salary: "",
+//       documents: [],
+//       deduction_income_tax: "",
+//       deduction_other_deductions: "",
+//       deduction_uif: "",
+//       deduction_bonus: "",
+//       deduction_savings: "",
+//       deduction_loan: "",
+//       deduction_damage: "",
+//       loan_amount: "",      // reset new field
+//     });
+//     setSelectedFiles([]);
+//     setShowEmployeeForm(false);
+
+//   } catch (err) {
+//     console.error("Error saving employee:", err);
+//     alert(`Error saving employee: ${err.response?.data?.error || err.message}`);
+//   } finally {
+//     setLoading(false);
+//   }
+// };
+
+//updated to handle editing (2May)
+const handleSaveEmployee = async () => {
+  // 1️⃣ Validate required fields
+  if (
+    !newEmployee.name ||
+    !newEmployee.surname ||
+    !newEmployee.email ||
+    (!editingEmployeeId && !newEmployee.password) // only require password when creating
+  ) {
+    alert("Please fill in all required fields.");
+    return;
+  }
+
+  setLoading(true);
+  try {
+    // 2️⃣ Build FormData
+    const formData = new FormData();
+    // Append all scalar fields except documents
+    [
+      "name",
+      "surname",
+      "telephonenum",
+      "cellnum",
+      "employeenum",
+      "roleid",
+      "email",
+      "password",         // will be blank on edit
+      "base_salary",
+      "deduction_income_tax",
+      "deduction_other_deductions",
+      "deduction_uif",
+      "deduction_bonus",
+      "deduction_savings",
+      "deduction_loan",
+      "deduction_damage",
+      "loan_amount"
+    ].forEach((field) => {
+      // On edit, skip password if empty
+      if (field === "password" && editingEmployeeId && !newEmployee.password) return;
+      formData.append(field, newEmployee[field] ?? "");
+    });
+    // Append up to 3 PDF files
+    newEmployee.documents.forEach((file) => {
+      formData.append("documents", file);
+    });
+
+    // 3️⃣ Determine URL & HTTP method
+    const url = editingEmployeeId
+      ? `${API_URL}/employees/${editingEmployeeId}`
+      : `${API_URL}/employees`;
+    const method = editingEmployeeId ? "put" : "post";
+
+    // 4️⃣ Send request
+    await axios[method](url, formData, {
+      headers: {
+        "Content-Type": "multipart/form-data",
+        ...getAuthHeaders().headers,
+      },
+    });
+
+    // 5️⃣ Refresh the list
+    const { data } = await axios.get(`${API_URL}/employees`, getAuthHeaders());
+    setEmployees(data);
+
+    // 6️⃣ Reset form state
+    setNewEmployee({
+      name: "",
+      surname: "",
+      telephonenum: "",
+      cellnum: "",
+      employeenum: "",
+      roleid: "",
+      email: "",
+      password: "",
+      base_salary: "",
+      documents: [],
+      deduction_income_tax: "",
+      deduction_other_deductions: "",
+      deduction_uif: "",
+      deduction_bonus: "",
+      deduction_savings: "",
+      deduction_loan: "",
+      deduction_damage: "",
+      loan_amount: "",
+    });
+    setEditingEmployeeId(null);
+    setShowEmployeeForm(false);
+
+  } catch (err) {
+    console.error("Error saving employee:", err);
+    alert(`Error: ${err.response?.data?.error || err.message}`);
+  } finally {
+    setLoading(false);
+  }
+};
+
+ 
+
   
-    setLoading(true);
-  
-    try {
-      if (editingEmployeeId) {
-        // Update existing employee
-        await axios.put(`${API_URL}/employees/${editingEmployeeId}`, newEmployee, getAuthHeaders());
-      } else {
-        // Create new employee
-        await axios.post(`${API_URL}/employees`, newEmployee, getAuthHeaders());
-      }
-  
-      // Refresh employee list
-      const employeesResponse = await axios.get(`${API_URL}/employees`, getAuthHeaders());
-      setEmployees(employeesResponse.data);
-  
-      // Reset form and editing state
-      setNewEmployee({
-        name: "",
-        surname: "",
-        telephonenum: "",
-        cellnum: "",
-        employeenum: "",
-        rolename: "",
-        email: "",
-        password: "",
-        base_salary: "",
-        status: true,
-        deduction_income_tax: "",
-        deduction_other_deductions: "",
-        deduction_uif: "",
-        deduction_bonus: "",
-        deduction_savings: "",
-        deduction_loan: "",
-        deduction_damage: "",
-      });
-      setEditingEmployeeId(null); // Clear editing state
-      setShowEmployeeForm(false);
-    } catch (err) {
-      console.error("Error saving employee:", err);
-      alert(`Error saving employee: ${err.response?.data?.error || err.message}`);
-    } finally {
-      setLoading(false);
-    }
-  };
   
   const handleSaveClient = async () => {
     if (!newClient.client || !newClient.representative || !newClient.email) {
@@ -259,24 +505,54 @@ const [newEmployee, setNewEmployee] = useState({
     }
   }
   
-
   const handleSaveTruck = async () => {
     if (!newTruck.truckregnum || !newTruck.trailersize) {
-      alert("Please fill in all required fields.")
-      return
+      alert("Please fill in all required fields.");
+      return;
     }
   
-    setLoading(true)
+    setLoading(true);
+  
+    // Create a FormData object to hold form values and files
+    const formData = new FormData();
+    formData.append("truckregnum", newTruck.truckregnum);
+    formData.append("trailersize", newTruck.trailersize);
+    formData.append("truckpurchasedate", newTruck.truckpurchasedate);
+    formData.append("year", newTruck.year);
+    formData.append("model", newTruck.model);
+    formData.append("purchase_price", newTruck.purchase_price);
+    formData.append("current_evaluation", newTruck.current_evaluation);
+    formData.append("vin_num", newTruck.vin_num);
+    formData.append("is_subcontractor", newTruck.is_subcontractor);
+  
+    // Append each uploaded document to the FormData object
+    if (newTruck.documents && newTruck.documents.length) {
+      newTruck.documents.forEach((file) => {
+        formData.append("documents", file);
+      });
+    }
+  
     try {
       if (editTruckId) {
-        await axios.put(`${API_URL}/trucks/${editTruckId}`, newTruck, getAuthHeaders())
+        await axios.put(`${API_URL}/trucks/${editTruckId}`, formData, {
+          headers: {
+            ...getAuthHeaders().headers,
+            "Content-Type": "multipart/form-data"
+          }
+        });
       } else {
-        await axios.post(`${API_URL}/trucks`, newTruck, getAuthHeaders())
+        await axios.post(`${API_URL}/trucks`, formData, {
+          headers: {
+            ...getAuthHeaders().headers,
+            "Content-Type": "multipart/form-data"
+          }
+        });
       }
   
-      const trucksResponse = await axios.get(`${API_URL}/trucks`, getAuthHeaders())
-      setTrucks(trucksResponse.data)
+      const trucksResponse = await axios.get(`${API_URL}/trucks`, getAuthHeaders());
+      setTrucks(trucksResponse.data);
   
+      // Reset the form state after successful submission
       setNewTruck({
         truckregnum: "",
         trailersize: "",
@@ -287,16 +563,17 @@ const [newEmployee, setNewEmployee] = useState({
         current_evaluation: "",
         vin_num: "",
         is_subcontractor: false,
-      })
-      setEditTruckId(null)
-      setShowTruckForm(false)
+        documents: [] // Reset document array as well
+      });
+      setEditTruckId(null);
+      setShowTruckForm(false);
     } catch (err) {
-      console.error(editTruckId ? "Error updating truck:" : "Error creating truck:", err)
-      alert(`Error: ${err.response?.data?.error || err.message}`)
+      console.error(editTruckId ? "Error updating truck:" : "Error creating truck:", err);
+      alert(`Error: ${err.response?.data?.error || err.message}`);
     } finally {
-      setLoading(false)
+      setLoading(false);
     }
-  }
+  };
   
 
   const handleSaveDriverRate = async () => {
@@ -346,10 +623,62 @@ const [newEmployee, setNewEmployee] = useState({
   }
   
   
+// const handleSaveSubcontractor = async () => {
+//   setLoading(true);
+
+//   try {
+//     const truckRegNums = newSubcontractor.trucks
+//       .map(truck => truck.reg.trim())
+//       .filter(Boolean)
+//       .join(',');
+
+//     const subDriverNames = newSubcontractor.trucks
+//       .map(truck => truck.driver.trim())
+//       .filter(Boolean)
+//       .join(',');
+
+//     const payload = {
+//       companyname: newSubcontractor.companyname,
+//       location: newSubcontractor.location,
+//       contact_person: newSubcontractor.contact_person,
+//       cellnum: newSubcontractor.cellnum,
+//       email: newSubcontractor.email,
+//       subei_reg_num: newSubcontractor.subei_reg_num,
+//       no_of_trucks: newSubcontractor.no_of_trucks,
+//       truckregnum: truckRegNums,
+//       subdrivername: subDriverNames
+//     };
+
+//     await axios.post(`${API_URL}/subcontractors`, payload, getAuthHeaders());
+
+//     const subcontractorsResponse = await axios.get(`${API_URL}/subcontractors`, getAuthHeaders());
+//     setSubcontractors(subcontractorsResponse.data);
+
+//     setNewSubcontractor({
+//       companyname: "",
+//       location: "",
+//       contact_person: "",
+//       cellnum: "",
+//       email: "",
+//       subei_reg_num: "",
+//       no_of_trucks: "",
+//       trucks: [{ reg: "", driver: "" }]
+//     });
+
+//     setShowSubcontractorForm(false);
+//   } catch (err) {
+//     console.error("Error saving subcontractor:", err);
+//     alert(`Error: ${err.response?.data?.error || err.message}`);
+//   } finally {
+//     setLoading(false);
+//   }
+// };
+
 const handleSaveSubcontractor = async () => {
   setLoading(true);
 
   try {
+    // Prepare truck data
     const truckRegNums = newSubcontractor.trucks
       .map(truck => truck.reg.trim())
       .filter(Boolean)
@@ -360,6 +689,7 @@ const handleSaveSubcontractor = async () => {
       .filter(Boolean)
       .join(',');
 
+    // Prepare payload
     const payload = {
       companyname: newSubcontractor.companyname,
       location: newSubcontractor.location,
@@ -372,11 +702,21 @@ const handleSaveSubcontractor = async () => {
       subdrivername: subDriverNames
     };
 
-    await axios.post(`${API_URL}/subcontractors`, payload, getAuthHeaders());
+    // Determine method and URL
+    const url = isEditMode
+      ? `${API_URL}/subcontractors/${subcontractorId}`
+      : `${API_URL}/subcontractors`;
 
+    const method = isEditMode ? axios.put : axios.post;
+
+    // Save the subcontractor
+    await method(url, payload, getAuthHeaders());
+
+    // Refresh list after saving
     const subcontractorsResponse = await axios.get(`${API_URL}/subcontractors`, getAuthHeaders());
     setSubcontractors(subcontractorsResponse.data);
 
+    // Reset form
     setNewSubcontractor({
       companyname: "",
       location: "",
@@ -389,6 +729,7 @@ const handleSaveSubcontractor = async () => {
     });
 
     setShowSubcontractorForm(false);
+    alert(isEditMode ? "Subcontractor updated!" : "Subcontractor added!");
   } catch (err) {
     console.error("Error saving subcontractor:", err);
     alert(`Error: ${err.response?.data?.error || err.message}`);
@@ -396,6 +737,7 @@ const handleSaveSubcontractor = async () => {
     setLoading(false);
   }
 };
+
 
   
 
@@ -535,13 +877,25 @@ const handleSaveSubcontractor = async () => {
                   <td>{employee.employeenum}</td>
                   <td>{employee.rolename}</td>
                   <td>
-                    <button className="manage-view-button" onClick={() => handleEditEmployee(employee.userid)}>
+                    <button
+                      className="manage-view-button"
+                      onClick={() => handleEditEmployee(employee.userid)}
+                    >
                       Edit
                     </button>
                   </td>
                   <td>
-                    <button className="manage-delete-button" onClick={() => handleDisableEmployee(employee.userid)}>
-                      Disable
+                    <button
+                      className={
+                        employee.status
+                          ? "manage-delete-button"
+                          : "manage-enable-button"
+                      }
+                      onClick={() =>
+                        handleToggleEmployee(employee.userid, employee.status)
+                      }
+                    >
+                      {employee.status ? "Disable" : "Enable"}
                     </button>
                   </td>
                 </tr>
@@ -550,7 +904,10 @@ const handleSaveSubcontractor = async () => {
           </table>
         </div>
       )}
-      <button className="manage-add-employee-button" onClick={handleAddEmployee}>
+      <button
+        className="manage-add-employee-button"
+        onClick={handleAddEmployee}
+      >
         Add Employee
       </button>
     </>
@@ -601,7 +958,35 @@ const handleSaveSubcontractor = async () => {
       </button>
     </>
   )
+// Generalized toggle handler
+const handleToggleEmployee = async (id, currentStatus) => {
+  setLoading(true)
+  try {
+    // Flip the status
+    const newStatus = !currentStatus
+    await axios.put(
+      `${API_URL}/employees/${id}/toggle-status`,
+      { status: newStatus },
+      getAuthHeaders()
+    )
 
+    // Refresh the list
+    const { data } = await axios.get(
+      `${API_URL}/employees`,
+      getAuthHeaders()
+    )
+    setEmployees(data)
+  } catch (err) {
+    console.error(`Error toggling employee ${id}:`, err)
+    alert(
+      `Error ${currentStatus ? "disabling" : "enabling"} employee: ${
+        err.response?.data?.error || err.message
+      }`
+    )
+  } finally {
+    setLoading(false)
+  }
+}
   const renderDriverRatesTable = () => (
     <div className="manage-DriverRates-table">
       {loading ? (
@@ -672,7 +1057,8 @@ const handleSaveSubcontractor = async () => {
               <th>Company</th>
               <th>Phone</th>
               <th>Email</th>
-              <th>Action</th>
+              <th>Status</th>
+              <th>Actions</th>
               <th></th>
             </tr>
           </thead>
@@ -684,14 +1070,25 @@ const handleSaveSubcontractor = async () => {
                 <td>{sub.companyname}</td>
                 <td>{sub.cellnum}</td>
                 <td>{sub.email}</td>
+                <td>{sub.status ? "Active" : "Inactive"}</td>
                 <td>
-                  <button className="manage-edit-button" onClick={() => handleEditSubcontractor(sub.userid)}>
+                  <button
+                    className="manage-edit-button"
+                    onClick={() => handleEditSubcontractor(sub.userid)}
+                  >
                     Edit
                   </button>
                 </td>
                 <td>
-                  <button className="manage-delete-button" onClick={() => handleDisableSubcontractor(sub.userid)}>
-                    Disable
+                  <button
+                    className={
+                      sub.status ? "manage-delete-button" : "manage-enable-button"
+                    }
+                    onClick={() =>
+                      handleToggleSubcontractor(sub.userid, sub.status)
+                    }
+                  >
+                    {sub.status ? "Disable" : "Enable"}
                   </button>
                 </td>
               </tr>
@@ -700,12 +1097,39 @@ const handleSaveSubcontractor = async () => {
         </table>
       )}
       <center>
-        <button className="manage-add-subcontractor-button" onClick={() => setShowSubcontractorForm(true)}>
+        <button
+          className="manage-add-subcontractor-button"
+          onClick={() => setShowSubcontractorForm(true)}
+        >
           Add Subcontractor
         </button>
       </center>
     </div>
   )
+
+  const handleToggleSubcontractor = async (id, currentStatus) => {
+    setLoading(true)
+    try {
+      const newStatus = !currentStatus
+      await axios.put(
+        `${API_URL}/subcontractors/${id}/toggle-status`,
+        { status: newStatus },
+        getAuthHeaders()
+      )
+  
+      const response = await axios.get(`${API_URL}/subcontractors`, getAuthHeaders())
+      setSubcontractors(response.data)
+    } catch (err) {
+      console.error(`Error toggling subcontractor ${id}:`, err)
+      alert(
+        `Error ${currentStatus ? "disabling" : "enabling"} subcontractor: ${
+          err.response?.data?.error || err.message
+        }`
+      )
+    } finally {
+      setLoading(false)
+    }
+  }
 
   const renderTruckTable = () => (
     <>
@@ -753,33 +1177,311 @@ const handleSaveSubcontractor = async () => {
     </>
   )
 
+  // const renderEmployeeForm = () => (
+  //   <div className="manage-add-employee-form">
+  //     <h3>Add New Employee</h3>
+  //     <div
+  //       className="manage-form-grid"
+  //       style={{
+  //         display: "grid",
+  //         gridTemplateColumns: "repeat(3, 1fr)",
+  //         gap: "16px",
+  //       }}
+  //     >
+  //       {/* Personal Details */}
+  //       <div className="manage-form-group">
+  //         <label>
+  //           Name <span style={{ color: "red" }}>*</span>
+  //         </label>
+  //         <input
+  //           type="text"
+  //           value={newEmployee.name}
+  //           onChange={(e) => setNewEmployee({ ...newEmployee, name: e.target.value })}
+  //           required
+  //         />
+  //       </div>
+  
+  //       <div className="manage-form-group">
+  //         <label>
+  //           Surname <span style={{ color: "red" }}>*</span>
+  //         </label>
+  //         <input
+  //           type="text"
+  //           value={newEmployee.surname}
+  //           onChange={(e) => setNewEmployee({ ...newEmployee, surname: e.target.value })}
+  //           required
+  //         />
+  //       </div>
+  
+  //       <div className="manage-form-group">
+  //         <label>Telephone Number</label>
+  //         <input
+  //           type="text"
+  //           value={newEmployee.telephonenum}
+  //           onChange={(e) => setNewEmployee({ ...newEmployee, telephonenum: e.target.value })}
+  //         />
+  //       </div>
+  
+  //       <div className="manage-form-group">
+  //         <label>Cell Number</label>
+  //         <input
+  //           type="text"
+  //           value={newEmployee.cellnum}
+  //           onChange={(e) => setNewEmployee({ ...newEmployee, cellnum: e.target.value })}
+  //         />
+  //       </div>
+  
+  //       <div className="manage-form-group">
+  //         <label>Employee Number</label>
+  //         <input
+  //           type="text"
+  //           value={newEmployee.employeenum}
+  //           onChange={(e) => setNewEmployee({ ...newEmployee, employeenum: e.target.value })}
+  //         />
+  //       </div>
+  
+  //       <div className="manage-form-group">
+  //         <label>Base Salary</label>
+  //         <input
+  //           type="number"
+  //           value={newEmployee.base_salary}
+  //           onChange={(e) => setNewEmployee({ ...newEmployee, base_salary: e.target.value })}
+  //         />
+  //       </div>
+  
+  //       <div className="manage-form-group">
+  //         <label>
+  //           Email <span style={{ color: "red" }}>*</span>
+  //         </label>
+  //         <input
+  //           type="email"
+  //           value={newEmployee.email}
+  //           onChange={(e) => setNewEmployee({ ...newEmployee, email: e.target.value })}
+  //           required
+  //         />
+  //       </div>
+  
+  //       <div className="manage-form-group">
+  //         <label>
+  //           Password <span style={{ color: "red" }}>*</span>
+  //         </label>
+  //         <input
+  //           type="password"
+  //           value={newEmployee.password}
+  //           onChange={(e) => setNewEmployee({ ...newEmployee, password: e.target.value })}
+  //           required
+  //         />
+  //       </div>
+  //       <div className="manage-form-group">
+  //         <label>
+  //           <strong>Role</strong>
+  //         </label>
+  //         <select
+  //           className="dropdown"
+  //           value={newEmployee.roleid || ""}
+  //           onChange={(e) => setNewEmployee({ ...newEmployee, roleid: Number.parseInt(e.target.value) })}
+  //         >
+  //           <option value="">Select Role</option>
+  //           <option value="2">Controller</option>
+  //           <option value="3">Manager</option>
+  //           <option value="5">Driver</option>
+  //           <option value="6">Finance Clerk</option>
+  //           <option value="8">Yard Staff</option>
+  //         </select>
+  //       </div>
+  
+  //       {/* Deductions */}
+  //       <div className="manage-form-group">
+  //         <label>Income Tax</label>
+  //         <input
+  //           type="number"
+  //           value={newEmployee.deduction_income_tax}
+  //           onChange={(e) => setNewEmployee({ ...newEmployee, deduction_income_tax: e.target.value })}
+  //         />
+  //       </div>
+  
+  //       <div className="manage-form-group">
+  //         <label>UIF</label>
+  //         <input
+  //           type="number"
+  //           value={newEmployee.deduction_uif}
+  //           onChange={(e) => setNewEmployee({ ...newEmployee, deduction_uif: e.target.value })}
+  //         />
+  //       </div>
+  
+  //       <div className="manage-form-group">
+  //         <label> Loan</label>
+  //         <input
+  //           type="number"
+  //           value={newEmployee.deduction_loan}
+  //           onChange={(e) => setNewEmployee({ ...newEmployee, deduction_loan: e.target.value })}
+  //         />
+  //       </div>
+  
+  //       <div className="manage-form-group">
+  //         <label>Bonus</label>
+  //         <input
+  //           type="number"
+  //           value={newEmployee.deduction_bonus}
+  //           onChange={(e) => setNewEmployee({ ...newEmployee, deduction_bonus: e.target.value })}
+  //         />
+  //       </div>
+  
+  //       <div className="manage-form-group">
+  //         <label>Savings</label>
+  //         <input
+  //           type="number"
+  //           value={newEmployee.deduction_savings}
+  //           onChange={(e) => setNewEmployee({ ...newEmployee, deduction_savings: e.target.value })}
+  //         />
+  //       </div>
+  
+  //       <div className="manage-form-group">
+  //         <label>Damage</label>
+  //         <input
+  //           type="number"
+  //           value={newEmployee.deduction_damage}
+  //           onChange={(e) => setNewEmployee({ ...newEmployee, deduction_damage: e.target.value })}
+  //         />
+  //       </div>
+  
+  //       <div className="manage-form-group">
+  //         <label>Other Deductions</label>
+  //         <input
+  //           type="number"
+  //           value={newEmployee.deduction_other_deductions}
+  //           onChange={(e) => setNewEmployee({ ...newEmployee, deduction_other_deductions: e.target.value })}
+  //         />
+  //       </div>
+  //       {/* File upload section */}
+  //       <div className="manage-form-group" style={{ gridColumn: "1 / span 3" }}>
+  //         <label>
+  //           <strong>Upload Documents (PDF Only, Max 3)</strong>
+  //         </label>
+  //         <div
+  //           style={{
+  //             border: "2px dashed #ccc",
+  //             borderRadius: "12px",
+  //             padding: "20px",
+  //             textAlign: "center",
+  //             backgroundColor: "#f9f9f9",
+  //           }}
+  //         >
+  //           <input
+  //             type="file"
+  //             accept=".pdf"
+  //             name="documents"
+  //             onChange={(e) => {
+  //               const file = e.target.files[0]
+  //               if (file && file.type === "application/pdf" && newEmployee.documents.length < 3) {
+  //                 setNewEmployee({
+  //                   ...newEmployee,
+  //                   documents: [...newEmployee.documents, file],
+  //                 })
+  //               }
+  //             }}
+  //             disabled={newEmployee.documents.length >= 3}
+  //           />
+  //           <small>
+  //             {newEmployee.documents.length >= 3 ? "Maximum of 3 PDF documents uploaded" : "Upload PDF documents only"}
+  //           </small>
+  //         </div>
+  
+  //         {/* List uploaded files */}
+  //         <div style={{ marginTop: "10px" }}>
+  //           {newEmployee.documents.map((doc, index) => (
+  //             <div key={index} style={{ display: "flex", alignItems: "center", marginBottom: "8px" }}>
+  //               <span style={{ flexGrow: 1 }}>{doc.name}</span>
+  //               <a
+  //                 href={URL.createObjectURL(doc)}
+  //                 download={doc.name}
+  //                 style={{
+  //                   marginRight: "10px",
+  //                   backgroundColor: "#4CAF50",
+  //                   color: "white",
+  //                   padding: "6px 12px",
+  //                   borderRadius: "4px",
+  //                   textDecoration: "none",
+  //                   fontSize: "0.85rem",
+  //                 }}
+  //               >
+  //                 Download
+  //               </a>
+  //               <button
+  //                 onClick={() => {
+  //                   const updatedDocs = [...newEmployee.documents]
+  //                   updatedDocs.splice(index, 1)
+  //                   setNewEmployee({ ...newEmployee, documents: updatedDocs })
+  //                 }}
+  //                 style={{
+  //                   backgroundColor: "#f44336",
+  //                   color: "white",
+  //                   border: "none",
+  //                   padding: "6px 12px",
+  //                   borderRadius: "4px",
+  //                   cursor: "pointer",
+  //                   fontSize: "0.85rem",
+  //                 }}
+  //               >
+  //                 Delete
+  //               </button>
+  //             </div>
+  //           ))}
+  //         </div>
+  //       </div>
+  //     </div>
+  
+  //     {/* Submit / Cancel */}
+  //     <div
+  //       className="manage-button-container"
+  //       style={{ marginTop: "30px", display: "flex", gap: "16px", justifyContent: "center" }}
+  //     >
+  //       <button onClick={handleSaveEmployee} className="manage-save-button" disabled={loading}>
+  //         {loading ? "Saving..." : "Confirm Employee Register"}
+  //       </button>
+  //       <button onClick={() => setShowEmployeeForm(false)} className="manage-cancel-button">
+  //         Cancel
+  //       </button>
+  //     </div>
+  //   </div>
+  // )
   const renderEmployeeForm = () => (
     <div className="manage-add-employee-form">
       <h3>Add New Employee</h3>
       <div
         className="manage-form-grid"
         style={{
-          display: 'grid',
-          gridTemplateColumns: 'repeat(3, 1fr)',
-          gap: '16px',
+          display: "grid",
+          gridTemplateColumns: "repeat(3, 1fr)",
+          gap: "16px",
         }}
       >
         {/* Personal Details */}
         <div className="manage-form-group">
-          <label>Name</label>
+          <label>
+            Name <span style={{ color: "red" }}>*</span>
+          </label>
           <input
             type="text"
             value={newEmployee.name}
-            onChange={(e) => setNewEmployee({ ...newEmployee, name: e.target.value })}
+            onChange={(e) =>
+              setNewEmployee({ ...newEmployee, name: e.target.value })
+            }
+            required
           />
         </div>
   
         <div className="manage-form-group">
-          <label>Surname</label>
+          <label>
+            Surname <span style={{ color: "red" }}>*</span>
+          </label>
           <input
             type="text"
             value={newEmployee.surname}
-            onChange={(e) => setNewEmployee({ ...newEmployee, surname: e.target.value })}
+            onChange={(e) =>
+              setNewEmployee({ ...newEmployee, surname: e.target.value })
+            }
+            required
           />
         </div>
   
@@ -788,7 +1490,9 @@ const handleSaveSubcontractor = async () => {
           <input
             type="text"
             value={newEmployee.telephonenum}
-            onChange={(e) => setNewEmployee({ ...newEmployee, telephonenum: e.target.value })}
+            onChange={(e) =>
+              setNewEmployee({ ...newEmployee, telephonenum: e.target.value })
+            }
           />
         </div>
   
@@ -797,7 +1501,10 @@ const handleSaveSubcontractor = async () => {
           <input
             type="text"
             value={newEmployee.cellnum}
-            onChange={(e) => setNewEmployee({ ...newEmployee, cellnum: e.target.value })}
+            onChange={(e) =>
+              setNewEmployee({ ...newEmployee, cellnum: e.target.value })
+            }
+            required
           />
         </div>
   
@@ -806,7 +1513,10 @@ const handleSaveSubcontractor = async () => {
           <input
             type="text"
             value={newEmployee.employeenum}
-            onChange={(e) => setNewEmployee({ ...newEmployee, employeenum: e.target.value })}
+            onChange={(e) =>
+              setNewEmployee({ ...newEmployee, employeenum: e.target.value })
+            }
+            required
           />
         </div>
   
@@ -815,29 +1525,63 @@ const handleSaveSubcontractor = async () => {
           <input
             type="number"
             value={newEmployee.base_salary}
-            onChange={(e) => setNewEmployee({ ...newEmployee, base_salary: e.target.value })}
+            onChange={(e) =>
+              setNewEmployee({ ...newEmployee, base_salary: e.target.value })
+            }
+            required
           />
         </div>
   
         <div className="manage-form-group">
-          <label>Email</label>
+          <label>
+            Email <span style={{ color: "red" }}>*</span>
+          </label>
           <input
             type="email"
             value={newEmployee.email}
-            onChange={(e) => setNewEmployee({ ...newEmployee, email: e.target.value })}
+            onChange={(e) =>
+              setNewEmployee({ ...newEmployee, email: e.target.value })
+            }
+            required
           />
         </div>
   
         <div className="manage-form-group">
-          <label>Password</label>
+          <label>
+            Password <span style={{ color: "red" }}>*</span>
+          </label>
           <input
             type="password"
             value={newEmployee.password}
-            onChange={(e) => setNewEmployee({ ...newEmployee, password: e.target.value })}
+            onChange={(e) =>
+              setNewEmployee({ ...newEmployee, password: e.target.value })
+            }
+            required
           />
         </div>
   
-
+        <div className="manage-form-group">
+          <label>
+            <strong>Role</strong>
+          </label>
+          <select
+            className="dropdown"
+            value={newEmployee.roleid || ""}
+            onChange={(e) =>
+              setNewEmployee({
+                ...newEmployee,
+                roleid: Number.parseInt(e.target.value),
+              })
+            }
+          >
+            <option value="">Select Role</option>
+            <option value="2">Controller</option>
+            <option value="3">Manager</option>
+            <option value="5">Driver</option>
+            <option value="6">Finance Clerk</option>
+            <option value="8">Yard Staff</option>
+          </select>
+        </div>
   
         {/* Deductions */}
         <div className="manage-form-group">
@@ -845,7 +1589,12 @@ const handleSaveSubcontractor = async () => {
           <input
             type="number"
             value={newEmployee.deduction_income_tax}
-            onChange={(e) => setNewEmployee({ ...newEmployee, deduction_income_tax: e.target.value })}
+            onChange={(e) =>
+              setNewEmployee({
+                ...newEmployee,
+                deduction_income_tax: e.target.value,
+              })
+            }
           />
         </div>
   
@@ -854,7 +1603,9 @@ const handleSaveSubcontractor = async () => {
           <input
             type="number"
             value={newEmployee.deduction_uif}
-            onChange={(e) => setNewEmployee({ ...newEmployee, deduction_uif: e.target.value })}
+            onChange={(e) =>
+              setNewEmployee({ ...newEmployee, deduction_uif: e.target.value })
+            }
           />
         </div>
   
@@ -863,7 +1614,9 @@ const handleSaveSubcontractor = async () => {
           <input
             type="number"
             value={newEmployee.deduction_loan}
-            onChange={(e) => setNewEmployee({ ...newEmployee, deduction_loan: e.target.value })}
+            onChange={(e) =>
+              setNewEmployee({ ...newEmployee, deduction_loan: e.target.value })
+            }
           />
         </div>
   
@@ -872,7 +1625,9 @@ const handleSaveSubcontractor = async () => {
           <input
             type="number"
             value={newEmployee.deduction_bonus}
-            onChange={(e) => setNewEmployee({ ...newEmployee, deduction_bonus: e.target.value })}
+            onChange={(e) =>
+              setNewEmployee({ ...newEmployee, deduction_bonus: e.target.value })
+            }
           />
         </div>
   
@@ -881,7 +1636,12 @@ const handleSaveSubcontractor = async () => {
           <input
             type="number"
             value={newEmployee.deduction_savings}
-            onChange={(e) => setNewEmployee({ ...newEmployee, deduction_savings: e.target.value })}
+            onChange={(e) =>
+              setNewEmployee({
+                ...newEmployee,
+                deduction_savings: e.target.value,
+              })
+            }
           />
         </div>
   
@@ -890,7 +1650,12 @@ const handleSaveSubcontractor = async () => {
           <input
             type="number"
             value={newEmployee.deduction_damage}
-            onChange={(e) => setNewEmployee({ ...newEmployee, deduction_damage: e.target.value })}
+            onChange={(e) =>
+              setNewEmployee({
+                ...newEmployee,
+                deduction_damage: e.target.value,
+              })
+            }
           />
         </div>
   
@@ -900,28 +1665,51 @@ const handleSaveSubcontractor = async () => {
             type="number"
             value={newEmployee.deduction_other_deductions}
             onChange={(e) =>
-              setNewEmployee({ ...newEmployee, deduction_other_deductions: e.target.value })
+              setNewEmployee({
+                ...newEmployee,
+                deduction_other_deductions: e.target.value,
+              })
             }
           />
         </div>
-                {/* File upload section */}
-        <div className="manage-form-group" style={{ gridColumn: '1 / span 3' }}>
-          <label><strong>Upload Documents (PDF Only, Max 3)</strong></label>
+  
+        {/* New Loan Amount */}
+        <div className="manage-form-group">
+          <label>Loan Amount</label>
+          <input
+            type="number"
+            value={newEmployee.loan_amount}
+            onChange={(e) =>
+              setNewEmployee({ ...newEmployee, loan_amount: e.target.value })
+            }
+          />
+        </div>
+  
+        {/* File upload section */}
+        <div className="manage-form-group" style={{ gridColumn: "1 / span 3" }}>
+          <label>
+            <strong>Upload Documents (PDF Only, Max 3)</strong>
+          </label>
           <div
             style={{
-              border: '2px dashed #ccc',
-              borderRadius: '12px',
-              padding: '20px',
-              textAlign: 'center',
-              backgroundColor: '#f9f9f9',
+              border: "2px dashed #ccc",
+              borderRadius: "12px",
+              padding: "20px",
+              textAlign: "center",
+              backgroundColor: "#f9f9f9",
             }}
           >
             <input
               type="file"
               accept=".pdf"
+              name="documents"
               onChange={(e) => {
                 const file = e.target.files[0];
-                if (file && file.type === "application/pdf" && newEmployee.documents.length < 3) {
+                if (
+                  file &&
+                  file.type === "application/pdf" &&
+                  newEmployee.documents.length < 3
+                ) {
                   setNewEmployee({
                     ...newEmployee,
                     documents: [...newEmployee.documents, file],
@@ -938,21 +1726,28 @@ const handleSaveSubcontractor = async () => {
           </div>
   
           {/* List uploaded files */}
-          <div style={{ marginTop: '10px' }}>
+          <div style={{ marginTop: "10px" }}>
             {newEmployee.documents.map((doc, index) => (
-              <div key={index} style={{ display: 'flex', alignItems: 'center', marginBottom: '8px' }}>
+              <div
+                key={index}
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  marginBottom: "8px",
+                }}
+              >
                 <span style={{ flexGrow: 1 }}>{doc.name}</span>
                 <a
                   href={URL.createObjectURL(doc)}
                   download={doc.name}
                   style={{
-                    marginRight: '10px',
-                    backgroundColor: '#4CAF50',
-                    color: 'white',
-                    padding: '6px 12px',
-                    borderRadius: '4px',
-                    textDecoration: 'none',
-                    fontSize: '0.85rem',
+                    marginRight: "10px",
+                    backgroundColor: "#4CAF50",
+                    color: "white",
+                    padding: "6px 12px",
+                    borderRadius: "4px",
+                    textDecoration: "none",
+                    fontSize: "0.85rem",
                   }}
                 >
                   Download
@@ -964,13 +1759,13 @@ const handleSaveSubcontractor = async () => {
                     setNewEmployee({ ...newEmployee, documents: updatedDocs });
                   }}
                   style={{
-                    backgroundColor: '#f44336',
-                    color: 'white',
-                    border: 'none',
-                    padding: '6px 12px',
-                    borderRadius: '4px',
-                    cursor: 'pointer',
-                    fontSize: '0.85rem',
+                    backgroundColor: "#f44336",
+                    color: "white",
+                    border: "none",
+                    padding: "6px 12px",
+                    borderRadius: "4px",
+                    cursor: "pointer",
+                    fontSize: "0.85rem",
                   }}
                 >
                   Delete
@@ -984,12 +1779,24 @@ const handleSaveSubcontractor = async () => {
       {/* Submit / Cancel */}
       <div
         className="manage-button-container"
-        style={{ marginTop: '30px', display: 'flex', gap: '16px', justifyContent: 'center' }}
+        style={{
+          marginTop: "30px",
+          display: "flex",
+          gap: "16px",
+          justifyContent: "center",
+        }}
       >
-        <button onClick={handleSaveEmployee} className="manage-save-button" disabled={loading}>
+        <button
+          onClick={handleSaveEmployee}
+          className="manage-save-button"
+          disabled={loading}
+        >
           {loading ? "Saving..." : "Confirm Employee Register"}
         </button>
-        <button onClick={() => setShowEmployeeForm(false)} className="manage-cancel-button">
+        <button
+          onClick={() => setShowEmployeeForm(false)}
+          className="manage-cancel-button"
+        >
           Cancel
         </button>
       </div>
@@ -1193,6 +2000,36 @@ const handleSaveSubcontractor = async () => {
               backgroundColor: '#f9f9f9',
             }}
           >
+            {/* 👇 Add this block here to show existing docs only in edit mode
+  {editTruckId && (
+    <div>
+      <h4>Existing Documents</h4>
+      <ul>
+        {newTruck.document_url1 && (
+          <li>
+            <a href={newTruck.document_url1} target="_blank" rel="noopener noreferrer">
+              View Document 1
+            </a>
+          </li>
+        )}
+        {newTruck.document_url2 && (
+          <li>
+            <a href={newTruck.document_url2} target="_blank" rel="noopener noreferrer">
+              View Document 2
+            </a>
+          </li>
+        )}
+        {newTruck.document_url3 && (
+          <li>
+            <a href={newTruck.document_url3} target="_blank" rel="noopener noreferrer">
+              View Document 3
+            </a>
+          </li>
+        )}
+      </ul>
+    </div>
+  )} */}
+
             <input
               type="file"
               accept=".pdf"
@@ -1405,7 +2242,9 @@ const RenderSubcontractorForm = ({ setShowSubcontractorForm }) => {
 
   return (
     <form onSubmit={(e) => e.preventDefault()} className="manage-subcontractor-form">
-      <h2 className="manage-form-title" style={{ alignItems: "center" }}>Add Subcontractor</h2>
+      <h2 className="manage-form-title" style={{ alignItems: "center" , textAlign: "center"}}>
+  {isEditMode ? "Edit Subcontractor" : "Add Subcontractor"}
+</h2>
 
       <div className="manage-subform-group" style={{ 
         display: 'grid', 
@@ -1555,9 +2394,11 @@ const RenderSubcontractorForm = ({ setShowSubcontractorForm }) => {
       </div>
 
       <div className="manage-form-actions" style={{ marginTop: '20px' }}>
-        <button type="button" className="manage-save-button" onClick={handleSaveSubcontractor} disabled={loading}>
-          {loading ? "Saving..." : "Add Subcontractor"}
-        </button>
+  
+      <button type="button" className="manage-save-button" onClick={handleSaveSubcontractor} disabled={loading}>
+  {loading ? "Saving..." : isEditMode ? "Update Subcontractor" : "Add Subcontractor"}
+      </button>
+        
         <button type="button" className="manage-cancel-button" onClick={() => setShowSubcontractorForm(false)}>
           Cancel
         </button>
@@ -1668,31 +2509,43 @@ const RenderSubcontractorForm = ({ setShowSubcontractorForm }) => {
   // }
 
   // Edit handlers (placeholders - would need to be implemented)
+  // const handleEditEmployee = (id) => {
+  //   const employee = employees.find((e) => e.userid === id);
+  //   if (employee) {
+  //     setNewEmployee({
+  //       name: employee.name,
+  //       surname: employee.surname,
+  //       telephonenum: employee.telephonenum,
+  //       cellnum: employee.cellnum,
+  //       employeenum: employee.employeenum,
+  //       roleid: employee.roleid,
+  //       email: employee.email,
+  //       password: "", // leave empty for security
+  //       base_salary: employee.base_salary,
+  //       deduction_income_tax: employee.deduction_income_tax,
+  //       deduction_uif: employee.deduction_uif,
+  //       deduction_bonus: employee.deduction_bonus,
+  //       deduction_savings: employee.deduction_savings,
+  //       deduction_loan: employee.deduction_loan,
+  //       deduction_damage: employee.deduction_damage,
+  //       deduction_other_deductions: employee.deduction_other_deductions,
+  //     });
+  //     setEditingEmployeeId(id);
+  //     setShowEmployeeForm(true);
+  //   }
+  // };
   const handleEditEmployee = (id) => {
     const employee = employees.find((e) => e.userid === id);
-    if (employee) {
-      setNewEmployee({
-        name: employee.name,
-        surname: employee.surname,
-        telephonenum: employee.telephonenum,
-        cellnum: employee.cellnum,
-        employeenum: employee.employeenum,
-        roleid: employee.roleid,
-        email: employee.email,
-        password: "", // leave empty for security
-        base_salary: employee.base_salary,
-        deduction_income_tax: employee.deduction_income_tax,
-        deduction_uif: employee.deduction_uif,
-        deduction_bonus: employee.deduction_bonus,
-        deduction_savings: employee.deduction_savings,
-        deduction_loan: employee.deduction_loan,
-        deduction_damage: employee.deduction_damage,
-        deduction_other_deductions: employee.deduction_other_deductions,
-      });
-      setEditingEmployeeId(id);
-      setShowEmployeeForm(true);
-    }
+    if (!employee) return;
+    setNewEmployee({
+      ...employee,
+      password: "",          // don’t prefill passwords
+      documents: [],         // if you track file uploads separately
+    });
+    setEditingEmployeeId(id);
+    setShowEmployeeForm(true);
   };
+  
   
 
   const handleEditClient = async (id) => {
@@ -1732,10 +2585,79 @@ const RenderSubcontractorForm = ({ setShowSubcontractorForm }) => {
     }
   }
   
-  const handleEditSubcontractor = (id) => {
-    console.log(`Edit subcontractor with ID: ${id}`)
-    // Implementation would fetch the subcontractor data and populate a form
-  }
+  const handleEditSubcontractor = async (id) => {
+    try {
+      const response = await axios.get(`${API_URL}/subcontractors/${id}`, getAuthHeaders());
+      const data = response.data;
+      
+      console.log("Received subcontractor data:", data); // Log to see the structure
+      
+      // Initialize arrays for truck registrations and driver names
+      let truckRegs = [];
+      let driverNames = [];
+      
+      // Handle truck registration numbers
+      if (data.truckregnum) {
+        // Ensure it's a string before splitting
+        truckRegs = typeof data.truckregnum === 'string' 
+          ? data.truckregnum.split(',').map(reg => reg.trim())
+          : Array.isArray(data.truckregnum) 
+            ? data.truckregnum 
+            : [String(data.truckregnum)];
+      }
+      
+      // Handle driver names
+      if (data.subdrivername) {
+        // Ensure it's a string before splitting
+        driverNames = typeof data.subdrivername === 'string'
+          ? data.subdrivername.split(',').map(name => name.trim())
+          : Array.isArray(data.subdrivername)
+            ? data.subdrivername
+            : [String(data.subdrivername)];
+      }
+      
+      // Create trucks array with both registration and driver info
+      const trucks = [];
+      const maxLength = Math.max(truckRegs.length, driverNames.length);
+      
+      for (let i = 0; i < maxLength; i++) {
+        trucks.push({
+          reg: truckRegs[i] || '',
+          driver: driverNames[i] || ''
+        });
+      }
+      
+      // If no trucks were found, add an empty one
+      if (trucks.length === 0) {
+        trucks.push({ reg: '', driver: '' });
+      }
+      
+      // Set form state
+      setNewSubcontractor({
+        companyname: data.companyname || '',
+        location: data.location || '',
+        contact_person: data.contact_person || '',
+        cellnum: data.cellnum || '',
+        email: data.email || '',
+        subei_reg_num: data.subei_reg_num || '',
+        no_of_trucks: data.no_of_trucks || trucks.length,
+        truckregnum: data.truckregnum || '',
+        subdrivername: data.subdrivername || '',
+        trucks: trucks
+      });
+      
+      setSubcontractorId(id);
+      setIsEditMode(true);
+      setNumTrucks(trucks.length);
+      setShowSubcontractorForm(true);
+    } catch (error) {
+      console.error("❌ Failed to fetch subcontractor:", error);
+      alert(`Failed to load subcontractor for editing. ${error.message}`);
+    }
+  };
+  
+
+  
 
   return (
     <div className="manage-container">
