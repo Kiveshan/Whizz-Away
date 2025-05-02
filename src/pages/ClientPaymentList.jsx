@@ -13,7 +13,12 @@ const ClientPaymentList = () => {
   const [clientPayments, setClientPayments] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  const [filters, setFilters] = useState({ year: "", month: "" });
+  // Set default filters to current year and month
+  const currentDate = new Date();
+  const [filters, setFilters] = useState({
+    year: currentDate.getFullYear().toString(),
+    month: (currentDate.getMonth() + 1).toString(),
+  });
 
   const monthNames = [
     "January", "February", "March", "April", "May", "June",
