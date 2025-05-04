@@ -4,7 +4,7 @@
   display: flex;
   flex-direction: column;
   align-items: center;
-  margin-top: -93px;
+  margin-top: -50px;
 }
 
 .manage-button-row {
@@ -69,11 +69,9 @@
 }
 
 table {
-  width: 100%;               /* Expanded table width to full container */
-  min-width: 800px;          /* Ensure minimum width for content */
- 
+  width: 800px;
   border-collapse: collapse;
-  background-color: rgb(255, 255, 255);
+  background-color: white;
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
 }
 
@@ -108,20 +106,6 @@ tr:hover {
 /* Optionally, style delete buttons if used */
 .manage-delete-button {
   background-color: #e74c3c;
-  color: white;
-  border: none;
-  cursor: pointer;
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  padding: 8px 12px;
-  border-radius: 4px;
-  font-size: 14px;
-  transition: background-color 0.3s, transform 0.2s;
-}
-/* Optionally, style delete buttons if used */
-.manage-enable-button {
-  background-color: green;
   color: white;
   border: none;
   cursor: pointer;
@@ -339,7 +323,7 @@ tr:hover {
   max-width: 800px;
   margin: auto;
   padding: 20px;
-  background: white;
+  background: #f9f9f9;
   border-radius: 8px;
   box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
   display: flex;
@@ -353,7 +337,7 @@ tr:hover {
   max-width: 800px;
   margin: auto;
   padding: 20px;
-  background: white;
+  background: #f9f9f9;
   border-radius: 8px;
   box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
   display: flex;
@@ -426,63 +410,4 @@ tr:hover {
   border: solid white;
   border-width: 0 2px 2px 0;
   transform: rotate(45deg);
-}
-
-.form-row {
-  display: flex;
-  gap: 1rem;
-}
-.form-field {
-  flex: 1;
-}
-
-/* Employee file upload */
-/* Container for document upload section */
-.document-upload-section {
-  margin-top: 30px;
-}
-
-.document-upload-section h4 {
-  margin-bottom: 10px;
-  font-weight: 600;
-}
-
-/* File input */
-.document-upload-section input[type="file"] {
-  display: block;
-  margin-bottom: 12px;
-  font-size: 14px;
-}
-
-/* File entry display */
-.document-upload-section .file-entry {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  margin-bottom: 8px;
-  font-size: 14px;
-}
-
-/* Download link */
-.document-upload-section .file-entry a.download-link {
-  color: #007bff;
-  text-decoration: underline;
-  cursor: pointer;
-  font-size: 14px;
-}
-
-/* Delete button */
-.document-upload-section .file-entry button.delete-btn {
-  background-color: #dc3545;
-  color: white;
-  border: none;
-  padding: 4px 10px;
-  border-radius: 4px;
-  cursor: pointer;
-  font-size: 13px;
-  transition: background-color 0.2s ease-in-out;
-}
-
-.document-upload-section .file-entry button.delete-btn:hover {
-  background-color: #c82333;
 }
