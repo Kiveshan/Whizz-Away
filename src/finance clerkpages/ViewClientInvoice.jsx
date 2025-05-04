@@ -111,7 +111,7 @@ const ViewClientInvoice = () => {
       navigate("/invoices", {
         state: {
           clientId: client.m5clientkey,
-          clientName: client.companyname,
+          clientName: client.client,
           clientEmail: client.email,
           clientRepresentative: client.representative,
         },
@@ -150,7 +150,7 @@ const ViewClientInvoice = () => {
             <tbody>
               {clients.map((client) => (
                 <tr key={client.m5clientkey} className="border-t">
-                  <td className="p-3">{client.companyname}</td>
+                  <td className="p-3">{client.client}</td>
                   <td className="p-3">{client.representative}</td>
                   <td className="p-3">{client.email}</td>
                   <td className="p-3">
