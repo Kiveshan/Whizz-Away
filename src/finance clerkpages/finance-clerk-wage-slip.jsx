@@ -1,7 +1,10 @@
+
 "use client"
 import { useNavigate, useParams, useLocation } from "react-router-dom"
 import { useState, useEffect, useRef } from "react"
 import "../finance clerkpages/css/finance-clerk-wageslip.css"
+import html2canvas from "html2canvas"
+import { jsPDF } from "jspdf"
 
 const FinanceClerkWageSlip = () => {
   const navigate = useNavigate()
@@ -16,6 +19,9 @@ const FinanceClerkWageSlip = () => {
   const [error, setError] = useState(null)
   const [employeeData, setEmployeeData] = useState(null)
   const [legs, setLegs] = useState([])
+  const [downloading, setDownloading] = useState(false)
+
+  const wageSlipRef = useRef(null)
   const [wageData, setWageData] = useState({
     payPeriod: "",
     payDate: "",
@@ -64,9 +70,9 @@ const FinanceClerkWageSlip = () => {
 
   // Helper function to get the last day of a month
   const getLastDayOfMonth = (year, month) => {
-    // month is 0-indexed (0 = January, 11 = December)
-    return new Date(year, month + 1, 0).toISOString()
-  }
+    const lastDay = new Date(year, month + 1, 0);
+    return `${lastDay.getFullYear()}-${String(lastDay.getMonth() + 1).padStart(2, "0")}-${String(lastDay.getDate()).padStart(2, "0")}`;
+  };
 
   // Update the checkExistingWageSlip function to include better error handling
   const checkExistingWageSlip = async (employeeId, month, year) => {
@@ -370,9 +376,9 @@ const FinanceClerkWageSlip = () => {
               // Only attempt to save if we haven't found an existing wage slip
               if (!wageSlipExists) {
                 // Calculate income tax based on rate
-                const incomeTaxRate = parseAmount(deductionsData.income_tax_rate || 0);
-                const calculatedIncomeTax = (incomeTaxRate / 100) * totalEarningsAmount;
-                
+                const incomeTaxRate = parseAmount(deductionsData.income_tax_rate || 0)
+                const calculatedIncomeTax = (incomeTaxRate / 100) * totalEarningsAmount
+
                 // Create wage payload with individual deduction values
                 const wagePayload = {
                   employeeId: cleanId,
@@ -383,7 +389,7 @@ const FinanceClerkWageSlip = () => {
                   netPay: netPayAmount,
                   calculatedIncomeTax: calculatedIncomeTax, // Add the calculated income tax
                   date: getLastDayOfMonth(Number.parseInt(selectedYear), monthIndexForPayPeriod),
-                };
+                }
 
                 console.log("Wage payload:", wagePayload)
 
@@ -467,6 +473,48 @@ const FinanceClerkWageSlip = () => {
     })
   }
 
+  const handleDownloadWageSlip = async () => {
+    try {
+      setDownloading(true)
+
+      if (!wageSlipRef.current) {
+        console.error("Wage slip container not found")
+        setDownloading(false)
+        return
+      }
+
+      // Create a filename with employee name, month and year
+      const employeeName = employeeData
+        ? `${employeeData.name}_${employeeData.surname}`
+        : driverName?.replace(/\s+/g, "_") || `Driver_${id}`
+      const filename = `${employeeName}_WageSlip_${selectedMonth}_${selectedYear}.pdf`
+
+      // Capture the wage slip as an image
+      const canvas = await html2canvas(wageSlipRef.current, {
+        scale: 2, // Higher scale for better quality
+        useCORS: true,
+        logging: false,
+        backgroundColor: "#ffffff",
+      })
+
+      // Calculate PDF dimensions based on the canvas
+      const imgWidth = 210 // A4 width in mm
+      const imgHeight = (canvas.height * imgWidth) / canvas.width
+
+      // Create PDF
+      const pdf = new jsPDF("p", "mm", "a4")
+      const imgData = canvas.toDataURL("image/png")
+
+      pdf.addImage(imgData, "PNG", 0, 0, imgWidth, imgHeight)
+      pdf.save(filename)
+
+      setDownloading(false)
+    } catch (error) {
+      console.error("Error downloading wage slip:", error)
+      setDownloading(false)
+    }
+  }
+
   return (
     <div className="wageslip-page-wrapper">
       <div className="wageslip-container">
@@ -475,7 +523,7 @@ const FinanceClerkWageSlip = () => {
         ) : error ? (
           <div className="wageslip-error-container">{error}</div>
         ) : (
-          <div className="wageslip-slip-container">
+          <div className="wageslip-slip-container" ref={wageSlipRef}>
             {/* Header */}
             <div className="wageslip-header">
               <div></div>
@@ -629,6 +677,14 @@ const FinanceClerkWageSlip = () => {
         <div className="wageslip-button-container">
           <button className="back-button" onClick={handleBack}>
             Back
+          </button>
+          <button
+            className="downloadwage1 wageslip-download-button"
+            onClick={handleDownloadWageSlip}
+            disabled={downloading}
+            style={{ marginLeft: "202px" }}
+          >
+            {downloading ? "Downloading..." : "Download Wage Slip"}
           </button>
         </div>
       </div>
