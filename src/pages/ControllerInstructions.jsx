@@ -860,7 +860,7 @@ const ControllerInstructions = () => {
                     </option>
                     {clients.map((client) => (
                       <option key={client.m5clientkey} value={client.m5clientkey}>
-                        {client.client}
+                        {client.companyname}
                       </option>
                     ))}
                   </select>
