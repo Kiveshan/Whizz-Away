@@ -9,11 +9,11 @@ dotenv.config()
 const router = express.Router()
 
 const pool = new pg.Pool({
-  user: process.env.PG_USER || "postgres",
-  host: process.env.PG_HOST || "localhost",
-  database: process.env.PG_DB || "Whizz-Away-Tester",
-  password: process.env.PG_PASSWORD || "123456",
-  port: process.env.PG_PORT || 5432,
+  user: process.env.POSTGRES_USER,
+  host: process.env.POSTGRES_HOST,
+  database: process.env.POSTGRES_DB,
+  password: process.env.POSTGRES_PASSWORD,
+  port:  5432,
   ssl: process.env.DB_SSL ? { rejectUnauthorized: false } : false,
 })
 
@@ -58,7 +58,7 @@ router.get("/:instructionId", async (req, res) => {
 const getClientName = async (clientId) => {
   try {
     const result = await pool.query(
-      "SELECT companyname FROM m5_client WHERE m5clientkey = $1",
+      "SELECT client as companyname FROM m5_client WHERE m5clientkey = $1",
       [clientId]
     )
     if (result.rows.length > 0) {

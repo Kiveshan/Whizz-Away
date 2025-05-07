@@ -173,6 +173,7 @@ function DynamicHeader() {
     if (location.pathname.startsWith("/ExpenseDetails/")) return "Fuel Expenses";
     if (location.pathname.startsWith("/finance-clerk-wage-details/")) return "Wages";
     if (location.pathname.startsWith("/DirectorExpenses/")) return "Fuel Expenses";
+    if (location.pathname.startsWith("/finance-clerk-wage-slip/")) return "Wages";
     return titleMap[location.pathname] || "Unknown Page"
   }
 

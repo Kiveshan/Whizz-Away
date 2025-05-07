@@ -344,7 +344,7 @@ const DirectorDocs = () => {
         {legs.map((leg) => (
           <button
             key={leg.legkey}
-            className={`step-btn ${currentLeg === leg.legnumber ? "bg-green-500 text-white" : ""}`}
+            className={`step-btn ${currentLeg === leg.legnumber ? "bg-green-500 text-black" : ""}`}
             onClick={() => handleLegClick(leg.legnumber)}
           >
             Leg {leg.legnumber}
