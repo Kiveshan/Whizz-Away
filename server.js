@@ -1043,6 +1043,175 @@ app.post("/api/admin/user-status", verifyToken, async (req, res) => {
 
 // === INVOICES ROUTES ===
 
+app.use('/uploads', express.static('uploads'))
+
+app.post("/api/payments/:clientId/upload", verifyToken, async (req, res) => {
+  try {
+    if (!pool) {
+      return res.status(503).json({
+        success: false,
+        message: "Database connection not established. Please try again later.",
+      })
+    }
+
+    const { clientId } = req.params
+    const { amount, fileupload } = req.body
+
+    if (!amount || isNaN(amount)) {
+      return res.status(400).json({
+        success: false,
+        message: "Amount is required and must be a number",
+      })
+    }
+
+    if (!fileupload) {
+      return res.status(400).json({
+        success: false,
+        message: "Payment date (fileupload) is required",
+      })
+    }
+
+    const queryText = `
+      INSERT INTO payment_m3 (clientid, amount, filename, fileupload)
+      VALUES ($1, $2, $3, $4)
+      RETURNING *
+    `
+    const queryParams = [clientId, amount, null, fileupload] // filename is null since no file upload
+
+    const result = await query(queryText, queryParams)
+    console.log(`Inserted payment for client ${clientId}:`, result.rows[0])
+
+    res.json({
+      success: true,
+      data: result.rows[0],
+    })
+  } catch (error) {
+    console.error(`Error uploading payment for client ${clientId}:`, error)
+    res.status(500).json({
+      success: false,
+      message: error.message,
+      stack: process.env.NODE_ENV === "production" ? null : error.stack,
+    })
+  }
+})
+
+
+app.get("/api/payments/:clientId/:paymentId", verifyToken, async (req, res) => {
+  try {
+    if (!pool) {
+      return res.status(503).json({
+        success: false,
+        message: "Database connection not established. Please try again later.",
+      });
+    }
+
+    const { clientId, paymentId } = req.params;
+    console.log(`Fetching payment ${paymentId} for client ${clientId}`);
+
+    const queryText = `
+      SELECT 
+        fileupload,
+        amount,
+        filename
+      FROM 
+        payment_m3
+      WHERE 
+        clientid = $1 AND paykey = $2
+    `;
+    const queryParams = [clientId, paymentId];
+
+    const result = await query(queryText, queryParams);
+    console.log(`Query returned ${result.rows.length} payment for client ${clientId}, payment ${paymentId}`);
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({
+        success: false,
+        message: "Payment not found",
+      });
+    }
+
+    const payment = result.rows[0];
+    payment.fileurl = payment.filename ? `${req.protocol}://${req.get('host')}/uploads/${payment.filename}` : null;
+
+    res.json({
+      success: true,
+      data: payment,
+    });
+  } catch (error) {
+    console.error(`Error fetching payment ${paymentId} for client ${clientId}:`, error);
+    res.status(500).json({
+      success: false,
+      message: error.message,
+      stack: process.env.NODE_ENV === "production" ? null : error.stack,
+    });
+  }
+});
+
+// Updated endpoint for fetching client payments
+app.get("/api/payments/:clientId", verifyToken, async (req, res) => {
+  try {
+    if (!pool) {
+      return res.status(503).json({
+        success: false,
+        message: "Database connection not established. Please try again later.",
+      })
+    }
+
+    const { clientId } = req.params
+    const { year, month } = req.query
+
+    console.log(`Fetching payments for client ${clientId} with query:`, req.query)
+
+    let queryText = `
+      SELECT 
+      paykey,
+        fileupload,
+        amount,
+        filename
+      FROM 
+        payment_m3
+      WHERE 
+        clientid = $1
+    `
+    const queryParams = [clientId]
+    let paramIndex = 2
+
+    if (year) {
+      queryText += ` AND EXTRACT(YEAR FROM fileupload) = $${paramIndex}`
+      queryParams.push(year)
+      paramIndex++
+    }
+    if (month) {
+      queryText += ` AND EXTRACT(MONTH FROM fileupload) = $${paramIndex}`
+      queryParams.push(month)
+      paramIndex++
+    }
+
+    queryText += ` ORDER BY fileupload DESC`
+
+    const result = await query(queryText, queryParams)
+    console.log(`Query returned ${result.rows.length} payments for client ${clientId}`)
+
+    // Map the results to include the file URL
+    const payments = result.rows.map(payment => ({
+      ...payment,
+      fileurl: payment.filename ? `${req.protocol}://${req.get('host')}/uploads/${payment.filename}` : null
+    }))
+
+    res.json({
+      success: true,
+      data: payments,
+    })
+  } catch (error) {
+    console.error(`Error fetching payments for client ${clientId}:`, error)
+    res.status(500).json({
+      success: false,
+      message: error.message,
+      stack: process.env.NODE_ENV === "production" ? null : error.stack,
+    })
+  }
+})
+
 // GET all completed instructions for invoices
 app.get("/api/invoices/completed", verifyToken, async (req, res) => {
   try {
@@ -1351,39 +1520,76 @@ app.post("/api/generate-pdf", async (req, res) => {
 
 // Function to generate statements for all clients
 async function generateMonthlyStatements() {
-  console.log("Starting monthly statement generation process...")
+  console.log("Starting monthly statement generation process...");
 
-  const today = new Date() // 2025-04-11
-  const currentMonth = today.getMonth() // 3 (April)
-  const currentYear = today.getFullYear() // 2025
-  const generationDate = new Date(currentYear, currentMonth, 1, 12, 0, 0)
-  const formattedGenDate = generationDate.toISOString().split("T")[0]
+  // Determine dates for the statement (April 1, 2025)
+  const today = new Date(); // 2025-04-25
+  const currentMonth = today.getMonth(); // 3 (April)
+  const currentYear = today.getFullYear(); // 2025
+  const generationDate = new Date(currentYear, currentMonth, 1, 12, 0, 0); // April 1, 2025
+  const formattedGenDate = generationDate.toISOString().split("T")[0]; // '2025-04-01'
 
-  const previousMonth = currentMonth === 0 ? 11 : currentMonth - 1 // 2 (March)
-  const previousYear = currentMonth === 0 ? currentYear - 1 : currentYear // 2025
+  // Previous month (for invoices: March 1 to March 31, 2025)
+  const previousMonth = currentMonth === 0 ? 11 : currentMonth - 1; // 2 (March)
+  const previousYear = currentMonth === 0 ? currentYear - 1 : currentYear; // 2025
+  const invoiceStartDate = new Date(previousYear, previousMonth, 1, 12, 0, 0); // March 1, 2025
+  const invoiceEndDate = new Date(previousYear, previousMonth + 1, 0, 12, 0, 0); // March 31, 2025
+  const formattedInvoiceStartDate = invoiceStartDate.toISOString().split("T")[0]; // '2025-03-01'
+  const formattedInvoiceEndDate = invoiceEndDate.toISOString().split("T")[0]; // '2025-03-31'
 
-  const startDate = new Date(previousYear, previousMonth, 1, 12, 0, 0) // Set to noon
-  const endDate = new Date(previousYear, previousMonth + 1, 0, 12, 0, 0) // Set to noon
+  // Two months prior (for payments: February 1 to February 28, 2025)
+  const paymentMonth = previousMonth === 0 ? 11 : previousMonth - 1; // 1 (February)
+  const paymentYear = previousMonth === 0 ? previousYear - 1 : previousYear; // 2025
+  const paymentStartDate = new Date(paymentYear, paymentMonth, 1, 12, 0, 0); // February 1, 2025
+  const paymentEndDate = new Date(paymentYear, paymentMonth + 1, 0, 12, 0, 0); // February 28, 2025
+  const formattedPaymentStartDate = paymentStartDate.toISOString().split("T")[0]; // '2025-02-01'
+  const formattedPaymentEndDate = paymentEndDate.toISOString().split("T")[0]; // '2025-02-28'
 
-  const formattedStartDate = startDate.toISOString().split("T")[0] // '2025-03-01'
-  const formattedEndDate = endDate.toISOString().split("T")[0] // '2025-03-31'
+  console.log(`Today: ${today.toISOString().split("T")[0]}`);
+  console.log(`Current Month: ${currentMonth}, Current Year: ${currentYear}`);
+  console.log(`Previous Month: ${previousMonth}, Previous Year: ${previousYear}`);
+  console.log(`Generating statements for invoices confirmed between ${formattedInvoiceStartDate} and ${formattedInvoiceEndDate}`);
+  console.log(`Fetching payments between ${formattedPaymentStartDate} and ${formattedPaymentEndDate}`);
 
-  console.log(`Today: ${today.toISOString().split("T")[0]}`)
-  console.log(`Current Month: ${currentMonth}, Current Year: ${currentYear}`)
-  console.log(`Previous Month: ${previousMonth}, Previous Year: ${previousYear}`)
-  console.log(`Generating statements for invoices confirmed between ${formattedStartDate} and ${formattedEndDate}`)
-
-  let dbClient
+  let dbClient;
   try {
-    dbClient = await pool.connect()
-    await dbClient.query("BEGIN")
+    dbClient = await pool.connect();
+    await dbClient.query("BEGIN");
 
-    const clientsResult = await query("SELECT m5clientkey FROM m5_client", [])
-    const clients = clientsResult.rows
+    // Fetch all clients
+    const clientsResult = await query("SELECT m5clientkey FROM m5_client", []);
+    const clients = clientsResult.rows;
+
+    // Fetch payments for all clients two months prior (February 2025)
+    const paymentsResult = await dbClient.query(
+      `SELECT 
+         clientid,
+         SUM(amount) as total_payments
+       FROM payment_m3
+       WHERE fileupload BETWEEN $1 AND $2
+       GROUP BY clientid`,
+      [formattedPaymentStartDate, formattedPaymentEndDate]
+    );
+    const paymentsMap = new Map(paymentsResult.rows.map(row => [row.clientid, Number.parseFloat(row.total_payments) || 0]));
+    console.log(`Fetched payments for ${paymentsResult.rows.length} clients between ${formattedPaymentStartDate} and ${formattedPaymentEndDate}`);
 
     for (const client of clients) {
-      const clientId = client.m5clientkey
+      const clientId = client.m5clientkey;
 
+      // Check if a statement already exists for this client and generation date
+      const existingStatement = await dbClient.query(
+        "SELECT statement_key FROM statements WHERE clientid = $1 AND generation_date = $2",
+        [clientId, formattedGenDate]
+      );
+
+      if (existingStatement.rows.length > 0) {
+        console.log(
+          `Client ${clientId}: Statement #${existingStatement.rows[0].statement_key} already exists for ${formattedGenDate}, skipping`
+        );
+        continue;
+      }
+
+      // Fetch invoices for the previous month (March 2025)
       const invoicesQuery = `
         SELECT 
           SUM(m1.total_cost) as total_amount,
@@ -1392,98 +1598,167 @@ async function generateMonthlyStatements() {
         JOIN m1_controller m1 ON i.m1key = m1.m1key
         WHERE i.clientid = $1 AND i.date BETWEEN $2 AND $3
         GROUP BY i.groupid
-      `
-      const invoicesResult = await dbClient.query(invoicesQuery, [clientId, formattedStartDate, formattedEndDate])
-      const invoices = invoicesResult.rows
+      `;
+      const invoicesResult = await dbClient.query(invoicesQuery, [clientId, formattedInvoiceStartDate, formattedInvoiceEndDate]);
+      const invoices = invoicesResult.rows;
 
-      if (invoices.length === 0) {
+      // Get total payments for this client (default to 0 if none)
+      const totalPayments = paymentsMap.get(clientId) || 0;
+      console.log(`Client ${clientId}: Total payments from ${formattedPaymentStartDate} to ${formattedPaymentEndDate}: R${totalPayments}`);
+
+      // Generate a statement if there are invoices OR payments
+      if (invoices.length === 0 && totalPayments === 0) {
         console.log(
-          `Client ${clientId}: No confirmed invoices found between ${formattedStartDate} and ${formattedEndDate}, skipping`,
-        )
-        continue
+          `Client ${clientId}: No invoices or payments found between ${formattedInvoiceStartDate} and ${formattedInvoiceEndDate}, skipping`
+        );
+        continue;
       }
 
-      for (const invoice of invoices) {
-        const totalAmount = invoice.total_amount
-        const invoice_group_id = invoice.invoice_group_id
+      // Set groupid: use invoice's groupid if invoices exist, otherwise null
+      let invoice_group_id = null;
+      if (invoices.length > 0) {
+        invoice_group_id = invoices[0].invoice_group_id;
+        console.log(`Client ${clientId}: Using invoice groupid ${invoice_group_id}`);
+      } else {
+        console.log(`Client ${clientId}: No invoices, setting groupid to null`);
+      }
 
-        const existingStatement = await dbClient.query(
-          "SELECT statement_key FROM statements WHERE groupid = $1 AND clientid = $2",
-          [invoice_group_id, clientId],
-        )
+      // Fetch the most recent statement to get the opening balance
+      const previousStatementQuery = `
+        SELECT s.agingid
+        FROM statements s
+        WHERE s.clientid = $1 AND s.generation_date < $2
+        ORDER BY s.generation_date DESC
+        LIMIT 1
+      `;
+      const previousStatementResult = await dbClient.query(previousStatementQuery, [clientId, formattedGenDate]);
+      let openingBalance = 0;
 
-        if (existingStatement.rows.length > 0) {
-          console.log(
-            `Client ${clientId}: Statement #${existingStatement.rows[0].statement_key} already exists for group ${invoice_group_id}, skipping`,
-          )
-          continue
-        }
-
-        const agingQuery = `
-          SELECT aging_key, current, "30days", "60days", "90days"
+      if (previousStatementResult.rows.length > 0) {
+        const previousAgingId = previousStatementResult.rows[0].agingid;
+        const previousAgingQuery = `
+          SELECT current, "30days", "60days", "90days"
           FROM aging_analysis
-          WHERE clientid = $1
-          ORDER BY aging_key DESC
-          LIMIT 1
-        `
-        const agingResult = await dbClient.query(agingQuery, [clientId])
-        let newCurrent, new30days, new60days, new90days
-
-        if (agingResult.rows.length > 0) {
-          const previousAging = agingResult.rows[0]
-          newCurrent = Math.max(Number.parseFloat(totalAmount) || 0, 0)
-          new30days = Math.max(Number.parseFloat(previousAging.current) || 0, 0)
-          new60days = Math.max(Number.parseFloat(previousAging["30days"]) || 0, 0)
-          new90days = Math.max(
-            (Number.parseFloat(previousAging["60days"]) || 0) + (Number.parseFloat(previousAging["90days"]) || 0),
-            0,
-          )
-        } else {
-          newCurrent = Math.max(Number.parseFloat(totalAmount) || 0, 0)
-          new30days = 0
-          new60days = 0
-          new90days = 0
+          WHERE aging_key = $1
+        `;
+        const previousAgingResult = await dbClient.query(previousAgingQuery, [previousAgingId]);
+        if (previousAgingResult.rows.length > 0) {
+          const row = previousAgingResult.rows[0];
+          openingBalance = 
+            (Number.parseFloat(row.current) || 0) +
+            (Number.parseFloat(row["30days"]) || 0) +
+            (Number.parseFloat(row["60days"]) || 0) +
+            (Number.parseFloat(row["90days"]) || 0);
         }
+      }
+      console.log(`Client ${clientId}: Opening balance (sum of previous current, 30days, 60days, 90days): R${openingBalance}`);
 
-        const insertAgingQuery = `
-          INSERT INTO aging_analysis (clientid, current, "30days", "60days", "90days")
-          VALUES ($1, $2, $3, $4, $5)
-          RETURNING aging_key
-        `
-        const agingValues = [clientId, newCurrent, new30days, new60days, new90days]
-        const agingInsertResult = await dbClient.query(insertAgingQuery, agingValues)
-        const newAgingId = agingInsertResult.rows[0].aging_key
+      // Calculate total invoices for the current period (March 2025)
+      const totalInvoices = invoices.length > 0 ? Number.parseFloat(invoices[0].total_amount) || 0 : 0;
 
-        const insertStatementQuery = `
-          INSERT INTO statements (groupid, generation_date, clientid, agingid)
-          VALUES ($1, $4, $2, $3)
-          RETURNING statement_key
-        `
-        const statementResult = await dbClient.query(insertStatementQuery, [
-          invoice_group_id,
-          clientId,
-          newAgingId,
-          formattedGenDate,
-        ])
-        const newStatementId = statementResult.rows[0].statement_key
+      // Fetch the most recent aging analysis for updating
+      const agingQuery = `
+        SELECT aging_key, current, "30days", "60days", "90days"
+        FROM aging_analysis
+        WHERE clientid = $1
+        ORDER BY aging_key DESC
+        LIMIT 1
+      `;
+      const agingResult = await dbClient.query(agingQuery, [clientId]);
+      let newCurrent, new30days, new60days, new90days;
 
-        console.log(`Generated statement #${newStatementId} for group ${invoice_group_id}`)
+      if (agingResult.rows.length > 0) {
+        const previousAging = agingResult.rows[0];
+        // Current = Total of March 2025 invoices (not adjusted by payments)
+        newCurrent = totalInvoices;
+        // 30days = Previous current (February 2025 invoices) minus February 2025 payments
+        let raw30days = Number.parseFloat(previousAging.current) || 0;
+        let remaining30days = raw30days - totalPayments;
+        let excessPayment = 0;
+
+        if (remaining30days < 0) {
+          let raw60days = Number.parseFloat(previousAging["30days"]) || 0;
+          let remaining60days = raw60days + remaining30days; // Add negative 30days to 60days
+
+          if (raw60days === 0) {
+            // If 60days is 0, allow 30days to go negative
+            new30days = remaining30days;
+            new60days = 0;
+            new90days = (Number.parseFloat(previousAging["60days"]) || 0) + (Number.parseFloat(previousAging["90days"]) || 0);
+          } else if (remaining60days < 0) {
+            // If 60days becomes negative, subtract excess from 90days
+            new30days = 0;
+            new60days = 0;
+            excessPayment = -remaining60days;
+            let raw90days = (Number.parseFloat(previousAging["60days"]) || 0) + (Number.parseFloat(previousAging["90days"]) || 0);
+            new90days = raw90days - excessPayment;
+          } else {
+            // 60days can absorb the excess from 30days
+            new30days = 0;
+            new60days = remaining60days;
+            new90days = (Number.parseFloat(previousAging["60days"]) || 0) + (Number.parseFloat(previousAging["90days"]) || 0);
+          }
+        } else {
+          // 30days can absorb the payment
+          new30days = remaining30days;
+          new60days = Number.parseFloat(previousAging["30days"]) || 0;
+          new90days = (Number.parseFloat(previousAging["60days"]) || 0) + (Number.parseFloat(previousAging["90days"]) || 0);
+        }
+        console.log(
+          `Client ${clientId}: Aging update - Current: R${newCurrent} (March 2025 invoices: R${totalInvoices}), 30days: R${new30days} (February 2025 invoices R${raw30days} - February payments R${totalPayments}), 60days: R${new60days}, 90days: R${new90days}`
+        );
+      } else {
+        // Initial aging for the client (no previous aging analysis)
+        newCurrent = totalInvoices; // March 2025 invoices
+        let remaining30days = 0 - totalPayments; // No previous invoices, so just subtract payments
+        if (remaining30days < 0) {
+          new30days = remaining30days; // Allow negative if no 60days
+          new60days = 0;
+          new90days = 0;
+        } else {
+          new30days = remaining30days;
+          new60days = 0;
+          new90days = 0;
+        }
+        console.log(
+          `Client ${clientId}: Initial aging - Current: R${newCurrent} (March 2025 invoices: R${totalInvoices}), 30days: R${new30days} (after deducting February 2025 payments R${totalPayments}), 60days: R${new60days}, 90days: R${new90days}`
+        );
       }
 
-      await dbClient.query("COMMIT")
+      // Insert new aging analysis record
+      const insertAgingQuery = `
+        INSERT INTO aging_analysis (clientid, current, "30days", "60days", "90days")
+        VALUES ($1, $2, $3, $4, $5)
+        RETURNING aging_key
+      `;
+      const agingValues = [clientId, newCurrent, new30days, new60days, new90days];
+      const agingInsertResult = await dbClient.query(insertAgingQuery, agingValues);
+      const newAgingId = agingInsertResult.rows[0].aging_key;
+
+      // Insert statement with opening_balance
+      const insertStatementQuery = `
+        INSERT INTO statements (groupid, generation_date, clientid, agingid, opening_balance)
+        VALUES ($1, $2, $3, $4, $5)
+        RETURNING statement_key
+      `;
+      const statementValues = [invoice_group_id, formattedGenDate, clientId, newAgingId, openingBalance];
+      const statementInsertResult = await dbClient.query(insertStatementQuery, statementValues);
+      console.log(
+        `Client ${clientId}: Generated statement #${statementInsertResult.rows[0].statement_key} for group ${invoice_group_id || 'null'} with opening balance R${openingBalance}`
+      );
     }
+
+    await dbClient.query("COMMIT");
+    console.log("Monthly statement generation completed successfully");
   } catch (error) {
-    console.error("Error in statement generation:", error)
-    if (dbClient) {
-      await dbClient.query("ROLLBACK")
-    }
+    await dbClient.query("ROLLBACK");
+    console.error("Error generating monthly statements:", error);
+    throw error;
   } finally {
-    if (dbClient) {
-      dbClient.release()
-    }
-    console.log("Monthly statement generation process completed.")
+    if (dbClient) dbClient.release();
   }
 }
+
 // GET statements for a specific client
 app.get("/api/statements/:clientId", verifyToken, async (req, res) => {
   try {
@@ -1547,18 +1822,20 @@ app.get("/api/statement/:statementId", verifyToken, async (req, res) => {
       return res.status(503).json({
         success: false,
         message: "Database connection not established. Please try again later.",
-      })
+      });
     }
 
-    const { statementId } = req.params
-    console.log(`Fetching statement details for statement ${statementId}`)
+    const { statementId } = req.params;
+    console.log(`Fetching statement details for statement ${statementId}`);
 
+    // Fetch statement details (including opening_balance, invoices, and client info)
     const queryText = `
       SELECT 
         s.statement_key,
         s.groupid,
         s.generation_date,
         s.clientid,
+        s.opening_balance,
         c.client AS client_name,
         c.representative AS client_representative,
         c.email AS client_email,
@@ -1588,21 +1865,65 @@ app.get("/api/statement/:statementId", verifyToken, async (req, res) => {
         usertable ut ON ut.roleid = 1 AND ut.status = 'active'
       WHERE 
         s.statement_key = $1
-    `
-    const result = await query(queryText, [statementId])
+    `;
+    const result = await query(queryText, [statementId]);
 
     if (result.rows.length === 0) {
       return res.status(404).json({
         success: false,
         message: "Statement not found",
-      })
+      });
     }
+
+    // Determine the statement period (previous month based on generation_date)
+    const generationDate = new Date(result.rows[0].generation_date);
+    const statementMonth = generationDate.getMonth() === 0 ? 11 : generationDate.getMonth() - 1;
+    const statementYear = generationDate.getMonth() === 0 ? generationDate.getFullYear() - 1 : generationDate.getFullYear();
+    const statementStartDate = new Date(statementYear, statementMonth, 1, 12, 0, 0);
+    const statementEndDate = new Date(statementYear, statementMonth + 1, 0, 12, 0, 0);
+    const formattedStatementStartDate = statementStartDate.toISOString().split("T")[0];
+    const formattedStatementEndDate = statementEndDate.toISOString().split("T")[0];
+
+    console.log(`Statement period (invoices): ${formattedStatementStartDate} to ${formattedStatementEndDate}`);
+
+    // Determine the payment period (two months prior to generation_date)
+    const paymentMonth = statementMonth === 0 ? 11 : statementMonth - 1;
+    const paymentYear = statementMonth === 0 ? statementYear - 1 : statementYear;
+    const paymentStartDate = new Date(paymentYear, paymentMonth, 1, 12, 0, 0);
+    const paymentEndDate = new Date(paymentYear, paymentMonth + 1, 0, 12, 0, 0);
+    const formattedPaymentStartDate = paymentStartDate.toISOString().split("T")[0];
+    const formattedPaymentEndDate = paymentEndDate.toISOString().split("T")[0];
+
+    console.log(`Payment period: ${formattedPaymentStartDate} to ${formattedPaymentEndDate}`);
+
+    // Fetch payments for the client within the payment period
+    const clientId = result.rows[0].clientid;
+    const paymentsQuery = `
+      SELECT 
+        paykey,
+        fileupload AS date,
+        amount
+      FROM 
+        payment_m3
+      WHERE 
+        clientid = $1
+        AND fileupload BETWEEN $2 AND $3
+    `;
+    const paymentsResult = await query(paymentsQuery, [clientId, formattedPaymentStartDate, formattedPaymentEndDate]);
+    const payments = paymentsResult.rows.map((row) => ({
+      paykey: row.paykey,
+      date: row.date,
+      amount: Number.parseFloat(row.amount || 0),
+    }));
+
+    console.log(`Fetched ${payments.length} payments for client ${clientId} between ${formattedPaymentStartDate} and ${formattedPaymentEndDate}`);
 
     // Group data for frontend
     const statementData = {
       statement_key: result.rows[0].statement_key,
       groupid: result.rows[0].groupid,
       generation_date: result.rows[0].generation_date,
+      opening_balance: Number.parseFloat(result.rows[0].opening_balance || 0),
       company_name: result.rows[0].companyname,
       client: {
         id: result.rows[0].clientid,
@@ -1627,22 +1948,23 @@ app.get("/api/statement/:statementId", verifyToken, async (req, res) => {
           task: row.invoice_task,
           invoice_num: row.invoice_num,
         })),
-    }
+      payments: payments, // Add payments to the response
+    };
 
-    console.log(`Fetched statement ${statementId} with ${statementData.invoices.length} invoices`)
+    console.log(`Fetched statement ${statementId} with opening balance R${statementData.opening_balance}, ${statementData.invoices.length} invoices, and ${statementData.payments.length} payments`);
     res.json({
       success: true,
       data: statementData,
-    })
+    });
   } catch (error) {
-    console.error(`Error fetching statement ${statementId}:`, error)
+    console.error(`Error fetching statement ${statementId}:`, error);
     res.status(500).json({
       success: false,
       message: error.message,
       stack: process.env.NODE_ENV === "production" ? null : error.stack,
-    })
+    });
   }
-})
+});
 // Schedule the statement generation to run on the 2nd day of each month at 1:00 AM
 cron.schedule("0 1 1 * *", async () => {
   console.log("Running scheduled statement generation task")
@@ -5243,6 +5565,11 @@ app.get("/api/employee/:id", async (req, res) => {
     if (client) client.release()
   }
 })
+
+
+
+
+
 
 app.listen(PORT, async () => {
   try {

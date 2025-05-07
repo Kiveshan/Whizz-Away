@@ -16,8 +16,12 @@ const DirectorClientDocuments = () => {
   
   // Filter states
   const [filter, setFilter] = useState("All")
-  const [yearFilter, setYearFilter] = useState("")
-  const [monthFilter, setMonthFilter] = useState("")
+  // Set default filters to current year and month
+  const currentDate = new Date()
+  const monthNames = ["January", "February", "March", "April", "May", "June", 
+                     "July", "August", "September", "October", "November", "December"]
+  const [yearFilter, setYearFilter] = useState(currentDate.getFullYear().toString())
+  const [monthFilter, setMonthFilter] = useState(monthNames[currentDate.getMonth()])
 
   // Auth helper function to get token from localStorage
   const getAuthHeader = () => {
