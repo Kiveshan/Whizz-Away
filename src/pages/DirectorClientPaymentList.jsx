@@ -1,93 +1,136 @@
 "use client"
 
-import { useState, useEffect } from "react"
-import { useNavigate, useLocation } from "react-router-dom"
-import "../css/ClientPayments.css"
+import { useState, useEffect } from "react";
+import { useNavigate, useLocation } from "react-router-dom";
+import axios from "axios";
+import "../css/ClientPayments.css";
 
-const DirectorClientPaymentList = () => {
-  const navigate = useNavigate()
-  const location = useLocation()
+const ClientPaymentList = () => {
+  const navigate = useNavigate();
+  const location = useLocation();
+  const { clientId, clientName } = location.state || {};
 
-  const [clientPayments, setClientPayments] = useState([
-    {
-      company: "Company ABC",
-      balance: "R20 000",
-      latestDate: "26/08/2023",
-      status: "Not Uploaded",
-      proof: null,
-    },
-    {
-      company: "Little Helpers LTD",
-      balance: "R20 000",
-      latestDate: "25/08/2023",
-      status: "Uploaded",
-      proof: "dummy_proof.png", // This is for illustration; it will be updated after file upload
-    },
-  ])
+  const [clientPayments, setClientPayments] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+  // Set default filters to current year and month
+  const currentDate = new Date();
+  const [filters, setFilters] = useState({
+    year: currentDate.getFullYear().toString(),
+    month: (currentDate.getMonth() + 1).toString(),
+  });
+
+  const monthNames = [
+    "January", "February", "March", "April", "May", "June",
+    "July", "August", "September", "October", "November", "December",
+  ];
 
   useEffect(() => {
-    if (location.state && location.state.uploadedProof) {
-      const { company, proof, amount } = location.state.uploadedProof
-      updatePaymentStatus(company, proof, amount)
+    if (!clientId) {
+      setError("No client selected");
+      setLoading(false);
+      return;
     }
-  }, [location.state])
 
-  const handleUpload = (company, balance) => {
-    // navigate(`/upload/${encodeURIComponent(company)}/${encodeURIComponent(balance)}`)
-    navigate(`/DirectorUploadProof`)
-  }
+    const fetchPayments = async () => {
+      try {
+        setLoading(true);
+        const url = new URL(`/api/payments/${clientId}`, window.location.origin);
+        if (filters.year) url.searchParams.append("year", filters.year);
+        if (filters.month) url.searchParams.append("month", filters.month);
+
+        const response = await axios.get(url.toString(), {
+          headers: {
+            "Authorization": `Bearer ${localStorage.getItem("token")}`,
+          },
+        });
+
+        if (response.data.success) {
+          setClientPayments(response.data.data);
+        } else {
+          throw new Error(response.data.message || "Failed to fetch payments");
+        }
+      } catch (err) {
+        console.error("Error fetching payments:", err);
+        setError(err.message || "An error occurred while fetching payments");
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchPayments();
+  }, [clientId, filters]);
+
+  const handleFilterChange = (e) => {
+    const { name, value } = e.target;
+    setFilters((prev) => ({
+      ...prev,
+      [name]: value === "Year" || value === "Month" ? "" : value,
+    }));
+  };
+
+  const handleUpload = () => {
+    navigate(`/upload/${encodeURIComponent(clientName)}`, {
+      state: { clientId, clientName },
+    });
+  };
 
   const handleBack = () => {
-    navigate("/DirectorDabtors")
-  }
+    navigate("/director-client-list-payments");
+  };
 
-  const handleViewProof = (company) => {
-    const payment = clientPayments.find((payment) => payment.company === company)
-    if (payment && payment.proof) {
-      openImageViewer(payment.proof, payment.company)
+  const handleViewProof = (fileUrl, date) => {
+    if (fileUrl) {
+      openImageViewer(fileUrl, `${clientName} - ${new Date(date).toLocaleDateString()}`);
     } else {
-      alert("No proof of payment uploaded")
+      alert("No proof of payment uploaded");
     }
-  }
+  };
 
-  const updatePaymentStatus = (company, proof, amount) => {
-    setClientPayments((prevPayments) =>
-      prevPayments.map((payment) =>
-        payment.company === company ? { ...payment, status: "Uploaded", proof, amount } : payment
-      )
-    )
-  }
+  const openImageViewer = (fileUrl, titleText) => {
+    const modal = document.createElement("div");
+    modal.className = "proof-modal";
 
-  const openImageViewer = (imageUrl, company) => {
-    const modal = document.createElement("div")
-    modal.className = "proof-modal"
+    const modalContent = document.createElement("div");
+    modalContent.className = "proof-modal-content";
 
-    const modalContent = document.createElement("div")
-    modalContent.className = "proof-modal-content"
+    const closeBtn = document.createElement("span");
+    closeBtn.className = "proof-modal-close";
+    closeBtn.innerHTML = "×";
+    closeBtn.onclick = () => document.body.removeChild(modal);
 
-    const closeBtn = document.createElement("span")
-    closeBtn.className = "proof-modal-close"
-    closeBtn.innerHTML = "&times;"
-    closeBtn.onclick = () => document.body.removeChild(modal)
+    const title = document.createElement("h2");
+    title.textContent = `Proof of Payment - ${titleText}`;
 
-    const title = document.createElement("h2")
-    title.textContent = `Proof of Payment - ${company}`
+    const fileExtension = fileUrl.split('.').pop().toLowerCase();
+    let contentElement;
 
-    const img = document.createElement("img")
-    img.src = imageUrl instanceof File ? URL.createObjectURL(imageUrl) : imageUrl
-    img.className = "proof-image"
-
-    modalContent.appendChild(closeBtn)
-    modalContent.appendChild(title)
-    modalContent.appendChild(img)
-    modal.appendChild(modalContent)
-
-    document.body.appendChild(modal)
-
-    if (imageUrl instanceof File) {
-      modal.addEventListener("remove", () => URL.revokeObjectURL(img.src))
+    if (['jpg', 'jpeg', 'png', 'gif'].includes(fileExtension)) {
+      contentElement = document.createElement("img");
+      contentElement.src = fileUrl;
+      contentElement.className = "proof-image";
+    } else if (fileExtension === 'pdf') {
+      contentElement = document.createElement("iframe");
+      contentElement.src = fileUrl;
+      contentElement.className = "proof-pdf";
+      contentElement.style.width = "100%";
+      contentElement.style.height = "500px";
+    } else {
+      contentElement = document.createElement("p");
+      contentElement.textContent = "Unsupported file format";
     }
-  }
+
+    modalContent.appendChild(closeBtn);
+    modalContent.appendChild(title);
+    modalContent.appendChild(contentElement);
+    modal.appendChild(modalContent);
+
+    document.body.appendChild(modal);
+  };
+
+  if (loading) return <div>Loading payments...</div>;
+  if (error) return <div className="error-message">Error: {error}</div>;
+  if (!clientId) return <div>Please select a client from the previous page.</div>;
 
   return (
     <div className="client-payment-container">
@@ -96,40 +139,83 @@ const DirectorClientPaymentList = () => {
           Back
         </button>
       </div>
-      <table className="payment-table1" >
+
+      <div className="action-bar">
+        <div className="filter-section46">
+          <div className="dropdown-container">
+            <select
+              name="year"
+              className="dropdown"
+              value={filters.year}
+              onChange={handleFilterChange}
+            >
+              <option>Year</option>
+              <option>2025</option>
+              <option>2024</option>
+              <option>2023</option>
+              <option>2022</option>
+            </select>
+            <select
+              name="month"
+              className="dropdown"
+              value={filters.month}
+              onChange={handleFilterChange}
+            >
+              <option>Month</option>
+              {monthNames.map((month, index) => (
+                <option key={index} value={index + 1}>
+                  {month}
+                </option>
+              ))}
+            </select>
+          </div>
+        </div>
+      </div>
+
+      <table className="payment-table1">
         <thead>
           <tr>
-            <th>Company</th>
-            <th>Balance</th>
-            <th>Latest Date</th>
-            <th>Status</th>
-            <th>Proof of Payment</th>
+            <th>Date</th>
+            <th>Amount</th>
+            <th>View</th>
           </tr>
         </thead>
         <tbody>
-          {clientPayments.map((payment, index) => (
-            <tr key={index}>
-              <td>{payment.company}</td>
-              <td>{payment.balance}</td>
-              <td>{payment.latestDate}</td>
-              <td>{payment.status}</td>
-              <td>
-                {payment.status === "Uploaded" ? (
-                  <button className="view-button" onClick={() => handleViewProof(payment.company)}>
+          {clientPayments.length > 0 ? (
+            clientPayments.map((payment, index) => (
+              <tr key={index}>
+                <td>{new Date(payment.fileupload).toLocaleDateString()}</td>
+                <td>{payment.amount}</td>
+                <td>
+                  <button className="view-button"
+                    onClick={() =>
+                      navigate(`/upload-proof/${clientName}/${payment.paykey}`, {
+                        state: { clientId, clientName },
+                      })
+                    }
+                  >
                     View
                   </button>
-                ) : (
-                  <button className="upload-button" onClick={() => handleUpload(payment.company, payment.balance)}>
-                    Upload
-                  </button>
-                )}
+                </td>
+              </tr>
+            ))
+          ) : (
+            <tr>
+              <td colSpan="3" className="p-3 text-center">
+                No payments found
               </td>
             </tr>
-          ))}
+          )}
         </tbody>
       </table>
-    </div>
-  )
-}
 
-export default DirectorClientPaymentList
+      <div className="upload-section" style={{ marginTop: "20px", textAlign: "center" }}>
+        <button className="upload-button" onClick={handleUpload}>
+          Upload Payment
+        </button>
+      </div>
+    </div>
+  );
+};
+
+export default ClientPaymentList;

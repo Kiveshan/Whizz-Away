@@ -59,6 +59,7 @@ import Viewcontrollerinstructions from "./pages/Viewcontrollerinstructions"
 import ViewcontrollerInstructionDetails from "./pages/ViewcontrollerInstructionDetails"
 import AdminDashboard from "./pages/AdminDashboard";
 import ClientListPay from "./pages/ClientListPay"
+import DirectorClientListPay from "./pages/DirectorClientListPay"
 // Finance Clerk Pages
 import FDashboard from "./finance clerkpages/FDashboard"
 import InstructionsList from "./finance clerkpages/InstructionsList"
@@ -98,6 +99,7 @@ function DynamicHeader() {
 
     "/client-payments": "Client Payments",
     "/client-list-payments": "Client Payments",
+    "/director-client-list-payments": "Client Payments",
     "/client-documents": "Client Documents",
     "/driver-wage": "Wages",
     "/DriverWageSlip": "Wages",
@@ -203,6 +205,7 @@ function ContentWrapper() {
         <Route path="/" element={<Landing />} />
         <Route path="/client-payments" element={<ClientPayments />} />
         <Route path="/client-list-payments" element={<ClientListPay />} />
+        <Route path="/director-client-list-payments" element ={<DirectorClientListPay />} />
         <Route path="/driver-wage" element={<DriverWage />} />
         <Route path="/DriverWageSlip" element={<DriverWageSlip />} />
         <Route path="/DriverWageList" element={<DriverWageList />} />

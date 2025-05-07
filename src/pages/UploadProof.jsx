@@ -18,6 +18,9 @@ const UploadProof = () => {
   const [error, setError] = useState(null);
   const [isViewMode, setIsViewMode] = useState(false); // Track if in view mode
 
+  // Retrieve roleId from localStorage
+  const roleId = JSON.parse(localStorage.getItem('user'))?.roleid;
+
   // Fetch payment details if in view mode (paymentId exists)
   useEffect(() => {
     if (paymentId) {
@@ -88,9 +91,21 @@ const UploadProof = () => {
       );
 
       if (response.data.success) {
-        navigate(`/client-payments`, {
-          state: { clientId, clientName },
-        });
+        // Redirect based on roleId
+        if (roleId == 1) {
+          navigate("/client-payments", {
+            state: { clientId, clientName },
+          });
+        } else if (roleId == 4) {
+          navigate("/DirectorClientPaymentList", {
+            state: { clientId, clientName },
+          });
+        } else {
+          // Default fallback navigation
+          navigate("/client-payments", {
+            state: { clientId, clientName },
+          });
+        }
       } else {
         throw new Error(response.data.message || "Failed to upload payment details");
       }
@@ -103,9 +118,20 @@ const UploadProof = () => {
   };
 
   const handleBack = () => {
-    navigate(`/client-payments`, {
-      state: { clientId, clientName },
-    });
+    if (roleId == 1) {
+      navigate("/client-payments", {
+        state: { clientId, clientName },
+      });
+    } else if (roleId == 4) {
+      navigate("/DirectorClientPaymentList", {
+        state: { clientId, clientName },
+      });
+    } else {
+      // Default fallback navigation
+      navigate("/client-payments", {
+        state: { clientId, clientName },
+      });
+    }
   };
 
   return (
