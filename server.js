@@ -1,4 +1,3 @@
-// export default app
 import express from "express"
 import cors from "cors"
 import bcrypt from "bcrypt"
@@ -12,7 +11,6 @@ import multer from 'multer';
 import multerS3 from 'multer-s3';
 import dotenv from "dotenv";
 import { S3Client } from '@aws-sdk/client-s3'
-dotenv.config();
 import bodyParser from "body-parser"
 import path from "path"
 import { fileURLToPath } from "url"
@@ -21,6 +19,8 @@ import pkg from "pg"
 const { Pool, types } = pkg
 import puppeteer from "puppeteer"
 import cron from "node-cron"
+import { GetObjectCommand } from "@aws-sdk/client-s3";
+
 
 // Load environment variables
 dotenv.config()
@@ -218,6 +218,7 @@ app.get("/test-session", (req, res) => {
       name: req.session.user.name,
       surname: req.session.user.surname,
       roleid: req.session.user.roleid,
+      
     },
   })
 })
@@ -2111,12 +2112,19 @@ app.get("/api/employees", verifyToken, async (req, res) => {
       SELECT
         e.*,
         r.rolename,
-        w.total_deductions
+        edh.deduction_income_tax,
+        edh.deduction_other_deductions,
+        edh.deduction_uif,
+        edh.deduction_bonus,
+        edh.deduction_savings,
+        edh.deduction_loan,
+        edh.deduction_damage,
+        edh.effective_date
       FROM m5_employee e
       JOIN roles r
         ON e.roleid = r.roleid
-      LEFT JOIN wages w
-        ON e.userid = w.employeeid
+      LEFT JOIN employee_deduction_history edh
+        ON e.userid = edh.employeeid
       WHERE e.roleid != 6
       ORDER BY e.userid
     `;
@@ -2131,26 +2139,27 @@ app.get("/api/employees", verifyToken, async (req, res) => {
   }
 });
 
+
 // Get employee by ID
-app.get("/api/employees/:id", verifyToken, async (req, res) => {
-  const client = await pool.connect();
-  try {
-    const { id } = req.params;
-    const query = "SELECT * FROM m5_employee WHERE userid = $1 AND roleid != 6 ";
-    const result = await client.query(query, [id]);
+// app.get("/api/employees/:id", verifyToken, async (req, res) => {
+//   const client = await pool.connect();
+//   try {
+//     const { id } = req.params;
+//     const query = "SELECT * FROM m5_employee WHERE userid = $1 AND roleid != 6 ";
+//     const result = await client.query(query, [id]);
 
-    if (result.rows.length === 0) {
-      return res.status(404).json({ message: "Employee not found" });
-    }
+//     if (result.rows.length === 0) {
+//       return res.status(404).json({ message: "Employee not found" });
+//     }
 
-    res.json(result.rows[0]);
-  } catch (err) {
-    console.error(`Error fetching employee ${req.params.id}:`, err);
-    res.status(500).json({ error: "Failed to fetch employee" });
-  } finally {
-    client.release();
-  }
-});
+//     res.json(result.rows[0]);
+//   } catch (err) {
+//     console.error(`Error fetching employee ${req.params.id}:`, err);
+//     res.status(500).json({ error: "Failed to fetch employee" });
+//   } finally {
+//     client.release();
+//   }
+// });
 
 // ----- AWS S3 and Multer-S3 Setup for Employee Uploads ----- //
 
@@ -2203,6 +2212,108 @@ const upload1 = multer({
 // ----- Employee Route for Creating a New Employee ----- //
 
 //updated 02 May
+// app.post(
+//   "/api/employees",
+//   verifyToken,
+//   upload1.array("documents", 3),
+//   async (req, res) => {
+//     const client = await pool.connect();
+//     try {
+//       console.log("req.files:", req.files);
+//       console.log("req.body:", req.body);
+
+//       const {
+//         name,
+//         surname,
+//         telephonenum,
+//         cellnum,
+//         employeenum,
+//         roleid,
+//         email,
+//         password,
+//         base_salary,
+//         deduction_income_tax,
+//         deduction_other_deductions,
+//         deduction_uif,
+//         deduction_bonus,
+//         deduction_savings,
+//         deduction_loan,
+//         deduction_damage,
+//         loan_amount,
+//       } = req.body;
+
+//       if (!password) {
+//         return res.status(400).json({ error: "Password is required" });
+//       }
+
+//       const company_reg_num = req.user.company_reg_num;
+//       if (!company_reg_num) {
+//         return res.status(400).json({ error: "Missing company registration number." });
+//       }
+
+//       const urls = (req.files || []).map((f) => f.location);
+//       while (urls.length < 3) urls.push(null);
+
+//       await client.query("BEGIN");
+
+//       const hashedPassword = await bcrypt.hash(password, 10);
+
+//       const insertEmployeeQuery = `
+//         INSERT INTO m5_employee (
+//           name, surname, telephonenum, cellnum, employeenum,
+//           roleid, email, password, base_salary, company_reg_num, status,
+//           document_url1, document_url2, document_url3,
+//           deduction_income_tax, deduction_other_deductions, deduction_uif,
+//           deduction_bonus, deduction_savings, deduction_loan, deduction_damage,
+//           loan_amount, income_tax_rate, deduction_date
+//         ) VALUES (
+//           $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, true,
+//           $11, $12, $13,
+//           $14, $15, $16, $17, $18, $19, $20,
+//           $21, 0, $22
+//         ) RETURNING *
+//       `;
+
+//       const insertValues = [
+//         name,
+//         surname,
+//         telephonenum,
+//         cellnum,
+//         employeenum,
+//         roleid,
+//         email,
+//         hashedPassword,
+//         base_salary,
+//         company_reg_num,
+//         urls[0],
+//         urls[1],
+//         urls[2],
+//         deduction_income_tax || 0,
+//         deduction_other_deductions || 0,
+//         deduction_uif || 0,
+//         deduction_bonus || 0,
+//         deduction_savings || 0,
+//         deduction_loan || 0,
+//         deduction_damage || 0,
+//         loan_amount || 0,
+//         new Date(), // 🆕 deduction_date
+//       ];
+
+//       const result = await client.query(insertEmployeeQuery, insertValues);
+
+//       await client.query("COMMIT");
+//       return res.status(201).json(result.rows[0]);
+//     } catch (err) {
+//       await client.query("ROLLBACK");
+//       console.error("Error in /api/employees:", err);
+//       return res.status(500).json({ error: "Failed to create employee" });
+//     } finally {
+//       client.release();
+//     }
+//   }
+// );
+
+//updated 8 May
 app.post(
   "/api/employees",
   verifyToken,
@@ -2229,8 +2340,8 @@ app.post(
         deduction_bonus,
         deduction_savings,
         deduction_loan,
-        deduction_damage,
-        loan_amount,
+        deduction_damage
+        // loan_amount
       } = req.body;
 
       if (!password) {
@@ -2238,6 +2349,7 @@ app.post(
       }
 
       const company_reg_num = req.user.company_reg_num;
+      // const company_reg_num = req.session.user.company_reg_num; // Updated to use session variable
       if (!company_reg_num) {
         return res.status(400).json({ error: "Missing company registration number." });
       }
@@ -2248,55 +2360,55 @@ app.post(
       await client.query("BEGIN");
 
       const hashedPassword = await bcrypt.hash(password, 10);
+      const deductionDate = new Date();
 
       const insertEmployeeQuery = `
         INSERT INTO m5_employee (
           name, surname, telephonenum, cellnum, employeenum,
           roleid, email, password, base_salary, company_reg_num, status,
-          document_url1, document_url2, document_url3,
-          deduction_income_tax, deduction_other_deductions, deduction_uif,
-          deduction_bonus, deduction_savings, deduction_loan, deduction_damage,
-          loan_amount, income_tax_rate, deduction_date
+          document_url1, document_url2, document_url3
         ) VALUES (
           $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, true,
-          $11, $12, $13,
-          $14, $15, $16, $17, $18, $19, $20,
-          $21, 0, $22
+          $11, $12, $13
         ) RETURNING *
       `;
 
       const insertValues = [
-        name,
-        surname,
-        telephonenum,
-        cellnum,
-        employeenum,
-        roleid,
-        email,
-        hashedPassword,
-        base_salary,
-        company_reg_num,
-        urls[0],
-        urls[1],
-        urls[2],
-        deduction_income_tax || 0,
-        deduction_other_deductions || 0,
-        deduction_uif || 0,
-        deduction_bonus || 0,
-        deduction_savings || 0,
-        deduction_loan || 0,
-        deduction_damage || 0,
-        loan_amount || 0,
-        new Date(), // 🆕 deduction_date
+        name, surname, telephonenum, cellnum, employeenum,
+        roleid, email, hashedPassword, base_salary, company_reg_num,
+        urls[0], urls[1], urls[2]
       ];
 
       const result = await client.query(insertEmployeeQuery, insertValues);
+      const newEmployee = result.rows[0];
+
+      const insertHistoryQuery = `
+        INSERT INTO employee_deduction_history (
+          employeeid, effective_date, income_tax_rate,
+          deduction_income_tax, deduction_other_deductions,
+          deduction_uif, deduction_bonus, deduction_savings,
+          deduction_loan, deduction_damage
+        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+      `;
+
+      const historyValues = [
+        newEmployee.userid, deductionDate, 0,
+        parseFloat(deduction_income_tax || 0),
+        parseFloat(deduction_other_deductions || 0),
+        parseFloat(deduction_uif || 0),
+        parseFloat(deduction_bonus || 0),
+        parseFloat(deduction_savings || 0),
+        parseFloat(deduction_loan || 0),
+        parseFloat(deduction_damage || 0),
+      ];
+
+      await client.query(insertHistoryQuery, historyValues);
 
       await client.query("COMMIT");
-      return res.status(201).json(result.rows[0]);
+      return res.status(201).json(newEmployee);
     } catch (err) {
       await client.query("ROLLBACK");
-      console.error("Error in /api/employees:", err);
+      console.error("Error in /api/employees POST:", err);
       return res.status(500).json({ error: "Failed to create employee" });
     } finally {
       client.release();
@@ -2304,7 +2416,123 @@ app.post(
   }
 );
 
+
 // Updated 2 May
+// app.put(
+//   "/api/employees/:id",
+//   verifyToken,
+//   upload1.array("documents", 3),
+//   async (req, res) => {
+//     const client = await pool.connect();
+//     try {
+//       const id = req.params.id;
+
+//       const {
+//         name,
+//         surname,
+//         telephonenum,
+//         cellnum,
+//         employeenum,
+//         roleid,
+//         email,
+//         password,
+//         base_salary,
+//         deduction_income_tax,
+//         deduction_other_deductions,
+//         deduction_uif,
+//         deduction_bonus,
+//         deduction_savings,
+//         deduction_loan,
+//         deduction_damage,
+//         loan_amount,
+//       } = req.body;
+
+//       const urls = (req.files || []).map((f) => f.location);
+//       while (urls.length < 3) urls.push(null);
+
+//       await client.query("BEGIN");
+
+//       let hashedPassword;
+//       if (password) {
+//         hashedPassword = await bcrypt.hash(password, 10);
+//       } else {
+//         const { rows } = await client.query(
+//           "SELECT password FROM m5_employee WHERE userid = $1",
+//           [id]
+//         );
+//         if (rows.length === 0) {
+//           throw new Error("Employee not found");
+//         }
+//         hashedPassword = rows[0].password;
+//       }
+
+//       const updateEmpQuery = `
+//         UPDATE m5_employee SET
+//           name                = $1,
+//           surname             = $2,
+//           telephonenum        = $3,
+//           cellnum             = $4,
+//           employeenum         = $5,
+//           roleid              = $6,
+//           email               = $7,
+//           password            = $8,
+//           base_salary         = $9,
+//           document_url1       = $10,
+//           document_url2       = $11,
+//           document_url3       = $12,
+//           deduction_income_tax        = $13,
+//           deduction_other_deductions  = $14,
+//           deduction_uif               = $15,
+//           deduction_bonus             = $16,
+//           deduction_savings           = $17,
+//           deduction_loan              = $18,
+//           deduction_damage            = $19,
+//           loan_amount                 = $20,
+//           deduction_date              = $21
+//         WHERE userid = $22
+//         RETURNING *
+//       `;
+
+//       const updateEmpValues = [
+//         name,
+//         surname,
+//         telephonenum,
+//         cellnum,
+//         employeenum,
+//         roleid,
+//         email,
+//         hashedPassword,
+//         base_salary,
+//         urls[0],
+//         urls[1],
+//         urls[2],
+//         parseFloat(deduction_income_tax || 0),
+//         parseFloat(deduction_other_deductions || 0),
+//         parseFloat(deduction_uif || 0),
+//         parseFloat(deduction_bonus || 0),
+//         parseFloat(deduction_savings || 0),
+//         parseFloat(deduction_loan || 0),
+//         parseFloat(deduction_damage || 0),
+//         parseFloat(loan_amount || 0),
+//         new Date(), // 🆕 update deduction_date
+//         id,
+//       ];
+
+//       const result = await client.query(updateEmpQuery, updateEmpValues);
+
+//       await client.query("COMMIT");
+//       res.json(result.rows[0]);
+//     } catch (err) {
+//       await client.query("ROLLBACK");
+//       console.error("Error updating employee:", err);
+//       res.status(500).json({ error: err.message || "Failed to update employee" });
+//     } finally {
+//       client.release();
+//     }
+//   }
+// );
+
+// Updated 8 May
 app.put(
   "/api/employees/:id",
   verifyToken,
@@ -2313,7 +2541,6 @@ app.put(
     const client = await pool.connect();
     try {
       const id = req.params.id;
-
       const {
         name,
         surname,
@@ -2330,8 +2557,7 @@ app.put(
         deduction_bonus,
         deduction_savings,
         deduction_loan,
-        deduction_damage,
-        loan_amount,
+        deduction_damage
       } = req.body;
 
       const urls = (req.files || []).map((f) => f.location);
@@ -2347,68 +2573,89 @@ app.put(
           "SELECT password FROM m5_employee WHERE userid = $1",
           [id]
         );
-        if (rows.length === 0) {
-          throw new Error("Employee not found");
-        }
+        if (rows.length === 0) throw new Error("Employee not found");
         hashedPassword = rows[0].password;
       }
 
       const updateEmpQuery = `
         UPDATE m5_employee SET
-          name                = $1,
-          surname             = $2,
-          telephonenum        = $3,
-          cellnum             = $4,
-          employeenum         = $5,
-          roleid              = $6,
-          email               = $7,
-          password            = $8,
-          base_salary         = $9,
-          document_url1       = $10,
-          document_url2       = $11,
-          document_url3       = $12,
-          deduction_income_tax        = $13,
-          deduction_other_deductions  = $14,
-          deduction_uif               = $15,
-          deduction_bonus             = $16,
-          deduction_savings           = $17,
-          deduction_loan              = $18,
-          deduction_damage            = $19,
-          loan_amount                 = $20,
-          deduction_date              = $21
-        WHERE userid = $22
+          name = $1, surname = $2, telephonenum = $3, cellnum = $4, employeenum = $5,
+          roleid = $6, email = $7, password = $8, base_salary = $9,
+          document_url1 = $10, document_url2 = $11, document_url3 = $12
+        WHERE userid = $13
         RETURNING *
       `;
 
-      const updateEmpValues = [
-        name,
-        surname,
-        telephonenum,
-        cellnum,
-        employeenum,
-        roleid,
-        email,
-        hashedPassword,
-        base_salary,
-        urls[0],
-        urls[1],
-        urls[2],
-        parseFloat(deduction_income_tax || 0),
-        parseFloat(deduction_other_deductions || 0),
-        parseFloat(deduction_uif || 0),
-        parseFloat(deduction_bonus || 0),
-        parseFloat(deduction_savings || 0),
-        parseFloat(deduction_loan || 0),
-        parseFloat(deduction_damage || 0),
-        parseFloat(loan_amount || 0),
-        new Date(), // 🆕 update deduction_date
-        id,
+      const updateValues = [
+        name, surname, telephonenum, cellnum, employeenum,
+        roleid, email, hashedPassword, base_salary,
+        urls[0], urls[1], urls[2], id
       ];
 
-      const result = await client.query(updateEmpQuery, updateEmpValues);
+      const result = await client.query(updateEmpQuery, updateValues);
+      const updatedEmployee = result.rows[0];
+
+      // Prepare new values
+      const newValues = {
+        income_tax: parseFloat(deduction_income_tax || 0),
+        other: parseFloat(deduction_other_deductions || 0),
+        uif: parseFloat(deduction_uif || 0),
+        bonus: parseFloat(deduction_bonus || 0),
+        savings: parseFloat(deduction_savings || 0),
+        loan: parseFloat(deduction_loan || 0),
+        damage: parseFloat(deduction_damage || 0),
+      };
+
+      // Get last deduction history
+      const { rows: lastRows } = await client.query(
+        `SELECT * FROM employee_deduction_history
+         WHERE employeeid = $1
+         ORDER BY effective_date DESC
+         LIMIT 1`,
+        [id]
+      );
+
+      const last = lastRows[0];
+
+      const isDuplicate =
+        last &&
+        newValues.income_tax === parseFloat(last.deduction_income_tax) &&
+        newValues.other === parseFloat(last.deduction_other_deductions) &&
+        newValues.uif === parseFloat(last.deduction_uif) &&
+        newValues.bonus === parseFloat(last.deduction_bonus) &&
+        newValues.savings === parseFloat(last.deduction_savings) &&
+        newValues.loan === parseFloat(last.deduction_loan) &&
+        newValues.damage === parseFloat(last.deduction_damage);
+
+      if (!isDuplicate) {
+        const insertHistoryQuery = `
+          INSERT INTO employee_deduction_history (
+            employeeid, effective_date, income_tax_rate,
+            deduction_income_tax, deduction_other_deductions,
+            deduction_uif, deduction_bonus, deduction_savings,
+            deduction_loan, deduction_damage
+          ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+        `;
+
+        const deductionDate = new Date();
+        const historyValues = [
+          updatedEmployee.userid,
+          deductionDate,
+          0,
+          newValues.income_tax,
+          newValues.other,
+          newValues.uif,
+          newValues.bonus,
+          newValues.savings,
+          newValues.loan,
+          newValues.damage
+        ];
+
+        await client.query(insertHistoryQuery, historyValues);
+      }
 
       await client.query("COMMIT");
-      res.json(result.rows[0]);
+      res.json(updatedEmployee);
     } catch (err) {
       await client.query("ROLLBACK");
       console.error("Error updating employee:", err);
@@ -2418,6 +2665,7 @@ app.put(
     }
   }
 );
+
 
 // Toggle employee status (enable/disable)
 app.put("/api/employees/:id/toggle-status", verifyToken, async (req, res) => {
@@ -2444,6 +2692,66 @@ app.put("/api/employees/:id/toggle-status", verifyToken, async (req, res) => {
     res.status(500).json({ error: "Failed to toggle employee status" });
   }
 });
+
+app.get('/api/employees/:id', verifyToken, async (req, res) => {
+  const client = await pool.connect();
+  try {
+    const { id } = req.params;
+    console.log("Employee ID:", id);  // Log the incoming ID
+
+    // Fetch the employee record by employeeid
+    const result = await client.query(
+      `SELECT * FROM m5_employees WHERE employeeid = $1`,
+      [id]
+    );
+
+    console.log(result.rows); // Log the query result
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: 'Employee not found' });
+    }
+
+    const employee = result.rows[0];
+    const { document_url1, document_url2, document_url3 } = employee;
+    const documentUrls = [document_url1, document_url2, document_url3];
+
+    // Helper function to extract the S3 key from a full S3 URL
+    const extractKeyFromUrl = (url) => {
+      if (!url) return null;
+      const urlParts = url.split('/');
+      const index = urlParts.findIndex(part => part === 'Employees');
+      return urlParts.slice(index).join('/');
+    };
+
+    // Regenerate signed URLs
+    const signedUrls = await Promise.all(
+      documentUrls.map(async (url) => {
+        if (!url) return null;
+
+        const key = extractKeyFromUrl(url);  // Extract key from URL
+        const command = new GetObjectCommand({
+          Bucket: process.env.Employees_AWS_BUCKET_NAME,
+          Key: key,
+        });
+
+        return await getSignedUrl(s3Client, command, { expiresIn: 3600 });
+      })
+    );
+
+    // Attach signed URLs to the employee object for return
+    employee.document_url1 = signedUrls[0];
+    employee.document_url2 = signedUrls[1];
+    employee.document_url3 = signedUrls[2];
+
+    res.json(employee);
+  } catch (err) {
+    console.error("Error fetching employee details:", err);
+    res.status(500).json({ error: "Failed to fetch employee details" });
+  } finally {
+    client.release();
+  }
+});
+
 
 // ---- Client Management Routes ---- //
 
@@ -2609,24 +2917,24 @@ app.get("/api/trucks", verifyToken, async (req, res) => {
 });
 
 // Get truck by ID
-app.get("/api/trucks/:id", verifyToken, async (req, res) => {
-  try {
-    const { id } = req.params;
+// app.get("/api/trucks/:id", verifyToken, async (req, res) => {
+//   try {
+//     const { id } = req.params;
 
-    // Simple query using pool.query directly
-    const query = "SELECT * FROM m5_trucks WHERE m5truckskey = $1";
-    const result = await pool.query(query, [id]);
+//     // Simple query using pool.query directly
+//     const query = "SELECT * FROM m5_trucks WHERE m5truckskey = $1";
+//     const result = await pool.query(query, [id]);
 
-    if (result.rows.length === 0) {
-      return res.status(404).json({ message: "Truck not found" });
-    }
+//     if (result.rows.length === 0) {
+//       return res.status(404).json({ message: "Truck not found" });
+//     }
 
-    res.json(result.rows[0]);
-  } catch (err) {
-    console.error(`Error fetching truck ${req.params.id}:`, err);
-    res.status(500).json({ error: "Failed to fetch truck" });
-  }
-});
+//     res.json(result.rows[0]);
+//   } catch (err) {
+//     console.error(`Error fetching truck ${req.params.id}:`, err);
+//     res.status(500).json({ error: "Failed to fetch truck" });
+//   }
+// });
 
 // Create the v3 S3 client
 const s3Client = new S3Client({
@@ -2798,6 +3106,117 @@ app.put("/api/trucks/:id", verifyToken, upload2.array('documents', 3), async (re
     client.release();
   }
 });
+
+// app.get('/api/trucks/:truckregnum', verifyToken, async (req, res) => {
+//   const client = await pool.connect();
+//   try {
+//     const { truckregnum } = req.params;
+
+//     // Fetch the truck record by truck registration number
+//     const result = await client.query(
+//       `SELECT * FROM m5_trucks WHERE truckregnum = $1`,
+//       [truckregnum]
+//     );
+
+//     if (result.rows.length === 0) {
+//       return res.status(404).json({ error: 'Truck not found' });
+//     }
+
+//     const truck = result.rows[0];
+//     const { document_url1, document_url2, document_url3 } = truck;
+
+//     // Helper function to extract the S3 key from a full S3 URL
+//     const extractKeyFromUrl = (url) => {
+//       if (!url) return null;
+//       const urlParts = url.split('/');
+//       const index = urlParts.findIndex(part => part === 'Trucks');
+//       return urlParts.slice(index).join('/');
+//     };
+
+//     // Regenerate signed URLs
+//     const signedUrls = await Promise.all(
+//       [document_url1, document_url2, document_url3].map(async (url) => {
+//         if (!url) return null;
+
+//         const key = extractKeyFromUrl(url);
+//         const command = new GetObjectCommand({
+//           Bucket: process.env.Trucks_AWS_BUCKET_NAME,
+//           Key: key,
+//         });
+
+//         return await getSignedUrl(s3Client, command, { expiresIn: 3600 });
+//       })
+//     );
+
+//     // Attach signed URLs to the truck object for return
+//     truck.document_url1 = signedUrls[0];
+//     truck.document_url2 = signedUrls[1];
+//     truck.document_url3 = signedUrls[2];
+
+//     res.json(truck);
+//   } catch (err) {
+//     console.error("Error fetching truck details:", err);
+//     res.status(500).json({ error: "Failed to fetch truck details" });
+//   } finally {
+//     client.release();
+//   }
+// });
+
+app.get('/api/trucks/:id', verifyToken, async (req, res) => {
+  const client = await pool.connect();
+  try {
+    const { id } = req.params;  // Use `id` instead of `truckregnum`
+
+    // Fetch the truck record by m5truckskey (or id)
+    const result = await client.query(
+      `SELECT * FROM m5_trucks WHERE m5truckskey = $1`, // Use m5truckskey for comparison
+      [id]
+    );
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: 'Truck not found' });
+    }
+
+    const truck = result.rows[0];
+    const { document_url1, document_url2, document_url3 } = truck;
+
+    // Helper function to extract the S3 key from a full S3 URL
+    const extractKeyFromUrl = (url) => {
+      if (!url) return null;
+      const urlParts = url.split('/');
+      const index = urlParts.findIndex(part => part === 'Trucks');
+      return urlParts.slice(index).join('/');
+    };
+
+    // Regenerate signed URLs
+    const signedUrls = await Promise.all(
+      [document_url1, document_url2, document_url3].map(async (url) => {
+        if (!url) return null;
+
+        const key = extractKeyFromUrl(url);
+        const command = new GetObjectCommand({
+          Bucket: process.env.Trucks_AWS_BUCKET_NAME,
+          Key: key,
+        });
+
+        return await getSignedUrl(s3Client, command, { expiresIn: 3600 });
+      })
+    );
+
+    // Attach signed URLs to the truck object for return
+    truck.document_url1 = signedUrls[0];
+    truck.document_url2 = signedUrls[1];
+    truck.document_url3 = signedUrls[2];
+
+    res.json(truck);
+  } catch (err) {
+    console.error("Error fetching truck details:", err);
+    res.status(500).json({ error: "Failed to fetch truck details" });
+  } finally {
+    client.release();
+  }
+});
+
 
 // Delete truck
 app.delete("/api/trucks/:id", verifyToken, async (req, res) => {
@@ -3180,7 +3599,7 @@ app.put("/api/subcontractors/:id/toggle-status", verifyToken, async (req, res) =
 
 // Import additional modules needed for server2.js functionality
 // import multer from "multer"
-import { uploadInstructionToS3, getSignedUrl } from "./utils/s3-config.js"
+import { uploadInstructionToS3} from "./utils/s3-config.js"
 import expensesRoutes from "./routes/expenses.js"
 
 import documentsRoutes from "./routes/Documents.js"

@@ -41,7 +41,7 @@ const [numTrucks, setNumTrucks] = useState(1);
   const [showClientForm, setShowClientForm] = useState(false)
   const [showTruckForm, setShowTruckForm] = useState(false)
   const [showDriverRateForm, setShowDriverRateForm] = useState(false)
-  const [showSubcontractorForm, setShowSubcontractorForm] = useState(false)
+  const [showSubcontractorForm, setShowSubcontractorForm] = useState(false)   
 
   // State for new items
 // Update the newEmployee state to include deduction fields
@@ -68,7 +68,7 @@ const [newEmployee, setNewEmployee] = useState({
   deduction_damage: "",
 
   // New loan_amount field (you added this column server-side)
-  loan_amount: "",
+  // loan_amount: "",
 });
 
 
@@ -395,7 +395,7 @@ const handleSaveEmployee = async () => {
       "deduction_savings",
       "deduction_loan",
       "deduction_damage",
-      "loan_amount"
+      // "loan_amount"
     ].forEach((field) => {
       // On edit, skip password if empty
       if (field === "password" && editingEmployeeId && !newEmployee.password) return;
@@ -443,7 +443,7 @@ const handleSaveEmployee = async () => {
       deduction_savings: "",
       deduction_loan: "",
       deduction_damage: "",
-      loan_amount: "",
+      // loan_amount: "",
     });
     setEditingEmployeeId(null);
     setShowEmployeeForm(false);
@@ -1634,6 +1634,7 @@ const handleToggleEmployee = async (id, currentStatus) => {
             <option value="">Select Role</option>
             <option value="2">Controller</option>
             <option value="3">Manager</option>
+            <option value="3">Director</option>
             <option value="5">Driver</option>
             <option value="6">Finance Clerk</option>
             <option value="8">Yard Staff</option>
@@ -1641,35 +1642,52 @@ const handleToggleEmployee = async (id, currentStatus) => {
         </div>
   
         {/* Deductions */}
+        <div style={{ gridColumn: "1 / span 3" }}>
+  <h3 style={{ textAlign: "center", marginTop: "30px" }}>
+    Employee Salary Deductions
+  </h3>
+</div>
+       
         <div className="manage-form-group">
-          <label>Income Tax</label>
-          <input
-            type="number"
-            value={newEmployee.deduction_income_tax}
-            onChange={(e) =>
-              setNewEmployee({
-                ...newEmployee,
-                deduction_income_tax: e.target.value,
-              })
-            }
-          />
-        </div>
-  
-        <div className="manage-form-group">
-          <label>UIF</label>
-          <input
-            type="number"
-            value={newEmployee.deduction_uif}
-            onChange={(e) =>
-              setNewEmployee({ ...newEmployee, deduction_uif: e.target.value })
-            }
-          />
-        </div>
+  <label>Income Tax (%)</label>
+  <input
+    type="number"
+    min="0"
+    max="100"
+    step="0.01"
+    value={newEmployee.deduction_income_tax}
+    onChange={(e) =>
+      setNewEmployee({
+        ...newEmployee,
+        deduction_income_tax: e.target.value,
+      })
+    }
+  />
+</div>
+
+<div className="manage-form-group">
+  <label>UIF (%)</label>
+  <input
+    type="number"
+    min="0"
+    max="100"
+    step="0.01"
+    value={newEmployee.deduction_uif}
+    onChange={(e) =>
+      setNewEmployee({
+        ...newEmployee,
+        deduction_uif: e.target.value,
+      })
+    }
+  />
+</div>
+
   
         <div className="manage-form-group">
           <label>Loan</label>
           <input
             type="number"
+             min="0"
             value={newEmployee.deduction_loan}
             onChange={(e) =>
               setNewEmployee({ ...newEmployee, deduction_loan: e.target.value })
@@ -1681,6 +1699,7 @@ const handleToggleEmployee = async (id, currentStatus) => {
           <label>Bonus</label>
           <input
             type="number"
+             min="0"
             value={newEmployee.deduction_bonus}
             onChange={(e) =>
               setNewEmployee({ ...newEmployee, deduction_bonus: e.target.value })
@@ -1692,6 +1711,7 @@ const handleToggleEmployee = async (id, currentStatus) => {
           <label>Savings</label>
           <input
             type="number"
+             min="0"
             value={newEmployee.deduction_savings}
             onChange={(e) =>
               setNewEmployee({
@@ -1706,6 +1726,7 @@ const handleToggleEmployee = async (id, currentStatus) => {
           <label>Damage</label>
           <input
             type="number"
+             min="0"
             value={newEmployee.deduction_damage}
             onChange={(e) =>
               setNewEmployee({
@@ -1720,6 +1741,7 @@ const handleToggleEmployee = async (id, currentStatus) => {
           <label>Other Deductions</label>
           <input
             type="number"
+             min="0"
             value={newEmployee.deduction_other_deductions}
             onChange={(e) =>
               setNewEmployee({
@@ -1731,7 +1753,7 @@ const handleToggleEmployee = async (id, currentStatus) => {
         </div>
   
         {/* New Loan Amount */}
-        <div className="manage-form-group">
+        {/* <div className="manage-form-group">
           <label>Loan Amount</label>
           <input
             type="number"
@@ -1740,7 +1762,22 @@ const handleToggleEmployee = async (id, currentStatus) => {
               setNewEmployee({ ...newEmployee, loan_amount: e.target.value })
             }
           />
-        </div>
+        </div> */}
+        {editingEmployeeId && newEmployee.existingDocuments && newEmployee.existingDocuments.length > 0 && (
+  <div style={{ marginBottom: '10px' }}>
+    <h4>Previously Uploaded Documents</h4>
+    <ul>
+      {newEmployee.existingDocuments.map((url, index) => (
+        <li key={index}>
+          <a href={url} target="_blank" rel="noopener noreferrer">
+            View Document {index + 1}
+          </a>
+        </li>
+      ))}
+    </ul>
+  </div>
+)}
+
   
         {/* File upload section */}
         <div className="manage-form-group" style={{ gridColumn: "1 / span 3" }}>
@@ -2057,6 +2094,23 @@ const handleToggleEmployee = async (id, currentStatus) => {
               backgroundColor: '#f9f9f9',
             }}
           >
+            {editTruckId && newTruck.existingDocuments && newTruck.existingDocuments.length > 0 && (
+  <div style={{ marginBottom: '10px' }}>
+    <h4>Previously Uploaded Documents</h4>
+    <ul>
+      {newTruck.existingDocuments.map((url, index) => (
+        <li key={index}>
+          <a href={url} target="_blank" rel="noopener noreferrer">
+            View Document {index + 1}
+          </a>
+        </li>
+      ))}
+    </ul>
+  </div>
+)}
+
+
+
             {/* 👇 Add this block here to show existing docs only in edit mode
   {editTruckId && (
     <div>
@@ -2160,12 +2214,94 @@ const handleToggleEmployee = async (id, currentStatus) => {
   
   
 
+  // const renderDriverRateForm = () => (
+  //   <form onSubmit={(e) => e.preventDefault()} className="manage-driver-rate-form">
+  //     <h2 className="manage-form-title">Add Driver Rate</h2>
+  
+  //     <div className="manage-form-group">
+  
+  //       <div className="form-row">
+  //         <div className="form-field">
+  //           <label><strong>Starting Point</strong></label>
+  //           <input
+  //             type="text"
+  //             className="form-input"
+  //             value={newDriverRate.startingpoint}
+  //             onChange={(e) => setNewDriverRate({ ...newDriverRate, startingpoint: e.target.value })}
+  //           />
+  //         </div>
+  
+  //         <div className="form-field">
+  //           <label><strong>Destination</strong></label>
+  //           <input
+  //             type="text"
+  //             className="form-input"
+  //             value={newDriverRate.destination}
+  //             onChange={(e) => setNewDriverRate({ ...newDriverRate, destination: e.target.value })}
+  //           />
+  //         </div>
+  //       </div>
+  
+  //       <div className="form-row">
+  //         <div className="form-field">
+  //           <label><strong>Driver Rate (6m)</strong></label>
+  //           <input
+  //             type="number"
+  //             className="form-input"
+  //             value={newDriverRate.driver_six_meter_rate}
+  //             onChange={(e) => setNewDriverRate({ ...newDriverRate, driver_six_meter_rate: e.target.value })}
+  //           />
+  //         </div>
+  
+  //         <div className="form-field">
+  //           <label><strong>Driver Rate (12m)</strong></label>
+  //           <input
+  //             type="number"
+  //             className="form-input"
+  //             value={newDriverRate.driver_twelve_meter_rate}
+  //             onChange={(e) => setNewDriverRate({ ...newDriverRate, driver_twelve_meter_rate: e.target.value })}
+  //           />
+  //         </div>
+  //       </div>
+  
+  //       <div className="form-row">
+  //         <div className="form-field">
+  //           <label><strong>Subie Rate (6m)</strong></label>
+  //           <input
+  //             type="number"
+  //             className="form-input"
+  //             value={newDriverRate.subie_six_meter_rate}
+  //             onChange={(e) => setNewDriverRate({ ...newDriverRate, subie_six_meter_rate: e.target.value })}
+  //           />
+  //         </div>
+  
+  //         <div className="form-field">
+  //           <label><strong>Subie Rate (12m)</strong></label>
+  //           <input
+  //             type="number"
+  //             className="form-input"
+  //             value={newDriverRate.subie_twelve_meter_rate}
+  //             onChange={(e) => setNewDriverRate({ ...newDriverRate, subie_twelve_meter_rate: e.target.value })}
+  //           />
+  //         </div>
+  //       </div>
+  //     </div>
+  
+  //     <div className="manage-form-actions">
+  //       <button type="button" className="manage-save-button" onClick={handleSaveDriverRate} disabled={loading}>
+  //         {loading ? "Saving..." : "Save"}
+  //       </button>
+  //       <button type="button" className="manage-cancel-button" onClick={() => setShowDriverRateForm(false)}>
+  //         Cancel
+  //       </button>
+  //     </div>
+  //   </form>
+  // )
   const renderDriverRateForm = () => (
     <form onSubmit={(e) => e.preventDefault()} className="manage-driver-rate-form">
       <h2 className="manage-form-title">Add Driver Rate</h2>
   
       <div className="manage-form-group">
-  
         <div className="form-row">
           <div className="form-field">
             <label><strong>Starting Point</strong></label>
@@ -2193,9 +2329,15 @@ const handleToggleEmployee = async (id, currentStatus) => {
             <label><strong>Driver Rate (6m)</strong></label>
             <input
               type="number"
+              min="0"
               className="form-input"
               value={newDriverRate.driver_six_meter_rate}
-              onChange={(e) => setNewDriverRate({ ...newDriverRate, driver_six_meter_rate: e.target.value })}
+              onChange={(e) => {
+                const value = parseFloat(e.target.value);
+                if (value >= 0 || e.target.value === "") {
+                  setNewDriverRate({ ...newDriverRate, driver_six_meter_rate: e.target.value });
+                }
+              }}
             />
           </div>
   
@@ -2203,9 +2345,15 @@ const handleToggleEmployee = async (id, currentStatus) => {
             <label><strong>Driver Rate (12m)</strong></label>
             <input
               type="number"
+              min="0"
               className="form-input"
               value={newDriverRate.driver_twelve_meter_rate}
-              onChange={(e) => setNewDriverRate({ ...newDriverRate, driver_twelve_meter_rate: e.target.value })}
+              onChange={(e) => {
+                const value = parseFloat(e.target.value);
+                if (value >= 0 || e.target.value === "") {
+                  setNewDriverRate({ ...newDriverRate, driver_twelve_meter_rate: e.target.value });
+                }
+              }}
             />
           </div>
         </div>
@@ -2215,9 +2363,15 @@ const handleToggleEmployee = async (id, currentStatus) => {
             <label><strong>Subie Rate (6m)</strong></label>
             <input
               type="number"
+              min="0"
               className="form-input"
               value={newDriverRate.subie_six_meter_rate}
-              onChange={(e) => setNewDriverRate({ ...newDriverRate, subie_six_meter_rate: e.target.value })}
+              onChange={(e) => {
+                const value = parseFloat(e.target.value);
+                if (value >= 0 || e.target.value === "") {
+                  setNewDriverRate({ ...newDriverRate, subie_six_meter_rate: e.target.value });
+                }
+              }}
             />
           </div>
   
@@ -2225,9 +2379,15 @@ const handleToggleEmployee = async (id, currentStatus) => {
             <label><strong>Subie Rate (12m)</strong></label>
             <input
               type="number"
+              min="0"
               className="form-input"
               value={newDriverRate.subie_twelve_meter_rate}
-              onChange={(e) => setNewDriverRate({ ...newDriverRate, subie_twelve_meter_rate: e.target.value })}
+              onChange={(e) => {
+                const value = parseFloat(e.target.value);
+                if (value >= 0 || e.target.value === "") {
+                  setNewDriverRate({ ...newDriverRate, subie_twelve_meter_rate: e.target.value });
+                }
+              }}
             />
           </div>
         </div>
@@ -2242,7 +2402,8 @@ const handleToggleEmployee = async (id, currentStatus) => {
         </button>
       </div>
     </form>
-  )
+  );
+  
   
   
   
@@ -2259,6 +2420,7 @@ const RenderSubcontractorForm = ({ setShowSubcontractorForm }) => {
   //   truckregnum: '',
   //   trucks: [],
   // });
+  
 
   const handleTrucksChange = (e) => {
     const value = parseInt(e.target.value, 10);
@@ -2317,6 +2479,8 @@ const RenderSubcontractorForm = ({ setShowSubcontractorForm }) => {
             onChange={(e) => setNewSubcontractor({ ...newSubcontractor, companyname: e.target.value })}
           />
         </label>
+        
+        
         <label>
           <strong>Location</strong>
           <input
@@ -2344,6 +2508,7 @@ const RenderSubcontractorForm = ({ setShowSubcontractorForm }) => {
             onChange={(e) => setNewSubcontractor({ ...newSubcontractor, cellnum: e.target.value })}
           />
         </label>
+        
         <label>
           <strong>Email</strong>
           <input
@@ -2591,17 +2756,75 @@ const RenderSubcontractorForm = ({ setShowSubcontractorForm }) => {
   //     setShowEmployeeForm(true);
   //   }
   // };
-  const handleEditEmployee = (id) => {
-    const employee = employees.find((e) => e.userid === id);
-    if (!employee) return;
-    setNewEmployee({
-      ...employee,
-      password: "",          // don’t prefill passwords
-      documents: [],         // if you track file uploads separately
-    });
-    setEditingEmployeeId(id);
-    setShowEmployeeForm(true);
-  };
+
+
+
+  // const handleEditEmployee = (id) => {
+  //   const employee = employees.find((e) => e.userid === id);
+  //   if (!employee) return;
+  //   setNewEmployee({
+  //     ...employee,
+  //     password: "",          // don’t prefill passwords
+  //     documents: [],         // if you track file uploads separately
+  //   });
+  //   setEditingEmployeeId(id);
+  //   setShowEmployeeForm(true);
+  // };
+ 
+//8 May
+const handleEditEmployee = (id) => {
+  const employee = employees.find((e) => e.userid === id);
+  if (!employee) return;
+
+  setNewEmployee({
+    name: employee.name,
+    surname: employee.surname,
+    telephonenum: employee.telephonenum,
+    cellnum: employee.cellnum,
+    employeenum: employee.employeenum,
+    roleid: employee.roleid,
+    email: employee.email,
+    base_salary: employee.base_salary,
+    deduction_income_tax: employee.deduction_income_tax || "",
+    deduction_other_deductions: employee.deduction_other_deductions || "",
+    deduction_uif: employee.deduction_uif || "",
+    deduction_bonus: employee.deduction_bonus || "",
+    deduction_savings: employee.deduction_savings || "",
+    deduction_loan: employee.deduction_loan || "",
+    deduction_damage: employee.deduction_damage || "",
+    password: "",
+    documents: [],
+  });
+
+  setEditingEmployeeId(id);
+  setShowEmployeeForm(true);
+};
+
+
+
+  // const handleEditEmployee = async (id) => {
+  //   const employee = employees.find((e) => e.userid === id);
+  //   if (!employee) return;
+  
+  //   try {
+  //     // Attempt to fetch employee details (no URLs yet for debugging)
+  //     const response = await axios.get(`/api/employees/${id}`, getAuthHeaders());
+  //     const updatedEmployee = response.data;
+  
+  //     setNewEmployee({
+  //       ...updatedEmployee,
+  //       password: "",  // Don't prefill passwords
+  //       documents: [], // Fresh array for new uploads
+  //     });
+  //     setEditingEmployeeId(id);
+  //     setShowEmployeeForm(true);
+  //   } catch (err) {
+  //     console.error("Failed to fetch employee:", err);  // Detailed error logging
+  //     alert("Could not load employee details.");
+  //   }
+  // };
+  
+  
   
   
 
@@ -2619,14 +2842,57 @@ const RenderSubcontractorForm = ({ setShowSubcontractorForm }) => {
   }
   
 
-  const handleEditTruck = (id) => {
-    const truckToEdit = trucks.find((t) => t.m5truckskey === id)
+  // const handleEditTruck = (id) => {
+  //   const truckToEdit = trucks.find((t) => t.m5truckskey === id)
+  //   if (truckToEdit) {
+  //     setNewTruck(truckToEdit)
+  //     setEditTruckId(id)
+  //     setShowTruckForm(true)
+  //   }
+  // }
+  const handleEditTruck = async (id) => {
+    const truckToEdit = trucks.find((t) => t.m5truckskey === id);
     if (truckToEdit) {
-      setNewTruck(truckToEdit)
-      setEditTruckId(id)
-      setShowTruckForm(true)
+      try {
+        const response = await axios.get(`/api/trucks/${id}`, getAuthHeaders());  // Use `id` here
+        const updatedTruck = response.data;
+  
+        const existingDocuments = [];
+        if (updatedTruck.document_url1) existingDocuments.push(updatedTruck.document_url1);
+        if (updatedTruck.document_url2) existingDocuments.push(updatedTruck.document_url2);
+        if (updatedTruck.document_url3) existingDocuments.push(updatedTruck.document_url3);
+  
+        setNewTruck({
+          ...updatedTruck,
+          documents: [], // Fresh array for new uploads
+          existingDocuments,
+        });
+        setEditTruckId(id);
+        setShowTruckForm(true);
+      } catch (err) {
+        console.error("Failed to fetch truck with documents:", err);
+        alert("Could not load truck details.");
+      }
     }
-  }
+  };
+  
+  
+  // const handleEditTruck = (id) => {
+  //   const truckToEdit = trucks.find((t) => t.m5truckskey === id);
+  //   if (truckToEdit) {
+  //     setNewTruck({
+  //       ...truckToEdit,
+  //       documents: [], // leave empty unless new files are selected
+  //       existingDocuments: [
+  //         truckToEdit.document_url1,
+  //         truckToEdit.document_url2,
+  //         truckToEdit.document_url3
+  //       ].filter(Boolean) // filter out null or undefined URLs
+  //     });
+  //     setEditTruckId(id);
+  //     setShowTruckForm(true);
+  //   }
+  // };
   
 
   const handleEditDriverRate = async (id) => {
