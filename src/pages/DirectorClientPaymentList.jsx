@@ -209,11 +209,7 @@ const ClientPaymentList = () => {
         </tbody>
       </table>
 
-      <div className="upload-section" style={{ marginTop: "20px", textAlign: "center" }}>
-        <button className="upload-button" onClick={handleUpload}>
-          Upload Payment
-        </button>
-      </div>
+
     </div>
   );
 };
