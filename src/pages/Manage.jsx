@@ -1751,123 +1751,149 @@ const handleToggleEmployee = async (id, currentStatus) => {
             }
           />
         </div>
-  
-        {/* New Loan Amount */}
-        {/* <div className="manage-form-group">
-          <label>Loan Amount</label>
-          <input
-            type="number"
-            value={newEmployee.loan_amount}
-            onChange={(e) =>
-              setNewEmployee({ ...newEmployee, loan_amount: e.target.value })
-            }
-          />
-        </div> */}
-        {editingEmployeeId && newEmployee.existingDocuments && newEmployee.existingDocuments.length > 0 && (
-  <div style={{ marginBottom: '10px' }}>
-    <h4>Previously Uploaded Documents</h4>
-    <ul>
-      {newEmployee.existingDocuments.map((url, index) => (
-        <li key={index}>
-          <a href={url} target="_blank" rel="noopener noreferrer">
-            View Document {index + 1}
-          </a>
-        </li>
-      ))}
-    </ul>
-  </div>
-)}
-
-  
-        {/* File upload section */}
+      
         <div className="manage-form-group" style={{ gridColumn: "1 / span 3" }}>
-          <label>
-            <strong>Upload Documents (PDF Only, Max 3)</strong>
-          </label>
+  <label>
+    <strong>Upload Documents (PDF Only, Max 3)</strong>
+  </label>
+  <div
+    style={{
+      border: "2px dashed #ccc",
+      borderRadius: "12px",
+      padding: "20px",
+      textAlign: "center",
+      backgroundColor: "#f9f9f9",
+    }}
+  >
+    <input
+      type="file"
+      accept=".pdf"
+      name="documents"
+      onChange={(e) => {
+        const file = e.target.files[0];
+        if (
+          file &&
+          file.type === "application/pdf" &&
+          newEmployee.documents.length < 3
+        ) {
+          setNewEmployee({
+            ...newEmployee,
+            documents: [...newEmployee.documents, file],
+          });
+        }
+      }}
+      disabled={newEmployee.documents.length >= 3}
+    />
+    <small>
+      {newEmployee.documents.length >= 3
+        ? "Maximum of 3 PDF documents uploaded"
+        : "Upload PDF documents only"}
+    </small>
+  </div>
+
+  {/* Combined list of uploaded and existing documents */}
+  <div style={{ marginTop: "15px" }}>
+    {(editingEmployeeId && newEmployee.existingDocuments?.length > 0) && (
+      <>
+        <h4>Previously Uploaded Documents</h4>
+        {newEmployee.existingDocuments.map((url, index) => (
           <div
+            key={`existing-${index}`}
             style={{
-              border: "2px dashed #ccc",
-              borderRadius: "12px",
-              padding: "20px",
-              textAlign: "center",
-              backgroundColor: "#f9f9f9",
+              display: "flex",
+              alignItems: "center",
+              marginBottom: "8px",
             }}
           >
-            <input
-              type="file"
-              accept=".pdf"
-              name="documents"
-              onChange={(e) => {
-                const file = e.target.files[0];
-                if (
-                  file &&
-                  file.type === "application/pdf" &&
-                  newEmployee.documents.length < 3
-                ) {
-                  setNewEmployee({
-                    ...newEmployee,
-                    documents: [...newEmployee.documents, file],
-                  });
-                }
+            <span style={{ flexGrow: 1 }}>Document {index + 1}</span>
+            <a
+              href={url}
+              target="_blank"
+              rel="noopener noreferrer"
+              style={{
+                marginRight: "10px",
+                backgroundColor: "#4CAF50",
+                color: "white",
+                padding: "6px 12px",
+                borderRadius: "4px",
+                textDecoration: "none",
+                fontSize: "0.85rem",
               }}
-              disabled={newEmployee.documents.length >= 3}
-            />
-            <small>
-              {newEmployee.documents.length >= 3
-                ? "Maximum of 3 PDF documents uploaded"
-                : "Upload PDF documents only"}
-            </small>
+            >
+              View
+            </a>
+            <button
+              onClick={() => handleDeleteEmployeeDocument(url)}
+              style={{
+                backgroundColor: "#f44336",
+                color: "white",
+                border: "none",
+                padding: "6px 12px",
+                borderRadius: "4px",
+                cursor: "pointer",
+                fontSize: "0.85rem",
+              }}
+            >
+              Delete
+            </button>
           </div>
-  
-          {/* List uploaded files */}
-          <div style={{ marginTop: "10px" }}>
-            {newEmployee.documents.map((doc, index) => (
-              <div
-                key={index}
-                style={{
-                  display: "flex",
-                  alignItems: "center",
-                  marginBottom: "8px",
-                }}
-              >
-                <span style={{ flexGrow: 1 }}>{doc.name}</span>
-                <a
-                  href={URL.createObjectURL(doc)}
-                  download={doc.name}
-                  style={{
-                    marginRight: "10px",
-                    backgroundColor: "#4CAF50",
-                    color: "white",
-                    padding: "6px 12px",
-                    borderRadius: "4px",
-                    textDecoration: "none",
-                    fontSize: "0.85rem",
-                  }}
-                >
-                  Download
-                </a>
-                <button
-                  onClick={() => {
-                    const updatedDocs = [...newEmployee.documents];
-                    updatedDocs.splice(index, 1);
-                    setNewEmployee({ ...newEmployee, documents: updatedDocs });
-                  }}
-                  style={{
-                    backgroundColor: "#f44336",
-                    color: "white",
-                    border: "none",
-                    padding: "6px 12px",
-                    borderRadius: "4px",
-                    cursor: "pointer",
-                    fontSize: "0.85rem",
-                  }}
-                >
-                  Delete
-                </button>
-              </div>
-            ))}
+        ))}
+      </>
+    )}
+
+    {newEmployee.documents.length > 0 && (
+      <>
+        <h4>Newly Uploaded Documents</h4>
+        {newEmployee.documents.map((doc, index) => (
+          <div
+            key={`new-${index}`}
+            style={{
+              display: "flex",
+              alignItems: "center",
+              marginBottom: "8px",
+            }}
+          >
+            <span style={{ flexGrow: 1 }}>{doc.name}</span>
+            <a
+              href={URL.createObjectURL(doc)}
+              download={doc.name}
+              style={{
+                marginRight: "10px",
+                backgroundColor: "#4CAF50",
+                color: "white",
+                padding: "6px 12px",
+                borderRadius: "4px",
+                textDecoration: "none",
+                fontSize: "0.85rem",
+              }}
+            >
+              Download
+            </a>
+            <button
+              onClick={() => {
+                const updatedDocs = [...newEmployee.documents];
+                updatedDocs.splice(index, 1);
+                setNewEmployee({ ...newEmployee, documents: updatedDocs });
+              }}
+              style={{
+                backgroundColor: "#f44336",
+                color: "white",
+                border: "none",
+                padding: "6px 12px",
+                borderRadius: "4px",
+                cursor: "pointer",
+                fontSize: "0.85rem",
+              }}
+            >
+              Delete
+            </button>
           </div>
-        </div>
+        ))}
+      </>
+    )}
+  </div>
+</div>
+
       </div>
   
       {/* Submit / Cancel */}
@@ -2005,213 +2031,441 @@ const handleToggleEmployee = async (id, currentStatus) => {
     </div>
   );
   
+// old working 9 may
+//   const renderTruckForm = () => (
+//     <div className="manage-add-truck-form">
+//       <h2>Add New Truck</h2>
+//       <div className="manage-truck-form-grid">
+//         <div className="manage-form-group">
+//           <label style={{ fontWeight: 'bold' }}>Truck Registration</label>
+//           <input
+//             type="text"
+//             value={newTruck.truckregnum}
+//             onChange={(e) => setNewTruck({ ...newTruck, truckregnum: e.target.value })}
+//           />
+//         </div>
+  
+//         <div className="manage-form-group">
+//           <label style={{ fontWeight: 'bold' }}>Trailer Size</label>
+//           <input
+//             type="text"
+//             value={newTruck.trailersize}
+//             onChange={(e) => setNewTruck({ ...newTruck, trailersize: e.target.value })}
+//           />
+//         </div>
+  
+//         <div className="manage-form-group">
+//           <label style={{ fontWeight: 'bold' }}>Year</label>
+//           <input
+//             type="text"
+//             value={newTruck.year}
+//             onChange={(e) => setNewTruck({ ...newTruck, year: e.target.value })}
+//           />
+//         </div>
+  
+//         <div className="manage-form-group">
+//           <label style={{ fontWeight: 'bold' }}>Model</label>
+//           <input
+//             type="text"
+//             value={newTruck.model}
+//             onChange={(e) => setNewTruck({ ...newTruck, model: e.target.value })}
+//           />
+//         </div>
+  
+//         <div className="manage-form-group">
+//           <label style={{ fontWeight: 'bold' }}>Purchase Price</label>
+//           <input
+//             type="text"
+//             value={newTruck.purchase_price}
+//             onChange={(e) => setNewTruck({ ...newTruck, purchase_price: e.target.value })}
+//           />
+//         </div>
+  
+//         <div className="manage-form-group">
+//           <label style={{ fontWeight: 'bold' }}>Current Evaluation</label>
+//           <input
+//             type="text"
+//             value={newTruck.current_evaluation}
+//             onChange={(e) => setNewTruck({ ...newTruck, current_evaluation: e.target.value })}
+//           />
+//         </div>
+  
+//         <div className="manage-form-group">
+//           <label style={{ fontWeight: 'bold' }}>VIN Number</label>
+//           <input
+//             type="text"
+//             value={newTruck.vin_num}
+//             onChange={(e) => setNewTruck({ ...newTruck, vin_num: e.target.value })}
+//           />
+//         </div>
+  
+//         <div className="manage-form-group">
+//           <label style={{ fontWeight: 'bold' }}>Purchase Date</label>
+//           <input
+//             type="date"
+//             value={newTruck.truckpurchasedate}
+//             onChange={(e) => setNewTruck({ ...newTruck, truckpurchasedate: e.target.value })}
+//           />
+//         </div>
+  
+//         {/* File upload section */}
+//         <div className="manage-form-group" style={{ gridColumn: '1 / span 3' }}>
+//           <label><strong>Upload Documents (PDF Only, Max 3)</strong></label>
+//           <div
+//             style={{
+//               border: '2px dashed #ccc',
+//               borderRadius: '12px',
+//               padding: '20px',
+//               textAlign: 'center',
+//               backgroundColor: '#f9f9f9',
+//             }}
+//           >
+//             {editTruckId && newTruck.existingDocuments && newTruck.existingDocuments.length > 0 && (
+//   <div style={{ marginBottom: '10px' }}>
+//     <h4>Previously Uploaded Documents</h4>
+//     <ul>
+//       {newTruck.existingDocuments.map((url, index) => (
+//         <li key={index}>
+//           <a href={url} target="_blank" rel="noopener noreferrer">
+//             View Document {index + 1}
+//           </a>
+//         </li>
+//       ))}
+//     </ul>
+//   </div>
+// )}
 
-  const renderTruckForm = () => (
-    <div className="manage-add-truck-form">
-      <h2>Add New Truck</h2>
-      <div className="manage-truck-form-grid">
-        <div className="manage-form-group">
-          <label style={{ fontWeight: 'bold' }}>Truck Registration</label>
-          <input
-            type="text"
-            value={newTruck.truckregnum}
-            onChange={(e) => setNewTruck({ ...newTruck, truckregnum: e.target.value })}
-          />
-        </div>
+//             <input
+//               type="file"
+//               accept=".pdf"
+//               onChange={(e) => {
+//                 const file = e.target.files[0];
+//                 if (file && file.type === "application/pdf" && (newTruck.documents?.length || 0) < 3) {
+//                   setNewTruck({
+//                     ...newTruck,
+//                     documents: [...(newTruck.documents || []), file],
+//                   });
+//                 }
+//               }}
+//               disabled={(newTruck.documents?.length || 0) >= 3}
+//             />
+//             <small>
+//               {(newTruck.documents?.length || 0) >= 3
+//                 ? "Maximum of 3 PDF documents uploaded"
+//                 : "Upload PDF documents only"}
+//             </small>
+//           </div>
   
-        <div className="manage-form-group">
-          <label style={{ fontWeight: 'bold' }}>Trailer Size</label>
-          <input
-            type="text"
-            value={newTruck.trailersize}
-            onChange={(e) => setNewTruck({ ...newTruck, trailersize: e.target.value })}
-          />
-        </div>
+//           {/* List uploaded files */}
+//           <div style={{ marginTop: '10px' }}>
+//             {(newTruck.documents || []).map((doc, index) => (
+//               <div key={index} style={{ display: 'flex', alignItems: 'center', marginBottom: '8px' }}>
+//                 <span style={{ flexGrow: 1 }}>{doc.name}</span>
+//                 <a
+//                   href={URL.createObjectURL(doc)}
+//                   download={doc.name}
+//                   style={{
+//                     marginRight: '10px',
+//                     backgroundColor: '#4CAF50',
+//                     color: 'white',
+//                     padding: '6px 12px',
+//                     borderRadius: '4px',
+//                     textDecoration: 'none',
+//                     fontSize: '0.85rem',
+//                   }}
+//                 >
+//                   Download
+//                 </a>
+//                 <button
+//                   onClick={() => {
+//                     const updatedDocs = [...newTruck.documents];
+//                     updatedDocs.splice(index, 1);
+//                     setNewTruck({ ...newTruck, documents: updatedDocs });
+//                   }}
+//                   style={{
+//                     backgroundColor: '#f44336',
+//                     color: 'white',
+//                     border: 'none',
+//                     padding: '6px 12px',
+//                     borderRadius: '4px',
+//                     cursor: 'pointer',
+//                     fontSize: '0.85rem',
+//                   }}
+//                 >
+//                   Delete
+//                 </button>
+//               </div>
+//             ))}
+//           </div>
+//         </div>
+//       </div>
   
-        <div className="manage-form-group">
-          <label style={{ fontWeight: 'bold' }}>Year</label>
-          <input
-            type="text"
-            value={newTruck.year}
-            onChange={(e) => setNewTruck({ ...newTruck, year: e.target.value })}
-          />
-        </div>
+//       <button onClick={handleSaveTruck} className="manage-save-button" disabled={loading}>
+//         {loading ? "Saving..." : editTruckId ? "Update Truck" : "Add Truck"}
+//       </button>
+//     </div>
+//   );
   
-        <div className="manage-form-group">
-          <label style={{ fontWeight: 'bold' }}>Model</label>
-          <input
-            type="text"
-            value={newTruck.model}
-            onChange={(e) => setNewTruck({ ...newTruck, model: e.target.value })}
-          />
-        </div>
-  
-        <div className="manage-form-group">
-          <label style={{ fontWeight: 'bold' }}>Purchase Price</label>
-          <input
-            type="text"
-            value={newTruck.purchase_price}
-            onChange={(e) => setNewTruck({ ...newTruck, purchase_price: e.target.value })}
-          />
-        </div>
-  
-        <div className="manage-form-group">
-          <label style={{ fontWeight: 'bold' }}>Current Evaluation</label>
-          <input
-            type="text"
-            value={newTruck.current_evaluation}
-            onChange={(e) => setNewTruck({ ...newTruck, current_evaluation: e.target.value })}
-          />
-        </div>
-  
-        <div className="manage-form-group">
-          <label style={{ fontWeight: 'bold' }}>VIN Number</label>
-          <input
-            type="text"
-            value={newTruck.vin_num}
-            onChange={(e) => setNewTruck({ ...newTruck, vin_num: e.target.value })}
-          />
-        </div>
-  
-        <div className="manage-form-group">
-          <label style={{ fontWeight: 'bold' }}>Purchase Date</label>
-          <input
-            type="date"
-            value={newTruck.truckpurchasedate}
-            onChange={(e) => setNewTruck({ ...newTruck, truckpurchasedate: e.target.value })}
-          />
-        </div>
-  
-        {/* File upload section */}
-        <div className="manage-form-group" style={{ gridColumn: '1 / span 3' }}>
-          <label><strong>Upload Documents (PDF Only, Max 3)</strong></label>
+// new working 9 may
+
+// const DocumentViewer = ({ documentUrl }) => {
+//   // Check if the document URL exists and is a valid link for a PDF or image.
+//   const isPdf = documentUrl && documentUrl.endsWith('.pdf');
+//   const isImage = documentUrl && /\.(jpg|jpeg|png|gif)$/i.test(documentUrl);
+
+//   if (isPdf) {
+//     // Display PDF in an iframe
+//     return (
+//       <iframe
+//         src={documentUrl}
+//         width="100%"
+//         height="600px"
+//         title="Document Viewer"
+//       ></iframe>
+//     );
+//   }
+
+//   if (isImage) {
+//     // Display Image
+//     return <img src={documentUrl} alt="Document" style={{ maxWidth: '100%', maxHeight: '600px' }} />;
+//   }
+
+//   // If not PDF or Image, return a simple text or a fallback UI
+//   return <div>Document format not supported for viewing.</div>;
+// };
+
+const renderTruckForm = () => (
+  <div className="manage-add-truck-form">
+    <h2>{editTruckId ? 'Edit Truck' : 'Add New Truck'}</h2>
+    <div className="manage-truck-form-grid">
+      <div className="manage-form-group">
+        <label style={{ fontWeight: 'bold' }}>Truck Registration</label>
+        <input
+          type="text"
+          value={newTruck.truckregnum}
+          onChange={(e) => setNewTruck({ ...newTruck, truckregnum: e.target.value })}
+        />
+      </div>
+
+      <div className="manage-form-group">
+        <label style={{ fontWeight: 'bold' }}>Trailer Size</label>
+        <input
+          type="text"
+          value={newTruck.trailersize}
+          onChange={(e) => setNewTruck({ ...newTruck, trailersize: e.target.value })}
+        />
+      </div>
+
+      <div className="manage-form-group">
+        <label style={{ fontWeight: 'bold' }}>Year</label>
+        <input
+          type="text"
+          value={newTruck.year}
+          onChange={(e) => setNewTruck({ ...newTruck, year: e.target.value })}
+        />
+      </div>
+
+      <div className="manage-form-group">
+        <label style={{ fontWeight: 'bold' }}>Model</label>
+        <input
+          type="text"
+          value={newTruck.model}
+          onChange={(e) => setNewTruck({ ...newTruck, model: e.target.value })}
+        />
+      </div>
+
+      <div className="manage-form-group">
+        <label style={{ fontWeight: 'bold' }}>Purchase Price</label>
+        <input
+          type="text"
+          value={newTruck.purchase_price}
+          onChange={(e) => setNewTruck({ ...newTruck, purchase_price: e.target.value })}
+        />
+      </div>
+
+      <div className="manage-form-group">
+        <label style={{ fontWeight: 'bold' }}>Current Evaluation</label>
+        <input
+          type="text"
+          value={newTruck.current_evaluation}
+          onChange={(e) => setNewTruck({ ...newTruck, current_evaluation: e.target.value })}
+        />
+      </div>
+
+      <div className="manage-form-group">
+        <label style={{ fontWeight: 'bold' }}>VIN Number</label>
+        <input
+          type="text"
+          value={newTruck.vin_num}
+          onChange={(e) => setNewTruck({ ...newTruck, vin_num: e.target.value })}
+        />
+      </div>
+
+      <div className="manage-form-group">
+        <label style={{ fontWeight: 'bold' }}>Purchase Date</label>
+        <input
+          type="date"
+          value={newTruck.truckpurchasedate}
+          onChange={(e) => setNewTruck({ ...newTruck, truckpurchasedate: e.target.value })}
+        />
+      </div>
+
+      {/* Document Uploads */}
+      <div className="manage-form-group" style={{ gridColumn: "1 / span 3" }}>
+  <label>
+    <strong>Upload Documents (PDF Only, Max 3)</strong>
+  </label>
+  <div
+    style={{
+      border: "2px dashed #ccc",
+      borderRadius: "12px",
+      padding: "20px",
+      textAlign: "center",
+      backgroundColor: "#f9f9f9",
+    }}
+  >
+    <input
+      type="file"
+      accept=".pdf"
+      name="truck-documents"
+      onChange={(e) => {
+        const file = e.target.files[0];
+        if (
+          file &&
+          file.type === "application/pdf" &&
+          (newTruck.documents?.length || 0) < 3
+        ) {
+          setNewTruck({
+            ...newTruck,
+            documents: [...(newTruck.documents || []), file],
+          });
+        }
+      }}
+      disabled={(newTruck.documents?.length || 0) >= 3}
+    />
+    <small>
+      {(newTruck.documents?.length || 0) >= 3
+        ? "Maximum of 3 PDF documents uploaded"
+        : "Upload PDF documents only"}
+    </small>
+  </div>
+
+  {/* Combined list of uploaded and existing documents */}
+  <div style={{ marginTop: "15px" }}>
+    {editTruckId && newTruck.existingDocuments?.length > 0 && (
+      <>
+        <h4>Previously Uploaded Documents</h4>
+        {newTruck.existingDocuments.map((url, index) => (
           <div
+            key={`existing-${index}`}
             style={{
-              border: '2px dashed #ccc',
-              borderRadius: '12px',
-              padding: '20px',
-              textAlign: 'center',
-              backgroundColor: '#f9f9f9',
+              display: "flex",
+              alignItems: "center",
+              marginBottom: "8px",
             }}
           >
-            {editTruckId && newTruck.existingDocuments && newTruck.existingDocuments.length > 0 && (
-  <div style={{ marginBottom: '10px' }}>
-    <h4>Previously Uploaded Documents</h4>
-    <ul>
-      {newTruck.existingDocuments.map((url, index) => (
-        <li key={index}>
-          <a href={url} target="_blank" rel="noopener noreferrer">
-            View Document {index + 1}
-          </a>
-        </li>
-      ))}
-    </ul>
-  </div>
-)}
-
-
-
-            {/* 👇 Add this block here to show existing docs only in edit mode
-  {editTruckId && (
-    <div>
-      <h4>Existing Documents</h4>
-      <ul>
-        {newTruck.document_url1 && (
-          <li>
-            <a href={newTruck.document_url1} target="_blank" rel="noopener noreferrer">
-              View Document 1
-            </a>
-          </li>
-        )}
-        {newTruck.document_url2 && (
-          <li>
-            <a href={newTruck.document_url2} target="_blank" rel="noopener noreferrer">
-              View Document 2
-            </a>
-          </li>
-        )}
-        {newTruck.document_url3 && (
-          <li>
-            <a href={newTruck.document_url3} target="_blank" rel="noopener noreferrer">
-              View Document 3
-            </a>
-          </li>
-        )}
-      </ul>
-    </div>
-  )} */}
-
-            <input
-              type="file"
-              accept=".pdf"
-              onChange={(e) => {
-                const file = e.target.files[0];
-                if (file && file.type === "application/pdf" && (newTruck.documents?.length || 0) < 3) {
-                  setNewTruck({
-                    ...newTruck,
-                    documents: [...(newTruck.documents || []), file],
-                  });
-                }
+            <span style={{ flexGrow: 1 }}>Document {index + 1}</span>
+            <a
+              href={url}
+              target="_blank"
+              rel="noopener noreferrer"
+              style={{
+                marginRight: "10px",
+                backgroundColor: "#4CAF50",
+                color: "white",
+                padding: "6px 12px",
+                borderRadius: "4px",
+                textDecoration: "none",
+                fontSize: "0.85rem",
               }}
-              disabled={(newTruck.documents?.length || 0) >= 3}
-            />
-            <small>
-              {(newTruck.documents?.length || 0) >= 3
-                ? "Maximum of 3 PDF documents uploaded"
-                : "Upload PDF documents only"}
-            </small>
+            >
+              View
+            </a>
+            <button
+              onClick={() => handleDeleteDocument(url)}
+              style={{
+                backgroundColor: "#f44336",
+                color: "white",
+                border: "none",
+                padding: "6px 12px",
+                borderRadius: "4px",
+                cursor: "pointer",
+                fontSize: "0.85rem",
+              }}
+            >
+              Delete
+            </button>
           </div>
-  
-          {/* List uploaded files */}
-          <div style={{ marginTop: '10px' }}>
-            {(newTruck.documents || []).map((doc, index) => (
-              <div key={index} style={{ display: 'flex', alignItems: 'center', marginBottom: '8px' }}>
-                <span style={{ flexGrow: 1 }}>{doc.name}</span>
-                <a
-                  href={URL.createObjectURL(doc)}
-                  download={doc.name}
-                  style={{
-                    marginRight: '10px',
-                    backgroundColor: '#4CAF50',
-                    color: 'white',
-                    padding: '6px 12px',
-                    borderRadius: '4px',
-                    textDecoration: 'none',
-                    fontSize: '0.85rem',
-                  }}
-                >
-                  Download
-                </a>
-                <button
-                  onClick={() => {
-                    const updatedDocs = [...newTruck.documents];
-                    updatedDocs.splice(index, 1);
-                    setNewTruck({ ...newTruck, documents: updatedDocs });
-                  }}
-                  style={{
-                    backgroundColor: '#f44336',
-                    color: 'white',
-                    border: 'none',
-                    padding: '6px 12px',
-                    borderRadius: '4px',
-                    cursor: 'pointer',
-                    fontSize: '0.85rem',
-                  }}
-                >
-                  Delete
-                </button>
-              </div>
-            ))}
+        ))}
+      </>
+    )}
+
+    {newTruck.documents?.length > 0 && (
+      <>
+        <h4>Newly Uploaded Documents</h4>
+        {newTruck.documents.map((doc, index) => (
+          <div
+            key={`new-${index}`}
+            style={{
+              display: "flex",
+              alignItems: "center",
+              marginBottom: "8px",
+            }}
+          >
+            <span style={{ flexGrow: 1 }}>{doc.name}</span>
+            <a
+              href={URL.createObjectURL(doc)}
+              download={doc.name}
+              style={{
+                marginRight: "10px",
+                backgroundColor: "#4CAF50",
+                color: "white",
+                padding: "6px 12px",
+                borderRadius: "4px",
+                textDecoration: "none",
+                fontSize: "0.85rem",
+              }}
+            >
+              Download
+            </a>
+            <button
+              onClick={() => {
+                const updatedDocs = [...newTruck.documents];
+                updatedDocs.splice(index, 1);
+                setNewTruck({ ...newTruck, documents: updatedDocs });
+              }}
+              style={{
+                backgroundColor: "#f44336",
+                color: "white",
+                border: "none",
+                padding: "6px 12px",
+                borderRadius: "4px",
+                cursor: "pointer",
+                fontSize: "0.85rem",
+              }}
+            >
+              Delete
+            </button>
           </div>
-        </div>
-      </div>
-  
-      <button onClick={handleSaveTruck} className="manage-save-button" disabled={loading}>
-        {loading ? "Saving..." : editTruckId ? "Update Truck" : "Add Truck"}
-      </button>
+        ))}
+      </>
+    )}
+  </div>
+</div>
+
+
+
+
     </div>
-  );
-  
+
+    <button onClick={handleSaveTruck} className="manage-save-button" disabled={loading}>
+      {loading ? "Saving..." : editTruckId ? "Update Truck" : "Add Truck"}
+    </button>
+  </div>
+);
+
+
+
   
 
   // const renderDriverRateForm = () => (
@@ -2772,33 +3026,115 @@ const RenderSubcontractorForm = ({ setShowSubcontractorForm }) => {
   // };
  
 //8 May
-const handleEditEmployee = (id) => {
-  const employee = employees.find((e) => e.userid === id);
-  if (!employee) return;
+// const handleEditEmployee = (id) => {
+//   const employee = employees.find((e) => e.userid === id);
+//   if (!employee) return;
 
-  setNewEmployee({
-    name: employee.name,
-    surname: employee.surname,
-    telephonenum: employee.telephonenum,
-    cellnum: employee.cellnum,
-    employeenum: employee.employeenum,
-    roleid: employee.roleid,
-    email: employee.email,
-    base_salary: employee.base_salary,
-    deduction_income_tax: employee.deduction_income_tax || "",
-    deduction_other_deductions: employee.deduction_other_deductions || "",
-    deduction_uif: employee.deduction_uif || "",
-    deduction_bonus: employee.deduction_bonus || "",
-    deduction_savings: employee.deduction_savings || "",
-    deduction_loan: employee.deduction_loan || "",
-    deduction_damage: employee.deduction_damage || "",
-    password: "",
-    documents: [],
-  });
+//   setNewEmployee({
+//     name: employee.name,
+//     surname: employee.surname,
+//     telephonenum: employee.telephonenum,
+//     cellnum: employee.cellnum,
+//     employeenum: employee.employeenum,
+//     roleid: employee.roleid,
+//     email: employee.email,
+//     base_salary: employee.base_salary,
+//     deduction_income_tax: employee.deduction_income_tax || "",
+//     deduction_other_deductions: employee.deduction_other_deductions || "",
+//     deduction_uif: employee.deduction_uif || "",
+//     deduction_bonus: employee.deduction_bonus || "",
+//     deduction_savings: employee.deduction_savings || "",
+//     deduction_loan: employee.deduction_loan || "",
+//     deduction_damage: employee.deduction_damage || "",
+//     password: "",
+//     documents: [],
+//   });
 
-  setEditingEmployeeId(id);
-  setShowEmployeeForm(true);
+//   setEditingEmployeeId(id);
+//   setShowEmployeeForm(true);
+// };
+
+// 11 May
+const handleEditEmployee = async (id) => {
+  try {
+    // Fetch the employee record (including deductionHistory and signed document URLs)
+    const response = await axios.get(`/api/employees/${id}`, getAuthHeaders());
+    const updatedEmployee = response.data;
+
+    // Build an array of existing document URLs (if available)
+    const existingDocuments = [];
+    if (updatedEmployee.document_url1)
+      existingDocuments.push(updatedEmployee.document_url1);
+    if (updatedEmployee.document_url2)
+      existingDocuments.push(updatedEmployee.document_url2);
+    if (updatedEmployee.document_url3)
+      existingDocuments.push(updatedEmployee.document_url3);
+
+    // Use the latest deduction record from deductionHistory, if available
+    const latestDeduction =
+      updatedEmployee.deductionHistory && updatedEmployee.deductionHistory.length > 0
+        ? updatedEmployee.deductionHistory[0]
+        : {};
+
+    // Set the form state using the fetched details.
+    // The deduction fields are now coming from the latest deduction history.
+    setNewEmployee({
+      name: updatedEmployee.name,
+      surname: updatedEmployee.surname,
+      telephonenum: updatedEmployee.telephonenum,
+      cellnum: updatedEmployee.cellnum,
+      employeenum: updatedEmployee.employeenum,
+      roleid: updatedEmployee.roleid,
+      email: updatedEmployee.email,
+      base_salary: updatedEmployee.base_salary,
+      // Use latest deduction values; fallback to empty strings if undefined.
+      deduction_income_tax: latestDeduction.deduction_income_tax || "",
+      deduction_other_deductions: latestDeduction.deduction_other_deductions || "",
+      deduction_uif: latestDeduction.deduction_uif || "",
+      deduction_bonus: latestDeduction.deduction_bonus || "",
+      deduction_savings: latestDeduction.deduction_savings || "",
+      deduction_loan: latestDeduction.deduction_loan || "",
+      deduction_damage: latestDeduction.deduction_damage || "",
+      password: "",
+      documents: [],
+      existingDocuments, // Array of signed URLs for existing documents
+    });
+
+    setEditingEmployeeId(id);
+    setShowEmployeeForm(true);
+  } catch (error) {
+    console.error('Error fetching employee details:', error);
+    alert('Could not load employee details.');
+  }
 };
+
+
+const handleDeleteEmployeeDocument = async (url) => {
+  if (window.confirm('Are you sure you want to delete this document?')) {
+    try {
+      console.log('Deleting employee document with URL:', url);
+      const response = await axios.post(
+        '/api/employees/delete-doc',
+        { employeeId: editingEmployeeId, url },
+        getAuthHeaders()
+      );
+
+      if (response.data.message === 'Document deleted successfully') {
+        setNewEmployee((prevState) => ({
+          ...prevState,
+          existingDocuments: prevState.existingDocuments.filter((doc) => doc !== url),
+        }));
+
+        alert('Document deleted successfully.');
+      }
+    } catch (error) {
+      console.error('Failed to delete employee document:', error);
+      alert('Error occurred while deleting document.');
+    }
+  }
+};
+
+
 
 
 
@@ -2850,11 +3186,36 @@ const handleEditEmployee = (id) => {
   //     setShowTruckForm(true)
   //   }
   // }
+  // const handleEditTruck = async (id) => {
+  //   const truckToEdit = trucks.find((t) => t.m5truckskey === id);
+  //   if (truckToEdit) {
+  //     try {
+  //       const response = await axios.get(`/api/trucks/${id}`, getAuthHeaders());  // Use `id` here
+  //       const updatedTruck = response.data;
+  
+  //       const existingDocuments = [];
+  //       if (updatedTruck.document_url1) existingDocuments.push(updatedTruck.document_url1);
+  //       if (updatedTruck.document_url2) existingDocuments.push(updatedTruck.document_url2);
+  //       if (updatedTruck.document_url3) existingDocuments.push(updatedTruck.document_url3);
+  
+  //       setNewTruck({
+  //         ...updatedTruck,
+  //         documents: [], // Fresh array for new uploads
+  //         existingDocuments,
+  //       });
+  //       setEditTruckId(id);
+  //       setShowTruckForm(true);
+  //     } catch (err) {
+  //       console.error("Failed to fetch truck with documents:", err);
+  //       alert("Could not load truck details.");
+  //     }
+  //   }
+  // };
   const handleEditTruck = async (id) => {
     const truckToEdit = trucks.find((t) => t.m5truckskey === id);
     if (truckToEdit) {
       try {
-        const response = await axios.get(`/api/trucks/${id}`, getAuthHeaders());  // Use `id` here
+        const response = await axios.get(`/api/trucks/${id}`, getAuthHeaders());
         const updatedTruck = response.data;
   
         const existingDocuments = [];
@@ -2864,7 +3225,7 @@ const handleEditEmployee = (id) => {
   
         setNewTruck({
           ...updatedTruck,
-          documents: [], // Fresh array for new uploads
+          documents: [], // for new uploads
           existingDocuments,
         });
         setEditTruckId(id);
@@ -2875,6 +3236,34 @@ const handleEditEmployee = (id) => {
       }
     }
   };
+
+
+  const handleDeleteDocument = async (url) => {
+    if (window.confirm('Are you sure you want to delete this document?')) {
+      try {
+        console.log('Deleting document with URL:', url); // Log the URL being passed
+        const response = await axios.post(
+          '/api/trucks/delete-doc',
+          { truckId: editTruckId, url },
+          getAuthHeaders()
+        );
+    
+        if (response.data.message === 'Document deleted successfully') {
+          setNewTruck((prevState) => ({
+            ...prevState,
+            existingDocuments: prevState.existingDocuments.filter((doc) => doc !== url),
+          }));
+    
+          alert('Document deleted successfully.');
+        }
+      } catch (error) {
+        console.error('Failed to delete document:', error);
+        alert('Error occurred while deleting document.');
+      }
+    }
+  };
+  
+  
   
   
   // const handleEditTruck = (id) => {

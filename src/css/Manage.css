@@ -486,3 +486,66 @@ tr:hover {
 .document-upload-section .file-entry button.delete-btn:hover {
   background-color: #c82333;
 }
+
+/* File upload */
+.file-upload-wrapper {
+  border: 2px dashed #ccc;
+  border-radius: 12px;
+  padding: 20px;
+  text-align: center;
+  background-color: #f9f9f9;
+  transition: border-color 0.3s ease;
+}
+
+.file-upload-wrapper:hover {
+  border-color: #888;
+}
+
+.file-upload-wrapper input[type="file"] {
+  margin-top: 10px;
+  cursor: pointer;
+}
+
+.file-upload-info {
+  margin-top: 8px;
+  font-size: 0.85rem;
+  color: #666;
+}
+
+.uploaded-file-entry {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background-color: #fff;
+  padding: 8px 12px;
+  border: 1px solid #ddd;
+  border-radius: 6px;
+  margin-bottom: 8px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+}
+
+.uploaded-file-entry span {
+  flex-grow: 1;
+  overflow-wrap: break-word;
+}
+
+.uploaded-file-entry a,
+.uploaded-file-entry button {
+  margin-left: 10px;
+  font-size: 0.85rem;
+  padding: 6px 10px;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  text-decoration: none;
+}
+
+.uploaded-file-entry a {
+  background-color: #4caf50;
+  color: white;
+}
+
+.uploaded-file-entry button {
+  background-color: #f44336;
+  color: white;
+}
