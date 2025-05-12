@@ -7,18 +7,27 @@ import { useNavigate } from "react-router-dom"
 import axios from "axios"
 
 export default function DirectorAnalytics() {
-  const [activeMonth, setActiveMonth] = useState("August")
-  const [activeYear, setActiveYear] = useState(new Date().getFullYear().toString())
-  const [activeFilter, setActiveFilter] = useState("fuel")
-  const [chartData, setChartData] = useState([])
-  const [isLoading, setIsLoading] = useState(false)
-  const [error, setError] = useState(null)
-  const navigate = useNavigate()
+  const getPreviousMonth = (month, year) => {
+    const date = new Date(year, monthNames.indexOf(month), 1);
+    date.setMonth(date.getMonth() - 1);
+    return `${monthNames[date.getMonth()]} ${date.getFullYear()}`;
+  };
+
 
   const monthNames = [
     "January", "February", "March", "April", "May", "June",
     "July", "August", "September", "October", "November", "December"
-  ]
+  ];
+
+  // Set initial Month and Year to the current month and year
+  const currentDate = new Date();
+  const [activeMonth, setActiveMonth] = useState(monthNames[currentDate.getMonth()]);
+  const [activeYear, setActiveYear] = useState(currentDate.getFullYear().toString());
+  const [activeFilter, setActiveFilter] = useState("fuel");
+  const [chartData, setChartData] = useState([]);
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState(null);
+  const navigate = useNavigate();
 
   // Function to fetch fuel data from the database
   const fetchFuelData = async (month, year) => {
@@ -152,10 +161,10 @@ export default function DirectorAnalytics() {
           const dieselCost = parseFloat(String(item.dieselCost).replace(/[^0-9.-]+/g, "")) || 0;
           const total = totalTurnover + dieselCost;
           console.log(`Parsed values - totalTurnover: ${totalTurnover}, dieselCost: ${dieselCost}, total: ${total}`);
-          
+
           const turnoverPercentage = total > 0 ? ((totalTurnover / total) * 100).toFixed(2) : 0;
           const dieselCostPercentage = total > 0 ? ((dieselCost / total) * 100).toFixed(2) : 0;
-          
+
           const result = {
             month: item.month,
             year: item.year,
@@ -278,10 +287,10 @@ export default function DirectorAnalytics() {
   };
 
   const calculateStatus = (cost) => {
-    if (cost <= 3500) return "good"
-    if (cost <= 4500) return "warning"
-    return "bad"
-  }
+    if (cost <= 3500) return "good";
+    if (cost <= 4500) return "warning";
+    return "bad";
+  };
 
   // Placeholder data for other graphs
   const subcontractorTurnoverPerMonthData = [
@@ -454,13 +463,13 @@ export default function DirectorAnalytics() {
             ) : error ? (
               <div className="error-message">{error}</div>
             ) : chartData.length === 0 ? (
-              <div className="no-data-message">No fuel data available for {activeMonth} {activeYear}</div>
+              <div className="no-data-message">No fuel data available for {activeMonth} ${activeYear}</div>
             ) : (
               <>
                 <ResponsiveContainer width="100%" height={350}>
-                  <BarChart data={chartData} margin={{ top: 40, right: 30, left: 20, bottom: 40 }}>
+                  <BarChart data={chartData} margin={{ top: 40, right: 30, left: 60, bottom: 40 }}>
                     <XAxis dataKey="truckId" />
-                    <YAxis label={{ value: 'Expense Amount (R)', angle: -90, position: 'insideLeft' }} />
+                    <YAxis label={{ value: 'Expense Amount (R)', angle: 0, position: 'top', dy: -20 }} />
                     <Tooltip content={<CustomTooltip />} />
                     <Bar
                       dataKey="value"
@@ -505,12 +514,12 @@ export default function DirectorAnalytics() {
             ) : error ? (
               <div className="error-message">{error}</div>
             ) : chartData.length === 0 ? (
-              <div className="no-data-message">No turnover data available for {activeMonth} {activeYear}</div>
+              <div className="no-data-message">No turnover data available for {activeMonth} ${activeYear}</div>
             ) : (
               <ResponsiveContainer width="100%" height={350}>
-                <BarChart data={chartData} margin={{ top: 40, right: 30, left: 20, bottom: 40 }}>
+                <BarChart data={chartData} margin={{ top: 40, right: 30, left: 60, bottom: 40 }}>
                   <XAxis dataKey="client" />
-                  <YAxis label={{ value: 'Turnover (R)', angle: -90, position: 'insideLeft' }} />
+                  <YAxis label={{ value: 'Turnover (R)', angle: 0, position: 'top', dy: -20 }} />
                   <Tooltip content={<CustomTooltip />} />
                   <Bar
                     dataKey="turnover"
@@ -535,7 +544,7 @@ export default function DirectorAnalytics() {
             ) : error ? (
               <div className="error-message">{error}</div>
             ) : chartData.length === 0 ? (
-              <div className="no-data-message">No aging analysis data available for {activeMonth} {activeYear}</div>
+              <div className="no-data-message">No aging analysis data available for {activeMonth} ${activeYear}</div>
             ) : (
               <>
                 <div className="chart-header">
@@ -551,15 +560,15 @@ export default function DirectorAnalytics() {
                     <span className="legend-color" style={{ backgroundColor: "#FFC107" }}></span>
                     <span>60 Days</span>
                   </div>
-                  <div className = "chart-header-item">
+                  <div className="chart-header-item">
                     <span className="legend-color" style={{ backgroundColor: "#F44336" }}></span>
                     <span>90 Days</span>
                   </div>
                 </div>
                 <ResponsiveContainer width="100%" height={350}>
-                  <BarChart data={chartData} margin={{ top: 40, right: 30, left: 20, bottom: 40 }}>
+                  <BarChart data={chartData} margin={{ top: 40, right: 30, left: 60, bottom: 40 }}>
                     <XAxis dataKey="client" />
-                    <YAxis label={{ value: 'Amount (R)', angle: -90, position: 'insideLeft' }} />
+                    <YAxis label={{ value: 'Amount (R)', angle: 0, position: 'top', dy: -20 }} />
                     <Tooltip content={<CustomTooltip />} />
                     <Bar
                       dataKey="current"
@@ -605,12 +614,12 @@ export default function DirectorAnalytics() {
         return (
           <div className="chart-wrapper">
             {chartData.length === 0 ? (
-              <div className="no-data-message">No subcontractor turnover data available for {activeMonth} {activeYear}</div>
+              <div className="no-data-message">No subcontractor turnover data available for {activeMonth} ${activeYear}</div>
             ) : (
               <ResponsiveContainer width="100%" height={350}>
-                <BarChart data={chartData} margin={{ top: 20, right: 30, left: 20, bottom: 40 }}>
+                <BarChart data={chartData} margin={{ top: 40, right: 30, left: 60, bottom: 40 }}>
                   <XAxis dataKey="month" tickFormatter={() => `${activeMonth} ${activeYear}`} />
-                  <YAxis label={{ value: 'Turnover (R)', angle: -90, position: 'insideLeft' }} />
+                  <YAxis label={{ value: 'Turnover (R)', angle: 0, position: 'top', dy: -20 }} />
                   <Tooltip content={<CustomTooltip />} />
                   <Bar
                     dataKey="turnover"
@@ -631,7 +640,7 @@ export default function DirectorAnalytics() {
         return (
           <div className="chart-wrapper">
             {chartData.length === 0 ? (
-              <div className="no-data-message">No data available for {activeMonth} {activeYear}</div>
+              <div className="no-data-message">No data available for {activeMonth} ${activeYear}</div>
             ) : (
               <>
                 <div className="chart-header">
@@ -645,9 +654,9 @@ export default function DirectorAnalytics() {
                   </div>
                 </div>
                 <ResponsiveContainer width="100%" height={350}>
-                  <BarChart data={chartData} margin={{ top: 20, right: 30, left: 20, bottom: 40 }}>
+                  <BarChart data={chartData} margin={{ top: 40, right: 30, left: 60, bottom: 40 }}>
                     <XAxis dataKey="month" tickFormatter={() => `${activeMonth} ${activeYear}`} />
-                    <YAxis label={{ value: 'Amount (R)', angle: -90, position: 'insideLeft' }} />
+                    <YAxis label={{ value: 'Amount (R)', angle: 0, position: 'top', dy: -20 }} />
                     <Tooltip content={<CustomTooltip />} />
                     <Legend />
                     <Bar
@@ -678,12 +687,12 @@ export default function DirectorAnalytics() {
         return (
           <div className="chart-wrapper">
             {chartData.length === 0 ? (
-              <div className="no-data-message">No wages data available for {activeMonth} {activeYear}</div>
+              <div className="no-data-message">No wages data available for {activeMonth} ${activeYear}</div>
             ) : (
               <ResponsiveContainer width="100%" height={350}>
-                <BarChart data={chartData} margin={{ top: 20, right: 30, left: 20, bottom: 40 }}>
+                <BarChart data={chartData} margin={{ top: 40, right: 30, left: 60, bottom: 40 }}>
                   <XAxis dataKey="month" tickFormatter={() => `${activeMonth} ${activeYear}`} />
-                  <YAxis label={{ value: 'Wages (R)', angle: -90, position: 'insideLeft' }} />
+                  <YAxis label={{ value: 'Wages (R)', angle: 0, position: 'top', dy: -20 }} />
                   <Tooltip content={<CustomTooltip />} />
                   <Bar
                     dataKey="wages"
@@ -715,10 +724,10 @@ export default function DirectorAnalytics() {
           const turnoverPercentage = chartData[index]?.turnoverPercentage ?? 0;
           const dieselCostPercentage = chartData[index]?.dieselCostPercentage ?? 0;
           console.log(`CustomBarLabelForTurnoverVsDiesel - turnoverPercentage: ${turnoverPercentage}, dieselCostPercentage: ${dieselCostPercentage}`);
-          
+
           const percentage = dataKey === "totalTurnover" ? turnoverPercentage : dieselCostPercentage;
           console.log(`CustomBarLabelForTurnoverVsDiesel - Selected percentage for ${dataKey}: ${percentage}`);
-          
+
           const labelText = `R${value.toLocaleString()} (${percentage.toFixed(2)}%)`;
           console.log(`CustomBarLabelForTurnoverVsDiesel - Rendering label: ${labelText}`);
 
@@ -743,7 +752,7 @@ export default function DirectorAnalytics() {
             ) : error ? (
               <div className="error-message">{error}</div>
             ) : chartData.length === 0 ? (
-              <div className="no-data-message">No data available for {activeMonth} {activeYear}</div>
+              <div className="no-data-message">No data available for {activeMonth} ${activeYear}</div>
             ) : (
               <>
                 <div className="chart-header">
@@ -757,9 +766,9 @@ export default function DirectorAnalytics() {
                   </div>
                 </div>
                 <ResponsiveContainer width="100%" height={350}>
-                  <BarChart data={chartData} margin={{ top: 40, right: 30, left: 20, bottom: 40 }}>
+                  <BarChart data={chartData} margin={{ top: 40, right: 30, left: 60, bottom: 40 }}>
                     <XAxis dataKey="month" tickFormatter={() => `${activeMonth} ${activeYear}`} />
-                    <YAxis label={{ value: 'Amount (R)', angle: -90, position: 'insideLeft' }} />
+                    <YAxis label={{ value: 'Amount (R)', angle: 0, position: 'top', dy: -20 }} />
                     <Tooltip content={<CustomTooltip />} />
                     <Legend />
                     <Bar
@@ -794,13 +803,13 @@ export default function DirectorAnalytics() {
             ) : error ? (
               <div className="error-message">{error}</div>
             ) : chartData.length === 0 ? (
-              <div className="no-data-message">No turnover data available for {activeMonth} {activeYear}</div>
+              <div className="no-data-message">No turnover data available for {activeMonth} ${activeYear}</div>
             ) : (
               <>
                 <ResponsiveContainer width="100%" height={350}>
-                  <BarChart data={chartData} margin={{ top: 40, right: 30, left: 20, bottom: 40 }}>
+                  <BarChart data={chartData} margin={{ top: 40, right: 30, left: 60, bottom: 40 }}>
                     <XAxis dataKey="truckId" />
-                    <YAxis label={{ value: 'Turnover (R)', angle: -90, position: 'insideLeft' }} />
+                    <YAxis label={{ value: 'Turnover (R)', angle: 0, position: 'top', dy: -20 }} />
                     <Tooltip content={<CustomTooltip />} />
                     <Bar
                       dataKey="turnover"
@@ -874,7 +883,7 @@ export default function DirectorAnalytics() {
             ) : error ? (
               <div className="error-message">{error}</div>
             ) : chartData.length === 0 ? (
-              <div className="no-data-message">No data available for {activeMonth} {activeYear}</div>
+              <div className="no-data-message">No data available for {activeMonth} ${activeYear}</div>
             ) : (
               <>
                 <div className="chart-header">
@@ -888,9 +897,9 @@ export default function DirectorAnalytics() {
                   </div>
                 </div>
                 <ResponsiveContainer width="100%" height={350}>
-                  <BarChart data={chartData} margin={{ top: 40, right: 30, left: 20, bottom: 40 }}>
+                  <BarChart data={chartData} margin={{ top: 40, right: 30, left: 60, bottom: 40 }}>
                     <XAxis dataKey="month" tickFormatter={() => `${activeMonth} ${activeYear}`} />
-                    <YAxis label={{ value: 'Amount (R)', angle: -90, position: 'insideLeft' }} />
+                    <YAxis label={{ value: 'Amount (R)', angle: 0, position: 'top', dy: -20 }} />
                     <Tooltip content={<CustomTooltip />} />
                     <Legend />
                     <Bar
@@ -1017,14 +1026,14 @@ export default function DirectorAnalytics() {
 
         <div className="chart-area">
           <h2 className="chart-title">
-            {activeFilter === "fuel" && `Fuel Expenses by Truck (${activeMonth} ${activeYear})`}
-            {activeFilter === "turnoverPerMonth" && `Turnover Per Month (${activeMonth} ${activeYear})`}
+            {activeFilter === "turnoverPerMonth" && `Turnover Per Month (Previous Month: ${getPreviousMonth(activeMonth, activeYear)} for ${activeMonth} ${activeYear} Statement)`}
+            {activeFilter === "turnoverVsDieselCost" && `Turnover vs Diesel Cost (Previous Month: ${getPreviousMonth(activeMonth, activeYear)} for ${activeMonth} ${activeYear} Statement)`}
+            {activeFilter === "turnoverPerTruck" && `Turnover Per Truck (Previous Month: ${getPreviousMonth(activeMonth, activeYear)} for ${activeMonth} ${activeYear} Statement)`}
             {activeFilter === "agingAnalysis" && `30, 60, 90, Current (${activeMonth} ${activeYear})`}
+            {activeFilter === "fuel" && `Fuel Expenses by Truck (${activeMonth} ${activeYear})`}
             {activeFilter === "subcontractorTurnoverPerMonth" && `Subcontractor Turnover Per Month (${activeMonth} ${activeYear})`}
             {activeFilter === "subcontractorVsTurnover" && `Subcontractor Turnover vs Turnover (${activeMonth} ${activeYear})`}
             {activeFilter === "wagesPerMonth" && `Wages (Total) Per Month (${activeMonth} ${activeYear})`}
-            {activeFilter === "turnoverVsDieselCost" && `Turnover vs Diesel Cost (${activeMonth} ${activeYear})`}
-            {activeFilter === "turnoverPerTruck" && `Turnover Per Truck (${activeMonth} ${activeYear})`}
             {activeFilter === "incomeVsExpense" && `Income vs Expense Per Month (${activeMonth} ${activeYear})`}
           </h2>
           {renderChart()}
