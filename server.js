@@ -3509,32 +3509,7 @@ app.put("/instructions/:instructionId/status", async (req, res) => {
   }
 })
 
-// app.get("/rate", async (req, res) => {
-//   const { startingPoint, destination } = req.query
-//   console.log(`Route /rate was accessed with startingPoint=${startingPoint} and destination=${destination}`)
 
-//   if (!startingPoint || !destination) {
-//     return res.status(400).json({ error: "Starting point and destination are required" })
-//   }
-
-//   try {
-//     const result = await pool.query("SELECT rate FROM m5_driver_rate WHERE startingpoint = $1 AND destination = $2", [
-//       startingPoint,
-//       destination,
-//     ])
-
-//     if (result.rows.length === 0) {
-//       return res.status(404).json({ error: "Rate not found for the given starting point and destination" })
-//     }
-
-//     console.log("Rate found:", result.rows[0])
-
-//     res.status(200).json({ rate: result.rows[0].rate })
-//   } catch (err) {
-//     console.error("Error fetching rate:", err)
-//     res.status(500).send("Server Error")
-//   }
-// })
 
 // Update the employees/drivers endpoint to only fetch drivers with roleid = 5
 app.get("/employees/drivers", async (req, res) => {
@@ -3946,26 +3921,7 @@ app.get("/client-instructions-details/:clientId", async (req, res) => {
   }
 })
 
-// app.get("/containers/numbers", async (req, res) => {
-//   console.log("Route /containers/numbers was accessed")
 
-//   try {
-//     const result = await pool.query("SELECT containernum FROM container ORDER BY containernum")
-
-//     console.log("Container numbers found:", result.rows)
-
-//     if (result.rows.length === 0) {
-//       console.log("No container numbers found in the container table")
-//     } else {
-//       console.log(`Found ${result.rows.length} container numbers`)
-//     }
-
-//     res.status(200).json(result.rows.map((row) => row.containernum))
-//   } catch (err) {
-//     console.error("Error fetching container numbers:", err)
-//     res.status(500).send("Server Error")
-//   }
-// })
 app.get("/api/container-details/:containerNum", async (req, res) => {
   const { containerNum } = req.params;
   console.log(`Route /api/container-details/${containerNum} was accessed`);
@@ -5193,64 +5149,7 @@ app.put("/api/employee-deductions/:employeeId", async (req, res) => {
     if (client) client.release();
   }
 });
-// Check if build directory exists before trying to serve static files
-// const buildPath = path.join(__dirname, "build")
-// if (fs.existsSync(buildPath)) {
-//   console.log("Build directory found, serving static files from:", buildPath)
-//   // Serve static files from the React app
-//   app.use(express.static(buildPath))
 
-//   // The "catchall" handler: for any request that doesn't
-//   // match one above, send back React's index.html file.
-//   app.get("*", (req, res) => {
-//     res.sendFile(path.join(buildPath, "index.html"))
-//   })
-// } else {
-//   console.log("Build directory not found at:", buildPath)
-//   console.log("Only API endpoints will be available")
-
-//   // Add a fallback route for non-API routes
-//   app.get("*", (req, res) => {
-//     // Check if this is an API request
-//     if (req.url.startsWith("/api/")) {
-//       return res.status(404).json({ error: "API endpoint not found" })
-//     }
-
-//     // For non-API requests, return a simple HTML page
-//     res.send(`
-//       <!DOCTYPE html>
-//       <html>
-//         <head>
-//           <title>Logistics API Server</title>
-//           <style>
-//             body { font-family: Arial, sans-serif; margin: 40px; line-height: 1.6; }
-//             h1 { color: #333; }
-//             .container { max-width: 800px; margin: 0 auto; }
-//             .note { background-color: #f8f9fa; padding: 15px; border-left: 4px solid #007bff; margin-bottom: 20px; }
-//             code { background-color: #f1f1f1; padding: 2px 5px; border-radius: 3px; }
-//           </style>
-//         </head>
-//         <body>
-//           <div class="container">
-//             <h1>Logistics API Server</h1>
-//             <div class="note">
-//               <p>The server is running in API-only mode. The React build directory was not found.</p>
-//               <p>API endpoints are available at <code>/api/...</code></p>
-//             </div>
-//             <p>Available endpoints:</p>
-//             <ul>
-//               <li><code>/api/clients</code> - Get all clients</li>
-//               <li><code>/api/shipment-types</code> - Get all shipment types</li>
-//               <li><code>/api/instructions</code> - Get all instructions</li>
-//               <li><code>/api/client-instruction-stats</code> - Get client instruction statistics</li>
-//               <li><code>/test-connection</code> - Test database connection</li>
-//             </ul>
-//           </div>
-//         </body>
-//       </html>
-//     `)
-//   })
-// }
 app.get("/instructions/driver/:id", async (req, res) => {
   const driverId = req.params.id
 
