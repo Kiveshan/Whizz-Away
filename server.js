@@ -2258,7 +2258,6 @@ app.get("/api/check-wage-slip", async (req, res) => {
   }
 });
 
-//thunderbolts
 async function saveDeductionHistory(pool, employeeId) {
   const client = await pool.connect();
   try {
@@ -3806,15 +3805,16 @@ SELECT
       WHEN e.documentfrom = 'Controller' THEN 
         (SELECT CONCAT(name, ' ', surname) FROM m5_employee WHERE roleid = 2 LIMIT 1)
       WHEN e.documentfrom = 'Manager' THEN 
-        (SELECT CONCAT(name, ' ', surname) FROM usertable WHERE roleid = 1 LIMIT 1)
-      WHEN e.driverid IS NOT NULL THEN CONCAT(emp.name, ' ', emp.surname)
+        (SELECT CONCAT(name, ' ', surname) FROM usertable WHERE userid = e.driverid)
+      WHEN e.documentfrom = 'Driver' AND e.driverid IS NOT NULL THEN 
+        CONCAT(emp.name, ' ', emp.surname)
       ELSE NULL
     END,
     e.documentfrom
   ) AS documentfrom_display
 FROM expenses_m2 e
 JOIN m5_trucks t ON e.truckid = t.m5truckskey
-LEFT JOIN m5_employee emp ON e.driverid = emp.userid
+LEFT JOIN m5_employee emp ON e.driverid = emp.userid AND e.documentfrom = 'Driver'
 WHERE e.truckid = $1
   AND (e.type ILIKE 'fuel' OR e.type ILIKE 'diesel' OR e.type ILIKE 'petrol')
 ORDER BY e.slipuploaddate DESC;
@@ -5458,7 +5458,7 @@ app.get("/api/driver-instructions/:driverId", async (req, res) => {
       WHERE 
         l.driverid = $1
       GROUP BY 
-        m1.m1key, m1.deadline, m1.pickupdate
+        m1.m1key, m1.deadline, m1.pickupdatye
       ORDER BY 
         COALESCE(m1.deadline, m1.pickupdate) DESC
     `;
