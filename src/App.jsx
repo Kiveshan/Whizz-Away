@@ -114,7 +114,7 @@ function DynamicHeader() {
     "/analytics": "Analytics",
     "/debtors": "Debtors",
     "/FDashboard": "Finance Clerk",
-    "/instructions": "Instructions",
+    "/instructions": "Instruction",
     "/update-instructions": "Assignments",
     "/Upload-Instruction-Documents": "Instruction Documents",
     "/invoices": "Invoices",
@@ -143,8 +143,8 @@ function DynamicHeader() {
     "/ManagerViewAssignment": "View Assignment",
     "/FinancialDocumentsView": "Client Documents",
 
-    "/CompanyInstructionView": "Instructions ",
-    "/CompanyInstructions": "Instructions ",
+    "/CompanyInstructionView": "Instruction ",
+    "/CompanyInstructions": "Instruction ",
 
     "/DirectorManagerViewAssignment": "View Assignment",
     "/DirectorDocs":"Documents",
@@ -162,9 +162,9 @@ function DynamicHeader() {
     "/DirectorManagerViewFuelExpence": "Truck Expenses",
     "/DirectorExpenses": "Truck Expenses",
     "/ControllerDashboard": "Controller",
-    "/FCcontrollerinstructions": "Instructions",
+    "/FCcontrollerinstructions": "Instruction",
     // Add these entries to the titleMap object in the DynamicHeader function
-    "/Viewcontrollerinstructions": "Instructions",
+    "/Viewcontrollerinstructions": "Instruction",
     "/ViewcontrollerInstructionDetails": "Container Details",
     "/AdminDashboard": "Admin",
   }

@@ -632,7 +632,7 @@ const Viewcontrollerinstructions = () => {
           <div className="form-section">
             <div className="form-row1">
               <div className="form-group">
-                <label>File Ref</label>
+                <label>File Reference</label>
                 <input
                   type="text"
                   className="form-input"
@@ -644,7 +644,7 @@ const Viewcontrollerinstructions = () => {
                 />
               </div>
               <div className="form-group">
-                <label>Booking Ref</label>
+                <label>Booking Reference</label>
                 <input
                   type="text"
                   className="form-input"
@@ -816,10 +816,10 @@ const Viewcontrollerinstructions = () => {
           <div className="form-section">
             <div className="form-row1">
               <div className="form-group full-width">
-                <label style={{ textAlign: "center", width: "100%", display: "block" }}>Description from client</label>
+                <label style={{ textAlign: "center", width: "100%", display: "block" }}>Description from Client</label>
                 <textarea
                   className="form-textarea"
-                  placeholder="Description from client, like type of goods etc"
+                  placeholder="Description from Client, like type of goods etc"
                   name="description"
                   value={formData.description}
                   readOnly
