@@ -561,7 +561,7 @@ const FinanceClerkWageDetails = () => {
           marginTop: "-35px",
         }}
       >
-        Wage for {driverName}
+         {driverName}
       </h2>
 
       {loading ? (
