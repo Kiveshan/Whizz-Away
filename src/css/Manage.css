@@ -411,3 +411,190 @@ tr:hover {
   border-width: 0 2px 2px 0;
   transform: rotate(45deg);
 }
+
+.form-row {
+  display: flex;
+  gap: 1rem;
+}
+.form-field {
+  flex: 1;
+}
+
+/* Employee file upload */
+/* Container for document upload section */
+.document-upload-section {
+  margin-top: 30px;
+}
+
+.document-upload-section h4 {
+  margin-bottom: 10px;
+  font-weight: 600;
+}
+
+/* File input */
+.document-upload-section input[type="file"] {
+  display: block;
+  margin-bottom: 12px;
+  font-size: 14px;
+}
+
+/* File entry display */
+.document-upload-section .file-entry {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 8px;
+  font-size: 14px;
+}
+
+/* Download link */
+.document-upload-section .file-entry a.download-link {
+  color: #007bff;
+  text-decoration: underline;
+  cursor: pointer;
+  font-size: 14px;
+}
+
+/* Delete button */
+.document-upload-section .file-entry button.delete-btn {
+  background-color: #dc3545;
+  color: white;
+  border: none;
+  padding: 4px 10px;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 13px;
+  transition: background-color 0.2s ease-in-out;
+}
+
+.document-upload-section .file-entry button.delete-btn:hover {
+  background-color: #c82333;
+}
+
+/* File upload */
+.file-upload-wrapper {
+  border: 2px dashed #ccc;
+  border-radius: 12px;
+  padding: 20px;
+  text-align: center;
+  background-color: #f9f9f9;
+  transition: border-color 0.3s ease;
+}
+
+.file-upload-wrapper:hover {
+  border-color: #888;
+}
+
+.file-upload-wrapper input[type="file"] {
+  margin-top: 10px;
+  cursor: pointer;
+}
+
+.file-upload-info {
+  margin-top: 8px;
+  font-size: 0.85rem;
+  color: #666;
+}
+
+.uploaded-file-entry {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background-color: #fff;
+  padding: 8px 12px;
+  border: 1px solid #ddd;
+  border-radius: 6px;
+  margin-bottom: 8px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+}
+
+.uploaded-file-entry span {
+  flex-grow: 1;
+  overflow-wrap: break-word;
+}
+
+.uploaded-file-entry a,
+.uploaded-file-entry button {
+  margin-left: 10px;
+  font-size: 0.85rem;
+  padding: 6px 10px;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  text-decoration: none;
+}
+
+.uploaded-file-entry a {
+  background-color: #4caf50;
+  color: white;
+}
+
+.uploaded-file-entry button {
+  background-color: #f44336;
+  color: white;
+}
+
+#custom-alert {
+  background-color: #f44336; /* red */
+  color: white;
+  padding: 15px 20px;
+  border-radius: 5px;
+  position: fixed;
+  top: 20px;
+  right: 20px;
+  z-index: 1000;
+  box-shadow: 0 4px 6px rgba(0,0,0,0.2);
+  display: none;
+  animation: fadeIn 0.3s ease-in-out;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(-10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.alert-visible {
+  display: block;
+}
+
+.alert-hidden {
+  display: none;
+}
+
+/* CustomAlert.css */
+.custom-alert {
+  position: fixed;
+  top: 20px;
+  right: 20px;
+  background-color: #f44336;
+  color: white;
+  padding: 15px;
+  border-radius: 5px;
+  box-shadow: 0px 4px 8px rgba(0, 0, 0, 0.2);
+  display: none;
+  align-items: center;
+  justify-content: space-between;
+  z-index: 9999;
+}
+
+.alert-content {
+  display: flex;
+  align-items: center;
+}
+
+.alert-message {
+  font-size: 16px;
+  margin-right: 10px;
+}
+
+.alert-close-btn {
+  background: none;
+  border: none;
+  color: white;
+  font-size: 18px;
+  cursor: pointer;
+}
+
+.alert-close-btn:hover {
+  color: #ddd;
+}

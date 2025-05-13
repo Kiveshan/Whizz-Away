@@ -5,6 +5,8 @@
   "proxy": "http://localhost:5000",
   "type": "module",
   "dependencies": {
+    "@aws-sdk/client-s3": "^3.797.0",
+    "@aws-sdk/s3-request-presigner": "^3.806.0",
     "@testing-library/dom": "^10.4.0",
     "@testing-library/jest-dom": "^6.6.3",
     "@testing-library/react": "^16.2.0",
