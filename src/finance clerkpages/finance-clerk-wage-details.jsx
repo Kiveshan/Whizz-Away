@@ -2,7 +2,7 @@
 import { useState, useEffect } from "react"
 import { useNavigate, useParams, useLocation } from "react-router-dom"
 import "../finance clerkpages/css/finance-clerk-wage.css"
-
+import jsPDF from "jspdf"
 const FinanceClerkWageDetails = () => {
   const navigate = useNavigate()
   const params = useParams()
