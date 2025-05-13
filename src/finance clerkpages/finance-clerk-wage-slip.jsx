@@ -1,9 +1,10 @@
 
-
 "use client"
 import { useNavigate, useParams, useLocation } from "react-router-dom"
-import { useState, useEffect } from "react"
+import { useState, useEffect, useRef } from "react"
 import "../finance clerkpages/css/finance-clerk-wageslip.css"
+import html2canvas from "html2canvas"
+import { jsPDF } from "jspdf"
 
 const FinanceClerkWageSlip = () => {
   const navigate = useNavigate()
@@ -11,10 +12,16 @@ const FinanceClerkWageSlip = () => {
   const location = useLocation()
   const { driverId, driverName, selectedMonth, selectedYear } = location.state || {}
 
+  // Add a ref to track if we've already saved a wage slip in this component instance
+  const hasAttemptedSave = useRef(false)
+
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
   const [employeeData, setEmployeeData] = useState(null)
   const [legs, setLegs] = useState([])
+  const [downloading, setDownloading] = useState(false)
+
+  const wageSlipRef = useRef(null)
   const [wageData, setWageData] = useState({
     payPeriod: "",
     payDate: "",
@@ -61,6 +68,91 @@ const FinanceClerkWageSlip = () => {
     return 0
   }
 
+  // Helper function to get the last day of a month
+  const getLastDayOfMonth = (year, month) => {
+    const lastDay = new Date(year, month + 1, 0);
+    return `${lastDay.getFullYear()}-${String(lastDay.getMonth() + 1).padStart(2, "0")}-${String(lastDay.getDate()).padStart(2, "0")}`;
+  };
+
+  // Update the checkExistingWageSlip function to include better error handling
+  const checkExistingWageSlip = async (employeeId, month, year) => {
+    try {
+      // Add logging to track function execution
+      console.log(`Checking for existing wage slip: employeeId=${employeeId}, month=${month}, year=${year}`)
+
+      const response = await fetch(
+        `http://localhost:5000/api/check-wage-slip?employeeId=${employeeId}&month=${month}&year=${year}`,
+      )
+
+      if (!response.ok) {
+        console.error("Failed to check existing wage slip:", response.status)
+        return { exists: false, error: true }
+      }
+
+      const data = await response.json()
+      console.log("Existing wage slip check result:", data)
+
+      // Return the wage slip data and useHistoricalValues flag
+      return data.exists
+        ? { exists: true, wageSlip: data.wageSlip, useHistoricalValues: data.useHistoricalValues }
+        : { exists: false }
+    } catch (error) {
+      console.error("Error checking existing wage slip:", error)
+      return { exists: false, error: true }
+    }
+  }
+
+  // Create a separate function for saving wage data to avoid duplicate code
+  const saveWageData = async (wagePayload) => {
+    // If we've already attempted to save in this component instance, don't try again
+    if (hasAttemptedSave.current) {
+      console.log("Already attempted to save wage data in this session, skipping")
+      return { success: false, exists: true }
+    }
+
+    try {
+      console.log("Creating new wage slip")
+
+      const saveResponse = await fetch("http://localhost:5000/api/save-wage-data", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(wagePayload),
+      })
+
+      // Mark that we've attempted a save
+      hasAttemptedSave.current = true
+
+      if (!saveResponse.ok) {
+        // If status is 409 (Conflict), it means the wage slip already exists
+        if (saveResponse.status === 409) {
+          console.log("Server detected existing wage slip (409 Conflict)")
+          return { success: false, exists: true }
+        }
+
+        console.error("Failed to save wage data:", saveResponse.status)
+        return { success: false, exists: false }
+      }
+
+      const saveResult = await saveResponse.json()
+      console.log("Wage data save result:", saveResult)
+
+      // Check if the save operation detected an existing record
+      if (saveResult.exists) {
+        console.log("Server detected existing wage slip during save operation")
+        return { success: false, exists: true }
+      }
+
+      console.log("Wage data saved successfully")
+      return { success: true, exists: false }
+    } catch (error) {
+      console.error("Error saving wage data:", error)
+      return { success: false, error: true }
+    }
+  }
+
+  // Update the useEffect hook to handle wage slip saving more carefully
   useEffect(() => {
     const fetchData = async () => {
       if (!id) {
@@ -91,6 +183,18 @@ const FinanceClerkWageSlip = () => {
         const lastDay = new Date(Number.parseInt(selectedYear), monthIndexForPayPeriod + 1, 0)
         const formattedFirstDay = firstDay.toLocaleDateString()
         const formattedLastDay = lastDay.toLocaleDateString()
+
+        // IMPORTANT: Check for existing wage slip FIRST, before doing any other processing
+        // This ensures we don't waste time calculating data if we're not going to save it
+        const existingWageSlipResult = await checkExistingWageSlip(
+          cleanId,
+          monthIndexForPayPeriod + 1, // 1-based month index
+          Number.parseInt(selectedYear),
+        )
+
+        // If there's already a wage slip, we can still fetch the data to display it,
+        // but we'll skip saving a new one
+        const wageSlipExists = existingWageSlipResult.exists
 
         // Fetch all legs for the driver
         try {
@@ -149,7 +253,7 @@ const FinanceClerkWageSlip = () => {
                 const legAmount = parseAmount(leg.driverrate)
                 totalEarningsAmount += legAmount
                 earnings.push({
-                  description: `INS${instructionId}-Leg${leg.legnumber || index + 1} (${leg.instruction_status || "Unknown"})`,
+                  description: `INS${instructionId}-Leg${leg.legnumber || index + 1} `,
                   amount: `R ${legAmount.toFixed(2)}`,
                 })
               })
@@ -162,86 +266,73 @@ const FinanceClerkWageSlip = () => {
 
             // After calculating earnings, fetch and process deductions
             try {
-              // Fetch deductions from wages table for this employee and month
+              // Fetch deductions from employee table for this employee
               console.log(
                 `Fetching deductions for employee ID: ${cleanId}, month: ${selectedMonth}, year: ${selectedYear}`,
               )
 
-              // First try the debug endpoint to see all data
-              const debugResponse = await fetch(
-                `http://localhost:5000/api/debug/wages/${cleanId}?month=${encodeURIComponent(selectedMonth)}&year=${encodeURIComponent(selectedYear)}`,
-              )
-
-              if (debugResponse.ok) {
-                const debugData = await debugResponse.json()
-                console.log("Debug wages data:", debugData)
-              }
-
-              // Now fetch the actual deductions
-              const wagesResponse = await fetch(
+              // Fetch the deductions - this endpoint now handles historical values
+              const deductionsResponse = await fetch(
                 `http://localhost:5000/api/employee-deductions/${cleanId}?month=${encodeURIComponent(selectedMonth)}&year=${encodeURIComponent(selectedYear)}`,
               )
 
               // Log the raw response for debugging
-              console.log("Deductions API response status:", wagesResponse.status)
+              console.log("Deductions API response status:", deductionsResponse.status)
 
               let deductions = []
               let totalDeductionsAmount = 0
+              let deductionsData = {} // Store deductions data for later use
 
-              if (wagesResponse.ok) {
-                const wagesData = await wagesResponse.json()
-                console.log("Raw deductions data:", wagesData)
+              if (deductionsResponse.ok) {
+                deductionsData = await deductionsResponse.json()
+                console.log("Deductions data from API (includes historical values if applicable):", deductionsData)
 
                 // Define all possible deduction fields
                 const deductionFields = [
-                  { key: "deduction_income_tax", label: "Income Tax" },
-                  { key: "deduction_other_deductions", label: "Other Deductions" },
-                  { key: "deduction_uif", label: "UIF" },
-                  { key: "deduction_bonus", label: "Bonus Deduction" },
-                  { key: "deduction_savings", label: "Savings" },
-                  { key: "deduction_loan", label: "Loan Repayment" },
-                  { key: "deduction_damage", label: "Damage Recovery" },
+                  { key: "income_tax_rate", label: "Income Tax", isRate: true },
+                  { key: "deduction_income_tax", label: "Income Tax (Fixed)", isRate: false },
+                  { key: "deduction_other_deductions", label: "Other Deductions", isRate: false },
+                  { key: "deduction_uif", label: "UIF", isRate: true },
+                  { key: "deduction_bonus", label: "Bonus Deduction", isRate: false },
+                  { key: "deduction_savings", label: "Savings", isRate: false },
+                  { key: "deduction_loan", label: "Loan Repayment", isRate: false },
+                  { key: "deduction_damage", label: "Damage Recovery", isRate: false },
                 ]
 
                 // Process each deduction field
                 deductionFields.forEach((field) => {
-                  if (wagesData && wagesData[field.key] !== null && wagesData[field.key] !== undefined) {
-                    const amount = parseAmount(wagesData[field.key])
+                  if (deductionsData && deductionsData[field.key] !== null && deductionsData[field.key] !== undefined) {
+                    const rawValue = parseAmount(deductionsData[field.key])
+
+                    // Handle rate-based deductions (like UIF)
+                    let amount = rawValue
+                    if (field.isRate && rawValue > 0) {
+                      // Convert percentage to decimal and multiply by total earnings
+                      amount = (rawValue / 100) * totalEarningsAmount
+                      console.log(`${field.label} rate:`, rawValue, "% of", totalEarningsAmount, "=", amount)
+                    }
+
                     console.log(
                       `${field.label} amount:`,
                       amount,
                       "Type:",
-                      typeof wagesData[field.key],
+                      typeof deductionsData[field.key],
                       "Raw value:",
-                      wagesData[field.key],
+                      deductionsData[field.key],
+                      field.isRate ? "(Rate)" : "",
                     )
 
                     if (!isNaN(amount) && amount > 0) {
                       totalDeductionsAmount += amount
                       deductions.push({
-                        description: field.label,
+                        description: field.isRate ? `${field.label} (Rate: ${rawValue.toFixed(2)}%)` : field.label,
                         amount: `R ${amount.toFixed(2)}`,
                       })
                     }
                   }
                 })
-
-                // If no deductions were found in the data, use mock data
-                if (deductions.length === 0 && Object.keys(wagesData).length > 0) {
-                  console.log("No positive deductions found in data, creating mock data")
-
-                  // Create mock data with the same structure as the API response
-                  const mockDeductions = [
-                    { description: "Income Tax (Mock)", amount: "R 1500.00" },
-                    { description: "UIF (Mock)", amount: "R 200.00" },
-                    { description: "Other Deductions (Mock)", amount: "R 300.00" },
-                  ]
-
-                  deductions = mockDeductions
-                  totalDeductionsAmount = 2000 // Mock total
-                }
               } else {
-                console.log("Failed to fetch deductions data:", wagesResponse.status)
+                console.log("Failed to fetch deductions data:", deductionsResponse.status)
 
                 // Use mock data for testing if API fails
                 deductions = [
@@ -268,6 +359,10 @@ const FinanceClerkWageSlip = () => {
               const netPayAmount = totalEarningsAmount - totalDeductionsAmount
               console.log("Net pay calculation:", totalEarningsAmount, "-", totalDeductionsAmount, "=", netPayAmount)
 
+              // Get the last day of the month for the wage slip date
+              const lastDayOfMonth = getLastDayOfMonth(Number.parseInt(selectedYear), monthIndexForPayPeriod)
+
+              // Update UI with calculated data
               setWageData({
                 payPeriod: `${formattedFirstDay} - ${formattedLastDay}`,
                 payDate: formattedLastDay,
@@ -277,6 +372,32 @@ const FinanceClerkWageSlip = () => {
                 totalDeductions: `R ${totalDeductionsAmount.toFixed(2)}`,
                 netPay: `R ${netPayAmount.toFixed(2)}`,
               })
+
+              // Only attempt to save if we haven't found an existing wage slip
+              if (!wageSlipExists) {
+                // Calculate income tax based on rate
+                const incomeTaxRate = parseAmount(deductionsData.income_tax_rate || 0)
+                const calculatedIncomeTax = (incomeTaxRate / 100) * totalEarningsAmount
+
+                // Create wage payload with individual deduction values
+                const wagePayload = {
+                  employeeId: cleanId,
+                  month: monthIndexForPayPeriod + 1,
+                  year: Number.parseInt(selectedYear),
+                  totalEarnings: totalEarningsAmount,
+                  totalDeductions: totalDeductionsAmount,
+                  netPay: netPayAmount,
+                  calculatedIncomeTax: calculatedIncomeTax, // Add the calculated income tax
+                  date: getLastDayOfMonth(Number.parseInt(selectedYear), monthIndexForPayPeriod),
+                }
+
+                console.log("Wage payload:", wagePayload)
+
+                // Use the separate function to save wage data
+                await saveWageData(wagePayload)
+              } else {
+                console.log("Wage slip already exists, skipping save operation")
+              }
             } catch (deductionsError) {
               console.error("Error fetching deductions data:", deductionsError)
 
@@ -339,7 +460,6 @@ const FinanceClerkWageSlip = () => {
     fetchData()
   }, [id, selectedMonth, selectedYear])
 
-
   const handleBack = () => {
     // Get the actual driver name from employee data if available, otherwise use the one from location state
     const actualDriverName = employeeData
@@ -353,6 +473,48 @@ const FinanceClerkWageSlip = () => {
     })
   }
 
+  const handleDownloadWageSlip = async () => {
+    try {
+      setDownloading(true)
+
+      if (!wageSlipRef.current) {
+        console.error("Wage slip container not found")
+        setDownloading(false)
+        return
+      }
+
+      // Create a filename with employee name, month and year
+      const employeeName = employeeData
+        ? `${employeeData.name}_${employeeData.surname}`
+        : driverName?.replace(/\s+/g, "_") || `Driver_${id}`
+      const filename = `${employeeName}_WageSlip_${selectedMonth}_${selectedYear}.pdf`
+
+      // Capture the wage slip as an image
+      const canvas = await html2canvas(wageSlipRef.current, {
+        scale: 2, // Higher scale for better quality
+        useCORS: true,
+        logging: false,
+        backgroundColor: "#ffffff",
+      })
+
+      // Calculate PDF dimensions based on the canvas
+      const imgWidth = 210 // A4 width in mm
+      const imgHeight = (canvas.height * imgWidth) / canvas.width
+
+      // Create PDF
+      const pdf = new jsPDF("p", "mm", "a4")
+      const imgData = canvas.toDataURL("image/png")
+
+      pdf.addImage(imgData, "PNG", 0, 0, imgWidth, imgHeight)
+      pdf.save(filename)
+
+      setDownloading(false)
+    } catch (error) {
+      console.error("Error downloading wage slip:", error)
+      setDownloading(false)
+    }
+  }
+
   return (
     <div className="wageslip-page-wrapper">
       <div className="wageslip-container">
@@ -361,7 +523,7 @@ const FinanceClerkWageSlip = () => {
         ) : error ? (
           <div className="wageslip-error-container">{error}</div>
         ) : (
-          <div className="wageslip-slip-container">
+          <div className="wageslip-slip-container" ref={wageSlipRef}>
             {/* Header */}
             <div className="wageslip-header">
               <div></div>
@@ -516,6 +678,14 @@ const FinanceClerkWageSlip = () => {
           <button className="back-button" onClick={handleBack}>
             Back
           </button>
+          <button
+            className="downloadwage1 wageslip-download-button"
+            onClick={handleDownloadWageSlip}
+            disabled={downloading}
+            style={{ marginLeft: "202px" }}
+          >
+            {downloading ? "Downloading..." : "Download Wage Slip"}
+          </button>
         </div>
       </div>
     </div>
@@ -523,4 +693,3 @@ const FinanceClerkWageSlip = () => {
 }
 
 export default FinanceClerkWageSlip
-

@@ -3,8 +3,6 @@ import { useState, useEffect } from "react"
 import { useNavigate, useParams, useLocation } from "react-router-dom"
 import "../finance clerkpages/css/finance-clerk-wage.css"
 import jsPDF from "jspdf"
-import "jspdf-autotable"
-
 const FinanceClerkWageDetails = () => {
   const navigate = useNavigate()
   const params = useParams()
@@ -563,7 +561,7 @@ const FinanceClerkWageDetails = () => {
           marginTop: "-35px",
         }}
       >
-        Wage for {driverName}
+         {driverName}
       </h2>
 
       {loading ? (
@@ -573,7 +571,7 @@ const FinanceClerkWageDetails = () => {
       ) : (
         <table
           style={{
-            width: "550px",
+            width: "450px",
             margin: "0 auto",
             borderCollapse: "collapse",
             fontSize: "16px",
@@ -599,7 +597,7 @@ const FinanceClerkWageDetails = () => {
             ) : (
               <tr style={{ backgroundColor: "white", padding: "12px 10px", borderBottom: "1px solid #eee" }}>
                 <td>
-                  <button className="downloadwage1" onClick={handleViewLegs}>
+                  <button className="downloadwage1" onClick={handleViewLegs} style={{ margin: "0 auto", display: "block" }}>
                     View
                   </button>
                 </td>
@@ -616,13 +614,15 @@ const FinanceClerkWageDetails = () => {
                       cursor: "pointer",
                       fontSize: "16px",
                       fontWeight: "normal",
+                      margin: "0 auto",
+                      display: "block"
                     }}
                   >
                     View
                   </button>
-                  <button className="downloadwage1" onClick={handleDownloadMonthlyWageSlip} disabled={downloadingMonth}>
+                  {/* <button className="downloadwage1" onClick={handleDownloadMonthlyWageSlip} disabled={downloadingMonth}>
                     {downloadingMonth ? "Downloading..." : "Download"}
-                  </button>
+                  </button> */}
                 </td>
               </tr>
             )}

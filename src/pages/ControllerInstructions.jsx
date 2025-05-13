@@ -1107,7 +1107,7 @@ const ControllerInstructions = () => {
               style={{ display: "flex", justifyContent: "space-between", marginBottom: "20px" }}
             >
               <div className="file-ref-column" style={{ width: "32%" }}>
-                <label>File Ref</label>
+                <label>File Reference</label>
                 <div className="input-wrapper" ref={fieldRefs.fileRef}>
                   <input
                     type="text"
@@ -1128,7 +1128,7 @@ const ControllerInstructions = () => {
                 </div>
               </div>
               <div className="booking-ref-column" style={{ width: "32%" }}>
-                <label>Booking Ref</label>
+                <label>Booking Reference</label>
                 <div className="input-wrapper" ref={fieldRefs.bookingRef}>
                   <input
                     type="text"
@@ -1488,12 +1488,12 @@ const ControllerInstructions = () => {
             }}
           >
             <label style={{ display: "block", fontWeight: "bold", marginBottom: "15px" }}>
-              Description from client
+              Description from Client
             </label>
             <div className="textarea-wrapper" ref={fieldRefs.description}>
               <textarea
                 className={`form-textarea ${fieldErrors.description ? "error-field" : ""}`}
-                placeholder="Description from client, like type of goods etc"
+                placeholder="Description from Client, like type of goods etc"
                 name="description"
                 value={formData.description}
                 onChange={handleInputChange}

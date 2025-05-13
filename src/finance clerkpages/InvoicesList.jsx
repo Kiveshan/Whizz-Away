@@ -31,12 +31,13 @@ const InvoicesList = () => {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState(null)
 
-  // Changed initial state to have empty values for year and month
+  // Set default filters to current year and month
+  const currentDate = new Date()
   const [filters, setFilters] = useState({
-    year: "",
-    month: "",
-    type: "All", // Default to import since it's active in the UI
-    clientId: clientId || null, // Add clientId to filters
+    year: currentDate.getFullYear().toString(),
+    month: (currentDate.getMonth() + 1).toString(),
+    type: "All",
+    clientId: clientId || null,
   })
 
   // Skip initial render to prevent auto-filtering on page load

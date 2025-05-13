@@ -58,7 +58,8 @@ import DirectorExpenses from "./pages/DirectorExpenses"
 import Viewcontrollerinstructions from "./pages/Viewcontrollerinstructions"
 import ViewcontrollerInstructionDetails from "./pages/ViewcontrollerInstructionDetails"
 import AdminDashboard from "./pages/AdminDashboard";
-
+import ClientListPay from "./pages/ClientListPay"
+import DirectorClientListPay from "./pages/DirectorClientListPay"
 // Finance Clerk Pages
 import FDashboard from "./finance clerkpages/FDashboard"
 import InstructionsList from "./finance clerkpages/InstructionsList"
@@ -97,6 +98,8 @@ function DynamicHeader() {
     "/Dashboard": "Business Manager",
 
     "/client-payments": "Client Payments",
+    "/client-list-payments": "Client Payments",
+    "/director-client-list-payments": "Client Payments",
     "/client-documents": "Client Documents",
     "/driver-wage": "Wages",
     "/DriverWageSlip": "Wages",
@@ -111,8 +114,8 @@ function DynamicHeader() {
     "/analytics": "Analytics",
     "/debtors": "Debtors",
     "/FDashboard": "Finance Clerk",
-    "/instructions": "Instructions",
-    "/update-instructions": "Assignments",
+    "/instructions": "Instruction",
+    "/update-instructions": "Assignment",
     "/Upload-Instruction-Documents": "Instruction Documents",
     "/invoices": "Invoices",
     "/client-invoice": "Invoices",
@@ -140,8 +143,8 @@ function DynamicHeader() {
     "/ManagerViewAssignment": "View Assignment",
     "/FinancialDocumentsView": "Client Documents",
 
-    "/CompanyInstructionView": "Instructions ",
-    "/CompanyInstructions": "Instructions ",
+    "/CompanyInstructionView": "Instruction ",
+    "/CompanyInstructions": "Instruction ",
 
     "/DirectorManagerViewAssignment": "View Assignment",
     "/DirectorDocs":"Documents",
@@ -159,9 +162,9 @@ function DynamicHeader() {
     "/DirectorManagerViewFuelExpence": "Truck Expenses",
     "/DirectorExpenses": "Truck Expenses",
     "/ControllerDashboard": "Controller",
-    "/FCcontrollerinstructions": "Instructions",
+    "/FCcontrollerinstructions": "Instruction",
     // Add these entries to the titleMap object in the DynamicHeader function
-    "/Viewcontrollerinstructions": "Instructions",
+    "/Viewcontrollerinstructions": "Instruction",
     "/ViewcontrollerInstructionDetails": "Container Details",
     "/AdminDashboard": "Admin",
   }
@@ -201,13 +204,16 @@ function ContentWrapper() {
       <Routes>
         <Route path="/" element={<Landing />} />
         <Route path="/client-payments" element={<ClientPayments />} />
+        <Route path="/client-list-payments" element={<ClientListPay />} />
+        <Route path="/director-client-list-payments" element ={<DirectorClientListPay />} />
         <Route path="/driver-wage" element={<DriverWage />} />
         <Route path="/DriverWageSlip" element={<DriverWageSlip />} />
         <Route path="/DriverWageList" element={<DriverWageList />} />
         <Route path="/client-documents" element={<ClientDocuments />} />
         <Route path="/ManagerViewFuelExpence" element={<ManagerViewFuelExpence />} />
         <Route path="/expenses" element={<Expenses />} />
-        <Route path="/upload/:companyName/:balance" element={<UploadProof />} />
+        <Route path="/upload/:clientName" element={<UploadProof />} />
+        <Route path="/upload-proof/:clientName/:paymentId?" element={<UploadProof />} />
         <Route path="/debtors" element={<Debtors />} />
         <Route path="/analytics" element={<Analytics />} />
         <Route path="/manage" element={<Manage />} />
@@ -243,7 +249,8 @@ function ContentWrapper() {
         <Route path="/DirectorExpenses/:truckId" element={<DirectorExpenses />} />
         // Add these routes in the ContentWrapper function, with the other Director routes
         <Route path="/Viewcontrollerinstructions" element={<Viewcontrollerinstructions />} />
-        <Route path="/ViewcontrollerInstructionDetails" element={<ViewcontrollerInstructionDetails />} />        <Route path="/AdminDashboard" element={<AdminDashboard />} />
+        <Route path="/ViewcontrollerInstructionDetails" element={<ViewcontrollerInstructionDetails />} />        
+        <Route path="/AdminDashboard" element={<AdminDashboard />} />
 
         {/* Finance Clerk Routes */}
         <Route path="/instructions" element={<InstructionsList />} />

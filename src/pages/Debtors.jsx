@@ -9,7 +9,7 @@ const Debtors = () => {
     navigate("/Dashboard");
   };
   const handlePaymentClick=()=>{
-    navigate("/client-payments");
+    navigate("/client-list-payments");
   }
   const handleStatementClick=()=>{
     navigate("/FinancialDocumentsView");

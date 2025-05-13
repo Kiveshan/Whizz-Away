@@ -4,7 +4,7 @@
   display: flex;
   flex-direction: column;
   align-items: center;
-  margin-top: -93px;
+  margin-top: -50px;
 }
 
 .manage-button-row {
@@ -69,11 +69,9 @@
 }
 
 table {
-  width: 100%;               /* Expanded table width to full container */
-  min-width: 800px;          /* Ensure minimum width for content */
- 
+  width: 800px;
   border-collapse: collapse;
-  background-color: rgb(255, 255, 255);
+  background-color: white;
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
 }
 
@@ -108,20 +106,6 @@ tr:hover {
 /* Optionally, style delete buttons if used */
 .manage-delete-button {
   background-color: #e74c3c;
-  color: white;
-  border: none;
-  cursor: pointer;
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  padding: 8px 12px;
-  border-radius: 4px;
-  font-size: 14px;
-  transition: background-color 0.3s, transform 0.2s;
-}
-/* Optionally, style delete buttons if used */
-.manage-enable-button {
-  background-color: green;
   color: white;
   border: none;
   cursor: pointer;
@@ -339,7 +323,7 @@ tr:hover {
   max-width: 800px;
   margin: auto;
   padding: 20px;
-  background: white;
+  background: #f9f9f9;
   border-radius: 8px;
   box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
   display: flex;
@@ -353,7 +337,7 @@ tr:hover {
   max-width: 800px;
   margin: auto;
   padding: 20px;
-  background: white;
+  background: #f9f9f9;
   border-radius: 8px;
   box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
   display: flex;

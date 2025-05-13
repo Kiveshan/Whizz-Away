@@ -91,13 +91,12 @@ const ExpenseDetails = () => {
     }
   }
 
-  // Handle viewing a document - get a fresh pre-signed URL if possible
   const handleViewDocument = async (expense) => {
     try {
       // If we have an expense ID, try to get a fresh pre-signed URL
       if (expense.ekey) {
         const response = await fetch(`http://localhost:5000/expenses/document/${expense.ekey}`)
-  
+        
         if (response.ok) {
           const data = await response.json()
           if (data.success && data.url) {
@@ -105,13 +104,13 @@ const ExpenseDetails = () => {
             window.open(data.url, '_blank');
             return
           }
+        } else {
+          console.error("Error response:", await response.text());
         }
       }
   
-      // Fallback to using the stored URL
-      if (expense.slipurl) {
-        window.open(expense.slipurl, '_blank');
-      } else if (expense.slipname) {
+      // If we don't have a URL from the API, check if we have a slip name
+      if (expense.slipname) {
         const url = `http://localhost:5000/uploads/${expense.slipname}`;
         window.open(url, '_blank');
       } else {
@@ -165,28 +164,28 @@ const ExpenseDetails = () => {
         }
       }
   
-      // Fallback to using the stored URL
-      if (expense.slipurl || expense.slipname) {
-        const docUrl = expense.slipurl || `http://localhost:5000/uploads/${expense.slipname}`;
-        const filename = expense.slipname || "document";
-        
-        // Fetch the file content first, then create a blob URL
-        fetch(docUrl)
-          .then(res => res.blob())
-          .then(blob => {
-            const blobUrl = window.URL.createObjectURL(blob);
-            const a = document.createElement('a');
-            a.style.display = 'none';
-            a.href = blobUrl;
-            a.download = filename;
-            document.body.appendChild(a);
-            a.click();
-            window.URL.revokeObjectURL(blobUrl);
-            document.body.removeChild(a);
-          });
-      } else {
-        alert("No document available to download");
-      }
+// If we don't have a URL from the API, check if we have a slip name
+else if (expense.slipname) {
+  const docUrl = `http://localhost:5000/uploads/${expense.slipname}`;
+  const filename = expense.slipname;
+  
+  // Fetch the file content first, then create a blob URL
+  fetch(docUrl)
+    .then(res => res.blob())
+    .then(blob => {
+      const blobUrl = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.style.display = 'none';
+      a.href = blobUrl;
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      window.URL.revokeObjectURL(blobUrl);
+      document.body.removeChild(a);
+    });
+} else {
+  alert("No document available to download");
+}
     } catch (err) {
       console.error("Error downloading document:", err);
       alert("Error downloading document. Please try again.");
@@ -270,22 +269,22 @@ const ExpenseDetails = () => {
                   <td>{expense.documentfrom_display || expense.documentfrom}</td>
                   <td>{formatDate(expense.slipuploaddate)}</td>
                   <td>
-                    <button
-                      className="view-button"
-                      onClick={() => handleViewDocument(expense)}
-                      disabled={!expense.slipurl && !expense.slipname}
-                    >
-                      View
-                    </button>
+                  <button
+                    className="view-button"
+                    onClick={() => handleViewDocument(expense)}
+                    disabled={!expense.s3key && !expense.slipname}
+                  >
+                    View
+                  </button>
                   </td>
                   <td>
-                    {expense.slipurl || expense.slipname ? (
-                      <button className="download-button" onClick={() => handleDownloadDocument(expense)}>
-                        Download
-                      </button>
-                    ) : (
-                      <span>No slip</span>
-                    )}
+                  {expense.s3key || expense.slipname ? (
+  <button className="download-button" onClick={() => handleDownloadDocument(expense)}>
+    Download
+  </button>
+) : (
+  <span>No slip</span>
+)}
                   </td>
                 </tr>
               ))

@@ -10,7 +10,7 @@ const DirectorDabtors = () => {
     navigate("/DirectorDashboard");
   };
   const handlePaymentClick=()=>{
-    navigate("/DirectorClientPaymentList");
+    navigate("/director-client-list-payments");
   }
   const handleStatementClick=()=>{
     navigate("/DirectorFinancialDocumentsView");

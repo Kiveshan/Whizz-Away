@@ -17,6 +17,7 @@ import puppeteer from "puppeteer";
 import cron from "node-cron";
 import path from "path";
 import fs from "fs";
+
 import { fileURLToPath } from "url";
 
 
@@ -93,6 +94,11 @@ const testConnection = async () => {
 }
 
 // Helper function to execute database queries
+function getLastDayOfMonth(year, month) {
+  // Create a date for the first day of the next month, then go back one day
+  return new Date(year, month + 1, 0);
+}
+
 async function query(text, params) {
   if (!pool) {
     throw new Error("Database connection not established")
@@ -1524,39 +1530,76 @@ app.post("/api/generate-pdf", async (req, res) => {
 
 // Function to generate statements for all clients
 async function generateMonthlyStatements() {
-  console.log("Starting monthly statement generation process...")
+  console.log("Starting monthly statement generation process...");
 
-  const today = new Date() // 2025-04-11
-  const currentMonth = today.getMonth() // 3 (April)
-  const currentYear = today.getFullYear() // 2025
-  const generationDate = new Date(currentYear, currentMonth, 1, 12, 0, 0)
-  const formattedGenDate = generationDate.toISOString().split("T")[0]
+  // Determine dates for the statement (April 1, 2025)
+  const today = new Date(); // 2025-04-25
+  const currentMonth = today.getMonth(); // 3 (April)
+  const currentYear = today.getFullYear(); // 2025
+  const generationDate = new Date(currentYear, currentMonth, 1, 12, 0, 0); // April 1, 2025
+  const formattedGenDate = generationDate.toISOString().split("T")[0]; // '2025-04-01'
 
-  const previousMonth = currentMonth === 0 ? 11 : currentMonth - 1 // 2 (March)
-  const previousYear = currentMonth === 0 ? currentYear - 1 : currentYear // 2025
+  // Previous month (for invoices: March 1 to March 31, 2025)
+  const previousMonth = currentMonth === 0 ? 11 : currentMonth - 1; // 2 (March)
+  const previousYear = currentMonth === 0 ? currentYear - 1 : currentYear; // 2025
+  const invoiceStartDate = new Date(previousYear, previousMonth, 1, 12, 0, 0); // March 1, 2025
+  const invoiceEndDate = new Date(previousYear, previousMonth + 1, 0, 12, 0, 0); // March 31, 2025
+  const formattedInvoiceStartDate = invoiceStartDate.toISOString().split("T")[0]; // '2025-03-01'
+  const formattedInvoiceEndDate = invoiceEndDate.toISOString().split("T")[0]; // '2025-03-31'
 
-  const startDate = new Date(previousYear, previousMonth, 1, 12, 0, 0) // Set to noon
-  const endDate = new Date(previousYear, previousMonth + 1, 0, 12, 0, 0) // Set to noon
+  // Two months prior (for payments: February 1 to February 28, 2025)
+  const paymentMonth = previousMonth === 0 ? 11 : previousMonth - 1; // 1 (February)
+  const paymentYear = previousMonth === 0 ? previousYear - 1 : previousYear; // 2025
+  const paymentStartDate = new Date(paymentYear, paymentMonth, 1, 12, 0, 0); // February 1, 2025
+  const paymentEndDate = new Date(paymentYear, paymentMonth + 1, 0, 12, 0, 0); // February 28, 2025
+  const formattedPaymentStartDate = paymentStartDate.toISOString().split("T")[0]; // '2025-02-01'
+  const formattedPaymentEndDate = paymentEndDate.toISOString().split("T")[0]; // '2025-02-28'
 
-  const formattedStartDate = startDate.toISOString().split("T")[0] // '2025-03-01'
-  const formattedEndDate = endDate.toISOString().split("T")[0] // '2025-03-31'
+  console.log(`Today: ${today.toISOString().split("T")[0]}`);
+  console.log(`Current Month: ${currentMonth}, Current Year: ${currentYear}`);
+  console.log(`Previous Month: ${previousMonth}, Previous Year: ${previousYear}`);
+  console.log(`Generating statements for invoices confirmed between ${formattedInvoiceStartDate} and ${formattedInvoiceEndDate}`);
+  console.log(`Fetching payments between ${formattedPaymentStartDate} and ${formattedPaymentEndDate}`);
 
-  console.log(`Today: ${today.toISOString().split("T")[0]}`)
-  console.log(`Current Month: ${currentMonth}, Current Year: ${currentYear}`)
-  console.log(`Previous Month: ${previousMonth}, Previous Year: ${previousYear}`)
-  console.log(`Generating statements for invoices confirmed between ${formattedStartDate} and ${formattedEndDate}`)
-
-  let dbClient
+  let dbClient;
   try {
-    dbClient = await pool.connect()
-    await dbClient.query("BEGIN")
+    dbClient = await pool.connect();
+    await dbClient.query("BEGIN");
 
-    const clientsResult = await query("SELECT m5clientkey FROM m5_client", [])
-    const clients = clientsResult.rows
+    // Fetch all clients
+    const clientsResult = await query("SELECT m5clientkey FROM m5_client", []);
+    const clients = clientsResult.rows;
+
+    // Fetch payments for all clients two months prior (February 2025)
+    const paymentsResult = await dbClient.query(
+      `SELECT 
+         clientid,
+         SUM(amount) as total_payments
+       FROM payment_m3
+       WHERE fileupload BETWEEN $1 AND $2
+       GROUP BY clientid`,
+      [formattedPaymentStartDate, formattedPaymentEndDate]
+    );
+    const paymentsMap = new Map(paymentsResult.rows.map(row => [row.clientid, Number.parseFloat(row.total_payments) || 0]));
+    console.log(`Fetched payments for ${paymentsResult.rows.length} clients between ${formattedPaymentStartDate} and ${formattedPaymentEndDate}`);
 
     for (const client of clients) {
-      const clientId = client.m5clientkey
+      const clientId = client.m5clientkey;
 
+      // Check if a statement already exists for this client and generation date
+      const existingStatement = await dbClient.query(
+        "SELECT statement_key FROM statements WHERE clientid = $1 AND generation_date = $2",
+        [clientId, formattedGenDate]
+      );
+
+      if (existingStatement.rows.length > 0) {
+        console.log(
+          `Client ${clientId}: Statement #${existingStatement.rows[0].statement_key} already exists for ${formattedGenDate}, skipping`
+        );
+        continue;
+      }
+
+      // Fetch invoices for the previous month (March 2025)
       const invoicesQuery = `
         SELECT 
           SUM(m1.total_cost) as total_amount,
@@ -1565,98 +1608,167 @@ async function generateMonthlyStatements() {
         JOIN m1_controller m1 ON i.m1key = m1.m1key
         WHERE i.clientid = $1 AND i.date BETWEEN $2 AND $3
         GROUP BY i.groupid
-      `
-      const invoicesResult = await dbClient.query(invoicesQuery, [clientId, formattedStartDate, formattedEndDate])
-      const invoices = invoicesResult.rows
+      `;
+      const invoicesResult = await dbClient.query(invoicesQuery, [clientId, formattedInvoiceStartDate, formattedInvoiceEndDate]);
+      const invoices = invoicesResult.rows;
 
-      if (invoices.length === 0) {
+      // Get total payments for this client (default to 0 if none)
+      const totalPayments = paymentsMap.get(clientId) || 0;
+      console.log(`Client ${clientId}: Total payments from ${formattedPaymentStartDate} to ${formattedPaymentEndDate}: R${totalPayments}`);
+
+      // Generate a statement if there are invoices OR payments
+      if (invoices.length === 0 && totalPayments === 0) {
         console.log(
-          `Client ${clientId}: No confirmed invoices found between ${formattedStartDate} and ${formattedEndDate}, skipping`,
-        )
-        continue
+          `Client ${clientId}: No invoices or payments found between ${formattedInvoiceStartDate} and ${formattedInvoiceEndDate}, skipping`
+        );
+        continue;
       }
 
-      for (const invoice of invoices) {
-        const totalAmount = invoice.total_amount
-        const invoice_group_id = invoice.invoice_group_id
+      // Set groupid: use invoice's groupid if invoices exist, otherwise null
+      let invoice_group_id = null;
+      if (invoices.length > 0) {
+        invoice_group_id = invoices[0].invoice_group_id;
+        console.log(`Client ${clientId}: Using invoice groupid ${invoice_group_id}`);
+      } else {
+        console.log(`Client ${clientId}: No invoices, setting groupid to null`);
+      }
 
-        const existingStatement = await dbClient.query(
-          "SELECT statement_key FROM statements WHERE groupid = $1 AND clientid = $2",
-          [invoice_group_id, clientId],
-        )
+      // Fetch the most recent statement to get the opening balance
+      const previousStatementQuery = `
+        SELECT s.agingid
+        FROM statements s
+        WHERE s.clientid = $1 AND s.generation_date < $2
+        ORDER BY s.generation_date DESC
+        LIMIT 1
+      `;
+      const previousStatementResult = await dbClient.query(previousStatementQuery, [clientId, formattedGenDate]);
+      let openingBalance = 0;
 
-        if (existingStatement.rows.length > 0) {
-          console.log(
-            `Client ${clientId}: Statement #${existingStatement.rows[0].statement_key} already exists for group ${invoice_group_id}, skipping`,
-          )
-          continue
-        }
-
-        const agingQuery = `
-          SELECT aging_key, current, "30days", "60days", "90days"
+      if (previousStatementResult.rows.length > 0) {
+        const previousAgingId = previousStatementResult.rows[0].agingid;
+        const previousAgingQuery = `
+          SELECT current, "30days", "60days", "90days"
           FROM aging_analysis
-          WHERE clientid = $1
-          ORDER BY aging_key DESC
-          LIMIT 1
-        `
-        const agingResult = await dbClient.query(agingQuery, [clientId])
-        let newCurrent, new30days, new60days, new90days
-
-        if (agingResult.rows.length > 0) {
-          const previousAging = agingResult.rows[0]
-          newCurrent = Math.max(Number.parseFloat(totalAmount) || 0, 0)
-          new30days = Math.max(Number.parseFloat(previousAging.current) || 0, 0)
-          new60days = Math.max(Number.parseFloat(previousAging["30days"]) || 0, 0)
-          new90days = Math.max(
-            (Number.parseFloat(previousAging["60days"]) || 0) + (Number.parseFloat(previousAging["90days"]) || 0),
-            0,
-          )
-        } else {
-          newCurrent = Math.max(Number.parseFloat(totalAmount) || 0, 0)
-          new30days = 0
-          new60days = 0
-          new90days = 0
+          WHERE aging_key = $1
+        `;
+        const previousAgingResult = await dbClient.query(previousAgingQuery, [previousAgingId]);
+        if (previousAgingResult.rows.length > 0) {
+          const row = previousAgingResult.rows[0];
+          openingBalance = 
+            (Number.parseFloat(row.current) || 0) +
+            (Number.parseFloat(row["30days"]) || 0) +
+            (Number.parseFloat(row["60days"]) || 0) +
+            (Number.parseFloat(row["90days"]) || 0);
         }
+      }
+      console.log(`Client ${clientId}: Opening balance (sum of previous current, 30days, 60days, 90days): R${openingBalance}`);
 
-        const insertAgingQuery = `
-          INSERT INTO aging_analysis (clientid, current, "30days", "60days", "90days")
-          VALUES ($1, $2, $3, $4, $5)
-          RETURNING aging_key
-        `
-        const agingValues = [clientId, newCurrent, new30days, new60days, new90days]
-        const agingInsertResult = await dbClient.query(insertAgingQuery, agingValues)
-        const newAgingId = agingInsertResult.rows[0].aging_key
+      // Calculate total invoices for the current period (March 2025)
+      const totalInvoices = invoices.length > 0 ? Number.parseFloat(invoices[0].total_amount) || 0 : 0;
 
-        const insertStatementQuery = `
-          INSERT INTO statements (groupid, generation_date, clientid, agingid)
-          VALUES ($1, $4, $2, $3)
-          RETURNING statement_key
-        `
-        const statementResult = await dbClient.query(insertStatementQuery, [
-          invoice_group_id,
-          clientId,
-          newAgingId,
-          formattedGenDate,
-        ])
-        const newStatementId = statementResult.rows[0].statement_key
+      // Fetch the most recent aging analysis for updating
+      const agingQuery = `
+        SELECT aging_key, current, "30days", "60days", "90days"
+        FROM aging_analysis
+        WHERE clientid = $1
+        ORDER BY aging_key DESC
+        LIMIT 1
+      `;
+      const agingResult = await dbClient.query(agingQuery, [clientId]);
+      let newCurrent, new30days, new60days, new90days;
 
-        console.log(`Generated statement #${newStatementId} for group ${invoice_group_id}`)
+      if (agingResult.rows.length > 0) {
+        const previousAging = agingResult.rows[0];
+        // Current = Total of March 2025 invoices (not adjusted by payments)
+        newCurrent = totalInvoices;
+        // 30days = Previous current (February 2025 invoices) minus February 2025 payments
+        let raw30days = Number.parseFloat(previousAging.current) || 0;
+        let remaining30days = raw30days - totalPayments;
+        let excessPayment = 0;
+
+        if (remaining30days < 0) {
+          let raw60days = Number.parseFloat(previousAging["30days"]) || 0;
+          let remaining60days = raw60days + remaining30days; // Add negative 30days to 60days
+
+          if (raw60days === 0) {
+            // If 60days is 0, allow 30days to go negative
+            new30days = remaining30days;
+            new60days = 0;
+            new90days = (Number.parseFloat(previousAging["60days"]) || 0) + (Number.parseFloat(previousAging["90days"]) || 0);
+          } else if (remaining60days < 0) {
+            // If 60days becomes negative, subtract excess from 90days
+            new30days = 0;
+            new60days = 0;
+            excessPayment = -remaining60days;
+            let raw90days = (Number.parseFloat(previousAging["60days"]) || 0) + (Number.parseFloat(previousAging["90days"]) || 0);
+            new90days = raw90days - excessPayment;
+          } else {
+            // 60days can absorb the excess from 30days
+            new30days = 0;
+            new60days = remaining60days;
+            new90days = (Number.parseFloat(previousAging["60days"]) || 0) + (Number.parseFloat(previousAging["90days"]) || 0);
+          }
+        } else {
+          // 30days can absorb the payment
+          new30days = remaining30days;
+          new60days = Number.parseFloat(previousAging["30days"]) || 0;
+          new90days = (Number.parseFloat(previousAging["60days"]) || 0) + (Number.parseFloat(previousAging["90days"]) || 0);
+        }
+        console.log(
+          `Client ${clientId}: Aging update - Current: R${newCurrent} (March 2025 invoices: R${totalInvoices}), 30days: R${new30days} (February 2025 invoices R${raw30days} - February payments R${totalPayments}), 60days: R${new60days}, 90days: R${new90days}`
+        );
+      } else {
+        // Initial aging for the client (no previous aging analysis)
+        newCurrent = totalInvoices; // March 2025 invoices
+        let remaining30days = 0 - totalPayments; // No previous invoices, so just subtract payments
+        if (remaining30days < 0) {
+          new30days = remaining30days; // Allow negative if no 60days
+          new60days = 0;
+          new90days = 0;
+        } else {
+          new30days = remaining30days;
+          new60days = 0;
+          new90days = 0;
+        }
+        console.log(
+          `Client ${clientId}: Initial aging - Current: R${newCurrent} (March 2025 invoices: R${totalInvoices}), 30days: R${new30days} (after deducting February 2025 payments R${totalPayments}), 60days: R${new60days}, 90days: R${new90days}`
+        );
       }
 
-      await dbClient.query("COMMIT")
+      // Insert new aging analysis record
+      const insertAgingQuery = `
+        INSERT INTO aging_analysis (clientid, current, "30days", "60days", "90days")
+        VALUES ($1, $2, $3, $4, $5)
+        RETURNING aging_key
+      `;
+      const agingValues = [clientId, newCurrent, new30days, new60days, new90days];
+      const agingInsertResult = await dbClient.query(insertAgingQuery, agingValues);
+      const newAgingId = agingInsertResult.rows[0].aging_key;
+
+      // Insert statement with opening_balance
+      const insertStatementQuery = `
+        INSERT INTO statements (groupid, generation_date, clientid, agingid, opening_balance)
+        VALUES ($1, $2, $3, $4, $5)
+        RETURNING statement_key
+      `;
+      const statementValues = [invoice_group_id, formattedGenDate, clientId, newAgingId, openingBalance];
+      const statementInsertResult = await dbClient.query(insertStatementQuery, statementValues);
+      console.log(
+        `Client ${clientId}: Generated statement #${statementInsertResult.rows[0].statement_key} for group ${invoice_group_id || 'null'} with opening balance R${openingBalance}`
+      );
     }
+
+    await dbClient.query("COMMIT");
+    console.log("Monthly statement generation completed successfully");
   } catch (error) {
-    console.error("Error in statement generation:", error)
-    if (dbClient) {
-      await dbClient.query("ROLLBACK")
-    }
+    await dbClient.query("ROLLBACK");
+    console.error("Error generating monthly statements:", error);
+    throw error;
   } finally {
-    if (dbClient) {
-      dbClient.release()
-    }
-    console.log("Monthly statement generation process completed.")
+    if (dbClient) dbClient.release();
   }
 }
+
 // GET statements for a specific client
 app.get("/api/statements/:clientId", verifyToken, async (req, res) => {
   try {
@@ -1720,18 +1832,20 @@ app.get("/api/statement/:statementId", verifyToken, async (req, res) => {
       return res.status(503).json({
         success: false,
         message: "Database connection not established. Please try again later.",
-      })
+      });
     }
 
-    const { statementId } = req.params
-    console.log(`Fetching statement details for statement ${statementId}`)
+    const { statementId } = req.params;
+    console.log(`Fetching statement details for statement ${statementId}`);
 
+    // Fetch statement details (including opening_balance, invoices, and client info)
     const queryText = `
       SELECT 
         s.statement_key,
         s.groupid,
         s.generation_date,
         s.clientid,
+        s.opening_balance,
         c.client AS client_name,
         c.representative AS client_representative,
         c.email AS client_email,
@@ -1761,21 +1875,65 @@ app.get("/api/statement/:statementId", verifyToken, async (req, res) => {
         usertable ut ON ut.roleid = 1 AND ut.status = 'active'
       WHERE 
         s.statement_key = $1
-    `
-    const result = await query(queryText, [statementId])
+    `;
+    const result = await query(queryText, [statementId]);
 
     if (result.rows.length === 0) {
       return res.status(404).json({
         success: false,
         message: "Statement not found",
-      })
+      });
     }
+
+    // Determine the statement period (previous month based on generation_date)
+    const generationDate = new Date(result.rows[0].generation_date);
+    const statementMonth = generationDate.getMonth() === 0 ? 11 : generationDate.getMonth() - 1;
+    const statementYear = generationDate.getMonth() === 0 ? generationDate.getFullYear() - 1 : generationDate.getFullYear();
+    const statementStartDate = new Date(statementYear, statementMonth, 1, 12, 0, 0);
+    const statementEndDate = new Date(statementYear, statementMonth + 1, 0, 12, 0, 0);
+    const formattedStatementStartDate = statementStartDate.toISOString().split("T")[0];
+    const formattedStatementEndDate = statementEndDate.toISOString().split("T")[0];
+
+    console.log(`Statement period (invoices): ${formattedStatementStartDate} to ${formattedStatementEndDate}`);
+
+    // Determine the payment period (two months prior to generation_date)
+    const paymentMonth = statementMonth === 0 ? 11 : statementMonth - 1;
+    const paymentYear = statementMonth === 0 ? statementYear - 1 : statementYear;
+    const paymentStartDate = new Date(paymentYear, paymentMonth, 1, 12, 0, 0);
+    const paymentEndDate = new Date(paymentYear, paymentMonth + 1, 0, 12, 0, 0);
+    const formattedPaymentStartDate = paymentStartDate.toISOString().split("T")[0];
+    const formattedPaymentEndDate = paymentEndDate.toISOString().split("T")[0];
+
+    console.log(`Payment period: ${formattedPaymentStartDate} to ${formattedPaymentEndDate}`);
+
+    // Fetch payments for the client within the payment period
+    const clientId = result.rows[0].clientid;
+    const paymentsQuery = `
+      SELECT 
+        paykey,
+        fileupload AS date,
+        amount
+      FROM 
+        payment_m3
+      WHERE 
+        clientid = $1
+        AND fileupload BETWEEN $2 AND $3
+    `;
+    const paymentsResult = await query(paymentsQuery, [clientId, formattedPaymentStartDate, formattedPaymentEndDate]);
+    const payments = paymentsResult.rows.map((row) => ({
+      paykey: row.paykey,
+      date: row.date,
+      amount: Number.parseFloat(row.amount || 0),
+    }));
+
+    console.log(`Fetched ${payments.length} payments for client ${clientId} between ${formattedPaymentStartDate} and ${formattedPaymentEndDate}`);
 
     // Group data for frontend
     const statementData = {
       statement_key: result.rows[0].statement_key,
       groupid: result.rows[0].groupid,
       generation_date: result.rows[0].generation_date,
+      opening_balance: Number.parseFloat(result.rows[0].opening_balance || 0),
       company_name: result.rows[0].companyname,
       client: {
         id: result.rows[0].clientid,
@@ -1800,22 +1958,23 @@ app.get("/api/statement/:statementId", verifyToken, async (req, res) => {
           task: row.invoice_task,
           invoice_num: row.invoice_num,
         })),
-    }
+      payments: payments, // Add payments to the response
+    };
 
-    console.log(`Fetched statement ${statementId} with ${statementData.invoices.length} invoices`)
+    console.log(`Fetched statement ${statementId} with opening balance R${statementData.opening_balance}, ${statementData.invoices.length} invoices, and ${statementData.payments.length} payments`);
     res.json({
       success: true,
       data: statementData,
-    })
+    });
   } catch (error) {
-    console.error(`Error fetching statement ${statementId}:`, error)
+    console.error(`Error fetching statement ${statementId}:`, error);
     res.status(500).json({
       success: false,
       message: error.message,
       stack: process.env.NODE_ENV === "production" ? null : error.stack,
-    })
+    });
   }
-})
+});
 // Schedule the statement generation to run on the 2nd day of each month at 1:00 AM
 cron.schedule("0 1 1 * *", async () => {
   console.log("Running scheduled statement generation task")
@@ -1981,87 +2140,283 @@ app.get("/api/employee/:id", async (req, res) => {
     if (client) client.release();
   }
 });
-app.get("/api/employee-deductions/:employeeId", async (req, res) => {
-  const { employeeId } = req.params;
-  const { month, year } = req.query;
-  
-  console.log(`Route /api/employee-deductions/${employeeId} was accessed with month=${month}, year=${year}`);
-  
-  if (!month || !year) {
-    return res.status(400).json({ error: "Month and year are required query parameters" });
-  }
-  
+app.post("/api/save-wage-data", async (req, res) => {
+  const { employeeId, month, year, totalEarnings, totalDeductions, netPay } = req.body;
+
+  console.log(`Route POST /api/save-wage-data accessed for employee ${employeeId}`);
+  console.log("Wage data:", { employeeId, month, year, totalEarnings, totalDeductions, netPay });
+
   let client;
   try {
     client = await pool.connect();
-    
-    // Convert month name to month number (1-based)
-    const monthNames = [
-      "January", "February", "March", "April", "May", "June",
-      "July", "August", "September", "October", "November", "December"
-    ];
-    const monthIndex = monthNames.indexOf(month) + 1;
-    
-    if (monthIndex === 0) {
-      return res.status(400).json({ error: "Invalid month name" });
-    }
-    
-    // Query to get deductions data for the employee for the specified month and year
-    const query = `
-      SELECT 
-        deduction_income_tax, 
-        deduction_other_deductions, 
-        deduction_uif,
-        deduction_bonus, 
-        deduction_savings, 
-        deduction_loan, 
-        deduction_damage,
-        total_deductions
-      FROM 
-        wages
-      WHERE 
-        employeeid = $1 
-        AND EXTRACT(MONTH FROM employee_date) = $2
-        AND EXTRACT(YEAR FROM employee_date) = $3
-      ORDER BY 
-        employee_date DESC
-      LIMIT 1
+    await client.query("BEGIN");
+
+    // Use the getLastDayOfMonth function to get the correct last day
+    const lastDay = getLastDayOfMonth(parseInt(year), parseInt(month) - 1);
+    const normalizedDate = lastDay.toISOString(); // Last day of the month
+
+    // Check if employee exists
+    const employeeQuery = `
+      SELECT *
+      FROM m5_employee
+      WHERE userid = $1
     `;
-    
-    const result = await client.query(query, [employeeId, monthIndex, year]);
-    
-    if (result.rows.length === 0) {
-      // If no data found, return default values instead of 404
-      return res.json({
-        deduction_income_tax: 0,
-        deduction_other_deductions: 0,
-        deduction_uif: 0,
-        deduction_bonus: 0,
-        deduction_savings: 0,
-        deduction_loan: 0,
-        deduction_damage: 0,
-        total_deductions: 0
-      });
+    const employeeResult = await client.query(employeeQuery, [employeeId]);
+
+    if (employeeResult.rows.length === 0) {
+      await client.query("ROLLBACK");
+      console.log(`Employee with ID ${employeeId} not found`);
+      return res.status(404).json({ error: "Employee not found" });
     }
-    
-    res.json(result.rows[0]);
+
+    // Insert or update wage record
+    const insertQuery = `
+      INSERT INTO wages (
+        employeeid,
+        total_earnings,
+        total_deductions,
+        net_pay,
+        employee_date
+      ) VALUES ($1, $2, $3, $4, $5)
+      ON CONFLICT ON CONSTRAINT unique_wage_per_employee_month_year
+      DO UPDATE SET
+        total_earnings = EXCLUDED.total_earnings,
+        total_deductions = EXCLUDED.total_deductions,
+        net_pay = EXCLUDED.net_pay
+      RETURNING wageskey
+    `;
+    const earnings = Number(Number(totalEarnings).toFixed(2));
+    const deductions = Number(Number(totalDeductions).toFixed(2));
+    const net = Number(Number(netPay).toFixed(2));
+    const params = [employeeId, earnings, deductions, net, normalizedDate];
+
+    console.log(`Inserting/updating wage record for employee ${employeeId}`);
+    const result = await client.query(insertQuery, params);
+
+    await client.query("COMMIT");
+
+    res.status(200).json({
+      success: true,
+      message: "Wage data saved successfully",
+      wagesKey: result.rows[0].wageskey,
+    });
   } catch (error) {
-    console.error(`Error fetching deductions data for employee ID ${employeeId}:`, error);
-    // Return default values on error instead of error status
-    return res.json({
-      deduction_income_tax: 1500,
-      deduction_other_deductions: 300,
-      deduction_uif: 200,
-      deduction_bonus: 0,
-      deduction_savings: 0,
-      deduction_loan: 0,
-      deduction_damage: 0,
-      total_deductions: 2000
+    if (client) await client.query("ROLLBACK");
+    console.error(`Error saving wage data for employee ${employeeId}:`, error);
+    res.status(500).json({
+      success: false,
+      error: "Failed to save wage data",
+      message: error.message,
     });
   } finally {
     if (client) client.release();
   }
 });
+app.get("/api/check-wage-slip", async (req, res) => {
+  try {
+    const { employeeId, month, year } = req.query;
+
+    console.log(`Checking for existing wage slip: employeeId=${employeeId}, month=${month}, year=${year}`);
+
+    if (!employeeId || !month || !year) {
+      console.log("Missing required parameters in check-wage-slip request");
+      return res.status(400).json({ error: "Missing required parameters" });
+    }
+
+    // Normalize the date to the last day of the month
+    const targetDate = new Date(Number.parseInt(year), Number.parseInt(month), 0);
+
+    // Query the database to check if a wage slip already exists
+    const query = `
+      SELECT w.*, e.deduction_date 
+      FROM public.wages w
+      JOIN public.m5_employee e ON w.employeeid = e.userid
+      WHERE w.employeeid = $1 
+        AND w.employee_date = $2
+      ORDER BY w.wageskey
+      LIMIT 1
+    `;
+
+    console.log(`Executing query with params: employeeId=${employeeId}, month=${month}, year=${year}`);
+    const result = await pool.query(query, [employeeId, targetDate]);
+
+    if (result.rows.length > 0) {
+      const wageSlip = result.rows[0];
+      console.log(`Found existing wage slip with ID ${wageSlip.wageskey}`);
+
+      let useHistoricalValues = false;
+      if (wageSlip.deduction_date) {
+        const deductionDate = new Date(wageSlip.deduction_date);
+        useHistoricalValues = targetDate < deductionDate;
+        console.log(
+          `Target date: ${targetDate.toISOString()}, Deduction date: ${deductionDate.toISOString()}, Use historical values: ${useHistoricalValues}`
+        );
+      }
+
+      return res.json({
+        exists: true,
+        wageSlip,
+        useHistoricalValues,
+      });
+    } else {
+      console.log(`No existing wage slip found for employeeId=${employeeId}, month=${month}, year=${year}`);
+      return res.json({ exists: false });
+    }
+  } catch (error) {
+    console.error("Error checking existing wage slip:", error);
+    res.status(500).json({ error: "Failed to check existing wage slip" });
+  }
+});
+
+async function saveDeductionHistory(pool, employeeId) {
+  const client = await pool.connect();
+  try {
+    await client.query("BEGIN");
+
+    // During transition period: Get current deduction values from m5_employee
+    const currentValues = await client.query(
+      `SELECT 
+        income_tax_rate,
+        deduction_income_tax,
+        deduction_other_deductions,
+        deduction_uif,
+        deduction_bonus,
+        deduction_savings,
+        deduction_loan,
+        deduction_damage
+      FROM m5_employee
+      WHERE userid = $1`,
+      [employeeId]
+    );
+
+    if (currentValues.rows.length === 0) {
+      await client.query("ROLLBACK");
+      return false;
+    }
+
+    const deductions = currentValues.rows[0];
+    const today = new Date().toISOString().split("T")[0];
+
+    // Insert current values into history table
+    await client.query(
+      `INSERT INTO employee_deduction_history (
+        employeeid,
+        effective_date,
+        income_tax_rate,
+        deduction_income_tax,
+        deduction_other_deductions,
+        deduction_uif,
+        deduction_bonus,
+        deduction_savings,
+        deduction_loan,
+        deduction_damage
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)`,
+      [
+        employeeId,
+        today,
+        deductions.income_tax_rate,
+        deductions.deduction_income_tax,
+        deductions.deduction_other_deductions,
+        deductions.deduction_uif,
+        deductions.deduction_bonus,
+        deductions.deduction_savings,
+        deductions.deduction_loan,
+        deductions.deduction_damage
+      ]
+    );
+
+    // Update deduction_date in employee record (for backward compatibility)
+    await client.query(
+      `UPDATE m5_employee
+      SET deduction_date = $1
+      WHERE userid = $2`,
+      [today, employeeId]
+    );
+
+    await client.query("COMMIT");
+    return true;
+  } catch (error) {
+    await client.query("ROLLBACK");
+    console.error(`Error saving deduction history for employee ${employeeId}:`, error);
+    throw error;
+  } finally {
+    client.release();
+  }
+}
+
+
+//Function to get the appropriate deduction values for a specific date
+async function getDeductionsForDate(pool, employeeId, targetDate) {
+  const client = await pool.connect();
+  try {
+    const targetDateObj = typeof targetDate === "string" ? new Date(targetDate) : targetDate;
+    
+    const year = targetDateObj.getFullYear();
+    const month = targetDateObj.getMonth();
+    
+    // Create date for last day of the month (month + 1, day 0 gives last day of current month)
+    const lastDayOfMonth = new Date(year, month + 1, 0);
+    const formattedTargetDate = lastDayOfMonth.toISOString().split("T")[0];
+
+    console.log(`Finding deductions for employee ${employeeId} for month ${month + 1}/${year}`);
+    console.log(`Using last day of month: ${formattedTargetDate} for deduction lookup`);
+
+    // First check if employee exists
+    const employeeCheck = await client.query(
+      `SELECT userid FROM m5_employee WHERE userid = $1`,
+      [employeeId]
+    );
+
+    if (employeeCheck.rows.length === 0) {
+      return null;
+    }
+
+    // Get the deduction history record with effective_date closest to but not after the LAST day of the month
+    const historicalValues = await client.query(
+      `SELECT 
+        income_tax_rate,
+        deduction_income_tax,
+        deduction_other_deductions,
+        deduction_uif,
+        deduction_bonus,
+        deduction_savings,
+        deduction_loan,
+        deduction_damage,
+        effective_date
+      FROM employee_deduction_history
+      WHERE employeeid = $1
+        AND effective_date::date <= $2::date
+      ORDER BY effective_date DESC
+      LIMIT 1`,
+      [employeeId, formattedTargetDate]
+    );
+
+    if (historicalValues.rows.length > 0) {
+      const effectiveDate = new Date(historicalValues.rows[0].effective_date);
+      console.log(`Found deduction record with effective date ${effectiveDate.toISOString().split("T")[0]} for employee ${employeeId}`);
+      return historicalValues.rows[0];
+    }
+
+    // If no historical values found, return default values
+    console.log(`No historical deduction values found for employee ${employeeId} for date ${formattedTargetDate}, returning defaults`);
+    return {
+      income_tax_rate: 0,
+      deduction_income_tax: 0,
+      deduction_other_deductions: 0,
+      deduction_uif: 0,
+      deduction_bonus: 0,
+      deduction_savings: 0,
+      deduction_loan: 0,
+      deduction_damage: 0
+    };
+  } catch (error) {
+    console.error(`Error getting deductions for employee ${employeeId} for date ${targetDate}:`, error);
+    throw error;
+  } finally {
+    client.release();
+  }
+}
+
 app.get("/api/admin/company-list", verifyToken, async (req, res) => {
   let client
   try {
@@ -2218,61 +2573,9 @@ app.post("/api/company/deactivate", verifyToken, async (req, res) => {
   }
 })
 
-// Reactivate a company and all its users
-app.post("/api/company/reactivate", verifyToken, async (req, res) => {
-  const { company_reg_num } = req.body;
-
-  if (!company_reg_num) {
-    return res.status(400).json({ error: "Company registration number is required" });
-  }
-
-  if (req.user.roleid !== 7) {
-    return res.status(403).json({ message: "You don't have permission to reactivate companies" });
-  }
-
-  const client = await pool.connect();
-
-  try {
-    await client.query("BEGIN");
-
-    const companyAdminResult = await client.query(
-      "UPDATE usertable SET status = 'active' WHERE company_reg_num = $1 AND roleid = 1 RETURNING *",
-      [company_reg_num]
-    );
-
-    if (companyAdminResult.rows.length === 0) {
-      await client.query("ROLLBACK");
-      return res.status(404).json({ message: "Company not found" });
-    }
-
-    await client.query(
-      "UPDATE usertable SET status = 'active' WHERE company_reg_num = $1",
-      [company_reg_num]
-    );
-
-    await client.query(
-      "UPDATE m5_employee SET status = TRUE WHERE company_reg_num = $1",
-      [company_reg_num]
-    );
-
-    await client.query("COMMIT");
-
-    res.json({
-      message: "Company and all associated users have been reactivated",
-      company: companyAdminResult.rows[0].companyname,
-    });
-  } catch (err) {
-    await client.query("ROLLBACK");
-    console.error("Error reactivating company:", err);
-    res.status(500).json({ error: "Failed to reactivate company" });
-  } finally {
-    client.release(); // Always release the client
-  }
-});
-
 // ------------------------------------------Module 0 Ends here---------------------------------- //
 
-/ ------------------------------------------Module 5 Starts here---------------------------------- //  
+// ------------------------------------------Module 5 Starts here---------------------------------- //  
 
 // ---- Employee Management Routes ---- //
 
@@ -3719,9 +4022,8 @@ app.put("/api/subcontractors/:id/toggle-status", verifyToken, async (req, res) =
 
 // Import additional modules needed for server2.js functionality
 // import multer from "multer"
-import { uploadInstructionToS3} from "./utils/s3-config.js"
-import expensesRoutes from "./routes/expenses.js"
 
+import expensesRoutes from "./routes/expenses.js"
 import documentsRoutes from "./routes/Documents.js"
 // Set up multer for file uploads
 const uploadsDir = path.join(__dirname, "uploads")
@@ -4660,32 +4962,7 @@ app.put("/instructions/:instructionId/status", async (req, res) => {
   }
 })
 
-// app.get("/rate", async (req, res) => {
-//   const { startingPoint, destination } = req.query
-//   console.log(`Route /rate was accessed with startingPoint=${startingPoint} and destination=${destination}`)
 
-//   if (!startingPoint || !destination) {
-//     return res.status(400).json({ error: "Starting point and destination are required" })
-//   }
-
-//   try {
-//     const result = await pool.query("SELECT rate FROM m5_driver_rate WHERE startingpoint = $1 AND destination = $2", [
-//       startingPoint,
-//       destination,
-//     ])
-
-//     if (result.rows.length === 0) {
-//       return res.status(404).json({ error: "Rate not found for the given starting point and destination" })
-//     }
-
-//     console.log("Rate found:", result.rows[0])
-
-//     res.status(200).json({ rate: result.rows[0].rate })
-//   } catch (err) {
-//     console.error("Error fetching rate:", err)
-//     res.status(500).send("Server Error")
-//   }
-// })
 
 // Update the employees/drivers endpoint to only fetch drivers with roleid = 5
 app.get("/employees/drivers", async (req, res) => {
@@ -4956,15 +5233,16 @@ SELECT
       WHEN e.documentfrom = 'Controller' THEN 
         (SELECT CONCAT(name, ' ', surname) FROM m5_employee WHERE roleid = 2 LIMIT 1)
       WHEN e.documentfrom = 'Manager' THEN 
-        (SELECT CONCAT(name, ' ', surname) FROM usertable WHERE roleid = 1 LIMIT 1)
-      WHEN e.driverid IS NOT NULL THEN CONCAT(emp.name, ' ', emp.surname)
+        (SELECT CONCAT(name, ' ', surname) FROM usertable WHERE userid = e.driverid)
+      WHEN e.documentfrom = 'Driver' AND e.driverid IS NOT NULL THEN 
+        CONCAT(emp.name, ' ', emp.surname)
       ELSE NULL
     END,
     e.documentfrom
   ) AS documentfrom_display
 FROM expenses_m2 e
 JOIN m5_trucks t ON e.truckid = t.m5truckskey
-LEFT JOIN m5_employee emp ON e.driverid = emp.userid
+LEFT JOIN m5_employee emp ON e.driverid = emp.userid AND e.documentfrom = 'Driver'
 WHERE e.truckid = $1
   AND (e.type ILIKE 'fuel' OR e.type ILIKE 'diesel' OR e.type ILIKE 'petrol')
 ORDER BY e.slipuploaddate DESC;
@@ -5096,26 +5374,7 @@ app.get("/client-instructions-details/:clientId", async (req, res) => {
   }
 })
 
-// app.get("/containers/numbers", async (req, res) => {
-//   console.log("Route /containers/numbers was accessed")
 
-//   try {
-//     const result = await pool.query("SELECT containernum FROM container ORDER BY containernum")
-
-//     console.log("Container numbers found:", result.rows)
-
-//     if (result.rows.length === 0) {
-//       console.log("No container numbers found in the container table")
-//     } else {
-//       console.log(`Found ${result.rows.length} container numbers`)
-//     }
-
-//     res.status(200).json(result.rows.map((row) => row.containernum))
-//   } catch (err) {
-//     console.error("Error fetching container numbers:", err)
-//     res.status(500).send("Server Error")
-//   }
-// })
 app.get("/api/container-details/:containerNum", async (req, res) => {
   const { containerNum } = req.params;
   console.log(`Route /api/container-details/${containerNum} was accessed`);
@@ -6165,178 +6424,185 @@ app.get("/api/debug/wages/:employeeId", async (req, res) => {
 });
 
 app.get("/api/employee-deductions/:employeeId", async (req, res) => {
-  const { employeeId } = req.params;
-  const { month, year } = req.query;
-  
-  console.log(`Route /api/employee-deductions/${employeeId} was accessed with month=${month}, year=${year}`);
-  
+  const { employeeId } = req.params
+  const { month, year } = req.query
+
+  console.log(`Route /api/employee-deductions/${employeeId} was accessed with month=${month}, year=${year}`)
+
   if (!month || !year) {
-    return res.status(400).json({ error: "Month and year are required query parameters" });
+    return res.status(400).json({ error: "Month and year are required query parameters" })
   }
+
+  let client
+  try {
+    client = await pool.connect()
+
+    // Convert month name to month number (0-based)
+    const monthNames = [
+      "January",
+      "February",
+      "March",
+      "April",
+      "May",
+      "June",
+      "July",
+      "August",
+      "September",
+      "October",
+      "November",
+      "December",
+    ]
+    const monthIndex = monthNames.indexOf(month)
+
+    if (monthIndex === -1) {
+      return res.status(400).json({ error: "Invalid month name" })
+    }
+
+    // Create a date object for the middle of the specified month
+    const targetDate = new Date(Number.parseInt(year), monthIndex, 15)
+    console.log(`Target date for deductions: ${targetDate.toISOString()}`)
+
+    // Use the function to get the appropriate deductions for this date
+    const deductions = await getDeductionsForDate(pool, employeeId, targetDate)
+
+    if (!deductions) {
+      return res.status(404).json({ error: "Employee not found" })
+    }
+
+    console.log(`Retrieved deductions for employee ${employeeId} for ${month} ${year}:`, deductions)
+    res.json(deductions)
+  } catch (error) {
+    console.error(`Error fetching deductions data for employee ID ${employeeId}:`, error)
+    // Return default values on error
+    return res.json({
+      deduction_income_tax: 0,
+      deduction_other_deductions: 0,
+      deduction_uif: 0,
+      deduction_bonus: 0,
+      deduction_savings: 0,
+      deduction_loan: 0,
+      deduction_damage: 0,
+      income_tax_rate: 0,
+    })
+  } finally {
+    if (client) client.release()
+  }
+})
+
+app.put("/api/employee-deductions/:employeeId", async (req, res) => {
+  const { employeeId } = req.params;
+  const deductionData = req.body;
+  
+  console.log(`Route PUT /api/employee-deductions/${employeeId} was accessed`);
+  console.log("Deduction data:", deductionData);
   
   let client;
   try {
     client = await pool.connect();
-    console.log(`Connected to database for employee deductions query`);
     
-    // Convert month name to month number (1-based)
-    const monthNames = [
-      "January", "February", "March", "April", "May", "June",
-      "July", "August", "September", "October", "November", "December"
-    ];
-    const monthIndex = monthNames.indexOf(month) + 1;
+    // Start transaction
+    await client.query('BEGIN');
     
-    if (monthIndex === 0) {
-      return res.status(400).json({ error: "Invalid month name" });
+    // First check if employee exists
+    const employeeCheck = await client.query(
+      `SELECT userid FROM m5_employee WHERE userid = $1`,
+      [employeeId]
+    );
+
+    if (employeeCheck.rows.length === 0) {
+      await client.query('ROLLBACK');
+      return res.status(404).json({ error: "Employee not found" });
     }
-    
-    console.log(`Looking for deductions for month index: ${monthIndex}, year: ${year}`);
-    
-    // First check if any data exists for this employee
-    const checkQuery = `
-      SELECT COUNT(*) as count
-      FROM wages
-      WHERE employeeid = $1
-    `;
-    
-    const checkResult = await client.query(checkQuery, [employeeId]);
-    const recordCount = parseInt(checkResult.rows[0].count);
-    
-    console.log(`Found ${recordCount} total wage records for employee ID ${employeeId}`);
-    
-    if (recordCount === 0) {
-      console.log(`No wage records found for employee ID ${employeeId}, returning mock data`);
-      // Return mock data since no records exist
-      return res.json({
-        deduction_income_tax: 1500,
-        deduction_other_deductions: 300,
-        deduction_uif: 200,
-        deduction_bonus: 0,
-        deduction_savings: 0,
-        deduction_loan: 0,
-        deduction_damage: 0
-      });
-    }
-    
-    // Query to get deductions data for the employee for the specified month and year
-    const query = `
-      SELECT 
-        deduction_income_tax, 
-        deduction_other_deductions, 
+
+    // Round all decimal values to two decimal places
+    const roundedDeductionData = {
+      income_tax_rate: roundToTwoDecimals(deductionData.income_tax_rate),
+      deduction_income_tax: roundToTwoDecimals(deductionData.deduction_income_tax),
+      deduction_other_deductions: roundToTwoDecimals(deductionData.deduction_other_deductions),
+      deduction_uif: roundToTwoDecimals(deductionData.deduction_uif),
+      deduction_bonus: roundToTwoDecimals(deductionData.deduction_bonus),
+      deduction_savings: roundToTwoDecimals(deductionData.deduction_savings),
+      deduction_loan: roundToTwoDecimals(deductionData.deduction_loan),
+      deduction_damage: roundToTwoDecimals(deductionData.deduction_damage)
+    };
+
+    const today = new Date().toISOString().split("T")[0];
+
+    // Insert new deduction values directly into history table
+    const insertResult = await client.query(
+      `INSERT INTO employee_deduction_history (
+        employeeid,
+        effective_date,
+        income_tax_rate,
+        deduction_income_tax,
+        deduction_other_deductions,
         deduction_uif,
-        deduction_bonus, 
-        deduction_savings, 
-        deduction_loan, 
+        deduction_bonus,
+        deduction_savings,
+        deduction_loan,
         deduction_damage
-      FROM 
-        wages
-      WHERE 
-        employeeid = $1 
-        AND EXTRACT(MONTH FROM employee_date) = $2
-        AND EXTRACT(YEAR FROM employee_date) = $3
-      ORDER BY 
-        employee_date DESC
-      LIMIT 1
-    `;
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+      RETURNING *`,
+      [
+        employeeId,
+        today,
+        roundedDeductionData.income_tax_rate,
+        roundedDeductionData.deduction_income_tax,
+        roundedDeductionData.deduction_other_deductions,
+        roundedDeductionData.deduction_uif,
+        roundedDeductionData.deduction_bonus,
+        roundedDeductionData.deduction_savings,
+        roundedDeductionData.deduction_loan,
+        roundedDeductionData.deduction_damage
+      ]
+    );
     
-    console.log(`Executing query with params: [${employeeId}, ${monthIndex}, ${year}]`);
-    const result = await client.query(query, [employeeId, monthIndex, year]);
+    // For backward compatibility: Update the m5_employee table as well
+    await client.query(
+      `UPDATE m5_employee
+      SET 
+        income_tax_rate = $1,
+        deduction_income_tax = $2,
+        deduction_other_deductions = $3,
+        deduction_uif = $4,
+        deduction_bonus = $5,
+        deduction_savings = $6,
+        deduction_loan = $7,
+        deduction_damage = $8,
+        deduction_date = $9
+      WHERE userid = $10`,
+      [
+        roundedDeductionData.income_tax_rate,
+        roundedDeductionData.deduction_income_tax,
+        roundedDeductionData.deduction_other_deductions,
+        roundedDeductionData.deduction_uif,
+        roundedDeductionData.deduction_bonus,
+        roundedDeductionData.deduction_savings,
+        roundedDeductionData.deduction_loan,
+        roundedDeductionData.deduction_damage,
+        today,
+        employeeId
+      ]
+    );
     
-    console.log(`Query returned ${result.rows.length} rows`);
+    // Commit transaction
+    await client.query('COMMIT');
     
-    if (result.rows.length === 0) {
-      console.log(`No deductions found for employee ${employeeId} in ${month} ${year}, returning mock data`);
-      // Return mock data since no specific records exist for this month/year
-      return res.json({
-        deduction_income_tax: 1500,
-        deduction_other_deductions: 300,
-        deduction_uif: 200,
-        deduction_bonus: 0,
-        deduction_savings: 0,
-        deduction_loan: 0,
-        deduction_damage: 0
-      });
-    }
-    
-    console.log(`Returning deduction data:`, result.rows[0]);
-    res.json(result.rows[0]);
-  } catch (error) {
-    console.error(`Error fetching deductions data for employee ID ${employeeId}:`, error);
-    // Return mock data on error
-    return res.json({
-      deduction_income_tax: 1500,
-      deduction_other_deductions: 300,
-      deduction_uif: 200,
-      deduction_bonus: 0,
-      deduction_savings: 0,
-      deduction_loan: 0,
-      deduction_damage: 0
+    console.log(`Updated deductions for employee ${employeeId}`);
+    res.json({
+      success: true,
+      message: "Deductions updated successfully",
+      data: insertResult.rows[0]
     });
+  } catch (error) {
+    if (client) await client.query('ROLLBACK');
+    console.error(`Error updating deductions for employee ${employeeId}:`, error);
+    res.status(500).json({ error: "Failed to update deductions" });
   } finally {
-    if (client) {
-      console.log(`Releasing database client for employee deductions query`);
-      client.release();
-    }
+    if (client) client.release();
   }
 });
-// Check if build directory exists before trying to serve static files
-// const buildPath = path.join(__dirname, "build")
-// if (fs.existsSync(buildPath)) {
-//   console.log("Build directory found, serving static files from:", buildPath)
-//   // Serve static files from the React app
-//   app.use(express.static(buildPath))
 
-//   // The "catchall" handler: for any request that doesn't
-//   // match one above, send back React's index.html file.
-//   app.get("*", (req, res) => {
-//     res.sendFile(path.join(buildPath, "index.html"))
-//   })
-// } else {
-//   console.log("Build directory not found at:", buildPath)
-//   console.log("Only API endpoints will be available")
-
-//   // Add a fallback route for non-API routes
-//   app.get("*", (req, res) => {
-//     // Check if this is an API request
-//     if (req.url.startsWith("/api/")) {
-//       return res.status(404).json({ error: "API endpoint not found" })
-//     }
-
-//     // For non-API requests, return a simple HTML page
-//     res.send(`
-//       <!DOCTYPE html>
-//       <html>
-//         <head>
-//           <title>Logistics API Server</title>
-//           <style>
-//             body { font-family: Arial, sans-serif; margin: 40px; line-height: 1.6; }
-//             h1 { color: #333; }
-//             .container { max-width: 800px; margin: 0 auto; }
-//             .note { background-color: #f8f9fa; padding: 15px; border-left: 4px solid #007bff; margin-bottom: 20px; }
-//             code { background-color: #f1f1f1; padding: 2px 5px; border-radius: 3px; }
-//           </style>
-//         </head>
-//         <body>
-//           <div class="container">
-//             <h1>Logistics API Server</h1>
-//             <div class="note">
-//               <p>The server is running in API-only mode. The React build directory was not found.</p>
-//               <p>API endpoints are available at <code>/api/...</code></p>
-//             </div>
-//             <p>Available endpoints:</p>
-//             <ul>
-//               <li><code>/api/clients</code> - Get all clients</li>
-//               <li><code>/api/shipment-types</code> - Get all shipment types</li>
-//               <li><code>/api/instructions</code> - Get all instructions</li>
-//               <li><code>/api/client-instruction-stats</code> - Get client instruction statistics</li>
-//               <li><code>/test-connection</code> - Test database connection</li>
-//             </ul>
-//           </div>
-//         </body>
-//       </html>
-//     `)
-//   })
-// }
 app.get("/instructions/driver/:id", async (req, res) => {
   const driverId = req.params.id
 
@@ -6544,7 +6810,7 @@ app.get("/api/driver-instructions/:driverId", async (req, res) => {
       WHERE 
         l.driverid = $1
       GROUP BY 
-        m1.m1key, m1.deadline, m1.pickupdate
+        m1.m1key, m1.deadline, m1.pickupdatye
       ORDER BY 
         COALESCE(m1.deadline, m1.pickupdate) DESC
     `;
@@ -6652,6 +6918,440 @@ app.get("/api/employee/:id", async (req, res) => {
   }
 })
 
+
+// ------------------------------------------Analytics Starts here---------------------------------- //
+
+const monthNames = [
+  "January", "February", "March", "April", "May", "June",
+  "July", "August", "September", "October", "November", "December"
+];
+
+// Fuel per truck (unchanged)
+app.get("/api/fuel-expenses", async (req, res) => {
+  let client;
+  try {
+    const { month, year } = req.query;
+    console.log(`Fetching fuel expenses for month: ${month}, year: ${year}`);
+    client = await pool.connect();
+
+    const query = `
+      SELECT t.truckregnum, 
+             SUM(e.expensecost) as total_cost, 
+             to_char(e.slipuploaddate, 'Month') as month_name,
+             EXTRACT(YEAR FROM e.slipuploaddate) as year
+      FROM expenses_m2 e
+      JOIN m5_trucks t ON e.truckid = t.m5truckskey
+      WHERE e.type = 'fuel'
+      AND TRIM(to_char(e.slipuploaddate, 'Month')) = $1
+      AND EXTRACT(YEAR FROM e.slipuploaddate)::text = $2
+      AND t.is_subcontractor = false
+      GROUP BY t.truckregnum, to_char(e.slipuploaddate, 'Month'), EXTRACT(YEAR FROM e.slipuploaddate)
+      ORDER BY total_cost DESC
+    `;
+    const formattedMonth = month;
+    console.log("Executing query with params:", [formattedMonth, year]);
+    const result = await client.query(query, [formattedMonth, year]);
+    console.log("Raw query result:", result.rows);
+    console.log(`Query returned ${result.rows.length} rows`);
+
+    const totalFuelExpense = result.rows.reduce((sum, row) => sum + parseFloat(row.total_cost), 0);
+    console.log(`Total fuel expense for ${month} ${year} (non-subcontractors): ${totalFuelExpense}`);
+
+    const truckData = result.rows.map(row => ({
+      truckregnum: row.truckregnum,
+      total_cost: parseFloat(row.total_cost),
+      month_name: row.month_name,
+      year: row.year,
+    }));
+
+    const enrichedData = truckData.map(row => {
+      const cost = parseFloat(row.total_cost);
+      const percentage = totalFuelExpense > 0 ? ((cost / totalFuelExpense) * 100).toFixed(2) : 0;
+      return {
+        ...row,
+        percentage: parseFloat(percentage),
+      };
+    });
+
+    console.log("Enriched data with percentages:", enrichedData);
+
+    res.json({
+      success: true,
+      data: enrichedData,
+    });
+  } catch (error) {
+    console.error("Error fetching fuel expenses:", error);
+    res.status(500).json({
+      success: false,
+      message: `Error fetching fuel expenses: ${error.message}`,
+      error: error.message,
+    });
+  } finally {
+    if (client) client.release();
+  }
+});
+
+// Turnover per month
+app.get("/api/turnover-per-month", async (req, res) => {
+  let client;
+  try {
+    const { month, year } = req.query;
+    console.log(`Fetching turnover for month: ${month} ${year}`);
+    client = await pool.connect();
+
+    const query = `
+      SELECT 
+        c.client, 
+        SUM(m.total_cost) as turnover,
+        to_char(i.date, 'Month') as month_name,
+        EXTRACT(YEAR FROM i.date) as year
+      FROM invoice i
+      JOIN m1_controller m ON i.m1key = m.m1key
+      JOIN m5_client c ON i.clientid = c.m5clientkey
+      WHERE TRIM(to_char(i.date, 'Month')) = $1
+      AND EXTRACT(YEAR FROM i.date)::text = $2
+      GROUP BY c.client, to_char(i.date, 'Month'), EXTRACT(YEAR FROM i.date)
+      ORDER BY turnover DESC
+    `;
+    const formattedMonth = month;
+    console.log("Executing query with params:", [formattedMonth, year]);
+    const result = await client.query(query, [formattedMonth, year]);
+    console.log("Raw query result:", result); // Log the full result object
+    console.log(`Query returned ${result.rows ? result.rows.length : 0} rows`);
+
+    if (!result.rows) {
+      console.log(`No rows returned for ${month} ${year}. Check query or data.`);
+      return res.json({
+        success: true,
+        data: [],
+      });
+    }
+
+    const totalTurnover = result.rows.reduce((sum, row) => sum + parseFloat(row.turnover || 0), 0);
+    console.log(`Total turnover for ${month} ${year}: ${totalTurnover}`);
+
+    const enrichedData = result.rows.map(row => {
+      const turnover = parseFloat(row.turnover || 0);
+      const percentage = totalTurnover > 0 ? ((turnover / totalTurnover) * 100).toFixed(2) : 0;
+      return {
+        client: row.client,
+        turnover: turnover,
+        month_name: row.month_name.trim(),
+        year: row.year.toString(),
+        percentage: parseFloat(percentage),
+      };
+    });
+
+    console.log("Enriched data with percentages:", enrichedData);
+
+    res.json({
+      success: true,
+      data: enrichedData,
+    });
+  } catch (error) {
+    console.error("Error fetching turnover per month:", error);
+    res.status(500).json({
+      success: false,
+      message: `Error fetching turnover per month: ${error.message}`,
+      error: error.message,
+    });
+  } finally {
+    if (client) client.release();
+  }
+});
+
+// Age analysis (unchanged, as it doesn't involve turnover)
+app.get("/api/aging-analysis", async (req, res) => {
+  let client;
+  try {
+    const { month, year } = req.query;
+    console.log(`Fetching aging analysis for month: ${month}, year: ${year}`);
+    client = await pool.connect();
+
+    const query = `
+      SELECT c.client, 
+             SUM(a.current) as current_amount,
+             SUM(a."30days") as thirty_days,
+             SUM(a."60days") as sixty_days,
+             SUM(a."90days") as ninety_days,
+             to_char(s.generation_date, 'Month') as month_name,
+             EXTRACT(YEAR FROM s.generation_date) as year
+      FROM aging_analysis a
+      JOIN statements s ON a.aging_key = s.agingid
+      JOIN m5_client c ON a.clientid = c.m5clientkey
+      WHERE TRIM(to_char(s.generation_date, 'Month')) = $1
+      AND EXTRACT(YEAR FROM s.generation_date)::text = $2
+      GROUP BY c.client, to_char(s.generation_date, 'Month'), EXTRACT(YEAR FROM s.generation_date)
+    `;
+    const formattedMonth = month;
+    console.log("Executing query with params:", [formattedMonth, year]);
+    const result = await client.query(query, [formattedMonth, year]);
+    console.log("Raw query result:", result.rows);
+    console.log(`Query returned ${result.rows.length} rows`);
+
+    const enrichedData = result.rows.map(row => ({
+      client: row.client,
+      current: parseFloat(row.current_amount) || 0,
+      thirtyDays: parseFloat(row.thirty_days) || 0,
+      sixtyDays: parseFloat(row.sixty_days) || 0,
+      ninetyDays: parseFloat(row.ninety_days) || 0,
+      month: row.month_name.trim(),
+      year: row.year.toString(),
+    }));
+
+    console.log("Enriched aging analysis data:", enrichedData);
+
+    res.json({
+      success: true,
+      data: enrichedData,
+    });
+  } catch (error) {
+    console.error("Error fetching aging analysis:", error);
+    res.status(500).json({
+      success: false,
+      message: `Error fetching aging analysis: ${error.message}`,
+      error: error.message,
+    });
+  } finally {
+    if (client) client.release();
+  }
+});
+
+// Total turnover vs total diesel cost
+app.get("/api/turnover-vs-diesel-cost", async (req, res) => {
+  let client;
+  try {
+    const { month, year } = req.query;
+    console.log(`Fetching turnover vs diesel cost for month: ${month} ${year}`);
+    client = await pool.connect();
+
+    const turnoverQuery = `
+      SELECT 
+        SUM(m.total_cost) as total_turnover,
+        to_char(i.date, 'Month') as month_name,
+        EXTRACT(YEAR FROM i.date) as year
+      FROM invoice i
+      JOIN m1_controller m ON i.m1key = m.m1key
+      WHERE TRIM(to_char(i.date, 'Month')) = $1
+      AND EXTRACT(YEAR FROM i.date)::text = $2
+      GROUP BY to_char(i.date, 'Month'), EXTRACT(YEAR FROM i.date)
+    `;
+
+    const dieselCostQuery = `
+      SELECT SUM(e.expensecost) as total_diesel_cost,
+             to_char(e.slipuploaddate, 'Month') as month_name,
+             EXTRACT(YEAR FROM e.slipuploaddate) as year
+      FROM expenses_m2 e
+      WHERE e.type = 'Fuel'
+      AND TRIM(to_char(e.slipuploaddate, 'Month')) = $1
+      AND EXTRACT(YEAR FROM e.slipuploaddate)::text = $2
+      GROUP BY to_char(e.slipuploaddate, 'Month'), EXTRACT(YEAR FROM e.slipuploaddate)
+    `;
+
+    const formattedMonth = month;
+    console.log("Executing turnover query with params:", [formattedMonth, year]);
+    const turnoverResult = await client.query(turnoverQuery, [formattedMonth, year]);
+    console.log("Turnover query result:", turnoverResult); // Log the full result object
+
+    console.log("Executing diesel cost query with params:", [formattedMonth, year]);
+    const dieselCostResult = await client.query(dieselCostQuery, [formattedMonth, year]);
+    console.log("Diesel cost query result:", dieselCostResult); // Log the full result object
+
+    const totalTurnover = turnoverResult.rows && turnoverResult.rows[0] ? parseFloat(turnoverResult.rows[0].total_turnover) || 0 : 0;
+    const totalDieselCost = dieselCostResult.rows && dieselCostResult.rows[0] ? parseFloat(dieselCostResult.rows[0].total_diesel_cost) || 0 : 0;
+
+    console.log(`Total turnover for ${month} ${year}: ${totalTurnover}`);
+    console.log(`Total diesel cost for ${month} ${year}: ${totalDieselCost}`);
+
+    const data = [{
+      month: month,
+      year: year,
+      totalTurnover: totalTurnover,
+      dieselCost: totalDieselCost,
+    }];
+
+    console.log("Prepared data:", data);
+
+    res.json({
+      success: true,
+      data: data,
+    });
+  } catch (error) {
+    console.error("Error fetching turnover vs diesel cost:", error);
+    res.status(500).json({
+      success: false,
+      message: `Error fetching turnover vs diesel cost: ${error.message}`,
+      error: error.message,
+    });
+  } finally {
+    if (client) client.release();
+  }
+});
+
+// Income vs Expenses (updated to include income)
+app.get("/api/all-expenses", async (req, res) => {
+  let client;
+  try {
+    const { month, year } = req.query;
+    console.log(`Fetching income and expenses for month: ${month}, year: ${year}`);
+    client = await pool.connect();
+
+    const expensesQuery = `
+      SELECT e.truckid,
+             e.type as expensedesc,
+             e.expensecost as total_cost,
+             to_char(e.slipuploaddate, 'Month') as month_name,
+             EXTRACT(YEAR FROM e.slipuploaddate) as year
+      FROM expenses_m2 e
+      WHERE TRIM(to_char(e.slipuploaddate, 'Month')) = $1
+      AND EXTRACT(YEAR FROM e.slipuploaddate)::text = $2
+    `;
+
+    const incomeQuery = `
+      SELECT 
+        SUM(m.total_cost) as total_income,
+        to_char(i.date, 'Month') as month_name,
+        EXTRACT(YEAR FROM i.date) as year
+      FROM invoice i
+      JOIN m1_controller m ON i.m1key = m.m1key
+      WHERE TRIM(to_char(i.date, 'Month')) = $1
+      AND EXTRACT(YEAR FROM i.date)::text = $2
+      GROUP BY to_char(i.date, 'Month'), EXTRACT(YEAR FROM i.date)
+    `;
+
+    const formattedMonth = month;
+    console.log("Executing expenses query with params:", [formattedMonth, year]);
+    const expensesResult = await client.query(expensesQuery, [formattedMonth, year]);
+    console.log("Expenses query result:", expensesResult); // Log the full result object
+
+    console.log("Executing income query with params:", [formattedMonth, year]);
+    const incomeResult = await client.query(incomeQuery, [formattedMonth, year]);
+    console.log("Income query result:", incomeResult); // Log the full result object
+
+    if (!expensesResult.rows || !incomeResult.rows) {
+      console.log(`No rows returned for ${month} ${year}. Check query or data.`);
+      return res.json({
+        success: true,
+        data: {
+          expenses: [],
+          income: 0,
+          month: month,
+          year: year,
+        },
+      });
+    }
+
+    const expensesData = expensesResult.rows.map(row => ({
+      truckid: row.truckid,
+      expensedesc: row.expensedesc,
+      total_cost: parseFloat(row.total_cost),
+      month_name: row.month_name.trim(),
+      year: row.year.toString(),
+    }));
+
+    const totalIncome = parseFloat(incomeResult.rows[0]?.total_income) || 0;
+
+    console.log("Processed expenses data:", expensesData);
+    console.log(`Total income for ${month} ${year}: ${totalIncome}`);
+
+    res.json({
+      success: true,
+      data: {
+        expenses: expensesData,
+        income: totalIncome,
+        month: month,
+        year: year,
+      },
+    });
+  } catch (error) {
+    console.error("Error fetching income and expenses:", error);
+    res.status(500).json({
+      success: false,
+      message: `Error fetching income and expenses: ${error.message}`,
+      error: error.message,
+    });
+  } finally {
+    if (client) client.release();
+  }
+});
+
+// Turnover per truck
+app.get("/api/turnover-per-truck", async (req, res) => {
+  let client;
+  try {
+    const { month, year } = req.query;
+    console.log(`Fetching turnover per truck for month: ${month} ${year}`);
+    client = await pool.connect();
+
+    const query = `
+      SELECT 
+        l.truckregnumber, 
+        SUM(m.total_cost) as total_turnover, 
+        to_char(i.date, 'Month') as month_name,
+        EXTRACT(YEAR FROM i.date) as year
+      FROM invoice i
+      JOIN m1_controller m ON i.m1key = m.m1key
+      JOIN legs_m2 l ON i.m1key = l.m1key
+      JOIN m5_trucks t ON l.truckregnumber = t.truckregnum AND t.is_subcontractor = false
+      WHERE TRIM(to_char(i.date, 'Month')) = $1
+      AND EXTRACT(YEAR FROM i.date)::text = $2
+      GROUP BY l.truckregnumber, to_char(i.date, 'Month'), EXTRACT(YEAR FROM i.date)
+      ORDER BY total_turnover DESC
+    `;
+    const formattedMonth = month;
+    console.log("Executing query with params:", [formattedMonth, year]);
+    const result = await client.query(query, [formattedMonth, year]);
+    console.log("Raw query result:", result); // Log the full result object
+    console.log(`Query returned ${result.rows ? result.rows.length : 0} rows`);
+
+    if (!result.rows) {
+      console.log(`No rows returned for ${month} ${year}. Check query or data.`);
+      return res.json({
+        success: true,
+        data: [],
+      });
+    }
+
+    const totalTurnover = result.rows.reduce((sum, row) => sum + parseFloat(row.total_turnover || 0), 0);
+    console.log(`Total turnover for ${month} ${year}: ${totalTurnover}`);
+
+    const truckData = result.rows.map(row => ({
+      truckregnumber: row.truckregnumber,
+      total_turnover: parseFloat(row.total_turnover || 0),
+      month_name: row.month_name.trim(),
+      year: row.year.toString(),
+    }));
+
+    const enrichedData = truckData.map(row => {
+      const turnover = parseFloat(row.total_turnover || 0);
+      const percentage = totalTurnover > 0 ? ((turnover / totalTurnover) * 100).toFixed(2) : 0;
+      return {
+        ...row,
+        percentage: parseFloat(percentage),
+      };
+    });
+
+    console.log("Enriched data with percentages:", enrichedData);
+
+    res.json({
+      success: true,
+      data: enrichedData,
+    });
+  } catch (error) {
+    console.error("Error fetching turnover per truck:", error);
+    res.status(500).json({
+      success: false,
+      message: `Error fetching turnover per truck: ${error.message}`,
+      error: error.message,
+    });
+  } finally {
+    if (client) client.release();
+  }
+});
+
+// ------------------------------------------Analytics Ends here---------------------------------- //
+
+
 app.listen(PORT, async () => {
   try {
     // Test database connection on startup
@@ -6664,6 +7364,7 @@ app.listen(PORT, async () => {
     } else {
       console.error(`❌ Failed to fix invoice sequence: ${seqFixResult.error}`);
     }
+    await generateMonthlyStatements()
     if (dbTest.success) {
       console.log(`✅ Database Connected Successfully at ${dbTest.time}`)
     } else {

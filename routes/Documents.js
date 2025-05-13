@@ -58,7 +58,7 @@ router.get("/:instructionId", async (req, res) => {
 const getClientName = async (clientId) => {
   try {
     const result = await pool.query(
-      "SELECT companyname FROM m5_client WHERE m5clientkey = $1",
+      "SELECT client as companyname FROM m5_client WHERE m5clientkey = $1",
       [clientId]
     )
     if (result.rows.length > 0) {
@@ -174,8 +174,8 @@ router.post("/upload", uploadInstructionToS3.single("file"), async (req, res) =>
   
       // Insert document into the database with the URL
       const result = await pool.query(
-        `INSERT INTO documents (name, type, leg_number, s3key, upload_date, m1key, client, url) 
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8) 
+        `INSERT INTO documents (name, type, leg_number, s3key, upload_date, m1key, client) 
+         VALUES ($1, $2, $3, $4, $5, $6, $7) 
          RETURNING document_id`,
         [
           documentName,
@@ -184,8 +184,8 @@ router.post("/upload", uploadInstructionToS3.single("file"), async (req, res) =>
           s3Key,
           uploadDate,
           instructionId,
-          clientId,
-          fileUrl // Store the URL in the database
+          clientId
+       
         ]
       )
   
@@ -230,9 +230,9 @@ router.get("/client/:clientId", async (req, res) => {
 
     // For each document, generate a fresh signed URL if the stored URL is expired or missing
     const documentsWithUrls = result.rows.map((doc) => {
-      // Generate a fresh pre-signed URL or use the stored one
-      const url = doc.url || getSignedUrl(doc.s3key, 86400) // 24 hour expiry
-
+      // Always generate a fresh pre-signed URL
+      const url = getSignedUrl(doc.s3key, 86400) // 24 hour expiry
+    
       return {
         id: doc.document_id.toString(),
         name: doc.name,

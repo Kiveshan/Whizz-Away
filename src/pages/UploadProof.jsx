@@ -1,80 +1,138 @@
 "use client"
 
-import { useState } from "react"
-import { useNavigate, useParams } from "react-router-dom"
-import "../css/ClientPayments.css"
-import { source } from "framer-motion/client"
+import { useState, useEffect } from "react";
+import { useNavigate, useLocation, useParams } from "react-router-dom";
+import axios from "axios";
+import "../css/ClientPayments.css";
 
 const UploadProof = () => {
-  const navigate = useNavigate()
-  const { companyName, balance } = useParams()
-  const [dragActive, setDragActive] = useState(false)
-  const [selectedFile, setSelectedFile] = useState(null)
-  const [amount, setAmount] = useState("")
-  const [isSubmitting, setIsSubmitting] = useState(false)
+  const navigate = useNavigate();
+  const { clientName, paymentId } = useParams(); // Extract paymentId from URL
+  const location = useLocation();
+  const { clientId } = location.state || {};
 
-  const handleDrag = (e) => {
-    e.preventDefault()
-    e.stopPropagation()
-    if (e.type === "dragenter" || e.type === "dragover") {
-      setDragActive(true)
-    } else if (e.type === "dragleave") {
-      setDragActive(false)
+  const [amount, setAmount] = useState("");
+  const [paymentDate, setPaymentDate] = useState("");
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isLoading, setIsLoading] = useState(false); // For loading payment details
+  const [error, setError] = useState(null);
+  const [isViewMode, setIsViewMode] = useState(false); // Track if in view mode
+
+  // Retrieve roleId from localStorage
+  const roleId = JSON.parse(localStorage.getItem('user'))?.roleid;
+
+  // Fetch payment details if in view mode (paymentId exists)
+  useEffect(() => {
+    if (paymentId) {
+      setIsViewMode(true);
+      const fetchPaymentDetails = async () => {
+        try {
+          setIsLoading(true);
+          const response = await axios.get(
+            `http://localhost:5000/api/payments/${clientId}/${paymentId}`,
+            {
+              headers: {
+                "Authorization": `Bearer ${localStorage.getItem("token")}`,
+              },
+            }
+          );
+
+          if (response.data.success) {
+            const { amount, fileupload } = response.data.data;
+            setAmount(amount.toString());
+            setPaymentDate(fileupload.split("T")[0]); // Format date for input (YYYY-MM-DD)
+          } else {
+            throw new Error(response.data.message || "Failed to fetch payment details");
+          }
+        } catch (err) {
+          console.error("Error fetching payment details:", err.response || err);
+          setError(err.message || "An error occurred while fetching payment details");
+        } finally {
+          setIsLoading(false);
+        }
+      };
+
+      fetchPaymentDetails();
     }
-  }
+  }, [paymentId, clientId]);
 
-  const handleDrop = (e) => {
-    e.preventDefault()
-    e.stopPropagation()
-    setDragActive(false)
+  const handleSubmit = async (e) => {
+    e.preventDefault();
 
-    if (e.dataTransfer.files && e.dataTransfer.files[0]) {
-      setSelectedFile(e.dataTransfer.files[0])
-    }
-  }
-
-  const handleFileSelect = (e) => {
-    if (e.target.files && e.target.files[0]) {
-      setSelectedFile(e.target.files[0])
-    }
-  }
-
-  const handleSubmit = (e) => {
-    e.preventDefault()
-
-    if (!selectedFile || !amount) {
-      alert("Please select a file and enter an amount")
-      return
+    if (!clientId) {
+      setError("No client selected");
+      return;
     }
 
-    setIsSubmitting(true)
+    if (!amount || isNaN(amount)) {
+      setError("Please enter a valid amount");
+      return;
+    }
 
-    // In a real app, you would upload the file to a server here
-    // For this example, we'll just simulate a successful upload
-    setTimeout(() => {
-      // Navigate back to the client payments list with the uploaded proof info
-      navigate("/client-payments", {
-        state: {
-          uploadedProof: {
-            company: decodeURIComponent(companyName),
-            proof: selectedFile,
-            amount: amount,
-            sourceDocDetails: "Source Doc Details",
-            date: new Date().toLocaleDateString("en-ZA", {
-              year: "numeric",
-              month: "long",
-              day: "numeric",
-            }), // Format: 1 January 2022   (en-ZA locale)      
-          },
+    if (!paymentDate) {
+      setError("Please select a payment date");
+      return;
+    }
+
+    try {
+      setIsSubmitting(true);
+      const response = await axios.post(
+        `http://localhost:5000/api/payments/${clientId}/upload`,
+        {
+          amount: parseFloat(amount),
+          fileupload: paymentDate,
         },
-      })
-      setIsSubmitting(false)
-    }, 1000) // Simulate a 1-second upload
-  }
+        {
+          headers: {
+            "Authorization": `Bearer ${localStorage.getItem("token")}`,
+            "Content-Type": "application/json",
+          },
+        }
+      );
+
+      if (response.data.success) {
+        // Redirect based on roleId
+        if (roleId == 1) {
+          navigate("/client-payments", {
+            state: { clientId, clientName },
+          });
+        } else if (roleId == 4) {
+          navigate("/DirectorClientPaymentList", {
+            state: { clientId, clientName },
+          });
+        } else {
+          // Default fallback navigation
+          navigate("/client-payments", {
+            state: { clientId, clientName },
+          });
+        }
+      } else {
+        throw new Error(response.data.message || "Failed to upload payment details");
+      }
+    } catch (err) {
+      console.error("Error uploading payment details:", err.response || err);
+      setError(err.message || "An error occurred while uploading the payment details");
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
 
   const handleBack = () => {
-    navigate("/client-payments")
-  }
+    if (roleId == 1) {
+      navigate("/client-payments", {
+        state: { clientId, clientName },
+      });
+    } else if (roleId == 4) {
+      navigate("/DirectorClientPaymentList", {
+        state: { clientId, clientName },
+      });
+    } else {
+      // Default fallback navigation
+      navigate("/client-payments", {
+        state: { clientId, clientName },
+      });
+    }
+  };
 
   return (
     <div className="upload-container">
@@ -84,34 +142,51 @@ const UploadProof = () => {
         </button>
       </div>
 
-      <div className="upload-content" style={{marginTop:"-120px"}}>
+      <div className="upload-content" style={{ marginTop: "20px" }}>
         <div className="upload-form">
-          <div className="amount-field">
-            <label>Amount Paid</label>
-            <input type="text" value={amount} onChange={(e) => setAmount(e.target.value)} placeholder="R0000" />
-          </div>
-          <div className="amount-field">
-            <label>Payment Date</label>
-            <input type="Date"  />
-          </div>
-          <div className="amount-field">
-            <label>Source Doc Details</label>
-            <input type="text" placeholder="Bank Statement" />
-          </div>
-
-
-          <button className="submit-button" onClick={handleSubmit} disabled={ !amount || isSubmitting}>
-            {isSubmitting ? "Submitting..." : "Submit Proof of Payment"}
-          </button>
+          <h2>{isViewMode ? `View Payment for ${clientName}` : `Upload Payment for ${clientName}`}</h2>
+          {error && <div className="error-message" style={{ color: "red", marginBottom: "10px" }}>{error}</div>}
+          {isLoading && <div>Loading payment details...</div>}
+          {!isLoading && (
+            <>
+              <div className="amount-field">
+                <label>Amount Paid</label>
+                <input
+                  type="number"
+                  value={amount}
+                  onChange={(e) => setAmount(e.target.value)}
+                  placeholder="0"
+                  readOnly={isViewMode} // Make read-only in view mode
+                  disabled={isViewMode} // Also disable to prevent interaction
+                />
+              </div>
+              <div className="amount-field">
+                <label>Payment Date</label>
+                <input
+                  type="date"
+                  value={paymentDate}
+                  onChange={(e) => setPaymentDate(e.target.value)}
+                  readOnly={isViewMode} // Make read-only in view mode
+                  disabled={isViewMode} // Also disable to prevent interaction
+                />
+              </div>
+              {!isViewMode && ( // Hide submit button in view mode
+                <button
+                  className="submit-button"
+                  onClick={handleSubmit}
+                  disabled={!amount || !paymentDate || isSubmitting}
+                >
+                  {isSubmitting ? "Submitting..." : "Submit Payment Details"}
+                </button>
+              )}
+            </>
+          )}
         </div>
 
-        <div className="info-box">
-        
-        </div>
+        <div className="info-box"></div>
       </div>
     </div>
-  )
-}
+  );
+};
 
-export default UploadProof
-
+export default UploadProof;
