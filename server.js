@@ -2317,6 +2317,18 @@ const upload1 = multer({
 // );
 
 //updated 8 May
+
+app.get("/api/employees/check-email-existence", verifyToken, async (req, res) => {
+  try {
+    const { email } = req.query;  // Get email from query params
+    // Query to check if email already exists
+    const result = await pool.query("SELECT 1 FROM m5_employee WHERE email = $1", [email]);
+    res.json({ exists: result.rows.length > 0 });
+  } catch (err) {
+    console.error("Error checking email existence:", err);
+    res.status(500).json({ error: "Failed to check email existence" });
+  }
+});
 app.post(
   "/api/employees",
   verifyToken,
@@ -2962,9 +2974,10 @@ app.get('/api/employees/:id', verifyToken, async (req, res) => {
 
     // Fetch the deduction history for this employee from employee_deduction_history.
     const historyResult = await client.query(
-      'SELECT * FROM employee_deduction_history WHERE employeeid = $1 ORDER BY effective_date DESC',
+      'SELECT * FROM employee_deduction_history WHERE employeeid = $1 ORDER BY effective_date DESC, history_id DESC',
       [id]
     );
+    
     // Add the fetched history as a new property on the employee object.
     employee.deductionHistory = historyResult.rows;
 
@@ -3056,7 +3069,19 @@ app.post('/api/employees/delete-doc', verifyToken, async (req, res) => {
 // ---- Client Management Routes ---- //
 
 // Get all clients
-app.get("/api/clients", verifyToken, async (req, res) => {
+app.get("/api/m5Clients/check-email-existence", verifyToken, async (req, res) => {
+  try {
+    const { email } = req.query;  // Get email from query params
+    // Query to check if email already exists
+    const result = await pool.query("SELECT 1 FROM m5_client WHERE email = $1", [email]);
+    res.json({ exists: result.rows.length > 0 });
+  } catch (err) {
+    console.error("Error checking email existence:", err);
+    res.status(500).json({ error: "Failed to check email existence" });
+  }
+});
+
+app.get("/api/m5Clients", verifyToken, async (req, res) => {
   try {
     // Simple query using pool.query directly
     const query = "SELECT * FROM m5_client ORDER BY m5clientkey";
@@ -3070,7 +3095,7 @@ app.get("/api/clients", verifyToken, async (req, res) => {
 });
 
 // Get client by ID
-app.get("/api/clients/:id", verifyToken, async (req, res) => {
+app.get("/api/m5Clients/:id", verifyToken, async (req, res) => {
   try {
     const { id } = req.params;
 
@@ -3089,8 +3114,10 @@ app.get("/api/clients/:id", verifyToken, async (req, res) => {
   }
 });
 
+
+
 // Create new client
-app.post("/api/clients", verifyToken, async (req, res) => {
+app.post("/api/m5Clients", verifyToken, async (req, res) => {
   try {
     // Renamed the variable to avoid conflict with the database client
     const {
@@ -3135,7 +3162,7 @@ app.post("/api/clients", verifyToken, async (req, res) => {
 });
 
 // Update client
-app.put("/api/clients/:id", verifyToken, async (req, res) => {
+app.put("/api/m5Clients/:id", verifyToken, async (req, res) => {
   try {
     const { id } = req.params;
     const {
@@ -3179,7 +3206,7 @@ app.put("/api/clients/:id", verifyToken, async (req, res) => {
 });
 
 // Delete client
-app.delete("/api/clients/:id", verifyToken, async (req, res) => {
+app.delete("/api/m5Clients/:id", verifyToken, async (req, res) => {
   try {
     const { id } = req.params;
 
@@ -3198,7 +3225,7 @@ app.delete("/api/clients/:id", verifyToken, async (req, res) => {
     console.error(`Error deleting client ${req.params.id}:`, err);
     res.status(500).json({ error: "Failed to delete client" });
   }
-});
+}); 
 
 // ---- Truck Management Routes ---- //
 
