@@ -5543,41 +5543,39 @@ app.get("/api/turnover-per-month", async (req, res) => {
   let client;
   try {
     const { month, year } = req.query;
-    console.log(`Fetching turnover for statement month: ${month} ${year}`);
+    console.log(`Fetching turnover for month: ${month} ${year}`);
     client = await pool.connect();
 
     const query = `
-      SELECT c.client, 
-             SUM(a.current) as turnover,
-             to_char(s.generation_date, 'Month') as statement_month,
-             EXTRACT(YEAR FROM s.generation_date) as statement_year
-      FROM aging_analysis a
-      JOIN statements s ON a.aging_key = s.agingid
-      JOIN m5_client c ON a.clientid = c.m5clientkey
-      WHERE TRIM(to_char(s.generation_date, 'Month')) = $1
-      AND EXTRACT(YEAR FROM s.generation_date)::text = $2
-      GROUP BY c.client, to_char(s.generation_date, 'Month'), EXTRACT(YEAR FROM s.generation_date)
+      SELECT 
+        c.client, 
+        SUM(m.total_cost) as turnover,
+        to_char(i.date, 'Month') as month_name,
+        EXTRACT(YEAR FROM i.date) as year
+      FROM invoice i
+      JOIN m1_controller m ON i.m1key = m.m1key
+      JOIN m5_client c ON i.clientid = c.m5clientkey
+      WHERE TRIM(to_char(i.date, 'Month')) = $1
+      AND EXTRACT(YEAR FROM i.date)::text = $2
+      GROUP BY c.client, to_char(i.date, 'Month'), EXTRACT(YEAR FROM i.date)
       ORDER BY turnover DESC
     `;
     const formattedMonth = month;
     console.log("Executing query with params:", [formattedMonth, year]);
     const result = await client.query(query, [formattedMonth, year]);
-    console.log("Raw query result:", result.rows);
-    console.log(`Query returned ${result.rows.length} rows`);
+    console.log("Raw query result:", result); // Log the full result object
+    console.log(`Query returned ${result.rows ? result.rows.length : 0} rows`);
 
-    if (result.rows.length === 0) {
-      console.log(`No data found for ${month} ${year}. Check if statements or aging_analysis data exists.`);
+    if (!result.rows) {
+      console.log(`No rows returned for ${month} ${year}. Check query or data.`);
+      return res.json({
+        success: true,
+        data: [],
+      });
     }
 
     const totalTurnover = result.rows.reduce((sum, row) => sum + parseFloat(row.turnover || 0), 0);
-
-    // Calculate the previous month for display
-    const date = new Date(year, monthNames.indexOf(month), 1);
-    date.setMonth(date.getMonth() - 1);
-    const displayMonth = monthNames[date.getMonth()];
-    const displayYear = date.getFullYear().toString();
-
-    console.log(`Total turnover for ${displayMonth} ${displayYear} (from ${month} ${year} statement): ${totalTurnover}`);
+    console.log(`Total turnover for ${month} ${year}: ${totalTurnover}`);
 
     const enrichedData = result.rows.map(row => {
       const turnover = parseFloat(row.turnover || 0);
@@ -5585,8 +5583,8 @@ app.get("/api/turnover-per-month", async (req, res) => {
       return {
         client: row.client,
         turnover: turnover,
-        month_name: displayMonth, // Display as previous month
-        year: displayYear,
+        month_name: row.month_name.trim(),
+        year: row.year.toString(),
         percentage: parseFloat(percentage),
       };
     });
@@ -5609,7 +5607,7 @@ app.get("/api/turnover-per-month", async (req, res) => {
   }
 });
 
-// Age analysis (no change needed since it should reflect the statement month)
+// Age analysis (unchanged, as it doesn't involve turnover)
 app.get("/api/aging-analysis", async (req, res) => {
   let client;
   try {
@@ -5671,18 +5669,19 @@ app.get("/api/turnover-vs-diesel-cost", async (req, res) => {
   let client;
   try {
     const { month, year } = req.query;
-    console.log(`Fetching turnover vs diesel cost for statement month: ${month} ${year}`);
+    console.log(`Fetching turnover vs diesel cost for month: ${month} ${year}`);
     client = await pool.connect();
 
     const turnoverQuery = `
-      SELECT SUM(a.current) as total_turnover,
-             to_char(s.generation_date, 'Month') as statement_month,
-             EXTRACT(YEAR FROM s.generation_date) as statement_year
-      FROM aging_analysis a
-      JOIN statements s ON a.aging_key = s.agingid
-      WHERE TRIM(to_char(s.generation_date, 'Month')) = $1
-      AND EXTRACT(YEAR FROM s.generation_date)::text = $2
-      GROUP BY to_char(s.generation_date, 'Month'), EXTRACT(YEAR FROM s.generation_date)
+      SELECT 
+        SUM(m.total_cost) as total_turnover,
+        to_char(i.date, 'Month') as month_name,
+        EXTRACT(YEAR FROM i.date) as year
+      FROM invoice i
+      JOIN m1_controller m ON i.m1key = m.m1key
+      WHERE TRIM(to_char(i.date, 'Month')) = $1
+      AND EXTRACT(YEAR FROM i.date)::text = $2
+      GROUP BY to_char(i.date, 'Month'), EXTRACT(YEAR FROM i.date)
     `;
 
     const dieselCostQuery = `
@@ -5699,27 +5698,21 @@ app.get("/api/turnover-vs-diesel-cost", async (req, res) => {
     const formattedMonth = month;
     console.log("Executing turnover query with params:", [formattedMonth, year]);
     const turnoverResult = await client.query(turnoverQuery, [formattedMonth, year]);
-    console.log("Turnover query result:", turnoverResult.rows);
+    console.log("Turnover query result:", turnoverResult); // Log the full result object
 
     console.log("Executing diesel cost query with params:", [formattedMonth, year]);
     const dieselCostResult = await client.query(dieselCostQuery, [formattedMonth, year]);
-    console.log("Diesel cost query result:", dieselCostResult.rows);
+    console.log("Diesel cost query result:", dieselCostResult); // Log the full result object
 
-    const totalTurnover = parseFloat(turnoverResult.rows[0]?.total_turnover) || 0;
-    const totalDieselCost = parseFloat(dieselCostResult.rows[0]?.total_diesel_cost) || 0;
+    const totalTurnover = turnoverResult.rows && turnoverResult.rows[0] ? parseFloat(turnoverResult.rows[0].total_turnover) || 0 : 0;
+    const totalDieselCost = dieselCostResult.rows && dieselCostResult.rows[0] ? parseFloat(dieselCostResult.rows[0].total_diesel_cost) || 0 : 0;
 
-    // Calculate the previous month for display
-    const date = new Date(year, monthNames.indexOf(month), 1);
-    date.setMonth(date.getMonth() - 1);
-    const displayMonth = monthNames[date.getMonth()];
-    const displayYear = date.getFullYear().toString();
-
-    console.log(`Total turnover for ${displayMonth} ${displayYear} (from ${month} ${year} statement): ${totalTurnover}`);
+    console.log(`Total turnover for ${month} ${year}: ${totalTurnover}`);
     console.log(`Total diesel cost for ${month} ${year}: ${totalDieselCost}`);
 
     const data = [{
-      month: displayMonth, // Display as previous month
-      year: displayYear,
+      month: month,
+      year: year,
       totalTurnover: totalTurnover,
       dieselCost: totalDieselCost,
     }];
@@ -5742,15 +5735,15 @@ app.get("/api/turnover-vs-diesel-cost", async (req, res) => {
   }
 });
 
-// Income vs Expenses (unchanged)
+// Income vs Expenses (updated to include income)
 app.get("/api/all-expenses", async (req, res) => {
   let client;
   try {
     const { month, year } = req.query;
-    console.log(`Fetching all expenses for month: ${month}, year: ${year}`);
+    console.log(`Fetching income and expenses for month: ${month}, year: ${year}`);
     client = await pool.connect();
 
-    const query = `
+    const expensesQuery = `
       SELECT e.truckid,
              e.type as expensedesc,
              e.expensecost as total_cost,
@@ -5760,13 +5753,42 @@ app.get("/api/all-expenses", async (req, res) => {
       WHERE TRIM(to_char(e.slipuploaddate, 'Month')) = $1
       AND EXTRACT(YEAR FROM e.slipuploaddate)::text = $2
     `;
-    const formattedMonth = month;
-    console.log("Executing query with params:", [formattedMonth, year]);
-    const result = await client.query(query, [formattedMonth, year]);
-    console.log("Raw query result:", result.rows);
-    console.log(`Query returned ${result.rows.length} rows`);
 
-    const expensesData = result.rows.map(row => ({
+    const incomeQuery = `
+      SELECT 
+        SUM(m.total_cost) as total_income,
+        to_char(i.date, 'Month') as month_name,
+        EXTRACT(YEAR FROM i.date) as year
+      FROM invoice i
+      JOIN m1_controller m ON i.m1key = m.m1key
+      WHERE TRIM(to_char(i.date, 'Month')) = $1
+      AND EXTRACT(YEAR FROM i.date)::text = $2
+      GROUP BY to_char(i.date, 'Month'), EXTRACT(YEAR FROM i.date)
+    `;
+
+    const formattedMonth = month;
+    console.log("Executing expenses query with params:", [formattedMonth, year]);
+    const expensesResult = await client.query(expensesQuery, [formattedMonth, year]);
+    console.log("Expenses query result:", expensesResult); // Log the full result object
+
+    console.log("Executing income query with params:", [formattedMonth, year]);
+    const incomeResult = await client.query(incomeQuery, [formattedMonth, year]);
+    console.log("Income query result:", incomeResult); // Log the full result object
+
+    if (!expensesResult.rows || !incomeResult.rows) {
+      console.log(`No rows returned for ${month} ${year}. Check query or data.`);
+      return res.json({
+        success: true,
+        data: {
+          expenses: [],
+          income: 0,
+          month: month,
+          year: year,
+        },
+      });
+    }
+
+    const expensesData = expensesResult.rows.map(row => ({
       truckid: row.truckid,
       expensedesc: row.expensedesc,
       total_cost: parseFloat(row.total_cost),
@@ -5774,17 +5796,25 @@ app.get("/api/all-expenses", async (req, res) => {
       year: row.year.toString(),
     }));
 
+    const totalIncome = parseFloat(incomeResult.rows[0]?.total_income) || 0;
+
     console.log("Processed expenses data:", expensesData);
+    console.log(`Total income for ${month} ${year}: ${totalIncome}`);
 
     res.json({
       success: true,
-      data: expensesData,
+      data: {
+        expenses: expensesData,
+        income: totalIncome,
+        month: month,
+        year: year,
+      },
     });
   } catch (error) {
-    console.error("Error fetching all expenses:", error);
+    console.error("Error fetching income and expenses:", error);
     res.status(500).json({
       success: false,
-      message: `Error fetching all expenses: ${error.message}`,
+      message: `Error fetching income and expenses: ${error.message}`,
       error: error.message,
     });
   } finally {
@@ -5797,16 +5827,17 @@ app.get("/api/turnover-per-truck", async (req, res) => {
   let client;
   try {
     const { month, year } = req.query;
-    console.log(`Fetching turnover per truck for statement month: ${month} ${year}`);
+    console.log(`Fetching turnover per truck for month: ${month} ${year}`);
     client = await pool.connect();
 
     const query = `
       SELECT 
         l.truckregnumber, 
-        SUM(l.driverrate) as total_turnover, 
-        to_char(i.date, 'Month') as statement_month,
-        EXTRACT(YEAR FROM i.date) as statement_year
+        SUM(m.total_cost) as total_turnover, 
+        to_char(i.date, 'Month') as month_name,
+        EXTRACT(YEAR FROM i.date) as year
       FROM invoice i
+      JOIN m1_controller m ON i.m1key = m.m1key
       JOIN legs_m2 l ON i.m1key = l.m1key
       JOIN m5_trucks t ON l.truckregnumber = t.truckregnum AND t.is_subcontractor = false
       WHERE TRIM(to_char(i.date, 'Month')) = $1
@@ -5817,24 +5848,25 @@ app.get("/api/turnover-per-truck", async (req, res) => {
     const formattedMonth = month;
     console.log("Executing query with params:", [formattedMonth, year]);
     const result = await client.query(query, [formattedMonth, year]);
-    console.log("Raw query result:", result.rows);
-    console.log(`Query returned ${result.rows.length} rows`);
+    console.log("Raw query result:", result); // Log the full result object
+    console.log(`Query returned ${result.rows ? result.rows.length : 0} rows`);
+
+    if (!result.rows) {
+      console.log(`No rows returned for ${month} ${year}. Check query or data.`);
+      return res.json({
+        success: true,
+        data: [],
+      });
+    }
 
     const totalTurnover = result.rows.reduce((sum, row) => sum + parseFloat(row.total_turnover || 0), 0);
-
-    // Calculate the previous month for display
-    const date = new Date(year, monthNames.indexOf(month), 1);
-    date.setMonth(date.getMonth() - 1);
-    const displayMonth = monthNames[date.getMonth()];
-    const displayYear = date.getFullYear().toString();
-
-    console.log(`Total turnover for ${displayMonth} ${displayYear} (from ${month} ${year} statement): ${totalTurnover}`);
+    console.log(`Total turnover for ${month} ${year}: ${totalTurnover}`);
 
     const truckData = result.rows.map(row => ({
       truckregnumber: row.truckregnumber,
       total_turnover: parseFloat(row.total_turnover || 0),
-      month_name: displayMonth, // Display as previous month
-      year: displayYear,
+      month_name: row.month_name.trim(),
+      year: row.year.toString(),
     }));
 
     const enrichedData = truckData.map(row => {

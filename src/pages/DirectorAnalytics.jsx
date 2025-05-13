@@ -79,9 +79,7 @@ export default function DirectorAnalytics() {
         params: { month, year }
       });
       console.log("API response:", response.data);
-
       if (response.data.success) {
-        console.log("Turnover data received:", response.data.data);
         const turnoverData = response.data.data.map(item => {
           const turnover = parseFloat(item.turnover);
           console.log(`Client ${item.client}: Turnover=${turnover}, Percentage=${item.percentage}%`);
@@ -89,7 +87,7 @@ export default function DirectorAnalytics() {
             client: item.client,
             turnover: turnover,
             month: item.month_name.trim(),
-            year: item.year.toString(),
+            year: item.year,
             percentage: item.percentage
           };
         });
@@ -99,8 +97,8 @@ export default function DirectorAnalytics() {
         throw new Error(response.data.message || "Failed to fetch data");
       }
     } catch (err) {
-      console.error("Error fetching turnover data:", err.response ? err.response.data : err.message);
-      setError(`Failed to fetch turnover data: ${err.message}`);
+      console.error("Error fetching turnover data:", err);
+      setError(err.message);
       return [];
     } finally {
       setIsLoading(false);
@@ -144,47 +142,30 @@ export default function DirectorAnalytics() {
   };
 
   // Function to fetch turnover vs diesel cost data from the database
-  const fetchTurnoverVsDieselCostData = async (month, year) => {
+  const fetchTurnoverVsDieselCost = async (month, year) => {
     setIsLoading(true);
     setError(null);
     try {
-      console.log(`Fetching turnover vs diesel cost data for month: ${month}, year: ${year}`);
+      console.log(`Fetching turnover vs diesel cost for month: ${month}, year: ${year}`);
       const response = await axios.get('http://localhost:5000/api/turnover-vs-diesel-cost', {
         params: { month, year }
       });
       console.log("API response:", response.data);
-
       if (response.data.success) {
-        console.log("Turnover vs diesel cost data received:", response.data.data);
-        const data = response.data.data.map(item => {
-          const totalTurnover = parseFloat(String(item.totalTurnover).replace(/[^0-9.-]+/g, "")) || 0;
-          const dieselCost = parseFloat(String(item.dieselCost).replace(/[^0-9.-]+/g, "")) || 0;
-          const total = totalTurnover + dieselCost;
-          console.log(`Parsed values - totalTurnover: ${totalTurnover}, dieselCost: ${dieselCost}, total: ${total}`);
-
-          const turnoverPercentage = total > 0 ? ((totalTurnover / total) * 100).toFixed(2) : 0;
-          const dieselCostPercentage = total > 0 ? ((dieselCost / total) * 100).toFixed(2) : 0;
-
-          const result = {
-            month: item.month,
-            year: item.year,
-            totalTurnover: totalTurnover,
-            dieselCost: dieselCost,
-            turnoverPercentage: parseFloat(turnoverPercentage),
-            dieselCostPercentage: parseFloat(dieselCostPercentage),
-            percentage: undefined,
-          };
-          console.log("Processed item:", result);
-          return result;
-        });
-        console.log("Processed turnover vs diesel cost data with percentages:", data);
+        const data = response.data.data.map(item => ({
+          month: item.month,
+          year: item.year,
+          totalTurnover: parseFloat(item.totalTurnover),
+          dieselCost: parseFloat(item.dieselCost),
+        }));
+        console.log("Processed turnover vs diesel cost data:", data);
         return data;
       } else {
         throw new Error(response.data.message || "Failed to fetch data");
       }
     } catch (err) {
-      console.error("Error fetching turnover vs diesel cost data:", err.response ? err.response.data : err.message);
-      setError(`Failed to fetch turnover vs diesel cost data: ${err.message}`);
+      console.error("Error fetching turnover vs diesel cost:", err);
+      setError(err.message);
       return [];
     } finally {
       setIsLoading(false);
@@ -192,84 +173,55 @@ export default function DirectorAnalytics() {
   };
 
   // Function to fetch income vs expense data using all expenses from expenses_m2
-  const fetchIncomeVsExpenseData = async (month, year) => {
+  const fetchIncomeVsExpenses = async (month, year) => {
     setIsLoading(true);
     setError(null);
     try {
-      console.log(`Fetching income vs expense data for month: ${month}, year: ${year}`);
-
-      // Fetch turnover (income)
-      console.log("Fetching turnover data...");
-      const turnoverResponse = await axios.get('http://localhost:5000/api/turnover-per-month', {
+      console.log(`Fetching income vs expenses for month: ${month}, year: ${year}`);
+      const response = await axios.get('http://localhost:5000/api/all-expenses', {
         params: { month, year }
       });
-      if (!turnoverResponse.data.success) {
-        throw new Error(turnoverResponse.data.message || "Failed to fetch turnover data");
+      console.log("API response:", response.data);
+      if (response.data.success) {
+        const data = {
+          expenses: response.data.data.expenses,
+          income: parseFloat(response.data.data.income),
+          month: response.data.data.month,
+          year: response.data.data.year,
+        };
+        console.log("Processed income vs expenses data:", data);
+        return data;
+      } else {
+        throw new Error(response.data.message || "Failed to fetch data");
       }
-      const turnoverData = turnoverResponse.data.data;
-      const totalTurnover = turnoverData.reduce((sum, item) => sum + (parseFloat(item.turnover) || 0), 0);
-      console.log(`Total turnover (income): ${totalTurnover}`);
-
-      // Fetch all expenses from expenses_m2
-      console.log("Fetching all expenses...");
-      const expensesResponse = await axios.get('http://localhost:5000/api/all-expenses', {
-        params: { month, year }
-      });
-      if (!expensesResponse.data.success) {
-        throw new Error(expensesResponse.data.message || "Failed to fetch expenses");
-      }
-      const expensesData = expensesResponse.data.data;
-      const totalExpenses = expensesData.reduce((sum, item) => sum + (parseFloat(item.total_cost) || 0), 0);
-      console.log(`Total expenses: ${totalExpenses}`);
-
-      // Calculate percentages
-      const total = totalTurnover + totalExpenses;
-      const incomePercentage = total > 0 ? ((totalTurnover / total) * 100).toFixed(2) : 0;
-      const expensePercentage = total > 0 ? ((totalExpenses / total) * 100).toFixed(2) : 0;
-      console.log(`Total: ${total}, Income Percentage: ${incomePercentage}%, Expense Percentage: ${expensePercentage}%`);
-
-      const result = [{
-        month,
-        year,
-        income: totalTurnover,
-        expense: totalExpenses,
-        incomePercentage: parseFloat(incomePercentage),
-        expensePercentage: parseFloat(expensePercentage),
-      }];
-      console.log("Processed income vs expense data:", result);
-
-      return result;
     } catch (err) {
-      console.error("Error fetching income vs expense data:", err.response ? err.response.data : err.message);
-      setError(`Failed to fetch income vs expense data: ${err.message}`);
-      return [];
+      console.error("Error fetching income vs expenses:", err);
+      setError(err.message);
+      return { expenses: [], income: 0 };
     } finally {
       setIsLoading(false);
     }
   };
 
   // Function to fetch turnover per truck from the database
-  const fetchTurnoverPerTruckData = async (month, year) => {
+  const fetchTurnoverPerTruck = async (month, year) => {
     setIsLoading(true);
     setError(null);
     try {
-      console.log(`Fetching turnover per truck data for month: ${month}, year: ${year}`);
+      console.log(`Fetching turnover per truck for month: ${month}, year: ${year}`);
       const response = await axios.get('http://localhost:5000/api/turnover-per-truck', {
         params: { month, year }
       });
       console.log("API response:", response.data);
-
       if (response.data.success) {
-        console.log("Turnover per truck data received:", response.data.data);
         const turnoverData = response.data.data.map(item => {
           const turnover = parseFloat(item.total_turnover);
-          console.log(`Truck ${item.truckregnumber}: Turnover=${turnover}, Percentage=${item.percentage}%`);
           return {
-            truckId: item.truckregnumber,
-            turnover: turnover,
+            truckregnumber: item.truckregnumber,
+            total_turnover: turnover,
             month: item.month_name.trim(),
-            year: item.year.toString(),
-            percentage: item.percentage,
+            year: item.year,
+            percentage: item.percentage
           };
         });
         console.log("Processed turnover per truck data:", turnoverData);
@@ -278,8 +230,8 @@ export default function DirectorAnalytics() {
         throw new Error(response.data.message || "Failed to fetch data");
       }
     } catch (err) {
-      console.error("Error fetching turnover per truck data:", err.response ? err.response.data : err.message);
-      setError(`Failed to fetch turnover per truck data: ${err.message}`);
+      console.error("Error fetching turnover per truck:", err);
+      setError(err.message);
       return [];
     } finally {
       setIsLoading(false);
@@ -338,7 +290,7 @@ export default function DirectorAnalytics() {
           data = await fetchAgingAnalysisData(activeMonth, activeYear);
           break;
         case "turnoverVsDieselCost":
-          data = await fetchTurnoverVsDieselCostData(activeMonth, activeYear);
+          data = await fetchTurnoverVsDieselCost(activeMonth, activeYear);
           break;
         case "subcontractorTurnoverPerMonth":
           data = subcontractorTurnoverPerMonthData.filter(
@@ -356,10 +308,10 @@ export default function DirectorAnalytics() {
           );
           break;
         case "turnoverPerTruck":
-          data = await fetchTurnoverPerTruckData(activeMonth, activeYear);
+          data = await fetchTurnoverPerTruck(activeMonth, activeYear);
           break;
         case "incomeVsExpense":
-          data = await fetchIncomeVsExpenseData(activeMonth, activeYear);
+          data = await fetchIncomeVsExpenses(activeMonth, activeYear);
           break;
         default:
           data = [];
@@ -462,8 +414,8 @@ export default function DirectorAnalytics() {
               <div className="loading-indicator">Loading fuel data...</div>
             ) : error ? (
               <div className="error-message">{error}</div>
-            ) : chartData.length === 0 ? (
-              <div className="no-data-message">No fuel data available for {activeMonth} ${activeYear}</div>
+            ) : !Array.isArray(chartData) || chartData.length === 0 ? (
+              <div className="no-data-message">No fuel data available for {activeMonth} {activeYear}</div>
             ) : (
               <>
                 <ResponsiveContainer width="100%" height={350}>
@@ -513,8 +465,8 @@ export default function DirectorAnalytics() {
               <div className="loading-indicator">Loading turnover data...</div>
             ) : error ? (
               <div className="error-message">{error}</div>
-            ) : chartData.length === 0 ? (
-              <div className="no-data-message">No turnover data available for {activeMonth} ${activeYear}</div>
+            ) : !Array.isArray(chartData) || chartData.length === 0 ? (
+              <div className="no-data-message">No turnover data available for {activeMonth} {activeYear}</div>
             ) : (
               <ResponsiveContainer width="100%" height={350}>
                 <BarChart data={chartData} margin={{ top: 40, right: 30, left: 60, bottom: 40 }}>
@@ -543,8 +495,8 @@ export default function DirectorAnalytics() {
               <div className="loading-indicator">Loading aging analysis data...</div>
             ) : error ? (
               <div className="error-message">{error}</div>
-            ) : chartData.length === 0 ? (
-              <div className="no-data-message">No aging analysis data available for {activeMonth} ${activeYear}</div>
+            ) : !Array.isArray(chartData) || chartData.length === 0 ? (
+              <div className="no-data-message">No aging analysis data available for {activeMonth} {activeYear}</div>
             ) : (
               <>
                 <div className="chart-header">
@@ -613,8 +565,8 @@ export default function DirectorAnalytics() {
       case "subcontractorTurnoverPerMonth":
         return (
           <div className="chart-wrapper">
-            {chartData.length === 0 ? (
-              <div className="no-data-message">No subcontractor turnover data available for {activeMonth} ${activeYear}</div>
+            {!Array.isArray(chartData) || chartData.length === 0 ? (
+              <div className="no-data-message">No subcontractor turnover data available for {activeMonth} {activeYear}</div>
             ) : (
               <ResponsiveContainer width="100%" height={350}>
                 <BarChart data={chartData} margin={{ top: 40, right: 30, left: 60, bottom: 40 }}>
@@ -639,8 +591,8 @@ export default function DirectorAnalytics() {
       case "subcontractorVsTurnover":
         return (
           <div className="chart-wrapper">
-            {chartData.length === 0 ? (
-              <div className="no-data-message">No data available for {activeMonth} ${activeYear}</div>
+            {!Array.isArray(chartData) || chartData.length === 0 ? (
+              <div className="no-data-message">No data available for {activeMonth} {activeYear}</div>
             ) : (
               <>
                 <div className="chart-header">
@@ -686,8 +638,8 @@ export default function DirectorAnalytics() {
       case "wagesPerMonth":
         return (
           <div className="chart-wrapper">
-            {chartData.length === 0 ? (
-              <div className="no-data-message">No wages data available for {activeMonth} ${activeYear}</div>
+            {!Array.isArray(chartData) || chartData.length === 0 ? (
+              <div className="no-data-message">No wages data available for {activeMonth} {activeYear}</div>
             ) : (
               <ResponsiveContainer width="100%" height={350}>
                 <BarChart data={chartData} margin={{ top: 40, right: 30, left: 60, bottom: 40 }}>
@@ -710,82 +662,47 @@ export default function DirectorAnalytics() {
 
       // Turnover vs Diesel cost
       case "turnoverVsDieselCost":
-        const CustomBarLabelForTurnoverVsDiesel = (props) => {
-          const { x, y, width, value, index, dataKey } = props;
-
-          if (value === undefined || value === null) {
-            console.log("CustomBarLabelForTurnoverVsDiesel: Value is undefined or null, skipping label");
-            return null;
-          }
-
-          console.log(`CustomBarLabelForTurnoverVsDiesel - index: ${index}, dataKey: ${dataKey}, chartData:`, chartData);
-          console.log(`CustomBarLabelForTurnoverVsDiesel - chartData[${index}]:`, chartData[index]);
-
-          const turnoverPercentage = chartData[index]?.turnoverPercentage ?? 0;
-          const dieselCostPercentage = chartData[index]?.dieselCostPercentage ?? 0;
-          console.log(`CustomBarLabelForTurnoverVsDiesel - turnoverPercentage: ${turnoverPercentage}, dieselCostPercentage: ${dieselCostPercentage}`);
-
-          const percentage = dataKey === "totalTurnover" ? turnoverPercentage : dieselCostPercentage;
-          console.log(`CustomBarLabelForTurnoverVsDiesel - Selected percentage for ${dataKey}: ${percentage}`);
-
-          const labelText = `R${value.toLocaleString()} (${percentage.toFixed(2)}%)`;
-          console.log(`CustomBarLabelForTurnoverVsDiesel - Rendering label: ${labelText}`);
-
-          return (
-            <text
-              x={x + width / 2}
-              y={y - 10}
-              fill="#000"
-              textAnchor="middle"
-              dominantBaseline="middle"
-              fontSize="12"
-            >
-              {labelText}
-            </text>
-          );
-        };
-
         return (
           <div className="chart-wrapper">
             {isLoading ? (
               <div className="loading-indicator">Loading turnover vs diesel cost data...</div>
             ) : error ? (
               <div className="error-message">{error}</div>
-            ) : chartData.length === 0 ? (
-              <div className="no-data-message">No data available for {activeMonth} ${activeYear}</div>
+            ) : !Array.isArray(chartData) || chartData.length === 0 ? (
+              <div className="no-data-message">No turnover vs diesel cost data available for {activeMonth} {activeYear}</div>
             ) : (
               <>
                 <div className="chart-header">
                   <div className="chart-header-item">
-                    <span className="legend-color" style={{ backgroundColor: "#9C27B0" }}></span>
+                    <span className="legend-color" style={{ backgroundColor: "#4169e1" }}></span>
                     <span>Turnover</span>
                   </div>
                   <div className="chart-header-item">
-                    <span className="legend-color" style={{ backgroundColor: "#E91E63" }}></span>
+                    <span className="legend-color" style={{ backgroundColor: "#ff6347" }}></span>
                     <span>Diesel Cost</span>
                   </div>
                 </div>
                 <ResponsiveContainer width="100%" height={350}>
                   <BarChart data={chartData} margin={{ top: 40, right: 30, left: 60, bottom: 40 }}>
-                    <XAxis dataKey="month" tickFormatter={() => `${activeMonth} ${activeYear}`} />
+                    <XAxis dataKey="month" />
                     <YAxis label={{ value: 'Amount (R)', angle: 0, position: 'top', dy: -20 }} />
                     <Tooltip content={<CustomTooltip />} />
                     <Legend />
                     <Bar
                       dataKey="totalTurnover"
                       name="Turnover (Rands)"
-                      fill="#9C27B0"
+                      fill="#4169e1"
                       radius={[4, 4, 0, 0]}
                     >
-                      <LabelList dataKey="totalTurnover" content={CustomBarLabelForTurnoverVsDiesel} position="top" />
+                      <LabelList dataKey="totalTurnover" content={CustomBarLabelForFuelAndTurnover} position="top" />
                     </Bar>
                     <Bar
                       dataKey="dieselCost"
                       name="Diesel Cost (Rands)"
-                      fill="#E91E63"
+                      fill="#ff6347"
                       radius={[4, 4, 0, 0]}
                     >
-                      <LabelList dataKey="dieselCost" content={CustomBarLabelForTurnoverVsDiesel} position="top" />
+                      <LabelList dataKey="dieselCost" content={CustomBarLabelForFuelAndTurnover} position="top" />
                     </Bar>
                   </BarChart>
                 </ResponsiveContainer>
@@ -802,121 +719,70 @@ export default function DirectorAnalytics() {
               <div className="loading-indicator">Loading turnover per truck data...</div>
             ) : error ? (
               <div className="error-message">{error}</div>
-            ) : chartData.length === 0 ? (
-              <div className="no-data-message">No turnover data available for {activeMonth} ${activeYear}</div>
+            ) : !Array.isArray(chartData) || chartData.length === 0 ? (
+              <div className="no-data-message">No turnover per truck data available for {activeMonth} {activeYear}</div>
             ) : (
-              <>
-                <ResponsiveContainer width="100%" height={350}>
-                  <BarChart data={chartData} margin={{ top: 40, right: 30, left: 60, bottom: 40 }}>
-                    <XAxis dataKey="truckId" />
-                    <YAxis label={{ value: 'Turnover (R)', angle: 0, position: 'top', dy: -20 }} />
-                    <Tooltip content={<CustomTooltip />} />
-                    <Bar
-                      dataKey="turnover"
-                      name="Turnover (Rands)"
-                      radius={[4, 4, 0, 0]}
-                    >
-                      {chartData.map((entry, index) => (
-                        <Cell key={`cell-${index}`} fill={getBarFill(entry)} />
-                      ))}
-                      <LabelList dataKey="turnover" content={CustomBarLabelForFuelAndTurnover} position="top" />
-                    </Bar>
-                  </BarChart>
-                </ResponsiveContainer>
-                <div className="chart-legend">
-                  <div className="legend-item">
-                    <span className="legend-color" style={{ backgroundColor: "#4169e1" }}></span>
-                    <span>Truck Turnover</span>
-                  </div>
-                </div>
-              </>
+              <ResponsiveContainer width="100%" height={350}>
+                <BarChart data={chartData} margin={{ top: 40, right: 30, left: 60, bottom: 40 }}>
+                  <XAxis dataKey="truckregnumber" />
+                  <YAxis label={{ value: 'Turnover (R)', angle: 0, position: 'top', dy: -20 }} />
+                  <Tooltip content={<CustomTooltip />} />
+                  <Bar
+                    dataKey="total_turnover"
+                    name="Turnover (Rands)"
+                    fill="#4169e1"
+                    radius={[4, 4, 0, 0]}
+                  >
+                    <LabelList dataKey="total_turnover" content={CustomBarLabelForFuelAndTurnover} position="top" />
+                  </Bar>
+                </BarChart>
+              </ResponsiveContainer>
             )}
           </div>
         );
 
       // Income vs expense per month
       case "incomeVsExpense":
-        const CustomBarLabelForIncomeVsExpense = (props) => {
-          const { x, y, width, value, index, dataKey } = props;
-
-          if (value === undefined || value === null) {
-            console.log("CustomBarLabelForIncomeVsExpense: Value is undefined or null, skipping label");
-            return null;
-          }
-
-          console.log(`CustomBarLabelForIncomeVsExpense - index: ${index}, dataKey: ${dataKey}, chartData:`, chartData);
-          console.log(`CustomBarLabelForIncomeVsExpense - chartData[${index}]:`, chartData[index]);
-
-          // Fallback: Calculate percentages directly to ensure correctness
-          const income = chartData[index]?.income ?? 0;
-          const expense = chartData[index]?.expense ?? 0;
-          const total = income + expense;
-          const incomePercentage = total > 0 ? ((income / total) * 100).toFixed(2) : 0;
-          const expensePercentage = total > 0 ? ((expense / total) * 100).toFixed(2) : 0;
-          console.log(`CustomBarLabelForIncomeVsExpense - Calculated: incomePercentage: ${incomePercentage}, expensePercentage: ${expensePercentage}`);
-
-          // Use calculated percentages instead of precomputed ones
-          const percentage = dataKey === "income" ? incomePercentage : expensePercentage;
-          console.log(`CustomBarLabelForIncomeVsExpense - Selected percentage for ${dataKey}: ${percentage}`);
-
-          const labelText = `R${value.toLocaleString()} (${percentage}%)`;
-          console.log(`CustomBarLabelForIncomeVsExpense - Rendering label: ${labelText}`);
-
-          return (
-            <text
-              x={x + width / 2}
-              y={y - 10}
-              fill="#000"
-              textAnchor="middle"
-              dominantBaseline="middle"
-              fontSize="12"
-            >
-              {labelText}
-            </text>
-          );
-        };
-
+        const totalExpenses = chartData.expenses ? chartData.expenses.reduce((sum, item) => sum + parseFloat(item.total_cost || 0), 0) : 0;
+        const incomeVsExpenseData = [
+          { name: "Income", value: chartData.income || 0, fill: "#4169e1" },
+          { name: "Expenses", value: totalExpenses, fill: "#ff6347" },
+        ];
         return (
           <div className="chart-wrapper">
             {isLoading ? (
-              <div className="loading-indicator">Loading income vs expense data...</div>
+              <div className="loading-indicator">Loading income vs expenses data...</div>
             ) : error ? (
               <div className="error-message">{error}</div>
-            ) : chartData.length === 0 ? (
-              <div className="no-data-message">No data available for {activeMonth} ${activeYear}</div>
+            ) : (chartData.income === 0 && (!chartData.expenses || chartData.expenses.length === 0)) ? (
+              <div className="no-data-message">No income vs expenses data available for {activeMonth} {activeYear}</div>
             ) : (
               <>
                 <div className="chart-header">
                   <div className="chart-header-item">
-                    <span className="legend-color" style={{ backgroundColor: "#9C27B0" }}></span>
+                    <span className="legend-color" style={{ backgroundColor: "#4169e1" }}></span>
                     <span>Income</span>
                   </div>
                   <div className="chart-header-item">
-                    <span className="legend-color" style={{ backgroundColor: "#E91E63" }}></span>
-                    <span>Expense</span>
+                    <span className="legend-color" style={{ backgroundColor: "#ff6347" }}></span>
+                    <span>Expenses</span>
                   </div>
                 </div>
                 <ResponsiveContainer width="100%" height={350}>
-                  <BarChart data={chartData} margin={{ top: 40, right: 30, left: 60, bottom: 40 }}>
-                    <XAxis dataKey="month" tickFormatter={() => `${activeMonth} ${activeYear}`} />
+                  <BarChart data={incomeVsExpenseData} margin={{ top: 40, right: 30, left: 60, bottom: 40 }}>
+                    <XAxis dataKey="name" />
                     <YAxis label={{ value: 'Amount (R)', angle: 0, position: 'top', dy: -20 }} />
                     <Tooltip content={<CustomTooltip />} />
                     <Legend />
                     <Bar
-                      dataKey="income"
-                      name="Income (Rands)"
-                      fill="#9C27B0"
+                      dataKey="value"
+                      name="Amount (Rands)"
                       radius={[4, 4, 0, 0]}
                     >
-                      <LabelList dataKey="income" content={CustomBarLabelForIncomeVsExpense} position="top" />
-                    </Bar>
-                    <Bar
-                      dataKey="expense"
-                      name="Expense (Rands)"
-                      fill="#E91E63"
-                      radius={[4, 4, 0, 0]}
-                    >
-                      <LabelList dataKey="expense" content={CustomBarLabelForIncomeVsExpense} position="top" />
+                      {incomeVsExpenseData.map((entry, index) => (
+                        <Cell key={`cell-${index}`} fill={entry.fill} />
+                      ))}
+                      <LabelList dataKey="value" content={CustomBarLabelForFuelAndTurnover} position="top" />
                     </Bar>
                   </BarChart>
                 </ResponsiveContainer>
@@ -1026,9 +892,9 @@ export default function DirectorAnalytics() {
 
         <div className="chart-area">
           <h2 className="chart-title">
-            {activeFilter === "turnoverPerMonth" && `Turnover Per Month (Previous Month: ${getPreviousMonth(activeMonth, activeYear)} for ${activeMonth} ${activeYear} Statement)`}
-            {activeFilter === "turnoverVsDieselCost" && `Turnover vs Diesel Cost (Previous Month: ${getPreviousMonth(activeMonth, activeYear)} for ${activeMonth} ${activeYear} Statement)`}
-            {activeFilter === "turnoverPerTruck" && `Turnover Per Truck (Previous Month: ${getPreviousMonth(activeMonth, activeYear)} for ${activeMonth} ${activeYear} Statement)`}
+            {activeFilter === "turnoverPerMonth" && `Turnover Per Month (${activeMonth} ${activeYear})`}
+            {activeFilter === "turnoverVsDieselCost" && `Turnover vs Diesel Cost (${activeMonth} ${activeYear})`}
+            {activeFilter === "turnoverPerTruck" && `Turnover Per Truck (${activeMonth} ${activeYear})`}
             {activeFilter === "agingAnalysis" && `30, 60, 90, Current (${activeMonth} ${activeYear})`}
             {activeFilter === "fuel" && `Fuel Expenses by Truck (${activeMonth} ${activeYear})`}
             {activeFilter === "subcontractorTurnoverPerMonth" && `Subcontractor Turnover Per Month (${activeMonth} ${activeYear})`}
