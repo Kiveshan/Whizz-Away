@@ -1047,6 +1047,175 @@ app.post("/api/admin/user-status", verifyToken, async (req, res) => {
 
 // === INVOICES ROUTES ===
 
+app.use('/uploads', express.static('uploads'))
+
+app.post("/api/payments/:clientId/upload", verifyToken, async (req, res) => {
+  try {
+    if (!pool) {
+      return res.status(503).json({
+        success: false,
+        message: "Database connection not established. Please try again later.",
+      })
+    }
+
+    const { clientId } = req.params
+    const { amount, fileupload } = req.body
+
+    if (!amount || isNaN(amount)) {
+      return res.status(400).json({
+        success: false,
+        message: "Amount is required and must be a number",
+      })
+    }
+
+    if (!fileupload) {
+      return res.status(400).json({
+        success: false,
+        message: "Payment date (fileupload) is required",
+      })
+    }
+
+    const queryText = `
+      INSERT INTO payment_m3 (clientid, amount, filename, fileupload)
+      VALUES ($1, $2, $3, $4)
+      RETURNING *
+    `
+    const queryParams = [clientId, amount, null, fileupload] // filename is null since no file upload
+
+    const result = await query(queryText, queryParams)
+    console.log(`Inserted payment for client ${clientId}:`, result.rows[0])
+
+    res.json({
+      success: true,
+      data: result.rows[0],
+    })
+  } catch (error) {
+    console.error(`Error uploading payment for client ${clientId}:`, error)
+    res.status(500).json({
+      success: false,
+      message: error.message,
+      stack: process.env.NODE_ENV === "production" ? null : error.stack,
+    })
+  }
+})
+
+
+app.get("/api/payments/:clientId/:paymentId", verifyToken, async (req, res) => {
+  try {
+    if (!pool) {
+      return res.status(503).json({
+        success: false,
+        message: "Database connection not established. Please try again later.",
+      });
+    }
+
+    const { clientId, paymentId } = req.params;
+    console.log(`Fetching payment ${paymentId} for client ${clientId}`);
+
+    const queryText = `
+      SELECT 
+        fileupload,
+        amount,
+        filename
+      FROM 
+        payment_m3
+      WHERE 
+        clientid = $1 AND paykey = $2
+    `;
+    const queryParams = [clientId, paymentId];
+
+    const result = await query(queryText, queryParams);
+    console.log(`Query returned ${result.rows.length} payment for client ${clientId}, payment ${paymentId}`);
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({
+        success: false,
+        message: "Payment not found",
+      });
+    }
+
+    const payment = result.rows[0];
+    payment.fileurl = payment.filename ? `${req.protocol}://${req.get('host')}/uploads/${payment.filename}` : null;
+
+    res.json({
+      success: true,
+      data: payment,
+    });
+  } catch (error) {
+    console.error(`Error fetching payment ${paymentId} for client ${clientId}:`, error);
+    res.status(500).json({
+      success: false,
+      message: error.message,
+      stack: process.env.NODE_ENV === "production" ? null : error.stack,
+    });
+  }
+});
+
+// Updated endpoint for fetching client payments
+app.get("/api/payments/:clientId", verifyToken, async (req, res) => {
+  try {
+    if (!pool) {
+      return res.status(503).json({
+        success: false,
+        message: "Database connection not established. Please try again later.",
+      })
+    }
+
+    const { clientId } = req.params
+    const { year, month } = req.query
+
+    console.log(`Fetching payments for client ${clientId} with query:`, req.query)
+
+    let queryText = `
+      SELECT 
+      paykey,
+        fileupload,
+        amount,
+        filename
+      FROM 
+        payment_m3
+      WHERE 
+        clientid = $1
+    `
+    const queryParams = [clientId]
+    let paramIndex = 2
+
+    if (year) {
+      queryText += ` AND EXTRACT(YEAR FROM fileupload) = $${paramIndex}`
+      queryParams.push(year)
+      paramIndex++
+    }
+    if (month) {
+      queryText += ` AND EXTRACT(MONTH FROM fileupload) = $${paramIndex}`
+      queryParams.push(month)
+      paramIndex++
+    }
+
+    queryText += ` ORDER BY fileupload DESC`
+
+    const result = await query(queryText, queryParams)
+    console.log(`Query returned ${result.rows.length} payments for client ${clientId}`)
+
+    // Map the results to include the file URL
+    const payments = result.rows.map(payment => ({
+      ...payment,
+      fileurl: payment.filename ? `${req.protocol}://${req.get('host')}/uploads/${payment.filename}` : null
+    }))
+
+    res.json({
+      success: true,
+      data: payments,
+    })
+  } catch (error) {
+    console.error(`Error fetching payments for client ${clientId}:`, error)
+    res.status(500).json({
+      success: false,
+      message: error.message,
+      stack: process.env.NODE_ENV === "production" ? null : error.stack,
+    })
+  }
+})
+
 // GET all completed instructions for invoices
 app.get("/api/invoices/completed", verifyToken, async (req, res) => {
   try {
@@ -2103,7 +2272,7 @@ app.post("/api/company/reactivate", verifyToken, async (req, res) => {
 
 // ------------------------------------------Module 0 Ends here---------------------------------- //
 
-// ------------------------------------------Module 5 Starts here---------------------------------- //  
+/ ------------------------------------------Module 5 Starts here---------------------------------- //  
 
 // ---- Employee Management Routes ---- //
 
@@ -2141,28 +2310,6 @@ app.get("/api/employees", verifyToken, async (req, res) => {
     client.release();
   }
 });
-
-
-// Get employee by ID
-// app.get("/api/employees/:id", verifyToken, async (req, res) => {
-//   const client = await pool.connect();
-//   try {
-//     const { id } = req.params;
-//     const query = "SELECT * FROM m5_employee WHERE userid = $1 AND roleid != 6 ";
-//     const result = await client.query(query, [id]);
-
-//     if (result.rows.length === 0) {
-//       return res.status(404).json({ message: "Employee not found" });
-//     }
-
-//     res.json(result.rows[0]);
-//   } catch (err) {
-//     console.error(`Error fetching employee ${req.params.id}:`, err);
-//     res.status(500).json({ error: "Failed to fetch employee" });
-//   } finally {
-//     client.release();
-//   }
-// });
 
 // ----- AWS S3 and Multer-S3 Setup for Employee Uploads ----- //
 
@@ -2212,110 +2359,6 @@ const upload1 = multer({
   },
 });
 
-// ----- Employee Route for Creating a New Employee ----- //
-
-//updated 02 May
-// app.post(
-//   "/api/employees",
-//   verifyToken,
-//   upload1.array("documents", 3),
-//   async (req, res) => {
-//     const client = await pool.connect();
-//     try {
-//       console.log("req.files:", req.files);
-//       console.log("req.body:", req.body);
-
-//       const {
-//         name,
-//         surname,
-//         telephonenum,
-//         cellnum,
-//         employeenum,
-//         roleid,
-//         email,
-//         password,
-//         base_salary,
-//         deduction_income_tax,
-//         deduction_other_deductions,
-//         deduction_uif,
-//         deduction_bonus,
-//         deduction_savings,
-//         deduction_loan,
-//         deduction_damage,
-//         loan_amount,
-//       } = req.body;
-
-//       if (!password) {
-//         return res.status(400).json({ error: "Password is required" });
-//       }
-
-//       const company_reg_num = req.user.company_reg_num;
-//       if (!company_reg_num) {
-//         return res.status(400).json({ error: "Missing company registration number." });
-//       }
-
-//       const urls = (req.files || []).map((f) => f.location);
-//       while (urls.length < 3) urls.push(null);
-
-//       await client.query("BEGIN");
-
-//       const hashedPassword = await bcrypt.hash(password, 10);
-
-//       const insertEmployeeQuery = `
-//         INSERT INTO m5_employee (
-//           name, surname, telephonenum, cellnum, employeenum,
-//           roleid, email, password, base_salary, company_reg_num, status,
-//           document_url1, document_url2, document_url3,
-//           deduction_income_tax, deduction_other_deductions, deduction_uif,
-//           deduction_bonus, deduction_savings, deduction_loan, deduction_damage,
-//           loan_amount, income_tax_rate, deduction_date
-//         ) VALUES (
-//           $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, true,
-//           $11, $12, $13,
-//           $14, $15, $16, $17, $18, $19, $20,
-//           $21, 0, $22
-//         ) RETURNING *
-//       `;
-
-//       const insertValues = [
-//         name,
-//         surname,
-//         telephonenum,
-//         cellnum,
-//         employeenum,
-//         roleid,
-//         email,
-//         hashedPassword,
-//         base_salary,
-//         company_reg_num,
-//         urls[0],
-//         urls[1],
-//         urls[2],
-//         deduction_income_tax || 0,
-//         deduction_other_deductions || 0,
-//         deduction_uif || 0,
-//         deduction_bonus || 0,
-//         deduction_savings || 0,
-//         deduction_loan || 0,
-//         deduction_damage || 0,
-//         loan_amount || 0,
-//         new Date(), // 🆕 deduction_date
-//       ];
-
-//       const result = await client.query(insertEmployeeQuery, insertValues);
-
-//       await client.query("COMMIT");
-//       return res.status(201).json(result.rows[0]);
-//     } catch (err) {
-//       await client.query("ROLLBACK");
-//       console.error("Error in /api/employees:", err);
-//       return res.status(500).json({ error: "Failed to create employee" });
-//     } finally {
-//       client.release();
-//     }
-//   }
-// );
-
 //updated 8 May
 
 app.get("/api/employees/check-email-existence", verifyToken, async (req, res) => {
@@ -2329,6 +2372,7 @@ app.get("/api/employees/check-email-existence", verifyToken, async (req, res) =>
     res.status(500).json({ error: "Failed to check email existence" });
   }
 });
+// Create a new employee
 app.post(
   "/api/employees",
   verifyToken,
@@ -2431,256 +2475,9 @@ app.post(
   }
 );
 
-
-// Updated 2 May
-// app.put(
-//   "/api/employees/:id",
-//   verifyToken,
-//   upload1.array("documents", 3),
-//   async (req, res) => {
-//     const client = await pool.connect();
-//     try {
-//       const id = req.params.id;
-
-//       const {
-//         name,
-//         surname,
-//         telephonenum,
-//         cellnum,
-//         employeenum,
-//         roleid,
-//         email,
-//         password,
-//         base_salary,
-//         deduction_income_tax,
-//         deduction_other_deductions,
-//         deduction_uif,
-//         deduction_bonus,
-//         deduction_savings,
-//         deduction_loan,
-//         deduction_damage,
-//         loan_amount,
-//       } = req.body;
-
-//       const urls = (req.files || []).map((f) => f.location);
-//       while (urls.length < 3) urls.push(null);
-
-//       await client.query("BEGIN");
-
-//       let hashedPassword;
-//       if (password) {
-//         hashedPassword = await bcrypt.hash(password, 10);
-//       } else {
-//         const { rows } = await client.query(
-//           "SELECT password FROM m5_employee WHERE userid = $1",
-//           [id]
-//         );
-//         if (rows.length === 0) {
-//           throw new Error("Employee not found");
-//         }
-//         hashedPassword = rows[0].password;
-//       }
-
-//       const updateEmpQuery = `
-//         UPDATE m5_employee SET
-//           name                = $1,
-//           surname             = $2,
-//           telephonenum        = $3,
-//           cellnum             = $4,
-//           employeenum         = $5,
-//           roleid              = $6,
-//           email               = $7,
-//           password            = $8,
-//           base_salary         = $9,
-//           document_url1       = $10,
-//           document_url2       = $11,
-//           document_url3       = $12,
-//           deduction_income_tax        = $13,
-//           deduction_other_deductions  = $14,
-//           deduction_uif               = $15,
-//           deduction_bonus             = $16,
-//           deduction_savings           = $17,
-//           deduction_loan              = $18,
-//           deduction_damage            = $19,
-//           loan_amount                 = $20,
-//           deduction_date              = $21
-//         WHERE userid = $22
-//         RETURNING *
-//       `;
-
-//       const updateEmpValues = [
-//         name,
-//         surname,
-//         telephonenum,
-//         cellnum,
-//         employeenum,
-//         roleid,
-//         email,
-//         hashedPassword,
-//         base_salary,
-//         urls[0],
-//         urls[1],
-//         urls[2],
-//         parseFloat(deduction_income_tax || 0),
-//         parseFloat(deduction_other_deductions || 0),
-//         parseFloat(deduction_uif || 0),
-//         parseFloat(deduction_bonus || 0),
-//         parseFloat(deduction_savings || 0),
-//         parseFloat(deduction_loan || 0),
-//         parseFloat(deduction_damage || 0),
-//         parseFloat(loan_amount || 0),
-//         new Date(), // 🆕 update deduction_date
-//         id,
-//       ];
-
-//       const result = await client.query(updateEmpQuery, updateEmpValues);
-
-//       await client.query("COMMIT");
-//       res.json(result.rows[0]);
-//     } catch (err) {
-//       await client.query("ROLLBACK");
-//       console.error("Error updating employee:", err);
-//       res.status(500).json({ error: err.message || "Failed to update employee" });
-//     } finally {
-//       client.release();
-//     }
-//   }
-// );
-
-// Updated 8 May
-// app.put(
-//   "/api/employees/:id",
-//   verifyToken,
-//   upload1.array("documents", 3),
-//   async (req, res) => {
-//     const client = await pool.connect();
-//     try {
-//       const id = req.params.id;
-//       const {
-//         name,
-//         surname,
-//         telephonenum,
-//         cellnum,
-//         employeenum,
-//         roleid,
-//         email,
-//         password,
-//         base_salary,
-//         deduction_income_tax,
-//         deduction_other_deductions,
-//         deduction_uif,
-//         deduction_bonus,
-//         deduction_savings,
-//         deduction_loan,
-//         deduction_damage
-//       } = req.body;
-
-//       const urls = (req.files || []).map((f) => f.location);
-//       while (urls.length < 3) urls.push(null);
-
-//       await client.query("BEGIN");
-
-//       let hashedPassword;
-//       if (password) {
-//         hashedPassword = await bcrypt.hash(password, 10);
-//       } else {
-//         const { rows } = await client.query(
-//           "SELECT password FROM m5_employee WHERE userid = $1",
-//           [id]
-//         );
-//         if (rows.length === 0) throw new Error("Employee not found");
-//         hashedPassword = rows[0].password;
-//       }
-
-//       const updateEmpQuery = `
-//         UPDATE m5_employee SET
-//           name = $1, surname = $2, telephonenum = $3, cellnum = $4, employeenum = $5,
-//           roleid = $6, email = $7, password = $8, base_salary = $9,
-//           document_url1 = $10, document_url2 = $11, document_url3 = $12
-//         WHERE userid = $13
-//         RETURNING *
-//       `;
-
-//       const updateValues = [
-//         name, surname, telephonenum, cellnum, employeenum,
-//         roleid, email, hashedPassword, base_salary,
-//         urls[0], urls[1], urls[2], id
-//       ];
-
-//       const result = await client.query(updateEmpQuery, updateValues);
-//       const updatedEmployee = result.rows[0];
-
-//       // Prepare new values
-//       const newValues = {
-//         income_tax: parseFloat(deduction_income_tax || 0),
-//         other: parseFloat(deduction_other_deductions || 0),
-//         uif: parseFloat(deduction_uif || 0),
-//         bonus: parseFloat(deduction_bonus || 0),
-//         savings: parseFloat(deduction_savings || 0),
-//         loan: parseFloat(deduction_loan || 0),
-//         damage: parseFloat(deduction_damage || 0),
-//       };
-
-//       // Get last deduction history
-//       const { rows: lastRows } = await client.query(
-//         `SELECT * FROM employee_deduction_history
-//          WHERE employeeid = $1
-//          ORDER BY effective_date DESC
-//          LIMIT 1`,
-//         [id]
-//       );
-
-//       const last = lastRows[0];
-
-//       const isDuplicate =
-//         last &&
-//         newValues.income_tax === parseFloat(last.deduction_income_tax) &&
-//         newValues.other === parseFloat(last.deduction_other_deductions) &&
-//         newValues.uif === parseFloat(last.deduction_uif) &&
-//         newValues.bonus === parseFloat(last.deduction_bonus) &&
-//         newValues.savings === parseFloat(last.deduction_savings) &&
-//         newValues.loan === parseFloat(last.deduction_loan) &&
-//         newValues.damage === parseFloat(last.deduction_damage);
-
-//       if (!isDuplicate) {
-//         const insertHistoryQuery = `
-//           INSERT INTO employee_deduction_history (
-//             employeeid, effective_date, income_tax_rate,
-//             deduction_income_tax, deduction_other_deductions,
-//             deduction_uif, deduction_bonus, deduction_savings,
-//             deduction_loan, deduction_damage
-//           ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
-//         `;
-
-//         const deductionDate = new Date();
-//         const historyValues = [
-//           updatedEmployee.userid,
-//           deductionDate,
-//           0,
-//           newValues.income_tax,
-//           newValues.other,
-//           newValues.uif,
-//           newValues.bonus,
-//           newValues.savings,
-//           newValues.loan,
-//           newValues.damage
-//         ];
-
-//         await client.query(insertHistoryQuery, historyValues);
-//       }
-
-//       await client.query("COMMIT");
-//       res.json(updatedEmployee);
-//     } catch (err) {
-//       await client.query("ROLLBACK");
-//       console.error("Error updating employee:", err);
-//       res.status(500).json({ error: err.message || "Failed to update employee" });
-//     } finally {
-//       client.release();
-//     }
-//   }
-// );
 //11 May
+// Update an employee
+// This endpoint allows updating an employee's details, including their documents.
 app.put(
   "/api/employees/:id",
   verifyToken,
@@ -2845,7 +2642,6 @@ app.put(
   }
 );
 
-
 // Toggle employee status (enable/disable)
 app.put("/api/employees/:id/toggle-status", verifyToken, async (req, res) => {
   try {
@@ -2873,57 +2669,9 @@ app.put("/api/employees/:id/toggle-status", verifyToken, async (req, res) => {
 });
 
 // -----------------------------
-// 1. GET Employee Details with Signed Document URLs
+// 1. Get a Specific Employee's Details
 // -----------------------------
-// app.get('/api/employees/:id', verifyToken, async (req, res) => {
-//   const client = await pool.connect();
-//   try {
-//     const { id } = req.params;
-//     const result = await client.query(
-//       'SELECT * FROM m5_employee WHERE userid = $1',
-//       [id]
-//     );
-//     if (result.rows.length === 0) {
-//       return res.status(404).json({ error: "Employee not found" });
-//     }
-//     let employee = result.rows[0];
-//     const { document_url1, document_url2, document_url3 } = employee;
-
-//     // Helper function: Extract the S3 key from a full URL.
-//     // Since files are stored under an "Employees" folder, we search for that folder.
-//     const extractKeyFromUrl = (url) => {
-//       if (!url) return null;
-//       const parts = url.split('/');
-//       const index = parts.findIndex(part => part === 'Employees');
-//       return index >= 0 ? parts.slice(index).join('/') : null;
-//     };
-
-//     // Regenerate signed URLs for each document.
-//     const signedUrls = await Promise.all(
-//       [document_url1, document_url2, document_url3].map(async (url) => {
-//         if (!url) return null;
-//         const key = extractKeyFromUrl(url);
-//         const command = new GetObjectCommand({
-//           Bucket: process.env.Employee_AWS_BUCKET_NAME,
-//           Key: key,
-//         });
-//         return await getSignedUrl(s3Client2, command, { expiresIn: 3600 });
-//       })
-//     );
-
-//     // Replace the stored document URLs with the signed URLs.
-//     employee.document_url1 = signedUrls[0];
-//     employee.document_url2 = signedUrls[1];
-//     employee.document_url3 = signedUrls[2];
-
-//     res.json(employee);
-//   } catch (err) {
-//     console.error("Error fetching employee details:", err);
-//     res.status(500).json({ error: "Failed to fetch employee details" });
-//   } finally {
-//     client.release();
-//   }
-// });
+// This endpoint retrieves an employee's details, including their deduction history and signed URLs for documents.
 app.get('/api/employees/:id', verifyToken, async (req, res) => {
   const client = await pool.connect();
   try {
@@ -3069,6 +2817,8 @@ app.post('/api/employees/delete-doc', verifyToken, async (req, res) => {
 // ---- Client Management Routes ---- //
 
 // Get all clients
+// This endpoint retrieves all clients from the m5_client table.
+// It uses the verifyToken middleware to ensure the user is authenticated.    
 app.get("/api/m5Clients/check-email-existence", verifyToken, async (req, res) => {
   try {
     const { email } = req.query;  // Get email from query params
@@ -3081,6 +2831,8 @@ app.get("/api/m5Clients/check-email-existence", verifyToken, async (req, res) =>
   }
 });
 
+// Get all clients
+// This endpoint retrieves all clients from the m5_client table.
 app.get("/api/m5Clients", verifyToken, async (req, res) => {
   try {
     // Simple query using pool.query directly
@@ -3095,6 +2847,7 @@ app.get("/api/m5Clients", verifyToken, async (req, res) => {
 });
 
 // Get client by ID
+// This endpoint retrieves a specific client by their ID from the m5_client table.
 app.get("/api/m5Clients/:id", verifyToken, async (req, res) => {
   try {
     const { id } = req.params;
@@ -3114,9 +2867,8 @@ app.get("/api/m5Clients/:id", verifyToken, async (req, res) => {
   }
 });
 
-
-
 // Create new client
+// This endpoint creates a new client in the m5_client table.
 app.post("/api/m5Clients", verifyToken, async (req, res) => {
   try {
     // Renamed the variable to avoid conflict with the database client
@@ -3230,6 +2982,7 @@ app.delete("/api/m5Clients/:id", verifyToken, async (req, res) => {
 // ---- Truck Management Routes ---- //
 
 // Get all trucks
+// This endpoint retrieves all trucks from the m5_trucks table.
 app.get("/api/trucks", verifyToken, async (req, res) => {
   try {
     // Simple query using pool.query directly
@@ -3244,6 +2997,7 @@ app.get("/api/trucks", verifyToken, async (req, res) => {
 });
 
 // S3 client setup
+// Create an S3 client using AWS SDK v3
 const s3Client = new S3Client({
   region: process.env.AWS_REGION,
   credentials: {
@@ -3253,6 +3007,7 @@ const s3Client = new S3Client({
 });
 
 // Multer S3 setup
+// Configure multer to upload files to S3 using multer-s3-v3.
 const upload2 = multer({
   storage: multerS3({
     s3: s3Client, // using the v3 client from @aws-sdk/client-s3
@@ -3277,6 +3032,8 @@ const upload2 = multer({
 });
 
 // Generate a signed URL
+// This function generates a signed URL for accessing S3 objects.
+// It uses the AWS SDK v3's getSignedUrl function.
 const generateSignedUrl = async (key) => {
   if (!key) return null;
   const command = new GetObjectCommand({
@@ -3287,6 +3044,8 @@ const generateSignedUrl = async (key) => {
 };
 
 // Route to fetch truck details
+// This endpoint retrieves a specific truck by its ID from the m5_trucks table.
+// It also generates signed URLs for the truck's documents.
 app.get('/api/trucks/:id', verifyToken, async (req, res) => {
   const client = await pool.connect();
   try {
@@ -3320,6 +3079,8 @@ app.get('/api/trucks/:id', verifyToken, async (req, res) => {
 });
 
 // Upload new truck
+// This endpoint allows uploading a new truck and its associated documents.
+// It uses the multer-s3 middleware to handle file uploads directly to S3.
 app.post('/api/trucks', verifyToken, upload2.array('documents', 3), async (req, res) => {
   const client = await pool.connect();
   try {
@@ -3567,688 +3328,9 @@ app.post('/api/trucks/delete-doc', verifyToken, async (req, res) => {
   }
 });
 
-
-
-
-
-// working code 9 MAY
-// S3 client setup
-// const s3Client = new S3Client({
-//   region: process.env.AWS_REGION,
-//   credentials: {
-//     accessKeyId: process.env.Trucks_AWS_ACCESS_KEY_ID,
-//     secretAccessKey: process.env.Trucks_AWS_SECRET_ACCESS_KEY,
-//   },
-// });
-
-// // Multer S3 setup
-// const upload2 = multer({
-//   storage: multerS3({
-//     s3: s3Client, // using the v3 client from @aws-sdk/client-s3
-//     bucket: process.env.Trucks_AWS_BUCKET_NAME, // your bucket name
-//     key: (req, file, cb) => {
-//       // In the form data, ensure 'truckregnum' is provided.
-//       const truckregnum = req.body.truckregnum || 'default';
-//       const uniqueName = `${Date.now()}_${file.originalname}`;
-//       // Files are stored under a folder named after truckregnum.
-//       cb(null, `Trucks/${truckregnum}/${uniqueName}`);
-//     },
-//   }),
-//   limits: { fileSize: 10 * 1024 * 1024 }, // 10 MB limit
-//   fileFilter: (req, file, cb) => {
-//     // Allow only PDF files.
-//     if (file.mimetype === 'application/pdf') {
-//       cb(null, true);
-//     } else {
-//       cb(new Error('Invalid file type, only PDF documents are allowed!'), false);
-//     }
-//   },
-// });
-
-// const generateSignedUrl = async (key) => {
-//   if (!key) return null;
-//   const command = new GetObjectCommand({
-//     Bucket: process.env.Trucks_AWS_BUCKET_NAME,
-//     Key: key,
-//   });
-//   return await getSignedUrl(s3Client, command, { expiresIn: 3600 }); // Valid for 1 hour
-// };
-
-// app.get('/api/trucks/:id', verifyToken, async (req, res) => {
-//   const client = await pool.connect();
-//   try {
-//     const { id } = req.params;
-
-//     // Fetch the truck record by m5truckskey (or id)
-//     const result = await client.query(
-//       `SELECT * FROM m5_trucks WHERE m5truckskey = $1`,
-//       [id]
-//     );
-
-//     if (result.rows.length === 0) {
-//       return res.status(404).json({ error: 'Truck not found' });
-//     }
-
-//     const truck = result.rows[0];
-//     const { document_url1, document_url2, document_url3 } = truck;
-
-//     // Dynamically generate signed URLs for each document using the stored S3 keys
-//     truck.document_url1 = await generateSignedUrl(document_url1);
-//     truck.document_url2 = await generateSignedUrl(document_url2);
-//     truck.document_url3 = await generateSignedUrl(document_url3);
-
-//     res.json(truck);
-//   } catch (err) {
-//     console.error("Error fetching truck details:", err);
-//     res.status(500).json({ error: "Failed to fetch truck details" });
-//   } finally {
-//     client.release();
-//   }
-// });
-
-
-// // Upload new truck
-// app.post('/api/trucks', verifyToken, upload2.array('documents', 3), async (req, res) => {
-//   const client = await pool.connect();
-//   try {
-//     const {
-//       truckregnum,
-//       trailersize,
-//       truckpurchasedate,
-//       year,
-//       model,
-//       purchase_price,
-//       current_evaluation,
-//       vin_num,
-//       is_subcontractor,
-//     } = req.body;
-
-//     // Map the uploaded files to their S3 keys (not the full URL)
-//     const fileKeys = req.files && req.files.length
-//       ? req.files.map(file => file.key) // Use file.key instead of file.location
-//       : [];
-
-//     // Map keys to their corresponding database columns.
-//     const document_url1 = fileKeys[0] || null;
-//     const document_url2 = fileKeys[1] || null;
-//     const document_url3 = fileKeys[2] || null;
-
-//     // Insert truck and document details in the database
-//     const result = await client.query(
-//       `INSERT INTO m5_trucks (
-//          truckregnum,
-//          trailersize,
-//          truckpurchasedate,
-//          year,
-//          model,
-//          purchase_price,
-//          current_evaluation,
-//          vin_num,
-//          is_subcontractor,
-//          document_url1,
-//          document_url2,
-//          document_url3
-//        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
-//        RETURNING *`,
-//       [
-//         truckregnum,
-//         trailersize,
-//         truckpurchasedate,
-//         year,
-//         model,
-//         purchase_price,
-//         current_evaluation,
-//         vin_num,
-//         is_subcontractor,
-//         document_url1,
-//         document_url2,
-//         document_url3,
-//       ]
-//     );
-
-//     res.status(201).json(result.rows[0]);
-//   } catch (err) {
-//     console.error("Error creating truck:", err);
-//     res.status(500).json({ error: "Failed to create truck" });
-//   } finally {
-//     client.release();
-//   }
-// });
-
-
-// // Update truck details
-// // app.put("/api/trucks/:id", verifyToken, upload2.array('documents', 3), async (req, res) => {
-// //   const client = await pool.connect();
-// //   try {
-// //     const { id } = req.params;
-// //     const {
-// //       truckregnum,
-// //       trailersize,
-// //       truckpurchasedate,
-// //       year,
-// //       model,
-// //       purchase_price,
-// //       current_evaluation,
-// //       vin_num,
-// //       is_subcontractor
-// //     } = req.body;
-
-// //     let fileUrls = [];
-// //     if (req.files && req.files.length) {
-// //       fileUrls = req.files.map(file => file.location);
-// //     }
-
-// //     const result = await client.query(`
-// //       UPDATE m5_trucks SET
-// //         truckregnum = $1,
-// //         trailersize = $2,
-// //         truckpurchasedate = $3,
-// //         year = $4,
-// //         model = $5,
-// //         purchase_price = $6,
-// //         current_evaluation = $7,
-// //         vin_num = $8,
-// //         is_subcontractor = $9
-// //       WHERE m5truckskey = $10
-// //       RETURNING *`,
-// //       [
-// //         truckregnum,
-// //         trailersize,
-// //         truckpurchasedate,
-// //         year,
-// //         model,
-// //         purchase_price,
-// //         current_evaluation,
-// //         vin_num,
-// //         is_subcontractor,
-// //         id
-// //       ]
-// //     );
-
-// //     if (result.rowCount === 0) {
-// //       return res.status(404).json({ error: "Truck not found" });
-// //     }
-
-// //     let truck = result.rows[0];
-// //     truck.documents = fileUrls;
-
-// //     res.json(truck);
-// //   } catch (err) {
-// //     console.error("Error updating truck:", err);
-// //     res.status(500).json({ error: "Failed to update truck" });
-// //   } finally {
-// //     client.release();
-// //   }
-// // });
-// app.put("/api/trucks/:id", verifyToken, upload2.array('documents', 3), async (req, res) => {
-//   const client = await pool.connect();
-//   try {
-//     const { id } = req.params;
-//     const {
-//       truckregnum,
-//       trailersize,
-//       truckpurchasedate,
-//       year,
-//       model,
-//       purchase_price,
-//       current_evaluation,
-//       vin_num,
-//       is_subcontractor
-//     } = req.body;
-
-//     const newFiles = req.files || [];
-//     console.log("📝 Uploaded Files:", newFiles);
-
-//     // Fetch existing documents from DB
-//     const existingResult = await client.query(
-//       `SELECT document_url1, document_url2, document_url3 FROM m5_trucks WHERE m5truckskey = $1`,
-//       [id]
-//     );
-
-//     if (existingResult.rows.length === 0) {
-//       return res.status(404).json({ error: "Truck not found" });
-//     }
-
-//     let { document_url1, document_url2, document_url3 } = existingResult.rows[0];
-//     const existingDocs = [document_url1, document_url2, document_url3];
-//     const newDocKeys = newFiles.map(file => file.key);
-
-//     console.log("📂 Existing S3 keys in DB:", existingDocs);
-//     console.log("📥 New S3 keys to be inserted:", newDocKeys);
-
-//     // Overwrite logic only if all 3 are already filled
-//     if (existingDocs.filter(Boolean).length >= 3) {
-//       for (const key of existingDocs) {
-//         if (key) {
-//           console.log(`🗑️ Deleting from S3: ${key}`);
-//           await s3Client.send(new DeleteObjectCommand({
-//             Bucket: process.env.Trucks_AWS_BUCKET_NAME,
-//             Key: key
-//           }));
-//         }
-//       }
-
-//       document_url1 = newDocKeys[0] || null;
-//       document_url2 = newDocKeys[1] || null;
-//       document_url3 = newDocKeys[2] || null;
-//     } else {
-//       // Fill available slots without overwriting
-//       let docIndex = 0;
-//       const slots = [document_url1, document_url2, document_url3];
-//       for (let i = 0; i < slots.length && docIndex < newDocKeys.length; i++) {
-//         if (!slots[i]) {
-//           slots[i] = newDocKeys[docIndex];
-//           docIndex++;
-//         }
-//       }
-
-//       // Update final values
-//       [document_url1, document_url2, document_url3] = slots;
-//     }
-
-//     const updateResult = await client.query(`
-//       UPDATE m5_trucks SET
-//         truckregnum = $1,
-//         trailersize = $2,
-//         truckpurchasedate = $3,
-//         year = $4,
-//         model = $5,
-//         purchase_price = $6,
-//         current_evaluation = $7,
-//         vin_num = $8,
-//         is_subcontractor = $9,
-//         document_url1 = $10,
-//         document_url2 = $11,
-//         document_url3 = $12
-//       WHERE m5truckskey = $13
-//       RETURNING *
-//     `, [
-//       truckregnum,
-//       trailersize,
-//       truckpurchasedate,
-//       year,
-//       model,
-//       purchase_price,
-//       current_evaluation,
-//       vin_num,
-//       is_subcontractor,
-//       document_url1,
-//       document_url2,
-//       document_url3,
-//       id
-//     ]);
-
-//     console.log("✅ Truck updated with proper document slotting");
-//     res.json(updateResult.rows[0]);
-
-//   } catch (err) {
-//     console.error("❌ Error updating truck:", err);
-//     res.status(500).json({ error: "Failed to update truck" });
-//   } finally {
-//     client.release();
-//   }
-// });
-
-// // Route to delete a document from S3 and update DB
-
-// app.post('/api/trucks/delete-doc', verifyToken, async (req, res) => {
-//   const { truckId, url } = req.body;
-//   const client = await pool.connect();
-
-//   if (!truckId || !url) {
-//     return res.status(400).json({ message: 'Missing truck ID or document URL' });
-//   }
-
-//   try {
-//     const s3Key = new URL(url).pathname.substring(1); // Get S3 key from the document URL
-//     console.log('S3 Key:', s3Key); // Log the extracted S3 key
-
-//     // Delete the document from S3
-//     const deleteCommand = new DeleteObjectCommand({
-//       Bucket: process.env.Trucks_AWS_BUCKET_NAME, // Using your S3 bucket name
-//       Key: s3Key, // The key of the document to delete
-//     });
-
-//     await s3Client.send(deleteCommand); // Send the delete command to S3
-
-//     // Find the document field (document_url1, document_url2, document_url3) in the database
-//     const { rows } = await client.query('SELECT document_url1, document_url2, document_url3 FROM m5_trucks WHERE m5truckskey = $1', [truckId]);
-
-//     console.log('Rows fetched from DB:', rows); // Log the database rows to ensure data is fetched
-
-//     let updateField = null;
-//     for (const field of ['document_url1', 'document_url2', 'document_url3']) {
-//       if (rows[0][field] === s3Key) {
-//         updateField = field;
-//         break;
-//       }
-//     }
-
-//     if (updateField) {
-//       // Update the DB to set the corresponding field to NULL
-//       await client.query(`UPDATE m5_trucks SET ${updateField} = NULL WHERE m5truckskey = $1`, [truckId]);
-//       console.log(`Updated field ${updateField} to NULL in the database.`);
-//     }
-
-//     res.json({ message: 'Document deleted successfully' });
-//   } catch (error) {
-//     console.error('Failed to delete document:', error);
-//     res.status(500).json({ message: 'Server error during document deletion' });
-//   } finally {
-//     client.release();
-//   }
-// });
-
-
-// working code 9 MAY
-
-
-
-
-
-// Get truck by ID
-// app.get("/api/trucks/:id", verifyToken, async (req, res) => {
-//   try {
-//     const { id } = req.params;
-
-//     // Simple query using pool.query directly
-//     const query = "SELECT * FROM m5_trucks WHERE m5truckskey = $1";
-//     const result = await pool.query(query, [id]);
-
-//     if (result.rows.length === 0) {
-//       return res.status(404).json({ message: "Truck not found" });
-//     }
-
-//     res.json(result.rows[0]);
-//   } catch (err) {
-//     console.error(`Error fetching truck ${req.params.id}:`, err);
-//     res.status(500).json({ error: "Failed to fetch truck" });
-//   }
-// });
-
-// // Create the v3 S3 client
-// const s3Client = new S3Client({
-//   region: process.env.AWS_REGION, // e.g., 'us-east-1' or 'af-south-1'
-//   credentials: {
-//     accessKeyId: process.env.Trucks_AWS_ACCESS_KEY_ID,
-//     secretAccessKey: process.env.Trucks_AWS_SECRET_ACCESS_KEY,
-//   },
-// });
-
-// // Configure multer to use multer-s3-v3 with the v3 S3 client
-// const upload2 = multer({
-//   storage: multerS3({
-//     s3: s3Client, // using the v3 client from @aws-sdk/client-s3
-//     bucket: process.env.Trucks_AWS_BUCKET_NAME, // your bucket name
-//     key: (req, file, cb) => {
-//       // In the form data, ensure 'truckregnum' is provided.
-//       const truckregnum = req.body.truckregnum || 'default';
-//       const uniqueName = `${Date.now()}_${file.originalname}`;
-//       // Files are stored under a folder named after truckregnum.
-//       cb(null, `Trucks/${truckregnum}/${uniqueName}`);
-//     },
-//   }),
-//   limits: { fileSize: 10 * 1024 * 1024 }, // e.g., 10 MB limit
-//   fileFilter: (req, file, cb) => {
-//     // Allow only PDF files.
-//     if (file.mimetype === 'application/pdf') {
-//       cb(null, true);
-//     } else {
-//       cb(new Error('Invalid file type, only PDF documents are allowed!'), false);
-//     }
-//   },
-// });
-
-// // Use the correct upload instance (upload2) in your route:
-// app.post('/api/trucks', verifyToken, upload2.array('documents', 3), async (req, res) => {
-//   const client = await pool.connect();
-//   try {
-//     // Destructure truck details from the request body.
-//     const {
-//       truckregnum,
-//       trailersize,
-//       truckpurchasedate,
-//       year,
-//       model,
-//       purchase_price,
-//       current_evaluation,
-//       vin_num,
-//       is_subcontractor,
-//     } = req.body;
-
-//     // Map the uploaded files to their S3 URLs.
-//     const fileUrls = req.files && req.files.length
-//       ? req.files.map(file => file.location)
-//       : [];
-
-//     // Map URLs to their corresponding database columns.
-//     const document_url1 = fileUrls[0] || null;
-//     const document_url2 = fileUrls[1] || null;
-//     const document_url3 = fileUrls[2] || null;
-
-//     // Insert truck and document details in the database.
-//     const result = await client.query(
-//       `INSERT INTO m5_trucks (
-//          truckregnum,
-//          trailersize,
-//          truckpurchasedate,
-//          year,
-//          model,
-//          purchase_price,
-//          current_evaluation,
-//          vin_num,
-//          is_subcontractor,
-//          document_url1,
-//          document_url2,
-//          document_url3
-//        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
-//        RETURNING *`,
-//       [
-//         truckregnum,
-//         trailersize,
-//         truckpurchasedate,
-//         year,
-//         model,
-//         purchase_price,
-//         current_evaluation,
-//         vin_num,
-//         is_subcontractor,
-//         document_url1,
-//         document_url2,
-//         document_url3,
-//       ]
-//     );
-
-//     res.status(201).json(result.rows[0]);
-//   } catch (err) {
-//     console.error("Error creating truck:", err);
-//     res.status(500).json({ error: "Failed to create truck" });
-//   } finally {
-//     client.release();
-//   }
-// });
-
-// // Update existing truck
-// app.put("/api/trucks/:id", verifyToken, upload2.array('documents', 3), async (req, res) => {
-//   const client = await pool.connect();
-//   try {
-//     const { id } = req.params;
-//     const {
-//       truckregnum,
-//       trailersize,
-//       truckpurchasedate,
-//       year,
-//       model,
-//       purchase_price,
-//       current_evaluation,
-//       vin_num,
-//       is_subcontractor
-//     } = req.body;
-
-//     // If new documents are provided, process them.
-//     let fileUrls = [];
-//     if (req.files && req.files.length) {
-//       fileUrls = req.files.map(file => file.location);
-//       // Optionally merge these newly uploaded file URLs with any already stored.
-//     }
-
-//     const query = `
-//       UPDATE m5_trucks SET
-//         truckregnum = $1,
-//         trailersize = $2,
-//         truckpurchasedate = $3,
-//         year = $4,
-//         model = $5,
-//         purchase_price = $6,
-//         current_evaluation = $7,
-//         vin_num = $8,
-//         is_subcontractor = $9
-//       WHERE m5truckskey = $10
-//       RETURNING *`;
-
-//     const values = [
-//       truckregnum,
-//       trailersize,
-//       truckpurchasedate,
-//       year,
-//       model,
-//       purchase_price,
-//       current_evaluation,
-//       vin_num,
-//       is_subcontractor,
-//       id
-//     ];
-
-//     const result = await client.query(query, values);
-
-//     if (result.rowCount === 0) {
-//       return res.status(404).json({ error: "Truck not found" });
-//     }
-
-//     let truck = result.rows[0];
-//     truck.documents = fileUrls; // update as needed – you may want to merge with previous docs.
-
-//     res.json(truck);
-//   } catch (err) {
-//     console.error("Error updating truck:", err);
-//     res.status(500).json({ error: "Failed to update truck" });
-//   } finally {
-//     client.release();
-//   }
-// });
-
-// app.get('/api/trucks/:truckregnum', verifyToken, async (req, res) => {
-//   const client = await pool.connect();
-//   try {
-//     const { truckregnum } = req.params;
-
-//     // Fetch the truck record by truck registration number
-//     const result = await client.query(
-//       `SELECT * FROM m5_trucks WHERE truckregnum = $1`,
-//       [truckregnum]
-//     );
-
-//     if (result.rows.length === 0) {
-//       return res.status(404).json({ error: 'Truck not found' });
-//     }
-
-//     const truck = result.rows[0];
-//     const { document_url1, document_url2, document_url3 } = truck;
-
-//     // Helper function to extract the S3 key from a full S3 URL
-//     const extractKeyFromUrl = (url) => {
-//       if (!url) return null;
-//       const urlParts = url.split('/');
-//       const index = urlParts.findIndex(part => part === 'Trucks');
-//       return urlParts.slice(index).join('/');
-//     };
-
-//     // Regenerate signed URLs
-//     const signedUrls = await Promise.all(
-//       [document_url1, document_url2, document_url3].map(async (url) => {
-//         if (!url) return null;
-
-//         const key = extractKeyFromUrl(url);
-//         const command = new GetObjectCommand({
-//           Bucket: process.env.Trucks_AWS_BUCKET_NAME,
-//           Key: key,
-//         });
-
-//         return await getSignedUrl(s3Client, command, { expiresIn: 3600 });
-//       })
-//     );
-
-//     // Attach signed URLs to the truck object for return
-//     truck.document_url1 = signedUrls[0];
-//     truck.document_url2 = signedUrls[1];
-//     truck.document_url3 = signedUrls[2];
-
-//     res.json(truck);
-//   } catch (err) {
-//     console.error("Error fetching truck details:", err);
-//     res.status(500).json({ error: "Failed to fetch truck details" });
-//   } finally {
-//     client.release();
-//   }
-// });
-
-// app.get('/api/trucks/:id', verifyToken, async (req, res) => {
-//   const client = await pool.connect();
-//   try {
-//     const { id } = req.params;  // Use `id` instead of `truckregnum`
-
-//     // Fetch the truck record by m5truckskey (or id)
-//     const result = await client.query(
-//       `SELECT * FROM m5_trucks WHERE m5truckskey = $1`, // Use m5truckskey for comparison
-//       [id]
-//     );
-
-//     if (result.rows.length === 0) {
-//       return res.status(404).json({ error: 'Truck not found' });
-//     }
-
-//     const truck = result.rows[0];
-//     const { document_url1, document_url2, document_url3 } = truck;
-
-//     // Helper function to extract the S3 key from a full S3 URL
-//     const extractKeyFromUrl = (url) => {
-//       if (!url) return null;
-//       const urlParts = url.split('/');
-//       const index = urlParts.findIndex(part => part === 'Trucks');
-//       return urlParts.slice(index).join('/');
-//     };
-
-//     // Regenerate signed URLs
-//     const signedUrls = await Promise.all(
-//       [document_url1, document_url2, document_url3].map(async (url) => {
-//         if (!url) return null;
-
-//         const key = extractKeyFromUrl(url);
-//         const command = new GetObjectCommand({
-//           Bucket: process.env.Trucks_AWS_BUCKET_NAME,
-//           Key: key,
-//         });
-
-//         return await getSignedUrl(s3Client, command, { expiresIn: 3600 });
-//       })
-//     );
-
-//     // Attach signed URLs to the truck object for return
-//     truck.document_url1 = signedUrls[0];
-//     truck.document_url2 = signedUrls[1];
-//     truck.document_url3 = signedUrls[2];
-
-//     res.json(truck);
-//   } catch (err) {
-//     console.error("Error fetching truck details:", err);
-//     res.status(500).json({ error: "Failed to fetch truck details" });
-//   } finally {
-//     client.release();
-//   }
-// });
-
-
 // Delete truck
+// This endpoint deletes a truck from the m5_trucks table.
+// It first checks if the truck exists before attempting to delete it.
 app.delete("/api/trucks/:id", verifyToken, async (req, res) => {
   try {
     const { id } = req.params;
@@ -4273,6 +3355,8 @@ app.delete("/api/trucks/:id", verifyToken, async (req, res) => {
 // ---- Driver Rate Management Routes ---- //
 
 // Get all driver rates
+// This endpoint retrieves all driver rates from the m5_driver_rate table.
+// It uses the verifyToken middleware to ensure the user is authenticated.
 app.get("/api/driver-rates", verifyToken, async (req, res) => {
   try {
     // Simple query using pool.query directly
@@ -4292,6 +3376,8 @@ app.get("/api/driver-rates", verifyToken, async (req, res) => {
 });
 
 // Get driver rate by ID
+// This endpoint retrieves a specific driver rate by its ID from the m5_driver_rate table.
+// It uses the verifyToken middleware to ensure the user is authenticated.
 app.get("/api/driver-rates/:id", verifyToken, async (req, res) => {
   try {
     const { id } = req.params;
@@ -4317,6 +3403,7 @@ app.get("/api/driver-rates/:id", verifyToken, async (req, res) => {
 });
 
 // Add new driver rate
+// This endpoint creates a new driver rate in the m5_driver_rate table.
 app.post("/api/driver-rates", verifyToken, async (req, res) => {
   try {
     const {
@@ -4345,6 +3432,7 @@ app.post("/api/driver-rates", verifyToken, async (req, res) => {
 });
 
 // Update driver rate
+// This endpoint updates an existing driver rate in the m5_driver_rate table.
 app.put("/api/driver-rates/:id", verifyToken, async (req, res) => {
   const client = await pool.connect();
   try {
@@ -4408,6 +3496,7 @@ app.put("/api/driver-rates/:id", verifyToken, async (req, res) => {
 });
 
 // Delete driver rate
+// This endpoint deletes a driver rate from the m5_driver_rate table.
 app.delete("/api/driver-rates/:id", verifyToken, async (req, res) => {
   try {
     const { id } = req.params;
@@ -4625,6 +3714,7 @@ app.put("/api/subcontractors/:id/toggle-status", verifyToken, async (req, res) =
 });
 
 // ------------------------------------------Module 5 Ends here---------------------------------- //
+
 
 
 // Import additional modules needed for server2.js functionality
