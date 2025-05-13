@@ -62,7 +62,7 @@ const [newEmployee, setNewEmployee] = useState({
   documents: [],
 
   // Deduction fields (now stored on m5_employee)
-  deduction_income_tax: "",
+  income_tax_rate: "",
   deduction_other_deductions: "",
   deduction_uif: "",
   deduction_bonus: "",
@@ -230,7 +230,7 @@ setLoading(true);
       "email",
       "password",         // will be blank on edit
       "base_salary",
-      "deduction_income_tax",
+      "income_tax_rate",
       "deduction_other_deductions",
       "deduction_uif",
       "deduction_bonus",
@@ -278,7 +278,7 @@ setLoading(true);
       password: "",
       base_salary: "",
       documents: [],
-      deduction_income_tax: "",
+      income_tax_rate: "",
       deduction_other_deductions: "",
       deduction_uif: "",
       deduction_bonus: "",
@@ -761,6 +761,34 @@ const handleSaveSubcontractor = async () => {
       </button>
     </>
   )
+  const handleToggleEmployee = async (id, currentStatus) => {
+    setLoading(true)
+    try {
+      // Flip the status
+      const newStatus = !currentStatus
+      await axios.put(
+        `${API_URL}/employees/${id}/toggle-status`,
+        { status: newStatus },
+        getAuthHeaders()
+      )
+  
+      // Refresh the list
+      const { data } = await axios.get(
+        `${API_URL}/employees`,
+        getAuthHeaders()
+      )
+      setEmployees(data)
+    } catch (err) {
+      console.error(`Error toggling employee ${id}:`, err)
+      alert(
+        `Error ${currentStatus ? "disabling" : "enabling"} employee: ${
+          err.response?.data?.error || err.message
+        }`
+      )
+    } finally {
+      setLoading(false)
+    }
+  }
 
   const renderClientTable = () => (
     <>
@@ -776,24 +804,34 @@ const handleSaveSubcontractor = async () => {
                 <th>Client</th>
                 <th>Representative</th>
                 <th>Email</th>
-                <th>Action</th>
-                <th></th>
+                <th>Edit</th>
+                <th>Enable / Disable</th>
               </tr>
             </thead>
             <tbody>
-              {clients.map((client) => (
-                <tr key={client.m5clientkey}>
-                  <td>{client.client}</td>
-                  <td>{client.representative}</td>
-                  <td>{client.email}</td>
+              {clients.map((c) => (
+                <tr key={c.m5clientkey}>
+                  <td>{c.client}</td>
+                  <td>{c.representative}</td>
+                  <td>{c.email}</td>
                   <td>
-                    <button className="manage-view-button" onClick={() => handleEditClient(client.m5clientkey)}>
+                    <button
+                      className="manage-view-button"
+                      onClick={() => handleEditClient(c.m5clientkey)}
+                    >
                       Edit
                     </button>
                   </td>
                   <td>
-                    <button className="manage-delete-button" onClick={() => handleDisableClient(client.m5clientkey)}>
-                      Disable
+                    <button
+                      className={
+                        c.status
+                          ? "manage-delete-button"
+                          : "manage-enable-button"
+                      }
+                      onClick={() => handleToggleClient(c.m5clientkey, c.status)}
+                    >
+                      {c.status ? "Disable" : "Enable"}
                     </button>
                   </td>
                 </tr>
@@ -802,40 +840,48 @@ const handleSaveSubcontractor = async () => {
           </table>
         </div>
       )}
-      <button className="manage-add-client-button" onClick={handleAddClient}>
+  
+      <button
+        className="manage-add-client-button"
+        onClick={handleAddClient}
+      >
         Add Client
       </button>
     </>
-  )
+  );
+  
+  const handleToggleClient = async (id, currentStatus) => {
+    setLoading(true);
+    try {
+      const newStatus = !currentStatus;
+  
+      // 1) toggle on server
+      const { data: updatedClient } = await axios.put(
+        `${API_URL}/clients/${id}/toggle-status`,
+        { status: newStatus },
+        getAuthHeaders()
+      );
+  
+      // 2) update local state (optimistic UI)
+      setClients((prev) =>
+        prev.map((c) =>
+          c.m5clientkey === id ? { ...c, status: updatedClient.status } : c
+        )
+      );
+    } catch (err) {
+      console.error(`Error toggling client ${id}:`, err);
+      alert(
+        `Error ${currentStatus ? "disabling" : "enabling"} client: ${
+          err.response?.data?.error || err.message
+        }`
+      );
+    } finally {
+      setLoading(false);
+    }
+  };
+  
 // Generalized toggle handler
-const handleToggleEmployee = async (id, currentStatus) => {
-  setLoading(true)
-  try {
-    // Flip the status
-    const newStatus = !currentStatus
-    await axios.put(
-      `${API_URL}/employees/${id}/toggle-status`,
-      { status: newStatus },
-      getAuthHeaders()
-    )
 
-    // Refresh the list
-    const { data } = await axios.get(
-      `${API_URL}/employees`,
-      getAuthHeaders()
-    )
-    setEmployees(data)
-  } catch (err) {
-    console.error(`Error toggling employee ${id}:`, err)
-    alert(
-      `Error ${currentStatus ? "disabling" : "enabling"} employee: ${
-        err.response?.data?.error || err.message
-      }`
-    )
-  } finally {
-    setLoading(false)
-  }
-}
 
 const renderDriverRatesTable = () => (
     <div className="manage-DriverRates-table1">
@@ -1201,11 +1247,11 @@ const renderDriverRatesTable = () => (
     max="100"
     form="employeeForm"
     step="0.01"
-    value={newEmployee.deduction_income_tax}
+    value={newEmployee.income_tax_rate}
     onChange={(e) =>
       setNewEmployee({
         ...newEmployee,
-        deduction_income_tax: e.target.value,
+        income_tax_rate: e.target.value,
       })
     }
   />
@@ -1625,6 +1671,7 @@ const renderTruckForm = () => (
           />
         </div>
 
+
         <div className="manage-form-group">
           <label style={{ fontWeight: 'bold' }}>Trailer Size</label>
           <input
@@ -1635,6 +1682,7 @@ const renderTruckForm = () => (
             required
           />
         </div>
+
 
         <div className="manage-form-group">
           <label style={{ fontWeight: 'bold' }}>Year</label>
@@ -1647,6 +1695,7 @@ const renderTruckForm = () => (
           />
         </div>
 
+
         <div className="manage-form-group">
           <label style={{ fontWeight: 'bold' }}>Model</label>
           <input
@@ -1658,6 +1707,7 @@ const renderTruckForm = () => (
           />
         </div>
 
+
         <div className="manage-form-group">
           <label style={{ fontWeight: 'bold' }}>Purchase Price</label>
           <input
@@ -1668,6 +1718,7 @@ const renderTruckForm = () => (
             required
           />
         </div>
+
 
         <div className="manage-form-group">
           <label style={{ fontWeight: 'bold' }}>Current Evaluation</label>
@@ -2348,7 +2399,7 @@ const RenderSubcontractorForm = ({ setShowSubcontractorForm }) => {
   //       email: employee.email,
   //       password: "", // leave empty for security
   //       base_salary: employee.base_salary,
-  //       deduction_income_tax: employee.deduction_income_tax,
+  //       income_tax_rate: employee.income_tax_rate,
   //       deduction_uif: employee.deduction_uif,
   //       deduction_bonus: employee.deduction_bonus,
   //       deduction_savings: employee.deduction_savings,
@@ -2389,7 +2440,7 @@ const RenderSubcontractorForm = ({ setShowSubcontractorForm }) => {
 //     roleid: employee.roleid,
 //     email: employee.email,
 //     base_salary: employee.base_salary,
-//     deduction_income_tax: employee.deduction_income_tax || "",
+//     income_tax_rate: employee.income_tax_rate || "",
 //     deduction_other_deductions: employee.deduction_other_deductions || "",
 //     deduction_uif: employee.deduction_uif || "",
 //     deduction_bonus: employee.deduction_bonus || "",
@@ -2438,7 +2489,7 @@ const handleEditEmployee = async (id) => {
       email: updatedEmployee.email,
       base_salary: updatedEmployee.base_salary,
       // Use latest deduction values; fallback to empty strings if undefined.
-      deduction_income_tax: latestDeduction.deduction_income_tax || "",
+      income_tax_rate: latestDeduction.income_tax_rate || "",
       deduction_other_deductions: latestDeduction.deduction_other_deductions || "",
       deduction_uif: latestDeduction.deduction_uif || "",
       deduction_bonus: latestDeduction.deduction_bonus || "",

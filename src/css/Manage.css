@@ -127,6 +127,30 @@ tr:hover {
   background-color: #a93226;
   transform: scale(0.95);
 }
+/* Optionally, style delete buttons if used */
+.manage-enable-button {
+  background-color: green;
+  color: white;
+  border: none;
+  cursor: pointer;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  padding: 8px 12px;
+  border-radius: 4px;
+  font-size: 14px;
+  transition: background-color 0.3s, transform 0.2s;
+}
+
+.manage-enable-button:hover {
+  background-color: #2bc04b;
+  transform: scale(1.05);
+}
+
+.manage-enable-button:active {
+  background-color: #26a928;
+  transform: scale(0.95);
+}
 
 
 .trash-icon {
