@@ -2587,7 +2587,7 @@ app.get("/api/employees", verifyToken, async (req, res) => {
       SELECT
         e.*,
         r.rolename,
-        edh.deduction_income_tax,
+        edh.income_tax_rate,
         edh.deduction_other_deductions,
         edh.deduction_uif,
         edh.deduction_bonus,
@@ -2696,7 +2696,7 @@ app.post(
         email,
         password,
         base_salary,
-        deduction_income_tax,
+        income_tax_rate,
         deduction_other_deductions,
         deduction_uif,
         deduction_bonus,
@@ -2747,7 +2747,7 @@ app.post(
       const insertHistoryQuery = `
         INSERT INTO employee_deduction_history (
           employeeid, effective_date, income_tax_rate,
-          deduction_income_tax, deduction_other_deductions,
+          income_tax_rate, deduction_other_deductions,
           deduction_uif, deduction_bonus, deduction_savings,
           deduction_loan, deduction_damage
         ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
@@ -2755,7 +2755,7 @@ app.post(
 
       const historyValues = [
         newEmployee.userid, deductionDate, 0,
-        parseFloat(deduction_income_tax || 0),
+        parseFloat(income_tax_rate || 0),
         parseFloat(deduction_other_deductions || 0),
         parseFloat(deduction_uif || 0),
         parseFloat(deduction_bonus || 0),
@@ -2799,7 +2799,7 @@ app.put(
         email,
         password,
         base_salary,
-        deduction_income_tax,
+        income_tax_rate,
         deduction_other_deductions,
         deduction_uif,
         deduction_bonus,
@@ -2880,7 +2880,7 @@ app.put(
 
       // Prepare new deduction history values.
       const newValues = {
-        income_tax: parseFloat(deduction_income_tax || 0),
+        income_tax: parseFloat(income_tax_rate || 0),
         other: parseFloat(deduction_other_deductions || 0),
         uif: parseFloat(deduction_uif || 0),
         bonus: parseFloat(deduction_bonus || 0),
@@ -2900,7 +2900,7 @@ app.put(
       const last = lastRows[0];
       const isDuplicate =
         last &&
-        newValues.income_tax === parseFloat(last.deduction_income_tax) &&
+        newValues.income_tax === parseFloat(last.income_tax_rate) &&
         newValues.other === parseFloat(last.deduction_other_deductions) &&
         newValues.uif === parseFloat(last.deduction_uif) &&
         newValues.bonus === parseFloat(last.deduction_bonus) &&
@@ -2911,17 +2911,15 @@ app.put(
       if (!isDuplicate) {
         const insertHistoryQuery = `
           INSERT INTO employee_deduction_history (
-            employeeid, effective_date, income_tax_rate,
-            deduction_income_tax, deduction_other_deductions,
+            employeeid, effective_date, income_tax_rate, deduction_other_deductions,
             deduction_uif, deduction_bonus, deduction_savings,
             deduction_loan, deduction_damage
-          ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+          ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
         `;
         const deductionDate = new Date();
         const historyValues = [
           updatedEmployee.userid,
           deductionDate,
-          0,
           newValues.income_tax,
           newValues.other,
           newValues.uif,
@@ -3174,9 +3172,9 @@ app.get("/api/m5Clients/:id", verifyToken, async (req, res) => {
 // This endpoint creates a new client in the m5_client table.
 app.post("/api/m5Clients", verifyToken, async (req, res) => {
   try {
-    // Renamed the variable to avoid conflict with the database client
+    // Destructure & rename to avoid conflict with the pg client
     const {
-      client: clientName,  // Renamed to clientName
+      client: clientName,
       representative,
       companyaddress,
       suburb,
@@ -3191,11 +3189,26 @@ app.post("/api/m5Clients", verifyToken, async (req, res) => {
     
     const result = await pool.query(
       `INSERT INTO m5_client (
-        client, representative, companyaddress, suburb, postalcode, 
-        email, client_reg_num, cellnum, vatregno, city, streetaddress
-      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11) RETURNING *`,
+         client,
+         representative,
+         companyaddress,
+         suburb,
+         postalcode,
+         email,
+         client_reg_num,
+         cellnum,
+         vatregno,
+         city,
+         streetaddress,
+         status
+       ) VALUES (
+         $1, $2, $3, $4, $5,
+         $6, $7, $8, $9, $10,
+         $11, $12
+       )
+       RETURNING m5clientkey, client, representative, email, status`,
       [
-        clientName,  // Use the renamed variable
+        clientName,
         representative,
         companyaddress,
         suburb,
@@ -3206,6 +3219,7 @@ app.post("/api/m5Clients", verifyToken, async (req, res) => {
         vatregno,
         city,
         streetaddress,
+        true                  // <-- force status = true on creation
       ]
     );
 
@@ -3215,6 +3229,7 @@ app.post("/api/m5Clients", verifyToken, async (req, res) => {
     res.status(500).json({ error: "Failed to create client" });
   }
 });
+
 
 // Update client
 app.put("/api/m5Clients/:id", verifyToken, async (req, res) => {
@@ -3260,6 +3275,36 @@ app.put("/api/m5Clients/:id", verifyToken, async (req, res) => {
   }
 });
 
+// Toggle client status
+app.put("/api/clients/:id/toggle-status", verifyToken, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { status } = req.body;  // expecting boolean
+
+    // 1. ensure client exists
+    const { rows: existing } = await pool.query(
+      "SELECT m5clientkey FROM m5_client WHERE m5clientkey = $1",
+      [id]
+    );
+    if (existing.length === 0) {
+      return res.status(404).json({ message: "Client not found" });
+    }
+
+    // 2. update and return the updated row
+    const { rows } = await pool.query(
+      `UPDATE m5_client
+         SET status = $1
+       WHERE m5clientkey = $2
+       RETURNING m5clientkey, client, representative, email, status`,
+      [status, id]
+    );
+    res.status(200).json(rows[0]);
+
+  } catch (err) {
+    console.error(`Error toggling client ${req.params.id} status:`, err);
+    res.status(500).json({ error: "Failed to toggle client status" });
+  }
+});
 // Delete client
 app.delete("/api/m5Clients/:id", verifyToken, async (req, res) => {
   try {
