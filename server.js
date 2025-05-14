@@ -263,40 +263,52 @@ app.get("/check-session-test", (req, res) => {
 })
 
 // Passport Local Strategy for Authentication
+// Passport Local Strategy for Authentication
 passport.use(
   new LocalStrategy({ usernameField: "email" }, async (email, password, done) => {
-    let client
+    let client;
     try {
-      client = await pool.connect()
-      let result = await client.query("SELECT * FROM usertable WHERE email = $1", [email])
-
-      if (result.rows.length === 0) {
-        result = await client.query("SELECT * FROM m5_employee WHERE email = $1", [email])
-        if (result.rows.length === 0) {
-          console.log("No user found in both tables with email:", email)
-          return done(null, false, { message: "Invalid email or password" })
+      client = await pool.connect();
+      
+      // Attempt to fetch the user from the 'usertable'
+      let result = await client.query("SELECT * FROM usertable WHERE email = $1", [email]);
+      let user = null;
+      
+      if (result.rows.length > 0) {
+        user = result.rows[0];
+        // Manually set the table property
+        user.table = "usertable";
+      } else {
+        // If not found, try fetching from 'm5_employee'
+        result = await client.query("SELECT * FROM m5_employee WHERE email = $1", [email]);
+        if (result.rows.length > 0) {
+          user = result.rows[0];
+          user.table = "m5_employee";
+        } else {
+          console.log("No user found in both tables with email:", email);
+          return done(null, false, { message: "Invalid email or password" });
         }
       }
 
-      const user = result.rows[0]
-      console.log("Fetched user:", user)
+      console.log("Fetched user:", user);
 
-      const passwordMatch = await bcrypt.compare(password, user.password)
+      // Compare the provided password against the stored hash
+      const passwordMatch = await bcrypt.compare(password, user.password);
       if (!passwordMatch) {
-        console.log("Password mismatch for user:", email)
-        return done(null, false, { message: "Invalid email or password" })
+        console.log("Password mismatch for user:", email);
+        return done(null, false, { message: "Invalid email or password" });
       }
 
-      user.table = result.fields[0].table
-      return done(null, user)
+      return done(null, user);
     } catch (err) {
-      console.error("Error during authentication:", err)
-      return done(err)
+      console.error("Error during authentication:", err);
+      return done(err);
     } finally {
-      if (client) client.release()
+      if (client) client.release();
     }
   }),
-)
+);
+
 
 passport.serializeUser((user, done) => {
   console.log("Serializing user:", user)
@@ -452,7 +464,7 @@ const verifyToken = (req, res, next) => {
     }
   }
 }
-
+//login 1
 app.post("/login", async (req, res, next) => {
   passport.authenticate("local", async (err, user, info) => {
     if (err) {
@@ -569,6 +581,8 @@ app.post("/login", async (req, res, next) => {
     })
   })(req, res, next)
 })
+
+
 
 // Logout endpoint
 app.post("/logout", (req, res) => {
@@ -2572,6 +2586,65 @@ app.post("/api/company/deactivate", verifyToken, async (req, res) => {
     if (client) client.release()
   }
 })
+
+// Reactivate a company and all its users
+app.post("/api/company/reactivate", verifyToken, async (req, res) => {
+  let client
+  try {
+    const { company_reg_num } = req.body
+
+    if (!company_reg_num) {
+      return res.status(400).json({ error: "Company registration number is required" })
+    }
+
+    // Only admins (roleid 7) can reactivate companies
+    if (req.user.roleid !== 7) {
+      return res.status(403).json({ message: "You don't have permission to reactivate companies" })
+    }
+
+    client = await pool.connect()
+    await client.query("BEGIN")
+
+    // Reactivate the company admin
+    const companyAdminResult = await client.query(
+      "UPDATE usertable SET status = 'active' WHERE company_reg_num = $1 AND roleid = 1 RETURNING *",
+      [company_reg_num]
+    )
+
+    if (companyAdminResult.rows.length === 0) {
+      await client.query("ROLLBACK")
+      return res.status(404).json({ message: "Company not found or no admin associated with the company" })
+    }
+
+    // Reactivate all users from this company
+    await client.query(
+      "UPDATE usertable SET status = 'active' WHERE company_reg_num = $1",
+      [company_reg_num]
+    )
+
+    // Reactivate all employees from this company
+    await client.query(
+      "UPDATE m5_employee SET status = TRUE WHERE company_reg_num = $1",
+      [company_reg_num]
+    )
+
+    await client.query("COMMIT")
+
+    res.json({
+      message: "Company and all associated users have been reactivated",
+      company: companyAdminResult.rows[0].companyname,
+    })
+  } catch (err) {
+    if (client) {
+      await client.query("ROLLBACK")
+    }
+    console.error("Error reactivating company:", err)
+    res.status(500).json({ error: "Failed to reactivate company" })
+  } finally {
+    if (client) client.release()
+  }
+})
+
 
 // ------------------------------------------Module 0 Ends here---------------------------------- //
 
