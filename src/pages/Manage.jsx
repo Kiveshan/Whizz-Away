@@ -1224,11 +1224,9 @@ const renderDriverRatesTable = () => (
           >
             <option value="">Select Role</option>
             <option value="2">Controller</option>
-            <option value="3">Manager</option>
             <option value="4">Director</option>
             <option value="5">Driver</option>
-            <option value="6">Finance Clerk</option>
-            <option value="8">Yard Staff</option>
+            <option value="3">Finance Clerk</option>
           </select>
         </div>
   
