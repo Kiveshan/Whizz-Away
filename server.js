@@ -2820,14 +2820,14 @@ app.post(
       const insertHistoryQuery = `
         INSERT INTO employee_deduction_history (
           employeeid, effective_date, income_tax_rate,
-          income_tax_rate, deduction_other_deductions,
+           deduction_other_deductions,
           deduction_uif, deduction_bonus, deduction_savings,
           deduction_loan, deduction_damage
-        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
       `;
 
       const historyValues = [
-        newEmployee.userid, deductionDate, 0,
+        newEmployee.userid, deductionDate, 
         parseFloat(income_tax_rate || 0),
         parseFloat(deduction_other_deductions || 0),
         parseFloat(deduction_uif || 0),
