@@ -1265,7 +1265,7 @@ app.get("/api/invoices/completed", verifyToken, async (req, res) => {
     public.m1_controller m1
   LEFT JOIN 
     public.shipment s ON m1.shipment_type = s.shipkey
-  LEFT JOIN
+  JOIN
     public.invoice i ON m1.m1key = i.m1key
 
 `
