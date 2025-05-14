@@ -13,13 +13,11 @@ export default function DirectorAnalytics() {
     return `${monthNames[date.getMonth()]} ${date.getFullYear()}`;
   };
 
-
   const monthNames = [
     "January", "February", "March", "April", "May", "June",
     "July", "August", "September", "October", "November", "December"
   ];
 
-  // Set initial Month and Year to the current month and year
   const currentDate = new Date();
   const [activeMonth, setActiveMonth] = useState(monthNames[currentDate.getMonth()]);
   const [activeYear, setActiveYear] = useState(currentDate.getFullYear().toString());
@@ -29,7 +27,6 @@ export default function DirectorAnalytics() {
   const [error, setError] = useState(null);
   const navigate = useNavigate();
 
-  // Function to fetch fuel data from the database
   const fetchFuelData = async (month, year) => {
     setIsLoading(true);
     setError(null);
@@ -69,7 +66,6 @@ export default function DirectorAnalytics() {
     }
   };
 
-  // Function to fetch turnover data from the database
   const fetchTurnoverData = async (month, year) => {
     setIsLoading(true);
     setError(null);
@@ -105,7 +101,6 @@ export default function DirectorAnalytics() {
     }
   };
 
-  // Function to fetch aging analysis data from the database
   const fetchAgingAnalysisData = async (month, year) => {
     setIsLoading(true);
     setError(null);
@@ -141,7 +136,6 @@ export default function DirectorAnalytics() {
     }
   };
 
-  // Function to fetch turnover vs diesel cost data from the database
   const fetchTurnoverVsDieselCost = async (month, year) => {
     setIsLoading(true);
     setError(null);
@@ -150,15 +144,25 @@ export default function DirectorAnalytics() {
       const response = await axios.get('http://localhost:5000/api/turnover-vs-diesel-cost', {
         params: { month, year }
       });
-      console.log("API response:", response.data);
+
       if (response.data.success) {
-        const data = response.data.data.map(item => ({
-          month: item.month,
-          year: item.year,
-          totalTurnover: parseFloat(item.totalTurnover),
-          dieselCost: parseFloat(item.dieselCost),
-        }));
+        const data = response.data.data.map(item => {
+          console.log(`Received percentages: turnoverPercentage=${item.turnoverPercentage} (${typeof item.turnoverPercentage}), dieselCostPercentage=${item.dieselCostPercentage} (${typeof item.dieselCostPercentage})`);
+          return {
+            month: item.month,
+            year: item.year,
+            totalTurnover: Number(item.totalTurnover) || 0,
+            dieselCost: Number(item.dieselCost) || 0,
+            turnoverPercentage: item.turnoverPercentage ?? 0,
+            dieselCostPercentage: item.dieselCostPercentage ?? 0
+          };
+        });
+
         console.log("Processed turnover vs diesel cost data:", data);
+
+        // Set the chartData here for rendering in JSX
+        setChartData(data);  // Assuming setChartData updates your chart's state
+
         return data;
       } else {
         throw new Error(response.data.message || "Failed to fetch data");
@@ -172,7 +176,6 @@ export default function DirectorAnalytics() {
     }
   };
 
-  // Function to fetch income vs expense data using all expenses from expenses_m2
   const fetchIncomeVsExpenses = async (month, year) => {
     setIsLoading(true);
     setError(null);
@@ -203,7 +206,6 @@ export default function DirectorAnalytics() {
     }
   };
 
-  // Function to fetch turnover per truck from the database
   const fetchTurnoverPerTruck = async (month, year) => {
     setIsLoading(true);
     setError(null);
@@ -238,13 +240,43 @@ export default function DirectorAnalytics() {
     }
   };
 
+  const fetchWagesPerMonthData = async (month, year) => {
+    setIsLoading(true);
+    setError(null);
+    try {
+      console.log(`Fetching wages per month data for month: ${month}, year: ${year}`);
+      const response = await axios.get('http://localhost:5000/api/wages-per-month', {
+        params: { month, year }
+      });
+      console.log("API response:", response.data);
+
+      if (response.data.success) {
+        console.log("Wages per month data received:", response.data.data);
+        const wagesData = response.data.data.map(item => ({
+          month: item.month,
+          year: item.year,
+          wages: parseFloat(item.wages) || 0,
+        }));
+        console.log("Processed wages per month data:", wagesData);
+        return wagesData;
+      } else {
+        throw new Error(response.data.message || "Failed to fetch data");
+      }
+    } catch (err) {
+      console.error("Error fetching wages per month data:", err.response ? err.response.data : err.message);
+      setError(`Failed to fetch wages per month data: ${err.message}`);
+      return [];
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   const calculateStatus = (cost) => {
     if (cost <= 3500) return "good";
     if (cost <= 4500) return "warning";
     return "bad";
   };
 
-  // Placeholder data for other graphs
   const subcontractorTurnoverPerMonthData = [
     { month: "January", year: "2025", turnover: 10000 },
     { month: "February", year: "2025", turnover: 12000 },
@@ -265,19 +297,9 @@ export default function DirectorAnalytics() {
     { month: "March", year: "2024", totalTurnover: 58000, subcontractorTurnover: 14000 },
   ];
 
-  const wagesPerMonthData = [
-    { month: "January", year: "2025", wages: 20000 },
-    { month: "February", year: "2025", wages: 22000 },
-    { month: "March", year: "2025", wages: 21000 },
-    { month: "April", year: "2025", wages: 23000 },
-    { month: "May", year: "2025", wages: 24000 },
-    { month: "June", year: "2025", wages: 25000 },
-    { month: "March", year: "2024", wages: 20500 },
-  ];
-
   useEffect(() => {
     const loadData = async () => {
-      setChartData([]); // Reset chartData to avoid stale data
+      setChartData([]);
       let data = [];
       switch (activeFilter) {
         case "fuel":
@@ -303,9 +325,7 @@ export default function DirectorAnalytics() {
           );
           break;
         case "wagesPerMonth":
-          data = wagesPerMonthData.filter(
-            (item) => item.month === activeMonth && item.year === activeYear
-          );
+          data = await fetchWagesPerMonthData(activeMonth, activeYear);
           break;
         case "turnoverPerTruck":
           data = await fetchTurnoverPerTruck(activeMonth, activeYear);
@@ -329,7 +349,7 @@ export default function DirectorAnalytics() {
           <p className="tooltip-label">{label}</p>
           {payload.map((entry, index) => (
             <p key={index} className="tooltip-value" style={{ color: entry.color }}>
-              {entry.name}: R {entry.value.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+              {activeFilter === "incomeVsExpense" ? `${label}: R${entry.value.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : `${entry.name}: R${entry.value.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
             </p>
           ))}
         </div>
@@ -350,19 +370,61 @@ export default function DirectorAnalytics() {
       }
     }
     console.log("Falling back to default color");
-    return "#4169e1"; // Blue (fallback)
+    return "#4169e1";
   };
 
-  // Custom label for displaying amount (and percentage if applicable) on top of the bars
+  const CustomBarLabelForTurnover = (props) => {
+    const { x, y, width, value, payload = {} } = props;
+    const percentage = payload.turnoverPercentage ?? 0;
+    console.log("CustomBarLabelForTurnover - payload:", payload); // Debug log
+    return (
+      <text
+        x={x + width / 2}
+        y={y - 10}
+        fill="#4169e1"
+        textAnchor="middle"
+        dominantBaseline="middle"
+        fontSize={12}
+      >
+        R{value?.toLocaleString?.()} ({percentage}%)
+      </text>
+    );
+  };
+
+  const CustomBarLabelForDieselCost = (props) => {
+    const { x, y, width, value, payload = {} } = props;
+    const percentage = payload.dieselCostPercentage ?? 0;
+    console.log("CustomBarLabelForDieselCost- payload:", payload); // Debug log
+    return (
+      <text
+        x={x + width / 2}
+        y={y - 10}
+        fill="#ff6347"
+        textAnchor="middle"
+        dominantBaseline="middle"
+        fontSize={12}
+      >
+        R{value?.toLocaleString?.()} ({percentage}%)
+      </text>
+    );
+  };
+
   const CustomBarLabelForFuelAndTurnover = (props) => {
-    const { x, y, width, value, index } = props;
+    const { x, y, width, value, index, dataKey } = props;
 
     if (value === undefined || value === null) {
       console.log("CustomBarLabelForFuelAndTurnover: Value is undefined or null, skipping label");
       return null;
     }
 
+    // Debug logs to verify inputs
+    console.log(`CustomBarLabelForFuelAndTurnover: index=${index}, dataKey=${dataKey}, chartData=`, chartData);
+
+    // Use for filters other than turnoverVsDieselCost (e.g., fuel, turnoverPerTruck)
     const percentage = chartData[index]?.percentage || 0;
+
+    console.log(`Selected percentage: ${percentage}% for dataKey=${dataKey}`);
+
     const labelText = `R${value.toLocaleString()} (${percentage.toFixed(2)}%)`;
 
     return (
@@ -406,7 +468,6 @@ export default function DirectorAnalytics() {
   const renderChart = () => {
     console.log("Rendering chart with chartData:", chartData);
     switch (activeFilter) {
-      // Fuel Per Truck
       case "fuel":
         return (
           <div className="chart-wrapper">
@@ -425,7 +486,7 @@ export default function DirectorAnalytics() {
                     <Tooltip content={<CustomTooltip />} />
                     <Bar
                       dataKey="value"
-                      name="Fuel Expense (Rands)"
+                      name="Fuel Expense"
                       radius={[4, 4, 0, 0]}
                       fillOpacity={0.9}
                       isAnimationActive={true}
@@ -457,7 +518,6 @@ export default function DirectorAnalytics() {
           </div>
         );
 
-      // Turnover per month
       case "turnoverPerMonth":
         return (
           <div className="chart-wrapper">
@@ -475,7 +535,7 @@ export default function DirectorAnalytics() {
                   <Tooltip content={<CustomTooltip />} />
                   <Bar
                     dataKey="turnover"
-                    name="Turnover (Rands)"
+                    name="Turnover"
                     fill="#4169e1"
                     radius={[4, 4, 0, 0]}
                   >
@@ -487,7 +547,6 @@ export default function DirectorAnalytics() {
           </div>
         );
 
-      // 30, 60, 90, Current per month
       case "agingAnalysis":
         return (
           <div className="chart-wrapper">
@@ -524,7 +583,7 @@ export default function DirectorAnalytics() {
                     <Tooltip content={<CustomTooltip />} />
                     <Bar
                       dataKey="current"
-                      name="Current (Rands)"
+                      name="Current"
                       fill="#4169e1"
                       radius={[4, 4, 0, 0]}
                     >
@@ -532,7 +591,7 @@ export default function DirectorAnalytics() {
                     </Bar>
                     <Bar
                       dataKey="thirtyDays"
-                      name="30 Days (Rands)"
+                      name="30 Days"
                       fill="#4CAF50"
                       radius={[4, 4, 0, 0]}
                     >
@@ -540,7 +599,7 @@ export default function DirectorAnalytics() {
                     </Bar>
                     <Bar
                       dataKey="sixtyDays"
-                      name="60 Days (Rands)"
+                      name="60 Days"
                       fill="#FFC107"
                       radius={[4, 4, 0, 0]}
                     >
@@ -548,7 +607,7 @@ export default function DirectorAnalytics() {
                     </Bar>
                     <Bar
                       dataKey="ninetyDays"
-                      name="90 Days (Rands)"
+                      name="90 Days"
                       fill="#F44336"
                       radius={[4, 4, 0, 0]}
                     >
@@ -561,7 +620,6 @@ export default function DirectorAnalytics() {
           </div>
         );
 
-      // Subcontractor turnover per month
       case "subcontractorTurnoverPerMonth":
         return (
           <div className="chart-wrapper">
@@ -575,7 +633,7 @@ export default function DirectorAnalytics() {
                   <Tooltip content={<CustomTooltip />} />
                   <Bar
                     dataKey="turnover"
-                    name="Subcontractor Turnover (Rands)"
+                    name="Subcontractor Turnover"
                     fill="#4169e1"
                     radius={[4, 4, 0, 0]}
                   >
@@ -587,7 +645,6 @@ export default function DirectorAnalytics() {
           </div>
         );
 
-      // Subcontractor turnover vs Turnover
       case "subcontractorVsTurnover":
         return (
           <div className="chart-wrapper">
@@ -613,7 +670,7 @@ export default function DirectorAnalytics() {
                     <Legend />
                     <Bar
                       dataKey="totalTurnover"
-                      name="Total Turnover (Rands)"
+                      name="Total Turnover"
                       fill="#9C27B0"
                       radius={[4, 4, 0, 0]}
                     >
@@ -621,7 +678,7 @@ export default function DirectorAnalytics() {
                     </Bar>
                     <Bar
                       dataKey="subcontractorTurnover"
-                      name="Subcontractor Turnover (Rands)"
+                      name="Subcontractor Turnover"
                       fill="#E91E63"
                       radius={[4, 4, 0, 0]}
                     >
@@ -634,11 +691,14 @@ export default function DirectorAnalytics() {
           </div>
         );
 
-      // Wages (total) per month
       case "wagesPerMonth":
         return (
           <div className="chart-wrapper">
-            {!Array.isArray(chartData) || chartData.length === 0 ? (
+            {isLoading ? (
+              <div className="loading-indicator">Loading wages data...</div>
+            ) : error ? (
+              <div className="error-message">{error}</div>
+            ) : !Array.isArray(chartData) || chartData.length === 0 ? (
               <div className="no-data-message">No wages data available for {activeMonth} {activeYear}</div>
             ) : (
               <ResponsiveContainer width="100%" height={350}>
@@ -648,7 +708,7 @@ export default function DirectorAnalytics() {
                   <Tooltip content={<CustomTooltip />} />
                   <Bar
                     dataKey="wages"
-                    name="Wages (Rands)"
+                    name="Wages"
                     fill="#4169e1"
                     radius={[4, 4, 0, 0]}
                   >
@@ -660,8 +720,8 @@ export default function DirectorAnalytics() {
           </div>
         );
 
-      // Turnover vs Diesel cost
       case "turnoverVsDieselCost":
+        console.log("turnoverVsDieselCost chartData:", chartData);
         return (
           <div className="chart-wrapper">
             {isLoading ? (
@@ -688,21 +748,11 @@ export default function DirectorAnalytics() {
                     <YAxis label={{ value: 'Amount (R)', angle: 0, position: 'top', dy: -20 }} />
                     <Tooltip content={<CustomTooltip />} />
                     <Legend />
-                    <Bar
-                      dataKey="totalTurnover"
-                      name="Turnover (Rands)"
-                      fill="#4169e1"
-                      radius={[4, 4, 0, 0]}
-                    >
-                      <LabelList dataKey="totalTurnover" content={CustomBarLabelForFuelAndTurnover} position="top" />
+                    <Bar dataKey="totalTurnover" name="Turnover" fill="#4169e1" radius={[4, 4, 0, 0]}>
+                      <LabelList dataKey="totalTurnover" content={CustomBarLabelForTurnover} position="top" />
                     </Bar>
-                    <Bar
-                      dataKey="dieselCost"
-                      name="Diesel Cost (Rands)"
-                      fill="#ff6347"
-                      radius={[4, 4, 0, 0]}
-                    >
-                      <LabelList dataKey="dieselCost" content={CustomBarLabelForFuelAndTurnover} position="top" />
+                    <Bar dataKey="dieselCost" name="Diesel Cost" fill="#ff6347" radius={[4, 4, 0, 0]}>
+                      <LabelList dataKey="dieselCost" content={CustomBarLabelForDieselCost} position="top" />
                     </Bar>
                   </BarChart>
                 </ResponsiveContainer>
@@ -711,7 +761,6 @@ export default function DirectorAnalytics() {
           </div>
         );
 
-      // Turnover per truck
       case "turnoverPerTruck":
         return (
           <div className="chart-wrapper">
@@ -729,7 +778,7 @@ export default function DirectorAnalytics() {
                   <Tooltip content={<CustomTooltip />} />
                   <Bar
                     dataKey="total_turnover"
-                    name="Turnover (Rands)"
+                    name="Turnover"
                     fill="#4169e1"
                     radius={[4, 4, 0, 0]}
                   >
@@ -741,7 +790,6 @@ export default function DirectorAnalytics() {
           </div>
         );
 
-      // Income vs expense per month
       case "incomeVsExpense":
         const totalExpenses = chartData.expenses ? chartData.expenses.reduce((sum, item) => sum + parseFloat(item.total_cost || 0), 0) : 0;
         const incomeVsExpenseData = [
@@ -770,19 +818,17 @@ export default function DirectorAnalytics() {
                 </div>
                 <ResponsiveContainer width="100%" height={350}>
                   <BarChart data={incomeVsExpenseData} margin={{ top: 40, right: 30, left: 60, bottom: 40 }}>
-                    <XAxis dataKey="name" />
+                    <XAxis dataKey="name" tick={{ fill: '#000' }} />
                     <YAxis label={{ value: 'Amount (R)', angle: 0, position: 'top', dy: -20 }} />
                     <Tooltip content={<CustomTooltip />} />
-                    <Legend />
                     <Bar
                       dataKey="value"
-                      name="Amount (Rands)"
                       radius={[4, 4, 0, 0]}
                     >
                       {incomeVsExpenseData.map((entry, index) => (
                         <Cell key={`cell-${index}`} fill={entry.fill} />
                       ))}
-                      <LabelList dataKey="value" content={CustomBarLabelForFuelAndTurnover} position="top" />
+                      <LabelList dataKey="value" content={CustomBarLabelForDefault} position="top" />
                     </Bar>
                   </BarChart>
                 </ResponsiveContainer>
