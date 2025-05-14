@@ -1782,7 +1782,7 @@ const renderTruckForm = () => (
                 }
               }}
               disabled={(newTruck.documents?.length || 0) >= 3}
-              required
+              
             />
             <small>
               {(newTruck.documents?.length || 0) >= 3
