@@ -18,14 +18,14 @@ const ClientStatement = () => {
 
   // Add ref for PDF generation
   const statementRef = useRef(null)
-  const roleId = JSON.parse(localStorage.getItem('user')).roleid;
+  const roleId = JSON.parse(localStorage.getItem("user")).roleid
   console.log(roleId)
 
   // Auth helper function to get token from localStorage
   const getAuthHeader = () => {
-    const token = localStorage.getItem("token");
-    return token ? { "Authorization": `Bearer ${token}` } : {};
-  };
+    const token = localStorage.getItem("token")
+    return token ? { Authorization: `Bearer ${token}` } : {}
+  }
 
   useEffect(() => {
     if (!statementId) {
@@ -37,15 +37,15 @@ const ClientStatement = () => {
     const fetchStatement = async () => {
       try {
         const response = await fetch(`/api/statement/${statementId}`, {
-          headers: getAuthHeader()
+          headers: getAuthHeader(),
         })
-        
+
         if (response.status === 401 || response.status === 403) {
           // Handle unauthorized or forbidden
-          navigate("/");
-          return;
+          navigate("/")
+          return
         }
-        
+
         if (!response.ok) throw new Error("Failed to fetch statement")
         const data = await response.json()
 
@@ -152,13 +152,14 @@ const ClientStatement = () => {
   if (loading) return <div>Loading statement...</div>
   if (error) return <div className="error-message">Error: {error}</div>
   if (!statement) return <div>Please select a statement from the list.</div>
-  if (statement.invoices.length === 0 && statement.payments.length === 0) return <div>No transactions for this statement period.</div>
+  if (statement.invoices.length === 0 && statement.payments.length === 0)
+    return <div>No transactions for this statement period.</div>
 
   // Calculate totals (include payments)
-  const invoicedAmount = statement.invoices.reduce((sum, inv) => sum + inv.amount, 0);
-  const amountPaid = statement.payments.reduce((sum, payment) => sum + payment.amount, 0);
-  const openingBalance = statement.opening_balance; // Use the stored opening balance
-  const balanceDue = openingBalance - amountPaid + invoicedAmount;
+  const invoicedAmount = statement.invoices.reduce((sum, inv) => sum + inv.amount, 0)
+  const amountPaid = statement.payments.reduce((sum, payment) => sum + payment.amount, 0)
+  const openingBalance = statement.opening_balance // Use the stored opening balance
+  const balanceDue = openingBalance - amountPaid + invoicedAmount
 
   // Combine invoices and payments into a single transactions array
   const transactions = [
@@ -176,21 +177,21 @@ const ClientStatement = () => {
       amount: null,
       payment: payment.amount,
     })),
-  ].sort((a, b) => a.date - b.date); // Sort by date
+  ].sort((a, b) => a.date - b.date) // Sort by date
 
   // Calculate running balance
-  let runningBalance = openingBalance; // Start with the opening balance
+  let runningBalance = openingBalance // Start with the opening balance
   const transactionsWithBalance = transactions.map((tx) => {
     if (tx.type === "Invoice") {
-      runningBalance += tx.amount;
+      runningBalance += tx.amount
     } else {
-      runningBalance -= tx.payment;
+      runningBalance -= tx.payment
     }
-    return { ...tx, balance: runningBalance };
-  });
+    return { ...tx, balance: runningBalance }
+  })
 
   // Determine if this is a small table that should fit on one page
-  const isSmallTable = transactions.length <= 3; // Update to consider total transactions
+  const isSmallTable = transactions.length <= 3 // Update to consider total transactions
 
   // Update the date formatting in the transactions table to ensure it fits in the column
   return (
@@ -209,7 +210,9 @@ const ClientStatement = () => {
             <div className="client-name">{statement.client.representative}</div>
             <div className="client-email">{statement.client.email}</div>
             <div className="client-phone">{statement.client.phone}</div>
-            <div className="client-address">{statement.client.address}</div>
+            <div className="client-address" style={{ maxWidth: "250px", overflowWrap: "break-word" }}>
+              {statement.client.address}
+            </div>
           </div>
 
           {/* Statement Title and Account Summary - Right Side */}
@@ -340,7 +343,7 @@ const ClientStatement = () => {
                 state: {
                   clientId: statement.client.id,
                   clientName: statement.client.name,
-                }
+                },
               })
             }
           }}
