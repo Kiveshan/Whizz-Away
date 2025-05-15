@@ -897,8 +897,8 @@ const renderDriverRatesTable = () => (
               <th>Ending Point</th>
               <th>Driver Rate (6m)</th>
               <th>Driver Rate (12m)</th>
-              <th>Subie Rate (6m)</th>
-              <th>Subie Rate (12m)</th>
+              <th>Subbie Rate (6m)</th>
+              <th>Subbie Rate (12m)</th>
               <th>Updated at</th>
               <th>Changes</th>
               <th>Delete</th>
@@ -931,7 +931,7 @@ const renderDriverRatesTable = () => (
       )}
       <center>
         <button className="manage-add-driver-rate-button" onClick={() => setShowDriverRateForm(true)}>
-          Add Driver Rate
+          New Rate
         </button>
       </center>
     </div>
@@ -1227,6 +1227,7 @@ const renderDriverRatesTable = () => (
             <option value="4">Director</option>
             <option value="5">Driver</option>
             <option value="3">Finance Clerk</option>
+             <option value="">Yard Staff</option>
           </select>
         </div>
   
@@ -1914,7 +1915,7 @@ const renderDriverRateForm = () => (
       className="manage-driver-rate-form"
       noValidate
     >
-      <h2 className="manage-form-title">Add Driver Rate</h2>
+      <h2 className="manage-form-title">Add Rate</h2>
   
       <div className="manage-form-group">
         <div className="form-row">
@@ -2004,7 +2005,7 @@ const renderDriverRateForm = () => (
         <div className="form-row">
           <div className="form-field">
             <label>
-              <strong>Subie Rate (6m)</strong>
+              <strong>Subbie Rate (6m)</strong>
             </label>
             <input
               type="number"
@@ -2025,7 +2026,7 @@ const renderDriverRateForm = () => (
   
           <div className="form-field">
             <label>
-              <strong>Subie Rate (12m)</strong>
+              <strong>Subbie Rate (12m)</strong>
             </label>
             <input
               type="number"

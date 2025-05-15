@@ -307,7 +307,7 @@ const ClientStatement = () => {
                     <th>Current</th>
                     <th>30 Days</th>
                     <th>60 Days</th>
-                    <th>90 Days</th>
+                    <th>90 Days + </th>
                   </tr>
                 </thead>
                 <tbody>
