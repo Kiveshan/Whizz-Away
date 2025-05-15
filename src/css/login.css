@@ -22,9 +22,9 @@
   margin-bottom: 2rem;
 }
 
-.logo-image1 {
-  width: 120px;
-  height: 120px;
+.logo-image5 {
+  width: 160px;
+  height: 160px;
   object-fit: cover;
 }
 
@@ -147,4 +147,12 @@ label {
   border-radius: 4px;
   margin-bottom: 20px;
   text-align: center;
+}
+
+.login-form h2 {
+  text-align: center;
+  margin-bottom: 1.5rem;
+  font-size: 1.5rem;
+
+  margin-top: 35px;
 }
