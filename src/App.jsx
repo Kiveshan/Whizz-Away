@@ -20,7 +20,7 @@ import DriverWageList from "./pages/DriverWageList"
 import Expenses from "./pages/Expenses"
 import Analytics from "./pages/Analytics"
 import Debtors from "./pages/Debtors"
-
+import CreditorsDashboard from "./pages/Creditors/purchaseOrder/views/CreditorsDashboard"
 import Manage from "./pages/Manage"
 import DriverWageSlip from "./pages/DriverWageSlip"
 import Landing from "./pages/Landing"
@@ -81,12 +81,18 @@ import ExpenseSubmission from "./finance clerkpages/ExpenseSubmission"
 import ViewClientInstruction from "./finance clerkpages/ViewClientInstruction"
 import ViewClientInvoice from "./finance clerkpages/ViewClientInvoice"
 import DebtorsDashboard from "./finance clerkpages/DebtorsDashboard"
-import CreditorsDashboard from "./finance clerkpages/CreditorsDashboard"
 import FClerkLegDetails from "./finance clerkpages/FClerkLegDetails"
 import FCcontrollerinstructions from "./finance clerkpages/FCcontrollerinstructions"
 import FCcontrollerInstructionDetails from "./finance clerkpages/FCcontrollerInstructionDetails"
-
+import CreditorsOther from "./pages/Creditors/purchaseOrder/views/CreditorsOther"
+import CreatePO from "./pages/Creditors/purchaseOrder/views/CreatePO"
+import POForm from "./pages/Creditors/purchaseOrder/views/POForm"
+import FilterPO from "./pages/Creditors/purchaseOrder/views/FilterPO"
+import CredStatements from "./pages/Creditors/Statements/views/CredStatements"
+import ViewPOForm from "./pages/Creditors/purchaseOrder/views/ViewPOForm"
+import ViewStatement from "./pages/Creditors/Statements/views/ViewStatement";
 // CSS Imports
+
 import "./css/card.css"
 import "./css/components.css"
 import "./css/layout.css"
@@ -113,7 +119,7 @@ function DynamicHeader() {
     "/expenses": "Truck Expenses",
     "/analytics": "Analytics",
     "/debtors": "Debtors",
-    "/FDashboard": "Finance Clerk",
+    "/FDashboard": "Debtors Clerk",
     "/instructions": "Instruction",
     "/update-instructions": "Assignment",
     "/Upload-Instruction-Documents": "Instruction Documents",
@@ -135,6 +141,7 @@ function DynamicHeader() {
     "/ViewClientInvoice": "Invoice",
     "/DebtorsDashboard": "Debtors",
     "/CreditorsDashboard": "Creditors",
+    "/FuelPage":"Fuel",
     "/DirectorDashboard": "Director",
     "/ManagerCreditorsDash": "Creditors",
     "/ManagerViewFuelExpence": "Truck Expenses",
@@ -142,10 +149,10 @@ function DynamicHeader() {
     "/ManagerLegDetails": "Wages",
     "/ManagerViewAssignment": "View Assignment",
     "/FinancialDocumentsView": "Client Documents",
-
+    "/Creditors/PurchaseOrders":"Purchase Orders",
     "/CompanyInstructionView": "Instruction ",
     "/CompanyInstructions": "Instruction ",
-
+    "/Creditors/CreditorsOther"     : "Creditors",
     "/DirectorManagerViewAssignment": "View Assignment",
     "/DirectorDocs":"Documents",
     "/DirectorAnalytics": "Analytics",
@@ -163,10 +170,14 @@ function DynamicHeader() {
     "/DirectorExpenses": "Truck Expenses",
     "/ControllerDashboard": "Controller",
     "/FCcontrollerinstructions": "Instruction",
-    // Add these entries to the titleMap object in the DynamicHeader function
     "/Viewcontrollerinstructions": "Instruction",
     "/ViewcontrollerInstructionDetails": "Container Details",
     "/AdminDashboard": "Admin",
+    "/Creditors/CreatePO"      : "Expenses",
+    "/Creditors/POForm"       : "Purchase Order",
+    "/Creditors/PurchaseOrder/View": "Purchase Order",
+    "/Creditors/CredStatements"   : "Purchase Orders",
+    "/Creditors/ViewStatement": "Statement of Expenses",
   }
 
   const getTitle = () => {
@@ -272,15 +283,20 @@ function ContentWrapper() {
         <Route path="/ExpenseSubmission" element={<ExpenseSubmission />} />
         <Route path="/ViewClientInstruction" element={<ViewClientInstruction />} />
         <Route path="/ViewClientInvoice" element={<ViewClientInvoice />} />
-
-        {/* Add this route to handle /invoice without an ID */}
-        <Route path="/invoice" element={<Navigate to="/invoices" replace />} />
-
+        <Route path="/Creditors/CreditorsOther" element={<CreditorsOther/>}/>
+        <Route path="/Creditors/CreatePO" element={<CreatePO/>}/>
+        <Route path="/Creditors/POForm" element={<POForm />} />
+        <Route path="/Creditors/PurchaseOrders" element={<FilterPO />} />
+        <Route path="/Creditors/CredStatements" element={<CredStatements />} />
+        <Route path="/Creditors/PurchaseOrder/View" element={<ViewPOForm />} />
+        <Route path="/Creditors/ViewStatement" element={<ViewStatement />} />
         {/* Add the routes for invoice viewing and downloading */}
+        <Route path="/invoice" element={<Navigate to="/invoices" replace />} />
         <Route path="/invoice/:id" element={<ClientInvoice />} />
         <Route path="/invoice/:id/download" element={<ClientInvoice />} />
         <Route path="/DebtorsDashboard" element={<DebtorsDashboard />} />
         <Route path="/CreditorsDashboard" element={<CreditorsDashboard />} />
+        <Route path="/FuelPage" element={<ViewExpense/>} />
         <Route path="/FClerkLegDetails" element={<FClerkLegDetails />} />
         <Route path="/FCcontrollerinstructions" element={<FCcontrollerinstructions />} />
         <Route path="/FCcontrollerInstructionDetails" element={<FCcontrollerInstructionDetails />} />

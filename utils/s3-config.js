@@ -234,7 +234,7 @@ const uploadFuelSlipToS3 = async (file, truckId) => {
 const fuelExpenseUpload = multer({
   storage: storage,
   limits: {
-    fileSize: 5 * 1024 * 1024, // 5MB file size limit
+    fileSize: 50 * 1024 * 1024, 
   },
   fileFilter: (req, file, cb) => {
     const filetypes = /jpeg|jpg|png|pdf/

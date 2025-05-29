@@ -1,4 +1,3 @@
-
 import express from "express"
 import { uploadFuelExpenseToS3, uploadFuelSlipToS3Bucket, getSignedUrl } from "../utils/s3-config.js"
 import pg from "pg"
@@ -14,7 +13,7 @@ const pool = new pg.Pool({
   host: process.env.POSTGRES_HOST,
   database: process.env.POSTGRES_DB,
   password: process.env.POSTGRES_PASSWORD,
-  port:  process.env.POSTGRES_PORT,
+  port: process.env.POSTGRES_PORT,
   ssl: process.env.DB_SSL ? { rejectUnauthorized: false } : false,
 })
 
@@ -23,10 +22,8 @@ router.get("/truck/:truckId", async (req, res) => {
   try {
     const truckId = req.params.truckId
 
-    // Log the request
     console.log(`Getting expenses for truck ID: ${truckId}`)
 
-    // Query to get all expenses for the truck
     const query = `
       SELECT * FROM public.expenses_m2 
       WHERE truckid = $1
@@ -35,7 +32,6 @@ router.get("/truck/:truckId", async (req, res) => {
 
     const result = await pool.query(query, [truckId])
 
-    // Log the result count
     console.log(`Found ${result.rows.length} expenses for truck ID: ${truckId}`)
 
     res.json(result.rows)
@@ -52,7 +48,6 @@ router.get("/truck/:truckId", async (req, res) => {
 router.post("/", (req, res) => {
   console.log("S3 expense upload route accessed")
 
-  // Use the uploadFuelExpenseToS3 middleware
   uploadFuelExpenseToS3.single("slip")(req, res, async (err) => {
     if (err) {
       console.error("Error in multer upload:", err)
@@ -73,9 +68,9 @@ router.post("/", (req, res) => {
     console.log("File:", req.file)
 
     try {
-      const { documentFrom, expenseCost } = req.body
+      const { documentFrom, expenseCost, orderno } = req.body
       let { driverId, truckId } = req.body
-      const uploadDate = new Date().toISOString().split("T")[0] // Format: YYYY-MM-DD
+      const uploadDate = new Date().toISOString().split("T")[0]
 
       // Validate file upload
       if (!req.file) {
@@ -85,10 +80,24 @@ router.post("/", (req, res) => {
         })
       }
 
+      // Validate orderno
+      if (!orderno) {
+        return res.status(400).json({
+          success: false,
+          message: "Order number is required",
+        })
+      }
+      const parsedOrderNo = Number.parseInt(orderno)
+      if (isNaN(parsedOrderNo)) {
+        return res.status(400).json({
+          success: false,
+          message: "Invalid order number format",
+        })
+      }
+
       // Upload file to S3 with proper folder structure
       const s3Key = await uploadFuelSlipToS3Bucket(req.file, truckId)
       
-      // Get S3 file information
       const slipName = req.file.originalname
       console.log("S3 Upload successful:", {
         slipName,
@@ -125,21 +134,20 @@ router.post("/", (req, res) => {
           })
         }
       }
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-      // Get driver name if documentFrom is "Driver"
+
       let documentSource = documentFrom
-      let userId = null;  // Default to null, will be set in specific cases
-      
+      let userId = null
+
       if (documentFrom === "Driver" && driverId) {
         try {
           const driverResult = await pool.query(
             "SELECT CONCAT(name, ' ', surname) as fullname FROM m5_employee WHERE userid = $1",
             [driverId],
           )
-      
+
           if (driverResult.rows.length > 0) {
             documentSource = driverResult.rows[0].fullname
-            userId = driverId  // Correct assignment here
+            userId = driverId
           }
         } catch (driverErr) {
           console.error("Error fetching driver name:", driverErr)
@@ -147,12 +155,11 @@ router.post("/", (req, res) => {
       } else if (documentFrom === "Manager") {
         try {
           console.log("Manager selected, querying usertable for manager")
-      
-          // Query specifically from usertable where roleid = 1 (Manager)
+
           const managerResult = await pool.query("SELECT * FROM usertable WHERE roleid = 1 AND userid = 1")
-      
+
           console.log("Manager query result:", managerResult.rows)
-      
+
           if (managerResult.rows.length > 0) {
             documentSource = `${managerResult.rows[0].name} ${managerResult.rows[0].surname}`
             userId = managerResult.rows[0].userid
@@ -160,19 +167,19 @@ router.post("/", (req, res) => {
           } else {
             console.error("No manager found in usertable with roleid = 1")
             documentSource = "Manager"
-            userId = null // Explicitly set to null
+            userId = null
           }
         } catch (managerErr) {
           console.error("Error fetching manager name:", managerErr)
           documentSource = "Manager"
-          userId = null // Explicitly set to null
+          userId = null
         }
       } else if (documentFrom === "Controller") {
         try {
           const controllerResult = await pool.query(
             "SELECT userid, CONCAT(name, ' ', surname) as fullname FROM m5_employee WHERE roleid = 2 LIMIT 1",
           )
-      
+
           if (controllerResult.rows.length > 0) {
             documentSource = controllerResult.rows[0].fullname
             userId = controllerResult.rows[0].userid
@@ -181,25 +188,26 @@ router.post("/", (req, res) => {
           console.error("Error fetching controller name:", controllerErr)
         }
       }
+
       try {
-        // First, try to insert with slipurl and s3key
         const query = `
           INSERT INTO public.expenses_m2 
-          (type, documentfrom, expensecost, description, slipname, s3key, slipuploaddate, truckid, driverid)
-          VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+          (type, documentfrom, expensecost, description, slipname, s3key, slipuploaddate, truckid, driverid, orderno)
+          VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
           RETURNING ekey
         `
 
         const values = [
-          "fuel", // Always "fuel" as per requirements
+          "fuel",
           documentSource,
           cost,
           "",
           slipName,
-          s3Key, // Store the S3 key for future URL generation
+          s3Key,
           uploadDate,
           truckId || null,
           userId || null,
+          parsedOrderNo,
         ]
 
         const result = await pool.query(query, values)
@@ -211,21 +219,20 @@ router.post("/", (req, res) => {
           data: {
             ekey: result.rows[0].ekey,
             slipName: slipName,
-            s3Key:s3Key
+            s3Key: s3Key
           },
         })
       } catch (error) {
-        // If the error is about the s3key column not existing
         if (error.message.includes('column "s3key" of relation "expenses_m2" does not exist')) {
           console.error("s3key column does not exist. Trying without s3key.")
 
           try {
             const fallbackQuery = `
-            INSERT INTO public.expenses_m2 
-            (type, documentfrom, expensecost, description, slipname, slipuploaddate, truckid, driverid)
-            VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
-            RETURNING ekey
-          `
+              INSERT INTO public.expenses_m2 
+              (type, documentfrom, expensecost, description, slipname, slipuploaddate, truckid, driverid, orderno)
+              VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+              RETURNING ekey
+            `
 
             const fallbackValues = [
               "fuel",
@@ -235,7 +242,8 @@ router.post("/", (req, res) => {
               slipName,
               uploadDate,
               truckId || null,
-              driverId || null,
+              userId || null,
+              parsedOrderNo,
             ]
 
             const fallbackResult = await pool.query(fallbackQuery, fallbackValues)
@@ -247,20 +255,17 @@ router.post("/", (req, res) => {
               data: {
                 ekey: fallbackResult.rows[0].ekey,
                 slipName: slipName,
-                warning:
-                  "S3 key not stored in database. Consider adding s3key column to expenses_m2 table for better URL management.",
+                warning: "S3 key not stored in database. Consider adding s3key column to expenses_m2 table for better URL management.",
               },
             })
           } catch (innerError) {
-            // If the error is about the slipurl column not existing
             if (innerError.message.includes('column "slipurl" of relation "expenses_m2" does not exist')) {
               console.error("slipurl column does not exist. Inserting without slipurl and s3key.")
 
-              // Insert without slipurl and s3key
               const basicQuery = `
                 INSERT INTO public.expenses_m2 
-                (type, documentfrom, expensecost, description, slipname, slipuploaddate, truckid, driverid)
-                VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+                (type, documentfrom, expensecost, description, slipname, slipuploaddate, truckid, driverid, orderno)
+                VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
                 RETURNING ekey
               `
 
@@ -272,7 +277,8 @@ router.post("/", (req, res) => {
                 slipName,
                 uploadDate,
                 truckId || null,
-                driverId || null,
+                userId || null,
+                parsedOrderNo,
               ]
 
               const basicResult = await pool.query(basicQuery, basicValues)
@@ -284,23 +290,20 @@ router.post("/", (req, res) => {
                 data: {
                   ekey: basicResult.rows[0].ekey,
                   slipName: slipName,
-                  warning:
-                    "S3 URL and key not stored in database. Please add s3key columns to expenses_m2 table.",
+                  warning: "S3 URL and key not stored in database. Please add s3key columns to expenses_m2 table.",
                 },
               })
             } else {
-              // For other errors, rethrow
               throw innerError
             }
           }
         } else if (error.message.includes('column "slipurl" of relation "expenses_m2" does not exist')) {
           console.error("slipurl column does not exist. Inserting without slipurl.")
 
-          // Insert without slipurl
           const fallbackQuery = `
             INSERT INTO public.expenses_m2 
-            (type, documentfrom, expensecost, description, slipname, slipuploaddate, truckid, driverid)
-            VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+            (type, documentfrom, expensecost, description, slipname, slipuploaddate, truckid, driverid, orderno)
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
             RETURNING ekey
           `
 
@@ -312,7 +315,8 @@ router.post("/", (req, res) => {
             slipName,
             uploadDate,
             truckId || null,
-            driverId || null,
+            userId || null,
+            parsedOrderNo,
           ]
 
           const fallbackResult = await pool.query(fallbackQuery, fallbackValues)
@@ -327,7 +331,6 @@ router.post("/", (req, res) => {
             },
           })
         } else {
-          // For other errors, rethrow
           throw error
         }
       }
@@ -342,12 +345,10 @@ router.post("/", (req, res) => {
   })
 })
 
-// GET endpoint to retrieve expense document
 router.get("/document/:id", async (req, res) => {
   try {
     const expenseId = req.params.id
 
-    // First, check if the columns exist in the table
     const checkColumnsQuery = `
       SELECT column_name 
       FROM information_schema.columns 
@@ -358,7 +359,6 @@ router.get("/document/:id", async (req, res) => {
     const columnsResult = await pool.query(checkColumnsQuery)
     const columnNames = columnsResult.rows.map((row) => row.column_name.toLowerCase())
 
-    // Build the query dynamically based on available columns
     const selectColumns = ["slipname"]
 
     if (columnNames.includes("slipurl")) {
@@ -388,7 +388,7 @@ router.get("/document/:id", async (req, res) => {
 
     let url = null
     if (s3key) {
-      url = getSignedUrl(s3key, 3600) // 1 hour expiry for viewing
+      url = getSignedUrl(s3key, 3600)
     } else {
       return res.status(404).json({
         success: false,
@@ -396,7 +396,6 @@ router.get("/document/:id", async (req, res) => {
       })
     }
 
-    // Determine file type for proper handling in the frontend
     let fileType = "image"
     if (slipname) {
       const extension = slipname.split(".").pop().toLowerCase()
@@ -405,7 +404,6 @@ router.get("/document/:id", async (req, res) => {
       }
     }
 
-    // Return the document URL and type
     res.json({
       success: true,
       url: url,

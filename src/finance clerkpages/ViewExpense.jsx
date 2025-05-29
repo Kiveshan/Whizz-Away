@@ -63,7 +63,7 @@ const ViewExpense = () => {
   return (
     <div className="expenses-container">
       <div className="client-payments-header">
-        <button className="back-button" onClick={() => navigate('/FDashboard')}>
+        <button className="back-button" onClick={() => navigate('/CreditorsDashboard')}>
           Back
         </button>
       </div>

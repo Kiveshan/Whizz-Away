@@ -395,39 +395,41 @@ function UpdateInstruction() {
     setShowRemoveLegModal(true)
   }
 
-  // Replace the useEffect that fetches legs with this updated version
-  useEffect(() => {
-    const fetchData = async () => {
-      try {
+useEffect(() => {
+  const fetchData = async () => {
+    try {
+      await fetchDrivers()
+      await fetchTruckRegNums()
+      await fetchShipmentType()
+
+      // If we have an instructionId, fetch legs first, then fetch starting points and destinations
+      if (instructionId) {
+        await fetchContainersForInstruction(instructionId)
+        await fetchLegsForInstruction(instructionId)
+        // Fetch starting points and destinations after legs are loaded
         await fetchStartingPoints()
         await fetchDestinations()
-        await fetchDrivers()
-        await fetchTruckRegNums()
-        await fetchShipmentType()
-
-        // If we have an instructionId, fetch containers for this instruction
-        if (instructionId) {
-          await fetchContainersForInstruction(instructionId)
-          await fetchLegsForInstruction(instructionId)
-          setInitialDataLoaded(true)
-        } else {
-          // Fallback to all containers if no specific instruction
-          await fetchAllContainers()
-          setInitialDataLoaded(true)
-        }
-      } catch (error) {
-        console.error("Error fetching initial data:", error)
-        setInitialDataLoaded(true) // Set to true even on error to prevent infinite loading
+        setInitialDataLoaded(true)
+      } else {
+        // If no instructionId, fetch starting points and destinations normally
+        await fetchStartingPoints()
+        await fetchDestinations()
+        await fetchAllContainers()
+        setInitialDataLoaded(true)
       }
+    } catch (error) {
+      console.error("Error fetching initial data:", error)
+      setInitialDataLoaded(true)
     }
+  }
 
-    fetchData()
+  fetchData()
 
-    // Reset the navigation state when component mounts
-    return () => {
-      isFromDocumentsPage.current = false
-    }
-  }, [instructionId]) // Only depend on instructionId
+  // Reset the navigation state when component mounts
+  return () => {
+    isFromDocumentsPage.current = false
+  }
+}, [instructionId])
 
   // Add a useEffect to log driver data whenever it changes
   useEffect(() => {
@@ -744,33 +746,103 @@ function UpdateInstruction() {
     }
   }
 
-  const fetchStartingPoints = async () => {
-    try {
-      const response = await fetch(`http://localhost:5000/starting-points`)
-      if (!response.ok) {
-        throw new Error("Failed to fetch starting points")
-      }
-      const data = await response.json()
-      console.log("Starting points from backend:", data)
-      setStartingPoints(data)
-    } catch (error) {
-      console.error("Error fetching starting points:", error)
-    }
-  }
+  // const fetchStartingPoints = async () => {
+  //   try {
+  //     const response = await fetch(`http://localhost:5000/starting-points`)
+  //     if (!response.ok) {
+  //       throw new Error("Failed to fetch starting points")
+  //     }
+  //     const data = await response.json()
+  //     console.log("Starting points from backend:", data)
+  //     setStartingPoints(data)
+  //   } catch (error) {
+  //     console.error("Error fetching starting points:", error)
+  //   }
+  // }
 
-  const fetchDestinations = async () => {
-    try {
-      const response = await fetch(`http://localhost:5000/destinations`)
-      if (!response.ok) {
-        throw new Error("Failed to fetch destinations")
-      }
-      const data = await response.json()
-      console.log("Destinations from backend:", data)
-      setDestinations(data)
-    } catch (error) {
-      console.error("Error fetching destinations:", error)
+  // const fetchDestinations = async () => {
+  //   try {
+  //     const response = await fetch(`http://localhost:5000/destinations`)
+  //     if (!response.ok) {
+  //       throw new Error("Failed to fetch destinations")
+  //     }
+  //     const data = await response.json()
+  //     console.log("Destinations from backend:", data)
+  //     setDestinations(data)
+  //   } catch (error) {
+  //     console.error("Error fetching destinations:", error)
+  //   }
+  // }
+  const fetchStartingPoints = async () => {
+  try {
+    // Fetch starting points from m5_driver_rate table
+    const response = await fetch(`http://localhost:5000/starting-points`)
+    if (!response.ok) {
+      throw new Error("Failed to fetch starting points")
     }
+    const driverRatePoints = await response.json()
+    console.log("Starting points from m5_driver_rate:", driverRatePoints)
+
+    // If we have an instructionId, also fetch starting points from saved legs
+    let legStartingPoints = []
+    if (instructionId) {
+      try {
+        const legResponse = await fetch(`http://localhost:5000/legs/${instructionId}`)
+        if (legResponse.ok) {
+          const legData = await legResponse.json()
+          legStartingPoints = [...new Set(legData.map(leg => leg.startingpoint).filter(Boolean))]
+          console.log("Starting points from saved legs:", legStartingPoints)
+        }
+      } catch (error) {
+        console.error("Error fetching starting points from legs:", error)
+      }
+    }
+
+    // Combine and deduplicate starting points
+    const allStartingPoints = [...new Set([...driverRatePoints, ...legStartingPoints])]
+    console.log("Combined starting points:", allStartingPoints)
+    
+    setStartingPoints(allStartingPoints)
+  } catch (error) {
+    console.error("Error fetching starting points:", error)
   }
+}
+
+// Replace the existing fetchDestinations function with this updated version
+const fetchDestinations = async () => {
+  try {
+    // Fetch destinations from m5_driver_rate table
+    const response = await fetch(`http://localhost:5000/destinations`)
+    if (!response.ok) {
+      throw new Error("Failed to fetch destinations")
+    }
+    const driverRateDestinations = await response.json()
+    console.log("Destinations from m5_driver_rate:", driverRateDestinations)
+
+    // If we have an instructionId, also fetch destinations from saved legs
+    let legDestinations = []
+    if (instructionId) {
+      try {
+        const legResponse = await fetch(`http://localhost:5000/legs/${instructionId}`)
+        if (legResponse.ok) {
+          const legData = await legResponse.json()
+          legDestinations = [...new Set(legData.map(leg => leg.destination).filter(Boolean))]
+          console.log("Destinations from saved legs:", legDestinations)
+        }
+      } catch (error) {
+        console.error("Error fetching destinations from legs:", error)
+      }
+    }
+
+    // Combine and deduplicate destinations
+    const allDestinations = [...new Set([...driverRateDestinations, ...legDestinations])]
+    console.log("Combined destinations:", allDestinations)
+    
+    setDestinations(allDestinations)
+  } catch (error) {
+    console.error("Error fetching destinations:", error)
+  }
+}
 
   // Update the fetchRate function to return a Promise so we can chain .then() calls
   const fetchRate = async (startingPoint, destination) => {
@@ -1034,9 +1106,6 @@ function UpdateInstruction() {
       }
       setLegs(updatedLegs)
     }
-
-    // Create a new leg in local state only (not in database yet)
-    // IMPORTANT: Initialize with an empty drivers array
     const newLeg = {
       id: `temp-${Date.now()}`, // Temporary ID to indicate this is not saved to DB yet
       legnumber: legs.length + 1,
@@ -1214,13 +1283,10 @@ function UpdateInstruction() {
         subbie_twelve_meter: 0,
       })
 
-      // Update driver rates to 0 immediately
-      // Force update driver rates based on the new rates
       if (drivers.length > 0) {
         const updatedDrivers = drivers.map((driver) => {
           const newDriver = { ...driver }
 
-          // Check if driver is a subcontractor (roleid = 6)
           const isSubcontractor = employeeDrivers.find((d) => d.userid.toString() === driver.driverid)?.roleid === 6
 
           // Check if this route has no rates
@@ -1775,111 +1841,11 @@ function UpdateInstruction() {
 
     return true
   }
-
-  // Function to check for duplicate driver information
-  // const checkForDuplicateDriver = async (driverToCheck) => {
-  //   console.log("Checking for duplicate driver:", driverToCheck)
-
-  //   // Create a signature for the driver we're checking
-  //   const driverSignature = `${driverToCheck.driverid}-${driverToCheck.truckregnumber}-${\
-  // driverToCheck.containernumber
-  // }
-  // ;-$
-  // {
-  //   driverToCheck.date
-  // }
-  // ;`
-  //   console.log("Driver signature:", driverSignature)
-
-  //   // First check within the current leg's drivers in memory
-  //   const currentLegDuplicates = drivers.filter((d) => {
-  //     // Skip the driver we're currently checking
-  //     if (d.id === driverToCheck.id) return false
-
-  //     const existingSignature = `
-  //     ${d.driverid}-${d.truckregnumber}-${d.containernumber}-${d.date}
-  //     `;
-  //     const isDuplicate = existingSignature === driverSignature
-
-  //     if (isDuplicate) {
-  //       console.log("Found duplicate in current leg's drivers:", d)
-  //       console.log("Existing signature:", existingSignature)
-  //     }
-
-  //     return isDuplicate
-  //   })
-
-  //   if (currentLegDuplicates.length > 0) {
-  //     console.log("Duplicate found in current leg:", currentLegDuplicates)
-  //     return true
-  //   }
-
-  //   // If we have an instruction ID and leg ID, also check against the database
-  //   if (instructionId && currentLagIndex !== null && legs[currentLagIndex].id) {
-  //     try {
-  //       console.log("Checking database for duplicates in current leg...")
-  //       const response = await fetch(`
-  //       localhost:5000/legs/${instructionId}`)
-
-  //       if (!response.ok) {
-  //         console.error("Error fetching legs for duplicate check:", response.statusText)
-  //         return false // Continue with save if we can't check
-  //       }
-
-  //       const allLegs = await response.json()
-  //       console.log("All legs from database:", allLegs)
-
-  //       // Find the current leg in the database
-  //       const currentLegId = legs[currentLagIndex].id
-  //       const currentLegFromDB = allLegs.find((leg) => leg.legkey === currentLegId)
-
-  //       console.log("Current leg from DB:", currentLegFromDB)
-
-  //       if (currentLegFromDB && currentLegFromDB.drivers) {
-  //         // Check against drivers in THIS leg from the database
-  //         const duplicateFound = currentLegFromDB.drivers.some((dbDriver) => {
-  //           // Skip the driver we're currently editing (if it has the same ID)
-  //           if (dbDriver.id === driverToCheck.id) return false
-
-  //           const dbDriverSignature = `${dbDriver.driverid}-${dbDriver.truckregnumber}-${dbDriver.containernumber}-${dbDriver.date}`
-  //           const isDuplicate = dbDriverSignature === driverSignature
-
-  //           if (isDuplicate) {
-  //             console.log("Found duplicate in database:", dbDriver)
-  //             console.log("DB driver signature:", dbDriverSignature)
-  //           }
-
-  //           return isDuplicate
-  //         })
-
-  //         if (duplicateFound) {
-  //           console.log("Duplicate found in database for current leg")
-  //           return true
-  //         }
-  //       }
-  //     } catch (error) {
-  //       console.error("Error checking for duplicates in database:", error)
-  //       // Continue with save even if this check fails
-  //     }
-  //   }
-
-  //   console.log("No duplicates found")
-  //   return false
-  // }
-
-  // Add this function before the handleSave function:
-
-  // Function to calculate the leg's driver rate based on container types
   const calculateLegDriverRate = (drivers, rates) => {
     if (!drivers || drivers.length === 0) {
       return 0
     }
 
-    // Don't average the rates - each driver should keep their own rate
-    // Just return the leg rate (which is separate from individual driver rates)
-    // This is typically the rate for the most common container type
-
-    // Count container types
     let sixMeterCount = 0
     let twelveMeterCount = 0
     let abnormalCount = 0
@@ -1960,59 +1926,7 @@ function UpdateInstruction() {
     }
 
     try {
-      setSaving(true) // Show saving indicator during checks
-
-      // Check for duplicate drivers within the current set of drivers
-      // const driverSignatures = new Set()
-      // const duplicateDrivers = []
-
-      // for (const driver of drivers) {
-      //   // Skip empty drivers
-      //   if (!driver.driverid || !driver.truckregnumber || !driver.containernumber || !driver.date) continue
-
-      //   const signature = `${driver.driverid}-${driver.truckregnumber}-${driver.containernumber}-${driver.date}`
-
-      //   if (driverSignatures.has(signature)) {
-      //     duplicateDrivers.push(driver)
-      //   } else {
-      //     driverSignatures.add(signature)
-      //   }
-      // }
-
-      // if (duplicateDrivers.length > 0) {
-      //   console.log("Found duplicate drivers in current set:", duplicateDrivers)
-      //   setDuplicateDriverInfo({
-      //     ...duplicateDrivers[0],
-      //     full_name: getDriverName(duplicateDrivers[0].driverid),
-      //   })
-      //   setShowDuplicateDriverModal(true)
-      //   return // Stop the save process
-      // }
-
-      // // Check ALL drivers for duplicates BEFORE attempting to save
-      // console.log("Checking all drivers for duplicates before saving...")
-      // for (const driver of drivers) {
-      //   // Skip empty drivers
-      //   if (!driver.driverid || !driver.truckregnumber || !driver.containernumber || !driver.date) continue
-
-      //   console.log("Checking driver for duplicates:", driver)
-      //   // Use the improved checkForDuplicateDriver function to check for duplicates
-      //   const isDuplicate = await checkForDuplicateDriver(driver)
-      //   if (isDuplicate) {
-      //     setSaving(false)
-      //     setDuplicateDriverInfo({
-      //       ...driver,
-      //       full_name: getDriverName(driver.driverid),
-      //     })
-      //     setShowDuplicateDriverModal(true)
-      //     return // Stop the save process
-      //   }
-      // }
-
-      // // If we get here, no duplicates were found, so we can proceed with saving
-      // console.log("No duplicates found, proceeding with save")
-
-      // Update the current leg with the latest form data
+      setSaving(true)
       const updatedLegs = [...legs]
       updatedLegs[currentLagIndex] = {
         ...updatedLegs[currentLagIndex],
@@ -2289,35 +2203,6 @@ function UpdateInstruction() {
     checkContainersDestination()
   }, [legs, instructionContainers, instructionId])
 
-  // Add this useEffect after the other useEffects
-  // useEffect(() => {
-  //   // This effect runs when currentLagIndex changes
-  //   if (currentLagIndex !== null && legs.length > 0 && legs[currentLagIndex]) {
-  //     const currentLeg = legs[currentLagIndex]
-
-  //     // If this leg has drivers, ensure they're properly loaded with all fields
-  //     if (currentLeg.drivers && currentLeg.drivers.length > 0) {
-  //       // Make a deep copy to ensure we don't lose any fields
-  //       const completeDrivers = currentLeg.drivers.map((driver) => ({
-  //         ...driver,
-  //         // Ensure these critical fields are preserved
-  //         container_type: driver.container_type || "",
-  //         driverRate: driver.driverRate || "",
-  //         full_name:
-  //           driver.full_name ||
-  //           (driver.driver_name && driver.driver_surname
-  //             ? `${driver.driver_name} ${driver.driver_surname}`
-  //             : driver.driverid
-  //               ? `Driver ID: ${driver.driverid}`
-  //               : "Unknown Driver"),
-  //         isAbnormal: driver.container_type === "abnormal" || driver.isAbnormal,
-  //       }))
-
-  //       setDrivers(completeDrivers)
-  //     }
-  //   }
-  // }, [currentLagIndex, legs])
-  // Add this useEffect to update driver rates whenever the rates state changes
   useEffect(() => {
     // Only update if we have drivers and rates
     if (drivers.length > 0 && (rates.six_meter !== undefined || rates.twelve_meter !== undefined)) {
@@ -2462,8 +2347,6 @@ function UpdateInstruction() {
         </div>
       )}
 
-      {/* Main Form */}
-      {/* Main Form */}
       <div className="px-4">
         {/* Update the UI to show when fields have been edited */}
         <div className="bg-blue-50 p-6 rounded-md mb-4">
@@ -2566,7 +2449,9 @@ function UpdateInstruction() {
                         <label
                           style={{ display: "block", color: "#374151", fontWeight: "500", marginBottom: "0.25rem" }}
                         >
-                          Driver
+                          {employeeDrivers.find((d) => d.userid.toString() === entry.driverid)?.roleid === 6
+                            ? "Driver (subbie)"
+                            : "Driver"}
                         </label>
                         <select
                           style={{
@@ -2766,8 +2651,6 @@ function UpdateInstruction() {
                                 : (rates && rates.twelve_meter ? rates.twelve_meter.toString() : "0")
 
                               console.log("Using rates - 6m:", sixMeterRate, "12m:", twelveMeterRate)
-
-                              // Check for "abnormal" with case-insensitive comparison and trim spaces
                               if (containerType.toLowerCase() === "abnormal") {
                                 // For abnormal container types, keep existing rate if available
                                 updatedDrivers[index].driverRate = updatedDrivers[index].driverRate || twelveMeterRate
@@ -3037,7 +2920,6 @@ function UpdateInstruction() {
             </div>
             <div className="modal-body">
               <div className="modal-item">
-                {/* Remove the "checked" class since the destinations don't match */}
                 <div className="modal-bullet"></div>
                 <span className="modal-item-text">
                   Last Leg Destination: <strong>{mismatchDetails.lastLegDestination}</strong>
@@ -3066,7 +2948,6 @@ function UpdateInstruction() {
         </div>
       )}
 
-      {/* Container Validation Modal */}
       {showContainerModal && (
         <div className="modal-wrapper">
           <div className="modal-backdrop animate-fadeIn"></div>
@@ -3247,22 +3128,17 @@ function UpdateInstruction() {
                         // Calculate the leg's driver rate based on container types
                         driverrate: calculateLegDriverRate(updatedDrivers, rates),
                         m1key: instructionId,
-                        // Also update the same logic in the driver removal handler in the showRemoveDriverModal section
-                        // Find the drivers mapping in the onClick handler of the "Yes" button and replace with:
                         drivers: updatedDrivers.map((driver) => {
-                          // Determine the driver rate based on container type
                           let driverRateToSave = "0"
 
                           if (driver.container_type === "12m") {
                             driverRateToSave = rates.twelve_meter.toString()
                           } else if (driver.container_type === "abnormal") {
-                            driverRateToSave = driver.driverRate || "0" // Use user input for abnormal
+                            driverRateToSave = driver.driverRate || "0" 
                           } else {
                             // Default to 6m rate
                             driverRateToSave = rates.six_meter.toString()
                           }
-
-                          // Log individual driver rate for debugging
                           console.log(
                             `Driver ${driver.driverid} with container type ${driver.container_type} has rate: ${driverRateToSave}`,
                           )

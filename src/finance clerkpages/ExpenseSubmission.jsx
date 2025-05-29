@@ -7,8 +7,6 @@ import "../finance clerkpages/css/Expenses1.css"
 const ExpenseSubmission = ({ onBack }) => {
   const navigate = useNavigate()
   const location = useLocation()
-
-  // Get truck information from location state
   const truckId = location.state?.truckId
   const truckRegNum = location.state?.truckRegNum
 
@@ -17,6 +15,7 @@ const ExpenseSubmission = ({ onBack }) => {
     expenseCost: "500",
     driverName: "",
     driverFullName: "",
+    orderno: "",
   })
 
   const [file, setFile] = useState(null)
@@ -64,7 +63,7 @@ const ExpenseSubmission = ({ onBack }) => {
     const { name, value } = e.target
     setFormData({
       ...formData,
-      [name]: value,
+      [name]: name === "orderno" ? value.replace(/[^0-9]/g, "") : value,
     })
 
     if (name === "documentFrom" && value !== "Driver") {
@@ -96,7 +95,6 @@ const ExpenseSubmission = ({ onBack }) => {
         }
         reader.readAsDataURL(selectedFile)
       } else {
-        // For non-image files like PDFs
         setFilePreview(null)
       }
     }
@@ -108,105 +106,98 @@ const ExpenseSubmission = ({ onBack }) => {
     setSubmitMessage("")
     setUploadProgress(0)
 
-    // Validate truck ID
     if (!truckId) {
       setSubmitMessage("Error: No truck selected")
       setIsSubmitting(false)
       return
     }
 
-    // Validate driver selection if "Driver" is selected
     if (formData.documentFrom === "Driver" && !formData.driverName) {
       setSubmitMessage("Error: Please select a driver")
       setIsSubmitting(false)
       return
     }
 
-    // Validate file upload
     if (!file) {
       setSubmitMessage("Error: Please upload a petrol slip")
       setIsSubmitting(false)
       return
     }
 
-    try {
-      // Create FormData object for the server request
-      const formDataToSend = new FormData()
+    if (!formData.orderno) {
+      setSubmitMessage("Error: Please enter an order number")
+      setIsSubmitting(false)
+      return
+    }
 
-      // Add data to FormData
+    try {
+      const formDataToSend = new FormData()
       formDataToSend.append("documentFrom", formData.documentFrom)
       formDataToSend.append("expenseCost", formData.expenseCost)
       formDataToSend.append("truckId", truckId)
-      formDataToSend.append("slip", file) // Add the file
+      formDataToSend.append("slip", file)
+      formDataToSend.append("orderno", formData.orderno)
 
-      // Only add driverId if documentFrom is "Driver"
       if (formData.documentFrom === "Driver" && formData.driverName) {
         formDataToSend.append("driverId", formData.driverName)
       }
-    
-      // Simulate upload progress
+
       setUploadProgress(10)
       setTimeout(() => setUploadProgress(30), 300)
       setTimeout(() => setUploadProgress(50), 600)
 
       console.log("Sending expense data to server with S3 upload...")
-      try {
-        const response = await fetch("http://localhost:5000/expenses", {
-          method: "POST",
-          body: formDataToSend,
-        })
+      const response = await fetch("http://localhost:5000/expenses", {
+        method: "POST",
+        body: formDataToSend,
+      })
 
-        // Check if the response is JSON
-        const contentType = response.headers.get("content-type")
-        if (!contentType || !contentType.includes("application/json")) {
-          throw new Error(`Server returned non-JSON response: ${await response.text()}`)
-        }
-
-        const result = await response.json()
-
-        if (!response.ok) {
-          throw new Error(result.message || "Failed to submit expense")
-        }
-
-        setUploadProgress(100)
-        console.log("Submission successful:", result)
-
-        // Check if there's a warning about slipurl column
-        if (result.data && result.data.warning) {
-          setSubmitMessage(`Expense submitted successfully! Note: ${result.data.warning}`)
-        } else {
-          setSubmitMessage("Expense submitted successfully!")
-        }
-        setFormData({
-          documentFrom: "Controller",
-          expenseCost: "",
-          driverName: "",
-          driverFullName: "",
-        })
-        setFile(null)
-        setFilePreview(null)
-
-        // Navigate back to expense details for this truck after a short delay
-        setTimeout(() => {
-          if (onBack) {
-            onBack()
-          } else {
-            navigate(`/ExpenseDetails/${truckId}`, {
-              state: {
-                truckId: truckId,
-                truckRegNum: truckRegNum,
-              },
-            })
-          }
-        }, 2000)
-      } catch (error) {
-        console.error("Error submitting expense:", error)
-        setSubmitMessage(`Error: ${error.message}`)
-        setUploadProgress(0)
+      const contentType = response.headers.get("content-type")
+      if (!contentType || !contentType.includes("application/json")) {
+        throw new Error(`Server returned non-JSON response: ${await response.text()}`)
       }
+
+      const result = await response.json()
+
+      if (!response.ok) {
+        throw new Error(result.message || "Failed to submit expense")
+      }
+
+      setUploadProgress(100)
+      console.log("Submission successful:", result)
+
+      if (result.data && result.data.warning) {
+        setSubmitMessage(`Expense submitted successfully! Note: ${result.data.warning}`)
+      } else {
+        setSubmitMessage("Expense submitted successfully!")
+      }
+
+      setFormData({
+        documentFrom: "Controller",
+        expenseCost: "",
+        driverName: "",
+        driverFullName: "",
+        orderno: "",
+      })
+      setFile(null)
+      setFilePreview(null)
+
+      setTimeout(() => {
+        if (onBack) {
+          onBack()
+        } else {
+          navigate(`/ExpenseDetails/${truckId}`, {
+            state: {
+              truckId: truckId,
+              truckRegNum: truckRegNum,
+            },
+          })
+        }
+      }, 2000)
     } catch (error) {
       console.error("Error submitting expense:", error)
       setSubmitMessage(`Error: ${error.message}`)
+      setUploadProgress(0)
     } finally {
       setIsSubmitting(false)
     }
@@ -225,12 +216,10 @@ const ExpenseSubmission = ({ onBack }) => {
         </button>
       </div>
 
-      {/* Simple centered title */}
-      <h2 className="expense-title" >{truckRegNum && `Add Fuel Expense for ${truckRegNum}`}</h2>
+      <h2 className="expense-title">{truckRegNum && `Add Fuel Expense for ${truckRegNum}`}</h2>
 
       <form onSubmit={handleSubmit} className="expense-form">
         <div className="form-card">
-          {/* Basic expense details */}
           <div className="form-grid">
             <div className="form-field">
               <label htmlFor="documentFrom">Document From</label>
@@ -251,7 +240,6 @@ const ExpenseSubmission = ({ onBack }) => {
                   name="expenseCost"
                   value={formData.expenseCost.replace(/^R/, "")}
                   onChange={(e) => {
-                    // Only allow numbers and decimal point
                     const value = e.target.value.replace(/[^0-9.]/g, "")
                     setFormData({
                       ...formData,
@@ -262,26 +250,37 @@ const ExpenseSubmission = ({ onBack }) => {
                 />
               </div>
             </div>
+
+            <div className="form-field">
+              <label htmlFor="orderno">Order Number</label>
+              <input
+                id="orderno"
+                type="text"
+                name="orderno"
+                value={formData.orderno}
+                onChange={handleInputChange}
+                placeholder="Enter order number"
+                required
+              />
+            </div>
+
+            {formData.documentFrom === "Driver" && (
+              <div className="form-field driver-field">
+                <label htmlFor="driverSelect">Driver Name</label>
+                <Select
+                  inputId="driverSelect"
+                  options={driverOptions}
+                  onChange={handleDriverChange}
+                  isSearchable
+                  placeholder="Select a driver"
+                  className="driver-select"
+                  classNamePrefix="driver-select"
+                />
+                {formData.driverFullName && <div className="driver-info">Selected: {formData.driverFullName}</div>}
+              </div>
+            )}
           </div>
 
-          {/* Driver selection (conditional) */}
-          {formData.documentFrom === "Driver" && (
-            <div className="form-field driver-field">
-              {/* <label htmlFor="driverSelect">Driver Name</label> */}
-              <Select
-                inputId="driverSelect"
-                options={driverOptions}
-                onChange={handleDriverChange}
-                isSearchable
-                placeholder="Select a driver"
-                className="driver-select"
-                classNamePrefix="driver-select"
-              />
-              {formData.driverFullName && <div className="driver-info">Selected: {formData.driverFullName}</div>}
-            </div>
-          )}
-
-          {/* File upload section */}
           <div className="upload-section">
             <label>Petrol Slip</label>
 
@@ -293,7 +292,7 @@ const ExpenseSubmission = ({ onBack }) => {
                   </svg>
                   <div className="upload-text">
                     <p>Click to upload or drag and drop</p>
-                    <p className="upload-hint">PNG, JPG or PDF (max 10MB)</p>
+                    <p className="upload-hint">PNG, JPG or PDF (max 50MB)</p>
                   </div>
                 </div>
                 <input
@@ -336,7 +335,6 @@ const ExpenseSubmission = ({ onBack }) => {
             )}
           </div>
 
-          {/* Progress and messages */}
           {uploadProgress > 0 && uploadProgress < 100 && (
             <div className="progress-bar">
               <div className="progress-fill" style={{ width: `${uploadProgress}%` }}></div>
@@ -347,11 +345,7 @@ const ExpenseSubmission = ({ onBack }) => {
             <div className={`message ${submitMessage.includes("Error") ? "error" : "success"}`}>{submitMessage}</div>
           )}
 
-          {/* Form actions */}
           <div className="form-actions">
-            {/* <button type="button" className="cancel-button" onClick={() => navigate(-1)}>
-              Cancel
-            </button> */}
             <button type="submit" className="submit-button" disabled={isSubmitting}>
               {isSubmitting ? "Submitting..." : "Submit"}
             </button>

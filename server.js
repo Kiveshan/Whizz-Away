@@ -164,7 +164,6 @@ app.use(express.json())
 app.use(bodyParser.json())
 app.use(bodyParser.urlencoded({ extended: true }))
 
-// Session middleware
 app.use(
   expressSession({
     secret: secretKey,
@@ -174,7 +173,7 @@ app.use(
       secure: process.env.NODE_ENV === "production", // Set to true if using HTTPS
       httpOnly: true,
       maxAge: 3600000, // Session expiration (1 hour)
-      sameSite: "lax", // Added to ensure cookies are sent with cross-site requests
+      sameSite: "lax", // Added to en sure cookies are sent with cross-site requests
     },
   }),
 )
@@ -565,6 +564,7 @@ app.post("/login", async (req, res, next) => {
     else if (roleid === 3) redirectUrl = "/FDashboard"
     else if (roleid === 4) redirectUrl = "/DirectorDashboard"
     else if (roleid === 7) redirectUrl = "/AdminDashboard"
+    else if (roleid ===8) redirectUrl= "/CreditorsDashboard"
 
     // Include roleid in the response
     return res.json({
@@ -4143,6 +4143,7 @@ app.put("/api/subcontractors/:id/toggle-status", verifyToken, async (req, res) =
 
 import expensesRoutes from "./routes/expenses.js"
 import documentsRoutes from "./routes/Documents.js"
+
 // Set up multer for file uploads
 const uploadsDir = path.join(__dirname, "uploads")
 if (!fs.existsSync(uploadsDir)) {
@@ -5110,7 +5111,7 @@ app.get("/employees/driverssub", async (req, res) => {
 
   try {
     const result = await pool.query(
-      "SELECT userid, name, surname, roleid FROM m5_employee WHERE roleid IN (5, 6) ORDER BY name, surname",
+      "SELECT userid, name, surname, roleid FROM m5_employee WHERE roleid IN (5, 6) AND status = true ORDER BY name, surname",
     )
 
     console.log("Drivers found:", result.rows)
@@ -7544,7 +7545,32 @@ app.get("/api/wages-per-month", async (req, res) => {
 });
 
 // ------------------------------------------Analytics Ends here---------------------------------- //
+import createPORoutes from "./routes/PurchaseOrder/CreatePO.js"
+import poFormRoutes from "./routes/PurchaseOrder/POForm.js"
+import filterExpensesRoutes from "./routes/PurchaseOrder/filterExpenses.js"
+import POStatements from "./routes/PurchaseOrder/POStatements.js";
 
+app.use(
+  "/api",
+  (req, res, next) => {
+    req.app.locals.pool = pool
+    next()
+  },
+  POStatements,
+)
+app.use("/api/po", (req, res, next) => {
+  req.app.locals.pool = pool;
+  next();
+}, createPORoutes);
+app.use("/api/po-form", (req, res, next) => {
+  req.app.locals.pool = pool;
+  next();
+}, poFormRoutes);
+
+app.use("/api", (req, res, next) => {
+  req.app.locals.pool = pool;
+  next();
+}, filterExpensesRoutes);
 
 app.listen(PORT, async () => {
   try {

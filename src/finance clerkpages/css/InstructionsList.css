@@ -58,9 +58,10 @@ body {
 
 .filter-buttons {
   display: flex;
-  gap: 10px;
+  gap: 7px;
   justify-content: center; /* Center the filter buttons */
   align-items: center;
+  margin-top: 10px;
 }
 
 .btn {

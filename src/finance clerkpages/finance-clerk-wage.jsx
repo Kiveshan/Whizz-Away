@@ -33,27 +33,28 @@ const FinanceClerkWage = () => {
     })
   }
 
-  // Function to determine the correct dashboard based on role
-  const getDashboardRouteByRole = () => {
-    // Use the stored dashboard route if available
-    const storedDashboard = localStorage.getItem("dashboardRoute")
-    if (storedDashboard) return storedDashboard
-    
-    // Fallback to role-based routing if no stored route
-    switch (userRole) {
-      case 1:
-        return "/Dashboard" // Business Manager
-      case 3:
-        return "/FDashboard" // Finance Clerk
-      case 4:
-        return "/DirectorDashboard" // Director
-      default:
-        return "/FDashboard" // Default to Finance Dashboard
-    }
+const getDashboardRouteByRole = () => {
+  // IMPORTANT: Check localStorage first
+  const storedDashboard = localStorage.getItem("dashboardRoute")
+  if (storedDashboard) return storedDashboard
+  
+  // Only fall back to role-based routing if no stored route
+  if (userRole === 8) {
+    return "/CreditorsDashboard"
   }
+  
+  // Further fallbacks
+  switch (userRole) {
+    case 1:
+      return "/Dashboard" 
+    case 4:
+      return "/DirectorDashboard" 
+    default:
+      return "/CreditorsDashboard" // Default to CreditorsDashboard instead of FDashboard
+  }
+}
 
   const handleBackClick = () => {
-    // Navigate to the appropriate dashboard based on role
     navigate(getDashboardRouteByRole())
   }
 
