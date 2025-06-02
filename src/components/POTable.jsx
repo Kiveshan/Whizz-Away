@@ -128,7 +128,11 @@ if (selectedMonth !== "All") {
 const handleViewClick = async (expense) => {
   if (!showFilterButtons) {
     navigate("/Creditors/ViewStatement", {
-      state: { supplierId: expense.supplierId }
+state: { 
+      supplierId: expense.supplierId,
+      selectedYear: selectedYear !== "All" ? selectedYear : new Date().getFullYear().toString(),
+      selectedMonth: selectedMonth !== "All" ? selectedMonth : new Date().toLocaleString("default", { month: "long" })
+    }
     });
     return;
   }

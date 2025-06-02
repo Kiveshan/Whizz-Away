@@ -12,13 +12,26 @@ const ViewStatement = () => {
   const printRef = useRef();
   const navigate = useNavigate();
   const [poData, setPoData] = useState(null);
-
+          const currentDate = new Date();
+        const year = state?.selectedYear || currentDate.getFullYear();
+        const month = state?.selectedMonth || currentDate.toLocaleString("default", { month: "long" });
   useEffect(() => {
     const fetchPOs = async () => {
       try {
         const supplierId = state?.supplierId;
-        const fromDate = "2025-05-01";
-        const toDate = "2025-05-31";
+
+
+        const monthIndex = [
+          "January", "February", "March", "April", "May", "June",
+          "July", "August", "September", "October", "November", "December"
+        ].indexOf(month);
+
+
+        const firstDay = new Date(year, monthIndex, 1);
+        const lastDay = new Date(year, monthIndex + 1, 0);
+
+        const fromDate = firstDay.toISOString().split("T")[0];
+        const toDate = lastDay.toISOString().split("T")[0];
 
         const res = await axios.get(`http://localhost:5000/api/statements`, {
           params: { supplierId, fromDate, toDate },
@@ -34,8 +47,7 @@ const ViewStatement = () => {
     };
 
     fetchPOs();
-  }, [state?.supplierId]);
-
+  }, [state?.supplierId, state?.selectedYear, state?.selectedMonth]);
   if (!poData) {
     return <div>No purchase order data available.</div>;
   }
@@ -99,7 +111,7 @@ const ViewStatement = () => {
             <tbody>
               {purchaseOrders.length === 0 ? (
                 <tr>
-                  <td colSpan="4">No purchase orders found for this supplier in May 2025.</td>
+                  <td colSpan="4">No purchase orders found for this supplier in {month} {year}.</td>
                 </tr>
               ) : (
                 purchaseOrders.map((po) => (
