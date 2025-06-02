@@ -5,8 +5,12 @@ import "../pages/Creditors/purchaseOrder/css/filterButtonBlue.css"
 import axios from "axios"
 
 const POTable = ({ showFilterButtons = true }) => {
-  const [selectedYear, setSelectedYear] = useState("2025")
-  const [selectedMonth, setSelectedMonth] = useState("May")
+  const currentDate = new Date()
+  const currentYear = currentDate.getFullYear().toString()
+  const currentMonth = currentDate.toLocaleString("default", { month: "long" })
+
+  const [selectedYear, setSelectedYear] = useState(currentYear)
+  const [selectedMonth, setSelectedMonth] = useState(currentMonth)
   const [activeFilter, setActiveFilter] = useState("All")
   const [isDropdownOpen, setIsDropdownOpen] = useState(false)
   const [expenses, setExpenses] = useState([])
