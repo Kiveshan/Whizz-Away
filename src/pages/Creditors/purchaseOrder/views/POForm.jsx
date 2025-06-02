@@ -134,6 +134,7 @@ const POForm = () => {
   };
 
 return (
+  <div className="po-form-wrapper">
     <div className="po-form-container">
       <CompanyHeader />
 
@@ -320,6 +321,7 @@ return (
 
         {error && <div className="error-message">{error}</div>}
       </form>
+    </div>
     </div>
   );
 };

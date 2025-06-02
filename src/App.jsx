@@ -91,6 +91,7 @@ import FilterPO from "./pages/Creditors/purchaseOrder/views/FilterPO"
 import CredStatements from "./pages/Creditors/Statements/views/CredStatements"
 import ViewPOForm from "./pages/Creditors/purchaseOrder/views/ViewPOForm"
 import ViewStatement from "./pages/Creditors/Statements/views/ViewStatement";
+import DirectorCreditorsOther from "./pages/DirectorCreditorsOther"
 // CSS Imports
 
 import "./css/card.css"
@@ -167,6 +168,7 @@ function DynamicHeader() {
     "/DirectorDriverWageSlip": "Wages",
     "/DirectorCreditorsDash": "Creditors",
     "/DirectorManagerViewFuelExpence": "Truck Expenses",
+    "/DirectorCreditorsOther": "Expenses",
     "/DirectorExpenses": "Truck Expenses",
     "/ControllerDashboard": "Controller",
     "/FCcontrollerinstructions": "Instruction",
@@ -241,6 +243,7 @@ function ContentWrapper() {
         <Route path="/ManagerViewAssignment" element={<ManagerViewAssignment />} />
         <Route path="/FinancialDocumentsView" element={<FinancialDocumentsView />} />
         <Route path="/CompanyInstructionView" element={<CompanyInstructionView />} />
+        <Route path="/DirectorCreditorsOther" element={<DirectorCreditorsOther />} />
         <Route path="/CompanyInstructions" element={<CompanyInstructions />} />
         <Route path="/DirectorManagerViewAssignment" element={<DirectorManagerViewAssignment />} />
         <Route path="/DirectorDocs" element={<DirectorDocs />} />

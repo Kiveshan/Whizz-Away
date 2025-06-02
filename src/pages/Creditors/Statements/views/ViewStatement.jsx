@@ -75,6 +75,7 @@ const ViewStatement = () => {
   };
 
   return (
+    <div className="po-form-wrapper">
     <div className="po-form-container">
       <button className="back-button" onClick={handleBack}>
         Back
@@ -131,6 +132,7 @@ const ViewStatement = () => {
           Download
         </button>
       </div>
+    </div>
     </div>
   );
 };

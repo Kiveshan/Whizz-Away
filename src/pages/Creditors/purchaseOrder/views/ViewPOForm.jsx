@@ -50,6 +50,7 @@ const ViewPOForm = () => {
   }
 
   return (
+     <div className="po-form-wrapper">
     <div className="po-form-container">
       <button className="back-button" onClick={handleBack}>
         Back
@@ -147,6 +148,7 @@ const ViewPOForm = () => {
           Download
         </button>
       </div>
+    </div>
     </div>
   )
 }

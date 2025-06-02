@@ -3,6 +3,7 @@ import "../pages/Creditors/purchaseOrder/css/PO.css";
 const CompanyHeader = ({ subtitle }) => {
   return (
     <>
+    <div className="po-form-wrapper">
       <div className="po-header">
         <div className="po-header-left">
           <div className="po-title-container">
@@ -35,6 +36,7 @@ const CompanyHeader = ({ subtitle }) => {
         VAT Reg No: 4130274923
         <br />
         Reg: 2019/302835/07
+      </div>
       </div>
     </>
   );

@@ -5,7 +5,7 @@ import Card from "../components/Card";
 const dashboardData = [
   { title: "Fuel", image: "/images/Diesel.jpeg", path: "/DirectorManagerViewFuelExpence" },
   { title: "Sub-Constructor", image: "/images/subconstructor.jpg", path: "" },
-  { title: "Other", image: "/images/OtherExpence.jpg", path: "" },
+  { title: "Other", image: "/images/OtherExpence.jpg", path: "/DirectorCreditorsOther" },
 ];
 
 const DirectorCreditorsDash = () => {

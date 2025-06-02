@@ -152,7 +152,29 @@ const handleViewClick = async (expense) => {
   const navigate = useNavigate()
 
   const handleBackClick = () => {
-    navigate("/Creditors/CreditorsOther")
+    const userData = localStorage.getItem("user")
+    let userRoleId = null
+    if (userData) {
+      try {
+        const parsedUserData = JSON.parse(userData)
+        userRoleId = parsedUserData.roleid
+      } catch (error) {
+        console.error("Error parsing user data from localStorage:", error)
+      }
+    }
+    if (!userRoleId) {
+      userRoleId = localStorage.getItem("roleId") || localStorage.getItem("userRoleId")
+      console.log("Direct role ID from localStorage:", userRoleId)
+    }
+    userRoleId = Number.parseInt(userRoleId, 10)
+    console.log("Final user role ID for navigation:", userRoleId)
+
+    // Navigate based on role ID
+    if (userRoleId === 1 || userRoleId === 4) {
+      navigate("/DirectorCreditorsOther")
+    } else {
+      navigate("/Creditors/CreditorsOther")
+    }
   }
   
 

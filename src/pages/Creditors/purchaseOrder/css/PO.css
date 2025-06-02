@@ -1,5 +1,5 @@
 /* Purchase Order Form Styles */
-.po-form-container {
+.po-form-wrapper .po-form-container {
   max-width: 700px;
   margin: 10px auto;
   background-color: #ffffff;
@@ -9,7 +9,7 @@
   font-family: 'Roboto', Arial, sans-serif;
 }
 
-.po-header {
+.po-form-wrapper .po-header {
   display: flex;
   justify-content: center;
   align-items: center;
@@ -21,17 +21,17 @@
   transition: transform 0.2s ease;
 }
 
-.po-header:hover {
+.po-form-wrapper .po-header:hover {
   transform: translateY(-1px);
 }
 
-.po-header-left {
+.po-form-wrapper .po-header-left {
   display: flex;
   align-items: center;
   width: 100%;
 }
 
-.po-subtitle {
+.po-form-wrapper .po-subtitle {
   font-size: 14px;
   font-weight: 400;
   color: #1a3c5e;
@@ -39,12 +39,12 @@
   text-transform: none;
 }
 
-.po-logo {
+.po-form-wrapper .po-logo {
   height: 36px;
   margin-right: 10px;
 }
 
-.po-title-container {
+.po-form-wrapper .po-title-container {
   flex-grow: 1;
   text-align: center;
   background: rgba(255, 255, 255, 0.2);
@@ -54,7 +54,7 @@
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
 }
 
-.po-title {
+.po-form-wrapper .po-title {
   font-size: 22px;
   font-weight: 700;
   color: #1a3c5e;
@@ -63,7 +63,7 @@
   margin: 0;
 }
 
-.company-details {
+.po-form-wrapper .company-details {
   display: flex;
   justify-content: space-between;
   gap: 12px;
@@ -75,7 +75,8 @@
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
 }
 
-.company-address, .company-contact {
+.po-form-wrapper .company-address, 
+.po-form-wrapper .company-contact {
   width: 48%;
   padding: 10px;
   border-radius: 6px;
@@ -84,17 +85,17 @@
   color: #333;
 }
 
-.company-address {
+.po-form-wrapper .company-address {
   font-weight: 500;
   background-color: #f5f7fa;
 }
 
-.company-contact {
+.po-form-wrapper .company-contact {
   font-weight: 400;
   background-color: #f5f7fa;
 }
 
-.company-contact::before {
+.po-form-wrapper .company-contact::before {
   content: "Contact Information:";
   display: block;
   font-weight: 600;
@@ -105,7 +106,7 @@
   letter-spacing: 0.5px;
 }
 
-.company-registration {
+.po-form-wrapper .company-registration {
   font-size: 12px;
   color: #666;
   margin-bottom: 10px;
@@ -117,21 +118,21 @@
   box-shadow: 0 1px 4px rgba(0, 0, 0, 0.03);
 }
 
-.form-section {
+.po-form-wrapper .form-section {
   margin-bottom: 8px;
 }
 
-.form-row {
+.po-form-wrapper .form-row {
   display: flex;
   gap: 2px;
   margin-bottom: 6px;
 }
 
-.form-group {
+.po-form-wrapper .form-group {
   flex: 1;
 }
 
-.form-group label {
+.po-form-wrapper .form-group label {
   display: block;
   margin-bottom: 2px;
   font-size: 13px;
@@ -139,7 +140,7 @@
   font-weight: 500;
 }
 
-.form-control {
+.po-form-wrapper .form-control {
   width: 100%;
   height: 34px; 
   padding: 8px 10px; 
@@ -151,7 +152,7 @@
   transition: border-color 0.2s, box-shadow 0.2s;
 }
 
-.dropdown-field {
+.po-form-wrapper .dropdown-field {
   width: 100%;
   padding: 6px 7px;
   border: 1px solid #ddd;
@@ -161,24 +162,25 @@
   transition: border-color 0.2s, box-shadow 0.2s;
 }
 
-.form-control:focus, .dropdown-field:focus {
+.po-form-wrapper .form-control:focus, 
+.po-form-wrapper .dropdown-field:focus {
   border-color: #4169e1;
   outline: none;
   box-shadow: 0 0 0 2px rgba(65, 105, 225, 0.15);
 }
 
-.line-items {
+.po-form-wrapper .line-items {
   margin-bottom: 8px;
   border-top: 1px solid #ddd;
   padding-top: 6px;
 }
 
-.line-items-table {
+.po-form-wrapper .line-items-table {
   width: 100%;
   border-collapse: collapse;
 }
 
-.line-items-table th {
+.po-form-wrapper .line-items-table th {
   background-color: #f5f7fa;
   padding: 5px;
   text-align: left;
@@ -188,54 +190,53 @@
   width: 20%;
 }
 
-.line-items-table td {
+.po-form-wrapper .line-items-table td {
   padding: 5px;
   border-bottom: 1px solid #eee;
   width: 20%;
 }
 
-/* Match table inputs to form-control size */
-.line-items-table input {
+.po-form-wrapper .line-items-table input {
   width: 100%;
-  height: 34px; /* Match form-control height */
-  padding: 8px 10px; /* Match form-control padding */
+  height: 34px;
+  padding: 8px 10px;
   border: 1px solid #ddd;
   border-radius: 4px;
   font-size: 13px;
   box-sizing: border-box;
 }
 
-.totals-section {
+.po-form-wrapper .totals-section {
   margin-top: 8px;
   width: 100%;
 }
 
-.totals-table {
+.po-form-wrapper .totals-table {
   width: 100%;
   border-collapse: collapse;
 }
 
-.totals-table td {
+.po-form-wrapper .totals-table td {
   padding: 5px;
   border-bottom: 1px solid #eee;
 }
 
-.totals-table tr:last-child td {
+.po-form-wrapper .totals-table tr:last-child td {
   border-bottom: none;
   font-weight: 700;
 }
 
-.label-cell {
+.po-form-wrapper .label-cell {
   width: 50%;
   text-align: left;
   font-weight: 600;
 }
 
-.amount-cell {
+.po-form-wrapper .amount-cell {
   width: 50%;
 }
 
-.amount-cell input {
+.po-form-wrapper .amount-cell input {
   width: 100%;
   height: 34px;
   padding: 8px 10px;
@@ -246,13 +247,13 @@
   box-sizing: border-box;
 }
 
-.submit-section {
+.po-form-wrapper .submit-section {
   display: flex;
   justify-content: center;
   margin-top: 12px;
 }
 
-.submit-btn {
+.po-form-wrapper .submit-btn {
   background: linear-gradient(135deg, #8dd28e, #7bc17c);
   color: white;
   border: none;
@@ -263,12 +264,12 @@
   transition: transform 0.2s, background 0.2s;
 }
 
-.submit-btn:hover {
+.po-form-wrapper .submit-btn:hover {
   transform: translateY(-1px);
   background: linear-gradient(135deg, #7bc17c, #6aa66b);
 }
 
-.error-message {
+.po-form-wrapper .error-message {
   color: #d32f2f;
   font-size: 13px;
   text-align: center;
@@ -277,70 +278,68 @@
 
 /* Responsive adjustments */
 @media (max-width: 768px) {
-  .po-form-container {
+  .po-form-wrapper .po-form-container {
     padding: 8px;
   }
 
-  .po-header {
+  .po-form-wrapper .po-header {
     flex-direction: column;
     gap: 6px;
     padding: 10px;
   }
 
-  .po-header-left {
+  .po-form-wrapper .po-header-left {
     justify-content: center;
   }
 
-  .company-details {
+  .po-form-wrapper .company-details {
     flex-direction: column;
     gap: 6px;
   }
 
-  .company-address, .company-contact {
+  .po-form-wrapper .company-address, 
+  .po-form-wrapper .company-contact {
     width: 100%;
     padding: 8px;
   }
 
-  .form-row {
-    flex-direction: column;
-    gap: 6px;
-  }
-
-  .po-title {
+  .po-form-wrapper .po-title {
     font-size: 18px;
   }
 
-  .po-subtitle {
+  .po-form-wrapper .po-subtitle {
     font-size: 12px;
   }
 
-  .form-group label {
+  .po-form-wrapper .form-group label {
     font-size: 12px;
   }
 
-  .form-control, .dropdown-field {
-    padding: 6px 8px; /* Slightly reduced for mobile */
-    font-size: 12px;
-    height: 30px; /* Slightly reduced for mobile */
-  }
-
-  .line-items-table th, .line-items-table td {
-    font-size: 12px;
-  }
-
-  .line-items-table input {
+  .po-form-wrapper .form-control, 
+  .po-form-wrapper .dropdown-field {
     padding: 6px 8px;
     font-size: 12px;
     height: 30px;
   }
 
-  .amount-cell input {
+  .po-form-wrapper .line-items-table th, 
+  .po-form-wrapper .line-items-table td {
+    font-size: 12px;
+  }
+
+  .po-form-wrapper .line-items-table input {
     padding: 6px 8px;
     font-size: 12px;
     height: 30px;
   }
 
-  .submit-btn {
+  .po-form-wrapper .amount-cell input {
+    padding: 6px 8px;
+    font-size: 12px;
+    height: 30px;
+  }
+
+  .po-form-wrapper .submit-btn {
     padding: 6px 16px;
     font-size: 13px;
   }

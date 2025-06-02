@@ -461,7 +461,6 @@ const FinanceClerkWageSlip = () => {
   }, [id, selectedMonth, selectedYear])
 
   const handleBack = () => {
-    // Get the actual driver name from employee data if available, otherwise use the one from location state
     const actualDriverName = employeeData
       ? `${employeeData.name} ${employeeData.surname}`
       : driverName || `Driver ${id}`
@@ -482,8 +481,6 @@ const FinanceClerkWageSlip = () => {
         setDownloading(false)
         return
       }
-
-      // Create a filename with employee name, month and year
       const employeeName = employeeData
         ? `${employeeData.name}_${employeeData.surname}`
         : driverName?.replace(/\s+/g, "_") || `Driver_${id}`
@@ -667,7 +664,7 @@ const FinanceClerkWageSlip = () => {
 
               {/* Footer */}
               <div className="wageslip-footer">
-                For Inquiries, please feel free to contact HR Department at hr@whizzaway.com.
+                
               </div>
             </div>
           </div>

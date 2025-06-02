@@ -2155,41 +2155,36 @@ app.get("/api/employee/:id", async (req, res) => {
   }
 });
 app.post("/api/save-wage-data", async (req, res) => {
-  const { employeeId, month, year, totalEarnings, totalDeductions, netPay } = req.body;
+  const { employeeId, month, year, totalEarnings, totalDeductions, netPay } = req.body
 
-  console.log(`Route POST /api/save-wage-data accessed for employee ${employeeId}`);
-  console.log("Wage data:", { employeeId, month, year, totalEarnings, totalDeductions, netPay });
+  console.log(`Saving wage data for employee ${employeeId} for ${month}/${year}`)
 
-  let client;
+  let client
   try {
-    client = await pool.connect();
-    await client.query("BEGIN");
+    client = await pool.connect()
+    await client.query("BEGIN")
 
-    // Use the getLastDayOfMonth function to get the correct last day
-    const lastDay = getLastDayOfMonth(parseInt(year), parseInt(month) - 1);
-    const normalizedDate = lastDay.toISOString(); // Last day of the month
+    // Calculate the target date (last day of month)
+    const lastDay = getLastDayOfMonth(Number.parseInt(year), Number.parseInt(month) - 1)
+    const normalizedDate = lastDay.toISOString()
+    const formattedDate = normalizedDate.split("T")[0]
+
+    // 🔥 Get the tax information that should be used for this date
+    const taxInfo = await getTaxAmountForDate(pool, totalEarnings, formattedDate)
 
     // Check if employee exists
-    const employeeQuery = `
-      SELECT *
-      FROM m5_employee
-      WHERE userid = $1
-    `;
-    const employeeResult = await client.query(employeeQuery, [employeeId]);
+    const employeeQuery = `SELECT * FROM m5_employee WHERE userid = $1`
+    const employeeResult = await client.query(employeeQuery, [employeeId])
 
     if (employeeResult.rows.length === 0) {
-      await client.query("ROLLBACK");
-      console.log(`Employee with ID ${employeeId} not found`);
-      return res.status(404).json({ error: "Employee not found" });
+      await client.query("ROLLBACK")
+      return res.status(404).json({ error: "Employee not found" })
     }
 
-    // Insert or update wage record
+    // Insert wage record with tax history
     const insertQuery = `
       INSERT INTO wages (
-        employeeid,
-        total_earnings,
-        total_deductions,
-        net_pay,
+        employeeid, total_earnings, total_deductions, net_pay,
         employee_date
       ) VALUES ($1, $2, $3, $4, $5)
       ON CONFLICT ON CONSTRAINT unique_wage_per_employee_month_year
@@ -2198,34 +2193,39 @@ app.post("/api/save-wage-data", async (req, res) => {
         total_deductions = EXCLUDED.total_deductions,
         net_pay = EXCLUDED.net_pay
       RETURNING wageskey
-    `;
-    const earnings = Number(Number(totalEarnings).toFixed(2));
-    const deductions = Number(Number(totalDeductions).toFixed(2));
-    const net = Number(Number(netPay).toFixed(2));
-    const params = [employeeId, earnings, deductions, net, normalizedDate];
+    `
 
-    console.log(`Inserting/updating wage record for employee ${employeeId}`);
-    const result = await client.query(insertQuery, params);
+    const params = [
+      employeeId,
+      Number(totalEarnings.toFixed(2)),
+      Number(totalDeductions.toFixed(2)),
+      Number(netPay.toFixed(2)),
+      normalizedDate,
+    ]
 
-    await client.query("COMMIT");
+    const result = await client.query(insertQuery, params)
+    await client.query("COMMIT")
+
+    console.log(`✅ Wage saved with latest tax amount: R${taxInfo.tax} included in total deductions`)
 
     res.status(200).json({
       success: true,
       message: "Wage data saved successfully",
       wagesKey: result.rows[0].wageskey,
-    });
+      taxAmountUsed: taxInfo.tax,
+    })
   } catch (error) {
-    if (client) await client.query("ROLLBACK");
-    console.error(`Error saving wage data for employee ${employeeId}:`, error);
+    if (client) await client.query("ROLLBACK")
+    console.error(`Error saving wage data:`, error)
     res.status(500).json({
       success: false,
       error: "Failed to save wage data",
       message: error.message,
-    });
+    })
   } finally {
-    if (client) client.release();
+    if (client) client.release()
   }
-});
+})
 app.get("/api/check-wage-slip", async (req, res) => {
   try {
     const { employeeId, month, year } = req.query;
@@ -2357,8 +2357,92 @@ async function saveDeductionHistory(pool, employeeId) {
     client.release();
   }
 }
+async function getTaxAmountForEarnings(pool, totalEarnings) {
+  try {
+
+    const roundedEarnings = Math.floor(totalEarnings);
+    const taxLookupQuery = `
+      SELECT tax 
+      FROM tax_deductions 
+      WHERE $1 >= remuneration_lower 
+      AND $1 <= remuneration_upper
+      LIMIT 1
+    `;
+    
+    const result = await pool.query(taxLookupQuery, [roundedEarnings]);
+    return result.rows.length > 0 ? result.rows[0].tax : 0;
+  } catch (error) {
+    console.error('Error looking up tax amount:', error);
+    return 0;
+  }
+}
 
 
+async function getTaxAmountForDate(pool, totalEarnings, targetDate) {
+  try {
+    console.log(`Looking up tax for earnings: ${totalEarnings} on date: ${targetDate}`)
+
+    // First, try to find exact bracket match
+    const taxLookupQuery = `
+      SELECT tax, remuneration_lower, remuneration_upper, effective_date
+      FROM tax_deductions 
+      WHERE $1::NUMERIC >= remuneration_lower::NUMERIC 
+        AND $1::NUMERIC <= remuneration_upper::NUMERIC
+        AND effective_date <= $2::DATE
+      ORDER BY effective_date DESC
+      LIMIT 1
+    `
+
+    const result = await pool.query(taxLookupQuery, [totalEarnings, targetDate])
+
+    if (result.rows.length > 0) {
+      const taxData = result.rows[0]
+      console.log(`✅ Tax found in bracket: R${taxData.tax} (effective from ${taxData.effective_date})`)
+      return {
+        tax: Number.parseFloat(taxData.tax),
+        effectiveDate: taxData.effective_date,
+        bracket: `${taxData.remuneration_lower} - ${taxData.remuneration_upper}`,
+      }
+    }
+
+    // If no exact match found, check if earnings exceed highest bracket
+    console.log(`❌ No exact bracket found for earnings: ${totalEarnings}`)
+    console.log(`🔍 Checking if earnings exceed highest tax bracket...`)
+
+    const highestBracketQuery = `
+      SELECT tax, remuneration_lower, remuneration_upper, effective_date
+      FROM tax_deductions 
+      WHERE effective_date <= $1::DATE
+      ORDER BY remuneration_upper DESC, effective_date DESC
+      LIMIT 1
+    `
+
+    const highestResult = await pool.query(highestBracketQuery, [targetDate])
+
+    if (highestResult.rows.length > 0) {
+      const highestBracket = highestResult.rows[0]
+      
+      if (totalEarnings >= highestBracket.remuneration_upper) {
+        console.log(`✅ Earnings (${totalEarnings}) exceed highest bracket (${highestBracket.remuneration_upper})`)
+        console.log(`📊 Using highest bracket tax: R${highestBracket.tax}`)
+        
+        return {
+          tax: Number.parseFloat(highestBracket.tax),
+          effectiveDate: highestBracket.effective_date,
+          bracket: `${highestBracket.remuneration_lower} - ${highestBracket.remuneration_upper} (exceeded)`,
+        }
+      }
+    }
+
+    // If still no match, return 0 (earnings below lowest bracket)
+    console.log(`❌ No tax bracket found for earnings: ${totalEarnings} on ${targetDate}`)
+    return { tax: 0, effectiveDate: null, bracket: "No bracket found" }
+    
+  } catch (error) {
+    console.error("Error looking up tax amount:", error)
+    return { tax: 0, effectiveDate: null, bracket: "Error" }
+  }
+}
 //Function to get the appropriate deduction values for a specific date
 async function getDeductionsForDate(pool, employeeId, targetDate) {
   const client = await pool.connect();
@@ -6542,6 +6626,185 @@ app.get("/api/debug/wages/:employeeId", async (req, res) => {
   }
 });
 
+// app.get("/api/employee-deductions/:employeeId", async (req, res) => {
+//   const { employeeId } = req.params
+//   const { month, year } = req.query
+
+//   console.log(`Route /api/employee-deductions/${employeeId} was accessed with month=${month}, year=${year}`)
+
+//   if (!month || !year) {
+//     return res.status(400).json({ error: "Month and year are required query parameters" })
+//   }
+
+//   let client
+//   try {
+//     client = await pool.connect()
+
+//     // Convert month name to month number (0-based)
+//     const monthNames = [
+//       "January",
+//       "February",
+//       "March",
+//       "April",
+//       "May",
+//       "June",
+//       "July",
+//       "August",
+//       "September",
+//       "October",
+//       "November",
+//       "December",
+//     ]
+//     const monthIndex = monthNames.indexOf(month)
+
+//     if (monthIndex === -1) {
+//       return res.status(400).json({ error: "Invalid month name" })
+//     }
+
+//     // Create a date object for the middle of the specified month
+//     const targetDate = new Date(Number.parseInt(year), monthIndex, 15)
+//     console.log(`Target date for deductions: ${targetDate.toISOString()}`)
+
+//     // Use the function to get the appropriate deductions for this date
+//     const deductions = await getDeductionsForDate(pool, employeeId, targetDate)
+
+//     if (!deductions) {
+//       return res.status(404).json({ error: "Employee not found" })
+//     }
+
+//     console.log(`Retrieved deductions for employee ${employeeId} for ${month} ${year}:`, deductions)
+//     res.json(deductions)
+//   } catch (error) {
+//     console.error(`Error fetching deductions data for employee ID ${employeeId}:`, error)
+//     // Return default values on error
+//     return res.json({
+//       deduction_income_tax: 0,
+//       deduction_other_deductions: 0,
+//       deduction_uif: 0,
+//       deduction_bonus: 0,
+//       deduction_savings: 0,
+//       deduction_loan: 0,
+//       deduction_damage: 0,
+//       income_tax_rate: 0,
+//     })
+//   } finally {
+//     if (client) client.release()
+//   }
+// })
+
+// app.put("/api/employee-deductions/:employeeId", async (req, res) => {
+//   const { employeeId } = req.params;
+//   const deductionData = req.body;
+  
+//   console.log(`Route PUT /api/employee-deductions/${employeeId} was accessed`);
+//   console.log("Deduction data:", deductionData);
+  
+//   let client;
+//   try {
+//     client = await pool.connect();
+    
+//     // Start transaction
+//     await client.query('BEGIN');
+    
+//     // First check if employee exists
+//     const employeeCheck = await client.query(
+//       `SELECT userid FROM m5_employee WHERE userid = $1`,
+//       [employeeId]
+//     );
+
+//     if (employeeCheck.rows.length === 0) {
+//       await client.query('ROLLBACK');
+//       return res.status(404).json({ error: "Employee not found" });
+//     }
+
+//     // Round all decimal values to two decimal places
+//     const roundedDeductionData = {
+//       income_tax_rate: roundToTwoDecimals(deductionData.income_tax_rate),
+//       deduction_income_tax: roundToTwoDecimals(deductionData.deduction_income_tax),
+//       deduction_other_deductions: roundToTwoDecimals(deductionData.deduction_other_deductions),
+//       deduction_uif: roundToTwoDecimals(deductionData.deduction_uif),
+//       deduction_bonus: roundToTwoDecimals(deductionData.deduction_bonus),
+//       deduction_savings: roundToTwoDecimals(deductionData.deduction_savings),
+//       deduction_loan: roundToTwoDecimals(deductionData.deduction_loan),
+//       deduction_damage: roundToTwoDecimals(deductionData.deduction_damage)
+//     };
+
+//     const today = new Date().toISOString().split("T")[0];
+
+//     // Insert new deduction values directly into history table
+//     const insertResult = await client.query(
+//       `INSERT INTO employee_deduction_history (
+//         employeeid,
+//         effective_date,
+//         income_tax_rate,
+//         deduction_income_tax,
+//         deduction_other_deductions,
+//         deduction_uif,
+//         deduction_bonus,
+//         deduction_savings,
+//         deduction_loan,
+//         deduction_damage
+//       ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+//       RETURNING *`,
+//       [
+//         employeeId,
+//         today,
+//         roundedDeductionData.income_tax_rate,
+//         roundedDeductionData.deduction_income_tax,
+//         roundedDeductionData.deduction_other_deductions,
+//         roundedDeductionData.deduction_uif,
+//         roundedDeductionData.deduction_bonus,
+//         roundedDeductionData.deduction_savings,
+//         roundedDeductionData.deduction_loan,
+//         roundedDeductionData.deduction_damage
+//       ]
+//     );
+    
+//     // For backward compatibility: Update the m5_employee table as well
+//     await client.query(
+//       `UPDATE m5_employee
+//       SET 
+//         income_tax_rate = $1,
+//         deduction_income_tax = $2,
+//         deduction_other_deductions = $3,
+//         deduction_uif = $4,
+//         deduction_bonus = $5,
+//         deduction_savings = $6,
+//         deduction_loan = $7,
+//         deduction_damage = $8,
+//         deduction_date = $9
+//       WHERE userid = $10`,
+//       [
+//         roundedDeductionData.income_tax_rate,
+//         roundedDeductionData.deduction_income_tax,
+//         roundedDeductionData.deduction_other_deductions,
+//         roundedDeductionData.deduction_uif,
+//         roundedDeductionData.deduction_bonus,
+//         roundedDeductionData.deduction_savings,
+//         roundedDeductionData.deduction_loan,
+//         roundedDeductionData.deduction_damage,
+//         today,
+//         employeeId
+//       ]
+//     );
+    
+//     // Commit transaction
+//     await client.query('COMMIT');
+    
+//     console.log(`Updated deductions for employee ${employeeId}`);
+//     res.json({
+//       success: true,
+//       message: "Deductions updated successfully",
+//       data: insertResult.rows[0]
+//     });
+//   } catch (error) {
+//     if (client) await client.query('ROLLBACK');
+//     console.error(`Error updating deductions for employee ${employeeId}:`, error);
+//     res.status(500).json({ error: "Failed to update deductions" });
+//   } finally {
+//     if (client) client.release();
+//   }
+// });
 app.get("/api/employee-deductions/:employeeId", async (req, res) => {
   const { employeeId } = req.params
   const { month, year } = req.query
@@ -6578,21 +6841,76 @@ app.get("/api/employee-deductions/:employeeId", async (req, res) => {
     }
 
     // Create a date object for the middle of the specified month
-    const targetDate = new Date(Number.parseInt(year), monthIndex, 15)
-    console.log(`Target date for deductions: ${targetDate.toISOString()}`)
+// Create target date (last day of the month for wage slip generation)
+const targetDate = new Date(Number.parseInt(year), monthIndex + 1, 0)
+const formattedTargetDate = targetDate.toISOString().split("T")[0]
+console.log(`Target date for tax lookup: ${formattedTargetDate}`)
+    // Get total earnings (same as before)
+    const totalEarningsQuery = `
+      SELECT total_earnings 
+      FROM wages 
+      WHERE employeeid = $1 
+      AND EXTRACT(MONTH FROM employee_date) = $2 
+      AND EXTRACT(YEAR FROM employee_date) = $3
+    `
 
-    // Use the function to get the appropriate deductions for this date
+    const earningsResult = await client.query(totalEarningsQuery, [employeeId, monthIndex + 1, year])
+    let totalEarnings = 0
+
+    if (earningsResult.rows.length > 0) {
+      totalEarnings = Number.parseFloat(earningsResult.rows[0].total_earnings) || 0
+    } else {
+      // Calculate total earnings if no wage record exists
+      const baseSalaryQuery = `SELECT base_salary FROM m5_employee WHERE userid = $1`
+      const baseSalaryResult = await client.query(baseSalaryQuery, [employeeId])
+
+      if (baseSalaryResult.rows.length > 0) {
+        totalEarnings = Number.parseFloat(baseSalaryResult.rows[0].base_salary) || 0
+      }
+
+      // Add legs earnings for this month/year
+      const legsQuery = `
+        SELECT SUM(driverrate) as legs_total
+        FROM legs_m2 l
+        JOIN m1_controller i ON l.m1key = i.m1key
+        WHERE l.driverid = $1
+        AND EXTRACT(MONTH FROM i.pickupdate) = $2
+        AND EXTRACT(YEAR FROM i.pickupdate) = $3
+      `
+
+      const legsResult = await client.query(legsQuery, [employeeId, monthIndex + 1, year])
+      if (legsResult.rows.length > 0 && legsResult.rows[0].legs_total) {
+        totalEarnings += Number.parseFloat(legsResult.rows[0].legs_total)
+      }
+    }
+
+    console.log(`Total earnings for tax calculation: ${totalEarnings} (type: ${typeof totalEarnings})`)
+
+// 🔥 KEY CHANGE: Use the target date for tax lookup
+const taxInfo = await getTaxAmountForDate(pool, totalEarnings, formattedTargetDate)
+let taxAmount = taxInfo.tax
+
+console.log(`Tax lookup result:`, taxInfo)
+
+    // Get other deductions
     const deductions = await getDeductionsForDate(pool, employeeId, targetDate)
 
     if (!deductions) {
       return res.status(404).json({ error: "Employee not found" })
     }
 
-    console.log(`Retrieved deductions for employee ${employeeId} for ${month} ${year}:`, deductions)
-    res.json(deductions)
+    // Set the calculated tax amount
+deductions.deduction_income_tax = taxInfo.tax
+deductions.tax_effective_date = taxInfo.effectiveDate
+deductions.tax_bracket_used = taxInfo.bracket
+
+// Remove income_tax_rate since it's no longer used
+delete deductions.income_tax_rate
+
+console.log(`Retrieved deductions for employee ${employeeId} for ${month} ${year}:`, deductions)
+res.json(deductions)
   } catch (error) {
     console.error(`Error fetching deductions data for employee ID ${employeeId}:`, error)
-    // Return default values on error
     return res.json({
       deduction_income_tax: 0,
       deduction_other_deductions: 0,
@@ -6601,12 +6919,12 @@ app.get("/api/employee-deductions/:employeeId", async (req, res) => {
       deduction_savings: 0,
       deduction_loan: 0,
       deduction_damage: 0,
-      income_tax_rate: 0,
     })
   } finally {
     if (client) client.release()
   }
 })
+
 
 app.put("/api/employee-deductions/:employeeId", async (req, res) => {
   const { employeeId } = req.params;
@@ -6632,11 +6950,7 @@ app.put("/api/employee-deductions/:employeeId", async (req, res) => {
       await client.query('ROLLBACK');
       return res.status(404).json({ error: "Employee not found" });
     }
-
-    // Round all decimal values to two decimal places
     const roundedDeductionData = {
-      income_tax_rate: roundToTwoDecimals(deductionData.income_tax_rate),
-      deduction_income_tax: roundToTwoDecimals(deductionData.deduction_income_tax),
       deduction_other_deductions: roundToTwoDecimals(deductionData.deduction_other_deductions),
       deduction_uif: roundToTwoDecimals(deductionData.deduction_uif),
       deduction_bonus: roundToTwoDecimals(deductionData.deduction_bonus),
@@ -6645,14 +6959,18 @@ app.put("/api/employee-deductions/:employeeId", async (req, res) => {
       deduction_damage: roundToTwoDecimals(deductionData.deduction_damage)
     };
 
+    // If deduction_income_tax is provided, use it; otherwise it will be calculated when needed
+    if (deductionData.deduction_income_tax !== undefined) {
+      roundedDeductionData.deduction_income_tax = roundToTwoDecimals(deductionData.deduction_income_tax);
+    }
+
     const today = new Date().toISOString().split("T")[0];
 
-    // Insert new deduction values directly into history table
+    // Insert new deduction values into history table (without income_tax_rate)
     const insertResult = await client.query(
       `INSERT INTO employee_deduction_history (
         employeeid,
         effective_date,
-        income_tax_rate,
         deduction_income_tax,
         deduction_other_deductions,
         deduction_uif,
@@ -6660,45 +6978,42 @@ app.put("/api/employee-deductions/:employeeId", async (req, res) => {
         deduction_savings,
         deduction_loan,
         deduction_damage
-      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
       RETURNING *`,
       [
         employeeId,
         today,
-        roundedDeductionData.income_tax_rate,
-        roundedDeductionData.deduction_income_tax,
-        roundedDeductionData.deduction_other_deductions,
-        roundedDeductionData.deduction_uif,
-        roundedDeductionData.deduction_bonus,
-        roundedDeductionData.deduction_savings,
-        roundedDeductionData.deduction_loan,
-        roundedDeductionData.deduction_damage
+        roundedDeductionData.deduction_income_tax || 0,
+        roundedDeductionData.deduction_other_deductions || 0,
+        roundedDeductionData.deduction_uif || 0,
+        roundedDeductionData.deduction_bonus || 0,
+        roundedDeductionData.deduction_savings || 0,
+        roundedDeductionData.deduction_loan || 0,
+        roundedDeductionData.deduction_damage || 0
       ]
     );
     
-    // For backward compatibility: Update the m5_employee table as well
+    // For backward compatibility: Update the m5_employee table as well (without income_tax_rate)
     await client.query(
       `UPDATE m5_employee
       SET 
-        income_tax_rate = $1,
-        deduction_income_tax = $2,
-        deduction_other_deductions = $3,
-        deduction_uif = $4,
-        deduction_bonus = $5,
-        deduction_savings = $6,
-        deduction_loan = $7,
-        deduction_damage = $8,
-        deduction_date = $9
-      WHERE userid = $10`,
+        deduction_income_tax = $1,
+        deduction_other_deductions = $2,
+        deduction_uif = $3,
+        deduction_bonus = $4,
+        deduction_savings = $5,
+        deduction_loan = $6,
+        deduction_damage = $7,
+        deduction_date = $8
+      WHERE userid = $9`,
       [
-        roundedDeductionData.income_tax_rate,
-        roundedDeductionData.deduction_income_tax,
-        roundedDeductionData.deduction_other_deductions,
-        roundedDeductionData.deduction_uif,
-        roundedDeductionData.deduction_bonus,
-        roundedDeductionData.deduction_savings,
-        roundedDeductionData.deduction_loan,
-        roundedDeductionData.deduction_damage,
+        roundedDeductionData.deduction_income_tax || 0,
+        roundedDeductionData.deduction_other_deductions || 0,
+        roundedDeductionData.deduction_uif || 0,
+        roundedDeductionData.deduction_bonus || 0,
+        roundedDeductionData.deduction_savings || 0,
+        roundedDeductionData.deduction_loan || 0,
+        roundedDeductionData.deduction_damage || 0,
         today,
         employeeId
       ]
@@ -6710,7 +7025,7 @@ app.put("/api/employee-deductions/:employeeId", async (req, res) => {
     console.log(`Updated deductions for employee ${employeeId}`);
     res.json({
       success: true,
-      message: "Deductions updated successfully",
+      message: "Deductions updated successfully (income tax will be calculated from tax brackets)",
       data: insertResult.rows[0]
     });
   } catch (error) {
@@ -6721,6 +7036,7 @@ app.put("/api/employee-deductions/:employeeId", async (req, res) => {
     if (client) client.release();
   }
 });
+
 
 app.get("/instructions/driver/:id", async (req, res) => {
   const driverId = req.params.id
