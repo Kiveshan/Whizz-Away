@@ -1,0 +1,476 @@
+.statement-page {
+  padding: 20px;
+  font-family: Arial, sans-serif;
+  position: relative;
+  min-height: 100vh;
+  padding-bottom: 70px; /* Space for the button */
+}
+body {
+  background-color: antiquewhite;
+}
+.statement-paper {
+  max-width: 800px;
+  margin: 0 auto;
+  background-color: white;
+  padding: 20px;
+  margin-bottom: 30px;
+}
+
+/* Statement Info Section */
+.statement-info-section {
+  display: flex;
+  justify-content: space-between;
+  position: relative;
+  margin-bottom: 20px;
+  min-height: 280px;
+}
+
+/* Client Info - Left Side */
+.client-info {
+  text-align: left;
+  font-size: 14px;
+  line-height: 1.5;
+  position: absolute;
+  bottom: 20px;
+  left: 0;
+}
+
+.to-label {
+  font-weight: bold;
+  margin-bottom: 5px;
+}
+
+.client-name {
+  font-weight: bold;
+  font-size: 16px;
+}
+
+/* Statement Title and Account Summary - Right Side */
+.statement-title {
+  width: 350px;
+  text-align: right;
+  margin-left: auto;
+}
+
+.statement-title h2 {
+  margin: 0;
+  font-size: 18px;
+  font-weight: bold;
+  position: relative;
+  text-align: center;
+  padding-bottom: 5px;
+}
+
+.statement-title h2::after {
+  content: "";
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  width: 100%;
+  height: 2px;
+  background-color: #000;
+}
+
+.statement-date {
+  font-size: 14px;
+  text-align: right;
+  margin-bottom: 5px;
+  padding-bottom: 5px;
+  position: relative;
+}
+
+.statement-date::after {
+  content: "";
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  width: 100%;
+  height: 2px;
+  background-color: #000;
+}
+
+.statement-title h3 {
+  margin: 20px 0 15px 0;
+  font-size: 18px;
+  font-weight: bold;
+  text-align: center;
+}
+
+/* Account Summary Table */
+.summary-table {
+  width: 300px;
+  border-collapse: collapse;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  overflow: hidden;
+  margin-top: 10px;
+  margin-left: -5px;
+}
+
+.summary-table tr {
+  border-bottom: 1px solid #ddd;
+}
+
+.summary-table tr:last-child {
+  border-bottom: none;
+}
+
+.summary-table td {
+  padding: 10px 15px;
+  font-size: 14px;
+}
+
+.summary-label {
+  text-align: left;
+  border-right: 1px solid #ddd;
+}
+
+.summary-value {
+  text-align: left;
+  min-width: 100px;
+}
+
+/* Divider */
+.statement-divider {
+  border-bottom: 2px solid #000;
+  margin: 20px 0;
+}
+
+/* Transactions Table */
+.transactions-section {
+  margin-bottom: 20px;
+  overflow-x: auto; /* Enable horizontal scrolling if needed */
+}
+
+/* Special handling for small tables */
+.transactions-section.small-table {
+  margin-bottom: 10px;
+}
+
+.age-analysis-section.small-table {
+  margin-top: 10px;
+}
+
+.transactions-table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-left: 0;
+  table-layout: fixed;
+}
+
+.transactions-table th {
+  background-color: #b8d1f3;
+  padding: 8px 6px;
+  text-align: left;
+  font-size: 14px;
+  font-weight: normal;
+  border: 1px solid #ddd;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.transactions-table td {
+  padding: 8px 6px;
+  font-size: 14px;
+  border: 1px solid #ddd;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  word-wrap: break-word;
+}
+
+/* Adjust column widths for better fit */
+.transactions-table th:nth-child(1),
+.transactions-table td:nth-child(1) {
+  width: 10%;
+}
+
+.transactions-table th:nth-child(2),
+.transactions-table td:nth-child(2) {
+  width: 12%;
+}
+
+.transactions-table th:nth-child(3),
+.transactions-table td:nth-child(3) {
+  width: 28%;
+}
+
+.transactions-table th:nth-child(4),
+.transactions-table td:nth-child(4),
+.transactions-table th:nth-child(5),
+.transactions-table td:nth-child(5),
+.transactions-table th:nth-child(6),
+.transactions-table td:nth-child(6) {
+  width: 16%;
+  text-align: right;
+}
+
+/* Balance Due Summary */
+.balance-due-summary {
+  display: flex;
+  justify-content: flex-end;
+  margin: 20px 0;
+  font-weight: bold;
+}
+
+.balance-due-label {
+  margin-right: 20px;
+}
+
+.balance-due-amount {
+  min-width: 80px;
+  text-align: right;
+}
+
+/* Age Analysis */
+.age-analysis-section {
+  margin: 30px 0;
+}
+
+.age-analysis-header {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  cursor: pointer;
+  margin-bottom: 10px;
+  font-weight: bold;
+}
+
+.dropdown-arrow {
+  margin-left: 10px;
+  font-size: 12px;
+  transition: transform 0.3s;
+}
+
+.dropdown-arrow.open {
+  transform: rotate(180deg);
+}
+
+.age-analysis-table {
+  width: 770px;
+  border-collapse: collapse;
+  margin-left: -5px;
+}
+
+.age-analysis-table th {
+  background-color: #b8d1f3;
+  padding: 8px 12px;
+  text-align: left;
+  font-size: 14px;
+  font-weight: normal;
+  border: 1px solid #ddd;
+}
+
+.age-analysis-table td {
+  padding: 8px 12px;
+  font-size: 14px;
+  border: 1px solid #ddd;
+}
+
+/* Header */
+.statement-header1 {
+  padding: 20px 0 40px 0;
+  text-align: center;
+  background-color: #b8d1f3;
+}
+
+.statement-header1 h1 {
+  margin: 0;
+  font-size: 24px;
+  font-weight: bold;
+  text-align: center;
+}
+
+/* Professional Back Button - moved more to the left */
+.back-button-container {
+  max-width: 800px;
+  margin: 0 auto;
+  display: flex;
+  justify-content: flex-start; /* Already aligned to the left */
+  padding: 0; /* Removed padding to move it more to the left */
+  margin-left: 20px; /* Added left margin to position it at the left edge */
+}
+
+.professional-back-button {
+  background-color: #8ee4a6;
+  color: #333;
+  padding: 10px 24px;
+  border-radius: 4px;
+  font-size: 14px;
+  font-weight: 500;
+  border: none;
+  cursor: pointer;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  transition: all 0.2s ease;
+}
+
+.professional-back-button:hover {
+  background-color: #7ad092;
+  box-shadow: 0 3px 6px rgba(0, 0, 0, 0.15);
+}
+
+.statementdownloadbtn1 {
+  display: flex;
+  justify-content: center; /* Centers buttons horizontally */
+  gap: 20px; /* Space between buttons */
+  margin-top: 20px; /* Adds spacing above */
+  margin-bottom: 30px;
+}
+
+.statementdownloadbtn1 .back-btn {
+  background-color: #28a745; /* Green */
+  color: white;
+  border: none;
+  padding: 10px 25px;
+  border-radius: 5px;
+  font-size: 16px;
+  cursor: pointer;
+  transition: background 0.3s ease;
+}
+
+.statementdownloadbtn1 .back-btn:hover {
+  background-color: #218838; /* Darker green on hover */
+}
+
+.statementdownloadbtn1 .download-btn {
+  background-color: #007bff; /* Blue */
+  color: white;
+  border: none;
+  padding: 10px 25px;
+  border-radius: 5px;
+  font-size: 16px;
+  cursor: pointer;
+  transition: background 0.3s ease;
+}
+
+.statementdownloadbtn1 .download-btn:hover {
+  background-color: #0056b3; /* Darker blue on hover */
+}
+
+.statement-paper.printing-mode {
+  box-shadow: none; /* Remove shadow for PDF */
+  padding: 0;
+  margin: 0;
+  width: 100%;
+}
+
+@media print {
+  .transactions-table {
+    width: 100%;
+    table-layout: fixed;
+    page-break-inside: avoid;
+    font-size: 11px;
+  }
+
+  .transactions-table th,
+  .transactions-table td {
+    padding: 6px 4px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    word-wrap: break-word;
+  }
+
+  /* Ensure date column doesn't overflow */
+  .transactions-table th:nth-child(1),
+  .transactions-table td:nth-child(1) {
+    width: 10%;
+    white-space: nowrap;
+  }
+
+  /* Ensure monetary values are right-aligned */
+  .transactions-table th:nth-child(4),
+  .transactions-table td:nth-child(4),
+  .transactions-table th:nth-child(5),
+  .transactions-table td:nth-child(5),
+  .transactions-table th:nth-child(6),
+  .transactions-table td:nth-child(6) {
+    text-align: right;
+  }
+
+  /* Avoid page breaks within sections */
+  .statement-info-section,
+  .transactions-section,
+  .age-analysis-section {
+    page-break-inside: avoid;
+  }
+
+  /* Special handling for small tables - keep everything on one page */
+  .transactions-section.small-table {
+    page-break-after: auto !important;
+  }
+
+  .age-analysis-section.small-table {
+    page-break-before: auto !important;
+  }
+
+  /* Keep age analysis on same page as balance due if possible */
+  .balance-due-summary,
+  .age-analysis-section {
+    page-break-before: avoid;
+  }
+  .statement-page {
+    padding: 0;
+    margin: 0;
+  }
+  .statement-paper {
+    page-break-inside: avoid;
+    box-shadow: none;
+  }
+  .transactions-table,
+  .age-analysis-table {
+    page-break-inside: avoid;
+  }
+  tr {
+    page-break-inside: avoid;
+  }
+  .statementdownloadbtn1 {
+    display: none; /* Hide buttons in PDF */
+  }
+}
+
+/* Ensure download button styles */
+.download-btn {
+  /* Existing styles, e.g. */
+  background-color: #005566; /* Your theme color */
+  color: white;
+  padding: 8px 16px;
+  border: none;
+  cursor: pointer;
+}
+
+.download-btn.generating,
+.download-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+  background-color: #ccc; /* Greyed-out, adjust to your theme */
+}
+
+/* Adjust the table to be more responsive */
+.transactions-table {
+  width: 100%;
+  table-layout: fixed;
+}
+
+.transactions-table th:nth-child(1),
+.transactions-table td:nth-child(1) {
+  width: 12%;
+}
+
+.transactions-table th:nth-child(2),
+.transactions-table td:nth-child(2) {
+  width: 15%;
+}
+
+.transactions-table th:nth-child(3),
+.transactions-table td:nth-child(3) {
+  width: 25%;
+}
+
+.transactions-table th:nth-child(4),
+.transactions-table td:nth-child(4),
+.transactions-table th:nth-child(5),
+.transactions-table td:nth-child(5),
+.transactions-table th:nth-child(6),
+.transactions-table td:nth-child(6) {
+  width: 16%;
+}

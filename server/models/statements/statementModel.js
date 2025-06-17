@@ -1,0 +1,180 @@
+import { pool, query } from "../../config/database.js";
+
+const getClientStatements = async (clientId, { year, month }) => {
+  try {
+    if (!pool) {
+      throw new Error(
+        "Database connection not established. Please try again later."
+      );
+    }
+
+    let queryText = `
+      SELECT 
+        statement_key,
+        generation_date
+      FROM 
+        statements
+      WHERE 
+        clientid = $1
+    `;
+    const queryParams = [clientId];
+    let paramIndex = 2;
+
+    if (year) {
+      queryText += ` AND EXTRACT(YEAR FROM generation_date) = $${paramIndex}`;
+      queryParams.push(year);
+      paramIndex++;
+    }
+    if (month) {
+      queryText += ` AND EXTRACT(MONTH FROM generation_date) = $${paramIndex}`;
+      queryParams.push(month);
+      paramIndex++;
+    }
+
+    queryText += ` ORDER BY generation_date DESC`;
+
+    const result = await query(queryText, queryParams);
+    return { success: true, data: result.rows };
+  } catch (error) {
+    throw error;
+  }
+};
+
+const getStatementDetails = async (statementId) => {
+  let client;
+  try {
+    if (!pool) {
+      throw new Error(
+        "Database connection not established. Please try again later."
+      );
+    }
+    client = await pool.connect();
+
+    const queryText = `
+      SELECT 
+        s.statement_key,
+        s.groupid,
+        s.generation_date,
+        s.clientid,
+        s.opening_balance,
+        c.client AS client_name,
+        c.representative AS client_representative,
+        c.email AS client_email,
+        c.cellnum AS client_phone,
+        c.companyaddress AS client_address,
+        a.current,
+        a."30days",
+        a."60days",
+        a."90days",
+        i.ikey,
+        i.date AS invoice_date,
+        m1.total_cost AS invoice_amount,
+        m1.task AS invoice_task,
+        i.invoice_num,
+        ut.companyname
+      FROM 
+        statements s
+      JOIN 
+        m5_client c ON s.clientid = c.m5clientkey
+      JOIN 
+        aging_analysis a ON s.agingid = a.aging_key
+      LEFT JOIN 
+        invoice i ON i.groupid = s.groupid
+      LEFT JOIN 
+        m1_controller m1 ON i.m1key = m1.m1key
+      INNER JOIN
+        usertable ut ON ut.roleid = 1 AND ut.status = 'active'
+      WHERE 
+        s.statement_key = $1
+    `;
+    const result = await query(queryText, [statementId]);
+
+    if (result.rows.length === 0) {
+      return { success: false, message: "Statement not found" };
+    }
+
+    const clientId = result.rows[0].clientid;
+    const generationDate = new Date(result.rows[0].generation_date);
+    const statementMonth =
+      generationDate.getMonth() === 0 ? 11 : generationDate.getMonth() - 1;
+    const statementYear =
+      generationDate.getMonth() === 0
+        ? generationDate.getFullYear() - 1
+        : generationDate.getFullYear();
+    const paymentMonth = statementMonth === 0 ? 11 : statementMonth - 1;
+    const paymentYear =
+      statementMonth === 0 ? statementYear - 1 : statementYear;
+    const paymentStartDate = new Date(paymentYear, paymentMonth, 1, 12, 0, 0);
+    const paymentEndDate = new Date(paymentYear, paymentMonth + 1, 0, 12, 0, 0);
+    const formattedPaymentStartDate = paymentStartDate
+      .toISOString()
+      .split("T")[0];
+    const formattedPaymentEndDate = paymentEndDate.toISOString().split("T")[0];
+
+    const paymentsQuery = `
+      SELECT 
+        paykey,
+        fileupload AS date,
+        amount
+      FROM 
+        payment_m3
+      WHERE 
+        clientid = $1
+        AND fileupload BETWEEN $2 AND $3
+    `;
+    const paymentsResult = await query(paymentsQuery, [
+      clientId,
+      formattedPaymentStartDate,
+      formattedPaymentEndDate,
+    ]);
+    const payments = paymentsResult.rows.map((row) => ({
+      paykey: row.paykey,
+      date: row.date,
+      amount: Number.parseFloat(row.amount || 0),
+    }));
+
+    console.log(
+      `Fetched ${payments.length} payments for client ${clientId} between ${formattedPaymentStartDate} and ${formattedPaymentEndDate}`
+    );
+
+    const statementData = {
+      statement_key: result.rows[0].statement_key,
+      groupid: result.rows[0].groupid,
+      generation_date: result.rows[0].generation_date,
+      opening_balance: Number.parseFloat(result.rows[0].opening_balance || 0),
+      company_name: result.rows[0].companyname,
+      client: {
+        id: result.rows[0].clientid,
+        name: result.rows[0].client_name,
+        representative: result.rows[0].client_representative,
+        email: result.rows[0].client_email,
+        phone: result.rows[0].client_phone,
+        address: result.rows[0].client_address,
+      },
+      aging: {
+        current: Number.parseFloat(result.rows[0].current || 0),
+        "30days": Number.parseFloat(result.rows[0]["30days"] || 0),
+        "60days": Number.parseFloat(result.rows[0]["60days"] || 0),
+        "90days": Number.parseFloat(result.rows[0]["90days"] || 0),
+      },
+      invoices: result.rows
+        .filter((row) => row.ikey !== null)
+        .map((row) => ({
+          ikey: row.ikey,
+          date: row.invoice_date,
+          amount: Number.parseFloat(row.invoice_amount || 0),
+          task: row.invoice_task,
+          invoice_num: row.invoice_num,
+        })),
+      payments: payments,
+    };
+
+    return { success: true, data: statementData };
+  } catch (error) {
+    throw error;
+  } finally {
+    if (client) client.release();
+  }
+};
+
+export { getClientStatements, getStatementDetails };

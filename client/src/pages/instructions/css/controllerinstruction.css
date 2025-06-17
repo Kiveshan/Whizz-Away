@@ -1,0 +1,316 @@
+.controller-instruction-page-wrapper .instruction-container1 {
+  font-family: Arial, sans-serif;
+  max-width: 1200px;
+  margin: 0 auto;
+  position: relative;
+  /* min-height: 100vh; */
+  padding: 5px; /* Reduced padding to make it more compact */
+  margin-top: -110px;
+  margin-bottom: 20px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center; /* Centers content vertically */
+  align-items: center; /* Centers content horizontally */
+}
+
+/* Content area with white background and slight shadow */
+.controller-instruction-page-wrapper .content {
+  padding: 10px; /* Reduced padding */
+  border-radius: 5px;
+  margin: 5px 0; /* Reduced margin */
+  margin-top: 10px;
+  box-sizing: border-box;
+  text-align: center; /* Centers text inside */
+}
+
+/* Title of the content */
+.controller-instruction-page-wrapper .content-title {
+  text-align: center;
+  font-size: 26px; /* Reduced font size slightly */
+  text-decoration: underline;
+  margin: 0 0 15px; /* Reduced margin */
+}
+
+/* Navigation buttons (Back and Logout) */
+.controller-instruction-page-wrapper .navigation-buttons {
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 15px; /* Reduced margin */
+}
+
+.controller-instruction-page-wrapper .back-button {
+  background-color: #4caf50; /* Green to match the screenshot */
+  color: white;
+  border: none;
+  padding: 8px 16px;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: background-color 0.3s;
+  font-size: 14px;
+  margin-top: 132px;
+}
+
+.controller-instruction-page-wrapper .logout-button {
+  background-color: #f89999;
+  color: white;
+}
+
+/* Form sections */
+.controller-instruction-page-wrapper .form-section {
+  background-color: #e6f7ff;
+  padding: 1px; /* Slightly reduced padding */
+  margin-bottom: 1px; /* Further reduced margin */
+  margin-top: -10px;
+  border-radius: 1px;
+  border-bottom: 1px solid blue;
+  width: 100%;
+  box-sizing: border-box;
+  padding: "20px";
+  border-radius: 5px;
+}
+
+/* Remove the blue line after the last form section */
+.controller-instruction-page-wrapper .form-section:last-child {
+  border-bottom: none;
+}
+
+/* Flex container for form rows */
+.controller-instruction-page-wrapper .form-row1 {
+  display: flex;
+  gap: 10px; /* Reduced gap */
+  margin-bottom: -5px; /* Reduced margin */
+  flex-wrap: wrap;
+}
+
+/* Form group styling */
+.controller-instruction-page-wrapper .form-group {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start; /* Ensures the label stays on the left */
+}
+
+.controller-instruction-page-wrapper .form-group label {
+  display: block;
+  margin-bottom: 4px; /* Reduced margin */
+  font-weight: bold;
+}
+
+.controller-instruction-page-wrapper .form-group.wide {
+  flex: 2;
+}
+
+.controller-instruction-page-wrapper .form-group.full-width {
+  width: 100%;
+}
+
+/* Form inputs and text areas */
+.controller-instruction-page-wrapper .form-input,
+.controller-instruction-page-wrapper .form-select,
+.controller-instruction-page-wrapper .form-textarea {
+  width: 100%;
+  padding: 6px 4px; /* Reduced padding */
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  box-sizing: border-box;
+}
+
+.controller-instruction-page-wrapper .form-textarea {
+  min-height: 40px; /* Reduced height */
+  resize: vertical;
+}
+
+/* Select wrapper */
+.controller-instruction-page-wrapper .select-wrapper {
+  position: relative;
+}
+
+.controller-instruction-page-wrapper .select-wrapper.small {
+  width: 80px;
+}
+
+/* Date, rate, trailer input groups */
+.controller-instruction-page-wrapper .date-input-group,
+.controller-instruction-page-wrapper .rates-input-group,
+.controller-instruction-page-wrapper .trailer-input-group {
+  display: flex;
+  align-items: center;
+  gap: 4px; /* Reduced gap */
+}
+
+/* Calendar button styling */
+.controller-instruction-page-wrapper .calendar-button {
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-size: 18px; /* Reduced font size */
+}
+
+/* Number input styling */
+.controller-instruction-page-wrapper .number-input-group {
+  display: flex;
+  align-items: center;
+}
+
+.controller-instruction-page-wrapper .number-controls {
+  display: flex;
+  flex-direction: column;
+  margin-left: 4px; /* Reduced margin */
+}
+
+.controller-instruction-page-wrapper .number-up,
+.controller-instruction-page-wrapper .number-down {
+  background: none;
+  border: 1px solid #ddd;
+  cursor: pointer;
+  font-size: 9px; /* Reduced font size */
+  padding: 0;
+  width: 18px; /* Reduced width */
+  height: 12px; /* Reduced height */
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.controller-instruction-page-wrapper .form-input.small {
+  width: 50px;
+}
+
+/* Add button styling */
+.controller-instruction-page-wrapper .add-button {
+  background-color: #8cc7f0;
+  border: none;
+  width: 22px; /* Reduced width */
+  height: 22px; /* Reduced height */
+  border-radius: 50%;
+  color: white;
+  font-weight: bold;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* Checkbox group styling */
+.controller-instruction-page-wrapper .checkboxes {
+  display: flex;
+  gap: 15px; /* Reduced gap */
+}
+
+.controller-instruction-page-wrapper .checkbox-group {
+  display: flex;
+  align-items: center;
+  gap: 4px; /* Reduced gap */
+}
+
+/* Button container styling */
+.controller-instruction-page-wrapper .button-container {
+  display: flex;
+  justify-content: center;
+  margin-top: 15px; /* Reduced margin */
+}
+
+.controller-instruction-page-wrapper .add-container-button {
+  background-color: #8cc7f0;
+  border: none;
+  padding: 8px 15px; /* Reduced padding */
+  border-radius: 5px;
+  cursor: pointer;
+  font-weight: bold;
+  color: black;
+}
+
+/* Visily logo styling (fixed at bottom left) */
+.controller-instruction-page-wrapper .visily-logo {
+  position: absolute;
+  bottom: 10px;
+  left: 10px;
+  font-size: 12px;
+  color: #666;
+}
+
+/* Responsive styles for smaller screens */
+@media (max-width: 768px) {
+  .controller-instruction-page-wrapper .form-row1 {
+    flex-direction: column;
+  }
+
+  .controller-instruction-page-wrapper .form-group {
+    width: 100%;
+  }
+}
+
+.controller-instruction-page-wrapper .back-button2 {
+  background-color: #90ee90;
+  border: none;
+  padding: 10px 20px;
+  border-radius: 6px;
+  cursor: pointer;
+  margin-top: -35px;
+  color: white;
+}
+
+.controller-instruction-page-wrapper .dropdown-container {
+  display: flex;
+  justify-content: center;
+  gap: 10px;
+  margin-bottom: 20px;
+}
+
+.controller-instruction-page-wrapper .dropdown {
+  width: 200px;
+  padding: 8px;
+  font-size: 14px;
+  border: 1px solid white;
+  border-radius: 4px;
+  background-color: white;
+  cursor: pointer;
+  appearance: none; /* Hides the default arrow */
+  -webkit-appearance: none; /* For Safari */
+  -moz-appearance: none; /* For Firefox */
+  padding-right: 25px; /* Adds space for custom icon */
+  background-image: url("data:image/svg+xml;charset=UTF-8,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20' fill='gray'%3E%3Cpath fill-rule='evenodd' d='M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z' clip-rule='evenodd'/%3E%3C/svg%3E"); /* Custom dropdown icon */
+  background-repeat: no-repeat;
+  background-position: right 10px center;
+  background-size: 14px;
+}
+
+/* Align all counters in a single row */
+.controller-instruction-page-wrapper .counter-container {
+  display: flex;
+  gap: 20px; /* Adds space between the counters */
+}
+
+.controller-instruction-page-wrapper .counter {
+  display: flex;
+  flex-direction: column; /* Keeps label above the input */
+  align-items: center;
+  background: white;
+  padding: 10px;
+  border-radius: 8px;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  width: 100px;
+}
+
+.controller-instruction-page-wrapper .counter span {
+  font-size: 14px;
+  font-weight: 600;
+  margin-bottom: 5px;
+}
+
+.controller-instruction-page-wrapper .counter input {
+  width: 50px;
+  padding: 5px;
+  font-size: 14px;
+  text-align: center;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+  outline: none;
+  -moz-appearance: textfield;
+}
+
+/* Restore up/down arrows in WebKit browsers */
+.controller-instruction-page-wrapper .counter input::-webkit-inner-spin-button,
+.controller-instruction-page-wrapper .counter input::-webkit-outer-spin-button {
+  -webkit-appearance: auto;
+  margin: 0;
+}

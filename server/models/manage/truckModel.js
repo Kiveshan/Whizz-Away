@@ -1,0 +1,247 @@
+import { pool } from "../../config/database.js";
+
+const getAllTrucks = async () => {
+  let client;
+  try {
+    client = await pool.connect();
+    const result = await client.query(
+      "SELECT * FROM m5_trucks ORDER BY m5truckskey"
+    );
+    return result.rows;
+  } catch (err) {
+    console.error("Error fetching trucks:", err);
+    throw err;
+  } finally {
+    if (client) client.release();
+  }
+};
+
+const getTruckById = async (id) => {
+  let client;
+  try {
+    client = await pool.connect();
+    const result = await client.query(
+      "SELECT * FROM m5_trucks WHERE m5truckskey = $1",
+      [id]
+    );
+    if (!result.rows.length) {
+      return { success: false, message: "Truck not found" };
+    }
+    return { success: true, data: result.rows[0] };
+  } catch (err) {
+    console.error(`Error fetching truck ${id}:`, err);
+    throw err;
+  } finally {
+    if (client) client.release();
+  }
+};
+
+const createTruck = async (truckData, documentKeys) => {
+  let client;
+  try {
+    client = await pool.connect();
+    const {
+      truckregnum,
+      trailersize,
+      truckpurchasedate,
+      year,
+      model,
+      purchase_price,
+      current_evaluation,
+      vin_num,
+      is_subcontractor,
+    } = truckData;
+
+    const document_url1 = documentKeys[0] || null;
+    const document_url2 = documentKeys[1] || null;
+    const document_url3 = documentKeys[2] || null;
+
+    const result = await client.query(
+      `INSERT INTO m5_trucks (
+         truckregnum, trailersize, truckpurchasedate, year, model,
+         purchase_price, current_evaluation, vin_num, is_subcontractor,
+         document_url1, document_url2, document_url3
+       ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
+       RETURNING *`,
+      [
+        truckregnum,
+        trailersize,
+        truckpurchasedate,
+        year,
+        model,
+        purchase_price,
+        current_evaluation,
+        vin_num,
+        is_subcontractor,
+        document_url1,
+        document_url2,
+        document_url3,
+      ]
+    );
+    return result.rows[0];
+  } catch (err) {
+    console.error("Error creating truck:", err);
+    throw err;
+  } finally {
+    if (client) client.release();
+  }
+};
+
+const updateTruck = async (id, truckData, newDocKeys) => {
+  let client;
+  try {
+    client = await pool.connect();
+    const {
+      truckregnum,
+      trailersize,
+      truckpurchasedate,
+      year,
+      model,
+      purchase_price,
+      current_evaluation,
+      vin_num,
+      is_subcontractor,
+    } = truckData;
+
+    const existingResult = await client.query(
+      "SELECT document_url1, document_url2, document_url3 FROM m5_trucks WHERE m5truckskey = $1",
+      [id]
+    );
+    if (!existingResult.rows.length) {
+      return { success: false, message: "Truck not found" };
+    }
+
+    let { document_url1, document_url2, document_url3 } =
+      existingResult.rows[0];
+    let currentDocs = [document_url1, document_url2, document_url3];
+
+    let newIndex = 0;
+    for (
+      let i = 0;
+      i < currentDocs.length && newIndex < newDocKeys.length;
+      i++
+    ) {
+      if (!currentDocs[i]) {
+        currentDocs[i] = newDocKeys[newIndex];
+        newIndex++;
+      }
+    }
+
+    [document_url1, document_url2, document_url3] = currentDocs;
+
+    const result = await client.query(
+      `UPDATE m5_trucks
+       SET truckregnum = $1, trailersize = $2, truckpurchasedate = $3,
+           year = $4, model = $5, purchase_price = $6,
+           current_evaluation = $7, vin_num = $8, is_subcontractor = $9,
+           document_url1 = $10, document_url2 = $11, document_url3 = $12
+       WHERE m5truckskey = $13
+       RETURNING *`,
+      [
+        truckregnum,
+        trailersize,
+        truckpurchasedate,
+        year,
+        model,
+        purchase_price,
+        current_evaluation,
+        vin_num,
+        is_subcontractor,
+        document_url1,
+        document_url2,
+        document_url3,
+        id,
+      ]
+    );
+    if (!result.rowCount) {
+      return { success: false, message: "Truck not found" };
+    }
+    return { success: true, data: result.rows[0] };
+  } catch (err) {
+    console.error(`Error updating truck ${id}:`, err);
+    throw err;
+  } finally {
+    if (client) client.release();
+  }
+};
+
+const deleteTruckDocument = async (truckId, url) => {
+  let client;
+  try {
+    client = await pool.connect();
+    const { rows } = await client.query(
+      "SELECT document_url1, document_url2, document_url3 FROM m5_trucks WHERE m5truckskey = $1",
+      [truckId]
+    );
+    if (!rows.length) {
+      return { success: false, message: "Truck not found" };
+    }
+
+    let updateField = null;
+    const storedUrls = [
+      rows[0].document_url1,
+      rows[0].document_url2,
+      rows[0].document_url3,
+    ];
+    for (let i = 0; i < storedUrls.length; i++) {
+      if (storedUrls[i]) {
+        let storedKey;
+        try {
+          storedKey = decodeURIComponent(
+            new URL(storedUrls[i]).pathname.substring(1)
+          );
+        } catch {
+          storedKey = storedUrls[i];
+        }
+        if (storedKey === url) {
+          updateField = `document_url${i + 1}`;
+          break;
+        }
+      }
+    }
+
+    if (updateField) {
+      await client.query(
+        `UPDATE m5_trucks SET ${updateField} = NULL WHERE m5truckskey = $1`,
+        [truckId]
+      );
+      return { success: true, message: "Document deleted successfully" };
+    }
+    return { success: false, message: "No matching document URL found" };
+  } catch (err) {
+    console.error("Error deleting truck document:", err);
+    throw err;
+  } finally {
+    if (client) client.release();
+  }
+};
+
+const deleteTruck = async (id) => {
+  let client;
+  try {
+    client = await pool.connect();
+    const checkResult = await client.query(
+      "SELECT m5truckskey FROM m5_trucks WHERE m5truckskey = $1",
+      [id]
+    );
+    if (!checkResult.rows.length) {
+      return { success: false, message: "Truck not found" };
+    }
+    await client.query("DELETE FROM m5_trucks WHERE m5truckskey = $1", [id]);
+    return { success: true, message: "Truck deleted successfully" };
+  } catch (err) {
+    console.error(`Error deleting truck ${id}:`, err);
+    throw err;
+  } finally {
+    if (client) client.release();
+  }
+};
+
+export {
+  getAllTrucks,
+  getTruckById,
+  createTruck,
+  updateTruck,
+  deleteTruckDocument,
+  deleteTruck,
+};

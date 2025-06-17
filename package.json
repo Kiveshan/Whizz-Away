@@ -1,67 +1,15 @@
 {
   "name": "trucking_app",
-  "version": "0.1.0",
+  "version": "0.1.7",
   "private": true,
-  "dependencies": {
-    "@testing-library/dom": "^10.4.0",
-    "@testing-library/jest-dom": "^6.6.3",
-    "@testing-library/react": "^16.2.0",
-    "@testing-library/user-event": "^13.5.0",
-    "axios": "^1.8.4",
-    "bcrypt": "^5.1.1",
-    "bcryptjs": "^3.0.2",
-    "body-parser": "^1.20.3",
-    "chart.js": "^4.4.8",
-    "cookie-parser": "^1.4.7",
-    "cors": "^2.8.5",
-    "dotenv": "^16.4.7",
-    "express-session": "^1.18.1",
-    "flash": "^1.1.0",
-    "framer-motion": "^12.5.0",
-    "jsonwebtoken": "^9.0.2",
-    "jwt-decode": "^4.0.0",
-    "method-override": "^3.0.0",
-    "passport": "^0.7.0",
-    "passport-local": "^1.0.0",
-    "pg": "^8.14.1",
-    "react": "^19.0.0",
-    "react-chartjs-2": "^5.3.0",
-    "react-dom": "^19.0.0",
-    "react-icons": "^5.5.0",
-    "react-router-dom": "^7.4.0",
-    "react-scripts": "^5.0.1",
-    "react-select": "^5.10.1",
-    "recharts": "^2.15.1",
-    "tailwindcss": "^4.0.14",
-    "web-vitals": "^2.1.4"
-  },
+  "type": "module",
   "scripts": {
-    "start": "concurrently \"npm run server\" \"react-scripts start\"",
-    "server": "node server.js",
-    "build": "react-scripts build",
-    "test": "react-scripts test",
-    "eject": "react-scripts eject"
-  },
-  "eslintConfig": {
-    "extends": [
-      "react-app",
-      "react-app/jest"
-    ]
-  },
-  "browserslist": {
-    "production": [
-      ">0.2%",
-      "not dead",
-      "not op_mini all"
-    ],
-    "development": [
-      "last 1 chrome version",
-      "last 1 firefox version",
-      "last 1 safari version"
-    ]
+    "start": "concurrently \"npm run server --prefix server\" \"npm run start --prefix client\"",
+    "build": "npm run build --prefix client",
+    "test": "npm run test --prefix client",
+    "server": "npm run server --prefix server"
   },
   "devDependencies": {
     "concurrently": "^9.1.2"
-  },
-  "proxy": "http://localhost:5000"
+  }
 }
