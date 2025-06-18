@@ -2,29 +2,66 @@
 
 import { useState, useEffect } from "react";
 import { useNavigate, useLocation, useParams } from "react-router-dom";
-import api from "../../../api"; // Import the configured Axios instance
+import api from "../../../api";
 import "../css/ClientPayments.css";
 
 const UploadProof = () => {
   const navigate = useNavigate();
-  const { clientName, paymentId } = useParams(); // Extract paymentId from URL
+  const { clientName, paymentId } = useParams();
   const location = useLocation();
   const { clientId } = location.state || {};
 
   const [amount, setAmount] = useState("");
   const [paymentDate, setPaymentDate] = useState("");
+  const [invoiceId, setInvoiceId] = useState("");
+  const [invoices, setInvoices] = useState([]);
+  const [file, setFile] = useState(null);
+  const [fileUrl, setFileUrl] = useState(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [isLoading, setIsLoading] = useState(false); // For loading payment details
+  const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState(null);
-  const [isViewMode, setIsViewMode] = useState(false); // Track if in view mode
+  const [isViewMode, setIsViewMode] = useState(!!paymentId);
 
-  // Retrieve roleId from localStorage
   const roleId = JSON.parse(localStorage.getItem("user"))?.roleid;
 
-  // Fetch payment details if in view mode (paymentId exists)
+  // Fetch invoices for dropdown
   useEffect(() => {
-    if (paymentId) {
-      setIsViewMode(true);
+    if (!clientId) {
+      setError("No client selected");
+      setIsLoading(false);
+      return;
+    }
+
+    const fetchInvoices = async () => {
+      try {
+        setIsLoading(true);
+        const response = await api.get(`/api/invoices/${clientId}`, {
+          headers: {
+            Authorization: `Bearer ${localStorage.getItem("token")}`,
+          },
+        });
+        if (response.data.success) {
+          setInvoices(response.data.data);
+          if (!isViewMode && response.data.data.length > 0) {
+            setInvoiceId(response.data.data[0].ikey.toString());
+          }
+        } else {
+          throw new Error(response.data.message || "Failed to fetch invoices");
+        }
+      } catch (err) {
+        console.error("Error fetching invoices:", err);
+        setError(err.message || "An error occurred while fetching invoices");
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    fetchInvoices();
+  }, [clientId, isViewMode]);
+
+  // Fetch payment details for view mode
+  useEffect(() => {
+    if (paymentId && clientId) {
       const fetchPaymentDetails = async () => {
         try {
           setIsLoading(true);
@@ -38,16 +75,19 @@ const UploadProof = () => {
           );
 
           if (response.data.success) {
-            const { amount, fileupload } = response.data.data;
+            const { amount, fileupload, invoiceid, fileurl } =
+              response.data.data;
             setAmount(amount.toString());
-            setPaymentDate(fileupload.split("T")[0]); // Format date for input (YYYY-MM-DD)
+            setPaymentDate(fileupload.split("T")[0]);
+            setInvoiceId(invoiceid ? invoiceid.toString() : "");
+            setFileUrl(fileurl);
           } else {
             throw new Error(
               response.data.message || "Failed to fetch payment details"
             );
           }
         } catch (err) {
-          console.error("Error fetching payment details:", err.response || err);
+          console.error("Error fetching payment details:", err);
           setError(
             err.message || "An error occurred while fetching payment details"
           );
@@ -59,6 +99,12 @@ const UploadProof = () => {
       fetchPaymentDetails();
     }
   }, [paymentId, clientId]);
+
+  const handleFileChange = (e) => {
+    const selectedFile = e.target.files[0];
+    setFile(selectedFile);
+    setError(null);
+  };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -78,24 +124,38 @@ const UploadProof = () => {
       return;
     }
 
+    if (!invoiceId) {
+      setError("Please select an invoice");
+      return;
+    }
+
+    if (!file && !isViewMode) {
+      setError("Please upload a proof of payment file");
+      return;
+    }
+
     try {
       setIsSubmitting(true);
+      const formData = new FormData();
+      formData.append("amount", parseFloat(amount));
+      formData.append("fileupload", paymentDate);
+      formData.append("invoiceid", invoiceId);
+      if (file) {
+        formData.append("file", file);
+      }
+
       const response = await api.post(
         `/api/payments/${clientId}/upload`,
-        {
-          amount: parseFloat(amount),
-          fileupload: paymentDate,
-        },
+        formData,
         {
           headers: {
             Authorization: `Bearer ${localStorage.getItem("token")}`,
-            "Content-Type": "application/json",
+            "Content-Type": "multipart/form-data",
           },
         }
       );
 
       if (response.data.success) {
-        // Redirect based on roleId
         if (roleId == 1) {
           navigate("/client-payments", {
             state: { clientId, clientName },
@@ -105,7 +165,6 @@ const UploadProof = () => {
             state: { clientId, clientName },
           });
         } else {
-          // Default fallback navigation
           navigate("/client-payments", {
             state: { clientId, clientName },
           });
@@ -116,7 +175,7 @@ const UploadProof = () => {
         );
       }
     } catch (err) {
-      console.error("Error uploading payment details:", err.response || err);
+      console.error("Error uploading payment details:", err);
       setError(
         err.message || "An error occurred while uploading the payment details"
       );
@@ -135,10 +194,63 @@ const UploadProof = () => {
         state: { clientId, clientName },
       });
     } else {
-      // Default fallback navigation
       navigate("/client-payments", {
         state: { clientId, clientName },
       });
+    }
+  };
+
+  const openImageViewer = (fileUrl, titleText) => {
+    const modal = document.createElement("div");
+    modal.className = "proof-modal";
+
+    const modalContent = document.createElement("div");
+    modalContent.className = "proof-modal-content";
+
+    const closeBtn = document.createElement("span");
+    closeBtn.className = "proof-modal-close";
+    closeBtn.innerHTML = "×";
+    closeBtn.onclick = () => document.body.removeChild(modal);
+
+    const title = document.createElement("h2");
+    title.textContent = `Proof of Payment - ${titleText}`;
+
+    const fileExtension = fileUrl.split(".").pop().toLowerCase();
+    let contentElement;
+
+    if (["jpg", "jpeg", "png", "gif"].includes(fileExtension)) {
+      contentElement = document.createElement("img");
+      contentElement.src = fileUrl;
+      contentElement.className = "proof-image";
+    } else if (fileExtension === "pdf") {
+      contentElement = document.createElement("iframe");
+      contentElement.src = fileUrl;
+      contentElement.className = "proof-pdf";
+      contentElement.style.width = "100%";
+      contentElement.style.height = "500px";
+    } else {
+      contentElement = document.createElement("p");
+      contentElement.textContent = "Unsupported file format";
+    }
+
+    modalContent.appendChild(closeBtn);
+    modalContent.appendChild(title);
+    modalContent.appendChild(contentElement);
+    modal.appendChild(modalContent);
+
+    document.body.appendChild(modal);
+  };
+
+  const handleViewProof = () => {
+    if (fileUrl) {
+      openImageViewer(
+        fileUrl,
+        `${decodeURIComponent(clientName)} - ${new Date(
+          paymentDate
+        ).toLocaleDateString()}`
+      );
+    } else {
+      setError("No proof of payment uploaded");
     }
   };
 
@@ -154,8 +266,8 @@ const UploadProof = () => {
         <div className="upload-form">
           <h2>
             {isViewMode
-              ? `View Payment for ${clientName}`
-              : `Upload Payment for ${clientName}`}
+              ? `View Payment for ${decodeURIComponent(clientName)}`
+              : `Upload Payment for ${decodeURIComponent(clientName)}`}
           </h2>
           {error && (
             <div
@@ -165,7 +277,7 @@ const UploadProof = () => {
               {error}
             </div>
           )}
-          {isLoading && <div>Loading payment details...</div>}
+          {isLoading && <div>Loading...</div>}
           {!isLoading && (
             <>
               <div className="amount-field">
@@ -175,8 +287,8 @@ const UploadProof = () => {
                   value={amount}
                   onChange={(e) => setAmount(e.target.value)}
                   placeholder="0"
-                  readOnly={isViewMode} // Make read-only in view mode
-                  disabled={isViewMode} // Also disable to prevent interaction
+                  readOnly={isViewMode}
+                  disabled={isViewMode}
                 />
               </div>
               <div className="amount-field">
@@ -185,15 +297,55 @@ const UploadProof = () => {
                   type="date"
                   value={paymentDate}
                   onChange={(e) => setPaymentDate(e.target.value)}
-                  readOnly={isViewMode} // Make read-only in view mode
-                  disabled={isViewMode} // Also disable to prevent interaction
+                  readOnly={isViewMode}
+                  disabled={isViewMode}
                 />
               </div>
-              {!isViewMode && ( // Hide submit button in view mode
+              <div className="amount-field">
+                <label>Select Invoice</label>
+                <select
+                  value={invoiceId}
+                  onChange={(e) => setInvoiceId(e.target.value)}
+                  disabled={isViewMode}
+                >
+                  <option value="">Select an invoice</option>
+                  {invoices.map((invoice) => (
+                    <option key={invoice.ikey} value={invoice.ikey}>
+                      {invoice.invoice_num} (
+                      {new Date(invoice.date).toLocaleDateString()})
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div className="amount-field">
+                <label>Proof of Payment</label>
+                <input
+                  type="file"
+                  accept=".jpg,.jpeg,.png,.pdf"
+                  onChange={handleFileChange}
+                  disabled={isViewMode}
+                />
+                {isViewMode && fileUrl && (
+                  <button
+                    className="view-button"
+                    onClick={handleViewProof}
+                    style={{ marginTop: "10px" }}
+                  >
+                    View Proof of Payment
+                  </button>
+                )}
+              </div>
+              {!isViewMode && (
                 <button
                   className="submit-button"
                   onClick={handleSubmit}
-                  disabled={!amount || !paymentDate || isSubmitting}
+                  disabled={
+                    !amount ||
+                    !paymentDate ||
+                    !invoiceId ||
+                    !file ||
+                    isSubmitting
+                  }
                 >
                   {isSubmitting ? "Submitting..." : "Submit Payment Details"}
                 </button>

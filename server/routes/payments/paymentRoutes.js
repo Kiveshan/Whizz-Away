@@ -1,9 +1,11 @@
 import express from "express";
 import { verifyToken } from "../../middleware/auth.js";
+import { uploadInstruction } from "../../utils/s3-config.js";
 import {
   createPaymentHandler,
   getPaymentHandler,
   getClientPaymentsHandler,
+  getClientInvoicesHandler,
 } from "../../controllers/payments/paymentController.js";
 
 const router = express.Router();
@@ -11,6 +13,7 @@ const router = express.Router();
 router.post(
   "/api/payments/:clientId/upload",
   verifyToken,
+  uploadInstruction.single("file"),
   createPaymentHandler
 );
 router.get(
@@ -19,5 +22,6 @@ router.get(
   getPaymentHandler
 );
 router.get("/api/payments/:clientId", verifyToken, getClientPaymentsHandler);
+router.get("/api/invoices/:clientId", verifyToken, getClientInvoicesHandler);
 
 export default router;

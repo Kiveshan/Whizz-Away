@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
-import api from "../../../api"; // Import the configured Axios instance
+import api from "../../../api";
 import "../css/ClientPayments.css";
 
 const ClientPaymentList = () => {
@@ -13,7 +13,6 @@ const ClientPaymentList = () => {
   const [clientPayments, setClientPayments] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  // Set default filters to current year and month
   const currentDate = new Date();
   const [filters, setFilters] = useState({
     year: currentDate.getFullYear().toString(),
@@ -92,17 +91,6 @@ const ClientPaymentList = () => {
     navigate("/client-list-payments");
   };
 
-  const handleViewProof = (fileUrl, date) => {
-    if (fileUrl) {
-      openImageViewer(
-        fileUrl,
-        `${clientName} - ${new Date(date).toLocaleDateString()}`
-      );
-    } else {
-      alert("No proof of payment uploaded");
-    }
-  };
-
   const openImageViewer = (fileUrl, titleText) => {
     const modal = document.createElement("div");
     modal.className = "proof-modal";
@@ -142,6 +130,19 @@ const ClientPaymentList = () => {
     modal.appendChild(modalContent);
 
     document.body.appendChild(modal);
+  };
+
+  const handleViewProof = (fileUrl, date, invoiceNum) => {
+    if (fileUrl) {
+      openImageViewer(
+        fileUrl,
+        `${clientName} - ${new Date(
+          date
+        ).toLocaleDateString()} - Invoice ${invoiceNum}`
+      );
+    } else {
+      alert("No proof of payment uploaded");
+    }
   };
 
   if (loading) return <div>Loading payments...</div>;
@@ -194,35 +195,55 @@ const ClientPaymentList = () => {
           <tr>
             <th>Date</th>
             <th>Amount</th>
+            <th>Invoice</th>
+            <th>Proof</th>
             <th>View</th>
           </tr>
         </thead>
         <tbody>
           {clientPayments.length > 0 ? (
             clientPayments.map((payment, index) => (
-              <tr key={index}>
+              <tr key={payment.paykey || index}>
                 <td>{new Date(payment.fileupload).toLocaleDateString()}</td>
                 <td>{payment.amount}</td>
+                <td>{payment.invoice_num || "N/A"}</td>
+                <td>
+                  <button
+                    className="view-button"
+                    onClick={() =>
+                      handleViewProof(
+                        payment.fileurl,
+                        payment.fileupload,
+                        payment.invoice_num
+                      )
+                    }
+                    disabled={!payment.fileurl}
+                  >
+                    View Proof
+                  </button>
+                </td>
                 <td>
                   <button
                     className="view-button"
                     onClick={() =>
                       navigate(
-                        `/upload-proof/${clientName}/${payment.paykey}`,
+                        `/upload-proof/${encodeURIComponent(clientName)}/${
+                          payment.paykey
+                        }`,
                         {
                           state: { clientId, clientName },
                         }
                       )
                     }
                   >
-                    View
+                    View Details
                   </button>
                 </td>
               </tr>
             ))
           ) : (
             <tr>
-              <td colSpan="3" className="p-3 text-center">
+              <td colSpan="5" className="p-3 text-center">
                 No payments found
               </td>
             </tr>

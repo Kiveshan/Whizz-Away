@@ -2,12 +2,16 @@ import {
   createPayment,
   getPayment,
   getClientPayments,
+  getClientInvoices,
 } from "../../models/payments/paymentModel.js";
+import { s3, getSignedUrl } from "../../utils/s3-config.js";
+import path from "path";
 
 const createPaymentHandler = async (req, res) => {
   try {
     const { clientId } = req.params;
-    const { amount, fileupload } = req.body;
+    const { amount, fileupload, invoiceid } = req.body;
+    const file = req.file;
 
     if (!amount || isNaN(amount)) {
       return res.status(400).json({
@@ -23,9 +27,68 @@ const createPaymentHandler = async (req, res) => {
       });
     }
 
-    console.log(`Inserting payment for client ${clientId}`);
-    const result = await createPayment(clientId, { amount, fileupload });
-    console.log(`Inserted payment for client ${clientId}:`, result.data);
+    if (!invoiceid) {
+      return res.status(400).json({
+        success: false,
+        message: "Invoice ID is required",
+      });
+    }
+
+    if (!file) {
+      return res.status(400).json({
+        success: false,
+        message: "Proof of payment file is required",
+      });
+    }
+
+    // Construct S3 key: payments/clientName/invoiceNum/filename
+    const originalFileName = file.originalname.replace(/[^a-zA-Z0-9.-]/g, "_");
+    const tempKey = `temp/${Date.now()}_${originalFileName}`;
+
+    // Upload file to temporary S3 location
+    await s3
+      .upload({
+        Bucket: process.env.S3_BUCKET_NAME || "sherwyn-whizz-away",
+        Key: tempKey,
+        Body: file.buffer,
+        ContentType: file.mimetype,
+      })
+      .promise();
+
+    // Create payment to get clientname and invoice_num
+    const paymentData = await createPayment(clientId, {
+      amount,
+      fileupload,
+      invoiceid,
+      filename: tempKey,
+    });
+    const { clientname, invoice_num } = paymentData.data;
+
+    // Move file to final S3 location
+    const finalKey = `payments/${clientname}/${invoice_num}/${originalFileName}`;
+    await s3
+      .copyObject({
+        Bucket: process.env.S3_BUCKET_NAME,
+        CopySource: `${process.env.S3_BUCKET_NAME}/${tempKey}`,
+        Key: finalKey,
+      })
+      .promise();
+    await s3
+      .deleteObject({
+        Bucket: process.env.S3_BUCKET_NAME,
+        Key: tempKey,
+      })
+      .promise();
+
+    // Update payment with final S3 key
+    const result = await createPayment(clientId, {
+      amount,
+      fileupload,
+      invoiceid,
+      filename: finalKey,
+    });
+
+    result.data.fileurl = getSignedUrl(finalKey, 3600);
 
     res.json({
       success: true,
@@ -56,7 +119,7 @@ const getPaymentHandler = async (req, res) => {
 
     const payment = result.data;
     payment.fileurl = payment.filename
-      ? `${req.protocol}://${req.get("host")}/uploads/${payment.filename}`
+      ? getSignedUrl(payment.filename, 3600)
       : null;
 
     res.json({
@@ -93,9 +156,7 @@ const getClientPaymentsHandler = async (req, res) => {
 
     const payments = result.data.map((payment) => ({
       ...payment,
-      fileurl: payment.filename
-        ? `${req.protocol}://${req.get("host")}/uploads/${payment.filename}`
-        : null,
+      fileurl: payment.filename ? getSignedUrl(payment.filename, 3600) : null,
     }));
 
     res.json({
@@ -112,4 +173,29 @@ const getClientPaymentsHandler = async (req, res) => {
   }
 };
 
-export { createPaymentHandler, getPaymentHandler, getClientPaymentsHandler };
+const getClientInvoicesHandler = async (req, res) => {
+  try {
+    const { clientId } = req.params;
+    console.log(`Fetching invoices for client ${clientId}`);
+
+    const result = await getClientInvoices(clientId);
+    res.json({
+      success: true,
+      data: result.data,
+    });
+  } catch (error) {
+    console.error(`Error fetching invoices for client ${clientId}:`, error);
+    res.status(500).json({
+      success: false,
+      message: error.message,
+      stack: process.env.NODE_ENV === "production" ? null : error.stack,
+    });
+  }
+};
+
+export {
+  createPaymentHandler,
+  getPaymentHandler,
+  getClientPaymentsHandler,
+  getClientInvoicesHandler,
+};
