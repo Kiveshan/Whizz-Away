@@ -13,7 +13,22 @@ const createPayment = async (
     }
     client = await pool.connect();
 
-    // Insert payment record
+    // Fetch client and invoice_num for S3 folder structure
+    const clientQuery = `SELECT client FROM m5_client WHERE m5clientkey = $1`;
+    const clientResult = await client.query(clientQuery, [clientId]);
+    if (clientResult.rows.length === 0) {
+      throw new Error("Client not found");
+    }
+
+    const invoiceQuery = `SELECT invoice_num FROM invoice WHERE ikey = $1 AND clientid = $2`;
+    const invoiceResult = await client.query(invoiceQuery, [
+      invoiceid,
+      clientId,
+    ]);
+    if (invoiceResult.rows.length === 0) {
+      throw new Error("Invoice not found");
+    }
+
     const queryText = `
       INSERT INTO payment_m3 (clientid, amount, filename, fileupload, invoiceid)
       VALUES ($1, $2, $3, $4, $5)
@@ -22,31 +37,46 @@ const createPayment = async (
     const queryParams = [clientId, amount, filename, fileupload, invoiceid];
 
     const result = await client.query(queryText, queryParams);
-
-    // Get additional info for response
-    const clientQuery = `SELECT client FROM m5_client WHERE m5clientkey = $1`;
-    const clientResult = await client.query(clientQuery, [clientId]);
-
-    const invoiceQuery = `SELECT invoice_num FROM invoice WHERE ikey = $1 AND clientid = $2`;
-    const invoiceResult = await client.query(invoiceQuery, [
-      invoiceid,
-      clientId,
-    ]);
-
     return {
       success: true,
       data: {
         ...result.rows[0],
-        clientName: clientResult.rows[0]?.client || "Unknown",
-        invoiceNum: invoiceResult.rows[0]?.invoice_num || "Unknown",
+        clientname: clientResult.rows[0].client,
+        invoice_num: invoiceResult.rows[0].invoice_num,
       },
     };
   } catch (error) {
-    console.error("Error creating payment:", error);
+    throw error;
+  } finally {
+    if (client) client.release();
+  }
+};
+
+const updatePaymentFilename = async (paymentId, filename) => {
+  let client;
+  try {
+    if (!pool) {
+      throw new Error(
+        "Database connection not established. Please try again later."
+      );
+    }
+    client = await pool.connect();
+
+    const queryText = `
+      UPDATE payment_m3 
+      SET filename = $1 
+      WHERE paykey = $2
+      RETURNING *
+    `;
+    const queryParams = [filename, paymentId];
+
+    const result = await client.query(queryText, queryParams);
     return {
-      success: false,
-      message: error.message || "Failed to create payment record",
+      success: true,
+      data: result.rows[0],
     };
+  } catch (error) {
+    throw error;
   } finally {
     if (client) client.release();
   }
@@ -87,7 +117,6 @@ const getPayment = async (clientId, paymentId) => {
 
     return { success: true, data: result.rows[0] };
   } catch (error) {
-    console.error("Error fetching payment:", error);
     throw error;
   } finally {
     if (client) client.release();
@@ -139,7 +168,6 @@ const getClientPayments = async (clientId, { year, month }) => {
     const result = await client.query(queryText, queryParams);
     return { success: true, data: result.rows };
   } catch (error) {
-    console.error("Error fetching client payments:", error);
     throw error;
   } finally {
     if (client) client.release();
@@ -167,11 +195,16 @@ const getClientInvoices = async (clientId) => {
     const result = await client.query(queryText, queryParams);
     return { success: true, data: result.rows };
   } catch (error) {
-    console.error("Error fetching client invoices:", error);
     throw error;
   } finally {
     if (client) client.release();
   }
 };
 
-export { createPayment, getPayment, getClientPayments, getClientInvoices };
+export {
+  createPayment,
+  updatePaymentFilename,
+  getPayment,
+  getClientPayments,
+  getClientInvoices,
+};

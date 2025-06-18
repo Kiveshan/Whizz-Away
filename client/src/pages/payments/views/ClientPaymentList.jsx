@@ -91,55 +91,10 @@ const ClientPaymentList = () => {
     navigate("/client-list-payments");
   };
 
-  const openImageViewer = (fileUrl, titleText) => {
-    const modal = document.createElement("div");
-    modal.className = "proof-modal";
-
-    const modalContent = document.createElement("div");
-    modalContent.className = "proof-modal-content";
-
-    const closeBtn = document.createElement("span");
-    closeBtn.className = "proof-modal-close";
-    closeBtn.innerHTML = "×";
-    closeBtn.onclick = () => document.body.removeChild(modal);
-
-    const title = document.createElement("h2");
-    title.textContent = `Proof of Payment - ${titleText}`;
-
-    const fileExtension = fileUrl.split(".").pop().toLowerCase();
-    let contentElement;
-
-    if (["jpg", "jpeg", "png", "gif"].includes(fileExtension)) {
-      contentElement = document.createElement("img");
-      contentElement.src = fileUrl;
-      contentElement.className = "proof-image";
-    } else if (fileExtension === "pdf") {
-      contentElement = document.createElement("iframe");
-      contentElement.src = fileUrl;
-      contentElement.className = "proof-pdf";
-      contentElement.style.width = "100%";
-      contentElement.style.height = "500px";
-    } else {
-      contentElement = document.createElement("p");
-      contentElement.textContent = "Unsupported file format";
-    }
-
-    modalContent.appendChild(closeBtn);
-    modalContent.appendChild(title);
-    modalContent.appendChild(contentElement);
-    modal.appendChild(modalContent);
-
-    document.body.appendChild(modal);
-  };
-
   const handleViewProof = (fileUrl, date, invoiceNum) => {
     if (fileUrl) {
-      openImageViewer(
-        fileUrl,
-        `${clientName} - ${new Date(
-          date
-        ).toLocaleDateString()} - Invoice ${invoiceNum}`
-      );
+      // Open file in new tab
+      window.open(fileUrl, "_blank", "noopener,noreferrer");
     } else {
       alert("No proof of payment uploaded");
     }
