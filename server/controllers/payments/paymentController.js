@@ -10,9 +10,10 @@ import path from "path";
 const createPaymentHandler = async (req, res) => {
   try {
     const { clientId } = req.params;
-    const { amount, fileupload, invoiceid } = req.body;
+    const { amount, paymentDate, invoiceId } = req.body;
     const file = req.file;
 
+    // Validation
     if (!amount || isNaN(amount)) {
       return res.status(400).json({
         success: false,
@@ -20,14 +21,14 @@ const createPaymentHandler = async (req, res) => {
       });
     }
 
-    if (!fileupload) {
+    if (!paymentDate) {
       return res.status(400).json({
         success: false,
-        message: "Payment date (fileupload) is required",
+        message: "Payment date is required",
       });
     }
 
-    if (!invoiceid) {
+    if (!invoiceId) {
       return res.status(400).json({
         success: false,
         message: "Invoice ID is required",
@@ -41,66 +42,133 @@ const createPaymentHandler = async (req, res) => {
       });
     }
 
-    // Construct S3 key: payments/clientName/invoiceNum/filename
+    // Get client and invoice information first
+    const clientInfo = await getClientAndInvoiceInfo(clientId, invoiceId);
+    if (!clientInfo.success) {
+      return res.status(400).json({
+        success: false,
+        message: clientInfo.message,
+      });
+    }
+
+    const { clientName, invoiceNum } = clientInfo.data;
+
+    // Sanitize filename and create S3 key
     const originalFileName = file.originalname.replace(/[^a-zA-Z0-9.-]/g, "_");
-    const tempKey = `temp/${Date.now()}_${originalFileName}`;
+    const timestamp = Date.now();
+    const fileExtension = path.extname(originalFileName);
+    const baseFileName = path.basename(originalFileName, fileExtension);
+    const finalFileName = `${baseFileName}_${timestamp}${fileExtension}`;
 
-    // Upload file to temporary S3 location
-    await s3
-      .upload({
-        Bucket: process.env.S3_BUCKET_NAME || "sherwyn-whizz-away",
-        Key: tempKey,
-        Body: file.buffer,
-        ContentType: file.mimetype,
-      })
-      .promise();
+    // S3 key structure: payments/clientName/invoiceNum/filename
+    const s3Key = `payments/${clientName}/${invoiceNum}/${finalFileName}`;
 
-    // Create payment to get clientname and invoice_num
-    const paymentData = await createPayment(clientId, {
-      amount,
-      fileupload,
-      invoiceid,
-      filename: tempKey,
-    });
-    const { clientname, invoice_num } = paymentData.data;
+    // Upload file to S3
+    const uploadParams = {
+      Bucket: process.env.S3_BUCKET_NAME || "sherwyn-whizz-away",
+      Key: s3Key,
+      Body: file.buffer,
+      ContentType: file.mimetype,
+      Metadata: {
+        clientId: clientId.toString(),
+        invoiceId: invoiceId.toString(),
+        uploadDate: new Date().toISOString(),
+      },
+    };
 
-    // Move file to final S3 location
-    const finalKey = `payments/${clientname}/${invoice_num}/${originalFileName}`;
-    await s3
-      .copyObject({
-        Bucket: process.env.S3_BUCKET_NAME,
-        CopySource: `${process.env.S3_BUCKET_NAME}/${tempKey}`,
-        Key: finalKey,
-      })
-      .promise();
-    await s3
-      .deleteObject({
-        Bucket: process.env.S3_BUCKET_NAME,
-        Key: tempKey,
-      })
-      .promise();
+    const uploadResult = await s3.upload(uploadParams).promise();
+    console.log(`File uploaded successfully to: ${uploadResult.Location}`);
 
-    // Update payment with final S3 key
-    const result = await createPayment(clientId, {
-      amount,
-      fileupload,
-      invoiceid,
-      filename: finalKey,
-    });
+    // Create payment record in database
+    const paymentData = {
+      amount: Number.parseFloat(amount),
+      fileupload: paymentDate,
+      invoiceid: Number.parseInt(invoiceId),
+      filename: s3Key, // Store the S3 key
+    };
 
-    result.data.fileurl = getSignedUrl(finalKey, 3600);
+    const result = await createPayment(clientId, paymentData);
 
-    res.json({
-      success: true,
-      data: result.data,
-    });
+    if (result.success) {
+      // Generate signed URL for immediate access
+      const signedUrl = getSignedUrl(s3Key, 3600); // 1 hour expiry
+
+      res.json({
+        success: true,
+        message: "Payment proof uploaded successfully",
+        data: {
+          ...result.data,
+          fileUrl: signedUrl,
+          s3Key: s3Key,
+        },
+      });
+    } else {
+      // If database insert fails, clean up the uploaded file
+      await s3
+        .deleteObject({
+          Bucket: process.env.S3_BUCKET_NAME,
+          Key: s3Key,
+        })
+        .promise();
+
+      throw new Error(result.message || "Failed to create payment record");
+    }
   } catch (error) {
-    console.error(`Error uploading payment for client ${clientId}:`, error);
+    console.error(
+      `Error uploading payment for client ${req.params.clientId}:`,
+      error
+    );
     res.status(500).json({
       success: false,
-      message: error.message,
+      message:
+        error.message || "An error occurred while uploading the payment proof",
       stack: process.env.NODE_ENV === "production" ? null : error.stack,
     });
+  }
+};
+
+// Helper function to get client and invoice information
+const getClientAndInvoiceInfo = async (clientId, invoiceId) => {
+  try {
+    const { pool } = await import("../../config/database.js");
+    const client = await pool.connect();
+
+    try {
+      // Get client name
+      const clientQuery = `SELECT client FROM m5_client WHERE m5clientkey = $1`;
+      const clientResult = await client.query(clientQuery, [clientId]);
+
+      if (clientResult.rows.length === 0) {
+        return { success: false, message: "Client not found" };
+      }
+
+      // Get invoice number
+      const invoiceQuery = `SELECT invoice_num FROM invoice WHERE ikey = $1 AND clientid = $2`;
+      const invoiceResult = await client.query(invoiceQuery, [
+        invoiceId,
+        clientId,
+      ]);
+
+      if (invoiceResult.rows.length === 0) {
+        return { success: false, message: "Invoice not found for this client" };
+      }
+
+      return {
+        success: true,
+        data: {
+          clientName: clientResult.rows[0].client.replace(/[^a-zA-Z0-9]/g, "_"), // Sanitize for folder name
+          invoiceNum: invoiceResult.rows[0].invoice_num.replace(
+            /[^a-zA-Z0-9]/g,
+            "_"
+          ), // Sanitize for folder name
+        },
+      };
+    } finally {
+      client.release();
+    }
+  } catch (error) {
+    console.error("Error getting client and invoice info:", error);
+    return { success: false, message: "Database error occurred" };
   }
 };
 
@@ -118,9 +186,15 @@ const getPaymentHandler = async (req, res) => {
     }
 
     const payment = result.data;
-    payment.fileurl = payment.filename
-      ? getSignedUrl(payment.filename, 3600)
-      : null;
+    // Generate signed URL if file exists
+    if (payment.filename) {
+      payment.fileUrl = getSignedUrl(payment.filename, 3600);
+      console.log(`Generated signed URL for file: ${payment.filename}`);
+      console.log(`Signed URL: ${payment.fileUrl}`);
+    } else {
+      payment.fileUrl = null;
+      console.log("No filename found for payment");
+    }
 
     res.json({
       success: true,
@@ -154,9 +228,10 @@ const getClientPaymentsHandler = async (req, res) => {
       `Query returned ${result.data.length} payments for client ${clientId}`
     );
 
+    // Generate signed URLs for all payments
     const payments = result.data.map((payment) => ({
       ...payment,
-      fileurl: payment.filename ? getSignedUrl(payment.filename, 3600) : null,
+      fileUrl: payment.filename ? getSignedUrl(payment.filename, 3600) : null,
     }));
 
     res.json({
@@ -164,7 +239,10 @@ const getClientPaymentsHandler = async (req, res) => {
       data: payments,
     });
   } catch (error) {
-    console.error(`Error fetching payments for client ${clientId}:`, error);
+    console.error(
+      `Error fetching payments for client ${req.params.clientId}:`,
+      error
+    );
     res.status(500).json({
       success: false,
       message: error.message,
@@ -184,7 +262,10 @@ const getClientInvoicesHandler = async (req, res) => {
       data: result.data,
     });
   } catch (error) {
-    console.error(`Error fetching invoices for client ${clientId}:`, error);
+    console.error(
+      `Error fetching invoices for client ${req.params.clientId}:`,
+      error
+    );
     res.status(500).json({
       success: false,
       message: error.message,

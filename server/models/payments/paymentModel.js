@@ -13,21 +13,7 @@ const createPayment = async (
     }
     client = await pool.connect();
 
-    // Fetch client and invoice_num for S3 folder structure
-    const clientQuery = `SELECT client FROM m5_client WHERE m5clientkey = $1`;
-    const clientResult = await client.query(clientQuery, [clientId]);
-    if (clientResult.rows.length === 0) {
-      throw new Error("Client not found");
-    }
-    const invoiceQuery = `SELECT invoice_num FROM invoice WHERE ikey = $1 AND clientid = $2`;
-    const invoiceResult = await client.query(invoiceQuery, [
-      invoiceid,
-      clientId,
-    ]);
-    if (invoiceResult.rows.length === 0) {
-      throw new Error("Invoice not found");
-    }
-
+    // Insert payment record
     const queryText = `
       INSERT INTO payment_m3 (clientid, amount, filename, fileupload, invoiceid)
       VALUES ($1, $2, $3, $4, $5)
@@ -36,16 +22,31 @@ const createPayment = async (
     const queryParams = [clientId, amount, filename, fileupload, invoiceid];
 
     const result = await client.query(queryText, queryParams);
+
+    // Get additional info for response
+    const clientQuery = `SELECT client FROM m5_client WHERE m5clientkey = $1`;
+    const clientResult = await client.query(clientQuery, [clientId]);
+
+    const invoiceQuery = `SELECT invoice_num FROM invoice WHERE ikey = $1 AND clientid = $2`;
+    const invoiceResult = await client.query(invoiceQuery, [
+      invoiceid,
+      clientId,
+    ]);
+
     return {
       success: true,
       data: {
         ...result.rows[0],
-        clientname: clientResult.rows[0].client,
-        invoice_num: invoiceResult.rows[0].invoice_num,
+        clientName: clientResult.rows[0]?.client || "Unknown",
+        invoiceNum: invoiceResult.rows[0]?.invoice_num || "Unknown",
       },
     };
   } catch (error) {
-    throw error;
+    console.error("Error creating payment:", error);
+    return {
+      success: false,
+      message: error.message || "Failed to create payment record",
+    };
   } finally {
     if (client) client.release();
   }
@@ -63,6 +64,7 @@ const getPayment = async (clientId, paymentId) => {
 
     const queryText = `
       SELECT 
+        p.paykey,
         p.fileupload,
         p.amount,
         p.filename,
@@ -85,6 +87,7 @@ const getPayment = async (clientId, paymentId) => {
 
     return { success: true, data: result.rows[0] };
   } catch (error) {
+    console.error("Error fetching payment:", error);
     throw error;
   } finally {
     if (client) client.release();
@@ -136,6 +139,7 @@ const getClientPayments = async (clientId, { year, month }) => {
     const result = await client.query(queryText, queryParams);
     return { success: true, data: result.rows };
   } catch (error) {
+    console.error("Error fetching client payments:", error);
     throw error;
   } finally {
     if (client) client.release();
@@ -163,6 +167,7 @@ const getClientInvoices = async (clientId) => {
     const result = await client.query(queryText, queryParams);
     return { success: true, data: result.rows };
   } catch (error) {
+    console.error("Error fetching client invoices:", error);
     throw error;
   } finally {
     if (client) client.release();
