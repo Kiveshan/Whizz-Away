@@ -51,6 +51,12 @@ export default function DirectorAnalytics() {
   const [error, setError] = useState(null);
   const navigate = useNavigate();
 
+  const calculateTurnoverStatus = (turnover) => {
+    if (turnover >= 10000) return "high";
+    if (turnover >= 5000) return "medium";
+    return "low";
+  };
+
   const fetchFuelData = async (month, year) => {
     setIsLoading(true);
     setError(null);
@@ -186,10 +192,8 @@ export default function DirectorAnalytics() {
       if (response.data.success) {
         const data = response.data.data.map((item) => {
           console.log(
-            `Received percentages: turnoverPercentage=${
-              item.turnoverPercentage
-            } (${typeof item.turnoverPercentage}), dieselCostPercentage=${
-              item.dieselCostPercentage
+            `Received percentages: turnoverPercentage=${item.turnoverPercentage
+            } (${typeof item.turnoverPercentage}), dieselCostPercentage=${item.dieselCostPercentage
             } (${typeof item.dieselCostPercentage})`
           );
           return {
@@ -254,9 +258,7 @@ export default function DirectorAnalytics() {
     setIsLoading(true);
     setError(null);
     try {
-      console.log(
-        `Fetching turnover per truck for month: ${month}, year: ${year}`
-      );
+      console.log(`Fetching turnover per truck for month: ${month}, year: ${year}`);
       const response = await api.get("/api/turnover-per-truck", {
         params: { month, year },
       });
@@ -264,12 +266,14 @@ export default function DirectorAnalytics() {
       if (response.data.success) {
         const turnoverData = response.data.data.map((item) => {
           const turnover = parseFloat(item.total_turnover);
+          const status = calculateTurnoverStatus(turnover);
           return {
             truckregnumber: item.truckregnumber,
             total_turnover: turnover,
             month: item.month_name.trim(),
             year: item.year,
             percentage: item.percentage,
+            status, // Add status
           };
         });
         console.log("Processed turnover per truck data:", turnoverData);
@@ -441,13 +445,13 @@ export default function DirectorAnalytics() {
             >
               {activeFilter === "incomeVsExpense"
                 ? `${label}: R${entry.value.toLocaleString(undefined, {
-                    minimumFractionDigits: 2,
-                    maximumFractionDigits: 2,
-                  })}`
+                  minimumFractionDigits: 2,
+                  maximumFractionDigits: 2,
+                })}`
                 : `${entry.name}: R${entry.value.toLocaleString(undefined, {
-                    minimumFractionDigits: 2,
-                    maximumFractionDigits: 2,
-                  })}`}
+                  minimumFractionDigits: 2,
+                  maximumFractionDigits: 2,
+                })}`}
             </p>
           ))}
         </div>
@@ -1062,46 +1066,79 @@ export default function DirectorAnalytics() {
         return (
           <div className="chart-wrapper">
             {isLoading ? (
-              <div className="loading-indicator">
-                Loading turnover per truck data...
-              </div>
+              <div className="loading-indicator">Loading turnover per truck data...</div>
             ) : error ? (
               <div className="error-message">{error}</div>
             ) : !Array.isArray(chartData) || chartData.length === 0 ? (
               <div className="no-data-message">
-                No turnover per truck data available for {activeMonth}{" "}
-                {activeYear}
+                No turnover per truck data available for {activeMonth} {activeYear}
               </div>
             ) : (
-              <ResponsiveContainer width="100%" height={350}>
-                <BarChart
-                  data={chartData}
-                  margin={{ top: 40, right: 30, left: 60, bottom: 40 }}
-                >
-                  <XAxis dataKey="truckregnumber" />
-                  <YAxis
-                    label={{
-                      value: "Turnover (R)",
-                      angle: 0,
-                      position: "top",
-                      dy: -20,
-                    }}
-                  />
-                  <Tooltip content={<CustomTooltip />} />
-                  <Bar
-                    dataKey="total_turnover"
-                    name="Turnover"
-                    fill="#4169e1"
-                    radius={[4, 4, 0, 0]}
+              <>
+                <ResponsiveContainer width="100%" height={350}>
+                  <BarChart
+                    data={chartData}
+                    margin={{ top: 40, right: 30, left: 60, bottom: 40 }}
                   >
-                    <LabelList
-                      dataKey="total_turnover"
-                      content={CustomBarLabelForFuelAndTurnover}
-                      position="top"
+                    <XAxis dataKey="truckregnumber" />
+                    <YAxis
+                      label={{
+                        value: "Turnover (R)",
+                        angle: 0,
+                        position: "top",
+                        dy: -20,
+                      }}
                     />
-                  </Bar>
-                </BarChart>
-              </ResponsiveContainer>
+                    <Tooltip content={<CustomTooltip />} />
+                    <Bar
+                      dataKey="total_turnover"
+                      name="Turnover"
+                      radius={[4, 4, 0, 0]}
+                    >
+                      {chartData.map((entry, index) => (
+                        <Cell
+                          key={`cell-${index}`}
+                          fill={
+                            entry.status === "high"
+                              ? "#4CAF50"
+                              : entry.status === "medium"
+                                ? "#FFC107"
+                                : "#F44336"
+                          }
+                        />
+                      ))}
+                      <LabelList
+                        dataKey="total_turnover"
+                        content={CustomBarLabelForFuelAndTurnover}
+                        position="top"
+                      />
+                    </Bar>
+                  </BarChart>
+                </ResponsiveContainer>
+                <div className="chart-legend">
+                  <div className="legend-item">
+                    <span
+                      className="legend-color"
+                      style={{ backgroundColor: "#4CAF50" }}
+                    ></span>
+                    <span>High: R10,000+</span>
+                  </div>
+                  <div className="legend-item">
+                    <span
+                      className="legend-color"
+                      style={{ backgroundColor: "#FFC107" }}
+                    ></span>
+                    <span>Medium: R5,000-R9,999</span>
+                  </div>
+                  <div className="legend-item">
+                    <span
+                      className="legend-color"
+                      style={{ backgroundColor: "#F44336" }}
+                    ></span>
+                    <span>Low: R0-R4,999</span>
+                  </div>
+                </div>
+              </>
             )}
           </div>
         );
@@ -1109,9 +1146,9 @@ export default function DirectorAnalytics() {
       case "incomeVsExpense":
         const totalExpenses = chartData.expenses
           ? chartData.expenses.reduce(
-              (sum, item) => sum + parseFloat(item.total_cost || 0),
-              0
-            )
+            (sum, item) => sum + parseFloat(item.total_cost || 0),
+            0
+          )
           : 0;
         const incomeVsExpenseData = [
           { name: "Income", value: chartData.income || 0, fill: "#4169e1" },
@@ -1226,73 +1263,64 @@ export default function DirectorAnalytics() {
         <div className="analytics-content">
           <div className="sidebar-filters">
             <button
-              className={`filter-button ${
-                activeFilter === "fuel" ? "active" : ""
-              }`}
+              className={`filter-button ${activeFilter === "fuel" ? "active" : ""
+                }`}
               onClick={() => setActiveFilter("fuel")}
             >
               Fuel Per Truck
             </button>
             <button
-              className={`filter-button ${
-                activeFilter === "turnoverPerMonth" ? "active" : ""
-              }`}
+              className={`filter-button ${activeFilter === "turnoverPerMonth" ? "active" : ""
+                }`}
               onClick={() => setActiveFilter("turnoverPerMonth")}
             >
               Turnover Per Month
             </button>
             <button
-              className={`filter-button ${
-                activeFilter === "agingAnalysis" ? "active" : ""
-              }`}
+              className={`filter-button ${activeFilter === "agingAnalysis" ? "active" : ""
+                }`}
               onClick={() => setActiveFilter("agingAnalysis")}
             >
               30, 60, 90, Current
             </button>
             <button
-              className={`filter-button ${
-                activeFilter === "subcontractorTurnoverPerMonth" ? "active" : ""
-              }`}
+              className={`filter-button ${activeFilter === "subcontractorTurnoverPerMonth" ? "active" : ""
+                }`}
               onClick={() => setActiveFilter("subcontractorTurnoverPerMonth")}
             >
               Subcontractor Turnover Per Month
             </button>
             <button
-              className={`filter-button ${
-                activeFilter === "subcontractorVsTurnover" ? "active" : ""
-              }`}
+              className={`filter-button ${activeFilter === "subcontractorVsTurnover" ? "active" : ""
+                }`}
               onClick={() => setActiveFilter("subcontractorVsTurnover")}
             >
               Subcontractor Turnover vs Turnover
             </button>
             <button
-              className={`filter-button ${
-                activeFilter === "wagesPerMonth" ? "active" : ""
-              }`}
+              className={`filter-button ${activeFilter === "wagesPerMonth" ? "active" : ""
+                }`}
               onClick={() => setActiveFilter("wagesPerMonth")}
             >
               Wages (Total) Per Month
             </button>
             <button
-              className={`filter-button ${
-                activeFilter === "turnoverVsDieselCost" ? "active" : ""
-              }`}
+              className={`filter-button ${activeFilter === "turnoverVsDieselCost" ? "active" : ""
+                }`}
               onClick={() => setActiveFilter("turnoverVsDieselCost")}
             >
               Turnover vs Diesel Cost
             </button>
             <button
-              className={`filter-button ${
-                activeFilter === "turnoverPerTruck" ? "active" : ""
-              }`}
+              className={`filter-button ${activeFilter === "turnoverPerTruck" ? "active" : ""
+                }`}
               onClick={() => setActiveFilter("turnoverPerTruck")}
             >
               Turnover Per Truck
             </button>
             <button
-              className={`filter-button ${
-                activeFilter === "incomeVsExpense" ? "active" : ""
-              }`}
+              className={`filter-button ${activeFilter === "incomeVsExpense" ? "active" : ""
+                }`}
               onClick={() => setActiveFilter("incomeVsExpense")}
             >
               Income vs Expense Per Month
