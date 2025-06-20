@@ -7,7 +7,7 @@
 .analytics-page-wrapper .header-actions {
   margin-bottom: 20px;
   display: flex;
-  justify-content: space-between; /* Aligns Back and Logout to opposite ends */
+  justify-content: space-between;
   align-items: center;
 }
 
@@ -30,7 +30,7 @@
 }
 
 .analytics-page-wrapper .back-button {
-  background-color: #4caf50; /* Green to match the screenshot */
+  background-color: #4caf50;
   color: white;
   border: none;
   padding: 8px 16px;
@@ -42,8 +42,9 @@
 }
 
 .analytics-page-wrapper .back-button:hover {
-  background-color: #45a049; /* Darker green on hover */
+  background-color: #45a049;
 }
+
 .analytics-page-wrapper .period-button:last-child {
   border-radius: 0 4px 4px 0;
 }
@@ -53,7 +54,6 @@
   color: white;
 }
 
-/* Analytics Content Layout */
 .analytics-page-wrapper .analytics-content {
   display: flex;
   gap: 20px;
@@ -91,6 +91,8 @@
   border-radius: 8px;
   padding: 20px;
   box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  min-height: 500px;
+  /* Ensure minimum height for charts */
 }
 
 .analytics-page-wrapper .chart-title {
@@ -103,9 +105,12 @@
 
 .analytics-page-wrapper .chart-wrapper {
   height: 100%;
+  min-height: 450px;
+  /* Ensure wrapper has enough height */
+  overflow: visible;
+  /* Allow labels to extend beyond wrapper */
 }
 
-/* Chart Legend */
 .analytics-page-wrapper .chart-legend {
   display: flex;
   justify-content: center;
@@ -125,7 +130,6 @@
   border-radius: 4px;
 }
 
-/* Chart Header with Labels */
 .analytics-page-wrapper .chart-header {
   display: flex;
   justify-content: center;
@@ -146,7 +150,6 @@
   color: #555;
 }
 
-/* Custom Tooltip */
 .analytics-page-wrapper .custom-tooltip {
   background-color: white;
   border: 1px solid #ddd;
@@ -164,6 +167,26 @@
   margin: 0;
 }
 
+.analytics-page-wrapper .recharts-cartesian-axis-tick {
+  font-size: 12px;
+  fill: #333;
+}
+
+/* Ensure x-axis labels have enough space and don't get clipped */
+.analytics-page-wrapper .recharts-cartesian-axis-tick-line {
+  stroke: #666;
+}
+
+.analytics-page-wrapper .recharts-cartesian-axis-tick text {
+  font-size: 11px;
+  fill: #333;
+}
+
+/* Prevent text clipping */
+.analytics-page-wrapper .recharts-surface {
+  overflow: visible;
+}
+
 @media (max-width: 768px) {
   .analytics-page-wrapper .analytics-content {
     flex-direction: column;
@@ -172,9 +195,16 @@
   .analytics-page-wrapper .sidebar-filters {
     width: 100%;
   }
+
+  .analytics-page-wrapper .chart-wrapper {
+    min-height: 400px;
+  }
+
+  .analytics-page-wrapper .recharts-cartesian-axis-tick {
+    font-size: 10px;
+  }
 }
 
-/* Styling for Date Filters (Month & Year) */
 .analytics-page-wrapper .date-filters {
   display: flex;
   justify-content: center;
@@ -184,11 +214,9 @@
 }
 
 .analytics-page-wrapper .date-filters select {
-  /* Remove default styling and arrow */
   -webkit-appearance: none;
   -moz-appearance: none;
   appearance: none;
-
   padding: 8px 12px;
   border: 1px solid #ccc;
   border-radius: 4px;
@@ -196,8 +224,6 @@
   font-size: 1rem;
   outline: none;
   transition: border-color 0.2s ease;
-
-  /* Add a custom arrow icon */
   background-image: url("data:image/svg+xml;utf8,<svg fill='%236169e1' height='16' viewBox='0 0 20 20' width='16' xmlns='http://www.w3.org/2000/svg'><path d='M5.516 7.548l4.484 4.482 4.484-4.482 1.516 1.516-6 6-6-6z'/></svg>");
   background-repeat: no-repeat;
   background-position: right 10px center;
@@ -208,14 +234,6 @@
   border-color: #4169e1;
 }
 
-/* Make the year dropdown wider */
 .analytics-page-wrapper .date-filters select.year-select {
-  width: 100px; /* Adjust as needed */
+  width: 100px;
 }
-
-/* Optional: Styling for Sidebar Filter Buttons */
-/* .analytics-page-wrapper .sidebar-filters {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-} */
