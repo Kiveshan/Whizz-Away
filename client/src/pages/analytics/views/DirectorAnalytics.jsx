@@ -35,7 +35,7 @@ export default function DirectorAnalytics() {
   const [chartData, setChartData] = useState([])
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState(null)
-  const roleId = JSON.parse(localStorage.getItem("user"))?.roleid;
+  const roleId = JSON.parse(localStorage.getItem("user"))?.roleid
   const navigate = useNavigate()
 
   const calculateTurnoverStatus = (turnover) => {
@@ -48,6 +48,13 @@ export default function DirectorAnalytics() {
     if (cost <= 3500) return "good"
     if (cost <= 4500) return "warning"
     return "bad"
+  }
+
+  // Calculate dynamic chart width based on data length
+  const getChartWidth = (dataLength) => {
+    const minWidth = 1200 // Increased minimum width
+    const barWidth = 180 // Increased width per bar/data point
+    return Math.max(minWidth, dataLength * barWidth)
   }
 
   // Replace the truncateClientName function with this new one
@@ -483,8 +490,8 @@ export default function DirectorAnalytics() {
 
   const CustomBarLabelForDieselCost = (props) => {
     const { x, y, width, value, payload = {} } = props
-    const percentage = payload.dieselCostPercentage ?? 0
     console.log("CustomBarLabelForDieselCost- payload:", payload)
+    const percentage = payload.dieselCostPercentage ?? 0
     return (
       <text x={x + width / 2} y={y - 10} fill="#ff6347" textAnchor="middle" dominantBaseline="middle" fontSize={12}>
         R{value?.toLocaleString?.()} ({percentage}%)
@@ -534,6 +541,8 @@ export default function DirectorAnalytics() {
 
   const renderChart = () => {
     console.log("Rendering chart with chartData:", chartData)
+    const chartWidth = getChartWidth(chartData.length)
+
     switch (activeFilter) {
       case "fuel":
         return (
@@ -548,40 +557,42 @@ export default function DirectorAnalytics() {
               </div>
             ) : (
               <>
-                <ResponsiveContainer width="100%" height={400}>
-                  <BarChart data={chartData} margin={{ top: 40, right: 30, left: 60, bottom: 120 }}>
-                    <XAxis
-                      dataKey="truckId"
-                      angle={-45}
-                      textAnchor="end"
-                      height={120}
-                      interval={0}
-                      tick={{ fontSize: 11, dy: 10 }}
-                    />
-                    <YAxis
-                      label={{
-                        value: "Expense Amount (R)",
-                        angle: 0,
-                        position: "top",
-                        dy: -20,
-                      }}
-                    />
-                    <Tooltip content={<CustomTooltip />} />
-                    <Bar
-                      dataKey="value"
-                      name="Fuel Expense"
-                      radius={[4, 4, 0, 0]}
-                      fillOpacity={0.9}
-                      isAnimationActive={true}
-                      animationDuration={500}
-                    >
-                      {chartData.map((entry, index) => (
-                        <Cell key={`cell-${index}`} fill={getBarFill(entry)} />
-                      ))}
-                      <LabelList dataKey="value" content={CustomBarLabelForFuelAndTurnover} position="top" />
-                    </Bar>
-                  </BarChart>
-                </ResponsiveContainer>
+                <div className="chart-scroll-container">
+                  <ResponsiveContainer width={chartWidth} height={500}>
+                    <BarChart data={chartData} margin={{ top: 40, right: 30, left: 60, bottom: 120 }}>
+                      <XAxis
+                        dataKey="truckId"
+                        angle={0}
+                        textAnchor="middle"
+                        height={150}
+                        interval={0}
+                        tick={{ fontSize: 11 }}
+                      />
+                      <YAxis
+                        label={{
+                          value: "Expense Amount (R)",
+                          angle: 0,
+                          position: "top",
+                          dy: -20,
+                        }}
+                      />
+                      <Tooltip content={<CustomTooltip />} />
+                      <Bar
+                        dataKey="value"
+                        name="Fuel Expense"
+                        radius={[4, 4, 0, 0]}
+                        fillOpacity={0.9}
+                        isAnimationActive={true}
+                        animationDuration={500}
+                      >
+                        {chartData.map((entry, index) => (
+                          <Cell key={`cell-${index}`} fill={getBarFill(entry)} />
+                        ))}
+                        <LabelList dataKey="value" content={CustomBarLabelForFuelAndTurnover} position="top" />
+                      </Bar>
+                    </BarChart>
+                  </ResponsiveContainer>
+                </div>
                 <div className="chart-legend">
                   <div className="legend-item">
                     <span className="legend-color" style={{ backgroundColor: "#4CAF50" }}></span>
@@ -613,30 +624,32 @@ export default function DirectorAnalytics() {
                 No turnover data available for {activeMonth} {activeYear}
               </div>
             ) : (
-              <ResponsiveContainer width="100%" height={400}>
-                <BarChart data={chartData} margin={{ top: 40, right: 30, left: 60, bottom: 100 }}>
-                  <XAxis
-                    dataKey="client"
-                    angle={0}
-                    textAnchor="middle"
-                    height={100}
-                    interval={0}
-                    tick={<CustomAxisTick />}
-                  />
-                  <YAxis
-                    label={{
-                      value: "Turnover (R)",
-                      angle: 0,
-                      position: "top",
-                      dy: -20,
-                    }}
-                  />
-                  <Tooltip content={<CustomTooltip />} />
-                  <Bar dataKey="turnover" name="Turnover" fill="#4169e1" radius={[4, 4, 0, 0]}>
-                    <LabelList dataKey="turnover" content={CustomBarLabelForFuelAndTurnover} position="top" />
-                  </Bar>
-                </BarChart>
-              </ResponsiveContainer>
+              <div className="chart-scroll-container">
+                <ResponsiveContainer width={chartWidth} height={500}>
+                  <BarChart data={chartData} margin={{ top: 40, right: 30, left: 60, bottom: 100 }}>
+                    <XAxis
+                      dataKey="client"
+                      angle={0}
+                      textAnchor="middle"
+                      height={120}
+                      interval={0}
+                      tick={<CustomAxisTick />}
+                    />
+                    <YAxis
+                      label={{
+                        value: "Turnover (R)",
+                        angle: 0,
+                        position: "top",
+                        dy: -20,
+                      }}
+                    />
+                    <Tooltip content={<CustomTooltip />} />
+                    <Bar dataKey="turnover" name="Turnover" fill="#4169e1" radius={[4, 4, 0, 0]}>
+                      <LabelList dataKey="turnover" content={CustomBarLabelForFuelAndTurnover} position="top" />
+                    </Bar>
+                  </BarChart>
+                </ResponsiveContainer>
+              </div>
             )}
           </div>
         )
@@ -672,39 +685,41 @@ export default function DirectorAnalytics() {
                     <span>90 Days</span>
                   </div>
                 </div>
-                <ResponsiveContainer width="100%" height={400}>
-                  <BarChart data={chartData} margin={{ top: 40, right: 30, left: 60, bottom: 100 }}>
-                    <XAxis
-                      dataKey="client"
-                      angle={0}
-                      textAnchor="middle"
-                      height={100}
-                      interval={0}
-                      tick={<CustomAxisTick />}
-                    />
-                    <YAxis
-                      label={{
-                        value: "Amount (R)",
-                        angle: 0,
-                        position: "top",
-                        dy: -20,
-                      }}
-                    />
-                    <Tooltip content={<CustomTooltip />} />
-                    <Bar dataKey="current" name="Current" fill="#4169e1" radius={[4, 4, 0, 0]}>
-                      <LabelList dataKey="current" content={CustomBarLabelForDefault} position="top" />
-                    </Bar>
-                    <Bar dataKey="thirtyDays" name="30 Days" fill="#4CAF50" radius={[4, 4, 0, 0]}>
-                      <LabelList dataKey="thirtyDays" content={CustomBarLabelForDefault} position="top" />
-                    </Bar>
-                    <Bar dataKey="sixtyDays" name="60 Days" fill="#FFC107" radius={[4, 4, 0, 0]}>
-                      <LabelList dataKey="sixtyDays" content={CustomBarLabelForDefault} position="top" />
-                    </Bar>
-                    <Bar dataKey="ninetyDays" name="90 Days" fill="#F44336" radius={[4, 4, 0, 0]}>
-                      <LabelList dataKey="ninetyDays" content={CustomBarLabelForDefault} position="top" />
-                    </Bar>
-                  </BarChart>
-                </ResponsiveContainer>
+                <div className="chart-scroll-container">
+                  <ResponsiveContainer width={chartWidth} height={500}>
+                    <BarChart data={chartData} margin={{ top: 40, right: 30, left: 60, bottom: 100 }}>
+                      <XAxis
+                        dataKey="client"
+                        angle={0}
+                        textAnchor="middle"
+                        height={120}
+                        interval={0}
+                        tick={<CustomAxisTick />}
+                      />
+                      <YAxis
+                        label={{
+                          value: "Amount (R)",
+                          angle: 0,
+                          position: "top",
+                          dy: -20,
+                        }}
+                      />
+                      <Tooltip content={<CustomTooltip />} />
+                      <Bar dataKey="current" name="Current" fill="#4169e1" radius={[4, 4, 0, 0]}>
+                        <LabelList dataKey="current" content={CustomBarLabelForDefault} position="top" />
+                      </Bar>
+                      <Bar dataKey="thirtyDays" name="30 Days" fill="#4CAF50" radius={[4, 4, 0, 0]}>
+                        <LabelList dataKey="thirtyDays" content={CustomBarLabelForDefault} position="top" />
+                      </Bar>
+                      <Bar dataKey="sixtyDays" name="60 Days" fill="#FFC107" radius={[4, 4, 0, 0]}>
+                        <LabelList dataKey="sixtyDays" content={CustomBarLabelForDefault} position="top" />
+                      </Bar>
+                      <Bar dataKey="ninetyDays" name="90 Days" fill="#F44336" radius={[4, 4, 0, 0]}>
+                        <LabelList dataKey="ninetyDays" content={CustomBarLabelForDefault} position="top" />
+                      </Bar>
+                    </BarChart>
+                  </ResponsiveContainer>
+                </div>
               </>
             )}
           </div>
@@ -718,23 +733,25 @@ export default function DirectorAnalytics() {
                 No subcontractor turnover data available for {activeMonth} {activeYear}
               </div>
             ) : (
-              <ResponsiveContainer width="100%" height={350}>
-                <BarChart data={chartData} margin={{ top: 40, right: 30, left: 60, bottom: 40 }}>
-                  <XAxis dataKey="month" tickFormatter={() => `${activeMonth} ${activeYear}`} />
-                  <YAxis
-                    label={{
-                      value: "Turnover (R)",
-                      angle: 0,
-                      position: "top",
-                      dy: -20,
-                    }}
-                  />
-                  <Tooltip content={<CustomTooltip />} />
-                  <Bar dataKey="turnover" name="Subcontractor Turnover" fill="#4169e1" radius={[4, 4, 0, 0]}>
-                    <LabelList dataKey="turnover" content={CustomBarLabelForDefault} position="top" />
-                  </Bar>
-                </BarChart>
-              </ResponsiveContainer>
+              <div className="chart-scroll-container">
+                <ResponsiveContainer width={chartWidth} height={500}>
+                  <BarChart data={chartData} margin={{ top: 40, right: 30, left: 60, bottom: 40 }}>
+                    <XAxis dataKey="month" tickFormatter={() => `${activeMonth} ${activeYear}`} />
+                    <YAxis
+                      label={{
+                        value: "Turnover (R)",
+                        angle: 0,
+                        position: "top",
+                        dy: -20,
+                      }}
+                    />
+                    <Tooltip content={<CustomTooltip />} />
+                    <Bar dataKey="turnover" name="Subcontractor Turnover" fill="#4169e1" radius={[4, 4, 0, 0]}>
+                      <LabelList dataKey="turnover" content={CustomBarLabelForDefault} position="top" />
+                    </Bar>
+                  </BarChart>
+                </ResponsiveContainer>
+              </div>
             )}
           </div>
         )
@@ -758,32 +775,34 @@ export default function DirectorAnalytics() {
                     <span>Subcontractor Turnover</span>
                   </div>
                 </div>
-                <ResponsiveContainer width="100%" height={350}>
-                  <BarChart data={chartData} margin={{ top: 40, right: 30, left: 60, bottom: 40 }}>
-                    <XAxis dataKey="month" tickFormatter={() => `${activeMonth} ${activeYear}`} />
-                    <YAxis
-                      label={{
-                        value: "Amount (R)",
-                        angle: 0,
-                        position: "top",
-                        dy: -20,
-                      }}
-                    />
-                    <Tooltip content={<CustomTooltip />} />
-                    <Legend />
-                    <Bar dataKey="totalTurnover" name="Total Turnover" fill="#9C27B0" radius={[4, 4, 0, 0]}>
-                      <LabelList dataKey="totalTurnover" content={CustomBarLabelForDefault} position="top" />
-                    </Bar>
-                    <Bar
-                      dataKey="subcontractorTurnover"
-                      name="Subcontractor Turnover"
-                      fill="#E91E63"
-                      radius={[4, 4, 0, 0]}
-                    >
-                      <LabelList dataKey="subcontractorTurnover" content={CustomBarLabelForDefault} position="top" />
-                    </Bar>
-                  </BarChart>
-                </ResponsiveContainer>
+                <div className="chart-scroll-container">
+                  <ResponsiveContainer width={chartWidth} height={500}>
+                    <BarChart data={chartData} margin={{ top: 40, right: 30, left: 60, bottom: 40 }}>
+                      <XAxis dataKey="month" tickFormatter={() => `${activeMonth} ${activeYear}`} />
+                      <YAxis
+                        label={{
+                          value: "Amount (R)",
+                          angle: 0,
+                          position: "top",
+                          dy: -20,
+                        }}
+                      />
+                      <Tooltip content={<CustomTooltip />} />
+                      <Legend />
+                      <Bar dataKey="totalTurnover" name="Total Turnover" fill="#9C27B0" radius={[4, 4, 0, 0]}>
+                        <LabelList dataKey="totalTurnover" content={CustomBarLabelForDefault} position="top" />
+                      </Bar>
+                      <Bar
+                        dataKey="subcontractorTurnover"
+                        name="Subcontractor Turnover"
+                        fill="#E91E63"
+                        radius={[4, 4, 0, 0]}
+                      >
+                        <LabelList dataKey="subcontractorTurnover" content={CustomBarLabelForDefault} position="top" />
+                      </Bar>
+                    </BarChart>
+                  </ResponsiveContainer>
+                </div>
               </>
             )}
           </div>
@@ -801,23 +820,25 @@ export default function DirectorAnalytics() {
                 No wages data available for {activeMonth} {activeYear}
               </div>
             ) : (
-              <ResponsiveContainer width="100%" height={350}>
-                <BarChart data={chartData} margin={{ top: 40, right: 30, left: 60, bottom: 40 }}>
-                  <XAxis dataKey="month" tickFormatter={() => `${activeMonth} ${activeYear}`} />
-                  <YAxis
-                    label={{
-                      value: "Wages (R)",
-                      angle: 0,
-                      position: "top",
-                      dy: -20,
-                    }}
-                  />
-                  <Tooltip content={<CustomTooltip />} />
-                  <Bar dataKey="wages" name="Wages" fill="#4169e1" radius={[4, 4, 0, 0]}>
-                    <LabelList dataKey="wages" content={CustomBarLabelForDefault} position="top" />
-                  </Bar>
-                </BarChart>
-              </ResponsiveContainer>
+              <div className="chart-scroll-container">
+                <ResponsiveContainer width={chartWidth} height={500}>
+                  <BarChart data={chartData} margin={{ top: 40, right: 30, left: 60, bottom: 40 }}>
+                    <XAxis dataKey="month" tickFormatter={() => `${activeMonth} ${activeYear}`} />
+                    <YAxis
+                      label={{
+                        value: "Wages (R)",
+                        angle: 0,
+                        position: "top",
+                        dy: -20,
+                      }}
+                    />
+                    <Tooltip content={<CustomTooltip />} />
+                    <Bar dataKey="wages" name="Wages" fill="#4169e1" radius={[4, 4, 0, 0]}>
+                      <LabelList dataKey="wages" content={CustomBarLabelForDefault} position="top" />
+                    </Bar>
+                  </BarChart>
+                </ResponsiveContainer>
+              </div>
             )}
           </div>
         )
@@ -846,27 +867,29 @@ export default function DirectorAnalytics() {
                     <span>Diesel Cost</span>
                   </div>
                 </div>
-                <ResponsiveContainer width="100%" height={350}>
-                  <BarChart data={chartData} margin={{ top: 40, right: 30, left: 60, bottom: 40 }}>
-                    <XAxis dataKey="month" />
-                    <YAxis
-                      label={{
-                        value: "Amount (R)",
-                        angle: 0,
-                        position: "top",
-                        dy: -20,
-                      }}
-                    />
-                    <Tooltip content={<CustomTooltip />} />
-                    <Legend />
-                    <Bar dataKey="totalTurnover" name="Turnover" fill="#4169e1" radius={[4, 4, 0, 0]}>
-                      <LabelList dataKey="totalTurnover" content={CustomBarLabelForTurnover} position="top" />
-                    </Bar>
-                    <Bar dataKey="dieselCost" name="Diesel Cost" fill="#ff6347" radius={[4, 4, 0, 0]}>
-                      <LabelList dataKey="dieselCost" content={CustomBarLabelForDieselCost} position="top" />
-                    </Bar>
-                  </BarChart>
-                </ResponsiveContainer>
+                <div className="chart-scroll-container">
+                  <ResponsiveContainer width={chartWidth} height={500}>
+                    <BarChart data={chartData} margin={{ top: 40, right: 30, left: 60, bottom: 40 }}>
+                      <XAxis dataKey="month" />
+                      <YAxis
+                        label={{
+                          value: "Amount (R)",
+                          angle: 0,
+                          position: "top",
+                          dy: -20,
+                        }}
+                      />
+                      <Tooltip content={<CustomTooltip />} />
+                      <Legend />
+                      <Bar dataKey="totalTurnover" name="Turnover" fill="#4169e1" radius={[4, 4, 0, 0]}>
+                        <LabelList dataKey="totalTurnover" content={CustomBarLabelForTurnover} position="top" />
+                      </Bar>
+                      <Bar dataKey="dieselCost" name="Diesel Cost" fill="#ff6347" radius={[4, 4, 0, 0]}>
+                        <LabelList dataKey="dieselCost" content={CustomBarLabelForDieselCost} position="top" />
+                      </Bar>
+                    </BarChart>
+                  </ResponsiveContainer>
+                </div>
               </>
             )}
           </div>
@@ -885,36 +908,40 @@ export default function DirectorAnalytics() {
               </div>
             ) : (
               <>
-                <ResponsiveContainer width="100%" height={400}>
-                  <BarChart data={chartData} margin={{ top: 40, right: 30, left: 60, bottom: 120 }}>
-                    <XAxis
-                      dataKey="truckregnumber"
-                      angle={-45}
-                      textAnchor="end"
-                      height={120}
-                      interval={0}
-                      tick={{ fontSize: 11, dy: 10 }}
-                    />
-                    <YAxis
-                      label={{
-                        value: "Turnover (R)",
-                        angle: 0,
-                        position: "top",
-                        dy: -20,
-                      }}
-                    />
-                    <Tooltip content={<CustomTooltip />} />
-                    <Bar dataKey="total_turnover" name="Turnover" radius={[4, 4, 0, 0]}>
-                      {chartData.map((entry, index) => (
-                        <Cell
-                          key={`cell-${index}`}
-                          fill={entry.status === "high" ? "#4CAF50" : entry.status === "medium" ? "#FFC107" : "#F44336"}
-                        />
-                      ))}
-                      <LabelList dataKey="total_turnover" content={CustomBarLabelForFuelAndTurnover} position="top" />
-                    </Bar>
-                  </BarChart>
-                </ResponsiveContainer>
+                <div className="chart-scroll-container">
+                  <ResponsiveContainer width={chartWidth} height={500}>
+                    <BarChart data={chartData} margin={{ top: 40, right: 30, left: 60, bottom: 120 }}>
+                      <XAxis
+                        dataKey="truckregnumber"
+                        angle={0}
+                        textAnchor="middle"
+                        height={150}
+                        interval={0}
+                        tick={{ fontSize: 11 }}
+                      />
+                      <YAxis
+                        label={{
+                          value: "Turnover (R)",
+                          angle: 0,
+                          position: "top",
+                          dy: -20,
+                        }}
+                      />
+                      <Tooltip content={<CustomTooltip />} />
+                      <Bar dataKey="total_turnover" name="Turnover" radius={[4, 4, 0, 0]}>
+                        {chartData.map((entry, index) => (
+                          <Cell
+                            key={`cell-${index}`}
+                            fill={
+                              entry.status === "high" ? "#4CAF50" : entry.status === "medium" ? "#FFC107" : "#F44336"
+                            }
+                          />
+                        ))}
+                        <LabelList dataKey="total_turnover" content={CustomBarLabelForFuelAndTurnover} position="top" />
+                      </Bar>
+                    </BarChart>
+                  </ResponsiveContainer>
+                </div>
                 <div className="chart-legend">
                   <div className="legend-item">
                     <span className="legend-color" style={{ backgroundColor: "#4CAF50" }}></span>
@@ -964,26 +991,28 @@ export default function DirectorAnalytics() {
                     <span>Expenses</span>
                   </div>
                 </div>
-                <ResponsiveContainer width="100%" height={350}>
-                  <BarChart data={incomeVsExpenseData} margin={{ top: 40, right: 30, left: 60, bottom: 40 }}>
-                    <XAxis dataKey="name" tick={{ fill: "#000" }} />
-                    <YAxis
-                      label={{
-                        value: "Amount (R)",
-                        angle: 0,
-                        position: "top",
-                        dy: -20,
-                      }}
-                    />
-                    <Tooltip content={<CustomTooltip />} />
-                    <Bar dataKey="value" radius={[4, 4, 0, 0]}>
-                      {incomeVsExpenseData.map((entry, index) => (
-                        <Cell key={`cell-${index}`} fill={entry.fill} />
-                      ))}
-                      <LabelList dataKey="value" content={CustomBarLabelForDefault} position="top" />
-                    </Bar>
-                  </BarChart>
-                </ResponsiveContainer>
+                <div className="chart-scroll-container">
+                  <ResponsiveContainer width={Math.max(1200, incomeVsExpenseData.length * 180)} height={500}>
+                    <BarChart data={incomeVsExpenseData} margin={{ top: 40, right: 30, left: 60, bottom: 40 }}>
+                      <XAxis dataKey="name" tick={{ fill: "#000" }} />
+                      <YAxis
+                        label={{
+                          value: "Amount (R)",
+                          angle: 0,
+                          position: "top",
+                          dy: -20,
+                        }}
+                      />
+                      <Tooltip content={<CustomTooltip />} />
+                      <Bar dataKey="value" radius={[4, 4, 0, 0]}>
+                        {incomeVsExpenseData.map((entry, index) => (
+                          <Cell key={`cell-${index}`} fill={entry.fill} />
+                        ))}
+                        <LabelList dataKey="value" content={CustomBarLabelForDefault} position="top" />
+                      </Bar>
+                    </BarChart>
+                  </ResponsiveContainer>
+                </div>
               </>
             )}
           </div>
@@ -996,11 +1025,11 @@ export default function DirectorAnalytics() {
 
   const handleBack = () => {
     if (roleId == 1) {
-      navigate("/Dashboard");
+      navigate("/Dashboard")
     } else if (roleId == 4) {
-      navigate("/DirectorDashboard");
+      navigate("/DirectorDashboard")
     }
-  };
+  }
 
   return (
     <div className="analytics-page-wrapper">
