@@ -22,6 +22,16 @@ const UploadProof = () => {
   const [error, setError] = useState(null);
   const [isViewMode, setIsViewMode] = useState(!!paymentId);
 
+  // Helper function to handle token expiration
+  const handleTokenExpiration = (error) => {
+    const status = error.response?.status;
+    if (status === 401 || status === 403) {
+      navigate("/");
+      return true;
+    }
+    return false;
+  };
+
   const roleId = JSON.parse(localStorage.getItem("user"))?.roleid;
 
   // Fetch invoices for dropdown
@@ -50,6 +60,10 @@ const UploadProof = () => {
         }
       } catch (err) {
         console.error("Error fetching invoices:", err);
+        // Check for token expiration
+        if (handleTokenExpiration(err)) {
+          return;
+        }
         setError(err.message || "An error occurred while fetching invoices");
       } finally {
         setIsLoading(false);
@@ -88,6 +102,10 @@ const UploadProof = () => {
           }
         } catch (err) {
           console.error("Error fetching payment details:", err);
+          // Check for token expiration
+          if (handleTokenExpiration(err)) {
+            return;
+          }
           setError(
             err.message || "An error occurred while fetching payment details"
           );
@@ -176,6 +194,10 @@ const UploadProof = () => {
       }
     } catch (err) {
       console.error("Error uploading payment details:", err);
+      // Check for token expiration
+      if (handleTokenExpiration(err)) {
+        return;
+      }
       setError(
         err.message || "An error occurred while uploading the payment details"
       );
@@ -308,7 +330,7 @@ const UploadProof = () => {
                           className="view-button centered"
                           onClick={handleViewProof}
                         >
-                          View Proof
+                          View Proof (New Tab)
                         </button>
                       ) : (
                         <div className="no-file">
