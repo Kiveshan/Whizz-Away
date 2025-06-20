@@ -6,9 +6,7 @@ import {
   deleteTruckDocument,
   deleteTruck,
 } from "../../models/manage/truckModel.js";
-import { s3ClientTrucks } from "../../utils/s3Config.js";
-import { GetObjectCommand } from "@aws-sdk/client-s3";
-import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
+import { s3Trucks, getSignedUrl } from "../../utils/s3Config.js";
 
 const getAllTrucksHandler = async (req, res) => {
   try {
@@ -32,26 +30,44 @@ const getTruckByIdHandler = async (req, res) => {
     let truck = result.data;
 
     const extractKeyFromUrl = (url) => {
-      if (!url) return null;
+      if (!url) {
+        console.log("No document URL provided, skipping key extraction");
+        return null;
+      }
       try {
-        return decodeURIComponent(new URL(url).pathname.substring(1));
-      } catch {
-        return url;
+        const key = decodeURIComponent(new URL(url).pathname.substring(1));
+        console.log(`Extracted S3 key from URL: ${key}`);
+        return key;
+      } catch (error) {
+        console.error(`Error extracting key from URL ${url}:`, error);
+        return url; // Fallback to URL if parsing fails
       }
     };
 
     const signedUrls = await Promise.all(
       [truck.document_url1, truck.document_url2, truck.document_url3].map(
         async (url) => {
-          if (!url) return null;
+          if (!url) {
+            console.log("No document URL provided, skipping signed URL generation");
+            return null;
+          }
           const key = extractKeyFromUrl(url);
-          const command = new GetObjectCommand({
-            Bucket: process.env.Trucks_AWS_BUCKET_NAME,
-            Key: key,
-          });
-          return await getSignedUrl(s3ClientTrucks, command, {
-            expiresIn: 3600,
-          });
+          if (!key) {
+            console.log("No valid key extracted, skipping signed URL generation");
+            return null;
+          }
+          try {
+            const signedUrl = await getSignedUrl(
+              key,
+              3600,
+              process.env.Trucks_AWS_BUCKET_NAME
+            );
+            console.log(`Generated signed URL for key ${key}: ${signedUrl}`);
+            return signedUrl;
+          } catch (error) {
+            console.error(`Failed to generate signed URL for key ${key}:`, error);
+            return null; // Return null to avoid breaking the response
+          }
         }
       )
     );
@@ -81,8 +97,8 @@ const createTruckHandler = async (req, res) => {
       is_subcontractor,
     } = req.body;
 
-    const fileKeys = (req.files || []).map((file) => file.key);
-    console.log("Creating truck with data:", req.body, "Files:", fileKeys);
+    const fileLocations = (req.files || []).map((file) => file.location);
+    console.log("Creating truck with data:", req.body, "Files:", fileLocations);
 
     const newTruck = await createTruck(
       {
@@ -96,7 +112,7 @@ const createTruckHandler = async (req, res) => {
         vin_num,
         is_subcontractor,
       },
-      fileKeys
+      fileLocations
     );
     res.status(201).json(newTruck);
   } catch (err) {
@@ -120,8 +136,8 @@ const updateTruckHandler = async (req, res) => {
       is_subcontractor,
     } = req.body;
 
-    const newDocKeys = (req.files || []).map((file) => file.key);
-    console.log(`Updating truck ID ${id}, New files:`, newDocKeys);
+    const newDocLocations = (req.files || []).map((file) => file.location);
+    console.log(`Updating truck ID ${id}, New files:`, newDocLocations);
 
     const result = await updateTruck(
       id,
@@ -136,7 +152,7 @@ const updateTruckHandler = async (req, res) => {
         vin_num,
         is_subcontractor,
       },
-      newDocKeys
+      newDocLocations
     );
     if (!result.success) {
       return res.status(404).json({ error: result.message });
@@ -165,13 +181,10 @@ const deleteTruckDocumentHandler = async (req, res) => {
       s3Key = url;
     }
 
-    const { DeleteObjectCommand } = await import("@aws-sdk/client-s3");
-    await s3ClientTrucks.send(
-      new DeleteObjectCommand({
-        Bucket: process.env.Trucks_AWS_BUCKET_NAME,
-        Key: s3Key,
-      })
-    );
+    await s3Trucks.deleteObject({
+      Bucket: process.env.Trucks_AWS_BUCKET_NAME,
+      Key: s3Key,
+    }).promise();
 
     const result = await deleteTruckDocument(truckId, s3Key);
     if (!result.success) {

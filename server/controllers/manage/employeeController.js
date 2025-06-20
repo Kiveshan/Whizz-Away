@@ -8,16 +8,12 @@ import {
   getEmployeeDetails,
   deleteEmployeeDocument,
 } from "../../models/manage/employeeModal.js";
-import { s3ClientEmployees } from "../../utils/s3Config.js";
-import { GetObjectCommand } from "@aws-sdk/client-s3";
-import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
+import { s3Employees, getSignedUrl } from "../../utils/s3Config.js";
 
 const getEmployeeBasicHandler = async (req, res) => {
   try {
-    // Remove the unnecessary split operation and validate the ID
     const id = req.params.id;
 
-    // Validate that the ID is a number
     if (isNaN(Number.parseInt(id))) {
       return res.status(400).json({
         error: "Invalid employee ID",
@@ -36,10 +32,7 @@ const getEmployeeBasicHandler = async (req, res) => {
     console.log(`Found employee data for ID ${id}:`, result.data);
     res.json(result.data);
   } catch (error) {
-    console.error(
-      `Error fetching employee data for ID ${req.params.id}:`,
-      error
-    );
+    console.error(`Error fetching employee data for ID ${req.params.id}:`, error);
     res.status(500).json({
       error: "An error occurred while fetching employee data",
       message: error.message,
@@ -141,7 +134,6 @@ const updateEmployeeHandler = async (req, res) => {
   try {
     const { id } = req.params;
 
-    // Validate that the ID is a number
     if (isNaN(Number.parseInt(id))) {
       return res.status(400).json({
         error: "Invalid employee ID",
@@ -204,7 +196,6 @@ const toggleEmployeeStatusHandler = async (req, res) => {
   try {
     const { id } = req.params;
 
-    // Validate that the ID is a number
     if (isNaN(Number.parseInt(id))) {
       return res.status(400).json({
         error: "Invalid employee ID",
@@ -229,7 +220,6 @@ const getEmployeeDetailsHandler = async (req, res) => {
   try {
     const { id } = req.params;
 
-    // Validate that the ID is a number
     if (isNaN(Number.parseInt(id))) {
       return res.status(400).json({
         error: "Invalid employee ID",
@@ -245,11 +235,17 @@ const getEmployeeDetailsHandler = async (req, res) => {
     const employee = result.data;
 
     const extractKeyFromUrl = (url) => {
-      if (!url) return null;
+      if (!url) {
+        console.log("No document URL provided, skipping key extraction");
+        return null;
+      }
       try {
-        return decodeURIComponent(new URL(url).pathname.substring(1));
+        const key = decodeURIComponent(new URL(url).pathname.substring(1));
+        console.log(`Extracted S3 key from URL: ${key}`);
+        return key;
       } catch (error) {
-        return url;
+        console.error(`Error extracting key from URL ${url}:`, error);
+        return url; // Fallback to URL if parsing fails
       }
     };
 
@@ -259,15 +255,27 @@ const getEmployeeDetailsHandler = async (req, res) => {
         employee.document_url2,
         employee.document_url3,
       ].map(async (url) => {
-        if (!url) return null;
+        if (!url) {
+          console.log("No document URL provided, skipping signed URL generation");
+          return null;
+        }
         const key = extractKeyFromUrl(url);
-        const command = new GetObjectCommand({
-          Bucket: process.env.Employee_AWS_BUCKET_NAME,
-          Key: key,
-        });
-        return await getSignedUrl(s3ClientEmployees, command, {
-          expiresIn: 3600,
-        });
+        if (!key) {
+          console.log("No valid key extracted, skipping signed URL generation");
+          return null;
+        }
+        try {
+          const signedUrl = await getSignedUrl(
+            key,
+            3600,
+            process.env.Employee_AWS_BUCKET_NAME
+          );
+          console.log(`Generated signed URL for key ${key}: ${signedUrl}`);
+          return signedUrl;
+        } catch (error) {
+          console.error(`Failed to generate signed URL for key ${key}:`, error);
+          return null; // Return null to avoid breaking the response
+        }
       })
     );
 
@@ -291,7 +299,6 @@ const deleteEmployeeDocumentHandler = async (req, res) => {
         .json({ message: "Missing employee ID or document URL" });
     }
 
-    // Validate that the employeeId is a number
     if (isNaN(Number.parseInt(employeeId))) {
       return res.status(400).json({
         error: "Invalid employee ID",
@@ -307,13 +314,10 @@ const deleteEmployeeDocumentHandler = async (req, res) => {
       s3Key = url;
     }
 
-    const { DeleteObjectCommand } = await import("@aws-sdk/client-s3");
-    await s3ClientEmployees.send(
-      new DeleteObjectCommand({
-        Bucket: process.env.Employee_AWS_BUCKET_NAME,
-        Key: s3Key,
-      })
-    );
+    await s3Employees.deleteObject({
+      Bucket: process.env.Employee_AWS_BUCKET_NAME,
+      Key: s3Key,
+    }).promise();
 
     const result = await deleteEmployeeDocument(
       Number.parseInt(employeeId),

@@ -39,6 +39,20 @@ const Manage = () => {
   const [showDriverRateForm, setShowDriverRateForm] = useState(false);
   const [showSubcontractorForm, setShowSubcontractorForm] = useState(false);
 
+  // Utility function to extract filename from S3 URL
+const extractFilenameFromUrl = (url) => {
+  if (!url) return "Unknown Document";
+  try {
+    const decodedPath = decodeURIComponent(new URL(url).pathname);
+    const parts = decodedPath.split("/");
+    const filename = parts[parts.length - 1].split("?")[0]; // Remove query params
+    return filename || "Unknown Document";
+  } catch (error) {
+    console.error(`Error extracting filename from URL ${url}:`, error);
+    return "Unknown Document";
+  }
+};
+
   // State for new items
   // Update the newEmployee state to include deduction fields
   const [newEmployee, setNewEmployee] = useState({
@@ -53,7 +67,7 @@ const Manage = () => {
     base_salary: "",
     // we no longer send `status` in the body
     documents: [],
-
+    existingDocuments: [],
     // Deduction fields (now stored on m5_employee)
     income_tax_rate: "",
     deduction_other_deductions: "",
@@ -62,9 +76,6 @@ const Manage = () => {
     deduction_savings: "",
     deduction_loan: "",
     deduction_damage: "",
-
-    // New loan_amount field (you added this column server-side)
-    // loan_amount: "",
   });
 
   const [newClient, setNewClient] = useState({
@@ -92,6 +103,7 @@ const Manage = () => {
     current_evaluation: "",
     vin_num: "",
     is_subcontractor: false,
+    existingDocuments: [],
   });
   const [newDriverRate, setNewDriverRate] = useState({
     startingpoint: "",
@@ -1087,7 +1099,7 @@ const Manage = () => {
     </>
   );
 
-  const renderEmployeeForm = () => (
+    const renderEmployeeForm = () => (
     <>
       {/* Hidden form to trigger browser validation */}
       <form
@@ -1198,7 +1210,6 @@ const Manage = () => {
               form="employeeForm"
               value={newEmployee.email}
               onChange={(e) => {
-                // clear any previous custom message
                 emailRef.current.setCustomValidity("");
                 setNewEmployee({ ...newEmployee, email: e.target.value });
               }}
@@ -1232,7 +1243,7 @@ const Manage = () => {
               onChange={(e) =>
                 setNewEmployee({
                   ...newEmployee,
-                  roleid: Number.parseInt(e.target.value),
+                  roleid: parseInt(e.target.value),
                 })
               }
             >
@@ -1241,7 +1252,7 @@ const Manage = () => {
               <option value="4">Director</option>
               <option value="5">Driver</option>
               <option value="3">Finance Clerk</option>
-              <option value="">Yard Staff</option>
+              <option value="0">Yard Staff</option>
             </select>
           </div>
 
@@ -1275,8 +1286,8 @@ const Manage = () => {
             <input
               type="number"
               min="0"
-              form="employeeForm"
               max="100"
+              form="employeeForm"
               step="0.01"
               value={newEmployee.deduction_uif}
               onChange={(e) =>
@@ -1324,8 +1335,8 @@ const Manage = () => {
             <label>Savings</label>
             <input
               type="number"
-              form="employeeForm"
               min="0"
+              form="employeeForm"
               value={newEmployee.deduction_savings}
               onChange={(e) =>
                 setNewEmployee({
@@ -1356,8 +1367,8 @@ const Manage = () => {
             <label>Other Deductions</label>
             <input
               type="number"
-              form="employeeForm"
               min="0"
+              form="employeeForm"
               value={newEmployee.deduction_other_deductions}
               onChange={(e) =>
                 setNewEmployee({
@@ -1426,7 +1437,7 @@ const Manage = () => {
                         }}
                       >
                         <span style={{ flexGrow: 1 }}>
-                          Document {index + 1}
+                          {extractFilenameFromUrl(url)}
                         </span>
                         <a
                           href={url}
@@ -1727,7 +1738,7 @@ const Manage = () => {
     </form>
   );
 
-  const renderTruckForm = () => (
+   const renderTruckForm = () => (
     <>
       {/* Hidden form to harness native HTML5 validation */}
       <form
@@ -1903,7 +1914,9 @@ const Manage = () => {
                         marginBottom: "8px",
                       }}
                     >
-                      <span style={{ flexGrow: 1 }}>Document {index + 1}</span>
+                      <span style={{ flexGrow: 1 }}>
+                        {extractFilenameFromUrl(url)}
+                      </span>
                       <a
                         href={url}
                         target="_blank"
@@ -2005,7 +2018,6 @@ const Manage = () => {
       </div>
     </>
   );
-
   const renderDriverRateForm = () => (
     <form
       onSubmit={handleSaveDriverRate}
