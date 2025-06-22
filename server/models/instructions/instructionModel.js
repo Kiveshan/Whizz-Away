@@ -1,43 +1,43 @@
-import { pool } from "../../config/database.js";
+import { pool } from "../../config/database.js"
 
 export const getShipmentTypes = async () => {
   const query = `
     SELECT shipkey, shipmenttype
     FROM public.shipment
     ORDER BY shipkey
-  `;
-  const client = await pool.connect();
+  `
+  const client = await pool.connect()
   try {
-    const result = await client.query(query);
-    return result.rows;
+    const result = await client.query(query)
+    return result.rows
   } catch (error) {
-    throw error;
+    throw error
   } finally {
-    client.release();
+    client.release()
   }
-};
+}
 
 export const getContainersByInstructionId = async (instructionId) => {
   const query = `
-    SELECT containerkey, containernum, weight, m1key, container_type
+    SELECT containerkey, containernum, weight, m1key, container_type, cargo_description
     FROM public.container
     WHERE m1key = $1
-  `;
-  const client = await pool.connect();
+  `
+  const client = await pool.connect()
   try {
-    const result = await client.query(query, [instructionId]);
-    return result.rows;
+    const result = await client.query(query, [instructionId])
+    return result.rows
   } catch (error) {
-    throw error;
+    throw error
   } finally {
-    client.release();
+    client.release()
   }
-};
+}
 
 export const saveInstruction = async ({ controllerData, containerData }) => {
-  const client = await pool.connect();
+  const client = await pool.connect()
   try {
-    await client.query("BEGIN");
+    await client.query("BEGIN")
 
     const controllerQuery = `
       INSERT INTO public.m1_controller (
@@ -51,7 +51,7 @@ export const saveInstruction = async ({ controllerData, containerData }) => {
       ) VALUES (
         $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25, $26, $27
       ) RETURNING m1key
-    `;
+    `
     const controllerValues = [
       controllerData.clientId,
       controllerData.task,
@@ -80,45 +80,43 @@ export const saveInstruction = async ({ controllerData, containerData }) => {
       controllerData.voyage_num || "",
       controllerData.imo_num || "",
       controllerData.flag_reg || "",
-    ];
+    ]
 
-    const controllerResult = await client.query(
-      controllerQuery,
-      controllerValues
-    );
-    const m1key = controllerResult.rows[0].m1key;
+    const controllerResult = await client.query(controllerQuery, controllerValues)
+    const m1key = controllerResult.rows[0].m1key
 
     for (const container of containerData) {
       const containerQuery = `
         INSERT INTO public.container (
-          containernum, weight, m1key, container_type
+          containernum, weight, m1key, container_type, cargo_description
         ) VALUES (
-          $1, $2, $3, $4
+          $1, $2, $3, $4, $5
         )
-      `;
+      `
       const containerValues = [
         container.containerNum,
         container.weight,
         m1key,
         container.container_type,
-      ];
-      await client.query(containerQuery, containerValues);
+        container.cargo_description || "",
+      ]
+      await client.query(containerQuery, containerValues)
     }
 
-    await client.query("COMMIT");
-    return { m1key };
+    await client.query("COMMIT")
+    return { m1key }
   } catch (error) {
-    await client.query("ROLLBACK");
-    throw error;
+    await client.query("ROLLBACK")
+    throw error
   } finally {
-    client.release();
+    client.release()
   }
-};
+}
 
 export const getClientInstructionStats = async () => {
   const statusCheckQuery = `
     SELECT DISTINCT status FROM public.m1_controller
-  `;
+  `
   const query = `
     SELECT 
       c.m5clientkey,
@@ -133,26 +131,28 @@ export const getClientInstructionStats = async () => {
       public.m5_client c
     LEFT JOIN 
       public.m1_controller m ON c.m5clientkey = m.client
+    WHERE 
+      c.status = true
     GROUP BY 
       c.m5clientkey, c.client, c.representative, c.email
     ORDER BY 
       c.client
-  `;
-  const client = await pool.connect();
+  `
+  const client = await pool.connect()
   try {
-    const statusResult = await client.query(statusCheckQuery);
+    const statusResult = await client.query(statusCheckQuery)
     console.log(
       "Available status values in database:",
-      statusResult.rows.map((row) => row.status)
-    );
-    const result = await client.query(query);
-    return result.rows;
+      statusResult.rows.map((row) => row.status),
+    )
+    const result = await client.query(query)
+    return result.rows
   } catch (error) {
-    throw error;
+    throw error
   } finally {
-    client.release();
+    client.release()
   }
-};
+}
 
 export const getInstructions = async (clientId) => {
   let query = `
@@ -171,23 +171,23 @@ export const getInstructions = async (clientId) => {
       public.m5_client c ON m.client = c.m5clientkey
     LEFT JOIN
       public.shipment s ON m.shipment_type = s.shipkey
-  `;
-  const queryParams = [];
+  `
+  const queryParams = []
   if (clientId) {
-    query += ` WHERE m.client = $1`;
-    queryParams.push(clientId);
+    query += ` WHERE m.client = $1`
+    queryParams.push(clientId)
   }
-  query += ` ORDER BY m.pickupdate DESC`;
-  const client = await pool.connect();
+  query += ` ORDER BY m.pickupdate DESC`
+  const client = await pool.connect()
   try {
-    const result = await client.query(query, queryParams);
-    return result.rows;
+    const result = await client.query(query, queryParams)
+    return result.rows
   } catch (error) {
-    throw error;
+    throw error
   } finally {
-    client.release();
+    client.release()
   }
-};
+}
 
 export const getInstructionById = async (instructionId) => {
   const query = `
@@ -206,32 +206,28 @@ export const getInstructionById = async (instructionId) => {
       public.shipment s ON m.shipment_type = s.shipkey
     WHERE 
       m.m1key = $1
-  `;
-  const client = await pool.connect();
+  `
+  const client = await pool.connect()
   try {
-    const result = await client.query(query, [instructionId]);
-    return result.rows.length > 0 ? result.rows[0] : null;
+    const result = await client.query(query, [instructionId])
+    return result.rows.length > 0 ? result.rows[0] : null
   } catch (error) {
-    throw error;
+    throw error
   } finally {
-    client.release();
+    client.release()
   }
-};
+}
 
 export const updateInstruction = async (instructionId, updatedData) => {
-  const client = await pool.connect();
+  const client = await pool.connect()
   try {
-    await client.query("BEGIN");
+    await client.query("BEGIN")
 
-    const bookingRef =
-      updatedData.booking_ref !== undefined ? updatedData.booking_ref : "";
-    const vesselName =
-      updatedData.vessel_name !== undefined ? updatedData.vessel_name : "";
-    const voyageNum =
-      updatedData.voyage_num !== undefined ? updatedData.voyage_num : "";
-    const imoNum = updatedData.imo_num !== undefined ? updatedData.imo_num : "";
-    const flagReg =
-      updatedData.flag_reg !== undefined ? updatedData.flag_reg : "";
+    const bookingRef = updatedData.booking_ref !== undefined ? updatedData.booking_ref : ""
+    const vesselName = updatedData.vessel_name !== undefined ? updatedData.vessel_name : ""
+    const voyageNum = updatedData.voyage_num !== undefined ? updatedData.voyage_num : ""
+    const imoNum = updatedData.imo_num !== undefined ? updatedData.imo_num : ""
+    const flagReg = updatedData.flag_reg !== undefined ? updatedData.flag_reg : ""
 
     const query = `
       UPDATE public.m1_controller
@@ -265,7 +261,7 @@ export const updateInstruction = async (instructionId, updatedData) => {
         flag_reg = $27
       WHERE m1key = $28
       RETURNING *
-    `;
+    `
     const values = [
       updatedData.client,
       updatedData.task,
@@ -273,7 +269,7 @@ export const updateInstruction = async (instructionId, updatedData) => {
       updatedData.pickup,
       updatedData.dropoff,
       updatedData.hazardous,
-      updatedData.surchages,
+      updatedData.surcharges,
       updatedData.pickuptime,
       updatedData.pickupdate,
       updatedData.stackdate,
@@ -295,84 +291,134 @@ export const updateInstruction = async (instructionId, updatedData) => {
       imoNum,
       flagReg,
       instructionId,
-    ];
+    ]
 
-    const result = await client.query(query, values);
-    await client.query("COMMIT");
-    return result.rows.length > 0 ? result.rows[0] : null;
+    const result = await client.query(query, values)
+    await client.query("COMMIT")
+    return result.rows.length > 0 ? result.rows[0] : null
   } catch (error) {
-    await client.query("ROLLBACK");
-    throw error;
+    await client.query("ROLLBACK")
+    throw error
   } finally {
-    client.release();
+    client.release()
   }
-};
+}
 
-export const updateContainersByInstructionId = async (
-  instructionId,
-  containerData
-) => {
-  const client = await pool.connect();
+export const updateContainersByInstructionId = async (instructionId, containerData) => {
+  const client = await pool.connect()
   try {
-    await client.query("BEGIN");
+    await client.query("BEGIN")
 
     // Delete existing containers
     const deleteQuery = `
       DELETE FROM public.container
       WHERE m1key = $1
-    `;
-    const deleteResult = await client.query(deleteQuery, [instructionId]);
-    console.log(
-      `Deleted ${deleteResult.rowCount} existing containers for instruction ID: ${instructionId}`
-    );
+    `
+    const deleteResult = await client.query(deleteQuery, [instructionId])
+    console.log(`Deleted ${deleteResult.rowCount} existing containers for instruction ID: ${instructionId}`)
 
     // Insert new containers
-    const insertResults = [];
+    const insertResults = []
     for (const container of containerData) {
-      const containerNum =
-        container.containernum || container.containerNum || "";
+      const containerNum = container.containernum || container.containerNum || ""
       const weight =
-        container.weight !== null && container.weight !== undefined
-          ? Number.parseFloat(container.weight)
-          : null;
-      const containerType =
-        container.containerType || container.container_type || "";
+        container.weight !== null && container.weight !== undefined ? Number.parseFloat(container.weight) : null
+      const containerType = container.containerType || container.container_type || ""
+      const cargoDescription = container.cargoDescription || container.cargo_description || ""
 
       console.log(
-        `Inserting container: containerNum=${containerNum}, weight=${weight}, m1key=${instructionId}, container_type=${containerType}`
-      );
+        `Inserting container: containerNum=${containerNum}, weight=${weight}, m1key=${instructionId}, container_type=${containerType}, cargo_description=${cargoDescription}`,
+      )
 
       const insertQuery = `
-        INSERT INTO public.container (containernum, weight, m1key, container_type)
-        VALUES ($1, $2, $3, $4)
+        INSERT INTO public.container (containernum, weight, m1key, container_type, cargo_description)
+        VALUES ($1, $2, $3, $4, $5)
         RETURNING containerkey
-      `;
-      const values = [containerNum, weight, instructionId, containerType];
+      `
+      const values = [containerNum, weight, instructionId, containerType, cargoDescription]
 
-      const result = await client.query(insertQuery, values);
-      console.log(`Inserted container with ID: ${result.rows[0].containerkey}`);
-      insertResults.push(result.rows[0]);
+      const result = await client.query(insertQuery, values)
+      console.log(`Inserted container with ID: ${result.rows[0].containerkey}`)
+      insertResults.push(result.rows[0])
     }
 
-    await client.query("COMMIT");
-    console.log(
-      `Successfully inserted ${insertResults.length} containers for instruction ID: ${instructionId}`
-    );
+    await client.query("COMMIT")
+    console.log(`Successfully inserted ${insertResults.length} containers for instruction ID: ${instructionId}`)
 
     // Verify insertion
     const verifyQuery = `
       SELECT COUNT(*) FROM public.container WHERE m1key = $1
-    `;
-    const verifyResult = await client.query(verifyQuery, [instructionId]);
-    console.log(
-      `Verification: ${verifyResult.rows[0].count} containers now exist for instruction ID: ${instructionId}`
-    );
+    `
+    const verifyResult = await client.query(verifyQuery, [instructionId])
+    console.log(`Verification: ${verifyResult.rows[0].count} containers now exist for instruction ID: ${instructionId}`)
 
-    return { data: insertResults };
+    return { data: insertResults }
   } catch (error) {
-    await client.query("ROLLBACK");
-    throw error;
+    await client.query("ROLLBACK")
+    throw error
   } finally {
-    client.release();
+    client.release()
   }
-};
+}
+
+export const getStartingPoints = async () => {
+  const query = `
+    SELECT DISTINCT startingpoint
+    FROM public.m5_driver_rate
+    WHERE startingpoint IS NOT NULL AND startingpoint != ''
+    ORDER BY startingpoint
+  `
+  const client = await pool.connect()
+  try {
+    const result = await client.query(query)
+    return result.rows
+  } catch (error) {
+    throw error
+  } finally {
+    client.release()
+  }
+}
+
+export const getDestinations = async () => {
+  const query = `
+    SELECT DISTINCT destination
+    FROM public.m5_driver_rate
+    WHERE destination IS NOT NULL AND destination != ''
+    ORDER BY destination
+  `
+  const client = await pool.connect()
+  try {
+    const result = await client.query(query)
+    return result.rows
+  } catch (error) {
+    throw error
+  } finally {
+    client.release()
+  }
+}
+
+export const getActiveClients = async () => {
+  const query = `
+    SELECT 
+      m5clientkey,
+      client AS companyname,
+      representative,
+      email,
+      cellnum
+    FROM 
+      public.m5_client
+    WHERE 
+      status = true
+    ORDER BY 
+      client
+  `
+  const client = await pool.connect()
+  try {
+    const result = await client.query(query)
+    return result.rows
+  } catch (error) {
+    throw error
+  } finally {
+    client.release()
+  }
+}

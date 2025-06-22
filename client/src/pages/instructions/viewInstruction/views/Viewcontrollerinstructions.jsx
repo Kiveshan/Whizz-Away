@@ -1,23 +1,24 @@
-"use client";
+"use client"
 
-import { useState, useEffect, useRef } from "react";
-import "../../css/controllerinstruction.css";
-import { useNavigate, useLocation } from "react-router-dom";
-import ErrorModal from "../../../../components/ErrorModal.jsx";
-import api from "../../../../api";
+import { useState, useEffect, useRef } from "react"
+import "../../css/ViewClientInstruction.css" // Changed from controllerinstruction.css
+import { useNavigate, useLocation } from "react-router-dom"
+import ErrorModal from "../../../../components/ErrorModal.jsx"
+import api from "../../../../api"
 
+// Rest of the component code remains exactly the same...
 const Viewcontrollerinstructions = () => {
-  const navigate = useNavigate();
-  const location = useLocation();
-  const instructionId = location.state?.instructionId;
-  const preservedFormData = location.state?.preservedFormData;
+  const navigate = useNavigate()
+  const location = useLocation()
+  const instructionId = location.state?.instructionId
+  const preservedFormData = location.state?.preservedFormData
 
   // Extract any additional state that was passed from DirectorMonitorInstructions
-  const clientId = location.state?.clientId;
-  const clientName = location.state?.clientName;
-  const selectedMonth = location.state?.selectedMonth;
-  const selectedYear = location.state?.selectedYear;
-  const activeFilter = location.state?.activeFilter;
+  const clientId = location.state?.clientId
+  const clientName = location.state?.clientName
+  const selectedMonth = location.state?.selectedMonth
+  const selectedYear = location.state?.selectedYear
+  const activeFilter = location.state?.activeFilter
 
   // Log the received state for debugging
   console.log("Viewcontrollerinstructions received state:", {
@@ -27,12 +28,12 @@ const Viewcontrollerinstructions = () => {
     selectedMonth,
     selectedYear,
     activeFilter,
-  });
+  })
 
   // Create refs for each date input
-  const pickupDateRef = useRef(null);
-  const etaDateRef = useRef(null);
-  const deadlineDateRef = useRef(null);
+  const pickupDateRef = useRef(null)
+  const etaDateRef = useRef(null)
+  const deadlineDateRef = useRef(null)
 
   // State for form data
   const [formData, setFormData] = useState({
@@ -66,64 +67,64 @@ const Viewcontrollerinstructions = () => {
     voyageNo: "", // Added voyage number field
     imoNo: "", // Added IMO number field
     flagReg: "", // Added flag registration field
-  });
+  })
 
   // State to track if shipment type is Import
-  const [isImport, setIsImport] = useState(false);
+  const [isImport, setIsImport] = useState(false)
 
   // State for clients and shipment types
-  const [clients, setClients] = useState([]);
-  const [shipmentTypes, setShipmentTypes] = useState([]);
+  const [clients, setClients] = useState([])
+  const [shipmentTypes, setShipmentTypes] = useState([])
   const [isLoading, setIsLoading] = useState({
     clients: true,
     shipmentTypes: true,
     instruction: instructionId ? true : false,
-  });
+  })
 
   // State for error modal
   const [errorModal, setErrorModal] = useState({
     isOpen: false,
     message: "",
-  });
+  })
 
   // State for success message
-  const [successMessage, setSuccessMessage] = useState("");
+  const [successMessage, setSuccessMessage] = useState("")
 
   // Style for non-editable fields - applied to ALL fields
   const nonEditableStyle = {
     backgroundColor: "#f0f0f0",
     cursor: "not-allowed",
     opacity: 0.7,
-  };
+  }
 
   // Format date from ISO to MM/DD/YYYY
   const formatDateForDisplay = (isoDate) => {
-    if (!isoDate) return "";
-    const date = new Date(isoDate);
+    if (!isoDate) return ""
+    const date = new Date(isoDate)
     return date.toLocaleDateString("en-US", {
       month: "2-digit",
       day: "2-digit",
       year: "numeric",
-    });
-  };
+    })
+  }
 
   // Format time from HH:MM:SS to hh:mm AM/PM
   const formatTimeForDisplay = (time) => {
-    if (!time) return "";
-    const [hours, minutes] = time.split(":");
-    const hour = Number.parseInt(hours, 10);
-    const ampm = hour >= 12 ? "PM" : "AM";
-    const hour12 = hour % 12 || 12;
-    return `${hour12}:${minutes} ${ampm}`;
-  };
+    if (!time) return ""
+    const [hours, minutes] = time.split(":")
+    const hour = Number.parseInt(hours, 10)
+    const ampm = hour >= 12 ? "PM" : "AM"
+    const hour12 = hour % 12 || 12
+    return `${hour12}:${minutes} ${ampm}`
+  }
 
   // Format weight to 2 decimal places
   const formatWeightForDisplay = (weight) => {
     if (weight === null || weight === undefined || weight === "") {
-      return "No Weight Amount Provided";
+      return "No Weight Amount Provided"
     }
-    return Number.parseFloat(weight).toFixed(2);
-  };
+    return Number.parseFloat(weight).toFixed(2)
+  }
 
   // Handle back button click - fixed to ensure clientId is passed correctly
   const handleBackClick = () => {
@@ -133,7 +134,7 @@ const Viewcontrollerinstructions = () => {
       selectedMonth,
       selectedYear,
       activeFilter,
-    });
+    })
 
     navigate("/CompanyInstructions", {
       state: {
@@ -143,36 +144,36 @@ const Viewcontrollerinstructions = () => {
         selectedYear: selectedYear,
         activeFilter: activeFilter,
       },
-    });
-  };
+    })
+  }
 
   // Fetch clients, shipment types, and instruction data on component mount
   useEffect(() => {
-    fetchClients();
-    fetchShipmentTypes();
+    fetchClients()
+    fetchShipmentTypes()
 
     if (preservedFormData) {
       // Use preserved form data if available (coming back from container details)
-      setFormData(preservedFormData);
+      setFormData(preservedFormData)
       // Set isImport based on the preserved shipment type
-      const shipmentTypeName = preservedFormData.shipmentTypeName || "";
-      setIsImport(shipmentTypeName.toLowerCase() === "import");
-      setIsLoading((prev) => ({ ...prev, instruction: false }));
+      const shipmentTypeName = preservedFormData.shipmentTypeName || ""
+      setIsImport(shipmentTypeName.toLowerCase() === "import")
+      setIsLoading((prev) => ({ ...prev, instruction: false }))
     } else if (instructionId) {
       // Otherwise fetch instruction data if ID is provided
-      fetchInstructionData(instructionId);
+      fetchInstructionData(instructionId)
     }
-  }, [instructionId, preservedFormData]);
+  }, [instructionId, preservedFormData])
 
   // Fetch instruction data by ID
   const fetchInstructionData = async (id) => {
-    setIsLoading((prev) => ({ ...prev, instruction: true }));
+    setIsLoading((prev) => ({ ...prev, instruction: true }))
     try {
-      console.log(`Fetching instruction data for ID: ${id}`);
-      const response = await api.get(`/api/instruction/${id}`);
-      const data = response.data;
+      console.log(`Fetching instruction data for ID: ${id}`)
+      const response = await api.get(`/api/instruction/${id}`)
+      const data = response.data
 
-      console.log("Instruction data received:", data);
+      console.log("Instruction data received:", data)
 
       // Format dates and times for display
       const formattedData = {
@@ -195,9 +196,7 @@ const Viewcontrollerinstructions = () => {
         bookingRef: data.booking_ref || "", // Added booking ref field
         rateWeight: data.rateweight || "kg",
         rate: data.rate ? data.rate.toString() : "",
-        weight: data.weight
-          ? formatWeightForDisplay(data.weight)
-          : "No Weight Amount Provided", // Format weight
+        weight: data.weight ? formatWeightForDisplay(data.weight) : "No Weight Amount Provided", // Format weight
         num_six_meters: data.num_six_meters || 0,
         num_twelve_meters: data.num_twelve_meters || 0,
         num_abnormal: data.num_abnormal || 0,
@@ -208,99 +207,96 @@ const Viewcontrollerinstructions = () => {
         voyageNo: data.voyage_num || "", // Added voyage number field
         imoNo: data.imo_num || "", // Added IMO number field
         flagReg: data.flag_reg || "", // Added flag registration field
-      };
+      }
 
-      setFormData(formattedData);
+      setFormData(formattedData)
 
       // Set isImport based on the fetched shipment type
-      const shipmentTypeName = data.shipmenttype || "";
-      setIsImport(shipmentTypeName.toLowerCase() === "import");
+      const shipmentTypeName = data.shipmenttype || ""
+      setIsImport(shipmentTypeName.toLowerCase() === "import")
     } catch (error) {
-      console.error("Error fetching instruction data:", error);
-      let errorMessage = "Failed to fetch instruction data. Please try again.";
+      console.error("Error fetching instruction data:", error)
+      let errorMessage = "Failed to fetch instruction data. Please try again."
 
       if (error.response) {
-        errorMessage = `Server error: ${error.response.status} ${error.response.statusText}`;
+        errorMessage = `Server error: ${error.response.status} ${error.response.statusText}`
       } else if (error.request) {
-        errorMessage = "Network error. Please check your connection.";
+        errorMessage = "Network error. Please check your connection."
       }
 
       setErrorModal({
         isOpen: true,
         message: errorMessage,
-      });
+      })
     } finally {
-      setIsLoading((prev) => ({ ...prev, instruction: false }));
+      setIsLoading((prev) => ({ ...prev, instruction: false }))
     }
-  };
+  }
 
   // Fetch clients from API
   const fetchClients = async () => {
-    setIsLoading((prev) => ({ ...prev, clients: true }));
+    setIsLoading((prev) => ({ ...prev, clients: true }))
     try {
-      console.log("Fetching clients...");
-      const response = await api.get("/api/clients");
-      const data = response.data;
+      console.log("Fetching clients...")
+      const response = await api.get("/api/clients")
+      const data = response.data
 
-      console.log("Clients data received:", data.length, "records");
-      setClients(data);
+      console.log("Clients data received:", data.length, "records")
+      setClients(data)
     } catch (error) {
-      console.error("Error fetching clients:", error);
-      let errorMessage = "Failed to fetch clients. Please try again.";
+      console.error("Error fetching clients:", error)
+      let errorMessage = "Failed to fetch clients. Please try again."
 
       if (error.response) {
-        errorMessage = `Server error: ${error.response.status} ${error.response.statusText}`;
+        errorMessage = `Server error: ${error.response.status} ${error.response.statusText}`
       } else if (error.request) {
-        errorMessage = "Network error. Please check your connection.";
+        errorMessage = "Network error. Please check your connection."
       }
 
       setErrorModal({
         isOpen: true,
         message: errorMessage,
-      });
-      setClients([]);
+      })
+      setClients([])
     } finally {
-      setIsLoading((prev) => ({ ...prev, clients: false }));
+      setIsLoading((prev) => ({ ...prev, clients: false }))
     }
-  };
+  }
 
   // Fetch shipment types from API
   const fetchShipmentTypes = async () => {
-    setIsLoading((prev) => ({ ...prev, shipmentTypes: true }));
+    setIsLoading((prev) => ({ ...prev, shipmentTypes: true }))
     try {
-      console.log("Fetching shipment types...");
-      const response = await api.get("/api/shipment-types");
-      const data = response.data;
+      console.log("Fetching shipment types...")
+      const response = await api.get("/api/shipment-types")
+      const data = response.data
 
-      console.log("Shipment types data received:", data.length, "records");
-      setShipmentTypes(data);
+      console.log("Shipment types data received:", data.length, "records")
+      setShipmentTypes(data)
     } catch (error) {
-      console.error("Error fetching shipment types:", error);
-      let errorMessage = "Failed to fetch shipment types. Please try again.";
+      console.error("Error fetching shipment types:", error)
+      let errorMessage = "Failed to fetch shipment types. Please try again."
 
       if (error.response) {
-        errorMessage = `Server error: ${error.response.status} ${error.response.statusText}`;
+        errorMessage = `Server error: ${error.response.status} ${error.response.statusText}`
       } else if (error.request) {
-        errorMessage = "Network error. Please check your connection.";
+        errorMessage = "Network error. Please check your connection."
       }
 
       setErrorModal({
         isOpen: true,
         message: errorMessage,
-      });
-      setShipmentTypes([]);
+      })
+      setShipmentTypes([])
     } finally {
-      setIsLoading((prev) => ({ ...prev, shipmentTypes: false }));
+      setIsLoading((prev) => ({ ...prev, shipmentTypes: false }))
     }
-  };
+  }
 
   // Handle view container details
   const handleViewContainerDetails = () => {
     // Calculate total containers
-    const totalContainers =
-      formData.num_six_meters +
-      formData.num_twelve_meters +
-      formData.num_abnormal;
+    const totalContainers = formData.num_six_meters + formData.num_twelve_meters + formData.num_abnormal
 
     // Navigate to container details page with state
     navigate("/ViewcontrollerInstructionDetails", {
@@ -316,43 +312,29 @@ const Viewcontrollerinstructions = () => {
         selectedYear: selectedYear,
         activeFilter: activeFilter,
       },
-    });
-  };
+    })
+  }
 
   // Retry fetching data
   const handleRetryFetch = () => {
     if (isLoading.clients || isLoading.shipmentTypes) {
-      return; // Don't retry if already loading
+      return // Don't retry if already loading
     }
 
-    fetchClients();
-    fetchShipmentTypes();
+    fetchClients()
+    fetchShipmentTypes()
     if (instructionId) {
-      fetchInstructionData(instructionId);
+      fetchInstructionData(instructionId)
     }
 
     setErrorModal({
       isOpen: false,
       message: "",
-    });
-  };
+    })
+  }
 
   return (
     <div className="controller-instruction-page-wrapper">
-      <div className="">
-        <button className="back-button" onClick={handleBackClick}>
-          Back
-        </button>
-        {clientName && (
-          <span
-            className="client-name"
-            style={{ fontWeight: "bold", marginLeft: "10px", display: "none" }}
-          >
-            {clientName} {clientId ? `(Client ID: ${clientId})` : ""}
-          </span>
-        )}
-      </div>
-
       {/* Error Modal */}
       {errorModal.isOpen && (
         <ErrorModal
@@ -361,6 +343,18 @@ const Viewcontrollerinstructions = () => {
           message={errorModal.message}
         />
       )}
+
+      {/* Back Button */}
+      <div className="client-payments-header">
+        <button className="back-button" onClick={handleBackClick}>
+          Back
+        </button>
+        {clientName && (
+          <span className="client-name" style={{ fontWeight: "bold", marginLeft: "10px", display: "none" }}>
+            {clientName} {clientId ? `(Client ID: ${clientId})` : ""}
+          </span>
+        )}
+      </div>
 
       {/* Success Message */}
       {successMessage && (
@@ -379,121 +373,123 @@ const Viewcontrollerinstructions = () => {
         </div>
       )}
 
-      <div className="instruction-container1" style={{ marginTop: "-20px" }}>
-        <div className="content">
-          {/* Loading indicator or retry button */}
-          {isLoading.clients ||
-          isLoading.shipmentTypes ||
-          isLoading.instruction ? (
-            <div style={{ textAlign: "center", padding: "20px" }}>
-              <p>Loading data...</p>
-            </div>
-          ) : clients.length === 0 || shipmentTypes.length === 0 ? (
-            <div style={{ textAlign: "center", padding: "20px" }}>
-              <p>Failed to load data from the database. Please try again.</p>
-              <button
-                onClick={handleRetryFetch}
-                style={{
-                  padding: "8px 16px",
-                  backgroundColor: "#4a90e2",
-                  color: "white",
-                  border: "none",
-                  borderRadius: "4px",
-                  cursor: "pointer",
-                  marginTop: "10px",
-                }}
-              >
-                Retry
-              </button>
-            </div>
-          ) : null}
+      {/* Loading indicator or retry button */}
+      {isLoading.clients || isLoading.shipmentTypes || isLoading.instruction ? (
+        <div style={{ textAlign: "center", padding: "20px" }}>
+          <p>Loading data...</p>
+        </div>
+      ) : clients.length === 0 || shipmentTypes.length === 0 ? (
+        <div style={{ textAlign: "center", padding: "20px" }}>
+          <p>Failed to load data from the database. Please try again.</p>
+          <button
+            onClick={handleRetryFetch}
+            style={{
+              padding: "8px 16px",
+              backgroundColor: "#4a90e2",
+              color: "white",
+              border: "none",
+              borderRadius: "4px",
+              cursor: "pointer",
+              marginTop: "10px",
+            }}
+          >
+            Retry
+          </button>
+        </div>
+      ) : null}
 
-          <div className="form-section">
-            <div className="form-row1">
-              <div className="form-group">
-                <label>Client</label>
-                <div className="select-wrapper">
-                  <select
-                    className="dropdown"
-                    name="clientId"
-                    value={formData.clientId}
-                    disabled={true}
-                    style={nonEditableStyle}
-                  >
-                    <option value="">Select Client</option>
-                    {clients.map((client) => (
-                      <option
-                        key={client.m5clientkey}
-                        value={client.m5clientkey}
-                      >
-                        {client.companyname}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-              </div>
-              <div className="form-group">
-                <label>Representative</label>
-                <input
-                  type="text"
-                  className="form-input"
-                  placeholder="Autoload representative"
-                  name="representative"
-                  value={formData.representative}
-                  readOnly
+      {/* Form with light blue background and sections - EXACT SAME STRUCTURE AS ControllerInstructions */}
+      <div className="form-container">
+        {/* Section 1: Client Information */}
+        <div className="form-section client-info-section">
+          <div className="form-row">
+            <div className="form-field">
+              <label>Client</label>
+              <div className="select-wrapper">
+                <select
+                  className="dropdown"
+                  name="clientId"
+                  value={formData.clientId}
+                  disabled={true}
                   style={nonEditableStyle}
-                />
+                >
+                  <option value="" disabled>
+                    Select Client
+                  </option>
+                  {clients.map((client) => (
+                    <option key={client.m5clientkey} value={client.m5clientkey}>
+                      {client.companyname}
+                    </option>
+                  ))}
+                </select>
               </div>
-              <div className="form-group">
-                <label>Contact Details</label>
-                <input
-                  type="text"
-                  className="form-input"
-                  placeholder="Autoload contact details"
-                  name="contactDetails"
-                  value={formData.contactDetails}
-                  readOnly
-                  style={nonEditableStyle}
-                />
-              </div>
-              <div className="form-group">
-                <label>Email</label>
-                <input
-                  type="email"
-                  className="form-input"
-                  placeholder="Autoload email"
-                  name="email"
-                  value={formData.email}
-                  readOnly
-                  style={nonEditableStyle}
-                />
-              </div>
+            </div>
+            <div className="form-field">
+              <label>Representative</label>
+              <input
+                type="text"
+                className="form-input"
+                placeholder="Autoload representative"
+                name="representative"
+                value={formData.representative}
+                readOnly
+                style={nonEditableStyle}
+              />
+            </div>
+            <div className="form-field">
+              <label>Contact Details</label>
+              <input
+                type="text"
+                className="form-input"
+                placeholder="Autoload contact details"
+                name="contactDetails"
+                value={formData.contactDetails}
+                readOnly
+                style={nonEditableStyle}
+              />
+            </div>
+            <div className="form-field">
+              <label>Email</label>
+              <input
+                type="email"
+                className="form-input"
+                placeholder="Autoload email"
+                name="email"
+                value={formData.email}
+                readOnly
+                style={nonEditableStyle}
+              />
             </div>
           </div>
+        </div>
 
-          <div className="form-section">
-            <div className="form-row1">
-              <div className="form-group">
-                <label>Shipment Type</label>
-                <div className="select-wrapper">
-                  <select
-                    className="dropdown"
-                    name="shipmentTypeId"
-                    value={formData.shipmentTypeId}
-                    disabled={true}
-                    style={nonEditableStyle}
-                  >
-                    <option value="">Select Shipment</option>
-                    {shipmentTypes.map((type) => (
-                      <option key={type.shipkey} value={type.shipkey}>
-                        {type.shipmenttype}
-                      </option>
-                    ))}
-                  </select>
-                </div>
+        {/* Section 2: Shipment Information */}
+        <div className="form-section">
+          <div className="form-row">
+            <div className="form-field">
+              <label>Shipment Type</label>
+              <div className="select-wrapper">
+                <select
+                  className="dropdown"
+                  name="shipmentTypeId"
+                  value={formData.shipmentTypeId}
+                  disabled={true}
+                  style={nonEditableStyle}
+                >
+                  <option value="" disabled>
+                    Select Shipment
+                  </option>
+                  {shipmentTypes.map((type) => (
+                    <option key={type.shipkey} value={type.shipkey}>
+                      {type.shipmenttype}
+                    </option>
+                  ))}
+                </select>
               </div>
-              <div className="form-group">
-                <label>Name of Task</label>
+            </div>
+            <div className="form-field">
+              <label>Name of Task</label>
+              <div className="input-wrapper">
                 <input
                   type="text"
                   className="form-input"
@@ -505,144 +501,136 @@ const Viewcontrollerinstructions = () => {
                 />
               </div>
             </div>
+          </div>
 
-            <div className="form-row1">
-              <div className="form-group">
-                <label>Pick-Up Location</label>
+          <div className="form-row">
+            <div className="form-field">
+              <label>Pick-Up Location</label>
+              <div className="select-wrapper">
                 <input
                   type="text"
                   className="form-input"
-                  placeholder="Input pick-up location here"
+                  placeholder="Pick-up location"
                   name="pickup"
                   value={formData.pickup}
                   readOnly
                   style={nonEditableStyle}
                 />
               </div>
-              <div className="form-group">
-                <label>Drop-off</label>
+            </div>
+            <div className="form-field">
+              <label>Drop-off</label>
+              <div className="select-wrapper">
                 <input
                   type="text"
                   className="form-input"
-                  placeholder="Input drop-off location here"
+                  placeholder="Drop-off location"
                   name="dropoff"
                   value={formData.dropoff}
                   readOnly
                   style={nonEditableStyle}
                 />
               </div>
-              <div className="form-group checkboxes">
-                <div className="checkbox-group">
-                  <input
-                    type="checkbox"
-                    id="hazardous"
-                    name="hazardous"
-                    checked={formData.hazardous}
-                    disabled={true}
-                    style={nonEditableStyle}
-                  />
-                  <label htmlFor="hazardous">Hazardous Materials</label>
-                </div>
-                <div className="checkbox-group">
-                  <input
-                    type="checkbox"
-                    id="surcharges"
-                    name="surcharges"
-                    checked={formData.surcharges}
-                    disabled={true}
-                    style={nonEditableStyle}
-                  />
-                  <label htmlFor="surcharges">Add Surcharges</label>
-                </div>
-              </div>
             </div>
-
-            {/* Date Inputs with functional calendar buttons */}
-            <div className="form-row1">
-              <div className="form-group">
-                <label>Pick-up Time</label>
-                <div className="date-input-group">
-                  <input
-                    type="text"
-                    className="form-input"
-                    placeholder="hh:mm AM/PM"
-                    name="pickupTime"
-                    value={formData.pickupTime}
-                    readOnly
-                    style={nonEditableStyle}
-                  />
-                  <button
-                    className="calendar-button"
-                    style={{ visibility: "hidden" }}
-                  ></button>
-                </div>
+            <div className="form-field checkbox-container">
+              <div className="checkbox-group">
+                <input
+                  type="checkbox"
+                  id="hazardous"
+                  name="hazardous"
+                  checked={formData.hazardous}
+                  disabled={true}
+                  style={nonEditableStyle}
+                />
+                <label htmlFor="hazardous">Hazardous Materials</label>
               </div>
-
-              <div className="form-group">
-                <label>Pick-up Date</label>
-                <div className="date-input-group">
-                  <input
-                    type="text"
-                    className="form-input"
-                    ref={pickupDateRef}
-                    placeholder="MM/DD/YYYY"
-                    name="pickupDate"
-                    value={formData.pickupDate}
-                    readOnly
-                    style={nonEditableStyle}
-                  />
-                  <button
-                    className="calendar-button"
-                    style={{ visibility: "hidden" }}
-                  ></button>
-                </div>
-              </div>
-              <div className="form-group">
-                <label>{isImport ? "ETA" : "Stack Date"}</label>
-                <div className="date-input-group">
-                  <input
-                    type="text"
-                    className="form-input"
-                    ref={etaDateRef}
-                    placeholder="MM/DD/YYYY"
-                    name="stackDate"
-                    value={formData.stackDate}
-                    readOnly
-                    style={nonEditableStyle}
-                  />
-                  <button
-                    className="calendar-button"
-                    style={{ visibility: "hidden" }}
-                  ></button>
-                </div>
-              </div>
-              <div className="form-group">
-                <label>Deadline</label>
-                <div className="date-input-group">
-                  <input
-                    type="text"
-                    className="form-input"
-                    ref={deadlineDateRef}
-                    placeholder="MM/DD/YYYY"
-                    name="deadline"
-                    value={formData.deadline}
-                    readOnly
-                    style={nonEditableStyle}
-                  />
-                  <button
-                    className="calendar-button"
-                    style={{ visibility: "hidden" }}
-                  ></button>
-                </div>
+              <div className="checkbox-group">
+                <input
+                  type="checkbox"
+                  id="surcharges"
+                  name="surcharges"
+                  checked={formData.surcharges}
+                  disabled={true}
+                  style={nonEditableStyle}
+                />
+                <label htmlFor="surcharges">Add Surcharges</label>
               </div>
             </div>
           </div>
 
-          {/* Additional form sections */}
-          <div className="form-section">
-            <div className="form-row1">
-              <div className="form-group">
-                <label>File Reference</label>
+          <div className="form-row date-row-with-separator">
+            <div className="form-field">
+              <label>Pick-up Time</label>
+              <div className="date-input-group">
+                <input
+                  type="text"
+                  className="form-input"
+                  placeholder="Time here"
+                  name="pickupTime"
+                  value={formData.pickupTime}
+                  readOnly
+                  style={nonEditableStyle}
+                />
+                <button className="calendar-button" style={{ visibility: "hidden" }}></button>
+              </div>
+            </div>
+            <div className="form-field">
+              <label>Pick-up Date</label>
+              <div className="date-input-group">
+                <input
+                  type="text"
+                  className="form-input"
+                  ref={pickupDateRef}
+                  placeholder="Date here"
+                  name="pickupDate"
+                  value={formData.pickupDate}
+                  readOnly
+                  style={nonEditableStyle}
+                />
+                <button className="calendar-button" style={{ visibility: "hidden" }}></button>
+              </div>
+            </div>
+            <div className="form-field">
+              <label>{isImport ? "ETA" : "Stack Date"}</label>
+              <div className="date-input-group">
+                <input
+                  type="text"
+                  className="form-input"
+                  ref={etaDateRef}
+                  placeholder="Date here"
+                  name="stackDate"
+                  value={formData.stackDate}
+                  readOnly
+                  style={nonEditableStyle}
+                />
+                <button className="calendar-button" style={{ visibility: "hidden" }}></button>
+              </div>
+            </div>
+            <div className="form-field">
+              <label>Deadline</label>
+              <div className="date-input-group">
+                <input
+                  type="text"
+                  className="form-input"
+                  ref={deadlineDateRef}
+                  placeholder="Date here"
+                  name="deadline"
+                  value={formData.deadline}
+                  readOnly
+                  style={nonEditableStyle}
+                />
+                <button className="calendar-button" style={{ visibility: "hidden" }}></button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Section 3: File Reference and Rates */}
+        <div className="form-section">
+          <div className="form-row">
+            <div className="form-field">
+              <label>File Ref</label>
+              <div className="input-wrapper">
                 <input
                   type="text"
                   className="form-input"
@@ -650,43 +638,27 @@ const Viewcontrollerinstructions = () => {
                   name="fileRef"
                   value={formData.fileRef}
                   readOnly
-                  style={{ ...nonEditableStyle, width: "60%" }}
+                  style={nonEditableStyle}
                 />
               </div>
-              <div className="form-group">
-                <label>Booking Reference</label>
-                <input
-                  type="text"
-                  className="form-input"
-                  placeholder="Enter booking reference"
-                  name="bookingRef"
-                  value={formData.bookingRef}
-                  readOnly
-                  style={{ ...nonEditableStyle, width: "60%" }}
-                />
-              </div>
-              <div className="form-group rates-group">
-                <label>Rates per</label>
-                <div
-                  className="rates-input-group"
-                  style={{ display: "flex", alignItems: "center" }}
-                >
-                  <div
-                    className="select-wrapper small"
-                    style={{ marginRight: "20px" }}
+            </div>
+            <div className="form-field rates-container">
+              <label>Rates per</label>
+              <div className="rates-input-group">
+                <div className="select-wrapper small">
+                  <select
+                    className="dropdown"
+                    name="rateWeight"
+                    value={formData.rateWeight}
+                    disabled={true}
+                    style={nonEditableStyle}
                   >
-                    <select
-                      className="dropdown"
-                      name="rateWeight"
-                      value={formData.rateWeight}
-                      disabled={true}
-                      style={{ ...nonEditableStyle, width: "100px" }}
-                    >
-                      <option value="kg">kg</option>
-                      <option value="m³">m³</option>
-                      <option value="Container">Container</option>
-                    </select>
-                  </div>
+                    <option value="kg">kg</option>
+                    <option value="m³">m³</option>
+                    <option value="Container">Container</option>
+                  </select>
+                </div>
+                <div className="input-wrapper">
                   <input
                     type="text"
                     className="form-input"
@@ -694,97 +666,93 @@ const Viewcontrollerinstructions = () => {
                     name="rate"
                     value={formData.rate}
                     readOnly
-                    style={{ ...nonEditableStyle, width: "60%" }}
+                    style={nonEditableStyle}
                   />
                 </div>
-                {/* Add weight field display for kg or m³ */}
-                {(formData.rateWeight === "kg" ||
-                  formData.rateWeight === "m³") && (
-                  <div
-                    className="weight-input-group"
-                    style={{
-                      marginTop: "10px",
-                      display: "flex",
-                      alignItems: "center",
-                    }}
-                  >
-                    <label style={{ marginRight: "10px" }}>
-                      {formData.rateWeight}
-                    </label>
+              </div>
+              {(formData.rateWeight === "kg" || formData.rateWeight === "m³") && (
+                <div className="weight-input-group">
+                  <label>{formData.rateWeight}</label>
+                  <div className="input-wrapper">
                     <input
                       type="text"
                       className="form-input"
-                      placeholder={`Weight in ${formData.rateWeight}`}
-                      style={{ ...nonEditableStyle, width: "60%" }}
+                      placeholder={`Enter weight in ${formData.rateWeight}`}
                       name="weight"
                       value={formData.weight}
-                      readOnly
-                    />
-                  </div>
-                )}
-              </div>
-            </div>
-
-            <div className="form-row1">
-              <div className="form-group">
-                <label style={{ marginLeft: "281px" }}>Trailer Size</label>
-                <div className="counter-container">
-                  <label style={{ marginTop: "40px" }}>No. of Containers</label>
-                  <div className="counter">
-                    <span>6m</span>
-                    <input
-                      type="number"
-                      value={formData.num_six_meters}
-                      min="0"
-                      name="num_six_meters"
-                      readOnly
-                      style={nonEditableStyle}
-                    />
-                  </div>
-                  <div className="counter">
-                    <span>12m</span>
-                    <input
-                      type="number"
-                      value={formData.num_twelve_meters}
-                      min="0"
-                      name="num_twelve_meters"
-                      readOnly
-                      style={nonEditableStyle}
-                    />
-                  </div>
-                  <div className="counter">
-                    <span>Abnormal</span>
-                    <input
-                      type="number"
-                      value={formData.num_abnormal}
-                      min="0"
-                      name="num_abnormal"
                       readOnly
                       style={nonEditableStyle}
                     />
                   </div>
                 </div>
-              </div>
+              )}
+            </div>
+          </div>
 
-              <div className="form-group">
+          <div className="form-row trailer-container">
+            <div className="trailer-title">
+              <h3>Trailer Size</h3>
+            </div>
+            <div className="container-section">
+              <div className="container-label">
+                <label>No. of Containers</label>
+              </div>
+              <div className="container-inputs">
+                <div className="container-input">
+                  <label>6m</label>
+                  <input
+                    type="number"
+                    value={formData.num_six_meters}
+                    min="0"
+                    name="num_six_meters"
+                    readOnly
+                    style={nonEditableStyle}
+                  />
+                </div>
+                <div className="container-input">
+                  <label>12m</label>
+                  <input
+                    type="number"
+                    value={formData.num_twelve_meters}
+                    min="0"
+                    name="num_twelve_meters"
+                    readOnly
+                    style={nonEditableStyle}
+                  />
+                </div>
+                <div className="container-input">
+                  <label>Abnormal</label>
+                  <input
+                    type="number"
+                    value={formData.num_abnormal}
+                    min="0"
+                    name="num_abnormal"
+                    readOnly
+                    style={nonEditableStyle}
+                  />
+                </div>
+              </div>
+              <div className="vat-container">
                 <label>VAT Rate</label>
                 <input
                   type="text"
                   className="form-input"
-                  placeholder="Vat Rate"
                   value={`${formData.vat}%`}
                   name="vat"
                   readOnly
-                  style={{ ...nonEditableStyle, width: "20%" }}
+                  style={nonEditableStyle}
                 />
               </div>
             </div>
           </div>
+        </div>
 
-          <div className="form-section">
-            <div className="form-row1">
-              <div className="form-group" style={{ width: "48%" }}>
-                <label>Vessel Name</label>
+        {/* Section 4: Vessel Information */}
+        <div className="form-section vessel-info-section">
+          <div className="form-row">
+            <div className="form-field">
+              <label>Vessel Name</label>
+              <div className="input-wrapper">
                 <input
                   type="text"
                   className="form-input"
@@ -795,8 +763,10 @@ const Viewcontrollerinstructions = () => {
                   style={nonEditableStyle}
                 />
               </div>
-              <div className="form-group" style={{ width: "48%" }}>
-                <label>Voyage No</label>
+            </div>
+            <div className="form-field">
+              <label>Voyage No.</label>
+              <div className="input-wrapper">
                 <input
                   type="text"
                   className="form-input"
@@ -808,25 +778,27 @@ const Viewcontrollerinstructions = () => {
                 />
               </div>
             </div>
-            <div className="form-row1">
-              <div className="form-group" style={{ width: "48%" }}>
-                <label>IMO No</label>
+            <div className="form-field">
+              <label>IMO No.</label>
+              <div className="input-wrapper">
                 <input
                   type="text"
                   className="form-input"
-                  placeholder="Enter IMO number"
+                  placeholder="Enter IMO number (numbers only)"
                   name="imoNo"
                   value={formData.imoNo}
                   readOnly
                   style={nonEditableStyle}
                 />
               </div>
-              <div className="form-group" style={{ width: "48%" }}>
-                <label>Flag Reg</label>
+            </div>
+            <div className="form-field">
+              <label>Flag Reg</label>
+              <div className="input-wrapper">
                 <input
                   type="text"
                   className="form-input"
-                  placeholder="Enter flag registration"
+                  placeholder="Enter flag registration (letters only)"
                   name="flagReg"
                   value={formData.flagReg}
                   readOnly
@@ -836,18 +808,30 @@ const Viewcontrollerinstructions = () => {
             </div>
           </div>
 
-          <div className="form-section">
-            <div className="form-row1">
-              <div className="form-group full-width">
-                <label
-                  style={{
-                    textAlign: "center",
-                    width: "100%",
-                    display: "block",
-                  }}
-                >
-                  Description from Client
-                </label>
+          <div className="form-row">
+            <div className="form-field">
+              <label>Booking Reference</label>
+              <div className="input-wrapper">
+                <input
+                  type="text"
+                  className="form-input"
+                  placeholder="Enter booking reference"
+                  name="bookingRef"
+                  value={formData.bookingRef}
+                  readOnly
+                  style={nonEditableStyle}
+                />
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Section 5: Description */}
+        <div className="form-section description-section">
+          <div className="form-row">
+            <div className="form-field full-width">
+              <label>Description from Client</label>
+              <div className="textarea-wrapper">
                 <textarea
                   className="form-textarea"
                   placeholder="Description from Client, like type of goods etc"
@@ -859,26 +843,27 @@ const Viewcontrollerinstructions = () => {
               </div>
             </div>
           </div>
+        </div>
 
-          <div className="button-container1">
-            <button
-              className="add-container-button"
-              onClick={handleViewContainerDetails}
-              disabled={
-                isLoading.clients ||
-                isLoading.shipmentTypes ||
-                isLoading.instruction ||
-                clients.length === 0 ||
-                shipmentTypes.length === 0
-              }
-            >
-              See Container Details
-            </button>
-          </div>
+        {/* Submit Button */}
+        <div className="button-container">
+          <button
+            className="add-container-button"
+            onClick={handleViewContainerDetails}
+            disabled={
+              isLoading.clients ||
+              isLoading.shipmentTypes ||
+              isLoading.instruction ||
+              clients.length === 0 ||
+              shipmentTypes.length === 0
+            }
+          >
+            See Container Details
+          </button>
         </div>
       </div>
     </div>
-  );
-};
+  )
+}
 
-export default Viewcontrollerinstructions;
+export default Viewcontrollerinstructions
