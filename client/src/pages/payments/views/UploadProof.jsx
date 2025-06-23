@@ -45,7 +45,7 @@ const UploadProof = () => {
     const fetchInvoices = async () => {
       try {
         setIsLoading(true);
-        const response = await api.get(`/api/invoices/${clientId}`, {
+        const response = await api.get(`/api/payment_invoices/${clientId}`, {
           headers: {
             Authorization: `Bearer ${localStorage.getItem("token")}`,
           },
