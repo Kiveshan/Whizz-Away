@@ -9,7 +9,7 @@ const dashboardData = [
     image: "/images/monitor.jpeg",
     path: "/CompanyInstructionView",
   },
-  { title: "Analytics", image: "/images/analytics.jpg", path: "/DirectorAnalytics" },
+  { title: "Analytics", image: "/images/analytics.jpg", path: "/analytics" },
   { title: "Debtors", image: "/images/clientDocs.jpeg", path: "/debtors" },
   { title: "Wages", image: "/images/wages.jpeg", path: "/finance-clerk-wage" },
   {
@@ -18,7 +18,7 @@ const dashboardData = [
     path: "/DirectorCreditorsDash",
   },
   { title: "Manage", image: "/images/manage.jpg", path: "/manage" },
-  { title: "Analytics", image: "/images/analytics.jpg", path: "/DirectorAnalytics" },
+  { title: "Analytics", image: "/images/analytics.jpg", path: "/analytics" },
 ];
 
 const Dashboard = () => {

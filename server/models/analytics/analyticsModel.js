@@ -256,7 +256,7 @@ const getTurnoverPerTruck = async (client, month, year) => {
       FROM legs_m2
       GROUP BY m1key
     ),
-    TruckCountsPerLeg AS (
+    TrucksPerLeg AS (
       SELECT 
         m1key,
         legnumber,
@@ -264,48 +264,43 @@ const getTurnoverPerTruck = async (client, month, year) => {
       FROM legs_m2
       GROUP BY m1key, legnumber
     ),
-    LegTruckContributions AS (
+    DetailedLegs AS (
       SELECT 
         l.m1key,
         l.legnumber,
         l.truckregnumber,
         m.total_cost,
         dl.num_legs,
-        tcpl.trucks_per_leg,
-        (m.total_cost / dl.num_legs / tcpl.trucks_per_leg) AS turnover_contribution,
-        m.pickupdate
+        tpl.trucks_per_leg,
+        l.date
       FROM legs_m2 l
       JOIN m1_controller m ON l.m1key = m.m1key
       JOIN DistinctLegs dl ON l.m1key = dl.m1key
-      JOIN TruckCountsPerLeg tcpl ON l.m1key = tcpl.m1key AND l.legnumber = tcpl.legnumber
+      JOIN TrucksPerLeg tpl ON l.m1key = tpl.m1key AND l.legnumber = tpl.legnumber
       JOIN m5_trucks t ON l.truckregnumber = t.truckregnum AND t.is_subcontractor = false
-      WHERE m.pickupdate IS NOT NULL
+      WHERE l.date IS NOT NULL
     )
     SELECT 
-      ltc.truckregnumber,
-      TO_CHAR(ltc.pickupdate, 'Month') AS month_name,
-      EXTRACT(YEAR FROM ltc.pickupdate)::TEXT AS year,
-      SUM(ltc.turnover_contribution) AS total_turnover
-    FROM LegTruckContributions ltc
-    WHERE TRIM(TO_CHAR(ltc.pickupdate, 'Month')) = $1
-      AND EXTRACT(YEAR FROM ltc.pickupdate)::TEXT = $2
-    GROUP BY ltc.truckregnumber, TO_CHAR(ltc.pickupdate, 'Month'), EXTRACT(YEAR FROM ltc.pickupdate)
+      truckregnumber,
+      TO_CHAR(date, 'Month') AS month_name,
+      EXTRACT(YEAR FROM date)::TEXT AS year,
+      SUM(total_cost / num_legs / trucks_per_leg) AS total_turnover
+    FROM DetailedLegs
+    WHERE TRIM(TO_CHAR(date, 'Month')) = $1
+      AND EXTRACT(YEAR FROM date)::TEXT = $2
+    GROUP BY truckregnumber, TO_CHAR(date, 'Month'), EXTRACT(YEAR FROM date)
     ORDER BY total_turnover DESC;
   `;
-  const result = await client.query(query, [month, year]);
-  console.log("Raw query result for month", month, year, ":", result.rows);
-  console.log(`Query returned ${result.rows ? result.rows.length : 0} rows`);
 
-  if (!result.rows || result.rows.length === 0) {
-    console.log(`No rows returned for ${month} ${year}. Check query or data.`);
-    return [];
-  }
+  const result = await client.query(query, [month, year]);
+  console.log("Raw query result:", result.rows);
+
+  if (!result.rows || result.rows.length === 0) return [];
 
   const totalTurnover = result.rows.reduce(
     (sum, row) => sum + parseFloat(row.total_turnover || 0),
     0
   );
-  console.log(`Total turnover for ${month} ${year}: ${totalTurnover}`);
 
   return result.rows.map((row) => {
     const turnover = parseFloat(row.total_turnover || 0);
