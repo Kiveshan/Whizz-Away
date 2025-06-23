@@ -16,6 +16,62 @@ const initialState = {
   driverRates: [],
   subcontractors: [],
 
+  // Pagination State
+  pagination: {
+    employees: {
+      currentPage: 1,
+      totalPages: 1,
+      totalItems: 0,
+      itemsPerPage: 5,
+    },
+    clients: {
+      currentPage: 1,
+      totalPages: 1,
+      totalItems: 0,
+      itemsPerPage: 5,
+    },
+    trucks: {
+      currentPage: 1,
+      totalPages: 1,
+      totalItems: 0,
+      itemsPerPage: 5,
+    },
+    driverRates: {
+      currentPage: 1,
+      totalPages: 1,
+      totalItems: 0,
+      itemsPerPage: 5,
+    },
+    subcontractors: {
+      currentPage: 1,
+      totalPages: 1,
+      totalItems: 0,
+      itemsPerPage: 5,
+    },
+  },
+
+  // Search/Filter State
+  filters: {
+    employees: {
+      search: "",
+      status: "all", // all, active, inactive
+    },
+    clients: {
+      search: "",
+      status: "all",
+    },
+    trucks: {
+      search: "",
+    },
+    driverRates: {
+      search: "",
+    },
+    subcontractors: {
+      search: "",
+      status: "all",
+    },
+  },
+
   // Form States
   showEmployeeForm: false,
   showClientForm: false,
@@ -128,6 +184,41 @@ function manageReducer(state, action) {
     case "SET_DATA":
       return { ...state, [action.payload.type]: action.payload.data }
 
+    case "SET_PAGINATION":
+      return {
+        ...state,
+        pagination: {
+          ...state.pagination,
+          [action.payload.type]: {
+            ...state.pagination[action.payload.type],
+            ...action.payload.data,
+          },
+        },
+      }
+
+    case "SET_FILTER":
+      return {
+        ...state,
+        filters: {
+          ...state.filters,
+          [action.payload.type]: {
+            ...state.filters[action.payload.type],
+            [action.payload.field]: action.payload.value,
+          },
+        },
+      }
+
+    case "RESET_PAGINATION":
+      return {
+        ...state,
+        pagination: {
+          ...state.pagination,
+          [action.payload]: {
+            ...initialState.pagination[action.payload],
+          },
+        },
+      }
+
     case "SHOW_FORM":
       return { ...state, [action.payload]: true }
 
@@ -149,8 +240,11 @@ function manageReducer(state, action) {
         [`editing${action.payload.type}Id`]: action.payload.id,
         ...(action.payload.type === "Client" && { isEditing: !!action.payload.id }),
         ...(action.payload.type === "Rate" && { isEditingRate: !!action.payload.id }),
-        ...(action.payload.type === "Subcontractor" && { isEditMode: !!action.payload.id }),
-        ...(action.payload.type === "Truck" && { editTruckId: action.payload.id }), // Add this line
+        ...(action.payload.type === "Subcontractor" && {
+          subcontractorId: action.payload.id,
+          isEditMode: !!action.payload.id,
+        }),
+        ...(action.payload.type === "Truck" && { editTruckId: action.payload.id }),
       }
 
     case "UPDATE_FORM_DATA":
@@ -198,6 +292,18 @@ export function useManageState() {
 
     setData: useCallback((type, data) => {
       dispatch({ type: "SET_DATA", payload: { type, data } })
+    }, []),
+
+    setPagination: useCallback((type, data) => {
+      dispatch({ type: "SET_PAGINATION", payload: { type, data } })
+    }, []),
+
+    setFilter: useCallback((type, field, value) => {
+      dispatch({ type: "SET_FILTER", payload: { type, field, value } })
+    }, []),
+
+    resetPagination: useCallback((type) => {
+      dispatch({ type: "RESET_PAGINATION", payload: type })
     }, []),
 
     showForm: useCallback((formType) => {

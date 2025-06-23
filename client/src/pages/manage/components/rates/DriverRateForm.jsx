@@ -16,9 +16,17 @@ const DriverRateForm = ({ driverRate, loading, isEditing, onSave, onCancel, onCh
   }
 
   const handleNumberChange = (field, value) => {
-    const numValue = Number.parseFloat(value)
-    if (numValue >= 0 || value === "") {
-      onChange(field, value)
+    // For driver rates, ensure they are valid numbers
+    if (field.includes("driver_") && value !== "") {
+      const numValue = Number.parseFloat(value)
+      if (numValue >= 0 || value === "") {
+        onChange(field, value)
+      }
+    } else {
+      // For subie rates, allow empty values (will be converted to null)
+      if (value === "" || Number.parseFloat(value) >= 0 || value === "") {
+        onChange(field, value)
+      }
     }
   }
 
@@ -30,7 +38,7 @@ const DriverRateForm = ({ driverRate, loading, isEditing, onSave, onCancel, onCh
         <div className="form-row">
           <div className="form-field">
             <label>
-              <strong>Starting Point</strong>
+              <strong>Starting Point *</strong>
             </label>
             <input
               type="text"
@@ -43,7 +51,7 @@ const DriverRateForm = ({ driverRate, loading, isEditing, onSave, onCancel, onCh
 
           <div className="form-field">
             <label>
-              <strong>Destination</strong>
+              <strong>Destination *</strong>
             </label>
             <input
               type="text"
@@ -58,27 +66,31 @@ const DriverRateForm = ({ driverRate, loading, isEditing, onSave, onCancel, onCh
         <div className="form-row">
           <div className="form-field">
             <label>
-              <strong>Driver Rate (6m)</strong>
+              <strong>Driver Rate (6m) * (Required)</strong>
             </label>
             <input
               type="number"
               min="0"
+              step="0.01"
               className="form-input"
               value={driverRate.driver_six_meter_rate || ""}
               onChange={(e) => handleNumberChange("driver_six_meter_rate", e.target.value)}
+              required
             />
           </div>
 
           <div className="form-field">
             <label>
-              <strong>Driver Rate (12m)</strong>
+              <strong>Driver Rate (12m) * (Required)</strong>
             </label>
             <input
               type="number"
               min="0"
+              step="0.01"
               className="form-input"
               value={driverRate.driver_twelve_meter_rate || ""}
               onChange={(e) => handleNumberChange("driver_twelve_meter_rate", e.target.value)}
+              required
             />
           </div>
         </div>
@@ -86,27 +98,31 @@ const DriverRateForm = ({ driverRate, loading, isEditing, onSave, onCancel, onCh
         <div className="form-row">
           <div className="form-field">
             <label>
-              <strong>Subbie Rate (6m)</strong>
+              <strong>Subbie Rate (6m) (Optional)</strong>
             </label>
             <input
               type="number"
               min="0"
+              step="0.01"
               className="form-input"
               value={driverRate.subie_six_meter_rate || ""}
               onChange={(e) => handleNumberChange("subie_six_meter_rate", e.target.value)}
+              placeholder="Leave empty if not applicable"
             />
           </div>
 
           <div className="form-field">
             <label>
-              <strong>Subbie Rate (12m)</strong>
+              <strong>Subbie Rate (12m) (Optional)</strong>
             </label>
             <input
               type="number"
               min="0"
+              step="0.01"
               className="form-input"
               value={driverRate.subie_twelve_meter_rate || ""}
               onChange={(e) => handleNumberChange("subie_twelve_meter_rate", e.target.value)}
+              placeholder="Leave empty if not applicable"
             />
           </div>
         </div>

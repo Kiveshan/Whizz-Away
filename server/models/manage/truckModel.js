@@ -1,45 +1,78 @@
-import { pool } from "../../config/database.js";
+import { pool } from "../../config/database.js"
 
-const getAllTrucks = async () => {
-  let client;
+const getAllTrucks = async (options = {}) => {
+  let client
   try {
-    client = await pool.connect();
-    const result = await client.query(
-      "SELECT * FROM m5_trucks ORDER BY m5truckskey"
-    );
-    return result.rows;
+    client = await pool.connect()
+
+    const { offset = 0, limit = 10, search = "" } = options
+
+    // Build WHERE clause for filtering
+    let whereClause = "WHERE 1=1"
+    const queryParams = []
+    let paramIndex = 1
+
+    // Search filter
+    if (search && search.trim() !== "") {
+      whereClause += ` AND (
+        LOWER(truckregnum) LIKE LOWER($${paramIndex}) OR 
+        LOWER(model) LIKE LOWER($${paramIndex}) OR 
+        LOWER(vin_num) LIKE LOWER($${paramIndex}) OR
+        LOWER(trailersize) LIKE LOWER($${paramIndex})
+      )`
+      queryParams.push(`%${search.trim()}%`)
+      paramIndex++
+    }
+
+    // Get total count for pagination
+    const countQuery = `SELECT COUNT(*) FROM m5_trucks ${whereClause}`
+    const countResult = await client.query(countQuery, queryParams)
+    const totalCount = Number.parseInt(countResult.rows[0].count)
+
+    // Get paginated results
+    const dataQuery = `
+      SELECT * FROM m5_trucks 
+      ${whereClause}
+      ORDER BY m5truckskey DESC
+      LIMIT $${paramIndex} OFFSET $${paramIndex + 1}
+    `
+
+    queryParams.push(limit, offset)
+    const dataResult = await client.query(dataQuery, queryParams)
+
+    return {
+      trucks: dataResult.rows,
+      totalCount,
+    }
   } catch (err) {
-    console.error("Error fetching trucks:", err);
-    throw err;
+    console.error("Error fetching trucks:", err)
+    throw err
   } finally {
-    if (client) client.release();
+    if (client) client.release()
   }
-};
+}
 
 const getTruckById = async (id) => {
-  let client;
+  let client
   try {
-    client = await pool.connect();
-    const result = await client.query(
-      "SELECT * FROM m5_trucks WHERE m5truckskey = $1",
-      [id]
-    );
+    client = await pool.connect()
+    const result = await client.query("SELECT * FROM m5_trucks WHERE m5truckskey = $1", [id])
     if (!result.rows.length) {
-      return { success: false, message: "Truck not found" };
+      return { success: false, message: "Truck not found" }
     }
-    return { success: true, data: result.rows[0] };
+    return { success: true, data: result.rows[0] }
   } catch (err) {
-    console.error(`Error fetching truck ${id}:`, err);
-    throw err;
+    console.error(`Error fetching truck ${id}:`, err)
+    throw err
   } finally {
-    if (client) client.release();
+    if (client) client.release()
   }
-};
+}
 
 const createTruck = async (truckData, documentKeys) => {
-  let client;
+  let client
   try {
-    client = await pool.connect();
+    client = await pool.connect()
     const {
       truckregnum,
       trailersize,
@@ -50,11 +83,11 @@ const createTruck = async (truckData, documentKeys) => {
       current_evaluation,
       vin_num,
       is_subcontractor,
-    } = truckData;
+    } = truckData
 
-    const document_url1 = documentKeys[0] || null;
-    const document_url2 = documentKeys[1] || null;
-    const document_url3 = documentKeys[2] || null;
+    const document_url1 = documentKeys[0] || null
+    const document_url2 = documentKeys[1] || null
+    const document_url3 = documentKeys[2] || null
 
     const result = await client.query(
       `INSERT INTO m5_trucks (
@@ -76,21 +109,21 @@ const createTruck = async (truckData, documentKeys) => {
         document_url1,
         document_url2,
         document_url3,
-      ]
-    );
-    return result.rows[0];
+      ],
+    )
+    return result.rows[0]
   } catch (err) {
-    console.error("Error creating truck:", err);
-    throw err;
+    console.error("Error creating truck:", err)
+    throw err
   } finally {
-    if (client) client.release();
+    if (client) client.release()
   }
-};
+}
 
 const updateTruck = async (id, truckData, newDocKeys) => {
-  let client;
+  let client
   try {
-    client = await pool.connect();
+    client = await pool.connect()
     const {
       truckregnum,
       trailersize,
@@ -101,33 +134,27 @@ const updateTruck = async (id, truckData, newDocKeys) => {
       current_evaluation,
       vin_num,
       is_subcontractor,
-    } = truckData;
+    } = truckData
 
     const existingResult = await client.query(
       "SELECT document_url1, document_url2, document_url3 FROM m5_trucks WHERE m5truckskey = $1",
-      [id]
-    );
+      [id],
+    )
     if (!existingResult.rows.length) {
-      return { success: false, message: "Truck not found" };
+      return { success: false, message: "Truck not found" }
     }
 
-    let { document_url1, document_url2, document_url3 } =
-      existingResult.rows[0];
-    let currentDocs = [document_url1, document_url2, document_url3];
+    let { document_url1, document_url2, document_url3 } = existingResult.rows[0]
+    const currentDocs = [document_url1, document_url2, document_url3]
 
-    let newIndex = 0;
-    for (
-      let i = 0;
-      i < currentDocs.length && newIndex < newDocKeys.length;
-      i++
-    ) {
+    let newIndex = 0
+    for (let i = 0; i < currentDocs.length && newIndex < newDocKeys.length; i++) {
       if (!currentDocs[i]) {
-        currentDocs[i] = newDocKeys[newIndex];
-        newIndex++;
+        currentDocs[i] = newDocKeys[newIndex]
+        newIndex++
       }
     }
-
-    [document_url1, document_url2, document_url3] = currentDocs;
+    ;[document_url1, document_url2, document_url3] = currentDocs
 
     const result = await client.query(
       `UPDATE m5_trucks
@@ -151,97 +178,78 @@ const updateTruck = async (id, truckData, newDocKeys) => {
         document_url2,
         document_url3,
         id,
-      ]
-    );
+      ],
+    )
     if (!result.rowCount) {
-      return { success: false, message: "Truck not found" };
+      return { success: false, message: "Truck not found" }
     }
-    return { success: true, data: result.rows[0] };
+    return { success: true, data: result.rows[0] }
   } catch (err) {
-    console.error(`Error updating truck ${id}:`, err);
-    throw err;
+    console.error(`Error updating truck ${id}:`, err)
+    throw err
   } finally {
-    if (client) client.release();
+    if (client) client.release()
   }
-};
+}
 
 const deleteTruckDocument = async (truckId, url) => {
-  let client;
+  let client
   try {
-    client = await pool.connect();
+    client = await pool.connect()
     const { rows } = await client.query(
       "SELECT document_url1, document_url2, document_url3 FROM m5_trucks WHERE m5truckskey = $1",
-      [truckId]
-    );
+      [truckId],
+    )
     if (!rows.length) {
-      return { success: false, message: "Truck not found" };
+      return { success: false, message: "Truck not found" }
     }
 
-    let updateField = null;
-    const storedUrls = [
-      rows[0].document_url1,
-      rows[0].document_url2,
-      rows[0].document_url3,
-    ];
+    let updateField = null
+    const storedUrls = [rows[0].document_url1, rows[0].document_url2, rows[0].document_url3]
     for (let i = 0; i < storedUrls.length; i++) {
       if (storedUrls[i]) {
-        let storedKey;
+        let storedKey
         try {
-          storedKey = decodeURIComponent(
-            new URL(storedUrls[i]).pathname.substring(1)
-          );
+          storedKey = decodeURIComponent(new URL(storedUrls[i]).pathname.substring(1))
         } catch {
-          storedKey = storedUrls[i];
+          storedKey = storedUrls[i]
         }
         if (storedKey === url) {
-          updateField = `document_url${i + 1}`;
-          break;
+          updateField = `document_url${i + 1}`
+          break
         }
       }
     }
 
     if (updateField) {
-      await client.query(
-        `UPDATE m5_trucks SET ${updateField} = NULL WHERE m5truckskey = $1`,
-        [truckId]
-      );
-      return { success: true, message: "Document deleted successfully" };
+      await client.query(`UPDATE m5_trucks SET ${updateField} = NULL WHERE m5truckskey = $1`, [truckId])
+      return { success: true, message: "Document deleted successfully" }
     }
-    return { success: false, message: "No matching document URL found" };
+    return { success: false, message: "No matching document URL found" }
   } catch (err) {
-    console.error("Error deleting truck document:", err);
-    throw err;
+    console.error("Error deleting truck document:", err)
+    throw err
   } finally {
-    if (client) client.release();
+    if (client) client.release()
   }
-};
+}
 
 const deleteTruck = async (id) => {
-  let client;
+  let client
   try {
-    client = await pool.connect();
-    const checkResult = await client.query(
-      "SELECT m5truckskey FROM m5_trucks WHERE m5truckskey = $1",
-      [id]
-    );
+    client = await pool.connect()
+    const checkResult = await client.query("SELECT m5truckskey FROM m5_trucks WHERE m5truckskey = $1", [id])
     if (!checkResult.rows.length) {
-      return { success: false, message: "Truck not found" };
+      return { success: false, message: "Truck not found" }
     }
-    await client.query("DELETE FROM m5_trucks WHERE m5truckskey = $1", [id]);
-    return { success: true, message: "Truck deleted successfully" };
+    await client.query("DELETE FROM m5_trucks WHERE m5truckskey = $1", [id])
+    return { success: true, message: "Truck deleted successfully" }
   } catch (err) {
-    console.error(`Error deleting truck ${id}:`, err);
-    throw err;
+    console.error(`Error deleting truck ${id}:`, err)
+    throw err
   } finally {
-    if (client) client.release();
+    if (client) client.release()
   }
-};
+}
 
-export {
-  getAllTrucks,
-  getTruckById,
-  createTruck,
-  updateTruck,
-  deleteTruckDocument,
-  deleteTruck,
-};
+export { getAllTrucks, getTruckById, createTruck, updateTruck, deleteTruckDocument, deleteTruck }

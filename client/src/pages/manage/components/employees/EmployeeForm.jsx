@@ -286,7 +286,7 @@ const EmployeeForm = ({ employee, loading, isEditing, onSave, onCancel, onChange
                         fontSize: "0.85rem",
                       }}
                     >
-                      Download
+                      View
                     </a>
                     <button
                       type="button"

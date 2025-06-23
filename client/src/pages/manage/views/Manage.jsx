@@ -3,6 +3,7 @@
 import { useEffect } from "react"
 import { useNavigate } from "react-router-dom"
 import "../css/Manage.css"
+import "../css/pagination.css"
 
 // Hooks
 import { useManageState } from "../hooks/useManageState"
@@ -11,8 +12,8 @@ import { useApi } from "../hooks/useApi"
 // Components
 import CustomAlert from "../components/common/CustomAlert"
 
-// Employee Components - Updated import paths
-import EmployeeTable from "../components/employees/Employeetable" // Note: lowercase 't' to match your file
+// Employee Components
+import EmployeeTable from "../components/employees/Employeetable"
 import EmployeeForm from "../components/employees/EmployeeForm"
 
 // Client Components
@@ -20,16 +21,16 @@ import ClientTable from "../components/clients/ClientTable"
 import ClientForm from "../components/clients/ClientForm"
 
 // Truck Components
-import TruckTable from "../components/trucks/TruckTable.jsx"
-import TruckForm from "../components/trucks/TruckForm.jsx"
+import TruckTable from "../components/trucks/TruckTable"
+import TruckForm from "../components/trucks/TruckForm"
 
 // Driver Rate Components
-import DriverRatesTable from "../components/rates/DriverRatesTable.jsx"
-import DriverRateForm from "../components/rates/DriverRateForm.jsx"
+import DriverRatesTable from "../components/rates/DriverRatesTable"
+import DriverRateForm from "../components/rates/DriverRateForm"
 
 // Subcontractor Components
-import SubcontractorTable from "../components/subcontractors/SubcontractorTable.jsx"
-import SubcontractorForm from "../components/subcontractors/SubcontractorForm.jsx"
+import SubcontractorTable from "../components/subcontractors/SubcontractorTable"
+import SubcontractorForm from "../components/subcontractors/SubcontractorForm"
 
 const Manage = () => {
   const navigate = useNavigate()
@@ -147,20 +148,24 @@ const Manage = () => {
 
   // Subcontractor handlers
   const handleSubcontractorFormChange = (field, value) => {
+    console.log(`Subcontractor form change: ${field} =`, value)
     actions.updateFormData("Subcontractor", { [field]: value })
   }
 
   const handleSubcontractorEdit = (id) => {
+    console.log(`Editing subcontractor ID: ${id}`)
     api.loadItemForEdit("subcontractor", id)
   }
 
   const handleSubcontractorAdd = () => {
+    console.log("Adding new subcontractor")
     actions.resetFormData("Subcontractor")
     actions.setEditing("Subcontractor", null)
     actions.showForm("showSubcontractorForm")
   }
 
   const handleSubcontractorCancel = () => {
+    console.log("Cancelling subcontractor form")
     actions.resetFormData("Subcontractor")
     actions.setEditing("Subcontractor", null)
     actions.hideForm("showSubcontractorForm")
@@ -234,6 +239,13 @@ const Manage = () => {
               onEdit={handleEmployeeEdit}
               onToggleStatus={api.toggleEmployeeStatus}
               onAdd={handleEmployeeAdd}
+              pagination={state.pagination.employees}
+              onPageChange={(page) => api.changePage("employees", page)}
+              onItemsPerPageChange={(itemsPerPage) => api.changeItemsPerPage("employees", itemsPerPage)}
+              filters={state.filters.employees}
+              onSearchChange={(value) => actions.setFilter("employees", "search", value)}
+              onStatusChange={(value) => actions.setFilter("employees", "status", value)}
+              onApplyFilters={() => api.applyFilters("employees")}
             />
           )}
         </>
@@ -259,6 +271,13 @@ const Manage = () => {
               onEdit={handleClientEdit}
               onToggleStatus={api.toggleClientStatus}
               onAdd={handleClientAdd}
+              pagination={state.pagination.clients}
+              onPageChange={(page) => api.changePage("clients", page)}
+              onItemsPerPageChange={(itemsPerPage) => api.changeItemsPerPage("clients", itemsPerPage)}
+              filters={state.filters.clients}
+              onSearchChange={(value) => actions.setFilter("clients", "search", value)}
+              onStatusChange={(value) => actions.setFilter("clients", "status", value)}
+              onApplyFilters={() => api.applyFilters("clients")}
             />
           )}
         </>
@@ -285,6 +304,12 @@ const Manage = () => {
               onEdit={handleTruckEdit}
               onDelete={(id) => api.deleteItem("truck", id)}
               onAdd={handleTruckAdd}
+              pagination={state.pagination.trucks}
+              onPageChange={(page) => api.changePage("trucks", page)}
+              onItemsPerPageChange={(itemsPerPage) => api.changeItemsPerPage("trucks", itemsPerPage)}
+              filters={state.filters.trucks}
+              onSearchChange={(value) => actions.setFilter("trucks", "search", value)}
+              onApplyFilters={() => api.applyFilters("trucks")}
             />
           )}
         </>
@@ -310,6 +335,12 @@ const Manage = () => {
               onEdit={handleDriverRateEdit}
               onDelete={(id) => api.deleteItem("rate", id)}
               onAdd={handleDriverRateAdd}
+              pagination={state.pagination.driverRates}
+              onPageChange={(page) => api.changePage("driverRates", page)}
+              onItemsPerPageChange={(itemsPerPage) => api.changeItemsPerPage("driverRates", itemsPerPage)}
+              filters={state.filters.driverRates}
+              onSearchChange={(value) => actions.setFilter("driverRates", "search", value)}
+              onApplyFilters={() => api.applyFilters("driverRates")}
             />
           )}
         </>
@@ -335,6 +366,13 @@ const Manage = () => {
               onEdit={handleSubcontractorEdit}
               onToggleStatus={api.toggleSubcontractorStatus}
               onAdd={handleSubcontractorAdd}
+              pagination={state.pagination.subcontractors}
+              onPageChange={(page) => api.changePage("subcontractors", page)}
+              onItemsPerPageChange={(itemsPerPage) => api.changeItemsPerPage("subcontractors", itemsPerPage)}
+              filters={state.filters.subcontractors}
+              onSearchChange={(value) => actions.setFilter("subcontractors", "search", value)}
+              onStatusChange={(value) => actions.setFilter("subcontractors", "status", value)}
+              onApplyFilters={() => api.applyFilters("subcontractors")}
             />
           )}
         </>

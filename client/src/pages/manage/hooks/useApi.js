@@ -1,45 +1,121 @@
 "use client"
 
 import { useCallback } from "react"
-import api from "../../../api.js" // Updated to match your API file location
+import api from "../../../api.js"
 
 export function useApi(state, actions) {
-  const fetchAllData = useCallback(async () => {
-    actions.setLoading(true)
-    actions.setError(null)
+  const fetchPaginatedData = useCallback(
+    async (type, page = 1, itemsPerPage = 10, filters = {}) => {
+      actions.setLoading(true)
+      actions.setError(null)
 
-    try {
-      const [employeesRes, clientsRes, trucksRes, ratesRes, subcontractorsRes] = await Promise.all([
-        api.get("/api/employees"),
-        api.get("/api/m5Clients"),
-        api.get("/api/trucks"),
-        api.get("/api/driver-rates"),
-        api.get("/api/subcontractors"),
-      ])
-
-      actions.setData("employees", employeesRes.data)
-      actions.setData("clients", clientsRes.data)
-      actions.setData("trucks", trucksRes.data)
-      actions.setData("driverRates", ratesRes.data)
-      actions.setData("subcontractors", subcontractorsRes.data)
-    } catch (err) {
-      console.error("Error fetching data:", err)
-      let errorMessage = "Failed to load data. Please try again."
-
-      if (err.response) {
-        const { status } = err.response
-        if (status === 401 || status === 403) {
-          // Handle unauthorized access
-          return
+      try {
+        const endpoints = {
+          employees: "/api/employees",
+          clients: "/api/m5Clients",
+          trucks: "/api/trucks",
+          driverRates: "/api/driver-rates",
+          subcontractors: "/api/subcontractors",
         }
-        errorMessage = err.response.data?.error || errorMessage
-      }
 
-      actions.setError(errorMessage)
-    } finally {
-      actions.setLoading(false)
-    }
-  }, [actions])
+        const endpoint = endpoints[type]
+        if (!endpoint) {
+          throw new Error(`Invalid data type: ${type}`)
+        }
+
+        // Build query parameters
+        const params = new URLSearchParams({
+          page: page.toString(),
+          limit: itemsPerPage.toString(),
+          ...filters,
+        })
+
+        const response = await api.get(`${endpoint}?${params}`)
+
+        // Update data and pagination
+        actions.setData(type, response.data.items || response.data)
+        actions.setPagination(type, {
+          currentPage: response.data.currentPage || page,
+          totalPages: response.data.totalPages || 1,
+          totalItems: response.data.totalItems || response.data.items?.length || response.data.length,
+          itemsPerPage: response.data.itemsPerPage || itemsPerPage,
+        })
+      } catch (err) {
+        console.error(`Error fetching ${type}:`, err)
+        let errorMessage = `Failed to load ${type}. Please try again.`
+
+        if (err.response) {
+          const { status } = err.response
+          if (status === 401 || status === 403) {
+            return
+          }
+          errorMessage = err.response.data?.error || errorMessage
+        }
+
+        actions.setError(errorMessage)
+      } finally {
+        actions.setLoading(false)
+      }
+    },
+    [actions],
+  )
+
+  const fetchAllData = useCallback(async () => {
+    const { pagination, filters } = state
+
+    await Promise.all([
+      fetchPaginatedData(
+        "employees",
+        pagination.employees.currentPage,
+        pagination.employees.itemsPerPage,
+        filters.employees,
+      ),
+      fetchPaginatedData("clients", pagination.clients.currentPage, pagination.clients.itemsPerPage, filters.clients),
+      fetchPaginatedData("trucks", pagination.trucks.currentPage, pagination.trucks.itemsPerPage, filters.trucks),
+      fetchPaginatedData(
+        "driverRates",
+        pagination.driverRates.currentPage,
+        pagination.driverRates.itemsPerPage,
+        filters.driverRates,
+      ),
+      fetchPaginatedData(
+        "subcontractors",
+        pagination.subcontractors.currentPage,
+        pagination.subcontractors.itemsPerPage,
+        filters.subcontractors,
+      ),
+    ])
+  }, [state, fetchPaginatedData])
+
+  const changePage = useCallback(
+    async (type, page) => {
+      const { pagination, filters } = state
+      const currentPagination = pagination[type]
+
+      if (page >= 1 && page <= currentPagination.totalPages) {
+        await fetchPaginatedData(type, page, currentPagination.itemsPerPage, filters[type])
+      }
+    },
+    [state, fetchPaginatedData],
+  )
+
+  const changeItemsPerPage = useCallback(
+    async (type, itemsPerPage) => {
+      const { filters } = state
+      actions.resetPagination(type)
+      await fetchPaginatedData(type, 1, itemsPerPage, filters[type])
+    },
+    [state, actions, fetchPaginatedData],
+  )
+
+  const applyFilters = useCallback(
+    async (type) => {
+      const { filters } = state
+      actions.resetPagination(type)
+      await fetchPaginatedData(type, 1, state.pagination[type].itemsPerPage, filters[type])
+    },
+    [state, actions, fetchPaginatedData],
+  )
 
   const saveEmployee = useCallback(
     async (employeeData, emailRef) => {
@@ -85,9 +161,13 @@ export function useApi(state, actions) {
           headers: { "Content-Type": "multipart/form-data" },
         })
 
-        // Refresh employees list
-        const { data } = await api.get("/api/employees")
-        actions.setData("employees", data)
+        // Refresh current page
+        await fetchPaginatedData(
+          "employees",
+          state.pagination.employees.currentPage,
+          state.pagination.employees.itemsPerPage,
+          state.filters.employees,
+        )
 
         // Reset form
         actions.resetFormData("Employee")
@@ -104,7 +184,7 @@ export function useApi(state, actions) {
         actions.setLoading(false)
       }
     },
-    [state.editingEmployeeId, actions],
+    [state, actions, fetchPaginatedData],
   )
 
   const saveClient = useCallback(
@@ -151,16 +231,19 @@ export function useApi(state, actions) {
               : Number.parseFloat(clientData.driver_twelve_meter_rate),
         }
 
-        console.log("Prepared client data:", preparedClientData) // Debug log
-
         if (state.isEditing) {
           await api.put(`/api/m5Clients/${state.editingClientId}`, preparedClientData)
         } else {
           await api.post("/api/m5Clients", preparedClientData)
         }
 
-        const clientsResponse = await api.get("/api/m5Clients")
-        actions.setData("clients", clientsResponse.data)
+        // Refresh current page
+        await fetchPaginatedData(
+          "clients",
+          state.pagination.clients.currentPage,
+          state.pagination.clients.itemsPerPage,
+          state.filters.clients,
+        )
 
         actions.resetFormData("Client")
         actions.setEditing("Client", null)
@@ -169,14 +252,13 @@ export function useApi(state, actions) {
         return true
       } catch (err) {
         console.error("Error saving client:", err)
-        console.error("Client data being sent:", clientData) // Debug log
         actions.showAlert(`Error saving client: ${err.response?.data?.error || err.message}`)
         return false
       } finally {
         actions.setLoading(false)
       }
     },
-    [state.isEditing, state.editingClientId, actions],
+    [state, actions, fetchPaginatedData],
   )
 
   const saveTruck = useCallback(
@@ -200,24 +282,24 @@ export function useApi(state, actions) {
           })
         }
 
-        let response
         if (state.editTruckId) {
-          // Update existing truck
-          response = await api.put(`/api/trucks/${state.editTruckId}`, formData, {
+          await api.put(`/api/trucks/${state.editTruckId}`, formData, {
             headers: { "Content-Type": "multipart/form-data" },
           })
         } else {
-          // Create new truck
-          response = await api.post("/api/trucks", formData, {
+          await api.post("/api/trucks", formData, {
             headers: { "Content-Type": "multipart/form-data" },
           })
         }
 
-        // Refresh trucks list
-        const trucksResponse = await api.get("/api/trucks")
-        actions.setData("trucks", trucksResponse.data)
+        // Refresh current page
+        await fetchPaginatedData(
+          "trucks",
+          state.pagination.trucks.currentPage,
+          state.pagination.trucks.itemsPerPage,
+          state.filters.trucks,
+        )
 
-        // Reset form and close
         actions.resetFormData("Truck")
         actions.setEditing("Truck", null)
         actions.hideForm("showTruckForm")
@@ -232,7 +314,7 @@ export function useApi(state, actions) {
         actions.setLoading(false)
       }
     },
-    [state.editTruckId, actions],
+    [state, actions, fetchPaginatedData],
   )
 
   const saveDriverRate = useCallback(
@@ -257,8 +339,13 @@ export function useApi(state, actions) {
           await api.post("/api/driver-rates", cleanedDriverRate)
         }
 
-        const ratesResponse = await api.get("/api/driver-rates")
-        actions.setData("driverRates", ratesResponse.data)
+        // Refresh current page
+        await fetchPaginatedData(
+          "driverRates",
+          state.pagination.driverRates.currentPage,
+          state.pagination.driverRates.itemsPerPage,
+          state.filters.driverRates,
+        )
 
         actions.resetFormData("DriverRate")
         actions.setEditing("Rate", null)
@@ -273,7 +360,7 @@ export function useApi(state, actions) {
         actions.setLoading(false)
       }
     },
-    [state.isEditingRate, state.editingRateId, actions],
+    [state, actions, fetchPaginatedData],
   )
 
   const saveSubcontractor = useCallback(
@@ -281,35 +368,55 @@ export function useApi(state, actions) {
       actions.setLoading(true)
 
       try {
-        const truckRegNums = subcontractorData.trucks
-          .map((truck) => truck.reg.trim())
+        console.log("Raw subcontractor data:", subcontractorData)
+        console.log("Current editing state:", {
+          isEditMode: state.isEditMode,
+          subcontractorId: state.subcontractorId,
+        })
+
+        // Ensure trucks array exists and has valid data
+        const trucks = subcontractorData.trucks || [{ reg: "", driver: "" }]
+
+        // Transform trucks array to comma-separated strings
+        const truckRegNums = trucks
+          .map((truck) => truck.reg?.trim())
           .filter(Boolean)
           .join(",")
 
-        const subDriverNames = subcontractorData.trucks
-          .map((truck) => truck.driver.trim())
+        const subDriverNames = trucks
+          .map((truck) => truck.driver?.trim())
           .filter(Boolean)
           .join(",")
 
         const payload = {
-          companyname: subcontractorData.companyname,
-          location: subcontractorData.location,
-          contact_person: subcontractorData.contact_person,
-          cellnum: subcontractorData.cellnum,
-          email: subcontractorData.email,
-          subei_reg_num: subcontractorData.subei_reg_num,
-          no_of_trucks: subcontractorData.no_of_trucks,
+          companyname: subcontractorData.companyname || "",
+          location: subcontractorData.location || "",
+          contact_person: subcontractorData.contact_person || "",
+          cellnum: subcontractorData.cellnum || "",
+          email: subcontractorData.email || "",
+          subei_reg_num: subcontractorData.subei_reg_num || "",
+          no_of_trucks: Number.parseInt(subcontractorData.no_of_trucks) || 1,
           truckregnum: truckRegNums,
           subdrivername: subDriverNames,
         }
 
+        console.log("Sending subcontractor payload:", payload)
+
         const url = state.isEditMode ? `/api/subcontractors/${state.subcontractorId}` : "/api/subcontractors"
         const method = state.isEditMode ? "put" : "post"
 
-        await api[method](url, payload)
+        console.log(`Making ${method.toUpperCase()} request to: ${url}`)
 
-        const subcontractorsResponse = await api.get("/api/subcontractors")
-        actions.setData("subcontractors", subcontractorsResponse.data)
+        const response = await api[method](url, payload)
+        console.log("API response:", response.data)
+
+        // Refresh current page
+        await fetchPaginatedData(
+          "subcontractors",
+          state.pagination.subcontractors.currentPage,
+          state.pagination.subcontractors.itemsPerPage,
+          state.filters.subcontractors,
+        )
 
         actions.resetFormData("Subcontractor")
         actions.setEditing("Subcontractor", null)
@@ -318,13 +425,14 @@ export function useApi(state, actions) {
         return true
       } catch (err) {
         console.error("Error saving subcontractor:", err)
+        console.error("Error response:", err.response?.data)
         actions.showAlert(`Error: ${err.response?.data?.error || err.message}`)
         return false
       } finally {
         actions.setLoading(false)
       }
     },
-    [state.isEditMode, state.subcontractorId, actions],
+    [state, actions, fetchPaginatedData],
   )
 
   const toggleEmployeeStatus = useCallback(
@@ -334,8 +442,14 @@ export function useApi(state, actions) {
         const newStatus = !currentStatus
         await api.put(`/api/employees/${id}/toggle-status`, { status: newStatus })
 
-        const { data } = await api.get("/api/employees")
-        actions.setData("employees", data)
+        // Refresh current page
+        await fetchPaginatedData(
+          "employees",
+          state.pagination.employees.currentPage,
+          state.pagination.employees.itemsPerPage,
+          state.filters.employees,
+        )
+
         actions.showAlert(`Employee ${newStatus ? "enabled" : "disabled"}!`)
       } catch (err) {
         console.error(`Error toggling employee ${id}:`, err)
@@ -346,7 +460,7 @@ export function useApi(state, actions) {
         actions.setLoading(false)
       }
     },
-    [actions],
+    [state, actions, fetchPaginatedData],
   )
 
   const toggleClientStatus = useCallback(
@@ -354,12 +468,16 @@ export function useApi(state, actions) {
       actions.setLoading(true)
       try {
         const newStatus = !currentStatus
-        const { data: updatedClient } = await api.put(`/api/clients/${id}/toggle-status`, { status: newStatus })
+        await api.put(`/api/clients/${id}/toggle-status`, { status: newStatus })
 
-        const updatedClients = state.clients.map((c) =>
-          c.m5clientkey === id ? { ...c, status: updatedClient.status } : c,
+        // Refresh current page
+        await fetchPaginatedData(
+          "clients",
+          state.pagination.clients.currentPage,
+          state.pagination.clients.itemsPerPage,
+          state.filters.clients,
         )
-        actions.setData("clients", updatedClients)
+
         actions.showAlert(`Client ${newStatus ? "enabled" : "disabled"}!`)
       } catch (err) {
         console.error(`Error toggling client ${id}:`, err)
@@ -370,7 +488,7 @@ export function useApi(state, actions) {
         actions.setLoading(false)
       }
     },
-    [state.clients, actions],
+    [state, actions, fetchPaginatedData],
   )
 
   const toggleSubcontractorStatus = useCallback(
@@ -380,8 +498,14 @@ export function useApi(state, actions) {
         const newStatus = !currentStatus
         await api.put(`/api/subcontractors/${id}/toggle-status`, { status: newStatus })
 
-        const response = await api.get("/api/subcontractors")
-        actions.setData("subcontractors", response.data)
+        // Refresh current page
+        await fetchPaginatedData(
+          "subcontractors",
+          state.pagination.subcontractors.currentPage,
+          state.pagination.subcontractors.itemsPerPage,
+          state.filters.subcontractors,
+        )
+
         actions.showAlert(`Subcontractor ${newStatus ? "enabled" : "disabled"}!`)
       } catch (err) {
         console.error(`Error toggling subcontractor ${id}:`, err)
@@ -392,7 +516,7 @@ export function useApi(state, actions) {
         actions.setLoading(false)
       }
     },
-    [actions],
+    [state, actions, fetchPaginatedData],
   )
 
   const deleteItem = useCallback(
@@ -400,20 +524,16 @@ export function useApi(state, actions) {
       actions.setLoading(true)
       try {
         let endpoint
-        let dataType
 
         switch (type) {
           case "client":
             endpoint = `/api/m5Clients/${id}`
-            dataType = "clients"
             break
           case "truck":
             endpoint = `/api/trucks/${id}`
-            dataType = "trucks"
             break
           case "rate":
             endpoint = `/api/driver-rates/${id}`
-            dataType = "driverRates"
             break
           default:
             throw new Error("Invalid type")
@@ -421,8 +541,15 @@ export function useApi(state, actions) {
 
         await api.delete(endpoint)
 
-        const response = await api.get(endpoint.split("/").slice(0, -1).join("/"))
-        actions.setData(dataType, response.data)
+        // Refresh current page
+        const dataType = type === "rate" ? "driverRates" : `${type}s`
+        await fetchPaginatedData(
+          dataType,
+          state.pagination[dataType].currentPage,
+          state.pagination[dataType].itemsPerPage,
+          state.filters[dataType],
+        )
+
         actions.showAlert(`${type.charAt(0).toUpperCase() + type.slice(1)} deleted!`)
       } catch (err) {
         console.error(`Error deleting ${type} ${id}:`, err)
@@ -431,7 +558,7 @@ export function useApi(state, actions) {
         actions.setLoading(false)
       }
     },
-    [actions],
+    [state, actions, fetchPaginatedData],
   )
 
   const loadItemForEdit = useCallback(
@@ -471,17 +598,19 @@ export function useApi(state, actions) {
         // Handle special cases for different types
         if (type === "employee") {
           const existingDocuments = []
+          // Check for document URLs and add them to existingDocuments array
           if (data.document_url1) existingDocuments.push(data.document_url1)
           if (data.document_url2) existingDocuments.push(data.document_url2)
           if (data.document_url3) existingDocuments.push(data.document_url3)
 
+          // Get the latest deduction data
           const latestDeduction =
             data.deductionHistory && data.deductionHistory.length > 0 ? data.deductionHistory[0] : {}
 
           actions.updateFormData(formType, {
             ...data,
-            documents: [],
-            existingDocuments,
+            documents: [], // Reset new documents
+            existingDocuments, // Set existing documents for display
             income_tax_rate: latestDeduction.income_tax_rate || "",
             deduction_other_deductions: latestDeduction.deduction_other_deductions || "",
             deduction_uif: latestDeduction.deduction_uif || "",
@@ -491,7 +620,6 @@ export function useApi(state, actions) {
             deduction_damage: latestDeduction.deduction_damage || "",
           })
         } else if (type === "client") {
-          // Handle client data with proper field mapping
           actions.updateFormData(formType, {
             ...data,
             driver_six_meter_rate: data.driver_six_meter_rate || "",
@@ -512,36 +640,60 @@ export function useApi(state, actions) {
           let truckRegs = []
           let driverNames = []
 
+          // Handle truckregnum - can be string, array, or PostgreSQL array format
           if (data.truckregnum) {
-            truckRegs =
-              typeof data.truckregnum === "string"
-                ? data.truckregnum.split(",").map((reg) => reg.trim())
-                : Array.isArray(data.truckregnum)
-                  ? data.truckregnum
-                  : [String(data.truckregnum)]
+            if (typeof data.truckregnum === "string") {
+              // Handle PostgreSQL array format {item1,item2} or comma-separated
+              if (data.truckregnum.startsWith("{") && data.truckregnum.endsWith("}")) {
+                truckRegs = data.truckregnum
+                  .slice(1, -1) // Remove { and }
+                  .split(",")
+                  .map((reg) => reg.replace(/"/g, "").trim())
+                  .filter(Boolean)
+              } else {
+                truckRegs = data.truckregnum
+                  .split(",")
+                  .map((reg) => reg.trim())
+                  .filter(Boolean)
+              }
+            } else if (Array.isArray(data.truckregnum)) {
+              truckRegs = data.truckregnum
+            } else {
+              truckRegs = [String(data.truckregnum)]
+            }
           }
 
+          // Handle subdrivername - can be string, array, or PostgreSQL array format
           if (data.subdrivername) {
-            driverNames =
-              typeof data.subdrivername === "string"
-                ? data.subdrivername.split(",").map((name) => name.trim())
-                : Array.isArray(data.subdrivername)
-                  ? data.subdrivername
-                  : [String(data.subdrivername)]
+            if (typeof data.subdrivername === "string") {
+              // Handle PostgreSQL array format {item1,item2} or comma-separated
+              if (data.subdrivername.startsWith("{") && data.subdrivername.endsWith("}")) {
+                driverNames = data.subdrivername
+                  .slice(1, -1) // Remove { and }
+                  .split(",")
+                  .map((name) => name.replace(/"/g, "").trim())
+                  .filter(Boolean)
+              } else {
+                driverNames = data.subdrivername
+                  .split(",")
+                  .map((name) => name.trim())
+                  .filter(Boolean)
+              }
+            } else if (Array.isArray(data.subdrivername)) {
+              driverNames = data.subdrivername
+            } else {
+              driverNames = [String(data.subdrivername)]
+            }
           }
 
           const trucks = []
-          const maxLength = Math.max(truckRegs.length, driverNames.length)
+          const maxLength = Math.max(truckRegs.length, driverNames.length, 1)
 
           for (let i = 0; i < maxLength; i++) {
             trucks.push({
               reg: truckRegs[i] || "",
               driver: driverNames[i] || "",
             })
-          }
-
-          if (trucks.length === 0) {
-            trucks.push({ reg: "", driver: "" })
           }
 
           actions.updateFormData(formType, {
@@ -595,6 +747,10 @@ export function useApi(state, actions) {
 
   return {
     fetchAllData,
+    fetchPaginatedData,
+    changePage,
+    changeItemsPerPage,
+    applyFilters,
     saveEmployee,
     saveClient,
     saveTruck,

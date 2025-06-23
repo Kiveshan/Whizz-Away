@@ -25,9 +25,33 @@ const checkClientEmailExistsHandler = async (req, res) => {
 
 const getAllClientsHandler = async (req, res) => {
   try {
-    console.log("Fetching all clients");
-    const clients = await getAllClients();
-    res.json(clients);
+    const {
+      page = 1,
+      limit = 10,
+      search = "",
+      status = "all"
+    } = req.query;
+
+    const pageNum = parseInt(page);
+    const limitNum = parseInt(limit);
+    const offset = (pageNum - 1) * limitNum;
+
+    console.log(`Fetching clients - Page: ${pageNum}, Limit: ${limitNum}, Search: ${search}, Status: ${status}`);
+    
+    const result = await getAllClients({
+      offset,
+      limit: limitNum,
+      search,
+      status
+    });
+
+    res.json({
+      items: result.clients,
+      currentPage: pageNum,
+      totalPages: Math.ceil(result.totalCount / limitNum),
+      totalItems: result.totalCount,
+      itemsPerPage: limitNum
+    });
   } catch (err) {
     console.error("Error fetching clients:", err);
     res.status(500).json({ error: "Failed to fetch clients" });
