@@ -1,14 +1,26 @@
 import { pool } from "../../config/database.js";
 
-const getTrucksWithFuelExpenses = async () => {
-  const queryText = `
-    SELECT DISTINCT m.truckid, t.truckregnum, t.is_subcontractor 
-    FROM expenses_m2 m
-    JOIN m5_trucks t ON m.truckid = t.m5truckskey
-    WHERE m.truckid IS NOT NULL
-    ORDER BY t.truckregnum
+// const getTrucksWithFuelExpenses = async () => {
+//   const queryText = `
+//     SELECT DISTINCT m.truckid, t.truckregnum, t.is_subcontractor 
+//     FROM expenses_m2 m
+//     JOIN m5_trucks t ON m.truckid = t.m5truckskey
+//     WHERE m.truckid IS NOT NULL
+//     ORDER BY t.truckregnum
+//   `;
+//   const result = await pool.query(queryText);
+//   return result.rows;
+// };
+const getAllCompanyOwnedTrucks = async () => {
+  const query = `
+    SELECT 
+      m5truckskey AS truckid, 
+      truckregnum 
+    FROM m5_trucks
+    WHERE is_subcontractor IS DISTINCT FROM TRUE
+    ORDER BY truckregnum;
   `;
-  const result = await pool.query(queryText);
+  const result = await pool.query(query);
   return result.rows;
 };
 
@@ -52,4 +64,7 @@ const getAllExpenses = async () => {
   return result.rows;
 };
 
-export { getTrucksWithFuelExpenses, getExpensesByTruckId, getAllExpenses };
+export { //getTrucksWithFuelExpenses 
+  getAllCompanyOwnedTrucks
+  , getExpensesByTruckId,
+   getAllExpenses };
