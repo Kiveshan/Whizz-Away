@@ -330,7 +330,7 @@ const UploadProof = () => {
                           className="view-button centered"
                           onClick={handleViewProof}
                         >
-                          View Proof (New Tab)
+                          View Proof
                         </button>
                       ) : (
                         <div className="no-file">
