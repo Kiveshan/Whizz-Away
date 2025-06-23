@@ -956,6 +956,46 @@ const ControllerInstructions = () => {
                   </div>
                 </div>
               </div>
+              {/* Rates per dropdown moved inside container inputs */}
+                <div className="container-input rates-per-row" style={{ display: 'none' }}>
+                  <label>Rates per</label>
+                  <div className="container-rate-group">
+                    <div className="select-wrapper small">
+                      <select
+                        className="dropdown"
+                        name="rateWeight"
+                        value={formData.rateWeight}
+                        onChange={handleInputChange}
+                      >
+                        <option value="kg">kg</option>
+                        <option value="m³">m³</option>
+                        <option value="Container">Container</option>
+                      </select>
+                    </div>
+                    {(formData.rateWeight === "kg" || formData.rateWeight === "m³") && (
+                      <div className="weight-input-group" ref={fieldRefs.weight} style={{ marginLeft: '8px' }}>
+                        <label>{formData.rateWeight}</label>
+                        <div className="input-wrapper">
+                          <input
+                            type="text"
+                            className={`form-input ${fieldErrors.weight ? "error-field" : ""}`}
+                            placeholder={`Enter weight in ${formData.rateWeight}`}
+                            name="weight"
+                            value={formData.weight}
+                            onChange={(e) => {
+                              const value = e.target.value
+                              if (value === "" || /^[0-9]*\.?[0-9]*$/.test(value)) {
+                                handleInputChange(e)
+                              }
+                            }}
+                          />
+                          <ErrorTooltip message={fieldErrors.weight} />
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </div>
+
               <div className="booking-vertical-group" style={{ marginTop: '8px', display: 'flex', flexDirection: 'column', gap: '8px', maxWidth: '220px' }}>
                   <div className="form-field">
                     <label>Booking Reference</label>
@@ -991,9 +1031,101 @@ const ControllerInstructions = () => {
                       <input type="text" className="form-input" value={`${formData.vat || 15}%`} readOnly />
                     </div>
                   </div>
+
+                  {/* Compact Rates per dropdown inserted below VAT */}
+                  <div className="form-field" style={{ maxWidth: '160px' }}>
+                    <label>Rates per</label>
+                    <div className="select-wrapper small">
+                      <select
+                        className="dropdown"
+                        name="rateWeight"
+                        value={formData.rateWeight}
+                        onChange={handleInputChange}
+                      >
+                        <option value="kg">kg</option>
+                        <option value="m³">m³</option>
+                        <option value="Container">Container</option>
+                      </select>
+                    </div>
+                    {/* conditional weight textbox */}
+                    {(formData.rateWeight === "kg" || formData.rateWeight === "m³") && (
+                      <div className="input-wrapper" style={{ marginTop: '6px' }} ref={fieldRefs.weight}>
+                        <input
+                          type="text"
+                          className={`form-input ${fieldErrors.weight ? "error-field" : ""}`}
+                          placeholder={`Enter weight in ${formData.rateWeight}`}
+                          name="weight"
+                          value={formData.weight}
+                          onChange={(e) => {
+                            const value = e.target.value
+                            if (value === "" || /^[0-9]*\.?[0-9]*$/.test(value)) {
+                              handleInputChange(e)
+                            }
+                          }}
+                        />
+                        <ErrorTooltip message={fieldErrors.weight} />
+                      </div>
+                    )}
+                  </div>
                 </div>
 
-                {/* Rate Type and VAT Rate moved to bottom of form */}
+                {/* Rates per selection */}
+              <div className="form-field rates-container" style={{ display: 'none' }}>
+                <label>Rates per</label>
+                <div className="rates-input-group">
+                  <div className="select-wrapper small">
+                    <select
+                      className="dropdown"
+                      name="rateWeight"
+                      value={formData.rateWeight}
+                      onChange={handleInputChange}
+                    >
+                      <option value="kg">kg</option>
+                      <option value="m³">m³</option>
+                      <option value="Container">Container</option>
+                    </select>
+                  </div>
+                  <div className="input-wrapper" ref={fieldRefs.rate} style={{ display: 'none' }}>
+                    <input
+                      type="text"
+                      className={`form-input ${fieldErrors.rate ? "error-field" : ""}`}
+                      placeholder="Rate"
+                      name="rate"
+                      value={formData.rate}
+                      onChange={(e) => {
+                        const value = e.target.value
+                        if (value === "" || /^[0-9]*\.?[0-9]*$/.test(value)) {
+                          handleInputChange(e)
+                        }
+                      }}
+                    />
+                    <ErrorTooltip message={fieldErrors.rate} />
+                  </div>
+                </div>
+                {(formData.rateWeight === "kg" || formData.rateWeight === "m³") && (
+                  <div className="weight-input-group" ref={fieldRefs.weight} style={{ marginTop: '8px' }}>
+                    <label>{formData.rateWeight}</label>
+                    <div className="input-wrapper">
+                      <input
+                        type="text"
+                        className={`form-input ${fieldErrors.weight ? "error-field" : ""}`}
+                        placeholder={`Enter weight in ${formData.rateWeight}`}
+                        name="weight"
+                        value={formData.weight}
+                        onChange={(e) => {
+                          const value = e.target.value
+                          if (value === "" || /^[0-9]*\.?[0-9]*$/.test(value)) {
+                            handleInputChange(e)
+                          }
+                        }}
+                      />
+                      <ErrorTooltip message={fieldErrors.weight} />
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* Rate Type and VAT Rate moved to bottom of form */}
 
               {/* Hazardous / Surcharge checkboxes moved below Rate Type */}
               <div className="date-time-group">

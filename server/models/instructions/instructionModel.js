@@ -52,6 +52,20 @@ export const saveInstruction = async ({ controllerData, containerData }) => {
         $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25, $26, $27
       ) RETURNING m1key
     `
+        // Calculate total_cost: Σ(rate × qty) for each container type
+    const sixRate = Number(controllerData.sixMeterRate || controllerData.six_meter_rate || controllerData.rate || 0)
+    const twelveRate = Number(controllerData.twelveMeterRate || controllerData.twelve_meter_rate || controllerData.rate || 0)
+    const abnormalRate = Number(controllerData.abnormalRate || controllerData.abnormal_rate || controllerData.rate || 0)
+
+    const numSix = Number(controllerData.num_six_meters || 0)
+    const numTwelve = Number(controllerData.num_twelve_meters || 0)
+    const numAbnormal = Number(controllerData.num_abnormal || 0)
+
+    const calculatedTotalCost = sixRate * numSix + twelveRate * numTwelve + abnormalRate * numAbnormal
+
+    // Overwrite/ensure total_cost field
+    controllerData.total_cost = calculatedTotalCost
+
     const controllerValues = [
       controllerData.clientId,
       controllerData.task,
