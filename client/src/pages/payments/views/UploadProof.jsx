@@ -243,164 +243,166 @@ const UploadProof = () => {
   };
 
   return (
-    <div className="upload-container">
-      <div className="header-actions">
-        <button onClick={handleBack} className="back-button">
-          Back
-        </button>
-      </div>
+    <div className="client-payment-dashboard-wrapper">
+      <div className="upload-container">
+        <div className="header-actions">
+          <button onClick={handleBack} className="back-button">
+            Back
+          </button>
+        </div>
 
-      <div className="upload-content">
-        <div className="upload-form">
-          <h2>
-            {isViewMode
-              ? `View Payment for ${decodeURIComponent(clientName)}`
-              : `Upload Payment Proof for ${decodeURIComponent(clientName)}`}
-          </h2>
+        <div className="upload-content">
+          <div className="upload-form">
+            <h2>
+              {isViewMode
+                ? `View Payment for ${decodeURIComponent(clientName)}`
+                : `Upload Payment Proof for ${decodeURIComponent(clientName)}`}
+            </h2>
 
-          {error && <div className="error-message">{error}</div>}
+            {error && <div className="error-message">{error}</div>}
 
-          {isLoading && <div>Loading...</div>}
+            {isLoading && <div>Loading...</div>}
 
-          {!isLoading && (
-            <>
-              {/* Invoice Selection - Full Width */}
-              <div className="form-row full-width">
-                <div className="amount-field">
-                  <label>Select Invoice *</label>
-                  <select
-                    value={invoiceId}
-                    onChange={(e) => setInvoiceId(e.target.value)}
-                    disabled={isViewMode}
-                    required
-                  >
-                    <option value="">Select an invoice</option>
-                    {invoices.map((invoice) => (
-                      <option key={invoice.ikey} value={invoice.ikey}>
-                        {invoice.invoice_num} (
-                        {new Date(invoice.date).toLocaleDateString()})
-                      </option>
-                    ))}
-                  </select>
-                  {isViewMode && invoiceId && (
-                    <div className="selected-info">
-                      Selected: {getSelectedInvoiceDetails()}
-                    </div>
-                  )}
-                </div>
-              </div>
-
-              {/* Amount and Date - Side by Side */}
-              <div className="form-row two-columns">
-                <div className="amount-field">
-                  <label>Amount Paid *</label>
-                  <input
-                    type="number"
-                    step="0.01"
-                    value={amount}
-                    onChange={(e) => setAmount(e.target.value)}
-                    placeholder="0.00"
-                    readOnly={isViewMode}
-                    disabled={isViewMode}
-                    required
-                  />
-                </div>
-                <div className="amount-field">
-                  <label>Payment Date *</label>
-                  <input
-                    type="date"
-                    value={paymentDate}
-                    onChange={(e) => setPaymentDate(e.target.value)}
-                    readOnly={isViewMode}
-                    disabled={isViewMode}
-                    required
-                  />
-                </div>
-              </div>
-
-              {/* File Upload Section - Conditional Layout */}
-              {isViewMode ? (
-                // View Mode - Centered button, no requirements
+            {!isLoading && (
+              <>
+                {/* Invoice Selection - Full Width */}
                 <div className="form-row full-width">
                   <div className="amount-field">
-                    <label>Proof of Payment *</label>
-                    <div className="view-proof-section">
-                      {fileUrl ? (
-                        <button
-                          className="view-button centered"
-                          onClick={handleViewProof}
-                        >
-                          View Proof
-                        </button>
-                      ) : (
-                        <div className="no-file">
-                          No proof of payment file uploaded
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                </div>
-              ) : (
-                // Upload Mode - Side by side with requirements
-                <div className="form-row two-columns upload-row">
-                  <div className="amount-field upload-column">
-                    <label>Proof of Payment * (JPG, PNG, PDF only)</label>
-                    <div className="file-upload-section compact">
-                      <div className="upload-icon">📁</div>
-                      <div className="upload-text">Upload Proof</div>
-                      <div className="file-input-wrapper">
-                        <input
-                          type="file"
-                          accept=".jpg,.jpeg,.png,.pdf"
-                          onChange={handleFileChange}
-                          required
-                        />
-                        <button type="button" className="browse-button">
-                          Choose File
-                        </button>
+                    <label>Select Invoice *</label>
+                    <select
+                      value={invoiceId}
+                      onChange={(e) => setInvoiceId(e.target.value)}
+                      disabled={isViewMode}
+                      required
+                    >
+                      <option value="">Select an invoice</option>
+                      {invoices.map((invoice) => (
+                        <option key={invoice.ikey} value={invoice.ikey}>
+                          {invoice.invoice_num} (
+                          {new Date(invoice.date).toLocaleDateString()})
+                        </option>
+                      ))}
+                    </select>
+                    {isViewMode && invoiceId && (
+                      <div className="selected-info">
+                        Selected: {getSelectedInvoiceDetails()}
                       </div>
-                      {file && (
-                        <div className="selected-file">✓ {file.name}</div>
-                      )}
-                    </div>
-                  </div>
-
-                  <div className="requirements-column">
-                    <div className="upload-specs compact">
-                      <h4>📋 Requirements</h4>
-                      <ul>
-                        <li>Select invoice for payment</li>
-                        <li>Enter exact amount paid</li>
-                        <li>Choose payment date</li>
-                        <li>Upload proof (receipt, transfer, etc.)</li>
-                        <li>Formats: JPG, PNG, PDF</li>
-                        <li>Max size: 10MB</li>
-                      </ul>
-                    </div>
+                    )}
                   </div>
                 </div>
-              )}
 
-              {/* Submit Button - Full Width (Upload Mode Only) */}
-              {!isViewMode && (
-                <div className="form-row full-width">
-                  <button
-                    className="submit-button"
-                    onClick={handleSubmit}
-                    disabled={
-                      !amount ||
-                      !paymentDate ||
-                      !invoiceId ||
-                      !file ||
-                      isSubmitting
-                    }
-                  >
-                    {isSubmitting ? "Uploading..." : "Upload Payment Proof"}
-                  </button>
+                {/* Amount and Date - Side by Side */}
+                <div className="form-row two-columns">
+                  <div className="amount-field">
+                    <label>Amount Paid *</label>
+                    <input
+                      type="number"
+                      step="0.01"
+                      value={amount}
+                      onChange={(e) => setAmount(e.target.value)}
+                      placeholder="0.00"
+                      readOnly={isViewMode}
+                      disabled={isViewMode}
+                      required
+                    />
+                  </div>
+                  <div className="amount-field">
+                    <label>Payment Date *</label>
+                    <input
+                      type="date"
+                      value={paymentDate}
+                      onChange={(e) => setPaymentDate(e.target.value)}
+                      readOnly={isViewMode}
+                      disabled={isViewMode}
+                      required
+                    />
+                  </div>
                 </div>
-              )}
-            </>
-          )}
+
+                {/* File Upload Section - Conditional Layout */}
+                {isViewMode ? (
+                  // View Mode - Centered button, no requirements
+                  <div className="form-row full-width">
+                    <div className="amount-field">
+                      <label>Proof of Payment *</label>
+                      <div className="view-proof-section">
+                        {fileUrl ? (
+                          <button
+                            className="view-button centered"
+                            onClick={handleViewProof}
+                          >
+                            View Proof
+                          </button>
+                        ) : (
+                          <div className="no-file">
+                            No proof of payment file uploaded
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                ) : (
+                  // Upload Mode - Side by side with requirements
+                  <div className="form-row two-columns upload-row">
+                    <div className="amount-field upload-column">
+                      <label>Proof of Payment * (JPG, PNG, PDF only)</label>
+                      <div className="file-upload-section compact">
+                        <div className="upload-icon">📁</div>
+                        <div className="upload-text">Upload Proof</div>
+                        <div className="file-input-wrapper">
+                          <input
+                            type="file"
+                            accept=".jpg,.jpeg,.png,.pdf"
+                            onChange={handleFileChange}
+                            required
+                          />
+                          <button type="button" className="browse-button">
+                            Choose File
+                          </button>
+                        </div>
+                        {file && (
+                          <div className="selected-file">✓ {file.name}</div>
+                        )}
+                      </div>
+                    </div>
+
+                    <div className="requirements-column">
+                      <div className="upload-specs compact">
+                        <h4>📋 Requirements</h4>
+                        <ul>
+                          <li>Select invoice for payment</li>
+                          <li>Enter exact amount paid</li>
+                          <li>Choose payment date</li>
+                          <li>Upload proof (receipt, transfer, etc.)</li>
+                          <li>Formats: JPG, PNG, PDF</li>
+                          <li>Max size: 10MB</li>
+                        </ul>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* Submit Button - Full Width (Upload Mode Only) */}
+                {!isViewMode && (
+                  <div className="form-row full-width">
+                    <button
+                      className="submit-button"
+                      onClick={handleSubmit}
+                      disabled={
+                        !amount ||
+                        !paymentDate ||
+                        !invoiceId ||
+                        !file ||
+                        isSubmitting
+                      }
+                    >
+                      {isSubmitting ? "Uploading..." : "Upload Payment Proof"}
+                    </button>
+                  </div>
+                )}
+              </>
+            )}
+          </div>
         </div>
       </div>
     </div>
