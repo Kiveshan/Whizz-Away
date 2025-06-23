@@ -17,65 +17,62 @@ const POTable = ({ showFilterButtons = true }) => {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
   const [expenseTypes, setExpenseTypes] = useState([])
-  useEffect(() => {
-    const fetchPurchaseOrders = async () => {
-      try {
-        setLoading(true)
-        const endpoint = showFilterButtons
-  ? "http://localhost:5000/api/purchase-orders"
-  : "http://localhost:5000/api/supplier-summary";
-
-const response = await axios.get(endpoint, {
-  params: !showFilterButtons
-    ? {
-        year: selectedYear,
-        month: selectedMonth,
-      }
-    : {},
-})
-        console.log("Response received:", response.data)
-          const formattedData = showFilterButtons
-            ? response.data.map((po) => ({
-                type: po.expense_type,
-                suppliedBy: po.supplier_name,
-                date: formatDate(po.date),
-                amount: formatAmount(po.total),
-                details: po.po_id.toString(),
-                id: po.po_id,
-              
-              }))
-            : response.data.map((row) => ({
-                supplier: row.supplier,
-                supplierId: row.supplier_id, 
-                monthYear: `${row.month_name.trim()} ${row.year}`,
-                total: formatAmount(row.total_amount),
-                rawMonth: row.month_name.trim(),
-                rawYear: row.year.toString(),
-                 poNumber: row.ponum
-            }))
-
-
-        setExpenses(formattedData)
-        const uniqueTypes = [...new Set(response.data.map((po) => po.expense_type))]
-        setExpenseTypes(uniqueTypes)
-
-        setError(null)
-      } catch (err) {
-        console.error("Error fetching purchase orders:", err)
-        console.error("Error details:", {
-          message: err.message,
-          status: err.response?.status,
-          statusText: err.response?.statusText,
-          data: err.response?.data,
-        })
-        setError(`Failed to load purchase orders. Status: ${err.response?.status || "Unknown"}`)
-      } finally {
-        setLoading(false)
-      }
+ useEffect(() => {
+  const fetchPurchaseOrders = async () => {
+    try {
+      setLoading(true);
+      const endpoint = showFilterButtons
+        ? "http://localhost:5000/api/purchase-orders"
+        : "http://localhost:5000/api/supplier-summary";
+ 
+      const response = await axios.get(endpoint, {
+        params: !showFilterButtons
+          ? {
+              year: selectedYear,
+              month: selectedMonth,
+            }
+          : {},
+      });
+      console.log("Response received:", response.data);
+      const formattedData = showFilterButtons
+        ? response.data.map((po) => ({
+            type: po.expense_type,
+            suppliedBy: po.supplier_name,
+            date: formatDate(po.date),
+            amount: formatAmount(po.total),
+            details: po.po_id.toString(),
+            id: po.po_id,
+          }))
+        : response.data.map((row) => ({
+            supplier: row.supplier,
+            supplierId: row.supplier_id,
+            monthYear: `${row.month_name.trim()} ${row.year}`,
+            total: formatAmount(row.total_amount),
+            rawMonth: row.month_name.trim(),
+            rawYear: row.year.toString(),
+            poNumber: row.ponum,
+          }));
+ 
+      setExpenses(formattedData);
+      const uniqueTypes = [...new Set(response.data.map((po) => po.expense_type))];
+      setExpenseTypes(uniqueTypes);
+      setError(null);
+    } catch (err) {
+      console.error("Error fetching purchase orders:", err);
+      console.error("Error details:", {
+        message: err.message,
+        status: err.response?.status,
+        statusText: err.response?.statusText,
+        data: err.response?.data,
+      });
+      setError(`Failed to load purchase orders. Status: ${err.response?.status || "Unknown"}`);
+    } finally {
+      setLoading(false);
     }
-
-    fetchPurchaseOrders()
-  }, [])
+  };
+ 
+  fetchPurchaseOrders();
+}, [selectedYear, selectedMonth, showFilterButtons]);
   const formatDate = (dateString) => {
     if (!dateString) return "N/A"
     const date = new Date(dateString)
