@@ -38,7 +38,7 @@
   border-radius: 4px;
   cursor: pointer;
   font-family: inherit;
-  margin-top: 135px;
+  top: 38px;
 }
 
 .client-payment-dashboard-wrapper .back-button:hover {
