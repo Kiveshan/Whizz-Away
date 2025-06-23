@@ -33,6 +33,26 @@ const checkBucket = async (bucketName) => {
 
 checkBucket(bucketName);
 
+const uploadPaymentProof = multer({
+  storage: storage,
+  limits: {
+    fileSize: 10 * 1024 * 1024, // 10MB file size limit
+  },
+  fileFilter: (req, file, cb) => {
+    const filetypes = /jpeg|jpg|png|pdf/;
+    const extname = filetypes.test(
+      path.extname(file.originalname).toLowerCase()
+    );
+    const mimetype = filetypes.test(file.mimetype);
+
+    if (mimetype && extname) {
+      return cb(null, true);
+    } else {
+      cb(new Error("Only image and PDF files are allowed!"));
+    }
+  },
+});
+
 const uploadInstruction = multer({
   storage: storage,
   limits: {
@@ -73,7 +93,7 @@ const uploadFuelExpense = multer({
   },
 });
 
-const getSignedUrl = (key, expiresInSeconds) => {
+const getSignedUrl = (key, expiresInSeconds = 3600) => {
   return s3.getSignedUrl("getObject", {
     Bucket: bucketName,
     Key: key,
@@ -81,4 +101,11 @@ const getSignedUrl = (key, expiresInSeconds) => {
   });
 };
 
-export { s3, uploadInstruction, uploadFuelExpense, getSignedUrl };
+export {
+  s3,
+  uploadInstruction,
+  uploadFuelExpense,
+  uploadPaymentProof,
+  getSignedUrl,
+  bucketName,
+};

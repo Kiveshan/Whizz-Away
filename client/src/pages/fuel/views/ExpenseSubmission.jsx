@@ -61,20 +61,20 @@ const ExpenseSubmission = ({ onBack }) => {
   }, []);
 
   const handleInputChange = (e) => {
-    const { name, value } = e.target;
+    const { name, value } = e.target
     setFormData({
       ...formData,
-      [name]: name === "orderno" ? value.replace(/[^0-9]/g, "") : value,
-    });
-
+      [name]: value,
+    })
+ 
     if (name === "documentFrom" && value !== "Driver") {
       setFormData((prev) => ({
         ...prev,
         driverName: "",
         driverFullName: "",
-      }));
+      }))
     }
-  };
+  }
 
   const handleDriverChange = (selectedOption) => {
     setFormData({
