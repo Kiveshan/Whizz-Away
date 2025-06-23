@@ -6,6 +6,8 @@ import {
   getAllExpenses,
   getTurnoverPerTruck,
   getWagesPerMonth,
+  getSubcontractorTurnoverPerMonth,
+  getSubcontractorVsTurnover,
 } from "../../models/analytics/analyticsModel.js";
 import { pool } from "../../config/database.js";
 
@@ -173,6 +175,46 @@ const getWagesPerMonthHandler = async (req, res) => {
   }
 };
 
+const getSubcontractorTurnoverPerMonthHandler = async (req, res) => {
+  let client;
+  try {
+    const { month, year } = req.query;
+    console.log(`Fetching subcontractor turnover for month: ${month}, year: ${year}`);
+    client = await pool.connect();
+    const result = await getSubcontractorTurnoverPerMonth(client, month, year);
+    res.json({ success: true, data: result });
+  } catch (error) {
+    console.error("Error fetching subcontractor turnover per month:", error);
+    res.status(500).json({
+      success: false,
+      message: `Error fetching subcontractor turnover per month: ${error.message}`,
+      error: error.message,
+    });
+  } finally {
+    if (client) client.release();
+  }
+};
+
+const getSubcontractorVsTurnoverHandler = async (req, res) => {
+  let client;
+  try {
+    const { month, year } = req.query;
+    console.log(`Fetching subcontractor vs turnover for month: ${month}, year: ${year}`);
+    client = await pool.connect();
+    const result = await getSubcontractorVsTurnover(client, month, year);
+    res.json({ success: true, data: result });
+  } catch (error) {
+    console.error("Error fetching subcontractor vs turnover:", error);
+    res.status(500).json({
+      success: false,
+      message: `Error fetching subcontractor vs turnover: ${error.message}`,
+      error: error.message,
+    });
+  } finally {
+    if (client) client.release();
+  }
+};
+
 export {
   getFuelExpensesHandler,
   getTurnoverPerMonthHandler,
@@ -181,4 +223,6 @@ export {
   getAllExpensesHandler,
   getTurnoverPerTruckHandler,
   getWagesPerMonthHandler,
+  getSubcontractorTurnoverPerMonthHandler,
+  getSubcontractorVsTurnoverHandler,
 };
