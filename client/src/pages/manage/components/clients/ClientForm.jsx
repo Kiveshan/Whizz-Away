@@ -13,9 +13,19 @@ const ClientForm = ({ client, loading, isEditing, onSave, onCancel, onChange }) 
       return
     }
 
+    // Debug log to see what data we're sending
+    console.log("Client form data before save:", client)
+
     const success = await onSave(client, emailRef)
     if (!success) {
       return
+    }
+  }
+
+  const handleNumberChange = (field, value) => {
+    // Allow empty string or valid numbers
+    if (value === "" || (!isNaN(value) && Number.parseFloat(value) >= 0)) {
+      onChange(field, value)
     }
   }
 
@@ -152,6 +162,82 @@ const ClientForm = ({ client, loading, isEditing, onSave, onCancel, onChange }) 
             value={client.vatregno || ""}
             onChange={(e) => onChange("vatregno", e.target.value)}
             required
+          />
+        </div>
+
+        <div className="manage-form-group">
+          <label>
+            <strong>Payment Type</strong>
+          </label>
+          <select value={client.payment_type || ""} onChange={(e) => onChange("payment_type", e.target.value)} required>
+            <option value="">Select Payment Type</option>
+            <option value="Cash">Cash</option>
+            <option value="Credit">Credit</option>
+            <option value="Bank Transfer">Bank Transfer</option>
+            <option value="Cheque">Cheque</option>
+          </select>
+        </div>
+
+        {/* New Route and Rate Fields */}
+        <div style={{ gridColumn: "1 / span 3", marginTop: "20px" }}>
+          <h3 style={{ textAlign: "center", marginBottom: "20px", color: "#333" }}>Route Information & Rates</h3>
+        </div>
+
+        <div className="manage-form-group">
+          <label>
+            <strong>Starting Point</strong>
+          </label>
+          <input
+            type="text"
+            value={client.starting_point || ""}
+            onChange={(e) => onChange("starting_point", e.target.value)}
+            placeholder="e.g., Johannesburg"
+          />
+        </div>
+
+        <div className="manage-form-group">
+          <label>
+            <strong>Destination</strong>
+          </label>
+          <input
+            type="text"
+            value={client.destination || ""}
+            onChange={(e) => onChange("destination", e.target.value)}
+            placeholder="e.g., Cape Town"
+          />
+        </div>
+
+        <div className="manage-form-group">
+          <label>
+            <strong>6m Rate (R)</strong>
+          </label>
+          <input
+            type="number"
+            min="0"
+            step="0.01"
+            value={client.driver_six_meter_rate || ""}
+            onChange={(e) => {
+              console.log("driver_six_meter_rate changed to:", e.target.value) // Debug log
+              handleNumberChange("driver_six_meter_rate", e.target.value)
+            }}
+            placeholder="0.00"
+          />
+        </div>
+
+        <div className="manage-form-group">
+          <label>
+            <strong>12m Rate (R)</strong>
+          </label>
+          <input
+            type="number"
+            min="0"
+            step="0.01"
+            value={client.driver_twelve_meter_rate || ""}
+            onChange={(e) => {
+              console.log("driver_twelve_meter_rate changed to:", e.target.value) // Debug log
+              handleNumberChange("driver_twelve_meter_rate", e.target.value)
+            }}
+            placeholder="0.00"
           />
         </div>
       </div>

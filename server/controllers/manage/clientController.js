@@ -63,6 +63,11 @@ const createClientHandler = async (req, res) => {
       vatregno,
       city,
       streetaddress,
+      payment_type,
+      starting_point,
+      destination,
+      driver_six_meter_rate,
+      driver_twelve_meter_rate,
     } = req.body;
 
     console.log("Creating client with data:", req.body);
@@ -78,6 +83,11 @@ const createClientHandler = async (req, res) => {
       vatregno,
       city,
       streetaddress,
+      payment_type,
+      starting_point,
+      destination,
+      driver_six_meter_rate,
+      driver_twelve_meter_rate,
     });
     res.status(201).json(newClient);
   } catch (err) {
@@ -101,9 +111,14 @@ const updateClientHandler = async (req, res) => {
       vatregno,
       city,
       streetaddress,
+      payment_type,
+      starting_point,
+      destination,
+      driver_six_meter_rate,
+      driver_twelve_meter_rate,
     } = req.body;
 
-    console.log(`Updating client ID ${id}`);
+    console.log(`Updating client ID ${id} with data:`, req.body);
     const result = await updateClient(id, {
       client,
       representative,
@@ -116,6 +131,11 @@ const updateClientHandler = async (req, res) => {
       vatregno,
       city,
       streetaddress,
+      payment_type,
+      starting_point,
+      destination,
+      driver_six_meter_rate,
+      driver_twelve_meter_rate,
     });
     if (!result.success) {
       return res.status(404).json({ error: result.message });

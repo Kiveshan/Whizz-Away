@@ -68,6 +68,10 @@ const initialState = {
     city: "",
     streetaddress: "",
     payment_type: "",
+    starting_point: "",
+    destination: "",
+    driver_six_meter_rate: "",
+    driver_twelve_meter_rate: "",
   },
 
   newTruck: {

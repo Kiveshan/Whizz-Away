@@ -125,10 +125,38 @@ export function useApi(state, actions) {
           }
         }
 
+        // Prepare client data with proper field mapping and type conversion
+        const preparedClientData = {
+          client: clientData.client || "",
+          representative: clientData.representative || "",
+          companyaddress: clientData.companyaddress || "",
+          suburb: clientData.suburb || "",
+          postalcode: clientData.postalcode || "",
+          email: clientData.email || "",
+          client_reg_num: clientData.client_reg_num || "",
+          cellnum: clientData.cellnum || "",
+          vatregno: clientData.vatregno || "",
+          city: clientData.city || "",
+          streetaddress: clientData.streetaddress || "",
+          payment_type: clientData.payment_type || "",
+          starting_point: clientData.starting_point || null,
+          destination: clientData.destination || null,
+          driver_six_meter_rate:
+            clientData.driver_six_meter_rate === "" || clientData.driver_six_meter_rate === undefined
+              ? null
+              : Number.parseFloat(clientData.driver_six_meter_rate),
+          driver_twelve_meter_rate:
+            clientData.driver_twelve_meter_rate === "" || clientData.driver_twelve_meter_rate === undefined
+              ? null
+              : Number.parseFloat(clientData.driver_twelve_meter_rate),
+        }
+
+        console.log("Prepared client data:", preparedClientData) // Debug log
+
         if (state.isEditing) {
-          await api.put(`/api/m5Clients/${state.editingClientId}`, clientData)
+          await api.put(`/api/m5Clients/${state.editingClientId}`, preparedClientData)
         } else {
-          await api.post("/api/m5Clients", clientData)
+          await api.post("/api/m5Clients", preparedClientData)
         }
 
         const clientsResponse = await api.get("/api/m5Clients")
@@ -141,6 +169,7 @@ export function useApi(state, actions) {
         return true
       } catch (err) {
         console.error("Error saving client:", err)
+        console.error("Client data being sent:", clientData) // Debug log
         actions.showAlert(`Error saving client: ${err.response?.data?.error || err.message}`)
         return false
       } finally {
@@ -460,6 +489,13 @@ export function useApi(state, actions) {
             deduction_savings: latestDeduction.deduction_savings || "",
             deduction_loan: latestDeduction.deduction_loan || "",
             deduction_damage: latestDeduction.deduction_damage || "",
+          })
+        } else if (type === "client") {
+          // Handle client data with proper field mapping
+          actions.updateFormData(formType, {
+            ...data,
+            driver_six_meter_rate: data.driver_six_meter_rate || "",
+            driver_twelve_meter_rate: data.driver_twelve_meter_rate || "",
           })
         } else if (type === "truck") {
           const existingDocuments = []

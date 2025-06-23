@@ -69,6 +69,11 @@ const createClient = async (clientData) => {
       vatregno,
       city,
       streetaddress,
+      payment_type,
+      starting_point,
+      destination,
+      driver_six_meter_rate,
+      driver_twelve_meter_rate,
     } = clientData;
 
     // Basic input validation
@@ -81,9 +86,11 @@ const createClient = async (clientData) => {
     const result = await client.query(
       `INSERT INTO m5_client (
          client, representative, companyaddress, suburb, postalcode,
-         email, client_reg_num, cellnum, vatregno, city, streetaddress, status
-       ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
-       RETURNING m5clientkey, client, representative, email, status`,
+         email, client_reg_num, cellnum, vatregno, city, streetaddress, 
+         payment_type, starting_point, destination, driver_six_meter_rate, 
+         driver_twelve_meter_rate, status
+       ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17)
+       RETURNING *`,
       [
         clientName,
         representative,
@@ -96,7 +103,12 @@ const createClient = async (clientData) => {
         vatregno,
         city,
         streetaddress,
-        true,
+        payment_type,
+        starting_point,
+        destination,
+        driver_six_meter_rate,
+        driver_twelve_meter_rate,
+        true, // status
       ]
     );
     return result.rows[0];
@@ -124,6 +136,11 @@ const updateClient = async (id, clientData) => {
       vatregno,
       city,
       streetaddress,
+      payment_type,
+      starting_point,
+      destination,
+      driver_six_meter_rate,
+      driver_twelve_meter_rate,
     } = clientData;
 
     // Basic input validation
@@ -137,8 +154,10 @@ const updateClient = async (id, clientData) => {
       `UPDATE m5_client
        SET client = $1, representative = $2, companyaddress = $3, suburb = $4,
            postalcode = $5, email = $6, client_reg_num = $7, cellnum = $8,
-           vatregno = $9, city = $10, streetaddress = $11
-       WHERE m5clientkey = $12
+           vatregno = $9, city = $10, streetaddress = $11, payment_type = $12,
+           starting_point = $13, destination = $14, driver_six_meter_rate = $15,
+           driver_twelve_meter_rate = $16
+       WHERE m5clientkey = $17
        RETURNING *`,
       [
         clientName,
@@ -152,6 +171,11 @@ const updateClient = async (id, clientData) => {
         vatregno,
         city,
         streetaddress,
+        payment_type,
+        starting_point,
+        destination,
+        driver_six_meter_rate,
+        driver_twelve_meter_rate,
         id,
       ]
     );

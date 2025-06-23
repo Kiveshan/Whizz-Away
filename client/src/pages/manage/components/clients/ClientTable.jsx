@@ -18,6 +18,11 @@ const ClientTable = ({ clients, loading, error, onEdit, onToggleStatus, onAdd })
               <th>Client</th>
               <th>Representative</th>
               <th>Email</th>
+              <th>Starting Point</th>
+              <th>Destination</th>
+              <th>6m Rate</th>
+              <th>12m Rate</th>
+              <th>Status</th>
               <th>Edit</th>
               <th>Enable / Disable</th>
             </tr>
@@ -28,6 +33,19 @@ const ClientTable = ({ clients, loading, error, onEdit, onToggleStatus, onAdd })
                 <td>{client.client}</td>
                 <td>{client.representative}</td>
                 <td>{client.email}</td>
+                <td>{client.starting_point || "N/A"}</td>
+                <td>{client.destination || "N/A"}</td>
+                <td>
+                  {client.driver_six_meter_rate
+                    ? `R ${Number.parseFloat(client.driver_six_meter_rate).toFixed(2)}`
+                    : "N/A"}
+                </td>
+                <td>
+                  {client.driver_twelve_meter_rate
+                    ? `R ${Number.parseFloat(client.driver_twelve_meter_rate).toFixed(2)}`
+                    : "N/A"}
+                </td>
+                <td>{client.status ? "Active" : "Inactive"}</td>
                 <td>
                   <button className="manage-view-button" onClick={() => onEdit(client.m5clientkey)}>
                     Edit
