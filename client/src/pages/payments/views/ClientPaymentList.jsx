@@ -23,6 +23,19 @@ const ClientPaymentList = () => {
   const [currentPage, setCurrentPage] = useState(1);
   const recordsPerPage = 5;
 
+  // Helper function to handle token expiration
+  const handleTokenExpiration = (error) => {
+    const status = error.response?.status;
+    if (status === 401 || status === 403) {
+      // Handle unauthorized or forbidden
+      localStorage.removeItem("token");
+      localStorage.removeItem("user");
+      navigate("/");
+      return true;
+    }
+    return false;
+  };
+
   const monthNames = [
     "January",
     "February",
@@ -69,6 +82,9 @@ const ClientPaymentList = () => {
         }
       } catch (err) {
         console.error("Error fetching payments:", err);
+        if (handleTokenExpiration(err)) {
+          return;
+        }
         setError(err.message || "An error occurred while fetching payments");
       } finally {
         setLoading(false);
