@@ -23,7 +23,7 @@ const ClientTable = ({
   }
 
   return (
-    <div className="table-container">
+    <div>
       <div>
         <button className="manage-add-client-button" onClick={onAdd}>
           Add Client
@@ -109,7 +109,6 @@ const ClientTable = ({
               </tbody>
             </table>
           </div>
-
           <Pagination
             currentPage={pagination.currentPage}
             totalPages={pagination.totalPages}

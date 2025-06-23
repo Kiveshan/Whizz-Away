@@ -23,7 +23,7 @@ const TruckTable = ({
   }
 
   return (
-    <div className="table-container">
+    <div>
       <div>
         <button className="manage-add-truck-button" onClick={onAdd}>
           Add Truck

@@ -53,13 +53,38 @@ const Manage = () => {
   }, [state.showAlert, actions])
 
   const handleBack = () => {
-    // Hide all forms before navigating back
-    actions.hideForm("showEmployeeForm")
-    actions.hideForm("showClientForm")
-    actions.hideForm("showTruckForm")
-    actions.hideForm("showDriverRateForm")
-    actions.hideForm("showSubcontractorForm")
-    navigate("/Dashboard")
+    // Check if any form is currently showing
+    const isAnyFormShowing =
+      state.showEmployeeForm ||
+      state.showClientForm ||
+      state.showTruckForm ||
+      state.showDriverRateForm ||
+      state.showSubcontractorForm
+
+    if (isAnyFormShowing) {
+      // If a form is showing, hide it and return to the table
+      actions.hideForm("showEmployeeForm")
+      actions.hideForm("showClientForm")
+      actions.hideForm("showTruckForm")
+      actions.hideForm("showDriverRateForm")
+      actions.hideForm("showSubcontractorForm")
+
+      // Reset all form data and editing states
+      actions.resetFormData("Employee")
+      actions.resetFormData("Client")
+      actions.resetFormData("Truck")
+      actions.resetFormData("DriverRate")
+      actions.resetFormData("Subcontractor")
+
+      actions.setEditing("Employee", null)
+      actions.setEditing("Client", null)
+      actions.setEditing("Truck", null)
+      actions.setEditing("Rate", null)
+      actions.setEditing("Subcontractor", null)
+    } else {
+      // If no form is showing (we're in table view), navigate to dashboard
+      navigate("/Dashboard")
+    }
   }
 
   // Employee handlers

@@ -23,7 +23,7 @@ const DriverRatesTable = ({
   }
 
   return (
-    <div className="table-container">
+    <div>
       <div>
         <button className="manage-add-driver-rate-button" onClick={onAdd}>
           New Rate
