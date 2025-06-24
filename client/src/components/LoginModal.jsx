@@ -1,5 +1,4 @@
-"use client"
-
+"use client";
 
 function LoginModal({ onClose, onSubmit, onSwitchToRegister }) {
   return (
@@ -18,12 +17,22 @@ function LoginModal({ onClose, onSubmit, onSwitchToRegister }) {
         <div className="modal-body">
           <div className="form-group">
             <label htmlFor="email">Email</label>
-            <input type="email" id="email" placeholder="Enter Email" className="form-input" />
+            <input
+              type="email"
+              id="email"
+              placeholder="Enter Email"
+              className="form-input"
+            />
           </div>
 
           <div className="form-group">
             <label htmlFor="password">Password</label>
-            <input type="password" id="password" placeholder="Enter Password" className="form-input" />
+            <input
+              type="password"
+              id="password"
+              placeholder="Enter Password"
+              className="form-input"
+            />
           </div>
 
           <div className="forgot-password">
@@ -45,8 +54,8 @@ function LoginModal({ onClose, onSubmit, onSwitchToRegister }) {
               href="#"
               className="link"
               onClick={(e) => {
-                e.preventDefault()
-                onSwitchToRegister()
+                e.preventDefault();
+                onSwitchToRegister();
               }}
             >
               Register Here
@@ -55,8 +64,7 @@ function LoginModal({ onClose, onSubmit, onSwitchToRegister }) {
         </div>
       </div>
     </div>
-  )
+  );
 }
 
-export default LoginModal
-
+export default LoginModal;
