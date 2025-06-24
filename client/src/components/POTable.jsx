@@ -1,35 +1,35 @@
-"use client"
-import { useState, useEffect } from "react"
-import { useNavigate } from "react-router-dom"
-import "../pages/Creditors/purchaseOrder/css/filterButtonBlue.css"
-import axios from "axios"
-import Pagination from "../components/Pagination"
+"use client";
+import { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
+import "../pages/Creditors/purchaseOrder/css/filterButtonBlue.css";
+import api from "../api.js"; // Updated to use api.js
+import Pagination from "../components/Pagination";
 
 const POTable = ({ showFilterButtons = true }) => {
-  const currentDate = new Date()
-  const currentYear = currentDate.getFullYear().toString()
-  const currentMonth = currentDate.toLocaleString("default", { month: "long" })
+  const currentDate = new Date();
+  const currentYear = currentDate.getFullYear().toString();
+  const currentMonth = currentDate.toLocaleString("default", { month: "long" });
 
-  const [selectedYear, setSelectedYear] = useState(currentYear)
-  const [selectedMonth, setSelectedMonth] = useState(currentMonth)
-  const [activeFilter, setActiveFilter] = useState("All")
-  const [isDropdownOpen, setIsDropdownOpen] = useState(false)
-  const [expenses, setExpenses] = useState([])
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState(null)
-  const [expenseTypes, setExpenseTypes] = useState([])
-  const [currentPage, setCurrentPage] = useState(1); // Added for pagination
-  const recordsPerPage = 2
+  const [selectedYear, setSelectedYear] = useState(currentYear);
+  const [selectedMonth, setSelectedMonth] = useState(currentMonth);
+  const [activeFilter, setActiveFilter] = useState("All");
+  const [isDropdownOpen, setIsDropdownOpen] = useState(false);
+  const [expenses, setExpenses] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+  const [expenseTypes, setExpenseTypes] = useState([]);
+  const [currentPage, setCurrentPage] = useState(1);
+  const recordsPerPage = 2;
 
   useEffect(() => {
     const fetchPurchaseOrders = async () => {
       try {
         setLoading(true);
         const endpoint = showFilterButtons
-          ? "http://localhost:5000/api/purchase-orders"
-          : "http://localhost:5000/api/supplier-summary";
+          ? "/api/purchase-orders"
+          : "/api/supplier-summary";
 
-        const response = await axios.get(endpoint, {
+        const response = await api.get(endpoint, {
           params: !showFilterButtons
             ? {
                 year: selectedYear,
@@ -58,7 +58,9 @@ const POTable = ({ showFilterButtons = true }) => {
             }));
 
         setExpenses(formattedData);
-        const uniqueTypes = [...new Set(response.data.map((po) => po.expense_type))];
+        const uniqueTypes = [
+          ...new Set(response.data.map((po) => po.expense_type)),
+        ];
         setExpenseTypes(uniqueTypes);
         setError(null);
       } catch (err) {
@@ -69,7 +71,11 @@ const POTable = ({ showFilterButtons = true }) => {
           statusText: err.response?.statusText,
           data: err.response?.data,
         });
-        setError(`Failed to load purchase orders. Status: ${err.response?.status || "Unknown"}`);
+        setError(
+          `Failed to load purchase orders. Status: ${
+            err.response?.status || "Unknown"
+          }`
+        );
       } finally {
         setLoading(false);
       }
@@ -81,9 +87,10 @@ const POTable = ({ showFilterButtons = true }) => {
   const formatDate = (dateString) => {
     if (!dateString) return "N/A";
     const date = new Date(dateString);
-    return `${(date.getMonth() + 1)
+    return `${(date.getMonth() + 1).toString().padStart(2, "0")}/${date
+      .getDate()
       .toString()
-      .padStart(2, "0")}/${date.getDate().toString().padStart(2, "0")}/${date.getFullYear()}`;
+      .padStart(2, "0")}/${date.getFullYear()}`;
   };
 
   const formatAmount = (amount) => {
@@ -159,7 +166,7 @@ const POTable = ({ showFilterButtons = true }) => {
     }
 
     try {
-      const response = await axios.get(`http://localhost:5000/api/po-form/list`, {
+      const response = await api.get(`/api/po-form/list`, {
         params: { poId: expense.id },
       });
 
@@ -240,10 +247,12 @@ const POTable = ({ showFilterButtons = true }) => {
   const paginatedExpenses = filteredExpenses.slice(startIndex, endIndex);
 
   return (
-    <div>
-      <button className="back-button" onClick={handleBackClick}>
-        Back
-      </button>
+    <div className="client-payment-dashboard-wrapper">
+      <div className="header-actions">
+        <button className="back-button" onClick={handleBackClick}>
+          Back
+        </button>
+      </div>
       <div className="dropdown-container74">
         <select
           value={selectedYear}
@@ -301,7 +310,9 @@ const POTable = ({ showFilterButtons = true }) => {
                     <button
                       key={type}
                       className={
-                        activeFilter === type ? "dropdown-item active" : "dropdown-item"
+                        activeFilter === type
+                          ? "dropdown-item active"
+                          : "dropdown-item"
                       }
                       onClick={() => handleFilterClick(type)}
                     >
@@ -320,7 +331,7 @@ const POTable = ({ showFilterButtons = true }) => {
           {loading ? (
             <div className="loading">Loading purchase orders...</div>
           ) : error ? (
-            <div className="error">
+            <div className="error-message">
               {error}
               <br />
               <button onClick={handleRetry} style={{ marginTop: "10px" }}>
@@ -329,7 +340,7 @@ const POTable = ({ showFilterButtons = true }) => {
             </div>
           ) : (
             <>
-              <table className="payment-table1" >
+              <table className="payment-table1">
                 <thead>
                   <tr>
                     {showFilterButtons ? (
@@ -366,7 +377,7 @@ const POTable = ({ showFilterButtons = true }) => {
                             <td>{expense.date}</td>
                             <td>
                               <button
-                                className="view-btn"
+                                className="view-button"
                                 onClick={() => handleViewClick(expense)}
                               >
                                 View
@@ -380,7 +391,7 @@ const POTable = ({ showFilterButtons = true }) => {
                             <td>{expense.total}</td>
                             <td>
                               <button
-                                className="view-btn"
+                                className="view-button"
                                 onClick={() => handleViewClick(expense)}
                               >
                                 View
