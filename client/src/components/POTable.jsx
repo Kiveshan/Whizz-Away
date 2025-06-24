@@ -2,7 +2,7 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import "../pages/Creditors/purchaseOrder/css/filterButtonBlue.css";
-import axios from "axios";
+import api from "../api.js";
 import Pagination from "../components/Pagination";
 
 const POTable = ({ showFilterButtons = true }) => {
