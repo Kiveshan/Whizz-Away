@@ -423,6 +423,7 @@ function UpdateInstruction() {
     });
     setShowRemoveLegModal(true);
   };
+
   useEffect(() => {
     const fetchData = async () => {
       try {
@@ -1715,6 +1716,7 @@ function UpdateInstruction() {
   };
 
   // Replace the handleFinalizeClick function with this updated version
+  // Lines 1423-1447: Update handleFinaliseClick function
   const handleFinaliseClick = async () => {
     if (legs.length === 0) {
       // No legs, just proceed
@@ -1741,14 +1743,8 @@ function UpdateInstruction() {
 
     try {
       // Fetch the instruction details to get the pickup and dropoff locations
-      const response = await fetch(
-        `http://localhost:5000/instructions/${instructionId}/details`
-      );
-      if (!response.ok) {
-        throw new Error("Failed to fetch instruction details");
-      }
-
-      const instructionDetails = await response.json();
+      const response = await api.get(`/instructions/${instructionId}/details`);
+      const instructionDetails = response.data;
       const pickup = instructionDetails.pickup;
       const dropoff = instructionDetails.dropoff;
 
@@ -1862,13 +1858,10 @@ function UpdateInstruction() {
   const fetchShipmentType = async () => {
     if (instructionId) {
       try {
-        const response = await fetch(
-          `http://localhost:5000/instructions/${instructionId}/shipment-type`
+        const response = await api.get(
+          `/instructions/${instructionId}/shipment-type`
         );
-        if (!response.ok) {
-          throw new Error("Failed to fetch shipment type");
-        }
-        const data = await response.json();
+        const data = response.data;
         setShipmentType(data.shipment_type);
         console.log("Shipment type:", data.shipment_type);
       } catch (error) {
@@ -1969,40 +1962,40 @@ function UpdateInstruction() {
       setTimeout(() => setSavedMessage(""), 5000);
       return;
     }
+
     if (instructionId) {
       try {
-        const instructionResponse = await fetch(
-          `http://localhost:5000/instructions/${instructionId}`
+        const instructionResponse = await api.get(
+          `/instructions/${instructionId}`
         );
-        if (instructionResponse.ok) {
-          const instructionData = await instructionResponse.json();
+        if (instructionResponse.status === 200) {
+          const instructionData = instructionResponse.data;
 
           if (instructionData.status === "New") {
             // Update the status to "In Progress"
-            const updateStatusResponse = await fetch(
-              `http://localhost:5000/instructions/${instructionId}/status`,
-              {
-                method: "PUT",
-                headers: {
-                  "Content-Type": "application/json",
-                },
-                body: JSON.stringify({ status: "In Progress" }),
-              }
-            );
-
-            if (updateStatusResponse.ok) {
-              console.log(
-                `Updated instruction ${instructionId} status from New to In Progress`
+            try {
+              const updateStatusResponse = await api.put(
+                `/instructions/${instructionId}/status`,
+                { status: "In Progress" }
               );
-              setInstructionStatus("In Progress");
+
+              if (updateStatusResponse.status === 200) {
+                console.log(
+                  `Updated instruction ${instructionId} status from New to In Progress`
+                );
+                setInstructionStatus("In Progress");
+              }
+            } catch (error) {
+              console.error("Error updating instruction status:", error);
             }
           }
         }
       } catch (statusError) {
-        console.error("Error updating instruction status:", statusError);
+        console.error("Error fetching instruction:", statusError);
         // Don't throw the error, just log it to avoid interrupting the main flow
       }
     }
+
     // Validate required fields
     if (!formData.startingPoint || !formData.destination) {
       setSavedMessage("Starting point and destination are required");
@@ -2086,25 +2079,12 @@ function UpdateInstruction() {
       );
 
       // Send the data to the server
-      const response = await fetch(`http://localhost:5000/legs/save`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(legData),
-      });
+      const response = await api.post("/legs/save", legData);
+      console.log("Server response:", response.data);
 
-      const responseText = await response.text();
-      console.log("Server response:", responseText);
+      const result = response.data;
 
-      let result;
-      try {
-        result = JSON.parse(responseText);
-      } catch (e) {
-        throw new Error(`Invalid JSON response: ${responseText}`);
-      }
-
-      if (!response.ok) {
+      if (response.status !== 200) {
         throw new Error(result.message || "Failed to save leg data");
       }
 
@@ -2172,18 +2152,16 @@ function UpdateInstruction() {
   };
 
   // Replace the shouldDisableAddLeg function with this improved version
+  // Replace the shouldDisableAddLeg function with this improved version
   const shouldDisableAddLeg = async () => {
     if (isCompleted) return true; // Always disable if completed
     if (legs.length === 0) return false; // Allow adding the first leg
 
     try {
-      // First, fetch the instruction details to get the dropoff location
-      const response = await fetch(
-        `http://localhost:5000/instructions/${instructionId}/details`
-      );
-      if (!response.ok) return false;
+      // Fetch the instruction details to get the dropoff location
+      const response = await api.get(`/instructions/${instructionId}/details`);
+      const instructionDetails = response.data;
 
-      const instructionDetails = await response.json();
       const dropoff = instructionDetails.dropoff;
 
       // If we don't have a dropoff location, don't disable
@@ -2237,7 +2215,6 @@ function UpdateInstruction() {
     }
   };
 
-  // Add this useEffect to check if we should hide the + button whenever legs or containers change
   useEffect(() => {
     const checkContainersDestination = async () => {
       if (
@@ -2251,15 +2228,11 @@ function UpdateInstruction() {
 
       try {
         // Fetch the instruction details to get the dropoff location
-        const response = await fetch(
-          `http://localhost:5000/instructions/${instructionId}/details`
+        const response = await api.get(
+          `/instructions/${instructionId}/details`
         );
-        if (!response.ok) {
-          setShouldHideAddLegButton(false);
-          return;
-        }
+        const instructionDetails = response.data;
 
-        const instructionDetails = await response.json();
         const dropoff = instructionDetails.dropoff;
 
         // If we don't have a dropoff location, don't hide
@@ -3540,32 +3513,7 @@ function UpdateInstruction() {
                       };
 
                       // Send the data to the server
-                      const response = await fetch(
-                        `http://localhost:5000/legs/save`,
-                        {
-                          method: "POST",
-                          headers: {
-                            "Content-Type": "application/json",
-                          },
-                          body: JSON.stringify(legData),
-                        }
-                      );
-
-                      const responseText = await response.text();
-                      let result;
-                      try {
-                        result = JSON.parse(responseText);
-                      } catch (e) {
-                        throw new Error(
-                          `Invalid JSON response: ${responseText}`
-                        );
-                      }
-
-                      if (!response.ok) {
-                        throw new Error(
-                          result.message || "Failed to save leg data"
-                        );
-                      }
+                      const response = await api.post(`/legs/save`, legData);
 
                       // Show success message
                       setSavedMessage("Driver removed successfully!");
