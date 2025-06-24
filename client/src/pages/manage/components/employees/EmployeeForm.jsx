@@ -146,7 +146,8 @@ const EmployeeForm = ({ employee, loading, isEditing, onSave, onCancel, onChange
             <option value="2">Controller</option>
             <option value="4">Director</option>
             <option value="5">Driver</option>
-            <option value="3">Finance Clerk</option>
+            <option value="3">Debtors Clerk</option>
+            <option value="8">Creditors Clerk</option>
             <option value="0">Yard Staff</option>
           </select>
         </div>
@@ -286,7 +287,7 @@ const EmployeeForm = ({ employee, loading, isEditing, onSave, onCancel, onChange
                         fontSize: "0.85rem",
                       }}
                     >
-                      View
+                      Download
                     </a>
                     <button
                       type="button"

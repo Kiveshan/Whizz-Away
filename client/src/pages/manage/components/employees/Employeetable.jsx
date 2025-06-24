@@ -23,7 +23,7 @@ const EmployeeTable = ({
   }
 
   return (
-    <div className="table-container">
+    <div>
       <div>
         <button className="manage-add-employee-button" onClick={onAdd}>
           Add Employee
@@ -44,7 +44,7 @@ const EmployeeTable = ({
       </div>
 
       {/* Table Content */}
-      <div className="table-content">
+      <div>
         {loading ? (
           <div className="loading">Loading employees...</div>
         ) : (
@@ -104,7 +104,6 @@ const EmployeeTable = ({
 
       {/* Pagination at the bottom */}
       {!loading && (
-        <div className="table-pagination">
           <Pagination
             currentPage={pagination.currentPage}
             totalPages={pagination.totalPages}
@@ -113,7 +112,6 @@ const EmployeeTable = ({
             onPageChange={onPageChange}
             onItemsPerPageChange={onItemsPerPageChange}
           />
-        </div>
       )}
     </div>
   )
