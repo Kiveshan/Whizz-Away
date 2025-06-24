@@ -2,7 +2,7 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import "../pages/Creditors/purchaseOrder/css/filterButtonBlue.css";
-import api from "../api.js"; // Updated to use api.js
+import axios from "axios";
 import Pagination from "../components/Pagination";
 
 const POTable = ({ showFilterButtons = true }) => {
@@ -18,7 +18,7 @@ const POTable = ({ showFilterButtons = true }) => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [expenseTypes, setExpenseTypes] = useState([]);
-  const [currentPage, setCurrentPage] = useState(1);
+  const [currentPage, setCurrentPage] = useState(1); // Added for pagination
   const recordsPerPage = 2;
 
   useEffect(() => {
