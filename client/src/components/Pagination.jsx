@@ -1,6 +1,6 @@
 import React from "react";
 import PropTypes from "prop-types";
-import "../pages/payments/css/ClientPayments.css"   //has pagination css!
+import "../pages/payments/css/ClientPayments.css"; // Import the updated ClientPayments.css
 
 const Pagination = ({
   totalRecords,
@@ -74,48 +74,50 @@ const Pagination = ({
   if (totalPages <= 1) return null;
 
   return (
-    <div className="pagination-container">
-      <div className="pagination-info">
-        Showing {startIndex} to {endIndex} of {totalRecords} entries
-      </div>
-      <div className="pagination-controls">
-        <button
-          className="pagination-btn prev-btn"
-          onClick={goToPreviousPage}
-          disabled={currentPage === 1}
-        >
-          ← Previous
-        </button>
-
-        <div className="pagination-numbers">
-          {getPageNumbers().map((pageNum, index) => (
-            <span key={index}>
-              {pageNum === "..." ? (
-                <span className="pagination-ellipsis">...</span>
-              ) : (
-                <button
-                  className={`pagination-number ${
-                    currentPage === pageNum ? "active" : ""
-                  }`}
-                  onClick={() => goToPage(pageNum)}
-                >
-                  {pageNum}
-                </button>
-              )}
-            </span>
-          ))}
+    <div className="client-payment-dashboard-wrapper">
+      <div className="pagination-container">
+        <div className="pagination-info">
+          Showing {startIndex} to {endIndex} of {totalRecords} entries
         </div>
+        <div className="pagination-controls">
+          <button
+            className="pagination-btn prev-btn"
+            onClick={goToPreviousPage}
+            disabled={currentPage === 1}
+          >
+            ← Previous
+          </button>
 
-        <button
-          className="pagination-btn next-btn"
-          onClick={goToNextPage}
-          disabled={currentPage === totalPages}
-        >
-          Next →
-        </button>
-      </div>
-      <div className="pagination-summary">
-        Page {currentPage} of {totalPages}
+          <div className="pagination-numbers">
+            {getPageNumbers().map((pageNum, index) => (
+              <span key={index}>
+                {pageNum === "..." ? (
+                  <span className="pagination-ellipsis">...</span>
+                ) : (
+                  <button
+                    className={`pagination-number ${
+                      currentPage === pageNum ? "active" : ""
+                    }`}
+                    onClick={() => goToPage(pageNum)}
+                  >
+                    {pageNum}
+                  </button>
+                )}
+              </span>
+            ))}
+          </div>
+
+          <button
+            className="pagination-btn next-btn"
+            onClick={goToNextPage}
+            disabled={currentPage === totalPages}
+          >
+            Next →
+          </button>
+        </div>
+        <div className="pagination-summary">
+          Page {currentPage} of {totalPages}
+        </div>
       </div>
     </div>
   );
