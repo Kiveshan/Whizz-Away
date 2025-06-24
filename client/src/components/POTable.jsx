@@ -4,7 +4,6 @@ import { useNavigate } from "react-router-dom";
 import "../pages/Creditors/purchaseOrder/css/filterButtonBlue.css";
 import axios from "axios";
 import Pagination from "../components/Pagination";
-import api from "../api.js";
 
 const POTable = ({ showFilterButtons = true }) => {
   const currentDate = new Date();
@@ -19,16 +18,18 @@ const POTable = ({ showFilterButtons = true }) => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [expenseTypes, setExpenseTypes] = useState([]);
+  const [currentPage, setCurrentPage] = useState(1); // Added for pagination
+  const recordsPerPage = 2;
 
   useEffect(() => {
     const fetchPurchaseOrders = async () => {
       try {
         setLoading(true);
         const endpoint = showFilterButtons
-          ? "/api/purchase-orders"
-          : "/api/supplier-summary";
+          ? "http://localhost:5000/api/purchase-orders"
+          : "http://localhost:5000/api/supplier-summary";
 
-        const response = await api.get(endpoint, {
+        const response = await axios.get(endpoint, {
           params: !showFilterButtons
             ? {
                 year: selectedYear,
@@ -36,7 +37,6 @@ const POTable = ({ showFilterButtons = true }) => {
               }
             : {},
         });
-
         console.log("Response received:", response.data);
         const formattedData = showFilterButtons
           ? response.data.map((po) => ({
@@ -83,9 +83,6 @@ const POTable = ({ showFilterButtons = true }) => {
 
     fetchPurchaseOrders();
   }, [selectedYear, selectedMonth, showFilterButtons]);
-
-  const [currentPage, setCurrentPage] = useState(1); // Added for pagination
-  const recordsPerPage = 2;
 
   const formatDate = (dateString) => {
     if (!dateString) return "N/A";
