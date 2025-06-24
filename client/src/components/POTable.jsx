@@ -4,7 +4,7 @@ import { useNavigate } from "react-router-dom";
 import "../pages/Creditors/purchaseOrder/css/filterButtonBlue.css";
 import axios from "axios";
 import Pagination from "../components/Pagination";
-import api from "../api";
+import api from "../api.js";
 
 const POTable = ({ showFilterButtons = true }) => {
   const currentDate = new Date();
@@ -28,7 +28,7 @@ const POTable = ({ showFilterButtons = true }) => {
           ? "/api/purchase-orders"
           : "/api/supplier-summary";
 
-        const response = await axios.get(endpoint, {
+        const response = await api.get(endpoint, {
           params: !showFilterButtons
             ? {
                 year: selectedYear,
@@ -36,6 +36,7 @@ const POTable = ({ showFilterButtons = true }) => {
               }
             : {},
         });
+
         console.log("Response received:", response.data);
         const formattedData = showFilterButtons
           ? response.data.map((po) => ({
@@ -82,6 +83,9 @@ const POTable = ({ showFilterButtons = true }) => {
 
     fetchPurchaseOrders();
   }, [selectedYear, selectedMonth, showFilterButtons]);
+
+  const [currentPage, setCurrentPage] = useState(1); // Added for pagination
+  const recordsPerPage = 2;
 
   const formatDate = (dateString) => {
     if (!dateString) return "N/A";
@@ -165,9 +169,12 @@ const POTable = ({ showFilterButtons = true }) => {
     }
 
     try {
-      const response = await api.get("/api/po-form/list", {
-        params: { poId: expense.id },
-      });
+      const response = await axios.get(
+        `http://localhost:5000/api/po-form/list`,
+        {
+          params: { poId: expense.id },
+        }
+      );
 
       if (response.data && response.data.length > 0) {
         const poData = response.data[0];
