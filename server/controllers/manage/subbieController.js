@@ -60,21 +60,24 @@ const getSubcontractorByIdHandler = async (req, res) => {
 
 const createSubcontractorHandler = async (req, res) => {
   try {
-    const {
-      cellnum,
-      email,
-      companyname,
-      location,
-      truckregnum,
-      contact_person,
-      subei_reg_num,
-      no_of_trucks,
-      subdrivername,
-    } = req.body
+    const { cellnum, email, companyname, location, contact_person, subei_reg_num, trucks } = req.body
 
     console.log("Creating subcontractor with data:", req.body)
-    if (!companyname || !location || !contact_person || !cellnum || !email) {
+
+    // Validate required fields
+    if (!companyname || !location || !contact_person || !cellnum || !email || !subei_reg_num) {
       return res.status(400).json({ error: "Please fill in all required fields" })
+    }
+
+    // Validate trucks array
+    if (!trucks || !Array.isArray(trucks) || trucks.length === 0) {
+      return res.status(400).json({ error: "At least one truck and driver combination is required" })
+    }
+
+    // Validate that at least one truck/driver combination has data
+    const validTrucks = trucks.filter((truck) => truck.reg && truck.driver)
+    if (validTrucks.length === 0) {
+      return res.status(400).json({ error: "At least one complete truck and driver combination is required" })
     }
 
     const result = await createSubcontractor({
@@ -82,15 +85,15 @@ const createSubcontractorHandler = async (req, res) => {
       email,
       companyname,
       location,
-      truckregnum,
       contact_person,
       subei_reg_num,
-      no_of_trucks,
-      subdrivername,
+      trucks: validTrucks,
     })
+
     if (!result.success) {
       return res.status(400).json({ error: result.message })
     }
+
     res.status(201).json(result.data)
   } catch (err) {
     console.error("Error creating subcontractor:", err)
@@ -108,23 +111,24 @@ const updateSubcontractorHandler = async (req, res) => {
       return res.status(400).json({ error: "Invalid subcontractor ID" })
     }
 
-    const {
-      cellnum,
-      email,
-      companyname,
-      location,
-      truckregnum,
-      contact_person,
-      subei_reg_num,
-      no_of_trucks,
-      subdrivername,
-    } = req.body
+    const { cellnum, email, companyname, location, contact_person, subei_reg_num, trucks } = req.body
 
     console.log(`Updating subcontractor ID ${parsedId} with data:`, req.body)
 
     // Validate required fields
-    if (!companyname || !location || !contact_person || !cellnum || !email) {
+    if (!companyname || !location || !contact_person || !cellnum || !email || !subei_reg_num) {
       return res.status(400).json({ error: "Please fill in all required fields" })
+    }
+
+    // Validate trucks array
+    if (!trucks || !Array.isArray(trucks) || trucks.length === 0) {
+      return res.status(400).json({ error: "At least one truck and driver combination is required" })
+    }
+
+    // Validate that at least one truck/driver combination has data
+    const validTrucks = trucks.filter((truck) => truck.reg && truck.driver)
+    if (validTrucks.length === 0) {
+      return res.status(400).json({ error: "At least one complete truck and driver combination is required" })
     }
 
     const result = await updateSubcontractor(parsedId, {
@@ -132,15 +136,15 @@ const updateSubcontractorHandler = async (req, res) => {
       email,
       companyname,
       location,
-      truckregnum,
       contact_person,
       subei_reg_num,
-      no_of_trucks,
-      subdrivername,
+      trucks: validTrucks,
     })
+
     if (!result.success) {
       return res.status(404).json({ error: result.message })
     }
+
     res.json(result.data)
   } catch (err) {
     console.error(`Error updating subcontractor ${req.params.id}:`, err)

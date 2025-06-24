@@ -60,7 +60,18 @@ const getTruckById = async (id) => {
     if (!result.rows.length) {
       return { success: false, message: "Truck not found" }
     }
-    return { success: true, data: result.rows[0] }
+
+    const truck = result.rows[0]
+
+    // Format dates for consistent handling
+    if (truck.truckpurchasedate) {
+      truck.truckpurchasedate = new Date(truck.truckpurchasedate).toISOString().split("T")[0]
+    }
+    if (truck.truck_license_expiry) {
+      truck.truck_license_expiry = new Date(truck.truck_license_expiry).toISOString().split("T")[0]
+    }
+
+    return { success: true, data: truck }
   } catch (err) {
     console.error(`Error fetching truck ${id}:`, err)
     throw err
@@ -83,6 +94,7 @@ const createTruck = async (truckData, documentKeys) => {
       current_evaluation,
       vin_num,
       is_subcontractor,
+      truck_license_expiry,
     } = truckData
 
     const document_url1 = documentKeys[0] || null
@@ -93,8 +105,8 @@ const createTruck = async (truckData, documentKeys) => {
       `INSERT INTO m5_trucks (
          truckregnum, trailersize, truckpurchasedate, year, model,
          purchase_price, current_evaluation, vin_num, is_subcontractor,
-         document_url1, document_url2, document_url3
-       ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
+         truck_license_expiry, document_url1, document_url2, document_url3
+       ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
        RETURNING *`,
       [
         truckregnum,
@@ -106,6 +118,7 @@ const createTruck = async (truckData, documentKeys) => {
         current_evaluation,
         vin_num,
         is_subcontractor,
+        truck_license_expiry,
         document_url1,
         document_url2,
         document_url3,
@@ -134,6 +147,7 @@ const updateTruck = async (id, truckData, newDocKeys) => {
       current_evaluation,
       vin_num,
       is_subcontractor,
+      truck_license_expiry,
     } = truckData
 
     const existingResult = await client.query(
@@ -161,8 +175,8 @@ const updateTruck = async (id, truckData, newDocKeys) => {
        SET truckregnum = $1, trailersize = $2, truckpurchasedate = $3,
            year = $4, model = $5, purchase_price = $6,
            current_evaluation = $7, vin_num = $8, is_subcontractor = $9,
-           document_url1 = $10, document_url2 = $11, document_url3 = $12
-       WHERE m5truckskey = $13
+           truck_license_expiry = $10, document_url1 = $11, document_url2 = $12, document_url3 = $13
+       WHERE m5truckskey = $14
        RETURNING *`,
       [
         truckregnum,
@@ -174,6 +188,7 @@ const updateTruck = async (id, truckData, newDocKeys) => {
         current_evaluation,
         vin_num,
         is_subcontractor,
+        truck_license_expiry,
         document_url1,
         document_url2,
         document_url3,
@@ -186,6 +201,57 @@ const updateTruck = async (id, truckData, newDocKeys) => {
     return { success: true, data: result.rows[0] }
   } catch (err) {
     console.error(`Error updating truck ${id}:`, err)
+    throw err
+  } finally {
+    if (client) client.release()
+  }
+}
+
+// New function to get trucks with expiring licenses
+const getTrucksWithExpiringLicenses = async (daysAhead = 30) => {
+  let client
+  try {
+    client = await pool.connect()
+
+    const query = `
+      SELECT truckregnum, truck_license_expiry, 
+             (truck_license_expiry - CURRENT_DATE) as days_until_expiry
+      FROM m5_trucks 
+      WHERE truck_license_expiry IS NOT NULL 
+        AND truck_license_expiry <= CURRENT_DATE + INTERVAL '${daysAhead} days'
+        AND truck_license_expiry >= CURRENT_DATE
+      ORDER BY truck_license_expiry ASC
+    `
+
+    const result = await client.query(query)
+    return result.rows
+  } catch (err) {
+    console.error("Error fetching trucks with expiring licenses:", err)
+    throw err
+  } finally {
+    if (client) client.release()
+  }
+}
+
+// New function to get expired licenses
+const getTrucksWithExpiredLicenses = async () => {
+  let client
+  try {
+    client = await pool.connect()
+
+    const query = `
+      SELECT truckregnum, truck_license_expiry,
+             (CURRENT_DATE - truck_license_expiry) as days_expired
+      FROM m5_trucks 
+      WHERE truck_license_expiry IS NOT NULL 
+        AND truck_license_expiry < CURRENT_DATE
+      ORDER BY truck_license_expiry ASC
+    `
+
+    const result = await client.query(query)
+    return result.rows
+  } catch (err) {
+    console.error("Error fetching trucks with expired licenses:", err)
     throw err
   } finally {
     if (client) client.release()
@@ -252,4 +318,13 @@ const deleteTruck = async (id) => {
   }
 }
 
-export { getAllTrucks, getTruckById, createTruck, updateTruck, deleteTruckDocument, deleteTruck }
+export {
+  getAllTrucks,
+  getTruckById,
+  createTruck,
+  updateTruck,
+  deleteTruckDocument,
+  deleteTruck,
+  getTrucksWithExpiringLicenses,
+  getTrucksWithExpiredLicenses,
+}

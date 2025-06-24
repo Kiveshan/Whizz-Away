@@ -46,6 +46,22 @@ const TruckForm = ({ truck, loading, isEditing, onSave, onCancel, onChange, onDe
     onChange("documents", updatedDocs)
   }
 
+  // Helper function to check if license is expiring soon
+  const isLicenseExpiringSoon = (expiryDate) => {
+    if (!expiryDate) return false
+    const today = new Date()
+    const expiry = new Date(expiryDate)
+    const daysUntilExpiry = Math.ceil((expiry - today) / (1000 * 60 * 60 * 24))
+    return daysUntilExpiry <= 30 && daysUntilExpiry >= 0
+  }
+
+  const isLicenseExpired = (expiryDate) => {
+    if (!expiryDate) return false
+    const today = new Date()
+    const expiry = new Date(expiryDate)
+    return expiry < today
+  }
+
   return (
     <div className="manage-add-truck-form">
       <h2>{isEditing ? "Edit Truck" : "Add New Truck"}</h2>
@@ -116,10 +132,57 @@ const TruckForm = ({ truck, loading, isEditing, onSave, onCancel, onChange, onDe
             <label style={{ fontWeight: "bold" }}>Purchase Date</label>
             <input
               type="date"
-              value={truck.truckpurchasedate || ""}
+              value={truck.truckpurchasedate ? new Date(truck.truckpurchasedate).toISOString().split("T")[0] : ""}
               onChange={(e) => onChange("truckpurchasedate", e.target.value)}
               required
             />
+          </div>
+
+          <div className="manage-form-group">
+            <label style={{ fontWeight: "bold" }}>
+              License Expiry Date
+              {truck.truck_license_expiry && isLicenseExpired(truck.truck_license_expiry) && (
+                <span style={{ color: "red", marginLeft: "10px", fontSize: "0.9em" }}>⚠️ EXPIRED</span>
+              )}
+              {truck.truck_license_expiry &&
+                !isLicenseExpired(truck.truck_license_expiry) &&
+                isLicenseExpiringSoon(truck.truck_license_expiry) && (
+                  <span style={{ color: "orange", marginLeft: "10px", fontSize: "0.9em" }}>⚠️ EXPIRES SOON</span>
+                )}
+            </label>
+            <input
+              type="date"
+              value={truck.truck_license_expiry ? new Date(truck.truck_license_expiry).toISOString().split("T")[0] : ""}
+              onChange={(e) => onChange("truck_license_expiry", e.target.value)}
+              style={{
+                borderColor:
+                  truck.truck_license_expiry && isLicenseExpired(truck.truck_license_expiry)
+                    ? "red"
+                    : truck.truck_license_expiry && isLicenseExpiringSoon(truck.truck_license_expiry)
+                      ? "orange"
+                      : "",
+              }}
+              required
+            />
+            {truck.truck_license_expiry && (
+              <small
+                style={{
+                  color: isLicenseExpired(truck.truck_license_expiry)
+                    ? "red"
+                    : isLicenseExpiringSoon(truck.truck_license_expiry)
+                      ? "orange"
+                      : "green",
+                  display: "block",
+                  marginTop: "5px",
+                }}
+              >
+                {isLicenseExpired(truck.truck_license_expiry)
+                  ? "License has expired!"
+                  : isLicenseExpiringSoon(truck.truck_license_expiry)
+                    ? `License expires in ${Math.ceil((new Date(truck.truck_license_expiry) - new Date()) / (1000 * 60 * 60 * 24))} days`
+                    : "License is current"}
+              </small>
+            )}
           </div>
 
           {/* Document Upload */}
@@ -179,7 +242,7 @@ const TruckForm = ({ truck, loading, isEditing, onSave, onCancel, onChange, onDe
                           fontSize: "0.85rem",
                         }}
                       >
-                       Download
+                        View
                       </a>
                       <button
                         type="button"

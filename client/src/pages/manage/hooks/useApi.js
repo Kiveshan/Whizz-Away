@@ -374,30 +374,37 @@ export function useApi(state, actions) {
           subcontractorId: state.subcontractorId,
         })
 
-        // Ensure trucks array exists and has valid data
-        const trucks = subcontractorData.trucks || [{ reg: "", driver: "" }]
+        // Validate required fields
+        if (
+          !subcontractorData.companyname ||
+          !subcontractorData.location ||
+          !subcontractorData.contact_person ||
+          !subcontractorData.cellnum ||
+          !subcontractorData.email ||
+          !subcontractorData.subei_reg_num
+        ) {
+          actions.showAlert("Please fill in all required company information fields.")
+          return false
+        }
 
-        // Transform trucks array to comma-separated strings
-        const truckRegNums = trucks
-          .map((truck) => truck.reg?.trim())
-          .filter(Boolean)
-          .join(",")
+        // Validate trucks array
+        const validTrucks = (subcontractorData.trucks || []).filter(
+          (truck) => truck.reg && truck.reg.trim() && truck.driver && truck.driver.trim(),
+        )
 
-        const subDriverNames = trucks
-          .map((truck) => truck.driver?.trim())
-          .filter(Boolean)
-          .join(",")
+        if (validTrucks.length === 0) {
+          actions.showAlert("Please provide at least one complete truck registration and driver name combination.")
+          return false
+        }
 
         const payload = {
-          companyname: subcontractorData.companyname || "",
-          location: subcontractorData.location || "",
-          contact_person: subcontractorData.contact_person || "",
-          cellnum: subcontractorData.cellnum || "",
-          email: subcontractorData.email || "",
-          subei_reg_num: subcontractorData.subei_reg_num || "",
-          no_of_trucks: Number.parseInt(subcontractorData.no_of_trucks) || 1,
-          truckregnum: truckRegNums,
-          subdrivername: subDriverNames,
+          companyname: subcontractorData.companyname,
+          location: subcontractorData.location,
+          contact_person: subcontractorData.contact_person,
+          cellnum: subcontractorData.cellnum,
+          email: subcontractorData.email,
+          subei_reg_num: subcontractorData.subei_reg_num,
+          trucks: validTrucks,
         }
 
         console.log("Sending subcontractor payload:", payload)
@@ -637,68 +644,11 @@ export function useApi(state, actions) {
             existingDocuments,
           })
         } else if (type === "subcontractor") {
-          let truckRegs = []
-          let driverNames = []
-
-          // Handle truckregnum - can be string, array, or PostgreSQL array format
-          if (data.truckregnum) {
-            if (typeof data.truckregnum === "string") {
-              // Handle PostgreSQL array format {item1,item2} or comma-separated
-              if (data.truckregnum.startsWith("{") && data.truckregnum.endsWith("}")) {
-                truckRegs = data.truckregnum
-                  .slice(1, -1) // Remove { and }
-                  .split(",")
-                  .map((reg) => reg.replace(/"/g, "").trim())
-                  .filter(Boolean)
-              } else {
-                truckRegs = data.truckregnum
-                  .split(",")
-                  .map((reg) => reg.trim())
-                  .filter(Boolean)
-              }
-            } else if (Array.isArray(data.truckregnum)) {
-              truckRegs = data.truckregnum
-            } else {
-              truckRegs = [String(data.truckregnum)]
-            }
-          }
-
-          // Handle subdrivername - can be string, array, or PostgreSQL array format
-          if (data.subdrivername) {
-            if (typeof data.subdrivername === "string") {
-              // Handle PostgreSQL array format {item1,item2} or comma-separated
-              if (data.subdrivername.startsWith("{") && data.subdrivername.endsWith("}")) {
-                driverNames = data.subdrivername
-                  .slice(1, -1) // Remove { and }
-                  .split(",")
-                  .map((name) => name.replace(/"/g, "").trim())
-                  .filter(Boolean)
-              } else {
-                driverNames = data.subdrivername
-                  .split(",")
-                  .map((name) => name.trim())
-                  .filter(Boolean)
-              }
-            } else if (Array.isArray(data.subdrivername)) {
-              driverNames = data.subdrivername
-            } else {
-              driverNames = [String(data.subdrivername)]
-            }
-          }
-
-          const trucks = []
-          const maxLength = Math.max(truckRegs.length, driverNames.length, 1)
-
-          for (let i = 0; i < maxLength; i++) {
-            trucks.push({
-              reg: truckRegs[i] || "",
-              driver: driverNames[i] || "",
-            })
-          }
-
+          // The new structure already provides trucks array from the backend
           actions.updateFormData(formType, {
             ...data,
-            trucks,
+            // trucks array is already properly formatted from the backend
+            trucks: data.trucks || [{ reg: "", driver: "" }],
           })
         } else {
           actions.updateFormData(formType, data)
