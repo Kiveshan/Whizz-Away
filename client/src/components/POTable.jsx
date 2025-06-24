@@ -2,7 +2,7 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import "../pages/Creditors/purchaseOrder/css/filterButtonBlue.css";
-import axios from "axios";
+import api from "../api.js"; // Updated to use api.js
 import Pagination from "../components/Pagination";
 
 const POTable = ({ showFilterButtons = true }) => {
@@ -18,7 +18,7 @@ const POTable = ({ showFilterButtons = true }) => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [expenseTypes, setExpenseTypes] = useState([]);
-  const [currentPage, setCurrentPage] = useState(1); // Added for pagination
+  const [currentPage, setCurrentPage] = useState(1);
   const recordsPerPage = 2;
 
   useEffect(() => {
@@ -26,10 +26,10 @@ const POTable = ({ showFilterButtons = true }) => {
       try {
         setLoading(true);
         const endpoint = showFilterButtons
-          ? "http://localhost:5000/api/purchase-orders"
-          : "http://localhost:5000/api/supplier-summary";
+          ? "/api/purchase-orders"
+          : "/api/supplier-summary";
 
-        const response = await axios.get(endpoint, {
+        const response = await api.get(endpoint, {
           params: !showFilterButtons
             ? {
                 year: selectedYear,
@@ -166,12 +166,9 @@ const POTable = ({ showFilterButtons = true }) => {
     }
 
     try {
-      const response = await axios.get(
-        `http://localhost:5000/api/po-form/list`,
-        {
-          params: { poId: expense.id },
-        }
-      );
+      const response = await api.get(`/api/po-form/list`, {
+        params: { poId: expense.id },
+      });
 
       if (response.data && response.data.length > 0) {
         const poData = response.data[0];
@@ -250,10 +247,12 @@ const POTable = ({ showFilterButtons = true }) => {
   const paginatedExpenses = filteredExpenses.slice(startIndex, endIndex);
 
   return (
-    <div>
-      <button className="back-button" onClick={handleBackClick}>
-        Back
-      </button>
+    <div className="client-payment-dashboard-wrapper">
+      <div className="header-actions">
+        <button className="back-button" onClick={handleBackClick}>
+          Back
+        </button>
+      </div>
       <div className="dropdown-container74">
         <select
           value={selectedYear}
@@ -332,7 +331,7 @@ const POTable = ({ showFilterButtons = true }) => {
           {loading ? (
             <div className="loading">Loading purchase orders...</div>
           ) : error ? (
-            <div className="error">
+            <div className="error-message">
               {error}
               <br />
               <button onClick={handleRetry} style={{ marginTop: "10px" }}>
@@ -378,7 +377,7 @@ const POTable = ({ showFilterButtons = true }) => {
                             <td>{expense.date}</td>
                             <td>
                               <button
-                                className="view-btn"
+                                className="view-button"
                                 onClick={() => handleViewClick(expense)}
                               >
                                 View
@@ -392,7 +391,7 @@ const POTable = ({ showFilterButtons = true }) => {
                             <td>{expense.total}</td>
                             <td>
                               <button
-                                className="view-btn"
+                                className="view-button"
                                 onClick={() => handleViewClick(expense)}
                               >
                                 View
