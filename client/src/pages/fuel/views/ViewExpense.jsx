@@ -3,14 +3,17 @@ import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import api from "../../../api"; // Import the configured Axios instance
 import "../css/Expenses1.css";
+import Pagination from "../../../components/Pagination"
 
 const ViewExpense = () => {
   const navigate = useNavigate();
   const [trucks, setTrucks] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [currentPage, setCurrentPage] = useState(1);
+  const recordsPerPage = 8; // Adjust as needed
 
-  useEffect(() => {
+useEffect(() => {
     const fetchTrucks = async () => {
       try {
         const response = await api.get("/trucks/company-owned");
@@ -63,6 +66,10 @@ const ViewExpense = () => {
     });
   };
 
+  const startIndex = (currentPage - 1) * recordsPerPage;
+  const endIndex = startIndex + recordsPerPage;
+  const currentRecords = trucks.slice(startIndex, endIndex);
+
   return (
     <div className="expenses-container">
       <div className="client-payments-header">
@@ -79,38 +86,48 @@ const ViewExpense = () => {
       ) : error ? (
         <p>{error}</p>
       ) : (
-        <table
-          className="expenses-table"
-          style={{ width: "30%", marginLeft: "540px" }}
-        >
-          <thead>
-            <tr>
-              <th>Truck Registration</th>
-              <th>Actions</th>
-            </tr>
-          </thead>
-          <tbody>
-            {trucks.length > 0 ? (
-              trucks.map((truck, index) => (
-                <tr key={index}>
-                  <td>{truck.truckregnum || "Unknown"}</td>
-                  <td>
-                    <button
-                      className="view-button"
-                      onClick={() => handleViewClick(truck)}
-                    >
-                      View
-                    </button>
-                  </td>
-                </tr>
-              ))
-            ) : (
+        <>
+        <div className="table-wrapper">
+          <table
+            className="expenses-table1"
+            style={{ width: "30%", marginLeft: "540px" }}
+          >
+            <thead>
               <tr>
-                <td colSpan="2">No trucks found</td>
+                <th>Truck Registration</th>
+                <th>Actions</th>
               </tr>
-            )}
-          </tbody>
-        </table>
+            </thead>
+            <tbody>
+              {currentRecords.length > 0 ? (
+                currentRecords.map((truck, index) => (
+                  <tr key={index}>
+                    <td>{truck.truckregnum || "Unknown"}</td>
+                    <td>
+                      <button
+                        className="view-button"
+                        onClick={() => handleViewClick(truck)}
+                      >
+                        View
+                      </button>
+                    </td>
+                  </tr>
+                ))
+              ) : (
+                <tr>
+                  <td colSpan="2">No trucks found</td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+          <Pagination
+            totalRecords={trucks.length}
+            recordsPerPage={recordsPerPage}
+            currentPage={currentPage}
+            onPageChange={setCurrentPage}
+          />
+          </div>
+        </>
       )}
     </div>
   );
