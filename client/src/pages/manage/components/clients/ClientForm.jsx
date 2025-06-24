@@ -169,7 +169,7 @@ const ClientForm = ({ client, loading, isEditing, onSave, onCancel, onChange }) 
           <label>
             <strong>Payment Type</strong>
           </label>
-          <select value={client.payment_type || ""} onChange={(e) => onChange("payment_type", e.target.value)} required>
+          <select className="dropdown" value={client.payment_type || ""} onChange={(e) => onChange("payment_type", e.target.value)} required>
             <option value="">Select Payment Type</option>
             <option value="Cash">Cash</option>
             <option value="Credit">Credit</option>

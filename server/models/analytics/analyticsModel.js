@@ -347,6 +347,100 @@ const getWagesPerMonth = async (client, month, year) => {
   }));
 };
 
+const getSubcontractorTurnoverPerMonth = async (client, month, year) => {
+  const query = `
+    SELECT 
+      e.companyname,
+      SUM(l.driverrate) as turnover,
+      TO_CHAR(l.date, 'Month') as month_name,
+      EXTRACT(YEAR FROM l.date) as year
+    FROM legs_m2 l
+    JOIN m5_employee e ON l.driverid = e.userid
+    WHERE e.roleid = 6
+      AND TRIM(TO_CHAR(l.date, 'Month')) = $1
+      AND EXTRACT(YEAR FROM l.date)::text = $2
+    GROUP BY e.companyname, TO_CHAR(l.date, 'Month'), EXTRACT(YEAR FROM l.date)
+    ORDER BY turnover DESC
+  `;
+  const result = await client.query(query, [month, year]);
+  console.log("Subcontractor turnover query result:", result.rows);
+  console.log(`Query returned ${result.rows.length} rows`);
+
+  if (!result.rows || result.rows.length === 0) {
+    console.log(`No subcontractor turnover data returned for ${month} ${year}.`);
+    return [];
+  }
+
+  const totalTurnover = result.rows.reduce(
+    (sum, row) => sum + parseFloat(row.turnover || 0),
+    0
+  );
+  console.log(`Total subcontractor turnover for ${month} ${year}: ${totalTurnover}`);
+
+  return result.rows.map((row) => {
+    const turnover = parseFloat(row.turnover || 0);
+    const percentage = totalTurnover > 0 ? ((turnover / totalTurnover) * 100).toFixed(2) : 0;
+    return {
+      companyname: row.companyname,
+      turnover: turnover,
+      month: row.month_name.trim(),
+      year: row.year.toString(),
+      percentage: parseFloat(percentage),
+    };
+  });
+};
+
+const getSubcontractorVsTurnover = async (client, month, year) => {
+  const subcontractorQuery = `
+    SELECT 
+      SUM(l.driverrate) as subcontractor_turnover,
+      TO_CHAR(l.date, 'Month') as month_name,
+      EXTRACT(YEAR FROM l.date) as year
+    FROM legs_m2 l
+    JOIN m5_employee e ON l.driverid = e.userid
+    WHERE e.roleid = 6
+      AND TRIM(TO_CHAR(l.date, 'Month')) = $1
+      AND EXTRACT(YEAR FROM l.date)::text = $2
+    GROUP BY TO_CHAR(l.date, 'Month'), EXTRACT(YEAR FROM l.date)
+  `;
+
+  // Fetch total turnover using getTurnoverPerMonth
+  const turnoverData = await getTurnoverPerMonth(client, month, year);
+  const totalTurnover = turnoverData.reduce(
+    (sum, item) => sum + parseFloat(item.turnover || 0),
+    0
+  );
+
+  // Fetch subcontractor turnover
+  const subcontractorResult = await client.query(subcontractorQuery, [month, year]);
+
+  console.log("Subcontractor turnover query result:", subcontractorResult.rows);
+  console.log("Total turnover from getTurnoverPerMonth:", totalTurnover);
+
+  const subcontractorTurnover = parseFloat(subcontractorResult.rows[0]?.subcontractor_turnover || 0);
+
+  console.log(`Subcontractor turnover for ${month} ${year}: ${subcontractorTurnover}`);
+  console.log(`Total turnover for ${month} ${year}: ${totalTurnover}`);
+
+  const total = totalTurnover + subcontractorTurnover;
+  let turnoverPercentage = 0;
+  let subcontractorPercentage = 0;
+
+  if (total > 0) {
+    turnoverPercentage = Number(((totalTurnover / total) * 100).toFixed(2));
+    subcontractorPercentage = Number(((subcontractorTurnover / total) * 100).toFixed(2));
+  }
+
+  return [{
+    month: month.trim(),
+    year: year.toString(),
+    totalTurnover: totalTurnover,
+    subcontractorTurnover: subcontractorTurnover,
+    turnoverPercentage,
+    subcontractorPercentage,
+  }];
+};
+
 export {
   getFuelExpenses,
   getTurnoverPerMonth,
@@ -355,4 +449,6 @@ export {
   getAllExpenses,
   getTurnoverPerTruck,
   getWagesPerMonth,
+  getSubcontractorTurnoverPerMonth,
+  getSubcontractorVsTurnover,
 };

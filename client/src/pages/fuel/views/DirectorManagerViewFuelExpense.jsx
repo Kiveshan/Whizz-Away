@@ -13,7 +13,7 @@ const DirectorManagerViewFuelExpense = () => {
   useEffect(() => {
     const fetchTrucks = async () => {
       try {
-        const response = await api.get("/trucks/fuel-expenses");
+        const response = await api.get("/trucks/company-owned");
 
         if (!response.data) {
           throw new Error("No data received from server");

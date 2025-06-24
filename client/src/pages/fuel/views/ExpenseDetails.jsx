@@ -3,6 +3,7 @@ import { useState, useEffect } from "react";
 import { useNavigate, useParams, useLocation } from "react-router-dom";
 import api from "../../../api"; // Import the configured Axios instance
 import "../css/Expenses1.css";
+import Pagination from "../../../components/Pagination"
 
 const ExpenseDetails = () => {
   const navigate = useNavigate();
@@ -21,6 +22,8 @@ const ExpenseDetails = () => {
   const [month, setMonth] = useState(currentMonth);
   const [viewerOpen, setViewerOpen] = useState(false);
   const [viewerUrl, setViewerUrl] = useState("");
+  const [currentPage, setCurrentPage] = useState(1);
+  const recordsPerPage = 5; // Adjust as needed
 
   useEffect(() => {
     const fetchExpenses = async () => {
@@ -59,6 +62,7 @@ const ExpenseDetails = () => {
         }
 
         setExpenses(filteredData);
+        setCurrentPage(1); // Reset to first page when data changes
       } catch (err) {
         console.error("Error fetching expense data:", err);
         setError("Failed to load expense data. Please try again later.");
@@ -72,10 +76,12 @@ const ExpenseDetails = () => {
 
   const handleYearChange = (e) => {
     setYear(e.target.value);
+    setCurrentPage(1); // Reset to first page on filter change
   };
 
   const handleMonthChange = (e) => {
     setMonth(e.target.value);
+    setCurrentPage(1); // Reset to first page on filter change
   };
 
   const formatDate = (dateString) => {
@@ -94,12 +100,10 @@ const ExpenseDetails = () => {
 
   const handleViewDocument = async (expense) => {
     try {
-      // If we have an expense ID, try to get a fresh pre-signed URL
       if (expense.ekey) {
         const response = await api.get(`/expenses/document/${expense.ekey}`);
 
         if (response.data.success && response.data.url) {
-          // Open in new tab
           window.open(response.data.url, "_blank");
           return;
         } else {
@@ -107,7 +111,6 @@ const ExpenseDetails = () => {
         }
       }
 
-      // If we don't have a URL from the API, check if we have a slip name
       if (expense.slipname) {
         const url = `http://localhost:5000/uploads/${expense.slipname}`;
         window.open(url, "_blank");
@@ -120,28 +123,14 @@ const ExpenseDetails = () => {
     }
   };
 
-  // Handle downloading a document - get a fresh pre-signed URL if possible
   const handleDownloadDocument = async (expense) => {
     try {
-      // If we have an expense ID, try to get a fresh pre-signed URL
       if (expense.ekey) {
         const response = await api.get(`/expenses/document/${expense.ekey}`);
 
         if (response.data.success && response.data.url) {
-          // Extract original filename from the URL or use the provided name
-          let filename = expense.slipname;
-          if (!filename && response.data.name) {
-            filename = response.data.name;
-          }
-          if (!filename) {
-            // Try to extract filename from URL if no name is provided
-            const urlParts = response.data.url.split("/");
-            const lastPart = urlParts[urlParts.length - 1];
-            // Remove any query parameters
-            filename = lastPart.split("?")[0];
-          }
+          let filename = expense.slipname || response.data.name || response.data.url.split("/").pop().split("?")[0];
 
-          // Fetch the file content first, then create a blob URL
           fetch(response.data.url)
             .then((res) => res.blob())
             .then((blob) => {
@@ -157,14 +146,10 @@ const ExpenseDetails = () => {
             });
           return;
         }
-      }
-
-      // If we don't have a URL from the API, check if we have a slip name
-      else if (expense.slipname) {
+      } else if (expense.slipname) {
         const docUrl = `http://localhost:5000/uploads/${expense.slipname}`;
         const filename = expense.slipname;
 
-        // Fetch the file content first, then create a blob URL
         fetch(docUrl)
           .then((res) => res.blob())
           .then((blob) => {
@@ -187,7 +172,6 @@ const ExpenseDetails = () => {
     }
   };
 
-  // Update this function to pass truck information to ExpenseSubmission
   const handleAddExpense = () => {
     navigate("/ExpenseSubmission", {
       state: {
@@ -196,6 +180,11 @@ const ExpenseDetails = () => {
       },
     });
   };
+
+  // Calculate paginated records
+  const startIndex = (currentPage - 1) * recordsPerPage;
+  const endIndex = startIndex + recordsPerPage;
+  const currentRecords = expenses.slice(startIndex, endIndex);
 
   return (
     <div className="expenses-container">
@@ -208,7 +197,6 @@ const ExpenseDetails = () => {
         </button>
       </div>
 
-      {/* Centered title - properly positioned above the filters */}
       <h2
         style={{
           textAlign: "center",
@@ -270,67 +258,75 @@ const ExpenseDetails = () => {
       {loading ? (
         <p>Loading expenses...</p>
       ) : error ? (
-        <p>{error}</p>
+        <p className="error-message">{error}</p>
       ) : (
-        <table className="expenses-table2">
-          <thead>
-            <tr>
-              <th>Expense Cost</th>
-              <th>Document by</th>
-              <th>Date</th>
-              <th>Display</th>
-              <th>Petrol Slip</th>
-            </tr>
-          </thead>
-          <tbody>
-            {expenses.length > 0 ? (
-              expenses.map((expense, index) => (
-                <tr key={expense.ekey || index}>
-                  <td>
-                    R{" "}
-                    {typeof expense.expensecost === "number"
-                      ? expense.expensecost.toFixed(2)
-                      : expense.expensecost}
-                  </td>
-                  <td>
-                    {expense.documentfrom_display || expense.documentfrom}
-                  </td>
-                  <td>{formatDate(expense.slipuploaddate)}</td>
-                  <td>
-                    <button
-                      className="view-button"
-                      onClick={() => handleViewDocument(expense)}
-                      disabled={!expense.s3key && !expense.slipname}
-                    >
-                      View
-                    </button>
-                  </td>
-                  <td>
-                    {expense.s3key || expense.slipname ? (
+        <>
+          <table className="expenses-table2">
+            <thead>
+              <tr>
+                <th>Expense Cost</th>
+                <th>Document by</th>
+                <th>Date</th>
+                <th>Display</th>
+                <th>Petrol Slip</th>
+              </tr>
+            </thead>
+            <tbody>
+              {currentRecords.length > 0 ? (
+                currentRecords.map((expense, index) => (
+                  <tr key={expense.ekey || index}>
+                    <td>
+                      R{" "}
+                      {typeof expense.expensecost === "number"
+                        ? expense.expensecost.toFixed(2)
+                        : expense.expensecost}
+                    </td>
+                    <td>
+                      {expense.documentfrom_display || expense.documentfrom}
+                    </td>
+                    <td>{formatDate(expense.slipuploaddate)}</td>
+                    <td>
                       <button
-                        className="download-button"
-                        onClick={() => handleDownloadDocument(expense)}
+                        className="view-button"
+                        onClick={() => handleViewDocument(expense)}
+                        disabled={!expense.s3key && !expense.slipname}
                       >
-                        Download
+                        View
                       </button>
-                    ) : (
-                      <span>No slip</span>
-                    )}
+                    </td>
+                    <td>
+                      {expense.s3key || expense.slipname ? (
+                        <button
+                          className="download-button"
+                          onClick={() => handleDownloadDocument(expense)}
+                        >
+                          Download
+                        </button>
+                      ) : (
+                        <span>No slip</span>
+                      )}
+                    </td>
+                  </tr>
+                ))
+              ) : (
+                <tr>
+                  <td
+                    colSpan="5"
+                    style={{ textAlign: "center", padding: "20px" }}
+                  >
+                    No expenses found for this truck
                   </td>
                 </tr>
-              ))
-            ) : (
-              <tr>
-                <td
-                  colSpan="5"
-                  style={{ textAlign: "center", padding: "20px" }}
-                >
-                  No expenses found for this truck
-                </td>
-              </tr>
-            )}
-          </tbody>
-        </table>
+              )}
+            </tbody>
+          </table>
+          <Pagination
+            totalRecords={expenses.length}
+            recordsPerPage={recordsPerPage}
+            currentPage={currentPage}
+            onPageChange={setCurrentPage}
+          />
+        </>
       )}
 
       <button
@@ -341,7 +337,6 @@ const ExpenseDetails = () => {
         Add Fuel Expense
       </button>
 
-      {/* Full Screen Image/Document Viewer */}
       {viewerOpen && (
         <div className="fullscreen-viewer">
           <div className="viewer-header">

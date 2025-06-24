@@ -2,6 +2,8 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import "../pages/Creditors/purchaseOrder/css/filterButtonBlue.css";
+import axios from "axios";
+import Pagination from "../components/Pagination";
 import api from "../api";
 
 const POTable = ({ showFilterButtons = true }) => {
@@ -26,7 +28,7 @@ const POTable = ({ showFilterButtons = true }) => {
           ? "/api/purchase-orders"
           : "/api/supplier-summary";
 
-        const response = await api.get(endpoint, {
+        const response = await axios.get(endpoint, {
           params: !showFilterButtons
             ? {
                 year: selectedYear,
@@ -34,7 +36,6 @@ const POTable = ({ showFilterButtons = true }) => {
               }
             : {},
         });
-
         console.log("Response received:", response.data);
         const formattedData = showFilterButtons
           ? response.data.map((po) => ({
@@ -238,6 +239,12 @@ const POTable = ({ showFilterButtons = true }) => {
     window.location.reload();
   };
 
+  // Calculate paginated expenses
+  const filteredExpenses = getFilteredExpenses();
+  const startIndex = (currentPage - 1) * recordsPerPage;
+  const endIndex = startIndex + recordsPerPage;
+  const paginatedExpenses = filteredExpenses.slice(startIndex, endIndex);
+
   return (
     <div>
       <button className="back-button" onClick={handleBackClick}>
@@ -317,7 +324,7 @@ const POTable = ({ showFilterButtons = true }) => {
       )}
 
       <div className="content1" style={{ marginTop: "20px" }}>
-        <div className="tables-container">
+        <div className="client-payment-container">
           {loading ? (
             <div className="loading">Loading purchase orders...</div>
           ) : error ? (
@@ -329,70 +336,78 @@ const POTable = ({ showFilterButtons = true }) => {
               </button>
             </div>
           ) : (
-            <table className="t1" style={{ margin: "0 auto" }}>
-              <thead>
-                <tr>
-                  {showFilterButtons ? (
-                    <>
-                      <th>Type</th>
-                      <th>Supplied By</th>
-                      <th>Date</th>
-                      <th>Details</th>
-                    </>
-                  ) : (
-                    <>
-                      <th>Supplier</th>
-                      <th>Month-Year</th>
-                      <th>Total</th>
-                      <th>Details</th>
-                    </>
-                  )}
-                </tr>
-              </thead>
-              <tbody>
-                {getFilteredExpenses().length === 0 ? (
+            <>
+              <table className="payment-table1">
+                <thead>
                   <tr>
-                    <td colSpan={showFilterButtons ? "5" : "3"}>
-                      No expenses found
-                    </td>
+                    {showFilterButtons ? (
+                      <>
+                        <th>Type</th>
+                        <th>Supplied By</th>
+                        <th>Date</th>
+                        <th>Details</th>
+                      </>
+                    ) : (
+                      <>
+                        <th>Supplier</th>
+                        <th>Month-Year</th>
+                        <th>Total</th>
+                        <th>Details</th>
+                      </>
+                    )}
                   </tr>
-                ) : (
-                  getFilteredExpenses().map((expense, index) => (
-                    <tr key={index}>
-                      {showFilterButtons ? (
-                        <>
-                          <td>{expense.type}</td>
-                          <td>{expense.suppliedBy}</td>
-                          <td>{expense.date}</td>
-                          <td>
-                            <button
-                              className="view-btn"
-                              onClick={() => handleViewClick(expense)}
-                            >
-                              View
-                            </button>
-                          </td>
-                        </>
-                      ) : (
-                        <>
-                          <td>{expense.supplier}</td>
-                          <td>{expense.monthYear}</td>
-                          <td>{expense.total}</td>
-                          <td>
-                            <button
-                              className="view-btn"
-                              onClick={() => handleViewClick(expense)}
-                            >
-                              View
-                            </button>
-                          </td>
-                        </>
-                      )}
+                </thead>
+                <tbody>
+                  {paginatedExpenses.length === 0 ? (
+                    <tr>
+                      <td colSpan={showFilterButtons ? "5" : "3"}>
+                        No expenses found
+                      </td>
                     </tr>
-                  ))
-                )}
-              </tbody>
-            </table>
+                  ) : (
+                    paginatedExpenses.map((expense, index) => (
+                      <tr key={index}>
+                        {showFilterButtons ? (
+                          <>
+                            <td>{expense.type}</td>
+                            <td>{expense.suppliedBy}</td>
+                            <td>{expense.date}</td>
+                            <td>
+                              <button
+                                className="view-btn"
+                                onClick={() => handleViewClick(expense)}
+                              >
+                                View
+                              </button>
+                            </td>
+                          </>
+                        ) : (
+                          <>
+                            <td>{expense.supplier}</td>
+                            <td>{expense.monthYear}</td>
+                            <td>{expense.total}</td>
+                            <td>
+                              <button
+                                className="view-btn"
+                                onClick={() => handleViewClick(expense)}
+                              >
+                                View
+                              </button>
+                            </td>
+                          </>
+                        )}
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
+              <Pagination
+                totalRecords={filteredExpenses.length}
+                recordsPerPage={recordsPerPage}
+                currentPage={currentPage}
+                onPageChange={setCurrentPage}
+              />
+            </>
           )}
         </div>
       </div>

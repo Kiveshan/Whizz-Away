@@ -23,7 +23,7 @@ const SubcontractorTable = ({
   }
 
   return (
-    <div className="table-container">
+    <div>
       <div >
         <button className="manage-add-subcontractor-button" onClick={onAdd}>
           Add Subcontractor
