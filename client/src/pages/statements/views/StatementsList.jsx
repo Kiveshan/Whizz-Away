@@ -1,9 +1,10 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import "../css/StatementList.css";
 import api from "../../../api"; // Import the axios instance
+import Pagination from "..//../../components/Pagination"; // Import the Pagination component
 
 const StatementList = () => {
   const navigate = useNavigate();
@@ -19,6 +20,15 @@ const StatementList = () => {
     year: currentDate.getFullYear().toString(),
     month: (currentDate.getMonth() + 1).toString(),
   });
+
+  // Pagination state
+  const [currentPage, setCurrentPage] = useState(1);
+  const [recordsPerPage] = useState(10); // You can make this configurable
+
+  // Handle pagination
+  const handlePageChange = useCallback((pageNumber) => {
+    setCurrentPage(pageNumber);
+  }, []);
 
   useEffect(() => {
     if (!clientId) {
@@ -81,6 +91,7 @@ const StatementList = () => {
       ...prev,
       [name]: value === "Year" || value === "Month" ? "" : value,
     }));
+    setCurrentPage(1); // Reset to first page when filter changes
   };
 
   const monthNames = [
@@ -98,13 +109,33 @@ const StatementList = () => {
     "December",
   ];
 
-  if (loading) return <div>Loading statements...</div>;
-  if (error) return <div className="error-message">Error: {error}</div>;
+  // Calculate pagination data
+  const totalRecords = statements.length;
+  const startIndex = (currentPage - 1) * recordsPerPage;
+  const endIndex = startIndex + recordsPerPage;
+  const currentStatements = statements.slice(startIndex, endIndex);
+
+  if (loading)
+    return (
+      <div className="statement-list-wrapper">
+        <div>Loading statements...</div>
+      </div>
+    );
+  if (error)
+    return (
+      <div className="statement-list-wrapper">
+        <div className="error-message">Error: {error}</div>
+      </div>
+    );
   if (!clientId)
-    return <div>Please select a client from the previous page.</div>;
+    return (
+      <div className="statement-list-wrapper">
+        <div>Please select a client from the previous page.</div>
+      </div>
+    );
 
   return (
-    <div className="">
+    <div className="statement-list-wrapper">
       <button
         onClick={() => navigate("/view-client-statements")}
         className="back-button"
@@ -153,12 +184,12 @@ const StatementList = () => {
           </tr>
         </thead>
         <tbody>
-          {statements.length === 0 ? (
+          {currentStatements.length === 0 ? (
             <tr>
               <td colSpan="3">No statements found for this client.</td>
             </tr>
           ) : (
-            statements.map((statement) => (
+            currentStatements.map((statement) => (
               <tr key={statement.statement_key}>
                 <td>{statement.statement_key}</td>
                 <td>
@@ -181,6 +212,15 @@ const StatementList = () => {
           )}
         </tbody>
       </table>
+      {/* Pagination Component */}
+      {totalRecords > 0 && (
+        <Pagination
+          totalRecords={totalRecords}
+          recordsPerPage={recordsPerPage}
+          currentPage={currentPage}
+          onPageChange={handlePageChange}
+        />
+      )}
     </div>
   );
 };

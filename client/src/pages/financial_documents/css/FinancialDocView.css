@@ -137,9 +137,9 @@
 .financial-docs-wrapper .t1 {
   width: 1000px;
   border-collapse: collapse;
+  font-family: inherit;
   margin-left: auto;
   margin-right: auto;
-  font-family: inherit;
 }
 
 .financial-docs-wrapper .clientinstructiontable {
@@ -147,6 +147,8 @@
   border-collapse: collapse;
   margin-top: -35px;
   align-items: center;
+  margin-left: auto;
+  margin-right: auto;
 }
 
 .financial-docs-wrapper thead {
