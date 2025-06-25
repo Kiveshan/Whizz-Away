@@ -7,6 +7,8 @@ import {
   getAllExpensesHandler,
   getTurnoverPerTruckHandler,
   getWagesPerMonthHandler,
+  getSubcontractorTurnoverPerMonthHandler,
+  getSubcontractorVsTurnoverHandler,
 } from "../../controllers/analytics/analyticsController.js";
 import { verifyToken } from "../../middleware/auth.js";
 
@@ -23,5 +25,9 @@ router.get(
 router.get("/api/all-expenses", verifyToken, getAllExpensesHandler);
 router.get("/api/turnover-per-truck", verifyToken, getTurnoverPerTruckHandler);
 router.get("/api/wages-per-month", verifyToken, getWagesPerMonthHandler);
+router.get("/api/subcontractor-turnover-per-month", verifyToken, 
+  getSubcontractorTurnoverPerMonthHandler);
+router.get("/api/subcontractor-vs-turnover", verifyToken, 
+  getSubcontractorVsTurnoverHandler);
 
 export default router;

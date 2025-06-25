@@ -54,7 +54,6 @@ const StatementList = () => {
           const { status, data } = err.response;
 
           if (status === 401 || status === 403) {
-            // Handle unauthorized or forbidden
             navigate("/");
             return;
           }

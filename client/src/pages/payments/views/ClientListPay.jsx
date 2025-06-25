@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import api from "../../../api"; // Import the configured Axios instance
-import "../../instructions/css/ViewClientInstruction.css";
+import "../css/ClientListPay.css";
 
 const ClientListPay = () => {
   const navigate = useNavigate();
@@ -39,7 +39,7 @@ const ClientListPay = () => {
   }, []);
 
   return (
-    <div className="">
+    <div className="payment-client-wrapper">
       {/* Back Button */}
       <div className="client-payments-header">
         <button className="back-button" onClick={() => navigate("/debtors")}>

@@ -1,25 +1,34 @@
 import {
-  getTrucksWithFuelExpenses,
+  // getTrucksWithFuelExpenses,
+  getAllCompanyOwnedTrucks,
   getExpensesByTruckId,
   getAllExpenses,
 } from "../../models/fuel/fuelModel.js";
 
-const getTrucksWithFuelExpensesHandler = async (req, res) => {
-  console.log("Route /trucks/fuel-expenses was accessed");
+// const getTrucksWithFuelExpensesHandler = async (req, res) => {
+//   console.log("Route /trucks/fuel-expenses was accessed");
 
+//   try {
+//     const trucks = await getTrucksWithFuelExpenses();
+//     console.log("Trucks with fuel expenses found:", trucks);
+
+//     if (trucks.length === 0) {
+//       console.log("No trucks with fuel expenses found");
+//     } else {
+//       console.log(`Found ${trucks.length} trucks with fuel expenses`);
+//     }
+
+//     res.status(200).json(trucks);
+//   } catch (err) {
+//     console.error("Error fetching trucks with fuel expenses:", err);
+//     res.status(500).json({ error: err.message });
+//   }
+// };
+const getAllCompanyOwnedTrucksHandler = async (req, res) => {
   try {
-    const trucks = await getTrucksWithFuelExpenses();
-    console.log("Trucks with fuel expenses found:", trucks);
-
-    if (trucks.length === 0) {
-      console.log("No trucks with fuel expenses found");
-    } else {
-      console.log(`Found ${trucks.length} trucks with fuel expenses`);
-    }
-
+    const trucks = await getAllCompanyOwnedTrucks();
     res.status(200).json(trucks);
   } catch (err) {
-    console.error("Error fetching trucks with fuel expenses:", err);
     res.status(500).json({ error: err.message });
   }
 };
@@ -63,7 +72,8 @@ const getAllExpensesHandler = async (req, res) => {
 };
 
 export {
-  getTrucksWithFuelExpensesHandler,
+  getAllCompanyOwnedTrucksHandler,
+  // getTrucksWithFuelExpensesHandler,
   getTruckExpensesHandler,
   getAllExpensesHandler,
 };
