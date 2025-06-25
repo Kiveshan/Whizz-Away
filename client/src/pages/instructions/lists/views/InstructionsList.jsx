@@ -1,9 +1,10 @@
-"use client";
+"use client"
 
-import { useState, useEffect } from "react";
-import { useNavigate, useLocation } from "react-router-dom";
-import "../../css/InstructionsList.css";
-import api from "../../../../api";
+import { useState, useEffect } from "react"
+import { useNavigate, useLocation } from "react-router-dom"
+import "../../css/InstructionsList.css"
+import api from "../../../../api"
+import Pagination from "../../../../components/Pagination"
 
 // Bell icon component with shake animation using SVG - exactly like in CompanyInstructions.jsx
 const BellIcon = () => {
@@ -28,12 +29,12 @@ const BellIcon = () => {
         <path d="M12 22C13.1 22 14 21.1 14 20H10C10 21.1 10.9 22 12 22ZM18 16V11C18 7.93 16.36 5.36 13.5 4.68V4C13.5 3.17 12.83 2.5 12 2.5C11.17 2.5 10.5 3.17 10.5 4V4.68C7.63 5.36 6 7.92 6 11V16L4 18V19H20V18L18 16Z" />
       </svg>
     </span>
-  );
-};
+  )
+}
 
 // Add the CSS animation for the shake effect - exactly like in CompanyInstructions.jsx
 const addShakeAnimation = () => {
-  const styleSheet = document.createElement("style");
+  const styleSheet = document.createElement("style")
   styleSheet.textContent = `
     @keyframes shake {
       0% { transform: rotate(0deg); }
@@ -46,9 +47,9 @@ const addShakeAnimation = () => {
     .bell-icon-status {
       display: inline-block;
     }
-  `;
-  document.head.appendChild(styleSheet);
-};
+  `
+  document.head.appendChild(styleSheet)
+}
 
 // Helper function to get current month name
 const getCurrentMonthName = () => {
@@ -65,121 +66,113 @@ const getCurrentMonthName = () => {
     "October",
     "November",
     "December",
-  ];
-  const currentMonth = new Date().getMonth(); // 0-11
-  return monthNames[currentMonth];
-};
+  ]
+  const currentMonth = new Date().getMonth() // 0-11
+  return monthNames[currentMonth]
+}
 
 // Helper function to get current year as string
 const getCurrentYear = () => {
-  return new Date().getFullYear().toString();
-};
+  return new Date().getFullYear().toString()
+}
 
 const Instructions = () => {
-  const navigate = useNavigate();
-  const location = useLocation();
+  const navigate = useNavigate()
+  const location = useLocation()
 
   // Extract state from location
-  const clientId = location.state?.clientId;
-  const clientName = location.state?.clientName;
+  const clientId = location.state?.clientId
+  const clientName = location.state?.clientName
 
   // Initialize state with current month and year
-  const [selectedMonth, setSelectedMonth] = useState(getCurrentMonthName());
-  const [selectedYear, setSelectedYear] = useState(getCurrentYear());
-  const [activeFilter, setActiveFilter] = useState(
-    location.state?.activeFilter || "All"
-  );
+  const [selectedMonth, setSelectedMonth] = useState(getCurrentMonthName())
+  const [selectedYear, setSelectedYear] = useState(getCurrentYear())
+  const [activeFilter, setActiveFilter] = useState(location.state?.activeFilter || "All")
 
-  const [instructions, setInstructions] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
+  const [instructions, setInstructions] = useState([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState(null)
+  const [currentPage, setCurrentPage] = useState(1)
+  const [recordsPerPage] = useState(10)
 
   // Add the shake animation when component mounts - exactly like in CompanyInstructions.jsx
   useEffect(() => {
-    addShakeAnimation();
-  }, []);
+    addShakeAnimation()
+  }, [])
 
   // Log when component mounts and what state it receives
   useEffect(() => {
-    console.log("InstructionsList mounted with state:", location.state);
-    console.log("clientId:", clientId);
-    console.log("clientName:", clientName);
-    console.log("selectedMonth:", selectedMonth);
-    console.log("selectedYear:", selectedYear);
-    console.log("activeFilter:", activeFilter);
-  }, [
-    location.state,
-    clientId,
-    clientName,
-    selectedMonth,
-    selectedYear,
-    activeFilter,
-  ]);
+    console.log("InstructionsList mounted with state:", location.state)
+    console.log("clientId:", clientId)
+    console.log("clientName:", clientName)
+    console.log("selectedMonth:", selectedMonth)
+    console.log("selectedYear:", selectedYear)
+    console.log("activeFilter:", activeFilter)
+  }, [location.state, clientId, clientName, selectedMonth, selectedYear, activeFilter])
 
   const fetchInstructions = async () => {
     try {
-      setLoading(true);
-      let url = "/api/instructions";
+      setLoading(true)
+      let url = "/api/instructions"
 
       // Add client filter if clientId is provided
       if (clientId) {
-        console.log("Fetching instructions for clientId:", clientId);
-        url += `?clientId=${clientId}`;
+        console.log("Fetching instructions for clientId:", clientId)
+        url += `?clientId=${clientId}`
       } else {
-        console.log("No clientId provided, fetching all instructions");
+        console.log("No clientId provided, fetching all instructions")
       }
 
-      console.log("Fetching from URL:", url);
-      const response = await api.get(url);
+      console.log("Fetching from URL:", url)
+      const response = await api.get(url)
 
-      const data = response.data;
-      console.log("Instructions data received:", data.length, "records");
-      setInstructions(data);
-      setLoading(false);
+      const data = response.data
+      console.log("Instructions data received:", data.length, "records")
+      setInstructions(data)
+      setLoading(false)
     } catch (error) {
-      console.error("Error fetching instructions:", error);
+      console.error("Error fetching instructions:", error)
       const errorMessage =
-        error.response?.data?.message ||
-        error.message ||
-        "Failed to load instructions. Please try again later.";
-      setError(errorMessage);
-      setLoading(false);
+        error.response?.data?.message || error.message || "Failed to load instructions. Please try again later."
+      setError(errorMessage)
+      setLoading(false)
     }
-  };
+  }
 
   // Log the clientId to verify it's being received correctly
-  console.log("InstructionsList - clientId for fetching:", clientId);
+  console.log("InstructionsList - clientId for fetching:", clientId)
 
   // Only fetch instructions if component is mounted
   useEffect(() => {
-    fetchInstructions();
-  }, [clientId]); // Make sure clientId is in the dependency array
+    fetchInstructions()
+  }, [clientId]) // Make sure clientId is in the dependency array
 
   const handleFilterClick = (filter) => {
-    setActiveFilter(filter);
-  };
+    setActiveFilter(filter)
+    setCurrentPage(1)
+  }
 
   // Helper function to determine status priority for sorting
   const getStatusPriority = (status) => {
     switch (status) {
       case "New":
-        return 1; // Highest priority
+        return 1 // Highest priority
       case "In progress":
-        return 2;
+        return 2
       case "Completed":
-        return 3;
+        return 3
       default:
-        return 4; // Lowest priority
+        return 4 // Lowest priority
     }
-  };
+  }
 
   const getFilteredInstructions = () => {
-    let filtered = [...instructions];
+    let filtered = [...instructions]
 
     // Filter by month and year if selected
     if (selectedMonth) {
       filtered = filtered.filter((item) => {
-        const date = new Date(item.startingdate || item.pickupdate);
+        const date = new Date(item.startingdate || item.pickupdate)
         const monthNames = [
           "January",
           "February",
@@ -193,42 +186,53 @@ const Instructions = () => {
           "October",
           "November",
           "December",
-        ];
-        return monthNames[date.getMonth()] === selectedMonth;
-      });
+        ]
+        return monthNames[date.getMonth()] === selectedMonth
+      })
     }
 
     if (selectedYear) {
       filtered = filtered.filter((item) => {
-        const date = new Date(item.startingdate || item.pickupdate);
-        return date.getFullYear().toString() === selectedYear;
-      });
+        const date = new Date(item.startingdate || item.pickupdate)
+        return date.getFullYear().toString() === selectedYear
+      })
     }
 
     // Filter by status or type
     if (activeFilter !== "All") {
       if (["New", "In progress", "Completed"].includes(activeFilter)) {
-        filtered = filtered.filter((item) => item.status === activeFilter);
+        filtered = filtered.filter((item) => item.status === activeFilter)
       } else if (activeFilter === "import") {
-        filtered = filtered.filter(
-          (item) => item.type_text === "import" || item.type === "import"
-        );
+        filtered = filtered.filter((item) => item.type_text === "import" || item.type === "import")
       } else if (activeFilter === "export") {
-        filtered = filtered.filter(
-          (item) => item.type_text === "export" || item.type === "export"
-        );
+        filtered = filtered.filter((item) => item.type_text === "export" || item.type === "export")
       }
     }
 
     // Sort by status priority: New -> In progress -> Completed
     filtered.sort((a, b) => {
-      const priorityA = getStatusPriority(a.status);
-      const priorityB = getStatusPriority(b.status);
-      return priorityA - priorityB;
-    });
+      const priorityA = getStatusPriority(a.status)
+      const priorityB = getStatusPriority(b.status)
+      return priorityA - priorityB
+    })
 
-    return filtered;
-  };
+    return filtered
+  }
+
+  // Pagination logic
+  const filteredInstructions = getFilteredInstructions()
+  const indexOfLastRecord = currentPage * recordsPerPage
+  const indexOfFirstRecord = indexOfLastRecord - recordsPerPage
+  const currentInstructions = filteredInstructions.slice(indexOfFirstRecord, indexOfLastRecord)
+
+  const handlePageChange = (pageNumber) => {
+    setCurrentPage(pageNumber)
+  }
+
+  // Reset to first page when filters change
+  useEffect(() => {
+    setCurrentPage(1)
+  }, [selectedMonth, selectedYear, activeFilter])
 
   // Function to render status with bell for "New" status - exactly like in CompanyInstructions.jsx
   const renderStatus = (status) => {
@@ -237,10 +241,10 @@ const Instructions = () => {
         <>
           <BellIcon /> {status}
         </>
-      );
+      )
     }
-    return status;
-  };
+    return status
+  }
 
   // Handle view instruction click - explicitly pass all state to FCcontrollerinstructions
   const handleViewInstruction = (instructionId) => {
@@ -252,16 +256,13 @@ const Instructions = () => {
       selectedMonth,
       selectedYear,
       activeFilter,
-    };
+    }
 
     // Log the state being passed to FCcontrollerinstructions
-    console.log(
-      "Navigating to FCcontrollerinstructions with state:",
-      stateToPass
-    );
+    console.log("Navigating to FCcontrollerinstructions with state:", stateToPass)
 
-    navigate("/FCcontrollerinstructions", { state: stateToPass });
-  };
+    navigate("/FCcontrollerinstructions", { state: stateToPass })
+  }
   // Added this new function
   const handleViewAssignment = (instructionId) => {
     // Create state object with all necessary parameters
@@ -272,22 +273,18 @@ const Instructions = () => {
       selectedMonth,
       selectedYear,
       activeFilter,
-    };
+    }
 
     // Log the state being passed to update-instructions
-    console.log("Navigating to update-instructions with state:", stateToPass);
+    console.log("Navigating to update-instructions with state:", stateToPass)
 
-    navigate("/update-instructions", { state: stateToPass });
-  };
+    navigate("/update-instructions", { state: stateToPass })
+  }
   return (
     <div>
       {/* Centered month and year filters - now positioned ABOVE the company name */}
       <div className="dropdown-container74">
-        <select
-          value={selectedMonth}
-          onChange={(e) => setSelectedMonth(e.target.value)}
-          className="dropdown"
-        >
+        <select value={selectedMonth} onChange={(e) => setSelectedMonth(e.target.value)} className="dropdown">
           <option value="">Select Month</option>
           <option value="January">January</option>
           <option value="February">February</option>
@@ -303,11 +300,7 @@ const Instructions = () => {
           <option value="December">December</option>
         </select>
 
-        <select
-          value={selectedYear}
-          onChange={(e) => setSelectedYear(e.target.value)}
-          className="dropdown"
-        >
+        <select value={selectedYear} onChange={(e) => setSelectedYear(e.target.value)} className="dropdown">
           <option value="">Select Year</option>
           <option value="2023">2023</option>
           <option value="2024">2024</option>
@@ -318,10 +311,7 @@ const Instructions = () => {
 
       {/* Centered company name heading */}
       <div className="client-payments-header">
-        <button
-          className="back-button"
-          onClick={() => navigate("/ViewClientInstruction")}
-        >
+        <button className="back-button" onClick={() => navigate("/ViewClientInstruction")}>
           Back
         </button>
         {clientName && <span className="client-name">{clientName}</span>}
@@ -331,49 +321,37 @@ const Instructions = () => {
         <div className="button-group">
           <div className="filter-buttons">
             <button
-              className={`btn btn-blue ${
-                activeFilter === "import" ? "active" : ""
-              }`}
+              className={`btn btn-blue ${activeFilter === "import" ? "active" : ""}`}
               onClick={() => handleFilterClick("import")}
             >
               Import
             </button>
             <button
-              className={`btn btn-blue ${
-                activeFilter === "export" ? "active" : ""
-              }`}
+              className={`btn btn-blue ${activeFilter === "export" ? "active" : ""}`}
               onClick={() => handleFilterClick("export")}
             >
               Export
             </button>
             <button
-              className={`btn btn-blue ${
-                activeFilter === "All" ? "active" : ""
-              }`}
+              className={`btn btn-blue ${activeFilter === "All" ? "active" : ""}`}
               onClick={() => handleFilterClick("All")}
             >
               All
             </button>
             <button
-              className={`btn btn-blue ${
-                activeFilter === "In progress" ? "active" : ""
-              }`}
+              className={`btn btn-blue ${activeFilter === "In progress" ? "active" : ""}`}
               onClick={() => handleFilterClick("In progress")}
             >
               In-Progress
             </button>
             <button
-              className={`btn btn-blue ${
-                activeFilter === "Completed" ? "active" : ""
-              }`}
+              className={`btn btn-blue ${activeFilter === "Completed" ? "active" : ""}`}
               onClick={() => handleFilterClick("Completed")}
             >
               Complete
             </button>
             <button
-              className={`btn btn-blue ${
-                activeFilter === "New" ? "active" : ""
-              }`}
+              className={`btn btn-blue ${activeFilter === "New" ? "active" : ""}`}
               onClick={() => handleFilterClick("New")}
             >
               New
@@ -399,31 +377,25 @@ const Instructions = () => {
                 </tr>
               </thead>
               <tbody>
-                {getFilteredInstructions().length === 0 ? (
+                {currentInstructions.length === 0 ? (
                   <tr>
                     <td colSpan="7">No instructions found</td>
                   </tr>
                 ) : (
-                  getFilteredInstructions().map((item) => (
+                  currentInstructions.map((item) => (
                     <tr key={item.m1controllerkey || item.m1key}>
                       <td>Instruction {item.m1controllerkey || item.m1key}</td>
                       <td>{item.fileno}</td>
                       <td>
                         {item.type_text ||
-                          (item.shipment_type === 1 ||
-                          item.shipment_type === "1"
+                          (item.shipment_type === 1 || item.shipment_type === "1"
                             ? "import"
-                            : item.shipment_type === 2 ||
-                              item.shipment_type === "2"
-                            ? "export"
-                            : item.type)}
+                            : item.shipment_type === 2 || item.shipment_type === "2"
+                              ? "export"
+                              : item.type)}
                       </td>
                       <td>{renderStatus(item.status)}</td>
-                      <td>
-                        {new Date(
-                          item.startingdate || item.pickupdate
-                        ).toLocaleDateString()}
-                      </td>
+                      <td>{new Date(item.startingdate || item.pickupdate).toLocaleDateString()}</td>
                       <td>
                         <button
                           className="view-btn"
@@ -444,19 +416,16 @@ const Instructions = () => {
                               selectedMonth,
                               selectedYear,
                               activeFilter,
-                            };
+                            }
 
                             // Log the state being passed to update-instructions
-                            console.log(
-                              "Navigating to update-instructions with state:",
-                              stateToPass
-                            );
+                            console.log("Navigating to update-instructions with state:", stateToPass)
 
                             // Use replace: true to ensure a clean navigation
                             navigate("/update-instructions", {
                               state: stateToPass,
                               replace: true,
-                            });
+                            })
                           }}
                         >
                           View
@@ -469,9 +438,21 @@ const Instructions = () => {
             </table>
           )}
         </div>
+
+        {/* Pagination - Added below the tables-container */}
+        {filteredInstructions.length > recordsPerPage && (
+          <div style={{ display: "flex", justifyContent: "center", marginTop: "20px" }}>
+            <Pagination
+              currentPage={currentPage}
+              totalRecords={filteredInstructions.length}
+              recordsPerPage={recordsPerPage}
+              onPageChange={handlePageChange}
+            />
+          </div>
+        )}
       </div>
     </div>
-  );
-};
+  )
+}
 
-export default Instructions;
+export default Instructions
