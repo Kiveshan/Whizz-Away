@@ -9,6 +9,7 @@ import "../css/pagination.css"
 import { useManageState } from "../hooks/useManageState"
 import { useApi } from "../hooks/useApi"
 import { useTruckNotifications } from "../hooks/useTruckNotifications"
+import { useTrailerNotifications } from "../hooks/useTrailerNotifications"
 
 // Components
 import CustomAlert from "../components/common/CustomAlert"
@@ -26,6 +27,10 @@ import ClientForm from "../components/clients/ClientForm"
 import TruckTable from "../components/trucks/TruckTable"
 import TruckForm from "../components/trucks/TruckForm"
 
+// Trailer Components
+import TrailerTable from "../components/trailers/TrailerTable"
+import TrailerForm from "../components/trailers/TrailerForm"
+
 // Driver Rate Components
 import DriverRatesTable from "../components/rates/DriverRatesTable"
 import DriverRateForm from "../components/rates/DriverRateForm"
@@ -38,7 +43,9 @@ const Manage = () => {
   const navigate = useNavigate()
   const { state, actions } = useManageState()
   const api = useApi(state, actions)
-  const { notifications, refreshNotifications } = useTruckNotifications()
+  const { notifications: truckNotifications, refreshNotifications: refreshTruckNotifications } = useTruckNotifications()
+  const { notifications: trailerNotifications, refreshNotifications: refreshTrailerNotifications } =
+    useTrailerNotifications()
 
   // Fetch data on component mount
   useEffect(() => {
@@ -61,6 +68,7 @@ const Manage = () => {
       state.showEmployeeForm ||
       state.showClientForm ||
       state.showTruckForm ||
+      state.showTrailerForm ||
       state.showDriverRateForm ||
       state.showSubcontractorForm
 
@@ -69,6 +77,7 @@ const Manage = () => {
       actions.hideForm("showEmployeeForm")
       actions.hideForm("showClientForm")
       actions.hideForm("showTruckForm")
+      actions.hideForm("showTrailerForm")
       actions.hideForm("showDriverRateForm")
       actions.hideForm("showSubcontractorForm")
 
@@ -76,12 +85,14 @@ const Manage = () => {
       actions.resetFormData("Employee")
       actions.resetFormData("Client")
       actions.resetFormData("Truck")
+      actions.resetFormData("Trailer")
       actions.resetFormData("DriverRate")
       actions.resetFormData("Subcontractor")
 
       actions.setEditing("Employee", null)
       actions.setEditing("Client", null)
       actions.setEditing("Truck", null)
+      actions.setEditing("Trailer", null)
       actions.setEditing("Rate", null)
       actions.setEditing("Subcontractor", null)
     } else {
@@ -151,6 +162,27 @@ const Manage = () => {
     actions.resetFormData("Truck")
     actions.setEditing("Truck", null)
     actions.hideForm("showTruckForm")
+  }
+
+  // Trailer handlers
+  const handleTrailerFormChange = (field, value) => {
+    actions.updateFormData("Trailer", { [field]: value })
+  }
+
+  const handleTrailerEdit = (id) => {
+    api.loadItemForEdit("trailer", id)
+  }
+
+  const handleTrailerAdd = () => {
+    actions.resetFormData("Trailer")
+    actions.setEditing("Trailer", null)
+    actions.showForm("showTrailerForm")
+  }
+
+  const handleTrailerCancel = () => {
+    actions.resetFormData("Trailer")
+    actions.setEditing("Trailer", null)
+    actions.hideForm("showTrailerForm")
   }
 
   // Driver Rate handlers
@@ -244,9 +276,23 @@ const Manage = () => {
         >
           Trucks
           <NotificationBell
-            count={notifications.count}
-            notifications={notifications}
-            onRefresh={refreshNotifications}
+            count={truckNotifications.count}
+            notifications={truckNotifications}
+            onRefresh={refreshTruckNotifications}
+            type="truck"
+          />
+        </button>
+        <button
+          className={`manage-tab-button ${state.activeTab === "trailers" ? "active" : ""}`}
+          onClick={() => actions.setActiveTab("trailers")}
+          style={{ position: "relative", display: "flex", alignItems: "center", gap: "8px" }}
+        >
+          Trailers
+          <NotificationBell
+            count={trailerNotifications.count}
+            notifications={trailerNotifications}
+            onRefresh={refreshTrailerNotifications}
+            type="trailer"
           />
         </button>
       </div>
@@ -344,6 +390,38 @@ const Manage = () => {
               filters={state.filters.trucks}
               onSearchChange={(value) => actions.setFilter("trucks", "search", value)}
               onApplyFilters={() => api.applyFilters("trucks")}
+            />
+          )}
+        </>
+      )}
+
+      {/* Trailers Tab */}
+      {state.activeTab === "trailers" && (
+        <>
+          {state.showTrailerForm ? (
+            <TrailerForm
+              trailer={state.newTrailer}
+              loading={state.loading}
+              isEditing={!!state.editTrailerId}
+              onSave={api.saveTrailer}
+              onCancel={handleTrailerCancel}
+              onChange={handleTrailerFormChange}
+              onDeleteDocument={api.deleteDocument}
+            />
+          ) : (
+            <TrailerTable
+              trailers={state.trailers}
+              loading={state.loading}
+              error={state.error}
+              onEdit={handleTrailerEdit}
+              onDelete={(id) => api.deleteItem("trailer", id)}
+              onAdd={handleTrailerAdd}
+              pagination={state.pagination.trailers}
+              onPageChange={(page) => api.changePage("trailers", page)}
+              onItemsPerPageChange={(itemsPerPage) => api.changeItemsPerPage("trailers", itemsPerPage)}
+              filters={state.filters.trailers || { search: "" }}
+              onSearchChange={(value) => actions.setFilter("trailers", "search", value)}
+              onApplyFilters={() => api.applyFilters("trailers")}
             />
           )}
         </>

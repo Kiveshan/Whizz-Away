@@ -2,7 +2,7 @@
 
 import { useState } from "react"
 
-const NotificationBell = ({ count, notifications, onRefresh }) => {
+const NotificationBell = ({ count, notifications, onRefresh, type = "truck" }) => {
   const [showDropdown, setShowDropdown] = useState(false)
 
   const formatDate = (dateString) => {
@@ -15,6 +15,30 @@ const NotificationBell = ({ count, notifications, onRefresh }) => {
     const today = new Date()
     const expiry = new Date(expiryDate)
     return Math.ceil((expiry - today) / (1000 * 60 * 60 * 24))
+  }
+
+  const getExpiryDateField = (item) => {
+    return type === "truck" ? item.truck_license_expiry : item.trailer_license_expiry
+  }
+
+  const getIdentifierField = (item) => {
+    return type === "truck" ? item.truckregnum : item.trailerregnum
+  }
+
+  const getIcon = () => {
+    return type === "truck" ? "🚛" : "🚚"
+  }
+
+  const getTypeLabel = () => {
+    return type === "truck" ? "truck" : "trailer"
+  }
+
+  const getTypeLabelPlural = () => {
+    return type === "truck" ? "trucks" : "trailers"
+  }
+
+  const getTypeLabelCapitalized = () => {
+    return type === "truck" ? "Truck" : "Trailer"
   }
 
   return (
@@ -31,7 +55,7 @@ const NotificationBell = ({ count, notifications, onRefresh }) => {
           fontSize: "18px",
           color: count > 0 ? "#ff6b35" : "#666",
         }}
-        title={`${count} truck license notifications`}
+        title={`${count} ${getTypeLabel()} license notifications`}
       >
         🔔
         {count > 0 && (
@@ -90,7 +114,7 @@ const NotificationBell = ({ count, notifications, onRefresh }) => {
             }}
           >
             <h4 style={{ margin: 0, fontSize: "14px", fontWeight: "600" }}>
-              License Notifications {notifications.loading && "(Loading...)"}
+              {getIcon()} {getTypeLabelCapitalized()} License Notifications {notifications.loading && "(Loading...)"}
             </h4>
             <button
               onClick={() => {
@@ -137,7 +161,7 @@ const NotificationBell = ({ count, notifications, onRefresh }) => {
               }}
             >
               <div style={{ fontSize: "24px", marginBottom: "8px" }}>✅</div>
-              All truck licenses are current
+              All {getTypeLabel()} licenses are current
             </div>
           ) : (
             <div style={{ maxHeight: "320px", overflowY: "auto" }}>
@@ -156,7 +180,7 @@ const NotificationBell = ({ count, notifications, onRefresh }) => {
                   >
                     🚨 EXPIRED LICENSES ({notifications.expired.length})
                   </div>
-                  {notifications.expired.map((truck, index) => (
+                  {notifications.expired.map((item, index) => (
                     <div
                       key={`expired-${index}`}
                       style={{
@@ -165,12 +189,24 @@ const NotificationBell = ({ count, notifications, onRefresh }) => {
                         backgroundColor: "#fff5f5",
                       }}
                     >
-                      <div style={{ fontWeight: "600", fontSize: "14px", color: "#c53030" }}>{truck.truckregnum}</div>
+                      <div
+                        style={{
+                          fontWeight: "600",
+                          fontSize: "14px",
+                          color: "#c53030",
+                          display: "flex",
+                          alignItems: "center",
+                          gap: "8px",
+                        }}
+                      >
+                        <span>{getIcon()}</span>
+                        {getIdentifierField(item)}
+                      </div>
                       <div style={{ fontSize: "12px", color: "#666", marginTop: "2px" }}>
-                        Expired: {formatDate(truck.truck_license_expiry)}
+                        Expired: {formatDate(getExpiryDateField(item))}
                       </div>
                       <div style={{ fontSize: "11px", color: "#c53030", marginTop: "2px" }}>
-                        {truck.days_expired} days overdue
+                        {item.days_expired} days overdue
                       </div>
                     </div>
                   ))}
@@ -192,7 +228,7 @@ const NotificationBell = ({ count, notifications, onRefresh }) => {
                   >
                     ⚠️ EXPIRING SOON ({notifications.expiring.length})
                   </div>
-                  {notifications.expiring.map((truck, index) => (
+                  {notifications.expiring.map((item, index) => (
                     <div
                       key={`expiring-${index}`}
                       style={{
@@ -201,12 +237,24 @@ const NotificationBell = ({ count, notifications, onRefresh }) => {
                         backgroundColor: "#fffbf0",
                       }}
                     >
-                      <div style={{ fontWeight: "600", fontSize: "14px", color: "#c05621" }}>{truck.truckregnum}</div>
+                      <div
+                        style={{
+                          fontWeight: "600",
+                          fontSize: "14px",
+                          color: "#c05621",
+                          display: "flex",
+                          alignItems: "center",
+                          gap: "8px",
+                        }}
+                      >
+                        <span>{getIcon()}</span>
+                        {getIdentifierField(item)}
+                      </div>
                       <div style={{ fontSize: "12px", color: "#666", marginTop: "2px" }}>
-                        Expires: {formatDate(truck.truck_license_expiry)}
+                        Expires: {formatDate(getExpiryDateField(item))}
                       </div>
                       <div style={{ fontSize: "11px", color: "#c05621", marginTop: "2px" }}>
-                        {getDaysUntilExpiry(truck.truck_license_expiry)} days remaining
+                        {getDaysUntilExpiry(getExpiryDateField(item))} days remaining
                       </div>
                     </div>
                   ))}

@@ -14,6 +14,7 @@ export function useApi(state, actions) {
           employees: "/api/employees",
           clients: "/api/m5Clients",
           trucks: "/api/trucks",
+          trailers: "/api/trailers", // Added trailers endpoint
           driverRates: "/api/driver-rates",
           subcontractors: "/api/subcontractors",
         }
@@ -72,6 +73,13 @@ export function useApi(state, actions) {
       ),
       fetchPaginatedData("clients", pagination.clients.currentPage, pagination.clients.itemsPerPage, filters.clients),
       fetchPaginatedData("trucks", pagination.trucks.currentPage, pagination.trucks.itemsPerPage, filters.trucks),
+      fetchPaginatedData(
+        // Added trailers to fetchAllData
+        "trailers",
+        pagination.trailers.currentPage,
+        pagination.trailers.itemsPerPage,
+        filters.trailers,
+      ),
       fetchPaginatedData(
         "driverRates",
         pagination.driverRates.currentPage,
@@ -317,6 +325,63 @@ export function useApi(state, actions) {
     [state, actions, fetchPaginatedData],
   )
 
+  // Added saveTrailer function
+  const saveTrailer = useCallback(
+    async (trailerData) => {
+      actions.setLoading(true)
+
+      try {
+        const formData = new FormData()
+
+        // Append all scalar fields
+        Object.keys(trailerData).forEach((key) => {
+          if (key !== "documents" && trailerData[key] !== undefined) {
+            formData.append(key, trailerData[key])
+          }
+        })
+
+        // Append documents
+        if (trailerData.documents && trailerData.documents.length) {
+          trailerData.documents.forEach((file) => {
+            formData.append("documents", file)
+          })
+        }
+
+        if (state.editTrailerId) {
+          await api.put(`/api/trailers/${state.editTrailerId}`, formData, {
+            headers: { "Content-Type": "multipart/form-data" },
+          })
+        } else {
+          await api.post("/api/trailers", formData, {
+            headers: { "Content-Type": "multipart/form-data" },
+          })
+        }
+
+        // Refresh current page
+        await fetchPaginatedData(
+          "trailers",
+          state.pagination.trailers.currentPage,
+          state.pagination.trailers.itemsPerPage,
+          state.filters.trailers,
+        )
+
+        actions.resetFormData("Trailer")
+        actions.setEditing("Trailer", null)
+        actions.hideForm("showTrailerForm")
+
+        actions.showAlert(state.editTrailerId ? "Trailer updated!" : "Trailer added!")
+        return true
+      } catch (err) {
+        console.error("Error saving trailer:", err)
+        actions.showAlert(`Error: ${err.response?.data?.error || err.message}`)
+        return false
+      } finally {
+        actions.setLoading(false)
+      }
+    },
+    [state, actions, fetchPaginatedData],
+  )
+
   const saveDriverRate = useCallback(
     async (rateData) => {
       actions.setLoading(true)
@@ -539,6 +604,9 @@ export function useApi(state, actions) {
           case "truck":
             endpoint = `/api/trucks/${id}`
             break
+          case "trailer": // Added trailer case
+            endpoint = `/api/trailers/${id}`
+            break
           case "rate":
             endpoint = `/api/driver-rates/${id}`
             break
@@ -587,6 +655,10 @@ export function useApi(state, actions) {
             endpoint = `/api/trucks/${id}`
             formType = "Truck"
             break
+          case "trailer": // Added trailer case
+            endpoint = `/api/trailers/${id}`
+            formType = "Trailer"
+            break
           case "rate":
             endpoint = `/api/driver-rates/${id}`
             formType = "DriverRate"
@@ -632,14 +704,30 @@ export function useApi(state, actions) {
             driver_six_meter_rate: data.driver_six_meter_rate || "",
             driver_twelve_meter_rate: data.driver_twelve_meter_rate || "",
           })
-        } else if (type === "truck") {
+        } else if (type === "truck" || type === "trailer") {
+          // Added trailer handling
           const existingDocuments = []
           if (data.document_url1) existingDocuments.push(data.document_url1)
           if (data.document_url2) existingDocuments.push(data.document_url2)
           if (data.document_url3) existingDocuments.push(data.document_url3)
 
+          // Format dates for HTML date inputs
+          const formattedData = { ...data }
+          if (type === "truck" && data.truckpurchasedate) {
+            formattedData.truckpurchasedate = new Date(data.truckpurchasedate).toISOString().split("T")[0]
+          }
+          if (type === "truck" && data.truck_license_expiry) {
+            formattedData.truck_license_expiry = new Date(data.truck_license_expiry).toISOString().split("T")[0]
+          }
+          if (type === "trailer" && data.trailerpurchasedate) {
+            formattedData.trailerpurchasedate = new Date(data.trailerpurchasedate).toISOString().split("T")[0]
+          }
+          if (type === "trailer" && data.trailer_license_expiry) {
+            formattedData.trailer_license_expiry = new Date(data.trailer_license_expiry).toISOString().split("T")[0]
+          }
+
           actions.updateFormData(formType, {
-            ...data,
+            ...formattedData,
             documents: [],
             existingDocuments,
           })
@@ -668,8 +756,22 @@ export function useApi(state, actions) {
     async (type, itemId, url) => {
       if (window.confirm("Are you sure you want to delete this document?")) {
         try {
-          const endpoint = type === "employee" ? "/api/employees/delete-doc" : "/api/trucks/delete-doc"
-          const idField = type === "employee" ? "employeeId" : "truckId"
+          let endpoint
+          let idField
+
+          if (type === "employee") {
+            endpoint = "/api/employees/delete-doc"
+            idField = "employeeId"
+          } else if (type === "truck") {
+            endpoint = "/api/trucks/delete-doc"
+            idField = "truckId"
+          } else if (type === "trailer") {
+            // Added trailer document deletion
+            endpoint = "/api/trailers/delete-doc"
+            idField = "trailerId"
+          } else {
+            throw new Error("Invalid document type")
+          }
 
           const response = await api.post(endpoint, {
             [idField]: itemId,
@@ -704,6 +806,7 @@ export function useApi(state, actions) {
     saveEmployee,
     saveClient,
     saveTruck,
+    saveTrailer, // Added saveTrailer to return object
     saveDriverRate,
     saveSubcontractor,
     toggleEmployeeStatus,

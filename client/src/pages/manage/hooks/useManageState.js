@@ -13,6 +13,7 @@ const initialState = {
   employees: [],
   clients: [],
   trucks: [],
+  trailers: [],
   driverRates: [],
   subcontractors: [],
 
@@ -31,6 +32,12 @@ const initialState = {
       itemsPerPage: 5,
     },
     trucks: {
+      currentPage: 1,
+      totalPages: 1,
+      totalItems: 0,
+      itemsPerPage: 5,
+    },
+    trailers: {
       currentPage: 1,
       totalPages: 1,
       totalItems: 0,
@@ -63,6 +70,9 @@ const initialState = {
     trucks: {
       search: "",
     },
+    trailers: {
+      search: "",
+    },
     driverRates: {
       search: "",
     },
@@ -76,6 +86,7 @@ const initialState = {
   showEmployeeForm: false,
   showClientForm: false,
   showTruckForm: false,
+  showTrailerForm: false,
   showDriverRateForm: false,
   showSubcontractorForm: false,
 
@@ -83,6 +94,7 @@ const initialState = {
   editingEmployeeId: null,
   editingClientId: null,
   editTruckId: null,
+  editTrailerId: null,
   editingRateId: null,
   subcontractorId: null,
   isEditing: false,
@@ -139,6 +151,22 @@ const initialState = {
     purchase_price: "",
     current_evaluation: "",
     vin_num: "",
+    truck_license_expiry: "",
+    is_subcontractor: false,
+    documents: [],
+    existingDocuments: [],
+  },
+
+  newTrailer: {
+    trailerregnum: "",
+    trailersize: "",
+    trailerpurchasedate: "",
+    year: "",
+    model: "",
+    purchase_price: "",
+    current_evaluation: "",
+    vin_num: "",
+    trailer_license_expiry: "",
     is_subcontractor: false,
     documents: [],
     existingDocuments: [],
@@ -230,6 +258,7 @@ function manageReducer(state, action) {
         ...(action.payload === "showEmployeeForm" && { editingEmployeeId: null }),
         ...(action.payload === "showClientForm" && { editingClientId: null, isEditing: false }),
         ...(action.payload === "showTruckForm" && { editTruckId: null }),
+        ...(action.payload === "showTrailerForm" && { editTrailerId: null }),
         ...(action.payload === "showDriverRateForm" && { editingRateId: null, isEditingRate: false }),
         ...(action.payload === "showSubcontractorForm" && { subcontractorId: null, isEditMode: false }),
       }
@@ -245,6 +274,7 @@ function manageReducer(state, action) {
           isEditMode: !!action.payload.id,
         }),
         ...(action.payload.type === "Truck" && { editTruckId: action.payload.id }),
+        ...(action.payload.type === "Trailer" && { editTrailerId: action.payload.id }),
       }
 
     case "UPDATE_FORM_DATA":
