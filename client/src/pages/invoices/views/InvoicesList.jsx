@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import "../css/InvoicesList.css";
 import api from "../../../api"; // Import the axios instance
+import Pagination from "../../../components/Pagination"; // Import the Pagination component
 
 // Utility function for formatting dates
 const formatDate = (dateString) => {
@@ -34,6 +35,10 @@ const InvoicesList = () => {
   const [instructions, setInstructions] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
+
+  // Pagination state
+  const [currentPage, setCurrentPage] = useState(1);
+  const [recordsPerPage] = useState(4); // You can make this configurable
 
   // Set default filters to current year and month
   const currentDate = new Date();
@@ -154,6 +159,7 @@ Troubleshooting tips:
       ...prev,
       [name]: value,
     }));
+    setCurrentPage(1); // Reset to first page when filter changes
   }, []);
 
   // Handle type filter changes - use useCallback to memoize
@@ -162,6 +168,12 @@ Troubleshooting tips:
       ...prev,
       type,
     }));
+    setCurrentPage(1); // Reset to first page when filter changes
+  }, []);
+
+  // Handle pagination
+  const handlePageChange = useCallback((pageNumber) => {
+    setCurrentPage(pageNumber);
   }, []);
 
   // Determine the back button destination
@@ -174,6 +186,12 @@ Troubleshooting tips:
       navigate("/FDashboard");
     }
   }, [clientId, navigate]);
+
+  // Calculate pagination data
+  const totalRecords = instructions.length;
+  const startIndex = (currentPage - 1) * recordsPerPage;
+  const endIndex = startIndex + recordsPerPage;
+  const currentInstructions = instructions.slice(startIndex, endIndex);
 
   return (
     <div className="invoices-list-wrapper">
@@ -283,7 +301,7 @@ Troubleshooting tips:
                   </tr>
                 </thead>
                 <tbody>
-                  {instructions.map((instruction) => (
+                  {currentInstructions.map((instruction) => (
                     <tr key={instruction.m1key}>
                       <td>{instruction.m1key}</td>
                       <td>{instruction.shipment_type}</td>
@@ -314,6 +332,15 @@ Troubleshooting tips:
               </table>
             )}
           </div>
+          {/* Pagination Component */}
+          {totalRecords > 0 && (
+            <Pagination
+              totalRecords={totalRecords}
+              recordsPerPage={recordsPerPage}
+              currentPage={currentPage}
+              onPageChange={handlePageChange}
+            />
+          )}
         </main>
       </div>
     </div>

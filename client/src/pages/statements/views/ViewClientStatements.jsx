@@ -1,15 +1,25 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import "../css/ViewClientStatements.css";
 import api from "../../../api"; // Import the axios instance
+import Pagination from "../../../components/Pagination"; // Import the Pagination component
 
 const ViewClientStatement = () => {
   const navigate = useNavigate();
   const [clients, setClients] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+
+  // Pagination state
+  const [currentPage, setCurrentPage] = useState(1);
+  const [recordsPerPage] = useState(5); // You can make this configurable
+
+  // Handle pagination
+  const handlePageChange = useCallback((pageNumber) => {
+    setCurrentPage(pageNumber);
+  }, []);
 
   useEffect(() => {
     // Fetch clients when component mounts
@@ -59,6 +69,12 @@ const ViewClientStatement = () => {
     fetchClients();
   }, [navigate]);
 
+  // Calculate pagination data
+  const totalRecords = clients.length;
+  const startIndex = (currentPage - 1) * recordsPerPage;
+  const endIndex = startIndex + recordsPerPage;
+  const currentClients = clients.slice(startIndex, endIndex);
+
   return (
     <div className="view-client-statements-wrapper">
       {/* Back Button */}
@@ -88,7 +104,7 @@ const ViewClientStatement = () => {
               </tr>
             </thead>
             <tbody>
-              {clients.map((client, index) => (
+              {currentClients.map((client, index) => (
                 <tr key={index} className="border-t">
                   <td className="p-3">{client.company}</td>
                   <td className="p-3">{client.representative}</td>
@@ -110,6 +126,15 @@ const ViewClientStatement = () => {
             </tbody>
           </table>
         </div>
+      )}
+      {/* Pagination Component */}
+      {totalRecords > 0 && (
+        <Pagination
+          totalRecords={totalRecords}
+          recordsPerPage={recordsPerPage}
+          currentPage={currentPage}
+          onPageChange={handlePageChange}
+        />
       )}
     </div>
   );

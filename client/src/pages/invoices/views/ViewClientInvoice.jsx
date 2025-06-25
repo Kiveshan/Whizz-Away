@@ -20,7 +20,7 @@ const ViewClientInvoice = () => {
 
   // Pagination state
   const [currentPage, setCurrentPage] = useState(1);
-  const [recordsPerPage] = useState(10); // You can make this configurable
+  const [recordsPerPage] = useState(5); // You can make this configurable
 
   // Auth helper function to get token from localStorage
   const getAuthHeader = () => {
