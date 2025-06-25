@@ -5,6 +5,8 @@ import {
   updateTruck,
   deleteTruckDocument,
   deleteTruck,
+  getTrucksWithExpiringLicenses,
+  getTrucksWithExpiredLicenses,
 } from "../../models/manage/truckModel.js"
 import { s3Trucks, getSignedUrl } from "../../utils/s3Config.js"
 
@@ -46,6 +48,14 @@ const getTruckByIdHandler = async (req, res) => {
       return res.status(404).json({ error: result.message })
     }
     const truck = result.data
+
+    // Format dates for proper display in date inputs
+    if (truck.truckpurchasedate) {
+      truck.truckpurchasedate = new Date(truck.truckpurchasedate).toISOString().split("T")[0]
+    }
+    if (truck.truck_license_expiry) {
+      truck.truck_license_expiry = new Date(truck.truck_license_expiry).toISOString().split("T")[0]
+    }
 
     const extractKeyFromUrl = (url) => {
       if (!url) {
@@ -107,6 +117,7 @@ const createTruckHandler = async (req, res) => {
       current_evaluation,
       vin_num,
       is_subcontractor,
+      truck_license_expiry,
     } = req.body
 
     const fileLocations = (req.files || []).map((file) => file.location)
@@ -123,6 +134,7 @@ const createTruckHandler = async (req, res) => {
         current_evaluation,
         vin_num,
         is_subcontractor,
+        truck_license_expiry,
       },
       fileLocations,
     )
@@ -146,6 +158,7 @@ const updateTruckHandler = async (req, res) => {
       current_evaluation,
       vin_num,
       is_subcontractor,
+      truck_license_expiry,
     } = req.body
 
     const newDocLocations = (req.files || []).map((file) => file.location)
@@ -163,6 +176,7 @@ const updateTruckHandler = async (req, res) => {
         current_evaluation,
         vin_num,
         is_subcontractor,
+        truck_license_expiry,
       },
       newDocLocations,
     )
@@ -173,6 +187,29 @@ const updateTruckHandler = async (req, res) => {
   } catch (err) {
     console.error("Error updating truck:", err)
     res.status(500).json({ error: "Failed to update truck" })
+  }
+}
+
+// New endpoint to get trucks with expiring licenses
+const getTrucksWithExpiringLicensesHandler = async (req, res) => {
+  try {
+    const { days = 30 } = req.query
+    const expiringTrucks = await getTrucksWithExpiringLicenses(Number.parseInt(days))
+    res.json(expiringTrucks)
+  } catch (err) {
+    console.error("Error fetching trucks with expiring licenses:", err)
+    res.status(500).json({ error: "Failed to fetch expiring licenses" })
+  }
+}
+
+// New endpoint to get trucks with expired licenses
+const getTrucksWithExpiredLicensesHandler = async (req, res) => {
+  try {
+    const expiredTrucks = await getTrucksWithExpiredLicenses()
+    res.json(expiredTrucks)
+  } catch (err) {
+    console.error("Error fetching trucks with expired licenses:", err)
+    res.status(500).json({ error: "Failed to fetch expired licenses" })
   }
 }
 
@@ -231,4 +268,6 @@ export {
   updateTruckHandler,
   deleteTruckDocumentHandler,
   deleteTruckHandler,
+  getTrucksWithExpiringLicensesHandler,
+  getTrucksWithExpiredLicensesHandler,
 }
