@@ -8,9 +8,11 @@ import "../css/pagination.css"
 // Hooks
 import { useManageState } from "../hooks/useManageState"
 import { useApi } from "../hooks/useApi"
+import { useTruckNotifications } from "../hooks/useTruckNotifications"
 
 // Components
 import CustomAlert from "../components/common/CustomAlert"
+import NotificationBell from "../components/common/NotificationBell"
 
 // Employee Components
 import EmployeeTable from "../components/employees/Employeetable"
@@ -36,6 +38,7 @@ const Manage = () => {
   const navigate = useNavigate()
   const { state, actions } = useManageState()
   const api = useApi(state, actions)
+  const { notifications, refreshNotifications } = useTruckNotifications()
 
   // Fetch data on component mount
   useEffect(() => {
@@ -237,8 +240,14 @@ const Manage = () => {
         <button
           className={`manage-tab-button ${state.activeTab === "trucks" ? "active" : ""}`}
           onClick={() => actions.setActiveTab("trucks")}
+          style={{ position: "relative", display: "flex", alignItems: "center", gap: "8px" }}
         >
           Trucks
+          <NotificationBell
+            count={notifications.count}
+            notifications={notifications}
+            onRefresh={refreshNotifications}
+          />
         </button>
       </div>
 
