@@ -1,50 +1,53 @@
-"use client"
+"use client";
 
-import { useNavigate } from "react-router-dom"
-import { useState,useEffect } from "react"
-import axios from "axios"
+import { useNavigate } from "react-router-dom";
+import { useState, useEffect } from "react";
+import api from "../../../../api.js"; // Updated to use api.js
 
 const CreatePO = () => {
-  const navigate = useNavigate()
-  const [selectedCategoryId, setSelectedCategoryId] = useState("")
-  const [expenseTypes, setExpenseTypes] = useState([])
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState(null)
+  const navigate = useNavigate();
+  const [selectedCategoryId, setSelectedCategoryId] = useState("");
+  const [expenseTypes, setExpenseTypes] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
 
-useEffect(() => {
-  const fetchExpenseTypes = async () => {
-    try {
-      setLoading(true)
-      const response = await axios.get("http://localhost:5000/api/po/expense-types")
-      setExpenseTypes(response.data)
-      setError(null)
-    } catch (err) {
-      setError("Failed to load expense types. Please try again.")
-    } finally {
-      setLoading(false)
-    }
-  }
+  useEffect(() => {
+    const fetchExpenseTypes = async () => {
+      try {
+        setLoading(true);
+        const response = await api.get("/api/po/expense-types");
+        setExpenseTypes(response.data);
+        setError(null);
+      } catch (err) {
+        setError("Failed to load expense types. Please try again.");
+      } finally {
+        setLoading(false);
+      }
+    };
 
-  fetchExpenseTypes()
-}, [])
+    fetchExpenseTypes();
+  }, []);
+
   const handleBack = () => {
-    navigate("/Creditors/CreditorsOther")
-  }
+    navigate("/Creditors/CreditorsOther");
+  };
 
   const handleCreatePO = () => {
-    const category = expenseTypes.find((c) => c.id === Number.parseInt(selectedCategoryId))
+    const category = expenseTypes.find(
+      (c) => c.id === Number.parseInt(selectedCategoryId)
+    );
     if (category) {
       navigate("/Creditors/POForm", {
         state: {
           categoryId: category.id,
           categoryName: category.expense,
         },
-      })
+      });
     }
-  }
+  };
 
   return (
-    <div className="create-po-container">
+    <div className="client-payment-dashboard-wrapper">
       <div className="client-payments-header">
         <button className="back-button" onClick={handleBack}>
           Back
@@ -52,18 +55,20 @@ useEffect(() => {
       </div>
 
       <div className="expenses-container">
-        <table className="expenses-table1" style={{marginTop:"40px"}}>
+        <table className="expenses-table1" style={{ marginTop: "40px" }}>
           <thead>
             <tr>
-              <th className="align-h1" colSpan={2}>Select Purchase Order Category</th>
+              <th className="align-h1" colSpan={2}>
+                Select Purchase Order Category
+              </th>
             </tr>
           </thead>
           <tbody>
-
             <tr>
               <td>
                 <select
-                  className="dropdown" style={{outline:"2px solid #ccc"}}
+                  className="dropdown"
+                  style={{ outline: "2px solid #ccc" }}
                   value={selectedCategoryId}
                   onChange={(e) => setSelectedCategoryId(e.target.value)}
                 >
@@ -77,7 +82,7 @@ useEffect(() => {
               </td>
               <td style={{ width: "30%" }}>
                 <button
-                  className="view-btn"
+                  className="view-button"
                   onClick={handleCreatePO}
                   disabled={!selectedCategoryId}
                 >
@@ -88,8 +93,9 @@ useEffect(() => {
           </tbody>
         </table>
       </div>
+      {error && <div className="error-message">{error}</div>}
     </div>
-  )
-}
+  );
+};
 
-export default CreatePO
+export default CreatePO;
