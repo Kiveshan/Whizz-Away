@@ -593,15 +593,19 @@ const ContainerDetailsPage = () => {
       num_six_meters: counts["6m"],
       num_twelve_meters: counts["12m"],
       num_abnormal: counts["Abnormal"],
+      // Preserve the rate fields for the form
+      sixMeterRate: updatedControllerData.rateper_6?.toString() || "",
+      twelveMeterRate: updatedControllerData.rateper_12?.toString() || "",
+      abnormalRate: updatedControllerData.rateper_abnormal?.toString() || "",
     }
 
     // Recalculate total_cost if rateWeight is Container
     if (finalControllerData.rateWeight === "Container") {
-      const rate = Number.parseFloat(finalControllerData.rate)
-      if (!isNaN(rate)) {
-        const totalContainers = counts["6m"] + counts["12m"] + counts["Abnormal"]
-        finalControllerData.total_cost = rate * totalContainers
-      }
+      const rate6 = Number.parseFloat(finalControllerData.rateper_6 || 0)
+      const rate12 = Number.parseFloat(finalControllerData.rateper_12 || 0)
+      const rateAbnormal = Number.parseFloat(finalControllerData.rateper_abnormal || 0)
+      const totalContainers = counts["6m"] + counts["12m"] + counts["Abnormal"]
+      finalControllerData.total_cost = rate6 * counts["6m"] + rate12 * counts["12m"] + rateAbnormal * counts["Abnormal"]
     }
 
     // Use the updated controller data for navigation
@@ -814,25 +818,7 @@ const ContainerDetailsPage = () => {
 
       <div className="container-details-wrapper">
         <div className="content">
-          <div className="add-container-section">
-            <button
-              className="add-container-button"
-              onClick={() => handleAddContainer("6m")}
-              style={{ marginRight: "10px" }}
-            >
-              Add 6m Container
-            </button>
-            <button
-              className="add-container-button"
-              onClick={() => handleAddContainer("12m")}
-              style={{ marginRight: "10px" }}
-            >
-              Add 12m Container
-            </button>
-            <button className="add-container-button" onClick={() => handleAddContainer("Abnormal")}>
-              Add Abnormal Container
-            </button>
-          </div>
+         
 
           <br />
 

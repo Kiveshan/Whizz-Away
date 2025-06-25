@@ -7,11 +7,6 @@ import "../../../../css/components.css"
 import ErrorModal from "../../../../components/ErrorModal.jsx"
 import api from "../../../../api" // Import the axios instance
 
-// Add this debug logging function at the top of the file, after imports
-const logDebug = (message, data) => {
-  console.log(`[FCcontrollerInstructionDetails] ${message}:`, data)
-}
-
 const FCcontrollerInstructionDetails = () => {
   const navigate = useNavigate()
   const location = useLocation()
@@ -72,7 +67,9 @@ const FCcontrollerInstructionDetails = () => {
 
   // Initialize containers based on container counts
   const initializeContainers = () => {
-    if (updatedControllerData) {
+    console.log("initializeContainers called with updatedControllerData:", updatedControllerData)
+
+    if (updatedControllerData && Object.keys(updatedControllerData).length > 0) {
       const containersList = []
       let containerId = 1
 
@@ -118,10 +115,12 @@ const FCcontrollerInstructionDetails = () => {
         })
       }
 
+      console.log("Initialized containers:", containersList)
       setContainers(containersList)
       setOriginalContainers([...containersList])
       setIsLoading(false)
     } else {
+      console.log("No controller data available, redirecting back")
       // Redirect back if no data
       navigate("/FCcontrollerinstructions")
     }
@@ -129,12 +128,19 @@ const FCcontrollerInstructionDetails = () => {
 
   // Fetch existing containers if instructionId is provided
   useEffect(() => {
+    console.log("useEffect triggered with:", {
+      controllerData: !!controllerData,
+      preservedContainers: !!preservedContainers,
+      instructionId: instructionId,
+    })
+
     if (controllerData) {
       // Initialize updatedControllerData with controllerData
+      console.log("Setting updatedControllerData from controllerData")
       setUpdatedControllerData(controllerData)
     }
 
-    if (preservedContainers) {
+    if (preservedContainers && preservedContainers.length > 0) {
       // Use preserved containers if available
       console.log("Using preserved containers:", preservedContainers)
 
@@ -145,11 +151,17 @@ const FCcontrollerInstructionDetails = () => {
       setOriginalContainers([...syncedContainers])
       setIsLoading(false)
     } else if (instructionId) {
+      console.log("Fetching containers for instructionId:", instructionId)
       fetchContainers(instructionId)
-    } else if (controllerData) {
+    } else if (controllerData && Object.keys(controllerData).length > 0) {
       // Force a re-initialization when controllerData changes
-      initializeContainers()
+      console.log("Initializing containers from controllerData")
+      // Set a small delay to ensure state is updated
+      setTimeout(() => {
+        initializeContainers()
+      }, 100)
     } else {
+      console.log("No data available, redirecting back")
       // Redirect back if no data - pass all state back
       navigate("/FCcontrollerinstructions", {
         state: {
@@ -175,7 +187,14 @@ const FCcontrollerInstructionDetails = () => {
 
   // Re-initialize containers when updatedControllerData changes
   useEffect(() => {
-    if (!preservedContainers && !instructionId && updatedControllerData) {
+    console.log("updatedControllerData changed:", updatedControllerData)
+    if (
+      !preservedContainers &&
+      !instructionId &&
+      updatedControllerData &&
+      Object.keys(updatedControllerData).length > 0
+    ) {
+      console.log("Re-initializing containers due to updatedControllerData change")
       initializeContainers()
     }
   }, [updatedControllerData, preservedContainers, instructionId])
@@ -209,6 +228,7 @@ const FCcontrollerInstructionDetails = () => {
         setOriginalContainers([...updatedContainersList])
       } else {
         // If no containers found, initialize based on controllerData
+        console.log("No existing containers found, initializing new ones")
         initializeContainers()
       }
     } catch (error) {
@@ -222,6 +242,7 @@ const FCcontrollerInstructionDetails = () => {
       }
 
       // If error, initialize based on controllerData
+      console.log("Error occurred, falling back to initialization")
       initializeContainers()
     } finally {
       setIsLoading(false)
@@ -407,14 +428,16 @@ const FCcontrollerInstructionDetails = () => {
         updated.num_abnormal = (updated.num_abnormal || 0) + 1
       }
 
-      // Recalculate total_cost if rateWeight is Container
-      if (updated.rateWeight === "Container") {
-        const rate = Number.parseFloat(updated.rate)
-        if (!isNaN(rate)) {
-          const totalContainers = updated.num_six_meters + updated.num_twelve_meters + updated.num_abnormal
-          updated.total_cost = rate * totalContainers
-        }
-      }
+      // Recalculate total_cost using new rate structure
+      const totalCost = calculateTotalCostFromRates(
+        updated.rateper_6 || 0,
+        updated.rateper_12 || 0,
+        updated.rateper_abnormal || 0,
+        updated.num_six_meters || 0,
+        updated.num_twelve_meters || 0,
+        updated.num_abnormal || 0,
+      )
+      updated.total_cost = totalCost
 
       return updated
     })
@@ -446,14 +469,16 @@ const FCcontrollerInstructionDetails = () => {
           updated.num_abnormal = Math.max(0, (updated.num_abnormal || 0) - 1)
         }
 
-        // Recalculate total_cost if rateWeight is Container
-        if (updated.rateWeight === "Container") {
-          const rate = Number.parseFloat(updated.rate)
-          if (!isNaN(rate)) {
-            const totalContainers = updated.num_six_meters + updated.num_twelve_meters + updated.num_abnormal
-            updated.total_cost = rate * totalContainers
-          }
-        }
+        // Recalculate total_cost using new rate structure
+        const totalCost = calculateTotalCostFromRates(
+          updated.rateper_6 || 0,
+          updated.rateper_12 || 0,
+          updated.rateper_abnormal || 0,
+          updated.num_six_meters || 0,
+          updated.num_twelve_meters || 0,
+          updated.num_abnormal || 0,
+        )
+        updated.total_cost = totalCost
 
         return updated
       })
@@ -466,6 +491,11 @@ const FCcontrollerInstructionDetails = () => {
       delete newErrors[`weight-${id}`]
       return newErrors
     })
+  }
+
+  // Helper function to calculate total cost from individual rates
+  const calculateTotalCostFromRates = (rate6, rate12, rateAbnormal, count6, count12, countAbnormal) => {
+    return rate6 * count6 + rate12 * count12 + rateAbnormal * countAbnormal
   }
 
   // Validate containers with updated container number format validation
@@ -533,27 +563,33 @@ const FCcontrollerInstructionDetails = () => {
     return isValid
   }
 
-  // Update the handleBackClick function to use the state variable
+  // IMPROVED: Update the handleBackClick function to preserve all current form state
   const handleBackClick = () => {
     // Count current containers by type
     const counts = countContainersByType()
 
-    // Update container counts in updatedControllerData
+    // Create comprehensive form data with all current values including rates
     const finalControllerData = {
       ...updatedControllerData,
       num_six_meters: counts["6m"],
       num_twelve_meters: counts["12m"],
       num_abnormal: counts["Abnormal"],
+      // Preserve rate fields for the form - ensure they're strings for input fields
+      sixMeterRate: updatedControllerData.rateper_6?.toString() || updatedControllerData.sixMeterRate || "",
+      twelveMeterRate: updatedControllerData.rateper_12?.toString() || updatedControllerData.twelveMeterRate || "",
+      abnormalRate: updatedControllerData.rateper_abnormal?.toString() || updatedControllerData.abnormalRate || "",
     }
 
-    // Recalculate total_cost if rateWeight is Container
-    if (finalControllerData.rateWeight === "Container") {
-      const rate = Number.parseFloat(finalControllerData.rate)
-      if (!isNaN(rate)) {
-        const totalContainers = counts["6m"] + counts["12m"] + counts["Abnormal"]
-        finalControllerData.total_cost = rate * totalContainers
-      }
-    }
+    // Recalculate total_cost using new rate structure
+    const totalCost = calculateTotalCostFromRates(
+      finalControllerData.rateper_6 || 0,
+      finalControllerData.rateper_12 || 0,
+      finalControllerData.rateper_abnormal || 0,
+      counts["6m"],
+      counts["12m"],
+      counts["Abnormal"],
+    )
+    finalControllerData.total_cost = totalCost
 
     // Use the updated controller data for navigation
     console.log("Navigating back with updated container counts:", counts)
@@ -590,29 +626,7 @@ const FCcontrollerInstructionDetails = () => {
     return counts
   }
 
-  // Add this function to calculate total cost
-  const calculateTotalCost = () => {
-    if (!updatedControllerData || !updatedControllerData.rate) return 0
-
-    const rate = Number.parseFloat(updatedControllerData.rate)
-    if (isNaN(rate)) return 0
-
-    if (updatedControllerData.rateWeight === "Container") {
-      // For Container: rate × total_number_of_containers
-      const totalContainers =
-        updatedControllerData.num_six_meters +
-        updatedControllerData.num_twelve_meters +
-        updatedControllerData.num_abnormal
-      return rate * totalContainers
-    } else {
-      // For kg or m³: rate × weight_value
-      const weight = Number.parseFloat(updatedControllerData.weight)
-      if (isNaN(weight)) return 0
-      return rate * weight
-    }
-  }
-
-  // Update the handleSubmit function to use existing MVC endpoints
+  // Update the handleSubmit function to use existing MVC endpoints with new rate structure
   const handleSubmit = async () => {
     // Validate containers first
     if (!validateContainers()) {
@@ -625,25 +639,25 @@ const FCcontrollerInstructionDetails = () => {
       // Create a copy of updatedControllerData for submission
       const submissionData = { ...updatedControllerData }
 
-      // Ensure total_cost and weight are properly set
-      if (submissionData.rateWeight === "Container") {
-        submissionData.total_cost = calculateTotalCost()
-        submissionData.weight = null // Set weight to null for Container rate
-      } else {
-        // For kg or m³, ensure weight is a valid number
-        if (!submissionData.weight || isNaN(Number.parseFloat(submissionData.weight))) {
-          setErrorModal({
-            isOpen: true,
-            message: `Weight must be provided when rate is per ${submissionData.rateWeight}`,
-          })
-          return
-        }
-        submissionData.total_cost = calculateTotalCost()
-      }
+      // Calculate total cost using new rate structure
+      const totalCost = calculateTotalCostFromRates(
+        submissionData.rateper_6 || 0,
+        submissionData.rateper_12 || 0,
+        submissionData.rateper_abnormal || 0,
+        submissionData.num_six_meters || 0,
+        submissionData.num_twelve_meters || 0,
+        submissionData.num_abnormal || 0,
+      )
+      submissionData.total_cost = totalCost
+
+      // Set weight to null since we're using Container-based rates
+      submissionData.weight = null
 
       // Log the values for debugging
       console.log("Before API call - total_cost:", submissionData.total_cost)
-      console.log("Before API call - weight:", submissionData.weight)
+      console.log("Before API call - rateper_6:", submissionData.rateper_6)
+      console.log("Before API call - rateper_12:", submissionData.rateper_12)
+      console.log("Before API call - rateper_abnormal:", submissionData.rateper_abnormal)
 
       // First update the instruction if needed
       if (instructionId) {
@@ -655,21 +669,20 @@ const FCcontrollerInstructionDetails = () => {
           pickup: String(submissionData.pickup || ""),
           dropoff: String(submissionData.dropoff || ""),
           hazardous: Boolean(submissionData.hazardous),
-          surchages: Boolean(submissionData.surchages), // Note: backend uses 'surchages' not 'surcharges'
+          surchages: Boolean(submissionData.surcharges), // Note: backend uses 'surchages' not 'surcharges'
           pickuptime: submissionData.pickupTime || null,
           pickupdate: submissionData.pickupDate || null,
           stackdate: submissionData.stackDate || null,
           deadline: submissionData.deadline || null,
           fileref: String(submissionData.fileRef || ""),
-          rateweight: String(submissionData.rateWeight || ""),
-          rate: Number.parseFloat(submissionData.rate) || 0,
+          rateweight: "Container", // Always Container for this form
           description: String(submissionData.description || ""),
           status: String(submissionData.status || "In Progress"),
           vat: Number.parseInt(submissionData.vat) || 15,
           num_six_meters: Number.parseInt(submissionData.num_six_meters) || 0,
           num_twelve_meters: Number.parseInt(submissionData.num_twelve_meters) || 0,
           num_abnormal: Number.parseInt(submissionData.num_abnormal) || 0,
-          weight: submissionData.rateWeight !== "Container" ? Number.parseFloat(submissionData.weight || 0) : null,
+          weight: null, // Always null for Container-based rates
           total_cost: Number.parseFloat(submissionData.total_cost || 0),
           // Shipping fields
           booking_ref: String(submissionData.bookingRef || ""),
@@ -677,6 +690,10 @@ const FCcontrollerInstructionDetails = () => {
           voyage_num: String(submissionData.voyageNo || ""),
           imo_num: String(submissionData.imoNo || ""),
           flag_reg: String(submissionData.flagReg || ""),
+          // New rate fields
+          rateper_6: Number.parseFloat(submissionData.rateper_6 || 0),
+          rateper_12: Number.parseFloat(submissionData.rateper_12 || 0),
+          rateper_abnormal: Number.parseFloat(submissionData.rateper_abnormal || 0),
         }
 
         console.log("Updating instruction with properly mapped data:", instructionUpdateData)
@@ -756,6 +773,14 @@ const FCcontrollerInstructionDetails = () => {
     )
   }
 
+  // Add debug information to the render
+  console.log("Rendering FCcontrollerInstructionDetails with:", {
+    isLoading,
+    containersLength: containers.length,
+    updatedControllerData: !!updatedControllerData,
+    controllerDataKeys: updatedControllerData ? Object.keys(updatedControllerData) : [],
+  })
+
   return (
     <>
       {/* Error Modal */}
@@ -797,25 +822,7 @@ const FCcontrollerInstructionDetails = () => {
 
       <div className="container-details-wrapper">
         <div className="content">
-          <div className="add-container-section">
-            <button
-              className="add-container-button"
-              onClick={() => handleAddContainer("6m")}
-              style={{ marginRight: "10px" }}
-            >
-              Add 6m Container
-            </button>
-            <button
-              className="add-container-button"
-              onClick={() => handleAddContainer("12m")}
-              style={{ marginRight: "10px" }}
-            >
-              Add 12m Container
-            </button>
-            <button className="add-container-button" onClick={() => handleAddContainer("Abnormal")}>
-              Add Abnormal Container
-            </button>
-          </div>
+          
 
           <br />
 
@@ -837,86 +844,94 @@ const FCcontrollerInstructionDetails = () => {
                   </tr>
                 </thead>
                 <tbody>
-                  {containers.map((container, index) => (
-                    <tr key={container.id} className={index % 2 === 1 ? "even-row" : ""}>
-                      <td>{container.id}</td>
-                      <td>{container.containerType}</td>
-                      <td className="input-cell">
-                        <div className="input-wrapper">
-                          <input
-                            type="text"
-                            value={container.containerNum}
-                            onChange={(e) => {
-                              const value = e.target.value
-                              handleContainerChange(container.id, "containerNum", value)
-                            }}
-                            className={`container-input ${
-                              fieldErrors[`container-${container.id}`] ? "error-field" : ""
-                            }`}
-                            placeholder="ABCD1234567"
-                            maxLength={11}
-                          />
-                          {fieldErrors[`container-${container.id}`] && (
-                            <ErrorTooltip message={fieldErrors[`container-${container.id}`]} />
-                          )}
-                        </div>
+                  {containers.length === 0 ? (
+                    <tr>
+                      <td colSpan={isImport ? 6 : 5} style={{ textAlign: "center", padding: "20px" }}>
+                        No containers to display. Please check the container counts in the previous form.
                       </td>
-                      {isImport && (
+                    </tr>
+                  ) : (
+                    containers.map((container, index) => (
+                      <tr key={container.id} className={index % 2 === 1 ? "even-row" : ""}>
+                        <td>{container.id}</td>
+                        <td>{container.containerType}</td>
                         <td className="input-cell">
                           <div className="input-wrapper">
                             <input
                               type="text"
-                              value={container.weight}
+                              value={container.containerNum}
                               onChange={(e) => {
                                 const value = e.target.value
-                                // Only allow numbers and decimal point
-                                if (value === "" || /^[0-9]*\.?[0-9]*$/.test(value)) {
-                                  handleContainerChange(container.id, "weight", value)
-                                }
+                                handleContainerChange(container.id, "containerNum", value)
                               }}
                               className={`container-input ${
-                                fieldErrors[`weight-${container.id}`] ? "error-field" : ""
+                                fieldErrors[`container-${container.id}`] ? "error-field" : ""
                               }`}
-                              placeholder="Weight"
+                              placeholder="ABCD1234567"
+                              maxLength={11}
                             />
-                            {fieldErrors[`weight-${container.id}`] && (
-                              <ErrorTooltip message={fieldErrors[`weight-${container.id}`]} />
+                            {fieldErrors[`container-${container.id}`] && (
+                              <ErrorTooltip message={fieldErrors[`container-${container.id}`]} />
                             )}
                           </div>
                         </td>
-                      )}
-                      {/* Add new Cargo Description cell */}
-                      <td className="input-cell">
-                        <div className="input-wrapper">
-                          <input
-                            type="text"
-                            value={container.cargoDescription}
-                            onChange={(e) => {
-                              handleContainerChange(container.id, "cargoDescription", e.target.value)
+                        {isImport && (
+                          <td className="input-cell">
+                            <div className="input-wrapper">
+                              <input
+                                type="text"
+                                value={container.weight}
+                                onChange={(e) => {
+                                  const value = e.target.value
+                                  // Only allow numbers and decimal point
+                                  if (value === "" || /^[0-9]*\.?[0-9]*$/.test(value)) {
+                                    handleContainerChange(container.id, "weight", value)
+                                  }
+                                }}
+                                className={`container-input ${
+                                  fieldErrors[`weight-${container.id}`] ? "error-field" : ""
+                                }`}
+                                placeholder="Weight"
+                              />
+                              {fieldErrors[`weight-${container.id}`] && (
+                                <ErrorTooltip message={fieldErrors[`weight-${container.id}`]} />
+                              )}
+                            </div>
+                          </td>
+                        )}
+                        {/* Add new Cargo Description cell */}
+                        <td className="input-cell">
+                          <div className="input-wrapper">
+                            <input
+                              type="text"
+                              value={container.cargoDescription}
+                              onChange={(e) => {
+                                handleContainerChange(container.id, "cargoDescription", e.target.value)
+                              }}
+                              className="container-input"
+                              placeholder="Enter cargo description"
+                            />
+                          </div>
+                        </td>
+                        <td>
+                          <button
+                            onClick={() => handleDeleteContainer(container.id)}
+                            className="delete-button"
+                            style={{
+                              backgroundColor: "#dc3545",
+                              color: "white",
+                              border: "none",
+                              borderRadius: "4px",
+                              padding: "5px 10px",
+                              cursor: "pointer",
                             }}
-                            className="container-input"
-                            placeholder="Enter cargo description"
-                          />
-                        </div>
-                      </td>
-                      <td>
-                        <button
-                          onClick={() => handleDeleteContainer(container.id)}
-                          className="delete-button"
-                          style={{
-                            backgroundColor: "#dc3545",
-                            color: "white",
-                            border: "none",
-                            borderRadius: "4px",
-                            padding: "5px 10px",
-                            cursor: "pointer",
-                          }}
-                        >
-                          Delete
-                        </button>
-                      </td>
-                    </tr>
-                  ))}
+                          >
+                            Delete
+                          </button>
+                        </td>
+                      </tr>
+                    ))
+                  )}
                 </tbody>
               </table>
             </div>
@@ -924,7 +939,7 @@ const FCcontrollerInstructionDetails = () => {
 
           <div className="submit-section">
             <button className="submit-button" onClick={handleSubmit}>
-              Save changes 
+              Save changes
             </button>
           </div>
         </div>
