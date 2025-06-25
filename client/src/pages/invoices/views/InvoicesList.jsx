@@ -176,144 +176,146 @@ Troubleshooting tips:
   }, [clientId, navigate]);
 
   return (
-    <div className="app">
-      {/* Main */}
-      <main className="main">
-        {/* Back Button */}
-        <div className="">
-          <button className="back-button" onClick={handleBackClick}>
-            Back
-          </button>
-        </div>
-
-        <div
-          className="action-bar"
-          style={{ display: "flex", justifyContent: "center", width: "100%" }}
-        >
-          <div className="filter-section6">
-            <div className="dropdown-container">
-              <select
-                className="dropdown"
-                name="year"
-                value={filters.year}
-                onChange={handleFilterChange}
-              >
-                <option value="">Year</option>
-                <option value="2025">2025</option>
-                <option value="2024">2024</option>
-                <option value="2023">2023</option>
-                <option value="2022">2022</option>
-              </select>
-              <select
-                className="dropdown"
-                name="month"
-                value={filters.month}
-                onChange={handleFilterChange}
-              >
-                <option value="">Month</option>
-                <option value="1">January</option>
-                <option value="2">February</option>
-                <option value="3">March</option>
-                <option value="4">April</option>
-                <option value="5">May</option>
-                <option value="6">June</option>
-                <option value="7">July</option>
-                <option value="8">August</option>
-                <option value="9">September</option>
-                <option value="10">October</option>
-                <option value="11">November</option>
-                <option value="12">December</option>
-              </select>
-            </div>
-          </div>
-        </div>
-        <div className="filter-section">
-          <div className="filter-group1">
-            <button
-              className={`filter-button ${
-                filters.type === "import" ? "active" : ""
-              }`}
-              onClick={() => handleTypeFilter("import")}
-            >
-              Import
-            </button>
-            <button
-              className={`filter-button ${
-                filters.type === "export" ? "active" : ""
-              }`}
-              onClick={() => handleTypeFilter("export")}
-            >
-              Export
-            </button>
-            <button
-              className={`filter-button outline ${
-                filters.type === "All" ? "active" : ""
-              }`}
-              onClick={() => handleTypeFilter("All")}
-            >
-              All
+    <div className="invoices-list-wrapper">
+      <div className="app">
+        {/* Main */}
+        <main className="main">
+          {/* Back Button */}
+          <div className="">
+            <button className="back-button" onClick={handleBackClick}>
+              Back
             </button>
           </div>
-        </div>
 
-        {/* Table */}
-        <div className="table-container22">
-          {loading ? (
-            <div className="loading-message">Loading instructions...</div>
-          ) : error ? (
-            <div className="error-message" style={{ whiteSpace: "pre-line" }}>
-              {error}
+          <div
+            className="action-bar"
+            style={{ display: "flex", justifyContent: "center", width: "100%" }}
+          >
+            <div className="filter-section6">
+              <div className="dropdown-container">
+                <select
+                  className="dropdown"
+                  name="year"
+                  value={filters.year}
+                  onChange={handleFilterChange}
+                >
+                  <option value="">Year</option>
+                  <option value="2025">2025</option>
+                  <option value="2024">2024</option>
+                  <option value="2023">2023</option>
+                  <option value="2022">2022</option>
+                </select>
+                <select
+                  className="dropdown"
+                  name="month"
+                  value={filters.month}
+                  onChange={handleFilterChange}
+                >
+                  <option value="">Month</option>
+                  <option value="1">January</option>
+                  <option value="2">February</option>
+                  <option value="3">March</option>
+                  <option value="4">April</option>
+                  <option value="5">May</option>
+                  <option value="6">June</option>
+                  <option value="7">July</option>
+                  <option value="8">August</option>
+                  <option value="9">September</option>
+                  <option value="10">October</option>
+                  <option value="11">November</option>
+                  <option value="12">December</option>
+                </select>
+              </div>
             </div>
-          ) : instructions.length === 0 ? (
-            <div className="no-data-message">
-              {clientName
-                ? `Please select a filter to view invoices for ${clientName}.`
-                : "Please select a filter to view invoices."}
+          </div>
+          <div className="filter-section">
+            <div className="filter-group1">
+              <button
+                className={`filter-button ${
+                  filters.type === "import" ? "active" : ""
+                }`}
+                onClick={() => handleTypeFilter("import")}
+              >
+                Import
+              </button>
+              <button
+                className={`filter-button ${
+                  filters.type === "export" ? "active" : ""
+                }`}
+                onClick={() => handleTypeFilter("export")}
+              >
+                Export
+              </button>
+              <button
+                className={`filter-button outline ${
+                  filters.type === "All" ? "active" : ""
+                }`}
+                onClick={() => handleTypeFilter("All")}
+              >
+                All
+              </button>
             </div>
-          ) : (
-            <table>
-              <thead>
-                <tr>
-                  <th>Instruction No</th>
-                  <th>Type</th>
-                  <th>File No</th>
-                  <th>Date</th>
-                  <th>Details</th>
-                </tr>
-              </thead>
-              <tbody>
-                {instructions.map((instruction) => (
-                  <tr key={instruction.m1key}>
-                    <td>{instruction.m1key}</td>
-                    <td>{instruction.shipment_type}</td>
-                    <td>{instruction.file_no}</td>
-                    <td>{formatDate(instruction.date)}</td>
-                    <td>
-                      <button
-                        className="small-btn"
-                        onClick={() => {
-                          debug(
-                            `Navigating to invoice view for ID: ${instruction.ikey}`
-                          );
-                          navigate(`/invoice/${instruction.ikey}`, {
-                            state: {
-                              clientId,
-                              clientName,
-                              returnToClientView: !!clientId,
-                            },
-                          });
-                        }}
-                      >
-                        View
-                      </button>
-                    </td>
+          </div>
+
+          {/* Table */}
+          <div className="table-container22">
+            {loading ? (
+              <div className="loading-message">Loading instructions...</div>
+            ) : error ? (
+              <div className="error-message" style={{ whiteSpace: "pre-line" }}>
+                {error}
+              </div>
+            ) : instructions.length === 0 ? (
+              <div className="no-data-message">
+                {clientName
+                  ? `Please select a filter to view invoices for ${clientName}.`
+                  : "Please select a filter to view invoices."}
+              </div>
+            ) : (
+              <table>
+                <thead>
+                  <tr>
+                    <th>Instruction No</th>
+                    <th>Type</th>
+                    <th>File No</th>
+                    <th>Date</th>
+                    <th>Details</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
-          )}
-        </div>
-      </main>
+                </thead>
+                <tbody>
+                  {instructions.map((instruction) => (
+                    <tr key={instruction.m1key}>
+                      <td>{instruction.m1key}</td>
+                      <td>{instruction.shipment_type}</td>
+                      <td>{instruction.file_no}</td>
+                      <td>{formatDate(instruction.date)}</td>
+                      <td>
+                        <button
+                          className="small-btn"
+                          onClick={() => {
+                            debug(
+                              `Navigating to invoice view for ID: ${instruction.ikey}`
+                            );
+                            navigate(`/invoice/${instruction.ikey}`, {
+                              state: {
+                                clientId,
+                                clientName,
+                                returnToClientView: !!clientId,
+                              },
+                            });
+                          }}
+                        >
+                          View
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )}
+          </div>
+        </main>
+      </div>
     </div>
   );
 };
