@@ -1,15 +1,20 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import api from "../../../api"; // Import the configured Axios instance
 import "../css/ClientListPay.css";
+import Pagination from "../../../components/Pagination.jsx";
 
 const DirectorClientListPay = () => {
   const navigate = useNavigate();
   const [clients, setClients] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+
+  // Pagination state
+  const [currentPage, setCurrentPage] = useState(1);
+  const [recordsPerPage] = useState(10); // You can make this configurable
 
   useEffect(() => {
     const fetchClients = async () => {
@@ -38,6 +43,17 @@ const DirectorClientListPay = () => {
     fetchClients();
   }, []);
 
+  // Handle pagination
+  const handlePageChange = useCallback((pageNumber) => {
+    setCurrentPage(pageNumber);
+  }, []);
+
+  // Calculate pagination data
+  const totalRecords = clients.length;
+  const startIndex = (currentPage - 1) * recordsPerPage;
+  const endIndex = startIndex + recordsPerPage;
+  const currentClients = clients.slice(startIndex, endIndex);
+
   return (
     <div className="payment-client-wrapper">
       {/* Back Button */}
@@ -57,7 +73,7 @@ const DirectorClientListPay = () => {
       {/* Table */}
       {!loading && !error && (
         <div className="clientinstructiontable">
-          <table className="t1" style={{ width: "70%", marginLeft: "350px" }}>
+          <table className="t1" style={{ width: "70%" }}>
             <thead className="bg-blue-300">
               <tr>
                 <th className="p-3">Company</th>
@@ -67,8 +83,8 @@ const DirectorClientListPay = () => {
               </tr>
             </thead>
             <tbody>
-              {clients.length > 0 ? (
-                clients.map((client, index) => (
+              {currentClients.length > 0 ? (
+                currentClients.map((client, index) => (
                   <tr key={client.m5clientkey || index} className="border-t">
                     <td className="p-3">{client.companyname}</td>
                     <td className="p-3">{client.representative}</td>
@@ -99,6 +115,14 @@ const DirectorClientListPay = () => {
               )}
             </tbody>
           </table>
+
+          {/* Pagination Component */}
+          <Pagination
+            totalRecords={totalRecords}
+            recordsPerPage={recordsPerPage}
+            currentPage={currentPage}
+            onPageChange={handlePageChange}
+          />
         </div>
       )}
     </div>
