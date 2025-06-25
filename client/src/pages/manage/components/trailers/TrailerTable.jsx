@@ -4,8 +4,8 @@ import { formatDate } from "../../utils/helpers"
 import Pagination from "../common/Pagination"
 import SearchFilter from "../common/SearchFilter"
 
-const TruckTable = ({
-  trucks,
+const TrailerTable = ({
+  trailers,
   loading,
   error,
   onEdit,
@@ -14,7 +14,7 @@ const TruckTable = ({
   pagination,
   onPageChange,
   onItemsPerPageChange,
-  filters,
+  filters = { search: "" },
   onSearchChange,
   onApplyFilters,
 }) => {
@@ -42,20 +42,19 @@ const TruckTable = ({
   return (
     <div>
       <div>
-      
         <button className="manage-add-truck-button" onClick={onAdd}>
-          Add Truck
+          Add Trailer
         </button>
       </div>
 
       {/* Search Filter at the top */}
       <div className="table-filters">
         <SearchFilter
-          searchValue={filters.search}
+          searchValue={filters?.search || ""}
           onSearchChange={onSearchChange}
           onApplyFilters={onApplyFilters}
           showStatusFilter={false}
-          placeholder="Search trucks by registration, model, or VIN..."
+          placeholder="Search trailers by registration, model, or VIN..."
           loading={loading}
         />
       </div>
@@ -63,13 +62,13 @@ const TruckTable = ({
       {/* Table Content */}
       <div className="table-content">
         {loading ? (
-          <div className="loading">Loading trucks...</div>
+          <div className="loading">Loading trailers...</div>
         ) : (
           <div className="manage-trucks-table1">
             <table>
               <thead>
                 <tr>
-                  <th>Truck Registration</th>
+                  <th>Trailer Registration</th>
                   <th>Trailer Size</th>
                   <th>Model</th>
                   <th>Year</th>
@@ -80,22 +79,22 @@ const TruckTable = ({
                 </tr>
               </thead>
               <tbody>
-                {trucks.length === 0 ? (
+                {trailers.length === 0 ? (
                   <tr>
                     <td colSpan="8" className="no-data">
-                      No trucks found
+                      No trailers found
                     </td>
                   </tr>
                 ) : (
-                  trucks.map((truck) => {
-                    const licenseStatus = getLicenseStatus(truck.truck_license_expiry)
+                  trailers.map((trailer) => {
+                    const licenseStatus = getLicenseStatus(trailer.trailer_license_expiry)
                     return (
-                      <tr key={truck.m5truckskey}>
-                        <td>{truck.truckregnum}</td>
-                        <td>{truck.trailersize}</td>
-                        <td>{truck.model}</td>
-                        <td>{truck.year}</td>
-                        <td>{formatDate(truck.truckpurchasedate)}</td>
+                      <tr key={trailer.m5trailerskey}>
+                        <td>{trailer.trailerregnum}</td>
+                        <td>{trailer.trailersize}</td>
+                        <td>{trailer.model}</td>
+                        <td>{trailer.year}</td>
+                        <td>{formatDate(trailer.trailerpurchasedate)}</td>
                         <td>
                           <span
                             style={{
@@ -106,19 +105,19 @@ const TruckTable = ({
                           >
                             {licenseStatus.text}
                           </span>
-                          {truck.truck_license_expiry && (
+                          {trailer.trailer_license_expiry && (
                             <div style={{ fontSize: "0.8em", color: "#666" }}>
-                              {formatDate(truck.truck_license_expiry)}
+                              {formatDate(trailer.trailer_license_expiry)}
                             </div>
                           )}
                         </td>
                         <td>
-                          <button className="manage-edit-button" onClick={() => onEdit(truck.m5truckskey)}>
+                          <button className="manage-edit-button" onClick={() => onEdit(trailer.m5trailerskey)}>
                             Edit
                           </button>
                         </td>
                         <td>
-                          <button className="manage-delete-button" onClick={() => onDelete(truck.m5truckskey)}>
+                          <button className="manage-delete-button" onClick={() => onDelete(trailer.m5trailerskey)}>
                             Delete
                           </button>
                         </td>
@@ -149,4 +148,4 @@ const TruckTable = ({
   )
 }
 
-export default TruckTable
+export default TrailerTable

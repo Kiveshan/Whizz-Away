@@ -1,7 +1,18 @@
 "use client"
 import { extractFilenameFromUrl } from "../../utils/helpers"
 
-const TruckForm = ({ truck, loading, isEditing, onSave, onCancel, onChange, onDeleteDocument }) => {
+const TrailerForm = ({ trailer, loading, isEditing, onSave, onCancel, onChange, onDeleteDocument }) => {
+  // Debug logging
+  console.log("TrailerForm props:", {
+    trailer: !!trailer,
+    loading,
+    isEditing,
+    onSave: typeof onSave,
+    onCancel: typeof onCancel,
+    onChange: typeof onChange,
+    onDeleteDocument: typeof onDeleteDocument,
+  })
+
   const handleSubmit = async (e) => {
     e.preventDefault()
 
@@ -10,7 +21,15 @@ const TruckForm = ({ truck, loading, isEditing, onSave, onCancel, onChange, onDe
       return
     }
 
-    const success = await onSave(truck)
+    console.log("About to call onSave with:", trailer)
+    console.log("onSave type:", typeof onSave)
+
+    if (typeof onSave !== "function") {
+      console.error("onSave is not a function! Received:", onSave)
+      return
+    }
+
+    const success = await onSave(trailer)
     if (!success) {
       return
     }
@@ -20,11 +39,11 @@ const TruckForm = ({ truck, loading, isEditing, onSave, onCancel, onChange, onDe
     const files = e.target.files
     if (files && files.length > 0) {
       const newFiles = Array.from(files).filter(
-        (file) => file.type === "application/pdf" && (truck.documents?.length || 0) < 3,
+        (file) => file.type === "application/pdf" && (trailer.documents?.length || 0) < 3,
       )
 
       if (newFiles.length > 0) {
-        const currentDocs = truck.documents || []
+        const currentDocs = trailer.documents || []
         const totalDocs = currentDocs.length + newFiles.length
 
         if (totalDocs <= 3) {
@@ -41,7 +60,7 @@ const TruckForm = ({ truck, loading, isEditing, onSave, onCancel, onChange, onDe
   }
 
   const removeDocument = (index) => {
-    const updatedDocs = [...(truck.documents || [])]
+    const updatedDocs = [...(trailer.documents || [])]
     updatedDocs.splice(index, 1)
     onChange("documents", updatedDocs)
   }
@@ -64,16 +83,16 @@ const TruckForm = ({ truck, loading, isEditing, onSave, onCancel, onChange, onDe
 
   return (
     <div className="manage-add-truck-form">
-      <h2>{isEditing ? "Edit Truck" : "Add New Truck"}</h2>
+      <h2>{isEditing ? "Edit Trailer" : "Add New Trailer"}</h2>
 
       <form onSubmit={handleSubmit} noValidate>
         <div className="manage-truck-form-grid">
           <div className="manage-form-group">
-            <label style={{ fontWeight: "bold" }}>Truck Registration</label>
+            <label style={{ fontWeight: "bold" }}>Trailer Registration</label>
             <input
               type="text"
-              value={truck.truckregnum || ""}
-              onChange={(e) => onChange("truckregnum", e.target.value)}
+              value={trailer.trailerregnum || ""}
+              onChange={(e) => onChange("trailerregnum", e.target.value)}
               required
             />
           </div>
@@ -82,7 +101,7 @@ const TruckForm = ({ truck, loading, isEditing, onSave, onCancel, onChange, onDe
             <label style={{ fontWeight: "bold" }}>Trailer Size</label>
             <input
               type="text"
-              value={truck.trailersize || ""}
+              value={trailer.trailersize || ""}
               onChange={(e) => onChange("trailersize", e.target.value)}
               required
             />
@@ -90,19 +109,24 @@ const TruckForm = ({ truck, loading, isEditing, onSave, onCancel, onChange, onDe
 
           <div className="manage-form-group">
             <label style={{ fontWeight: "bold" }}>Year</label>
-            <input type="text" value={truck.year || ""} onChange={(e) => onChange("year", e.target.value)} required />
+            <input type="text" value={trailer.year || ""} onChange={(e) => onChange("year", e.target.value)} required />
           </div>
 
           <div className="manage-form-group">
             <label style={{ fontWeight: "bold" }}>Model</label>
-            <input type="text" value={truck.model || ""} onChange={(e) => onChange("model", e.target.value)} required />
+            <input
+              type="text"
+              value={trailer.model || ""}
+              onChange={(e) => onChange("model", e.target.value)}
+              required
+            />
           </div>
 
           <div className="manage-form-group">
             <label style={{ fontWeight: "bold" }}>Purchase Price</label>
             <input
               type="text"
-              value={truck.purchase_price || ""}
+              value={trailer.purchase_price || ""}
               onChange={(e) => onChange("purchase_price", e.target.value)}
               required
             />
@@ -112,7 +136,7 @@ const TruckForm = ({ truck, loading, isEditing, onSave, onCancel, onChange, onDe
             <label style={{ fontWeight: "bold" }}>Current Evaluation</label>
             <input
               type="text"
-              value={truck.current_evaluation || ""}
+              value={trailer.current_evaluation || ""}
               onChange={(e) => onChange("current_evaluation", e.target.value)}
               required
             />
@@ -122,7 +146,7 @@ const TruckForm = ({ truck, loading, isEditing, onSave, onCancel, onChange, onDe
             <label style={{ fontWeight: "bold" }}>VIN Number</label>
             <input
               type="text"
-              value={truck.vin_num || ""}
+              value={trailer.vin_num || ""}
               onChange={(e) => onChange("vin_num", e.target.value)}
               required
             />
@@ -132,8 +156,10 @@ const TruckForm = ({ truck, loading, isEditing, onSave, onCancel, onChange, onDe
             <label style={{ fontWeight: "bold" }}>Purchase Date</label>
             <input
               type="date"
-              value={truck.truckpurchasedate ? new Date(truck.truckpurchasedate).toISOString().split("T")[0] : ""}
-              onChange={(e) => onChange("truckpurchasedate", e.target.value)}
+              value={
+                trailer.trailerpurchasedate ? new Date(trailer.trailerpurchasedate).toISOString().split("T")[0] : ""
+              }
+              onChange={(e) => onChange("trailerpurchasedate", e.target.value)}
               required
             />
           </div>
@@ -141,45 +167,49 @@ const TruckForm = ({ truck, loading, isEditing, onSave, onCancel, onChange, onDe
           <div className="manage-form-group">
             <label style={{ fontWeight: "bold" }}>
               License Expiry Date
-              {truck.truck_license_expiry && isLicenseExpired(truck.truck_license_expiry) && (
+              {trailer.trailer_license_expiry && isLicenseExpired(trailer.trailer_license_expiry) && (
                 <span style={{ color: "red", marginLeft: "10px", fontSize: "0.9em" }}>⚠️ EXPIRED</span>
               )}
-              {truck.truck_license_expiry &&
-                !isLicenseExpired(truck.truck_license_expiry) &&
-                isLicenseExpiringSoon(truck.truck_license_expiry) && (
+              {trailer.trailer_license_expiry &&
+                !isLicenseExpired(trailer.trailer_license_expiry) &&
+                isLicenseExpiringSoon(trailer.trailer_license_expiry) && (
                   <span style={{ color: "orange", marginLeft: "10px", fontSize: "0.9em" }}>⚠️ EXPIRES SOON</span>
                 )}
             </label>
             <input
               type="date"
-              value={truck.truck_license_expiry ? new Date(truck.truck_license_expiry).toISOString().split("T")[0] : ""}
-              onChange={(e) => onChange("truck_license_expiry", e.target.value)}
+              value={
+                trailer.trailer_license_expiry
+                  ? new Date(trailer.trailer_license_expiry).toISOString().split("T")[0]
+                  : ""
+              }
+              onChange={(e) => onChange("trailer_license_expiry", e.target.value)}
               style={{
                 borderColor:
-                  truck.truck_license_expiry && isLicenseExpired(truck.truck_license_expiry)
+                  trailer.trailer_license_expiry && isLicenseExpired(trailer.trailer_license_expiry)
                     ? "red"
-                    : truck.truck_license_expiry && isLicenseExpiringSoon(truck.truck_license_expiry)
+                    : trailer.trailer_license_expiry && isLicenseExpiringSoon(trailer.trailer_license_expiry)
                       ? "orange"
                       : "",
               }}
               required
             />
-            {truck.truck_license_expiry && (
+            {trailer.trailer_license_expiry && (
               <small
                 style={{
-                  color: isLicenseExpired(truck.truck_license_expiry)
+                  color: isLicenseExpired(trailer.trailer_license_expiry)
                     ? "red"
-                    : isLicenseExpiringSoon(truck.truck_license_expiry)
+                    : isLicenseExpiringSoon(trailer.trailer_license_expiry)
                       ? "orange"
                       : "green",
                   display: "block",
                   marginTop: "5px",
                 }}
               >
-                {isLicenseExpired(truck.truck_license_expiry)
+                {isLicenseExpired(trailer.trailer_license_expiry)
                   ? "License has expired!"
-                  : isLicenseExpiringSoon(truck.truck_license_expiry)
-                    ? `License expires in ${Math.ceil((new Date(truck.truck_license_expiry) - new Date()) / (1000 * 60 * 60 * 24))} days`
+                  : isLicenseExpiringSoon(trailer.trailer_license_expiry)
+                    ? `License expires in ${Math.ceil((new Date(trailer.trailer_license_expiry) - new Date()) / (1000 * 60 * 60 * 24))} days`
                     : "License is current"}
               </small>
             )}
@@ -204,10 +234,10 @@ const TruckForm = ({ truck, loading, isEditing, onSave, onCancel, onChange, onDe
                 accept=".pdf"
                 multiple
                 onChange={handleFileUpload}
-                disabled={(truck.documents?.length || 0) >= 3}
+                disabled={(trailer.documents?.length || 0) >= 3}
               />
               <small>
-                {(truck.documents?.length || 0) >= 3
+                {(trailer.documents?.length || 0) >= 3
                   ? "Maximum of 3 PDF documents uploaded"
                   : "Upload PDF documents only"}
               </small>
@@ -215,10 +245,10 @@ const TruckForm = ({ truck, loading, isEditing, onSave, onCancel, onChange, onDe
 
             {/* Document Lists */}
             <div style={{ marginTop: "15px" }}>
-              {isEditing && truck.existingDocuments?.length > 0 && (
+              {isEditing && trailer.existingDocuments?.length > 0 && (
                 <>
                   <h4>Previously Uploaded Documents</h4>
-                  {truck.existingDocuments.map((url, index) => (
+                  {trailer.existingDocuments.map((url, index) => (
                     <div
                       key={`existing-${index}`}
                       style={{
@@ -246,7 +276,7 @@ const TruckForm = ({ truck, loading, isEditing, onSave, onCancel, onChange, onDe
                       </a>
                       <button
                         type="button"
-                        onClick={() => onDeleteDocument("truck", truck.m5truckskey, url)}
+                        onClick={() => onDeleteDocument("trailer", trailer.m5trailerskey, url)}
                         style={{
                           backgroundColor: "#f44336",
                           color: "white",
@@ -264,10 +294,10 @@ const TruckForm = ({ truck, loading, isEditing, onSave, onCancel, onChange, onDe
                 </>
               )}
 
-              {truck.documents?.length > 0 && (
+              {trailer.documents?.length > 0 && (
                 <>
                   <h4>Newly Uploaded Documents</h4>
-                  {truck.documents.map((doc, index) => (
+                  {trailer.documents.map((doc, index) => (
                     <div
                       key={`new-${index}`}
                       style={{
@@ -316,7 +346,7 @@ const TruckForm = ({ truck, loading, isEditing, onSave, onCancel, onChange, onDe
         </div>
 
         <button type="submit" className="manage-save-button" disabled={loading}>
-          {loading ? "Saving..." : isEditing ? "Update Truck" : "Add Truck"}
+          {loading ? "Saving..." : isEditing ? "Update Trailer" : "Add Trailer"}
         </button>
 
         <button type="button" onClick={onCancel} className="manage-cancel-button">
@@ -327,4 +357,4 @@ const TruckForm = ({ truck, loading, isEditing, onSave, onCancel, onChange, onDe
   )
 }
 
-export default TruckForm
+export default TrailerForm
