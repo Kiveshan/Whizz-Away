@@ -161,144 +161,146 @@ const DirectorClientDocuments = () => {
   };
 
   return (
-    <div className="monitor-instructions-container">
-      {/* Header with back button and client name */}
-      <div className="user-profile">
-        <button className="back-button" onClick={handleBack}>
-          Back
-        </button>
-      </div>
+    <div className="director-client-docs-wrapper">
+      <div className="monitor-instructions-container">
+        {/* Header with back button and client name */}
+        <div className="user-profile">
+          <button className="back-button" onClick={handleBack}>
+            Back
+          </button>
+        </div>
 
-      {/* Year and Month filters */}
-      <div className="action-bar">
-        <div className="filter-section9">
-          <div className="filter-group">
-            <select
-              className="dropdown"
-              onChange={handleYearChange}
-              value={yearFilter || "Year"}
-            >
-              <option>Year</option>
-              <option>2025</option>
-              <option>2024</option>
-              <option>2023</option>
-              <option>2022</option>
-            </select>
-            <select
-              className="dropdown"
-              onChange={handleMonthChange}
-              value={monthFilter || "Month"}
-            >
-              <option>Month</option>
-              <option>January</option>
-              <option>February</option>
-              <option>March</option>
-              <option>April</option>
-              <option>May</option>
-              <option>June</option>
-              <option>July</option>
-              <option>August</option>
-              <option>September</option>
-              <option>October</option>
-              <option>November</option>
-              <option>December</option>
-            </select>
+        {/* Year and Month filters */}
+        <div className="action-bar">
+          <div className="filter-section9">
+            <div className="filter-group">
+              <select
+                className="dropdown"
+                onChange={handleYearChange}
+                value={yearFilter || "Year"}
+              >
+                <option>Year</option>
+                <option>2025</option>
+                <option>2024</option>
+                <option>2023</option>
+                <option>2022</option>
+              </select>
+              <select
+                className="dropdown"
+                onChange={handleMonthChange}
+                value={monthFilter || "Month"}
+              >
+                <option>Month</option>
+                <option>January</option>
+                <option>February</option>
+                <option>March</option>
+                <option>April</option>
+                <option>May</option>
+                <option>June</option>
+                <option>July</option>
+                <option>August</option>
+                <option>September</option>
+                <option>October</option>
+                <option>November</option>
+                <option>December</option>
+              </select>
+            </div>
           </div>
         </div>
-      </div>
 
-      {/* Type filters */}
-      <div className="filter-section9">
-        <div className="filter-group">
-          <button
-            className={`filter-button ${filter === "import" ? "active" : ""}`}
-            onClick={() => handleFilterChange("import")}
-          >
-            Import
-          </button>
-          <button
-            className={`filter-button ${filter === "export" ? "active" : ""}`}
-            onClick={() => handleFilterChange("export")}
-          >
-            Export
-          </button>
-          <button
-            className={`filter-button ${filter === "All" ? "active" : ""}`}
-            onClick={() => handleFilterChange("All")}
-          >
-            All
-          </button>
+        {/* Type filters */}
+        <div className="filter-section9">
+          <div className="filter-group">
+            <button
+              className={`filter-button ${filter === "import" ? "active" : ""}`}
+              onClick={() => handleFilterChange("import")}
+            >
+              Import
+            </button>
+            <button
+              className={`filter-button ${filter === "export" ? "active" : ""}`}
+              onClick={() => handleFilterChange("export")}
+            >
+              Export
+            </button>
+            <button
+              className={`filter-button ${filter === "All" ? "active" : ""}`}
+              onClick={() => handleFilterChange("All")}
+            >
+              All
+            </button>
+          </div>
         </div>
-      </div>
 
-      {/* Loading and error states */}
-      {loading && (
-        <div className="loading-message">Loading instructions...</div>
-      )}
+        {/* Loading and error states */}
+        {loading && (
+          <div className="loading-message">Loading instructions...</div>
+        )}
 
-      {error && <div className="error-message">{error}</div>}
+        {error && <div className="error-message">{error}</div>}
 
-      {/* Instructions table */}
-      {!loading && !error && (
-        <div className="instructions-table">
-          <table>
-            <thead>
-              <tr>
-                <th>Instruction No.</th>
-                <th>File No.</th>
-                <th>Type</th>
-                <th>Date</th>
-                <th>Amount</th>
-                <th>Invoice</th>
-                <th>Statement</th>
-              </tr>
-            </thead>
-            <tbody>
-              {instructions.length > 0 ? (
-                instructions.map((instruction) => (
-                  <tr key={instruction.m1key}>
-                    <td>{instruction.instruction_no}</td>
-                    <td>{instruction.file_no}</td>
-                    <td>{instruction.shipment_type}</td>
-                    <td>{instruction.pickupdate}</td>
-                    <td>R {instruction.total_cost}</td>
-                    <td>
-                      {/* Always show View button for invoices since completed instructions should have invoices */}
-                      <button
-                        className="view-button"
-                        onClick={() => handleViewInvoice(instruction.ikey)}
-                      >
-                        View
-                      </button>
-                    </td>
-                    <td>
-                      {instruction.has_statement ? (
+        {/* Instructions table */}
+        {!loading && !error && (
+          <div className="instructions-table">
+            <table>
+              <thead>
+                <tr>
+                  <th>Instruction No.</th>
+                  <th>File No.</th>
+                  <th>Type</th>
+                  <th>Date</th>
+                  <th>Amount</th>
+                  <th>Invoice</th>
+                  <th>Statement</th>
+                </tr>
+              </thead>
+              <tbody>
+                {instructions.length > 0 ? (
+                  instructions.map((instruction) => (
+                    <tr key={instruction.m1key}>
+                      <td>{instruction.instruction_no}</td>
+                      <td>{instruction.file_no}</td>
+                      <td>{instruction.shipment_type}</td>
+                      <td>{instruction.pickupdate}</td>
+                      <td>R {instruction.total_cost}</td>
+                      <td>
+                        {/* Always show View button for invoices since completed instructions should have invoices */}
                         <button
                           className="view-button"
-                          onClick={() =>
-                            handleViewStatement(instruction.statement_id)
-                          }
+                          onClick={() => handleViewInvoice(instruction.ikey)}
                         >
                           View
                         </button>
-                      ) : (
-                        <span className="pending-status">Pending</span>
-                      )}
+                      </td>
+                      <td>
+                        {instruction.has_statement ? (
+                          <button
+                            className="view-button"
+                            onClick={() =>
+                              handleViewStatement(instruction.statement_id)
+                            }
+                          >
+                            View
+                          </button>
+                        ) : (
+                          <span className="pending-status">Pending</span>
+                        )}
+                      </td>
+                    </tr>
+                  ))
+                ) : (
+                  <tr>
+                    <td colSpan="7" style={{ textAlign: "center" }}>
+                      No instructions found for this client with the selected
+                      filters
                     </td>
                   </tr>
-                ))
-              ) : (
-                <tr>
-                  <td colSpan="7" style={{ textAlign: "center" }}>
-                    No instructions found for this client with the selected
-                    filters
-                  </td>
-                </tr>
-              )}
-            </tbody>
-          </table>
-        </div>
-      )}
+                )}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
     </div>
   );
 };
