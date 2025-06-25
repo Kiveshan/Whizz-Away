@@ -3,6 +3,8 @@ import {
   getSubcontractorById,
   createSubcontractor,
   updateSubcontractor,
+  deleteSubcontractorDriver,
+  deleteSubcontractorTruck,
   toggleSubcontractorStatus,
 } from "../../models/manage/subbieModel.js"
 
@@ -40,7 +42,6 @@ const getSubcontractorByIdHandler = async (req, res) => {
   try {
     const { id } = req.params
 
-    // Validate ID parameter
     const parsedId = Number.parseInt(id)
     if (isNaN(parsedId)) {
       return res.status(400).json({ error: "Invalid subcontractor ID" })
@@ -60,7 +61,7 @@ const getSubcontractorByIdHandler = async (req, res) => {
 
 const createSubcontractorHandler = async (req, res) => {
   try {
-    const { cellnum, email, companyname, location, contact_person, subei_reg_num, trucks } = req.body
+    const { cellnum, email, companyname, location, contact_person, subei_reg_num, drivers, trucks } = req.body
 
     console.log("Creating subcontractor with data:", req.body)
 
@@ -69,16 +70,19 @@ const createSubcontractorHandler = async (req, res) => {
       return res.status(400).json({ error: "Please fill in all required fields" })
     }
 
-    // Validate trucks array
-    if (!trucks || !Array.isArray(trucks) || trucks.length === 0) {
-      return res.status(400).json({ error: "At least one truck and driver combination is required" })
+    // Validate drivers array
+    if (!drivers || !Array.isArray(drivers) || drivers.length === 0) {
+      return res.status(400).json({ error: "At least one driver is required" })
     }
 
-    // Validate that at least one truck/driver combination has data
-    const validTrucks = trucks.filter((truck) => truck.reg && truck.driver)
-    if (validTrucks.length === 0) {
-      return res.status(400).json({ error: "At least one complete truck and driver combination is required" })
+    // Validate that at least one driver has a name
+    const validDrivers = drivers.filter((driver) => driver.name && driver.name.trim())
+    if (validDrivers.length === 0) {
+      return res.status(400).json({ error: "At least one driver with a name is required" })
     }
+
+    // Trucks are optional, but if provided, validate them
+    const validTrucks = trucks ? trucks.filter((truck) => truck.truckregnum && truck.truckregnum.trim()) : []
 
     const result = await createSubcontractor({
       cellnum,
@@ -87,6 +91,7 @@ const createSubcontractorHandler = async (req, res) => {
       location,
       contact_person,
       subei_reg_num,
+      drivers: validDrivers,
       trucks: validTrucks,
     })
 
@@ -105,13 +110,12 @@ const updateSubcontractorHandler = async (req, res) => {
   try {
     const { id } = req.params
 
-    // Validate ID parameter
     const parsedId = Number.parseInt(id)
     if (isNaN(parsedId)) {
       return res.status(400).json({ error: "Invalid subcontractor ID" })
     }
 
-    const { cellnum, email, companyname, location, contact_person, subei_reg_num, trucks } = req.body
+    const { cellnum, email, companyname, location, contact_person, subei_reg_num, drivers, trucks } = req.body
 
     console.log(`Updating subcontractor ID ${parsedId} with data:`, req.body)
 
@@ -120,16 +124,19 @@ const updateSubcontractorHandler = async (req, res) => {
       return res.status(400).json({ error: "Please fill in all required fields" })
     }
 
-    // Validate trucks array
-    if (!trucks || !Array.isArray(trucks) || trucks.length === 0) {
-      return res.status(400).json({ error: "At least one truck and driver combination is required" })
+    // Validate drivers array
+    if (!drivers || !Array.isArray(drivers) || drivers.length === 0) {
+      return res.status(400).json({ error: "At least one driver is required" })
     }
 
-    // Validate that at least one truck/driver combination has data
-    const validTrucks = trucks.filter((truck) => truck.reg && truck.driver)
-    if (validTrucks.length === 0) {
-      return res.status(400).json({ error: "At least one complete truck and driver combination is required" })
+    // Validate that at least one driver has a name
+    const validDrivers = drivers.filter((driver) => driver.name && driver.name.trim())
+    if (validDrivers.length === 0) {
+      return res.status(400).json({ error: "At least one driver with a name is required" })
     }
+
+    // Trucks are optional, but if provided, validate them
+    const validTrucks = trucks ? trucks.filter((truck) => truck.truckregnum && truck.truckregnum.trim()) : []
 
     const result = await updateSubcontractor(parsedId, {
       cellnum,
@@ -138,6 +145,7 @@ const updateSubcontractorHandler = async (req, res) => {
       location,
       contact_person,
       subei_reg_num,
+      drivers: validDrivers,
       trucks: validTrucks,
     })
 
@@ -152,12 +160,57 @@ const updateSubcontractorHandler = async (req, res) => {
   }
 }
 
+const deleteSubcontractorDriverHandler = async (req, res) => {
+  try {
+    const { driverId } = req.params
+
+    const parsedId = Number.parseInt(driverId)
+    if (isNaN(parsedId)) {
+      return res.status(400).json({ error: "Invalid driver ID" })
+    }
+
+    console.log(`Deleting subcontractor driver ID ${parsedId}`)
+    const result = await deleteSubcontractorDriver(parsedId)
+
+    if (!result.success) {
+      return res.status(404).json({ message: result.message })
+    }
+
+    res.json({ message: result.message })
+  } catch (err) {
+    console.error(`Error deleting subcontractor driver ${req.params.driverId}:`, err)
+    res.status(500).json({ error: "Failed to delete driver" })
+  }
+}
+
+const deleteSubcontractorTruckHandler = async (req, res) => {
+  try {
+    const { truckId } = req.params
+
+    const parsedId = Number.parseInt(truckId)
+    if (isNaN(parsedId)) {
+      return res.status(400).json({ error: "Invalid truck ID" })
+    }
+
+    console.log(`Deleting subcontractor truck ID ${parsedId}`)
+    const result = await deleteSubcontractorTruck(parsedId)
+
+    if (!result.success) {
+      return res.status(404).json({ message: result.message })
+    }
+
+    res.json({ message: result.message })
+  } catch (err) {
+    console.error(`Error deleting subcontractor truck ${req.params.truckId}:`, err)
+    res.status(500).json({ error: "Failed to delete truck" })
+  }
+}
+
 const toggleSubcontractorStatusHandler = async (req, res) => {
   try {
     const { id } = req.params
     const { status } = req.body
 
-    // Validate ID parameter
     const parsedId = Number.parseInt(id)
     if (isNaN(parsedId)) {
       return res.status(400).json({ error: "Invalid subcontractor ID" })
@@ -180,5 +233,7 @@ export {
   getSubcontractorByIdHandler,
   createSubcontractorHandler,
   updateSubcontractorHandler,
+  deleteSubcontractorDriverHandler,
+  deleteSubcontractorTruckHandler,
   toggleSubcontractorStatusHandler,
 }

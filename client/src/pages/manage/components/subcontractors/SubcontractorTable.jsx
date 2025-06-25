@@ -10,6 +10,8 @@ const SubcontractorTable = ({
   onEdit,
   onToggleStatus,
   onAdd,
+  onDeleteDriver,
+  onDeleteTruck,
   pagination,
   onPageChange,
   onItemsPerPageChange,
@@ -25,7 +27,6 @@ const SubcontractorTable = ({
   return (
     <div>
       <div>
-      
         <button className="manage-add-subcontractor-button" onClick={onAdd}>
           Add Subcontractor
         </button>
@@ -53,22 +54,19 @@ const SubcontractorTable = ({
             <table>
               <thead>
                 <tr>
-                  <th>Company Name</th>
-                  <th>Contact Person</th>
-                  <th>Phone</th>
-                  <th>Email</th>
+                  <th>Company Info</th>
+                  <th>Contact Details</th>
                   <th>Drivers</th>
-                  <th>Truck Registrations</th>
-                  <th>Driver Count</th>
+                  <th>Trucks</th>
+                  <th>Counts</th>
                   <th>Status</th>
                   <th>Actions</th>
-                  <th></th>
                 </tr>
               </thead>
               <tbody>
                 {subcontractors.length === 0 ? (
                   <tr>
-                    <td colSpan="10" className="no-data">
+                    <td colSpan="7" className="no-data">
                       No subcontractors found
                     </td>
                   </tr>
@@ -76,31 +74,57 @@ const SubcontractorTable = ({
                   subcontractors.map((sub) => (
                     <tr key={sub.subei_reg_num || sub.min_userid}>
                       <td>
-                        <strong>{sub.companyname}</strong>
-                        <br />
-                        <small style={{ color: "#666" }}>Reg: {sub.subei_reg_num}</small>
-                      </td>
-                      <td>{sub.contact_person}</td>
-                      <td>{sub.cellnum}</td>
-                      <td>{sub.email}</td>
-                      <td>
-                        <div style={{ maxWidth: "200px", fontSize: "13px" }}>{sub.driver_names || "N/A"}</div>
+                        <div>
+                          <strong>{sub.companyname}</strong>
+                          <br />
+                          <small style={{ color: "#666" }}>Reg: {sub.subei_reg_num}</small>
+                          <br />
+                          <small style={{ color: "#666" }}>{sub.location}</small>
+                        </div>
                       </td>
                       <td>
-                        <div style={{ maxWidth: "150px", fontSize: "13px" }}>{sub.truck_registrations || "N/A"}</div>
+                        <div>
+                          <strong>{sub.contact_person}</strong>
+                          <br />
+                          <small>{sub.cellnum}</small>
+                          <br />
+                          <small>{sub.email}</small>
+                        </div>
                       </td>
                       <td>
-                        <span
-                          style={{
-                            background: "#e3f2fd",
-                            padding: "4px 8px",
-                            borderRadius: "12px",
-                            fontSize: "12px",
-                            fontWeight: "bold",
-                          }}
-                        >
-                          {sub.driver_count || 0}
-                        </span>
+                        <div style={{ maxWidth: "200px", fontSize: "13px" }}>{sub.driver_names || "No drivers"}</div>
+                      </td>
+                      <td>
+                        <div style={{ maxWidth: "150px", fontSize: "13px" }}>
+                          {sub.truck_registrations || "No trucks"}
+                        </div>
+                      </td>
+                      <td>
+                        <div style={{ textAlign: "center" }}>
+                          <div
+                            style={{
+                              background: "#e3f2fd",
+                              padding: "4px 8px",
+                              borderRadius: "12px",
+                              fontSize: "12px",
+                              fontWeight: "bold",
+                              marginBottom: "4px",
+                            }}
+                          >
+                            👥 {sub.driver_count || 0}
+                          </div>
+                          <div
+                            style={{
+                              background: "#f3e5f5",
+                              padding: "4px 8px",
+                              borderRadius: "12px",
+                              fontSize: "12px",
+                              fontWeight: "bold",
+                            }}
+                          >
+                            🚛 {sub.truck_count || 0}
+                          </div>
+                        </div>
                       </td>
                       <td>
                         <span className={`status-badge ${sub.status ? "active" : "inactive"}`}>
@@ -108,17 +132,23 @@ const SubcontractorTable = ({
                         </span>
                       </td>
                       <td>
-                        <button className="manage-edit-button" onClick={() => onEdit(sub.min_userid)}>
-                          Edit
-                        </button>
-                      </td>
-                      <td>
-                        <button
-                          className={sub.status ? "manage-delete-button" : "manage-enable-button"}
-                          onClick={() => onToggleStatus(sub.min_userid, sub.status)}
-                        >
-                          {sub.status ? "Disable" : "Enable"}
-                        </button>
+                        <div style={{ display: "flex", flexDirection: "column", gap: "5px" }}>
+                          <button
+                            className="manage-edit-button"
+                            onClick={() => onEdit(sub.min_userid)}
+                            style={{ fontSize: "12px", padding: "4px 8px" }}
+                          >
+                            Edit Company
+                          </button>
+
+                          <button
+                            className={sub.status ? "manage-delete-button" : "manage-enable-button"}
+                            onClick={() => onToggleStatus(sub.min_userid, sub.status)}
+                            style={{ fontSize: "12px", padding: "4px 8px" }}
+                          >
+                            {sub.status ? "Disable" : "Enable"}
+                          </button>
+                        </div>
                       </td>
                     </tr>
                   ))

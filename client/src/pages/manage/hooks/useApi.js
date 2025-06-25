@@ -14,7 +14,7 @@ export function useApi(state, actions) {
           employees: "/api/employees",
           clients: "/api/m5Clients",
           trucks: "/api/trucks",
-          trailers: "/api/trailers", // Added trailers endpoint
+          trailers: "/api/trailers",
           driverRates: "/api/driver-rates",
           subcontractors: "/api/subcontractors",
         }
@@ -74,7 +74,6 @@ export function useApi(state, actions) {
       fetchPaginatedData("clients", pagination.clients.currentPage, pagination.clients.itemsPerPage, filters.clients),
       fetchPaginatedData("trucks", pagination.trucks.currentPage, pagination.trucks.itemsPerPage, filters.trucks),
       fetchPaginatedData(
-        // Added trailers to fetchAllData
         "trailers",
         pagination.trailers.currentPage,
         pagination.trailers.itemsPerPage,
@@ -325,7 +324,6 @@ export function useApi(state, actions) {
     [state, actions, fetchPaginatedData],
   )
 
-  // Added saveTrailer function
   const saveTrailer = useCallback(
     async (trailerData) => {
       actions.setLoading(true)
@@ -452,15 +450,18 @@ export function useApi(state, actions) {
           return false
         }
 
-        // Validate trucks array
-        const validTrucks = (subcontractorData.trucks || []).filter(
-          (truck) => truck.reg && truck.reg.trim() && truck.driver && truck.driver.trim(),
-        )
+        // Validate drivers array - at least one driver is required
+        const validDrivers = (subcontractorData.drivers || []).filter((driver) => driver.name && driver.name.trim())
 
-        if (validTrucks.length === 0) {
-          actions.showAlert("Please provide at least one complete truck registration and driver name combination.")
+        if (validDrivers.length === 0) {
+          actions.showAlert("Please provide at least one driver name.")
           return false
         }
+
+        // Trucks are optional, but if provided, validate them
+        const validTrucks = (subcontractorData.trucks || []).filter(
+          (truck) => truck.truckregnum && truck.truckregnum.trim(),
+        )
 
         const payload = {
           companyname: subcontractorData.companyname,
@@ -469,6 +470,7 @@ export function useApi(state, actions) {
           cellnum: subcontractorData.cellnum,
           email: subcontractorData.email,
           subei_reg_num: subcontractorData.subei_reg_num,
+          drivers: validDrivers,
           trucks: validTrucks,
         }
 
@@ -604,7 +606,7 @@ export function useApi(state, actions) {
           case "truck":
             endpoint = `/api/trucks/${id}`
             break
-          case "trailer": // Added trailer case
+          case "trailer":
             endpoint = `/api/trailers/${id}`
             break
           case "rate":
@@ -636,6 +638,70 @@ export function useApi(state, actions) {
     [state, actions, fetchPaginatedData],
   )
 
+  // NEW: Delete individual subcontractor driver
+  const deleteSubcontractorDriver = useCallback(
+    async (driverId) => {
+      if (!window.confirm("Are you sure you want to delete this driver?")) {
+        return false
+      }
+
+      actions.setLoading(true)
+      try {
+        await api.delete(`/api/subcontractors/drivers/${driverId}`)
+
+        // Refresh current page
+        await fetchPaginatedData(
+          "subcontractors",
+          state.pagination.subcontractors.currentPage,
+          state.pagination.subcontractors.itemsPerPage,
+          state.filters.subcontractors,
+        )
+
+        actions.showAlert("Driver deleted successfully!")
+        return true
+      } catch (err) {
+        console.error("Error deleting driver:", err)
+        actions.showAlert(`Error deleting driver: ${err.response?.data?.error || err.message}`)
+        return false
+      } finally {
+        actions.setLoading(false)
+      }
+    },
+    [state, actions, fetchPaginatedData],
+  )
+
+  // NEW: Delete individual subcontractor truck
+  const deleteSubcontractorTruck = useCallback(
+    async (truckId) => {
+      if (!window.confirm("Are you sure you want to delete this truck?")) {
+        return false
+      }
+
+      actions.setLoading(true)
+      try {
+        await api.delete(`/api/subcontractors/trucks/${truckId}`)
+
+        // Refresh current page
+        await fetchPaginatedData(
+          "subcontractors",
+          state.pagination.subcontractors.currentPage,
+          state.pagination.subcontractors.itemsPerPage,
+          state.filters.subcontractors,
+        )
+
+        actions.showAlert("Truck deleted successfully!")
+        return true
+      } catch (err) {
+        console.error("Error deleting truck:", err)
+        actions.showAlert(`Error deleting truck: ${err.response?.data?.error || err.message}`)
+        return false
+      } finally {
+        actions.setLoading(false)
+      }
+    },
+    [state, actions, fetchPaginatedData],
+  )
+
   const loadItemForEdit = useCallback(
     async (type, id) => {
       try {
@@ -655,7 +721,7 @@ export function useApi(state, actions) {
             endpoint = `/api/trucks/${id}`
             formType = "Truck"
             break
-          case "trailer": // Added trailer case
+          case "trailer":
             endpoint = `/api/trailers/${id}`
             formType = "Trailer"
             break
@@ -705,7 +771,6 @@ export function useApi(state, actions) {
             driver_twelve_meter_rate: data.driver_twelve_meter_rate || "",
           })
         } else if (type === "truck" || type === "trailer") {
-          // Added trailer handling
           const existingDocuments = []
           if (data.document_url1) existingDocuments.push(data.document_url1)
           if (data.document_url2) existingDocuments.push(data.document_url2)
@@ -732,11 +797,11 @@ export function useApi(state, actions) {
             existingDocuments,
           })
         } else if (type === "subcontractor") {
-          // The new structure already provides trucks array from the backend
+          // Handle the new structure with separate drivers and trucks arrays
           actions.updateFormData(formType, {
             ...data,
-            // trucks array is already properly formatted from the backend
-            trucks: data.trucks || [{ reg: "", driver: "" }],
+            drivers: data.drivers || [{ name: "" }],
+            trucks: data.trucks || [],
           })
         } else {
           actions.updateFormData(formType, data)
@@ -766,7 +831,6 @@ export function useApi(state, actions) {
             endpoint = "/api/trucks/delete-doc"
             idField = "truckId"
           } else if (type === "trailer") {
-            // Added trailer document deletion
             endpoint = "/api/trailers/delete-doc"
             idField = "trailerId"
           } else {
@@ -806,13 +870,15 @@ export function useApi(state, actions) {
     saveEmployee,
     saveClient,
     saveTruck,
-    saveTrailer, // Added saveTrailer to return object
+    saveTrailer,
     saveDriverRate,
     saveSubcontractor,
     toggleEmployeeStatus,
     toggleClientStatus,
     toggleSubcontractorStatus,
     deleteItem,
+    deleteSubcontractorDriver, // NEW
+    deleteSubcontractorTruck, // NEW
     loadItemForEdit,
     deleteDocument,
   }

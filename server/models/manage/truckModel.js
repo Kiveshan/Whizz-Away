@@ -7,8 +7,8 @@ const getAllTrucks = async (options = {}) => {
 
     const { offset = 0, limit = 10, search = "" } = options
 
-    // Build WHERE clause for filtering
-    let whereClause = "WHERE 1=1"
+    // Build WHERE clause for filtering - EXCLUDE subcontractor trucks
+    let whereClause = "WHERE (is_subcontractor = false OR is_subcontractor IS NULL)"
     const queryParams = []
     let paramIndex = 1
 
@@ -117,7 +117,7 @@ const createTruck = async (truckData, documentKeys) => {
         purchase_price,
         current_evaluation,
         vin_num,
-        is_subcontractor,
+        is_subcontractor || false, // Default to false for company trucks
         truck_license_expiry,
         document_url1,
         document_url2,
@@ -187,7 +187,7 @@ const updateTruck = async (id, truckData, newDocKeys) => {
         purchase_price,
         current_evaluation,
         vin_num,
-        is_subcontractor,
+        is_subcontractor || false,
         truck_license_expiry,
         document_url1,
         document_url2,
@@ -207,7 +207,7 @@ const updateTruck = async (id, truckData, newDocKeys) => {
   }
 }
 
-// New function to get trucks with expiring licenses
+// New function to get trucks with expiring licenses (EXCLUDE subcontractor trucks)
 const getTrucksWithExpiringLicenses = async (daysAhead = 30) => {
   let client
   try {
@@ -220,6 +220,7 @@ const getTrucksWithExpiringLicenses = async (daysAhead = 30) => {
       WHERE truck_license_expiry IS NOT NULL 
         AND truck_license_expiry <= CURRENT_DATE + INTERVAL '${daysAhead} days'
         AND truck_license_expiry >= CURRENT_DATE
+        AND (is_subcontractor = false OR is_subcontractor IS NULL)
       ORDER BY truck_license_expiry ASC
     `
 
@@ -233,7 +234,7 @@ const getTrucksWithExpiringLicenses = async (daysAhead = 30) => {
   }
 }
 
-// New function to get expired licenses
+// New function to get expired licenses (EXCLUDE subcontractor trucks)
 const getTrucksWithExpiredLicenses = async () => {
   let client
   try {
@@ -245,6 +246,7 @@ const getTrucksWithExpiredLicenses = async () => {
       FROM m5_trucks 
       WHERE truck_license_expiry IS NOT NULL 
         AND truck_license_expiry < CURRENT_DATE
+        AND (is_subcontractor = false OR is_subcontractor IS NULL)
       ORDER BY truck_license_expiry ASC
     `
 
