@@ -98,13 +98,27 @@ const StatementList = () => {
     "December",
   ];
 
-  if (loading) return <div>Loading statements...</div>;
-  if (error) return <div className="error-message">Error: {error}</div>;
+  if (loading)
+    return (
+      <div className="statement-list-wrapper">
+        <div>Loading statements...</div>
+      </div>
+    );
+  if (error)
+    return (
+      <div className="statement-list-wrapper">
+        <div className="error-message">Error: {error}</div>
+      </div>
+    );
   if (!clientId)
-    return <div>Please select a client from the previous page.</div>;
+    return (
+      <div className="statement-list-wrapper">
+        <div>Please select a client from the previous page.</div>
+      </div>
+    );
 
   return (
-    <div className="">
+    <div className="statement-list-wrapper">
       <button
         onClick={() => navigate("/view-client-statements")}
         className="back-button"

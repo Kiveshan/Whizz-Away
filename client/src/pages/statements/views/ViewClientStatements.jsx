@@ -60,7 +60,7 @@ const ViewClientStatement = () => {
   }, [navigate]);
 
   return (
-    <div className="">
+    <div className="view-client-statements-wrapper">
       {/* Back Button */}
       <div className="client-payments-header">
         <button
