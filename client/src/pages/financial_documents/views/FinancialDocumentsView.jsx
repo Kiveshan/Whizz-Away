@@ -71,7 +71,7 @@ const FinancialDocumentsView = () => {
       {!loading && !error && (
         <>
           <div className="clientinstructiontable">
-            <table className="t1" style={{ width: "70%", marginLeft: "375px" }}>
+            <table className="t1" style={{ width: "70%" }}>
               <thead className="bg-blue-300">
                 <tr>
                   <th className="p-3">Company</th>
