@@ -1,9 +1,10 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import api from "../../../api"; // Import the configured Axios instance
 import "../css/ClientDocuments.css";
+import Pagination from "../../../components/Pagination"; // Import the Pagination component
 
 const DirectorClientDocuments = () => {
   const navigate = useNavigate();
@@ -14,6 +15,10 @@ const DirectorClientDocuments = () => {
   const [instructions, setInstructions] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+
+  // Pagination state
+  const [currentPage, setCurrentPage] = useState(1);
+  const [recordsPerPage] = useState(10); // You can make this configurable
 
   // Filter states
   const [filter, setFilter] = useState("All");
@@ -98,6 +103,7 @@ const DirectorClientDocuments = () => {
 
         if (response.data.success) {
           setInstructions(response.data.data);
+          setCurrentPage(1); // Reset to first page when data changes
           setError(null);
         } else {
           setError(response.data.message || "Failed to fetch instructions");
@@ -123,17 +129,25 @@ const DirectorClientDocuments = () => {
   // Filter handlers
   const handleFilterChange = (type) => {
     setFilter(type);
+    setCurrentPage(1); // Reset to first page when filter changes
   };
 
   const handleYearChange = (event) => {
     const selectedYear = event.target.value;
     setYearFilter(selectedYear === "Year" ? "" : selectedYear);
+    setCurrentPage(1); // Reset to first page when filter changes
   };
 
   const handleMonthChange = (event) => {
     const selectedMonth = event.target.value;
     setMonthFilter(selectedMonth === "Month" ? "" : selectedMonth);
+    setCurrentPage(1); // Reset to first page when filter changes
   };
+
+  // Handle pagination
+  const handlePageChange = useCallback((pageNumber) => {
+    setCurrentPage(pageNumber);
+  }, []);
 
   // View handlers
   const handleViewInvoice = (ikey) => {
@@ -159,6 +173,12 @@ const DirectorClientDocuments = () => {
       },
     });
   };
+
+  // Calculate pagination data
+  const totalRecords = instructions.length;
+  const startIndex = (currentPage - 1) * recordsPerPage;
+  const endIndex = startIndex + recordsPerPage;
+  const currentInstructions = instructions.slice(startIndex, endIndex);
 
   return (
     <div className="director-client-docs-wrapper">
@@ -241,64 +261,76 @@ const DirectorClientDocuments = () => {
 
         {/* Instructions table */}
         {!loading && !error && (
-          <div className="instructions-table">
-            <table>
-              <thead>
-                <tr>
-                  <th>Instruction No.</th>
-                  <th>File No.</th>
-                  <th>Type</th>
-                  <th>Date</th>
-                  <th>Amount</th>
-                  <th>Invoice</th>
-                  <th>Statement</th>
-                </tr>
-              </thead>
-              <tbody>
-                {instructions.length > 0 ? (
-                  instructions.map((instruction) => (
-                    <tr key={instruction.m1key}>
-                      <td>{instruction.instruction_no}</td>
-                      <td>{instruction.file_no}</td>
-                      <td>{instruction.shipment_type}</td>
-                      <td>{instruction.pickupdate}</td>
-                      <td>R {instruction.total_cost}</td>
-                      <td>
-                        {/* Always show View button for invoices since completed instructions should have invoices */}
-                        <button
-                          className="view-button"
-                          onClick={() => handleViewInvoice(instruction.ikey)}
-                        >
-                          View
-                        </button>
-                      </td>
-                      <td>
-                        {instruction.has_statement ? (
+          <>
+            <div className="instructions-table">
+              <table>
+                <thead>
+                  <tr>
+                    <th>Instruction No.</th>
+                    <th>File No.</th>
+                    <th>Type</th>
+                    <th>Date</th>
+                    <th>Amount</th>
+                    <th>Invoice</th>
+                    <th>Statement</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {currentInstructions.length > 0 ? (
+                    currentInstructions.map((instruction) => (
+                      <tr key={instruction.m1key}>
+                        <td>{instruction.instruction_no}</td>
+                        <td>{instruction.file_no}</td>
+                        <td>{instruction.shipment_type}</td>
+                        <td>{instruction.pickupdate}</td>
+                        <td>R {instruction.total_cost}</td>
+                        <td>
+                          {/* Always show View button for invoices since completed instructions should have invoices */}
                           <button
                             className="view-button"
-                            onClick={() =>
-                              handleViewStatement(instruction.statement_id)
-                            }
+                            onClick={() => handleViewInvoice(instruction.ikey)}
                           >
                             View
                           </button>
-                        ) : (
-                          <span className="pending-status">Pending</span>
-                        )}
+                        </td>
+                        <td>
+                          {instruction.has_statement ? (
+                            <button
+                              className="view-button"
+                              onClick={() =>
+                                handleViewStatement(instruction.statement_id)
+                              }
+                            >
+                              View
+                            </button>
+                          ) : (
+                            <span className="pending-status">Pending</span>
+                          )}
+                        </td>
+                      </tr>
+                    ))
+                  ) : (
+                    <tr>
+                      <td colSpan="7" style={{ textAlign: "center" }}>
+                        No instructions found for this client with the selected
+                        filters
                       </td>
                     </tr>
-                  ))
-                ) : (
-                  <tr>
-                    <td colSpan="7" style={{ textAlign: "center" }}>
-                      No instructions found for this client with the selected
-                      filters
-                    </td>
-                  </tr>
-                )}
-              </tbody>
-            </table>
-          </div>
+                  )}
+                </tbody>
+              </table>
+            </div>
+
+            {/* Pagination Component */}
+            {totalRecords > 0 && (
+              <Pagination
+                totalRecords={totalRecords}
+                recordsPerPage={recordsPerPage}
+                currentPage={currentPage}
+                onPageChange={handlePageChange}
+              />
+            )}
+          </>
         )}
       </div>
     </div>

@@ -95,6 +95,7 @@
   background-color: rgb(19, 94, 253);
   cursor: pointer;
   font-family: inherit;
+  color: white;
 }
 
 .director-client-docs-wrapper .filter-button.active {
@@ -247,6 +248,7 @@
   background-color: rgb(52, 102, 236);
   cursor: pointer;
   font-family: inherit;
+  color: white;
 }
 
 .client-docs-wrapper .filter-button.active {
