@@ -155,33 +155,6 @@ const modalAnimation = `
 }
 `;
 
-// Add this debug function at the top of the component
-const debugDriverData = (drivers) => {
-  if (!drivers || drivers.length === 0) {
-    console.log("No drivers to debug");
-    return;
-  }
-
-  console.log("Debugging driver data:");
-  drivers.forEach((driver, index) => {
-    console.log(`Driver ${index}:`);
-    console.log(`  ID: ${driver.id} (${typeof driver.id})`);
-    console.log(`  Driver ID: ${driver.driverid} (${typeof driver.driverid})`);
-    console.log(
-      `  Truck Reg: ${driver.truckregnumber} (${typeof driver.truckregnumber})`
-    );
-    console.log(
-      `  Container: ${
-        driver.containernumber
-      } (${typeof driver.containernumber})`
-    );
-    console.log(`  Container Type: ${driver.container_type}`);
-    console.log(`  Date: ${driver.date} (${typeof driver.date})`);
-    console.log(`  Full Name: ${driver.full_name}`);
-    console.log(`  Driver Rate: ${driver.driverRate}`);
-  });
-};
-
 const Plus = ({ onClick, disabled }) => (
   <button
     onClick={onClick}
@@ -308,8 +281,6 @@ function UpdateInstruction() {
     containerNumber: "",
   });
 
-  // Add a new state variable to track which legs have been saved
-  // Add this after the other state variables (around line 200)
   const [savedLegs, setSavedLegs] = useState(new Set());
 
   // Add these state variables after the other state declarations
@@ -320,8 +291,6 @@ function UpdateInstruction() {
     subbie_twelve_meter: 0,
   });
 
-  // Improve the refreshLegData function to ensure data is properly refreshed
-  // Update refreshLegData function to use Axios
   const refreshLegData = async () => {
     if (instructionId) {
       try {
@@ -394,7 +363,6 @@ function UpdateInstruction() {
                 currentLeg.drivers
               );
               setDrivers(currentLeg.drivers);
-              debugDriverData(currentLeg.drivers);
             } else {
               setDrivers([]);
             }
@@ -423,6 +391,7 @@ function UpdateInstruction() {
     });
     setShowRemoveLegModal(true);
   };
+
   useEffect(() => {
     const fetchData = async () => {
       try {
@@ -455,24 +424,6 @@ function UpdateInstruction() {
     };
   }, [instructionId]);
 
-  // Add a useEffect to log driver data whenever it changes
-  useEffect(() => {
-    if (drivers && drivers.length > 0) {
-      console.log("Current drivers state:", JSON.stringify(drivers, null, 2));
-
-      // Check if all fields are properly populated in the form
-      drivers.forEach((driver, index) => {
-        console.log(`Driver ${index} form field values:`);
-        console.log(`  Driver ID: ${driver.driverid || "empty"}`);
-        console.log(`  Truck Reg: ${driver.truckregnumber || "empty"}`);
-        console.log(`  Container: ${driver.containernumber || "empty"}`);
-        console.log(`  Container Type: ${driver.container_type || "empty"}`);
-        console.log(`  Date: ${driver.date || "empty"}`);
-        console.log(`  Driver Rate: ${driver.driverRate || "empty"}`);
-      });
-    }
-  }, [drivers]);
-
   // Replace the entire useEffect that handles the selectedLegIndex with this version
   useEffect(() => {
     // Only run this effect once when the component mounts with a selectedLegIndex
@@ -481,10 +432,6 @@ function UpdateInstruction() {
       selectedLegIndex !== undefined &&
       legs.length > 0
     ) {
-      console.log(
-        `Selecting leg at index ${selectedLegIndex} after navigation`
-      );
-
       // Make sure the selectedLegIndex is valid
       if (selectedLegIndex < legs.length) {
         // Force a clean state before selecting the leg
@@ -715,7 +662,6 @@ function UpdateInstruction() {
               JSON.stringify(fetchedLegs[0].drivers, null, 2)
             );
             setDrivers(fetchedLegs[0].drivers);
-            debugDriverData(fetchedLegs[0].drivers);
           } else {
             console.log("No drivers for first leg, setting empty array");
             setDrivers([]);
@@ -1230,7 +1176,6 @@ function UpdateInstruction() {
           JSON.stringify(normalizedDrivers, null, 2)
         );
         setDrivers(normalizedDrivers);
-        debugDriverData(normalizedDrivers);
       } else {
         console.log("No drivers for selected leg, setting empty array");
         setDrivers([]);
@@ -1715,6 +1660,7 @@ function UpdateInstruction() {
   };
 
   // Replace the handleFinalizeClick function with this updated version
+  // Lines 1423-1447: Update handleFinaliseClick function
   const handleFinaliseClick = async () => {
     if (legs.length === 0) {
       // No legs, just proceed
@@ -1741,14 +1687,8 @@ function UpdateInstruction() {
 
     try {
       // Fetch the instruction details to get the pickup and dropoff locations
-      const response = await fetch(
-        `http://localhost:5000/instructions/${instructionId}/details`
-      );
-      if (!response.ok) {
-        throw new Error("Failed to fetch instruction details");
-      }
-
-      const instructionDetails = await response.json();
+      const response = await api.get(`/instructions/${instructionId}/details`);
+      const instructionDetails = response.data;
       const pickup = instructionDetails.pickup;
       const dropoff = instructionDetails.dropoff;
 
@@ -1862,13 +1802,10 @@ function UpdateInstruction() {
   const fetchShipmentType = async () => {
     if (instructionId) {
       try {
-        const response = await fetch(
-          `http://localhost:5000/instructions/${instructionId}/shipment-type`
+        const response = await api.get(
+          `/instructions/${instructionId}/shipment-type`
         );
-        if (!response.ok) {
-          throw new Error("Failed to fetch shipment type");
-        }
-        const data = await response.json();
+        const data = response.data;
         setShipmentType(data.shipment_type);
         console.log("Shipment type:", data.shipment_type);
       } catch (error) {
@@ -1969,40 +1906,40 @@ function UpdateInstruction() {
       setTimeout(() => setSavedMessage(""), 5000);
       return;
     }
+
     if (instructionId) {
       try {
-        const instructionResponse = await fetch(
-          `http://localhost:5000/instructions/${instructionId}`
+        const instructionResponse = await api.get(
+          `/instructions/${instructionId}`
         );
-        if (instructionResponse.ok) {
-          const instructionData = await instructionResponse.json();
+        if (instructionResponse.status === 200) {
+          const instructionData = instructionResponse.data;
 
           if (instructionData.status === "New") {
             // Update the status to "In Progress"
-            const updateStatusResponse = await fetch(
-              `http://localhost:5000/instructions/${instructionId}/status`,
-              {
-                method: "PUT",
-                headers: {
-                  "Content-Type": "application/json",
-                },
-                body: JSON.stringify({ status: "In Progress" }),
-              }
-            );
-
-            if (updateStatusResponse.ok) {
-              console.log(
-                `Updated instruction ${instructionId} status from New to In Progress`
+            try {
+              const updateStatusResponse = await api.put(
+                `/instructions/${instructionId}/status`,
+                { status: "In Progress" }
               );
-              setInstructionStatus("In Progress");
+
+              if (updateStatusResponse.status === 200) {
+                console.log(
+                  `Updated instruction ${instructionId} status from New to In Progress`
+                );
+                setInstructionStatus("In Progress");
+              }
+            } catch (error) {
+              console.error("Error updating instruction status:", error);
             }
           }
         }
       } catch (statusError) {
-        console.error("Error updating instruction status:", statusError);
+        console.error("Error fetching instruction:", statusError);
         // Don't throw the error, just log it to avoid interrupting the main flow
       }
     }
+
     // Validate required fields
     if (!formData.startingPoint || !formData.destination) {
       setSavedMessage("Starting point and destination are required");
@@ -2086,25 +2023,12 @@ function UpdateInstruction() {
       );
 
       // Send the data to the server
-      const response = await fetch(`http://localhost:5000/legs/save`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(legData),
-      });
+      const response = await api.post("/legs/save", legData);
+      console.log("Server response:", response.data);
 
-      const responseText = await response.text();
-      console.log("Server response:", responseText);
+      const result = response.data;
 
-      let result;
-      try {
-        result = JSON.parse(responseText);
-      } catch (e) {
-        throw new Error(`Invalid JSON response: ${responseText}`);
-      }
-
-      if (!response.ok) {
+      if (response.status !== 200) {
         throw new Error(result.message || "Failed to save leg data");
       }
 
@@ -2170,73 +2094,6 @@ function UpdateInstruction() {
     );
     return driver ? `${driver.name} ${driver.surname}` : "Unknown Driver";
   };
-
-  // Replace the shouldDisableAddLeg function with this improved version
-  const shouldDisableAddLeg = async () => {
-    if (isCompleted) return true; // Always disable if completed
-    if (legs.length === 0) return false; // Allow adding the first leg
-
-    try {
-      // First, fetch the instruction details to get the dropoff location
-      const response = await fetch(
-        `http://localhost:5000/instructions/${instructionId}/details`
-      );
-      if (!response.ok) return false;
-
-      const instructionDetails = await response.json();
-      const dropoff = instructionDetails.dropoff;
-
-      // If we don't have a dropoff location, don't disable
-      if (!dropoff) return false;
-
-      // Check if the last leg's destination matches the dropoff
-      const lastLeg = legs[legs.length - 1];
-      if (lastLeg.destination !== dropoff) return false;
-
-      // Get all containers assigned to legs
-      const assignedContainers = new Set();
-      const containersReachingDropoff = new Set();
-
-      // Collect all containers from all legs
-      legs.forEach((leg) => {
-        if (leg.drivers && leg.drivers.length > 0) {
-          leg.drivers.forEach((driver) => {
-            if (driver.containernumber) {
-              assignedContainers.add(driver.containernumber);
-
-              // If this leg's destination is the dropoff, mark this container as reaching dropoff
-              if (leg.destination === dropoff) {
-                containersReachingDropoff.add(driver.containernumber);
-              }
-            }
-          });
-        }
-      });
-
-      // If no containers are assigned, don't disable
-      if (assignedContainers.size === 0) return false;
-
-      // Get all containers from the instruction
-      const allInstructionContainers = instructionContainers.map(
-        (c) => c.containernum
-      );
-
-      // If there are no instruction containers, don't disable
-      if (allInstructionContainers.length === 0) return false;
-
-      // Check if all instruction containers are assigned and reach dropoff
-      const allContainersReachDropoff = allInstructionContainers.every(
-        (container) => containersReachingDropoff.has(container)
-      );
-
-      // Only disable the + button if all containers reach the dropoff
-      return allContainersReachDropoff;
-    } catch (error) {
-      console.error("Error in shouldDisableAddLeg:", error);
-      return false; // On error, don't disable
-    }
-  };
-
   // Add this useEffect to check if we should hide the + button whenever legs or containers change
   useEffect(() => {
     const checkContainersDestination = async () => {
@@ -2251,15 +2108,11 @@ function UpdateInstruction() {
 
       try {
         // Fetch the instruction details to get the dropoff location
-        const response = await fetch(
-          `http://localhost:5000/instructions/${instructionId}/details`
+        const response = await api.get(
+          `/instructions/${instructionId}/details`
         );
-        if (!response.ok) {
-          setShouldHideAddLegButton(false);
-          return;
-        }
+        const instructionDetails = response.data;
 
-        const instructionDetails = await response.json();
         const dropoff = instructionDetails.dropoff;
 
         // If we don't have a dropoff location, don't hide
@@ -2368,8 +2221,6 @@ function UpdateInstruction() {
     }
   }, [rates]);
 
-  // Add this useEffect to ensure driver rates are properly updated when rates change
-  // Replace the existing useEffect for rates with this one
   useEffect(() => {
     // Only update if we have drivers and rates
     if (drivers.length > 0) {
@@ -2583,7 +2434,6 @@ function UpdateInstruction() {
           </div>
         </div>
 
-        {/* Driver Entries - Always show this section if we're on a leg */}
         {currentLagIndex !== null && (
           <div className="bg-blue-50 p-6 rounded-md mb-4">
             <h3 className="text-lg font-medium mb-4">Driver Information</h3>
@@ -3540,32 +3390,7 @@ function UpdateInstruction() {
                       };
 
                       // Send the data to the server
-                      const response = await fetch(
-                        `http://localhost:5000/legs/save`,
-                        {
-                          method: "POST",
-                          headers: {
-                            "Content-Type": "application/json",
-                          },
-                          body: JSON.stringify(legData),
-                        }
-                      );
-
-                      const responseText = await response.text();
-                      let result;
-                      try {
-                        result = JSON.parse(responseText);
-                      } catch (e) {
-                        throw new Error(
-                          `Invalid JSON response: ${responseText}`
-                        );
-                      }
-
-                      if (!response.ok) {
-                        throw new Error(
-                          result.message || "Failed to save leg data"
-                        );
-                      }
+                      const response = await api.post(`/legs/save`, legData);
 
                       // Show success message
                       setSavedMessage("Driver removed successfully!");

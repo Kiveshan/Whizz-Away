@@ -22,6 +22,10 @@ router.get(
   getPaymentHandler
 );
 router.get("/api/payments/:clientId", verifyToken, getClientPaymentsHandler);
-router.get("/api/invoices/:clientId", verifyToken, getClientInvoicesHandler);
+router.get(
+  "/api/payment_invoices/:clientId",
+  verifyToken,
+  getClientInvoicesHandler
+);
 
 export default router;
