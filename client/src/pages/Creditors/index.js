@@ -4,3 +4,6 @@ export { default as FilterPO } from "./purchaseOrder/views/FilterPO.jsx";
 export { default as ViewPOForm } from "./purchaseOrder/views/ViewPOForm.jsx";
 export { default as CredStatements } from "./Statements/views/CredStatements.jsx";
 export { default as ViewStatement } from "./Statements/views/ViewStatement.jsx";
+export { default as SubcontractorList } from "./subContractors/views/SubcontractorList.jsx";
+export { default as SubcontractorStatementDetails } from "./subContractors/views/SubcontractorStatementDetails.jsx";
+export { default as SubcontractorStatements } from "./subContractors/views/SubcontractorStatements.jsx";
