@@ -273,7 +273,7 @@ const CompanyInstructionView = () => {
                       </td>
                       <td className="p-3">
                         <button
-                          className={`view-butn ${client.new_count > 0 ? "bg-red-500" : ""}`}
+                          className={`company-instruction-view-view-button ${client.new_count > 0 ? "red-state" : ""}`}
                           onClick={() =>
                             navigate("/CompanyInstructions", {
                               state: {

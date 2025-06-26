@@ -103,7 +103,7 @@
   gap: 5px;
 }
 
-/* View button styles */
+/* View button styles - matching ViewClientInstruction.jsx exactly */
 .company-instruction-view-view-button {
   background-color: #3b82f6;
   color: white;
@@ -120,11 +120,11 @@
   background-color: #2563eb;
 }
 
-.company-instruction-view-view-button.bg-red-500 {
+.company-instruction-view-view-button.red-state {
   background-color: #ef4444;
 }
 
-.company-instruction-view-view-button.bg-red-500:hover {
+.company-instruction-view-view-button.red-state:hover {
   background-color: #dc2626;
 }
 
