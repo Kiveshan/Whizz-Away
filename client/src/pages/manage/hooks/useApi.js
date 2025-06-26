@@ -17,6 +17,7 @@ export function useApi(state, actions) {
           trailers: "/api/trailers",
           driverRates: "/api/driver-rates",
           subcontractors: "/api/subcontractors",
+          clientRates: "/api/client-rates",
         }
 
         const endpoint = endpoints[type]
@@ -90,6 +91,12 @@ export function useApi(state, actions) {
         pagination.subcontractors.currentPage,
         pagination.subcontractors.itemsPerPage,
         filters.subcontractors,
+      ),
+      fetchPaginatedData(
+        "clientRates",
+        pagination.clientRates.currentPage,
+        pagination.clientRates.itemsPerPage,
+        filters.clientRates,
       ),
     ])
   }, [state, fetchPaginatedData])
@@ -509,6 +516,68 @@ export function useApi(state, actions) {
     [state, actions, fetchPaginatedData],
   )
 
+  const saveClientRates = useCallback(
+    async (ratesData) => {
+      actions.setLoading(true)
+
+      try {
+        const clientId = state.newClientRate.clientId
+        console.log("Saving client rates:", { clientId, ratesData })
+
+        // Validate that we have a client ID
+        if (!clientId) {
+          actions.showAlert("Client ID is missing.")
+          return false
+        }
+
+        // Validate that we have at least one rate
+        if (!ratesData || ratesData.length === 0) {
+          actions.showAlert("Please add at least one rate.")
+          return false
+        }
+
+        // Validate each rate
+        const validRates = ratesData.filter((rate) => {
+          return rate.starting_point && rate.destination && (rate["6m_rate"] || rate["12m_rate"])
+        })
+
+        if (validRates.length === 0) {
+          actions.showAlert(
+            "Please provide valid starting point, destination, and at least one rate (6m or 12m) for each entry.",
+          )
+          return false
+        }
+
+        const payload = {
+          rates: validRates,
+        }
+
+        await api.post(`/api/client-rates/${clientId}`, payload)
+
+        // Refresh current page
+        await fetchPaginatedData(
+          "clientRates",
+          state.pagination.clientRates.currentPage,
+          state.pagination.clientRates.itemsPerPage,
+          state.filters.clientRates,
+        )
+
+        actions.resetFormData("ClientRate")
+        actions.setEditing("ClientRate", null)
+        actions.hideForm("showClientRateForm")
+        actions.showAlert("Client rates saved successfully!")
+        return true
+      } catch (err) {
+        console.error("Error saving client rates:", err)
+        actions.showAlert(`Error saving client rates: ${err.response?.data?.error || err.message}`)
+        return false
+      } finally {
+        actions.setLoading(false)
+      }
+    },
+    [state, actions, fetchPaginatedData],
+  )
+
   const toggleEmployeeStatus = useCallback(
     async (id, currentStatus) => {
       actions.setLoading(true)
@@ -702,6 +771,37 @@ export function useApi(state, actions) {
     [state, actions, fetchPaginatedData],
   )
 
+  const deleteClientRate = useCallback(
+    async (rateId) => {
+      if (!window.confirm("Are you sure you want to delete this rate?")) {
+        return false
+      }
+
+      actions.setLoading(true)
+      try {
+        await api.delete(`/api/client-rates/${rateId}`)
+
+        // Refresh current page
+        await fetchPaginatedData(
+          "clientRates",
+          state.pagination.clientRates.currentPage,
+          state.pagination.clientRates.itemsPerPage,
+          state.filters.clientRates,
+        )
+
+        actions.showAlert("Client rate deleted successfully!")
+        return true
+      } catch (err) {
+        console.error("Error deleting client rate:", err)
+        actions.showAlert(`Error deleting client rate: ${err.response?.data?.error || err.message}`)
+        return false
+      } finally {
+        actions.setLoading(false)
+      }
+    },
+    [state, actions, fetchPaginatedData],
+  )
+
   const loadItemForEdit = useCallback(
     async (type, id) => {
       try {
@@ -732,6 +832,10 @@ export function useApi(state, actions) {
           case "subcontractor":
             endpoint = `/api/subcontractors/${id}`
             formType = "Subcontractor"
+            break
+          case "clientRate":
+            endpoint = `/api/client-rates/client/${id}`
+            formType = "ClientRate"
             break
           default:
             throw new Error("Invalid type")
@@ -803,6 +907,21 @@ export function useApi(state, actions) {
             drivers: data.drivers || [{ name: "" }],
             trucks: data.trucks || [],
           })
+        } else if (type === "clientRate") {
+          // Handle client rates - data should include client info and rates
+          actions.updateFormData(formType, {
+            ...data,
+            clientId: id,
+            rates: data.rates || [
+              {
+                starting_point: "",
+                destination: "",
+                "6m_rate": "",
+                "12m_rate": "",
+                surcharges: "",
+              },
+            ],
+          })
         } else {
           actions.updateFormData(formType, data)
         }
@@ -873,12 +992,14 @@ export function useApi(state, actions) {
     saveTrailer,
     saveDriverRate,
     saveSubcontractor,
+    saveClientRates,
     toggleEmployeeStatus,
     toggleClientStatus,
     toggleSubcontractorStatus,
     deleteItem,
     deleteSubcontractorDriver, // NEW
     deleteSubcontractorTruck, // NEW
+    deleteClientRate,
     loadItemForEdit,
     deleteDocument,
   }
