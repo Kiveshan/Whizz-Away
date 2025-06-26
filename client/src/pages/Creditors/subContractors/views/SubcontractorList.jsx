@@ -35,7 +35,6 @@ const SubcontractorList = () => {
             contactPerson: "John Smith",
             email: "john@eliteconstruction.com",
             phone: "+1 (555) 123-4567",
-            specialization: "Electrical Work",
           },
           {
             id: "SC002",
@@ -43,7 +42,6 @@ const SubcontractorList = () => {
             contactPerson: "Sarah Johnson",
             email: "sarah@probuildsolutions.com",
             phone: "+1 (555) 234-5678",
-            specialization: "Plumbing",
           },
           {
             id: "SC003",
@@ -51,7 +49,6 @@ const SubcontractorList = () => {
             contactPerson: "Mike Wilson",
             email: "mike@mastercraftcontractors.com",
             phone: "+1 (555) 345-6789",
-            specialization: "Roofing",
           },
           {
             id: "SC004",
@@ -59,7 +56,6 @@ const SubcontractorList = () => {
             contactPerson: "Lisa Brown",
             email: "lisa@precisionflooring.com",
             phone: "+1 (555) 456-7890",
-            specialization: "Flooring",
           },
           {
             id: "SC005",
@@ -67,7 +63,6 @@ const SubcontractorList = () => {
             contactPerson: "David Martinez",
             email: "david@urbanlandscaping.com",
             phone: "+1 (555) 567-8901",
-            specialization: "Landscaping",
           },
           {
             id: "SC006",
@@ -75,7 +70,6 @@ const SubcontractorList = () => {
             contactPerson: "Robert Taylor",
             email: "robert@steelframe.com",
             phone: "+1 (555) 678-9012",
-            specialization: "Steel Work",
           },
         ];
 
@@ -119,7 +113,6 @@ const SubcontractorList = () => {
                 <th>Company Name</th>
                 <th>Contact Person</th>
                 <th>Email</th>
-                <th>Specialization</th>
                 <th>Actions</th>
               </tr>
             </thead>
@@ -129,7 +122,6 @@ const SubcontractorList = () => {
                   <td>{subcontractor.companyName}</td>
                   <td>{subcontractor.contactPerson}</td>
                   <td>{subcontractor.email}</td>
-                  <td>{subcontractor.specialization}</td>
                   <td>
                     <button
                       className="view-btn"

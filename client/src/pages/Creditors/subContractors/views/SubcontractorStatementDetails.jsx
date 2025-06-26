@@ -243,11 +243,10 @@ const SubcontractorStatementDetail = () => {
               <thead>
                 <tr>
                   <th>Date</th>
-                  <th>Project</th>
-                  <th>Description</th>
-                  <th>Hours</th>
+                  <th>Starting</th>
+                  <th>Destination</th>
                   <th>Rate</th>
-                  <th>Materials</th>
+                  <th>Instruction</th>
                   <th>Total</th>
                 </tr>
               </thead>
@@ -258,7 +257,6 @@ const SubcontractorStatementDetail = () => {
                     <td>{item.projectName}</td>
                     <td>{item.description}</td>
                     <td>{item.hoursWorked}</td>
-                    <td>R{item.hourlyRate}</td>
                     <td>R{item.materialCost.toLocaleString()}</td>
                     <td>R{item.totalAmount.toLocaleString()}</td>
                   </tr>

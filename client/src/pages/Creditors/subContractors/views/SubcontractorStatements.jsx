@@ -191,7 +191,6 @@ const SubcontractorStatements = () => {
             <th>Month/Year</th>
             <th>Date Generated</th>
             <th>Total Amount</th>
-            <th>Status</th>
             <th>Actions</th>
           </tr>
         </thead>
@@ -209,13 +208,6 @@ const SubcontractorStatements = () => {
                 </td>
                 <td>{statement.generationDate.toLocaleDateString()}</td>
                 <td>R{statement.totalAmount.toLocaleString()}</td>
-                <td>
-                  <span
-                    className={`status-badge ${statement.status.toLowerCase()}`}
-                  >
-                    {statement.status}
-                  </span>
-                </td>
                 <td>
                   <button
                     className="view-btn"
