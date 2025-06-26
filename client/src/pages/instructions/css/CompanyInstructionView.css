@@ -1,24 +1,30 @@
-/* ViewClientInstruction - Unique CSS with wrappers to avoid conflicts */
+/* CompanyInstructionView - Unique CSS with wrappers to avoid conflicts */
 
-.view-client-instruction-wrapper {
+.company-instruction-view-wrapper {
   font-family: Arial, sans-serif;
   width: 100%;
   min-height: 100vh;
   background-color: #f5f5f5;
+  text-align: center;
 }
 
 /* Header Styles */
-.view-client-instruction-header {
+.company-instruction-view-header {
   display: flex;
-  justify-content: space-between;
-  align-items: center;
+  justify-content: center;
   padding: 20px;
   background-color: #ffffff;
   box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
   margin-bottom: 20px;
 }
 
-.view-client-instruction-back-button {
+.company-instruction-view-header-content {
+  width: 100%;
+  max-width: 1000px;
+  text-align: left;
+}
+
+.company-instruction-view-back-button {
   background-color: #4caf50;
   color: white;
   border: none;
@@ -30,39 +36,39 @@
   transition: background-color 0.3s ease;
 }
 
-.view-client-instruction-back-button:hover {
+.company-instruction-view-back-button:hover {
   background-color: #45a049;
 }
 
 /* Table Container */
-.view-client-instruction-table-container {
+.company-instruction-view-table-container {
   display: flex;
-  flex-direction: column;
-  align-items: center;
+  justify-content: center;
   padding: 0 20px;
 }
 
-.view-client-instruction-table-wrapper {
+.company-instruction-view-table-wrapper {
   background-color: white;
   border-radius: 8px;
   box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
   overflow: hidden;
   width: 100%;
-  max-width: 1200px;
+  max-width: 1000px;
+  margin-top: -80px;
 }
 
 /* Table Styles */
-.view-client-instruction-table {
+.company-instruction-view-table {
   width: 100%;
   border-collapse: collapse;
   font-size: 14px;
 }
 
-.view-client-instruction-table thead {
+.company-instruction-view-table thead {
   background-color: #93c5fd; /* bg-blue-300 equivalent */
 }
 
-.view-client-instruction-table th {
+.company-instruction-view-table th {
   padding: 12px;
   text-align: left;
   font-weight: bold;
@@ -70,27 +76,27 @@
   border-bottom: 2px solid #e5e7eb;
 }
 
-.view-client-instruction-table td {
+.company-instruction-view-table td {
   padding: 12px;
   border-bottom: 1px solid #e5e7eb;
   color: #374151;
 }
 
-.view-client-instruction-table tbody tr:hover {
+.company-instruction-view-table tbody tr:hover {
   background-color: #f9fafb;
 }
 
-.view-client-instruction-table tbody tr.border-t {
+.company-instruction-view-table tbody tr.border-t {
   border-top: 1px solid #e5e7eb;
 }
 
 /* Centered cell styling */
-.view-client-instruction-centered-cell {
+.company-instruction-view-centered-cell {
   text-align: center;
 }
 
 /* Bell icon header container */
-.view-client-instruction-bell-header {
+.company-instruction-view-bell-header {
   display: flex;
   align-items: center;
   justify-content: center;
@@ -98,7 +104,7 @@
 }
 
 /* View button styles */
-.view-client-instruction-view-button {
+.company-instruction-view-view-button {
   background-color: #3b82f6;
   color: white;
   border: none;
@@ -110,27 +116,27 @@
   transition: background-color 0.3s ease;
 }
 
-.view-client-instruction-view-button:hover {
+.company-instruction-view-view-button:hover {
   background-color: #2563eb;
 }
 
-.view-client-instruction-view-button.bg-red-500 {
+.company-instruction-view-view-button.bg-red-500 {
   background-color: #ef4444;
 }
 
-.view-client-instruction-view-button.bg-red-500:hover {
+.company-instruction-view-view-button.bg-red-500:hover {
   background-color: #dc2626;
 }
 
 /* Loading and Error States */
-.view-client-instruction-loading {
+.company-instruction-view-loading {
   text-align: center;
   padding: 40px;
   font-size: 16px;
   color: #6b7280;
 }
 
-.view-client-instruction-error {
+.company-instruction-view-error {
   text-align: center;
   padding: 40px;
   font-size: 16px;
@@ -141,7 +147,7 @@
   margin: 20px;
 }
 
-.view-client-instruction-no-data {
+.company-instruction-view-no-data {
   text-align: center;
   padding: 40px;
   font-size: 16px;
@@ -149,20 +155,20 @@
 }
 
 /* Pagination Styles */
-.view-client-instruction-pagination-container {
+.company-instruction-view-pagination-container {
   display: flex;
   justify-content: center;
   margin-top: 20px;
   padding: 20px;
 }
 
-.view-client-instruction-pagination {
+.company-instruction-view-pagination {
   display: flex;
   align-items: center;
   gap: 8px;
 }
 
-.view-client-instruction-pagination-button {
+.company-instruction-view-pagination-button {
   padding: 8px 12px;
   border: 1px solid #d1d5db;
   background-color: white;
@@ -173,30 +179,30 @@
   transition: all 0.2s ease;
 }
 
-.view-client-instruction-pagination-button:hover {
+.company-instruction-view-pagination-button:hover {
   background-color: #f3f4f6;
   border-color: #9ca3af;
 }
 
-.view-client-instruction-pagination-button.active {
+.company-instruction-view-pagination-button.active {
   background-color: #3b82f6;
   color: white;
   border-color: #3b82f6;
 }
 
-.view-client-instruction-pagination-button:disabled {
+.company-instruction-view-pagination-button:disabled {
   opacity: 0.5;
   cursor: not-allowed;
 }
 
-.view-client-instruction-pagination-info {
+.company-instruction-view-pagination-info {
   font-size: 14px;
   color: #6b7280;
   margin-right: 16px;
 }
 
 /* Bell Animation Keyframes */
-@keyframes view-client-instruction-bell-shake {
+@keyframes company-instruction-view-bell-shake {
   0% {
     transform: rotate(0);
   }
@@ -226,16 +232,16 @@
   }
 }
 
-.view-client-instruction-bell-icon {
+.company-instruction-view-bell-icon {
   display: inline-block;
   position: relative;
 }
 
-.view-client-instruction-bell-icon.shake {
-  animation: view-client-instruction-bell-shake 2s infinite;
+.company-instruction-view-bell-icon.shake {
+  animation: company-instruction-view-bell-shake 2s infinite;
 }
 
-.view-client-instruction-bell-count {
+.company-instruction-view-bell-count {
   position: absolute;
   top: -8px;
   right: -8px;
@@ -244,7 +250,7 @@
   color: black;
 }
 
-.view-client-instruction-row-bell-count {
+.company-instruction-view-row-bell-count {
   position: absolute;
   top: -8px;
   right: -8px;
@@ -255,42 +261,46 @@
 
 /* Responsive Design */
 @media (max-width: 768px) {
-  .view-client-instruction-header {
+  .company-instruction-view-header {
     flex-direction: column;
     gap: 10px;
     text-align: center;
   }
 
-  .view-client-instruction-table-container {
+  .company-instruction-view-table-container {
     padding: 0 10px;
   }
 
-  .view-client-instruction-table {
+  .company-instruction-view-table {
     font-size: 12px;
   }
 
-  .view-client-instruction-table th,
-  .view-client-instruction-table td {
+  .company-instruction-view-table th,
+  .company-instruction-view-table td {
     padding: 8px 4px;
   }
 
-  .view-client-instruction-pagination {
+  .company-instruction-view-pagination {
     flex-wrap: wrap;
     gap: 4px;
   }
 
-  .view-client-instruction-pagination-button {
+  .company-instruction-view-pagination-button {
     padding: 6px 8px;
     font-size: 12px;
+  }
+
+  .company-instruction-view-table-wrapper {
+    margin-top: -40px;
   }
 }
 
 @media (max-width: 480px) {
-  .view-client-instruction-table-wrapper {
+  .company-instruction-view-table-wrapper {
     overflow-x: auto;
   }
 
-  .view-client-instruction-table {
+  .company-instruction-view-table {
     min-width: 600px;
   }
 }

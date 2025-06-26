@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react"
 import { useNavigate } from "react-router-dom"
-import "../../css/ViewClientInstruction.css"
+import "../../css/CompanyInstructionView.css"
 import api from "../../../../api"
 import Pagination from "../../../../components/Pagination"
 
