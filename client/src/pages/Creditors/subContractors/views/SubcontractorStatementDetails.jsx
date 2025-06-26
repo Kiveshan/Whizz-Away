@@ -320,7 +320,7 @@ const SubcontractorStatementDetail = () => {
           <button
             className="back-btn"
             onClick={() =>
-              navigate("/subcontractor-statements", {
+              navigate("/Creditors/SubcontractorStatements", {
                 state: {
                   subcontractorId: statement.subcontractorId,
                   subcontractorName: statement.subcontractorName,

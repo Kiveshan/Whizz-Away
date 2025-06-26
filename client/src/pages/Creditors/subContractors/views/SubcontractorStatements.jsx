@@ -142,7 +142,7 @@ const SubcontractorStatements = () => {
   return (
     <div className="subcontractor-statements-wrapper">
       <button
-        onClick={() => navigate("/subcontractors")}
+        onClick={() => navigate("/Creditors/SubcontractorList")}
         className="back-button"
       >
         Back to Subcontractors
