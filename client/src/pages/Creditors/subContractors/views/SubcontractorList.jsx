@@ -68,9 +68,9 @@ const SubcontractorList = () => {
             if (roleId == 8) {
               navigate("/CreditorsDashboard", {});
             } else if (roleId == 1) {
-              navigate("/Dashboard", {});
+              navigate("/DirectorCreditorsDash", {});
             } else if (roleId == 4) {
-              navigate("/DirectorDashboard", {});
+              navigate("/DirectorCreditorsDash", {});
             }
           }}
         >

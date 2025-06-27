@@ -270,6 +270,7 @@ const SubcontractorStatementDetail = () => {
                 state: {
                   subcontractorId: statement.subcontractorId,
                   subcontractorName: statement.subcontractorName,
+                  subei_reg_num: subei_reg_num,
                 },
               })
             }
