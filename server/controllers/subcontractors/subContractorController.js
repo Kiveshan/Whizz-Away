@@ -48,11 +48,9 @@ const getStatementDetailsHandler = async (req, res) => {
     const { statementId, legKeys, subei_reg_num } = req.query;
 
     if (!statementId || !legKeys || !subei_reg_num) {
-      return res
-        .status(400)
-        .json({
-          error: "Statement ID, leg keys, and registration number are required",
-        });
+      return res.status(400).json({
+        error: "Statement ID, leg keys, and registration number are required",
+      });
     }
 
     console.log("Query params:", req.query); // Debug log

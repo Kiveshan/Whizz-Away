@@ -16,6 +16,7 @@ const SubcontractorStatementDetail = () => {
     subcontractorId,
     subei_reg_num,
     legids,
+    date,
   } = location.state || {};
 
   const [statement, setStatement] = useState(null);
@@ -89,7 +90,7 @@ const SubcontractorStatementDetail = () => {
           statementId,
           subcontractorName,
           subcontractorId,
-          generationDate: new Date(),
+          generationDate: date,
           workItems,
           companyInfo,
           summary: {
@@ -180,20 +181,13 @@ const SubcontractorStatementDetail = () => {
 
           <div className="statement-info-section">
             <div className="subcontractor-info">
-              <div className="to-label">Bill To:</div>
+              <div className="to-label">To:</div>
               <div className="subcontractor-name">
                 {statement.subcontractorName}
               </div>
-              <div className="subcontractor-id">
-                ID: {statement.subcontractorId}
-              </div>
             </div>
             <div className="statement-details">
-              <h2>Work Statement</h2>
               <div className="statement-meta">
-                <p>
-                  <strong>Statement ID:</strong> {statement.statementId}
-                </p>
                 <p>
                   <strong>Generated:</strong>{" "}
                   {statement.generationDate.toLocaleDateString()}

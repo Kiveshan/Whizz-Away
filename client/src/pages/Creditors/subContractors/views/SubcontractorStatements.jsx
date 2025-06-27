@@ -200,7 +200,8 @@ const SubcontractorStatements = () => {
                           subcontractorName,
                           subcontractorId,
                           subei_reg_num,
-                          legids: statement.legids, // Pass as-is, now ensured to be a string
+                          legids: statement.legids,
+                          date: statement.generationDate, // Pass as-is, now ensured to be a string
                         },
                       })
                     }
