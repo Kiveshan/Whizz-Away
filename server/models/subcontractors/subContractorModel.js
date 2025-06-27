@@ -92,16 +92,17 @@ const getStatementDetails = async (statementId, legKeys, subei_reg_num) => {
     const legids = await getStatementLegIds(statementId, subei_reg_num);
     let allLegKeys = [...legKeys];
 
-    if (legids) {
+    if (legids && Array.isArray(legids)) {
       try {
-        const parsedLegids = JSON.parse(legids);
-        const additionalLegKeys = parsedLegids
+        const additionalLegKeys = legids
           .map((item) => item.legkey)
           .filter((key) => !allLegKeys.includes(key));
         allLegKeys = [...allLegKeys, ...additionalLegKeys];
       } catch (e) {
-        console.error("Failed to parse legids JSON:", e, "legids:", legids);
+        console.error("Failed to process legids array:", e, "legids:", legids);
       }
+    } else if (legids) {
+      console.warn("legids is not an array:", legids);
     }
 
     const query = `
