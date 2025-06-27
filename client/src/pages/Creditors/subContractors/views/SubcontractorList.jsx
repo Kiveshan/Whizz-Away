@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
+import api from "../../../../api"; // Import the axios instance
 import "../css/SubcontractorList.css";
 import Pagination from "../../../../components/Pagination";
 
@@ -20,60 +21,26 @@ const SubcontractorList = () => {
     setCurrentPage(pageNumber);
   }, []);
 
+  const roleId = JSON.parse(localStorage.getItem("user")).roleid;
+  console.log(roleId);
+
   useEffect(() => {
-    // Simulate API call with dummy data
     const fetchSubcontractors = async () => {
       try {
-        // Simulate loading delay
-        await new Promise((resolve) => setTimeout(resolve, 1000));
+        setLoading(true);
+        const response = await api.get("/subcontractor");
+        if (!response.data) throw new Error("Failed to fetch subcontractors");
+        const data = response.data;
 
-        // Dummy subcontractor data
-        const dummySubcontractors = [
-          {
-            id: "SC001",
-            companyName: "Elite Construction Services",
-            contactPerson: "John Smith",
-            email: "john@eliteconstruction.com",
-            phone: "+1 (555) 123-4567",
-          },
-          {
-            id: "SC002",
-            companyName: "ProBuild Solutions",
-            contactPerson: "Sarah Johnson",
-            email: "sarah@probuildsolutions.com",
-            phone: "+1 (555) 234-5678",
-          },
-          {
-            id: "SC003",
-            companyName: "MasterCraft Contractors",
-            contactPerson: "Mike Wilson",
-            email: "mike@mastercraftcontractors.com",
-            phone: "+1 (555) 345-6789",
-          },
-          {
-            id: "SC004",
-            companyName: "Precision Flooring Co.",
-            contactPerson: "Lisa Brown",
-            email: "lisa@precisionflooring.com",
-            phone: "+1 (555) 456-7890",
-          },
-          {
-            id: "SC005",
-            companyName: "Urban Landscaping",
-            contactPerson: "David Martinez",
-            email: "david@urbanlandscaping.com",
-            phone: "+1 (555) 567-8901",
-          },
-          {
-            id: "SC006",
-            companyName: "Steel Frame Specialists",
-            contactPerson: "Robert Taylor",
-            email: "robert@steelframe.com",
-            phone: "+1 (555) 678-9012",
-          },
-        ];
-
-        setSubcontractors(dummySubcontractors);
+        // Transform API data to match the expected structure
+        const transformedSubcontractors = data.map((item, index) => ({
+          id: `SC${String(item.min_userid).padStart(3, "0")}`,
+          companyName: item.companyname,
+          contactPerson: item.contact_person,
+          email: item.email,
+          phone: item.cellnum,
+        }));
+        setSubcontractors(transformedSubcontractors);
       } catch (err) {
         console.error("Error fetching subcontractors:", err);
         setError("Failed to fetch subcontractors");
@@ -95,7 +62,19 @@ const SubcontractorList = () => {
     <div className="subcontractor-list-wrapper">
       {/* Back Button */}
       <div className="subcontractor-header">
-        <button className="back-button" onClick={() => navigate("/dashboard")}>
+        <button
+          className="back-button"
+          onClick={() => {
+            if (roleId == 8) {
+              // If we came from client view, go back to the filtered invoices list
+              navigate("/CreditorsDashboard", {});
+            } else if (roleId == 1) {
+              navigate("/Dashboard", {});
+            } else if (roleId == 4) {
+              navigate("/DirectorDashboard", {});
+            }
+          }}
+        >
           Back
         </button>
       </div>

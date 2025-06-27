@@ -3,6 +3,6 @@ import { getAllSubContractorsHandler } from "../../controllers/subcontractors/su
 
 const router = express.Router();
 
-router.get("/api/subcontractor", getAllSubContractorsHandler);
+router.get("/subcontractor", getAllSubContractorsHandler);
 
 export default router;
