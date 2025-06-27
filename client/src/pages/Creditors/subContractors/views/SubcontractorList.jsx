@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
-import api from "../../../../api"; // Import the axios instance
+import api from "../../../../api";
 import "../css/SubcontractorList.css";
 import Pagination from "../../../../components/Pagination";
 
@@ -22,7 +22,6 @@ const SubcontractorList = () => {
   }, []);
 
   const roleId = JSON.parse(localStorage.getItem("user")).roleid;
-  console.log(roleId);
 
   useEffect(() => {
     const fetchSubcontractors = async () => {
@@ -39,6 +38,7 @@ const SubcontractorList = () => {
           contactPerson: item.contact_person,
           email: item.email,
           phone: item.cellnum,
+          subei_reg_num: item.subei_reg_num,
         }));
         setSubcontractors(transformedSubcontractors);
       } catch (err) {
@@ -66,7 +66,6 @@ const SubcontractorList = () => {
           className="back-button"
           onClick={() => {
             if (roleId == 8) {
-              // If we came from client view, go back to the filtered invoices list
               navigate("/CreditorsDashboard", {});
             } else if (roleId == 1) {
               navigate("/Dashboard", {});
@@ -109,6 +108,7 @@ const SubcontractorList = () => {
                           state: {
                             subcontractorId: subcontractor.id,
                             subcontractorName: subcontractor.companyName,
+                            subei_reg_num: subcontractor.subei_reg_num,
                           },
                         })
                       }
@@ -123,7 +123,6 @@ const SubcontractorList = () => {
         </div>
       )}
 
-      {/* Pagination Component */}
       {totalRecords > 0 && (
         <Pagination
           totalRecords={totalRecords}

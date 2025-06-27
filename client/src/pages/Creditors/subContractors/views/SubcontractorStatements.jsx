@@ -2,13 +2,15 @@
 
 import { useState, useEffect, useCallback } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
+import api from "../../../../api";
 import "../css/SubcontractorStatements.css";
 import Pagination from "../../../../components/Pagination";
 
 const SubcontractorStatements = () => {
   const navigate = useNavigate();
   const location = useLocation();
-  const { subcontractorId, subcontractorName } = location.state || {};
+  const { subcontractorId, subcontractorName, subei_reg_num } =
+    location.state || {};
 
   const [statements, setStatements] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -25,60 +27,43 @@ const SubcontractorStatements = () => {
   const [currentPage, setCurrentPage] = useState(1);
   const [recordsPerPage] = useState(10);
 
-  // Handle pagination
   const handlePageChange = useCallback((pageNumber) => {
     setCurrentPage(pageNumber);
   }, []);
 
   useEffect(() => {
-    if (!subcontractorId) {
-      setError("No subcontractor selected");
+    if (!subcontractorId || !subei_reg_num) {
+      setError("No subcontractor selected or missing registration number");
       setLoading(false);
       return;
     }
 
     const fetchStatements = async () => {
       try {
-        // Simulate loading delay
-        await new Promise((resolve) => setTimeout(resolve, 800));
+        setLoading(true);
+        const response = await api.get("/subcontractor/statements", {
+          params: {
+            subei_reg_num,
+            year: filters.year,
+            month: filters.month,
+          },
+        });
 
-        // Generate dummy statements based on filters
-        const dummyStatements = [];
-        const selectedYear = Number.parseInt(filters.year);
-        const selectedMonth = Number.parseInt(filters.month);
+        if (!response.data) throw new Error("Failed to fetch statements");
 
-        // Generate statements for the selected month/year
-        if (filters.year && filters.month) {
-          const monthNames = [
-            "January",
-            "February",
-            "March",
-            "April",
-            "May",
-            "June",
-            "July",
-            "August",
-            "September",
-            "October",
-            "November",
-            "December",
-          ];
+        const transformedStatements = response.data.map((item) => ({
+          statementId: item.sub_state_id,
+          month: new Date(item.date).toLocaleString("default", {
+            month: "long",
+          }),
+          year: new Date(item.date).getFullYear(),
+          generationDate: new Date(item.date),
+          totalAmount: item.amount,
+          status: "Pending", // Assuming status needs to be derived; adjust as needed
+          legids: item.legids,
+        }));
 
-          for (let i = 1; i <= 3; i++) {
-            dummyStatements.push({
-              statementId: `${subcontractorId}-${selectedYear}${selectedMonth
-                .toString()
-                .padStart(2, "0")}-${i.toString().padStart(3, "0")}`,
-              month: monthNames[selectedMonth - 1],
-              year: selectedYear,
-              generationDate: new Date(selectedYear, selectedMonth - 1, i * 10),
-              totalAmount: Math.floor(Math.random() * 50000) + 10000,
-              status: i === 1 ? "Paid" : i === 2 ? "Pending" : "Overdue",
-            });
-          }
-        }
-
-        setStatements(dummyStatements);
+        setStatements(transformedStatements);
       } catch (err) {
         console.error("Error fetching statements:", err);
         setError("Failed to fetch statements");
@@ -88,7 +73,7 @@ const SubcontractorStatements = () => {
     };
 
     fetchStatements();
-  }, [subcontractorId, filters]);
+  }, [subcontractorId, subei_reg_num, filters]);
 
   const handleFilterChange = (e) => {
     const { name, value } = e.target;
@@ -114,7 +99,6 @@ const SubcontractorStatements = () => {
     "December",
   ];
 
-  // Calculate pagination data
   const totalRecords = statements.length;
   const startIndex = (currentPage - 1) * recordsPerPage;
   const endIndex = startIndex + recordsPerPage;
@@ -132,7 +116,7 @@ const SubcontractorStatements = () => {
         <div className="error-message">Error: {error}</div>
       </div>
     );
-  if (!subcontractorId)
+  if (!subcontractorId || !subei_reg_num)
     return (
       <div className="subcontractor-statements-wrapper">
         <div>Please select a subcontractor from the previous page.</div>
@@ -147,11 +131,9 @@ const SubcontractorStatements = () => {
       >
         Back to Subcontractors
       </button>
-
       <div className="page-title">
         <h2>Monthly Statements - {subcontractorName}</h2>
       </div>
-
       <div className="action-bar">
         <div className="filter-section">
           <div className="dropdown-container">
@@ -183,13 +165,11 @@ const SubcontractorStatements = () => {
           </div>
         </div>
       </div>
-
       <table className="statements-table">
         <thead>
           <tr>
             <th>Statement ID</th>
             <th>Month/Year</th>
-            <th>Date Generated</th>
             <th>Total Amount</th>
             <th>Actions</th>
           </tr>
@@ -206,7 +186,6 @@ const SubcontractorStatements = () => {
                 <td>
                   {statement.month} {statement.year}
                 </td>
-                <td>{statement.generationDate.toLocaleDateString()}</td>
                 <td>R{statement.totalAmount.toLocaleString()}</td>
                 <td>
                   <button
@@ -215,8 +194,9 @@ const SubcontractorStatements = () => {
                       navigate("/Creditors/SubcontractorStatementDetails", {
                         state: {
                           statementId: statement.statementId,
-                          subcontractorName: subcontractorName,
-                          subcontractorId: subcontractorId,
+                          subcontractorName,
+                          subcontractorId,
+                          subei_reg_num,
                         },
                       })
                     }
@@ -229,8 +209,6 @@ const SubcontractorStatements = () => {
           )}
         </tbody>
       </table>
-
-      {/* Pagination Component */}
       {totalRecords > 0 && (
         <Pagination
           totalRecords={totalRecords}
