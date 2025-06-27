@@ -4,6 +4,7 @@ import {
   getStatementDetails,
   getStatementLegIds,
   getCompanyInfo,
+  getSubcontractorInfo,
 } from "../../models/subcontractors/subContractorModel.js";
 
 const getAllSubContractorsHandler = async (req, res) => {
@@ -71,10 +72,27 @@ const getStatementDetailsHandler = async (req, res) => {
 
 const getCompanyInfoHandler = async (req, res) => {
   try {
-    const companyInfo = await getCompanyInfo();
+    const { roleid, status } = req.query;
+    const companyInfo = await getCompanyInfo(roleid, status);
     res.json(companyInfo);
   } catch (error) {
     console.error("Error fetching company info:", error);
+    res.status(500).json({ error: error.message });
+  }
+};
+
+const getSubcontractorInfoHandler = async (req, res) => {
+  try {
+    const { subei_reg_num } = req.query;
+    if (!subei_reg_num) {
+      return res
+        .status(400)
+        .json({ error: "Subcontractor registration number is required" });
+    }
+    const subInfo = await getSubcontractorInfo(subei_reg_num);
+    res.json(subInfo);
+  } catch (error) {
+    console.error("Error fetching subcontractor info:", error);
     res.status(500).json({ error: error.message });
   }
 };
@@ -84,4 +102,5 @@ export {
   getSubContractorStatementsHandler,
   getStatementDetailsHandler,
   getCompanyInfoHandler,
+  getSubcontractorInfoHandler,
 };

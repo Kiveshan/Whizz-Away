@@ -24,6 +24,7 @@ const SubcontractorStatementDetail = () => {
   const [error, setError] = useState(null);
   const [isGenerating, setIsGenerating] = useState(false);
   const [companyInfo, setCompanyInfo] = useState(null);
+  const [subcontractorInfo, setSubcontractorInfo] = useState(null);
 
   const statementRef = useRef(null);
 
@@ -88,10 +89,21 @@ const SubcontractorStatementDetail = () => {
         setCompanyInfo({
           name: companyData.companyname || "Construction Management Pro",
           address:
-            companyData.address + " " + companyData.suburb ||
+            companyData.address ||
             "123 Business Ave, Suite 100, City, State 12345",
           phone: companyData.cell_num || "+1 (555) 000-0000",
           email: companyData.email || "billing@constructionpro.com",
+        });
+
+        // Fetch subcontractor info
+        const subResponse = await api.get("/subcontractor/info", {
+          params: { subei_reg_num },
+        });
+        const subData = subResponse.data[0] || {};
+        setSubcontractorInfo({
+          name: subcontractorName,
+          location: subData.location || "N/A",
+          contact_person: subData.contact_person || "N/A",
         });
 
         setStatement({
@@ -164,7 +176,7 @@ const SubcontractorStatementDetail = () => {
         <div className="error-message">Error: {error}</div>
       </div>
     );
-  if (!statement || !companyInfo)
+  if (!statement || !companyInfo || !subcontractorInfo)
     return (
       <div className="statement-detail-wrapper">
         <div>Please select a statement from the list.</div>
@@ -189,7 +201,11 @@ const SubcontractorStatementDetail = () => {
             <div className="subcontractor-info">
               <div className="to-label">To:</div>
               <div className="subcontractor-name">
-                {statement.subcontractorName}
+                {subcontractorInfo.name}
+                <br />
+                {subcontractorInfo.location}
+                <br />
+                {subcontractorInfo.contact_person}
               </div>
             </div>
             <div className="statement-details">

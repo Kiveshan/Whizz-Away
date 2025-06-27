@@ -131,25 +131,54 @@ const getStatementDetails = async (statementId, legKeys, subei_reg_num) => {
   }
 };
 
-const getCompanyInfo = async () => {
+const getCompanyInfo = async (roleid, status) => {
   let client;
   try {
     client = await pool.connect();
     const query = `
       SELECT 
-      *
+        companyname,
+        address,
+        cell_num AS phone,
+        email
       FROM 
         usertable
       WHERE 
-        roleid = 1
-        AND status = 'active'
+        roleid = $1
+        AND status = $2
         AND companyname IS NOT NULL
         AND address IS NOT NULL
         AND cell_num IS NOT NULL
         AND email IS NOT NULL
       LIMIT 1
     `;
-    const result = await client.query(query);
+    const values = [roleid, status];
+    const result = await client.query(query, values);
+    return result.rows;
+  } catch (error) {
+    throw error;
+  } finally {
+    if (client) client.release();
+  }
+};
+
+const getSubcontractorInfo = async (subei_reg_num) => {
+  let client;
+  try {
+    client = await pool.connect();
+    const query = `
+      SELECT 
+        location,
+        contact_person
+      FROM 
+        m5_employee
+      WHERE 
+        subei_reg_num = $1
+        AND status = true
+      LIMIT 1
+    `;
+    const values = [subei_reg_num];
+    const result = await client.query(query, values);
     return result.rows;
   } catch (error) {
     throw error;
@@ -164,4 +193,5 @@ export {
   getStatementDetails,
   getStatementLegIds,
   getCompanyInfo,
+  getSubcontractorInfo,
 };
