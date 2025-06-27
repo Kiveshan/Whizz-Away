@@ -17,6 +17,7 @@ import routes from "./routes/index.js";
 import "./utils/statementGenerator.js"; // Added to start cron job
 import fs from "fs";
 import multer from "multer";
+import "./utils/subcontractorStatementGeneration.js";
 
 // Get __dirname equivalent in ES modules
 const __filename = fileURLToPath(import.meta.url);
