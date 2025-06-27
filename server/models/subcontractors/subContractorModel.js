@@ -11,7 +11,9 @@ const getAllSubContractors = async () => {
         contact_person,
         MIN(userid) as min_userid,
         cellnum,
-        email
+        email,
+        subei_reg_num
+
       FROM 
         m5_employee
       WHERE 
@@ -22,7 +24,7 @@ const getAllSubContractors = async () => {
         AND contact_person IS NOT NULL 
         AND contact_person != ''
         AND status = true
-      GROUP BY companyname, location, contact_person, cellnum, email
+      GROUP BY companyname, location, contact_person, cellnum, email,subei_reg_num
       ORDER BY companyname
     `;
     const result = await client.query(query);

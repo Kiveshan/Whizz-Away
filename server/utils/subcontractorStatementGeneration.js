@@ -208,7 +208,7 @@ const insertSubcontractorStatement = async (
 };
 
 // Schedule the statement generation to run on the 2nd day of each month at 1:00 AM
-cron.schedule("* * * * *", async () => {
+cron.schedule("0 0 1 * *", async () => {
   console.log("🚀 Starting test statement generation...");
 
   // Test with current month - 1 (previous month)
