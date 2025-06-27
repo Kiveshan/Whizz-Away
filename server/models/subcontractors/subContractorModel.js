@@ -131,9 +131,37 @@ const getStatementDetails = async (statementId, legKeys, subei_reg_num) => {
   }
 };
 
+const getCompanyInfo = async () => {
+  let client;
+  try {
+    client = await pool.connect();
+    const query = `
+      SELECT 
+      *
+      FROM 
+        usertable
+      WHERE 
+        roleid = 1
+        AND status = 'active'
+        AND companyname IS NOT NULL
+        AND address IS NOT NULL
+        AND cell_num IS NOT NULL
+        AND email IS NOT NULL
+      LIMIT 1
+    `;
+    const result = await client.query(query);
+    return result.rows;
+  } catch (error) {
+    throw error;
+  } finally {
+    if (client) client.release();
+  }
+};
+
 export {
   getAllSubContractors,
   getSubContractorStatements,
   getStatementDetails,
   getStatementLegIds,
+  getCompanyInfo,
 };

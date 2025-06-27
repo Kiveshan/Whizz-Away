@@ -3,6 +3,7 @@ import {
   getSubContractorStatements,
   getStatementDetails,
   getStatementLegIds,
+  getCompanyInfo,
 } from "../../models/subcontractors/subContractorModel.js";
 
 const getAllSubContractorsHandler = async (req, res) => {
@@ -68,8 +69,19 @@ const getStatementDetailsHandler = async (req, res) => {
   }
 };
 
+const getCompanyInfoHandler = async (req, res) => {
+  try {
+    const companyInfo = await getCompanyInfo();
+    res.json(companyInfo);
+  } catch (error) {
+    console.error("Error fetching company info:", error);
+    res.status(500).json({ error: error.message });
+  }
+};
+
 export {
   getAllSubContractorsHandler,
   getSubContractorStatementsHandler,
   getStatementDetailsHandler,
+  getCompanyInfoHandler,
 };

@@ -23,6 +23,7 @@ const SubcontractorStatementDetail = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [isGenerating, setIsGenerating] = useState(false);
+  const [companyInfo, setCompanyInfo] = useState(null);
 
   const statementRef = useRef(null);
 
@@ -79,12 +80,19 @@ const SubcontractorStatementDetail = () => {
           0
         );
 
-        const companyInfo = {
-          name: "Construction Management Pro",
-          address: "123 Business Ave, Suite 100, City, State 12345",
-          phone: "+1 (555) 000-0000",
-          email: "billing@constructionpro.com",
-        };
+        // Fetch company info from usertable where roleid = 1 and status = 'active'
+        const companyResponse = await api.get("/subcontractor/company-info", {
+          params: { roleid: 1, status: "active" },
+        });
+        const companyData = companyResponse.data[0] || {};
+        setCompanyInfo({
+          name: companyData.companyname || "Construction Management Pro",
+          address:
+            companyData.address + " " + companyData.suburb ||
+            "123 Business Ave, Suite 100, City, State 12345",
+          phone: companyData.cell_num || "+1 (555) 000-0000",
+          email: companyData.email || "billing@constructionpro.com",
+        });
 
         setStatement({
           statementId,
@@ -92,7 +100,6 @@ const SubcontractorStatementDetail = () => {
           subcontractorId,
           generationDate: date,
           workItems,
-          companyInfo,
           summary: {
             totalAmount,
             taxRate: 0.15,
@@ -157,7 +164,7 @@ const SubcontractorStatementDetail = () => {
         <div className="error-message">Error: {error}</div>
       </div>
     );
-  if (!statement)
+  if (!statement || !companyInfo)
     return (
       <div className="statement-detail-wrapper">
         <div>Please select a statement from the list.</div>
@@ -169,12 +176,11 @@ const SubcontractorStatementDetail = () => {
       <div className="statement-page">
         <div className="statement-paper" ref={statementRef}>
           <div className="statement-header">
-            <h1>{statement.companyInfo.name}</h1>
+            <h1>{companyInfo.name}</h1>
             <div className="company-details">
-              <p>{statement.companyInfo.address}</p>
+              <p>{companyInfo.address}</p>
               <p>
-                Phone: {statement.companyInfo.phone} | Email:{" "}
-                {statement.companyInfo.email}
+                Phone: {companyInfo.phone} | Email: {companyInfo.email}
               </p>
             </div>
           </div>
