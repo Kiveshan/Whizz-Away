@@ -65,4 +65,74 @@ const getSubContractorStatements = async (subei_reg_num, year, month) => {
   }
 };
 
-export { getAllSubContractors, getSubContractorStatements };
+const getStatementLegIds = async (statementId, subei_reg_num) => {
+  let client;
+  try {
+    client = await pool.connect();
+    const query = `
+      SELECT legids 
+      FROM subcontractor_statements 
+      WHERE subbie_reg_num = $1 AND sub_state_id = $2
+    `;
+    const values = [subei_reg_num, statementId];
+    const result = await client.query(query, values);
+    return result.rows.length > 0 ? result.rows[0].legids : null;
+  } catch (error) {
+    throw error;
+  } finally {
+    if (client) client.release();
+  }
+};
+
+const getStatementDetails = async (statementId, legKeys, subei_reg_num) => {
+  let client;
+  try {
+    client = await pool.connect();
+    // Fetch legids to extract additional legkeys
+    const legids = await getStatementLegIds(statementId, subei_reg_num);
+    let allLegKeys = [...legKeys];
+
+    if (legids) {
+      try {
+        const parsedLegids = JSON.parse(legids);
+        const additionalLegKeys = parsedLegids
+          .map((item) => item.legkey)
+          .filter((key) => !allLegKeys.includes(key));
+        allLegKeys = [...allLegKeys, ...additionalLegKeys];
+      } catch (e) {
+        console.error("Failed to parse legids JSON:", e, "legids:", legids);
+      }
+    }
+
+    const query = `
+      SELECT 
+        l.legkey,
+        l.date,
+        l.startingpoint,
+        l.destination,
+        l.driverrate,
+        m1.description AS m1_description
+      FROM 
+        legs_m2 l
+      LEFT JOIN 
+        m1_controller m1 ON l.m1key = m1.m1key
+      WHERE l.legkey = ANY($1)
+    `;
+    console.log("Executing query with legKeys:", allLegKeys);
+    const values = [allLegKeys];
+    const result = await client.query(query, values);
+    console.log(`Found ${result.rows.length} leg details`);
+    return result.rows;
+  } catch (error) {
+    throw error;
+  } finally {
+    if (client) client.release();
+  }
+};
+
+export {
+  getAllSubContractors,
+  getSubContractorStatements,
+  getStatementDetails,
+  getStatementLegIds,
+};

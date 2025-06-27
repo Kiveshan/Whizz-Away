@@ -1,6 +1,8 @@
 import {
   getAllSubContractors,
   getSubContractorStatements,
+  getStatementDetails,
+  getStatementLegIds,
 } from "../../models/subcontractors/subContractorModel.js";
 
 const getAllSubContractorsHandler = async (req, res) => {
@@ -41,4 +43,35 @@ const getSubContractorStatementsHandler = async (req, res) => {
   }
 };
 
-export { getAllSubContractorsHandler, getSubContractorStatementsHandler };
+const getStatementDetailsHandler = async (req, res) => {
+  try {
+    const { statementId, legKeys, subei_reg_num } = req.query;
+
+    if (!statementId || !legKeys || !subei_reg_num) {
+      return res
+        .status(400)
+        .json({
+          error: "Statement ID, leg keys, and registration number are required",
+        });
+    }
+
+    console.log("Query params:", req.query); // Debug log
+    const legKeysArray = legKeys.split(",").map(Number);
+    const details = await getStatementDetails(
+      statementId,
+      legKeysArray,
+      subei_reg_num
+    );
+    console.log(`Found ${details.length} leg details`);
+    res.json(details);
+  } catch (error) {
+    console.error("Error fetching statement details:", error);
+    res.status(500).json({ error: error.message });
+  }
+};
+
+export {
+  getAllSubContractorsHandler,
+  getSubContractorStatementsHandler,
+  getStatementDetailsHandler,
+};

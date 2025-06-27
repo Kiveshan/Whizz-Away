@@ -2,127 +2,113 @@
 
 import { useNavigate, useLocation } from "react-router-dom";
 import { useState, useEffect, useRef } from "react";
+import api from "../../../../api";
 import "../css/SubcontractorStatementDetail.css";
 import html2pdf from "html2pdf.js";
 
 const SubcontractorStatementDetail = () => {
   const navigate = useNavigate();
   const location = useLocation();
-  const { statementId, subcontractorName, subcontractorId } =
-    location.state || {};
+  console.log("Received state:", location.state); // Debug log
+  const {
+    statementId,
+    subcontractorName,
+    subcontractorId,
+    subei_reg_num,
+    legids,
+  } = location.state || {};
 
   const [statement, setStatement] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [isGenerating, setIsGenerating] = useState(false);
 
-  // Add ref for PDF generation
   const statementRef = useRef(null);
 
   useEffect(() => {
-    if (!statementId) {
-      setError("No statement selected");
+    if (!statementId || !legids) {
+      setError("No statement or leg data selected");
       setLoading(false);
       return;
     }
 
     const fetchStatementDetail = async () => {
       try {
-        // Simulate loading delay
-        await new Promise((resolve) => setTimeout(resolve, 1000));
+        setLoading(true);
+        // Parse legids string to extract legkey values
+        let legKeys;
+        try {
+          const parsedLegids = JSON.parse(legids);
+          legKeys = parsedLegids.map((item) => item.legkey); // Extract only legkey
+          console.log("Parsed legKeys:", legKeys); // Debug log
+        } catch (e) {
+          console.error("Invalid legids JSON:", e, "Received:", legids);
+          legKeys = []; // Fallback to empty array if parsing fails
+        }
 
-        // Generate dummy detailed statement data
-        const dummyStatement = {
-          statementId: statementId,
-          subcontractorName: subcontractorName,
-          subcontractorId: subcontractorId,
-          generationDate: new Date(),
-          month: "December",
-          year: 2024,
-          workItems: [
-            {
-              id: 1,
-              date: "2024-12-05",
-              projectName: "Downtown Office Complex",
-              description: "Electrical installation - Phase 1",
-              hoursWorked: 40,
-              hourlyRate: 85,
-              materialCost: 2500,
-              totalAmount: 5900,
-            },
-            {
-              id: 2,
-              date: "2024-12-12",
-              projectName: "Residential Building A",
-              description: "Wiring and panel installation",
-              hoursWorked: 32,
-              hourlyRate: 85,
-              materialCost: 1800,
-              totalAmount: 4520,
-            },
-            {
-              id: 3,
-              date: "2024-12-18",
-              projectName: "Shopping Center Renovation",
-              description: "Emergency lighting system",
-              hoursWorked: 24,
-              hourlyRate: 90,
-              materialCost: 3200,
-              totalAmount: 5360,
-            },
-            {
-              id: 4,
-              date: "2024-12-22",
-              projectName: "Industrial Warehouse",
-              description: "High voltage electrical work",
-              hoursWorked: 48,
-              hourlyRate: 95,
-              materialCost: 4500,
-              totalAmount: 9060,
-            },
-          ],
-          companyInfo: {
-            name: "Construction Management Pro",
-            address: "123 Business Ave, Suite 100, City, State 12345",
-            phone: "+1 (555) 000-0000",
-            email: "billing@constructionpro.com",
+        if (legKeys.length === 0) {
+          throw new Error("No valid leg keys found in legids");
+        }
+
+        // API call to fetch leg details
+        const response = await api.get("/subcontractor/statement-details", {
+          params: {
+            statementId,
+            legKeys: legKeys.join(","),
+            subei_reg_num,
           },
-        };
+        });
+        console.log("Statement details response:", response.data); // Debug log
+
+        if (!response.data)
+          throw new Error("Failed to fetch statement details");
+
+        const workItems = response.data.map((leg) => ({
+          id: leg.legkey,
+          date: leg.date,
+          startingPoint: leg.startingpoint,
+          destination: leg.destination,
+          rate: leg.driverrate || 0,
+          instruction: leg.m1_description || "N/A",
+        }));
 
         // Calculate totals
-        const totalHours = dummyStatement.workItems.reduce(
-          (sum, item) => sum + item.hoursWorked,
-          0
-        );
-        const totalMaterials = dummyStatement.workItems.reduce(
-          (sum, item) => sum + item.materialCost,
-          0
-        );
-        const totalAmount = dummyStatement.workItems.reduce(
-          (sum, item) => sum + item.totalAmount,
+        const totalAmount = workItems.reduce(
+          (sum, item) => sum + (item.rate || 0),
           0
         );
 
-        dummyStatement.summary = {
-          totalHours,
-          totalMaterials,
-          totalAmount,
-          taxRate: 0.15,
-          taxAmount: totalAmount * 0.15,
-          finalAmount: totalAmount + totalAmount * 0.15,
+        const companyInfo = {
+          name: "Construction Management Pro",
+          address: "123 Business Ave, Suite 100, City, State 12345",
+          phone: "+1 (555) 000-0000",
+          email: "billing@constructionpro.com",
         };
 
-        setStatement(dummyStatement);
+        setStatement({
+          statementId,
+          subcontractorName,
+          subcontractorId,
+          generationDate: new Date(),
+          workItems,
+          companyInfo,
+          summary: {
+            totalAmount,
+            taxRate: 0.15,
+            taxAmount: totalAmount * 0.15,
+            finalAmount: totalAmount + totalAmount * 0.15,
+          },
+        });
       } catch (err) {
         console.error("Error fetching statement detail:", err);
-        setError("Failed to fetch statement details");
+        setError(`Failed to fetch statement details: ${err.message}`);
       } finally {
         setLoading(false);
       }
     };
 
     fetchStatementDetail();
-  }, [statementId, subcontractorName, subcontractorId]);
+  }, [statementId, subcontractorId, subcontractorName, subei_reg_num, legids]);
 
   const generatePDF = () => {
     if (isGenerating) return;
@@ -136,30 +122,21 @@ const SubcontractorStatementDetail = () => {
         margin: [20, 15, 20, 15],
         filename: filename,
         image: { type: "png", quality: 0.98 },
-        html2canvas: {
-          scale: 1.2,
-          useCORS: true,
-          scrollY: 0,
-          scrollX: 0,
-        },
+        html2canvas: { scale: 1.2, useCORS: true, scrollY: 0, scrollX: 0 },
         jsPDF: {
           unit: "mm",
           format: "a4",
           orientation: "portrait",
           compress: true,
         },
-        pagebreak: {
-          mode: ["avoid-all", "css", "legacy"],
-        },
+        pagebreak: { mode: ["avoid-all", "css", "legacy"] },
       };
 
       html2pdf()
         .set(opt)
         .from(element)
         .save()
-        .then(() => {
-          setIsGenerating(false);
-        })
+        .then(() => setIsGenerating(false))
         .catch((error) => {
           console.error("PDF generation error:", error);
           setIsGenerating(false);
@@ -190,7 +167,6 @@ const SubcontractorStatementDetail = () => {
     <div className="statement-detail-wrapper">
       <div className="statement-page">
         <div className="statement-paper" ref={statementRef}>
-          {/* Header */}
           <div className="statement-header">
             <h1>{statement.companyInfo.name}</h1>
             <div className="company-details">
@@ -202,9 +178,7 @@ const SubcontractorStatementDetail = () => {
             </div>
           </div>
 
-          {/* Statement Info Section */}
           <div className="statement-info-section">
-            {/* Subcontractor Info - Left Side */}
             <div className="subcontractor-info">
               <div className="to-label">Bill To:</div>
               <div className="subcontractor-name">
@@ -214,16 +188,11 @@ const SubcontractorStatementDetail = () => {
                 ID: {statement.subcontractorId}
               </div>
             </div>
-
-            {/* Statement Details - Right Side */}
             <div className="statement-details">
               <h2>Work Statement</h2>
               <div className="statement-meta">
                 <p>
                   <strong>Statement ID:</strong> {statement.statementId}
-                </p>
-                <p>
-                  <strong>Period:</strong> {statement.month} {statement.year}
                 </p>
                 <p>
                   <strong>Generated:</strong>{" "}
@@ -233,10 +202,8 @@ const SubcontractorStatementDetail = () => {
             </div>
           </div>
 
-          {/* Horizontal Line */}
           <div className="statement-divider"></div>
 
-          {/* Work Items Table */}
           <div className="work-items-section">
             <h3>Work Completed</h3>
             <table className="work-items-table">
@@ -247,45 +214,24 @@ const SubcontractorStatementDetail = () => {
                   <th>Destination</th>
                   <th>Rate</th>
                   <th>Instruction</th>
-                  <th>Total</th>
                 </tr>
               </thead>
               <tbody>
                 {statement.workItems.map((item) => (
                   <tr key={item.id}>
                     <td>{new Date(item.date).toLocaleDateString()}</td>
-                    <td>{item.projectName}</td>
-                    <td>{item.description}</td>
-                    <td>{item.hoursWorked}</td>
-                    <td>R{item.materialCost.toLocaleString()}</td>
-                    <td>R{item.totalAmount.toLocaleString()}</td>
+                    <td>{item.startingPoint}</td>
+                    <td>{item.destination}</td>
+                    <td>R{item.rate.toLocaleString()}</td>
+                    <td>{item.instruction}</td>
                   </tr>
                 ))}
               </tbody>
             </table>
           </div>
 
-          {/* Payment Summary */}
           <div className="payment-summary">
             <div className="summary-details">
-              <div className="summary-row">
-                <span>Total Hours Worked:</span>
-                <span>{statement.summary.totalHours} hours</span>
-              </div>
-              <div className="summary-row">
-                <span>Total Materials:</span>
-                <span>
-                  R{statement.summary.totalMaterials.toLocaleString()}
-                </span>
-              </div>
-              <div className="summary-row">
-                <span>Subtotal:</span>
-                <span>R{statement.summary.totalAmount.toLocaleString()}</span>
-              </div>
-              <div className="summary-row">
-                <span>Tax (15%):</span>
-                <span>R{statement.summary.taxAmount.toLocaleString()}</span>
-              </div>
               <div className="summary-row total-row">
                 <span>
                   <strong>Total Amount Due:</strong>
@@ -298,22 +244,8 @@ const SubcontractorStatementDetail = () => {
               </div>
             </div>
           </div>
-
-          {/* Payment Terms */}
-          <div className="payment-terms">
-            <h4>Payment Terms</h4>
-            <p>
-              Payment is due within 30 days of statement date. Late payments may
-              incur additional charges.
-            </p>
-            <p>
-              Please reference Statement ID: {statement.statementId} when making
-              payment.
-            </p>
-          </div>
         </div>
 
-        {/* Buttons */}
         <div className="statement-actions">
           <button
             className="back-btn"

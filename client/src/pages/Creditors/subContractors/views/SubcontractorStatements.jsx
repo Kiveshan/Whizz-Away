@@ -60,7 +60,10 @@ const SubcontractorStatements = () => {
           generationDate: new Date(item.date),
           totalAmount: item.amount,
           status: "Pending", // Assuming status needs to be derived; adjust as needed
-          legids: item.legids,
+          legids:
+            typeof item.legids === "object"
+              ? JSON.stringify(item.legids)
+              : item.legids,
         }));
 
         setStatements(transformedStatements);
@@ -177,7 +180,7 @@ const SubcontractorStatements = () => {
         <tbody>
           {currentStatements.length === 0 ? (
             <tr>
-              <td colSpan="6">No statements found for the selected period.</td>
+              <td colSpan="4">No statements found for the selected period.</td>
             </tr>
           ) : (
             currentStatements.map((statement) => (
@@ -197,6 +200,7 @@ const SubcontractorStatements = () => {
                           subcontractorName,
                           subcontractorId,
                           subei_reg_num,
+                          legids: statement.legids, // Pass as-is, now ensured to be a string
                         },
                       })
                     }
