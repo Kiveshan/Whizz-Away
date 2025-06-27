@@ -21,12 +21,7 @@ const ClientRatesTable = ({
   }
 
   return (
-    <div className="table-container">
-      <div className="table-header">
-        <h2>Client Rates Management</h2>
-        <p className="table-description">Manage rates for each client by clicking Edit Rates</p>
-      </div>
-
+    <div >
       {/* Search Filter at the top */}
       <div className="table-filters">
         <SearchFilter
@@ -52,8 +47,8 @@ const ClientRatesTable = ({
                   <th>Client Name</th>
                   <th>Representative</th>
                   <th>Email</th>
-                  <th>Company Address</th>
-                  <th>Current Rates</th>
+                  <th>Address</th>
+                  <th>Number</th>
                   <th>Status</th>
                   <th>Actions</th>
                 </tr>
@@ -104,7 +99,7 @@ const ClientRatesTable = ({
 
       {/* Pagination at the bottom */}
       {!loading && (
-        <div className="table-pagination">
+        <div>
           <Pagination
             currentPage={pagination.currentPage}
             totalPages={pagination.totalPages}

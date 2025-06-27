@@ -288,7 +288,7 @@ const Manage = () => {
           className={`manage-tab-button ${state.activeTab === "clients" ? "active" : ""}`}
           onClick={() => actions.setActiveTab("clients")}
         >
-          Clients Information
+          Clients
         </button>
         <button
           className={`manage-tab-button ${state.activeTab === "clientRates" ? "active" : ""}`}

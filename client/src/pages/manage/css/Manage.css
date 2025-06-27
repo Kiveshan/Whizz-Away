@@ -622,3 +622,231 @@ tr:hover {
 .alert-close-btn:hover {
   color: #ddd;
 }
+/* Styling for the main form container */
+.manage-add-client-form {
+  max-width: 1600px;
+  margin: 0 auto;
+  padding: 20px;
+  background-color: #ffffff;
+  border-radius: 8px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, CantArial, sans-serif;
+}
+
+/* Loading and error states */
+.loading {
+  text-align: center;
+  padding: 16px;
+  font-size: 16px;
+  color: #6b7280;
+  animation: pulse 1.5s infinite;
+}
+
+.error {
+  text-align: center;
+  padding: 16px;
+  font-size: 16px;
+  color: #dc2626;
+}
+
+/* Rates section styling */
+.rates-section {
+  margin-bottom: 20px;
+}
+
+/* Rates header with title and add button */
+.rates-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 12px;
+}
+
+.rates-header h3 {
+  font-size: 18px;
+  font-weight: 600;
+  color: #111827;
+}
+
+.add-rate-button {
+  padding: 6px 12px;
+  background-color: #2563eb;
+  color: #ffffff;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 500;
+  transition: background-color 0.2s ease;
+}
+
+.add-rate-button:hover {
+  background-color: #1d4ed8;
+}
+
+/* Row for rate entries (5 per row) */
+.rate-row {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+@media (min-width: 1024px) {
+  .rate-row {
+    grid-template-columns: repeat(5, 1fr);
+  }
+}
+
+/* Individual rate entry */
+.rate-entry {
+  padding: 10px;
+  border: 1px solid #e5e7eb;
+  border-radius: 6px;
+  background-color: #f9fafb;
+}
+
+/* Rate entry header with title and remove button */
+.rate-entry-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 6px;
+}
+
+.rate-entry-header h4 {
+  font-size: 14px;
+  font-weight: 500;
+  color: #374151;
+}
+
+.remove-rate-button {
+  background: none;
+  border: none;
+  color: #ef4444;
+  cursor: pointer;
+  font-size: 11px;
+  font-weight: 500;
+  transition: color 0.2s ease;
+}
+
+.remove-rate-button:hover {
+  color: #b91c1c;
+}
+
+/* Form grid within each rate entry (single column) */
+.manage-form-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+/* Form group styling for labels and inputs */
+.manage-form-group {
+  display: flex;
+  flex-direction: column;
+}
+
+.manage-form-group label {
+  font-size: 11px;
+  font-weight: 500;
+  color: #374151;
+  margin-bottom: 3px;
+}
+
+.manage-form-group label strong {
+  font-weight: 600;
+}
+
+.manage-form-group input {
+  padding: 6px;
+  border: 1px solid #d1d5db;
+  border-radius: 5px;
+  font-size: 11px;
+  color: #111827;
+  background-color: #ffffff;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.manage-form-group input::placeholder {
+  color: #9ca3af;
+}
+
+.manage-form-group input:focus {
+  outline: none;
+  border-color: #3b82f6;
+  box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.2);
+}
+
+/* Rates summary section */
+.rates-summary {
+  margin-top: 12px;
+}
+
+.rates-summary p {
+  font-size: 13px;
+  color: #4b5563;
+}
+
+.rates-summary .rates-note {
+  font-size: 11px;
+  color: #6b7280;
+  font-style: italic;
+}
+
+/* Button container for save and cancel */
+.manage-button-container {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  margin-top: 12px;
+}
+
+.manage-save-button {
+  padding: 8px 20px;
+  background-color: #16a34a;
+  color: #ffffff;
+  border: none;
+  border-radius: 6px;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background-color 0.2s ease;
+}
+
+.manage-save-button:hover {
+  background-color: #15803d;
+}
+
+.manage-save-button:disabled {
+  background-color: #9ca3af;
+  cursor: not-allowed;
+}
+
+.manage-cancel-button {
+  padding: 8px 20px;
+  background-color: #e5e7eb;
+  color: #1f2937;
+  border: none;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background-color 0.2s ease;
+}
+
+.manage-cancel-button:hover {
+  background-color: #d1d5db;
+}
+
+/* Animation for loading state */
+@keyframes pulse {
+  0% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.5;
+  }
+  100% {
+    opacity: 1;
+  }
+}

@@ -13,10 +13,8 @@ const ClientRatesForm = ({ clientData, loading, onSave, onCancel }) => {
     },
   ])
 
-  // Initialize rates when clientData changes
   useEffect(() => {
     console.log("ClientRatesForm received clientData:", clientData)
-
     if (clientData) {
       if (clientData.rates && clientData.rates.length > 0) {
         setRates(
@@ -30,7 +28,6 @@ const ClientRatesForm = ({ clientData, loading, onSave, onCancel }) => {
           })),
         )
       } else {
-        // Start with one empty rate
         setRates([
           {
             starting_point: "",
@@ -44,12 +41,10 @@ const ClientRatesForm = ({ clientData, loading, onSave, onCancel }) => {
     }
   }, [clientData])
 
-  // Show loading state
   if (loading) {
     return <div className="loading">Loading client rates...</div>
   }
 
-  // Show error if no client data
   if (!clientData) {
     return <div className="error">Error: No client data available</div>
   }
@@ -85,37 +80,27 @@ const ClientRatesForm = ({ clientData, loading, onSave, onCancel }) => {
 
   const handleSubmit = async (e) => {
     e.preventDefault()
-
-    // Validate that we have at least one complete rate
     const validRates = rates.filter(
       (rate) => rate.starting_point.trim() && rate.destination.trim() && (rate["6m_rate"] || rate["12m_rate"]),
     )
-
     if (validRates.length === 0) {
       alert("Please provide at least one complete rate with starting point, destination, and either 6m or 12m rate.")
       return
     }
-
     const success = await onSave(validRates)
     if (success) {
       // Form will be closed by parent component
     }
   }
 
+  // Group rates into chunks of 5 for rendering rows
+  const rateRows = []
+  for (let i = 0; i < rates.length; i += 5) {
+    rateRows.push(rates.slice(i, i + 5))
+  }
+
   return (
     <form className="manage-add-client-form" onSubmit={handleSubmit} noValidate>
-      <div className="client-rates-header">
-        <h2>Manage Rates for {clientData.client}</h2>
-        <div className="client-info">
-          <p>
-            <strong>Representative:</strong> {clientData.representative}
-          </p>
-          <p>
-            <strong>Email:</strong> {clientData.email}
-          </p>
-        </div>
-      </div>
-
       <div className="rates-section">
         <div className="rates-header">
           <h3>Client Rates</h3>
@@ -124,86 +109,94 @@ const ClientRatesForm = ({ clientData, loading, onSave, onCancel }) => {
           </button>
         </div>
 
-        {rates.map((rate, index) => (
-          <div key={index} className="rate-entry">
-            <div className="rate-entry-header">
-              <h4>Rate #{index + 1}</h4>
-              {rates.length > 1 && (
-                <button type="button" onClick={() => removeRate(index)} className="remove-rate-button">
-                  Remove
-                </button>
-              )}
-            </div>
+        {rateRows.map((row, rowIndex) => (
+          <div key={rowIndex} className="rate-row">
+            {row.map((rate, index) => (
+              <div key={rowIndex * 5 + index} className="rate-entry">
+                <div className="rate-entry-header">
+                  <h4>Rate #{rowIndex * 5 + index + 1}</h4>
+                  {rates.length > 1 && (
+                    <button
+                      type="button"
+                      onClick={() => removeRate(rowIndex * 5 + index)}
+                      className="remove-rate-button"
+                    >
+                      Remove
+                    </button>
+                  )}
+                </div>
 
-            <div className="manage-form-grid">
-              <div className="manage-form-group">
-                <label>
-                  <strong>Starting Point *</strong>
-                </label>
-                <input
-                  type="text"
-                  value={rate.starting_point}
-                  onChange={(e) => handleRateChange(index, "starting_point", e.target.value)}
-                  placeholder="e.g., Johannesburg"
-                  required
-                />
-              </div>
+                <div className="manage-form-grid">
+                  <div className="manage-form-group">
+                    <label>
+                      <strong>Starting Point *</strong>
+                    </label>
+                    <input
+                      type="text"
+                      value={rate.starting_point}
+                      onChange={(e) => handleRateChange(rowIndex * 5 + index, "starting_point", e.target.value)}
+                      placeholder="e.g., Johannesburg"
+                      required
+                    />
+                  </div>
 
-              <div className="manage-form-group">
-                <label>
-                  <strong>Destination *</strong>
-                </label>
-                <input
-                  type="text"
-                  value={rate.destination}
-                  onChange={(e) => handleRateChange(index, "destination", e.target.value)}
-                  placeholder="e.g., Cape Town"
-                  required
-                />
-              </div>
+                  <div className="manage-form-group">
+                    <label>
+                      <strong>Destination *</strong>
+                    </label>
+                    <input
+                      type="text"
+                      value={rate.destination}
+                      onChange={(e) => handleRateChange(rowIndex * 5 + index, "destination", e.target.value)}
+                      placeholder="e.g., Cape Town"
+                      required
+                    />
+                  </div>
 
-              <div className="manage-form-group">
-                <label>
-                  <strong>6m Rate (R)</strong>
-                </label>
-                <input
-                  type="number"
-                  min="0"
-                  step="0.01"
-                  value={rate["6m_rate"]}
-                  onChange={(e) => handleRateChange(index, "6m_rate", e.target.value)}
-                  placeholder="0.00"
-                />
-              </div>
+                  <div className="manage-form-group">
+                    <label>
+                      <strong>6m Rate (R)</strong>
+                    </label>
+                    <input
+                      type="number"
+                      min="0"
+                      step="0.01"
+                      value={rate["6m_rate"]}
+                      onChange={(e) => handleRateChange(rowIndex * 5 + index, "6m_rate", e.target.value)}
+                      placeholder="0.00"
+                    />
+                  </div>
 
-              <div className="manage-form-group">
-                <label>
-                  <strong>12m Rate (R)</strong>
-                </label>
-                <input
-                  type="number"
-                  min="0"
-                  step="0.01"
-                  value={rate["12m_rate"]}
-                  onChange={(e) => handleRateChange(index, "12m_rate", e.target.value)}
-                  placeholder="0.00"
-                />
-              </div>
+                  <div className="manage-form-group">
+                    <label>
+                      <strong>12m Rate (R)</strong>
+                    </label>
+                    <input
+                      type="number"
+                      min="0"
+                      step="0.01"
+                      value={rate["12m_rate"]}
+                      onChange={(e) => handleRateChange(rowIndex * 5 + index, "12m_rate", e.target.value)}
+                      placeholder="0.00"
+                    />
+                  </div>
 
-              <div className="manage-form-group">
-                <label>
-                  <strong>Surcharges (R) - Optional</strong>
-                </label>
-                <input
-                  type="number"
-                  min="0"
-                  step="0.01"
-                  value={rate.surcharges}
-                  onChange={(e) => handleRateChange(index, "surcharges", e.target.value)}
-                  placeholder="0.00"
-                />
+                  <div className="manage-form-group">
+                    <label>
+                      <strong>Surcharges (R) - Optional</strong>
+                    </label>
+                    <input
+                      type="number"
+                      min="0"
+                      step="0.01"
+                      value={rate.surcharges}
+                      onChange={(e) => handleRateChange(rowIndex * 5 + index, "surcharges", e.target.value)}
+                      placeholder="0.00"
+                    />
+                  </div>
+                </div>
               </div>
-            </div>
+            ))}
           </div>
         ))}
 
