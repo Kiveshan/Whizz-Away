@@ -47,7 +47,7 @@ router.use("/documents", documentRoutes);
 router.use("/expenses", fuelSlipRoutes);
 router.use(fuelRoutes);
 router.use(purchaseOrderRoutes);
-router.use("/api", instructionRoutes);
+router.use("/api/instructions", instructionRoutes);
 router.use(assignmentRoutes);
 
 export default router;
