@@ -199,69 +199,91 @@ const ControllerInstructions = () => {
 
   // Update rates when pickup or dropoff changes
   useEffect(() => {
-    if (!isMounted.current) return;
-    
-    const { pickup, dropoff, clientId: client } = formData;
-    const prev = prevValuesRef.current;
+    console.log('=== RATE FETCHING EFFECT TRIGGERED ===');
+    console.log('Current form data:', {
+      clientId: formData.clientId,
+      pickup: formData.pickup,
+      dropoff: formData.dropoff,
+      num_six_meters: formData.num_six_meters,
+      num_twelve_meters: formData.num_twelve_meters,
+      num_abnormal: formData.num_abnormal
+    });
 
-    // Only update if any of the values have changed
-    const valuesChanged = pickup !== prev.pickup || 
-                         dropoff !== prev.dropoff || 
-                         client !== prev.client;
+    const { pickup, dropoff, clientId } = formData;
     
-    if (valuesChanged && pickup && dropoff && client) {
-      console.log('Detected changes in pickup/dropoff/client. Fetching new rates...');
-      
-      // Update previous values immediately to prevent duplicate calls
-      prevValuesRef.current = { pickup, dropoff, client };
-      
-      const updateRates = async () => {
-        try {
-          console.log('Fetching rates with:', { client, pickup, dropoff });
-          const rates = await memoizedFetchRates(client, pickup, dropoff);
-          
-          if (rates && isMounted.current) {
-            console.log('Received rates from server:', rates);
-            
-            // Only update rates for container types that have a count > 0
-            setFormData(prev => {
-              const updates = { ...prev };
-              
-              if (prev.num_six_meters > 0 && rates.sixMeterRate !== undefined) {
-                console.log('Updating 6m rate to:', rates.sixMeterRate);
-                updates.sixMeterRate = rates.sixMeterRate;
-              }
-              
-              if (prev.num_twelve_meters > 0 && rates.twelveMeterRate !== undefined) {
-                console.log('Updating 12m rate to:', rates.twelveMeterRate);
-                updates.twelveMeterRate = rates.twelveMeterRate;
-              }
-              
-              // Abnormal rate is not in the rates object, so we don't update it here
-              
-              if (rates.surcharges !== undefined) {
-                updates.surcharges = rates.surcharges;
-              }
-              
-              return updates;
-            });
-          } else if (!rates) {
-            console.log('No rates returned from server');
-          }
-        } catch (error) {
-          console.error('Error updating rates:', error);
-        }
-      };
-
-      updateRates();
-      
-      // Update the previous values
-      prevValuesRef.current = { pickup, dropoff, client };
+    // Check if we have all required fields
+    if (!clientId || !pickup || !dropoff) {
+      console.log('Missing required fields for rate fetching:', { 
+        hasClientId: !!clientId,
+        hasPickup: !!pickup,
+        hasDropoff: !!dropoff 
+      });
+      return;
     }
+
+    console.log('All required fields present, proceeding to fetch rates...');
     
-    return () => {
-      isMounted.current = false;
+    const fetchAndUpdateRates = async () => {
+      try {
+        console.log('Calling memoizedFetchRates with:', { clientId, pickup, dropoff });
+        const rates = await memoizedFetchRates(clientId, pickup, dropoff);
+        
+        console.log('Rates received from API:', rates);
+        
+        setFormData(prev => {
+          const updates = { ...prev };
+          
+          if (rates) {
+            console.log('Updating form data with new rates:', rates);
+            
+            // Only update rates that are not null or undefined
+            if (rates.sixMeterRate != null) {
+              console.log('Setting sixMeterRate to:', rates.sixMeterRate);
+              updates.sixMeterRate = rates.sixMeterRate;
+            } else {
+              console.log('sixMeterRate is null/undefined, clearing field');
+              updates.sixMeterRate = ''; // Clear if null/undefined
+            }
+            
+            if (rates.twelveMeterRate != null) {
+              console.log('Setting twelveMeterRate to:', rates.twelveMeterRate);
+              updates.twelveMeterRate = rates.twelveMeterRate;
+            } else {
+              console.log('twelveMeterRate is null/undefined, clearing field');
+              updates.twelveMeterRate = ''; // Clear if null/undefined
+            }
+            
+            if (rates.abnormalRate != null) {
+              console.log('Setting abnormalRate to:', rates.abnormalRate);
+              updates.abnormalRate = rates.abnormalRate;
+            } else {
+              console.log('abnormalRate is null/undefined, clearing field');
+              updates.abnormalRate = ''; // Clear if null/undefined
+            }
+            
+            if (rates.surcharges !== undefined) {
+              updates.surcharges = rates.surcharges;
+            }
+          } else {
+            console.log('No rates found for client, clearing all rate fields');
+            // Clear all rate fields when no rates are found
+            updates.sixMeterRate = '';
+            updates.twelveMeterRate = '';
+            updates.abnormalRate = '';
+          }
+          
+          return updates;
+        });
+      } catch (error) {
+        console.error('Error in fetchAndUpdateRates:', {
+          message: error.message,
+          response: error.response?.data,
+          status: error.response?.status
+        });
+      }
     };
+
+    fetchAndUpdateRates();
   }, [formData.pickup, formData.dropoff, formData.clientId, memoizedFetchRates]);
 
   // Track which rate fields should be enabled
@@ -286,27 +308,16 @@ const ControllerInstructions = () => {
     console.log('Container counts:', {
       sixMeter: formData.num_six_meters,
       twelveMeter: formData.num_twelve_meters,
-      abnormal: formData.num_abnormal
+      abnormal: formData.num_abnormal,
+      sixMeterRate: formData.sixMeterRate,
+      twelveMeterRate: formData.twelveMeterRate,
+      abnormalRate: formData.abnormalRate
     });
     
     // Only update state if it has changed
     if (JSON.stringify(rateFieldsEnabled) !== JSON.stringify(newState)) {
       console.log('Updating rate fields enabled state:', newState);
       setRateFieldsEnabled(newState);
-    }
-    
-    // Clear rates when container count goes to zero
-    if (formData.num_six_meters === 0 && formData.sixMeterRate) {
-      console.log('Clearing sixMeterRate');
-      setFormData(prev => ({ ...prev, sixMeterRate: "" }));
-    }
-    if (formData.num_twelve_meters === 0 && formData.twelveMeterRate) {
-      console.log('Clearing twelveMeterRate');
-      setFormData(prev => ({ ...prev, twelveMeterRate: "" }));
-    }
-    if (formData.num_abnormal === 0 && formData.abnormalRate) {
-      console.log('Clearing abnormalRate');
-      setFormData(prev => ({ ...prev, abnormalRate: "" }));
     }
   }, [
     formData.num_six_meters, 
@@ -545,7 +556,7 @@ const ControllerInstructions = () => {
     // Find the selected client from the clients array
     const selectedClient = clients.find(client => client.m5clientkey.toString() === clientId);
     
-    // Update form data with client information
+    // Clear rates immediately when client changes
     setFormData(prev => ({
       ...prev,
       clientId,
@@ -553,25 +564,33 @@ const ControllerInstructions = () => {
       contactDetails: selectedClient?.contactDetails || selectedClient?.cellnum || '',
       email: selectedClient?.email || '',
       pickup: '',
-      dropoff: '' // Clear destination
-    }))
+      dropoff: '', // Clear destination
+      sixMeterRate: '', // Clear rates
+      twelveMeterRate: '',
+      abnormalRate: ''
+    }));
     
     setClientStartingPoints([]) // Clear client-specific starting points
     setClientDestinations([]) // Clear client-specific destinations list
     setDestinations([]) // Clear global destinations list
 
-    if (!clientId) return
+    if (!clientId) return;
     
     try {
       setIsLoadingLocations(true)
       setLocationError(null)
       
-      // Check if client has any rates first
+      // Check if client has any rates
       try {
-        await api.get(`/api/instructions/client/${clientId}/check-rates`)
+        const response = await api.get(`/api/instructions/client/${clientId}/check-rates`);
+        if (!response.data?.hasRates) {
+          console.log('Client has no rates, showing notification');
+          setShowNoRatesModal(true);
+        }
       } catch (error) {
-        console.error('Could not check client rates, continuing anyway:', error)
-        // Continue even if we can't check rates
+        console.error('Error checking client rates:', error);
+        // If we can't check rates, assume client has no rates to be safe
+        setShowNoRatesModal(true);
       }
       
       // Fetch starting points for the selected client
@@ -1061,19 +1080,6 @@ const ControllerInstructions = () => {
           ...prev,
           [type]: value === '' ? '' : numValue
         };
-        
-        // If count is being set to 0, clear the corresponding rate
-        if (numValue === 0) {
-          const rateField = {
-            'num_six_meters': 'sixMeterRate',
-            'num_twelve_meters': 'twelveMeterRate',
-            'num_abnormal': 'abnormalRate'
-          }[type];
-          
-          if (rateField) {
-            updatedFormData[rateField] = '';
-          }
-        }
         
         // Update rate fields enabled state based on the new counts
         const newCounts = {
@@ -1639,12 +1645,14 @@ const ControllerInstructions = () => {
                             padding: '8px',
                             border: '1px solid #ccc',
                             borderRadius: '4px',
-                            backgroundColor: '#fff',
+                            backgroundColor: rateFieldsEnabled.sixMeter ? '#fff' : '#f5f5f5',
                             fontSize: '16px',
                             position: 'relative',
-                            zIndex: 1000
+                            zIndex: 1000,
+                            cursor: rateFieldsEnabled.sixMeter ? 'text' : 'not-allowed'
                           }}
-                          placeholder="0.00"
+                          disabled={!rateFieldsEnabled.sixMeter}
+                          placeholder={rateFieldsEnabled.sixMeter ? "0.00" : ""}
                         />
                         <p style={{
                           fontSize: '12px',
@@ -1706,9 +1714,11 @@ const ControllerInstructions = () => {
                             padding: '8px',
                             border: '1px solid #000',
                             borderRadius: '4px',
-                            backgroundColor: '#fff'
+                            backgroundColor: rateFieldsEnabled.twelveMeter ? '#fff' : '#f5f5f5',
+                            cursor: rateFieldsEnabled.twelveMeter ? 'text' : 'not-allowed'
                           }}
-                          placeholder="0.00"
+                          disabled={!rateFieldsEnabled.twelveMeter}
+                          placeholder={rateFieldsEnabled.twelveMeter ? "0.00" : ""}
                         />
                       </div>
                     </div>
@@ -1761,9 +1771,11 @@ const ControllerInstructions = () => {
                             padding: '8px',
                             border: '1px solid #000',
                             borderRadius: '4px',
-                            backgroundColor: '#fff'
+                            backgroundColor: rateFieldsEnabled.abnormal ? '#fff' : '#f5f5f5',
+                            cursor: rateFieldsEnabled.abnormal ? 'text' : 'not-allowed'
                           }}
-                          placeholder="0.00"
+                          disabled={!rateFieldsEnabled.abnormal}
+                          placeholder={rateFieldsEnabled.abnormal ? "0.00" : ""}
                         />
                       </div>
                     </div>
