@@ -106,36 +106,76 @@ const ControllerInstructions = () => {
     }));
   };
 
-  // Initialize form data first
+  // Initialize form data with preserved data if available, or default values
   const [formData, setFormData] = useState(() => {
+    console.log('Initializing form data with:', { preservedFormData, containerCounts });
+    
+    // Process surcharge amount from preserved data
+    let surchargesAmount = '';
+    let surcharges = false;
+    
     if (preservedFormData) {
-      if (containerCounts) {
-        console.log("Initializing form data with container counts:", containerCounts);
-        return {
-          ...initialData,
-          ...preservedFormData,
-          num_six_meters: containerCounts["6m"] || 0,
-          num_twelve_meters: containerCounts["12m"] || 0,
-          num_abnormal: containerCounts["Abnormal"] || 0,
-          rateWeight: "Container",
-          weight: "",
-          surcharges: false,
-          surchargesAmount: "",
-        };
+      // Handle both string and number types for surchargesAmount
+      if (preservedFormData.surchargesAmount !== undefined && preservedFormData.surchargesAmount !== '') {
+        surchargesAmount = preservedFormData.surchargesAmount.toString();
+        surcharges = true;
       }
-      return {
-        ...initialData,
-        ...preservedFormData,
-        rateWeight: "Container",
-        num_six_meters: 0,
-        num_twelve_meters: 0,
-        num_abnormal: 0,
-        surcharges: false,
-        surchargesAmount: "",
-      };
+      
+      // If surcharges is explicitly set to true, ensure we have an amount
+      if (preservedFormData.surcharges && !surchargesAmount) {
+        surchargesAmount = '0';
+        surcharges = true;
+      }
     }
-    return { ...initialData };
+    
+    // Create the initial data object with all required fields
+    const initialFormData = {
+      // Form fields
+      clientId: preservedFormData?.clientId || '',
+      clientName: preservedFormData?.clientName || '',
+      pickup: preservedFormData?.pickup || '',
+      dropoff: preservedFormData?.dropoff || '',
+      num_six_meters: containerCounts ? containerCounts['6m'] : 0,
+      num_twelve_meters: containerCounts ? containerCounts['12m'] : 0,
+      num_abnormal: containerCounts ? containerCounts['Abnormal'] : 0,
+      sixMeterRate: preservedFormData?.sixMeterRate || '',
+      twelveMeterRate: preservedFormData?.twelveMeterRate || '',
+      abnormalRate: preservedFormData?.abnormalRate || '',
+      hazardous: preservedFormData?.hazardous || false,
+      
+      // Surcharge fields - ensure these are always initialized
+      surcharges: surcharges,
+      surchargesAmount: surchargesAmount,
+      preserveSurcharges: preservedFormData?.preserveSurcharges || false,
+      
+      // Other fields with defaults
+      rateWeight: preservedFormData?.rateWeight || "Container",
+      weight: preservedFormData?.weight || "",
+      
+      // Add any other fields that might be needed
+      ...(preservedFormData || {}) // Spread any additional fields from preserved data
+    };
+    
+    console.log('Initial form data:', initialFormData);
+    return initialFormData;
   });
+
+  // Debug effect to log form data changes
+  useEffect(() => {
+    console.log('Form Data Updated:', {
+      // Surcharge related fields
+      surcharges: formData.surcharges,
+      surchargesAmount: formData.surchargesAmount,
+      preserveSurcharges: formData.preserveSurcharges,
+      // Rate fields
+      sixMeterRate: formData.sixMeterRate,
+      twelveMeterRate: formData.twelveMeterRate,
+      // Client and location
+      clientId: formData.clientId,
+      pickup: formData.pickup,
+      dropoff: formData.dropoff
+    });
+  }, [formData]);
 
   // Get rate values from formData
   const sixMeterRate = formData.sixMeterRate || "";
@@ -261,8 +301,21 @@ const ControllerInstructions = () => {
               updates.abnormalRate = ''; // Clear if null/undefined
             }
             
+            // Handle surcharges - only set the amount, don't auto-check the box
             if (rates.surcharges !== undefined) {
-              updates.surcharges = rates.surcharges;
+              console.log('Processing surcharges:', rates.surcharges);
+              const surchargesNum = parseFloat(rates.surcharges);
+              const hasSurcharges = !isNaN(surchargesNum) && surchargesNum > 0;
+              
+              // Only set the amount, don't change the surcharges checkbox state here
+              updates.surchargesAmount = hasSurcharges ? surchargesNum.toString() : '';
+              updates.preserveSurcharges = hasSurcharges;
+              
+              console.log('Updated surcharge values (checkbox state unchanged):', {
+                surcharges: updates.surcharges,
+                surchargesAmount: updates.surchargesAmount,
+                preserveSurcharges: updates.preserveSurcharges
+              });
             }
           } else {
             console.log('No rates found for client, clearing all rate fields');
@@ -550,25 +603,37 @@ const ControllerInstructions = () => {
 
   // Handle client selection change
   const handleClientChange = async (e) => {
+    // Don't do anything if the client hasn't actually changed
+    if (e.target.value === formData.clientId) return;
     const clientId = e.target.value
     console.log('Client changed to:', clientId)
     
     // Find the selected client from the clients array
     const selectedClient = clients.find(client => client.m5clientkey.toString() === clientId);
     
-    // Clear rates immediately when client changes
-    setFormData(prev => ({
-      ...prev,
-      clientId,
-      representative: selectedClient?.representative || '',
-      contactDetails: selectedClient?.contactDetails || selectedClient?.cellnum || '',
-      email: selectedClient?.email || '',
-      pickup: '',
-      dropoff: '', // Clear destination
-      sixMeterRate: '', // Clear rates
-      twelveMeterRate: '',
-      abnormalRate: ''
-    }));
+    // Clear rates immediately when client changes but preserve surcharges
+    setFormData(prev => {
+      const updatedData = {
+        ...prev,
+        clientId,
+        representative: selectedClient?.representative || '',
+        contactDetails: selectedClient?.contactDetails || selectedClient?.cellnum || '',
+        email: selectedClient?.email || '',
+        pickup: '',
+        dropoff: '', // Clear destination
+        sixMeterRate: '', // Clear rates
+        twelveMeterRate: '',
+        abnormalRate: ''
+      };
+      
+      // Only clear surcharges if we're not preserving them
+      if (!prev.preserveSurcharges) {
+        updatedData.surcharges = false;
+        updatedData.surchargesAmount = '';
+      }
+      
+      return updatedData;
+    });
     
     setClientStartingPoints([]) // Clear client-specific starting points
     setClientDestinations([]) // Clear client-specific destinations list
@@ -928,16 +993,24 @@ const ControllerInstructions = () => {
     const dropoff = e.target.value;
     console.log('Dropoff changed to:', dropoff);
     
-    // Reset rates when dropoff changes
-    setFormData(prev => ({
-      ...prev,
-      dropoff,
-      sixMeterRate: "",
-      twelveMeterRate: "",
-      abnormalRate: "",
-      surcharges: false,
-      surchargesAmount: ""
-    }));
+    // Reset rates when dropoff changes but preserve surcharges
+    setFormData(prev => {
+      const updatedData = {
+        ...prev,
+        dropoff,
+        sixMeterRate: "",
+        twelveMeterRate: "",
+        abnormalRate: ""
+      };
+      
+      // Only clear surcharges if we're not preserving them
+      if (!prev.preserveSurcharges) {
+        updatedData.surcharges = false;
+        updatedData.surchargesAmount = "";
+      }
+      
+      return updatedData;
+    });
     
     // Only fetch rates if we have all required fields
     if (formData.clientId && formData.pickup && dropoff) {
@@ -976,27 +1049,96 @@ const ControllerInstructions = () => {
         // Update rates in form data
         const { sixMeterRate, twelveMeterRate, surcharges } = response.data || {};
         
-        const updates = {
-          ...(sixMeterRate !== undefined && { sixMeterRate: sixMeterRate.toString() }),
-          ...(twelveMeterRate !== undefined && { twelveMeterRate: twelveMeterRate.toString() }),
-          ...(surcharges !== undefined && { 
-            surcharges: !!surcharges,
-            ...(surcharges ? { surchargesAmount: surcharges.toString() } : {})
-          })
-        };
+        console.log('Raw rates from API:', { sixMeterRate, twelveMeterRate, surcharges });
         
-        console.log('Updating form data with rates:', updates);
-        setFormData(prev => ({
-          ...prev,
-          ...updates
-        }));
+        // Process rates
+        const updates = {};
+        
+        // Set six meter rate if available
+        if (sixMeterRate !== undefined && sixMeterRate !== null) {
+          updates.sixMeterRate = sixMeterRate.toString();
+        }
+        
+        // Set twelve meter rate if available
+        if (twelveMeterRate !== undefined && twelveMeterRate !== null) {
+          updates.twelveMeterRate = twelveMeterRate.toString();
+        }
+        
+        // Process surcharges if available
+        console.log('Processing surcharges - raw value:', surcharges);
+        if (surcharges !== undefined && surcharges !== null) {
+          // Handle both string and number types for surcharges
+          const surchargesNum = typeof surcharges === 'string' 
+            ? parseFloat(surcharges) 
+            : Number(surcharges);
+          
+          console.log('Processing surcharges details:', {
+            rawSurcharges: surcharges,
+            type: typeof surcharges,
+            surchargesNum,
+            isNumber: typeof surcharges === 'number',
+            isString: typeof surcharges === 'string'
+          });
+          
+          // Always set the surcharge amount if we have a value, even if it's 0
+          if (!isNaN(surchargesNum)) {
+            updates.surcharges = true; // Always set to true if we have a surcharge value
+            updates.surchargesAmount = surchargesNum.toString();
+            updates.preserveSurcharges = true;
+            
+            console.log('Setting surcharge values:', {
+              surcharges: updates.surcharges,
+              surchargesAmount: updates.surchargesAmount,
+              preserveSurcharges: updates.preserveSurcharges
+            });
+            
+            // Force the surcharge input to be visible by setting the rateFieldsEnabled
+            setRateFieldsEnabled(prev => ({
+              ...prev,
+              surcharges: true
+            }));
+          } else {
+            console.log('Invalid surcharge value, clearing surcharge fields');
+            updates.surcharges = false;
+            updates.surchargesAmount = '';
+            updates.preserveSurcharges = false;
+          }
+        }
+        
+        console.log('Updating form data with rates and surcharges:', updates);
+        
+        setFormData(prev => {
+          const newData = {
+            ...prev,
+            ...updates
+          };
+          
+          // Ensure preserveSurcharges is set if we have a surcharge amount
+          if (updates.surchargesAmount !== undefined && updates.surchargesAmount !== '') {
+            newData.preserveSurcharges = true;
+          }
+          
+          console.log('Final form data update:', newData);
+          return newData;
+        });
         
         // Enable rate fields if we have rates
+        const hasSurcharges = surcharges !== undefined && surcharges !== null && surcharges !== 0;
         setRateFieldsEnabled({
           sixMeter: sixMeterRate !== undefined,
           twelveMeter: twelveMeterRate !== undefined,
-          abnormal: false // Always disabled for abnormal as it's not in the rates
+          abnormal: false, // Always disabled for abnormal as it's not in the rates
+          surcharges: hasSurcharges
         });
+        
+        // If we have surcharges, ensure the surcharge checkbox is checked
+        if (hasSurcharges) {
+          setFormData(prev => ({
+            ...prev,
+            surcharges: true,
+            preserveSurcharges: true
+          }));
+        }
         
       } catch (error) {
         console.error('Error fetching rates:', {
@@ -1805,102 +1947,81 @@ const ControllerInstructions = () => {
                     className="controller-instructions-form-field"
                     style={{ display: "flex", flexDirection: "row", gap: "30px", alignItems: "center" }}
                   >
-                    <label className="controller-instructions-checkbox-container" style={{ margin: "5px 0" }}>
-                      <input
-                        type="checkbox"
-                        name="hazardous"
-                        checked={formData.hazardous || false}
-                        onChange={handleInputChange}
-                      />
-                      <span className="controller-instructions-checkmark"></span>
-                      Hazardous Materials
-                    </label>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '30px' }}>
                       <label className="controller-instructions-checkbox-container" style={{ margin: "5px 0" }}>
                         <input
                           type="checkbox"
-                          name="surcharges"
-                          checked={formData.surcharges || false}
-                          onChange={(e) => {
-                            const checked = e.target.checked;
-                            setFormData(prev => ({
-                              ...prev,
-                              surcharges: checked,
-                              // Reset surchargesAmount when unchecking
-                              ...(!checked && { surchargesAmount: '' })
-                            }));
-                          }}
+                          name="hazardous"
+                          checked={formData.hazardous || false}
+                          onChange={handleInputChange}
                         />
                         <span className="controller-instructions-checkmark"></span>
-                        Add Surcharges
+                        Hazardous
                       </label>
-                      {formData.surcharges && (
-                        <div className="controller-instructions-input-wrapper" style={{ width: '100px' }}>
+                      
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                        <label className="controller-instructions-checkbox-container" style={{ margin: "5px 0" }}>
                           <input
-                            type="number"
-                            className="controller-instructions-form-input"
-                            placeholder="Amount"
-                            value={formData.surchargesAmount || ''}
+                            type="checkbox"
+                            name="surcharges"
+                            checked={!!formData.surcharges}
                             onChange={(e) => {
-                              const value = e.target.value;
+                              const checked = e.target.checked;
                               setFormData(prev => ({
                                 ...prev,
-                                surchargesAmount: value
+                                surcharges: checked,
+                                // Only clear surchargesAmount when unchecking and there's no surcharge from the API
+                                ...(!checked && !prev.sixMeterRate && !prev.twelveMeterRate && { surchargesAmount: '' })
                               }));
                             }}
-                            min="0"
-                            step="0.01"
                           />
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                </div>
-              </div>
-              {/* Rates per dropdown moved inside container inputs */}
-              <div
-                className="controller-instructions-container-input controller-instructions-rates-per-row"
-                style={{ display: "none" }}
-              >
-                <label>Rates per</label>
-                <div className="controller-instructions-container-rate-group">
-                  <div className="controller-instructions-select-wrapper controller-instructions-small">
-                    <select
-                      className="controller-instructions-dropdown"
-                      name="rateWeight"
-                      value={formData.rateWeight}
-                      onChange={handleInputChange}
-                    >
-                      <option value="kg">kg</option>
-                      <option value="m³">m³</option>
-                      <option value="Container">Container</option>
-                    </select>
-                  </div>
-                  {(formData.rateWeight === "kg" || formData.rateWeight === "m³") && (
-                    <div
-                      className="controller-instructions-weight-input-group"
-                      ref={fieldRefs.weight}
-                      style={{ marginLeft: "8px" }}
-                    >
-                      <label>{formData.rateWeight}</label>
-                      <div className="controller-instructions-input-wrapper">
-                        <input
-                          type="text"
-                          className={`controller-instructions-form-input ${fieldErrors.weight ? "controller-instructions-error-field" : ""}`}
-                          placeholder={`Enter weight in ${formData.rateWeight}`}
-                          name="weight"
-                          value={formData.weight}
-                          onChange={(e) => {
-                            const value = e.target.value
-                            if (value === "" || /^[0-9]*\.?[0-9]*$/.test(value)) {
-                              handleInputChange(e)
-                            }
-                          }}
-                        />
-                        <ErrorTooltip message={fieldErrors.weight} />
+                          <span className="controller-instructions-checkmark"></span>
+                          Add Surcharges
+                        </label>
+                        
+                        {/* Only show surcharge input if the surcharges checkbox is checked */}
+                        {formData.surcharges && (
+                          <div className="controller-instructions-input-wrapper" style={{ width: '160px', marginLeft: '8px' }}>
+                            <input
+                              type="number"
+                              className="controller-instructions-form-input"
+                              placeholder="Enter surcharge"
+                              value={formData.surchargesAmount || ''}
+                              onChange={(e) => {
+                                const value = e.target.value;
+                                console.log('Surcharge input changed:', { oldValue: formData.surchargesAmount, newValue: value });
+                                setFormData(prev => ({
+                                  ...prev,
+                                  surchargesAmount: value,
+                                  surcharges: value !== '' && value !== '0',
+                                  preserveSurcharges: true
+                                }));
+                              }}
+                              onFocus={() => {
+                                // Ensure surcharges is true when focusing the input
+                                if (!formData.surcharges) {
+                                  setFormData(prev => ({
+                                    ...prev,
+                                    surcharges: true
+                                  }));
+                                }
+                              }}
+                              min="0"
+                              step="0.01"
+                              style={{
+                                width: '100%',
+                                padding: '8px',
+                                border: '1px solid #ccc',
+                                borderRadius: '4px',
+                                fontSize: '14px',
+                                backgroundColor: formData.surcharges ? '#f8f9fa' : '#fff'
+                              }}
+                            />
+                          </div>
+                        )}
                       </div>
                     </div>
-                  )}
+                  </div>
                 </div>
               </div>
 
@@ -1949,92 +2070,60 @@ const ControllerInstructions = () => {
                 </div>
 
                 {/* Compact Rates per dropdown inserted below VAT */}
-                <div className="controller-instructions-form-field" style={{ maxWidth: "160px" }}>
+                <div className="controller-instructions-form-field" style={{ maxWidth: "250px" }}>
                   <label>Rates per</label>
-                  <div className="controller-instructions-select-wrapper controller-instructions-small">
-                    <select
-                      className="controller-instructions-dropdown"
-                      name="rateWeight"
-                      value={formData.rateWeight}
-                      onChange={handleInputChange}
-                    >
-                      <option value="kg">kg</option>
-                      <option value="m³">m³</option>
-                      <option value="Container">Container</option>
-                    </select>
-                  </div>
-                  {/* conditional weight textbox */}
-                  {(formData.rateWeight === "kg" || formData.rateWeight === "m³") && (
-                    <div
-                      className="controller-instructions-input-wrapper"
-                      style={{ marginTop: "6px" }}
-                      ref={fieldRefs.weight}
-                    >
-                      <input
-                        type="text"
-                        className={`controller-instructions-form-input ${fieldErrors.weight ? "controller-instructions-error-field" : ""}`}
-                        placeholder={`Enter weight in ${formData.rateWeight}`}
-                        name="weight"
-                        value={formData.weight}
-                        onChange={(e) => {
-                          const value = e.target.value
-                          if (value === "" || /^[0-9]*\.?[0-9]*$/.test(value)) {
-                            handleInputChange(e)
-                          }
-                        }}
-                      />
-                      <ErrorTooltip message={fieldErrors.weight} />
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '4px' }}>
+                    <div className="controller-instructions-select-wrapper controller-instructions-small">
+                      <select
+                        className="controller-instructions-dropdown"
+                        name="rateWeight"
+                        value={formData.rateWeight}
+                        onChange={handleInputChange}
+                        style={{ minWidth: '100px' }}
+                      >
+                        <option value="kg">kg</option>
+                        <option value="m³">m³</option>
+                        <option value="Container">Container</option>
+                      </select>
                     </div>
-                  )}
+                    {(formData.rateWeight === "kg" || formData.rateWeight === "m³") && (
+                      <div
+                        className="controller-instructions-weight-input-group"
+                        ref={fieldRefs.weight}
+                        style={{ display: 'flex', alignItems: 'center', gap: '4px' }}
+                      >
+                        <div className="controller-instructions-input-wrapper" style={{ width: '180px' }}>
+                          <input
+                            type="text"
+                            className={`controller-instructions-form-input ${fieldErrors.weight ? "controller-instructions-error-field" : ""}`}
+                            placeholder="Enter weight"
+                            name="weight"
+                            value={formData.weight}
+                            onChange={(e) => {
+                              const value = e.target.value
+                              if (value === "" || /^[0-9]*\.?[0-9]*$/.test(value)) {
+                                handleInputChange(e)
+                              }
+                            }}
+                            style={{ 
+                              width: '100%',
+                              padding: '8px',
+                              border: '1px solid #ccc',
+                              borderRadius: '4px',
+                              fontSize: '14px'
+                            }}
+                          />
+                        </div>
+                        <span style={{ whiteSpace: 'nowrap' }}>{formData.rateWeight}</span>
+                        <ErrorTooltip message={fieldErrors.weight} />
+                      </div>
+                    )}
+                  </div>
                 </div>
               </div>
 
-              {/* Rates per selection */}
-              <div
-                className="controller-instructions-form-field controller-instructions-rates-container"
-                style={{ display: "none" }}
-              >
-                <label>Rates per</label>
-                <div className="controller-instructions-rates-input-group">
-                  <div className="controller-instructions-select-wrapper controller-instructions-small">
-                    <select
-                      className="controller-instructions-dropdown"
-                      name="rateWeight"
-                      value={formData.rateWeight}
-                      onChange={handleInputChange}
-                    >
-                      <option value="kg">kg</option>
-                      <option value="m³">m³</option>
-                      <option value="Container">Container</option>
-                    </select>
-                  </div>
-                </div>
-                {(formData.rateWeight === "kg" || formData.rateWeight === "m³") && (
-                  <div
-                    className="controller-instructions-weight-input-group"
-                    ref={fieldRefs.weight}
-                    style={{ marginTop: "8px" }}
-                  >
-                    <label>{formData.rateWeight}</label>
-                    <div className="controller-instructions-input-wrapper">
-                      <input
-                        type="text"
-                        className={`controller-instructions-form-input ${fieldErrors.weight ? "controller-instructions-error-field" : ""}`}
-                        placeholder={`Enter weight in ${formData.rateWeight}`}
-                        name="weight"
-                        value={formData.weight}
-                        onChange={(e) => {
-                          const value = e.target.value
-                          if (value === "" || /^[0-9]*\.?[0-9]*$/.test(value)) {
-                            handleInputChange(e)
-                          }
-                        }}
-                      />
-                      <ErrorTooltip message={fieldErrors.weight} />
-                    </div>
-                  </div>
-                )}
-              </div>
+              {/* Hidden rates per selection (kept for reference) */}
+              <div style={{ display: "none" }}></div>
 
               {/* Rate Type and VAT Rate moved to bottom of form */}
 
