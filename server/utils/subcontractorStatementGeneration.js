@@ -15,18 +15,20 @@ const generateStatementsForMonth = async (year, month) => {
       throw new Error("Year and month are required");
     }
 
-    const firstDay = new Date(year, month - 1, 1);
-    const lastDay = new Date(year, month, 0);
+    // Use the same date calculation logic for consistency
+    const invoiceStartDate = new Date(year, month - 1, 1, 12, 0, 0); // First day of target month
+    const invoiceEndDate = new Date(year, month, 0, 12, 0, 0); // Last day of target month
 
+    const formattedInvoiceStartDate = invoiceStartDate
+      .toISOString()
+      .split("T")[0];
+    const formattedInvoiceEndDate = invoiceEndDate.toISOString().split("T")[0];
+
+    console.log(`Target month: ${year}-${month.toString().padStart(2, "0")}`);
+    console.log(`Invoice start date: ${formattedInvoiceStartDate}`);
+    console.log(`Invoice end date: ${formattedInvoiceEndDate}`);
     console.log(
-      `Manually generating statements for ${year}-${month
-        .toString()
-        .padStart(2, "0")}`
-    );
-    console.log(
-      `Date range: ${firstDay.toISOString().split("T")[0]} to ${
-        lastDay.toISOString().split("T")[0]
-      }`
+      `Date range: ${formattedInvoiceStartDate} to ${formattedInvoiceEndDate}`
     );
 
     const subcontractorQuery = `
@@ -52,13 +54,13 @@ const generateStatementsForMonth = async (year, month) => {
     `;
 
     console.log("Executing query with params:", [
-      firstDay.toISOString().split("T")[0],
-      lastDay.toISOString().split("T")[0],
+      formattedInvoiceStartDate,
+      formattedInvoiceEndDate,
     ]);
 
     const subcontractorResult = await client.query(subcontractorQuery, [
-      firstDay.toISOString().split("T")[0],
-      lastDay.toISOString().split("T")[0],
+      formattedInvoiceStartDate,
+      formattedInvoiceEndDate,
     ]);
 
     console.log(
@@ -74,7 +76,7 @@ const generateStatementsForMonth = async (year, month) => {
     }
 
     for (const subcontractor of subcontractorResult.rows) {
-      await insertSubcontractorStatement(client, subcontractor, lastDay);
+      await insertSubcontractorStatement(client, subcontractor, invoiceEndDate);
     }
 
     return {
@@ -165,7 +167,7 @@ const insertSubcontractorStatement = async (
     console.log(`Leg details for ${subcontractor.companyname}:`, legDetails);
 
     // Validate total amount
-    const totalAmount = parseFloat(subcontractor.total_amount) || 0;
+    const totalAmount = Number.parseFloat(subcontractor.total_amount) || 0;
     if (totalAmount <= 0) {
       console.log("Skipping subcontractor - total amount is 0 or invalid");
       return;
@@ -209,22 +211,46 @@ const insertSubcontractorStatement = async (
 
 // Schedule the statement generation to run on the 2nd day of each month at 1:00 AM
 cron.schedule("0 1 1 * *", async () => {
-  console.log("🚀 Starting test statement generation...");
+  console.log("🚀 Starting monthly statement generation...");
 
-  // Test with current month - 1 (previous month)
-  const now = new Date();
-  const testYear = now.getFullYear();
-  const testMonth = now.getMonth(); // This will be previous month (0-based)
+  // Use the same date calculation logic as the other statement generation code
+  const today = new Date();
+  const currentMonth = today.getMonth();
+  const currentYear = today.getFullYear();
 
-  // If current month is January, test with December of previous year
-  const finalYear = testMonth === 0 ? testYear - 1 : testYear;
-  const finalMonth = testMonth === 0 ? 12 : testMonth;
+  console.log(`Current date: ${today.toISOString().split("T")[0]}`);
+  console.log(
+    `Current month: ${currentMonth + 1}, Current year: ${currentYear}`
+  );
 
-  console.log(`Testing with year: ${finalYear}, month: ${finalMonth}`);
+  const previousMonth = currentMonth === 0 ? 11 : currentMonth - 1;
+  const previousYear = currentMonth === 0 ? currentYear - 1 : currentYear;
 
-  const result = await generateStatementsForMonth(finalYear, finalMonth);
+  const invoiceStartDate = new Date(previousYear, previousMonth, 1, 12, 0, 0);
+  const invoiceEndDate = new Date(previousYear, previousMonth + 1, 0, 12, 0, 0);
 
-  console.log("✅ Test completed successfully:", result);
+  const formattedInvoiceStartDate = invoiceStartDate
+    .toISOString()
+    .split("T")[0];
+  const formattedInvoiceEndDate = invoiceEndDate.toISOString().split("T")[0];
+
+  console.log(
+    `Previous month: ${previousMonth + 1}, Previous year: ${previousYear}`
+  );
+  console.log(
+    `Invoice date range: ${formattedInvoiceStartDate} to ${formattedInvoiceEndDate}`
+  );
+
+  try {
+    // Pass the previous year and month (adding 1 because our function expects 1-12, not 0-11)
+    const result = await generateStatementsForMonth(
+      previousYear,
+      previousMonth + 1
+    );
+    console.log("✅ Statement generation completed successfully:", result);
+  } catch (error) {
+    console.error("❌ Statement generation failed:", error);
+  }
 });
 
 export { generateStatementsForMonth };
