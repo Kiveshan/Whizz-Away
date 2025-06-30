@@ -25,25 +25,30 @@ const ClientTable = ({
   return (
     <div>
       <div>
+        
         <button className="manage-add-client-button" onClick={onAdd}>
           Add Client
         </button>
       </div>
 
-      <SearchFilter
-        searchValue={filters.search}
-        onSearchChange={onSearchChange}
-        statusValue={filters.status}
-        onStatusChange={onStatusChange}
-        onApplyFilters={onApplyFilters}
-        placeholder="Search clients by name, email, or company..."
-        loading={loading}
-      />
+      {/* Search Filter at the top */}
+      <div className="table-filters">
+        <SearchFilter
+          searchValue={filters.search}
+          onSearchChange={onSearchChange}
+          statusValue={filters.status}
+          onStatusChange={onStatusChange}
+          onApplyFilters={onApplyFilters}
+          placeholder="Search clients by name, email, or company..."
+          loading={loading}
+        />
+      </div>
 
-      {loading ? (
-        <div className="loading">Loading clients...</div>
-      ) : (
-        <>
+      {/* Table Content */}
+      <div>
+        {loading ? (
+          <div className="loading">Loading clients...</div>
+        ) : (
           <div className="manage-clients-table1">
             <table>
               <thead>
@@ -51,10 +56,7 @@ const ClientTable = ({
                   <th>Client</th>
                   <th>Representative</th>
                   <th>Email</th>
-                  <th>Starting Point</th>
-                  <th>Destination</th>
-                  <th>6m Rate</th>
-                  <th>12m Rate</th>
+                  <th>City</th>
                   <th>Status</th>
                   <th>Edit</th>
                   <th>Enable / Disable</th>
@@ -63,7 +65,7 @@ const ClientTable = ({
               <tbody>
                 {clients.length === 0 ? (
                   <tr>
-                    <td colSpan="10" className="no-data">
+                    <td colSpan="8" className="no-data">
                       No clients found
                     </td>
                   </tr>
@@ -73,18 +75,7 @@ const ClientTable = ({
                       <td>{client.client}</td>
                       <td>{client.representative}</td>
                       <td>{client.email}</td>
-                      <td>{client.starting_point || "N/A"}</td>
-                      <td>{client.destination || "N/A"}</td>
-                      <td>
-                        {client.driver_six_meter_rate
-                          ? `R ${Number.parseFloat(client.driver_six_meter_rate).toFixed(2)}`
-                          : "N/A"}
-                      </td>
-                      <td>
-                        {client.driver_twelve_meter_rate
-                          ? `R ${Number.parseFloat(client.driver_twelve_meter_rate).toFixed(2)}`
-                          : "N/A"}
-                      </td>
+                      <td>{client.city}</td>
                       <td>
                         <span className={`status-badge ${client.status ? "active" : "inactive"}`}>
                           {client.status ? "Active" : "Inactive"}
@@ -109,6 +100,12 @@ const ClientTable = ({
               </tbody>
             </table>
           </div>
+        )}
+      </div>
+
+      {/* Pagination at the bottom */}
+      {!loading && (
+        <div>
           <Pagination
             currentPage={pagination.currentPage}
             totalPages={pagination.totalPages}
@@ -117,7 +114,7 @@ const ClientTable = ({
             onPageChange={onPageChange}
             onItemsPerPageChange={onItemsPerPageChange}
           />
-        </>
+        </div>
       )}
     </div>
   )
