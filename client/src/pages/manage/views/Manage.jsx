@@ -39,6 +39,10 @@ import DriverRateForm from "../components/rates/DriverRateForm"
 import SubcontractorTable from "../components/subcontractors/SubcontractorTable"
 import SubcontractorForm from "../components/subcontractors/SubcontractorForm"
 
+// Client Rate Components
+import ClientRatesTable from "../components/clientRates/ClientRatesTable"
+import ClientRatesForm from "../components/clientRates/ClientRatesForm"
+
 const Manage = () => {
   const navigate = useNavigate()
   const { state, actions } = useManageState()
@@ -67,6 +71,7 @@ const Manage = () => {
     const isAnyFormShowing =
       state.showEmployeeForm ||
       state.showClientForm ||
+      state.showClientRateForm ||
       state.showTruckForm ||
       state.showTrailerForm ||
       state.showDriverRateForm ||
@@ -76,6 +81,7 @@ const Manage = () => {
       // If a form is showing, hide it and return to the table
       actions.hideForm("showEmployeeForm")
       actions.hideForm("showClientForm")
+      actions.hideForm("showClientRateForm")
       actions.hideForm("showTruckForm")
       actions.hideForm("showTrailerForm")
       actions.hideForm("showDriverRateForm")
@@ -84,6 +90,7 @@ const Manage = () => {
       // Reset all form data and editing states
       actions.resetFormData("Employee")
       actions.resetFormData("Client")
+      actions.resetFormData("ClientRate")
       actions.resetFormData("Truck")
       actions.resetFormData("Trailer")
       actions.resetFormData("DriverRate")
@@ -91,6 +98,7 @@ const Manage = () => {
 
       actions.setEditing("Employee", null)
       actions.setEditing("Client", null)
+      actions.setEditing("ClientRate", null)
       actions.setEditing("Truck", null)
       actions.setEditing("Trailer", null)
       actions.setEditing("Rate", null)
@@ -231,6 +239,31 @@ const Manage = () => {
     actions.hideForm("showSubcontractorForm")
   }
 
+  // Client Rate handlers
+  const handleClientRateFormChange = (field, value) => {
+    actions.updateFormData("ClientRate", { [field]: value })
+  }
+
+  const handleClientRateEdit = (clientId, clientName) => {
+    console.log("Editing client rates for:", { clientId, clientName })
+
+    // Set client info first
+    actions.updateFormData("ClientRate", {
+      clientId: clientId,
+      client: clientName,
+      rates: [],
+    })
+
+    // Load existing rates for this client
+    api.loadItemForEdit("clientRate", clientId)
+  }
+
+  const handleClientRateCancel = () => {
+    actions.resetFormData("ClientRate")
+    actions.setEditing("ClientRate", null)
+    actions.hideForm("showClientRateForm")
+  }
+
   return (
     <div className="manage-container">
       {/* Header */}
@@ -255,7 +288,13 @@ const Manage = () => {
           className={`manage-tab-button ${state.activeTab === "clients" ? "active" : ""}`}
           onClick={() => actions.setActiveTab("clients")}
         >
-          Clients Information
+          Clients
+        </button>
+        <button
+          className={`manage-tab-button ${state.activeTab === "clientRates" ? "active" : ""}`}
+          onClick={() => actions.setActiveTab("clientRates")}
+        >
+          Client Rates
         </button>
         <button
           className={`manage-tab-button ${state.activeTab === "rates" ? "active" : ""}`}
@@ -358,6 +397,36 @@ const Manage = () => {
               onSearchChange={(value) => actions.setFilter("clients", "search", value)}
               onStatusChange={(value) => actions.setFilter("clients", "status", value)}
               onApplyFilters={() => api.applyFilters("clients")}
+            />
+          )}
+        </>
+      )}
+
+      {/* Client Rates Tab */}
+      {state.activeTab === "clientRates" && (
+        <>
+          {state.showClientRateForm ? (
+            <ClientRatesForm
+              clientData={state.newClientRate}
+              loading={state.loading}
+              isEditing={!!state.editingClientRateId}
+              onSave={(ratesData) => api.saveClientRates(ratesData)}
+              onCancel={handleClientRateCancel}
+              onChange={handleClientRateFormChange}
+              onDeleteRate={api.deleteClientRate}
+            />
+          ) : (
+            <ClientRatesTable
+              clients={state.clientRates}
+              loading={state.loading}
+              error={state.error}
+              onEditRates={handleClientRateEdit}
+              pagination={state.pagination.clientRates}
+              onPageChange={(page) => api.changePage("clientRates", page)}
+              onItemsPerPageChange={(itemsPerPage) => api.changeItemsPerPage("clientRates", itemsPerPage)}
+              filters={state.filters.clientRates}
+              onSearchChange={(value) => actions.setFilter("clientRates", "search", value)}
+              onApplyFilters={() => api.applyFilters("clientRates")}
             />
           )}
         </>

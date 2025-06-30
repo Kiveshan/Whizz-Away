@@ -3,13 +3,11 @@
 import Pagination from "../common/Pagination"
 import SearchFilter from "../common/SearchFilter"
 
-const ClientTable = ({
+const ClientRatesTable = ({
   clients,
   loading,
   error,
-  onEdit,
-  onToggleStatus,
-  onAdd,
+  onEditRates,
   pagination,
   onPageChange,
   onItemsPerPageChange,
@@ -23,14 +21,7 @@ const ClientTable = ({
   }
 
   return (
-    <div>
-      <div>
-        
-        <button className="manage-add-client-button" onClick={onAdd}>
-          Add Client
-        </button>
-      </div>
-
+    <div >
       {/* Search Filter at the top */}
       <div className="table-filters">
         <SearchFilter
@@ -39,13 +30,13 @@ const ClientTable = ({
           statusValue={filters.status}
           onStatusChange={onStatusChange}
           onApplyFilters={onApplyFilters}
-          placeholder="Search clients by name, email, or company..."
+          placeholder="Search clients by name, email, or representative..."
           loading={loading}
         />
       </div>
 
       {/* Table Content */}
-      <div>
+      <div className="table-content">
         {loading ? (
           <div className="loading">Loading clients...</div>
         ) : (
@@ -53,45 +44,48 @@ const ClientTable = ({
             <table>
               <thead>
                 <tr>
-                  <th>Client</th>
+                  <th>Client Name</th>
                   <th>Representative</th>
                   <th>Email</th>
-                  <th>City</th>
+                  <th>Address</th>
+                  <th>Number</th>
                   <th>Status</th>
-                  <th>Edit</th>
-                  <th>Enable / Disable</th>
+                  <th>Actions</th>
                 </tr>
               </thead>
               <tbody>
                 {clients.length === 0 ? (
                   <tr>
-                    <td colSpan="8" className="no-data">
+                    <td colSpan="7" className="no-data">
                       No clients found
                     </td>
                   </tr>
                 ) : (
                   clients.map((client) => (
                     <tr key={client.m5clientkey}>
-                      <td>{client.client}</td>
+                      <td>
+                        <strong>{client.client}</strong>
+                      </td>
                       <td>{client.representative}</td>
                       <td>{client.email}</td>
-                      <td>{client.city}</td>
+                      <td>{client.companyaddress || "N/A"}</td>
+                      <td>
+                        <span className="rate-count-badge">
+                          {client.rate_count || 0} rate{(client.rate_count || 0) !== 1 ? "s" : ""}
+                        </span>
+                      </td>
                       <td>
                         <span className={`status-badge ${client.status ? "active" : "inactive"}`}>
                           {client.status ? "Active" : "Inactive"}
                         </span>
                       </td>
                       <td>
-                        <button className="manage-view-button" onClick={() => onEdit(client.m5clientkey)}>
-                          Edit
-                        </button>
-                      </td>
-                      <td>
                         <button
-                          className={client.status ? "manage-delete-button" : "manage-enable-button"}
-                          onClick={() => onToggleStatus(client.m5clientkey, client.status)}
+                          className="manage-view-button"
+                          onClick={() => onEditRates(client.m5clientkey)}
+                          disabled={!client.status}
                         >
-                          {client.status ? "Disable" : "Enable"}
+                          Edit Rates
                         </button>
                       </td>
                     </tr>
@@ -120,4 +114,4 @@ const ClientTable = ({
   )
 }
 
-export default ClientTable
+export default ClientRatesTable
