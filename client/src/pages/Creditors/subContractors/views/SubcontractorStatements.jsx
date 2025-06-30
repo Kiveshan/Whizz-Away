@@ -2,18 +2,20 @@
 
 import { useState, useEffect, useCallback } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
-import "../css/StatementList.css";
-import api from "../../../api"; // Import the axios instance
-import Pagination from "..//../../components/Pagination"; // Import the Pagination component
+import api from "../../../../api";
+import "../css/SubcontractorStatements.css";
+import Pagination from "../../../../components/Pagination";
 
-const StatementList = () => {
+const SubcontractorStatements = () => {
   const navigate = useNavigate();
   const location = useLocation();
-  const { clientId } = location.state || {};
+  const { subcontractorId, subcontractorName, subei_reg_num } =
+    location.state || {};
 
   const [statements, setStatements] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+
   // Set default filters to current year and month
   const currentDate = new Date();
   const [filters, setFilters] = useState({
@@ -23,67 +25,58 @@ const StatementList = () => {
 
   // Pagination state
   const [currentPage, setCurrentPage] = useState(1);
-  const [recordsPerPage] = useState(10); // You can make this configurable
+  const [recordsPerPage] = useState(10);
 
-  // Handle pagination
   const handlePageChange = useCallback((pageNumber) => {
     setCurrentPage(pageNumber);
   }, []);
 
   useEffect(() => {
-    if (!clientId) {
-      setError("No client selected");
+    if (!subcontractorId || !subei_reg_num) {
+      setError("No subcontractor selected or missing registration number");
       setLoading(false);
       return;
     }
 
     const fetchStatements = async () => {
       try {
-        // Build query parameters
-        const params = new URLSearchParams();
-        if (filters.year) params.append("year", filters.year);
-        if (filters.month) params.append("month", filters.month);
+        setLoading(true);
+        const response = await api.get("/subcontractor/statements", {
+          params: {
+            subei_reg_num,
+            year: filters.year,
+            month: filters.month,
+          },
+        });
 
-        // Use axios instead of fetch
-        const requestUrl = `/api/statements/${clientId}?${params.toString()}`;
-        const response = await api.get(requestUrl);
+        if (!response.data) throw new Error("Failed to fetch statements");
 
-        if (response.data.success) {
-          setStatements(response.data.data);
-        } else {
-          throw new Error(
-            response.data.message || "Failed to fetch statements"
-          );
-        }
+        const transformedStatements = response.data.map((item) => ({
+          statementId: item.sub_state_id,
+          month: new Date(item.date).toLocaleString("default", {
+            month: "long",
+          }),
+          year: new Date(item.date).getFullYear(),
+          generationDate: new Date(item.date),
+          totalAmount: item.amount,
+          status: "Pending", // Assuming status needs to be derived; adjust as needed
+          legids:
+            typeof item.legids === "object"
+              ? JSON.stringify(item.legids)
+              : item.legids,
+        }));
+
+        setStatements(transformedStatements);
       } catch (err) {
         console.error("Error fetching statements:", err);
-
-        let errorMessage = "Failed to fetch statements";
-
-        if (err.response) {
-          const { status, data } = err.response;
-
-          if (status === 401 || status === 403) {
-            navigate("/");
-            return;
-          }
-
-          errorMessage = data?.message || `HTTP error! Status: ${status}`;
-        } else if (err.request) {
-          errorMessage =
-            "No response received from server. Please check your connection.";
-        } else {
-          errorMessage = err.message;
-        }
-
-        setError(errorMessage);
+        setError("Failed to fetch statements");
       } finally {
         setLoading(false);
       }
     };
 
     fetchStatements();
-  }, [clientId, filters, navigate]);
+  }, [subcontractorId, subei_reg_num, filters]);
 
   const handleFilterChange = (e) => {
     const { name, value } = e.target;
@@ -91,7 +84,7 @@ const StatementList = () => {
       ...prev,
       [name]: value === "Year" || value === "Month" ? "" : value,
     }));
-    setCurrentPage(1); // Reset to first page when filter changes
+    setCurrentPage(1);
   };
 
   const monthNames = [
@@ -109,7 +102,6 @@ const StatementList = () => {
     "December",
   ];
 
-  // Calculate pagination data
   const totalRecords = statements.length;
   const startIndex = (currentPage - 1) * recordsPerPage;
   const endIndex = startIndex + recordsPerPage;
@@ -117,34 +109,36 @@ const StatementList = () => {
 
   if (loading)
     return (
-      <div className="statement-list-wrapper">
+      <div className="subcontractor-statements-wrapper">
         <div>Loading statements...</div>
       </div>
     );
   if (error)
     return (
-      <div className="statement-list-wrapper">
+      <div className="subcontractor-statements-wrapper">
         <div className="error-message">Error: {error}</div>
       </div>
     );
-  if (!clientId)
+  if (!subcontractorId || !subei_reg_num)
     return (
-      <div className="statement-list-wrapper">
-        <div>Please select a client from the previous page.</div>
+      <div className="subcontractor-statements-wrapper">
+        <div>Please select a subcontractor from the previous page.</div>
       </div>
     );
 
   return (
-    <div className="statement-list-wrapper">
+    <div className="subcontractor-statements-wrapper">
       <button
-        onClick={() => navigate("/view-client-statements")}
+        onClick={() => navigate("/Creditors/SubcontractorList")}
         className="back-button"
       >
-        Back
+        Back to Subcontractors
       </button>
-
+      <div className="page-title">
+        <h2>Monthly Statements - {subcontractorName}</h2>
+      </div>
       <div className="action-bar">
-        <div className="filter-section46">
+        <div className="filter-section">
           <div className="dropdown-container">
             <select
               name="year"
@@ -174,37 +168,45 @@ const StatementList = () => {
           </div>
         </div>
       </div>
-
-      <table className="instruction-table1">
+      <table className="statements-table">
         <thead>
           <tr>
-            <th>Statement No</th>
-            <th>Date</th>
+            <th>Statement ID</th>
+            <th>Month/Year</th>
+            <th>Total Amount</th>
             <th>Actions</th>
           </tr>
         </thead>
         <tbody>
           {currentStatements.length === 0 ? (
             <tr>
-              <td colSpan="3">No statements found for this client.</td>
+              <td colSpan="4">No statements found for the selected period.</td>
             </tr>
           ) : (
             currentStatements.map((statement) => (
-              <tr key={statement.statement_key}>
-                <td>{statement.statement_key}</td>
+              <tr key={statement.statementId}>
+                <td>{statement.statementId}</td>
                 <td>
-                  {new Date(statement.generation_date).toLocaleDateString()}
+                  {statement.month} {statement.year}
                 </td>
+                <td>R{statement.totalAmount.toLocaleString()}</td>
                 <td>
                   <button
                     className="view-btn"
                     onClick={() =>
-                      navigate("/client-statement", {
-                        state: { statementId: statement.statement_key },
+                      navigate("/Creditors/SubcontractorStatementDetails", {
+                        state: {
+                          statementId: statement.statementId,
+                          subcontractorName,
+                          subcontractorId,
+                          subei_reg_num,
+                          legids: statement.legids,
+                          date: statement.generationDate, // Pass as-is, now ensured to be a string
+                        },
                       })
                     }
                   >
-                    View
+                    View Details
                   </button>
                 </td>
               </tr>
@@ -212,7 +214,6 @@ const StatementList = () => {
           )}
         </tbody>
       </table>
-      {/* Pagination Component */}
       {totalRecords > 0 && (
         <Pagination
           totalRecords={totalRecords}
@@ -225,4 +226,4 @@ const StatementList = () => {
   );
 };
 
-export default StatementList;
+export default SubcontractorStatements;

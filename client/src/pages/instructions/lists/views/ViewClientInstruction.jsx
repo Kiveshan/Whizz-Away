@@ -1,25 +1,28 @@
-"use client";
+"use client"
 
-import { useState, useEffect } from "react";
-import { useNavigate } from "react-router-dom";
-import "../../css/ViewClientInstruction.css";
-import api from "../../../../api";
+import { useState, useEffect } from "react"
+import { useNavigate } from "react-router-dom"
+import "../../css/ViewClientInstruction.css"
+import api from "../../../../api"
+import Pagination from "../../../../components/Pagination"
 
 const ViewClientInstruction = () => {
-  const navigate = useNavigate();
-  const [clients, setClients] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
-  const [totalNewInstructions, setTotalNewInstructions] = useState(0);
+  const navigate = useNavigate()
+  const [clients, setClients] = useState([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState(null)
+  const [totalNewInstructions, setTotalNewInstructions] = useState(0)
+  const [currentPage, setCurrentPage] = useState(1)
+  const [recordsPerPage] = useState(10)
 
   useEffect(() => {
     const fetchClientStats = async () => {
       try {
-        setLoading(true);
-        const response = await api.get("/api/client-instruction-stats");
+        setLoading(true)
+        const response = await api.get("/api/client-instruction-stats")
 
-        const data = response.data;
-        console.log("Client data received:", data); // Debug log
+        const data = response.data
+        console.log("Client data received:", data) // Debug log
 
         // Ensure all clients have the required properties as numbers
         const processedData = data.map((client) => ({
@@ -27,35 +30,30 @@ const ViewClientInstruction = () => {
           new_count: Number.parseInt(client.new_count) || 0,
           in_progress_count: Number.parseInt(client.in_progress_count) || 0,
           completed_count: Number.parseInt(client.completed_count) || 0,
-        }));
+        }))
 
         // Calculate total new instructions
-        const totalNew = processedData.reduce(
-          (sum, client) => sum + client.new_count,
-          0
-        );
-        setTotalNewInstructions(totalNew);
+        const totalNew = processedData.reduce((sum, client) => sum + client.new_count, 0)
+        setTotalNewInstructions(totalNew)
 
-        setClients(processedData);
-        setLoading(false);
+        setClients(processedData)
+        setLoading(false)
       } catch (error) {
-        console.error("Error fetching client statistics:", error);
+        console.error("Error fetching client statistics:", error)
         const errorMessage =
-          error.response?.data?.message ||
-          error.message ||
-          "Failed to load client data. Please try again later.";
-        setError(errorMessage);
-        setLoading(false);
+          error.response?.data?.message || error.message || "Failed to load client data. Please try again later."
+        setError(errorMessage)
+        setLoading(false)
       }
-    };
+    }
 
-    fetchClientStats();
-  }, []);
+    fetchClientStats()
+  }, [])
 
   // Style for centered cells
   const centeredCellStyle = {
     textAlign: "center",
-  };
+  }
 
   // Bell animation keyframes
   const bellKeyframes = `
@@ -70,11 +68,11 @@ const ViewClientInstruction = () => {
   92% { transform: rotate(1deg); }
   100% { transform: rotate(0); }
 }
-`;
+`
 
   // Bell icon component for header
   const BellIcon = ({ count }) => {
-    const hasNewInstructions = count > 0;
+    const hasNewInstructions = count > 0
 
     const bellStyle = {
       width: "24px",
@@ -82,7 +80,7 @@ const ViewClientInstruction = () => {
       fill: count > 0 ? "#ff0000" : "#00cc00", // Red if there are new instructions, green if zero
       animation: hasNewInstructions ? "bellShake 2s infinite" : "none",
       position: "relative",
-    };
+    }
 
     const countStyle = {
       position: "absolute",
@@ -91,28 +89,24 @@ const ViewClientInstruction = () => {
       fontSize: "12px",
       fontWeight: "bold",
       color: "black",
-    };
+    }
 
     return (
       <div style={{ position: "relative", display: "inline-block" }}>
         <style>{bellKeyframes}</style>
         {/* Solid bell SVG */}
-        <svg
-          style={bellStyle}
-          viewBox="0 0 24 24"
-          xmlns="http://www.w3.org/2000/svg"
-        >
+        <svg style={bellStyle} viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
           <path d="M12 22c1.1 0 2-.9 2-2h-4c0 1.1.9 2 2 2zm6-6v-5c0-3.07-1.63-5.64-4.5-6.32V4c0-.83-.67-1.5-1.5-1.5s-1.5.67-1.5 1.5v.68C7.64 5.36 6 7.92 6 11v5l-2 2v1h16v-1l-2-2z" />
         </svg>
         {count > 0 && <span style={countStyle}>{count}</span>}
       </div>
-    );
-  };
+    )
+  }
 
   // Bell icon component for table rows
   const RowBellIcon = ({ count }) => {
     // Only show bell if count > 0
-    if (count <= 0) return null;
+    if (count <= 0) return null
 
     const bellStyle = {
       width: "20px", // Slightly smaller than header bell
@@ -121,7 +115,7 @@ const ViewClientInstruction = () => {
       animation: "bellShake 2s infinite", // Always animate since we only show it when count > 0
       display: "inline-block",
       position: "relative",
-    };
+    }
 
     const countStyle = {
       position: "absolute",
@@ -130,38 +124,38 @@ const ViewClientInstruction = () => {
       fontSize: "10px",
       fontWeight: "bold",
       color: "black",
-    };
+    }
 
     return (
       <div style={{ position: "relative", display: "inline-block" }}>
         <style>{bellKeyframes}</style>
-        <svg
-          style={bellStyle}
-          viewBox="0 0 24 24"
-          xmlns="http://www.w3.org/2000/svg"
-        >
+        <svg style={bellStyle} viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
           <path d="M12 22c1.1 0 2-.9 2-2h-4c0 1.1.9 2 2 2zm6-6v-5c0-3.07-1.63-5.64-4.5-6.32V4c0-.83-.67-1.5-1.5-1.5s-1.5.67-1.5 1.5v.68C7.64 5.36 6 7.92 6 11v5l-2 2v1h16v-1l-2-2z" />
         </svg>
         <span style={countStyle}>{count}</span>
       </div>
-    );
-  };
+    )
+  }
 
   // Handle view instructions click - explicitly pass clientId and clientName
   const handleViewInstructions = (clientId, clientName) => {
-    console.log(
-      "Navigating to instructions with clientId:",
-      clientId,
-      "and clientName:",
-      clientName
-    );
+    console.log("Navigating to instructions with clientId:", clientId, "and clientName:", clientName)
     navigate("/instructions", {
       state: {
         clientId: clientId,
         clientName: clientName,
       },
-    });
-  };
+    })
+  }
+
+  // Pagination logic
+  const indexOfLastRecord = currentPage * recordsPerPage
+  const indexOfFirstRecord = indexOfLastRecord - recordsPerPage
+  const currentClients = clients.slice(indexOfFirstRecord, indexOfLastRecord)
+
+  const handlePageChange = (pageNumber) => {
+    setCurrentPage(pageNumber)
+  }
 
   return (
     <div className="">
@@ -172,10 +166,7 @@ const ViewClientInstruction = () => {
       </div>
 
       {/* Table */}
-      <div
-        className="table3"
-        style={{ display: "flex", justifyContent: "center" }}
-      >
+      <div className="table3" style={{ display: "flex", justifyContent: "center" }}>
         {loading ? (
           <p>Loading client data...</p>
         ) : error ? (
@@ -223,17 +214,13 @@ const ViewClientInstruction = () => {
                   </td>
                 </tr>
               ) : (
-                clients.map((client, index) => (
+                currentClients.map((client, index) => (
                   <tr key={index} className="border-t">
                     <td className="p-3">{client.companyname}</td>
                     <td className="p-3">{client.representative}</td>
                     <td className="p-3">{client.email}</td>
                     <td className="p-3" style={{ textAlign: "center" }}>
-                      {client.new_count > 0 ? (
-                        <RowBellIcon count={client.new_count} />
-                      ) : (
-                        "0"
-                      )}
+                      {client.new_count > 0 ? <RowBellIcon count={client.new_count} /> : "0"}
                     </td>
                     <td className="p-3" style={centeredCellStyle}>
                       {client.in_progress_count}
@@ -243,15 +230,8 @@ const ViewClientInstruction = () => {
                     </td>
                     <td className="p-3">
                       <button
-                        className={`view-butn ${
-                          client.new_count > 0 ? "bg-red-500" : ""
-                        }`}
-                        onClick={() =>
-                          handleViewInstructions(
-                            client.m5clientkey,
-                            client.companyname
-                          )
-                        }
+                        className={`view-butn ${client.new_count > 0 ? "bg-red-500" : ""}`}
+                        onClick={() => handleViewInstructions(client.m5clientkey, client.companyname)}
                       >
                         View
                       </button>
@@ -263,8 +243,20 @@ const ViewClientInstruction = () => {
           </table>
         )}
       </div>
-    </div>
-  );
-};
 
-export default ViewClientInstruction;
+      {/* Pagination - Now outside the table container */}
+      {clients.length > recordsPerPage && (
+        <div style={{ display: "flex", justifyContent: "center", marginTop: "20px" }}>
+          <Pagination
+            currentPage={currentPage}
+            totalRecords={clients.length}
+            recordsPerPage={recordsPerPage}
+            onPageChange={handlePageChange}
+          />
+        </div>
+      )}
+    </div>
+  )
+}
+
+export default ViewClientInstruction

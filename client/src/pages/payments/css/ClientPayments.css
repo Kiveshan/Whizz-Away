@@ -388,7 +388,7 @@
   flex-direction: column;
   align-items: center;
   gap: 15px;
-background: rgba(0, 0, 0, 0); /* Fully transparent */
+  background: rgba(0, 0, 0, 0); /* Fully transparent */
   border: 1px solid transparent; /* No visible border */
 }
 

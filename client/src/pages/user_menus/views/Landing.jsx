@@ -25,7 +25,7 @@ const dashboardData = [
   },
   { title: "Wages", image: "/images/wage.jpeg", path: "/wages" },
   { title: "Manage", image: "/images/team-management.png", path: "/creditors" },
-  { title: "Analytics", image: "/images/Analytics.jpg", path: "/creditors" },
+  { title: "Analytics", image: "/images/analytics.jpg", path: "/creditors" },
 ];
 
 const Landing = () => {

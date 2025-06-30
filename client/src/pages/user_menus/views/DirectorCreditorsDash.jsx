@@ -8,7 +8,11 @@ const dashboardData = [
     image: "/images/Diesel.jpeg",
     path: "/DirectorManagerViewFuelExpense",
   },
-  { title: "Sub-Constructor", image: "/images/subconstructor.jpg", path: "" },
+  {
+    title: "Sub-Constructor",
+    image: "/images/subconstructor.jpg",
+    path: "/Creditors/SubcontractorList",
+  },
   {
     title: "Other",
     image: "/images/OtherExpence.jpg",

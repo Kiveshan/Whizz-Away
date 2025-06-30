@@ -1,0 +1,295 @@
+/* Statement Detail Wrapper */
+.statement-detail-wrapper {
+  /* Reset any inherited styles */
+  all: initial;
+  font-family: Arial, sans-serif;
+  box-sizing: border-box;
+  display: block;
+}
+
+.statement-detail-wrapper *,
+.statement-detail-wrapper *::before,
+.statement-detail-wrapper *::after {
+  box-sizing: inherit;
+}
+
+.statement-detail-wrapper .statement-page {
+  padding: 20px;
+  font-family: Arial, sans-serif;
+  position: relative;
+  min-height: 100vh;
+  padding-bottom: 70px;
+}
+
+.statement-detail-wrapper .statement-paper {
+  max-width: 900px;
+  margin: 0 auto;
+  background-color: white;
+  padding: 30px;
+  margin-bottom: 30px;
+  box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+}
+
+/* Header */
+.statement-detail-wrapper .statement-header {
+  text-align: center;
+  padding: 20px 0 30px 0;
+  background-color: #b8d1f3;
+  margin: -30px -30px 30px -30px;
+}
+
+.statement-detail-wrapper .statement-header h1 {
+  margin: 0 0 10px 0;
+  font-size: 24px;
+  font-weight: bold;
+  font-family: inherit;
+}
+
+.statement-detail-wrapper .company-details {
+  font-size: 14px;
+  color: #555;
+}
+
+.statement-detail-wrapper .company-details p {
+  margin: 5px 0;
+  font-family: inherit;
+}
+
+/* Statement Info Section */
+.statement-detail-wrapper .statement-info-section {
+  display: flex;
+  justify-content: space-between;
+  min-height: 120px;
+}
+
+/* Subcontractor Info - Left Side */
+.statement-detail-wrapper .subcontractor-info {
+  text-align: left;
+  font-size: 14px;
+  line-height: 1.6;
+  font-family: inherit;
+}
+
+.statement-detail-wrapper .to-label {
+  font-weight: bold;
+  font-size: 16px;
+}
+
+.statement-detail-wrapper .subcontractor-name {
+  font-weight: bold;
+  font-size: 18px;
+  margin-bottom: 5px;
+}
+
+.statement-detail-wrapper .subcontractor-id {
+  color: #666;
+  font-size: 14px;
+}
+
+/* Statement Details - Right Side */
+.statement-detail-wrapper .statement-details {
+  text-align: right;
+  font-family: inherit;
+}
+
+.statement-detail-wrapper .statement-details h2 {
+  margin: 0 0 15px 0;
+  font-size: 20px;
+  font-weight: bold;
+  color: #333;
+  font-family: inherit;
+}
+
+.statement-detail-wrapper .statement-meta p {
+  margin: 5px 0;
+  font-size: 14px;
+  font-family: inherit;
+}
+
+/* Divider */
+.statement-detail-wrapper .statement-divider {
+  border-bottom: 2px solid #333;
+  margin: 30px 0;
+  margin-top: 0px;
+}
+
+/* Work Items Section */
+.statement-detail-wrapper .work-items-section {
+  margin-bottom: 30px;
+}
+
+.statement-detail-wrapper .work-items-section h3 {
+  margin: 0 0 15px 0;
+  font-size: 18px;
+  font-weight: bold;
+  color: #333;
+  font-family: inherit;
+}
+
+/* Work Items Table */
+.statement-detail-wrapper .work-items-table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-bottom: 20px;
+  font-family: inherit;
+}
+
+.statement-detail-wrapper .work-items-table th {
+  background-color: #b8d1f3;
+  padding: 10px 8px;
+  text-align: left;
+  font-size: 14px;
+  font-weight: bold;
+  border: 1px solid #ddd;
+  font-family: inherit;
+}
+
+.statement-detail-wrapper .work-items-table td {
+  padding: 10px 8px;
+  font-size: 13px;
+  border: 1px solid #ddd;
+  font-family: inherit;
+}
+
+.statement-detail-wrapper .work-items-table tbody tr:nth-child(even) {
+  background-color: #f9f9f9;
+}
+
+.statement-detail-wrapper .work-items-table tbody tr:hover {
+  background-color: #f0f8ff;
+}
+
+/* Payment Summary */
+.statement-detail-wrapper .payment-summary {
+  display: flex;
+  justify-content: flex-end;
+  margin: 30px 0;
+}
+
+.statement-detail-wrapper .summary-details {
+  width: 350px;
+  border: 2px solid #333;
+  padding: 20px;
+  background-color: #f8f9fa;
+}
+
+.statement-detail-wrapper .summary-row {
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 10px;
+  font-size: 14px;
+  font-family: inherit;
+}
+
+.statement-detail-wrapper .summary-row.total-row {
+  border-top: 2px solid #333;
+  padding-top: 10px;
+  margin-top: 15px;
+  font-size: 16px;
+}
+
+/* Payment Terms */
+.statement-detail-wrapper .payment-terms {
+  margin-top: 30px;
+  padding: 20px;
+  background-color: #f8f9fa;
+  border-left: 4px solid #007bff;
+}
+
+.statement-detail-wrapper .payment-terms h4 {
+  margin: 0 0 10px 0;
+  font-size: 16px;
+  font-weight: bold;
+  color: #333;
+  font-family: inherit;
+}
+
+.statement-detail-wrapper .payment-terms p {
+  margin: 8px 0;
+  font-size: 14px;
+  line-height: 1.5;
+  color: #555;
+  font-family: inherit;
+}
+
+/* Action Buttons */
+.statement-detail-wrapper .statement-actions {
+  display: flex;
+  justify-content: center;
+  gap: 20px;
+  margin-top: 30px;
+}
+
+.statement-detail-wrapper .back-btn {
+  background-color: #28a745;
+  color: white;
+  border: none;
+  padding: 12px 25px;
+  border-radius: 5px;
+  font-size: 16px;
+  cursor: pointer;
+  transition: background 0.3s ease;
+  font-family: inherit;
+}
+
+.statement-detail-wrapper .back-btn:hover {
+  background-color: #218838;
+}
+
+.statement-detail-wrapper .download-btn {
+  background-color: #007bff;
+  color: white;
+  border: none;
+  padding: 12px 25px;
+  border-radius: 5px;
+  font-size: 16px;
+  cursor: pointer;
+  transition: background 0.3s ease;
+  font-family: inherit;
+}
+
+.statement-detail-wrapper .download-btn:hover {
+  background-color: #0056b3;
+}
+
+.statement-detail-wrapper .download-btn.generating,
+.statement-detail-wrapper .download-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+  background-color: #ccc;
+}
+
+/* Loading and Error States */
+.statement-detail-wrapper div {
+  text-align: center;
+  padding: 20px;
+  font-family: inherit;
+}
+
+.statement-detail-wrapper .error-message {
+  color: #d32f2f;
+  text-align: center;
+  padding: 20px;
+  font-family: inherit;
+}
+
+/* Print Styles */
+@media print {
+  .statement-detail-wrapper .statement-actions {
+    display: none;
+  }
+
+  .statement-detail-wrapper .statement-paper {
+    box-shadow: none;
+    padding: 0;
+    margin: 0;
+  }
+
+  .statement-detail-wrapper .work-items-table {
+    page-break-inside: avoid;
+  }
+
+  .statement-detail-wrapper .payment-summary {
+    page-break-inside: avoid;
+  }
+}

@@ -1,15 +1,20 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import api from "../../../api"; // Import the configured Axios instance
 import "../css/FinancialDocView.css";
+import Pagination from "../../../components/Pagination"; // Import the Pagination component
 
 const DirectorFinancialDocumentsView = () => {
   const navigate = useNavigate();
   const [clients, setClients] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+
+  // Pagination state
+  const [currentPage, setCurrentPage] = useState(1);
+  const [recordsPerPage] = useState(10); // You can make this configurable
 
   useEffect(() => {
     const fetchClients = async () => {
@@ -38,6 +43,17 @@ const DirectorFinancialDocumentsView = () => {
     fetchClients();
   }, []);
 
+  // Handle pagination
+  const handlePageChange = useCallback((pageNumber) => {
+    setCurrentPage(pageNumber);
+  }, []);
+
+  // Calculate pagination data
+  const totalRecords = clients.length;
+  const startIndex = (currentPage - 1) * recordsPerPage;
+  const endIndex = startIndex + recordsPerPage;
+  const currentClients = clients.slice(startIndex, endIndex);
+
   return (
     <div className="director-financial-docs-wrapper">
       {/* Back Button */}
@@ -56,50 +72,62 @@ const DirectorFinancialDocumentsView = () => {
 
       {/* Table */}
       {!loading && !error && (
-        <div className="clientinstructiontable">
-          <table className="t1" style={{ width: "70%", marginLeft: "350px" }}>
-            <thead className="bg-blue-300">
-              <tr>
-                <th className="p-3">Company</th>
-                <th className="p-3">Representative</th>
-                <th className="p-3">Email</th>
-                <th className="p-3">Instructions</th>
-              </tr>
-            </thead>
-            <tbody>
-              {clients.length > 0 ? (
-                clients.map((client, index) => (
-                  <tr key={client.m5clientkey || index} className="border-t">
-                    <td className="p-3">{client.companyname}</td>
-                    <td className="p-3">{client.representative}</td>
-                    <td className="p-3">{client.email}</td>
-                    <td className="p-3">
-                      <button
-                        className="view-butn"
-                        onClick={() =>
-                          navigate("/DirectorClientDocuments", {
-                            state: {
-                              clientId: client.m5clientkey,
-                              clientName: client.companyname,
-                            },
-                          })
-                        }
-                      >
-                        View
-                      </button>
+        <>
+          <div className="clientinstructiontable">
+            <table className="t1" style={{ width: "70%", marginLeft: "350px" }}>
+              <thead className="bg-blue-300">
+                <tr>
+                  <th className="p-3">Company</th>
+                  <th className="p-3">Representative</th>
+                  <th className="p-3">Email</th>
+                  <th className="p-3">Instructions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {currentClients.length > 0 ? (
+                  currentClients.map((client, index) => (
+                    <tr key={client.m5clientkey || index} className="border-t">
+                      <td className="p-3">{client.companyname}</td>
+                      <td className="p-3">{client.representative}</td>
+                      <td className="p-3">{client.email}</td>
+                      <td className="p-3">
+                        <button
+                          className="view-butn"
+                          onClick={() =>
+                            navigate("/DirectorClientDocuments", {
+                              state: {
+                                clientId: client.m5clientkey,
+                                clientName: client.companyname,
+                              },
+                            })
+                          }
+                        >
+                          View
+                        </button>
+                      </td>
+                    </tr>
+                  ))
+                ) : (
+                  <tr>
+                    <td colSpan="4" className="p-3 text-center">
+                      No clients found
                     </td>
                   </tr>
-                ))
-              ) : (
-                <tr>
-                  <td colSpan="4" className="p-3 text-center">
-                    No clients found
-                  </td>
-                </tr>
-              )}
-            </tbody>
-          </table>
-        </div>
+                )}
+              </tbody>
+            </table>
+          </div>
+
+          {/* Pagination Component */}
+          {totalRecords > 0 && (
+            <Pagination
+              totalRecords={totalRecords}
+              recordsPerPage={recordsPerPage}
+              currentPage={currentPage}
+              onPageChange={handlePageChange}
+            />
+          )}
+        </>
       )}
     </div>
   );
