@@ -89,6 +89,9 @@ const ControllerInstructions = () => {
   const [isImport, setIsImport] = useState(false)
   const today = new Date().toISOString().split("T")[0]
   
+  // Form validation state
+  const [fieldErrors, setFieldErrors] = useState({})
+  
   // State for client-specific locations 
   const [clientStartingPoints, setClientStartingPoints] = useState([])
   const [clientDestinations, setClientDestinations] = useState([])
@@ -100,64 +103,303 @@ const ControllerInstructions = () => {
   const handleInputChange = (e) => {
     const { name, value, type, checked } = e.target;
     
-    setFormData(prevState => ({
-      ...prevState,
-      [name]: type === 'checkbox' ? checked : value
+    // Special handling for IMO number (numbers only)
+    if (name === 'imoNo' && value !== '' && !/^\d*$/.test(value)) {
+      return; // Don't update if not a number
+    }
+    
+    // Special handling for Flag Registration (letters and spaces only)
+    if (name === 'flagReg' && value !== '' && !/^[A-Za-z\s]*$/.test(value)) {
+      return; // Don't update if contains non-letter characters
+    }
+    
+    // Update form data
+    const newValue = type === 'checkbox' ? checked : value;
+    setFormData(prev => ({
+      ...prev,
+      [name]: newValue
     }));
+    
+    // Clear error when user starts typing and the field is no longer empty/invalid
+    if (fieldErrors[name] && isFieldValid(name, newValue)) {
+      setFieldErrors(prev => {
+        const newErrors = { ...prev };
+        delete newErrors[name];
+        return newErrors;
+      });
+    }
+  };
+
+  // Initialize containers based on counts while preserving existing container data
+  const initializeContainers = (containerCounts = null) => {
+    const counts = containerCounts || {
+      num_six_meters: formData.num_six_meters || 0,
+      num_twelve_meters: formData.num_twelve_meters || 0,
+      num_abnormal: formData.num_abnormal || 0
+    };
+    
+    // Create a map of existing containers by type and index
+    const existingContainersByType = {
+      '6m': [],
+      '12m': [],
+      'Abnormal': []
+    };
+    
+    // Group existing containers by type
+    containers.forEach(container => {
+      if (existingContainersByType[container.containerType]) {
+        existingContainersByType[container.containerType].push(container);
+      }
+    });
+    
+    const containersList = [];
+    let containerId = 1;
+    
+    // Helper function to get or create container
+    const getOrCreateContainer = (type, index) => {
+      const existing = existingContainersByType[type];
+      if (index < existing.length) {
+        // Use existing container if available
+        return {
+          ...existing[index],
+          id: containerId++
+        };
+      }
+      // Create new container if needed
+      return {
+        id: containerId++,
+        containerKey: null,
+        containerNum: "",
+        weight: isImport ? "" : null,
+        containerType: type,
+        cargoDescription: ""
+      };
+    };
+    
+    // Add 6m containers
+    for (let i = 0; i < (counts.num_six_meters || 0); i++) {
+      containersList.push(getOrCreateContainer('6m', i));
+    }
+    
+    // Add 12m containers
+    for (let i = 0; i < (counts.num_twelve_meters || 0); i++) {
+      containersList.push(getOrCreateContainer('12m', i));
+    }
+    
+    // Add abnormal containers
+    for (let i = 0; i < (counts.num_abnormal || 0); i++) {
+      containersList.push(getOrCreateContainer('Abnormal', i));
+    }
+    
+    setContainers(containersList);
+    setShowContainerDetails(containersList.length > 0);
+  };
+
+  // Handle container input changes
+  const handleContainerChange = (id, field, value) => {
+    if (field === "containerNum") {
+      // Container number validation
+      if (value.length > 11) return;
+      
+      // First 4 letters, then 7 numbers
+      let newValue = "";
+      for (let i = 0; i < value.length; i++) {
+        const char = value[i];
+        if (i < 4) {
+          if (/^[a-zA-Z]$/.test(char)) newValue += char;
+        } else if (/^[0-9]$/.test(char)) {
+          newValue += char;
+        }
+      }
+      
+      // Update field errors
+      let error = null;
+      if (newValue.length > 0 && newValue.length < 11) {
+        error = "Does not match correct format (ABCD1234567)";
+      } else if (newValue.length === 11 && !/^[a-zA-Z]{4}[0-9]{7}$/.test(newValue)) {
+        error = "Does not match correct format (ABCD1234567)";
+      }
+      
+      setContainerFieldErrors(prev => ({
+        ...prev,
+        [`container-${id}`]: error
+      }));
+      
+      value = newValue;
+    } else if (field === "weight" && value !== "") {
+      // Only allow numbers and decimal point for weight
+      if (!/^\d*\.?\d*$/.test(value)) return;
+    }
+    
+    // Update container
+    setContainers(prev => 
+      prev.map(container => 
+        container.id === id ? { ...container, [field]: value } : container
+      )
+    );
   };
 
   // Initialize form data with preserved data if available, or default values
   const [formData, setFormData] = useState(() => {
-    console.log('Initializing form data with:', { preservedFormData, containerCounts });
-    
-    // Process surcharge amount from preserved data
-    let surchargesAmount = '';
-    let surcharges = false;
-    
-    if (preservedFormData) {
-      // Handle both string and number types for surchargesAmount
-      if (preservedFormData.surchargesAmount !== undefined && preservedFormData.surchargesAmount !== '') {
-        surchargesAmount = preservedFormData.surchargesAmount.toString();
-        surcharges = true;
-      }
+    console.log('Initializing form data with:', { 
+      preservedFormData, 
+      containerCounts,
+      locationState: location.state 
+    });
+
+    // Default form data structure
+    const defaultFormData = {
+      // Client and basic info
+      clientId: '',
+      clientName: '',
+      representative: '',
+      contactDetails: '',
+      email: '',
+      task: '',
+      shipmentTypeId: '',
+      shipmentTypeName: '',
       
-      // If surcharges is explicitly set to true, ensure we have an amount
-      if (preservedFormData.surcharges && !surchargesAmount) {
-        surchargesAmount = '0';
-        surcharges = true;
-      }
+      // Location data
+      startingPoints: [],
+      destinations: [],
+      selectedStartingPoint: '',
+      selectedDestination: '',
+      pickup: '',
+      dropoff: '',
+      
+      // Other form fields
+      hazardous: false,
+      surcharges: false,
+      surchargesAmount: '',
+      pickupTime: '',
+      pickupDate: '',
+      stackDate: '',
+      deadline: '',
+      fileRef: '',
+      bookingRef: '',
+      vesselName: '',
+      voyageNo: '',
+      imoNo: '',
+      flagReg: '',
+      rateWeight: 'Container',
+      weight: '',
+      vat: 15,
+      description: '',
+      rateper_6: '',
+      rateper_12: '',
+      rateper_abnormal: '',
+      num_six_meters: 0,
+      num_twelve_meters: 0,
+      num_abnormal: 0,
+      total_cost: 0,
+      preserveSurcharges: false
+    };
+
+    // If no preserved data, return defaults
+    if (!preservedFormData && !location.state) {
+      console.log('Using default form data');
+      return defaultFormData;
     }
-    
-    // Create the initial data object with all required fields
-    const initialFormData = {
-      // Form fields
-      clientId: preservedFormData?.clientId || '',
-      clientName: preservedFormData?.clientName || '',
-      pickup: preservedFormData?.pickup || '',
-      dropoff: preservedFormData?.dropoff || '',
-      num_six_meters: containerCounts ? containerCounts['6m'] : 0,
-      num_twelve_meters: containerCounts ? containerCounts['12m'] : 0,
-      num_abnormal: containerCounts ? containerCounts['Abnormal'] : 0,
-      sixMeterRate: preservedFormData?.sixMeterRate || '',
-      twelveMeterRate: preservedFormData?.twelveMeterRate || '',
-      abnormalRate: preservedFormData?.abnormalRate || '',
-      hazardous: preservedFormData?.hazardous || false,
-      
-      // Surcharge fields - ensure these are always initialized
-      surcharges: surcharges,
-      surchargesAmount: surchargesAmount,
-      preserveSurcharges: preservedFormData?.preserveSurcharges || false,
-      
-      // Other fields with defaults
-      rateWeight: preservedFormData?.rateWeight || "Container",
-      weight: preservedFormData?.weight || "",
-      
-      // Add any other fields that might be needed
-      ...(preservedFormData || {}) // Spread any additional fields from preserved data
+
+    // Get location data from multiple possible sources with priority to location.state
+    const locationData = {
+      startingPoints: location.state?.startingPoints || preservedFormData?.startingPoints || [],
+      destinations: location.state?.destinations || preservedFormData?.destinations || [],
+      selectedStartingPoint: location.state?.selectedStartingPoint || 
+                            preservedFormData?.selectedStartingPoint || 
+                            preservedFormData?.pickup || 
+                            location.state?.pickup ||
+                            '',
+      selectedDestination: location.state?.selectedDestination || 
+                          preservedFormData?.selectedDestination || 
+                          preservedFormData?.dropoff || 
+                          location.state?.dropoff ||
+                          ''
     };
     
-    console.log('Initial form data:', initialFormData);
-    return initialFormData;
+    // Get container counts from multiple possible sources
+    const containerCountsData = {
+      num_six_meters: containerCounts?.['6m'] ?? preservedFormData?.num_six_meters ?? 0,
+      num_twelve_meters: containerCounts?.['12m'] ?? preservedFormData?.num_twelve_meters ?? 0,
+      num_abnormal: containerCounts?.['Abnormal'] ?? preservedFormData?.num_abnormal ?? 0
+    };
+    
+    console.log('Initializing with location data:', locationData);
+    console.log('Initial container counts:', containerCountsData);
+    
+    // Log all potential data sources for debugging
+    console.log('Data sources for form initialization:', {
+      defaultFormData: { ...defaultFormData },
+      preservedFormData: preservedFormData ? { ...preservedFormData } : null,
+      controllerData: location.state?.controllerData ? { ...location.state.controllerData } : null,
+      locationState: location.state ? { ...location.state } : null
+    });
+
+    // Create form data with preserved values or fall back to defaults
+    const formData = {
+      // Start with default values
+      ...defaultFormData,
+      
+      // Apply preserved form data (from sessionStorage or previous navigation)
+      ...(preservedFormData || {}),
+      
+      // Then apply any controller data from location state (highest priority)
+      ...(location.state?.controllerData || {}),
+      
+      // Apply location data with proper fallbacks
+      startingPoints: Array.isArray(locationData.startingPoints) ? 
+                     [...locationData.startingPoints] : 
+                     [],
+      destinations: Array.isArray(locationData.destinations) ? 
+                   [...locationData.destinations] : 
+                   [],
+      selectedStartingPoint: locationData.selectedStartingPoint || '',
+      selectedDestination: locationData.selectedDestination || '',
+      
+      // Apply container counts
+      ...containerCountsData,
+      
+      // Explicitly set client data from controller data if available
+      ...(location.state?.controllerData?.clientId && {
+        clientId: location.state.controllerData.clientId,
+        clientName: location.state.controllerData.clientName,
+        representative: location.state.controllerData.representative,
+        contactDetails: location.state.controllerData.contactDetails,
+        email: location.state.controllerData.email
+      }),
+      
+      // Handle pickup and dropoff with multiple fallback sources
+      pickup: preservedFormData?.pickup || 
+             location.state?.pickup || 
+             location.state?.controllerData?.pickup || 
+             locationData.selectedStartingPoint || 
+             locationData.pickup ||
+             '',
+      dropoff: preservedFormData?.dropoff || 
+              location.state?.dropoff || 
+              location.state?.controllerData?.dropoff || 
+              locationData.selectedDestination || 
+              locationData.dropoff ||
+              '',
+      
+      // Other special cases
+      hazardous: Boolean(preservedFormData?.hazardous || false),
+      surcharges: Boolean(preservedFormData?.surcharges || false),
+      vat: Number(preservedFormData?.vat) || 15,
+      total_cost: Number(preservedFormData?.total_cost) || 0
+    };
+    
+    console.log('Form data initialized with locations:', {
+      pickup: formData.pickup,
+      dropoff: formData.dropoff,
+      selectedStarting: formData.selectedStartingPoint,
+      selectedDest: formData.selectedDestination,
+      hasStartingPoints: formData.startingPoints?.length > 0,
+      hasDestinations: formData.destinations?.length > 0
+    });
+    
+    console.log('Initialized form data:', formData);
+    return formData;
   });
 
   // Debug effect to log form data changes
@@ -393,14 +635,17 @@ const ControllerInstructions = () => {
   const [destinations, setDestinations] = useState([])
   const [clients, setClients] = useState([])
   const [shipmentTypes, setShipmentTypes] = useState([])
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [containers, setContainers] = useState([]);
+  const [showContainerDetails, setShowContainerDetails] = useState(false);
+  const [containerFieldErrors, setContainerFieldErrors] = useState({});
+  const [submitError, setSubmitError] = useState('');
   const [isLoading, setIsLoading] = useState({
     clients: true,
     shipmentTypes: true,
     startingPoints: true,
     destinations: true,
-  })
-  // Error modal state removed
-  const [fieldErrors, setFieldErrors] = useState({})
+  });
   const [preservedContainers, setPreservedContainers] = useState(location.state?.preservedContainers || [])
 
   // Function to update rate field enabled state based on container counts
@@ -492,62 +737,94 @@ const ControllerInstructions = () => {
     ref.current.click()
   }
 
+  // Fetch starting points when client changes or component mounts
   useEffect(() => {
-    fetchClients()
-    fetchShipmentTypes()
-    fetchStartingPoints()
-    fetchDestinations()
-    if (preservedFormData && preservedFormData.shipmentTypeName) {
-      setIsImport(preservedFormData.shipmentTypeName.toLowerCase() === "import")
+    if (formData.clientId) {
+      fetchStartingPoints();
+    } else {
+      // Clear starting points if no client is selected
+      setStartingPoints([]);
     }
-  }, [])
+  }, [formData.clientId])
 
-  // Main useEffect for handling preserved data and container counts
+  // Handle client data from navigation state
   useEffect(() => {
-    if (preservedFormData) {
-      console.log("Processing preserved form data...")
+    console.log('Location state changed:', location.state);
+    
+    // If we have client data in the location state, update the form
+    if (location.state?.controllerData?.clientId) {
+      console.log('Found client data in location state:', location.state.controllerData);
+      const { clientId, clientName, representative, contactDetails, email } = location.state.controllerData;
+      
+      setFormData(prev => ({
+        ...prev,
+        clientId: clientId || '',
+        clientName: clientName || '',
+        representative: representative || '',
+        contactDetails: contactDetails || '',
+        email: email || ''
+      }));
+      
+      // Clear the client data from location state to prevent reusing it
+      window.history.replaceState({ ...location.state, controllerData: null }, '');
+    }
+  }, [location.state]);
 
-      let updatedFormData = { ...preservedFormData, rateWeight: "Container" }
+  // Initial data loading effect
+  useEffect(() => {
+    fetchClients();
+    fetchShipmentTypes();
+    fetchDestinations();
+    
+    if (preservedFormData?.shipmentTypeName) {
+      setIsImport(preservedFormData.shipmentTypeName.toLowerCase() === "import");
+    }
+  }, []);
 
-      if (containerCounts) {
-        console.log("Updating form data with container counts:", containerCounts)
-        updatedFormData = {
-          ...preservedFormData,
-          num_six_meters: containerCounts["6m"],
-          num_twelve_meters: containerCounts["12m"],
-          num_abnormal: containerCounts["Abnormal"],
-          rateWeight: "Container",
-          weight: "",
+  // Effect to handle rate population when clients load
+  useEffect(() => {
+    if (
+      preservedFormData &&
+      clients.length > 0 &&
+      preservedFormData.clientId &&
+      !preservedFormData.sixMeterRate && // Only populate if no preserved rates
+      !preservedFormData.twelveMeterRate
+    ) {
+      console.log("Clients loaded - checking if we need to populate rates from database");
+
+      const selectedClient = clients.find(
+        (client) => client.m5clientkey.toString() === preservedFormData.clientId.toString(),
+      );
+
+      if (selectedClient) {
+        console.log("Found selected client for rate population:", selectedClient.companyname);
+
+        // Get current enabled state
+        const currentEnabledState = {
+          sixMeter: formData.num_six_meters > 0,
+          twelveMeter: formData.num_twelve_meters > 0,
+          abnormal: formData.num_abnormal > 0
+        };
+
+        // Update rate fields enabled state
+        const newEnabledState = updateRateFieldsEnabled(formData);
+
+        // Restore preserved rate values if they exist and fields are enabled
+        if (preservedFormData.sixMeterRate !== undefined && newEnabledState.sixMeter) {
+          console.log("Restoring preserved 6m rate:", preservedFormData.sixMeterRate);
+          setFormData(prev => ({ ...prev, sixMeterRate: preservedFormData.sixMeterRate }));
+        }
+        if (preservedFormData.twelveMeterRate !== undefined && newEnabledState.twelveMeter) {
+          console.log("Restoring preserved 12m rate:", preservedFormData.twelveMeterRate);
+          setFormData(prev => ({ ...prev, twelveMeterRate: preservedFormData.twelveMeterRate }));
+        }
+        if (preservedFormData.abnormalRate !== undefined && newEnabledState.abnormal) {
+          console.log("Restoring preserved abnormal rate:", preservedFormData.abnormalRate);
+          setFormData(prev => ({ ...prev, abnormalRate: preservedFormData.abnormalRate }));
         }
       }
-
-      setFormData(updatedFormData)
-
-      // Update rate fields enabled state
-      const newEnabledState = updateRateFieldsEnabled(updatedFormData)
-
-      // Restore preserved rate values if they exist and fields are enabled
-      if (preservedFormData.sixMeterRate !== undefined && newEnabledState.sixMeter) {
-        console.log("Restoring preserved 6m rate:", preservedFormData.sixMeterRate)
-        setFormData(prev => ({ ...prev, sixMeterRate: preservedFormData.sixMeterRate }));
-      }
-      if (preservedFormData.twelveMeterRate !== undefined && newEnabledState.twelveMeter) {
-        console.log("Restoring preserved 12m rate:", preservedFormData.twelveMeterRate)
-        setFormData(prev => ({ ...prev, twelveMeterRate: preservedFormData.twelveMeterRate }));
-      }
-      if (preservedFormData.abnormalRate !== undefined && newEnabledState.abnormal) {
-        console.log("Restoring preserved abnormal rate:", preservedFormData.abnormalRate)
-        setFormData(prev => ({ ...prev, abnormalRate: preservedFormData.abnormalRate }));
-      }
-
-      if (preservedFormData.shipmentTypeName) {
-        setIsImport(preservedFormData.shipmentTypeName.toLowerCase() === "import")
-      }
-    } else {
-      // Initial state - all containers are 0, so all rate fields should be disabled
-      updateRateFieldsEnabled({ num_six_meters: 0, num_twelve_meters: 0, num_abnormal: 0 })
     }
-  }, [preservedFormData, containerCounts])
+  }, [clients, preservedFormData, formData]);
 
   // Separate useEffect to handle rate population when clients load
   useEffect(() => {
@@ -605,17 +882,32 @@ const ControllerInstructions = () => {
   const handleClientChange = async (e) => {
     // Don't do anything if the client hasn't actually changed
     if (e.target.value === formData.clientId) return;
-    const clientId = e.target.value
-    console.log('Client changed to:', clientId)
+    const clientId = e.target.value;
+    console.log('Client changed to:', clientId);
     
-    // Find the selected client from the clients array
-    const selectedClient = clients.find(client => client.m5clientkey.toString() === clientId);
+    // Find the selected client from the clients array or from the location state
+    let selectedClient = clients.find(client => client.m5clientkey.toString() === clientId);
+    
+    // If client not found in clients array but we have it in location state
+    if (!selectedClient && location.state?.controllerData?.clientId === clientId) {
+      console.log('Using client data from location state');
+      selectedClient = {
+        m5clientkey: clientId,
+        client_name: location.state.controllerData.clientName,
+        representative: location.state.controllerData.representative,
+        cellnum: location.state.controllerData.contactDetails,
+        email: location.state.controllerData.email
+      };
+    }
+    
+    console.log('Selected client data:', selectedClient);
     
     // Clear rates immediately when client changes but preserve surcharges
     setFormData(prev => {
       const updatedData = {
         ...prev,
         clientId,
+        clientName: selectedClient?.client_name || '',
         representative: selectedClient?.representative || '',
         contactDetails: selectedClient?.contactDetails || selectedClient?.cellnum || '',
         email: selectedClient?.email || '',
@@ -626,6 +918,8 @@ const ControllerInstructions = () => {
         abnormalRate: ''
       };
       
+      console.log('Updated form data with client:', updatedData);
+      
       // Only clear surcharges if we're not preserving them
       if (!prev.preserveSurcharges) {
         updatedData.surcharges = false;
@@ -635,9 +929,9 @@ const ControllerInstructions = () => {
       return updatedData;
     });
     
-    setClientStartingPoints([]) // Clear client-specific starting points
-    setClientDestinations([]) // Clear client-specific destinations list
-    setDestinations([]) // Clear global destinations list
+    setClientStartingPoints([]); // Clear client-specific starting points
+    setClientDestinations([]); // Clear client-specific destinations list
+    setDestinations([]); // Clear global destinations list
 
     if (!clientId) return;
     
@@ -773,20 +1067,20 @@ const ControllerInstructions = () => {
   }
 
   const fetchClients = async () => {
-    setIsLoading(prev => ({ ...prev, clients: true }))
+    setIsLoading(prev => ({ ...prev, clients: true }));
     try {
-      console.log("Fetching active clients...")
-      const response = await api.get("/api/instructions/active-clients")
+      console.log("Fetching active clients...");
+      const response = await api.get("/api/instructions/active-clients");
       
       if (!response.data) {
-        throw new Error("No data received from server")
+        throw new Error("No data received from server");
       }
       
-      console.log("Active clients data received:", response.data)
-      console.log("Number of clients:", response.data.length)
+      console.log("Active clients data received:", response.data);
+      console.log("Number of clients:", response.data.length);
       
       if (!Array.isArray(response.data)) {
-        throw new Error("Expected an array of clients but received:" + JSON.stringify(response.data))
+        throw new Error("Expected an array of clients but received:" + JSON.stringify(response.data));
       }
       
       // Transform the data to ensure it has the expected structure
@@ -798,32 +1092,11 @@ const ControllerInstructions = () => {
         contactDetails: client.cellnum || '',
         driver_six_meter_rate: client.driver_six_meter_rate || null,
         driver_twelve_meter_rate: client.driver_twelve_meter_rate || null
-      }))
+      }));
       
-      console.log("Processed clients data:", clientsData)
-      setClients(clientsData)
-      
-      // If there's preserved form data, try to select the client
-      if (preservedFormData?.clientId) {
-        const selectedClient = clientsData.find(c => c.m5clientkey.toString() === preservedFormData.clientId.toString())
-        if (selectedClient) {
-          console.log("Found preserved client:", selectedClient)
-          // Update form data directly to avoid race conditions
-          setFormData(prev => ({
-            ...prev,
-            clientId: selectedClient.m5clientkey,
-            representative: selectedClient.representative || '',
-            email: selectedClient.email || '',
-            contactDetails: selectedClient.contactDetails || selectedClient.cellnum || ''
-          }))
-          
-          // Manually trigger the client change handler
-          const event = { target: { value: selectedClient.m5clientkey } }
-          await handleClientChange(event)
-        }
-      }
-      
-      return clientsData
+      console.log('Setting clients state with:', clientsData);
+      setClients(clientsData);
+      return clientsData;
     } catch (error) {
       console.error("Error in fetchClients:", error)
       let errorMessage = "Failed to fetch active clients. Please try again."
@@ -874,24 +1147,66 @@ const ControllerInstructions = () => {
   }
 
   const fetchStartingPoints = async () => {
-    setIsLoading((prev) => ({ ...prev, startingPoints: true }))
+    const currentClientId = formData.clientId;
+    if (!currentClientId) {
+      console.log('No client selected, skipping starting points fetch');
+      setStartingPoints([]);
+      return;
+    }
+
+    setIsLoading((prev) => ({ ...prev, startingPoints: true }));
     try {
-      console.log("Fetching starting points...")
-      const response = await api.get("/api/instructions/starting-points")
-      console.log("Starting points data received:", response.data.length, "records")
-      setStartingPoints(response.data)
-    } catch (error) {
-      console.error("Error fetching starting points:", error)
-      let errorMessage = "Failed to fetch starting points. Please try again."
-      if (error.response) {
-        const { status } = error.response
-        errorMessage = `Failed to fetch starting points: ${status} ${error.response.statusText}`
-      } else if (error.request) {
-        errorMessage = "No response received from server. Please check your connection."
+      console.log(`Fetching starting points for client ID: ${currentClientId}`);
+      const response = await api.get(`/api/instructions/client/${currentClientId}/starting-points`)
+        .catch(error => {
+          console.error('API Error:', error);
+          if (error.response) {
+            console.error('Error response:', error.response.status, error.response.data);
+            if (error.response.status === 404) {
+              console.log('No starting points found for this client');
+              setShowNoRatesModal(true);
+              return { data: [] };
+            }
+          }
+          throw error;
+        });
+
+      console.log('Starting points response:', response?.data);
+      const responseData = response?.data || [];
+      
+      // Process the response data
+      const processedPoints = responseData
+        .map((item) => {
+          try {
+            if (typeof item === 'string') {
+              return { value: item, label: item };
+            } else if (item && typeof item === 'object') {
+              const point = item.starting_point || item.value || item.label || '';
+              return point ? { value: point, label: point } : null;
+            }
+            return null;
+          } catch (e) {
+            console.error('Error processing starting point:', item, e);
+            return null;
+          }
+        })
+        .filter(Boolean); // Remove any null/undefined entries
+
+      console.log(`Processed ${processedPoints.length} starting points`);
+      setStartingPoints(processedPoints);
+      
+      // If we have exactly one starting point, auto-select it
+      if (processedPoints.length === 1) {
+        const point = processedPoints[0].value;
+        console.log('Auto-selecting single starting point:', point);
+        handlePickupChange({ target: { value: point } });
       }
-      setStartingPoints([])
+      
+    } catch (error) {
+      console.error("Error fetching starting points:", error);
+      setStartingPoints([]);
     } finally {
-      setIsLoading((prev) => ({ ...prev, startingPoints: false }))
+      setIsLoading((prev) => ({ ...prev, startingPoints: false }));
     }
   }
 
@@ -905,13 +1220,49 @@ const ControllerInstructions = () => {
     setIsLoading(prev => ({ ...prev, destinations: true }));
     
     try {
+      console.log(`Fetching destinations for client: ${currentClientId} pickup: ${startingPoint}`);
       const response = await api.get(
         `/api/instructions/client/${currentClientId}/destinations/${encodeURIComponent(startingPoint)}`
       );
-      setDestinations(response.data);
+      
+      console.log('Destinations response:', response?.data);
+      
+      // Process the response data
+      const processedDests = (response?.data || [])
+        .map(item => {
+          try {
+            if (typeof item === 'string') {
+              return { value: item, label: item };
+            } else if (item && typeof item === 'object') {
+              const dest = item.destination || item.value || item.label || '';
+              return dest ? { value: dest, label: dest } : null;
+            }
+            return null;
+          } catch (e) {
+            console.error('Error processing destination:', item, e);
+            return null;
+          }
+        })
+        .filter(Boolean);
+        
+      console.log(`Processed ${processedDests.length} destinations`);
+      setDestinations(processedDests);
+      
+      // If we have exactly one destination, auto-select it
+      if (processedDests.length === 1) {
+        const dest = processedDests[0].value;
+        console.log('Auto-selecting single destination:', dest);
+        handleDropoffChange({ target: { value: dest } });
+      }
+      
     } catch (error) {
-      console.error("Failed to fetch destinations:", error);
+      console.error('Error fetching destinations:', error);
       setDestinations([]);
+      
+      // Show error to user if needed
+      if (error.response) {
+        console.error('Error response:', error.response.status, error.response.data);
+      }
     } finally {
       setIsLoading(prev => ({ ...prev, destinations: false }));
     }
@@ -956,8 +1307,8 @@ const ControllerInstructions = () => {
                 label: item.destination || item.value || item.label || ''
               }))
               .filter(item => item.value) // Filter out any empty values
-          : []
-          
+          : [];
+        
         console.log('Processed destinations:', destinations)
         setClientDestinations(destinations)
         
@@ -1168,15 +1519,30 @@ const ControllerInstructions = () => {
     const { value, options } = e.target;
     const selectedOption = options[options.selectedIndex];
     const shipmentTypeName = selectedOption.text;
+    const isImportType = shipmentTypeName.toLowerCase().includes('import');
     
-    setFormData(prev => ({
-      ...prev,
-      shipmentTypeId: value,
-      shipmentTypeName: shipmentTypeName,
-      // Reset dependent fields when shipment type changes
-      pickup: '',
-      dropoff: ''
-    }));
+    // Update isImport state based on shipment type
+    setIsImport(isImportType);
+    
+    setFormData(prev => {
+      // Reinitialize containers with the new isImport state before updating form data
+      const containerCounts = {
+        num_six_meters: prev.num_six_meters || 0,
+        num_twelve_meters: prev.num_twelve_meters || 0,
+        num_abnormal: prev.num_abnormal || 0
+      };
+      
+      // Initialize containers with the current container counts
+      initializeContainers(containerCounts);
+      
+      // Return the updated form data
+      return {
+        ...prev,
+        shipmentTypeId: value,
+        shipmentTypeName: shipmentTypeName
+        // Don't reset pickup and dropoff to preserve locations
+      };
+    });
   };
 
   // Handle rate changes with validation
@@ -1223,24 +1589,28 @@ const ControllerInstructions = () => {
           [type]: value === '' ? '' : numValue
         };
         
-        // Update rate fields enabled state based on the new counts
-        const newCounts = {
+        // Get the current container counts
+        const containerCounts = {
           num_six_meters: type === 'num_six_meters' ? numValue : prev.num_six_meters || 0,
           num_twelve_meters: type === 'num_twelve_meters' ? numValue : prev.num_twelve_meters || 0,
           num_abnormal: type === 'num_abnormal' ? numValue : prev.num_abnormal || 0,
         };
         
+        // Update rate fields enabled state based on the new counts
         const newEnabledState = {
-          sixMeter: newCounts.num_six_meters > 0,
-          twelveMeter: newCounts.num_twelve_meters > 0,
-          abnormal: newCounts.num_abnormal > 0,
+          sixMeter: containerCounts.num_six_meters > 0,
+          twelveMeter: containerCounts.num_twelve_meters > 0,
+          abnormal: containerCounts.num_abnormal > 0,
         };
         
-        console.log('Container counts updated:', newCounts);
+        console.log('Container counts updated:', containerCounts);
         console.log('New rate fields enabled state:', newEnabledState);
         
         // Update the rate fields enabled state
         setRateFieldsEnabled(newEnabledState);
+        
+        // Initialize containers based on counts, preserving existing container data
+        initializeContainers(containerCounts);
         
         return updatedFormData;
       });
@@ -1264,8 +1634,56 @@ const ControllerInstructions = () => {
     }).format(amount || 0);
   };
 
-  // State for form submission
-  const [isSubmitting, setIsSubmitting] = useState(false);
+  // Helper function to validate a field
+  const isFieldValid = useCallback((fieldName, value) => {
+    switch(fieldName) {
+      case 'clientId':
+      case 'shipmentTypeId':
+      case 'pickup':
+      case 'dropoff':
+      case 'pickupDate':
+      case 'stackDate':
+      case 'deadline':
+      case 'pickupTime':
+        return !!value;
+      case 'task':
+      case 'bookingRef':
+      case 'fileRef':
+      case 'vesselName':
+      case 'voyageNo':
+        return value?.trim() !== '';
+      case 'imoNo':
+        return /^\d{7}$/.test(value?.trim());
+      case 'flagReg':
+        return /^[A-Za-z\s]+$/.test(value?.trim());
+      case 'description':
+        // Description is completely optional with no validation
+        return true;
+      default:
+        return true;
+    }
+  }, []);
+
+  // Effect to clear errors when fields become valid
+  useEffect(() => {
+    const newErrors = { ...fieldErrors };
+    let hasChanges = false;
+    
+    // Check each field with an error
+    Object.keys(fieldErrors).forEach(fieldName => {
+      const value = formData[fieldName];
+      
+      // Check if field is now valid using the same validation logic as handleInputChange
+      if (isFieldValid(fieldName, value)) {
+        delete newErrors[fieldName];
+        hasChanges = true;
+      }
+    });
+    
+    if (hasChanges) {
+      setFieldErrors(newErrors);
+    }
+  }, [formData, fieldErrors, isFieldValid]);
 
   // Reset form to initial state
   const resetForm = () => {
@@ -1299,166 +1717,203 @@ const ControllerInstructions = () => {
 
 
   
-  // Calculate individual rates - no total cost calculation needed on frontend
+  // Calculate total cost based on container counts, rates, and surcharge
+  const calculateTotalCost = useCallback((formData) => {
+    // Get container counts, defaulting to 0 if not set
+    const sixMeterCount = formData.num_six_meters || 0;
+    const twelveMeterCount = formData.num_twelve_meters || 0;
+    const abnormalCount = formData.num_abnormal || 0;
+    
+    // Get rates, defaulting to 0 if not set
+    const sixMeterRate = formData.sixMeterRate ? parseFloat(formData.sixMeterRate) : 0;
+    const twelveMeterRate = formData.twelveMeterRate ? parseFloat(formData.twelveMeterRate) : 0;
+    const abnormalRate = formData.abnormalRate ? parseFloat(formData.abnormalRate) : 0;
+    
+    // Calculate subtotal
+    const subtotal = 
+      (sixMeterCount * sixMeterRate) + 
+      (twelveMeterCount * twelveMeterRate) + 
+      (abnormalCount * abnormalRate);
+    
+    // Add surcharge if applicable
+    const surchargeAmount = (formData.surcharges && formData.surchargesAmount) ? 
+      parseFloat(formData.surchargesAmount) || 0 : 0;
+    
+    const total = subtotal + surchargeAmount;
+    
+    console.log('Calculating total cost:', {
+      sixMeter: { count: sixMeterCount, rate: sixMeterRate, total: sixMeterCount * sixMeterRate },
+      twelveMeter: { count: twelveMeterCount, rate: twelveMeterRate, total: twelveMeterCount * twelveMeterRate },
+      abnormal: { count: abnormalCount, rate: abnormalRate, total: abnormalCount * abnormalRate },
+      subtotal,
+      surcharge: surchargeAmount,
+      total
+    });
+    
+    return {
+      subtotal,
+      surcharge: surchargeAmount,
+      total
+    };
+  }, []);
+  
+  // Update total cost when relevant fields change
+  useEffect(() => {
+    const { total } = calculateTotalCost(formData);
+    setFormData(prev => ({
+      ...prev,
+      total_cost: total
+    }));
+  }, [
+    formData.num_six_meters,
+    formData.num_twelve_meters,
+    formData.num_abnormal,
+    formData.sixMeterRate,
+    formData.twelveMeterRate,
+    formData.abnormalRate,
+    formData.surcharges,
+    formData.surchargesAmount,
+    calculateTotalCost
+  ]);
+
 
   // Handle form submission
   const handleSubmit = async (e) => {
     e.preventDefault();
+    setSubmitError('');
     
     // Prevent double submission
-    if (isSubmitting) return;
+    if (isSubmitting) {
+      console.log('Already submitting, ignoring duplicate submit');
+      return;
+    }
     
-    // Set loading state
-    setIsSubmitting(true);
+    // Validate form fields
+    const newFieldErrors = {};
+    const requiredFields = ['clientId', 'shipmentTypeId', 'task', 'pickup', 'dropoff'];
+    
+    requiredFields.forEach(field => {
+      if (!formData[field]) {
+        newFieldErrors[field] = 'This field is required';
+      }
+    });
+    
+    // Validate container numbers and weights
+    const newContainerErrors = {};
+    let hasContainerErrors = false;
+    
+    containers.forEach(container => {
+      if (!container.containerNum) {
+        newContainerErrors[`container-${container.id}`] = 'Container number is required';
+        hasContainerErrors = true;
+      } else if (container.containerNum.length !== 11) {
+        newContainerErrors[`container-${container.id}`] = 'Container number must be 11 characters';
+        hasContainerErrors = true;
+      }
+      
+      if (isImport && container.weight === '') {
+        newContainerErrors[`weight-${container.id}`] = 'Weight is required for import shipments';
+        hasContainerErrors = true;
+      } else if (isImport && isNaN(parseFloat(container.weight))) {
+        newContainerErrors[`weight-${container.id}`] = 'Weight must be a number';
+        hasContainerErrors = true;
+      }
+    });
+    
+    // Update state with any validation errors
+    setFieldErrors(newFieldErrors);
+    setContainerFieldErrors(newContainerErrors);
+    
+    // If there are validation errors, don't submit
+    if (Object.keys(newFieldErrors).length > 0 || hasContainerErrors) {
+      // Scroll to first error
+      const firstErrorField = document.querySelector('.is-invalid');
+      if (firstErrorField) {
+        firstErrorField.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      }
+      return;
+    }
+    
+    // Prevent double submission
+    if (isSubmitting) {
+      console.log('Already submitting, ignoring duplicate submit');
+      return;
+    }
     
     try {
-      // Clear previous errors
-      setFieldErrors({});
+      setIsSubmitting(true);
       
-      // Validate form data
-      const errors = {};
-      
-      // Required fields validation
-      if (!formData.clientId) errors.clientId = 'Please select a client';
-      if (!formData.shipmentTypeId) errors.shipmentTypeId = 'Please select a shipment type';
-      if (!formData.pickup) errors.pickup = 'Please select a pickup location';
-      if (!formData.dropoff) errors.dropoff = 'Please select a destination';
-      
-      // Container counts validation
-      const sixMeterCount = parseInt(formData.num_six_meters, 10) || 0;
-      const twelveMeterCount = parseInt(formData.num_twelve_meters, 10) || 0;
-      const abnormalCount = parseInt(formData.num_abnormal, 10) || 0;
-      const totalContainers = sixMeterCount + twelveMeterCount + abnormalCount;
-      
-      if (totalContainers === 0) {
-        errors.containerCount = 'At least one container must be added';
-      } else {
-        // Only check rates if at least one container is added
-        if (sixMeterCount > 0) {
-          if (!sixMeterRate || isNaN(parseFloat(sixMeterRate)) || parseFloat(sixMeterRate) <= 0) {
-            errors.sixMeterRate = 'Valid rate is required for 6m containers';
-          }
-        }
-        
-        if (twelveMeterCount > 0) {
-          if (!twelveMeterRate || isNaN(parseFloat(twelveMeterRate)) || parseFloat(twelveMeterRate) <= 0) {
-            errors.twelveMeterRate = 'Valid rate is required for 12m containers';
-          }
-        }
-        
-        if (abnormalCount > 0) {
-          if (!abnormalRate || isNaN(parseFloat(abnormalRate)) || parseFloat(abnormalRate) <= 0) {
-            errors.abnormalRate = 'Valid rate is required for abnormal containers';
-          }
-        }
-      }
-      
-      // Validate surcharge amount if surcharges are checked
-      if (formData.surcharges) {
-        if (!formData.surchargesAmount) {
-          errors.surchargesAmount = 'Please enter the surcharge amount';
-        } else if (isNaN(parseFloat(formData.surchargesAmount))) {
-          errors.surchargesAmount = 'Please enter a valid number for surcharge amount';
-        } else if (parseFloat(formData.surchargesAmount) <= 0) {
-          errors.surchargesAmount = 'Surcharge amount must be greater than zero';
-        }
-      }
-      
-      // If there are validation errors, show them and stop submission
-      if (Object.keys(errors).length > 0) {
-        setFieldErrors(errors);
-        
-        // Find the first error element to scroll to
-        let firstErrorElement = null;
-        const firstErrorKey = Object.keys(errors)[0];
-        
-        // Map error keys to their corresponding refs
-        const errorRefs = {
-          'clientId': 'clientId',
-          'shipmentTypeId': 'shipmentTypeId',
-          'pickup': 'pickup',
-          'dropoff': 'dropoff',
-          'containerCount': 'containerCount',
-          'sixMeterRate': 'sixMeterRate',
-          'twelveMeterRate': 'twelveMeterRate',
-          'abnormalRate': 'abnormalRate',
-          'surchargesAmount': 'surchargesAmount'
-        };
-        
-        // Try to find the error element in refs first
-        if (errorRefs[firstErrorKey] && fieldRefs[errorRefs[firstErrorKey]]?.current) {
-          firstErrorElement = fieldRefs[errorRefs[firstErrorKey]].current;
-        } 
-        // If not found in refs, try to find by name
-        else {
-          firstErrorElement = document.querySelector(`[name="${firstErrorKey}"]`);
-        }
-        
-        // If we found an element, scroll to it
-        if (firstErrorElement) {
-          firstErrorElement.scrollIntoView({ 
-            behavior: 'smooth', 
-            block: 'center' 
-          });
-          
-          // Focus the element if it's an input
-          if (firstErrorElement.tagName === 'INPUT' || firstErrorElement.tagName === 'SELECT') {
-            firstErrorElement.focus();
-          }
-        }
-        
-        return;
-      }
-      
-      // Prepare the data for submission
-      const submissionData = {
-        ...formData,
-        // Convert string numbers to actual numbers
-        num_six_meters: parseInt(formData.num_six_meters, 10) || 0,
-        num_twelve_meters: parseInt(formData.num_twelve_meters, 10) || 0,
-        num_abnormal: parseInt(formData.num_abnormal, 10) || 0,
-        // Map rate fields to backend expected format
-        rateper_6: parseFloat(sixMeterRate) || 0,
-        rateper_12: parseFloat(twelveMeterRate) || 0,
-        rateper_abnormal: parseFloat(abnormalRate) || 0,
-        surchargesAmount: formData.surcharges ? parseFloat(formData.surchargesAmount) || 0 : 0,
-        // Format dates if needed
-        pickupDate: formData.pickupDate ? new Date(formData.pickupDate).toISOString() : null,
-        stackDate: formData.stackDate ? new Date(formData.stackDate).toISOString() : null,
-        deadline: formData.deadline ? new Date(formData.deadline).toISOString() : null,
+      // Prepare the instruction data
+      const instructionData = {
+        client: formData.clientId,
+        shipment_type: formData.shipmentTypeId,
+        task: formData.task,
+        pickup: formData.pickup,
+        dropoff: formData.dropoff,
+        hazardous: formData.hazardous || false,
+        surcharges: formData.surcharges || false,
+        surcharges_amount: formData.surchargesAmount || '',
+        pickupdate: formData.pickupDate,
+        pickuptime: formData.pickupTime,
+        stackdate: formData.stackDate,
+        deadline: formData.deadline,
+        booking_ref: formData.bookingRef,
+        file_ref: formData.fileRef,
+        vessel_name: formData.vesselName,
+        voyage_num: formData.voyageNo,
+        imo_num: formData.imoNo,
+        flag_reg: formData.flagReg,
+        description: formData.description || '',
+        status: 'New',
+        vat: formData.vat || 15,
+        rateper_6: formData.sixMeterRate || 0,
+        rateper_12: formData.twelveMeterRate || 0,
+        rateper_abnormal: formData.abnormalRate || 0,
+        num_six_meters: formData.num_six_meters || 0,
+        num_twelve_meters: formData.num_twelve_meters || 0,
+        num_abnormal: formData.num_abnormal || 0,
+        rateWeight: formData.rateWeight || 'Container',
+        weight: formData.rateWeight !== 'Container' ? parseFloat(formData.weight) : null
       };
       
-      console.log('Submitting form data:', submissionData);
+      // Prepare container data
+      const containerData = containers.map(container => ({
+        container_type: container.containerType,
+        containerNum: container.containerNum,
+        weight: isImport ? parseFloat(container.weight || 0) : null,
+        cargo_description: container.cargoDescription || ""
+      }));
       
-      // Submit the form data to the API
-      const response = await api.post('/instructions/save-instruction', submissionData);
+      // Calculate final total cost
+      const { total, subtotal, surcharge } = calculateTotalCost(formData);
       
-      // Handle successful submission
-      console.log('Form submitted successfully:', response.data);
+      console.log('Submitting instruction data:', instructionData);
+      console.log('Submitting container data:', containerData);
+      console.log('Total cost calculation:', {
+        subtotal,
+        surcharge,
+        total
+      });
       
-      // Show success message with auto-close and callback
-      // Removed error modal state
-      resetForm();
-      navigate('/instructions');
-    } catch (error) {
-      // Handle API errors
-      let errorMessage = 'An error occurred while submitting the form.';
+      // Add total cost and surcharge to instruction data
+      instructionData.total_cost = total;
+      instructionData.surcharge = surcharge; // Use the already calculated surcharge
       
-      if (error.response) {
-        // The request was made and the server responded with a status code
-        // that falls out of the range of 2xx
-        console.error('Error response:', error.response.data);
-        errorMessage = error.response.data.message || errorMessage;
-      } else if (error.request) {
-        // The request was made but no response was received
-        console.error('No response received:', error.request);
-        errorMessage = 'No response from server. Please check your connection.';
+      // First, save the instruction
+      const response = await api.post('/api/instructions/save-instruction', {
+        controllerData: instructionData,
+        containerData: containerData
+      });
+      
+      if (response.data.success) {
+        // Navigate to dashboard on success
+        navigate('/ControllerDashboard');
       } else {
-        // Something happened in setting up the request that triggered an Error
-        console.error('Error:', error.message);
+        throw new Error(response.data.message || 'Failed to save instruction');
       }
-      
-      // Removed error modal
+    } catch (error) {
+      console.error('Error submitting form:', error);
+      setSubmitError(error.response?.data?.message || error.message || 'An error occurred while saving the instruction');
     } finally {
       // Always reset loading state
       setIsSubmitting(false);
@@ -1575,7 +2030,7 @@ const ControllerInstructions = () => {
           </button>
         </div>
       ) : null}
-      <div className="controller-instructions-form-container" style={{ maxWidth: "1200px" }}>
+      <form onSubmit={handleSubmit} className="controller-instructions-form-container" style={{ maxWidth: "1200px" }}>
         <div className="controller-instructions-form-section controller-instructions-client-info-section">
           <div className="controller-instructions-form-row">
             <div className="controller-instructions-form-field">
@@ -2419,12 +2874,19 @@ const ControllerInstructions = () => {
               <div className="controller-instructions-input-wrapper" ref={fieldRefs.imoNo}>
                 <input
                   type="text"
+                  inputMode="numeric"
+                  pattern="[0-9]*"
                   className={`controller-instructions-form-input ${fieldErrors.imoNo ? "controller-instructions-error-field" : ""}`}
                   placeholder="Enter IMO number (numbers only)"
                   name="imoNo"
                   value={formData.imoNo}
                   onChange={handleInputChange}
-                  maxLength={15}
+                  onKeyPress={(e) => {
+                    if (!/[0-9]/.test(e.key)) {
+                      e.preventDefault();
+                    }
+                  }}
+                  maxLength={7}
                 />
                 <ErrorTooltip message={fieldErrors.imoNo} />
               </div>
@@ -2439,6 +2901,11 @@ const ControllerInstructions = () => {
                   name="flagReg"
                   value={formData.flagReg}
                   onChange={handleInputChange}
+                  onKeyPress={(e) => {
+                    if (!/[a-zA-Z\s]/.test(e.key)) {
+                      e.preventDefault();
+                    }
+                  }}
                 />
                 <ErrorTooltip message={fieldErrors.flagReg} />
               </div>
@@ -2506,11 +2973,92 @@ const ControllerInstructions = () => {
           {/* Total cost display removed - calculated on backend */}
         </div>
 
-        <div className="controller-instructions-button-container">
+        {showContainerDetails && (
+          <div className="container-details-section" style={{ margin: '20px 0', width: '100%' }}>
+            <div className="controller-instructions-form-section" style={{ backgroundColor: '#f8f9fa', padding: '15px', borderRadius: '4px' }}>
+              <h4 style={{ marginBottom: '15px', color: '#0d6efd' }}>Container Details</h4>
+              <div style={{ overflowX: 'auto' }}>
+                <table className="table" style={{ marginBottom: '0', backgroundColor: 'white' }}>
+                  <thead className="table-primary">
+                    <tr>
+                      <th style={{ width: '5%' }}>#</th>
+                      <th style={{ width: '15%' }}>Container Type</th>
+                      <th style={{ width: '20%' }}>Container Number</th>
+                      {isImport && <th style={{ width: '15%' }}>Weight (kg)</th>}
+                      <th style={{ width: isImport ? '45%' : '60%' }}>Cargo Description</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {containers.map((container) => (
+                      <tr key={container.id}>
+                        <td>{container.id}</td>
+                        <td>{container.containerType}</td>
+                        <td>
+                          <input
+                            type="text"
+                            className={`form-control form-control-sm ${containerFieldErrors[`container-${container.id}`] ? 'is-invalid' : ''}`}
+                            value={container.containerNum}
+                            onChange={(e) => handleContainerChange(container.id, 'containerNum', e.target.value)}
+                            placeholder="ABCD1234567"
+                            maxLength={11}
+                            style={{ minWidth: '120px' }}
+                          />
+                          {containerFieldErrors[`container-${container.id}`] && (
+                            <div className="invalid-feedback d-block">
+                              {containerFieldErrors[`container-${container.id}`]}
+                            </div>
+                          )}
+                        </td>
+                        {isImport && (
+                          <td>
+                            <div className="input-group input-group-sm">
+                              <input
+                                type="text"
+                                className={`form-control form-control-sm ${containerFieldErrors[`weight-${container.id}`] ? 'is-invalid' : ''}`}
+                                value={container.weight || ''}
+                                onChange={(e) => handleContainerChange(container.id, 'weight', e.target.value)}
+                                placeholder="0.00"
+                                style={{ textAlign: 'right' }}
+                              />
+                              <span className="input-group-text">kg</span>
+                            </div>
+                            {containerFieldErrors[`weight-${container.id}`] && (
+                              <div className="invalid-feedback d-block">
+                                {containerFieldErrors[`weight-${container.id}`]}
+                              </div>
+                            )}
+                          </td>
+                        )}
+                        <td>
+                          <input
+                            type="text"
+                            className="form-control form-control-sm"
+                            value={container.cargoDescription}
+                            onChange={(e) => handleContainerChange(container.id, 'cargoDescription', e.target.value)}
+                            placeholder="Enter cargo description"
+                          />
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+        )}
+
+        <div className="controller-instructions-button-container" style={{ margin: '20px 0' }}>
           <button
-            className="controller-instructions-add-container-button"
-            onClick={(e) => handleSubmit(e)}
-            disabled={isSubmitting} // Only disable when form is submitting
+            type="submit"
+            className="btn btn-primary"
+            disabled={isSubmitting}
+            style={{
+              padding: '8px 24px',
+              fontSize: '16px',
+              fontWeight: '500',
+              borderRadius: '4px',
+              boxShadow: '0 2px 4px rgba(0,0,0,0.1)'
+            }}
           >
             {isSubmitting ? (
               <>
@@ -2518,11 +3066,17 @@ const ControllerInstructions = () => {
                 Submitting...
               </>
             ) : (
-              'Add Container Details'
+              'Submit Instruction'
             )}
           </button>
+          
+          {submitError && (
+            <div className="alert alert-danger mt-3" role="alert" style={{ marginTop: '15px' }}>
+              {submitError}
+            </div>
+          )}
         </div>
-      </div>
+      </form>
       {/* Booking fields below Abnormal */}
       <div className="controller-instructions-booking-group" style={{ display: "none" }}>
         <div className="controller-instructions-form-field">

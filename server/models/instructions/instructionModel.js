@@ -42,7 +42,7 @@ export const saveInstruction = async ({ controllerData, containerData }) => {
     const controllerQuery = `
       INSERT INTO public.m1_controller (
         client, task, shipment_type, pickup, dropoff, 
-        hazardous, surchages, pickuptime, pickupdate, 
+        hazardous, surchages, surcharge, pickuptime, pickupdate, 
         stackdate, deadline, fileref, rateweight, 
         description, status, vat,
         num_six_meters, num_twelve_meters, num_abnormal,
@@ -50,41 +50,76 @@ export const saveInstruction = async ({ controllerData, containerData }) => {
         voyage_num, imo_num, flag_reg,
         rateper_6, rateper_12, rateper_abnormal
       ) VALUES (
-        $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25, $26, $27, $28, $29
+        $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25, $26, $27, $28, $29, $30
       ) RETURNING m1key
     `
-
-    // Get rates from controller data with fallbacks
-    const ratePer6 = Number(controllerData.rateper_6 || 0)
-    const ratePer12 = Number(controllerData.rateper_12 || 0)
-    const ratePerAbnormal = Number(controllerData.rateper_abnormal || 0)
 
     // Get container counts
     const numSix = Number(controllerData.num_six_meters || 0)
     const numTwelve = Number(controllerData.num_twelve_meters || 0)
     const numAbnormal = Number(controllerData.num_abnormal || 0)
 
-    // Calculate total cost: (rateper_6 × num_six_meters) + (rateper_12 × num_twelve_meters) + (rateper_abnormal × num_abnormal)
-    const calculatedTotalCost = ratePer6 * numSix + ratePer12 * numTwelve + ratePerAbnormal * numAbnormal
+    // Get rates - only use the provided rates if the corresponding container count is > 0
+    const ratePer6 = numSix > 0 ? Number(controllerData.rateper_6 || 0) : 0;
+    const ratePer12 = numTwelve > 0 ? Number(controllerData.rateper_12 || 0) : 0;
+    const ratePerAbnormal = numAbnormal > 0 ? Number(controllerData.rateper_abnormal || 0) : 0;
+    
+    // Update the rates in controllerData - set to 0 if count is 0
+    controllerData.rateper_6 = ratePer6;
+    controllerData.rateper_12 = ratePer12;
+    controllerData.rateper_abnormal = ratePerAbnormal;
+
+    console.log('Rates and counts:', {
+      sixMeter: { count: numSix, rate: ratePer6, total: numSix * ratePer6 },
+      twelveMeter: { count: numTwelve, rate: ratePer12, total: numTwelve * ratePer12 },
+      abnormal: { count: numAbnormal, rate: ratePerAbnormal, total: numAbnormal * ratePerAbnormal }
+    });
+
+    // Calculate base cost: (rateper_6 × num_six_meters) + (rateper_12 × num_twelve_meters) + (rateper_abnormal × num_abnormal)
+    const baseCost = ratePer6 * numSix + ratePer12 * numTwelve + ratePerAbnormal * numAbnormal;
+    
+    // Calculate surcharge amount if surcharges are checked and amount is a positive number
+    const surchargeAmount = (controllerData.surcharges && controllerData.surcharges_amount && parseFloat(controllerData.surcharges_amount) > 0)
+      ? Math.abs(parseFloat(controllerData.surcharges_amount)) 
+      : 0;
+      
+    console.log('Surcharge calculation:', {
+      hasSurcharge: controllerData.surcharges,
+      surchargeAmount: surchargeAmount,
+      finalSurcharge: surchargeAmount
+    });
+      
+    // Calculate total cost: base cost + surcharge
+    const calculatedTotalCost = baseCost + surchargeAmount;
+    
+    // Update the surcharge amount in controllerData
+    controllerData.surcharge = surchargeAmount;
+
+    console.log('Final cost calculation:', {
+      baseCost,
+      surchargeAmount,
+      calculatedTotalCost
+    });
 
     // Overwrite/ensure total_cost field
-    controllerData.total_cost = calculatedTotalCost
+    controllerData.total_cost = calculatedTotalCost;
 
     const controllerValues = [
-      controllerData.clientId,
-      controllerData.task,
-      controllerData.shipmentTypeId,
-      controllerData.pickup,
-      controllerData.dropoff,
-      controllerData.hazardous,
-      controllerData.surcharges,
-      controllerData.pickupTime,
-      controllerData.pickupDate,
-      controllerData.stackDate,
-      controllerData.deadline,
-      controllerData.fileRef,
-      controllerData.rateWeight,
-      controllerData.description,
+      controllerData.clientId || null,
+      controllerData.task || null,
+      controllerData.shipmentTypeId || null,
+      controllerData.pickup || null,
+      controllerData.dropoff || null,
+      controllerData.hazardous || false,
+      controllerData.surcharges || false, // This is the boolean flag
+      surchargeAmount, // This is the actual surcharge amount
+      controllerData.pickupTime || null,
+      controllerData.pickupDate || null,
+      controllerData.stackDate || null,
+      controllerData.deadline || null,
+      controllerData.fileRef || null,
+      controllerData.rateWeight || null,
+      controllerData.description || null,
       "New",
       controllerData.vat || 15,
       controllerData.num_six_meters || 0,
@@ -93,15 +128,15 @@ export const saveInstruction = async ({ controllerData, containerData }) => {
       controllerData.weight === "" || controllerData.weight === null || controllerData.weight === undefined
         ? null
         : Number(controllerData.weight),
-      controllerData.total_cost,
-      controllerData.booking_ref || "",
-      controllerData.vessel_name || "",
-      controllerData.voyage_num || "",
-      controllerData.imo_num || "",
-      controllerData.flag_reg || "",
+      controllerData.total_cost || 0,
+      controllerData.booking_ref || null,
+      controllerData.vessel_name || null,
+      controllerData.voyage_num || null,
+      controllerData.imo_num || null,
+      controllerData.flag_reg || null,
       controllerData.rateper_6 || 0,
       controllerData.rateper_12 || 0,
-      controllerData.rateper_abnormal || 0,
+      controllerData.rateper_abnormal || 0
     ]
 
     const controllerResult = await client.query(controllerQuery, controllerValues)

@@ -19,7 +19,7 @@ const ViewClientInstruction = () => {
     const fetchClientStats = async () => {
       try {
         setLoading(true)
-        const response = await api.get("/api/client-instruction-stats")
+        const response = await api.get("/api/instructions/client-instruction-stats")
 
         const data = response.data
         console.log("Client data received:", data) // Debug log

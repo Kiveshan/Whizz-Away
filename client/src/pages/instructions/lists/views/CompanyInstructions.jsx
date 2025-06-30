@@ -118,7 +118,7 @@ const CompanyInstructions = () => {
         console.log("Fetching instructions with clientId:", clientId) // Debug log
 
         // Fetch all instructions first
-        const response = await api.get("/api/instructions")
+        const response = await api.get("/api/instructions/instructions")
 
         const data = response.data
         console.log("All instructions fetched:", data.length)

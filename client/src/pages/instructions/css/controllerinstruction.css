@@ -10,6 +10,7 @@ Unique wrapper for ControllerInstructions component only
   justify-content: flex-start;
   padding-top: 0px !important;
   position: relative;
+  margin-top: -2000px; /* Added to lift the entire wrapper up */
 }
 
 .controller-instructions-unique-wrapper .controller-instructions-header {
@@ -44,7 +45,7 @@ Unique wrapper for ControllerInstructions component only
 
 /* Form container - lifted much higher and wider */
 .controller-instructions-unique-wrapper .controller-instructions-form-container {
-  margin-top: -60px !important; /* Negative margin to lift form even higher */
+  margin-top: -140px !important; /* Increased negative margin to lift form higher */
   background-color: #e6f2ff;
   border-radius: 8px;
   overflow: visible;
@@ -56,6 +57,7 @@ Unique wrapper for ControllerInstructions component only
   padding: 20px;
   position: relative;
   box-sizing: border-box;
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1); /* Added shadow for better depth */
 }
 
 .controller-instructions-unique-wrapper .controller-instructions-form-section {
@@ -341,28 +343,44 @@ Unique wrapper for ControllerInstructions component only
 .controller-instructions-unique-wrapper .controller-instructions-button-container {
   display: flex;
   justify-content: center;
-  padding: 10px 0;
-  margin-top: 5px;
+  padding: 4px 0;  /* Reduced padding */
+  margin-top: -60px;  /* Reduced margin */
+  margin-bottom: 8px;  /* Added bottom margin for spacing */
 }
 
 .controller-instructions-unique-wrapper .controller-instructions-add-container-button {
   background-color: #4a90e2;
   color: white;
   border: none;
-  border-radius: 4px;
-  padding: 12px 24px;
+  border-radius: 6px;  /* Slightly more rounded corners */
+  padding: 14px 28px;  /* Increased padding for taller button */
   cursor: pointer;
   font-size: 16px;
-  font-weight: 500;
+  font-weight: 600;  /* Slightly bolder text */
+  min-height: 48px;  /* Minimum height for better touch targets */
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s ease;  /* Smooth transition for hover effects */
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);  /* Subtle shadow for depth */
 }
 
 .controller-instructions-unique-wrapper .controller-instructions-add-container-button:hover {
   background-color: #3a80d2;
+  transform: translateY(-1px);  /* Slight lift effect on hover */
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15);  /* Enhanced shadow on hover */
+}
+
+.controller-instructions-unique-wrapper .controller-instructions-add-container-button:active {
+  transform: translateY(0);  /* Push down effect when clicked */
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
 }
 
 .controller-instructions-unique-wrapper .controller-instructions-add-container-button:disabled {
   background-color: #cccccc;
   cursor: not-allowed;
+  transform: none;
+  box-shadow: none;
 }
 
 /* Form elements */
@@ -390,6 +408,35 @@ Unique wrapper for ControllerInstructions component only
   background-color: #fff;
   margin: 0;
   transition: border-color 0.2s;
+}
+
+/* Date input specific styles */
+.controller-instructions-unique-wrapper input[type="date"] {
+  min-width: 200px; /* Make date inputs wider */
+  padding-right: 30px; /* Add space for calendar icon */
+}
+
+/* Date input group adjustments */
+.controller-instructions-unique-wrapper .controller-instructions-date-input-group {
+  display: flex;
+  align-items: center;
+  position: relative;
+  width: 100%;
+}
+
+/* Calendar button positioning */
+.controller-instructions-unique-wrapper .controller-instructions-calendar-button {
+  position: absolute;
+  right: 8px;
+  top: 50%;
+  transform: translateY(-50%);
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 5px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
 /* Textarea specific styles */
@@ -492,6 +539,23 @@ Unique wrapper for ControllerInstructions component only
   color: #ff4d4f;
   font-size: 12px;
   margin-top: 5px;
+}
+
+/* Error field styling */
+.controller-instructions-unique-wrapper .controller-instructions-error-field,
+.controller-instructions-unique-wrapper .controller-instructions-form-field .controller-instructions-input-wrapper .controller-instructions-form-input.controller-instructions-error-field,
+.controller-instructions-unique-wrapper .controller-instructions-form-field .controller-instructions-input-wrapper .controller-instructions-form-textarea.controller-instructions-error-field {
+  border: 2px solid #d32f2f !important;
+  background-color: #ffebee !important;
+  outline: none !important;
+  box-shadow: 0 0 0 1px #d32f2f !important;
+}
+
+/* Error message styling */
+.controller-instructions-unique-wrapper .controller-instructions-error-message {
+  color: #d32f2f;
+  font-size: 0.75rem;
+  margin-top: 4px;
 }
 
 /* Checkbox container styles */

@@ -113,7 +113,7 @@ const Instructions = () => {
   const fetchInstructions = async () => {
     try {
       setLoading(true)
-      let url = "/api/instructions"
+      let url = "/api/instructions/instructions"
 
       // Add client filter if clientId is provided
       if (clientId) {
