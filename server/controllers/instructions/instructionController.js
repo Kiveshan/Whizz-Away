@@ -29,13 +29,38 @@ export const getShipmentTypesHandler = async (req, res) => {
 export const getContainersHandler = async (req, res) => {
   try {
     const instructionId = req.params.instructionId
-    console.log(`Fetching containers for instruction ID: ${instructionId}`)
+    console.log(`[${new Date().toISOString()}] getContainersHandler: Fetching containers for instruction ID:`, {
+      instructionId,
+      type: typeof instructionId,
+      params: req.params,
+      query: req.query
+    })
+    
     const containers = await getContainersByInstructionId(instructionId)
-    console.log(`Found ${containers.length} containers for instruction ID: ${instructionId}`)
+    console.log(`[${new Date().toISOString()}] getContainersHandler: Found containers:`, {
+      instructionId,
+      containerCount: containers.length,
+      containers: containers
+    })
+    
+    if (containers.length === 0) {
+      console.log(`[${new Date().toISOString()}] No containers found for instruction ID: ${instructionId}`)
+      return res.status(200).json([]) // Return empty array instead of 404
+    }
+    
     res.json(containers)
   } catch (error) {
-    console.error("Error fetching containers:", error)
-    res.status(500).json({ error: error.message })
+    console.error(`[${new Date().toISOString()}] Error in getContainersHandler:`, {
+      error: error.message,
+      stack: error.stack,
+      params: req.params,
+      query: req.query
+    })
+    res.status(500).json({ 
+      error: error.message,
+      details: 'Failed to fetch containers',
+      instructionId: req.params.instructionId
+    })
   }
 }
 

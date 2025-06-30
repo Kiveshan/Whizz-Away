@@ -1,66 +1,22 @@
 
 "use client"
 
-import { useState, useEffect, useRef } from "react"
+import React, { useState, useEffect, useRef } from "react"
 import "../../css/viewcontrollerinstructions.css"
 import { useNavigate, useLocation } from "react-router-dom"
-import ErrorModal from "../../../../components/ErrorModal.jsx"
+import ErrorModal from "../../../../components/ErrorModal"
 import api from "../../../../api"
+import "../../../../css/components.css"
 
 const Viewcontrollerinstructions = () => {
   const navigate = useNavigate()
   const location = useLocation()
+  const isMounted = useRef(true)
   const instructionId = location.state?.instructionId
-  const preservedFormData = location.state?.preservedFormData
-
-  // Extract any additional state that was passed from DirectorMonitorInstructions
-  const clientId = location.state?.clientId
-  const clientName = location.state?.clientName
-  const selectedMonth = location.state?.selectedMonth
-  const selectedYear = location.state?.selectedYear
-  const activeFilter = location.state?.activeFilter
-
-  // Log the received state for debugging
-  console.log("Viewcontrollerinstructions received state:", {
-    instructionId,
-    clientId,
-    clientName,
-    selectedMonth,
-    selectedYear,
-    activeFilter,
-  })
-
-  // Create refs for each date input
-  const pickupDateRef = useRef(null)
-  const etaDateRef = useRef(null)
-  const deadlineDateRef = useRef(null)
-
-  const fieldRefs = {
-    clientId: useRef(null),
-    shipmentTypeId: useRef(null),
-    task: useRef(null),
-    pickup: useRef(null),
-    dropoff: useRef(null),
-    pickupTime: useRef(null),
-    pickupDate: useRef(null),
-    stackDate: useRef(null),
-    deadline: useRef(null),
-    bookingRef: useRef(null),
-    fileRef: useRef(null),
-    rate: useRef(null),
-    sixMeterRate: useRef(null),
-    twelveMeterRate: useRef(null),
-    abnormalRate: useRef(null),
-    weight: useRef(null),
-    description: useRef(null),
-    vesselName: useRef(null),
-    voyageNo: useRef(null),
-    imoNo: useRef(null),
-    flagReg: useRef(null),
-  }
-
-  // State for form data
-  const [formData, setFormData] = useState({
+  const preservedFormData = location.state?.preservedFormData || {}
+  
+  // Form data state with default values
+  const getDefaultFormData = () => ({
     clientId: "",
     representative: "",
     contactDetails: "",
@@ -72,49 +28,61 @@ const Viewcontrollerinstructions = () => {
     dropoff: "",
     hazardous: false,
     surcharges: false,
+    surchargesAmount: "",
+    num_six_meters: 0,
+    num_twelve_meters: 0,
+    num_abnormal: 0,
     pickupTime: "",
     pickupDate: "",
     stackDate: "",
     deadline: "",
     fileRef: "",
     bookingRef: "",
-    rateWeight: "Container",
-    rate: "",
-    weight: "",
-    num_six_meters: 0,
-    num_twelve_meters: 0,
-    num_abnormal: 0,
-    vat: 15,
-    description: "",
-    status: "",
     vesselName: "",
     voyageNo: "",
     imoNo: "",
     flagReg: "",
+    rateWeight: "Container",
+    weight: "",
+    vat: 15,
+    description: "",
     total_cost: 0,
-  })
+    sixMeterRate: "",
+    twelveMeterRate: "",
+    abnormalRate: "",
+    status: ""
+  });
 
-  // Individual rate states
-  const [sixMeterRate, setSixMeterRate] = useState("")
-  const [twelveMeterRate, setTwelveMeterRate] = useState("")
-  const [abnormalRate, setAbnormalRate] = useState("")
-  const [weight, setWeight] = useState("")
+  const [formData, setFormData] = useState(() => ({
+    ...getDefaultFormData(),
+    ...(preservedFormData || {})
+  }))
 
-  // State to track if shipment type is Import
-  const [isImport, setIsImport] = useState(false)
+  // Refs for form fields (minimal refs needed for view mode)
+  const pickupDateRef = useRef(null)
+  const etaDateRef = useRef(null)
+  const deadlineDateRef = useRef(null)
 
   // State for clients and shipment types
   const [clients, setClients] = useState([])
   const [shipmentTypes, setShipmentTypes] = useState([])
   const [startingPoints, setStartingPoints] = useState([])
   const [destinations, setDestinations] = useState([])
+  const [sixMeterRate, setSixMeterRate] = useState("")
+  const [twelveMeterRate, setTwelveMeterRate] = useState("")
+  const [abnormalRate, setAbnormalRate] = useState("")
+  const [weight, setWeight] = useState("")
   const [isLoading, setIsLoading] = useState({
     clients: true,
     shipmentTypes: true,
     startingPoints: true,
     destinations: true,
-    instruction: instructionId ? true : false,
+    instruction: !!instructionId
   })
+
+  // State for container data
+  const [containers, setContainers] = useState([])
+  const [isLoadingContainers, setIsLoadingContainers] = useState(false)
 
   // State for error modal
   const [errorModal, setErrorModal] = useState({
@@ -124,6 +92,9 @@ const Viewcontrollerinstructions = () => {
 
   // State for success message
   const [successMessage, setSuccessMessage] = useState("")
+
+  // State to track if shipment type is Import
+  const [isImport, setIsImport] = useState(false)
 
   // Style for non-editable fields - applied to ALL fields
   const nonEditableStyle = {
@@ -145,70 +116,98 @@ const Viewcontrollerinstructions = () => {
     return time.substring(0, 5) // Get HH:MM from HH:MM:SS
   }
 
-  // Handle back button click - fixed to ensure clientId is passed correctly
+  // Handle back button click
   const handleBackClick = () => {
-    console.log("Navigating back to DirectorMonitorInstructions with state:", {
-      clientId,
-      clientName,
-      selectedMonth,
-      selectedYear,
-      activeFilter,
-    })
-
-    navigate("/CompanyInstructions", {
-      state: {
-        clientId: clientId,
-        clientName: clientName,
-        selectedMonth: selectedMonth,
-        selectedYear: selectedYear,
-        activeFilter: activeFilter,
-      },
-    })
+    navigate(-1) // Go back to the previous page
   }
 
-  // Fetch clients, shipment types, and instruction data on component mount
+  // Track if initial data has been loaded
+  const [initialDataLoaded, setInitialDataLoaded] = useState(false)
+
+  // Fetch all required data on component mount
   useEffect(() => {
     console.log("useEffect triggered with:", { instructionId, preservedFormData: !!preservedFormData })
 
-    fetchClients()
-    fetchShipmentTypes()
-    fetchStartingPoints()
-    fetchDestinations()
+    const fetchData = async () => {
+      try {
+        if (!instructionId) {
+          console.log("No instructionId provided")
+          navigate("/CompanyInstructions")
+          return
+        }
 
-    // For view-only component, always fetch fresh data from database if instructionId exists
-    if (instructionId) {
-      console.log("Calling fetchInstructionData with ID:", instructionId)
-      fetchInstructionData(instructionId)
-    } else {
-      console.log("No instructionId provided")
-      // If no instructionId, redirect back
-      navigate("/CompanyInstructions")
+        console.log("Calling fetchInstructionData with ID:", instructionId)
+        await fetchInstructionData(instructionId)
+
+        // First fetch clients and shipment types
+        await Promise.all([
+          fetchClients(),
+          fetchShipmentTypes()
+        ]);
+
+        // Then fetch container details after formData is set
+        fetchContainerDetails();
+
+        // Mark initial data as loaded
+        setInitialDataLoaded(true)
+        console.log("Initial data loading complete")
+      } catch (error) {
+        console.error("Error in fetchData:", error)
+        setErrorModal({
+          isOpen: true,
+          message: `Failed to load required data: ${error.message || 'Unknown error'}`
+        })
+      }
+    }
+
+
+    fetchData()
+    
+    // Cleanup function
+    return () => {
+      isMounted.current = false
     }
   }, [instructionId, navigate])
 
   // Fetch instruction data by ID
   const fetchInstructionData = async (id) => {
-    setIsLoading((prev) => ({ ...prev, instruction: true }))
+    if (!id) {
+      console.error("No instruction ID provided")
+      throw new Error("No instruction ID provided")
+    }
+
     try {
       console.log(`Fetching instruction data for ID: ${id}`)
-      const response = await api.get(`/api/instruction/${id}`)
+      const response = await api.get(`/api/instructions/instruction/${id}`)
       const data = response.data
+
+      if (!data) {
+        throw new Error("No data received from server")
+      }
+      
+      // Log the received data for debugging
+      console.log("API Response Data:", data)
 
       console.log("Instruction data received:", data)
 
+      // Start with default form data and override with API data
+      const defaultFormData = getDefaultFormData()
+      
       // Format dates and times for input fields
       const formattedData = {
-        clientId: data.client.toString(),
+        ...defaultFormData,
+        clientId: data.client?.toString() || "",
         representative: data.representative || "",
         contactDetails: data.cellnum || "",
         email: data.email || "",
-        shipmentTypeId: data.shipment_type.toString(),
+        shipmentTypeId: data.shipment_type?.toString() || "",
         shipmentTypeName: data.shipmenttype || "",
         task: data.task || "",
         pickup: data.pickup || "",
         dropoff: data.dropoff || "",
-        hazardous: data.hazardous || false,
-        surcharges: data.surchages || false,
+        hazardous: Boolean(data.hazardous),
+        surcharges: Boolean(data.surchages),
+        surchargesAmount: data.surcharges_amount?.toString() || "",
         pickupTime: formatTimeForInput(data.pickuptime) || "",
         pickupDate: formatDateForInput(data.pickupdate) || "",
         stackDate: formatDateForInput(data.stackdate) || "",
@@ -218,19 +217,20 @@ const Viewcontrollerinstructions = () => {
         rateWeight: data.rateweight || "Container",
         rate: data.rate ? data.rate.toString() : "",
         weight: data.weight ? data.weight.toString() : "",
-        num_six_meters: data.num_six_meters || 0,
-        num_twelve_meters: data.num_twelve_meters || 0,
-        num_abnormal: data.num_abnormal || 0,
-        vat: data.vat || 15,
+        num_six_meters: Number(data.num_six_meters) || 0,
+        num_twelve_meters: Number(data.num_twelve_meters) || 0,
+        num_abnormal: Number(data.num_abnormal) || 0,
+        vat: Number(data.vat) || 15,
         description: data.description || "",
         status: data.status || "",
         vesselName: data.vessel_name || "",
         voyageNo: data.voyage_num || "",
         imoNo: data.imo_num || "",
         flagReg: data.flag_reg || "",
-        total_cost: data.total_cost || 0,
+        total_cost: Number(data.total_cost) || 0,
       }
 
+      console.log("Formatted data before setFormData:", formattedData)
       setFormData(formattedData)
 
       // Set individual rates if available - using correct field names from database
@@ -241,10 +241,28 @@ const Viewcontrollerinstructions = () => {
 
       // Set isImport based on the fetched shipment type
       const shipmentTypeName = data.shipmenttype || ""
-      setIsImport(shipmentTypeName.toLowerCase() === "import")
+      const isImportValue = shipmentTypeName.toLowerCase() === "import"
+      console.log("Setting isImport to:", isImportValue)
+      setIsImport(isImportValue)
+      
+      // After setting all state, ensure loading is set to false
+      setIsLoading(prev => ({
+        ...prev,
+        instruction: false,
+        clients: false,
+        shipmentTypes: false,
+        startingPoints: false,
+        destinations: false
+      }))
     } catch (error) {
       console.error("Error fetching instruction data:", error)
       let errorMessage = "Failed to fetch instruction data. Please try again."
+      
+      // Set loading to false on error
+      setIsLoading(prev => ({
+        ...prev,
+        instruction: false
+      }))
 
       if (error.response) {
         errorMessage = `Server error: ${error.response.status} ${error.response.statusText}`
@@ -263,145 +281,266 @@ const Viewcontrollerinstructions = () => {
 
   // Fetch clients from API
   const fetchClients = async () => {
-    setIsLoading((prev) => ({ ...prev, clients: true }))
     try {
       console.log("Fetching clients...")
-      const response = await api.get("/api/clients")
+      const response = await api.get("/api/instructions/active-clients")
       const data = response.data
+
+      if (!data || !Array.isArray(data)) {
+        throw new Error("Invalid data format received from server")
+      }
 
       console.log("Clients data received:", data.length, "records")
       setClients(data)
+      return true
     } catch (error) {
       console.error("Error fetching clients:", error)
-      let errorMessage = "Failed to fetch clients. Please try again."
-
-      if (error.response) {
-        errorMessage = `Server error: ${error.response.status} ${error.response.statusText}`
-      } else if (error.request) {
-        errorMessage = "Network error. Please check your connection."
-      }
-
-      setErrorModal({
-        isOpen: true,
-        message: errorMessage,
-      })
+      // Don't show error for clients - we can proceed with empty clients list
       setClients([])
-    } finally {
-      setIsLoading((prev) => ({ ...prev, clients: false }))
+      return false
     }
   }
 
   // Fetch shipment types from API
   const fetchShipmentTypes = async () => {
-    setIsLoading((prev) => ({ ...prev, shipmentTypes: true }))
     try {
       console.log("Fetching shipment types...")
-      const response = await api.get("/api/shipment-types")
+      const response = await api.get("/api/instructions/shipment-types")
       const data = response.data
+
+      if (!data || !Array.isArray(data)) {
+        throw new Error("Invalid shipment types data format")
+      }
 
       console.log("Shipment types data received:", data.length, "records")
       setShipmentTypes(data)
+      return true
     } catch (error) {
       console.error("Error fetching shipment types:", error)
-      let errorMessage = "Failed to fetch shipment types. Please try again."
-
-      if (error.response) {
-        errorMessage = `Server error: ${error.response.status} ${error.response.statusText}`
-      } else if (error.request) {
-        errorMessage = "Network error. Please check your connection."
-      }
-
-      setErrorModal({
-        isOpen: true,
-        message: errorMessage,
-      })
-      setShipmentTypes([])
-    } finally {
-      setIsLoading((prev) => ({ ...prev, shipmentTypes: false }))
+      // Set default shipment types if API fails
+      const defaultTypes = [
+        { id: 1, name: 'Import' },
+        { id: 2, name: 'Export' },
+        { id: 3, name: 'Cross Dock' },
+        { id: 4, name: 'Empty Return' },
+        { id: 5, name: 'Empty Collection' },
+        { id: 6, name: 'Other' }
+      ]
+      console.log("Using default shipment types")
+      setShipmentTypes(defaultTypes)
+      return true
     }
   }
 
   // Fetch starting points from API
   const fetchStartingPoints = async () => {
+    if (!formData.clientId) {
+      console.log("No client selected, skipping starting points fetch")
+      setIsLoading((prev) => ({ ...prev, startingPoints: false }))
+      return true
+    }
+    
     setIsLoading((prev) => ({ ...prev, startingPoints: true }))
     try {
-      console.log("Fetching starting points...")
-      const response = await api.get("/api/starting-points")
+      console.log(`Fetching starting points for client ${formData.clientId}...`)
+      const response = await api.get(`/api/instructions/client/${formData.clientId}/starting-points`)
       const data = response.data
 
       console.log("Starting points data received:", data.length, "records")
       setStartingPoints(data)
+      setIsLoading((prev) => ({ ...prev, startingPoints: false }))
+      return true
     } catch (error) {
       console.error("Error fetching starting points:", error)
-      let errorMessage = "Failed to fetch starting points. Please try again."
-
-      if (error.response) {
-        errorMessage = `Server error: ${error.response.status} ${error.response.statusText}`
-      } else if (error.request) {
-        errorMessage = "Network error. Please check your connection."
-      }
-
-      setErrorModal({
-        isOpen: true,
-        message: errorMessage,
-      })
-      setStartingPoints([])
-    } finally {
+      // Set default starting points if API fails
+      setStartingPoints([
+        'Durban',
+        'Johannesburg',
+        'Cape Town',
+        'Port Elizabeth',
+        'East London',
+        'Other'
+      ])
       setIsLoading((prev) => ({ ...prev, startingPoints: false }))
+      return true
     }
   }
 
   // Fetch destinations from API
   const fetchDestinations = async () => {
+    if (!formData.clientId || !formData.pickup) {
+      console.log("No client or pickup selected, skipping destinations fetch")
+      setIsLoading((prev) => ({ ...prev, destinations: false }))
+      return true
+    }
+    
     setIsLoading((prev) => ({ ...prev, destinations: true }))
     try {
-      console.log("Fetching destinations...")
-      const response = await api.get("/api/destinations")
+      console.log(`Fetching destinations for client ${formData.clientId} and pickup ${formData.pickup}...`)
+      const response = await api.get(`/api/instructions/client/${formData.clientId}/destinations/${encodeURIComponent(formData.pickup)}`)
       const data = response.data
 
       console.log("Destinations data received:", data.length, "records")
       setDestinations(data)
+      setIsLoading((prev) => ({ ...prev, destinations: false }))
+      return true
     } catch (error) {
       console.error("Error fetching destinations:", error)
-      let errorMessage = "Failed to fetch destinations. Please try again."
-
-      if (error.response) {
-        errorMessage = `Server error: ${error.response.status} ${error.response.statusText}`
-      } else if (error.request) {
-        errorMessage = "Network error. Please check your connection."
-      }
-
-      setErrorModal({
-        isOpen: true,
-        message: errorMessage,
-      })
-      setDestinations([])
-    } finally {
+      // Set default destinations if API fails
+      setDestinations([
+        'Durban',
+        'Johannesburg',
+        'Cape Town',
+        'Port Elizabeth',
+        'East London',
+        'Other'
+      ])
       setIsLoading((prev) => ({ ...prev, destinations: false }))
+      return true
     }
   }
 
-  // Handle view container details
-  const handleViewContainerDetails = () => {
-    // Calculate total containers
-    const totalContainers = formData.num_six_meters + formData.num_twelve_meters + formData.num_abnormal
+  // Initialize containers based on controller data counts
+  const initializeContainers = () => {
+    if (!formData) {
+      console.log("No formData available for container initialization");
+      return [];
+    }
+    
+    console.log("Initializing containers with formData:", {
+      num_six_meters: formData.num_six_meters,
+      num_twelve_meters: formData.num_twelve_meters,
+      num_abnormal: formData.num_abnormal
+    });
+    
+    const containersList = [];
+    let containerId = 1;
 
-    // Navigate to container details page with state
-    navigate("/ViewcontrollerInstructionDetails", {
-      state: {
-        controllerData: formData,
-        isImport: isImport,
-        totalContainers: totalContainers,
-        instructionId: instructionId,
-        // Pass through the original navigation state for when we return
-        clientId: clientId,
-        clientName: clientName,
-        selectedMonth: selectedMonth,
-        selectedYear: selectedYear,
-        activeFilter: activeFilter,
-      },
-    })
-  }
+    // Ensure we have valid numbers for container counts
+    const sixMeters = parseInt(formData.num_six_meters) || 0;
+    const twelveMeters = parseInt(formData.num_twelve_meters) || 0;
+    const abnormal = parseInt(formData.num_abnormal) || 0;
+
+    // Add 6m containers
+    for (let i = 0; i < sixMeters; i++) {
+      containersList.push({
+        id: containerId++,
+        containerKey: null,
+        containerNum: "",
+        weight: "",
+        containerType: "6m",
+        cargoDescription: ""
+      });
+    }
+
+    // Add 12m containers
+    for (let i = 0; i < twelveMeters; i++) {
+      containersList.push({
+        id: containerId++,
+        containerKey: null,
+        containerNum: "",
+        weight: "",
+        containerType: "12m",
+        cargoDescription: ""
+      });
+    }
+
+    // Add abnormal containers
+    for (let i = 0; i < abnormal; i++) {
+      containersList.push({
+        id: containerId++,
+        containerKey: null,
+        containerNum: "",
+        weight: "",
+        containerType: "Abnormal",
+        cargoDescription: ""
+      });
+    }
+
+    console.log(`Initialized ${containersList.length} containers`);
+    return containersList;
+  };
+
+  // Determine container type based on index and form data
+  const determineContainerType = (index, data) => {
+    if (!data) return "Unknown";
+    const sixMCount = data.num_six_meters || 0;
+    const twelveMCount = data.num_twelve_meters || 0;
+    if (index < sixMCount) return "6m";
+    if (index < sixMCount + twelveMCount) return "12m";
+    return "Abnormal";
+  };
+
+  // Fetch container details
+  const fetchContainerDetails = async () => {
+    if (!instructionId) {
+      console.log("No instructionId available for fetching container details");
+      return;
+    }
+    
+    // Wait for formData to be available
+    if (!formData) {
+      console.log("formData not available yet, waiting...");
+      return;
+    }
+    
+    console.log("Fetching container details with formData:", {
+      instructionId,
+      hasFormData: !!formData,
+      containerCounts: formData ? {
+        six_meters: formData.num_six_meters,
+        twelve_meters: formData.num_twelve_meters,
+        abnormal: formData.num_abnormal
+      } : 'No formData'
+    });
+    
+    setIsLoadingContainers(true);
+    
+    try {
+      // First, try to fetch from the API
+      const response = await api.get(`/api/instructions/containers/${instructionId}`);
+      const data = response.data || [];
+      
+      console.log("Containers data from API:", data);
+      
+      if (data && data.length > 0) {
+        // Map container data to match the expected format
+        const containersList = data.map((container, index) => ({
+          id: index + 1,
+          containerKey: container.containerkey,
+          containerNum: container.containernum ? container.containernum.toString() : "",
+          weight: container.weight !== null ? container.weight.toString() : "",
+          containerType: container.container_type || determineContainerType(index, formData),
+          cargoDescription: container.cargo_description || ""
+        }));
+        console.log("Mapped containers list:", containersList);
+        setContainers(containersList);
+      } else {
+        // If no containers found in API, initialize from form data
+        console.log("No containers found in API, initializing from form data");
+        const initializedContainers = initializeContainers();
+        console.log("Initialized containers:", initializedContainers);
+        setContainers(initializedContainers);
+      }
+    } catch (error) {
+      console.error("Error fetching containers:", error);
+      // On error (including 404), initialize from form data
+      console.log("Error fetching containers, initializing from form data");
+      const initializedContainers = initializeContainers();
+      console.log("Initialized containers on error:", initializedContainers);
+      setContainers(initializedContainers);
+    } finally {
+      setIsLoadingContainers(false);
+    }
+  };
+  
+  // Call fetchContainerDetails when formData changes
+  useEffect(() => {
+    if (instructionId && formData) {
+      console.log("formData updated, fetching container details");
+      fetchContainerDetails();
+    }
+  }, [formData, instructionId]);
 
   // Retry fetching data
   const handleRetryFetch = () => {
@@ -427,65 +566,107 @@ const Viewcontrollerinstructions = () => {
     ref.current.click()
   }
 
-  return (
-    <div className="view-controller-instructions-unique-wrapper">
-      {/* Error Modal */}
-      {errorModal.isOpen && (
+  // Render loading state
+  if (isLoading.instruction) {
+    return (
+      <div className="view-controller-instructions-container">
+        <h2 className="view-controller-instructions-title">Loading Instruction...</h2>
+        <div className="text-center my-5">
+          <div className="spinner-border text-primary" role="status" style={{ width: '3rem', height: '3rem' }}>
+            <span className="visually-hidden">Loading...</span>
+          </div>
+          <p className="mt-3">Loading instruction data, please wait...</p>
+        </div>
+      </div>
+    )
+  }
+
+  // Render error state
+  if (errorModal.isOpen) {
+    return (
+      <div className="view-controller-instructions-container">
         <ErrorModal
           isOpen={errorModal.isOpen}
           message={errorModal.message}
-          onClose={() => setErrorModal({ ...errorModal, isOpen: false })}
+          onClose={() => setErrorModal({ isOpen: false, message: "" })}
         />
-      )}
+        <div className="text-center my-5">
+          <h3>Error Loading Instruction</h3>
+          <p className="text-danger">{errorModal.message}</p>
+          <button 
+            className="btn btn-primary mt-3"
+            onClick={() => window.location.reload()}
+          >
+            Try Again
+          </button>
+        </div>
+      </div>
+    )
+  }
 
-      {/* Success Message */}
-      {successMessage && <div className="success-message">{successMessage}</div>}
-
-      <div className="view-controller-instructions-header">
-        <button className="view-controller-instructions-back-button" onClick={handleBackClick}>
-          Back
+  // Main content
+  return (
+    <div className="view-controller-instructions-container">
+      <div className="d-flex justify-content-between align-items-center mb-4">
+        <h2 className="view-controller-instructions-title mb-0">
+          View Instruction {formData.fileRef ? `- ${formData.fileRef}` : ''}
+        </h2>
+        <button 
+          className="btn btn-secondary"
+          onClick={() => navigate('/CompanyInstructions')}
+        >
+          Back to List
         </button>
       </div>
 
-      {/* Loading indicator or retry button */}
-      {isLoading.clients ||
-      isLoading.shipmentTypes ||
-      isLoading.startingPoints ||
-      isLoading.destinations ||
-      isLoading.instruction ? (
-        <div style={{ textAlign: "center", padding: "20px" }}>
-          <p>Loading data...</p>
+      {/* Debug Information - Only show in development */}
+      {process.env.NODE_ENV === 'development' && (
+        <div className="alert alert-info">
+          <h5>Debug Information</h5>
+          <p><strong>Instruction ID:</strong> {instructionId}</p>
+          <p><strong>Initial Data Loaded:</strong> {initialDataLoaded ? 'Yes' : 'No'}</p>
+          <p><strong>Clients:</strong> {clients.length} loaded</p>
+          <p><strong>Shipment Types:</strong> {shipmentTypes.length} loaded</p>
+          <p><strong>Form Data Status:</strong> {formData.status || 'Not set'}</p>
         </div>
-      ) : clients.length === 0 ||
-        shipmentTypes.length === 0 ||
-        startingPoints.length === 0 ||
-        destinations.length === 0 ? (
-        <div style={{ textAlign: "center", padding: "20px" }}>
-          <p>Failed to load data from the database. Please try again.</p>
+      )}
+
+      {/* Success Message */}
+      {successMessage && <div className="alert alert-success">{successMessage}</div>}
+
+      {/* Loading indicator */}
+      {!initialDataLoaded && (
+        <div className="text-center my-5">
+          <div className="spinner-border text-primary" role="status">
+            <span className="visually-hidden">Loading...</span>
+          </div>
+          <p className="mt-2">Loading form data...</p>
+        </div>
+      )}
+
+      {/* Error state */}
+      {initialDataLoaded && clients.length === 0 && (
+        <div className="alert alert-danger" role="alert">
+          <h4 className="alert-heading">Error Loading Data</h4>
+          <p>Failed to load required client data. Please try again.</p>
           <button
             onClick={handleRetryFetch}
-            style={{
-              padding: "8px 16px",
-              backgroundColor: "#4a90e2",
-              color: "white",
-              border: "none",
-              borderRadius: "4px",
-              cursor: "pointer",
-              marginTop: "10px",
-            }}
+            className="btn btn-primary"
           >
             Retry
           </button>
         </div>
-      ) : null}
+      )}
 
-      <div className="view-controller-instructions-form-container" style={{ maxWidth: "1200px" }}>
+      {/* Main Form - Only show when data is loaded */}
+      {initialDataLoaded && (
+        <div className="view-controller-instructions-form-container" style={{ maxWidth: "1200px" }}>
         {/* Client Information Section */}
         <div className="view-controller-instructions-form-section view-controller-instructions-client-info-section">
           <div className="view-controller-instructions-form-row">
             <div className="view-controller-instructions-form-field">
               <label>Client</label>
-              <div className="view-controller-instructions-select-wrapper" ref={fieldRefs.clientId}>
+              <div className="view-controller-instructions-select-wrapper">
                 <select
                   className="view-controller-instructions-dropdown"
                   name="clientId"
@@ -564,15 +745,12 @@ const Viewcontrollerinstructions = () => {
                         readOnly
                         style={nonEditableStyle}
                       />
-                      <div
-                        className="view-controller-instructions-input-wrapper view-controller-instructions-rate-input"
-                        ref={fieldRefs.sixMeterRate}
-                      >
+                      <div className="view-controller-instructions-input-wrapper view-controller-instructions-rate-input">
                         <input
                           type="text"
                           className="view-controller-instructions-form-input"
                           placeholder="Rate"
-                          value={sixMeterRate}
+                          value={formData.sixMeterRate}
                           readOnly
                           style={nonEditableStyle}
                         />
@@ -590,15 +768,12 @@ const Viewcontrollerinstructions = () => {
                         readOnly
                         style={nonEditableStyle}
                       />
-                      <div
-                        className="view-controller-instructions-input-wrapper view-controller-instructions-rate-input"
-                        ref={fieldRefs.twelveMeterRate}
-                      >
+                      <div className="view-controller-instructions-input-wrapper view-controller-instructions-rate-input">
                         <input
                           type="text"
                           className="view-controller-instructions-form-input"
                           placeholder="Rate"
-                          value={twelveMeterRate}
+                          value={formData.twelveMeterRate}
                           readOnly
                           style={nonEditableStyle}
                         />
@@ -616,15 +791,12 @@ const Viewcontrollerinstructions = () => {
                         readOnly
                         style={nonEditableStyle}
                       />
-                      <div
-                        className="view-controller-instructions-input-wrapper view-controller-instructions-rate-input"
-                        ref={fieldRefs.abnormalRate}
-                      >
+                      <div className="view-controller-instructions-input-wrapper view-controller-instructions-rate-input">
                         <input
                           type="text"
                           className="view-controller-instructions-form-input"
                           placeholder="Rate"
-                          value={abnormalRate}
+                          value={formData.abnormalRate}
                           readOnly
                           style={nonEditableStyle}
                         />
@@ -674,7 +846,7 @@ const Viewcontrollerinstructions = () => {
               >
                 <div className="view-controller-instructions-form-field">
                   <label>Booking Reference</label>
-                  <div className="view-controller-instructions-input-wrapper" ref={fieldRefs.bookingRef}>
+                  <div className="view-controller-instructions-input-wrapper">
                     <input
                       type="text"
                       className="view-controller-instructions-form-input"
@@ -688,7 +860,7 @@ const Viewcontrollerinstructions = () => {
                 </div>
                 <div className="view-controller-instructions-form-field">
                   <label>File Ref</label>
-                  <div className="view-controller-instructions-input-wrapper" ref={fieldRefs.fileRef}>
+                  <div className="view-controller-instructions-input-wrapper">
                     <input
                       type="text"
                       className="view-controller-instructions-form-input"
@@ -731,17 +903,13 @@ const Viewcontrollerinstructions = () => {
                   </div>
                   {/* conditional weight textbox */}
                   {(formData.rateWeight === "kg" || formData.rateWeight === "m³") && (
-                    <div
-                      className="view-controller-instructions-input-wrapper"
-                      style={{ marginTop: "6px" }}
-                      ref={fieldRefs.weight}
-                    >
+                    <div className="view-controller-instructions-input-wrapper" style={{ marginTop: "6px" }}>
                       <input
                         type="text"
                         className="view-controller-instructions-form-input"
                         placeholder={`Enter weight in ${formData.rateWeight}`}
                         name="weight"
-                        value={formData.weight || weight}
+                        value={formData.weight || ""}
                         readOnly
                         style={nonEditableStyle}
                       />
@@ -758,7 +926,7 @@ const Viewcontrollerinstructions = () => {
                 >
                   <div className="view-controller-instructions-form-field view-controller-instructions-small-field">
                     <label>Shipment Type</label>
-                    <div className="view-controller-instructions-select-wrapper" ref={fieldRefs.shipmentTypeId}>
+                    <div className="view-controller-instructions-select-wrapper">
                       <select
                         className="view-controller-instructions-dropdown"
                         name="shipmentTypeId"
@@ -779,7 +947,7 @@ const Viewcontrollerinstructions = () => {
                   </div>
                   <div className="view-controller-instructions-form-field view-controller-instructions-small-field">
                     <label>Name of Task</label>
-                    <div className="view-controller-instructions-input-wrapper" ref={fieldRefs.task}>
+                    <div className="view-controller-instructions-input-wrapper">
                       <input
                         type="text"
                         className="view-controller-instructions-form-input"
@@ -796,52 +964,30 @@ const Viewcontrollerinstructions = () => {
                 <div className="view-controller-instructions-date-time-row-1" style={{ display: "flex", gap: "15px" }}>
                   <div className="view-controller-instructions-form-field" style={{ flex: "1", minWidth: "0" }}>
                     <label>Pick-Up Location</label>
-                    <div
-                      className="view-controller-instructions-date-input-group"
-                      ref={fieldRefs.pickup}
-                      style={{ width: "100%" }}
-                    >
-                      <select
+                    <div className="view-controller-instructions-date-input-group" style={{ width: "100%" }}>
+                      <input
+                        type="text"
                         className="view-controller-instructions-form-input"
                         name="pickup"
-                        value={formData.pickup}
-                        disabled={true}
+                        value={formData.pickup || ""}
+                        readOnly
                         style={{ ...nonEditableStyle, width: "100%", maxWidth: "75%" }}
-                      >
-                        <option value="" disabled>
-                          Select Pick-Up Location
-                        </option>
-                        {startingPoints.map((point, index) => (
-                          <option key={index} value={point.startingpoint}>
-                            {point.startingpoint}
-                          </option>
-                        ))}
-                      </select>
+                        placeholder="Pick-up location"
+                      />
                     </div>
                   </div>
                   <div className="view-controller-instructions-form-field" style={{ flex: "1", minWidth: "0" }}>
                     <label>Drop-off Location</label>
-                    <div
-                      className="view-controller-instructions-date-input-group"
-                      ref={fieldRefs.dropoff}
-                      style={{ width: "100%" }}
-                    >
-                      <select
+                    <div className="view-controller-instructions-date-input-group" style={{ width: "100%" }}>
+                      <input
+                        type="text"
                         className="view-controller-instructions-form-input"
                         name="dropoff"
-                        value={formData.dropoff}
-                        disabled={true}
+                        value={formData.dropoff || ""}
+                        readOnly
                         style={{ ...nonEditableStyle, width: "100%", maxWidth: "75%" }}
-                      >
-                        <option value="" disabled>
-                          Select Drop-off Location
-                        </option>
-                        {destinations.map((dest, index) => (
-                          <option key={index} value={dest.destination}>
-                            {dest.destination}
-                          </option>
-                        ))}
-                      </select>
+                        placeholder="Drop-off location"
+                      />
                     </div>
                   </div>
                 </div>
@@ -852,11 +998,7 @@ const Viewcontrollerinstructions = () => {
                 >
                   <div className="view-controller-instructions-form-field" style={{ flex: "1", minWidth: "0" }}>
                     <label>Pick-up Time</label>
-                    <div
-                      className="view-controller-instructions-date-input-group"
-                      ref={fieldRefs.pickupTime}
-                      style={{ width: "100%" }}
-                    >
+                    <div className="view-controller-instructions-date-input-group" style={{ width: "100%" }}>
                       <input
                         type="time"
                         className="view-controller-instructions-form-input"
@@ -864,35 +1006,22 @@ const Viewcontrollerinstructions = () => {
                         name="pickupTime"
                         value={formData.pickupTime}
                         readOnly
-                        style={{ ...nonEditableStyle, width: "75%" }}
+                        style={{ ...nonEditableStyle, width: "100%" }}
                       />
-                      <button
-                        className="view-controller-instructions-calendar-button"
-                        style={{ visibility: "hidden" }}
-                      ></button>
                     </div>
                   </div>
                   <div className="view-controller-instructions-form-field" style={{ flex: "1", minWidth: "0" }}>
                     <label>Pick-up Date</label>
-                    <div
-                      className="view-controller-instructions-date-input-group"
-                      ref={fieldRefs.pickupDate}
-                      style={{ width: "100%" }}
-                    >
+                    <div className="view-controller-instructions-date-input-group" style={{ width: "100%" }}>
                       <input
                         type="date"
                         className="view-controller-instructions-form-input"
-                        ref={pickupDateRef}
                         placeholder="Date here"
                         name="pickupDate"
                         value={formData.pickupDate}
                         readOnly
-                        style={{ ...nonEditableStyle, width: "75%" }}
+                        style={{ ...nonEditableStyle, width: "100%" }}
                       />
-                      <button
-                        className="view-controller-instructions-calendar-button"
-                        style={{ visibility: "hidden" }}
-                      ></button>
                     </div>
                   </div>
                 </div>
@@ -900,48 +1029,30 @@ const Viewcontrollerinstructions = () => {
                 <div className="view-controller-instructions-date-time-row-2" style={{ display: "flex", gap: "15px" }}>
                   <div className="view-controller-instructions-form-field" style={{ flex: "1", minWidth: "0" }}>
                     <label>{isImport ? "ETA" : "Stack Date"}</label>
-                    <div
-                      className="view-controller-instructions-date-input-group"
-                      ref={fieldRefs.stackDate}
-                      style={{ width: "100%" }}
-                    >
+                    <div className="view-controller-instructions-date-input-group" style={{ width: "100%" }}>
                       <input
                         type="date"
                         className="view-controller-instructions-form-input"
-                        ref={etaDateRef}
                         placeholder="Date here"
                         name="stackDate"
                         value={formData.stackDate}
                         readOnly
-                        style={{ ...nonEditableStyle, width: "75%" }}
+                        style={{ ...nonEditableStyle, width: "100%" }}
                       />
-                      <button
-                        className="view-controller-instructions-calendar-button"
-                        style={{ visibility: "hidden" }}
-                      ></button>
                     </div>
                   </div>
                   <div className="view-controller-instructions-form-field" style={{ flex: "1", minWidth: "0" }}>
                     <label>Deadline</label>
-                    <div
-                      className="view-controller-instructions-date-input-group"
-                      ref={fieldRefs.deadline}
-                      style={{ width: "100%" }}
-                    >
+                    <div className="view-controller-instructions-date-input-group" style={{ width: "100%" }}>
                       <input
                         type="date"
                         className="view-controller-instructions-form-input"
-                        ref={deadlineDateRef}
                         placeholder="Date here"
                         name="deadline"
                         value={formData.deadline}
                         readOnly
-                        style={{ ...nonEditableStyle, width: "75%" }}
+                        style={{ ...nonEditableStyle, width: "100%" }}
                       />
-                      <button
-                        className="view-controller-instructions-calendar-button"
-                        style={{ visibility: "hidden" }}
-                      ></button>
                     </div>
                   </div>
                 </div>
@@ -955,13 +1066,10 @@ const Viewcontrollerinstructions = () => {
           className="view-controller-instructions-form-section view-controller-instructions-vessel-info-section"
           style={{ marginTop: "16px" }}
         >
-          <div
-            className="view-controller-instructions-form-row view-controller-instructions-vessel-info-row"
-            style={{ display: "flex", flexWrap: "wrap", gap: "12px", alignItems: "flex-start", width: "100%" }}
-          >
+          <div className="view-controller-instructions-form-row" style={{ display: "flex", flexWrap: "wrap", gap: "12px", alignItems: "flex-start", width: "100%" }}>
             <div className="view-controller-instructions-form-field">
               <label>Vessel Name</label>
-              <div className="view-controller-instructions-input-wrapper" ref={fieldRefs.vesselName}>
+              <div className="view-controller-instructions-input-wrapper">
                 <input
                   type="text"
                   className="view-controller-instructions-form-input"
@@ -975,7 +1083,7 @@ const Viewcontrollerinstructions = () => {
             </div>
             <div className="view-controller-instructions-form-field">
               <label>Voyage No.</label>
-              <div className="view-controller-instructions-input-wrapper" ref={fieldRefs.voyageNo}>
+              <div className="view-controller-instructions-input-wrapper">
                 <input
                   type="text"
                   className="view-controller-instructions-form-input"
@@ -989,11 +1097,11 @@ const Viewcontrollerinstructions = () => {
             </div>
             <div className="view-controller-instructions-form-field">
               <label>IMO No.</label>
-              <div className="view-controller-instructions-input-wrapper" ref={fieldRefs.imoNo}>
+              <div className="view-controller-instructions-input-wrapper">
                 <input
                   type="text"
                   className="view-controller-instructions-form-input"
-                  placeholder="Enter IMO number (numbers only)"
+                  placeholder="Enter IMO number"
                   name="imoNo"
                   value={formData.imoNo}
                   readOnly
@@ -1003,11 +1111,11 @@ const Viewcontrollerinstructions = () => {
             </div>
             <div className="view-controller-instructions-form-field">
               <label>Flag Reg</label>
-              <div className="view-controller-instructions-input-wrapper" ref={fieldRefs.flagReg}>
+              <div className="view-controller-instructions-input-wrapper">
                 <input
                   type="text"
                   className="view-controller-instructions-form-input"
-                  placeholder="Enter flag registration (letters only)"
+                  placeholder="Enter flag registration"
                   name="flagReg"
                   value={formData.flagReg}
                   readOnly
@@ -1016,46 +1124,93 @@ const Viewcontrollerinstructions = () => {
               </div>
             </div>
             {/* Description from Client */}
-            <div
-              className="view-controller-instructions-form-field view-controller-instructions-description-field"
-              style={{ flex: "1 1 180px", minWidth: "160px", maxWidth: "180px" }}
-            >
+            <div className="view-controller-instructions-form-field" style={{ flex: "1 1 100%" }}>
               <label>Description from Client</label>
-              <div className="view-controller-instructions-textarea-wrapper" ref={fieldRefs.description}>
+              <div className="view-controller-instructions-textarea-wrapper">
                 <textarea
                   className="view-controller-instructions-form-textarea"
                   placeholder="Description from Client"
                   name="description"
                   value={formData.description}
                   readOnly
-                  style={{ ...nonEditableStyle, height: "60px", width: "100%", resize: "vertical" }}
+                  style={{ ...nonEditableStyle, height: "80px", width: "100%", resize: "vertical" }}
                 ></textarea>
               </div>
             </div>
           </div>
         </div>
 
-        {/* Submit Button */}
-        <div className="view-controller-instructions-button-container">
-          <button
-            className="view-controller-instructions-add-container-button"
-            onClick={handleViewContainerDetails}
-            disabled={
-              isLoading.clients ||
-              isLoading.shipmentTypes ||
-              isLoading.startingPoints ||
-              isLoading.destinations ||
-              isLoading.instruction ||
-              clients.length === 0 ||
-              shipmentTypes.length === 0 ||
-              startingPoints.length === 0 ||
-              destinations.length === 0
-            }
-          >
-            See Container Details
-          </button>
+        {/* Container Details Section */}
+        <div className="container-details-wrapper mt-4">
+          <h4 className="mb-3">Container Details</h4>
+          <div className="content">
+            {isLoadingContainers ? (
+              <div className="text-center p-3">
+                <div className="spinner-border text-primary" role="status">
+                  <span className="visually-hidden">Loading...</span>
+                </div>
+                <p className="mt-2">Loading container data...</p>
+              </div>
+            ) : containers.length > 0 ? (
+              <div className="container-table-wrapper">
+                <table className="container-table1">
+                  <thead>
+                    <tr>
+                      <th>#</th>
+                      <th>Container Type</th>
+                      <th>Container Number</th>
+                      {isImport && <th>Weight</th>}
+                      <th>Cargo Description</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {containers.map((container, index) => (
+                      <tr key={container.id} className={index % 2 === 1 ? "even-row" : ""}>
+                        <td>{container.id}</td>
+                        <td>{container.containerType}</td>
+                        <td>
+                          <input
+                            type="text"
+                            value={container.containerNum}
+                            readOnly
+                            className="container-input"
+                            style={nonEditableStyle}
+                          />
+                        </td>
+                        {isImport && (
+                          <td>
+                            <input
+                              type="text"
+                              value={container.weight}
+                              readOnly
+                              className="container-input"
+                              style={nonEditableStyle}
+                            />
+                          </td>
+                        )}
+                        <td>
+                          <input
+                            type="text"
+                            value={container.cargoDescription}
+                            readOnly
+                            className="container-input"
+                            style={nonEditableStyle}
+                          />
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            ) : (
+              <div className="alert alert-info mb-0">
+                No container details available for this instruction.
+              </div>
+            )}
+          </div>
         </div>
-      </div>
+        </div>
+      )}
     </div>
   )
 }

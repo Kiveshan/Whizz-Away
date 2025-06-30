@@ -20,7 +20,17 @@ const router = express.Router()
 
 // Existing routes
 router.get("/shipment-types", getShipmentTypesHandler)
-router.get("/containers/:instructionId", getContainersHandler)
+// Test route - should work
+router.get('/test-containers/:id', (req, res) => {
+  console.log(`[${new Date().toISOString()}] Test route hit with ID:`, req.params.id);
+  res.json({ success: true, message: 'Test route works!', id: req.params.id });
+});
+
+// Containers route - simplified for debugging
+router.get('/containers/:instructionId', (req, res, next) => {
+  console.log(`[${new Date().toISOString()}] CONTAINERS ROUTE HIT with ID:`, req.params.instructionId);
+  next();
+}, getContainersHandler);
 router.post("/save-instruction", verifyToken, saveInstructionHandler)
 router.get("/client-instruction-stats", getClientInstructionStatsHandler)
 router.get("/instructions", getInstructionsHandler)

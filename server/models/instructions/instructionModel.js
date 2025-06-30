@@ -18,16 +18,46 @@ export const getShipmentTypes = async () => {
 }
 
 export const getContainersByInstructionId = async (instructionId) => {
+  // Convert instructionId to string to match database type
+  const instructionIdStr = String(instructionId);
   const query = `
     SELECT containerkey, containernum, weight, m1key, container_type, cargo_description
     FROM public.container
     WHERE m1key = $1
   `
+  
+  console.log(`[${new Date().toISOString()}] getContainersByInstructionId: Executing query`, {
+    query,
+    params: [instructionIdStr],
+    instructionId,
+    instructionIdType: typeof instructionId,
+    instructionIdStr,
+    instructionIdStrType: typeof instructionIdStr
+  });
+  
   const client = await pool.connect()
   try {
-    const result = await client.query(query, [instructionId])
+    const startTime = Date.now();
+    const result = await client.query(query, [instructionIdStr])
+    const duration = Date.now() - startTime;
+    
+    console.log(`[${new Date().toISOString()}] getContainersByInstructionId: Query completed`, {
+      instructionId,
+      instructionIdStr,
+      rowCount: result.rowCount,
+      duration: `${duration}ms`,
+      sampleRows: result.rows.slice(0, 3) // Log first 3 rows as sample
+    });
+    
     return result.rows
   } catch (error) {
+    console.error(`[${new Date().toISOString()}] Error in getContainersByInstructionId:`, {
+      error: error.message,
+      stack: error.stack,
+      instructionId,
+      instructionIdStr,
+      query
+    });
     throw error
   } finally {
     client.release()
@@ -101,8 +131,11 @@ export const saveInstruction = async ({ controllerData, containerData }) => {
       calculatedTotalCost
     });
 
-    // Overwrite/ensure total_cost field
-    controllerData.total_cost = calculatedTotalCost;
+    // Format total cost to 2 decimal places and ensure it's a number
+    const formattedTotalCost = Number(calculatedTotalCost.toFixed(2));
+    
+    // Overwrite/ensure total_cost field with formatted value
+    controllerData.total_cost = formattedTotalCost;
 
     const controllerValues = [
       controllerData.clientId || null,
