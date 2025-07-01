@@ -4,25 +4,28 @@ import {
   getClientStatementsHandler,
   getStatementDetailsHandler,
   generateStatementsHandler,
+  authenticateScheduledJob, // Add this import
 } from "../../controllers/statements/statementController.js";
 
 const router = express.Router();
 
-// Get statements for a specific client
+// Existing routes (keep these)
 router.get(
   "/api/statements/:clientId",
   verifyToken,
   getClientStatementsHandler
 );
-
-// Get details for a specific statement
 router.get(
   "/api/statement/:statementId",
   verifyToken,
   getStatementDetailsHandler
 );
 
-// Generate statements (manual trigger)
-router.post("/api/statements/generate", verifyToken, generateStatementsHandler);
+// Update this route to use authenticateScheduledJob instead of verifyToken
+router.post(
+  "/api/statements/generate",
+  authenticateScheduledJob,
+  generateStatementsHandler
+);
 
 export default router;

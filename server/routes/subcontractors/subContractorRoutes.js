@@ -6,28 +6,22 @@ import {
   getCompanyInfoHandler,
   getSubcontractorInfoHandler,
   generateSubcontractorStatementHandler,
+  authenticateScheduledJob, // Add this import
 } from "../../controllers/subcontractors/subContractorController.js";
 
 const router = express.Router();
 
-// Get all subcontractors
+// Existing routes (keep these)
 router.get("/subcontractor", getAllSubContractorsHandler);
-
-// Get statements for a specific subcontractor
 router.get("/subcontractor/statements", getSubContractorStatementsHandler);
-
-// Get details for a specific statement
 router.get("/subcontractor/statement-details", getStatementDetailsHandler);
-
-// Get company information
 router.get("/subcontractor/company-info", getCompanyInfoHandler);
-
-// Get subcontractor information
 router.get("/subcontractor/info", getSubcontractorInfoHandler);
 
-// Generate subcontractor statements (manual trigger)
+// Update this route to use authenticateScheduledJob
 router.post(
   "/subcontractor/generate-statement",
+  authenticateScheduledJob,
   generateSubcontractorStatementHandler
 );
 

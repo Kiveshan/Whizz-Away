@@ -7,6 +7,22 @@ import {
 } from "../../models/subcontractors/subContractorModel.js";
 import { generateCurrentMonthStatements } from "../../utils/subcontractorStatementGeneration.js";
 
+const authenticateScheduledJob = (req, res, next) => {
+  const authHeader = req.headers.authorization;
+  const token = authHeader && authHeader.split(" ")[1];
+
+  if (!token || token !== process.env.API_SECRET) {
+    console.log("Unauthorized API call attempt");
+    return res.status(401).json({
+      success: false,
+      message: "Unauthorized - Invalid API secret",
+    });
+  }
+
+  console.log("Authenticated scheduled job request");
+  next();
+};
+
 const getAllSubContractorsHandler = async (req, res) => {
   try {
     console.log("Fetching subcontractors from database...");
@@ -149,4 +165,5 @@ export {
   getCompanyInfoHandler,
   getSubcontractorInfoHandler,
   generateSubcontractorStatementHandler,
+  authenticateScheduledJob,
 };

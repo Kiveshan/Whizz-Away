@@ -310,16 +310,4 @@ const upsertSubcontractorStatement = async (
   }
 };
 
-// Schedule the statement generation to run on the 1st day of each month at 1:00 AM
-cron.schedule("0 1 1 * *", async () => {
-  console.log("🚀 Starting monthly statement generation...");
-
-  try {
-    const result = await generateCurrentMonthStatements();
-    console.log("✅ Statement generation completed successfully:", result);
-  } catch (error) {
-    console.error("❌ Statement generation failed:", error);
-  }
-});
-
 export { generateStatementsForMonth, generateCurrentMonthStatements };

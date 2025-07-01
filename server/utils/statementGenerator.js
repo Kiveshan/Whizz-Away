@@ -366,10 +366,4 @@ async function generateMonthlyStatements(specificClientId = null) {
   }
 }
 
-// Schedule the statement generation to run on the 2nd day of each month at 1:00 AM
-cron.schedule("0 1 1 * *", async () => {
-  console.log("Running scheduled statement generation task");
-  await generateMonthlyStatements();
-});
-
 export { generateMonthlyStatements };
