@@ -6,21 +6,22 @@ import {
   getSubcontractorInfo,
 } from "../../models/subcontractors/subContractorModel.js";
 import { generateCurrentMonthStatements } from "../../utils/subcontractorStatementGeneration.js";
+import { verifyToken } from "../../middleware/auth.js";
 
 const authenticateScheduledJob = (req, res, next) => {
+  // Check if it's a scheduled job first (API_SECRET)
   const authHeader = req.headers.authorization;
   const token = authHeader && authHeader.split(" ")[1];
 
-  if (!token || token !== process.env.API_SECRET) {
-    console.log("Unauthorized API call attempt");
-    return res.status(401).json({
-      success: false,
-      message: "Unauthorized - Invalid API secret",
-    });
+  if (token === process.env.API_SECRET) {
+    console.log("Authenticated scheduled job request");
+    req.isScheduledJob = true;
+    return next();
   }
 
-  console.log("Authenticated scheduled job request");
-  next();
+  // If not API_SECRET, use existing verifyToken middleware
+  req.isScheduledJob = false;
+  return verifyToken(req, res, next);
 };
 
 const getAllSubContractorsHandler = async (req, res) => {
