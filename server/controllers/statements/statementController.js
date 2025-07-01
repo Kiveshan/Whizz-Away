@@ -2,6 +2,7 @@ import {
   getClientStatements,
   getStatementDetails,
 } from "../../models/statements/statementModel.js";
+import { generateMonthlyStatements } from "../../utils/statementGenerator.js";
 
 const getClientStatementsHandler = async (req, res) => {
   try {
@@ -23,7 +24,10 @@ const getClientStatementsHandler = async (req, res) => {
       data: result.data,
     });
   } catch (error) {
-    console.error(`Error fetching statements for client ${clientId}:`, error);
+    console.error(
+      `Error fetching statements for client ${req.params.clientId}:`,
+      error
+    );
     res.status(500).json({
       success: false,
       message: error.message,
@@ -102,7 +106,7 @@ const getStatementDetailsHandler = async (req, res) => {
       data: result.data,
     });
   } catch (error) {
-    console.error(`Error fetching statement ${statementId}:`, error);
+    console.error(`Error fetching statement ${req.params.statementId}:`, error);
     res.status(500).json({
       success: false,
       message: error.message,
@@ -111,4 +115,48 @@ const getStatementDetailsHandler = async (req, res) => {
   }
 };
 
-export { getClientStatementsHandler, getStatementDetailsHandler };
+const generateStatementsHandler = async (req, res) => {
+  try {
+    const { clientId, specificClient } = req.body;
+
+    console.log(
+      `Manual statement generation requested${
+        specificClient ? ` for client ${clientId}` : " for all clients"
+      }`
+    );
+
+    // Validate input for specific client generation
+    if (specificClient && !clientId) {
+      return res.status(400).json({
+        success: false,
+        message: "Client ID is required for specific client generation",
+      });
+    }
+
+    // Call the statement generation function
+    const result = await generateMonthlyStatements(
+      specificClient ? clientId : null
+    );
+
+    console.log(`Statement generation completed: ${result.message}`);
+
+    res.json(result);
+  } catch (error) {
+    console.error("Error in manual statement generation:", error);
+    res.status(500).json({
+      success: false,
+      message: "Internal server error during statement generation",
+      error:
+        process.env.NODE_ENV === "production"
+          ? "Internal server error"
+          : error.message,
+      stack: process.env.NODE_ENV === "production" ? null : error.stack,
+    });
+  }
+};
+
+export {
+  getClientStatementsHandler,
+  getStatementDetailsHandler,
+  generateStatementsHandler,
+};
