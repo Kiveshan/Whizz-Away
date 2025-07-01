@@ -1,5 +1,4 @@
 import { pool } from "../config/database.js";
-import cron from "node-cron";
 
 /**
  * Generate statements for current month based on previous month's legs
@@ -47,8 +46,6 @@ const generateCurrentMonthStatements = async (specificSubeiRegNum = null) => {
         e.companyname,
         e.contact_person,
         ARRAY_AGG(l.legkey) as leg_ids,
-        ARRAY_AGG(l.driverrate) as driver_rates,
-        SUM(l.driverrate) as total_amount,
         COUNT(l.legkey) as total_legs
       FROM m5_employee e
       INNER JOIN legs_m2 l ON e.userid = l.driverid
@@ -71,7 +68,6 @@ const generateCurrentMonthStatements = async (specificSubeiRegNum = null) => {
 
     subcontractorQuery += `
       GROUP BY e.subei_reg_num, e.companyname, e.contact_person
-      HAVING SUM(l.driverrate) > 0
     `;
 
     console.log("Executing query with params:", queryParams);
@@ -203,8 +199,6 @@ const generateStatementsForMonth = async (
         e.companyname,
         e.contact_person,
         ARRAY_AGG(l.legkey) as leg_ids,
-        ARRAY_AGG(l.driverrate) as driver_rates,
-        SUM(l.driverrate) as total_amount,
         COUNT(l.legkey) as total_legs
       FROM m5_employee e
       INNER JOIN legs_m2 l ON e.userid = l.driverid
@@ -227,7 +221,6 @@ const generateStatementsForMonth = async (
 
     subcontractorQuery += `
       GROUP BY e.subei_reg_num, e.companyname, e.contact_person
-      HAVING SUM(l.driverrate) > 0
     `;
 
     const subcontractorResult = await client.query(
@@ -303,6 +296,108 @@ const generateStatementsForMonth = async (
 };
 
 /**
+ * Get leg details with VAT calculation for a subcontractor
+ */
+const getLegsWithVAT = async (client, legIds, subeiRegNum) => {
+  try {
+    console.log(`Getting leg details with VAT for ${legIds.length} legs`);
+
+    // First, check if we should get rates from existing statement
+    const existingStatementQuery = `
+      SELECT legids 
+      FROM subcontractor_statements 
+      WHERE subbie_reg_num = $1 
+      ORDER BY date DESC 
+      LIMIT 1
+    `;
+
+    const existingResult = await client.query(existingStatementQuery, [
+      subeiRegNum,
+    ]);
+    let useExistingRates = false;
+    const existingLegRates = new Map();
+
+    if (existingResult.rows.length > 0 && existingResult.rows[0].legids) {
+      try {
+        const existingLegids = existingResult.rows[0].legids;
+        if (Array.isArray(existingLegids)) {
+          useExistingRates = true;
+          existingLegids.forEach((leg) => {
+            existingLegRates.set(leg.legkey, leg.driverrate);
+          });
+          console.log(
+            `Found existing statement with ${existingLegids.length} legs, using existing rates`
+          );
+        }
+      } catch (e) {
+        console.log(
+          "Could not parse existing legids, will calculate fresh rates"
+        );
+      }
+    }
+
+    // Get leg details with instruction VAT
+    const legDetailsQuery = `
+      SELECT 
+        l.legkey,
+        l.driverrate as original_rate,
+        l.m1key,
+        COALESCE(m1.vat, 0) as vat_percentage
+      FROM legs_m2 l
+      LEFT JOIN m1_controller m1 ON l.m1key = m1.m1key
+      WHERE l.legkey = ANY($1)
+    `;
+
+    const legDetailsResult = await client.query(legDetailsQuery, [legIds]);
+    const legDetails = [];
+    let totalAmount = 0;
+
+    for (const leg of legDetailsResult.rows) {
+      let finalRate;
+
+      if (useExistingRates && existingLegRates.has(leg.legkey)) {
+        // Use rate from existing statement
+        finalRate = existingLegRates.get(leg.legkey);
+        console.log(`Leg ${leg.legkey}: Using existing rate R${finalRate}`);
+      } else {
+        // Calculate new rate with VAT
+        const originalRate = Number.parseFloat(leg.original_rate) || 0;
+        const vatPercentage = Number.parseFloat(leg.vat_percentage) || 0;
+        const vatAmount = (originalRate * vatPercentage) / 100;
+        finalRate = originalRate + vatAmount;
+
+        console.log(
+          `Leg ${
+            leg.legkey
+          }: Original R${originalRate} + VAT ${vatPercentage}% (R${vatAmount.toFixed(
+            2
+          )}) = R${finalRate.toFixed(2)}`
+        );
+      }
+
+      legDetails.push({
+        legkey: leg.legkey,
+        driverrate: finalRate,
+      });
+
+      totalAmount += finalRate;
+    }
+
+    console.log(
+      `Total amount for ${legDetails.length} legs: R${totalAmount.toFixed(2)}`
+    );
+
+    return {
+      legDetails,
+      totalAmount,
+    };
+  } catch (error) {
+    console.error("Error getting legs with VAT:", error);
+    throw error;
+  }
+};
+
+/**
  * Insert or update a statement record for a subcontractor (UPSERT)
  */
 const upsertSubcontractorStatement = async (
@@ -324,29 +419,19 @@ const upsertSubcontractorStatement = async (
       return { created: false, updated: false };
     }
 
-    // Validate and prepare leg details for JSON storage
+    // Validate leg IDs
     if (!subcontractor.leg_ids || !Array.isArray(subcontractor.leg_ids)) {
       console.log("No leg IDs found for subcontractor");
       return { created: false, updated: false };
     }
 
-    if (
-      !subcontractor.driver_rates ||
-      !Array.isArray(subcontractor.driver_rates)
-    ) {
-      console.log("No driver rates found for subcontractor");
-      return { created: false, updated: false };
-    }
+    // Get leg details with VAT calculation
+    const { legDetails, totalAmount } = await getLegsWithVAT(
+      client,
+      subcontractor.leg_ids,
+      subcontractor.subei_reg_num
+    );
 
-    const legDetails = subcontractor.leg_ids.map((legId, index) => ({
-      legkey: legId,
-      driverrate: subcontractor.driver_rates[index] || 0,
-    }));
-
-    console.log(`Leg details for ${subcontractor.companyname}:`, legDetails);
-
-    // Validate total amount
-    const totalAmount = Number.parseFloat(subcontractor.total_amount) || 0;
     if (totalAmount <= 0) {
       console.log("Skipping subcontractor - total amount is 0 or invalid");
       return { created: false, updated: false };
@@ -383,7 +468,11 @@ const upsertSubcontractorStatement = async (
       await client.query(updateQuery, updateParams);
 
       console.log(
-        `✅ Updated statement ${existingStatementId} for ${subcontractor.companyname} - Amount: R${totalAmount} (${subcontractor.total_legs} legs)`
+        `✅ Updated statement ${existingStatementId} for ${
+          subcontractor.companyname
+        } - Amount: R${totalAmount.toFixed(2)} (${
+          subcontractor.total_legs
+        } legs)`
       );
       return { created: false, updated: true };
     } else {
@@ -408,7 +497,11 @@ const upsertSubcontractorStatement = async (
       const insertResult = await client.query(insertQuery, insertParams);
 
       console.log(
-        `✅ Created statement ${insertResult.rows[0].sub_state_id} for ${subcontractor.companyname} - Amount: R${totalAmount} (${subcontractor.total_legs} legs)`
+        `✅ Created statement ${insertResult.rows[0].sub_state_id} for ${
+          subcontractor.companyname
+        } - Amount: R${totalAmount.toFixed(2)} (${
+          subcontractor.total_legs
+        } legs)`
       );
       return { created: true, updated: false };
     }
