@@ -4,7 +4,11 @@ import cron from "node-cron";
 /**
  * Manual function to generate statements for a specific month (for testing/backfill)
  */
-const generateStatementsForMonth = async (year, month) => {
+const generateStatementsForMonth = async (
+  year,
+  month,
+  specificSubeiRegNum = null
+) => {
   let client;
 
   try {
@@ -31,7 +35,7 @@ const generateStatementsForMonth = async (year, month) => {
       `Date range: ${formattedInvoiceStartDate} to ${formattedInvoiceEndDate}`
     );
 
-    const subcontractorQuery = `
+    let subcontractorQuery = `
       SELECT 
         e.subei_reg_num,
         e.companyname,
@@ -49,23 +53,47 @@ const generateStatementsForMonth = async (year, month) => {
         AND l.date <= $2
         AND l.driverrate IS NOT NULL
         AND l.driverrate > 0
+    `;
+
+    const queryParams = [formattedInvoiceStartDate, formattedInvoiceEndDate];
+
+    // Add specific subcontractor filter if provided
+    if (specificSubeiRegNum) {
+      subcontractorQuery += ` AND e.subei_reg_num = $3`;
+      queryParams.push(specificSubeiRegNum);
+    }
+
+    subcontractorQuery += `
       GROUP BY e.subei_reg_num, e.companyname, e.contact_person
       HAVING SUM(l.driverrate) > 0
     `;
 
-    console.log("Executing query with params:", [
-      formattedInvoiceStartDate,
-      formattedInvoiceEndDate,
-    ]);
+    console.log("Executing query with params:", queryParams);
 
-    const subcontractorResult = await client.query(subcontractorQuery, [
-      formattedInvoiceStartDate,
-      formattedInvoiceEndDate,
-    ]);
+    const subcontractorResult = await client.query(
+      subcontractorQuery,
+      queryParams
+    );
 
     console.log(
       `Found ${subcontractorResult.rows.length} subcontractors with activity`
     );
+
+    if (subcontractorResult.rows.length === 0) {
+      const message = specificSubeiRegNum
+        ? `No activity found for subcontractor ${specificSubeiRegNum} in ${year}-${month
+            .toString()
+            .padStart(2, "0")}`
+        : `No subcontractors with activity found for ${year}-${month
+            .toString()
+            .padStart(2, "0")}`;
+      return {
+        success: true,
+        message,
+        count: 0,
+        stats: { processed: 0, created: 0, updated: 0 },
+      };
+    }
 
     // Debug: Log the first result to see the data structure
     if (subcontractorResult.rows.length > 0) {
@@ -75,16 +103,46 @@ const generateStatementsForMonth = async (year, month) => {
       );
     }
 
+    let processedCount = 0;
+    let createdCount = 0;
+    let updatedCount = 0;
+
     for (const subcontractor of subcontractorResult.rows) {
-      await insertSubcontractorStatement(client, subcontractor, invoiceEndDate);
+      const result = await upsertSubcontractorStatement(
+        client,
+        subcontractor,
+        invoiceEndDate
+      );
+      if (result.created) {
+        createdCount++;
+      } else if (result.updated) {
+        updatedCount++;
+      }
+      processedCount++;
     }
+
+    const message = specificSubeiRegNum
+      ? `Statement processed for subcontractor ${specificSubeiRegNum}. ${
+          createdCount > 0
+            ? "Created new statement."
+            : "Updated existing statement."
+        }`
+      : `Generated ${processedCount} statements for ${year}-${month
+          .toString()
+          .padStart(
+            2,
+            "0"
+          )}. Created: ${createdCount}, Updated: ${updatedCount}`;
 
     return {
       success: true,
-      message: `Generated ${
-        subcontractorResult.rows.length
-      } statements for ${year}-${month.toString().padStart(2, "0")}`,
-      count: subcontractorResult.rows.length,
+      message,
+      count: processedCount,
+      stats: {
+        processed: processedCount,
+        created: createdCount,
+        updated: updatedCount,
+      },
     };
   } catch (error) {
     console.error("Error in generateStatementsForMonth:", error);
@@ -95,9 +153,38 @@ const generateStatementsForMonth = async (year, month) => {
 };
 
 /**
- * Insert a statement record for a subcontractor
+ * Generate statements for current month based on previous month's data
  */
-const insertSubcontractorStatement = async (
+const generateCurrentMonthStatements = async (specificSubeiRegNum = null) => {
+  // Use the same date calculation logic as the other statement generation code
+  const today = new Date();
+  const currentMonth = today.getMonth();
+  const currentYear = today.getFullYear();
+
+  console.log(`Current date: ${today.toISOString().split("T")[0]}`);
+  console.log(
+    `Current month: ${currentMonth + 1}, Current year: ${currentYear}`
+  );
+
+  const previousMonth = currentMonth === 0 ? 11 : currentMonth - 1;
+  const previousYear = currentMonth === 0 ? currentYear - 1 : currentYear;
+
+  console.log(
+    `Previous month: ${previousMonth + 1}, Previous year: ${previousYear}`
+  );
+
+  // Pass the previous year and month (adding 1 because our function expects 1-12, not 0-11)
+  return await generateStatementsForMonth(
+    previousYear,
+    previousMonth + 1,
+    specificSubeiRegNum
+  );
+};
+
+/**
+ * Insert or update a statement record for a subcontractor (UPSERT)
+ */
+const upsertSubcontractorStatement = async (
   client,
   subcontractor,
   statementDate
@@ -112,11 +199,39 @@ const insertSubcontractorStatement = async (
     // Validate required fields
     if (!subcontractor.subei_reg_num) {
       console.log("Skipping subcontractor - no registration number");
-      return;
+      return { created: false, updated: false };
     }
 
     if (!statementDate) {
       throw new Error("Statement date is required");
+    }
+
+    // Validate and prepare leg details for JSON storage
+    if (!subcontractor.leg_ids || !Array.isArray(subcontractor.leg_ids)) {
+      console.log("No leg IDs found for subcontractor");
+      return { created: false, updated: false };
+    }
+
+    if (
+      !subcontractor.driver_rates ||
+      !Array.isArray(subcontractor.driver_rates)
+    ) {
+      console.log("No driver rates found for subcontractor");
+      return { created: false, updated: false };
+    }
+
+    const legDetails = subcontractor.leg_ids.map((legId, index) => ({
+      legkey: legId,
+      driverrate: subcontractor.driver_rates[index] || 0,
+    }));
+
+    console.log(`Leg details for ${subcontractor.companyname}:`, legDetails);
+
+    // Validate total amount
+    const totalAmount = Number.parseFloat(subcontractor.total_amount) || 0;
+    if (totalAmount <= 0) {
+      console.log("Skipping subcontractor - total amount is 0 or invalid");
+      return { created: false, updated: false };
     }
 
     // Check if statement already exists for this month
@@ -135,72 +250,58 @@ const insertSubcontractorStatement = async (
     ]);
 
     if (existingResult.rows.length > 0) {
+      // Update existing statement
+      const existingStatementId = existingResult.rows[0].sub_state_id;
+      const updateQuery = `
+        UPDATE subcontractor_statements 
+        SET amount = $2, legids = $3, date = $4
+        WHERE sub_state_id = $1
+      `;
+
+      const updateParams = [
+        existingStatementId,
+        totalAmount,
+        JSON.stringify(legDetails),
+        statementDate.toISOString().split("T")[0],
+      ];
+
+      await client.query(updateQuery, updateParams);
+
       console.log(
-        `Statement already exists for ${subcontractor.companyname} (${
-          subcontractor.subei_reg_num
-        }) for ${statementDate.getFullYear()}-${(statementDate.getMonth() + 1)
-          .toString()
-          .padStart(2, "0")}`
+        `✅ Updated statement ${existingStatementId} for ${subcontractor.companyname} - Amount: R${totalAmount} (${subcontractor.total_legs} legs)`
       );
-      return;
+      return { created: false, updated: true };
+    } else {
+      // Insert new statement
+      const insertQuery = `
+        INSERT INTO subcontractor_statements (
+          subbie_reg_num, 
+          date, 
+          amount, 
+          legids
+        ) VALUES ($1, $2, $3, $4)
+        RETURNING sub_state_id
+      `;
+
+      const insertParams = [
+        subcontractor.subei_reg_num,
+        statementDate.toISOString().split("T")[0],
+        totalAmount,
+        JSON.stringify(legDetails),
+      ];
+
+      console.log("Insert params:", insertParams);
+
+      const insertResult = await client.query(insertQuery, insertParams);
+
+      console.log(
+        `✅ Created statement ${insertResult.rows[0].sub_state_id} for ${subcontractor.companyname} - Amount: R${totalAmount} (${subcontractor.total_legs} legs)`
+      );
+      return { created: true, updated: false };
     }
-
-    // Validate and prepare leg details for JSON storage
-    if (!subcontractor.leg_ids || !Array.isArray(subcontractor.leg_ids)) {
-      console.log("No leg IDs found for subcontractor");
-      return;
-    }
-
-    if (
-      !subcontractor.driver_rates ||
-      !Array.isArray(subcontractor.driver_rates)
-    ) {
-      console.log("No driver rates found for subcontractor");
-      return;
-    }
-
-    const legDetails = subcontractor.leg_ids.map((legId, index) => ({
-      legkey: legId,
-      driverrate: subcontractor.driver_rates[index] || 0,
-    }));
-
-    console.log(`Leg details for ${subcontractor.companyname}:`, legDetails);
-
-    // Validate total amount
-    const totalAmount = Number.parseFloat(subcontractor.total_amount) || 0;
-    if (totalAmount <= 0) {
-      console.log("Skipping subcontractor - total amount is 0 or invalid");
-      return;
-    }
-
-    // Insert new statement
-    const insertQuery = `
-      INSERT INTO subcontractor_statements (
-        subbie_reg_num, 
-        date, 
-        amount, 
-        legids
-      ) VALUES ($1, $2, $3, $4)
-      RETURNING sub_state_id
-    `;
-
-    const insertParams = [
-      subcontractor.subei_reg_num,
-      statementDate.toISOString().split("T")[0],
-      totalAmount,
-      JSON.stringify(legDetails),
-    ];
-
-    console.log("Insert params:", insertParams);
-
-    const insertResult = await client.query(insertQuery, insertParams);
-
-    console.log(
-      `✅ Created statement ${insertResult.rows[0].sub_state_id} for ${subcontractor.companyname} - Amount: R${totalAmount} (${subcontractor.total_legs} legs)`
-    );
   } catch (error) {
     console.error(
-      `❌ Error inserting statement for ${
+      `❌ Error upserting statement for ${
         subcontractor.companyname || "Unknown"
       }:`,
       error
@@ -209,48 +310,16 @@ const insertSubcontractorStatement = async (
   }
 };
 
-// Schedule the statement generation to run on the 2nd day of each month at 1:00 AM
+// Schedule the statement generation to run on the 1st day of each month at 1:00 AM
 cron.schedule("0 1 1 * *", async () => {
   console.log("🚀 Starting monthly statement generation...");
 
-  // Use the same date calculation logic as the other statement generation code
-  const today = new Date();
-  const currentMonth = today.getMonth();
-  const currentYear = today.getFullYear();
-
-  console.log(`Current date: ${today.toISOString().split("T")[0]}`);
-  console.log(
-    `Current month: ${currentMonth + 1}, Current year: ${currentYear}`
-  );
-
-  const previousMonth = currentMonth === 0 ? 11 : currentMonth - 1;
-  const previousYear = currentMonth === 0 ? currentYear - 1 : currentYear;
-
-  const invoiceStartDate = new Date(previousYear, previousMonth, 1, 12, 0, 0);
-  const invoiceEndDate = new Date(previousYear, previousMonth + 1, 0, 12, 0, 0);
-
-  const formattedInvoiceStartDate = invoiceStartDate
-    .toISOString()
-    .split("T")[0];
-  const formattedInvoiceEndDate = invoiceEndDate.toISOString().split("T")[0];
-
-  console.log(
-    `Previous month: ${previousMonth + 1}, Previous year: ${previousYear}`
-  );
-  console.log(
-    `Invoice date range: ${formattedInvoiceStartDate} to ${formattedInvoiceEndDate}`
-  );
-
   try {
-    // Pass the previous year and month (adding 1 because our function expects 1-12, not 0-11)
-    const result = await generateStatementsForMonth(
-      previousYear,
-      previousMonth + 1
-    );
+    const result = await generateCurrentMonthStatements();
     console.log("✅ Statement generation completed successfully:", result);
   } catch (error) {
     console.error("❌ Statement generation failed:", error);
   }
 });
 
-export { generateStatementsForMonth };
+export { generateStatementsForMonth, generateCurrentMonthStatements };
