@@ -250,6 +250,7 @@ function UpdateInstruction() {
   });
   // Add state for no drivers modal
   const [showNoDriversModal, setShowNoDriversModal] = useState(false);
+  const [showShipmentType3Modal, setShowShipmentType3Modal] = useState(false)
   // Add state for back button confirmation modal
   const [showBackConfirmModal, setShowBackConfirmModal] = useState(false);
   // Add state for driver removal confirmation modal
@@ -282,6 +283,15 @@ function UpdateInstruction() {
   });
 
   const [savedLegs, setSavedLegs] = useState(new Set());
+    const isShipmentType3 = () => {
+  return shipmentType === 3
+}
+
+// NEW: Check if we can add more legs for shipment type 3
+const canAddLegForShipmentType3 = () => {
+  if (!isShipmentType3()) return true
+  return legs.length === 0
+}
 
   // Add these state variables after the other state declarations
   const [rates, setRates] = useState({
@@ -1035,15 +1045,19 @@ function UpdateInstruction() {
   };
 
   // Update the handleAddLeg function to only modify local state, not save to database
-  const handleAddLeg = () => {
-    if (isCompleted) return;
+const handleAddLeg = () => {
+  if (isCompleted) return
 
-    // Check if there are unsaved changes in the current leg
-    if (hasUnsavedChanges()) {
-      // Show the unsaved changes modal
-      setShowUnsavedChangesModal(true);
-      return;
-    }
+  // NEW: Check if this is shipment type 3 and if we already have a leg
+  if (isShipmentType3() && !canAddLegForShipmentType3()) {
+    setShowShipmentType3Modal(true)
+    return
+  }
+
+  if (hasUnsavedChanges()) {
+    setShowUnsavedChangesModal(true)
+    return
+  }
 
     // Save current leg data to local state if any
     if (currentLagIndex !== null) {
@@ -1661,36 +1675,35 @@ function UpdateInstruction() {
 
   // Replace the handleFinalizeClick function with this updated version
   // Lines 1423-1447: Update handleFinaliseClick function
-  const handleFinaliseClick = async () => {
-    if (legs.length === 0) {
-      // No legs, just proceed
-      navigateToDocuments();
-      return;
-    }
+const handleFinaliseClick = async () => {
+  if (legs.length === 0) {
+    navigateToDocuments()
+    return
+  }
 
-    // Check if there are any drivers added to any legs - do this check FIRST
-    const hasDrivers = legs.some(
-      (leg) => leg.drivers && leg.drivers.length > 0
-    );
-    if (!hasDrivers) {
-      // No drivers added, show the no drivers modal
-      setShowNoDriversModal(true);
-      return;
-    }
+  const hasDrivers = legs.some((leg) => leg.drivers && leg.drivers.length > 0)
+  if (!hasDrivers) {
+    setShowNoDriversModal(true)
+    return
+  }
 
-    // Check if there are unsaved changes - do this check SECOND
-    if (hasUnsavedChanges()) {
-      // Show the unsaved changes modal
-      setShowUnsavedChangesModal(true);
-      return;
-    }
+  if (hasUnsavedChanges()) {
+    setShowUnsavedChangesModal(true)
+    return
+  }
 
-    try {
-      // Fetch the instruction details to get the pickup and dropoff locations
-      const response = await api.get(`/instructions/${instructionId}/details`);
-      const instructionDetails = response.data;
-      const pickup = instructionDetails.pickup;
-      const dropoff = instructionDetails.dropoff;
+  try {
+    const response = await api.get(`/instructions/${instructionId}/details`)
+    const instructionDetails = response.data
+    const pickup = instructionDetails.pickup
+    const dropoff = instructionDetails.dropoff
+
+    // NEW: For shipment type 3, skip container and destination validation
+    if (isShipmentType3()) {
+      console.log("Shipment type 3 detected, skipping validation checks")
+      navigateToDocuments()
+      return
+    }
 
       // First check if all containers reach the dropoff destination
       const missingContainers = await checkContainersReachDropoff(dropoff);
@@ -2095,16 +2108,18 @@ function UpdateInstruction() {
     return driver ? `${driver.name} ${driver.surname}` : "Unknown Driver";
   };
   // Add this useEffect to check if we should hide the + button whenever legs or containers change
-  useEffect(() => {
-    const checkContainersDestination = async () => {
-      if (
-        !instructionId ||
-        legs.length === 0 ||
-        instructionContainers.length === 0
-      ) {
-        setShouldHideAddLegButton(false);
-        return;
-      }
+useEffect(() => {
+  const checkContainersDestination = async () => {
+    if (!instructionId || legs.length === 0 || instructionContainers.length === 0) {
+      setShouldHideAddLegButton(false)
+      return
+    }
+
+    // NEW: For shipment type 3, hide add leg button if we already have 1 leg
+    if (isShipmentType3()) {
+      setShouldHideAddLegButton(legs.length >= 1)
+      return
+    }
 
       try {
         // Fetch the instruction details to get the dropoff location
@@ -2176,8 +2191,7 @@ function UpdateInstruction() {
     };
 
     checkContainersDestination();
-  }, [legs, instructionContainers, instructionId]);
-
+  }, [legs, instructionContainers, instructionId, shipmentType])
   useEffect(() => {
     // Only update if we have drivers and rates
     if (
@@ -3142,47 +3156,44 @@ function UpdateInstruction() {
         </div>
       )}
 
-      {showContainerModal && (
-        <div className="modal-wrapper">
-          <div className="modal-backdrop animate-fadeIn"></div>
-          <div className="modal-container animate-scaleIn">
-            <div className="modal-header">
-              <h3 className="modal-title">Container Destination Warning</h3>
-              <p className="modal-description">
-                All containers must reach the final destination.
-              </p>
-            </div>
-            <div className="modal-body">
-              <div className="modal-item">
-                <div className="modal-bullet"></div>
-                <span className="modal-item-text">
-                  Final Destination:{" "}
-                  <strong>{containerValidationDetails.dropoff}</strong>
-                </span>
-              </div>
-              {containerValidationDetails.missingContainers.map(
-                (container, index) => (
-                  <div key={index} className="modal-item">
-                    <div className="modal-bullet"></div>
-                    <span className="modal-item-text">
-                      Container <strong>{container}</strong> does not reach
-                      final destination
-                    </span>
-                  </div>
-                )
-              )}
-            </div>
-            <div className="modal-footer">
-              <button
-                className="modal-btn modal-btn-primary"
-                onClick={() => setShowContainerModal(false)}
-              >
-                Okay
-              </button>
-            </div>
-          </div>
+{showContainerModal && (
+  <div className="modal-wrapper">
+    <div className="modal-backdrop animate-fadeIn"></div>
+    <div className="modal-container animate-scaleIn">
+      <div className="modal-header">
+        <h3 className="modal-title">Container Destination Warning</h3>
+        <p className="modal-description">Some containers have not reached their final destination. Do you want to continue anyway?</p>
+      </div>
+      <div className="modal-body">
+        <div className="modal-item">
+          <div className="modal-bullet"></div>
+          <span className="modal-item-text">
+            Final Destination: <strong>{containerValidationDetails.dropoff}</strong>
+          </span>
         </div>
-      )}
+        {containerValidationDetails.missingContainers.map((container, index) => (
+          <div key={index} className="modal-item">
+            <div className="modal-bullet"></div>
+            <span className="modal-item-text">
+              Container <strong>{container}</strong> does not reach final destination
+            </span>
+          </div>
+        ))}
+      </div>
+      <div className="modal-footer">
+        <button className="modal-btn modal-btn-secondary" onClick={() => setShowContainerModal(false)}>
+          No, Go Back
+        </button>
+        <button className="modal-btn modal-btn-primary" onClick={() => {
+          setShowContainerModal(false)
+          navigateToDocuments()
+        }}>
+          Yes, Continue
+        </button>
+      </div>
+    </div>
+  </div>
+)}
 
       {/* Unsaved Changes Modal */}
       {showUnsavedChangesModal && (
