@@ -318,8 +318,9 @@ const UploadProof = () => {
                     />
                     {!isViewMode && (
                       <div className="field-help">
-                        Enter a reference for this payment such as transaction
-                        ID, check number, or any other identifying information.
+                        Enter a reference for this payment such as date of
+                        payment, bank statement no., or any other identifying
+                        information.
                       </div>
                     )}
                   </div>

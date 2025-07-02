@@ -218,15 +218,17 @@ const SubcontractorStatements = () => {
           <button
             onClick={handleManualGeneration}
             disabled={generating}
-            className="generate-statement-btn"
+            className="back-button"
             style={{
-              marginLeft: "10px",
-              padding: "8px 16px",
-              backgroundColor: generating ? "#ccc" : "#28a745",
+              backgroundColor: "#4caf50",
               color: "white",
               border: "none",
-              borderRadius: "4px",
-              cursor: generating ? "not-allowed" : "pointer",
+              padding: "10px 20px",
+              borderRadius: "6px",
+              cursor: "pointer",
+              fontFamily: "inherit",
+              marginTop: "333px",
+              marginLeft: "920px",
             }}
           >
             {generating ? "Generating..." : "Generate Statement"}
