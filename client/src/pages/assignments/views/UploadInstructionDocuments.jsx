@@ -15,7 +15,8 @@ const UploadInstructionDocuments = () => {
   const [documents, setDocuments] = useState([]);
   const [selectedFile, setSelectedFile] = useState(null);
   const [docName, setDocName] = useState("");
-  const [docType, setDocType] = useState("Instruction Document");
+  // const [docType, setDocType] = useState("Instruction Document");
+  const [docType, setDocType] = useState("Delivery Note")
   const [legNumber, setLegNumber] = useState("");
   const [loading, setLoading] = useState(false);
   const [legs, setLegs] = useState([]);
@@ -26,8 +27,27 @@ const UploadInstructionDocuments = () => {
   const [isSubmitting, setIsSubmitting] = useState(isCompleted);
   const [shipmentType, setShipmentType] = useState(null);
   const [debugInfo, setDebugInfo] = useState({});
-  const [containerCount, setContainerCount] = useState(0);
+const [containerCount, setContainerCount] = useState(0);
+const [containersReachedCount, setContainersReachedCount] = useState(0);
   const [isDocumentPage, setIsDocumentPage] = useState(true);
+  // NEW: Check if shipment type is 3
+const isShipmentType3 = () => {
+  return shipmentType === 3
+}
+
+// NEW: Get available document types based on shipment type
+const getAvailableDocumentTypes = () => {
+  if (isShipmentType3()) {
+    return ["Delivery Note"] // Only Delivery Note for shipment type 3
+  }
+
+  // For other shipment types, show all options
+  const types = ["Instruction Document", "Delivery Note"]
+  if (showEmptyTurningDepotOption()) {
+    types.push("Empty Turning Depot Document")
+  }
+  return types
+}
 
   // Add state for modals
   const [showFinishConfirmModal, setShowFinishConfirmModal] = useState(false);
@@ -58,6 +78,9 @@ const UploadInstructionDocuments = () => {
           shipmentTypeFromState: location.state.shipmentType,
           shipmentTypeValueFromState: shipmentTypeValue,
         }));
+        if (shipmentTypeValue === 3) {
+    setDocType("Delivery Note");
+  }
       } else {
         // Otherwise fetch it
         fetchShipmentType();
@@ -65,18 +88,32 @@ const UploadInstructionDocuments = () => {
     }
   }, [instructionId]);
 
+  // const fetchContainers = async () => {
+  //   try {
+  //     const response = await api.get(
+  //       `/containers/instruction/${instructionId}`
+  //     );
+  //     console.log("Containers for instruction:", response.data);
+  //     setContainerCount(response.data.length);
+  //   } catch (error) {
+  //     console.error("Error fetching containers:", error);
+  //     setContainerCount(0);
+  //   }
+  // };
   const fetchContainers = async () => {
-    try {
-      const response = await api.get(
-        `/containers/instruction/${instructionId}`
-      );
-      console.log("Containers for instruction:", response.data);
-      setContainerCount(response.data.length);
-    } catch (error) {
-      console.error("Error fetching containers:", error);
-      setContainerCount(0);
-    }
-  };
+  try {
+    const response = await api.get(`/containers/instruction/${instructionId}`);
+    console.log("Containers for instruction:", response.data);
+    setContainerCount(response.data.length);
+    
+    const reachedCount = await countContainersReachingDestination();
+    setContainersReachedCount(reachedCount);
+  } catch (error) {
+    console.error("Error fetching containers:", error);
+    setContainerCount(0);
+    setContainersReachedCount(0);
+  }
+};
 
   const fetchShipmentType = async () => {
     try {
@@ -96,6 +133,9 @@ const UploadInstructionDocuments = () => {
         shipmentTypeFromAPI: response.data.shipment_type,
         shipmentTypeValueFromAPI: shipmentTypeValue,
       }));
+      if (shipmentTypeValue === 3) {
+      setDocType("Delivery Note")
+    }
     } catch (error) {
       console.error("Error fetching shipment type:", error);
       setDebugInfo((prev) => ({
@@ -197,6 +237,10 @@ const UploadInstructionDocuments = () => {
       setSubmitMessage("Error: File size exceeds 10MB limit");
       return false;
     }
+    if (isShipmentType3() && docType !== "Delivery Note") {
+    setSubmitMessage("Error: Only Delivery Note documents are allowed for this shipment type")
+    return false
+  }
 
     // For Instruction Document type
     if (docType === "Instruction Document") {
@@ -219,7 +263,7 @@ const UploadInstructionDocuments = () => {
         (doc) => doc.type === "Delivery Note"
       );
 
-      if (legDeliveryNotes.length >= containerCount) {
+      if (legDeliveryNotes.length >= containersReachedCount) {
         setSubmitMessage(`Error: Too many delivery notes`);
         return false;
       }
@@ -389,6 +433,7 @@ const UploadInstructionDocuments = () => {
       setDocName("");
       setSelectedFile(null);
       setFilePreview(null);
+      setDocType(isShipmentType3() ? "Delivery Note" : "Instruction Document");
       if (document.getElementById("fileInput")) {
         document.getElementById("fileInput").value = "";
       }
@@ -430,26 +475,35 @@ const UploadInstructionDocuments = () => {
 
   // Modified to show confirmation modal instead of directly completing
   const handleFinish = () => {
-    // Check if we have all required documents
-    const instructionDocs = documents.filter(
-      (doc) => doc.type === "Instruction Document"
+//     // Check if we have all required documents
+// // Check if we have all required documents
+const instructionDocs = documents.filter(
+  (doc) => doc.type === "Instruction Document"
+);
+const deliveryNotes = documents.filter(
+  (doc) => doc.type === "Delivery Note"
+);
+
+// NEW: For shipment type 3, only require delivery notes
+if (isShipmentType3()) {
+  if (deliveryNotes.length === 0) {
+    setSubmitMessage("Error: At least 1 Delivery Note is required");
+    return;
+  }
+} else {
+  // For other shipment types, require instruction document
+  if (instructionDocs.length !== 1) {
+    setSubmitMessage("Error: Exactly 1 Instruction Document is required");
+    return;
+  }
+
+  if (deliveryNotes.length !== containerCount) {
+    setSubmitMessage(
+      `Error: Exactly ${containerCount} Delivery Notes are required (one per container)`
     );
-    const deliveryNotes = documents.filter(
-      (doc) => doc.type === "Delivery Note"
-    );
-
-    if (instructionDocs.length !== 1) {
-      setSubmitMessage("Error: Exactly 1 Instruction Document is required");
-      return;
-    }
-
-    if (deliveryNotes.length !== containerCount) {
-      setSubmitMessage(
-        `Error: Exactly ${containerCount} Delivery Notes are required (one per container)`
-      );
-      return;
-    }
-
+    return;
+  }
+}
     // Show confirmation modal
     setShowFinishConfirmModal(true);
   };
@@ -490,28 +544,34 @@ const UploadInstructionDocuments = () => {
   };
 
   // Check if we can finish the instruction
-  const canFinish = () => {
-    const instructionDocs = documents.filter(
-      (doc) => doc.type === "Instruction Document"
-    );
-    const deliveryNotes = documents.filter(
-      (doc) => doc.type === "Delivery Note"
-    );
-    const emptyTurningDocs = documents.filter(
-      (doc) => doc.type === "Empty Turning Depot Document"
-    );
+const canFinish = () => {
+  const instructionDocs = documents.filter(
+    (doc) => doc.type === "Instruction Document"
+  );
+  const deliveryNotes = documents.filter(
+    (doc) => doc.type === "Delivery Note"
+  );
+  const emptyTurningDocs = documents.filter(
+    (doc) => doc.type === "Empty Turning Depot Document"
+  );
 
-    // Basic requirements for all shipment types
-    const basicRequirements =
-      instructionDocs.length === 1 && deliveryNotes.length === containerCount;
+  // NEW: For shipment type 3, only require delivery notes
+  if (isShipmentType3()) {
+    return deliveryNotes.length > 0;
+  }
 
-    // For Import shipments, also require an Empty Turning Depot Document
-    if (showEmptyTurningDepotOption()) {
-      return basicRequirements && emptyTurningDocs.length === 1;
-    }
+  // Basic requirements for other shipment types
+  const basicRequirements =
+    instructionDocs.length === 1 && deliveryNotes.length === containerCount;
 
-    return basicRequirements;
-  };
+  // For Import shipments, also require an Empty Turning Depot Document
+  if (showEmptyTurningDepotOption()) {
+    return basicRequirements && emptyTurningDocs.length === 1;
+  }
+
+  return basicRequirements;
+  return true;
+};
 
   // Determine if we should show the Empty Turning Depot Document option
   const showEmptyTurningDepotOption = () => {
@@ -521,7 +581,43 @@ const UploadInstructionDocuments = () => {
     );
     return shipmentType !== 2;
   };
-
+  const countContainersReachingDestination = async () => {
+  try {
+    // Get instruction details to get the dropoff location
+    const instructionResponse = await api.get(`/instructions/${instructionId}/details`);
+    const dropoff = instructionResponse.data.dropoff;
+    
+    // Get all legs for this instruction
+    const legsResponse = await api.get(`/legs/${instructionId}`);
+    const legsData = legsResponse.data;
+    
+    // Get all containers for this instruction
+    const containersResponse = await api.get(`/containers/instruction/${instructionId}`);
+    const instructionContainers = containersResponse.data;
+    
+    // Track which containers reach the final destination
+    const containersReachingDropoff = new Set();
+    
+    legsData.forEach((leg) => {
+      if (leg.destination === dropoff && leg.drivers && leg.drivers.length > 0) {
+        leg.drivers.forEach((driver) => {
+          if (driver.containernumber) {
+            containersReachingDropoff.add(driver.containernumber.toString());
+          }
+        });
+      }
+    });
+    
+    console.log("Containers reaching final destination:", Array.from(containersReachingDropoff));
+    console.log("Total instruction containers:", instructionContainers.length);
+    console.log("Containers reached count:", containersReachingDropoff.size);
+    
+    return containersReachingDropoff.size;
+  } catch (error) {
+    console.error("Error counting containers reaching destination:", error);
+    return 0;
+  }
+};
   return (
     <div className="instruction-container">
       <div>
@@ -603,11 +699,11 @@ const UploadInstructionDocuments = () => {
               onChange={(e) => setDocType(e.target.value)}
               className="dropdown"
             >
-              <option>Instruction Document</option>
-              <option>Delivery Note</option>
-              {showEmptyTurningDepotOption() && (
-                <option>Empty Turning Depot Document</option>
-              )}
+              {getAvailableDocumentTypes().map((type) => (
+                <option key={type} value={type}>
+                  {type}
+                </option>
+              ))}
             </select>
 
             {submitMessage && (
@@ -703,73 +799,76 @@ const UploadInstructionDocuments = () => {
         )}
       </div>
 
-      {/* Document requirements status */}
-      <div className="requirements-section">
-        <h4>Document Requirements:</h4>
-        <ul>
-          <li
-            style={{
-              color:
-                documents.filter((doc) => doc.type === "Instruction Document")
-                  .length === 1
-                  ? "green"
-                  : "red",
-            }}
-          >
-            Instruction Document:{" "}
-            {
-              documents.filter((doc) => doc.type === "Instruction Document")
-                .length
-            }
-            /1
-          </li>
-          <li
-            style={{
-              color:
-                documents.filter((doc) => doc.type === "Delivery Note")
-                  .length === containerCount
-                  ? "green"
-                  : "red",
-            }}
-          >
-            Delivery Notes:{" "}
-            {documents.filter((doc) => doc.type === "Delivery Note").length}/
-            {containerCount}
-          </li>
-          {showEmptyTurningDepotOption() && (
-            <li
-              style={{
-                color:
-                  documents.filter(
-                    (doc) => doc.type === "Empty Turning Depot Document"
-                  ).length === 1
-                    ? "green"
-                    : "red",
-              }}
-            >
-              Empty Turning Depot Document:{" "}
-              {
-                documents.filter(
-                  (doc) => doc.type === "Empty Turning Depot Document"
-                ).length
-              }
-              /1
-            </li>
-          )}
-        </ul>
-      </div>
-
-      <button
-        className="finish-btn"
-        onClick={handleFinish}
-        disabled={!canFinish() || isCompleted}
+<div className="requirements-section">
+  <h4>Document Requirements:</h4>
+  <ul>
+    {!isShipmentType3() && (
+      <li
         style={{
-          opacity: canFinish() && !isCompleted ? 1 : 0.5,
-          cursor: canFinish() && !isCompleted ? "pointer" : "not-allowed",
+          color:
+            documents.filter((doc) => doc.type === "Instruction Document")
+              .length === 1
+              ? "green"
+              : "red",
         }}
       >
-        Finish Instruction
-      </button>
+        Instruction Document:{" "}
+        {
+          documents.filter((doc) => doc.type === "Instruction Document")
+            .length
+        }
+        /1
+      </li>
+    )}
+    <li
+      style={{
+        color: isShipmentType3()
+          ? documents.filter((doc) => doc.type === "Delivery Note").length > 0
+            ? "green"
+            : "red"
+          : documents.filter((doc) => doc.type === "Delivery Note").length === containersReachedCount
+            ? "green"
+            : "red",
+      }}
+    >
+      Delivery Notes:{" "}
+      {documents.filter((doc) => doc.type === "Delivery Note").length}/
+      {isShipmentType3() ? "1+" : containersReachedCount}
+    </li>
+    {showEmptyTurningDepotOption() && !isShipmentType3() && (
+      <li
+        style={{
+          color:
+            documents.filter(
+              (doc) => doc.type === "Empty Turning Depot Document"
+            ).length === 1
+              ? "green"
+              : "red",
+        }}
+      >
+        Empty Turning Depot Document:{" "}
+        {
+          documents.filter(
+            (doc) => doc.type === "Empty Turning Depot Document"
+          ).length
+        }
+        /1
+      </li>
+    )}
+  </ul>
+</div>
+
+<button
+  className="finish-btn"
+  onClick={handleFinish}
+  disabled={!canFinish() || isCompleted}
+  style={{
+    opacity: canFinish() && !isCompleted ? 1 : 0.5,
+    cursor: canFinish() && !isCompleted ? "pointer" : "not-allowed",
+  }}
+>
+  Finish Instruction
+</button>
 
       {/* Finish Confirmation Modal */}
       {showFinishConfirmModal && (
