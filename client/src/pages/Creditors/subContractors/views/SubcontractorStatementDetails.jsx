@@ -75,7 +75,7 @@ const SubcontractorStatementDetail = () => {
           instruction: leg.m1_description || "N/A",
         }));
 
-        // Calculate totals
+        // Calculate total as sum of all rates (no additional tax/VAT)
         const totalAmount = workItems.reduce(
           (sum, item) => sum + (item.rate || 0),
           0
@@ -113,10 +113,8 @@ const SubcontractorStatementDetail = () => {
           generationDate: date,
           workItems,
           summary: {
-            totalAmount,
-            taxRate: 0.15,
-            taxAmount: totalAmount * 0.15,
-            finalAmount: totalAmount + totalAmount * 0.15,
+            totalAmount, // Sum of all rates
+            finalAmount: totalAmount, // Same as totalAmount (no additional calculations)
           },
         });
       } catch (err) {

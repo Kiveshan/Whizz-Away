@@ -93,7 +93,6 @@ const getInvoiceDetails = async (id) => {
         m1.pickupdate,
         m1.description,
         m1.total_cost,  
-        m1.rate,
         m1.vat,
         m1.rateweight,
         m1.booking_ref,

@@ -326,7 +326,7 @@ const ClientInvoice = () => {
 
           {/* Vessel/Ref and Destination */}
           <div className="vessel-destination">
-            <div className="vessel">Vessel/Ref : {invoiceData.vessel_name}</div>
+            <div className="vessel">Starting : {invoiceData.pickup}</div>
             <div className="destination">
               Destination : {invoiceData.dropoff}
             </div>
@@ -347,6 +347,10 @@ const ClientInvoice = () => {
                 <tr>
                   <td className="label">Description</td>
                   <td className="value">{invoiceData.description}</td>
+                </tr>
+                <tr>
+                  <td className="label">Vessel/Ref</td>
+                  <td className="value">{invoiceData.vessel_name}</td>
                 </tr>
               </tbody>
             </table>
