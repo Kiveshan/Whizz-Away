@@ -45,7 +45,7 @@ Unique wrapper for ControllerInstructions component only
 
 /* Form container - lifted much higher and wider */
 .controller-instructions-unique-wrapper .controller-instructions-form-container {
-  margin-top: -140px !important; /* Increased negative margin to lift form higher */
+  margin-top: -90px !important; /* Increased negative margin to lift form higher */
   background-color: #e6f2ff;
   border-radius: 8px;
   overflow: visible;
@@ -173,17 +173,21 @@ Unique wrapper for ControllerInstructions component only
 }
 
 .controller-instructions-unique-wrapper .controller-instructions-container-input {
-  display: grid;
-  grid-template-columns: 80px 70px 90px;
-  gap: 12px;
+  display: flex;
   align-items: center;
-  margin-bottom: 8px;
+  gap: 15px;
+  margin-bottom: 12px;
+  width: 100%;
+  padding: 4px 0;
+  border-bottom: 1px solid #e0e0e0;
 }
 
 .controller-instructions-unique-wrapper .controller-instructions-container-input label {
   font-weight: 500;
   text-align: left;
-  justify-self: start;
+  min-width: 60px;
+  font-size: 14px;
+  color: #333;
 }
 
 .controller-instructions-unique-wrapper .controller-instructions-container-rate-group {
@@ -191,30 +195,37 @@ Unique wrapper for ControllerInstructions component only
 }
 
 .controller-instructions-unique-wrapper .controller-instructions-container-input input[type="number"] {
-  width: 60px;
+  width: 80px;
   height: 32px;
   text-align: center;
-  padding: 4px;
-  border: 1px solid #ddd;
+  padding: 4px 8px;
+  border: 1px solid #ccc;
   border-radius: 4px;
-  justify-self: center;
+  box-sizing: border-box;
+  font-size: 14px;
+  background-color: #fff;
 }
 
 .controller-instructions-unique-wrapper .controller-instructions-container-rate-group input[type="text"] {
-  width: 80px;
+  width: 100px;
   height: 32px;
   padding: 4px 8px;
-  border: 1px solid #ddd;
+  border: 1px solid #ccc;
   border-radius: 4px;
-  justify-self: start;
+  box-sizing: border-box;
+  font-size: 14px;
+  background-color: #fff;
 }
 
 .controller-instructions-unique-wrapper .controller-instructions-container-input input[type="text"] {
-  width: 80px;
+  width: 100px;
   height: 32px;
   padding: 4px 8px;
-  border: 1px solid #ddd;
+  border: 1px solid #ccc;
   border-radius: 4px;
+  box-sizing: border-box;
+  font-size: 14px;
+  background-color: #fff;
 }
 
 /* Right side booking/rates section */

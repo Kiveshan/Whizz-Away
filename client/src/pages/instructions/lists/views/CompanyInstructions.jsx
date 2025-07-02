@@ -127,24 +127,49 @@ const CompanyInstructions = () => {
         let filteredData = data
 
         if (clientId) {
-          // Convert clientId to string for consistent comparison
-          const clientIdStr = String(clientId)
+          try {
+            // Convert clientId to string for consistent comparison
+            const clientIdStr = String(clientId).trim()
+            console.log('Filtering instructions for client ID:', clientIdStr)
 
-          // Apply strict filtering
-          filteredData = data.filter((item) => {
-            // Convert all possible client ID fields to strings for comparison
-            const itemClientId = String(item.client || item.clientid || item.m5clientkey || item.client_id || "")
-            const matches = itemClientId === clientIdStr
+            // Apply flexible filtering
+            filteredData = data.filter((item) => {
+              // Get all possible client ID fields and convert to strings
+              const possibleClientIds = [
+                item.client,
+                item.clientid,
+                item.m5clientkey,
+                item.client_id,
+                item.client_key,
+                item.clientId
+              ]
+              
+              // Check if any of the possible IDs match (case-insensitive and trimmed)
+              const hasMatch = possibleClientIds.some(id => 
+                id !== undefined && id !== null && String(id).trim() === clientIdStr
+              )
 
-            // Log each comparison for debugging
-            if (matches) {
-              console.log(`Found matching item: ${JSON.stringify(item)}`)
+              // Log detailed info for debugging
+              if (!hasMatch) {
+                console.log('Instruction did not match client ID:', {
+                  instructionId: item.m1key || item.id,
+                  possibleClientIds: possibleClientIds.map(id => (id !== undefined && id !== null ? String(id).trim() : 'null/undefined')),
+                  expectedClientId: clientIdStr
+                })
+              }
+
+              return hasMatch
+            })
+
+            console.log(`Filtered to ${filteredData.length} instructions for clientId: ${clientId}`)
+            if (filteredData.length === 0) {
+              console.warn('No instructions found for client ID. Full data:', data)
             }
-
-            return matches
-          })
-
-          console.log(`Filtered to ${filteredData.length} instructions for clientId: ${clientId}`)
+          } catch (error) {
+            console.error('Error filtering instructions by client ID:', error)
+            // In case of error, show all data to prevent empty results
+            filteredData = data
+          }
         }
 
         setInstructions(filteredData)

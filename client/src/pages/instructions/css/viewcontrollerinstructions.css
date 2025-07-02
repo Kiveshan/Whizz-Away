@@ -11,7 +11,160 @@
   justify-content: flex-start;
   padding-top: 0px !important;
   position: relative;
-  margin-top: -2000px;
+  margin-top: -40;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+/* Container details section */
+.view-controller-instructions-unique-wrapper .container-details {
+  width: 100%;
+  max-width: 1200px;
+  margin: 15px auto;
+  background: white;
+  border-radius: 6px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+  padding: 15px;
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+/* Container header */
+.view-controller-instructions-unique-wrapper .container-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 20px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid #eee;
+}
+
+.view-controller-instructions-unique-wrapper .container-header h3 {
+  margin: 0;
+  color: #333;
+  font-size: 18px;
+}
+
+/* Container list */
+.view-controller-instructions-unique-wrapper .container-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  gap: 15px;
+  width: 100%;
+}
+
+/* Container card */
+.view-controller-instructions-unique-wrapper .container-card {
+  background: #fff;
+  border: 1px solid #e0e0e0;
+  border-radius: 6px;
+  padding: 15px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+  transition: all 0.3s ease;
+}
+
+.view-controller-instructions-unique-wrapper .container-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15);
+}
+
+/* Container info */
+.view-controller-instructions-unique-wrapper .container-info {
+  margin-bottom: 10px;
+}
+
+.view-controller-instructions-unique-wrapper .container-info p {
+  margin: 5px 0;
+  font-size: 14px;
+  color: #555;
+  display: flex;
+  justify-content: space-between;
+}
+
+.view-controller-instructions-unique-wrapper .container-info p span:first-child {
+  font-weight: 600;
+  color: #333;
+  margin-right: 10px;
+}
+
+/* Status indicator */
+.view-controller-instructions-unique-wrapper .status-indicator {
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  margin-right: 5px;
+}
+
+.view-controller-instructions-unique-wrapper .status-active {
+  background-color: #4caf50;
+}
+
+.view-controller-instructions-unique-wrapper .status-inactive {
+  background-color: #f44336;
+}
+
+/* Action buttons */
+.view-controller-instructions-unique-wrapper .action-buttons {
+  display: flex;
+  gap: 10px;
+  margin-top: 15px;
+  padding-top: 10px;
+  border-top: 1px solid #f0f0f0;
+}
+
+.view-controller-instructions-unique-wrapper .btn {
+  padding: 6px 12px;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 500;
+  transition: all 0.2s;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.view-controller-instructions-unique-wrapper .btn-edit {
+  background-color: #2196f3;
+  color: white;
+}
+
+.view-controller-instructions-unique-wrapper .btn-delete {
+  background-color: #f44336;
+  color: white;
+}
+
+.view-controller-instructions-unique-wrapper .btn:hover {
+  opacity: 0.9;
+  transform: translateY(-1px);
+}
+
+/* No containers message */
+.view-controller-instructions-unique-wrapper .no-containers {
+  text-align: center;
+  color: #666;
+  padding: 30px;
+  grid-column: 1 / -1;
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+  .view-controller-instructions-unique-wrapper .container-list {
+    grid-template-columns: 1fr;
+  }
+  
+  .view-controller-instructions-unique-wrapper .action-buttons {
+    flex-direction: column;
+  }
+  
+  .view-controller-instructions-unique-wrapper .btn {
+    width: 100%;
+    margin-bottom: 5px;
+  }
 }
 
 .view-controller-instructions-unique-wrapper .view-controller-instructions-header {
@@ -26,26 +179,33 @@
   color: white;
   border: none;
   border-radius: 4px;
-  padding: 8px 16px;
+  padding: 6px 12px;
   cursor: pointer;
-  position: relative;
-  top: -20px;
+  position: absolute;
+  top: -35px;
   left: 20px;
   z-index: 1000;
+  box-shadow: 0 1px 2px rgba(0,0,0,0.1);
+  transition: background-color 0.2s;
+  font-size: 13px;
+}
+
+.view-controller-instructions-unique-wrapper .view-controller-instructions-back-button:hover {
+  background-color: #3a80d2;
 }
 
 /* Main form container */
 .view-controller-instructions-unique-wrapper .view-controller-instructions-form-container {
-  margin-top: -140px !important;
+  margin-top: 20px !important;
   background-color: #e6f2ff;
   border-radius: 8px;
   overflow: visible;
   width: 98%;
-  max-width: 2000px;
+  max-width: 1200px;
   margin-left: auto;
   margin-right: auto;
   margin-bottom: 20px !important;
-  padding: 20px;
+  padding: 15px 20px;
   position: relative;
   box-sizing: border-box;
   box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
@@ -54,10 +214,10 @@
 
 /* Form sections */
 .view-controller-instructions-unique-wrapper .view-controller-instructions-form-section {
-  padding: 4px 0;
+  padding: 2px 0;
   background-color: #e6f2ff;
   border: none;
-  margin-bottom: 4px;
+  margin-bottom: 2px;
 }
 
 /* Hide any <hr> elements */
@@ -96,9 +256,10 @@
 /* Form rows */
 .view-controller-instructions-unique-wrapper .view-controller-instructions-form-row {
   display: flex;
-  gap: 15px;
-  margin-bottom: 4px;
+  gap: 10px;
+  margin-bottom: 2px;
   flex-wrap: wrap;
+  width: 100%;
 }
 
 .view-controller-instructions-unique-wrapper .view-controller-instructions-form-row:last-child {
@@ -108,15 +269,15 @@
 /* Form fields */
 .view-controller-instructions-unique-wrapper .view-controller-instructions-form-field {
   flex: 1;
-  min-width: 200px;
-  margin-bottom: 8px;
+  min-width: 160px;
+  margin-bottom: 6px;
 }
 
 .view-controller-instructions-unique-wrapper .view-controller-instructions-form-field label {
   display: block;
-  margin-bottom: 4px;
+  margin-bottom: 2px;
   font-weight: 500;
-  font-size: 14px;
+  font-size: 13px;
   color: #333;
 }
 
@@ -125,20 +286,21 @@
 .view-controller-instructions-unique-wrapper .view-controller-instructions-dropdown,
 .view-controller-instructions-unique-wrapper .view-controller-instructions-form-textarea {
   width: 100%;
-  padding: 6px 10px;
+  padding: 4px 8px;
   border: 1px solid #ddd;
-  border-radius: 4px;
-  font-size: 14px;
-  height: 36px;
+  border-radius: 3px;
+  font-size: 13px;
+  height: 30px;
   box-sizing: border-box;
   font-family: Arial, sans-serif;
   background-color: white;
 }
 
 .view-controller-instructions-unique-wrapper .view-controller-instructions-form-textarea {
-  min-height: 80px;
+  min-height: 60px;
   resize: vertical;
   height: auto;
+  line-height: 1.3;
 }
 
 /* Select wrapper */

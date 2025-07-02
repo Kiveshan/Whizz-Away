@@ -38,10 +38,6 @@ const Viewcontrollerinstructions = () => {
     deadline: "",
     fileRef: "",
     bookingRef: "",
-    vesselName: "",
-    voyageNo: "",
-    imoNo: "",
-    flagReg: "",
     rateWeight: "Container",
     weight: "",
     vat: 15,
@@ -50,7 +46,8 @@ const Viewcontrollerinstructions = () => {
     sixMeterRate: "",
     twelveMeterRate: "",
     abnormalRate: "",
-    status: ""
+    status: "",
+    vesselName: ""
   });
 
   const [formData, setFormData] = useState(() => ({
@@ -62,6 +59,7 @@ const Viewcontrollerinstructions = () => {
   const pickupDateRef = useRef(null)
   const etaDateRef = useRef(null)
   const deadlineDateRef = useRef(null)
+  const vesselNameRef = useRef(null)
 
   // State for clients and shipment types
   const [clients, setClients] = useState([])
@@ -206,8 +204,8 @@ const Viewcontrollerinstructions = () => {
         pickup: data.pickup || "",
         dropoff: data.dropoff || "",
         hazardous: Boolean(data.hazardous),
-        surcharges: Boolean(data.surchages),
-        surchargesAmount: data.surcharges_amount?.toString() || "",
+        surcharges: Boolean(data.surchages), // Note: This matches the database field name (missing 'r')
+        surchargesAmount: data.surcharge?.toString() || "", // Changed from surcharges_amount to surcharge
         pickupTime: formatTimeForInput(data.pickuptime) || "",
         pickupDate: formatDateForInput(data.pickupdate) || "",
         stackDate: formatDateForInput(data.stackdate) || "",
@@ -224,10 +222,10 @@ const Viewcontrollerinstructions = () => {
         description: data.description || "",
         status: data.status || "",
         vesselName: data.vessel_name || "",
-        voyageNo: data.voyage_num || "",
-        imoNo: data.imo_num || "",
-        flagReg: data.flag_reg || "",
         total_cost: Number(data.total_cost) || 0,
+        rateper_6: data.rateper_6 ? Number(data.rateper_6) : 0,
+        rateper_12: data.rateper_12 ? Number(data.rateper_12) : 0,
+        rateper_abnormal: data.rateper_abnormal ? Number(data.rateper_abnormal) : 0,
       }
 
       console.log("Formatted data before setFormData:", formattedData)
@@ -569,7 +567,7 @@ const Viewcontrollerinstructions = () => {
   // Render loading state
   if (isLoading.instruction) {
     return (
-      <div className="view-controller-instructions-container">
+      <div className="view-controller-instructions-unique-wrapper">
         <h2 className="view-controller-instructions-title">Loading Instruction...</h2>
         <div className="text-center my-5">
           <div className="spinner-border text-primary" role="status" style={{ width: '3rem', height: '3rem' }}>
@@ -584,7 +582,7 @@ const Viewcontrollerinstructions = () => {
   // Render error state
   if (errorModal.isOpen) {
     return (
-      <div className="view-controller-instructions-container">
+      <div className="view-controller-instructions-unique-wrapper">
         <ErrorModal
           isOpen={errorModal.isOpen}
           message={errorModal.message}
@@ -606,30 +604,17 @@ const Viewcontrollerinstructions = () => {
 
   // Main content
   return (
-    <div className="view-controller-instructions-container">
-      <div className="d-flex justify-content-between align-items-center mb-4">
-        <h2 className="view-controller-instructions-title mb-0">
-          View Instruction {formData.fileRef ? `- ${formData.fileRef}` : ''}
-        </h2>
+    <div className="view-controller-instructions-unique-wrapper" style={{ paddingTop: '10px' }}>
+      {/* Back Button - Top Left */}
+      <div style={{ position: 'absolute', top: '10px', left: '20px', zIndex: 1000 }}>
         <button 
-          className="btn btn-secondary"
+          className="view-controller-instructions-back-button"
           onClick={() => navigate('/CompanyInstructions')}
+          style={{ margin: 0 }}
         >
-          Back to List
+          Back
         </button>
       </div>
-
-      {/* Debug Information - Only show in development */}
-      {process.env.NODE_ENV === 'development' && (
-        <div className="alert alert-info">
-          <h5>Debug Information</h5>
-          <p><strong>Instruction ID:</strong> {instructionId}</p>
-          <p><strong>Initial Data Loaded:</strong> {initialDataLoaded ? 'Yes' : 'No'}</p>
-          <p><strong>Clients:</strong> {clients.length} loaded</p>
-          <p><strong>Shipment Types:</strong> {shipmentTypes.length} loaded</p>
-          <p><strong>Form Data Status:</strong> {formData.status || 'Not set'}</p>
-        </div>
-      )}
 
       {/* Success Message */}
       {successMessage && <div className="alert alert-success">{successMessage}</div>}
@@ -662,7 +647,7 @@ const Viewcontrollerinstructions = () => {
       {initialDataLoaded && (
         <div className="view-controller-instructions-form-container" style={{ maxWidth: "1200px" }}>
         {/* Client Information Section */}
-        <div className="view-controller-instructions-form-section view-controller-instructions-client-info-section">
+        <div className="view-controller-instructions-form-section view-controller-instructions-client-info-section" style={{ marginTop: '10px' }}>
           <div className="view-controller-instructions-form-row">
             <div className="view-controller-instructions-form-field">
               <label>Client</label>
@@ -750,7 +735,7 @@ const Viewcontrollerinstructions = () => {
                           type="text"
                           className="view-controller-instructions-form-input"
                           placeholder="Rate"
-                          value={formData.sixMeterRate}
+                          value={formData.rateper_6}
                           readOnly
                           style={nonEditableStyle}
                         />
@@ -773,7 +758,7 @@ const Viewcontrollerinstructions = () => {
                           type="text"
                           className="view-controller-instructions-form-input"
                           placeholder="Rate"
-                          value={formData.twelveMeterRate}
+                          value={formData.rateper_12}
                           readOnly
                           style={nonEditableStyle}
                         />
@@ -796,7 +781,7 @@ const Viewcontrollerinstructions = () => {
                           type="text"
                           className="view-controller-instructions-form-input"
                           placeholder="Rate"
-                          value={formData.abnormalRate}
+                          value={formData.rateper_abnormal}
                           readOnly
                           style={nonEditableStyle}
                         />
@@ -808,34 +793,47 @@ const Viewcontrollerinstructions = () => {
                 {/* Hazardous and Surcharges Checkboxes */}
                 <div
                   className="view-controller-instructions-form-row"
-                  style={{ marginTop: "16px", marginBottom: "16px", marginLeft: "10px" }}
+                  style={{ marginTop: "16px", marginLeft: "10px" }}
                 >
                   <div
                     className="view-controller-instructions-form-field"
-                    style={{ display: "flex", flexDirection: "row", gap: "30px", alignItems: "center" }}
+                    style={{ display: "flex", flexDirection: "column", gap: "10px" }}
                   >
-                    <label className="view-controller-instructions-checkbox-container" style={{ margin: "5px 0" }}>
-                      <input
-                        type="checkbox"
-                        name="hazardous"
-                        checked={formData.hazardous || false}
-                        disabled={true}
-                        style={nonEditableStyle}
-                      />
-                      <span className="view-controller-instructions-checkmark"></span>
-                      Hazardous Materials
-                    </label>
-                    <label className="view-controller-instructions-checkbox-container" style={{ margin: "5px 0" }}>
-                      <input
-                        type="checkbox"
-                        name="surcharges"
-                        checked={formData.surcharges || false}
-                        disabled={true}
-                        style={nonEditableStyle}
-                      />
-                      <span className="view-controller-instructions-checkmark"></span>
-                      Add Surcharges
-                    </label>
+                    <div style={{ display: "flex", gap: "30px", alignItems: "center" }}>
+                      <label className="view-controller-instructions-checkbox-container" style={{ margin: "5px 0" }}>
+                        <input
+                          type="checkbox"
+                          name="hazardous"
+                          checked={formData.hazardous || false}
+                          disabled={true}
+                          style={nonEditableStyle}
+                        />
+                        <span className="view-controller-instructions-checkmark"></span>
+                        Hazardous Materials
+                      </label>
+                      <label className="view-controller-instructions-checkbox-container" style={{ margin: "5px 0" }}>
+                        <input
+                          type="checkbox"
+                          name="surcharges"
+                          checked={formData.surcharges || false}
+                          disabled={true}
+                          style={nonEditableStyle}
+                        />
+                        <span className="view-controller-instructions-checkmark"></span>
+                        Add Surcharges
+                      </label>
+                    </div>
+                    {formData.surcharges && (
+                      <div style={{ marginTop: "5px", maxWidth: "200px" }}>
+                        <input
+                          type="text"
+                          className="view-controller-instructions-form-input"
+                          value={formData.surchargesAmount || ''}
+                          readOnly
+                          style={{ ...nonEditableStyle, width: '100%' }}
+                        />
+                      </div>
+                    )}
                   </div>
                 </div>
               </div>
@@ -1082,49 +1080,6 @@ const Viewcontrollerinstructions = () => {
               </div>
             </div>
             <div className="view-controller-instructions-form-field">
-              <label>Voyage No.</label>
-              <div className="view-controller-instructions-input-wrapper">
-                <input
-                  type="text"
-                  className="view-controller-instructions-form-input"
-                  placeholder="Enter voyage number"
-                  name="voyageNo"
-                  value={formData.voyageNo}
-                  readOnly
-                  style={nonEditableStyle}
-                />
-              </div>
-            </div>
-            <div className="view-controller-instructions-form-field">
-              <label>IMO No.</label>
-              <div className="view-controller-instructions-input-wrapper">
-                <input
-                  type="text"
-                  className="view-controller-instructions-form-input"
-                  placeholder="Enter IMO number"
-                  name="imoNo"
-                  value={formData.imoNo}
-                  readOnly
-                  style={nonEditableStyle}
-                />
-              </div>
-            </div>
-            <div className="view-controller-instructions-form-field">
-              <label>Flag Reg</label>
-              <div className="view-controller-instructions-input-wrapper">
-                <input
-                  type="text"
-                  className="view-controller-instructions-form-input"
-                  placeholder="Enter flag registration"
-                  name="flagReg"
-                  value={formData.flagReg}
-                  readOnly
-                  style={nonEditableStyle}
-                />
-              </div>
-            </div>
-            {/* Description from Client */}
-            <div className="view-controller-instructions-form-field" style={{ flex: "1 1 100%" }}>
               <label>Description from Client</label>
               <div className="view-controller-instructions-textarea-wrapper">
                 <textarea
@@ -1141,60 +1096,87 @@ const Viewcontrollerinstructions = () => {
         </div>
 
         {/* Container Details Section */}
-        <div className="container-details-wrapper mt-4">
-          <h4 className="mb-3">Container Details</h4>
-          <div className="content">
+        <div className="view-controller-instructions-form-section" style={{ marginTop: '10px', padding: '15px' }}>
+          <h4 style={{ margin: '0 0 10px 0', fontSize: '14px', fontWeight: '600' }}>Container Details</h4>
+          <div className="content" style={{ width: '100%', fontSize: '13px' }}>
             {isLoadingContainers ? (
-              <div className="text-center p-3">
-                <div className="spinner-border text-primary" role="status">
+              <div className="text-center p-2" style={{ fontSize: '13px' }}>
+                <div className="spinner-border spinner-border-sm text-primary" role="status">
                   <span className="visually-hidden">Loading...</span>
                 </div>
-                <p className="mt-2">Loading container data...</p>
+                <p className="mt-1 mb-0">Loading container data...</p>
               </div>
             ) : containers.length > 0 ? (
-              <div className="container-table-wrapper">
-                <table className="container-table1">
+              <div style={{ width: '100%', overflowX: 'auto' }}>
+                <table style={{ 
+                  width: '100%', 
+                  borderCollapse: 'collapse', 
+                  backgroundColor: '#fff',
+                  fontSize: '13px'
+                }}>
                   <thead>
-                    <tr>
-                      <th>#</th>
-                      <th>Container Type</th>
-                      <th>Container Number</th>
-                      {isImport && <th>Weight</th>}
-                      <th>Cargo Description</th>
+                    <tr style={{ backgroundColor: '#f1f5ff' }}>
+                      <th style={{ padding: '4px 6px', border: '1px solid #dee2e6', textAlign: 'left', fontWeight: '600' }}>#</th>
+                      <th style={{ padding: '4px 6px', border: '1px solid #dee2e6', textAlign: 'left', fontWeight: '600' }}>Type</th>
+                      <th style={{ padding: '4px 6px', border: '1px solid #dee2e6', textAlign: 'left', fontWeight: '600' }}>Number</th>
+                      {isImport && <th style={{ padding: '4px 6px', border: '1px solid #dee2e6', textAlign: 'left', fontWeight: '600' }}>Weight</th>}
+                      <th style={{ padding: '4px 6px', border: '1px solid #dee2e6', textAlign: 'left', fontWeight: '600' }}>Cargo</th>
                     </tr>
                   </thead>
                   <tbody>
                     {containers.map((container, index) => (
-                      <tr key={container.id} className={index % 2 === 1 ? "even-row" : ""}>
-                        <td>{container.id}</td>
-                        <td>{container.containerType}</td>
-                        <td>
+                      <tr key={container.id} style={{ 
+                        backgroundColor: index % 2 === 1 ? '#f9f9f9' : '#fff',
+                        fontSize: '13px',
+                        lineHeight: '1.2'
+                      }}>
+                        <td style={{ padding: '4px 6px', border: '1px solid #eee' }}>{container.id}</td>
+                        <td style={{ padding: '4px 6px', border: '1px solid #eee' }}>{container.containerType}</td>
+                        <td style={{ padding: '4px 6px', border: '1px solid #eee' }}>
                           <input
                             type="text"
                             value={container.containerNum}
                             readOnly
-                            className="container-input"
-                            style={nonEditableStyle}
+                            style={{ 
+                              ...nonEditableStyle, 
+                              width: '100%', 
+                              border: 'none', 
+                              background: 'none',
+                              padding: '2px 4px',
+                              fontSize: '13px'
+                            }}
                           />
                         </td>
                         {isImport && (
-                          <td>
+                          <td style={{ padding: '4px 6px', border: '1px solid #eee' }}>
                             <input
                               type="text"
                               value={container.weight}
                               readOnly
-                              className="container-input"
-                              style={nonEditableStyle}
+                              style={{ 
+                                ...nonEditableStyle, 
+                                width: '100%', 
+                                border: 'none', 
+                                background: 'none',
+                                padding: '2px 4px',
+                                fontSize: '13px'
+                              }}
                             />
                           </td>
                         )}
-                        <td>
+                        <td style={{ padding: '4px 6px', border: '1px solid #eee' }}>
                           <input
                             type="text"
                             value={container.cargoDescription}
                             readOnly
-                            className="container-input"
-                            style={nonEditableStyle}
+                            style={{ 
+                              ...nonEditableStyle, 
+                              width: '100%', 
+                              border: 'none', 
+                              background: 'none',
+                              padding: '2px 4px',
+                              fontSize: '13px'
+                            }}
                           />
                         </td>
                       </tr>
@@ -1203,12 +1185,12 @@ const Viewcontrollerinstructions = () => {
                 </table>
               </div>
             ) : (
-              <div className="alert alert-info mb-0">
+              <div className="alert alert-info mb-0 py-1 px-2" style={{ fontSize: '13px' }}>
                 No container details available for this instruction.
               </div>
             )}
+            </div>
           </div>
-        </div>
         </div>
       )}
     </div>
