@@ -15,8 +15,7 @@ const UploadProof = () => {
   const [paymentDate, setPaymentDate] = useState("");
   const [invoiceId, setInvoiceId] = useState("");
   const [invoices, setInvoices] = useState([]);
-  const [file, setFile] = useState(null);
-  const [fileUrl, setFileUrl] = useState(null);
+  const [reference, setReference] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState(null);
@@ -89,12 +88,12 @@ const UploadProof = () => {
           );
 
           if (response.data.success) {
-            const { amount, fileupload, invoiceid, fileurl } =
+            const { amount, fileupload, invoiceid, reference } =
               response.data.data;
             setAmount(amount.toString());
             setPaymentDate(fileupload.split("T")[0]);
             setInvoiceId(invoiceid ? invoiceid.toString() : "");
-            setFileUrl(fileurl);
+            setReference(reference || "");
           } else {
             throw new Error(
               response.data.message || "Failed to fetch payment details"
@@ -117,12 +116,6 @@ const UploadProof = () => {
       fetchPaymentDetails();
     }
   }, [paymentId, clientId]);
-
-  const handleFileChange = (e) => {
-    const selectedFile = e.target.files[0];
-    setFile(selectedFile);
-    setError(null);
-  };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -147,28 +140,27 @@ const UploadProof = () => {
       return;
     }
 
-    if (!file && !isViewMode) {
-      setError("Please upload a proof of payment file");
+    if (!reference.trim()) {
+      setError("Please enter a payment reference");
       return;
     }
 
     try {
       setIsSubmitting(true);
-      const formData = new FormData();
-      formData.append("amount", Number.parseFloat(amount));
-      formData.append("fileupload", paymentDate);
-      formData.append("invoiceid", invoiceId);
-      if (file) {
-        formData.append("file", file);
-      }
+      const paymentData = {
+        amount: Number.parseFloat(amount),
+        fileupload: paymentDate,
+        invoiceid: invoiceId,
+        reference: reference.trim(),
+      };
 
       const response = await api.post(
         `/api/payments/${clientId}/upload`,
-        formData,
+        paymentData,
         {
           headers: {
             Authorization: `Bearer ${localStorage.getItem("token")}`,
-            "Content-Type": "multipart/form-data",
+            "Content-Type": "application/json",
           },
         }
       );
@@ -189,17 +181,17 @@ const UploadProof = () => {
         }
       } else {
         throw new Error(
-          response.data.message || "Failed to upload payment details"
+          response.data.message || "Failed to save payment details"
         );
       }
     } catch (err) {
-      console.error("Error uploading payment details:", err);
+      console.error("Error saving payment details:", err);
       // Check for token expiration
       if (handleTokenExpiration(err)) {
         return;
       }
       setError(
-        err.message || "An error occurred while uploading the payment details"
+        err.message || "An error occurred while saving the payment details"
       );
     } finally {
       setIsSubmitting(false);
@@ -219,15 +211,6 @@ const UploadProof = () => {
       navigate("/client-payments", {
         state: { clientId, clientName },
       });
-    }
-  };
-
-  const handleViewProof = () => {
-    if (fileUrl) {
-      // Open file in new tab
-      window.open(fileUrl, "_blank", "noopener,noreferrer");
-    } else {
-      setError("No proof of payment uploaded");
     }
   };
 
@@ -256,7 +239,7 @@ const UploadProof = () => {
             <h2>
               {isViewMode
                 ? `View Payment for ${decodeURIComponent(clientName)}`
-                : `Upload Payment Proof for ${decodeURIComponent(clientName)}`}
+                : `Add Payment for ${decodeURIComponent(clientName)}`}
             </h2>
 
             {error && <div className="error-message">{error}</div>}
@@ -319,68 +302,28 @@ const UploadProof = () => {
                   </div>
                 </div>
 
-                {/* File Upload Section - Conditional Layout */}
-                {isViewMode ? (
-                  // View Mode - Centered button, no requirements
-                  <div className="form-row full-width">
-                    <div className="amount-field">
-                      <label>Proof of Payment *</label>
-                      <div className="view-proof-section">
-                        {fileUrl ? (
-                          <button
-                            className="view-button centered"
-                            onClick={handleViewProof}
-                          >
-                            View Proof
-                          </button>
-                        ) : (
-                          <div className="no-file">
-                            No proof of payment file uploaded
-                          </div>
-                        )}
+                {/* Reference Field - Full Width */}
+                <div className="form-row full-width">
+                  <div className="amount-field">
+                    <label>Payment Reference *</label>
+                    <input
+                      type="text"
+                      value={reference}
+                      onChange={(e) => setReference(e.target.value)}
+                      placeholder="Enter payment reference (e.g., transaction ID, check number, etc.)"
+                      readOnly={isViewMode}
+                      disabled={isViewMode}
+                      required
+                      maxLength={255}
+                    />
+                    {!isViewMode && (
+                      <div className="field-help">
+                        Enter a reference for this payment such as transaction
+                        ID, check number, or any other identifying information.
                       </div>
-                    </div>
+                    )}
                   </div>
-                ) : (
-                  // Upload Mode - Side by side with requirements
-                  <div className="form-row two-columns upload-row">
-                    <div className="amount-field upload-column">
-                      <label>Proof of Payment * (JPG, PNG, PDF only)</label>
-                      <div className="file-upload-section compact">
-                        <div className="upload-icon">📁</div>
-                        <div className="upload-text">Upload Proof</div>
-                        <div className="file-input-wrapper">
-                          <input
-                            type="file"
-                            accept=".jpg,.jpeg,.png,.pdf"
-                            onChange={handleFileChange}
-                            required
-                          />
-                          <button type="button" className="browse-button">
-                            Choose File
-                          </button>
-                        </div>
-                        {file && (
-                          <div className="selected-file">✓ {file.name}</div>
-                        )}
-                      </div>
-                    </div>
-
-                    <div className="requirements-column">
-                      <div className="upload-specs compact">
-                        <h4>📋 Requirements</h4>
-                        <ul>
-                          <li>Select invoice for payment</li>
-                          <li>Enter exact amount paid</li>
-                          <li>Choose payment date</li>
-                          <li>Upload proof (receipt, transfer, etc.)</li>
-                          <li>Formats: JPG, PNG, PDF</li>
-                          <li>Max size: 10MB</li>
-                        </ul>
-                      </div>
-                    </div>
-                  </div>
-                )}
+                </div>
 
                 {/* Submit Button - Full Width (Upload Mode Only) */}
                 {!isViewMode && (
@@ -392,11 +335,11 @@ const UploadProof = () => {
                         !amount ||
                         !paymentDate ||
                         !invoiceId ||
-                        !file ||
+                        !reference.trim() ||
                         isSubmitting
                       }
                     >
-                      {isSubmitting ? "Uploading..." : "Upload Payment Proof"}
+                      {isSubmitting ? "Saving..." : "Save Payment"}
                     </button>
                   </div>
                 )}

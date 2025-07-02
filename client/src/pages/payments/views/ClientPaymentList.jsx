@@ -112,15 +112,6 @@ const ClientPaymentList = () => {
     navigate("/client-list-payments");
   };
 
-  const handleViewProof = (fileUrl, date, invoiceNum) => {
-    if (fileUrl) {
-      // Open file in new tab
-      window.open(fileUrl, "_blank", "noopener,noreferrer");
-    } else {
-      alert("No proof of payment uploaded");
-    }
-  };
-
   // Pagination calculations
   const totalRecords = clientPayments.length;
   const totalPages = Math.ceil(totalRecords / recordsPerPage);
@@ -253,7 +244,7 @@ const ClientPaymentList = () => {
               <th>Date</th>
               <th>Amount</th>
               <th>Invoice</th>
-              <th>Proof</th>
+              <th>Reference</th>
               <th>View</th>
             </tr>
           </thead>
@@ -262,23 +253,9 @@ const ClientPaymentList = () => {
               currentRecords.map((payment, index) => (
                 <tr key={payment.paykey || index}>
                   <td>{new Date(payment.fileupload).toLocaleDateString()}</td>
-                  <td>{payment.amount}</td>
+                  <td>R{payment.amount.toLocaleString()}</td>
                   <td>{payment.invoice_num || "N/A"}</td>
-                  <td>
-                    <button
-                      className="view-button"
-                      onClick={() =>
-                        handleViewProof(
-                          payment.fileurl,
-                          payment.fileupload,
-                          payment.invoice_num
-                        )
-                      }
-                      disabled={!payment.fileurl}
-                    >
-                      View Proof
-                    </button>
-                  </td>
+                  <td>{payment.reference || "N/A"}</td>
                   <td>
                     <button
                       className="view-button"
@@ -359,7 +336,7 @@ const ClientPaymentList = () => {
           style={{ marginTop: "20px", textAlign: "center" }}
         >
           <button className="upload-button" onClick={handleUpload}>
-            Upload Payment
+            Add Payment
           </button>
         </div>
       </div>

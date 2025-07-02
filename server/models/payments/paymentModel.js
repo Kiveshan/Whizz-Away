@@ -2,7 +2,7 @@ import { pool } from "../../config/database.js";
 
 const createPayment = async (
   clientId,
-  { amount, fileupload, invoiceid, filename }
+  { amount, fileupload, invoiceid, reference }
 ) => {
   let client;
   try {
@@ -13,7 +13,7 @@ const createPayment = async (
     }
     client = await pool.connect();
 
-    // Fetch client and invoice_num for S3 folder structure
+    // Fetch client and invoice_num for reference
     const clientQuery = `SELECT client FROM m5_client WHERE m5clientkey = $1`;
     const clientResult = await client.query(clientQuery, [clientId]);
     if (clientResult.rows.length === 0) {
@@ -30,11 +30,11 @@ const createPayment = async (
     }
 
     const queryText = `
-      INSERT INTO payment_m3 (clientid, amount, filename, fileupload, invoiceid)
+      INSERT INTO payment_m3 (clientid, amount, reference, fileupload, invoiceid)
       VALUES ($1, $2, $3, $4, $5)
       RETURNING *
     `;
-    const queryParams = [clientId, amount, filename, fileupload, invoiceid];
+    const queryParams = [clientId, amount, reference, fileupload, invoiceid];
 
     const result = await client.query(queryText, queryParams);
     return {
@@ -44,36 +44,6 @@ const createPayment = async (
         clientname: clientResult.rows[0].client,
         invoice_num: invoiceResult.rows[0].invoice_num,
       },
-    };
-  } catch (error) {
-    throw error;
-  } finally {
-    if (client) client.release();
-  }
-};
-
-const updatePaymentFilename = async (paymentId, filename) => {
-  let client;
-  try {
-    if (!pool) {
-      throw new Error(
-        "Database connection not established. Please try again later."
-      );
-    }
-    client = await pool.connect();
-
-    const queryText = `
-      UPDATE payment_m3 
-      SET filename = $1 
-      WHERE paykey = $2
-      RETURNING *
-    `;
-    const queryParams = [filename, paymentId];
-
-    const result = await client.query(queryText, queryParams);
-    return {
-      success: true,
-      data: result.rows[0],
     };
   } catch (error) {
     throw error;
@@ -97,7 +67,7 @@ const getPayment = async (clientId, paymentId) => {
         p.paykey,
         p.fileupload,
         p.amount,
-        p.filename,
+        p.reference,
         p.invoiceid,
         i.invoice_num,
         c.client
@@ -138,7 +108,7 @@ const getClientPayments = async (clientId, { year, month }) => {
         p.paykey,
         p.fileupload,
         p.amount,
-        p.filename,
+        p.reference,
         p.invoiceid,
         i.invoice_num,
         c.client
@@ -201,10 +171,4 @@ const getClientInvoices = async (clientId) => {
   }
 };
 
-export {
-  createPayment,
-  updatePaymentFilename,
-  getPayment,
-  getClientPayments,
-  getClientInvoices,
-};
+export { createPayment, getPayment, getClientPayments, getClientInvoices };
