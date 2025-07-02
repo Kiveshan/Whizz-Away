@@ -149,13 +149,3 @@
   padding: 20px;
   font-family: inherit;
 }
-
-.subcontractor-statements-wrapper .generate-statement-btn {
-  background-color: #4caf50;
-  color: white;
-  border: none;
-  padding: 10px 20px;
-  border-radius: 6px;
-  cursor: pointer;
-  font-family: inherit;
-}
