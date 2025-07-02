@@ -36,6 +36,7 @@ const ClientStatement = () => {
 
         if (response.data.success) {
           console.log("Statement data received:", response.data.data); // Debug log
+          console.log("Invoices data:", response.data.data.invoices); // Debug log for invoices
           console.log("Payments data:", response.data.data.payments); // Debug log for payments
           setStatement(response.data.data);
         } else {
@@ -193,13 +194,32 @@ const ClientStatement = () => {
   const openingBalance = statement.opening_balance; // Use the stored opening balance
   const balanceDue = openingBalance - amountPaid + invoicedAmount;
 
+  // Helper function to format pickup + dropoff details
+  const formatInvoiceDetails = (invoice) => {
+    const pickup = invoice.pickup || "";
+    const dropoff = invoice.dropoff || "";
+
+    // Debug log to see what we're working with
+    console.log("Invoice details:", { pickup, dropoff, invoice });
+
+    if (pickup && dropoff) {
+      return `${pickup} → ${dropoff}`;
+    } else if (pickup) {
+      return pickup;
+    } else if (dropoff) {
+      return `→ ${dropoff}`;
+    } else {
+      // Fallback to task or invoice number if pickup/dropoff are empty
+      return invoice.task || invoice.invoice_num || `Invoice #${invoice.ikey}`;
+    }
+  };
+
   // Combine invoices and payments into a single transactions array
   const transactions = [
     ...statement.invoices.map((invoice) => ({
       type: "Invoice",
       date: new Date(invoice.date),
-      details:
-        invoice.task || invoice.invoice_num || `Invoice #${invoice.ikey}`,
+      details: formatInvoiceDetails(invoice), // Use the helper function
       reference: "", // Invoices don't have references
       amount: invoice.amount,
       payment: null,

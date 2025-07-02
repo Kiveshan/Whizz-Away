@@ -70,6 +70,8 @@ const getStatementDetails = async (statementId) => {
         i.date AS invoice_date,
         m1.total_cost AS invoice_amount,
         m1.task AS invoice_task,
+        m1.pickup,
+        m1.dropoff,
         i.invoice_num,
         ut.companyname
       FROM 
@@ -176,6 +178,8 @@ const getStatementDetails = async (statementId) => {
           amount: Number.parseFloat(row.invoice_amount || 0),
           task: row.invoice_task,
           invoice_num: row.invoice_num,
+          pickup: row.pickup,
+          dropoff: row.dropoff,
         })),
       payments: payments,
     };
