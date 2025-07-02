@@ -115,7 +115,8 @@ const getStatementDetails = async (statementId) => {
       SELECT 
         paykey,
         fileupload AS date,
-        amount
+        amount,
+        reference
       FROM 
         payment_m3
       WHERE 
@@ -127,15 +128,23 @@ const getStatementDetails = async (statementId) => {
       formattedPaymentStartDate,
       formattedPaymentEndDate,
     ]);
+
+    // FIX: Include the reference field in the payment mapping
     const payments = paymentsResult.rows.map((row) => ({
       paykey: row.paykey,
       date: row.date,
       amount: Number.parseFloat(row.amount || 0),
+      reference: row.reference || "", // Add the reference field here
     }));
 
     console.log(
       `Fetched ${payments.length} payments for client ${clientId} between ${formattedPaymentStartDate} and ${formattedPaymentEndDate}`
     );
+
+    // Debug: Log payment data to verify reference is included
+    if (payments.length > 0) {
+      console.log("Sample payment data:", JSON.stringify(payments[0], null, 2));
+    }
 
     const statementData = {
       statement_key: result.rows[0].statement_key,

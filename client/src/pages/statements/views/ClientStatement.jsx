@@ -35,6 +35,8 @@ const ClientStatement = () => {
         const response = await api.get(`/api/statement/${statementId}`);
 
         if (response.data.success) {
+          console.log("Statement data received:", response.data.data); // Debug log
+          console.log("Payments data:", response.data.data.payments); // Debug log for payments
           setStatement(response.data.data);
         } else {
           throw new Error(response.data.message || "Failed to fetch statement");
@@ -198,17 +200,25 @@ const ClientStatement = () => {
       date: new Date(invoice.date),
       details:
         invoice.task || invoice.invoice_num || `Invoice #${invoice.ikey}`,
+      reference: "", // Invoices don't have references
       amount: invoice.amount,
       payment: null,
     })),
-    ...statement.payments.map((payment) => ({
-      type: "Payment",
-      date: new Date(payment.date),
-      details: `Payment ID: ${payment.paykey}`,
-      amount: null,
-      payment: payment.amount,
-    })),
+    ...statement.payments.map((payment) => {
+      console.log("Processing payment:", payment); // Debug log
+      return {
+        type: "Payment",
+        date: new Date(payment.date),
+        details: `Payment ID: ${payment.paykey}`,
+        reference: payment.reference || "", // Payment reference from the database
+        amount: null,
+        payment: payment.amount,
+      };
+    }),
   ].sort((a, b) => a.date - b.date); // Sort by date
+
+  // Debug log for transactions
+  console.log("Final transactions array:", transactions);
 
   // Calculate running balance
   let runningBalance = openingBalance; // Start with the opening balance
@@ -303,12 +313,13 @@ const ClientStatement = () => {
               <table className="transactions-table">
                 <thead>
                   <tr>
-                    <th>Date</th>
-                    <th>Transactions</th>
-                    <th>Details</th>
-                    <th>Amount</th>
-                    <th>Payments</th>
-                    <th>Balance</th>
+                    <th style={{ width: "12%" }}>Date</th>
+                    <th style={{ width: "15%" }}>Transactions</th>
+                    <th style={{ width: "25%" }}>Details</th>
+                    <th style={{ width: "15%" }}>Reference</th>
+                    <th style={{ width: "12%" }}>Amount</th>
+                    <th style={{ width: "12%" }}>Payments</th>
+                    <th style={{ width: "12%" }}>Balance</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -320,6 +331,7 @@ const ClientStatement = () => {
                     </td>
                     <td>Opening Balance</td>
                     <td></td>
+                    <td></td>
                     <td>R0</td>
                     <td></td>
                     <td>R{openingBalance.toFixed(2)}</td>
@@ -329,6 +341,7 @@ const ClientStatement = () => {
                       <td>{tx.date.toLocaleDateString("en-GB")}</td>
                       <td>{tx.type}</td>
                       <td>{tx.details}</td>
+                      <td>{tx.reference || ""}</td>
                       <td>{tx.amount ? `R${tx.amount.toFixed(2)}` : ""}</td>
                       <td>{tx.payment ? `R${tx.payment.toFixed(2)}` : ""}</td>
                       <td>R{tx.balance.toFixed(2)}</td>
