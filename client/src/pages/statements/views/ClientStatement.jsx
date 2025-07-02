@@ -209,7 +209,7 @@ const ClientStatement = () => {
       return {
         type: "Payment",
         date: new Date(payment.date),
-        details: `Payment ID: ${payment.paykey}`,
+        details: payment.invoice_num || "", // Use invoice number, empty if no match
         reference: payment.reference || "", // Payment reference from the database
         amount: null,
         payment: payment.amount,
