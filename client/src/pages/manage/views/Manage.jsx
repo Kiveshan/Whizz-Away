@@ -4,6 +4,7 @@ import { useEffect } from "react"
 import { useNavigate } from "react-router-dom"
 import "../css/Manage.css"
 import "../css/pagination.css"
+import "../css/additional-styles.css"
 
 // Hooks
 import { useManageState } from "../hooks/useManageState"
@@ -43,6 +44,9 @@ import SubcontractorForm from "../components/subcontractors/SubcontractorForm"
 import ClientRatesTable from "../components/clientRates/ClientRatesTable"
 import ClientRatesForm from "../components/clientRates/ClientRatesForm"
 
+// Creditors Components
+import CreditorsTab from "../components/creditors/CreditorsTab"
+
 const Manage = () => {
   const navigate = useNavigate()
   const { state, actions } = useManageState()
@@ -75,7 +79,9 @@ const Manage = () => {
       state.showTruckForm ||
       state.showTrailerForm ||
       state.showDriverRateForm ||
-      state.showSubcontractorForm
+      state.showSubcontractorForm ||
+      state.showSupplierForm ||
+      state.showExpenseTypeForm
 
     if (isAnyFormShowing) {
       // If a form is showing, hide it and return to the table
@@ -86,6 +92,8 @@ const Manage = () => {
       actions.hideForm("showTrailerForm")
       actions.hideForm("showDriverRateForm")
       actions.hideForm("showSubcontractorForm")
+      actions.hideForm("showSupplierForm")
+      actions.hideForm("showExpenseTypeForm")
 
       // Reset all form data and editing states
       actions.resetFormData("Employee")
@@ -95,7 +103,8 @@ const Manage = () => {
       actions.resetFormData("Trailer")
       actions.resetFormData("DriverRate")
       actions.resetFormData("Subcontractor")
-
+      actions.resetFormData("Supplier")
+      actions.resetFormData("ExpenseType")
       actions.setEditing("Employee", null)
       actions.setEditing("Client", null)
       actions.setEditing("ClientRate", null)
@@ -103,6 +112,8 @@ const Manage = () => {
       actions.setEditing("Trailer", null)
       actions.setEditing("Rate", null)
       actions.setEditing("Subcontractor", null)
+      actions.setEditing("Supplier", null)
+      actions.setEditing("ExpenseType", null)
     } else {
       // If no form is showing (we're in table view), navigate to dashboard
       navigate("/Dashboard")
@@ -246,14 +257,12 @@ const Manage = () => {
 
   const handleClientRateEdit = (clientId, clientName) => {
     console.log("Editing client rates for:", { clientId, clientName })
-
     // Set client info first
     actions.updateFormData("ClientRate", {
       clientId: clientId,
       client: clientName,
       rates: [],
     })
-
     // Load existing rates for this client
     api.loadItemForEdit("clientRate", clientId)
   }
@@ -307,6 +316,12 @@ const Manage = () => {
           onClick={() => actions.setActiveTab("subcontractors")}
         >
           Subcontractors
+        </button>
+        <button
+          className={`manage-tab-button ${state.activeTab === "creditors" ? "active" : ""}`}
+          onClick={() => actions.setActiveTab("creditors")}
+        >
+          Creditors
         </button>
         <button
           className={`manage-tab-button ${state.activeTab === "trucks" ? "active" : ""}`}
@@ -558,6 +573,9 @@ const Manage = () => {
           )}
         </>
       )}
+
+      {/* Creditors Tab */}
+      {state.activeTab === "creditors" && <CreditorsTab state={state} actions={actions} api={api} />}
     </div>
   )
 }

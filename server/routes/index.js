@@ -8,6 +8,8 @@ import manageTruckRoutes from "./manage/truckRoutes.js";
 import manageDriverRatesRoutes from "./manage/driverRatesRoutes.js";
 import manageSubbieRoutes from "./manage/subbieRoutes.js";
 import manageTrailerRoutes from "./manage/trailerRoutes.js";
+import supplierRoutes from "./manage/supplierRoutes.js"
+import expenseTypeRoutes from "./manage/expenseTypeRoutes.js"
 import manageClientRateRoutes from "./manage/clientRateRoutes.js";
 import paymentRoutes from "./payments/paymentRoutes.js";
 import clientRoutes from "./clients/clientRoutes.js";
@@ -37,6 +39,8 @@ router.use(manageDriverRatesRoutes);
 router.use(manageSubbieRoutes);
 router.use(manageTrailerRoutes);
 router.use(manageClientRateRoutes);
+router.use(supplierRoutes);
+router.use(expenseTypeRoutes);
 router.use(invoiceRoutes);
 router.use(paymentRoutes);
 router.use(clientRoutes);
