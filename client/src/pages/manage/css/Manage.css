@@ -1,3 +1,404 @@
+/* === Global Form Input Styling for Consistency === */
+.client-form input,
+.client-form select,
+.manage-form-grid input,
+.manage-form-grid select,
+.manage-truck-form-grid input,
+.manage-driver-rate-form .form-field input,
+.manage-subcontractor-form input,
+.manage-subcontractor-form select,
+.manage-add-employee-form input,
+.manage-add-employee-form select {
+  width: 100%;
+  padding: 10px;
+  font-size: 14px;
+  box-sizing: border-box; /* Ensures padding doesn't affect width */
+  line-height: 1.5; /* Consistent height */
+  height: 40px; /* Fixed height for uniformity */
+}
+
+/* === ClientForm Styles === */
+.client-form {
+  max-width: 1200px;
+  margin: 20px auto;
+  padding: 20px;
+  background: linear-gradient(135deg, #f0f4ff 0%, #ffffff 100%);
+  border-radius: 10px;
+  box-shadow: 0 6px 14px rgba(65, 105, 225, 0.15);
+  border: 1px solid #4169e1;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+  position: relative;
+  overflow: hidden;
+}
+
+.client-form::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 4px;
+  background: #4169e1;
+}
+
+.client-form h2 {
+  text-align: center;
+  margin-bottom: 25px;
+  color: #2c3e50;
+  font-size: 26px;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+}
+
+.client-form .client-form-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 20px;
+  width: 100%;
+}
+
+.client-form .client-form-group {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.client-form .client-form-group label {
+  font-weight: 600;
+  color: #2c3e50;
+  margin-bottom: 6px;
+  font-size: 14px;
+  transition: color 0.3s ease;
+}
+
+.client-form .client-form-group label:hover {
+  color: #4169e1;
+}
+
+.client-form .client-form-group label strong {
+  font-weight: 700;
+}
+
+.client-form .client-form-group input,
+.client-form .client-form-group select {
+  border: 2px solid #dfe4ff;
+  border-radius: 6px;
+  outline: none;
+  background-color: #fff;
+  transition: border-color 0.3s ease, box-shadow 0.3s ease, transform 0.2s ease;
+}
+
+.client-form .client-form-group input:focus,
+.client-form .client-form-group select:focus {
+  border-color: #4169e1;
+  box-shadow: 0 0 6px rgba(65, 105, 225, 0.3);
+  transform: translateY(-2px);
+}
+
+.client-form .client-form-group input:hover,
+.client-form .client-form-group select:hover {
+  border-color: #6b89e9;
+}
+
+.client-form .client-form-group select.client-dropdown {
+  appearance: none;
+  background: #fff url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="%232c3e50" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"></polyline></svg>') no-repeat right 12px center;
+  cursor: pointer;
+}
+
+.client-form .client-button-container {
+  grid-column: 1 / -1;
+  display: flex;
+  justify-content: center;
+  gap: 12px;
+  margin-top: 25px;
+}
+
+.client-form .client-save-button,
+.client-form .client-cancel-button {
+  padding: 12px 24px;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 16px;
+  font-weight: 600;
+  transition: background-color 0.3s ease, transform 0.2s ease, box-shadow 0.3s ease;
+  position: relative;
+  overflow: hidden;
+}
+
+.client-form .client-save-button::after,
+.client-form .client-cancel-button::after {
+  content: '';
+  position: absolute;
+  width: 100px;
+  height: 100px;
+  background: rgba(255, 255, 255, 0.3);
+  border-radius: 50%;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%) scale(0);
+  transition: transform 0.4s ease;
+}
+
+.client-form .client-save-button:hover::after,
+.client-form .client-cancel-button:hover::after {
+  transform: translate(-50%, -50%) scale(1.5);
+}
+
+.client-form .client-save-button {
+  background: #2ecc71;
+  color: white;
+}
+
+.client-form .client-save-button:hover {
+  background: #27ae60;
+  transform: TranslateY(-2px);
+  box-shadow: 0 4px 10px rgba(46, 204, 113, 0.3);
+}
+
+.client-form .client-save-button:disabled {
+  background: #9ca3af;
+  cursor: not-allowed;
+  transform: none;
+  box-shadow: none;
+}
+
+.client-form .client-cancel-button {
+  background: #e74c3c;
+  color: white;
+}
+
+.client-form .client-cancel-button:hover {
+  background: #c0392b;
+  transform: translateY(-2px);
+  box-shadow: 0 4px 10px rgba(231, 76, 60, 0.3);
+}
+
+/* === Other Form Styles (Updated for Input Size Consistency) === */
+.manage-add-client-form {
+  max-width: 1600px;
+  margin: 0 auto;
+  padding: 20px;
+  background-color: #ffffff;
+  border-radius: 8px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+}
+
+.manage-add-client-form h2,
+.manage-add-truck-form h2,
+.manage-add-employee-form h2,
+.manage-driver-rate-form h2,
+.manage-subcontractor-form h2 {
+  text-align: center;
+  margin-bottom: 20px;
+  color: #333;
+  font-size: 24px;
+  font-weight: 600;
+}
+
+.manage-form-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 15px;
+  width: 100%;
+}
+
+.manage-truck-form-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 15px;
+  width: 100%;
+}
+
+.manage-truck-form-grid .manage-full-width {
+  grid-column: span 2;
+}
+
+.manage-form-group {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.manage-form-group label {
+  font-weight: 500;
+  color: #333;
+  margin-bottom: 5px;
+  font-size: 14px;
+}
+
+.manage-form-group label strong {
+  font-weight: 600;
+}
+
+.manage-form-grid input,
+.manage-form-grid select,
+.manage-truck-form-grid input {
+  border: 1px solid #ddd;
+  border-radius: 5px;
+  outline: none;
+  transition: border-color 0.3s, box-shadow 0.3s;
+}
+
+.manage-form-grid input:focus,
+.manage-form-grid select:focus,
+.manage-truck-form-grid input:focus {
+  border-color: #4169e1;
+  box-shadow: 0 0 0 2px rgba(65, 105, 225, 0.2);
+}
+
+.manage-button-container {
+  display: flex;
+  justify-content: space-between;
+  width: 100%;
+  margin-top: 15px;
+}
+
+.manage-save-button,
+.manage-cancel-button {
+  width: 48%;
+  padding: 12px;
+  border: none;
+  border-radius: 5px;
+  cursor: pointer;
+  font-size: 16px;
+  font-weight: 500;
+  transition: background-color 0.3s;
+}
+
+.manage-save-button {
+  background: #2ecc71;
+  color: white;
+}
+
+.manage-save-button:hover {
+  background: #27ae60;
+}
+
+.manage-cancel-button {
+  background: #e74c3c;
+  color: white; /* Updated to white for consistency */
+}
+
+.manage-cancel-button:hover {
+  background: #c0392b;
+}
+
+.manage-driver-rate-form {
+  max-width: 800px;
+  margin: auto;
+  padding: 20px;
+  background: #f9fafb;
+  border-radius: 8px;
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+  display: flex;
+  flex-direction: column;
+  gap: 15px;
+}
+
+.manage-driver-rate-form .form-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 15px;
+  margin-bottom: 15px;
+}
+
+.manage-driver-rate-form .form-field {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.manage-driver-rate-form .form-field label {
+  font-weight: 500;
+  color: #333;
+  font-size: 14px;
+  margin-bottom: 5px;
+}
+
+.manage-driver-rate-form .form-field label strong {
+  font-weight: 600;
+}
+
+.manage-driver-rate-form .form-field input {
+  border: 1px solid #ddd;
+  border-radius: 5px;
+  outline: none;
+  transition: border-color 0.3s, box-shadow 0.3s;
+}
+
+.manage-driver-rate-form .form-field input:focus {
+  border-color: #4169e1;
+  box-shadow: 0 0 5px rgba(65, 105, 225, 0.2);
+}
+
+.manage-driver-rate-form .form-field input:hover {
+  border-color: #b3c0ff;
+}
+
+.manage-driver-rate-form .form-field input::placeholder {
+  color: #9ca3af;
+}
+
+.manage-driver-rate-form .manage-form-actions {
+  display: flex;
+  justify-content: center;
+  gap: 10px;
+  margin-top: 20px;
+}
+
+.manage-driver-rate-form .manage-save-button,
+.manage-driver-rate-form .manage-cancel-button {
+  padding: 12px 20px;
+  border: none;
+  border-radius: 5px;
+  cursor: pointer;
+  font-size: 16px;
+  font-weight: 500;
+  transition: background-color 0.3s, box-shadow 0.3s;
+}
+
+.manage-driver-rate-form .manage-save-button {
+  background: #2ecc71;
+  color: white;
+}
+
+.manage-driver-rate-form .manage-save-button:hover {
+  background: #27ae60;
+  box-shadow: 0 3px 8px rgba(46, 204, 113, 0.2);
+}
+
+.manage-driver-rate-form .manage-cancel-button {
+  background: #e74c3c;
+  color: white;
+}
+
+.manage-driver-rate-form .manage-cancel-button:hover {
+  background: #c0392b;
+  box-shadow: 0 3px 8px rgba(231, 76, 60, 0.2);
+}
+
+.manage-subcontractor-form {
+  max-width: 800px;
+  margin: auto;
+  padding: 20px;
+  background: #f9fafb;
+  border-radius: 8px;
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.manage-subform-group {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+
+/* === Existing Non-Form Styles (Unchanged) === */
 .manage-container {
   width: 100%;
   padding: 20px;
@@ -34,7 +435,6 @@
   background-color: #2ecc71;
 }
 
-/* Tabs styling */
 .manage-tabs-container {
   display: flex;
   gap: 10px;
@@ -57,7 +457,6 @@
   color: white;
 }
 
-/* Tables */
 .manage-employees-table,
 .manage-clients-table,
 .manage-trucks-table,
@@ -92,7 +491,6 @@ tr:hover {
   background-color: #f5f5f5;
 }
 
-/* Buttons inside tables */
 .manage-view-button,
 .manage-edit-button {
   background-color: #4169e1;
@@ -103,7 +501,6 @@ tr:hover {
   cursor: pointer;
 }
 
-/* Optionally, style delete buttons if used */
 .manage-delete-button {
   background-color: #e74c3c;
   color: white;
@@ -127,7 +524,7 @@ tr:hover {
   background-color: #a93226;
   transform: scale(0.95);
 }
-/* Optionally, style delete buttons if used */
+
 .manage-enable-button {
   background-color: green;
   color: white;
@@ -152,12 +549,10 @@ tr:hover {
   transform: scale(0.95);
 }
 
-
 .trash-icon {
   font-size: 18px;
 }
 
-/* Add buttons */
 .manage-add-employee-button,
 .manage-add-client-button,
 .manage-add-truck-button,
@@ -184,8 +579,6 @@ tr:hover {
   background-color: #3158c9;
 }
 
-/* Forms */
-.manage-add-client-form,
 .manage-add-truck-form,
 .manage-add-employee-form {
   display: flex;
@@ -200,180 +593,99 @@ tr:hover {
   box-shadow: 0px 4px 6px rgba(0, 0, 0, 0.1);
 }
 
-.manage-add-client-form h2,
-.manage-add-truck-form h2,
-.manage-add-employee-form h2 {
+.loading {
   text-align: center;
-  margin-bottom: 20px;
-  color: #333;
-}
-
-/* Form grids */
-.manage-form-grid,
-.manage-truck-form-grid {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 15px;
-  width: 100%;
-}
-
-.manage-truck-form-grid .manage-full-width {
-  grid-column: span 2;
-}
-
-/* Form groups */
-.manage-form-group {
-  display: flex;
-  flex-direction: column;
-  gap: 5px;
-
-}
-
-.manage-form-group label {
-  font-weight: 500;
-  color: #333;
-  margin-bottom: 5px;
-}
-
-.manage-form-grid input,
-.manage-form-grid select,
-.manage-truck-form-grid input {
-  width: 100%;
-  padding: 12px;
+  padding: 16px;
   font-size: 16px;
-  border: 1px solid #ddd;
-  border-radius: 5px;
-  outline: none;
-  transition: border-color 0.3s;
+  color: #6b7280;
+  animation: pulse 1.5s infinite;
 }
 
-.manage-form-grid input:focus,
-.manage-form-grid select:focus,
-.manage-truck-form-grid input:focus {
-  border-color: #4169e1;
-  box-shadow: 0 0 0 2px rgba(65, 105, 225, 0.2);
+.error {
+  text-align: center;
+  padding: 16px;
+  font-size: 16px;
+  color: #dc2626;
 }
 
-/* Button container for forms */
-.manage-button-container {
+.rates-section {
+  margin-bottom: 20px;
+}
+
+.rates-header {
   display: flex;
   justify-content: space-between;
-  width: 100%;
-  margin-top: 15px;
+  align-items: center;
+  margin-bottom: 12px;
 }
 
-.manage-save-button,
-.manage-cancel-button {
-  width: 48%;
-  padding: 12px;
+.rates-header h3 {
+  font-size: 18px;
+  font-weight: 600;
+  color: #111827;
+}
+
+.add-rate-button {
+  padding: 6px 12px;
+  background-color: #2563eb;
+  color: #ffffff;
   border: none;
-  border-radius: 5px;
+  border-radius: 6px;
   cursor: pointer;
-  font-size: 16px;
+  font-size: 13px;
   font-weight: 500;
-  transition: background-color 0.3s;
+  transition: background-color 0.2s ease;
 }
 
-.manage-save-button {
-  background: #2ecc71;
-  color: white;
+.add-rate-button:hover {
+  background-color: #1d4ed8;
 }
 
-.manage-save-button:hover {
-  background: #27ae60;
-}
-
-.manage-cancel-button {
-  background: #e74c3c;
-  color: black;
-}
-
-.manage-cancel-button:hover {
-  background: #c0392b;
-  color: white;
-}
-
-/* Additional truck button */
-.manage-add-truck-button {
-  background-color: #4169e1;
-  color: white;
-  border: none;
-  padding: 10px 20px;
-  border-radius: 4px;
-  cursor: pointer;
-  margin-top: 25px;
-  font-size: 16px;
-  transition: background-color 0.3s;
-}
-
-.manage-add-truck-button:hover {
-  background-color: #3158c9;
-}
-
-/* Media queries */
-@media (max-width: 768px) {
-  .manage-form-grid,
-  .manage-truck-form-grid {
-    grid-template-columns: 1fr;
-  }
-
-  .manage-truck-form-grid .manage-full-width {
-    grid-column: 1;
-  }
-
-  .manage-button-container {
-    flex-direction: column;
-    gap: 10px;
-  }
-
-  .manage-save-button,
-  .manage-cancel-button {
-    width: 100%;
-  }
-
-  .manage-button-row {
-    flex-direction: column;
-    align-items: center;
-  }
-
-  .manage-button {
-    width: 100%;
-  }
-}
-
-/* Driver rate form */
-.manage-driver-rate-form {
-  width: 100%;
-  max-width: 800px;
-  margin: auto;
-  padding: 20px;
-  background: #f9f9f9;
-  border-radius: 8px;
-  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
-  display: flex;
-  flex-direction: column;
-  gap: 15px;
-}
-
-/* Subcontractor form */
-.manage-subcontractor-form {
-  width: 100%;
-  max-width: 800px;
-  margin: auto;
-  padding: 20px;
-  background: #f9f9f9;
-  border-radius: 8px;
-  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
-  display: flex;
-  flex-direction: column;
-  gap: 20px;
- 
-}
-
-.manage-subform-group {
+.rate-row {
   display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 10px;
+  grid-template-columns: 1fr;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+@media (min-width: 1024px) {
+  .rate-row {
+    grid-template-columns: repeat(5, 1fr);
+  }
+}
+
+.rate-entry {
+  padding: 10px;
+  border: 1px solid #e5e7eb;
+  border-radius: 6px;
+  background-color: #f9fafb;
+}
+
+.rate-entry-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 6px;
+}
+
+.rate-entry-header h4 {
+  font-size: 14px;
+  font-weight: 500;
+  color: #374151;
+}
+
+.remove-rate-button {
+  background: none;
+  border: none;
+  color: #ef4444;
+  cursor: pointer;
+  font-size: 11px;
+  font-weight: 500;
+  transition: color 0.2s ease;
+}
+
+.remove-rate-button:hover {
+  color: #b91c1c;
 }
 
 .checkbox-container {
@@ -436,16 +748,6 @@ tr:hover {
   transform: rotate(45deg);
 }
 
-.form-row {
-  display: flex;
-  gap: 1rem;
-}
-.form-field {
-  flex: 1;
-}
-
-/* Employee file upload */
-/* Container for document upload section */
 .document-upload-section {
   margin-top: 30px;
 }
@@ -455,14 +757,13 @@ tr:hover {
   font-weight: 600;
 }
 
-/* File input */
 .document-upload-section input[type="file"] {
   display: block;
   margin-bottom: 12px;
   font-size: 14px;
+  height: auto; /* File inputs don't need fixed height */
 }
 
-/* File entry display */
 .document-upload-section .file-entry {
   display: flex;
   align-items: center;
@@ -471,7 +772,6 @@ tr:hover {
   font-size: 14px;
 }
 
-/* Download link */
 .document-upload-section .file-entry a.download-link {
   color: #007bff;
   text-decoration: underline;
@@ -479,7 +779,6 @@ tr:hover {
   font-size: 14px;
 }
 
-/* Delete button */
 .document-upload-section .file-entry button.delete-btn {
   background-color: #dc3545;
   color: white;
@@ -495,7 +794,6 @@ tr:hover {
   background-color: #c82333;
 }
 
-/* File upload */
 .file-upload-wrapper {
   border: 2px dashed #ccc;
   border-radius: 12px;
@@ -559,7 +857,7 @@ tr:hover {
 }
 
 #custom-alert {
-  background-color: #f44336; /* red */
+  background-color: #f44336;
   color: white;
   padding: 15px 20px;
   border-radius: 5px;
@@ -567,7 +865,7 @@ tr:hover {
   top: 20px;
   right: 20px;
   z-index: 1000;
-  box-shadow: 0 4px 6px rgba(0,0,0,0.2);
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.2);
   display: none;
   animation: fadeIn 0.3s ease-in-out;
 }
@@ -585,7 +883,6 @@ tr:hover {
   display: none;
 }
 
-/* CustomAlert.css */
 .custom-alert {
   position: fixed;
   top: 20px;
@@ -622,3 +919,91 @@ tr:hover {
 .alert-close-btn:hover {
   color: #ddd;
 }
+
+/* Responsive design */
+@media (max-width: 1024px) {
+  .client-form .client-form-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (max-width: 768px) {
+  .client-form .client-form-grid,
+  .manage-form-grid,
+  .manage-truck-form-grid,
+  .manage-driver-rate-form .form-row,
+  .manage-subform-group {
+    grid-template-columns: 1fr;
+  }
+
+  .client-form,
+  .manage-add-client-form,
+  .manage-add-truck-form,
+  .manage-add-employee-form,
+  .manage-driver-rate-form,
+  .manage-subcontractor-form {
+    padding: 15px;
+  }
+
+  .client-form .client-button-container,
+  .manage-button-container,
+  .manage-driver-rate-form .manage-form-actions {
+    flex-direction: column;
+    gap: 10px;
+  }
+
+  .client-form .client-save-button,
+  .client-form .client-cancel-button,
+  .manage-save-button,
+  .manage-cancel-button,
+  .manage-driver-rate-form .manage-save-button,
+  .manage-driver-rate-form .manage-cancel-button {
+    width: 100%;
+  }
+
+  .manage-button-row {
+    flex-direction: column;
+    align-items: center;
+  }
+
+  .manage-button {
+    width: 100%;
+  }
+}
+
+@keyframes pulse {
+  0% { opacity: 1; }
+  50% { opacity: 0.5; }
+  100% { opacity: 1; }
+}
+
+.sub-tab-navigation {
+  margin-bottom: 1.5rem; /* Equivalent to Tailwind's mb-6 (6 * 0.25rem = 1.5rem) */
+}
+
+.tab-container {
+  display: flex;
+  gap: 1rem; /* Equivalent to Tailwind's space-x-4 (4 * 0.25rem = 1rem) */
+  border-bottom: 1px solid #e5e7eb; /* Equivalent to Tailwind's border-gray-200 */
+}
+
+.tab {
+  padding: 0.5rem 1rem; /* Equivalent to Tailwind's py-2 px-4 */
+  font-weight: 500; /* Equivalent to Tailwind's font-medium */
+  font-size: 0.875rem; /* Equivalent to Tailwind's text-sm */
+  color: #6b7280; /* Equivalent to Tailwind's text-gray-500 */
+  background: none;
+  border: none;
+  cursor: pointer;
+  transition: color 0.2s ease;
+}
+
+.tab:hover {
+  color: #4b5563; /* Equivalent to Tailwind's hover:text-gray-700 */
+}
+
+.tab.active {
+  color: #2563eb; /* Equivalent to Tailwind's text-blue-600 */
+  border-bottom: 2px solid #3b82f6; /* Equivalent to Tailwind's border-b-2 border-blue-500 */
+}
+

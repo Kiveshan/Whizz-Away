@@ -8,7 +8,7 @@ const creditorsDashboardData = [
   {
     title: "Subcontractors",
     image: "/images/subconstructor.jpg",
-    path: "/Creditors/subcontractor",
+    path: "/Creditors/SubcontractorList",
   },
   { title: "Wages", image: "/images/wages.jpeg", path: "/finance-clerk-wage" },
   {

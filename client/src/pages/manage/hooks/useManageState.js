@@ -16,6 +16,10 @@ const initialState = {
   trailers: [],
   driverRates: [],
   subcontractors: [],
+  clientRates: [],
+  suppliers: [],
+  expenseTypes: [],
+  allExpenseTypes: [], // For dropdowns - contains ALL expense types
 
   // Pagination State
   pagination: {
@@ -55,6 +59,24 @@ const initialState = {
       totalItems: 0,
       itemsPerPage: 5,
     },
+    clientRates: {
+      currentPage: 1,
+      totalPages: 1,
+      totalItems: 0,
+      itemsPerPage: 5,
+    },
+    suppliers: {
+      currentPage: 1,
+      totalPages: 1,
+      totalItems: 0,
+      itemsPerPage: 5,
+    },
+    expenseTypes: {
+      currentPage: 1,
+      totalPages: 1,
+      totalItems: 0,
+      itemsPerPage: 5,
+    },
   },
 
   // Search/Filter State
@@ -80,6 +102,16 @@ const initialState = {
       search: "",
       status: "all",
     },
+    clientRates: {
+      search: "",
+    },
+    suppliers: {
+      search: "",
+      status: "all",
+    },
+    expenseTypes: {
+      search: "",
+    },
   },
 
   // Form States
@@ -89,6 +121,9 @@ const initialState = {
   showTrailerForm: false,
   showDriverRateForm: false,
   showSubcontractorForm: false,
+  showClientRateForm: false,
+  showSupplierForm: false,
+  showExpenseTypeForm: false,
 
   // Edit States
   editingEmployeeId: null,
@@ -100,6 +135,9 @@ const initialState = {
   isEditing: false,
   isEditingRate: false,
   isEditMode: false,
+  editingClientRateId: null,
+  editingSupplierId: null,
+  editingExpenseTypeId: null,
 
   // Form Data
   newEmployee: {
@@ -192,6 +230,39 @@ const initialState = {
     trucks: [{ reg: "", driver: "" }],
   },
 
+  newClientRate: {
+    clientId: null,
+    clientName: "",
+    rates: [
+      {
+        starting_point: "",
+        destination: "",
+        "6m_rate": "",
+        "12m_rate": "",
+        surcharges: "",
+      },
+    ],
+  },
+
+  newSupplier: {
+    supplier: "",
+    representative: "",
+    address: "",
+    suburb: "",
+    postalcode: "",
+    email: "",
+    cellnum: "",
+    vatregno: "",
+    city: "",
+    streetaddress: "",
+    payment_type: "",
+    expenseTypes: [],
+  },
+
+  newExpenseType: {
+    expense: "",
+  },
+
   // Alert
   showAlert: false,
   alertMessage: "",
@@ -261,6 +332,9 @@ function manageReducer(state, action) {
         ...(action.payload === "showTrailerForm" && { editTrailerId: null }),
         ...(action.payload === "showDriverRateForm" && { editingRateId: null, isEditingRate: false }),
         ...(action.payload === "showSubcontractorForm" && { subcontractorId: null, isEditMode: false }),
+        ...(action.payload === "showClientRateForm" && { editingClientRateId: null }),
+        ...(action.payload === "showSupplierForm" && { editingSupplierId: null }),
+        ...(action.payload === "showExpenseTypeForm" && { editingExpenseTypeId: null }),
       }
 
     case "SET_EDITING":
@@ -275,6 +349,9 @@ function manageReducer(state, action) {
         }),
         ...(action.payload.type === "Truck" && { editTruckId: action.payload.id }),
         ...(action.payload.type === "Trailer" && { editTrailerId: action.payload.id }),
+        ...(action.payload.type === "ClientRate" && { editingClientRateId: action.payload.id }),
+        ...(action.payload.type === "Supplier" && { editingSupplierId: action.payload.id }),
+        ...(action.payload.type === "ExpenseType" && { editingExpenseTypeId: action.payload.id }),
       }
 
     case "UPDATE_FORM_DATA":

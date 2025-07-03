@@ -1,4 +1,4 @@
-import { pool } from "../../config/database.js";
+import { pool } from "../../config/database.js"
 
 export const getPurchaseOrders = async () => {
   const query = `
@@ -11,28 +11,30 @@ export const getPurchaseOrders = async () => {
     FROM purchase_orders po
     JOIN expense_types et ON po.expense_type_id = et.id
     JOIN suppliers s ON po.supplier_id = s.supplier_id
-  `;
+  `
+
   try {
-    const result = await pool.query(query);
-    return result.rows;
+    const result = await pool.query(query)
+    return result.rows
   } catch (error) {
-    throw error;
+    throw error
   }
-};
+}
 
 export const getExpenseTypes = async () => {
   const query = `
     SELECT id, expense 
     FROM expense_types
     ORDER BY expense
-  `;
+  `
+
   try {
-    const result = await pool.query(query);
-    return result.rows;
+    const result = await pool.query(query)
+    return result.rows
   } catch (error) {
-    throw error;
+    throw error
   }
-};
+}
 
 export const getStatements = async (supplierId, fromDate, toDate) => {
   let query = `
@@ -55,31 +57,35 @@ export const getStatements = async (supplierId, fromDate, toDate) => {
     JOIN suppliers s ON po.supplier_id = s.supplier_id
     LEFT JOIN expense_types e ON po.expense_type_id = e.id
     WHERE 1=1
-  `;
-  const values = [];
-  let paramIndex = 1;
+  `
+
+  const values = []
+  let paramIndex = 1
 
   if (supplierId) {
-    query += ` AND po.supplier_id = $${paramIndex++}`;
-    values.push(supplierId);
+    query += ` AND po.supplier_id = $${paramIndex++}`
+    values.push(supplierId)
   }
+
   if (fromDate) {
-    query += ` AND po.date >= $${paramIndex++}`;
-    values.push(fromDate);
+    query += ` AND po.date >= $${paramIndex++}`
+    values.push(fromDate)
   }
+
   if (toDate) {
-    query += ` AND po.date <= $${paramIndex++}`;
-    values.push(toDate);
+    query += ` AND po.date <= $${paramIndex++}`
+    values.push(toDate)
   }
-  query += ` ORDER BY po.date DESC`;
+
+  query += ` ORDER BY po.date DESC`
 
   try {
-    const result = await pool.query(query, values);
-    return result.rows;
+    const result = await pool.query(query, values)
+    return result.rows
   } catch (error) {
-    throw error;
+    throw error
   }
-};
+}
 
 export const getSupplierSummary = async (year, month) => {
   let query = `
@@ -96,14 +102,16 @@ export const getSupplierSummary = async (year, month) => {
     FROM purchase_orders po
     JOIN suppliers s ON po.supplier_id = s.supplier_id
     WHERE 1=1
-  `;
-  const values = [];
-  let paramIndex = 1;
+  `
+
+  const values = []
+  let paramIndex = 1
 
   if (year && year !== "All") {
-    query += ` AND EXTRACT(YEAR FROM po.date) = $${paramIndex++}`;
-    values.push(year);
+    query += ` AND EXTRACT(YEAR FROM po.date) = $${paramIndex++}`
+    values.push(year)
   }
+
   if (month && month !== "All") {
     const monthIndex =
       [
@@ -119,22 +127,24 @@ export const getSupplierSummary = async (year, month) => {
         "October",
         "November",
         "December",
-      ].indexOf(month) + 1;
-    query += ` AND EXTRACT(MONTH FROM po.date) = $${paramIndex++}`;
-    values.push(monthIndex);
+      ].indexOf(month) + 1
+
+    query += ` AND EXTRACT(MONTH FROM po.date) = $${paramIndex++}`
+    values.push(monthIndex)
   }
+
   query += `
     GROUP BY s.supplier_id, s.supplier, EXTRACT(YEAR FROM po.date), EXTRACT(MONTH FROM po.date), TO_CHAR(po.date, 'Month')
     ORDER BY year DESC, month DESC, s.supplier
-  `;
+  `
 
   try {
-    const result = await pool.query(query, values);
-    return result.rows;
+    const result = await pool.query(query, values)
+    return result.rows
   } catch (error) {
-    throw error;
+    throw error
   }
-};
+}
 
 export const getSuppliersByExpenseType = async (expenseTypeId) => {
   const query = `
@@ -143,29 +153,32 @@ export const getSuppliersByExpenseType = async (expenseTypeId) => {
     JOIN supplier_expense_types set ON s.supplier_id = set.se_id
     WHERE set.expense_type_id = $1 AND s.status = true
     ORDER BY s.supplier
-  `;
+  `
+
   try {
-    const result = await pool.query(query, [expenseTypeId]);
-    return result.rows;
+    const result = await pool.query(query, [expenseTypeId])
+    return result.rows
   } catch (error) {
-    throw error;
+    throw error
   }
-};
+}
 
 export const calculatePurchaseOrder = (quantity, unitPrice) => {
-  const qty = Number(quantity) || 0;
-  const price = Number(unitPrice) || 0;
-  const amount = qty * price;
-  const subtotal = amount;
-  const vat = subtotal * 0.15;
-  const total = subtotal + vat;
+  const qty = Number(quantity) || 0
+  const price = Number(unitPrice) || 0
+
+  const amount = qty * price
+  const subtotal = amount
+  const vat = subtotal * 0.15
+  const total = subtotal + vat
+
   return {
     amount: amount.toFixed(2),
     subtotal: subtotal.toFixed(2),
     vat: vat.toFixed(2),
     total: total.toFixed(2),
-  };
-};
+  }
+}
 
 export const createPurchaseOrder = async ({
   expenseTypeId,
@@ -180,12 +193,10 @@ export const createPurchaseOrder = async ({
   date,
   total,
 }) => {
-  const currentDate = new Date();
-  const datePrefix = `PO-${currentDate.getFullYear()}${(
-    currentDate.getMonth() + 1
-  )
+  const currentDate = new Date()
+  const datePrefix = `PO-${currentDate.getFullYear()}${(currentDate.getMonth() + 1)
     .toString()
-    .padStart(2, "0")}${currentDate.getDate().toString().padStart(2, "0")}`;
+    .padStart(2, "0")}${currentDate.getDate().toString().padStart(2, "0")}`
 
   const latestPoQuery = `
     SELECT ponum 
@@ -193,16 +204,18 @@ export const createPurchaseOrder = async ({
     WHERE ponum LIKE $1 
     ORDER BY ponum DESC 
     LIMIT 1
-  `;
-  const latestPoResult = await pool.query(latestPoQuery, [`${datePrefix}%`]);
+  `
 
-  let sequenceNumber = 1;
+  const latestPoResult = await pool.query(latestPoQuery, [`${datePrefix}%`])
+
+  let sequenceNumber = 1
   if (latestPoResult.rows.length > 0) {
-    const latestPoNum = latestPoResult.rows[0].ponum;
-    const latestSequence = Number.parseInt(latestPoNum.split("-")[2], 10);
-    sequenceNumber = latestSequence + 1;
+    const latestPoNum = latestPoResult.rows[0].ponum
+    const latestSequence = Number.parseInt(latestPoNum.split("-")[2], 10)
+    sequenceNumber = latestSequence + 1
   }
-  const poNum = `${datePrefix}-${sequenceNumber.toString().padStart(3, "0")}`;
+
+  const poNum = `${datePrefix}-${sequenceNumber.toString().padStart(3, "0")}`
 
   const query = `
     INSERT INTO purchase_orders (
@@ -211,7 +224,8 @@ export const createPurchaseOrder = async ({
     )
     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
     RETURNING po_id
-  `;
+  `
+
   const values = [
     expenseTypeId,
     supplierId,
@@ -225,23 +239,105 @@ export const createPurchaseOrder = async ({
     date || new Date().toISOString().split("T")[0],
     poNum,
     total,
-  ];
+  ]
 
   try {
-    const result = await pool.query(query, values);
-    return { poId: result.rows[0].po_id, poNum };
+    const result = await pool.query(query, values)
+    return { poId: result.rows[0].po_id, poNum }
   } catch (error) {
-    throw error;
+    throw error
   }
-};
+}
 
-export const getPurchaseOrderList = async (
+// New function for creating multiple purchase orders with same PO number
+export const createMultiplePurchaseOrders = async ({
   supplierId,
-  expenseTypeId,
-  fromDate,
-  toDate,
-  poId
-) => {
+  date,
+  attentionTo,
+  receivedBy,
+  regNo,
+  subbie,
+  lineItems,
+  totals,
+}) => {
+  const client = await pool.connect()
+
+  try {
+    await client.query("BEGIN")
+
+    // Generate PO number
+    const currentDate = new Date()
+    const datePrefix = `PO-${currentDate.getFullYear()}${(currentDate.getMonth() + 1)
+      .toString()
+      .padStart(2, "0")}${currentDate.getDate().toString().padStart(2, "0")}`
+
+    const latestPoQuery = `
+      SELECT ponum 
+      FROM purchase_orders 
+      WHERE ponum LIKE $1 
+      ORDER BY ponum DESC 
+      LIMIT 1
+    `
+
+    const latestPoResult = await client.query(latestPoQuery, [`${datePrefix}%`])
+
+    let sequenceNumber = 1
+    if (latestPoResult.rows.length > 0) {
+      const latestPoNum = latestPoResult.rows[0].ponum
+      const latestSequence = Number.parseInt(latestPoNum.split("-")[2], 10)
+      sequenceNumber = latestSequence + 1
+    }
+
+    const poNum = `${datePrefix}-${sequenceNumber.toString().padStart(3, "0")}`
+
+    // Insert each line item as a separate record with the same PO number
+    const insertQuery = `
+      INSERT INTO purchase_orders (
+        expense_type_id, supplier_id, reg_no, attention_to, received_by,
+        quantity, unit_price, description, subbie, date, ponum, total
+      )
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
+      RETURNING po_id
+    `
+
+    const insertedIds = []
+
+    for (const item of lineItems) {
+      const values = [
+        item.expenseTypeId,
+        supplierId,
+        regNo,
+        attentionTo,
+        receivedBy,
+        item.quantity,
+        item.unitPrice,
+        item.description,
+        subbie,
+        date || new Date().toISOString().split("T")[0],
+        poNum,
+        item.amount, // Individual line item amount
+      ]
+
+      const result = await client.query(insertQuery, values)
+      insertedIds.push(result.rows[0].po_id)
+    }
+
+    await client.query("COMMIT")
+
+    return {
+      poNum,
+      itemCount: lineItems.length,
+      insertedIds,
+    }
+  } catch (error) {
+    await client.query("ROLLBACK")
+    throw error
+  } finally {
+    client.release()
+  }
+}
+
+export const getPurchaseOrderList = async (supplierId, expenseTypeId, fromDate, toDate, poId) => {
   let query = `
     SELECT po.po_id, po.ponum, po.date, s.supplier, e.expense,
            po.description, po.quantity, po.unit_price,
@@ -251,36 +347,42 @@ export const getPurchaseOrderList = async (
     JOIN suppliers s ON po.supplier_id = s.supplier_id
     JOIN expense_types e ON po.expense_type_id = e.id
     WHERE 1=1
-  `;
-  const values = [];
-  let paramIndex = 1;
+  `
+
+  const values = []
+  let paramIndex = 1
 
   if (poId) {
-    query += ` AND po.po_id = $${paramIndex++}`;
-    values.push(poId);
+    query += ` AND po.po_id = $${paramIndex++}`
+    values.push(poId)
   }
+
   if (supplierId) {
-    query += ` AND po.supplier_id = $${paramIndex++}`;
-    values.push(supplierId);
+    query += ` AND po.supplier_id = $${paramIndex++}`
+    values.push(supplierId)
   }
+
   if (expenseTypeId) {
-    query += ` AND po.expense_type_id = $${paramIndex++}`;
-    values.push(expenseTypeId);
+    query += ` AND po.expense_type_id = $${paramIndex++}`
+    values.push(expenseTypeId)
   }
+
   if (fromDate) {
-    query += ` AND po.date >= $${paramIndex++}`;
-    values.push(fromDate);
+    query += ` AND po.date >= $${paramIndex++}`
+    values.push(fromDate)
   }
+
   if (toDate) {
-    query += ` AND po.date <= $${paramIndex++}`;
-    values.push(toDate);
+    query += ` AND po.date <= $${paramIndex++}`
+    values.push(toDate)
   }
-  query += ` ORDER BY po.date DESC`;
+
+  query += ` ORDER BY po.date DESC`
 
   try {
-    const result = await pool.query(query, values);
-    return result.rows;
+    const result = await pool.query(query, values)
+    return result.rows
   } catch (error) {
-    throw error;
+    throw error
   }
-};
+}

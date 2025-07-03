@@ -71,6 +71,47 @@
   box-shadow: 0 0 0 2px rgba(0, 123, 255, 0.25);
 }
 
+/* Sub-tab Navigation Styles */
+.sub-tab-navigation {
+  margin-bottom: 1.5rem;
+}
+
+.sub-tab-container {
+  display: flex;
+  gap: 1rem;
+  border-bottom: 1px solid #e5e7eb;
+  padding-bottom: 0;
+}
+
+.sub-tab-button {
+  padding: 0.5rem 1rem;
+  font-weight: 500;
+  font-size: 0.875rem;
+  background: none;
+  border: none;
+  cursor: pointer;
+  position: relative;
+  transition: all 0.2s ease-in-out;
+  border-bottom: 2px solid transparent;
+}
+
+.sub-tab-button:hover {
+  color: #374151;
+}
+
+.sub-tab-button.active {
+  color: #2563eb;
+  border-bottom-color: #2563eb;
+}
+
+.sub-tab-button.inactive {
+  color: #6b7280;
+}
+
+.sub-tab-button.inactive:hover {
+  color: #374151;
+}
+
 /* Responsive improvements */
 @media (max-width: 768px) {
   .manage-form-grid {
@@ -89,5 +130,16 @@
   .manage-tab-button {
     flex: 1;
     min-width: 120px;
+  }
+
+  .sub-tab-container {
+    flex-wrap: wrap;
+    gap: 0.5rem;
+  }
+
+  .sub-tab-button {
+    flex: 1;
+    min-width: 100px;
+    text-align: center;
   }
 }

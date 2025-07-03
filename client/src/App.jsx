@@ -105,6 +105,9 @@ import {
   ViewPOForm,
   CredStatements,
   ViewStatement,
+  SubcontractorList,
+  SubcontractorStatements,
+  SubcontractorStatementDetails,
 } from "./pages/Creditors";
 
 // CSS Imports
@@ -182,6 +185,9 @@ function DynamicHeader() {
     "/Creditors/PurchaseOrder/View": "Purchase Order",
     "/Creditors/CredStatements": "Purchase Orders",
     "/Creditors/ViewStatement": "Statement of Expenses",
+    "/Creditors/SubcontractorList": "Subcontractors",
+    "/Creditors/SubcontractorStatements": "Subcontractors",
+    "/Creditors/SubcontractorStatementDetails": "Subcontractor Statement",
   };
 
   const getTitle = () => {
@@ -348,6 +354,18 @@ function ContentWrapper() {
         <Route path="/Creditors/CredStatements" element={<CredStatements />} />
         <Route path="/Creditors/PurchaseOrder/View" element={<ViewPOForm />} />
         <Route path="/Creditors/ViewStatement" element={<ViewStatement />} />
+        <Route
+          path="/Creditors/SubcontractorList"
+          element={<SubcontractorList />}
+        />
+        <Route
+          path="/Creditors/SubcontractorStatementDetails"
+          element={<SubcontractorStatementDetails />}
+        />
+        <Route
+          path="/Creditors/SubcontractorStatements"
+          element={<SubcontractorStatements />}
+        />
         {/* Add the routes for invoice viewing and downloading */}
         <Route path="/invoice" element={<Navigate to="/invoices" replace />} />
         <Route path="/invoice/:id" element={<ClientInvoice />} />
