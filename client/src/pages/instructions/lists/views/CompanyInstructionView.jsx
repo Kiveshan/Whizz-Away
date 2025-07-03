@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react"
 import { useNavigate } from "react-router-dom"
-import "../../css/ViewClientInstruction.css"
+import "../../css/CompanyInstructionView.css"
 import api from "../../../../api"
 import Pagination from "../../../../components/Pagination"
 
@@ -21,7 +21,7 @@ const CompanyInstructionView = () => {
     const fetchClientStats = async () => {
       try {
         setLoading(true)
-        const response = await api.get("/api/client-instruction-stats")
+        const response = await api.get("/api/instructions/client-instruction-stats")
 
         const data = response.data
         console.log("Client data received:", data) // Debug log
@@ -273,7 +273,7 @@ const CompanyInstructionView = () => {
                       </td>
                       <td className="p-3">
                         <button
-                          className={`view-butn ${client.new_count > 0 ? "bg-red-500" : ""}`}
+                          className={`company-instruction-view-view-button ${client.new_count > 0 ? "red-state" : ""}`}
                           onClick={() =>
                             navigate("/CompanyInstructions", {
                               state: {

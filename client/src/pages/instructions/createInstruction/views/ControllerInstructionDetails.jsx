@@ -19,7 +19,7 @@ const ContainerDetailsPage = () => {
   // Get data from location state
   const {
     controllerData,
-    isImport,
+    isImport: initialIsImport,
     instructionId,
     clientId,
     clientName,
@@ -38,6 +38,16 @@ const ContainerDetailsPage = () => {
     activeFilter: null,
     preservedContainers: null,
   }
+  
+  // State for isImport based on shipment type
+  const [isImport, setIsImport] = useState(initialIsImport || false)
+  
+  // Update isImport when shipment type changes
+  useEffect(() => {
+    if (controllerData?.shipmentTypeName) {
+      setIsImport(controllerData.shipmentTypeName.toLowerCase() === 'import')
+    }
+  }, [controllerData?.shipmentTypeName])
 
   // Log the received state for debugging
   console.log("ControllerInstructionDetails received state:", location.state)
@@ -90,6 +100,166 @@ const ContainerDetailsPage = () => {
       if (isNaN(weight)) return 0
       return rate * weight
     }
+  }
+
+  // Handle back navigation while preserving form data
+  const handleBack = () => {
+    console.log('Current location state:', location.state);
+    console.log('Updated controller data:', updatedControllerData);
+    
+    // Count the number of containers by type
+    const counts = containers.reduce(
+      (acc, container) => {
+        if (container.containerType === "6m") acc["6m"]++
+        else if (container.containerType === "12m") acc["12m"]++
+        else if (container.containerType === "Abnormal") acc["Abnormal"]++
+        return acc
+      },
+      { "6m": 0, "12m": 0, Abnormal: 0 },
+    )
+
+    // Get location data from multiple possible sources with priority to current state
+    const locationData = {
+      // Preserve the original arrays to maintain references
+      startingPoints: Array.isArray(updatedControllerData.startingPoints) ? 
+                     [...updatedControllerData.startingPoints] : 
+                     (location.state?.startingPoints || []),
+      destinations: Array.isArray(updatedControllerData.destinations) ? 
+                   [...updatedControllerData.destinations] : 
+                   (location.state?.destinations || []),
+      // Handle selected locations with priority to current values
+      selectedStartingPoint: updatedControllerData.selectedStartingPoint || 
+                           location.state?.selectedStartingPoint || 
+                           updatedControllerData.pickup || '',
+      selectedDestination: updatedControllerData.selectedDestination || 
+                         location.state?.selectedDestination || 
+                         updatedControllerData.dropoff || '',
+      // Ensure pickup and dropoff are explicitly set
+      pickup: updatedControllerData.pickup || 
+             location.state?.pickup || 
+             updatedControllerData.selectedStartingPoint || '',
+      dropoff: updatedControllerData.dropoff || 
+              location.state?.dropoff || 
+              updatedControllerData.selectedDestination || ''
+    };
+    
+    console.log('Location data sources:', {
+      statePickup: location.state?.pickup,
+      stateDropoff: location.state?.dropoff,
+      controllerPickup: updatedControllerData.pickup,
+      controllerDropoff: updatedControllerData.dropoff,
+      selectedStart: updatedControllerData.selectedStartingPoint,
+      selectedDest: updatedControllerData.selectedDestination
+    });
+
+    // Get client data from multiple possible sources with priority to the most recent data
+    const clientData = {
+      // First try updated controller data (most recent)
+      clientId: updatedControllerData.clientId || location.state?.clientId || '',
+      clientName: updatedControllerData.clientName || location.state?.clientName || '',
+      representative: updatedControllerData.representative || location.state?.representative || '',
+      contactDetails: updatedControllerData.contactDetails || location.state?.contactDetails || '',
+      email: updatedControllerData.email || location.state?.email || ''
+    };
+    
+    console.log('Client data sources:', {
+      stateClientId: location.state?.clientId,
+      stateClientName: location.state?.clientName,
+      controllerClientId: updatedControllerData.clientId,
+      controllerClientName: updatedControllerData.clientName,
+      finalClientId: clientData.clientId,
+      finalClientName: clientData.clientName
+    });
+    
+    // Log the full client data being preserved
+    console.log('Full client data being preserved:', clientData);
+
+    console.log('Location data to preserve:', locationData);
+    console.log('Client data to preserve:', clientData);
+
+    // Create a copy of the controller data with all fields
+    const finalControllerData = { 
+      // First spread the existing controller data
+      ...updatedControllerData,
+      // Then add/override with location and client data
+      ...locationData,
+      ...clientData,
+      // Ensure these fields are set
+      pickup: updatedControllerData.pickup || locationData.selectedStartingPoint || '',
+      dropoff: updatedControllerData.dropoff || locationData.selectedDestination || '',
+      // Update container counts
+      num_six_meters: counts["6m"],
+      num_twelve_meters: counts["12m"],
+      num_abnormal: counts["Abnormal"],
+      // Ensure location data is included
+      startingPoints: locationData.startingPoints,
+      destinations: locationData.destinations,
+      selectedStartingPoint: locationData.selectedStartingPoint,
+      selectedDestination: locationData.selectedDestination,
+      // Preserve client info
+      clientId: updatedControllerData.clientId || location.state?.clientId,
+      clientName: updatedControllerData.clientName || location.state?.clientName
+    };
+    
+    console.log('Final controller data with preserved state:', finalControllerData);
+
+    // Recalculate total_cost if rateWeight is Container
+    if (finalControllerData.rateWeight === "Container") {
+      const rate6 = Number.parseFloat(finalControllerData.rateper_6 || 0);
+      const rate12 = Number.parseFloat(finalControllerData.rateper_12 || 0);
+      const rateAbnormal = Number.parseFloat(finalControllerData.rateper_abnormal || 0);
+      finalControllerData.total_cost = rate6 * counts["6m"] + rate12 * counts["12m"] + rateAbnormal * counts["Abnormal"];
+    }
+
+    console.log("Navigating back with container counts:", counts);
+    console.log("Final controller data:", finalControllerData);
+
+    // Prepare navigation state with all required data
+    const navigationState = {
+      // Preserve all existing state
+      ...(location.state || {}),
+      // Add/override with our form data
+      preservedFormData: {
+        ...finalControllerData,
+        // Ensure all location data is included
+        ...locationData
+      },
+      controllerData: {
+        ...finalControllerData,
+        // Ensure all location data is included
+        ...locationData
+      },
+      containerCounts: counts,
+      preservedContainers: containers,
+      instructionId: instructionId,
+      // Client data
+      clientId: finalControllerData.clientId,
+      clientName: finalControllerData.clientName,
+      // UI state
+      selectedMonth: selectedMonth,
+      selectedYear: selectedYear,
+      activeFilter: activeFilter,
+      isImport: isImport,
+      // Include location data at root level for easier access
+      ...locationData,
+      selectedStartingPoint: locationData.selectedStartingPoint,
+      selectedDestination: locationData.selectedDestination,
+      // Ensure pickup/dropoff are set correctly
+      pickup: finalControllerData.pickup,
+      dropoff: finalControllerData.dropoff,
+      // Add container counts to the root level for easier access
+      num_six_meters: counts["6m"],
+      num_twelve_meters: counts["12m"],
+      num_abnormal: counts["Abnormal"]
+    };
+
+    console.log('Navigating back with state:', navigationState);
+
+    // Navigate back to ControllerInstructions with the updated form data and all state parameters
+    navigate("/ControllerInstructions", {
+      state: navigationState,
+      replace: false // Allow proper navigation history
+    });
   }
 
   // Initialize containers based on container counts
@@ -582,52 +752,6 @@ const ContainerDetailsPage = () => {
     return isValid
   }
 
-  // Update the handleBackClick function to use the state variable
-  const handleBackClick = () => {
-    // Count current containers by type
-    const counts = countContainersByType()
-
-    // Update container counts in updatedControllerData
-    const finalControllerData = {
-      ...updatedControllerData,
-      num_six_meters: counts["6m"],
-      num_twelve_meters: counts["12m"],
-      num_abnormal: counts["Abnormal"],
-      // Preserve the rate fields for the form
-      sixMeterRate: updatedControllerData.rateper_6?.toString() || "",
-      twelveMeterRate: updatedControllerData.rateper_12?.toString() || "",
-      abnormalRate: updatedControllerData.rateper_abnormal?.toString() || "",
-    }
-
-    // Recalculate total_cost if rateWeight is Container
-    if (finalControllerData.rateWeight === "Container") {
-      const rate6 = Number.parseFloat(finalControllerData.rateper_6 || 0)
-      const rate12 = Number.parseFloat(finalControllerData.rateper_12 || 0)
-      const rateAbnormal = Number.parseFloat(finalControllerData.rateper_abnormal || 0)
-      const totalContainers = counts["6m"] + counts["12m"] + counts["Abnormal"]
-      finalControllerData.total_cost = rate6 * counts["6m"] + rate12 * counts["12m"] + rateAbnormal * counts["Abnormal"]
-    }
-
-    // Use the updated controller data for navigation
-    console.log("Navigating back with updated container counts:", counts)
-    console.log("Updated controller data:", finalControllerData)
-
-    // Navigate back to ControllerInstructions with the updated form data and all state parameters
-    navigate("/ControllerInstructions", {
-      state: {
-        preservedFormData: finalControllerData,
-        preservedContainers: containers, // Add containers to state
-        containerCounts: counts, // Explicitly pass counts
-        instructionId: instructionId,
-        clientId: clientId,
-        clientName: clientName,
-        selectedMonth: selectedMonth,
-        selectedYear: selectedYear,
-        activeFilter: activeFilter,
-      },
-    })
-  }
-
   // Format date from MM/DD/YYYY to ISO
   const formatDateForSubmission = (displayDate) => {
     if (!displayDate) return ""
@@ -670,7 +794,40 @@ const ContainerDetailsPage = () => {
 
     try {
       // Create a copy of updatedControllerData for submission
-      const submissionData = { ...updatedControllerData }
+      const submissionData = { 
+        ...updatedControllerData,
+        // Ensure all required fields are included with default values if missing
+        clientId: updatedControllerData.clientId || '',
+        clientName: updatedControllerData.clientName || '',
+        task: updatedControllerData.task || '',
+        shipmentTypeId: updatedControllerData.shipmentTypeId || '',
+        shipmentTypeName: updatedControllerData.shipmentTypeName || '',
+        pickup: updatedControllerData.pickup || '',
+        dropoff: updatedControllerData.dropoff || '',
+        hazardous: updatedControllerData.hazardous || false,
+        surcharges: updatedControllerData.surcharges || false,
+        surchargesAmount: updatedControllerData.surchargesAmount || '',
+        pickupTime: updatedControllerData.pickupTime || '',
+        pickupDate: updatedControllerData.pickupDate || '',
+        stackDate: updatedControllerData.stackDate || '',
+        deadline: updatedControllerData.deadline || '',
+        fileRef: updatedControllerData.fileRef || '',
+        bookingRef: updatedControllerData.bookingRef || '',
+        vesselName: updatedControllerData.vesselName || '',
+        voyageNo: updatedControllerData.voyageNo || '',
+        imoNo: updatedControllerData.imoNo || '',
+        flagReg: updatedControllerData.flagReg || '',
+        rateWeight: updatedControllerData.rateWeight || 'Container',
+        weight: updatedControllerData.weight || '',
+        vat: updatedControllerData.vat || 15,
+        description: updatedControllerData.description || '',
+        rateper_6: updatedControllerData.rateper_6 || '',
+        rateper_12: updatedControllerData.rateper_12 || '',
+        rateper_abnormal: updatedControllerData.rateper_abnormal || '',
+        num_six_meters: updatedControllerData.num_six_meters || 0,
+        num_twelve_meters: updatedControllerData.num_twelve_meters || 0,
+        num_abnormal: updatedControllerData.num_abnormal || 0
+      }
 
       // Ensure total_cost and weight are properly set
       if (submissionData.rateWeight === "Container") {
@@ -689,6 +846,7 @@ const ContainerDetailsPage = () => {
       }
 
       // Log the values for debugging
+      console.log("Before API call - submissionData:", submissionData)
       console.log("Before API call - total_cost:", submissionData.total_cost)
       console.log("Before API call - weight:", submissionData.weight)
 
@@ -699,25 +857,49 @@ const ContainerDetailsPage = () => {
           // Ensure these fields are explicitly included and properly formatted
           total_cost: Number.parseFloat(submissionData.total_cost || 0),
           weight: submissionData.rateWeight !== "Container" ? Number.parseFloat(submissionData.weight || 0) : null,
-          // Make sure shipping fields are explicitly included
+          // Map fields to match database column names
           booking_ref: submissionData.bookingRef || "",
           vessel_name: submissionData.vesselName || "",
           voyage_num: submissionData.voyageNo || "",
           imo_num: submissionData.imoNo || "",
           flag_reg: submissionData.flagReg || "",
+          // Include location data
+          pickup: submissionData.pickup || '',
+          dropoff: submissionData.dropoff || '',
+          startingPoints: submissionData.startingPoints || [],
+          destinations: submissionData.destinations || [],
+          selectedStartingPoint: submissionData.selectedStartingPoint || '',
+          selectedDestination: submissionData.selectedDestination || '',
+          // Add other required fields
+          client: submissionData.clientId,
+          shipment_type: submissionData.shipmentTypeId,
+          pickuptime: submissionData.pickupTime,
+          pickupdate: submissionData.pickupDate,
+          stackdate: submissionData.stackDate,
+          description: submissionData.description || '',
+          status: 'New',
+          vat: submissionData.vat || 15,
+          surchages: submissionData.surcharges || false,
+          surchages_amount: submissionData.surchargesAmount || '',
+          rateper_6: Number(submissionData.sixMeterRate) || 0,
+          rateper_12: Number(submissionData.twelveMeterRate) || 0,
+          rateper_abnormal: Number(submissionData.abnormalRate) || 0,
+          num_six_meters: Number(submissionData.num_six_meters) || 0,
+          num_twelve_meters: Number(submissionData.num_twelve_meters) || 0,
+          num_abnormal: Number(submissionData.num_abnormal) || 0
         },
         containerData: containers.map((container) => ({
           container_type: container.containerType,
           containerNum: container.containerNum,
           weight: isImport ? Number.parseFloat(container.weight || 0) : null,
-          cargo_description: container.cargoDescription || "", // Add cargo description field
+          cargo_description: container.cargoDescription || ""
         })),
       }
 
       console.log("Sending data to API:", JSON.stringify(data, null, 2))
 
-      // Send data to API using axios instead of fetch
-      const response = await api.post("/api/save-instruction", data)
+      // Send data to API using axios with the correct endpoint path
+      const response = await api.post("/api/instructions/save-instruction", data)
 
       console.log("API response:", response.data)
 
@@ -795,7 +977,20 @@ const ContainerDetailsPage = () => {
         />
       )}
 
-      <button className="back-button" onClick={handleBackClick}>
+      <button
+        className="back-button"
+        onClick={handleBack}
+        style={{
+          backgroundColor: "#6c757d",
+          color: "white",
+          border: "none",
+          borderRadius: "4px",
+          padding: "10px 20px",
+          cursor: "pointer",
+          fontSize: "1rem",
+          fontWeight: "500",
+        }}
+      >
         Back
       </button>
 
@@ -818,8 +1013,6 @@ const ContainerDetailsPage = () => {
 
       <div className="container-details-wrapper">
         <div className="content">
-         
-
           <br />
 
           {isLoading ? (
@@ -925,8 +1118,21 @@ const ContainerDetailsPage = () => {
             </div>
           )}
 
-          <div className="submit-section">
-            <button className="submit-button" onClick={handleSubmit}>
+          <div className="submit-section" style={{ display: "flex", gap: "1rem", justifyContent: "center" }}>
+            <button
+              className="submit-button"
+              onClick={handleSubmit}
+              style={{
+                backgroundColor: "#28a745",
+                color: "white",
+                border: "none",
+                borderRadius: "4px",
+                padding: "10px 20px",
+                cursor: "pointer",
+                fontSize: "1rem",
+                fontWeight: "500",
+              }}
+            >
               Submit
             </button>
           </div>

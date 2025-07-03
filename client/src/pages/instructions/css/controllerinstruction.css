@@ -1,4 +1,4 @@
-/* Unique wrapper for ControllerInstructions component only */
+Unique wrapper for ControllerInstructions component only
 .controller-instructions-unique-wrapper {
   padding: 0px 20px 10px !important;
   font-family: Arial, sans-serif;
@@ -10,6 +10,7 @@
   justify-content: flex-start;
   padding-top: 0px !important;
   position: relative;
+  margin-top: -2000px; /* Added to lift the entire wrapper up */
 }
 
 .controller-instructions-unique-wrapper .controller-instructions-header {
@@ -42,18 +43,21 @@
   right: 20px;
 }
 
-/* Form container - lifted much higher */
+/* Form container - lifted much higher and wider */
 .controller-instructions-unique-wrapper .controller-instructions-form-container {
-  margin-top: -60px !important; /* Negative margin to lift form even higher */
+  margin-top: -90px !important; /* Increased negative margin to lift form higher */
   background-color: #e6f2ff;
   border-radius: 8px;
   overflow: visible;
-  max-width: 1800px;
+  width: 98%;
+  max-width: 2000px;
   margin-left: auto;
   margin-right: auto;
   margin-bottom: 20px !important;
-  padding: 15px;
+  padding: 20px;
   position: relative;
+  box-sizing: border-box;
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1); /* Added shadow for better depth */
 }
 
 .controller-instructions-unique-wrapper .controller-instructions-form-section {
@@ -82,6 +86,7 @@
   background-color: #e6f2ff !important;
   padding: 0 !important;
   position: relative;
+  width: 100%;
 }
 
 /* Black line below client information */
@@ -98,15 +103,36 @@
 
 .controller-instructions-unique-wrapper .controller-instructions-client-info-section .controller-instructions-form-row {
   display: flex;
+  flex-wrap: wrap;
   gap: 15px;
   margin-bottom: 4px;
+  width: 100%;
+  box-sizing: border-box;
 }
 
 .controller-instructions-unique-wrapper
   .controller-instructions-client-info-section
   .controller-instructions-form-field {
-  flex: 1;
-  min-width: 200px;
+  flex: 1 1 calc(16.666% - 15px);
+  min-width: 180px;
+  max-width: 100%;
+  box-sizing: border-box;
+}
+
+@media (max-width: 1400px) {
+  .controller-instructions-unique-wrapper
+    .controller-instructions-client-info-section
+    .controller-instructions-form-field {
+    flex: 1 1 calc(33.333% - 15px);
+  }
+}
+
+@media (max-width: 768px) {
+  .controller-instructions-unique-wrapper
+    .controller-instructions-client-info-section
+    .controller-instructions-form-field {
+    flex: 1 1 100%;
+  }
 }
 
 /* Container and booking section */
@@ -147,17 +173,21 @@
 }
 
 .controller-instructions-unique-wrapper .controller-instructions-container-input {
-  display: grid;
-  grid-template-columns: 80px 70px 90px;
-  gap: 12px;
+  display: flex;
   align-items: center;
-  margin-bottom: 8px;
+  gap: 15px;
+  margin-bottom: 12px;
+  width: 100%;
+  padding: 4px 0;
+  border-bottom: 1px solid #e0e0e0;
 }
 
 .controller-instructions-unique-wrapper .controller-instructions-container-input label {
   font-weight: 500;
   text-align: left;
-  justify-self: start;
+  min-width: 60px;
+  font-size: 14px;
+  color: #333;
 }
 
 .controller-instructions-unique-wrapper .controller-instructions-container-rate-group {
@@ -165,30 +195,37 @@
 }
 
 .controller-instructions-unique-wrapper .controller-instructions-container-input input[type="number"] {
-  width: 60px;
+  width: 80px;
   height: 32px;
   text-align: center;
-  padding: 4px;
-  border: 1px solid #ddd;
+  padding: 4px 8px;
+  border: 1px solid #ccc;
   border-radius: 4px;
-  justify-self: center;
+  box-sizing: border-box;
+  font-size: 14px;
+  background-color: #fff;
 }
 
 .controller-instructions-unique-wrapper .controller-instructions-container-rate-group input[type="text"] {
-  width: 80px;
+  width: 100px;
   height: 32px;
   padding: 4px 8px;
-  border: 1px solid #ddd;
+  border: 1px solid #ccc;
   border-radius: 4px;
-  justify-self: start;
+  box-sizing: border-box;
+  font-size: 14px;
+  background-color: #fff;
 }
 
 .controller-instructions-unique-wrapper .controller-instructions-container-input input[type="text"] {
-  width: 80px;
+  width: 100px;
   height: 32px;
   padding: 4px 8px;
-  border: 1px solid #ddd;
+  border: 1px solid #ccc;
   border-radius: 4px;
+  box-sizing: border-box;
+  font-size: 14px;
+  background-color: #fff;
 }
 
 /* Right side booking/rates section */
@@ -317,28 +354,44 @@
 .controller-instructions-unique-wrapper .controller-instructions-button-container {
   display: flex;
   justify-content: center;
-  padding: 10px 0;
-  margin-top: 5px;
+  padding: 4px 0;  /* Reduced padding */
+  margin-top: -60px;  /* Reduced margin */
+  margin-bottom: 8px;  /* Added bottom margin for spacing */
 }
 
 .controller-instructions-unique-wrapper .controller-instructions-add-container-button {
   background-color: #4a90e2;
   color: white;
   border: none;
-  border-radius: 4px;
-  padding: 12px 24px;
+  border-radius: 6px;  /* Slightly more rounded corners */
+  padding: 14px 28px;  /* Increased padding for taller button */
   cursor: pointer;
   font-size: 16px;
-  font-weight: 500;
+  font-weight: 600;  /* Slightly bolder text */
+  min-height: 48px;  /* Minimum height for better touch targets */
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s ease;  /* Smooth transition for hover effects */
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);  /* Subtle shadow for depth */
 }
 
 .controller-instructions-unique-wrapper .controller-instructions-add-container-button:hover {
   background-color: #3a80d2;
+  transform: translateY(-1px);  /* Slight lift effect on hover */
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15);  /* Enhanced shadow on hover */
+}
+
+.controller-instructions-unique-wrapper .controller-instructions-add-container-button:active {
+  transform: translateY(0);  /* Push down effect when clicked */
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
 }
 
 .controller-instructions-unique-wrapper .controller-instructions-add-container-button:disabled {
   background-color: #cccccc;
   cursor: not-allowed;
+  transform: none;
+  box-shadow: none;
 }
 
 /* Form elements */
@@ -349,22 +402,87 @@
   font-size: 14px;
 }
 
+/* Base form input styles */
 .controller-instructions-unique-wrapper .controller-instructions-form-input,
 .controller-instructions-unique-wrapper .controller-instructions-dropdown,
+.controller-instructions-unique-wrapper select,
+.controller-instructions-unique-wrapper input[type="text"],
+.controller-instructions-unique-wrapper input[type="email"],
 .controller-instructions-unique-wrapper .controller-instructions-form-textarea {
   width: 100%;
-  padding: 6px 10px;
-  border: 1px solid #ddd;
+  padding: 8px 12px;
+  border: 1px solid #d9d9d9;
   border-radius: 4px;
   font-size: 14px;
   height: 36px;
   box-sizing: border-box;
+  background-color: #fff;
+  margin: 0;
+  transition: border-color 0.2s;
 }
 
+/* Date input specific styles */
+.controller-instructions-unique-wrapper input[type="date"] {
+  min-width: 200px; /* Make date inputs wider */
+  padding-right: 30px; /* Add space for calendar icon */
+}
+
+/* Date input group adjustments */
+.controller-instructions-unique-wrapper .controller-instructions-date-input-group {
+  display: flex;
+  align-items: center;
+  position: relative;
+  width: 100%;
+}
+
+/* Calendar button positioning */
+.controller-instructions-unique-wrapper .controller-instructions-calendar-button {
+  position: absolute;
+  right: 8px;
+  top: 50%;
+  transform: translateY(-50%);
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 5px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* Textarea specific styles */
 .controller-instructions-unique-wrapper .controller-instructions-form-textarea {
-  min-height: 80px;
+  min-height: 100px;
   resize: vertical;
-  height: auto;
+  width: 100%;
+  padding: 8px 12px;
+  border: 1px solid #d9d9d9;
+  border-radius: 4px;
+  font-size: 14px;
+  box-sizing: border-box;
+  background-color: #fff;
+  margin: 0;
+}
+
+/* Dropdown arrow for select elements */
+.controller-instructions-unique-wrapper select {
+  appearance: none;
+  background-image: url("data:image/svg+xml;charset=US-ASCII,%3Csvg width='12' height='12' viewBox='0 0 24 24' fill='none' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M7 10l5 5 5-5H7z' fill='%23333'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 10px center;
+  padding-right: 30px;
+}
+
+/* Hover and focus states */
+.controller-instructions-unique-wrapper .controller-instructions-form-input:focus,
+.controller-instructions-unique-wrapper .controller-instructions-dropdown:focus,
+.controller-instructions-unique-wrapper select:focus,
+.controller-instructions-unique-wrapper input[type="text"]:focus,
+.controller-instructions-unique-wrapper input[type="email"]:focus,
+.controller-instructions-unique-wrapper .controller-instructions-form-textarea:focus {
+  border-color: #4a90e2;
+  outline: none;
+  box-shadow: 0 0 0 2px rgba(74, 144, 226, 0.2);
 }
 
 .controller-instructions-unique-wrapper .controller-instructions-select-wrapper {
@@ -432,6 +550,23 @@
   color: #ff4d4f;
   font-size: 12px;
   margin-top: 5px;
+}
+
+/* Error field styling */
+.controller-instructions-unique-wrapper .controller-instructions-error-field,
+.controller-instructions-unique-wrapper .controller-instructions-form-field .controller-instructions-input-wrapper .controller-instructions-form-input.controller-instructions-error-field,
+.controller-instructions-unique-wrapper .controller-instructions-form-field .controller-instructions-input-wrapper .controller-instructions-form-textarea.controller-instructions-error-field {
+  border: 2px solid #d32f2f !important;
+  background-color: #ffebee !important;
+  outline: none !important;
+  box-shadow: 0 0 0 1px #d32f2f !important;
+}
+
+/* Error message styling */
+.controller-instructions-unique-wrapper .controller-instructions-error-message {
+  color: #d32f2f;
+  font-size: 0.75rem;
+  margin-top: 4px;
 }
 
 /* Checkbox container styles */

@@ -118,7 +118,7 @@ const CompanyInstructions = () => {
         console.log("Fetching instructions with clientId:", clientId) // Debug log
 
         // Fetch all instructions first
-        const response = await api.get("/api/instructions")
+        const response = await api.get("/api/instructions/instructions")
 
         const data = response.data
         console.log("All instructions fetched:", data.length)
@@ -127,24 +127,49 @@ const CompanyInstructions = () => {
         let filteredData = data
 
         if (clientId) {
-          // Convert clientId to string for consistent comparison
-          const clientIdStr = String(clientId)
+          try {
+            // Convert clientId to string for consistent comparison
+            const clientIdStr = String(clientId).trim()
+            console.log('Filtering instructions for client ID:', clientIdStr)
 
-          // Apply strict filtering
-          filteredData = data.filter((item) => {
-            // Convert all possible client ID fields to strings for comparison
-            const itemClientId = String(item.client || item.clientid || item.m5clientkey || item.client_id || "")
-            const matches = itemClientId === clientIdStr
+            // Apply flexible filtering
+            filteredData = data.filter((item) => {
+              // Get all possible client ID fields and convert to strings
+              const possibleClientIds = [
+                item.client,
+                item.clientid,
+                item.m5clientkey,
+                item.client_id,
+                item.client_key,
+                item.clientId
+              ]
+              
+              // Check if any of the possible IDs match (case-insensitive and trimmed)
+              const hasMatch = possibleClientIds.some(id => 
+                id !== undefined && id !== null && String(id).trim() === clientIdStr
+              )
 
-            // Log each comparison for debugging
-            if (matches) {
-              console.log(`Found matching item: ${JSON.stringify(item)}`)
+              // Log detailed info for debugging
+              if (!hasMatch) {
+                console.log('Instruction did not match client ID:', {
+                  instructionId: item.m1key || item.id,
+                  possibleClientIds: possibleClientIds.map(id => (id !== undefined && id !== null ? String(id).trim() : 'null/undefined')),
+                  expectedClientId: clientIdStr
+                })
+              }
+
+              return hasMatch
+            })
+
+            console.log(`Filtered to ${filteredData.length} instructions for clientId: ${clientId}`)
+            if (filteredData.length === 0) {
+              console.warn('No instructions found for client ID. Full data:', data)
             }
-
-            return matches
-          })
-
-          console.log(`Filtered to ${filteredData.length} instructions for clientId: ${clientId}`)
+          } catch (error) {
+            console.error('Error filtering instructions by client ID:', error)
+            // In case of error, show all data to prevent empty results
+            filteredData = data
+          }
         }
 
         setInstructions(filteredData)
@@ -230,6 +255,14 @@ const CompanyInstructions = () => {
             item.type === "export" ||
             item.shipment_type === 2 ||
             item.shipment_type === "2",
+        )
+      } else if (activeFilter === "cross-haul") {
+        filtered = filtered.filter(
+          (item) =>
+            item.type_text === "cross-haul" ||
+            item.type === "cross-haul" ||
+            item.shipment_type === 3 ||
+            item.shipment_type === "3",
         )
       }
     }
@@ -354,6 +387,12 @@ const CompanyInstructions = () => {
               Export
             </button>
             <button
+              className={`btn btn-blue ${activeFilter === "cross-haul" ? "active" : ""}`}
+              onClick={() => handleFilterClick("cross-haul")}
+            >
+              Cross-haul
+            </button>
+            <button
               className={`btn btn-blue ${activeFilter === "All" ? "active" : ""}`}
               onClick={() => handleFilterClick("All")}
             >
@@ -404,9 +443,7 @@ const CompanyInstructions = () => {
                     <td colSpan="7">No instructions found</td>
                   </tr>
                 ) : (
-                  getFilteredInstructions()
-                    .slice((currentPage - 1) * recordsPerPage, currentPage * recordsPerPage)
-                    .map((item) => (
+                  currentInstructions.map((item) => (
                       <tr key={item.m1controllerkey || item.m1key}>
                         <td>Instruction {item.m1controllerkey || item.m1key}</td>
                         <td>{item.fileno}</td>
@@ -416,7 +453,9 @@ const CompanyInstructions = () => {
                               ? "import"
                               : item.shipment_type === 2 || item.shipment_type === "2"
                                 ? "export"
-                                : item.type)}
+                                : item.shipment_type === 3 || item.shipment_type === "3"
+                                  ? "cross-haul"
+                                  : item.type)}
                         </td>
                         <td>{renderStatus(item.status)}</td>
                         <td>{new Date(item.startingdate || item.pickupdate).toLocaleDateString()}</td>
@@ -445,17 +484,21 @@ const CompanyInstructions = () => {
         </div>
       </div>
 
-      {/* Pagination Component - ADDED */}
-      {getFilteredInstructions().length > 0 && (
-        <Pagination
-          totalRecords={getFilteredInstructions().length}
-          recordsPerPage={recordsPerPage}
-          currentPage={currentPage}
-          onPageChange={handlePageChange}
-        />
+      {/* Pagination Component */}
+      {!loading && !error && filteredInstructions.length > 0 && (
+        <div style={{ marginTop: '20px', display: 'flex', justifyContent: 'center' }}>
+          <Pagination
+            totalRecords={filteredInstructions.length}
+            recordsPerPage={recordsPerPage}
+            currentPage={currentPage}
+            onPageChange={handlePageChange}
+          />
+        </div>
       )}
     </div>
   )
 }
 
 export default CompanyInstructions
+
+
