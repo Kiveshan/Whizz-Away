@@ -17,6 +17,7 @@ export const getContainersByInstructionId = async (instructionId) => {
     SELECT containerkey, containernum, weight, m1key, container_type, cargo_description
     FROM public.container
     WHERE m1key = $1
+    ORDER BY containerkey
   `
 
   console.log(`[${new Date().toISOString()}] getContainersByInstructionId: Executing query`, {
@@ -677,195 +678,498 @@ export const getClientRates = async (clientId, start, destination) => {
   }
 }
 
-export const updateFCInstructionAndContainers = async (instructionId, instructionData, containerData) => {
-  const client = await pool.connect();
+// Helper functions for formatting and comparison
+const formatDateForComparison = (dateValue) => {
+  if (!dateValue) return null
+
   try {
-    // Start transaction
-    await client.query('BEGIN');
-    
-    console.log(`[${new Date().toISOString()}] [MODEL] updateFCInstructionAndContainers: Starting transaction for instruction ${instructionId}`);
-    
-    // 1. Update the instruction
-    const updateQuery = `
-      UPDATE public.m1_controller
-      SET 
-        client = $1,
-        task = $2,
-        shipment_type = $3,
-        pickup = $4,
-        dropoff = $5,
-        hazardous = $6,
-        surchages = $7,
-        pickuptime = $8,
-        pickupdate = $9,
-        stackdate = $10,
-        deadline = $11,
-        fileref = $12,
-        rateweight = $13,
-        description = $14,
-        vat = $15,
-        num_six_meters = $16,
-        num_twelve_meters = $17,
-        num_abnormal = $18,
-        num_breakbulk = $19,
-        total_cost = $20,
-        weight = $21,
-        status = $22,
-        booking_ref = $23,
-        vessel_name = $24,
-        rateper_6 = $25,
-        rateper_12 = $26,
-        rateper_abnormal = $27,
-        rateper_breakbulk = $28,
-        unitrate = $29
-      WHERE m1key = $30
-      RETURNING *
-    `;
-
-    // Process instruction weight to prevent empty string errors
-    let instructionWeight = null;
-    if (instructionData.weight !== undefined && instructionData.weight !== null && instructionData.weight !== '') {
-      // Convert to string first to handle any object types
-      const weightStr = String(instructionData.weight).trim();
-      if (weightStr !== '') {
-        const parsedWeight = Number.parseFloat(weightStr);
-        if (!isNaN(parsedWeight)) {
-          instructionWeight = parsedWeight;
-          console.log(`[${new Date().toISOString()}] [MODEL] Valid instruction weight: ${instructionWeight}`);
-        } else {
-          console.log(`[${new Date().toISOString()}] [MODEL] Warning: Invalid instruction weight '${weightStr}', using null instead`);
-        }
+    // Handle different date formats
+    let date
+    if (typeof dateValue === "string") {
+      // Handle MM/DD/YYYY format
+      if (dateValue.includes("/")) {
+        const [month, day, year] = dateValue.split("/")
+        date = new Date(year, month - 1, day)
+      } else {
+        date = new Date(dateValue)
       }
+    } else {
+      date = new Date(dateValue)
     }
-    console.log(`[${new Date().toISOString()}] [MODEL] Final instruction weight value: ${instructionWeight}`);
-    
-    const updateValues = [
-      instructionData.client,
-      instructionData.task,
-      instructionData.shipment_type,
-      instructionData.pickup,
-      instructionData.dropoff,
-      instructionData.hazardous,
-      instructionData.surchages,
-      instructionData.pickuptime,
-      instructionData.pickupdate,
-      instructionData.stackdate,
-      instructionData.deadline,
-      instructionData.fileref,
-      instructionData.rateweight,
-      instructionData.description,
-      instructionData.vat || 15,
-      instructionData.num_six_meters || 0,
-      instructionData.num_twelve_meters || 0,
-      instructionData.num_abnormal || 0,
-      instructionData.num_breakbulk || 0,
-      instructionData.total_cost,
-      instructionWeight,  // Use validated weight instead of raw value
-      instructionData.status || "In progress",
-      instructionData.booking_ref,
-      instructionData.vessel_name,
-      instructionData.rateper_6,
-      instructionData.rateper_12,
-      instructionData.rateper_abnormal,
-      instructionData.rateper_breakbulk,
-      instructionData.unitrate,
-      instructionId,
-    ];
 
-    const instructionResult = await client.query(updateQuery, updateValues);
-    console.log(`[${new Date().toISOString()}] [MODEL] Instruction updated successfully`);
-    
-    // 2. Delete existing containers
-    const deleteQuery = `
-      DELETE FROM public.container
-      WHERE m1key = $1
-    `;
-    const deleteResult = await client.query(deleteQuery, [instructionId]);
-    console.log(`[${new Date().toISOString()}] [MODEL] Deleted ${deleteResult.rowCount} existing containers for instruction ID: ${instructionId}`);
-    
-    // 3. Insert new containers
-    const insertResults = [];
-    for (const container of containerData) {
-      const containerNum = container.containernum || container.containerNum || "";
-      
-      // Improved weight handling to prevent NaN values and empty strings
-      let weight = null;
-      
-      // First, ensure we're not dealing with an empty string or undefined/null
-      if (container.weight !== null && container.weight !== undefined && container.weight !== '') {
-        // Convert to string first to handle any object types
-        const weightStr = String(container.weight).trim();
-        
-        // Check if it's empty after trimming
-        if (weightStr === '') {
-          weight = null;
-          console.log(`[${new Date().toISOString()}] [MODEL] Empty weight value after trimming, using null`);
-        } else {
-          // Parse the weight and check if it's a valid number
-          const parsedWeight = Number.parseFloat(weightStr);
-          
-          // Only use the parsed weight if it's a valid number
-          if (!isNaN(parsedWeight)) {
-            weight = parsedWeight;
-            console.log(`[${new Date().toISOString()}] [MODEL] Valid weight value: ${weight}`);
-          } else {
-            console.log(`[${new Date().toISOString()}] [MODEL] Warning: Invalid weight value '${weightStr}' for container, using null instead`);
-          }
+    if (isNaN(date.getTime())) {
+      console.warn(`Invalid date value: ${dateValue}`)
+      return null
+    }
+
+    return date.toISOString().split("T")[0] // Returns YYYY-MM-DD
+  } catch (error) {
+    console.error(`Error formatting date ${dateValue}:`, error)
+    return null
+  }
+}
+
+const formatTimeForComparison = (timeValue) => {
+  if (!timeValue) return null
+
+  try {
+    // Handle different time formats
+    const timeStr = String(timeValue).trim()
+    const parts = timeStr.split(":")
+
+    if (parts.length >= 2) {
+      const hours = parts[0].padStart(2, "0")
+      const minutes = parts[1].padStart(2, "0")
+      const seconds = parts[2] ? parts[2].padStart(2, "0") : "00"
+      return `${hours}:${minutes}:${seconds}`
+    }
+
+    console.warn(`Invalid time format: ${timeValue}`)
+    return null
+  } catch (error) {
+    console.error(`Error formatting time ${timeValue}:`, error)
+    return null
+  }
+}
+
+const compareValues = (currentValue, newValue, fieldType = "string") => {
+  // Handle null/undefined cases
+  if (currentValue === null && newValue === null) return true
+  if (currentValue === undefined && newValue === undefined) return true
+  if (currentValue === null && (newValue === "" || newValue === undefined)) return true
+  if ((currentValue === "" || currentValue === undefined) && newValue === null) return true
+
+  // Handle different field types
+  switch (fieldType) {
+    case "date":
+      const currentDate = formatDateForComparison(currentValue)
+      const newDate = formatDateForComparison(newValue)
+      return currentDate === newDate
+
+    case "time":
+      const currentTime = formatTimeForComparison(currentValue)
+      const newTime = formatTimeForComparison(newValue)
+      return currentTime === newTime
+
+    case "number":
+      const currentNum = currentValue === null ? null : Number(currentValue)
+      const newNum = newValue === null || newValue === "" ? null : Number(newValue)
+      return currentNum === newNum
+
+    case "boolean":
+      return Boolean(currentValue) === Boolean(newValue)
+
+    default:
+      // String comparison
+      const currentStr = currentValue === null ? null : String(currentValue)
+      const newStr = newValue === null || newValue === "" ? null : String(newValue)
+      return currentStr === newStr
+  }
+}
+
+const compareContainers = (currentContainers, newContainers) => {
+  // Create maps for easier comparison
+  const currentMap = new Map()
+  const newMap = new Map()
+
+  // Map current containers by containerkey
+  currentContainers.forEach((container) => {
+    if (container.containerkey) {
+      currentMap.set(container.containerkey, container)
+    }
+  })
+
+  // Map new containers by containerKey (if exists) or create temporary keys
+  newContainers.forEach((container, index) => {
+    const key = container.containerKey || `new_${index}`
+    newMap.set(key, container)
+  })
+
+  const changes = {
+    toUpdate: [],
+    toInsert: [],
+    toDelete: [],
+  }
+
+  // Find containers to update or insert
+  for (const [key, newContainer] of newMap) {
+    const keyStr = String(key) // Convert key to string for comparison
+    if (keyStr.startsWith("new_")) {
+      // This is a new container
+      changes.toInsert.push(newContainer)
+    } else {
+      const currentContainer = currentMap.get(Number(key)) // Convert back to number for map lookup
+      if (currentContainer) {
+        // Compare container fields
+        const containerNum = newContainer.containernum || newContainer.containerNum || ""
+        const weight =
+          newContainer.weight !== null && newContainer.weight !== undefined && newContainer.weight !== ""
+            ? Number.parseFloat(newContainer.weight)
+            : null
+        const containerType = newContainer.containerType || newContainer.container_type || ""
+        const cargoDescription = newContainer.cargoDescription || newContainer.cargo_description || ""
+
+        const hasChanges =
+          currentContainer.containernum !== containerNum ||
+          currentContainer.weight !== weight ||
+          currentContainer.container_type !== containerType ||
+          currentContainer.cargo_description !== cargoDescription
+
+        if (hasChanges) {
+          changes.toUpdate.push({
+            containerkey: Number(key), // Use numeric key for database
+            containernum: containerNum,
+            weight: weight,
+            container_type: containerType,
+            cargo_description: cargoDescription,
+          })
         }
       } else {
-        console.log(`[${new Date().toISOString()}] [MODEL] Weight is null, undefined, or empty string: '${container.weight}'`);
+        // Container with key doesn't exist in current, treat as new
+        changes.toInsert.push(newContainer)
       }
-      
-      const containerType = container.containerType || container.container_type || "";
-      const cargoDescription = container.cargoDescription || container.cargo_description || "";
+    }
+  }
 
-      console.log(`[${new Date().toISOString()}] [MODEL] Inserting container: containerNum=${containerNum}, weight=${weight}, m1key=${instructionId}, container_type=${containerType}, cargo_description=${cargoDescription}`);
+  // Find containers to delete
+  for (const [key, currentContainer] of currentMap) {
+    if (!newMap.has(key)) {
+      changes.toDelete.push(currentContainer.containerkey)
+    }
+  }
+
+  return changes
+}
+
+export const updateFCInstructionAndContainers = async (instructionId, instructionData, containerData) => {
+  const client = await pool.connect()
+  try {
+    // Start transaction
+    await client.query("BEGIN")
+
+    console.log(
+      `[${new Date().toISOString()}] [MODEL] updateFCInstructionAndContainers: Starting transaction for instruction ${instructionId}`,
+    )
+
+    // 1. Fetch current instruction data
+    const getCurrentQuery = `
+      SELECT * FROM public.m1_controller WHERE m1key = $1
+    `
+    const currentResult = await client.query(getCurrentQuery, [instructionId])
+
+    if (currentResult.rows.length === 0) {
+      throw new Error(`Instruction with ID ${instructionId} not found`)
+    }
+
+    const currentInstruction = currentResult.rows[0]
+    console.log(`[${new Date().toISOString()}] [MODEL] Current instruction data fetched`)
+
+    // Helper function to handle undefined values - preserve existing values
+    const preserveExistingValue = (newValue, currentValue) => {
+      if (newValue === undefined || newValue === "undefined") {
+        return currentValue // Keep existing database value
+      }
+      return newValue
+    }
+
+    // 2. Compare fields and build dynamic update query
+    const fieldsToUpdate = []
+    const valuesToUpdate = []
+    let paramIndex = 1
+
+    // Define field mappings with their types - EXCLUDE STATUS from updates
+    const fieldMappings = [
+      { db: "client", new: preserveExistingValue(instructionData.client, currentInstruction.client), type: "number" },
+      { db: "task", new: preserveExistingValue(instructionData.task, currentInstruction.task), type: "string" },
+      {
+        db: "shipment_type",
+        new: preserveExistingValue(instructionData.shipment_type, currentInstruction.shipment_type),
+        type: "number",
+      },
+      { db: "pickup", new: preserveExistingValue(instructionData.pickup, currentInstruction.pickup), type: "string" },
+      {
+        db: "dropoff",
+        new: preserveExistingValue(instructionData.dropoff, currentInstruction.dropoff),
+        type: "string",
+      },
+      {
+        db: "hazardous",
+        new: preserveExistingValue(instructionData.hazardous, currentInstruction.hazardous),
+        type: "boolean",
+      },
+      {
+        db: "surchages",
+        new: preserveExistingValue(instructionData.surchages, currentInstruction.surchages),
+        type: "boolean",
+      },
+      {
+        db: "pickuptime",
+        new: preserveExistingValue(instructionData.pickuptime, currentInstruction.pickuptime),
+        type: "time",
+      },
+      {
+        db: "pickupdate",
+        new: preserveExistingValue(instructionData.pickupdate, currentInstruction.pickupdate),
+        type: "date",
+      },
+      {
+        db: "stackdate",
+        new: preserveExistingValue(instructionData.stackdate, currentInstruction.stackdate),
+        type: "date",
+      },
+      {
+        db: "deadline",
+        new: preserveExistingValue(instructionData.deadline, currentInstruction.deadline),
+        type: "date",
+      },
+      {
+        db: "fileref",
+        new: preserveExistingValue(instructionData.fileref, currentInstruction.fileref),
+        type: "string",
+      },
+      {
+        db: "rateweight",
+        new: preserveExistingValue(instructionData.rateweight, currentInstruction.rateweight),
+        type: "string",
+      },
+      {
+        db: "description",
+        new: preserveExistingValue(instructionData.description, currentInstruction.description),
+        type: "string",
+      },
+      { db: "vat", new: preserveExistingValue(instructionData.vat, currentInstruction.vat) || 15, type: "number" },
+      {
+        db: "num_six_meters",
+        new: preserveExistingValue(instructionData.num_six_meters, currentInstruction.num_six_meters) || 0,
+        type: "number",
+      },
+      {
+        db: "num_twelve_meters",
+        new: preserveExistingValue(instructionData.num_twelve_meters, currentInstruction.num_twelve_meters) || 0,
+        type: "number",
+      },
+      {
+        db: "num_abnormal",
+        new: preserveExistingValue(instructionData.num_abnormal, currentInstruction.num_abnormal) || 0,
+        type: "number",
+      },
+      {
+        db: "num_breakbulk",
+        new: preserveExistingValue(instructionData.num_breakbulk, currentInstruction.num_breakbulk) || 0,
+        type: "number",
+      },
+      {
+        db: "total_cost",
+        new: preserveExistingValue(instructionData.total_cost, currentInstruction.total_cost),
+        type: "number",
+      },
+      { db: "weight", new: preserveExistingValue(instructionData.weight, currentInstruction.weight), type: "number" },
+      {
+        db: "booking_ref",
+        new: preserveExistingValue(instructionData.booking_ref, currentInstruction.booking_ref),
+        type: "string",
+      },
+      {
+        db: "vessel_name",
+        new: preserveExistingValue(instructionData.vessel_name, currentInstruction.vessel_name),
+        type: "string",
+      },
+      {
+        db: "rateper_6",
+        new: preserveExistingValue(instructionData.rateper_6, currentInstruction.rateper_6),
+        type: "number",
+      },
+      {
+        db: "rateper_12",
+        new: preserveExistingValue(instructionData.rateper_12, currentInstruction.rateper_12),
+        type: "number",
+      },
+      {
+        db: "rateper_abnormal",
+        new: preserveExistingValue(instructionData.rateper_abnormal, currentInstruction.rateper_abnormal),
+        type: "number",
+      },
+      {
+        db: "rateper_breakbulk",
+        new: preserveExistingValue(instructionData.rateper_breakbulk, currentInstruction.rateper_breakbulk),
+        type: "number",
+      },
+      {
+        db: "unitrate",
+        new: preserveExistingValue(instructionData.unitrate, currentInstruction.unitrate),
+        type: "number",
+      },
+      {
+        db: "surcharge",
+        new: preserveExistingValue(instructionData.surcharge, currentInstruction.surcharge),
+        type: "number",
+      },
+    ]
+
+    // Compare each field
+    for (const field of fieldMappings) {
+      const currentValue = currentInstruction[field.db]
+      const newValue = field.new
+
+      if (!compareValues(currentValue, newValue, field.type)) {
+        console.log(`[${new Date().toISOString()}] [MODEL] Field ${field.db} changed: ${currentValue} -> ${newValue}`)
+
+        fieldsToUpdate.push(`${field.db} = $${paramIndex}`)
+
+        // Format the value based on type
+        let formattedValue = newValue
+        if (field.type === "date") {
+          formattedValue = formatDateForComparison(newValue)
+        } else if (field.type === "time") {
+          formattedValue = formatTimeForComparison(newValue)
+        } else if (field.type === "number") {
+          // Handle weight field specially to prevent empty string errors
+          if (field.db === "weight" || field.db === "unitrate") {
+            if (newValue === null || newValue === undefined || newValue === "") {
+              formattedValue = null
+            } else {
+              const parsedValue = Number.parseFloat(String(newValue).trim())
+              formattedValue = isNaN(parsedValue) ? null : parsedValue
+            }
+          } else {
+            formattedValue = newValue === null || newValue === "" ? null : Number(newValue)
+          }
+        } else if (field.type === "boolean") {
+          formattedValue = Boolean(newValue)
+        } else {
+          // String type
+          formattedValue = newValue === null || newValue === "" ? null : String(newValue)
+        }
+
+        valuesToUpdate.push(formattedValue)
+        paramIndex++
+      }
+    }
+
+    // 3. Update instruction if there are changes (STATUS IS NEVER UPDATED)
+    let instructionResult = currentInstruction
+    if (fieldsToUpdate.length > 0) {
+      const updateQuery = `
+        UPDATE public.m1_controller
+        SET ${fieldsToUpdate.join(", ")}
+        WHERE m1key = $${paramIndex}
+        RETURNING *
+      `
+
+      valuesToUpdate.push(instructionId)
+
+      console.log(`[${new Date().toISOString()}] [MODEL] Updating instruction with query:`, updateQuery)
+      console.log(`[${new Date().toISOString()}] [MODEL] Update values:`, valuesToUpdate)
+
+      const updateResult = await client.query(updateQuery, valuesToUpdate)
+      instructionResult = updateResult.rows[0]
+      console.log(`[${new Date().toISOString()}] [MODEL] Instruction updated successfully`)
+    } else {
+      console.log(`[${new Date().toISOString()}] [MODEL] No instruction fields changed, skipping update`)
+    }
+
+    // 4. Handle container updates
+    const getCurrentContainersQuery = `
+      SELECT containerkey, containernum, weight, container_type, cargo_description
+      FROM public.container
+      WHERE m1key = $1
+      ORDER BY containerkey
+    `
+    const currentContainersResult = await client.query(getCurrentContainersQuery, [instructionId])
+    const currentContainers = currentContainersResult.rows
+
+    console.log(`[${new Date().toISOString()}] [MODEL] Current containers:`, currentContainers.length)
+    console.log(`[${new Date().toISOString()}] [MODEL] New containers:`, containerData.length)
+
+    // Compare containers
+    const containerChanges = compareContainers(currentContainers, containerData)
+
+    console.log(`[${new Date().toISOString()}] [MODEL] Container changes:`, {
+      toUpdate: containerChanges.toUpdate.length,
+      toInsert: containerChanges.toInsert.length,
+      toDelete: containerChanges.toDelete.length,
+    })
+
+    // Delete containers
+    for (const containerKey of containerChanges.toDelete) {
+      const deleteQuery = `DELETE FROM public.container WHERE containerkey = $1`
+      await client.query(deleteQuery, [containerKey])
+      console.log(`[${new Date().toISOString()}] [MODEL] Deleted container ${containerKey}`)
+    }
+
+    // Update containers
+    for (const container of containerChanges.toUpdate) {
+      const updateQuery = `
+        UPDATE public.container
+        SET containernum = $1, weight = $2, container_type = $3, cargo_description = $4
+        WHERE containerkey = $5
+      `
+      await client.query(updateQuery, [
+        container.containernum,
+        container.weight,
+        container.container_type,
+        container.cargo_description,
+        container.containerkey,
+      ])
+      console.log(`[${new Date().toISOString()}] [MODEL] Updated container ${container.containerkey}`)
+    }
+
+    // Insert new containers
+    const insertResults = []
+    for (const container of containerChanges.toInsert) {
+      const containerNum = container.containernum || container.containerNum || ""
+
+      // Handle weight with proper validation
+      let weight = null
+      if (container.weight !== null && container.weight !== undefined && container.weight !== "") {
+        const weightStr = String(container.weight).trim()
+        if (weightStr !== "") {
+          const parsedWeight = Number.parseFloat(weightStr)
+          if (!isNaN(parsedWeight)) {
+            weight = parsedWeight
+          }
+        }
+      }
+
+      const containerType = container.containerType || container.container_type || ""
+      const cargoDescription = container.cargoDescription || container.cargo_description || ""
 
       const insertQuery = `
         INSERT INTO public.container (containernum, weight, m1key, container_type, cargo_description)
         VALUES ($1, $2, $3, $4, $5)
         RETURNING containerkey
-      `;
-      
-      // Final safety check to ensure weight is null and not an empty string
-      // This prevents PostgreSQL errors with invalid input syntax for double precision
-      const finalWeight = weight === '' ? null : weight;
-      
-      const values = [containerNum, finalWeight, instructionId, containerType, cargoDescription];
-      
-      console.log(`[${new Date().toISOString()}] [MODEL] Final values for container insert:`, {
-        containerNum,
-        weight: finalWeight,
-        instructionId,
-        containerType,
-        cargoDescription
-      });
+      `
 
-      const result = await client.query(insertQuery, values);
-      console.log(`[${new Date().toISOString()}] [MODEL] Inserted container with ID: ${result.rows[0].containerkey}`);
-      insertResults.push(result.rows[0]);
+      const values = [containerNum, weight, instructionId, containerType, cargoDescription]
+      const result = await client.query(insertQuery, values)
+      insertResults.push(result.rows[0])
+      console.log(`[${new Date().toISOString()}] [MODEL] Inserted new container ${result.rows[0].containerkey}`)
     }
-    
+
     // Commit transaction
-    await client.query('COMMIT');
-    console.log(`[${new Date().toISOString()}] [MODEL] Transaction committed successfully`);
-    
+    await client.query("COMMIT")
+    console.log(`[${new Date().toISOString()}] [MODEL] Transaction committed successfully`)
+
     // Return combined result
     return {
-      instruction: instructionResult.rows[0],
-      containers: insertResults,
-      success: true
-    };
+      instruction: instructionResult,
+      containers: {
+        updated: containerChanges.toUpdate.length,
+        inserted: insertResults.length,
+        deleted: containerChanges.toDelete.length,
+      },
+      success: true,
+    }
   } catch (error) {
     // Rollback transaction on error
-    await client.query('ROLLBACK');
-    console.error(`[${new Date().toISOString()}] [MODEL] Error in updateFCInstructionAndContainers:`, error);
-    throw error;
+    await client.query("ROLLBACK")
+    console.error(`[${new Date().toISOString()}] [MODEL] Error in updateFCInstructionAndContainers:`, error)
+    throw error
   } finally {
     // Release client
-    client.release();
+    client.release()
   }
-};
+}
 
 export const saveInstructionAndContainers = async (controllerData, containerData) => {
   const {
