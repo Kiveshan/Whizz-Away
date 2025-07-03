@@ -47,7 +47,7 @@ router.get("/fc/containers/:instructionId", getFCContainersHandler);
 router.post("/fc/save-instruction", verifyToken, saveFCInstructionHandler)
 router.get("/fc/instruction/:id", getFCInstructionByIdHandler)
 router.put("/fc/instruction/:id", updateFCInstructionHandler)
-router.post("/fc/containers/:instructionId", updateFCContainersHandler)
+router.put("/fc/containers/:instructionId", updateFCContainersHandler)
 
 // Shared routes
 router.get("/active-clients", getActiveClientsHandler)
@@ -57,6 +57,3 @@ router.get("/client/:clientId/check-rates", checkClientRatesHandler)
 router.get("/client/:clientId/rates", getClientRatesHandler)
 
 export default router
-
-
-

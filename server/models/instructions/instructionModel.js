@@ -420,7 +420,7 @@ export const updateInstruction = async (instructionId, updatedData) => {
       updatedData.pickup,
       updatedData.dropoff,
       updatedData.hazardous,
-      updatedData.surcharges,
+      updatedData.surchages,
       updatedData.pickuptime,
       updatedData.pickupdate,
       updatedData.stackdate,

@@ -206,6 +206,8 @@ const Instructions = () => {
         filtered = filtered.filter((item) => item.type_text === "import" || item.type === "import")
       } else if (activeFilter === "export") {
         filtered = filtered.filter((item) => item.type_text === "export" || item.type === "export")
+      } else if (activeFilter === "cross-haul") {
+        filtered = filtered.filter((item) => item.type_text === "cross-haul" || item.type === "cross-haul")
       }
     }
 
@@ -331,6 +333,12 @@ const Instructions = () => {
               onClick={() => handleFilterClick("export")}
             >
               Export
+            </button>
+            <button
+              className={`btn btn-blue ${activeFilter === "cross-haul" ? "active" : ""}`}
+              onClick={() => handleFilterClick("cross-haul")}
+            >
+              Cross-Haul
             </button>
             <button
               className={`btn btn-blue ${activeFilter === "All" ? "active" : ""}`}

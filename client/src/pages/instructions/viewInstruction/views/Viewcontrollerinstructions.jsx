@@ -47,7 +47,10 @@ const Viewcontrollerinstructions = () => {
     twelveMeterRate: "",
     abnormalRate: "",
     status: "",
-    vesselName: ""
+    vesselName: "",
+    unitrate: "",
+    num_breakbulk: 0,
+    rateper_breakbulk: ""
   });
 
   const [formData, setFormData] = useState(() => ({
@@ -93,6 +96,9 @@ const Viewcontrollerinstructions = () => {
 
   // State to track if shipment type is Import
   const [isImport, setIsImport] = useState(false)
+
+  // State to track if shipment type is cross-haul or shipmentID is 3
+  const [isCrossHaulOrSpecial, setIsCrossHaulOrSpecial] = useState(false)
 
   // Style for non-editable fields - applied to ALL fields
   const nonEditableStyle = {
@@ -226,6 +232,9 @@ const Viewcontrollerinstructions = () => {
         rateper_6: data.rateper_6 ? Number(data.rateper_6) : 0,
         rateper_12: data.rateper_12 ? Number(data.rateper_12) : 0,
         rateper_abnormal: data.rateper_abnormal ? Number(data.rateper_abnormal) : 0,
+        unitrate: data.unitrate || "",
+        num_breakbulk: Number(data.num_breakbulk) || 0,
+        rateper_breakbulk: data.rateper_breakbulk ? data.rateper_breakbulk.toString() : "",
       }
 
       console.log("Formatted data before setFormData:", formattedData)
@@ -242,6 +251,14 @@ const Viewcontrollerinstructions = () => {
       const isImportValue = shipmentTypeName.toLowerCase() === "import"
       console.log("Setting isImport to:", isImportValue)
       setIsImport(isImportValue)
+      
+      // Set isCrossHaulOrSpecial based on shipment type or ID
+      const isCrossHaul = shipmentTypeName.toLowerCase() === "cross-haul" || shipmentTypeName.toLowerCase() === "cross haul"
+      const isSpecialId = data.shipment_type?.toString() === "3"
+      const isCrossHaulOrSpecialValue = isCrossHaul || isSpecialId
+      console.log("Setting isCrossHaulOrSpecial to:", isCrossHaulOrSpecialValue, 
+        "(shipmentTypeName: ", shipmentTypeName, ", shipment_type: ", data.shipment_type, ")")
+      setIsCrossHaulOrSpecial(isCrossHaulOrSpecialValue)
       
       // After setting all state, ensure loading is set to false
       setIsLoading(prev => ({
@@ -788,6 +805,31 @@ const Viewcontrollerinstructions = () => {
                       </div>
                     </div>
                   </div>
+                  {isCrossHaulOrSpecial && (
+                    <div className="view-controller-instructions-container-input">
+                      <label>Break Bulk</label>
+                      <div className="view-controller-instructions-container-rate-group">
+                        <input
+                          type="number"
+                          value={formData.num_breakbulk || 0}
+                          min="0"
+                          name="num_breakbulk"
+                          readOnly
+                          style={nonEditableStyle}
+                        />
+                        <div className="view-controller-instructions-input-wrapper view-controller-instructions-rate-input">
+                          <input
+                            type="text"
+                            className="view-controller-instructions-form-input"
+                            placeholder="Rate"
+                            value={formData.rateper_breakbulk || ""}
+                            readOnly
+                            style={nonEditableStyle}
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  )}
                 </div>
 
                 {/* Hazardous and Surcharges Checkboxes */}
@@ -885,7 +927,7 @@ const Viewcontrollerinstructions = () => {
 
                 {/* Rates per dropdown */}
                 <div className="view-controller-instructions-form-field" style={{ maxWidth: "160px" }}>
-                  <label>Rates per</label>
+                  <label>Unit per</label>
                   <div className="view-controller-instructions-select-wrapper view-controller-instructions-small">
                     <select
                       className="view-controller-instructions-dropdown"
@@ -896,9 +938,24 @@ const Viewcontrollerinstructions = () => {
                     >
                       <option value="kg">kg</option>
                       <option value="m³">m³</option>
+                      <option value="ton">ton</option>
                       <option value="Container">Container</option>
                     </select>
                   </div>
+                  {/* Unit rate textbox - only visible for kg, m³, and ton */}
+                  {(formData.rateWeight === "kg" || formData.rateWeight === "m³" || formData.rateWeight === "ton") && (
+                    <div className="view-controller-instructions-input-wrapper" style={{ marginTop: "6px" }}>
+                      <input
+                        type="text"
+                        className="view-controller-instructions-form-input"
+                        placeholder="Unit Rate"
+                        name="unitrate"
+                        value={formData.unitrate || ""}
+                        readOnly
+                        style={nonEditableStyle}
+                      />
+                    </div>
+                  )}
                   {/* conditional weight textbox */}
                   {(formData.rateWeight === "kg" || formData.rateWeight === "m³") && (
                     <div className="view-controller-instructions-input-wrapper" style={{ marginTop: "6px" }}>
@@ -1025,21 +1082,39 @@ const Viewcontrollerinstructions = () => {
                 </div>
 
                 <div className="view-controller-instructions-date-time-row-2" style={{ display: "flex", gap: "15px" }}>
-                  <div className="view-controller-instructions-form-field" style={{ flex: "1", minWidth: "0" }}>
-                    <label>{isImport ? "ETA" : "Stack Date"}</label>
-                    <div className="view-controller-instructions-date-input-group" style={{ width: "100%" }}>
-                      <input
-                        type="date"
-                        className="view-controller-instructions-form-input"
-                        placeholder="Date here"
-                        name="stackDate"
-                        value={formData.stackDate}
-                        readOnly
-                        style={{ ...nonEditableStyle, width: "100%" }}
-                      />
+                  {!isCrossHaulOrSpecial && (
+                    <div className="view-controller-instructions-form-field" style={{ maxWidth: "200px" }}>
+                      <label>Vessel Name</label>
+                      <div className="view-controller-instructions-input-wrapper">
+                        <input
+                          type="text"
+                          className="view-controller-instructions-form-input"
+                          placeholder="Enter vessel name"
+                          name="vesselName"
+                          value={formData.vesselName}
+                          readOnly
+                          style={nonEditableStyle}
+                        />
+                      </div>
                     </div>
-                  </div>
-                  <div className="view-controller-instructions-form-field" style={{ flex: "1", minWidth: "0" }}>
+                  )}
+                  {!isCrossHaulOrSpecial && (
+                    <div className="view-controller-instructions-form-field" style={{ flex: "1", minWidth: "0" }}>
+                      <label>{isImport ? "ETA" : "Stack Date"}</label>
+                      <div className="view-controller-instructions-date-input-group" style={{ width: "100%" }}>
+                        <input
+                          type="date"
+                          className="view-controller-instructions-form-input"
+                          placeholder="Date here"
+                          name="stackDate"
+                          value={formData.stackDate}
+                          readOnly
+                          style={{ ...nonEditableStyle, width: "100%" }}
+                        />
+                      </div>
+                    </div>
+                  )}
+                  <div className="view-controller-instructions-form-field" style={{ flex: "1", minWidth: "0", maxWidth: "180px" }}>
                     <label>Deadline</label>
                     <div className="view-controller-instructions-date-input-group" style={{ width: "100%" }}>
                       <input
@@ -1053,50 +1128,30 @@ const Viewcontrollerinstructions = () => {
                       />
                     </div>
                   </div>
+                  <div className="view-controller-instructions-form-field" style={{ flex: "1", minWidth: "0" }}>
+                    <label>Description from Client</label>
+                    <div className="view-controller-instructions-input-wrapper">
+                      <input
+                        type="text"
+                        className="view-controller-instructions-form-input"
+                        placeholder="Description from Client"
+                        name="description"
+                        value={formData.description}
+                        readOnly
+                        style={nonEditableStyle}
+                      />
+                    </div>
+                  </div>
                 </div>
               </div>
             </div>
           </div>
         </div>
 
-        {/* Vessel Information Section */}
-        <div
-          className="view-controller-instructions-form-section view-controller-instructions-vessel-info-section"
-          style={{ marginTop: "16px" }}
-        >
-          <div className="view-controller-instructions-form-row" style={{ display: "flex", flexWrap: "wrap", gap: "12px", alignItems: "flex-start", width: "100%" }}>
-            <div className="view-controller-instructions-form-field">
-              <label>Vessel Name</label>
-              <div className="view-controller-instructions-input-wrapper">
-                <input
-                  type="text"
-                  className="view-controller-instructions-form-input"
-                  placeholder="Enter vessel name"
-                  name="vesselName"
-                  value={formData.vesselName}
-                  readOnly
-                  style={nonEditableStyle}
-                />
-              </div>
-            </div>
-            <div className="view-controller-instructions-form-field">
-              <label>Description from Client</label>
-              <div className="view-controller-instructions-textarea-wrapper">
-                <textarea
-                  className="view-controller-instructions-form-textarea"
-                  placeholder="Description from Client"
-                  name="description"
-                  value={formData.description}
-                  readOnly
-                  style={{ ...nonEditableStyle, height: "80px", width: "100%", resize: "vertical" }}
-                ></textarea>
-              </div>
-            </div>
-          </div>
-        </div>
+
 
         {/* Container Details Section */}
-        <div className="view-controller-instructions-form-section" style={{ marginTop: '10px', padding: '15px' }}>
+        <div className="view-controller-instructions-form-section" style={{ marginTop: '5px', padding: '15px' }}>
           <h4 style={{ margin: '0 0 10px 0', fontSize: '14px', fontWeight: '600' }}>Container Details</h4>
           <div className="content" style={{ width: '100%', fontSize: '13px' }}>
             {isLoadingContainers ? (

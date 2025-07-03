@@ -256,6 +256,14 @@ const CompanyInstructions = () => {
             item.shipment_type === 2 ||
             item.shipment_type === "2",
         )
+      } else if (activeFilter === "cross-haul") {
+        filtered = filtered.filter(
+          (item) =>
+            item.type_text === "cross-haul" ||
+            item.type === "cross-haul" ||
+            item.shipment_type === 3 ||
+            item.shipment_type === "3",
+        )
       }
     }
 
@@ -379,6 +387,12 @@ const CompanyInstructions = () => {
               Export
             </button>
             <button
+              className={`btn btn-blue ${activeFilter === "cross-haul" ? "active" : ""}`}
+              onClick={() => handleFilterClick("cross-haul")}
+            >
+              Cross-haul
+            </button>
+            <button
               className={`btn btn-blue ${activeFilter === "All" ? "active" : ""}`}
               onClick={() => handleFilterClick("All")}
             >
@@ -429,9 +443,7 @@ const CompanyInstructions = () => {
                     <td colSpan="7">No instructions found</td>
                   </tr>
                 ) : (
-                  getFilteredInstructions()
-                    .slice((currentPage - 1) * recordsPerPage, currentPage * recordsPerPage)
-                    .map((item) => (
+                  currentInstructions.map((item) => (
                       <tr key={item.m1controllerkey || item.m1key}>
                         <td>Instruction {item.m1controllerkey || item.m1key}</td>
                         <td>{item.fileno}</td>
@@ -441,7 +453,9 @@ const CompanyInstructions = () => {
                               ? "import"
                               : item.shipment_type === 2 || item.shipment_type === "2"
                                 ? "export"
-                                : item.type)}
+                                : item.shipment_type === 3 || item.shipment_type === "3"
+                                  ? "cross-haul"
+                                  : item.type)}
                         </td>
                         <td>{renderStatus(item.status)}</td>
                         <td>{new Date(item.startingdate || item.pickupdate).toLocaleDateString()}</td>
@@ -470,14 +484,16 @@ const CompanyInstructions = () => {
         </div>
       </div>
 
-      {/* Pagination Component - ADDED */}
-      {getFilteredInstructions().length > 0 && (
-        <Pagination
-          totalRecords={getFilteredInstructions().length}
-          recordsPerPage={recordsPerPage}
-          currentPage={currentPage}
-          onPageChange={handlePageChange}
-        />
+      {/* Pagination Component */}
+      {!loading && !error && filteredInstructions.length > 0 && (
+        <div style={{ marginTop: '20px', display: 'flex', justifyContent: 'center' }}>
+          <Pagination
+            totalRecords={filteredInstructions.length}
+            recordsPerPage={recordsPerPage}
+            currentPage={currentPage}
+            onPageChange={handlePageChange}
+          />
+        </div>
       )}
     </div>
   )
