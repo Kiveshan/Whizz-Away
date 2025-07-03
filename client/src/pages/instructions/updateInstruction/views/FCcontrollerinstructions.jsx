@@ -515,29 +515,68 @@ const FCcontrollerinstructions = () => {
         return true;
       });
 
-      // Prepare container data for API
-      const containerData = filteredContainers.map((container) => ({
-        containerKey: container.containerKey,
-        containernum: container.containerNum,
-        weight: container.weight ? parseFloat(container.weight) : null,
-        container_type: container.containerType,
-        cargo_description: container.cargoDescription,
-      }));
+      // Prepare container data for API with improved validation
+      const containerData = filteredContainers.map((container) => {
+        // Handle weight properly to avoid NaN values and empty strings
+        let weight = null;
+        // Check if weight exists and is not an empty string
+        if (container.weight !== undefined && container.weight !== null && container.weight !== '') {
+          // Try to parse the weight
+          const parsedWeight = parseFloat(container.weight);
+          // Only use parsed value if it's a valid number
+          if (!isNaN(parsedWeight)) {
+            weight = parsedWeight;
+          }
+        }
+        
+        // Ensure we're explicitly setting weight to null if it's invalid
+        return {
+          containerKey: container.containerKey,
+          containernum: container.containerNum,
+          weight: weight,  // This will be null for empty strings or invalid numbers
+          container_type: container.containerType,
+          cargo_description: container.cargoDescription,
+        };
+      });
 
-      // Update instruction in m1_controller table
-      await api.put(`/api/instructions/fc/instruction/${instructionId}`, instructionUpdateData);
+      // Use the new unified endpoint to update both instruction and containers in a single call
+      console.log('Using unified endpoint to update instruction and containers');
+      console.log('Instruction data being sent:', instructionUpdateData);
+      console.log('Container data being sent:', containerData);
       
-      // Update containers in container table
-      await api.put(`/api/instructions/fc/containers/${instructionId}`, { containers: containerData });
-      
-      // Show success message and reset modification flag
-      setContainerSuccessMessage("Changes saved successfully!");
-      setIsContainerDataModified(false);
-      
-      // Redirect to instruction list after a short delay
-      setTimeout(() => {
-        navigate('/instructions/list');
-      }, 1500);
+      try {
+        const response = await api.put(`/api/instructions/fc/update/${instructionId}`, {
+          instructionData: instructionUpdateData,
+          containers: containerData
+        });
+        
+        console.log('Unified update response:', response.data);
+        
+        // Check if the response indicates success
+        if (response.data && response.data.success) {
+          // Show success message and reset modification flag
+          setContainerSuccessMessage(response.data.message || "Changes saved successfully!");
+          setIsContainerDataModified(false);
+          
+          // Redirect to instruction list after a short delay
+          console.log('Save successful, redirecting to instruction list...');
+          setTimeout(() => {
+            navigate('/instructions/list');
+          }, 1500);
+        } else {
+          // If response doesn't explicitly indicate success, show warning
+          console.warn('Server response did not indicate success:', response.data);
+          setContainerSuccessMessage("Changes may have been saved, but the server response was unexpected.");
+          setErrorModal({
+            isOpen: true,
+            message: "The server response was unexpected. Please verify your changes were saved correctly.",
+          });
+        }
+      } catch (apiError) {
+        // Handle the specific API error
+        console.error('API error details:', apiError.response?.data || apiError.message);
+        throw apiError; // Re-throw to be caught by the outer catch block
+      }
     } catch (error) {
       console.error("Error saving container details:", error)
       setErrorModal({

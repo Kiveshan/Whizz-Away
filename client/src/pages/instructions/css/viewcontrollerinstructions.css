@@ -196,7 +196,7 @@
 
 /* Main form container */
 .view-controller-instructions-unique-wrapper .view-controller-instructions-form-container {
-  margin-top: 20px !important;
+  margin-top: 0px !important;
   background-color: #e6f2ff;
   border-radius: 8px;
   overflow: visible;

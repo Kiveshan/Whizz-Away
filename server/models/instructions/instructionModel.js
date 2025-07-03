@@ -677,6 +677,196 @@ export const getClientRates = async (clientId, start, destination) => {
   }
 }
 
+export const updateFCInstructionAndContainers = async (instructionId, instructionData, containerData) => {
+  const client = await pool.connect();
+  try {
+    // Start transaction
+    await client.query('BEGIN');
+    
+    console.log(`[${new Date().toISOString()}] [MODEL] updateFCInstructionAndContainers: Starting transaction for instruction ${instructionId}`);
+    
+    // 1. Update the instruction
+    const updateQuery = `
+      UPDATE public.m1_controller
+      SET 
+        client = $1,
+        task = $2,
+        shipment_type = $3,
+        pickup = $4,
+        dropoff = $5,
+        hazardous = $6,
+        surchages = $7,
+        pickuptime = $8,
+        pickupdate = $9,
+        stackdate = $10,
+        deadline = $11,
+        fileref = $12,
+        rateweight = $13,
+        description = $14,
+        vat = $15,
+        num_six_meters = $16,
+        num_twelve_meters = $17,
+        num_abnormal = $18,
+        num_breakbulk = $19,
+        total_cost = $20,
+        weight = $21,
+        status = $22,
+        booking_ref = $23,
+        vessel_name = $24,
+        rateper_6 = $25,
+        rateper_12 = $26,
+        rateper_abnormal = $27,
+        rateper_breakbulk = $28,
+        unitrate = $29
+      WHERE m1key = $30
+      RETURNING *
+    `;
+
+    // Process instruction weight to prevent empty string errors
+    let instructionWeight = null;
+    if (instructionData.weight !== undefined && instructionData.weight !== null && instructionData.weight !== '') {
+      // Convert to string first to handle any object types
+      const weightStr = String(instructionData.weight).trim();
+      if (weightStr !== '') {
+        const parsedWeight = Number.parseFloat(weightStr);
+        if (!isNaN(parsedWeight)) {
+          instructionWeight = parsedWeight;
+          console.log(`[${new Date().toISOString()}] [MODEL] Valid instruction weight: ${instructionWeight}`);
+        } else {
+          console.log(`[${new Date().toISOString()}] [MODEL] Warning: Invalid instruction weight '${weightStr}', using null instead`);
+        }
+      }
+    }
+    console.log(`[${new Date().toISOString()}] [MODEL] Final instruction weight value: ${instructionWeight}`);
+    
+    const updateValues = [
+      instructionData.client,
+      instructionData.task,
+      instructionData.shipment_type,
+      instructionData.pickup,
+      instructionData.dropoff,
+      instructionData.hazardous,
+      instructionData.surchages,
+      instructionData.pickuptime,
+      instructionData.pickupdate,
+      instructionData.stackdate,
+      instructionData.deadline,
+      instructionData.fileref,
+      instructionData.rateweight,
+      instructionData.description,
+      instructionData.vat || 15,
+      instructionData.num_six_meters || 0,
+      instructionData.num_twelve_meters || 0,
+      instructionData.num_abnormal || 0,
+      instructionData.num_breakbulk || 0,
+      instructionData.total_cost,
+      instructionWeight,  // Use validated weight instead of raw value
+      instructionData.status || "In progress",
+      instructionData.booking_ref,
+      instructionData.vessel_name,
+      instructionData.rateper_6,
+      instructionData.rateper_12,
+      instructionData.rateper_abnormal,
+      instructionData.rateper_breakbulk,
+      instructionData.unitrate,
+      instructionId,
+    ];
+
+    const instructionResult = await client.query(updateQuery, updateValues);
+    console.log(`[${new Date().toISOString()}] [MODEL] Instruction updated successfully`);
+    
+    // 2. Delete existing containers
+    const deleteQuery = `
+      DELETE FROM public.container
+      WHERE m1key = $1
+    `;
+    const deleteResult = await client.query(deleteQuery, [instructionId]);
+    console.log(`[${new Date().toISOString()}] [MODEL] Deleted ${deleteResult.rowCount} existing containers for instruction ID: ${instructionId}`);
+    
+    // 3. Insert new containers
+    const insertResults = [];
+    for (const container of containerData) {
+      const containerNum = container.containernum || container.containerNum || "";
+      
+      // Improved weight handling to prevent NaN values and empty strings
+      let weight = null;
+      
+      // First, ensure we're not dealing with an empty string or undefined/null
+      if (container.weight !== null && container.weight !== undefined && container.weight !== '') {
+        // Convert to string first to handle any object types
+        const weightStr = String(container.weight).trim();
+        
+        // Check if it's empty after trimming
+        if (weightStr === '') {
+          weight = null;
+          console.log(`[${new Date().toISOString()}] [MODEL] Empty weight value after trimming, using null`);
+        } else {
+          // Parse the weight and check if it's a valid number
+          const parsedWeight = Number.parseFloat(weightStr);
+          
+          // Only use the parsed weight if it's a valid number
+          if (!isNaN(parsedWeight)) {
+            weight = parsedWeight;
+            console.log(`[${new Date().toISOString()}] [MODEL] Valid weight value: ${weight}`);
+          } else {
+            console.log(`[${new Date().toISOString()}] [MODEL] Warning: Invalid weight value '${weightStr}' for container, using null instead`);
+          }
+        }
+      } else {
+        console.log(`[${new Date().toISOString()}] [MODEL] Weight is null, undefined, or empty string: '${container.weight}'`);
+      }
+      
+      const containerType = container.containerType || container.container_type || "";
+      const cargoDescription = container.cargoDescription || container.cargo_description || "";
+
+      console.log(`[${new Date().toISOString()}] [MODEL] Inserting container: containerNum=${containerNum}, weight=${weight}, m1key=${instructionId}, container_type=${containerType}, cargo_description=${cargoDescription}`);
+
+      const insertQuery = `
+        INSERT INTO public.container (containernum, weight, m1key, container_type, cargo_description)
+        VALUES ($1, $2, $3, $4, $5)
+        RETURNING containerkey
+      `;
+      
+      // Final safety check to ensure weight is null and not an empty string
+      // This prevents PostgreSQL errors with invalid input syntax for double precision
+      const finalWeight = weight === '' ? null : weight;
+      
+      const values = [containerNum, finalWeight, instructionId, containerType, cargoDescription];
+      
+      console.log(`[${new Date().toISOString()}] [MODEL] Final values for container insert:`, {
+        containerNum,
+        weight: finalWeight,
+        instructionId,
+        containerType,
+        cargoDescription
+      });
+
+      const result = await client.query(insertQuery, values);
+      console.log(`[${new Date().toISOString()}] [MODEL] Inserted container with ID: ${result.rows[0].containerkey}`);
+      insertResults.push(result.rows[0]);
+    }
+    
+    // Commit transaction
+    await client.query('COMMIT');
+    console.log(`[${new Date().toISOString()}] [MODEL] Transaction committed successfully`);
+    
+    // Return combined result
+    return {
+      instruction: instructionResult.rows[0],
+      containers: insertResults,
+      success: true
+    };
+  } catch (error) {
+    // Rollback transaction on error
+    await client.query('ROLLBACK');
+    console.error(`[${new Date().toISOString()}] [MODEL] Error in updateFCInstructionAndContainers:`, error);
+    throw error;
+  } finally {
+    // Release client
+    client.release();
+  }
+};
+
 export const saveInstructionAndContainers = async (controllerData, containerData) => {
   const {
     client,

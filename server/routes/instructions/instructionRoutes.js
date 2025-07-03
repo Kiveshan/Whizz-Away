@@ -19,6 +19,7 @@ import {
   getFCInstructionByIdHandler,
   updateFCInstructionHandler,
   updateFCContainersHandler,
+  updateFCInstructionAndContainersHandler,
 } from "../../controllers/instructions/instructionController.js"
 import { verifyToken } from "../../middleware/auth.js"
 
@@ -48,6 +49,8 @@ router.post("/fc/save-instruction", verifyToken, saveFCInstructionHandler)
 router.get("/fc/instruction/:id", getFCInstructionByIdHandler)
 router.put("/fc/instruction/:id", updateFCInstructionHandler)
 router.put("/fc/containers/:instructionId", updateFCContainersHandler)
+// New unified endpoint for updating both instruction and containers
+router.put("/fc/update/:id", updateFCInstructionAndContainersHandler)
 
 // Shared routes
 router.get("/active-clients", getActiveClientsHandler)
