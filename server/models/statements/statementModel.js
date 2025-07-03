@@ -70,6 +70,8 @@ const getStatementDetails = async (statementId) => {
         i.date AS invoice_date,
         m1.total_cost AS invoice_amount,
         m1.task AS invoice_task,
+        m1.pickup,
+        m1.dropoff,
         i.invoice_num,
         ut.companyname
       FROM 
@@ -113,29 +115,40 @@ const getStatementDetails = async (statementId) => {
 
     const paymentsQuery = `
       SELECT 
-        paykey,
-        fileupload AS date,
-        amount
+        p.paykey,
+        p.fileupload AS date,
+        p.amount,
+        p.reference,
+        i.invoice_num
       FROM 
-        payment_m3
+        payment_m3 p
+      LEFT JOIN 
+        invoice i ON p.invoiceid = i.ikey
       WHERE 
-        clientid = $1
-        AND fileupload BETWEEN $2 AND $3
+        p.clientid = $1
+        AND p.fileupload BETWEEN $2 AND $3
     `;
     const paymentsResult = await query(paymentsQuery, [
       clientId,
       formattedPaymentStartDate,
       formattedPaymentEndDate,
     ]);
+
     const payments = paymentsResult.rows.map((row) => ({
       paykey: row.paykey,
       date: row.date,
       amount: Number.parseFloat(row.amount || 0),
+      reference: row.reference || "",
+      invoice_num: row.invoice_num || "",
     }));
 
     console.log(
       `Fetched ${payments.length} payments for client ${clientId} between ${formattedPaymentStartDate} and ${formattedPaymentEndDate}`
     );
+
+    if (payments.length > 0) {
+      console.log("Sample payment data:", JSON.stringify(payments[0], null, 2));
+    }
 
     const statementData = {
       statement_key: result.rows[0].statement_key,
@@ -165,6 +178,8 @@ const getStatementDetails = async (statementId) => {
           amount: Number.parseFloat(row.invoice_amount || 0),
           task: row.invoice_task,
           invoice_num: row.invoice_num,
+          pickup: row.pickup,
+          dropoff: row.dropoff,
         })),
       payments: payments,
     };

@@ -1,17 +1,14 @@
 import {
   createPayment,
-  updatePaymentFilename,
   getPayment,
   getClientPayments,
   getClientInvoices,
 } from "../../models/payments/paymentModel.js";
-import { s3, getSignedUrl, bucketName } from "../../utils/s3-config.js";
 
 const createPaymentHandler = async (req, res) => {
   try {
     const { clientId } = req.params;
-    const { amount, fileupload, invoiceid } = req.body;
-    const file = req.file;
+    const { amount, fileupload, invoiceid, reference } = req.body;
 
     if (!amount || isNaN(amount)) {
       return res.status(400).json({
@@ -34,61 +31,28 @@ const createPaymentHandler = async (req, res) => {
       });
     }
 
-    if (!file) {
+    if (!reference || !reference.trim()) {
       return res.status(400).json({
         success: false,
-        message: "Proof of payment file is required",
+        message: "Payment reference is required",
       });
     }
 
-    // First, create payment record to get client and invoice details
-    const tempPayment = await createPayment(clientId, {
+    // Create payment record with reference
+    const payment = await createPayment(clientId, {
       amount,
       fileupload,
       invoiceid,
-      filename: "temp", // Temporary filename
+      reference: reference.trim(),
     });
-
-    const { clientname, invoice_num, paykey } = tempPayment.data;
-
-    // Clean filename for S3
-    const originalFileName = file.originalname.replace(/[^a-zA-Z0-9.-]/g, "_");
-    const timestamp = Date.now();
-    const finalFileName = `${timestamp}_${originalFileName}`;
-
-    // Construct final S3 key: payments/clientName/invoiceNum/filename
-    const finalKey = `payments/${clientname.replace(
-      /[^a-zA-Z0-9]/g,
-      "_"
-    )}/${invoice_num}/${finalFileName}`;
-
-    // Upload file directly to final S3 location
-    await s3
-      .upload({
-        Bucket: bucketName,
-        Key: finalKey,
-        Body: file.buffer,
-        ContentType: file.mimetype,
-      })
-      .promise();
-
-    // Update payment record with final S3 key
-    await updatePaymentFilename(paykey, finalKey);
-
-    // Generate signed URL for response
-    const fileUrl = getSignedUrl(finalKey, 3600);
 
     res.json({
       success: true,
-      data: {
-        ...tempPayment.data,
-        filename: finalKey,
-        fileurl: fileUrl,
-      },
+      data: payment.data,
     });
   } catch (error) {
     console.error(
-      `Error uploading payment for client ${req.params.clientId}:`,
+      `Error creating payment for client ${req.params.clientId}:`,
       error
     );
     res.status(500).json({
@@ -112,14 +76,9 @@ const getPaymentHandler = async (req, res) => {
       });
     }
 
-    const payment = result.data;
-    payment.fileurl = payment.filename
-      ? getSignedUrl(payment.filename, 3600)
-      : null;
-
     res.json({
       success: true,
-      data: payment,
+      data: result.data,
     });
   } catch (error) {
     console.error(
@@ -149,14 +108,9 @@ const getClientPaymentsHandler = async (req, res) => {
       `Query returned ${result.data.length} payments for client ${clientId}`
     );
 
-    const payments = result.data.map((payment) => ({
-      ...payment,
-      fileurl: payment.filename ? getSignedUrl(payment.filename, 3600) : null,
-    }));
-
     res.json({
       success: true,
-      data: payments,
+      data: result.data,
     });
   } catch (error) {
     console.error(

@@ -88,43 +88,76 @@ const getStatementDetails = async (statementId, legKeys, subei_reg_num) => {
   let client;
   try {
     client = await pool.connect();
-    // Fetch legids to extract additional legkeys
-    const legids = await getStatementLegIds(statementId, subei_reg_num);
-    let allLegKeys = [...legKeys];
 
-    if (legids && Array.isArray(legids)) {
-      try {
-        const additionalLegKeys = legids
-          .map((item) => item.legkey)
-          .filter((key) => !allLegKeys.includes(key));
-        allLegKeys = [...allLegKeys, ...additionalLegKeys];
-      } catch (e) {
-        console.error("Failed to process legids array:", e, "legids:", legids);
-      }
-    } else if (legids) {
-      console.warn("legids is not an array:", legids);
+    // First, get the stored legids from the statement (which now contain VAT-inclusive rates)
+    const statementQuery = `
+      SELECT legids 
+      FROM subcontractor_statements 
+      WHERE sub_state_id = $1 AND subbie_reg_num = $2
+    `;
+    const statementResult = await client.query(statementQuery, [
+      statementId,
+      subei_reg_num,
+    ]);
+
+    if (statementResult.rows.length === 0) {
+      throw new Error(
+        `Statement ${statementId} not found for subcontractor ${subei_reg_num}`
+      );
     }
 
+    const storedLegids = statementResult.rows[0].legids;
+    console.log("Stored legids from statement:", storedLegids);
+
+    if (!storedLegids || !Array.isArray(storedLegids)) {
+      throw new Error("No valid leg data found in statement");
+    }
+
+    // Extract legkeys from stored data
+    const legKeysFromStatement = storedLegids.map((leg) => leg.legkey);
+
+    // Get additional leg details from legs_m2 table for display purposes
     const query = `
       SELECT 
         l.legkey,
         l.date,
         l.startingpoint,
         l.destination,
-        l.driverrate,
         m1.description AS m1_description
       FROM 
         legs_m2 l
       LEFT JOIN 
         m1_controller m1 ON l.m1key = m1.m1key
       WHERE l.legkey = ANY($1)
+      ORDER BY l.date, l.legkey
     `;
-    console.log("Executing query with legKeys:", allLegKeys);
-    const values = [allLegKeys];
-    const result = await client.query(query, values);
-    console.log(`Found ${result.rows.length} leg details`);
-    return result.rows;
+
+    console.log("Executing query with legKeys:", legKeysFromStatement);
+    const legDetailsResult = await client.query(query, [legKeysFromStatement]);
+
+    // Merge leg details with stored VAT-inclusive rates
+    const enrichedLegDetails = legDetailsResult.rows.map((leg) => {
+      const storedLeg = storedLegids.find(
+        (stored) => stored.legkey === leg.legkey
+      );
+
+      return {
+        legkey: leg.legkey,
+        date: leg.date,
+        startingpoint: leg.startingpoint,
+        destination: leg.destination,
+        // Use the VAT-inclusive rate from the stored statement
+        driverrate: storedLeg ? storedLeg.driverrate : 0, // This already includes VAT
+        m1_description: leg.m1_description,
+      };
+    });
+
+    console.log(
+      `Found ${enrichedLegDetails.length} leg details with VAT-inclusive rates`
+    );
+    return enrichedLegDetails;
   } catch (error) {
+    console.error("Error in getStatementDetails:", error);
     throw error;
   } finally {
     if (client) client.release();
