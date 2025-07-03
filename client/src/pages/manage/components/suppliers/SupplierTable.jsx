@@ -67,7 +67,6 @@ const SupplierTable = ({
                   <th>Status</th>
                   <th>Representative</th>
                   <th>Contact</th>
-                  <th>Payment Type</th>
                   <th>Actions</th>
                   <th></th>
                 </tr>
@@ -112,7 +111,7 @@ const SupplierTable = ({
                           )}
                         </div>
                       </td>
-                      <td>{supplier.payment_type || "invoice"}</td>
+                      
                       <td>
                         <button
                           className="manage-view-button"

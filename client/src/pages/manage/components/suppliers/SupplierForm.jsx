@@ -9,7 +9,7 @@ const SupplierForm = ({
   onSubmit = () => {},
   onCancel = () => {},
   onChange = () => {},
-  expenseTypes = [],
+  allExpenseTypes = [],
 }) => {
   const [formData, setFormData] = useState({
     supplier: "",
@@ -54,12 +54,12 @@ const SupplierForm = ({
 
   // Add this useEffect to log expense types when they change
   useEffect(() => {
-    console.log("SupplierForm: Received expense types:", expenseTypes)
-    console.log("SupplierForm: Number of expense types:", expenseTypes.length)
-    if (expenseTypes.length > 0) {
-      console.log("SupplierForm: First few expense types:", expenseTypes.slice(0, 5))
+    console.log("SupplierForm: Received expense types:", allExpenseTypes)
+    console.log("SupplierForm: Number of expense types:", allExpenseTypes.length)
+    if (allExpenseTypes.length > 0) {
+      console.log("SupplierForm: First few expense types:", allExpenseTypes.slice(0, 5))
     }
-  }, [expenseTypes])
+  }, [allExpenseTypes])
 
   // Close dropdown when clicking outside
   useEffect(() => {
@@ -108,7 +108,7 @@ const SupplierForm = ({
 
     const selectedNames = formData.expenseTypes
       .map((id) => {
-        const expenseType = expenseTypes.find((et) => et.id === id)
+        const expenseType = allExpenseTypes.find((et) => et.id === id || et.expense_type_id === id)
         return expenseType ? expenseType.expense : null
       })
       .filter(Boolean)
@@ -306,13 +306,12 @@ const SupplierForm = ({
           {/* Payment Type */}
           <div className="manage-form-group">
             <label style={{ fontWeight: "bold" }}>Payment Type</label>
-            <select value={formData.payment_type} onChange={(e) => handleInputChange("payment_type", e.target.value)}>
-              <option value="">Select payment type</option>
+            <select value={formData.payment_type} onChange={(e) => handleInputChange("payment_type", e.target.value)} className="dropdown">
+              <option value="">Select type</option>
               <option value="cash">Cash</option>
               <option value="credit">Credit</option>
-              <option value="bank Transfer">EFT</option>
+              <option value="eft">EFT</option>
               <option value="cheque">Cheque</option>
-              
             </select>
           </div>
 
@@ -324,7 +323,7 @@ const SupplierForm = ({
               <button
                 type="button"
                 onClick={() => setDropdownOpen(!dropdownOpen)}
-                disabled={loading || expenseTypes.length === 0}
+                disabled={loading || allExpenseTypes.length === 0}
                 style={{
                   width: "100%",
                   padding: "12px 16px",
@@ -332,26 +331,26 @@ const SupplierForm = ({
                   borderRadius: "4px",
                   backgroundColor: "white",
                   textAlign: "left",
-                  cursor: expenseTypes.length === 0 ? "not-allowed" : "pointer",
+                  cursor: allExpenseTypes.length === 0 ? "not-allowed" : "pointer",
                   display: "flex",
                   justifyContent: "space-between",
                   alignItems: "center",
                   fontSize: "14px",
-                  color: expenseTypes.length === 0 ? "#999" : "#333",
+                  color: allExpenseTypes.length === 0 ? "#999" : "#333",
                 }}
               >
                 <span>
-                  {expenseTypes.length === 0
+                  {allExpenseTypes.length === 0
                     ? "No expense types available. Please add expense types first."
                     : getSelectedExpenseTypesText()}
                 </span>
                 <span style={{ fontSize: "12px", color: "#666" }}>
-                  {expenseTypes.length > 0 ? (dropdownOpen ? "▲" : "▼") : ""}
+                  {allExpenseTypes.length > 0 ? (dropdownOpen ? "▲" : "▼") : ""}
                 </span>
               </button>
 
               {/* Dropdown Menu */}
-              {dropdownOpen && expenseTypes.length > 0 && (
+              {dropdownOpen && allExpenseTypes.length > 0 && (
                 <div
                   style={{
                     position: "absolute",
@@ -368,44 +367,47 @@ const SupplierForm = ({
                     boxShadow: "0 2px 8px rgba(0,0,0,0.1)",
                   }}
                 >
-                  {expenseTypes.map((expenseType) => (
-                    <label
-                      key={expenseType.id}
-                      style={{
-                        display: "flex",
-                        alignItems: "center",
-                        padding: "10px 16px",
-                        cursor: "pointer",
-                        borderBottom: "1px solid #f0f0f0",
-                        backgroundColor: formData.expenseTypes?.includes(expenseType.id) ? "#f8f9fa" : "white",
-                        transition: "background-color 0.2s",
-                      }}
-                      onMouseEnter={(e) => {
-                        if (!formData.expenseTypes?.includes(expenseType.id)) {
-                          e.target.style.backgroundColor = "#f5f5f5"
-                        }
-                      }}
-                      onMouseLeave={(e) => {
-                        if (!formData.expenseTypes?.includes(expenseType.id)) {
-                          e.target.style.backgroundColor = "white"
-                        }
-                      }}
-                    >
-                      <input
-                        type="checkbox"
-                        checked={formData.expenseTypes?.includes(expenseType.id) || false}
-                        onChange={() => handleExpenseTypeChange(expenseType.id)}
-                        disabled={loading}
+                  {allExpenseTypes.map((expenseType) => {
+                    const expenseTypeId = expenseType.id || expenseType.expense_type_id
+                    return (
+                      <label
+                        key={expenseTypeId}
                         style={{
-                          marginRight: "12px",
-                          width: "16px",
-                          height: "16px",
+                          display: "flex",
+                          alignItems: "center",
+                          padding: "10px 16px",
                           cursor: "pointer",
+                          borderBottom: "1px solid #f0f0f0",
+                          backgroundColor: formData.expenseTypes?.includes(expenseTypeId) ? "#f8f9fa" : "white",
+                          transition: "background-color 0.2s",
                         }}
-                      />
-                      <span style={{ fontSize: "14px", color: "#333" }}>{expenseType.expense}</span>
-                    </label>
-                  ))}
+                        onMouseEnter={(e) => {
+                          if (!formData.expenseTypes?.includes(expenseTypeId)) {
+                            e.target.style.backgroundColor = "#f5f5f5"
+                          }
+                        }}
+                        onMouseLeave={(e) => {
+                          if (!formData.expenseTypes?.includes(expenseTypeId)) {
+                            e.target.style.backgroundColor = "white"
+                          }
+                        }}
+                      >
+                        <input
+                          type="checkbox"
+                          checked={formData.expenseTypes?.includes(expenseTypeId) || false}
+                          onChange={() => handleExpenseTypeChange(expenseTypeId)}
+                          disabled={loading}
+                          style={{
+                            marginRight: "12px",
+                            width: "16px",
+                            height: "16px",
+                            cursor: "pointer",
+                          }}
+                        />
+                        <span style={{ fontSize: "14px", color: "#333" }}>{expenseType.expense}</span>
+                      </label>
+                    )
+                  })}
                 </div>
               )}
             </div>
@@ -416,11 +418,12 @@ const SupplierForm = ({
                 <small style={{ color: "#666", fontWeight: "bold" }}>Selected ({formData.expenseTypes.length}):</small>
                 <div style={{ marginTop: "5px", display: "flex", flexWrap: "wrap", gap: "5px" }}>
                   {formData.expenseTypes.map((id) => {
-                    const expenseType = expenseTypes.find((et) => et.id === id)
+                    const expenseType = allExpenseTypes.find((et) => et.id === id || et.expense_type_id === id)
                     if (!expenseType) return null
+                    const expenseTypeId = expenseType.id || expenseType.expense_type_id
                     return (
                       <span
-                        key={id}
+                        key={expenseTypeId}
                         style={{
                           display: "inline-flex",
                           alignItems: "center",
@@ -435,7 +438,7 @@ const SupplierForm = ({
                         {expenseType.expense}
                         <button
                           type="button"
-                          onClick={() => handleExpenseTypeChange(id)}
+                          onClick={() => handleExpenseTypeChange(expenseTypeId)}
                           style={{
                             marginLeft: "6px",
                             background: "none",

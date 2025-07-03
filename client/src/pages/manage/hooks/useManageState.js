@@ -19,6 +19,7 @@ const initialState = {
   clientRates: [],
   suppliers: [],
   expenseTypes: [],
+  allExpenseTypes: [], // For dropdowns - contains ALL expense types
 
   // Pagination State
   pagination: {

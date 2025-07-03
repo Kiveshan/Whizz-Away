@@ -138,7 +138,7 @@ const CreditorsTab = ({ state, actions, api }) => {
               onSubmit={handleSupplierSave}
               onCancel={handleSupplierCancel}
               onChange={handleSupplierFormChange}
-              expenseTypes={state.expenseTypes}
+              allExpenseTypes={state.allExpenseTypes || []}
             />
           ) : (
             <SupplierTable

@@ -3,6 +3,7 @@ import {
   getExpenseTypeById,
   createExpenseType,
   updateExpenseType,
+  getSimpleExpenseTypes,
   deleteExpenseType,
 } from "../../models/manage/expenseTypeModel.js"
 
@@ -203,6 +204,24 @@ export const deleteExpenseTypeHandler = async (req, res) => {
     res.status(500).json({
       success: false,
       error: "Failed to delete expense type",
+      details: error.message,
+    })
+  }
+}
+
+// Get simple expense types for dropdown
+export const getSimpleExpenseTypesHandler = async (req, res) => {
+  try {
+    console.log("Getting simple expense types for dropdown")
+
+    const expenseTypes = await getSimpleExpenseTypes.getSimpleExpenseTypes()
+
+    console.log(`Returning ${expenseTypes.length} simple expense types`)
+    res.json(expenseTypes)
+  } catch (error) {
+    console.error("Error in getSimpleExpenseTypesHandler:", error)
+    res.status(500).json({
+      error: "Failed to fetch expense types",
       details: error.message,
     })
   }

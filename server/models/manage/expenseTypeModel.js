@@ -108,3 +108,22 @@ export const deleteExpenseType = async (id) => {
     throw error
   }
 }
+
+export const getSimpleExpenseTypes = async () => {
+  try {
+    console.log("Getting simple expense types for dropdown")
+
+    const expenseTypesQuery = `
+      SELECT expense_type_id as id, expense
+      FROM expense_types
+      ORDER BY expense ASC
+    `
+    const result = await query(expenseTypesQuery)
+
+    console.log(`Found ${result.rows.length} expense types for dropdown`)
+    return result.rows
+  } catch (error) {
+    console.error("Error getting simple expense types:", error)
+    throw error
+  }
+}

@@ -1,4 +1,3 @@
-
 "use client"
 
 import { useCallback } from "react"
@@ -91,6 +90,34 @@ export function useApi(state, actions) {
     [actions],
   )
 
+  // Add a separate function to fetch ALL expense types for dropdowns
+  const fetchAllExpenseTypes = useCallback(async () => {
+    try {
+      console.log("Fetching ALL expense types for dropdown...")
+      const response = await api.get("/api/expense-types/simple")
+      console.log("Fetched all expense types:", response.data)
+
+      // Update the expense types in state - use allExpenseTypes key
+      actions.setData("allExpenseTypes", response.data || [])
+      return response.data || []
+    } catch (error) {
+      console.error("Error fetching all expense types:", error)
+      // Try fallback to regular endpoint
+      try {
+        console.log("Trying fallback endpoint...")
+        const fallbackResponse = await api.get("/api/expense-types?limit=1000")
+        const fallbackData = fallbackResponse.data.expenseTypes || fallbackResponse.data || []
+        console.log("Fallback expense types:", fallbackData)
+        actions.setData("allExpenseTypes", fallbackData)
+        return fallbackData
+      } catch (fallbackError) {
+        console.error("Fallback also failed:", fallbackError)
+        actions.setData("allExpenseTypes", [])
+        return []
+      }
+    }
+  }, [actions])
+
   const fetchAllData = useCallback(async () => {
     const { pagination, filters } = state
 
@@ -113,7 +140,7 @@ export function useApi(state, actions) {
         "driverRates",
         pagination.driverRates.currentPage,
         pagination.driverRates.itemsPerPage,
-  filters.driverRates,
+        filters.driverRates,
       ),
       fetchPaginatedData(
         "subcontractors",
@@ -139,8 +166,10 @@ export function useApi(state, actions) {
         pagination.expenseTypes.itemsPerPage,
         filters.expenseTypes,
       ),
+      // Also fetch all expense types for dropdowns
+      fetchAllExpenseTypes(),
     ])
-  }, [state, fetchPaginatedData])
+  }, [state, fetchPaginatedData, fetchAllExpenseTypes])
 
   const changePage = useCallback(
     async (type, page) => {
@@ -158,9 +187,7 @@ export function useApi(state, actions) {
     async (type, itemsPerPage) => {
       const { filters } = state
       actions.resetPagination(type)
-      await
-
- fetchPaginatedData(type, 1, itemsPerPage, filters[type])
+      await fetchPaginatedData(type, 1, itemsPerPage, filters[type])
     },
     [state, actions, fetchPaginatedData],
   )
@@ -710,6 +737,9 @@ export function useApi(state, actions) {
           state.filters.expenseTypes,
         )
 
+        // Also refresh all expense types for dropdowns
+        await fetchAllExpenseTypes()
+
         actions.resetFormData("ExpenseType")
         actions.setEditing("ExpenseType", null)
         actions.hideForm("showExpenseTypeForm")
@@ -724,7 +754,7 @@ export function useApi(state, actions) {
         actions.setLoading(false)
       }
     },
-    [state, actions, fetchPaginatedData],
+    [state, actions, fetchPaginatedData, fetchAllExpenseTypes],
   )
 
   const toggleEmployeeStatus = useCallback(
@@ -760,7 +790,7 @@ export function useApi(state, actions) {
       actions.setLoading(true)
       try {
         const newStatus = !currentStatus
-        await api.put(`/api/m5Clients/${id}/toggle-status`, { status: newStatus })
+        await api.put(`/api/clients/${id}/toggle-status`, { status: newStatus })
 
         // Refresh current page
         await fetchPaginatedData(
@@ -890,6 +920,11 @@ const toggleSupplierStatus = useCallback(
           state.filters[dataType],
         )
 
+        // If deleting expense type, also refresh all expense types for dropdowns
+        if (type === "expenseType") {
+          await fetchAllExpenseTypes()
+        }
+
         actions.showAlert(`${type.charAt(0).toUpperCase() + type.slice(1)} deleted!`)
       } catch (err) {
         console.error(`Error deleting ${type} ${id}:`, err)
@@ -898,9 +933,10 @@ const toggleSupplierStatus = useCallback(
         actions.setLoading(false)
       }
     },
-    [state, actions, fetchPaginatedData],
+    [state, actions, fetchPaginatedData, fetchAllExpenseTypes],
   )
 
+  // NEW: Delete individual subcontractor driver
   const deleteSubcontractorDriver = useCallback(
     async (driverId) => {
       if (!window.confirm("Are you sure you want to delete this driver?")) {
@@ -932,6 +968,7 @@ const toggleSupplierStatus = useCallback(
     [state, actions, fetchPaginatedData],
   )
 
+  // NEW: Delete individual subcontractor truck
   const deleteSubcontractorTruck = useCallback(
     async (truckId) => {
       if (!window.confirm("Are you sure you want to delete this truck?")) {
@@ -1202,6 +1239,7 @@ const toggleSupplierStatus = useCallback(
   return {
     fetchAllData,
     fetchPaginatedData,
+    fetchAllExpenseTypes,
     changePage,
     changeItemsPerPage,
     applyFilters,

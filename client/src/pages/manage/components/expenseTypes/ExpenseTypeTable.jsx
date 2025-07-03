@@ -62,18 +62,6 @@ const ExpenseTypeTable = ({
         </button>
       </div>
 
-      {/* Search Filter at the top */}
-      <div className="table-filters">
-        <SearchFilter
-          searchValue={filters.search}
-          onSearchChange={onSearchChange}
-          onApplyFilters={onApplyFilters}
-          placeholder="Search expense types by name..."
-          loading={loading}
-          hideStatusFilter={true}
-        />
-      </div>
-
       {/* Table Content */}
       <div>
         {loading ? (
