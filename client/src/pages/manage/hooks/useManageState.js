@@ -17,6 +17,8 @@ const initialState = {
   driverRates: [],
   subcontractors: [],
   clientRates: [],
+  suppliers: [],
+  expenseTypes: [],
 
   // Pagination State
   pagination: {
@@ -62,6 +64,18 @@ const initialState = {
       totalItems: 0,
       itemsPerPage: 5,
     },
+    suppliers: {
+      currentPage: 1,
+      totalPages: 1,
+      totalItems: 0,
+      itemsPerPage: 5,
+    },
+    expenseTypes: {
+      currentPage: 1,
+      totalPages: 1,
+      totalItems: 0,
+      itemsPerPage: 5,
+    },
   },
 
   // Search/Filter State
@@ -90,6 +104,13 @@ const initialState = {
     clientRates: {
       search: "",
     },
+    suppliers: {
+      search: "",
+      status: "all",
+    },
+    expenseTypes: {
+      search: "",
+    },
   },
 
   // Form States
@@ -100,6 +121,8 @@ const initialState = {
   showDriverRateForm: false,
   showSubcontractorForm: false,
   showClientRateForm: false,
+  showSupplierForm: false,
+  showExpenseTypeForm: false,
 
   // Edit States
   editingEmployeeId: null,
@@ -112,6 +135,8 @@ const initialState = {
   isEditingRate: false,
   isEditMode: false,
   editingClientRateId: null,
+  editingSupplierId: null,
+  editingExpenseTypeId: null,
 
   // Form Data
   newEmployee: {
@@ -218,6 +243,25 @@ const initialState = {
     ],
   },
 
+  newSupplier: {
+    supplier: "",
+    representative: "",
+    address: "",
+    suburb: "",
+    postalcode: "",
+    email: "",
+    cellnum: "",
+    vatregno: "",
+    city: "",
+    streetaddress: "",
+    payment_type: "",
+    expenseTypes: [],
+  },
+
+  newExpenseType: {
+    expense: "",
+  },
+
   // Alert
   showAlert: false,
   alertMessage: "",
@@ -288,6 +332,8 @@ function manageReducer(state, action) {
         ...(action.payload === "showDriverRateForm" && { editingRateId: null, isEditingRate: false }),
         ...(action.payload === "showSubcontractorForm" && { subcontractorId: null, isEditMode: false }),
         ...(action.payload === "showClientRateForm" && { editingClientRateId: null }),
+        ...(action.payload === "showSupplierForm" && { editingSupplierId: null }),
+        ...(action.payload === "showExpenseTypeForm" && { editingExpenseTypeId: null }),
       }
 
     case "SET_EDITING":
@@ -303,6 +349,8 @@ function manageReducer(state, action) {
         ...(action.payload.type === "Truck" && { editTruckId: action.payload.id }),
         ...(action.payload.type === "Trailer" && { editTrailerId: action.payload.id }),
         ...(action.payload.type === "ClientRate" && { editingClientRateId: action.payload.id }),
+        ...(action.payload.type === "Supplier" && { editingSupplierId: action.payload.id }),
+        ...(action.payload.type === "ExpenseType" && { editingExpenseTypeId: action.payload.id }),
       }
 
     case "UPDATE_FORM_DATA":

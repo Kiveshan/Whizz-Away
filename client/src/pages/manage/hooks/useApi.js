@@ -1,3 +1,4 @@
+
 "use client"
 
 import { useCallback } from "react"
@@ -18,6 +19,8 @@ export function useApi(state, actions) {
           driverRates: "/api/driver-rates",
           subcontractors: "/api/subcontractors",
           clientRates: "/api/client-rates",
+          suppliers: "/api/suppliers",
+          expenseTypes: "/api/expense-types",
         }
 
         const endpoint = endpoints[type]
@@ -32,15 +35,40 @@ export function useApi(state, actions) {
           ...filters,
         })
 
+        // For suppliers, don't add status filter to get ALL suppliers
+        if (type === "suppliers") {
+          params.delete("status")
+        }
+
         const response = await api.get(`${endpoint}?${params}`)
 
+        // Handle different response structures
+        let responseData = response.data
+        if (type === "suppliers") {
+          if (responseData.suppliers) {
+            responseData.items = Array.isArray(responseData.suppliers) ? responseData.suppliers : []
+          } else if (Array.isArray(responseData)) {
+            responseData = { items: responseData, totalItems: responseData.length }
+          } else if (!responseData.items) {
+            responseData.items = []
+          }
+        } else if (type === "expenseTypes") {
+          if (responseData.expenseTypes) {
+            responseData.items = Array.isArray(responseData.expenseTypes) ? responseData.expenseTypes : []
+          } else if (Array.isArray(responseData)) {
+            responseData = { items: responseData, totalItems: responseData.length }
+          } else if (!responseData.items) {
+            responseData.items = []
+          }
+        }
+
         // Update data and pagination
-        actions.setData(type, response.data.items || response.data)
+        actions.setData(type, responseData.items || responseData || [])
         actions.setPagination(type, {
-          currentPage: response.data.currentPage || page,
-          totalPages: response.data.totalPages || 1,
-          totalItems: response.data.totalItems || response.data.items?.length || response.data.length,
-          itemsPerPage: response.data.itemsPerPage || itemsPerPage,
+          currentPage: responseData.currentPage || page,
+          totalPages: responseData.totalPages || 1,
+          totalItems: responseData.totalItems || responseData.items?.length || responseData.length || 0,
+          itemsPerPage: responseData.itemsPerPage || itemsPerPage,
         })
       } catch (err) {
         console.error(`Error fetching ${type}:`, err)
@@ -55,6 +83,7 @@ export function useApi(state, actions) {
         }
 
         actions.setError(errorMessage)
+        actions.setData(type, [])
       } finally {
         actions.setLoading(false)
       }
@@ -84,7 +113,7 @@ export function useApi(state, actions) {
         "driverRates",
         pagination.driverRates.currentPage,
         pagination.driverRates.itemsPerPage,
-        filters.driverRates,
+  filters.driverRates,
       ),
       fetchPaginatedData(
         "subcontractors",
@@ -97,6 +126,18 @@ export function useApi(state, actions) {
         pagination.clientRates.currentPage,
         pagination.clientRates.itemsPerPage,
         filters.clientRates,
+      ),
+      fetchPaginatedData(
+        "suppliers",
+        pagination.suppliers.currentPage,
+        pagination.suppliers.itemsPerPage,
+        filters.suppliers,
+      ),
+      fetchPaginatedData(
+        "expenseTypes",
+        pagination.expenseTypes.currentPage,
+        pagination.expenseTypes.itemsPerPage,
+        filters.expenseTypes,
       ),
     ])
   }, [state, fetchPaginatedData])
@@ -117,7 +158,9 @@ export function useApi(state, actions) {
     async (type, itemsPerPage) => {
       const { filters } = state
       actions.resetPagination(type)
-      await fetchPaginatedData(type, 1, itemsPerPage, filters[type])
+      await
+
+ fetchPaginatedData(type, 1, itemsPerPage, filters[type])
     },
     [state, actions, fetchPaginatedData],
   )
@@ -578,6 +621,112 @@ export function useApi(state, actions) {
     [state, actions, fetchPaginatedData],
   )
 
+  const saveSupplier = useCallback(
+    async (supplierData) => {
+      actions.setLoading(true)
+      console.log("saveSupplier called with data:", supplierData)
+      console.log("Is editing:", !!state.editingSupplierId)
+
+      try {
+        // Prepare supplier data with proper field mapping
+        const preparedSupplierData = {
+          supplier: supplierData.supplier || "",
+          representative: supplierData.representative || "",
+          address: supplierData.address || "",
+          suburb: supplierData.suburb || "",
+          postalcode: supplierData.postalcode || "",
+          email: supplierData.email || "",
+          cellnum: supplierData.cellnum || "",
+          vatregno: supplierData.vatregno || "",
+          city: supplierData.city || "",
+          streetaddress: supplierData.streetaddress || "",
+          payment_type: supplierData.payment_type || "",
+          expenseTypes: supplierData.expenseTypes || [],
+        }
+
+        console.log("Prepared supplier data:", preparedSupplierData)
+
+        const url = state.editingSupplierId ? `/api/suppliers/${state.editingSupplierId}` : "/api/suppliers"
+        const method = state.editingSupplierId ? "put" : "post"
+
+        console.log(`Making ${method.toUpperCase()} request to: ${url}`)
+
+        const response = await api[method](url, preparedSupplierData)
+        console.log("API response:", response.data)
+
+        // Refresh current page
+        await fetchPaginatedData(
+          "suppliers",
+          state.pagination.suppliers.currentPage,
+          state.pagination.suppliers.itemsPerPage,
+          state.filters.suppliers,
+        )
+
+        actions.resetFormData("Supplier")
+        actions.setEditing("Supplier", null)
+        actions.hideForm("showSupplierForm")
+        actions.showAlert(state.editingSupplierId ? "Supplier updated!" : "Supplier added!")
+        return true
+      } catch (err) {
+        console.error("Error saving supplier:", err)
+        console.error("Error response:", err.response?.data)
+        actions.showAlert(`Error saving supplier: ${err.response?.data?.error || err.message}`)
+        return false
+      } finally {
+        actions.setLoading(false)
+      }
+    },
+    [state, actions, fetchPaginatedData],
+  )
+
+  const saveExpenseType = useCallback(
+    async (expenseTypeData) => {
+      actions.setLoading(true)
+      console.log("saveExpenseType called with data:", expenseTypeData)
+      console.log("Is editing:", !!state.editingExpenseTypeId)
+
+      try {
+        const preparedExpenseTypeData = {
+          expense: expenseTypeData.expense || "",
+        }
+
+        console.log("Prepared expense type data:", preparedExpenseTypeData)
+
+        const url = state.editingExpenseTypeId
+          ? `/api/expense-types/${state.editingExpenseTypeId}`
+          : "/api/expense-types"
+        const method = state.editingExpenseTypeId ? "put" : "post"
+
+        console.log(`Making ${method.toUpperCase()} request to: ${url}`)
+
+        const response = await api[method](url, preparedExpenseTypeData)
+        console.log("API response:", response.data)
+
+        // Refresh current page
+        await fetchPaginatedData(
+          "expenseTypes",
+          state.pagination.expenseTypes.currentPage,
+          state.pagination.expenseTypes.itemsPerPage,
+          state.filters.expenseTypes,
+        )
+
+        actions.resetFormData("ExpenseType")
+        actions.setEditing("ExpenseType", null)
+        actions.hideForm("showExpenseTypeForm")
+        actions.showAlert(state.editingExpenseTypeId ? "Expense type updated!" : "Expense type added!")
+        return true
+      } catch (err) {
+        console.error("Error saving expense type:", err)
+        console.error("Error response:", err.response?.data)
+        actions.showAlert(`Error saving expense type: ${err.response?.data?.error || err.message}`)
+        return false
+      } finally {
+        actions.setLoading(false)
+      }
+    },
+    [state, actions, fetchPaginatedData],
+  )
+
   const toggleEmployeeStatus = useCallback(
     async (id, currentStatus) => {
       actions.setLoading(true)
@@ -611,7 +760,7 @@ export function useApi(state, actions) {
       actions.setLoading(true)
       try {
         const newStatus = !currentStatus
-        await api.put(`/api/clients/${id}/toggle-status`, { status: newStatus })
+        await api.put(`/api/m5Clients/${id}/toggle-status`, { status: newStatus })
 
         // Refresh current page
         await fetchPaginatedData(
@@ -662,6 +811,45 @@ export function useApi(state, actions) {
     [state, actions, fetchPaginatedData],
   )
 
+const toggleSupplierStatus = useCallback(
+  async (id) => {
+    actions.setLoading(true);
+    try {
+      // Validate ID
+      const supplierId = Number.parseInt(id);
+      if (isNaN(supplierId) || supplierId <= 0) {
+        throw new Error("Invalid supplier ID");
+      }
+
+      console.log(`Sending PUT request to toggle supplier ${supplierId}`);
+      await api.put(`/api/suppliers/${supplierId}/toggle-status`);
+
+      // Refresh current page
+      await fetchPaginatedData(
+        "suppliers",
+        state.pagination.suppliers.currentPage,
+        state.pagination.suppliers.itemsPerPage,
+        state.filters.suppliers,
+      );
+
+      actions.showAlert(`Supplier status toggled successfully!`);
+    } catch (err) {
+      console.error(`Error toggling supplier ${id}:`, {
+        message: err.message,
+        response: err.response?.data,
+        status: err.response?.status,
+        code: err.code,
+      });
+      actions.showAlert(
+        `Error toggling supplier status: ${err.response?.data?.error || err.message}`,
+      );
+    } finally {
+      actions.setLoading(false);
+    }
+  },
+  [state, actions, fetchPaginatedData],
+);
+
   const deleteItem = useCallback(
     async (type, id) => {
       actions.setLoading(true)
@@ -681,6 +869,12 @@ export function useApi(state, actions) {
           case "rate":
             endpoint = `/api/driver-rates/${id}`
             break
+          case "supplier":
+            endpoint = `/api/suppliers/${id}`
+            break
+          case "expenseType":
+            endpoint = `/api/expense-types/${id}`
+            break
           default:
             throw new Error("Invalid type")
         }
@@ -688,7 +882,7 @@ export function useApi(state, actions) {
         await api.delete(endpoint)
 
         // Refresh current page
-        const dataType = type === "rate" ? "driverRates" : `${type}s`
+        const dataType = type === "rate" ? "driverRates" : type === "expenseType" ? "expenseTypes" : `${type}s`
         await fetchPaginatedData(
           dataType,
           state.pagination[dataType].currentPage,
@@ -707,7 +901,6 @@ export function useApi(state, actions) {
     [state, actions, fetchPaginatedData],
   )
 
-  // NEW: Delete individual subcontractor driver
   const deleteSubcontractorDriver = useCallback(
     async (driverId) => {
       if (!window.confirm("Are you sure you want to delete this driver?")) {
@@ -739,7 +932,6 @@ export function useApi(state, actions) {
     [state, actions, fetchPaginatedData],
   )
 
-  // NEW: Delete individual subcontractor truck
   const deleteSubcontractorTruck = useCallback(
     async (truckId) => {
       if (!window.confirm("Are you sure you want to delete this truck?")) {
@@ -808,38 +1000,56 @@ export function useApi(state, actions) {
         let endpoint
         let formType
 
+        // Validate ID before making the request
+        const numericId = Number.parseInt(id)
+        if (isNaN(numericId) || numericId <= 0) {
+          console.error(`Invalid ID for ${type}:`, id)
+          actions.showAlert(`Invalid ${type} ID provided.`)
+          return
+        }
+
         switch (type) {
           case "employee":
-            endpoint = `/api/employees/${id}/details`
+            endpoint = `/api/employees/${numericId}/details`
             formType = "Employee"
             break
           case "client":
-            endpoint = `/api/m5Clients/${id}`
+            endpoint = `/api/m5Clients/${numericId}`
             formType = "Client"
             break
           case "truck":
-            endpoint = `/api/trucks/${id}`
+            endpoint = `/api/trucks/${numericId}`
             formType = "Truck"
             break
           case "trailer":
-            endpoint = `/api/trailers/${id}`
+            endpoint = `/api/trailers/${numericId}`
             formType = "Trailer"
             break
           case "rate":
-            endpoint = `/api/driver-rates/${id}`
+            endpoint = `/api/driver-rates/${numericId}`
             formType = "DriverRate"
             break
           case "subcontractor":
-            endpoint = `/api/subcontractors/${id}`
+            endpoint = `/api/subcontractors/${numericId}`
             formType = "Subcontractor"
             break
           case "clientRate":
-            endpoint = `/api/client-rates/client/${id}`
+            endpoint = `/api/client-rates/client/${numericId}`
             formType = "ClientRate"
+            break
+          case "supplier":
+            endpoint = `/api/suppliers/${numericId}`
+            formType = "Supplier"
+            break
+          case "expenseType":
+            endpoint = `/api/expense-types/${numericId}`
+            formType = "ExpenseType"
             break
           default:
             throw new Error("Invalid type")
         }
+
+        console.log(`Loading ${type} for edit with ID:`, numericId, "Endpoint:", endpoint)
 
         const response = await api.get(endpoint)
         const data = response.data
@@ -911,7 +1121,7 @@ export function useApi(state, actions) {
           // Handle client rates - data should include client info and rates
           actions.updateFormData(formType, {
             ...data,
-            clientId: id,
+            clientId: numericId,
             rates: data.rates || [
               {
                 starting_point: "",
@@ -922,15 +1132,24 @@ export function useApi(state, actions) {
               },
             ],
           })
+        } else if (type === "supplier") {
+          // Handle supplier data - ensure we have the supplier data
+          const supplierData = data.supplier || data
+          console.log("Supplier data for edit:", supplierData)
+
+          actions.updateFormData(formType, {
+            ...supplierData,
+            expenseTypes: supplierData.expenseTypes || [],
+          })
         } else {
           actions.updateFormData(formType, data)
         }
 
-        actions.setEditing(type.charAt(0).toUpperCase() + type.slice(1), id)
+        actions.setEditing(type.charAt(0).toUpperCase() + type.slice(1), numericId)
         actions.showForm(`show${formType}Form`)
       } catch (error) {
         console.error(`Error loading ${type} for edit:`, error)
-        actions.showAlert(`Could not load ${type} details.`)
+        actions.showAlert(`Could not load ${type} details: ${error.response?.data?.error || error.message}`)
       }
     },
     [actions],
@@ -993,12 +1212,15 @@ export function useApi(state, actions) {
     saveDriverRate,
     saveSubcontractor,
     saveClientRates,
+    saveSupplier,
+    saveExpenseType,
     toggleEmployeeStatus,
     toggleClientStatus,
     toggleSubcontractorStatus,
+    toggleSupplierStatus,
     deleteItem,
-    deleteSubcontractorDriver, // NEW
-    deleteSubcontractorTruck, // NEW
+    deleteSubcontractorDriver,
+    deleteSubcontractorTruck,
     deleteClientRate,
     loadItemForEdit,
     deleteDocument,
