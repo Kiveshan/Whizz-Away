@@ -570,32 +570,24 @@ export const updateFCInstructionAndContainersHandler = async (req, res) => {
     const { id } = req.params;
     const { instructionData, containers } = req.body;
     
-    // Validate input data
-    if (!id) {
-      return res.status(400).json({ success: false, error: "Missing instruction ID" });
-    }
+    console.log(`[${new Date().toISOString()}] [FC] updateFCInstructionAndContainersHandler: Updating instruction ${id} and containers`);
+    console.log('Instruction data:', instructionData);
+    console.log('Container data:', containers);
     
-    if (!instructionData) {
-      return res.status(400).json({ success: false, error: "Missing instruction data" });
-    }
-    
-    if (!containers || !Array.isArray(containers)) {
-      return res.status(400).json({ success: false, error: "Containers must be an array" });
-    }
-    
-    console.log(`[${new Date().toISOString()}] [CONTROLLER] updateFCInstructionAndContainersHandler: Processing request for instruction ${id} with ${containers.length} containers`);
-    
+    // Call the model function to update both in a single transaction
     const result = await updateFCInstructionAndContainers(id, instructionData, containers);
-    res.status(200).json({ success: true, message: "Instruction and containers updated successfully", data: result });
+    
+    res.status(200).json({
+      success: true,
+      message: "Instruction and containers updated successfully",
+      data: result
+    });
   } catch (error) {
-    console.error(`[${new Date().toISOString()}] [CONTROLLER] Error in updateFCInstructionAndContainersHandler:`, error);
+    console.error(`[${new Date().toISOString()}] [FC] Error in updateFCInstructionAndContainersHandler:`, error);
     res.status(500).json({ 
       success: false, 
-      error: "Failed to update instruction and containers", 
-      message: error.message,
-      details: error.stack
+      error: "Failed to update instruction and containers",
+      message: error.message || "An unexpected error occurred"
     });
   }
-};
-
-// ... (rest of the code remains the same)
+}
