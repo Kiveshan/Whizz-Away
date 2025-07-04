@@ -34,13 +34,13 @@ const ClientForm = ({ client, loading, isEditing, onSave, onCancel, onChange }) 
       <div className="client-form-grid">
         <div className="client-form-group">
           <label>
-            <strong>Company Name</strong>
+            <strong>Client Name</strong>
           </label>
           <input
             type="text"
             value={client.client || ""}
             onChange={(e) => onChange("client", e.target.value)}
-            required
+            
           />
         </div>
 
@@ -52,7 +52,7 @@ const ClientForm = ({ client, loading, isEditing, onSave, onCancel, onChange }) 
             type="text"
             value={client.representative || ""}
             onChange={(e) => onChange("representative", e.target.value)}
-            required
+            
           />
         </div>
 
@@ -64,7 +64,7 @@ const ClientForm = ({ client, loading, isEditing, onSave, onCancel, onChange }) 
             type="text"
             value={client.cellnum || ""}
             onChange={(e) => onChange("cellnum", e.target.value)}
-            required
+            
           />
         </div>
 
@@ -80,7 +80,7 @@ const ClientForm = ({ client, loading, isEditing, onSave, onCancel, onChange }) 
               emailRef.current?.setCustomValidity("")
               onChange("email", e.target.value)
             }}
-            required
+            
           />
         </div>
 
@@ -92,7 +92,7 @@ const ClientForm = ({ client, loading, isEditing, onSave, onCancel, onChange }) 
             type="text"
             value={client.streetaddress || ""}
             onChange={(e) => onChange("streetaddress", e.target.value)}
-            required
+            
           />
         </div>
 
@@ -100,7 +100,7 @@ const ClientForm = ({ client, loading, isEditing, onSave, onCancel, onChange }) 
           <label>
             <strong>City</strong>
           </label>
-          <input type="text" value={client.city || ""} onChange={(e) => onChange("city", e.target.value)} required />
+          <input type="text" value={client.city || ""} onChange={(e) => onChange("city", e.target.value)}  />
         </div>
 
         <div className="client-form-group">
@@ -111,7 +111,7 @@ const ClientForm = ({ client, loading, isEditing, onSave, onCancel, onChange }) 
             type="text"
             value={client.suburb || ""}
             onChange={(e) => onChange("suburb", e.target.value)}
-            required
+            
           />
         </div>
 
@@ -123,7 +123,7 @@ const ClientForm = ({ client, loading, isEditing, onSave, onCancel, onChange }) 
             type="text"
             value={client.postalcode || ""}
             onChange={(e) => onChange("postalcode", e.target.value)}
-            required
+            
           />
         </div>
 
@@ -135,7 +135,7 @@ const ClientForm = ({ client, loading, isEditing, onSave, onCancel, onChange }) 
             type="text"
             value={client.companyaddress || ""}
             onChange={(e) => onChange("companyaddress", e.target.value)}
-            required
+            
           />
         </div>
 
@@ -147,7 +147,7 @@ const ClientForm = ({ client, loading, isEditing, onSave, onCancel, onChange }) 
             type="text"
             value={client.client_reg_num || ""}
             onChange={(e) => onChange("client_reg_num", e.target.value)}
-            required
+            
           />
         </div>
 
@@ -159,7 +159,7 @@ const ClientForm = ({ client, loading, isEditing, onSave, onCancel, onChange }) 
             type="text"
             value={client.vatregno || ""}
             onChange={(e) => onChange("vatregno", e.target.value)}
-            required
+            
           />
         </div>
 
@@ -167,7 +167,7 @@ const ClientForm = ({ client, loading, isEditing, onSave, onCancel, onChange }) 
           <label>
             <strong>Payment Type</strong>
           </label>
-          <select className="client-dropdown" value={client.payment_type || ""} onChange={(e) => onChange("payment_type", e.target.value)} required>
+          <select className="client-dropdown" value={client.payment_type || ""} onChange={(e) => onChange("payment_type", e.target.value)} >
             <option value="">Select Payment Type</option>
             <option value="Cash">Cash</option>
             <option value="Credit">Credit</option>

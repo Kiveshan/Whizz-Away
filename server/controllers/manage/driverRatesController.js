@@ -61,25 +61,21 @@ const createDriverRateHandler = async (req, res) => {
       subie_twelve_meter_rate,
     } = req.body
 
-    // Validate required fields
+    // Validate required fields (only starting point and destination)
     if (!startingpoint || !destination) {
       return res.status(400).json({ error: "Starting point and destination are required" })
     }
 
-    // Validate required driver rates
+    // Validate all rates (only if provided - all are now optional)
     if (
-      driver_six_meter_rate == null ||
-      driver_six_meter_rate === "" ||
-      isNaN(Number.parseFloat(driver_six_meter_rate)) ||
-      driver_twelve_meter_rate == null ||
-      driver_twelve_meter_rate === "" ||
-      isNaN(Number.parseFloat(driver_twelve_meter_rate))
-    ) {
-      return res.status(400).json({ error: "Driver 6m and 12m rates are required and must be valid numbers" })
-    }
-
-    // Validate optional subie rates (if provided, must be valid numbers)
-    if (
+      (driver_six_meter_rate !== null &&
+        driver_six_meter_rate !== "" &&
+        driver_six_meter_rate !== undefined &&
+        isNaN(Number.parseFloat(driver_six_meter_rate))) ||
+      (driver_twelve_meter_rate !== null &&
+        driver_twelve_meter_rate !== "" &&
+        driver_twelve_meter_rate !== undefined &&
+        isNaN(Number.parseFloat(driver_twelve_meter_rate))) ||
       (subie_six_meter_rate !== null &&
         subie_six_meter_rate !== "" &&
         subie_six_meter_rate !== undefined &&
@@ -89,7 +85,7 @@ const createDriverRateHandler = async (req, res) => {
         subie_twelve_meter_rate !== undefined &&
         isNaN(Number.parseFloat(subie_twelve_meter_rate)))
     ) {
-      return res.status(400).json({ error: "Subie rates must be valid numbers if provided" })
+      return res.status(400).json({ error: "All rates must be valid numbers if provided" })
     }
 
     console.log("Creating driver rate with data:", req.body)
@@ -125,18 +121,16 @@ const updateDriverRateHandler = async (req, res) => {
       return res.status(400).json({ error: "Invalid ID format" })
     }
 
-    // Validate driver rates if provided (they are required if being updated)
+    // Validate all rates (only if provided - all are now optional)
     if (
       (driver_six_meter_rate !== undefined &&
-        (driver_six_meter_rate === "" || isNaN(Number.parseFloat(driver_six_meter_rate)))) ||
+        driver_six_meter_rate !== null &&
+        driver_six_meter_rate !== "" &&
+        isNaN(Number.parseFloat(driver_six_meter_rate))) ||
       (driver_twelve_meter_rate !== undefined &&
-        (driver_twelve_meter_rate === "" || isNaN(Number.parseFloat(driver_twelve_meter_rate))))
-    ) {
-      return res.status(400).json({ error: "Driver rates must be valid numbers" })
-    }
-
-    // Validate optional subie rates (if provided, must be valid numbers or null/empty)
-    if (
+        driver_twelve_meter_rate !== null &&
+        driver_twelve_meter_rate !== "" &&
+        isNaN(Number.parseFloat(driver_twelve_meter_rate))) ||
       (subie_six_meter_rate !== undefined &&
         subie_six_meter_rate !== null &&
         subie_six_meter_rate !== "" &&
@@ -146,7 +140,7 @@ const updateDriverRateHandler = async (req, res) => {
         subie_twelve_meter_rate !== "" &&
         isNaN(Number.parseFloat(subie_twelve_meter_rate)))
     ) {
-      return res.status(400).json({ error: "Subie rates must be valid numbers if provided" })
+      return res.status(400).json({ error: "All rates must be valid numbers if provided" })
     }
 
     console.log(`Updating driver rate ID ${id}`)
