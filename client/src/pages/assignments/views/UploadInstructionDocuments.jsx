@@ -497,7 +497,7 @@ if (isShipmentType3()) {
     return;
   }
 
-  if (deliveryNotes.length !== containerCount) {
+  if (deliveryNotes.length !== containersReachedCount) {
     setSubmitMessage(
       `Error: Exactly ${containerCount} Delivery Notes are required (one per container)`
     );
@@ -562,7 +562,7 @@ const canFinish = () => {
 
   // Basic requirements for other shipment types
   const basicRequirements =
-    instructionDocs.length === 1 && deliveryNotes.length === containerCount;
+    instructionDocs.length === 1 && deliveryNotes.length === containersReachedCount;
 
   // For Import shipments, also require an Empty Turning Depot Document
   if (showEmptyTurningDepotOption()) {
@@ -570,7 +570,6 @@ const canFinish = () => {
   }
 
   return basicRequirements;
-  return true;
 };
 
   // Determine if we should show the Empty Turning Depot Document option
