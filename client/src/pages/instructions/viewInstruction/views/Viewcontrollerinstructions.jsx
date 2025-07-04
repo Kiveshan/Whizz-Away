@@ -926,7 +926,7 @@ const Viewcontrollerinstructions = () => {
                 </div>
 
                 {/* Rates per dropdown */}
-                <div className="view-controller-instructions-form-field" style={{ maxWidth: "160px" }}>
+                <div className="view-controller-instructions-form-field" style={{ maxWidth: "300px" }}>
                   <label>Unit per</label>
                   <div className="view-controller-instructions-select-wrapper view-controller-instructions-small">
                     <select
@@ -942,32 +942,39 @@ const Viewcontrollerinstructions = () => {
                       <option value="Container">Container</option>
                     </select>
                   </div>
-                  {/* Unit rate textbox - only visible for kg, m³, and ton */}
+                  
+                  {/* Container for rate and weight inputs */}
                   {(formData.rateWeight === "kg" || formData.rateWeight === "m³" || formData.rateWeight === "ton") && (
-                    <div className="view-controller-instructions-input-wrapper" style={{ marginTop: "6px" }}>
-                      <input
-                        type="text"
-                        className="view-controller-instructions-form-input"
-                        placeholder="Unit Rate"
-                        name="unitrate"
-                        value={formData.unitrate || ""}
-                        readOnly
-                        style={nonEditableStyle}
-                      />
-                    </div>
-                  )}
-                  {/* conditional weight textbox */}
-                  {(formData.rateWeight === "kg" || formData.rateWeight === "m³") && (
-                    <div className="view-controller-instructions-input-wrapper" style={{ marginTop: "6px" }}>
-                      <input
-                        type="text"
-                        className="view-controller-instructions-form-input"
-                        placeholder={`Enter weight in ${formData.rateWeight}`}
-                        name="weight"
-                        value={formData.weight || ""}
-                        readOnly
-                        style={nonEditableStyle}
-                      />
+                    <div style={{ display: 'flex', gap: '10px', marginTop: '6px' }}>
+                      {/* Unit rate textbox */}
+                      <div style={{ flex: 1, minWidth: '100px' }}>
+                        <label style={{ fontSize: '12px', marginBottom: '2px', display: 'block' }}>Rate per {formData.rateWeight}</label>
+                        <input
+                          type="text"
+                          className="view-controller-instructions-form-input"
+                          placeholder="Unit Rate"
+                          name="unitrate"
+                          value={formData.unitrate || ""}
+                          readOnly
+                          style={{ ...nonEditableStyle, width: '100%' }}
+                        />
+                      </div>
+                      
+                      {/* Weight textbox - only for kg and m³ */}
+                      {(formData.rateWeight === "kg" || formData.rateWeight === "m³") && (
+                        <div style={{ flex: 1, minWidth: '100px' }}>
+                          <label style={{ fontSize: '12px', marginBottom: '2px', display: 'block' }}>Weight</label>
+                          <input
+                            type="text"
+                            className="view-controller-instructions-form-input"
+                            placeholder={`Weight in ${formData.rateWeight}`}
+                            name="weight"
+                            value={formData.weight || ""}
+                            readOnly
+                            style={{ ...nonEditableStyle, width: '100%' }}
+                          />
+                        </div>
+                      )}
                     </div>
                   )}
                 </div>

@@ -2323,11 +2323,12 @@ const FCcontrollerinstructions = () => {
                   </div>
                   {/* This surchages section has been moved to be next to the checkbox */}
 
-                  {/* Compact Rates per dropdown inserted below VAT */}
+                  {/* Compact Rates per dropdown and input fields in one row */}
                   <div className="controller-instructions-form-field">
                     <label>Unit per</label>
-                    <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-                      <div className="controller-instructions-select-wrapper" style={{ minWidth: "80px" }}>
+                    <div style={{ display: "flex", alignItems: "flex-start", gap: "15px", width: "100%" }}>
+                      {/* Unit per dropdown */}
+                      <div className="controller-instructions-select-wrapper" style={{ minWidth: "100px", marginTop: '5px' }}>
                         <select
                           className="controller-instructions-dropdown"
                           name="rateWeight"
@@ -2343,18 +2344,19 @@ const FCcontrollerinstructions = () => {
                           <option value="Container">Container</option>
                         </select>
                       </div>
-                      {/* Rate per unit and weight textboxes displayed vertically with labels */}
+                      
+                      {/* Rate per unit and weight textboxes */}
                       {(formData.rateWeight === "kg" ||
                         formData.rateWeight === "m³" ||
                         formData.rateWeight === "ton") && (
-                        <div style={{ display: "flex", flexDirection: "column", gap: "15px", marginTop: "15px" }}>
+                        <div style={{ display: "flex", gap: "15px", width: "100%", marginTop: '48px', marginLeft: '-113px' }}>
                           {/* Unit Rate Field */}
-                          <div className="controller-instructions-form-field">
+                          <div className="controller-instructions-form-field" style={{ flex: 1, minWidth: "150px" }}>
                             <label>{`Rate per ${formData.rateWeight}`}</label>
                             <div
                               className="controller-instructions-input-wrapper"
-                              style={{ width: "100%" }}
                               ref={fieldRefs.unitRate}
+                              style={{ width: "100%" }}
                             >
                               <input
                                 type="text"
@@ -2375,12 +2377,12 @@ const FCcontrollerinstructions = () => {
                           </div>
 
                           {/* Weight Field */}
-                          <div className="controller-instructions-form-field">
+                          <div className="controller-instructions-form-field" style={{ flex: 1, minWidth: "150px" }}>
                             <label>{`Weight (${formData.rateWeight})`}</label>
                             <div
                               className="controller-instructions-input-wrapper"
-                              style={{ width: "100%" }}
                               ref={fieldRefs.weight}
+                              style={{ width: "100%" }}
                             >
                               <input
                                 type="text"
@@ -2700,8 +2702,7 @@ const FCcontrollerinstructions = () => {
                             name="deadline"
                             value={formData.deadline}
                             onChange={handleInputChange}
-                            min={formData.stackDate || formData.pickupDate || today}
-                            disabled={!formData.stackDate}
+                            min={formData.pickupDate || today}
                             style={{ width: formData.shipmentTypeName?.toLowerCase() === "cross-haul" ? "70%" : "75%" }}
                           />
                           <button
@@ -2982,7 +2983,7 @@ const FCcontrollerinstructions = () => {
         </div>
       </div>
     </div>
-  )
-}
+  );
+};
 
-export default FCcontrollerinstructions
+export default FCcontrollerinstructions;

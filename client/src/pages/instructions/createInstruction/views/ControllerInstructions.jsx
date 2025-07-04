@@ -1,4 +1,4 @@
-// "use client"
+﻿// "use client"
 
 import { useState, useEffect, useRef, useMemo, useCallback } from "react"
 import "../../css/controllerinstruction.css"
@@ -1475,7 +1475,7 @@ const ControllerInstructions = () => {
                 <ErrorTooltip message={fieldErrors.shipmentTypeId} />
               </div>
             </div>
-            <div className="controller-instructions-form-field">
+            {/* <div className="controller-instructions-form-field">
               <label>Name of Task</label>
               <div className="controller-instructions-input-wrapper" ref={fieldRefs.current.task}>
                 <input
@@ -1488,7 +1488,7 @@ const ControllerInstructions = () => {
                 />
                 <ErrorTooltip message={fieldErrors.task} />
               </div>
-            </div>
+            </div> */}
           </div>
         </div>
         <div className="controller-instructions-form-section">
@@ -1559,7 +1559,7 @@ const ControllerInstructions = () => {
                             }
                           }}
                           style={{
-                            width: "100%",
+                            width: "50%",
                             padding: "8px",
                             border: "1px solid #000",
                             borderRadius: "4px",
@@ -1595,7 +1595,7 @@ const ControllerInstructions = () => {
                         onChange={(e) => handleContainerCountChange("num_twelve_meters", e.target.value)}
                         disabled={isWeightBased}
                       />
-                      <div style={{ width: "100%" }}>
+                      <div style={{ width: "50%" }}>
                         <input
                           type="text"
                           value={
@@ -1630,7 +1630,7 @@ const ControllerInstructions = () => {
                             }
                           }}
                           style={{
-                            width: "100%",
+                            width: "50%",
                             padding: "8px",
                             border: "1px solid #000",
                             borderRadius: "4px",
@@ -1666,7 +1666,7 @@ const ControllerInstructions = () => {
                         onChange={(e) => handleContainerCountChange("num_abnormal", e.target.value)}
                         disabled={isWeightBased}
                       />
-                      <div style={{ width: "100%" }}>
+                      <div style={{ width: "50%" }}>
                         <input
                           type="text"
                           value={
@@ -1701,7 +1701,7 @@ const ControllerInstructions = () => {
                             }
                           }}
                           style={{
-                            width: "100%",
+                            width: "50%",
                             padding: "8px",
                             border: "1px solid #000",
                             borderRadius: "4px",
@@ -1734,7 +1734,7 @@ const ControllerInstructions = () => {
                             cursor: disableBreakBulkFields ? "not-allowed" : "text",
                           }}
                         />
-                        <div style={{ width: "100%" }}>
+                        <div style={{ width: "50%" }}>
                           <input
                             type="text"
                             value={
@@ -1775,7 +1775,7 @@ const ControllerInstructions = () => {
                               }
                             }}
                             style={{
-                              width: "100%",
+                              width: "50%",
                               padding: "8px",
                               border: "1px solid #000",
                               borderRadius: "4px",
@@ -1905,7 +1905,7 @@ const ControllerInstructions = () => {
                         </div>
                       )}
                     </div>
-                    {/* Rates per Section */}
+                    {/* unit per Section */}
                     <div
                       style={{
                         display: "flex",
@@ -1934,7 +1934,7 @@ const ControllerInstructions = () => {
                           }}
                         >
                           <option value="kg">kg</option>
-                          <option value="mÂ³">mÂ³</option>
+                        
                           <option value="ton">ton</option>
                           <option value="Container">Container</option>
                         </select>
@@ -2017,22 +2017,9 @@ const ControllerInstructions = () => {
                   boxSizing: "border-box",
                 }}
               >
-                <div
-                  style={{
-                    display: "flex",
-                    gap: "12px",
-                    flexWrap: "nowrap",
-                    width: "100%",
-                    alignItems: "flex-start",
-                  }}
-                >
-                  <div
-                    className="controller-instructions-form-field"
-                    style={{
-                      flex: "0 0 160px",
-                      boxSizing: "border-sizing",
-                    }}
-                  >
+                <div style={{ display: "flex", gap: "12px", flexWrap: "wrap", width: "100%", marginBottom: "12px" }}>
+                  {/* Shipment Type */}
+                  <div className="controller-instructions-form-field" style={{ flex: "1 1 160px" }}>
                     <label>Shipment Type</label>
                     <div className="controller-instructions-select-wrapper" ref={fieldRefs.current.shipmentTypeId}>
                       <select
@@ -2043,9 +2030,7 @@ const ControllerInstructions = () => {
                         disabled={isLoading.shipmentTypes || shipmentTypes.length === 0}
                         style={{ width: "100%" }}
                       >
-                        <option value="" disabled>
-                          Select Shipment
-                        </option>
+                        <option value="" disabled>Select Shipment</option>
                         {shipmentTypes.map((type) => (
                           <option key={type.shipkey} value={type.shipkey}>
                             {type.shipmenttype}
@@ -2055,13 +2040,15 @@ const ControllerInstructions = () => {
                       <ErrorTooltip message={fieldErrors.shipmentTypeId} />
                     </div>
                   </div>
-                  <div className="controller-instructions-form-field" style={{ flex: "0 0 180px" }}>
-                    <label>Booking Reference</label>
+
+                  {/* Booking Ref */}
+                  <div className="controller-instructions-form-field" style={{ flex: "1 1 180px" }}>
+                    <label>Booking Ref</label>
                     <div className="controller-instructions-input-wrapper" ref={fieldRefs.current.bookingRef}>
                       <input
                         type="text"
                         className={`controller-instructions-form-input ${fieldErrors.bookingRef ? "controller-instructions-error-field" : ""}`}
-                        placeholder="Enter booking ref"
+                        placeholder="Booking ref"
                         name="bookingRef"
                         value={formData.bookingRef}
                         onChange={handleInputChange}
@@ -2070,167 +2057,159 @@ const ControllerInstructions = () => {
                       <ErrorTooltip message={fieldErrors.bookingRef} />
                     </div>
                   </div>
-                </div>
-                <div className="controller-instructions-form-field" style={{ maxWidth: "120px" }}>
-                  <label>VAT Rate</label>
-                  <div className="controller-instructions-input-wrapper">
-                    <input
-                      type="text"
-                      className="controller-instructions-form-input"
-                      value={`${formData.vat || 15}%`}
-                      readOnly
-                    />
-                  </div>
-                </div>
 
-                {/* Dynamic layout based on shipment type */}
-                {isCrossHaul ? (
-                  // Cross-haul layout: File Ref, Name of Task, Pick-up Time, Pick-up Date, Deadline on left; Description on right
-                  <div
-                    style={{
-                      display: "flex",
-                      gap: "16px",
-                      alignItems: "flex-start",
-                      width: "100%",
-                      flexWrap: "wrap",
-                    }}
-                  >
-                    {/* Left side - Form fields */}
-                    <div
-                      style={{
-                        flex: "1",
-                        minWidth: "300px",
-                        display: "flex",
-                        flexDirection: "column",
-                        gap: "12px",
-                      }}
-                    >
-                      {/* File Ref and Name of Task row */}
-                      <div style={{ display: "flex", gap: "12px", flexWrap: "wrap" }}>
-                        <div className="controller-instructions-form-field" style={{ flex: "1", minWidth: "120px" }}>
-                          <label>File Ref</label>
-                          <div className="controller-instructions-input-wrapper" ref={fieldRefs.current.fileRef}>
-                            <input
-                              type="text"
-                              className={`controller-instructions-form-input ${fieldErrors.fileRef ? "controller-instructions-error-field" : ""}`}
-                              placeholder="Enter file ref"
-                              name="fileRef"
-                              value={formData.fileRef}
-                              onChange={handleInputChange}
-                              style={{ width: "100%" }}
-                            />
-                            <ErrorTooltip message={fieldErrors.fileRef} />
-                          </div>
-                        </div>
-                        <div className="controller-instructions-form-field" style={{ flex: "1", minWidth: "150px" }}>
-                          <label>Name of Task</label>
-                          <div className="controller-instructions-input-wrapper" ref={fieldRefs.current.task}>
-                            <input
-                              type="text"
-                              className={`controller-instructions-form-input ${fieldErrors.task ? "controller-instructions-error-field" : ""}`}
-                              placeholder="Input Name of Task"
-                              name="task"
-                              value={formData.task}
-                              onChange={handleInputChange}
-                              style={{ width: "100%" }}
-                            />
-                            <ErrorTooltip message={fieldErrors.task} />
-                          </div>
-                        </div>
-                      </div>
-
-                      {/* Pick-up Time, Pick-up Date, Deadline row */}
-                      <div style={{ display: "flex", gap: "12px", flexWrap: "wrap" }}>
-                        <div className="controller-instructions-form-field" style={{ flex: "1", minWidth: "120px" }}>
-                          <label>Pick-up Time</label>
-                          <div
-                            className="controller-instructions-date-input-group"
-                            ref={fieldRefs.current.pickupTime}
-                            style={{ width: "100%" }}
-                          >
-                            <input
-                              type="time"
-                              className={`controller-instructions-form-input ${fieldErrors.pickupTime ? "controller-instructions-error-field" : ""}`}
-                              placeholder="Time here"
-                              name="pickupTime"
-                              value={formData.pickupTime}
-                              onChange={handleInputChange}
-                              style={{ width: "100%" }}
-                            />
-                            <ErrorTooltip message={fieldErrors.pickupTime} />
-                          </div>
-                        </div>
-                        <div className="controller-instructions-form-field" style={{ flex: "1", minWidth: "140px" }}>
-                          <label>Pick-up Date</label>
-                          <div
-                            className="controller-instructions-date-input-group"
-                            ref={fieldRefs.current.pickupDate}
-                            style={{ width: "100%" }}
-                          >
-                            <input
-                              type="date"
-                              className={`controller-instructions-form-input ${fieldErrors.pickupDate ? "controller-instructions-error-field" : ""}`}
-                              ref={pickupDateRef}
-                              placeholder="Date here"
-                              name="pickupDate"
-                              value={formData.pickupDate}
-                              onChange={handleInputChange}
-                              style={{ width: "100%" }}
-                            />
-                            <ErrorTooltip message={fieldErrors.pickupDate} />
-                          </div>
-                        </div>
-                        <div className="controller-instructions-form-field" style={{ flex: "1", minWidth: "120px" }}>
-                          <label>Deadline</label>
-                          <div
-                            className="controller-instructions-date-input-group"
-                            ref={fieldRefs.current.deadline}
-                            style={{ width: "100%" }}
-                          >
-                            <input
-                              type="date"
-                              className={`controller-instructions-form-input ${fieldErrors.deadline ? "controller-instructions-error-field" : ""}`}
-                              ref={deadlineDateRef}
-                              placeholder="Date here"
-                              name="deadline"
-                              value={formData.deadline}
-                              onChange={handleInputChange}
-                              min={formData.pickupDate || today}
-                              style={{ width: "100%" }}
-                            />
-                            <ErrorTooltip message={fieldErrors.deadline} />
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* Right side - Description */}
-                    <div style={{ flex: "0 0 300px", minWidth: "250px" }}>
-                      <div className="controller-instructions-form-field" style={{ width: "100%" }}>
-                        <label>Description from Client</label>
-                        <div className="controller-instructions-input-wrapper" ref={fieldRefs.current.description}>
-                          <input
-                            type="text"
-                            className={`controller-instructions-form-input ${fieldErrors.description ? "controller-instructions-error-field" : ""}`}
-                            placeholder="Description from Client"
-                            name="description"
-                            value={formData.description}
-                            onChange={handleInputChange}
-                            style={{
-                              width: "100%",
-                              padding: "8px",
-                              border: "1px solid #ced4da",
-                              borderRadius: "4px",
-                              fontSize: "14px",
-                              boxSizing: "border-box",
-                            }}
-                          />
-                          <ErrorTooltip message={fieldErrors.description} />
-                        </div>
-                      </div>
+                  {/* File Ref */}
+                  <div className="controller-instructions-form-field" style={{ flex: "1 1 120px" }}>
+                    <label>File Ref</label>
+                    <div className="controller-instructions-input-wrapper" ref={fieldRefs.current.fileRef}>
+                      <input
+                        type="text"
+                        className={`controller-instructions-form-input ${fieldErrors.fileRef ? "controller-instructions-error-field" : ""}`}
+                        placeholder="File ref"
+                        name="fileRef"
+                        value={formData.fileRef}
+                        onChange={handleInputChange}
+                        style={{ width: "100%" }}
+                      />
+                      <ErrorTooltip message={fieldErrors.fileRef} />
                     </div>
                   </div>
-                ) : (
+
+                  {/* Name of Task */}
+                  <div className="controller-instructions-form-field" style={{ flex: "1 1 160px" }}>
+                    <label>Name of Task</label>
+                    <div className="controller-instructions-input-wrapper" ref={fieldRefs.current.task}>
+                      <input
+                        type="text"
+                        className={`controller-instructions-form-input ${fieldErrors.task ? "controller-instructions-error-field" : ""}`}
+                        placeholder="Name of Task"
+                        name="task"
+                        value={formData.task}
+                        onChange={handleInputChange}
+                        style={{ width: "100%" }}
+                      />
+                      <ErrorTooltip message={fieldErrors.task} />
+                    </div>
+                  </div>
+                </div>
+
+                {/* Pick-up Time, Pick-up Date, Stack Date, and Deadline row */}
+                <div style={{ display: "flex", gap: "12px", flexWrap: "wrap", width: "100%", marginBottom: "12px" }}>
+                  {/* Pick-up Time */}
+
+                  {/* Pick-up Time */}
+                  <div className="controller-instructions-form-field" style={{ flex: "0 0 120px" }}>
+                    <label>Pick-up Time</label>
+                    <div className="controller-instructions-input-wrapper" ref={fieldRefs.current.pickupTime}>
+                      <input
+                        type="time"
+                        className={`controller-instructions-form-input ${fieldErrors.pickupTime ? "controller-instructions-error-field" : ""}`}
+                        placeholder="Time here"
+                        name="pickupTime"
+                        value={formData.pickupTime}
+                        onChange={handleInputChange}
+                        style={{ width: "100%" }}
+                      />
+                      <ErrorTooltip message={fieldErrors.pickupTime} />
+                    </div>
+                  </div>
+
+                  {/* Pick-up Date */}
+                  <div className="controller-instructions-form-field" style={{ flex: "0 0 140px" }}>
+                    <label>Pick-up Date</label>
+                    <div className="controller-instructions-input-wrapper" ref={fieldRefs.current.pickupDate}>
+                      <input
+                        type="date"
+                        className={`controller-instructions-form-input ${fieldErrors.pickupDate ? "controller-instructions-error-field" : ""}`}
+                        ref={pickupDateRef}
+                        placeholder="Date here"
+                        name="pickupDate"
+                        value={formData.pickupDate}
+                        onChange={handleInputChange}
+                        style={{ width: "100%" }}
+                      />
+                      <ErrorTooltip message={fieldErrors.pickupDate} />
+                    </div>
+                  </div>
+
+                  {/* Stack/ETA Date - Hidden for Cross-haul */}
+                  {!isCrossHaul && (
+                    <div className="controller-instructions-form-field" style={{ flex: "0 0 140px" }}>
+                      <label>{isImport ? "ETA" : "Stack Date"}</label>
+                      <div className="controller-instructions-input-wrapper" ref={fieldRefs.current.stackDate}>
+                        <input
+                          type="date"
+                          className={`controller-instructions-form-input ${fieldErrors.stackDate ? "controller-instructions-error-field" : ""}`}
+                          ref={etaDateRef}
+                          name="stackDate"
+                          value={formData.stackDate}
+                          onChange={handleInputChange}
+                          style={{
+                            width: "100%",
+                            padding: "6px 8px",
+                            border: "1px solid #ced4da",
+                            borderRadius: "4px",
+                            fontSize: "13px",
+                            height: "32px"
+                          }}
+                          min={formData.pickupDate || today}
+                          disabled={!formData.pickupDate}
+                          onClick={() => formData.pickupDate && openCalendar(etaDateRef)}
+                        />
+                        <ErrorTooltip message={fieldErrors.stackDate} />
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Deadline */}
+                  <div className="controller-instructions-form-field" style={{ flex: "0 0 140px" }}>
+                    <label>Deadline</label>
+                    <div className="controller-instructions-input-wrapper" ref={fieldRefs.current.deadline}>
+                      <input
+                        type="date"
+                        className={`controller-instructions-form-input ${fieldErrors.deadline ? "controller-instructions-error-field" : ""}`}
+                        ref={deadlineDateRef}
+                        placeholder="Date here"
+                        name="deadline"
+                        value={formData.deadline}
+                        onChange={handleInputChange}
+                        min={formData.pickupDate || today}
+                        style={{ width: "100%" }}
+                      />
+                      <ErrorTooltip message={fieldErrors.deadline} />
+                    </div>
+                  </div>
+                </div>
+
+                {/* Description field for Cross-haul - shown below date/time fields */}
+                {isCrossHaul && (
+                  <div className="controller-instructions-form-field" style={{ width: "100%", marginTop: "12px" }}>
+                    <label>Description from Client</label>
+                    <div className="controller-instructions-input-wrapper" ref={fieldRefs.current.description}>
+                      <input
+                        type="text"
+                        className={`controller-instructions-form-input ${fieldErrors.description ? "controller-instructions-error-field" : ""}`}
+                        placeholder="Description from Client"
+                        name="description"
+                        value={formData.description}
+                        onChange={handleInputChange}
+                        style={{
+                          width: "100%",
+                          padding: "8px 12px",
+                          border: "1px solid #ced4da",
+                          borderRadius: "4px",
+                          fontSize: "14px",
+                          boxSizing: "border-box",
+                          height: "36px"
+                        }}
+                      />
+                      <ErrorTooltip message={fieldErrors.description} />
+                    </div>
+                  </div>
+                )}
+
+                {/* Import/Export layout: Vessel Name and Description on left; File Ref, Name of Task, dates on right */}
+                {!isCrossHaul && (
                   // Import/Export layout: Vessel Name and Description on left; File Ref, Name of Task, dates on right
                   <>
                     <div
@@ -2242,48 +2221,70 @@ const ControllerInstructions = () => {
                         flexWrap: "wrap",
                       }}
                     >
-                      <div style={{ display: "flex", gap: "16px", flex: "1", flexWrap: "wrap" }}>
-                        {/* Vessel Name */}
-                        <div className="controller-instructions-form-field" style={{ flex: "1", minWidth: "200px" }}>
-                          <label>Vessel Name</label>
-                          <div className="controller-instructions-input-wrapper" ref={fieldRefs.current.vesselName}>
+                      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(160px, 1fr))", gap: "24px", width: "100%" }}>
+                        {/* VAT Rate */}
+                        <div className="controller-instructions-form-field" style={{ width: "100%" }}>
+                          <label>VAT Rate</label>
+                          <div className="controller-instructions-input-wrapper">
                             <input
                               type="text"
-                              className={`controller-instructions-form-input vessel-name-input ${fieldErrors.vesselName ? "controller-instructions-error-field" : ""}`}
-                              placeholder="Vessel name"
-                              name="vesselName"
-                              value={formData.vesselName}
-                              onChange={handleInputChange}
-                              style={{
-                                width: "100%",
-                                padding: "8px",
-                                border: "1px solid #ced4da",
-                                borderRadius: "4px",
-                                fontSize: "14px",
-                                boxSizing: "border-box",
+                              className="controller-instructions-form-input"
+                              value={`${formData.vat || 15}%`}
+                              readOnly
+                              style={{ 
+                                width: "100%", 
+                                padding: "4px 6px", 
+                                fontSize: "12px",
+                                height: "30px"
                               }}
                             />
-                            <ErrorTooltip message={fieldErrors.vesselName} />
                           </div>
                         </div>
+                        
+                        {/* Vessel Name - Hidden for Cross-haul */}
+                        {!isCrossHaul && (
+                          <div className="controller-instructions-form-field" style={{ width: "100%" }}>
+                            <label>Vessel Name</label>
+                            <div className="controller-instructions-input-wrapper" ref={fieldRefs.current.vesselName}>
+                              <input
+                                type="text"
+                                className={`controller-instructions-form-input vessel-name-input ${fieldErrors.vesselName ? "controller-instructions-error-field" : ""}`}
+                                placeholder="Vessel name"
+                                name="vesselName"
+                                value={formData.vesselName}
+                                onChange={handleInputChange}
+                                style={{
+                                  width: "100%",
+                                  padding: "4px 6px",
+                                  border: "1px solid #ced4da",
+                                  borderRadius: "4px",
+                                  fontSize: "12px",
+                                  height: "30px"
+                                }}
+                              />
+                              <ErrorTooltip message={fieldErrors.vesselName} />
+                            </div>
+                          </div>
+                        )}
+
                         {/* Description from Client */}
-                        <div className="controller-instructions-form-field" style={{ flex: "1", minWidth: "200px" }}>
-                          <label>Description from Client</label>
+                        <div className="controller-instructions-form-field" style={{ width: "100%" }}>
+                          <label>Description</label>
                           <div className="controller-instructions-input-wrapper" ref={fieldRefs.current.description}>
                             <input
                               type="text"
                               className={`controller-instructions-form-input ${fieldErrors.description ? "controller-instructions-error-field" : ""}`}
-                              placeholder="Description from Client"
+                              placeholder="Description"
                               name="description"
                               value={formData.description}
                               onChange={handleInputChange}
                               style={{
                                 width: "100%",
-                                padding: "8px",
+                                padding: "4px 6px",
                                 border: "1px solid #ced4da",
                                 borderRadius: "4px",
-                                fontSize: "14px",
-                                boxSizing: "border-box",
+                                fontSize: "12px",
+                                height: "30px"
                               }}
                             />
                             <ErrorTooltip message={fieldErrors.description} />
@@ -2298,155 +2299,22 @@ const ControllerInstructions = () => {
                         className="controller-instructions-shipment-task-row"
                         style={{ order: -1, marginBottom: "8px" }}
                       >
-                        <div className="controller-instructions-form-field controller-instructions-small-field">
-                          <label>File Ref</label>
-                          <div className="controller-instructions-input-wrapper" ref={fieldRefs.current.fileRef}>
-                            <input
-                              type="text"
-                              className={`controller-instructions-form-input ${fieldErrors.fileRef ? "controller-instructions-error-field" : ""}`}
-                              placeholder="Enter file ref"
-                              name="fileRef"
-                              value={formData.fileRef}
-                              onChange={handleInputChange}
-                            />
-                            <ErrorTooltip message={fieldErrors.fileRef} />
-                          </div>
-                        </div>
-                        <div className="controller-instructions-form-field controller-instructions-small-field">
-                          <label>Name of Task</label>
-                          <div className="controller-instructions-input-wrapper" ref={fieldRefs.current.task}>
-                            <input
-                              type="text"
-                              className={`controller-instructions-form-input ${fieldErrors.task ? "controller-instructions-error-field" : ""}`}
-                              placeholder="Input Name of Task"
-                              name="task"
-                              value={formData.task}
-                              onChange={handleInputChange}
-                            />
-                            <ErrorTooltip message={fieldErrors.task} />
-                          </div>
-                        </div>
+                        
                       </div>
                       <div
                         className="controller-instructions-date-time-row-1"
                         style={{
                           marginTop: "15px",
-                          display: "flex",
-                          gap: "15px",
-                          flexWrap: "wrap",
+                          display: "grid",
+                          gridTemplateColumns: "repeat(auto-fill, minmax(140px, 1fr))",
+                          gap: "12px",
                         }}
                       >
-                        <div className="controller-instructions-form-field" style={{ flex: "1", minWidth: "0" }}>
-                          <label>Pick-up Time</label>
-                          <div
-                            className="controller-instructions-date-input-group"
-                            ref={fieldRefs.current.pickupTime}
-                            style={{ width: "100%" }}
-                          >
-                            <input
-                              type="time"
-                              className={`controller-instructions-form-input ${fieldErrors.pickupTime ? "controller-instructions-error-field" : ""}`}
-                              placeholder="Time here"
-                              name="pickupTime"
-                              value={formData.pickupTime}
-                              onChange={handleInputChange}
-                              style={{ width: "75%" }}
-                            />
-                            <button className="controller-instructions-calendar-button"></button>
-                            <ErrorTooltip message={fieldErrors.pickupTime} />
-                          </div>
-                        </div>
-                        <div className="controller-instructions-form-field" style={{ flex: "1", minWidth: "0" }}>
-                          <label>Pick-up Date</label>
-                          <div
-                            className="controller-instructions-date-input-group"
-                            ref={fieldRefs.current.pickupDate}
-                            style={{ width: "100%" }}
-                          >
-                            <input
-                              type="date"
-                              className={`controller-instructions-form-input ${fieldErrors.pickupDate ? "controller-instructions-error-field" : ""}`}
-                              ref={pickupDateRef}
-                              placeholder="Date here"
-                              name="pickupDate"
-                              value={formData.pickupDate}
-                              onChange={handleInputChange}
-                              style={{ width: "75%" }}
-                            />
-                            <button
-                              className="controller-instructions-calendar-button"
-                              onClick={() => openCalendar(pickupDateRef)}
-                            ></button>
-                            <ErrorTooltip message={fieldErrors.pickupDate} />
-                          </div>
-                        </div>
+                      
+                       
                       </div>
-                      <div className="controller-instructions-date-time-row-2" style={{ display: "flex", gap: "15px" }}>
-                        {/* Stack/ETA Date */}
-                        <div className="controller-instructions-form-field" style={{ flex: "1", minWidth: "0" }}>
-                          <label>{isImport ? "ETA" : "Stack Date"}</label>
-                          <div
-                            className="controller-instructions-date-input-group"
-                            ref={fieldRefs.current.stackDate}
-                            style={{ width: "100%" }}
-                          >
-                            <input
-                              type="date"
-                              className={`controller-instructions-form-input ${fieldErrors.stackDate ? "controller-instructions-error-field" : ""}`}
-                              ref={etaDateRef}
-                              placeholder="Date here"
-                              name="stackDate"
-                              value={formData.stackDate}
-                              onChange={handleInputChange}
-                              min={formData.pickupDate || today}
-                              disabled={!formData.pickupDate}
-                              style={{ width: "75%" }}
-                            />
-                            <button
-                              className="controller-instructions-calendar-button"
-                              onClick={() =>
-                                formData.pickupDate
-                                  ? openCalendar(etaDateRef)
-                                  : console.log("Please select a pickup date first")
-                              }
-                            ></button>
-                            <ErrorTooltip message={fieldErrors.stackDate} />
-                          </div>
-                        </div>
-                        <div className="controller-instructions-form-field" style={{ flex: "1", minWidth: "0" }}>
-                          <label>Deadline</label>
-                          <div
-                            className="controller-instructions-date-input-group"
-                            ref={fieldRefs.current.deadline}
-                            style={{ width: "100%" }}
-                          >
-                            <input
-                              type="date"
-                              className={`controller-instructions-form-input ${fieldErrors.deadline ? "controller-instructions-error-field" : ""}`}
-                              ref={deadlineDateRef}
-                              placeholder="Date here"
-                              name="deadline"
-                              value={formData.deadline}
-                              onChange={handleInputChange}
-                              min={formData.stackDate || formData.pickupDate || today}
-                              disabled={!formData.stackDate}
-                              style={{ width: "75%" }}
-                            />
-                            <button
-                              className="controller-instructions-calendar-button"
-                              onClick={() => {
-                                if (!formData.pickupDate) {
-                                  console.log("Please select a pickup date first")
-                                } else if (!formData.stackDate) {
-                                  console.log(`Please select ${isImport ? "an ETA" : "a stack date"} first`)
-                                } else {
-                                  openCalendar(deadlineDateRef)
-                                }
-                              }}
-                            ></button>
-                            <ErrorTooltip message={fieldErrors.deadline} />
-                          </div>
-                        </div>
+                      <div className="controller-instructions-date-time-row-2" style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(140px, 1fr))", gap: "12px" }}>
+                        {/* This space is left intentionally blank after moving the stack date field */}
                       </div>
                     </div>
                   </>
@@ -2470,7 +2338,7 @@ const ControllerInstructions = () => {
                       <th style={{ width: "5%" }}>#</th>
                       <th style={{ width: "15%" }}>Container Type</th>
                       <th style={{ width: "20%" }}>Container Number</th>
-                      {isImport && <th style={{ width: "15%" }}>Weight (kg)</th>}
+                      {isImport && <th style={{ width: "15%" }}>Weight</th>}
                       <th style={{ width: isImport ? "45%" : "60%" }}>Cargo Description</th>
                     </tr>
                   </thead>
@@ -2506,7 +2374,7 @@ const ControllerInstructions = () => {
                                 placeholder="0.00"
                                 style={{ textAlign: "right" }}
                               />
-                              <span className="input-group-text">kg</span>
+                         
                             </div>
                             {containerFieldErrors[`weight-${container.id}`] && (
                               <div className="invalid-feedback d-block">
