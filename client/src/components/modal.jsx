@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react";
 import Login from "../pages/auth/views/Login";
 import Register from "../pages/auth/views/Register";
-import "../css/modal.css";
+import styles from "../css/modal.module.css"; // Import CSS Module
 
 const Modal = ({ isOpen, onClose, initialForm }) => {
   const [isLogin, setIsLogin] = useState(initialForm === "login");
@@ -24,13 +24,15 @@ const Modal = ({ isOpen, onClose, initialForm }) => {
   return (
     <div
       id="modal-popup"
-      className="modal-popup"
+      className={styles.modalPopup}
       onClick={handleBackgroundClick}
     >
-      <div className="modal-content" onClick={(e) => e.stopPropagation()}>
-        {/* Use a conditional class name based on the current form */}
+      <div className={styles.modalContent} onClick={(e) => e.stopPropagation()}>
+      
+
+        {/* Close Button */}
         <button
-          className={isLogin ? "close-btn-login" : "close-btn"}
+          className={isLogin ? styles.closeBtnLogin : styles.closeBtn}
           onClick={onClose}
         >
           X

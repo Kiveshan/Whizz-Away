@@ -1,22 +1,107 @@
 "use client"
 
-import { useRef } from "react"
+import { useRef, useState } from "react"
 import { extractFilenameFromUrl } from "../../utils/helpers"
 
 const EmployeeForm = ({ employee, loading, isEditing, onSave, onCancel, onChange, onDeleteDocument }) => {
   const emailRef = useRef(null)
+  const [cellnumError, setCellnumError] = useState('')
+  const [telephonenumError, setTelephonenumError] = useState('')
+
+  // Phone number validation function
+  const validatePhoneNumber = (value, fieldName) => {
+    // Remove all non-digit characters except a leading '+' for country code
+    const cleanedValue = value.replace(/[^\d+]/g, '')
+    // Extract digits only (excluding the leading '+' if present)
+    const digitsOnly = cleanedValue.startsWith('+') ? cleanedValue.slice(1) : cleanedValue
+    
+    // Regular expression to ensure exactly 10 digits
+    const phoneRegex = /^\d{10}$/
+    
+    if (!value) {
+      return `${fieldName} is required`
+    }
+    
+    if (!phoneRegex.test(digitsOnly)) {
+      return `${fieldName} must be exactly 10 digits`
+    }
+    
+    return ''
+  }
+
+  // Restrict input to digits and optional leading '+'
+  const handlePhoneNumberKeyDown = (e) => {
+    const allowedKeys = [
+      'Backspace', 'Delete', 'ArrowLeft', 'ArrowRight', 'Tab', 'Home', 'End'
+    ]
+    // Allow '+' only as the first character
+    const isPlusAllowed = e.key === '+' && e.target.selectionStart === 0 && !e.target.value.includes('+')
+    // Allow digits and control keys
+    if (!/^[0-9]$/.test(e.key) && !allowedKeys.includes(e.key) && !isPlusAllowed) {
+      e.preventDefault()
+    }
+  }
+
+  // Handle phone number input
+  const handleNumberChange = (field, value) => {
+    if (field === "cellnum") {
+      const error = validatePhoneNumber(value, "Cell Number")
+      setCellnumError(error)
+      onChange(field, value)
+    } else if (field === "telephonenum") {
+      const error = validatePhoneNumber(value, "Telephone Number")
+      setTelephonenumError(error)
+      onChange(field, value)
+    } else {
+      onChange(field, value)
+    }
+  }
+
+  // Validate all required fields on submit
+  const validateForm = () => {
+    let isValid = true
+    
+    // Validate cell number
+    const cellError = validatePhoneNumber(employee.cellnum || '', "Cell Number")
+    setCellnumError(cellError)
+    if (cellError) isValid = false
+
+    // Validate telephone number
+    const telError = validatePhoneNumber(employee.telephonenum || '', "Telephone Number")
+    setTelephonenumError(telError)
+    if (telError) isValid = false
+
+    // Validate email
+    if (!emailRef.current?.checkValidity()) {
+      emailRef.current?.setCustomValidity("Please enter a valid email address")
+      isValid = false
+    } else {
+      emailRef.current?.setCustomValidity("")
+    }
+
+    // Validate required fields
+    const requiredFields = ['name', 'surname', 'email', 'employeenum', 'base_salary']
+    if (!isEditing) requiredFields.push('password')
+    requiredFields.forEach(field => {
+      if (!employee[field]) {
+        isValid = false
+      }
+    })
+
+    return isValid
+  }
 
   const handleSubmit = async (e) => {
     e.preventDefault()
 
-    if (!e.target.checkValidity()) {
+    // Perform custom validation
+    if (!validateForm()) {
       e.target.reportValidity()
       return
     }
 
     const success = await onSave(employee, emailRef)
     if (!success) {
-      // Form validation failed, stay on form
       return
     }
   }
@@ -51,7 +136,12 @@ const EmployeeForm = ({ employee, loading, isEditing, onSave, onCancel, onChange
           <label>
             Name <span style={{ color: "red" }}>*</span>
           </label>
-          <input type="text" value={employee.name || ""} onChange={(e) => onChange("name", e.target.value)} required />
+          <input
+            type="text"
+            value={employee.name || ""}
+            onChange={(e) => onChange("name", e.target.value)}
+            required
+          />
         </div>
 
         <div className="manage-form-group">
@@ -67,26 +157,41 @@ const EmployeeForm = ({ employee, loading, isEditing, onSave, onCancel, onChange
         </div>
 
         <div className="manage-form-group">
-          <label>Telephone Number</label>
+          <label>
+            Telephone Number <span style={{ color: "red" }}>*</span>
+          </label>
           <input
             type="text"
             value={employee.telephonenum || ""}
-            onChange={(e) => onChange("telephonenum", e.target.value)}
+            onChange={(e) => handleNumberChange("telephonenum", e.target.value)}
+            onKeyDown={handlePhoneNumberKeyDown}
+            className={telephonenumError ? 'input-error' : ''}
+            placeholder="e.g., 1234567890 or +1234567890"
+            required
           />
+          {telephonenumError && <span className="error-message">{telephonenumError}</span>}
         </div>
 
         <div className="manage-form-group">
-          <label>Cell Number</label>
+          <label>
+            Cell Number <span style={{ color: "red" }}>*</span>
+          </label>
           <input
             type="text"
             value={employee.cellnum || ""}
-            onChange={(e) => onChange("cellnum", e.target.value)}
+            onChange={(e) => handleNumberChange("cellnum", e.target.value)}
+            onKeyDown={handlePhoneNumberKeyDown}
+            className={cellnumError ? 'input-error' : ''}
+            placeholder="e.g., 1234567890 or +1234567890"
             required
           />
+          {cellnumError && <span className="error-message">{cellnumError}</span>}
         </div>
 
         <div className="manage-form-group">
-          <label>Employee Number</label>
+          <label>
+            Employee Number <span style={{ color: "red" }}>*</span>
+          </label>
           <input
             type="text"
             value={employee.employeenum || ""}
@@ -96,7 +201,9 @@ const EmployeeForm = ({ employee, loading, isEditing, onSave, onCancel, onChange
         </div>
 
         <div className="manage-form-group">
-          <label>Base Salary</label>
+          <label>
+            Base Salary <span style={{ color: "red" }}>*</span>
+          </label>
           <input
             type="number"
             value={employee.base_salary || ""}

@@ -1,14 +1,89 @@
 "use client"
 
-import { useRef } from "react"
+import { useRef, useState } from "react"
 
 const ClientForm = ({ client, loading, isEditing, onSave, onCancel, onChange }) => {
   const emailRef = useRef(null)
+  const [cellnumError, setCellnumError] = useState('')
+
+  // Phone number validation function
+  const validateCellNumber = (value) => {
+    // Remove all non-digit characters except a leading '+' for country code
+    const cleanedValue = value.replace(/[^\d+]/g, '')
+    // Extract digits only (excluding the leading '+' if present)
+    const digitsOnly = cleanedValue.startsWith('+') ? cleanedValue.slice(1) : cleanedValue
+    
+    // Regular expression to ensure exactly 10 digits
+    const phoneRegex = /^\d{10}$/
+    
+    if (!value) {
+      return 'Cell number is required'
+    }
+    
+    if (!phoneRegex.test(digitsOnly)) {
+      return 'Cell number must be exactly 10 digits'
+    }
+    
+    return ''
+  }
+
+  // Restrict input to digits and optional leading '+'
+  const handleCellNumberKeyDown = (e) => {
+    const allowedKeys = [
+      'Backspace', 'Delete', 'ArrowLeft', 'ArrowRight', 'Tab', 'Home', 'End'
+    ]
+    // Allow '+' only as the first character
+    const isPlusAllowed = e.key === '+' && e.target.selectionStart === 0 && !e.target.value.includes('+')
+    // Allow digits and control keys
+    if (!/^[0-9]$/.test(e.key) && !allowedKeys.includes(e.key) && !isPlusAllowed) {
+      e.preventDefault()
+    }
+  }
+
+  // Handle cell number input
+  const handleNumberChange = (field, value) => {
+    if (field === "cellnum") {
+      const error = validateCellNumber(value)
+      setCellnumError(error)
+      onChange(field, value)
+    } else {
+      onChange(field, value)
+    }
+  }
+
+  // Validate all required fields on submit
+  const validateForm = () => {
+    let isValid = true
+    
+    // Validate cell number
+    const cellError = validateCellNumber(client.cellnum || '')
+    setCellnumError(cellError)
+    if (cellError) isValid = false
+
+    // Validate email
+    if (!emailRef.current?.checkValidity()) {
+      emailRef.current?.setCustomValidity("Please enter a valid email address")
+      isValid = false
+    } else {
+      emailRef.current?.setCustomValidity("")
+    }
+
+    // Validate required fields
+    const requiredFields = ['client', 'email', 'cellnum']
+    requiredFields.forEach(field => {
+      if (!client[field]) {
+        isValid = false
+      }
+    })
+
+    return isValid
+  }
 
   const handleSubmit = async (e) => {
     e.preventDefault()
 
-    if (!e.target.checkValidity()) {
+    // Perform custom validation
+    if (!validateForm()) {
       e.target.reportValidity()
       return
     }
@@ -18,12 +93,6 @@ const ClientForm = ({ client, loading, isEditing, onSave, onCancel, onChange }) 
     const success = await onSave(client, emailRef)
     if (!success) {
       return
-    }
-  }
-
-  const handleNumberChange = (field, value) => {
-    if (value === "" || (!isNaN(value) && Number.parseFloat(value) >= 0)) {
-      onChange(field, value)
     }
   }
 
@@ -40,7 +109,7 @@ const ClientForm = ({ client, loading, isEditing, onSave, onCancel, onChange }) 
             type="text"
             value={client.client || ""}
             onChange={(e) => onChange("client", e.target.value)}
-            
+            required
           />
         </div>
 
@@ -52,7 +121,6 @@ const ClientForm = ({ client, loading, isEditing, onSave, onCancel, onChange }) 
             type="text"
             value={client.representative || ""}
             onChange={(e) => onChange("representative", e.target.value)}
-            
           />
         </div>
 
@@ -63,9 +131,13 @@ const ClientForm = ({ client, loading, isEditing, onSave, onCancel, onChange }) 
           <input
             type="text"
             value={client.cellnum || ""}
-            onChange={(e) => onChange("cellnum", e.target.value)}
-            
+            onChange={(e) => handleNumberChange("cellnum", e.target.value)}
+            onKeyDown={handleCellNumberKeyDown}
+            className={cellnumError ? 'input-error' : ''}
+            placeholder="e.g., 1234567890 or +1234567890"
+            required
           />
+          {cellnumError && <span className="error-message">{cellnumError}</span>}
         </div>
 
         <div className="client-form-group">
@@ -80,7 +152,7 @@ const ClientForm = ({ client, loading, isEditing, onSave, onCancel, onChange }) 
               emailRef.current?.setCustomValidity("")
               onChange("email", e.target.value)
             }}
-            
+            required
           />
         </div>
 
@@ -92,7 +164,6 @@ const ClientForm = ({ client, loading, isEditing, onSave, onCancel, onChange }) 
             type="text"
             value={client.streetaddress || ""}
             onChange={(e) => onChange("streetaddress", e.target.value)}
-            
           />
         </div>
 
@@ -100,7 +171,11 @@ const ClientForm = ({ client, loading, isEditing, onSave, onCancel, onChange }) 
           <label>
             <strong>City</strong>
           </label>
-          <input type="text" value={client.city || ""} onChange={(e) => onChange("city", e.target.value)}  />
+          <input
+            type="text"
+            value={client.city || ""}
+            onChange={(e) => onChange("city", e.target.value)}
+          />
         </div>
 
         <div className="client-form-group">
@@ -111,7 +186,6 @@ const ClientForm = ({ client, loading, isEditing, onSave, onCancel, onChange }) 
             type="text"
             value={client.suburb || ""}
             onChange={(e) => onChange("suburb", e.target.value)}
-            
           />
         </div>
 
@@ -123,7 +197,6 @@ const ClientForm = ({ client, loading, isEditing, onSave, onCancel, onChange }) 
             type="text"
             value={client.postalcode || ""}
             onChange={(e) => onChange("postalcode", e.target.value)}
-            
           />
         </div>
 
@@ -135,7 +208,6 @@ const ClientForm = ({ client, loading, isEditing, onSave, onCancel, onChange }) 
             type="text"
             value={client.companyaddress || ""}
             onChange={(e) => onChange("companyaddress", e.target.value)}
-            
           />
         </div>
 
@@ -147,7 +219,6 @@ const ClientForm = ({ client, loading, isEditing, onSave, onCancel, onChange }) 
             type="text"
             value={client.client_reg_num || ""}
             onChange={(e) => onChange("client_reg_num", e.target.value)}
-            
           />
         </div>
 
@@ -159,7 +230,6 @@ const ClientForm = ({ client, loading, isEditing, onSave, onCancel, onChange }) 
             type="text"
             value={client.vatregno || ""}
             onChange={(e) => onChange("vatregno", e.target.value)}
-            
           />
         </div>
 
@@ -167,7 +237,11 @@ const ClientForm = ({ client, loading, isEditing, onSave, onCancel, onChange }) 
           <label>
             <strong>Payment Type</strong>
           </label>
-          <select className="client-dropdown" value={client.payment_type || ""} onChange={(e) => onChange("payment_type", e.target.value)} >
+          <select
+            className="client-dropdown"
+            value={client.payment_type || ""}
+            onChange={(e) => onChange("payment_type", e.target.value)}
+          >
             <option value="">Select Payment Type</option>
             <option value="Cash">Cash</option>
             <option value="Credit">Credit</option>

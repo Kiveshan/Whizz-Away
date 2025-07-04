@@ -52,7 +52,6 @@ const SupplierForm = ({
     }
   }, [supplier])
 
-  // Add this useEffect to log expense types when they change
   useEffect(() => {
     console.log("SupplierForm: Received expense types:", allExpenseTypes)
     console.log("SupplierForm: Number of expense types:", allExpenseTypes.length)
@@ -61,7 +60,6 @@ const SupplierForm = ({
     }
   }, [allExpenseTypes])
 
-  // Close dropdown when clicking outside
   useEffect(() => {
     const handleClickOutside = (event) => {
       if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
@@ -75,13 +73,51 @@ const SupplierForm = ({
     }
   }, [])
 
+  // Phone number validation function
+  const validatePhoneNumber = (value) => {
+    // Remove all non-digit characters except a leading '+' for country code
+    const cleanedValue = value.replace(/[^\d+]/g, '')
+    // Extract digits only (excluding the leading '+' if present)
+    const digitsOnly = cleanedValue.startsWith('+') ? cleanedValue.slice(1) : cleanedValue
+    
+    // Regular expression to ensure exactly 10 digits
+    const phoneRegex = /^\d{10}$/
+    
+    if (!value) {
+      return 'Cell number is required'
+    }
+    
+    if (!phoneRegex.test(digitsOnly)) {
+      return 'Cell number must be exactly 10 digits'
+    }
+    
+    return ''
+  }
+
+  // Restrict input to digits and optional leading '+'
+  const handlePhoneNumberKeyDown = (e) => {
+    const allowedKeys = [
+      'Backspace', 'Delete', 'ArrowLeft', 'ArrowRight', 'Tab', 'Home', 'End'
+    ]
+    // Allow '+' only as the first character
+    const isPlusAllowed = e.key === '+' && e.target.selectionStart === 0 && !e.target.value.includes('+')
+    // Allow digits and control keys
+    if (!/^[0-9]$/.test(e.key) && !allowedKeys.includes(e.key) && !isPlusAllowed) {
+      e.preventDefault()
+    }
+  }
+
   const handleInputChange = (field, value) => {
     console.log(`Field ${field} changed to:`, value)
     setFormData((prev) => ({ ...prev, [field]: value }))
     onChange(field, value)
 
-    // Clear error when user starts typing
-    if (errors[field]) {
+    // Validate cell number in real-time
+    if (field === "cellnum") {
+      const error = validatePhoneNumber(value)
+      setErrors((prev) => ({ ...prev, cellnum: error }))
+    } else if (errors[field]) {
+      // Clear other field errors when typing
       setErrors((prev) => ({ ...prev, [field]: "" }))
     }
   }
@@ -91,10 +127,8 @@ const SupplierForm = ({
     let newExpenseTypes
 
     if (currentExpenseTypes.includes(expenseTypeId)) {
-      // Remove if already selected
       newExpenseTypes = currentExpenseTypes.filter((id) => id !== expenseTypeId)
     } else {
-      // Add if not selected
       newExpenseTypes = [...currentExpenseTypes, expenseTypeId]
     }
 
@@ -134,8 +168,9 @@ const SupplierForm = ({
     } else if (!/\S+@\S+\.\S+/.test(formData.email)) {
       newErrors.email = "Email format is invalid"
     }
-    if (!formData.cellnum?.trim()) {
-      newErrors.cellnum = "Cell number is required"
+    const cellError = validatePhoneNumber(formData.cellnum || '')
+    if (cellError) {
+      newErrors.cellnum = cellError
     }
 
     setErrors(newErrors)
@@ -149,6 +184,9 @@ const SupplierForm = ({
 
     if (!validateForm()) {
       console.log("Form validation failed:", errors)
+      if (!e.target.checkValidity()) {
+        e.target.reportValidity()
+      }
       return
     }
 
@@ -240,11 +278,13 @@ const SupplierForm = ({
           <div className="manage-form-group">
             <label style={{ fontWeight: "bold" }}>Cell Number *</label>
             <input
-              type="tel"
+              type="text"
               value={formData.cellnum}
               onChange={(e) => handleInputChange("cellnum", e.target.value)}
+              onKeyDown={handlePhoneNumberKeyDown}
               required
               style={{ borderColor: errors.cellnum ? "red" : "" }}
+              placeholder="e.g., 1234567890 or +1234567890"
             />
             {errors.cellnum && (
               <small style={{ color: "red", display: "block", marginTop: "5px" }}>{errors.cellnum}</small>
@@ -466,7 +506,7 @@ const SupplierForm = ({
             )}
           </div>
         </div>
-            <br />
+        <br />
         <button type="submit" className="manage-save-button" disabled={loading}>
           {loading ? "Saving..." : isEditing ? "Update Supplier" : "Add Supplier"}
         </button>
