@@ -3293,52 +3293,70 @@ function UpdateInstruction() {
         </div>
       )}
 
-    {showContainerModal && (
-      <div className="modal-wrapper">
-        <div className="modal-backdrop animate-fadeIn"></div>
-        <div className="modal-container animate-scaleIn">
-          <div className="modal-header">
-            <h3 className="modal-title">Container Destination Warning</h3>
-            <p className="modal-description">
-              All containers must reach the final destination.
-            </p>
-          </div>
-          <div className="modal-body">
-            <div className="modal-item">
-              <div className="modal-bullet"></div>
-              <span className="modal-item-text">
-                Final Destination: <strong>{containerValidationDetails.dropoff}</strong>
-              </span>
-            </div>
-            {containerValidationDetails.missingContainers.map((container, index) => (
-              <div key={index} className="modal-item">
-                <div className="modal-bullet"></div>
-                <span className="modal-item-text">
-                  Container <strong>{container}</strong> does not reach final destination
-                </span>
-              </div>
-            ))}
-          </div>
-          <div className="modal-footer">
-            <button
-              className="modal-btn modal-btn-secondary"
-              onClick={() => setShowContainerModal(false)}
-            >
-              Cancel
-            </button>
-            <button
-              className="modal-btn modal-btn-primary"
-              onClick={() => {
-                setShowContainerModal(false);
-                navigateToDocuments();
-              }}
-            >
-              Proceed Anyway
-            </button>
-          </div>
+{showContainerModal && (
+  <div className="modal-wrapper">
+    <div className="modal-backdrop animate-fadeIn"></div>
+    <div className="modal-container animate-scaleIn">
+      <div className="modal-header">
+        <div className="flex items-center gap-4">
+          <svg
+            xmlns="http://www.w3.org/2000/svg"
+            width="50"
+            height="50"
+            viewBox="0 0 24 24"
+            fill="#FEE2E2"
+            stroke="#DC2626"
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            className="text-red-600 drop-shadow-sm"
+          >
+            <path d="M12 2L2 19h20L12 2z" />
+            <path d="M12 8v4" />
+            <circle cx="12" cy="16" r="1" />
+          </svg>
+          <h3 className="modal-title">Container Destination Warning</h3>
         </div>
+        <p className="modal-description">
+          All containers must reach the final destination.
+        </p>
       </div>
-    )}
+      <div className="modal-body">
+        <div className="modal-item">
+          <div className="modal-bullet"></div>
+          <span className="modal-item-text">
+            Final Destination: <strong>{containerValidationDetails.dropoff}</strong>
+          </span>
+        </div>
+        {containerValidationDetails.missingContainers.map((container, index) => (
+          <div key={index} className="modal-item">
+            <div className="modal-bullet"></div>
+            <span className="modal-item-text">
+              Container <strong>{container}</strong> does not reach final destination
+            </span>
+          </div>
+        ))}
+      </div>
+      <div className="modal-footer">
+        <button
+          className="modal-btn modal-btn-secondary"
+          onClick={() => setShowContainerModal(false)}
+        >
+          Cancel
+        </button>
+        <button
+          className="modal-btn modal-btn-primary"
+          onClick={() => {
+            setShowContainerModal(false);
+            navigateToDocuments();
+          }}
+        >
+          Proceed Anyway
+        </button>
+      </div>
+    </div>
+  </div>
+)}
 
       {/* Unsaved Changes Modal */}
       {showUnsavedChangesModal && (
