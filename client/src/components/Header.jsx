@@ -70,7 +70,7 @@ const Header = ({ title }) => {
       <h1>{title}</h1>
       <div className="user-info">
         <img
-          src={isLoggedIn ? "/images/lady.jpg" : "/images/guest-avatar.png"}
+          src={isLoggedIn ? "/images/lady.jpg" : "/images/mann.jpg"}
           className="user-img"
           alt={`${user.name} ${user.surname}`}
         />

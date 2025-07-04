@@ -19,28 +19,56 @@ const Login = ({ switchToRegister }) => {
 
   const handleLogin = async (e) => {
     e.preventDefault();
+    setError(""); // Clear previous errors
 
     try {
       const response = await api.post("/login", {
         email,
         password,
+      }, {
+        headers: {
+          'Content-Type': 'application/json',
+        },
       });
 
-      if (response.status === 200) {
-        const data = response.data;
-        console.log("Login successful. Token:", data.token);
-
-        localStorage.setItem("token", data.token);
-        navigate(data.redirectUrl);
+      console.log('Login response:', response);
+      
+      if (response.data && response.data.token) {
+        // Store the token in localStorage
+        localStorage.setItem('token', response.data.token);
+        
+        // Redirect based on user role or to dashboard
+        const redirectUrl = response.data.redirectUrl || '/dashboard';
+        navigate(redirectUrl);
       } else {
-        console.log("Error from server:", response.data);
-        setError(response.data.message || "Login failed. Please try again.");
+        console.error('Unexpected response format:', response);
+        setError('Unexpected response from server. Please try again.');
       }
     } catch (err) {
-      console.error("Login Error:", err);
-      setError(
-        err.response?.data?.message || "An error occurred. Please try again."
-      );
+      console.error('Login Error:', err);
+      
+      // Handle different types of errors
+      if (err.response) {
+        // The request was made and the server responded with a status code
+        // that falls out of the range of 2xx
+        const errorMessage = err.response.data?.message || 'Login failed. Please check your credentials.';
+        setError(errorMessage);
+        
+        // Handle specific status codes
+        if (err.response.status === 401) {
+          setError('Invalid email or password');
+        } else if (err.response.status === 403) {
+          setError('Account not active or not approved. Please contact support.');
+        }
+      } else if (err.request) {
+        // The request was made but no response was received
+        console.error('No response received:', err.request);
+        setError('Unable to connect to the server. Please check your connection.');
+      } else {
+        // Something happened in setting up the request
+        console.error('Error:', err.message);
+        setError('An error occurred. Please try again.');
+      }
     }
   };
 

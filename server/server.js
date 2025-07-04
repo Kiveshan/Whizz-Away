@@ -27,15 +27,26 @@ const app = express();
 const PORT = process.env.PORT || 5000;
 
 // Enhanced CORS configuration
-app.use(
-  cors({
-    credentials: true,
-    origin: ["http://localhost:3000", "http://127.0.0.1:3000"],
-    methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
-    allowedHeaders: ["Content-Type", "Authorization", "Cache-Control"],
-    exposedHeaders: ["Authorization"],
-  })
-);
+app.use((req, res, next) => {
+  const allowedOrigins = ["http://localhost:3000", "http://127.0.0.1:3000"];
+  const origin = req.headers.origin;
+  
+  if (allowedOrigins.includes(origin)) {
+    res.setHeader('Access-Control-Allow-Origin', origin);
+  }
+  
+  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, Cache-Control');
+  res.setHeader('Access-Control-Allow-Credentials', 'true');
+  res.setHeader('Access-Control-Expose-Headers', 'Authorization');
+  
+  // Handle preflight requests
+  if (req.method === 'OPTIONS') {
+    return res.sendStatus(200);
+  }
+  
+  next();
+});
 
 // Middleware
 
@@ -43,19 +54,27 @@ app.use(requestLogger);
 app.use(express.json());
 app.use(bodyParser.json());
 app.use(bodyParser.urlencoded({ extended: true }));
-app.use(
-  expressSession({
-    secret: secretKey,
-    resave: false,
-    saveUninitialized: false,
-    cookie: {
-      secure: process.env.NODE_ENV === "production",
-      httpOnly: true,
-      maxAge: 3600000,
-      sameSite: "lax",
-    },
-  })
-);
+const sessionConfig = {
+  secret: secretKey,
+  resave: false,
+  saveUninitialized: false,
+  proxy: true, // Trust the reverse proxy (if using one)
+  cookie: {
+    secure: process.env.NODE_ENV === "production",
+    httpOnly: true,
+    maxAge: 24 * 60 * 60 * 1000, // 24 hours
+    sameSite: process.env.NODE_ENV === "production" ? 'none' : 'lax',
+  },
+  name: 'whizzaway.sid' // Custom session cookie name
+};
+
+// In production, trust the first proxy
+if (process.env.NODE_ENV === 'production') {
+  app.set('trust proxy', 1);
+  sessionConfig.cookie.secure = true;
+}
+
+app.use(expressSession(sessionConfig));
 app.use(sessionDebugger);
 app.use(passport.initialize());
 app.use(passport.session());
