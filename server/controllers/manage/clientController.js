@@ -11,11 +11,15 @@ import {
 const checkClientEmailExistsHandler = async (req, res) => {
   try {
     const { email } = req.query
+
     if (!email) {
       return res.status(400).json({ error: "Email parameter is required" })
     }
+
     console.log(`Checking email existence for ${email}`)
+
     const exists = await checkClientEmailExists(email)
+
     res.json({ exists })
   } catch (err) {
     console.error("Error checking email existence:", err)
@@ -56,11 +60,15 @@ const getAllClientsHandler = async (req, res) => {
 const getClientByIdHandler = async (req, res) => {
   try {
     const { id } = req.params
+
     console.log(`Fetching client ID ${id}`)
+
     const result = await getClientById(id)
+
     if (!result.success) {
       return res.status(404).json({ message: result.message })
     }
+
     res.json(result.data)
   } catch (err) {
     console.error(`Error fetching client ${req.params.id}:`, err)
@@ -86,6 +94,12 @@ const createClientHandler = async (req, res) => {
     } = req.body
 
     console.log("Creating client with data:", req.body)
+
+    // Only validate client name is provided
+    if (!client || client.trim() === "") {
+      return res.status(400).json({ error: "Client name is required" })
+    }
+
     const newClient = await createClient({
       client,
       representative,
@@ -100,6 +114,7 @@ const createClientHandler = async (req, res) => {
       streetaddress,
       payment_type,
     })
+
     res.status(201).json(newClient)
   } catch (err) {
     console.error("Error creating client:", err)
@@ -110,6 +125,7 @@ const createClientHandler = async (req, res) => {
 const updateClientHandler = async (req, res) => {
   try {
     const { id } = req.params
+
     const {
       client,
       representative,
@@ -126,6 +142,12 @@ const updateClientHandler = async (req, res) => {
     } = req.body
 
     console.log(`Updating client ID ${id} with data:`, req.body)
+
+    // Only validate client name is provided
+    if (!client || client.trim() === "") {
+      return res.status(400).json({ error: "Client name is required" })
+    }
+
     const result = await updateClient(id, {
       client,
       representative,
@@ -140,9 +162,11 @@ const updateClientHandler = async (req, res) => {
       streetaddress,
       payment_type,
     })
+
     if (!result.success) {
       return res.status(404).json({ error: result.message })
     }
+
     res.json(result.data)
   } catch (err) {
     console.error(`Error updating client ${req.params.id}:`, err)
@@ -154,11 +178,15 @@ const toggleClientStatusHandler = async (req, res) => {
   try {
     const { id } = req.params
     const { status } = req.body
+
     console.log(`Toggling status for client ID ${id} to ${status}`)
+
     const result = await toggleClientStatus(id, status)
+
     if (!result.success) {
       return res.status(404).json({ message: result.message })
     }
+
     res.json(result.data)
   } catch (err) {
     console.error(`Error toggling client ${req.params.id} status:`, err)
@@ -169,11 +197,15 @@ const toggleClientStatusHandler = async (req, res) => {
 const deleteClientHandler = async (req, res) => {
   try {
     const { id } = req.params
+
     console.log(`Deleting client ID ${id}`)
+
     const result = await deleteClient(id)
+
     if (!result.success) {
       return res.status(404).json({ message: result.message })
     }
+
     res.json({ message: result.message })
   } catch (err) {
     console.error(`Error deleting client ${req.params.id}:`, err)

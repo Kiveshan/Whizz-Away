@@ -3,12 +3,10 @@
 const DriverRateForm = ({ driverRate, loading, isEditing, onSave, onCancel, onChange }) => {
   const handleSubmit = async (e) => {
     e.preventDefault()
-
     if (!e.target.checkValidity()) {
       e.target.reportValidity()
       return
     }
-
     const success = await onSave(driverRate)
     if (!success) {
       return
@@ -16,17 +14,9 @@ const DriverRateForm = ({ driverRate, loading, isEditing, onSave, onCancel, onCh
   }
 
   const handleNumberChange = (field, value) => {
-    // For driver rates, ensure they are valid numbers
-    if (field.includes("driver_") && value !== "") {
-      const numValue = Number.parseFloat(value)
-      if (numValue >= 0 || value === "") {
-        onChange(field, value)
-      }
-    } else {
-      // For subie rates, allow empty values (will be converted to null)
-      if (value === "" || Number.parseFloat(value) >= 0 || value === "") {
-        onChange(field, value)
-      }
+    // Allow empty values or valid positive numbers for all rate fields
+    if (value === "" || (!isNaN(Number.parseFloat(value)) && Number.parseFloat(value) >= 0)) {
+      onChange(field, value)
     }
   }
 
@@ -48,7 +38,6 @@ const DriverRateForm = ({ driverRate, loading, isEditing, onSave, onCancel, onCh
               required
             />
           </div>
-
           <div className="form-field">
             <label>
               <strong>Destination *</strong>
@@ -66,7 +55,7 @@ const DriverRateForm = ({ driverRate, loading, isEditing, onSave, onCancel, onCh
         <div className="form-row">
           <div className="form-field">
             <label>
-              <strong>Driver Rate (6m) * (Required)</strong>
+              <strong>Driver Rate (6m) (Optional)</strong>
             </label>
             <input
               type="number"
@@ -75,13 +64,12 @@ const DriverRateForm = ({ driverRate, loading, isEditing, onSave, onCancel, onCh
               className="form-input"
               value={driverRate.driver_six_meter_rate || ""}
               onChange={(e) => handleNumberChange("driver_six_meter_rate", e.target.value)}
-              required
+              placeholder="Leave empty if not applicable"
             />
           </div>
-
           <div className="form-field">
             <label>
-              <strong>Driver Rate (12m) * (Required)</strong>
+              <strong>Driver Rate (12m) (Optional)</strong>
             </label>
             <input
               type="number"
@@ -90,7 +78,7 @@ const DriverRateForm = ({ driverRate, loading, isEditing, onSave, onCancel, onCh
               className="form-input"
               value={driverRate.driver_twelve_meter_rate || ""}
               onChange={(e) => handleNumberChange("driver_twelve_meter_rate", e.target.value)}
-              required
+              placeholder="Leave empty if not applicable"
             />
           </div>
         </div>
@@ -110,7 +98,6 @@ const DriverRateForm = ({ driverRate, loading, isEditing, onSave, onCancel, onCh
               placeholder="Leave empty if not applicable"
             />
           </div>
-
           <div className="form-field">
             <label>
               <strong>Subbie Rate (12m) (Optional)</strong>

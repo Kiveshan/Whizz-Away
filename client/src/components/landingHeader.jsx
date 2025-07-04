@@ -1,5 +1,5 @@
 "use client"
-import "../css/modal.css"
+import "../css/modal.module.css"
 
 const Header = ({ onLoginClick, onRegisterClick }) => {
   return (

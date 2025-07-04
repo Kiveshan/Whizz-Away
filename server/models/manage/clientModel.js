@@ -79,9 +79,11 @@ const getClientById = async (id) => {
   try {
     client = await pool.connect()
     const result = await client.query("SELECT * FROM m5_client WHERE m5clientkey = $1", [id])
+
     if (!result.rows.length) {
       return { success: false, message: "Client not found" }
     }
+
     return { success: true, data: result.rows[0] }
   } catch (err) {
     console.error(`Error fetching client ${id}:`, err)
@@ -95,6 +97,7 @@ const createClient = async (clientData) => {
   let client
   try {
     client = await pool.connect()
+
     const {
       client: clientName,
       representative,
@@ -110,9 +113,9 @@ const createClient = async (clientData) => {
       payment_type,
     } = clientData
 
-    // Basic input validation
-    if (!clientName || !email || !representative) {
-      throw new Error("Missing required fields: client, email, or representative")
+    // Only validate that client name is provided
+    if (!clientName || clientName.trim() === "") {
+      throw new Error("Client name is required")
     }
 
     const result = await client.query(
@@ -123,21 +126,22 @@ const createClient = async (clientData) => {
        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
        RETURNING *`,
       [
-        clientName,
-        representative,
-        companyaddress,
-        suburb,
-        postalcode,
-        email,
-        client_reg_num,
-        cellnum,
-        vatregno,
-        city,
-        streetaddress,
-        payment_type,
+        clientName.trim(),
+        representative || null,
+        companyaddress || null,
+        suburb || null,
+        postalcode || null,
+        email || null,
+        client_reg_num || null,
+        cellnum || null,
+        vatregno || null,
+        city || null,
+        streetaddress || null,
+        payment_type || null,
         true, // status
       ],
     )
+
     return result.rows[0]
   } catch (err) {
     console.error("Error creating client:", err.code, err.message)
@@ -151,6 +155,7 @@ const updateClient = async (id, clientData) => {
   let client
   try {
     client = await pool.connect()
+
     const {
       client: clientName,
       representative,
@@ -166,9 +171,9 @@ const updateClient = async (id, clientData) => {
       payment_type,
     } = clientData
 
-    // Basic input validation
-    if (!clientName || !email || !representative) {
-      throw new Error("Missing required fields: client, email, or representative")
+    // Only validate that client name is provided
+    if (!clientName || clientName.trim() === "") {
+      throw new Error("Client name is required")
     }
 
     const result = await client.query(
@@ -179,24 +184,26 @@ const updateClient = async (id, clientData) => {
        WHERE m5clientkey = $13
        RETURNING *`,
       [
-        clientName,
-        representative,
-        companyaddress,
-        suburb,
-        postalcode,
-        email,
-        client_reg_num,
-        cellnum,
-        vatregno,
-        city,
-        streetaddress,
-        payment_type,
+        clientName.trim(),
+        representative || null,
+        companyaddress || null,
+        suburb || null,
+        postalcode || null,
+        email || null,
+        client_reg_num || null,
+        cellnum || null,
+        vatregno || null,
+        city || null,
+        streetaddress || null,
+        payment_type || null,
         id,
       ],
     )
+
     if (!result.rowCount) {
       return { success: false, message: "Client not found" }
     }
+
     return { success: true, data: result.rows[0] }
   } catch (err) {
     console.error(`Error updating client ${id}:`, err.code, err.message)
@@ -210,10 +217,13 @@ const toggleClientStatus = async (id, status) => {
   let client
   try {
     client = await pool.connect()
+
     const checkResult = await client.query("SELECT m5clientkey FROM m5_client WHERE m5clientkey = $1", [id])
+
     if (!checkResult.rows.length) {
       return { success: false, message: "Client not found" }
     }
+
     const result = await client.query(
       `UPDATE m5_client
        SET status = $1
@@ -221,6 +231,7 @@ const toggleClientStatus = async (id, status) => {
        RETURNING m5clientkey, client, representative, email, status`,
       [status, id],
     )
+
     return { success: true, data: result.rows[0] }
   } catch (err) {
     console.error(`Error toggling client ${id} status:`, err)
@@ -234,11 +245,15 @@ const deleteClient = async (id) => {
   let client
   try {
     client = await pool.connect()
+
     const checkResult = await client.query("SELECT m5clientkey FROM m5_client WHERE m5clientkey = $1", [id])
+
     if (!checkResult.rows.length) {
       return { success: false, message: "Client not found" }
     }
+
     await client.query("DELETE FROM m5_client WHERE m5clientkey = $1", [id])
+
     return { success: true, message: "Client deleted successfully" }
   } catch (err) {
     console.error(`Error deleting client ${id}:`, err)
