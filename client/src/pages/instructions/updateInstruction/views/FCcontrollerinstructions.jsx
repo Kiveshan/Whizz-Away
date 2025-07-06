@@ -1,3 +1,5 @@
+
+
 // "use client"
 
 // import { useState, useEffect, useRef } from "react"
@@ -67,6 +69,7 @@
 //   const [isImport, setIsImport] = useState(location.state?.isImport || false)
 //   const today = new Date().toISOString().split("T")[0]
 //   const [weight, setWeight] = useState("")
+//   const [rateUpdateMessage, setRateUpdateMessage] = useState("")
 
 //   // Log the isImport state for debugging
 //   useEffect(() => {
@@ -115,9 +118,7 @@
 //       vat: 15,
 //       description: "",
 //       total_cost: 0,
-//       rateper_6: 0,
-//       rateper_12: 0,
-//       rateper_abnormal: 0,
+//       status: "",
 //     }
 
 //     if (preservedFormData) {
@@ -180,8 +181,12 @@
 //       vat: 15,
 //       description: "",
 //       total_cost: 0,
+//       status: "",
 //     }
 //   })
+
+//   // Check if the instruction should be read-only based on status
+//   const isReadOnly = formData.status === "In progress" || formData.status === "Completed"
 
 //   const [startingPoints, setStartingPoints] = useState([])
 //   const [destinations, setDestinations] = useState([])
@@ -207,6 +212,11 @@
 //   const [containerSuccessMessage, setContainerSuccessMessage] = useState("")
 //   const [isContainerLoading, setIsContainerLoading] = useState(false)
 //   const [isContainerDataModified, setIsContainerDataModified] = useState(false)
+
+//   const [confirmationModal, setConfirmationModal] = useState({
+//     isOpen: false,
+//     message: "",
+//   })
 
 //   // Initialize containers based on container counts
 //   const initializeContainers = () => {
@@ -453,6 +463,7 @@
 //   const validateAllFields = () => {
 //     const newErrors = {}
 //     let isValid = true
+//     const isCrossHaul = isCrossHaulShipment()
 
 //     // Required fields validation
 //     const requiredFields = [
@@ -466,6 +477,11 @@
 //       { name: "bookingRef", label: "Booking Reference" },
 //       { name: "description", label: "Description" },
 //     ]
+
+//     // Add vessel name only if not cross-haul
+//     if (!isCrossHaul) {
+//       requiredFields.push({ name: "vesselName", label: "Vessel Name" })
+//     }
 
 //     requiredFields.forEach((field) => {
 //       if (!formData[field.name]) {
@@ -514,6 +530,63 @@
 //     setContainerFieldErrors((prev) => ({ ...prev, [`${fieldType}-${containerId}`]: "" }))
 //   }
 
+//   // Check for rate/counter mismatch and show confirmation if needed
+//   const checkRateCounterMismatch = () => {
+//     const mismatches = []
+//     const containerTypesWithCounts = []
+
+//     // Check each container type for rate > 0 but count = 0
+//     if ((formData.rateper_6 > 0 || Number(formData.rateper_6) > 0) && formData.num_six_meters === 0) {
+//       mismatches.push("6m")
+//     }
+//     if ((formData.rateper_12 > 0 || Number(formData.rateper_12) > 0) && formData.num_twelve_meters === 0) {
+//       mismatches.push("12m")
+//     }
+//     if ((formData.rateper_abnormal > 0 || Number(formData.rateper_abnormal) > 0) && formData.num_abnormal === 0) {
+//       mismatches.push("Abnormal")
+//     }
+//     if (
+//       (formData.rateper_breakbulk > 0 || Number(formData.rateper_breakbulk) > 0) &&
+//       (formData.num_breakbulk === 0 || !formData.num_breakbulk)
+//     ) {
+//       mismatches.push("Break Bulk")
+//     }
+
+//     // If there are mismatches, collect container types with counts > 0
+//     if (mismatches.length > 0) {
+//       if (formData.num_six_meters > 0) {
+//         containerTypesWithCounts.push(`6m (${formData.num_six_meters} containers, Rate: R${formData.rateper_6})`)
+//       }
+//       if (formData.num_twelve_meters > 0) {
+//         containerTypesWithCounts.push(`12m (${formData.num_twelve_meters} containers, Rate: R${formData.rateper_12})`)
+//       }
+//       if (formData.num_abnormal > 0) {
+//         containerTypesWithCounts.push(
+//           `Abnormal (${formData.num_abnormal} containers, Rate: R${formData.rateper_abnormal})`,
+//         )
+//       }
+//       if (formData.num_breakbulk > 0) {
+//         containerTypesWithCounts.push(
+//           `Break Bulk (${formData.num_breakbulk} containers, Rate: R${formData.rateper_breakbulk})`,
+//         )
+//       }
+
+//       // Show confirmation modal
+//       const message =
+//         containerTypesWithCounts.length > 0
+//           ? `You have containers with the following rates: ${containerTypesWithCounts.join(", ")}. Are you sure you want to continue?`
+//           : "You have set rates for container types with 0 containers. Are you sure you want to continue?"
+
+//       setConfirmationModal({
+//         isOpen: true,
+//         message: message,
+//       })
+//       return false // Don't proceed with save
+//     }
+
+//     return true // No mismatches, proceed with save
+//   }
+
 //   // Handle save changes with enhanced logic
 //   const handleSaveChanges = async () => {
 //     console.log("=== SAVE CHANGES INITIATED ===")
@@ -528,6 +601,18 @@
 //       return
 //     }
 
+//     // Check for rate/counter mismatch
+//     if (!checkRateCounterMismatch()) {
+//       console.log("⚠️ Rate/counter mismatch detected - showing confirmation")
+//       return
+//     }
+
+//     // Proceed with actual save logic
+//     await performSave()
+//   }
+
+//   // Extract the actual save logic into a separate function
+//   const performSave = async () => {
 //     try {
 //       setIsContainerLoading(true)
 //       setContainerSuccessMessage("")
@@ -558,7 +643,7 @@
 //         client: formData.clientId,
 //         shipment_type: formData.shipmentTypeId,
 //         total_cost: totalCost,
-//         status: formData.status || "In progress",
+//         status: formData.status, // Preserve existing status, don't default to "In progress"
 //         rateweight: formData.rateWeight,
 //       }
 
@@ -685,6 +770,16 @@
 //     } finally {
 //       setIsContainerLoading(false)
 //     }
+//   }
+
+//   // Handle confirmation modal actions
+//   const handleConfirmSave = async () => {
+//     setConfirmationModal({ isOpen: false, message: "" })
+//     await performSave()
+//   }
+
+//   const handleCancelSave = () => {
+//     setConfirmationModal({ isOpen: false, message: "" })
 //   }
 
 //   // Initialize containers when component mounts or container counts change
@@ -976,6 +1071,7 @@
 //         weight: data.weight || "",
 //         num_six_meters: data.num_six_meters || 0,
 //         num_twelve_meters: data.num_twelve_meters || 0,
+//         num_abnormal: data.num_abnormal || 0,
 //         num_breakbulk: data.num_breakbulk || 0,
 //         vat: data.vat || 15,
 //         description: data.description || "",
@@ -994,6 +1090,7 @@
 //         rateper_12: data.rateper_12 || 0,
 //         rateper_abnormal: data.rateper_abnormal || 0,
 //         rateper_breakbulk: data.rateper_breakbulk || 0,
+//         status: data.status || "",
 //       }
 
 //       setFormData(newFormData)
@@ -1257,6 +1354,8 @@
 //     const selectedShipmentType = shipmentTypes.find((type) => type.shipkey.toString() === shipmentTypeId)
 //     const shipmentTypeName = selectedShipmentType ? selectedShipmentType.shipmenttype : ""
 //     const isImportType = shipmentTypeName.toLowerCase() === "import"
+//     const isCrossHaul = shipmentTypeName.toLowerCase() === "cross-haul"
+
 //     setIsImport(isImportType)
 //     setFormData({
 //       ...formData,
@@ -1264,6 +1363,12 @@
 //       shipmentTypeName,
 //     })
 //     setFieldErrors((prev) => ({ ...prev, shipmentTypeId: "" }))
+//   }
+
+//   // Check if shipment type is Cross-haul
+//   const isCrossHaulShipment = () => {
+//     const selectedShipmentType = shipmentTypes.find((type) => type.shipkey.toString() === formData.shipmentTypeId)
+//     return selectedShipmentType && selectedShipmentType.shipmenttype.toLowerCase() === "cross-haul"
 //   }
 
 //   // Format date from any format to YYYY-MM-DD for input[type="date"]
@@ -1296,31 +1401,35 @@
 //     return dateString // Return original if can't parse
 //   }
 
-//   // Fetch rates based on pickup location
-//   const fetchRates = async (pickupLocation) => {
+//   // Fetch rates based on pickup and dropoff locations - always update rates
+//   const fetchRates = async (pickupLocation, dropoffLocation = null) => {
 //     if (!formData.clientId || !pickupLocation) return
 
-//     console.log("Fetching rates for client:", formData.clientId, "and location:", pickupLocation)
+//     console.log("Fetching rates for client:", formData.clientId, "pickup:", pickupLocation, "dropoff:", dropoffLocation)
 
 //     try {
-//       // First, get the default destination for this client and pickup location
-//       const destinations = await api.get(
-//         `/api/instructions/client/${formData.clientId}/destinations/${encodeURIComponent(pickupLocation)}`,
-//       )
-//       const defaultDestination = destinations.data?.[0]?.destination
+//       let destinationToUse = dropoffLocation
 
-//       if (!defaultDestination) {
-//         console.log("No default destination found for pickup location:", pickupLocation)
-//         return
+//       // If no dropoff provided, get the default destination for this client and pickup location
+//       if (!destinationToUse) {
+//         const destinations = await api.get(
+//           `/api/instructions/client/${formData.clientId}/destinations/${encodeURIComponent(pickupLocation)}`,
+//         )
+//         destinationToUse = destinations.data?.[0]?.destination
+
+//         if (!destinationToUse) {
+//           console.log("No destination found for pickup location:", pickupLocation)
+//           return
+//         }
 //       }
 
-//       console.log("Using default destination:", defaultDestination)
+//       console.log("Using destination:", destinationToUse)
 
-//       // Then fetch rates with both start and destination using FC-specific endpoint
-//       const response = await api.get(`/api/instructions/fc/client/${formData.clientId}/rates`, {
+//       // Fetch rates with both start and destination using the correct endpoint
+//       const response = await api.get(`/api/instructions/client/${formData.clientId}/rates`, {
 //         params: {
 //           start: pickupLocation,
-//           destination: defaultDestination,
+//           destination: destinationToUse,
 //         },
 //       })
 
@@ -1337,29 +1446,62 @@
 //           const abnormalRate = rateData.rateper_abnormal || rateData.abnormalRate || 0
 //           const surcharge = rateData.surcharge || rateData.surchages || 0
 
-//           console.log("Setting rates:", { rate6m, rate12m, abnormalRate, surcharge })
+//           console.log("Updating rates (always override):", { rate6m, rate12m, abnormalRate, surcharge })
 
-//           setFormData((prev) => ({
-//             ...prev,
-//             rateper_6: rate6m,
-//             rateper_12: rate12m,
-//             rateper_abnormal: abnormalRate,
-//             surcharge: surcharge,
-//           }))
+//           // Always update rates regardless of current values
+//           setFormData((prev) => {
+//             const updatedData = {
+//               ...prev,
+//               rateper_6: rate6m,
+//               rateper_12: rate12m,
+//               rateper_abnormal: abnormalRate,
+//               surcharge: surcharge,
+//             }
+
+//             // Recalculate total cost with new rates
+//             const totalCost =
+//               (updatedData.num_six_meters || 0) * rate6m +
+//               (updatedData.num_twelve_meters || 0) * rate12m +
+//               (updatedData.num_abnormal || 0) * abnormalRate +
+//               (updatedData.num_breakbulk || 0) * (updatedData.rateper_breakbulk || 0)
+
+//             updatedData.total_cost = totalCost
+
+//             return updatedData
+//           })
+
+//           // Show user feedback that rates were updated
+//           setRateUpdateMessage("Rates updated based on selected route")
+//           setTimeout(() => setRateUpdateMessage(""), 3000)
 //         }
 //       }
 //     } catch (error) {
 //       console.error("Error fetching rates:", error)
 //       console.error("Error details:", error.response?.data || error.message)
 
-//       // Only reset rates if they haven't been set yet
-//       setFormData((prev) => ({
-//         ...prev,
-//         rateper_6: prev.rateper_6 || 0,
-//         rateper_12: prev.rateper_12 || 0,
-//         rateper_abnormal: prev.rateper_abnormal || 0,
-//         surcharge: prev.surcharge || 0,
-//       }))
+//       // Show error message to user
+//       setErrorModal({
+//         isOpen: true,
+//         message: "Failed to fetch rates for selected route. Please check your selection or try again.",
+//       })
+//     }
+//   }
+
+//   const handleDropoffChange = async (e) => {
+//     const dropoffLocation = e.target.value
+
+//     // Update the dropoff location in form data
+//     setFormData((prev) => ({
+//       ...prev,
+//       dropoff: dropoffLocation,
+//     }))
+
+//     // Clear field error
+//     clearFieldError("dropoff")
+
+//     // Fetch new rates for the current pickup and new dropoff combination
+//     if (formData.pickup && dropoffLocation) {
+//       await fetchRates(formData.pickup, dropoffLocation)
 //     }
 //   }
 
@@ -1373,8 +1515,14 @@
 //       dropoff: "", // Clear the dropoff when pickup changes
 //     }))
 
-//     // Fetch new rates and destinations for the selected pickup location
-//     await Promise.all([fetchRates(pickupLocation), fetchDestinations(pickupLocation)])
+//     // Clear field error
+//     clearFieldError("pickup")
+
+//     // Fetch new destinations and rates for the selected pickup location
+//     await Promise.all([
+//       fetchDestinations(pickupLocation),
+//       fetchRates(pickupLocation), // This will get default destination
+//     ])
 //   }
 
 //   const handleInputChange = (e) => {
@@ -1499,7 +1647,10 @@
 //         ...formData,
 //         [name]: value,
 //         stackDate: formData.stackDate && new Date(formData.stackDate) <= new Date(value) ? "" : formData.stackDate,
-//         deadline: formData.deadline && new Date(formData.deadline) <= new Date(value) ? "" : formData.deadline,
+//         deadline:
+//           formData.deadline && new Date(formData.deadline) <= new Date(value) <= new Date(value)
+//             ? ""
+//             : formData.deadline,
 //       })
 //       setFieldErrors((prev) => ({ ...prev, pickupDate: "" }))
 //     } else {
@@ -1610,6 +1761,8 @@
 
 //   const validateForm = () => {
 //     console.log("validateForm called")
+//     const isCrossHaul = isCrossHaulShipment()
+
 //     const requiredFields = [
 //       "clientId",
 //       "shipmentTypeId",
@@ -1618,13 +1771,17 @@
 //       "dropoff",
 //       "pickupTime",
 //       "pickupDate",
-//       "stackDate",
 //       "deadline",
 //       "bookingRef",
 //       "fileRef",
 //       "description",
-//       "vesselName",
 //     ]
+
+//     // Add vessel name and stack date as required only if not cross-haul
+//     if (!isCrossHaul) {
+//       requiredFields.push("vesselName", "stackDate")
+//     }
+
 //     let isValid = true
 //     const errors = {}
 //     console.log("Validating required fields...")
@@ -1830,6 +1987,13 @@
 //     cursor: "not-allowed",
 //   }
 
+//   const readOnlyStyle = {
+//     backgroundColor: "#f8f9fa",
+//     cursor: "not-allowed",
+//     color: "#6c757d",
+//     border: "1px solid #e9ecef",
+//   }
+
 //   const ErrorTooltip = ({ message }) => {
 //     if (!message) return null
 //     return (
@@ -1923,13 +2087,29 @@
 //           </button>
 //         </div>
 //         <div className="controller-instructions-form-container" style={{ maxWidth: "1200px" }}>
+//           {isReadOnly && (
+//             <div
+//               style={{
+//                 backgroundColor: "#fff3cd",
+//                 border: "1px solid #ffeaa7",
+//                 borderRadius: "4px",
+//                 padding: "12px",
+//                 marginBottom: "20px",
+//                 textAlign: "center",
+//                 color: "#856404",
+//                 fontWeight: "bold",
+//               }}
+//             >
+//               ⚠️ This instruction is {formData.status} and is in read-only mode
+//             </div>
+//           )}
 //           <div className="controller-instructions-form-section controller-instructions-client-info-section">
 //             <div className="controller-instructions-form-row">
 //               <div className="controller-instructions-form-field">
 //                 <label>Client</label>
 //                 <div className="controller-instructions-select-wrapper" ref={fieldRefs.clientId}>
 //                   <select
-//                     style={nonEditableStyle}
+//                     style={isReadOnly ? readOnlyStyle : nonEditableStyle}
 //                     className={`dropdown ${fieldErrors.clientId ? "controller-instructions-error-field" : ""}`}
 //                     name="clientId"
 //                     value={formData.clientId || ""}
@@ -1953,7 +2133,7 @@
 //                 <input
 //                   type="text"
 //                   className="controller-instructions-form-input"
-//                   style={nonEditableStyle}
+//                   style={isReadOnly ? readOnlyStyle : nonEditableStyle}
 //                   value={formData.representative || ""}
 //                   readOnly
 //                   placeholder="Autoload representative"
@@ -1972,7 +2152,8 @@
 //                   name="contactDetails"
 //                   value={formData.contactDetails}
 //                   readOnly
-//                   style={nonEditableStyle}
+//                   style={isReadOnly ? readOnlyStyle : nonEditableStyle}
+//                   disabled={isReadOnly}
 //                 />
 //               </div>
 //               <div className="controller-instructions-form-field">
@@ -1984,7 +2165,8 @@
 //                   name="email"
 //                   value={formData.email}
 //                   readOnly
-//                   style={nonEditableStyle}
+//                   style={isReadOnly ? readOnlyStyle : nonEditableStyle}
+//                   disabled={isReadOnly}
 //                 />
 //               </div>
 //             </div>
@@ -1999,8 +2181,8 @@
 //                     name="shipmentTypeId"
 //                     value={formData.shipmentTypeId}
 //                     onChange={handleShipmentTypeChange}
-//                     disabled={true}
-//                     style={nonEditableStyle}
+//                     disabled={isReadOnly}
+//                     style={isReadOnly ? readOnlyStyle : {}}
 //                   >
 //                     <option value="" disabled>
 //                       Select Shipment
@@ -2024,6 +2206,8 @@
 //                     name="task"
 //                     value={formData.task}
 //                     onChange={handleInputChange}
+//                     disabled={isReadOnly}
+//                     style={isReadOnly ? readOnlyStyle : {}}
 //                   />
 //                   <ErrorTooltip message={fieldErrors.task} />
 //                 </div>
@@ -2057,20 +2241,8 @@
 //                           min="0"
 //                           name="num_six_meters"
 //                           onChange={(e) => handleNumericInputChange(e)}
-//                           disabled={
-//                             formData.rateWeight !== "Container" ||
-//                             !formData.rateper_6 ||
-//                             formData.rateper_6 === "0" ||
-//                             Number(formData.rateper_6) === 0
-//                           }
-//                           style={
-//                             formData.rateWeight !== "Container" ||
-//                             !formData.rateper_6 ||
-//                             formData.rateper_6 === "0" ||
-//                             Number(formData.rateper_6) === 0
-//                               ? nonEditableStyle
-//                               : {}
-//                           }
+//                           disabled={formData.rateWeight !== "Container" || isReadOnly}
+//                           style={isReadOnly ? readOnlyStyle : {}}
 //                         />
 //                         <div
 //                           className="controller-instructions-input-wrapper controller-instructions-rate-input"
@@ -2083,8 +2255,8 @@
 //                             value={formData.rateper_6 || ""}
 //                             name="rateper_6"
 //                             onChange={handleRateChange}
-//                             disabled={true}
-//                             style={nonEditableStyle}
+//                             disabled={formData.rateWeight !== "Container" || isReadOnly}
+//                             style={isReadOnly ? readOnlyStyle : {}}
 //                           />
 //                           <ErrorTooltip message={fieldErrors.rateper_6} />
 //                         </div>
@@ -2100,20 +2272,8 @@
 //                           min="0"
 //                           name="num_twelve_meters"
 //                           onChange={(e) => handleNumericInputChange(e)}
-//                           disabled={
-//                             formData.rateWeight !== "Container" ||
-//                             !formData.rateper_12 ||
-//                             formData.rateper_12 === "0" ||
-//                             Number(formData.rateper_12) === 0
-//                           }
-//                           style={
-//                             formData.rateWeight !== "Container" ||
-//                             !formData.rateper_12 ||
-//                             formData.rateper_12 === "0" ||
-//                             Number(formData.rateper_12) === 0
-//                               ? nonEditableStyle
-//                               : {}
-//                           }
+//                           disabled={formData.rateWeight !== "Container" || isReadOnly}
+//                           style={isReadOnly ? readOnlyStyle : {}}
 //                         />
 //                         <div
 //                           className="controller-instructions-input-wrapper controller-instructions-rate-input"
@@ -2126,8 +2286,8 @@
 //                             value={formData.rateper_12 || ""}
 //                             name="rateper_12"
 //                             onChange={handleRateChange}
-//                             disabled={true}
-//                             style={nonEditableStyle}
+//                             disabled={formData.rateWeight !== "Container" || isReadOnly}
+//                             style={isReadOnly ? readOnlyStyle : {}}
 //                           />
 //                           <ErrorTooltip message={fieldErrors.rateper_12} />
 //                         </div>
@@ -2143,20 +2303,8 @@
 //                           min="0"
 //                           name="num_abnormal"
 //                           onChange={(e) => handleNumericInputChange(e)}
-//                           disabled={
-//                             formData.rateWeight !== "Container" ||
-//                             !formData.rateper_abnormal ||
-//                             formData.rateper_abnormal === "0" ||
-//                             Number(formData.rateper_abnormal) === 0
-//                           }
-//                           style={
-//                             formData.rateWeight !== "Container" ||
-//                             !formData.rateper_abnormal ||
-//                             formData.rateper_abnormal === "0" ||
-//                             Number(formData.rateper_abnormal) === 0
-//                               ? nonEditableStyle
-//                               : {}
-//                           }
+//                           disabled={formData.rateWeight !== "Container" || isReadOnly}
+//                           style={isReadOnly ? readOnlyStyle : {}}
 //                         />
 //                         <div
 //                           className="controller-instructions-input-wrapper controller-instructions-rate-input"
@@ -2169,8 +2317,8 @@
 //                             value={formData.rateper_abnormal || ""}
 //                             name="rateper_abnormal"
 //                             onChange={handleRateChange}
-//                             disabled={true}
-//                             style={nonEditableStyle}
+//                             disabled={formData.rateWeight !== "Container" || isReadOnly}
+//                             style={isReadOnly ? readOnlyStyle : {}}
 //                           />
 //                           <ErrorTooltip message={fieldErrors.rateper_abnormal} />
 //                         </div>
@@ -2187,20 +2335,8 @@
 //                             min="0"
 //                             name="num_breakbulk"
 //                             onChange={(e) => handleNumericInputChange(e)}
-//                             disabled={
-//                               formData.rateWeight !== "Container" ||
-//                               !formData.rateper_breakbulk ||
-//                               formData.rateper_breakbulk === "0" ||
-//                               Number(formData.rateper_breakbulk) === 0
-//                             }
-//                             style={
-//                               formData.rateWeight !== "Container" ||
-//                               !formData.rateper_breakbulk ||
-//                               formData.rateper_breakbulk === "0" ||
-//                               Number(formData.rateper_breakbulk) === 0
-//                                 ? nonEditableStyle
-//                                 : {}
-//                             }
+//                             disabled={formData.rateWeight !== "Container" || isReadOnly}
+//                             style={isReadOnly ? readOnlyStyle : {}}
 //                           />
 //                           <div
 //                             className="controller-instructions-input-wrapper controller-instructions-rate-input"
@@ -2213,8 +2349,8 @@
 //                               value={formData.rateper_breakbulk || ""}
 //                               name="rateper_breakbulk"
 //                               onChange={handleRateChange}
-//                               disabled={true}
-//                               style={nonEditableStyle}
+//                               disabled={formData.rateWeight !== "Container" || isReadOnly}
+//                               style={isReadOnly ? readOnlyStyle : {}}
 //                             />
 //                             <ErrorTooltip message={fieldErrors.rateper_breakbulk} />
 //                           </div>
@@ -2238,6 +2374,7 @@
 //                           name="hazardous"
 //                           checked={formData.hazardous || false}
 //                           onChange={handleInputChange}
+//                           disabled={isReadOnly}
 //                         />
 //                         <span className="controller-instructions-checkmark"></span>
 //                         Hazardous Materials
@@ -2249,6 +2386,7 @@
 //                             name="surchages"
 //                             checked={formData.surchages || false}
 //                             onChange={handleInputChange}
+//                             disabled={isReadOnly}
 //                           />
 //                           <span className="controller-instructions-checkmark"></span>
 //                           Add Surcharges
@@ -2267,7 +2405,8 @@
 //                               min="0"
 //                               step="0.01"
 //                               placeholder="Amount"
-//                               style={{ width: "100%", padding: "4px 8px" }}
+//                               style={{ width: "100%", padding: "4px 8px", ...(isReadOnly ? readOnlyStyle : {}) }}
+//                               disabled={isReadOnly}
 //                             />
 //                           </div>
 //                         )}
@@ -2281,44 +2420,72 @@
 //                   style={{ marginTop: "8px", display: "flex", flexDirection: "column", gap: "8px", maxWidth: "220px" }}
 //                 >
 //                   <div className="controller-instructions-form-field">
-//                     <label>Booking Reference</label>
-//                     <div className="controller-instructions-input-wrapper" ref={fieldRefs.bookingRef}>
-//                       <input
-//                         type="text"
-//                         className={`controller-instructions-form-input ${fieldErrors.bookingRef ? "controller-instructions-error-field" : ""}`}
-//                         placeholder="Enter booking ref"
-//                         name="bookingRef"
-//                         value={formData.bookingRef}
-//                         onChange={handleInputChange}
-//                       />
-//                       <ErrorTooltip message={fieldErrors.bookingRef} />
+//                     <label>Shipment Type</label>
+//                     <div className="controller-instructions-select-wrapper" ref={fieldRefs.shipmentTypeId}>
+//                       <select
+//                         className={`controller-instructions-dropdown ${fieldErrors.shipmentTypeId ? "controller-instructions-error-field" : ""}`}
+//                         name="shipmentTypeId"
+//                         value={formData.shipmentTypeId}
+//                         onChange={handleShipmentTypeChange}
+//                         disabled={isReadOnly}
+//                         style={isReadOnly ? readOnlyStyle : {}}
+//                       >
+//                         <option value="" disabled>
+//                           Select Shipment
+//                         </option>
+//                         {shipmentTypes.map((type) => (
+//                           <option key={type.shipkey} value={type.shipkey}>
+//                             {type.shipmenttype}
+//                           </option>
+//                         ))}
+//                       </select>
+//                       <ErrorTooltip message={fieldErrors.shipmentTypeId} />
 //                     </div>
 //                   </div>
 //                   <div className="controller-instructions-form-field">
-//                     <label>File Ref</label>
-//                     <div className="controller-instructions-input-wrapper" ref={fieldRefs.fileRef}>
-//                       <input
-//                         type="text"
-//                         className={`controller-instructions-form-input ${fieldErrors.fileRef ? "controller-instructions-error-field" : ""}`}
-//                         placeholder="Enter file ref"
-//                         name="fileRef"
-//                         value={formData.fileRef}
-//                         onChange={handleInputChange}
-//                       />
-//                       <ErrorTooltip message={fieldErrors.fileRef} />
+//                     <label>Pickup Location</label>
+//                     <div className="controller-instructions-select-wrapper" ref={fieldRefs.pickup}>
+//                       <select
+//                         className={`controller-instructions-dropdown ${fieldErrors.pickup ? "controller-instructions-error-field" : ""}`}
+//                         name="pickup"
+//                         value={formData.pickup || ""}
+//                         onChange={handlePickupChange}
+//                         disabled={isReadOnly}
+//                         style={isReadOnly ? readOnlyStyle : {}}
+//                       >
+//                         <option value="" disabled>
+//                           Select Pickup
+//                         </option>
+//                         {startingPoints.map((point) => (
+//                           <option key={point.id} value={point.startingpoint}>
+//                             {point.startingpoint}
+//                           </option>
+//                         ))}
+//                       </select>
+//                       <ErrorTooltip message={fieldErrors.pickup} />
 //                     </div>
 //                   </div>
-//                   <div className="controller-instructions-form-field" style={{ maxWidth: "120px" }}>
-//                     <label>VAT Rate %</label>
-//                     <div className="controller-instructions-input-wrapper">
-//                       <input
-//                         type="number"
-//                         className="controller-instructions-form-input"
-//                         name="vat"
-//                         value={formData.vat || 15}
-//                         onChange={handleInputChange}
-//                         required
-//                       />
+//                   <div className="controller-instructions-form-field">
+//                     <label>Dropoff Location</label>
+//                     <div className="controller-instructions-select-wrapper" ref={fieldRefs.dropoff}>
+//                       <select
+//                         className={`controller-instructions-dropdown ${fieldErrors.dropoff ? "controller-instructions-error-field" : ""}`}
+//                         name="dropoff"
+//                         value={formData.dropoff || ""}
+//                         onChange={handleDropoffChange}
+//                         disabled={isReadOnly}
+//                         style={isReadOnly ? readOnlyStyle : {}}
+//                       >
+//                         <option value="" disabled>
+//                           Select Dropoff
+//                         </option>
+//                         {destinations.map((dest) => (
+//                           <option key={dest.id} value={dest.destination}>
+//                             {dest.destination}
+//                           </option>
+//                         ))}
+//                       </select>
+//                       <ErrorTooltip message={fieldErrors.dropoff} />
 //                     </div>
 //                   </div>
 //                   {/* This surchages section has been moved to be next to the checkbox */}
@@ -2328,15 +2495,18 @@
 //                     <label>Unit per</label>
 //                     <div style={{ display: "flex", alignItems: "flex-start", gap: "15px", width: "100%" }}>
 //                       {/* Unit per dropdown */}
-//                       <div className="controller-instructions-select-wrapper" style={{ minWidth: "100px", marginTop: '5px' }}>
+//                       <div
+//                         className="controller-instructions-select-wrapper"
+//                         style={{ minWidth: "100px", marginTop: "5px" }}
+//                       >
 //                         <select
 //                           className="controller-instructions-dropdown"
 //                           name="rateWeight"
 //                           value={formData.rateWeight || "Container"}
 //                           onChange={handleInputChange}
-//                           style={{ ...nonEditableStyle, width: "100%", padding: "4px 8px" }}
+//                           style={{ width: "100%", padding: "4px 8px", ...(isReadOnly ? readOnlyStyle : {}) }}
 //                           ref={fieldRefs.rateWeight}
-//                           disabled={true}
+//                           disabled={isReadOnly}
 //                         >
 //                           <option value="kg">kg</option>
 //                           <option value="m³">m³</option>
@@ -2344,12 +2514,20 @@
 //                           <option value="Container">Container</option>
 //                         </select>
 //                       </div>
-                      
+
 //                       {/* Rate per unit and weight textboxes */}
 //                       {(formData.rateWeight === "kg" ||
 //                         formData.rateWeight === "m³" ||
 //                         formData.rateWeight === "ton") && (
-//                         <div style={{ display: "flex", gap: "15px", width: "100%", marginTop: '48px', marginLeft: '-113px' }}>
+//                         <div
+//                           style={{
+//                             display: "flex",
+//                             gap: "15px",
+//                             width: "100%",
+//                             marginTop: "48px",
+//                             marginLeft: "-113px",
+//                           }}
+//                         >
 //                           {/* Unit Rate Field */}
 //                           <div className="controller-instructions-form-field" style={{ flex: 1, minWidth: "150px" }}>
 //                             <label>{`Rate per ${formData.rateWeight}`}</label>
@@ -2369,8 +2547,8 @@
 //                                     handleInputChange(e)
 //                                   }
 //                                 }}
-//                                 disabled={true}
-//                                 style={nonEditableStyle}
+//                                 disabled={isReadOnly}
+//                                 style={isReadOnly ? readOnlyStyle : {}}
 //                               />
 //                               <ErrorTooltip message={fieldErrors.unitRate} />
 //                             </div>
@@ -2395,6 +2573,8 @@
 //                                     handleInputChange(e)
 //                                   }
 //                                 }}
+//                                 disabled={isReadOnly}
+//                                 style={isReadOnly ? readOnlyStyle : {}}
 //                               />
 //                               <ErrorTooltip message={fieldErrors.quantity} />
 //                             </div>
@@ -2410,40 +2590,35 @@
 //                 <div className="controller-instructions-date-time-group">
 //                   <div className="controller-instructions-shipment-task-row" style={{ order: -1, marginBottom: "8px" }}>
 //                     <div className="controller-instructions-form-field controller-instructions-small-field">
-//                       <label>Shipment Type</label>
-//                       <div className="controller-instructions-select-wrapper" ref={fieldRefs.shipmentTypeId}>
-//                         <select
-//                           className={`controller-instructions-dropdown ${fieldErrors.shipmentTypeId ? "controller-instructions-error-field" : ""}`}
-//                           name="shipmentTypeId"
-//                           value={formData.shipmentTypeId}
-//                           onChange={handleShipmentTypeChange}
-//                           disabled={true}
-//                           style={nonEditableStyle}
-//                         >
-//                           <option value="" disabled>
-//                             Select Shipment
-//                           </option>
-//                           {shipmentTypes.map((type) => (
-//                             <option key={type.shipkey} value={type.shipkey}>
-//                               {type.shipmenttype}
-//                             </option>
-//                           ))}
-//                         </select>
-//                         <ErrorTooltip message={fieldErrors.shipmentTypeId} />
+//                       <label>Booking Reference</label>
+//                       <div className="controller-instructions-input-wrapper" ref={fieldRefs.bookingRef}>
+//                         <input
+//                           type="text"
+//                           className={`controller-instructions-form-input ${fieldErrors.bookingRef ? "controller-instructions-error-field" : ""}`}
+//                           placeholder="Enter booking ref"
+//                           name="bookingRef"
+//                           value={formData.bookingRef}
+//                           onChange={handleInputChange}
+//                           disabled={isReadOnly}
+//                           style={isReadOnly ? readOnlyStyle : {}}
+//                         />
+//                         <ErrorTooltip message={fieldErrors.bookingRef} />
 //                       </div>
 //                     </div>
 //                     <div className="controller-instructions-form-field controller-instructions-small-field">
-//                       <label>Name of Task</label>
-//                       <div className="controller-instructions-input-wrapper" ref={fieldRefs.task}>
+//                       <label>File Ref</label>
+//                       <div className="controller-instructions-input-wrapper" ref={fieldRefs.fileRef}>
 //                         <input
 //                           type="text"
-//                           className={`controller-instructions-form-input ${fieldErrors.task ? "controller-instructions-error-field" : ""}`}
-//                           placeholder="Input Name of Task"
-//                           name="task"
-//                           value={formData.task}
+//                           className={`controller-instructions-form-input ${fieldErrors.fileRef ? "controller-instructions-error-field" : ""}`}
+//                           placeholder="Enter file ref"
+//                           name="fileRef"
+//                           value={formData.fileRef}
 //                           onChange={handleInputChange}
+//                           disabled={isReadOnly}
+//                           style={isReadOnly ? readOnlyStyle : {}}
 //                         />
-//                         <ErrorTooltip message={fieldErrors.task} />
+//                         <ErrorTooltip message={fieldErrors.fileRef} />
 //                       </div>
 //                     </div>
 //                     {/* Booking / File / VAT inline with task */}
@@ -2453,16 +2628,15 @@
 //                         style={{ flex: "0 1 160px" }}
 //                       >
 //                         <label>Booking Reference</label>
-//                         <div className="controller-instructions-input-wrapper" ref={fieldRefs.bookingRef}>
+//                         <div className="controller-instructions-input-wrapper">
 //                           <input
 //                             type="text"
-//                             className={`controller-instructions-form-input ${fieldErrors.bookingRef ? "controller-instructions-error-field" : ""}`}
+//                             className="controller-instructions-form-input"
 //                             placeholder="Enter booking ref"
 //                             name="bookingRef"
 //                             value={formData.bookingRef}
 //                             onChange={handleInputChange}
 //                           />
-//                           <ErrorTooltip message={fieldErrors.bookingRef} />
 //                         </div>
 //                       </div>
 //                       <div
@@ -2470,21 +2644,20 @@
 //                         style={{ flex: "0 1 160px" }}
 //                       >
 //                         <label>File Ref</label>
-//                         <div className="controller-instructions-input-wrapper" ref={fieldRefs.fileRef}>
+//                         <div className="controller-instructions-input-wrapper">
 //                           <input
 //                             type="text"
-//                             className={`controller-instructions-form-input ${fieldErrors.fileRef ? "controller-instructions-error-field" : ""}`}
+//                             className="controller-instructions-form-input"
 //                             placeholder="Enter file ref"
 //                             name="fileRef"
 //                             value={formData.fileRef}
 //                             onChange={handleInputChange}
 //                           />
-//                           <ErrorTooltip message={fieldErrors.fileRef} />
 //                         </div>
 //                       </div>
 //                       <div
 //                         className="controller-instructions-form-field controller-instructions-small-field"
-//                         style={{ flex: "0 1 120px" }}
+//                         style={{ flex: "0 1 80px" }}
 //                       >
 //                         <label>VAT Rate %</label>
 //                         <div className="controller-instructions-input-wrapper">
@@ -2499,274 +2672,40 @@
 //                         </div>
 //                       </div>
 //                     </div>
-
-//                     {/* Vessel Details - will be moved below ETA/Deadline */}
 //                   </div>
-//                   <div className="controller-instructions-shipment-task-row" style={{ display: "none" }}>
-//                     <div className="controller-instructions-form-field controller-instructions-small-field">
-//                       <label>Shipment Type</label>
-//                       <div className="controller-instructions-select-wrapper" ref={fieldRefs.shipmentTypeId}>
-//                         <select
-//                           className={`controller-instructions-dropdown ${fieldErrors.shipmentTypeId ? "controller-instructions-error-field" : ""}`}
-//                           name="shipmentTypeId"
-//                           value={formData.shipmentTypeId}
-//                           onChange={handleShipmentTypeChange}
-//                           disabled={true}
-//                           style={nonEditableStyle}
-//                         >
-//                           <option value="" disabled>
-//                             Select Shipment
-//                           </option>
-//                           {shipmentTypes.map((type) => (
-//                             <option key={type.shipkey} value={type.shipkey}>
-//                               {type.shipmenttype}
-//                             </option>
-//                           ))}
-//                         </select>
-//                         <ErrorTooltip message={fieldErrors.shipmentTypeId} />
-//                       </div>
-//                     </div>
-//                     <div className="controller-instructions-form-field controller-instructions-small-field">
-//                       <label>Name of Task</label>
-//                       <div className="controller-instructions-input-wrapper" ref={fieldRefs.task}>
-//                         <input
-//                           type="text"
-//                           className={`controller-instructions-form-input ${fieldErrors.task ? "controller-instructions-error-field" : ""}`}
-//                           placeholder="Input Name of Task"
-//                           name="task"
-//                           value={formData.task}
-//                           onChange={handleInputChange}
-//                         />
-//                         <ErrorTooltip message={fieldErrors.task} />
-//                       </div>
+//                   <div className="controller-instructions-form-field">
+//                     <label>Name of Task</label>
+//                     <div className="controller-instructions-input-wrapper" ref={fieldRefs.task}>
+//                       <input
+//                         type="text"
+//                         className={`controller-instructions-form-input ${fieldErrors.task ? "controller-instructions-error-field" : ""}`}
+//                         placeholder="Input Name of Task"
+//                         name="task"
+//                         value={formData.task}
+//                         onChange={handleInputChange}
+//                         disabled={isReadOnly}
+//                         style={isReadOnly ? readOnlyStyle : {}}
+//                       />
+//                       <ErrorTooltip message={fieldErrors.task} />
 //                     </div>
 //                   </div>
-//                   <div className="controller-instructions-date-time-row-1" style={{ display: "flex", gap: "15px" }}>
-//                     <div className="controller-instructions-form-field" style={{ flex: "1", minWidth: "0" }}>
-//                       <label>Pick-Up Location</label>
-//                       <div
-//                         className="controller-instructions-date-input-group"
-//                         ref={fieldRefs.pickup}
-//                         style={{ width: "100%" }}
-//                       >
-//                         <select
-//                           className={`controller-instructions-form-input ${fieldErrors.pickup ? "controller-instructions-error-field" : ""}`}
-//                           name="pickup"
-//                           value={formData.pickup || ""}
-//                           onChange={handlePickupChange}
-//                           disabled={true}
-//                           style={{ ...nonEditableStyle, width: "100%", maxWidth: "75%" }}
-//                         >
-//                           <option value="" disabled>
-//                             {startingPoints.length === 0 ? "No locations available" : "Select Pick-Up Location"}
-//                           </option>
-//                           {Array.isArray(startingPoints) &&
-//                             startingPoints.map((point) => {
-//                               const pointValue = point.startingpoint
-//                               return (
-//                                 <option key={point.id} value={pointValue}>
-//                                   {pointValue}
-//                                 </option>
-//                               )
-//                             })}
-//                         </select>
-//                         <ErrorTooltip message={fieldErrors.pickup} />
-//                       </div>
-//                     </div>
-//                     <div className="controller-instructions-form-field" style={{ flex: "1", minWidth: "0" }}>
-//                       <label>Drop-off Location</label>
-//                       <div
-//                         className="controller-instructions-date-input-group"
-//                         ref={fieldRefs.dropoff}
-//                         style={{ width: "100%" }}
-//                       >
-//                         <select
-//                           className={`controller-instructions-form-input ${fieldErrors.dropoff ? "controller-instructions-error-field" : ""}`}
-//                           name="dropoff"
-//                           value={formData.dropoff}
-//                           onChange={handleInputChange}
-//                           disabled={true}
-//                           style={{ ...nonEditableStyle, width: "100%", maxWidth: "75%" }}
-//                         >
-//                           <option value="" disabled>
-//                             Select Drop-off Location
-//                           </option>
-//                           {destinations.map((dest, index) => (
-//                             <option key={index} value={dest.destination}>
-//                               {dest.destination}
-//                             </option>
-//                           ))}
-//                         </select>
-//                         <ErrorTooltip message={fieldErrors.dropoff} />
-//                       </div>
+//                   <div className="controller-instructions-form-field" style={{ maxWidth: "120px" }}>
+//                     <label>VAT Rate %</label>
+//                     <div className="controller-instructions-input-wrapper">
+//                       <input
+//                         type="number"
+//                         className="controller-instructions-form-input"
+//                         name="vat"
+//                         value={formData.vat || 15}
+//                         onChange={handleInputChange}
+//                         required
+//                         disabled={isReadOnly}
+//                         style={isReadOnly ? readOnlyStyle : {}}
+//                       />
 //                     </div>
 //                   </div>
-//                   <div
-//                     className="controller-instructions-date-time-row-1"
-//                     style={{ marginTop: "15px", display: "flex", gap: "15px" }}
-//                   >
-//                     <div className="controller-instructions-form-field" style={{ flex: "1", minWidth: "0" }}>
-//                       <label>Pick-up Time</label>
-//                       <div
-//                         className="controller-instructions-date-input-group"
-//                         ref={fieldRefs.pickupTime}
-//                         style={{ width: "100%" }}
-//                       >
-//                         <input
-//                           type="time"
-//                           className={`controller-instructions-form-input ${fieldErrors.pickupTime ? "controller-instructions-error-field" : ""}`}
-//                           placeholder="Time here"
-//                           name="pickupTime"
-//                           value={formData.pickupTime}
-//                           onChange={handleInputChange}
-//                           style={{ width: "75%" }}
-//                         />
-//                         <button className="controller-instructions-calendar-button"></button>
-//                         <ErrorTooltip message={fieldErrors.pickupTime} />
-//                       </div>
-//                     </div>
-//                     <div className="controller-instructions-form-field" style={{ flex: "1", minWidth: "0" }}>
-//                       <label>Pick-up Date</label>
-//                       <div
-//                         className="controller-instructions-date-input-group"
-//                         ref={fieldRefs.pickupDate}
-//                         style={{ width: "100%" }}
-//                       >
-//                         <input
-//                           type="date"
-//                           className={`controller-instructions-form-input ${fieldErrors.pickupDate ? "controller-instructions-error-field" : ""}`}
-//                           ref={pickupDateRef}
-//                           placeholder="Date here"
-//                           name="pickupDate"
-//                           value={formData.pickupDate}
-//                           onChange={handleInputChange}
-//                           style={{ width: "75%" }}
-//                         />
-//                         <button
-//                           className="controller-instructions-calendar-button"
-//                           onClick={() => openCalendar(pickupDateRef)}
-//                         ></button>
-//                         <ErrorTooltip message={fieldErrors.pickupDate} />
-//                       </div>
-//                     </div>
-//                   </div>
-//                   <div className="controller-instructions-date-time-row-2" style={{ display: "flex", gap: "15px" }}>
-//                     {formData.shipmentTypeId !== "3" && formData.shipmentTypeName.toLowerCase() !== "cross-haul" && (
-//                       <div className="controller-instructions-form-field" style={{ flex: "1", minWidth: "0" }}>
-//                         <label>{isImport ? "ETA" : "Stack Date"}</label>
-//                         <div
-//                           className="controller-instructions-date-input-group"
-//                           ref={fieldRefs.stackDate}
-//                           style={{ width: "100%" }}
-//                         >
-//                           <input
-//                             type="date"
-//                             className={`controller-instructions-form-input ${fieldErrors.stackDate ? "controller-instructions-error-field" : ""}`}
-//                             ref={etaDateRef}
-//                             placeholder="Date here"
-//                             name="stackDate"
-//                             value={formData.stackDate}
-//                             onChange={handleInputChange}
-//                             min={formData.pickupDate || today}
-//                             disabled={!formData.pickupDate}
-//                             style={{ width: "75%" }}
-//                           />
-//                           <button
-//                             className="controller-instructions-calendar-button"
-//                             onClick={() =>
-//                               formData.pickupDate
-//                                 ? openCalendar(etaDateRef)
-//                                 : setErrorModal({
-//                                     isOpen: true,
-//                                     message: "Please select a pickup date first",
-//                                   })
-//                             }
-//                           ></button>
-//                           <ErrorTooltip message={fieldErrors.stackDate} />
-//                         </div>
-//                       </div>
-//                     )}
-//                     <div style={{ display: "flex", gap: "15px", flex: "1" }}>
-//                       <div className="controller-instructions-form-field" style={{ flex: "1", minWidth: "0" }}>
-//                         <label>Deadline</label>
-//                         <div
-//                           className="controller-instructions-date-input-group"
-//                           ref={fieldRefs.deadline}
-//                           style={{ width: "100%" }}
-//                         >
-//                           <input
-//                             type="date"
-//                             className={`controller-instructions-form-input ${fieldErrors.deadline ? "controller-instructions-error-field" : ""}`}
-//                             ref={deadlineDateRef}
-//                             placeholder="Date here"
-//                             name="deadline"
-//                             value={formData.deadline}
-//                             onChange={handleInputChange}
-//                             min={formData.pickupDate || today}
-//                             style={{ width: formData.shipmentTypeName?.toLowerCase() === "cross-haul" ? "70%" : "75%" }}
-//                           />
-//                           <button
-//                             className="controller-instructions-calendar-button"
-//                             onClick={() => {
-//                               if (!formData.pickupDate) {
-//                                 setErrorModal({
-//                                   isOpen: true,
-//                                   message: "Please select a pickup date first",
-//                                 })
-//                               } else if (!formData.stackDate) {
-//                                 setErrorModal({
-//                                   isOpen: true,
-//                                   message: `Please select ${isImport ? "an ETA" : "a stack date"} first`,
-//                                 })
-//                               } else {
-//                                 openCalendar(deadlineDateRef)
-//                               }
-//                             }}
-//                           ></button>
-//                           <ErrorTooltip message={fieldErrors.deadline} />
-//                         </div>
-//                       </div>
-
-      
-
-//                       {formData.shipmentTypeName?.toLowerCase() === "cross-haul" && (
-//                         <div className="controller-instructions-form-field" style={{ flex: "1", minWidth: "0" }}>
-//                           <label>Description</label>
-//                           <div className="controller-instructions-input-wrapper" ref={fieldRefs.description}>
-//                             <input
-//                               type="text"
-//                               className={`controller-instructions-form-input ${fieldErrors.description ? "controller-instructions-error-field" : ""}`}
-//                               placeholder="Client description"
-//                               name="description"
-//                               value={formData.description}
-//                               onChange={handleInputChange}
-//                               style={{ width: "100%" }}
-//                             />
-//                             <ErrorTooltip message={fieldErrors.description} />
-//                           </div>
-//                         </div>
-//                       )}
-//                     </div>
-//                   </div>
-//                 </div>
-//               </div>
-//             </div>
-//           </div>
-//           {formData.shipmentTypeName?.toLowerCase() !== "cross-haul" && (
-//             <div
-//               className="controller-instructions-form-section controller-instructions-vessel-info-section"
-//               style={{ marginTop: "16px" }}
-//             >
-//               <div
-//                 className="controller-instructions-form-row controller-instructions-vessel-info-row"
-//                 style={{ display: "flex", flexWrap: "wrap", gap: "12px", alignItems: "flex-start", width: "100%" }}
-//               >
-//                 <div
-//                   className="controller-instructions-form-field"
-//                   style={{ flex: "1", minWidth: "200px", maxWidth: "300px" }}
-//                 >
-//                   {formData.shipmentTypeId !== "3" && formData.shipmentTypeName?.toLowerCase() !== "cross-haul" && (
-//                     <>
+//                   {!isCrossHaulShipment() && (
+//                     <div className="controller-instructions-form-field">
 //                       <label>Vessel Name</label>
 //                       <div className="controller-instructions-input-wrapper" ref={fieldRefs.vesselName}>
 //                         <input
@@ -2776,217 +2715,347 @@
 //                           name="vesselName"
 //                           value={formData.vesselName}
 //                           onChange={handleInputChange}
-//                           style={{ width: "100%" }}
+//                           disabled={isReadOnly}
+//                           style={isReadOnly ? readOnlyStyle : {}}
 //                         />
 //                         <ErrorTooltip message={fieldErrors.vesselName} />
 //                       </div>
-//                     </>
+//                     </div>
 //                   )}
+//                   <div className="controller-instructions-form-field">
+//                     <label>Description</label>
+//                     <div className="controller-instructions-input-wrapper" ref={fieldRefs.description}>
+//                       <input
+//                         type="text"
+//                         className={`controller-instructions-form-input ${fieldErrors.description ? "controller-instructions-error-field" : ""}`}
+//                         placeholder="Enter description"
+//                         name="description"
+//                         value={formData.description}
+//                         onChange={handleInputChange}
+//                         disabled={isReadOnly}
+//                         style={isReadOnly ? readOnlyStyle : {}}
+//                       />
+//                       <ErrorTooltip message={fieldErrors.description} />
+//                     </div>
+//                   </div>
 //                 </div>
-//                 <div
-//                   className="controller-instructions-form-field"
-//                   style={{ flex: "1", minWidth: "200px", maxWidth: "300px" }}
-//                 >
-//                   <label>Description from Client</label>
-//                   <div className="controller-instructions-input-wrapper" ref={fieldRefs.description}>
+//                 <div className="controller-instructions-date-time-group">
+//                   <div className="controller-instructions-form-field">
+//                     <label>Pickup Time</label>
 //                     <input
-//                       type="text"
-//                       className={`controller-instructions-form-input ${fieldErrors.description ? "controller-instructions-error-field" : ""}`}
-//                       placeholder="Client description"
-//                       name="description"
-//                       value={formData.description}
+//                       type="time"
+//                       className={`controller-instructions-form-input ${fieldErrors.pickupTime ? "controller-instructions-error-field" : ""}`}
+//                       name="pickupTime"
+//                       value={formData.pickupTime}
 //                       onChange={handleInputChange}
-//                       style={{ width: "100%" }}
+//                       ref={fieldRefs.pickupTime}
+//                       disabled={isReadOnly}
+//                       style={isReadOnly ? readOnlyStyle : {}}
 //                     />
-//                     <ErrorTooltip message={fieldErrors.description} />
+//                     <ErrorTooltip message={fieldErrors.pickupTime} />
+//                   </div>
+//                   <div className="controller-instructions-form-field">
+//                     <label>Pickup Date</label>
+//                     <div className="controller-instructions-date-wrapper" ref={fieldRefs.pickupDate}>
+//                       <input
+//                         type="date"
+//                         className={`controller-instructions-form-input ${fieldErrors.pickupDate ? "controller-instructions-error-field" : ""}`}
+//                         name="pickupDate"
+//                         value={formData.pickupDate}
+//                         onChange={handleInputChange}
+//                         min={today}
+//                         ref={pickupDateRef}
+//                         disabled={isReadOnly}
+//                         style={isReadOnly ? readOnlyStyle : {}}
+//                       />
+//                       <ErrorTooltip message={fieldErrors.pickupDate} />
+//                     </div>
+//                   </div>
+//                   {!isCrossHaulShipment() && (
+//                     <div className="controller-instructions-form-field">
+//                       <label>{isImport ? "ETA Date" : "Stack Date"}</label>
+//                       <div className="controller-instructions-date-wrapper" ref={fieldRefs.stackDate}>
+//                         <input
+//                           type="date"
+//                           className={`controller-instructions-form-input ${fieldErrors.stackDate ? "controller-instructions-error-field" : ""}`}
+//                           name="stackDate"
+//                           value={formData.stackDate}
+//                           onChange={handleInputChange}
+//                           min={formData.pickupDate || today}
+//                           ref={etaDateRef}
+//                           disabled={isReadOnly}
+//                           style={isReadOnly ? readOnlyStyle : {}}
+//                         />
+//                         <ErrorTooltip message={fieldErrors.stackDate} />
+//                       </div>
+//                     </div>
+//                   )}
+//                   <div className="controller-instructions-form-field">
+//                     <label>Deadline</label>
+//                     <div className="controller-instructions-date-wrapper" ref={fieldRefs.deadline}>
+//                       <input
+//                         type="date"
+//                         className={`controller-instructions-form-input ${fieldErrors.deadline ? "controller-instructions-error-field" : ""}`}
+//                         name="deadline"
+//                         value={formData.deadline}
+//                         onChange={handleInputChange}
+//                         min={formData.pickupDate || today}
+//                         ref={deadlineDateRef}
+//                         disabled={isReadOnly}
+//                         style={isReadOnly ? readOnlyStyle : {}}
+//                       />
+//                       <ErrorTooltip message={fieldErrors.deadline} />
+//                     </div>
 //                   </div>
 //                 </div>
 //               </div>
 //             </div>
-//           )}
-//           <div
-//             className="controller-instructions-form-section controller-instructions-description-section"
-//             style={{ display: "none" }}
-//           >
-//             <div className="controller-instructions-form-row">
-//               <div
-//                 className="controller-instructions-form-field controller-instructions-full-width"
-//                 style={{ width: "100%" }}
-//               >
-//                 <label>Description from Client</label>
-//                 <div className="controller-instructions-textarea-wrapper" ref={fieldRefs.description}>
-//                   <textarea
-//                     className={`controller-instructions-form-textarea ${fieldErrors.description ? "controller-instructions-error-field" : ""}`}
-//                     placeholder="Description from Client, like type of goods etc"
-//                     name="description"
-//                     value={formData.description}
-//                     onChange={handleInputChange}
-//                     style={{ width: "100%" }}
-//                   ></textarea>
-//                   <ErrorTooltip message={fieldErrors.description} />
-//                 </div>
-//               </div>
-//             </div>
 //           </div>
-//           {/* Container Details Section */}
-//           <div className="container-details-section" style={{ marginTop: "30px" }}>
-//             <h3>Container Details</h3>
-
-//             {containerSuccessMessage && (
-//               <div className="success-message" style={{ color: "green", marginBottom: "15px" }}>
-//                 {containerSuccessMessage}
-//               </div>
-//             )}
-
-//             {isContainerLoading ? (
-//               <div style={{ textAlign: "center", padding: "20px" }}>
-//                 <p>Loading container data...</p>
-//               </div>
-//             ) : containers && containers.length > 0 ? (
-//               <div className="container-table-wrapper">
-//                 <table className="container-table" style={{ width: "100%", borderCollapse: "collapse" }}>
-//                   <thead>
-//                     <tr>
-//                       <th>Container Type</th>
-//                       <th>Container Number</th>
-//                       {isImport && <th>Weight</th>}
-//                       <th>Cargo Description</th>
-//                     </tr>
-//                   </thead>
-//                   <tbody>
-//                     {containers.map((container) => (
-//                       <tr key={container.id}>
-//                         <td>{container.containerType}</td>
-//                         <td className="input-cell">
-//                           <div className="input-wrapper">
-//                             <input
-//                               type="text"
-//                               value={container.containerNum}
-//                               onChange={(e) => handleContainerChange(container.id, "containerNum", e.target.value)}
-//                               className={`container-input ${
-//                                 containerFieldErrors[`container-${container.id}`] ? "error-field" : ""
-//                               }`}
-//                               placeholder="ABCD1234567"
-//                               maxLength={11}
-//                             />
-//                             {containerFieldErrors[`container-${container.id}`] && (
-//                               <ErrorTooltip message={containerFieldErrors[`container-${container.id}`]} />
-//                             )}
-//                           </div>
-//                         </td>
+//           {/* Container Details Table */}
+//           {containers.length > 0 && (
+//             <div className="controller-instructions-form-section">
+//               <div className="controller-instructions-container-details-section">
+//                 <h3>Container Details</h3>
+//                 {(containerSuccessMessage || rateUpdateMessage) && (
+//                   <div className="controller-instructions-success-message">
+//                     {containerSuccessMessage || rateUpdateMessage}
+//                   </div>
+//                 )}
+//                 <div
+//                   className="controller-instructions-container-table-wrapper"
+//                   style={{
+//                     overflowX: "auto",
+//                     marginBottom: "20px",
+//                   }}
+//                 >
+//                   <table
+//                     className="controller-instructions-container-table"
+//                     style={{
+//                       width: "100%",
+//                       borderCollapse: "collapse",
+//                       marginBottom: "10px",
+//                     }}
+//                   >
+//                     <thead>
+//                       <tr>
+//                         <th style={{ padding: "12px 8px", textAlign: "left", borderBottom: "2px solid #ddd" }}>
+//                           Container Type
+//                         </th>
+//                         <th style={{ padding: "12px 8px", textAlign: "left", borderBottom: "2px solid #ddd" }}>
+//                           Container Number
+//                         </th>
 //                         {isImport && (
-//                           <td className="input-cell">
-//                             <div className="input-wrapper">
+//                           <th style={{ padding: "12px 8px", textAlign: "left", borderBottom: "2px solid #ddd" }}>
+//                             Weight (kg)
+//                           </th>
+//                         )}
+//                         <th style={{ padding: "12px 8px", textAlign: "left", borderBottom: "2px solid #ddd" }}>
+//                           Cargo Description
+//                         </th>
+//                       </tr>
+//                     </thead>
+//                     <tbody>
+//                       {containers.map((container) => (
+//                         <tr key={container.id}>
+//                           <td>{container.containerType}</td>
+//                           <td>
+//                             <div className="controller-instructions-input-wrapper">
 //                               <input
 //                                 type="text"
-//                                 value={container.weight || ""}
-//                                 onChange={(e) => handleContainerChange(container.id, "weight", e.target.value)}
-//                                 className={`container-input ${
-//                                   containerFieldErrors[`weight-${container.id}`] ? "error-field" : ""
+//                                 className={`controller-instructions-form-input ${
+//                                   containerFieldErrors[`container-${container.id}`]
+//                                     ? "controller-instructions-error-field"
+//                                     : ""
 //                                 }`}
-//                                 placeholder="Weight"
+//                                 value={container.containerNum}
+//                                 onChange={(e) => handleContainerChange(container.id, "containerNum", e.target.value)}
+//                                 placeholder="ABCD1234567"
+//                                 maxLength={11}
+//                                 disabled={isReadOnly}
+//                                 style={isReadOnly ? readOnlyStyle : {}}
 //                               />
-//                               {containerFieldErrors[`weight-${container.id}`] && (
-//                                 <ErrorTooltip message={containerFieldErrors[`weight-${container.id}`]} />
+//                               {containerFieldErrors[`container-${container.id}`] && (
+//                                 <div
+//                                   className="controller-instructions-container-error-text"
+//                                   style={{
+//                                     color: "#e74c3c",
+//                                     fontSize: "12px",
+//                                     marginTop: "4px",
+//                                     fontWeight: "500",
+//                                     display: "block",
+//                                   }}
+//                                 >
+//                                   {containerFieldErrors[`container-${container.id}`]}
+//                                 </div>
 //                               )}
 //                             </div>
 //                           </td>
-//                         )}
-//                         <td className="input-cell">
-//                           <div className="input-wrapper">
-//                             <input
-//                               type="text"
-//                               value={container.cargoDescription || ""}
-//                               onChange={(e) => handleContainerChange(container.id, "cargoDescription", e.target.value)}
-//                               className="container-input"
-//                               placeholder="Cargo description"
-//                             />
-//                           </div>
-//                         </td>
-//                       </tr>
-//                     ))}
-//                   </tbody>
-//                 </table>
+//                           {isImport && (
+//                             <td>
+//                               <div className="controller-instructions-input-wrapper">
+//                                 <input
+//                                   type="text"
+//                                   className={`controller-instructions-form-input ${
+//                                     containerFieldErrors[`weight-${container.id}`]
+//                                       ? "controller-instructions-error-field"
+//                                       : ""
+//                                   }`}
+//                                   value={container.weight || ""}
+//                                   onChange={(e) => handleContainerChange(container.id, "weight", e.target.value)}
+//                                   placeholder="0.00"
+//                                   disabled={isReadOnly}
+//                                   style={isReadOnly ? readOnlyStyle : {}}
+//                                 />
+//                                 {containerFieldErrors[`weight-${container.id}`] && (
+//                                   <div
+//                                     className="controller-instructions-container-error-text"
+//                                     style={{
+//                                       color: "#e74c3c",
+//                                       fontSize: "12px",
+//                                       marginTop: "4px",
+//                                       fontWeight: "500",
+//                                       display: "block",
+//                                     }}
+//                                   >
+//                                     {containerFieldErrors[`weight-${container.id}`]}
+//                                   </div>
+//                                 )}
+//                               </div>
+//                             </td>
+//                           )}
+//                           <td>
+//                             <div className="controller-instructions-input-wrapper">
+//                               <input
+//                                 type="text"
+//                                 className="controller-instructions-form-input"
+//                                 value={container.cargoDescription}
+//                                 onChange={(e) =>
+//                                   handleContainerChange(container.id, "cargoDescription", e.target.value)
+//                                 }
+//                                 placeholder="Enter cargo description"
+//                                 disabled={isReadOnly}
+//                                 style={isReadOnly ? readOnlyStyle : {}}
+//                               />
+//                             </div>
+//                           </td>
+//                         </tr>
+//                       ))}
+//                     </tbody>
+//                   </table>
+//                 </div>
+//                 {isContainerLoading && (
+//                   <div className="controller-instructions-loading-message">Updating containers...</div>
+//                 )}
 //               </div>
-//             ) : (
-//               <div style={{ textAlign: "center", padding: "20px" }}>
-//                 <p>
-//                   No containers to display.{" "}
-//                   {instructionId ? "No containers found for this instruction." : "Please add container counts above."}
-//                 </p>
-//               </div>
-//             )}
-
-//             <div className="submit-section" style={{ marginTop: "20px", textAlign: "right" }}>
+//             </div>
+//           )}
+//           {!isReadOnly && (
+//             <div className="controller-instructions-form-actions" style={{ display: "flex", justifyContent: "center" }}>
 //               <button
-//                 className="save-button"
+//                 className="controller-instructions-save-button"
 //                 onClick={handleSaveChanges}
-//                 disabled={isContainerLoading}
 //                 style={{
-//                   backgroundColor: isContainerLoading ? "#cccccc" : "#4CAF50",
+//                   backgroundColor: "#4a90e2",
 //                   color: "white",
-//                   padding: "10px 20px",
+//                   padding: "12px 24px",
 //                   border: "none",
 //                   borderRadius: "4px",
-//                   cursor: isContainerLoading ? "not-allowed" : "pointer",
+//                   cursor: "pointer",
+//                   fontSize: "16px",
+//                   fontWeight: "bold",
 //                 }}
 //               >
-//                 {isContainerLoading ? "Saving..." : "Save Changes"}
+//                 Save Changes
 //               </button>
 //             </div>
-//           </div>
+//           )}
 
-//           {/* Booking fields below Abnormal */}
-//           <div className="controller-instructions-booking-group" style={{ display: "none" }}>
-//             <div className="controller-instructions-form-field">
-//               <label>Booking Reference</label>
-//               <div className="controller-instructions-input-wrapper" ref={fieldRefs.bookingRef}>
-//                 <input
-//                   type="text"
-//                   className={`controller-instructions-form-input ${fieldErrors.bookingRef ? "controller-instructions-error-field" : ""}`}
-//                   placeholder="Enter booking ref"
-//                   name="bookingRef"
-//                   value={formData.bookingRef}
-//                   onChange={handleInputChange}
-//                 />
-//                 <ErrorTooltip message={fieldErrors.bookingRef} />
+//           {isReadOnly && (
+//             <div className="controller-instructions-form-actions" style={{ display: "flex", justifyContent: "center" }}>
+//               <div
+//                 style={{
+//                   backgroundColor: "#6c757d",
+//                   color: "white",
+//                   padding: "12px 24px",
+//                   borderRadius: "4px",
+//                   fontSize: "16px",
+//                   fontWeight: "bold",
+//                   textAlign: "center",
+//                 }}
+//               >
+//                 This instruction is {formData.status} and cannot be edited
 //               </div>
 //             </div>
-//             <div className="controller-instructions-form-field">
-//               <label>File Ref</label>
-//               <div className="controller-instructions-input-wrapper" ref={fieldRefs.fileRef}>
-//                 <input
-//                   type="text"
-//                   className={`controller-instructions-form-input ${fieldErrors.fileRef ? "controller-instructions-error-field" : ""}`}
-//                   placeholder="Enter file ref"
-//                   name="fileRef"
-//                   value={formData.fileRef}
-//                   onChange={handleInputChange}
-//                 />
-//                 <ErrorTooltip message={fieldErrors.fileRef} />
-//               </div>
-//             </div>
-//             <div className="controller-instructions-form-field" style={{ maxWidth: "120px" }}>
-//               <label>VAT Rate %</label>
-//               <div className="controller-instructions-input-wrapper">
-//                 <input
-//                   type="number"
-//                   className="controller-instructions-form-input"
-//                   name="vat"
-//                   value={formData.vat || 15}
-//                   onChange={handleInputChange}
-//                   required
-//                 />
+//           )}
+//         </div>
+//         {/* Confirmation Modal */}
+//         {confirmationModal.isOpen && (
+//           <div
+//             className="controller-instructions-modal-overlay"
+//             style={{
+//               position: "fixed",
+//               top: 0,
+//               left: 0,
+//               right: 0,
+//               bottom: 0,
+//               backgroundColor: "rgba(0, 0, 0, 0.5)",
+//               display: "flex",
+//               justifyContent: "center",
+//               alignItems: "center",
+//               zIndex: 1000,
+//             }}
+//           >
+//             <div
+//               className="controller-instructions-modal-content"
+//               style={{
+//                 backgroundColor: "white",
+//                 padding: "24px",
+//                 borderRadius: "8px",
+//                 maxWidth: "500px",
+//                 width: "90%",
+//                 boxShadow: "0 4px 6px rgba(0, 0, 0, 0.1)",
+//               }}
+//             >
+//               <h3 style={{ marginBottom: "16px", color: "#333" }}>Confirm Save</h3>
+//               <p style={{ marginBottom: "24px", lineHeight: "1.5", color: "#666" }}>{confirmationModal.message}</p>
+//               <div style={{ display: "flex", justifyContent: "flex-end", gap: "12px" }}>
+//                 <button
+//                   onClick={handleCancelSave}
+//                   style={{
+//                     padding: "8px 16px",
+//                     border: "1px solid #ddd",
+//                     borderRadius: "4px",
+//                     backgroundColor: "white",
+//                     color: "#666",
+//                     cursor: "pointer",
+//                   }}
+//                 >
+//                   No, Let Me Edit
+//                 </button>
+//                 <button
+//                   onClick={handleConfirmSave}
+//                   style={{
+//                     padding: "8px 16px",
+//                     border: "none",
+//                     borderRadius: "4px",
+//                     backgroundColor: "#4a90e2",
+//                     color: "white",
+//                     cursor: "pointer",
+//                   }}
+//                 >
+//                   Yes, Continue
+//                 </button>
 //               </div>
 //             </div>
 //           </div>
-//         </div>
+//         )}
 //       </div>
 //     </div>
-//   );
-// };
+//   )
+// }
 
-// export default FCcontrollerinstructions;
+// export default FCcontrollerinstructions
+
 "use client"
 
 import { useState, useEffect, useRef } from "react"
@@ -3105,6 +3174,7 @@ const FCcontrollerinstructions = () => {
       vat: 15,
       description: "",
       total_cost: 0,
+      status: "",
     }
 
     if (preservedFormData) {
@@ -3167,8 +3237,12 @@ const FCcontrollerinstructions = () => {
       vat: 15,
       description: "",
       total_cost: 0,
+      status: "",
     }
   })
+
+  // Check if the instruction should be read-only based on status
+  const isReadOnly = formData.status === "In progress" || formData.status === "Completed"
 
   const [startingPoints, setStartingPoints] = useState([])
   const [destinations, setDestinations] = useState([])
@@ -3194,6 +3268,11 @@ const FCcontrollerinstructions = () => {
   const [containerSuccessMessage, setContainerSuccessMessage] = useState("")
   const [isContainerLoading, setIsContainerLoading] = useState(false)
   const [isContainerDataModified, setIsContainerDataModified] = useState(false)
+
+  const [confirmationModal, setConfirmationModal] = useState({
+    isOpen: false,
+    message: "",
+  })
 
   // Initialize containers based on container counts
   const initializeContainers = () => {
@@ -3227,7 +3306,7 @@ const FCcontrollerinstructions = () => {
         id: containerId++,
         containerKey: null,
         containerNum: "",
-        weight: isImport ? "" : null,
+        weight: isImport ? null : null, // Always start with null
         containerType: "6m",
         cargoDescription: "",
       })
@@ -3239,7 +3318,7 @@ const FCcontrollerinstructions = () => {
         id: containerId++,
         containerKey: null,
         containerNum: "",
-        weight: isImport ? "" : null,
+        weight: isImport ? null : null, // Always start with null
         containerType: "12m",
         cargoDescription: "",
       })
@@ -3251,7 +3330,7 @@ const FCcontrollerinstructions = () => {
         id: containerId++,
         containerKey: null,
         containerNum: "",
-        weight: isImport ? "" : null,
+        weight: isImport ? null : null, // Always start with null
         containerType: "Abnormal",
         cargoDescription: "",
       })
@@ -3263,7 +3342,7 @@ const FCcontrollerinstructions = () => {
         id: containerId++,
         containerKey: null,
         containerNum: "",
-        weight: isImport ? "" : null,
+        weight: isImport ? null : null, // Always start with null
         containerType: "BreakBulk",
         cargoDescription: "",
       })
@@ -3315,6 +3394,33 @@ const FCcontrollerinstructions = () => {
     if (field === "weight") {
       // Clear error when user starts typing
       clearContainerFieldError(id, "weight")
+
+      // Sanitize weight value - convert empty string to null, validate numeric input
+      let sanitizedValue = null
+      if (value && value.trim() !== "") {
+        // Only allow valid numeric input (including decimals)
+        if (/^[0-9]*\.?[0-9]*$/.test(value.trim())) {
+          const numValue = Number.parseFloat(value.trim())
+          if (!isNaN(numValue) && numValue >= 0) {
+            sanitizedValue = numValue
+          } else {
+            // Invalid number, keep as string for user feedback but will be sanitized on save
+            sanitizedValue = value
+          }
+        } else {
+          // Invalid format, don't update
+          return
+        }
+      }
+
+      // Update with sanitized value (null for empty, number for valid input)
+      setContainers((prevContainers) =>
+        prevContainers.map((container) =>
+          container.id === id ? { ...container, [field]: sanitizedValue } : container,
+        ),
+      )
+      setIsContainerDataModified(true)
+      return
     }
 
     // Update the container value
@@ -3345,12 +3451,22 @@ const FCcontrollerinstructions = () => {
         isValid = false
       }
 
-      if (isImport && (container.weight === "" || container.weight === null)) {
-        newErrors[`weight-${container.id}`] = "Field is required"
-        isValid = false
-      } else if (isImport && container.weight && !/^[0-9]*\.?[0-9]*$/.test(container.weight)) {
-        newErrors[`weight-${container.id}`] = "Numbers only"
-        isValid = false
+      // Weight validation for import shipments
+      if (isImport) {
+        if (container.weight === null || container.weight === undefined || container.weight === "") {
+          newErrors[`weight-${container.id}`] = "Field is required"
+          isValid = false
+        } else if (typeof container.weight === "string" && container.weight.trim() === "") {
+          newErrors[`weight-${container.id}`] = "Field is required"
+          isValid = false
+        } else if (container.weight !== null) {
+          const weightValue =
+            typeof container.weight === "number" ? container.weight : Number.parseFloat(container.weight)
+          if (isNaN(weightValue) || weightValue < 0) {
+            newErrors[`weight-${container.id}`] = "Must be a valid positive number"
+            isValid = false
+          }
+        }
       }
     }
 
@@ -3507,6 +3623,63 @@ const FCcontrollerinstructions = () => {
     setContainerFieldErrors((prev) => ({ ...prev, [`${fieldType}-${containerId}`]: "" }))
   }
 
+  // Check for rate/counter mismatch and show confirmation if needed
+  const checkRateCounterMismatch = () => {
+    const mismatches = []
+    const containerTypesWithCounts = []
+
+    // Check each container type for rate > 0 but count = 0
+    if ((formData.rateper_6 > 0 || Number(formData.rateper_6) > 0) && formData.num_six_meters === 0) {
+      mismatches.push("6m")
+    }
+    if ((formData.rateper_12 > 0 || Number(formData.rateper_12) > 0) && formData.num_twelve_meters === 0) {
+      mismatches.push("12m")
+    }
+    if ((formData.rateper_abnormal > 0 || Number(formData.rateper_abnormal) > 0) && formData.num_abnormal === 0) {
+      mismatches.push("Abnormal")
+    }
+    if (
+      (formData.rateper_breakbulk > 0 || Number(formData.rateper_breakbulk) > 0) &&
+      (formData.num_breakbulk === 0 || !formData.num_breakbulk)
+    ) {
+      mismatches.push("Break Bulk")
+    }
+
+    // If there are mismatches, collect container types with counts > 0
+    if (mismatches.length > 0) {
+      if (formData.num_six_meters > 0) {
+        containerTypesWithCounts.push(`6m (${formData.num_six_meters} containers, Rate: R${formData.rateper_6})`)
+      }
+      if (formData.num_twelve_meters > 0) {
+        containerTypesWithCounts.push(`12m (${formData.num_twelve_meters} containers, Rate: R${formData.rateper_12})`)
+      }
+      if (formData.num_abnormal > 0) {
+        containerTypesWithCounts.push(
+          `Abnormal (${formData.num_abnormal} containers, Rate: R${formData.rateper_abnormal})`,
+        )
+      }
+      if (formData.num_breakbulk > 0) {
+        containerTypesWithCounts.push(
+          `Break Bulk (${formData.num_breakbulk} containers, Rate: R${formData.rateper_breakbulk})`,
+        )
+      }
+
+      // Show confirmation modal
+      const message =
+        containerTypesWithCounts.length > 0
+          ? `You have containers with the following rates: ${containerTypesWithCounts.join(", ")}. Are you sure you want to continue?`
+          : "You have set rates for container types with 0 containers. Are you sure you want to continue?"
+
+      setConfirmationModal({
+        isOpen: true,
+        message: message,
+      })
+      return false // Don't proceed with save
+    }
+
+    return true // No mismatches, proceed with save
+  }
+
   // Handle save changes with enhanced logic
   const handleSaveChanges = async () => {
     console.log("=== SAVE CHANGES INITIATED ===")
@@ -3521,6 +3694,18 @@ const FCcontrollerinstructions = () => {
       return
     }
 
+    // Check for rate/counter mismatch
+    if (!checkRateCounterMismatch()) {
+      console.log("⚠️ Rate/counter mismatch detected - showing confirmation")
+      return
+    }
+
+    // Proceed with actual save logic
+    await performSave()
+  }
+
+  // Extract the actual save logic into a separate function
+  const performSave = async () => {
     try {
       setIsContainerLoading(true)
       setContainerSuccessMessage("")
@@ -3528,6 +3713,45 @@ const FCcontrollerinstructions = () => {
       // Fetch original data for comparison
       console.log("📊 Fetching original data for comparison...")
       const originalData = await fetchOriginalData()
+
+      // Helper function to format dates for database (YYYY-MM-DD)
+      const formatDateForDB = (dateString) => {
+        if (!dateString) return null
+        try {
+          // If already in YYYY-MM-DD format, return as is
+          if (/^\d{4}-\d{2}-\d{2}$/.test(dateString)) {
+            return dateString
+          }
+          // Handle MM/DD/YYYY format
+          if (dateString.includes("/")) {
+            const [month, day, year] = dateString.split("/")
+            if (year && month && day) {
+              return `${year}-${month.padStart(2, "0")}-${day.padStart(2, "0")}`
+            }
+          }
+          // Try to parse as Date object
+          const date = new Date(dateString)
+          if (!isNaN(date.getTime())) {
+            return date.toISOString().split("T")[0]
+          }
+          return null
+        } catch (e) {
+          console.error("Error formatting date:", e)
+          return null
+        }
+      }
+
+      // Helper function to format time for database (HH:MM:SS)
+      const formatTimeForDB = (timeString) => {
+        if (!timeString) return null
+        try {
+          const [hours, minutes] = timeString.split(":")
+          return `${hours.padStart(2, "0")}:${minutes.padStart(2, "0")}:00`
+        } catch (e) {
+          console.error("Error formatting time:", e)
+          return null
+        }
+      }
 
       // Recalculate total cost based on current values
       const numSix = formData.num_six_meters || 0
@@ -3545,32 +3769,65 @@ const FCcontrollerinstructions = () => {
       const surchargeAmount = formData.surchages ? Number(formData.surcharge || 0) : 0
       const totalCost = Number((baseCost + surchargeAmount).toFixed(2))
 
-      // Prepare instruction update data
+      // Prepare instruction update data with proper field mapping
       const instructionUpdateData = {
-        ...formData,
+        // Map frontend fields to backend database fields
         client: formData.clientId,
+        task: formData.task,
         shipment_type: formData.shipmentTypeId,
-        total_cost: totalCost,
-        status: formData.status || "In progress",
+        pickup: formData.pickup,
+        dropoff: formData.dropoff,
+        hazardous: Boolean(formData.hazardous),
+        surchages: Boolean(formData.surchages),
+        surcharge: surchargeAmount,
+        pickuptime: formatTimeForDB(formData.pickupTime),
+        pickupdate: formatDateForDB(formData.pickupDate),
+        stackdate: formatDateForDB(formData.stackDate),
+        deadline: formatDateForDB(formData.deadline),
+        fileref: formData.fileRef,
         rateweight: formData.rateWeight,
+        description: formData.description,
+        status: formData.status,
+        vat: Number(formData.vat || 15),
+        num_six_meters: numSix,
+        num_twelve_meters: numTwelve,
+        num_abnormal: numAbnormal,
+        num_breakbulk: numBreakBulk,
+        weight: formData.rateWeight !== "Container" ? Number(formData.weight || 0) : null,
+        total_cost: totalCost,
+        booking_ref: formData.bookingRef,
+        vessel_name: formData.vesselName,
+        rateper_6: ratePer6,
+        rateper_12: ratePer12,
+        rateper_abnormal: ratePerAbnormal,
+        rateper_breakbulk: ratePerBreakBulk,
+        unitrate: formData.rateWeight !== "Container" ? Number(formData.unitRate || 0) : null,
       }
 
       // Prepare container data with containerKey for smart updates
       const containerData = containers.map((container) => {
-        let weight = null
-        if (container.weight !== undefined && container.weight !== null && container.weight !== "") {
-          const parsedWeight = Number.parseFloat(container.weight)
-          if (!isNaN(parsedWeight)) {
-            weight = parsedWeight
+        // Sanitize weight value
+        let sanitizedWeight = null
+        if (container.weight !== null && container.weight !== undefined && container.weight !== "") {
+          if (typeof container.weight === "string") {
+            const trimmedWeight = container.weight.trim()
+            if (trimmedWeight !== "") {
+              const parsedWeight = Number.parseFloat(trimmedWeight)
+              if (!isNaN(parsedWeight) && parsedWeight >= 0) {
+                sanitizedWeight = parsedWeight
+              }
+            }
+          } else if (typeof container.weight === "number" && container.weight >= 0) {
+            sanitizedWeight = container.weight
           }
         }
 
         return {
           containerKey: container.containerKey, // Important for smart updates
-          containernum: container.containerNum,
-          weight: weight,
-          container_type: container.containerType,
-          cargo_description: container.cargoDescription,
+          containernum: container.containerNum || "",
+          weight: sanitizedWeight, // Will be null for empty/invalid values
+          container_type: container.containerType || "",
+          cargo_description: container.cargoDescription || "",
         }
       })
 
@@ -3589,50 +3846,6 @@ const FCcontrollerinstructions = () => {
         console.log("Old rateper_abnormal:", originalData.rateper_abnormal, "→ New rateper_abnormal:", ratePerAbnormal)
         console.log("Old task:", originalData.task, "→ New task:", formData.task)
         console.log("Old description:", originalData.description, "→ New description:", formData.description)
-
-        console.log("🔄 CONTAINER CHANGES:")
-        const originalContainers = originalData.containers || []
-        console.log(
-          "Original containers count:",
-          originalContainers.length,
-          "→ New containers count:",
-          containers.length,
-        )
-
-        containers.forEach((newContainer, index) => {
-          const originalContainer = originalContainers.find((oc) => oc.containerkey === newContainer.containerKey)
-          if (originalContainer) {
-            console.log(`Container ${index + 1} (UPDATE):`, {
-              containerKey: newContainer.containerKey,
-              oldNum: originalContainer.containernum,
-              newNum: newContainer.containerNum,
-              oldWeight: originalContainer.weight,
-              newWeight: newContainer.weight,
-              oldType: originalContainer.container_type,
-              newType: newContainer.containerType,
-              oldCargo: originalContainer.cargo_description,
-              newCargo: newContainer.cargoDescription,
-            })
-          } else {
-            console.log(`Container ${index + 1} (NEW):`, {
-              containerNum: newContainer.containerNum,
-              weight: newContainer.weight,
-              type: newContainer.containerType,
-              cargo: newContainer.cargoDescription,
-            })
-          }
-        })
-
-        // Log containers to be deleted
-        originalContainers.forEach((originalContainer) => {
-          const stillExists = containers.find((nc) => nc.containerKey === originalContainer.containerkey)
-          if (!stillExists) {
-            console.log("Container (DELETE):", {
-              containerKey: originalContainer.containerkey,
-              containerNum: originalContainer.containernum,
-            })
-          }
-        })
       }
 
       console.log("💾 Sending update request to server...")
@@ -3680,6 +3893,16 @@ const FCcontrollerinstructions = () => {
     }
   }
 
+  // Handle confirmation modal actions
+  const handleConfirmSave = async () => {
+    setConfirmationModal({ isOpen: false, message: "" })
+    await performSave()
+  }
+
+  const handleCancelSave = () => {
+    setConfirmationModal({ isOpen: false, message: "" })
+  }
+
   // Initialize containers when component mounts or container counts change
   useEffect(() => {
     console.log("Container loading effect triggered")
@@ -3711,7 +3934,7 @@ const FCcontrollerinstructions = () => {
             id: container.containerkey || index + 1,
             containerKey: container.containerkey,
             containerNum: container.containernum || "",
-            weight: container.weight !== null && container.weight !== undefined ? container.weight.toString() : "",
+            weight: container.weight !== null && container.weight !== undefined ? container.weight : null,
             containerType: container.container_type || "6m",
             cargoDescription: container.cargo_description || "",
           }))
@@ -3988,6 +4211,7 @@ const FCcontrollerinstructions = () => {
         rateper_12: data.rateper_12 || 0,
         rateper_abnormal: data.rateper_abnormal || 0,
         rateper_breakbulk: data.rateper_breakbulk || 0,
+        status: data.status || "",
       }
 
       setFormData(newFormData)
@@ -4012,7 +4236,7 @@ const FCcontrollerinstructions = () => {
           id: container.containerkey || index + 1,
           containerKey: container.containerkey,
           containerNum: container.containernum || "",
-          weight: container.weight !== null && container.weight !== undefined ? container.weight.toString() : "",
+          weight: container.weight !== null && container.weight !== undefined ? container.weight : null,
           containerType: container.container_type || "6m",
           cargoDescription: container.cargo_description || "",
         }))
@@ -4884,6 +5108,13 @@ const FCcontrollerinstructions = () => {
     cursor: "not-allowed",
   }
 
+  const readOnlyStyle = {
+    backgroundColor: "#f8f9fa",
+    cursor: "not-allowed",
+    color: "#6c757d",
+    border: "1px solid #e9ecef",
+  }
+
   const ErrorTooltip = ({ message }) => {
     if (!message) return null
     return (
@@ -4977,13 +5208,29 @@ const FCcontrollerinstructions = () => {
           </button>
         </div>
         <div className="controller-instructions-form-container" style={{ maxWidth: "1200px" }}>
+          {isReadOnly && (
+            <div
+              style={{
+                backgroundColor: "#fff3cd",
+                border: "1px solid #ffeaa7",
+                borderRadius: "4px",
+                padding: "12px",
+                marginBottom: "20px",
+                textAlign: "center",
+                color: "#856404",
+                fontWeight: "bold",
+              }}
+            >
+              ⚠️ This instruction is {formData.status} and is in read-only mode
+            </div>
+          )}
           <div className="controller-instructions-form-section controller-instructions-client-info-section">
             <div className="controller-instructions-form-row">
               <div className="controller-instructions-form-field">
                 <label>Client</label>
                 <div className="controller-instructions-select-wrapper" ref={fieldRefs.clientId}>
                   <select
-                    style={nonEditableStyle}
+                    style={isReadOnly ? readOnlyStyle : nonEditableStyle}
                     className={`dropdown ${fieldErrors.clientId ? "controller-instructions-error-field" : ""}`}
                     name="clientId"
                     value={formData.clientId || ""}
@@ -5007,7 +5254,7 @@ const FCcontrollerinstructions = () => {
                 <input
                   type="text"
                   className="controller-instructions-form-input"
-                  style={nonEditableStyle}
+                  style={isReadOnly ? readOnlyStyle : nonEditableStyle}
                   value={formData.representative || ""}
                   readOnly
                   placeholder="Autoload representative"
@@ -5026,7 +5273,8 @@ const FCcontrollerinstructions = () => {
                   name="contactDetails"
                   value={formData.contactDetails}
                   readOnly
-                  style={nonEditableStyle}
+                  style={isReadOnly ? readOnlyStyle : nonEditableStyle}
+                  disabled={isReadOnly}
                 />
               </div>
               <div className="controller-instructions-form-field">
@@ -5038,7 +5286,8 @@ const FCcontrollerinstructions = () => {
                   name="email"
                   value={formData.email}
                   readOnly
-                  style={nonEditableStyle}
+                  style={isReadOnly ? readOnlyStyle : nonEditableStyle}
+                  disabled={isReadOnly}
                 />
               </div>
             </div>
@@ -5053,6 +5302,8 @@ const FCcontrollerinstructions = () => {
                     name="shipmentTypeId"
                     value={formData.shipmentTypeId}
                     onChange={handleShipmentTypeChange}
+                    disabled={isReadOnly}
+                    style={isReadOnly ? readOnlyStyle : {}}
                   >
                     <option value="" disabled>
                       Select Shipment
@@ -5076,6 +5327,8 @@ const FCcontrollerinstructions = () => {
                     name="task"
                     value={formData.task}
                     onChange={handleInputChange}
+                    disabled={isReadOnly}
+                    style={isReadOnly ? readOnlyStyle : {}}
                   />
                   <ErrorTooltip message={fieldErrors.task} />
                 </div>
@@ -5109,6 +5362,8 @@ const FCcontrollerinstructions = () => {
                           min="0"
                           name="num_six_meters"
                           onChange={(e) => handleNumericInputChange(e)}
+                          disabled={formData.rateWeight !== "Container" || isReadOnly}
+                          style={isReadOnly ? readOnlyStyle : {}}
                         />
                         <div
                           className="controller-instructions-input-wrapper controller-instructions-rate-input"
@@ -5121,6 +5376,8 @@ const FCcontrollerinstructions = () => {
                             value={formData.rateper_6 || ""}
                             name="rateper_6"
                             onChange={handleRateChange}
+                            disabled={formData.rateWeight !== "Container" || isReadOnly}
+                            style={isReadOnly ? readOnlyStyle : {}}
                           />
                           <ErrorTooltip message={fieldErrors.rateper_6} />
                         </div>
@@ -5136,6 +5393,8 @@ const FCcontrollerinstructions = () => {
                           min="0"
                           name="num_twelve_meters"
                           onChange={(e) => handleNumericInputChange(e)}
+                          disabled={formData.rateWeight !== "Container" || isReadOnly}
+                          style={isReadOnly ? readOnlyStyle : {}}
                         />
                         <div
                           className="controller-instructions-input-wrapper controller-instructions-rate-input"
@@ -5148,6 +5407,8 @@ const FCcontrollerinstructions = () => {
                             value={formData.rateper_12 || ""}
                             name="rateper_12"
                             onChange={handleRateChange}
+                            disabled={formData.rateWeight !== "Container" || isReadOnly}
+                            style={isReadOnly ? readOnlyStyle : {}}
                           />
                           <ErrorTooltip message={fieldErrors.rateper_12} />
                         </div>
@@ -5163,6 +5424,8 @@ const FCcontrollerinstructions = () => {
                           min="0"
                           name="num_abnormal"
                           onChange={(e) => handleNumericInputChange(e)}
+                          disabled={formData.rateWeight !== "Container" || isReadOnly}
+                          style={isReadOnly ? readOnlyStyle : {}}
                         />
                         <div
                           className="controller-instructions-input-wrapper controller-instructions-rate-input"
@@ -5175,6 +5438,8 @@ const FCcontrollerinstructions = () => {
                             value={formData.rateper_abnormal || ""}
                             name="rateper_abnormal"
                             onChange={handleRateChange}
+                            disabled={formData.rateWeight !== "Container" || isReadOnly}
+                            style={isReadOnly ? readOnlyStyle : {}}
                           />
                           <ErrorTooltip message={fieldErrors.rateper_abnormal} />
                         </div>
@@ -5191,6 +5456,8 @@ const FCcontrollerinstructions = () => {
                             min="0"
                             name="num_breakbulk"
                             onChange={(e) => handleNumericInputChange(e)}
+                            disabled={formData.rateWeight !== "Container" || isReadOnly}
+                            style={isReadOnly ? readOnlyStyle : {}}
                           />
                           <div
                             className="controller-instructions-input-wrapper controller-instructions-rate-input"
@@ -5203,6 +5470,8 @@ const FCcontrollerinstructions = () => {
                               value={formData.rateper_breakbulk || ""}
                               name="rateper_breakbulk"
                               onChange={handleRateChange}
+                              disabled={formData.rateWeight !== "Container" || isReadOnly}
+                              style={isReadOnly ? readOnlyStyle : {}}
                             />
                             <ErrorTooltip message={fieldErrors.rateper_breakbulk} />
                           </div>
@@ -5226,6 +5495,7 @@ const FCcontrollerinstructions = () => {
                           name="hazardous"
                           checked={formData.hazardous || false}
                           onChange={handleInputChange}
+                          disabled={isReadOnly}
                         />
                         <span className="controller-instructions-checkmark"></span>
                         Hazardous Materials
@@ -5237,6 +5507,7 @@ const FCcontrollerinstructions = () => {
                             name="surchages"
                             checked={formData.surchages || false}
                             onChange={handleInputChange}
+                            disabled={isReadOnly}
                           />
                           <span className="controller-instructions-checkmark"></span>
                           Add Surcharges
@@ -5255,7 +5526,8 @@ const FCcontrollerinstructions = () => {
                               min="0"
                               step="0.01"
                               placeholder="Amount"
-                              style={{ width: "100%", padding: "4px 8px" }}
+                              style={{ width: "100%", padding: "4px 8px", ...(isReadOnly ? readOnlyStyle : {}) }}
+                              disabled={isReadOnly}
                             />
                           </div>
                         )}
@@ -5269,44 +5541,72 @@ const FCcontrollerinstructions = () => {
                   style={{ marginTop: "8px", display: "flex", flexDirection: "column", gap: "8px", maxWidth: "220px" }}
                 >
                   <div className="controller-instructions-form-field">
-                    <label>Booking Reference</label>
-                    <div className="controller-instructions-input-wrapper" ref={fieldRefs.bookingRef}>
-                      <input
-                        type="text"
-                        className={`controller-instructions-form-input ${fieldErrors.bookingRef ? "controller-instructions-error-field" : ""}`}
-                        placeholder="Enter booking ref"
-                        name="bookingRef"
-                        value={formData.bookingRef}
-                        onChange={handleInputChange}
-                      />
-                      <ErrorTooltip message={fieldErrors.bookingRef} />
+                    <label>Shipment Type</label>
+                    <div className="controller-instructions-select-wrapper" ref={fieldRefs.shipmentTypeId}>
+                      <select
+                        className={`controller-instructions-dropdown ${fieldErrors.shipmentTypeId ? "controller-instructions-error-field" : ""}`}
+                        name="shipmentTypeId"
+                        value={formData.shipmentTypeId}
+                        onChange={handleShipmentTypeChange}
+                        disabled={isReadOnly}
+                        style={isReadOnly ? readOnlyStyle : {}}
+                      >
+                        <option value="" disabled>
+                          Select Shipment
+                        </option>
+                        {shipmentTypes.map((type) => (
+                          <option key={type.shipkey} value={type.shipkey}>
+                            {type.shipmenttype}
+                          </option>
+                        ))}
+                      </select>
+                      <ErrorTooltip message={fieldErrors.shipmentTypeId} />
                     </div>
                   </div>
                   <div className="controller-instructions-form-field">
-                    <label>File Ref</label>
-                    <div className="controller-instructions-input-wrapper" ref={fieldRefs.fileRef}>
-                      <input
-                        type="text"
-                        className={`controller-instructions-form-input ${fieldErrors.fileRef ? "controller-instructions-error-field" : ""}`}
-                        placeholder="Enter file ref"
-                        name="fileRef"
-                        value={formData.fileRef}
-                        onChange={handleInputChange}
-                      />
-                      <ErrorTooltip message={fieldErrors.fileRef} />
+                    <label>Pickup Location</label>
+                    <div className="controller-instructions-select-wrapper" ref={fieldRefs.pickup}>
+                      <select
+                        className={`controller-instructions-dropdown ${fieldErrors.pickup ? "controller-instructions-error-field" : ""}`}
+                        name="pickup"
+                        value={formData.pickup || ""}
+                        onChange={handlePickupChange}
+                        disabled={isReadOnly}
+                        style={isReadOnly ? readOnlyStyle : {}}
+                      >
+                        <option value="" disabled>
+                          Select Pickup
+                        </option>
+                        {startingPoints.map((point) => (
+                          <option key={point.id} value={point.startingpoint}>
+                            {point.startingpoint}
+                          </option>
+                        ))}
+                      </select>
+                      <ErrorTooltip message={fieldErrors.pickup} />
                     </div>
                   </div>
-                  <div className="controller-instructions-form-field" style={{ maxWidth: "120px" }}>
-                    <label>VAT Rate %</label>
-                    <div className="controller-instructions-input-wrapper">
-                      <input
-                        type="number"
-                        className="controller-instructions-form-input"
-                        name="vat"
-                        value={formData.vat || 15}
-                        onChange={handleInputChange}
-                        required
-                      />
+                  <div className="controller-instructions-form-field">
+                    <label>Dropoff Location</label>
+                    <div className="controller-instructions-select-wrapper" ref={fieldRefs.dropoff}>
+                      <select
+                        className={`controller-instructions-dropdown ${fieldErrors.dropoff ? "controller-instructions-error-field" : ""}`}
+                        name="dropoff"
+                        value={formData.dropoff || ""}
+                        onChange={handleDropoffChange}
+                        disabled={isReadOnly}
+                        style={isReadOnly ? readOnlyStyle : {}}
+                      >
+                        <option value="" disabled>
+                          Select Dropoff
+                        </option>
+                        {destinations.map((dest) => (
+                          <option key={dest.id} value={dest.destination}>
+                            {dest.destination}
+                          </option>
+                        ))}
+                      </select>
+                      <ErrorTooltip message={fieldErrors.dropoff} />
                     </div>
                   </div>
                   {/* This surchages section has been moved to be next to the checkbox */}
@@ -5325,8 +5625,9 @@ const FCcontrollerinstructions = () => {
                           name="rateWeight"
                           value={formData.rateWeight || "Container"}
                           onChange={handleInputChange}
-                          style={{ width: "100%", padding: "4px 8px" }}
+                          style={{ width: "100%", padding: "4px 8px", ...(isReadOnly ? readOnlyStyle : {}) }}
                           ref={fieldRefs.rateWeight}
+                          disabled={isReadOnly}
                         >
                           <option value="kg">kg</option>
                           <option value="m³">m³</option>
@@ -5367,6 +5668,8 @@ const FCcontrollerinstructions = () => {
                                     handleInputChange(e)
                                   }
                                 }}
+                                disabled={isReadOnly}
+                                style={isReadOnly ? readOnlyStyle : {}}
                               />
                               <ErrorTooltip message={fieldErrors.unitRate} />
                             </div>
@@ -5391,6 +5694,8 @@ const FCcontrollerinstructions = () => {
                                     handleInputChange(e)
                                   }
                                 }}
+                                disabled={isReadOnly}
+                                style={isReadOnly ? readOnlyStyle : {}}
                               />
                               <ErrorTooltip message={fieldErrors.quantity} />
                             </div>
@@ -5406,38 +5711,35 @@ const FCcontrollerinstructions = () => {
                 <div className="controller-instructions-date-time-group">
                   <div className="controller-instructions-shipment-task-row" style={{ order: -1, marginBottom: "8px" }}>
                     <div className="controller-instructions-form-field controller-instructions-small-field">
-                      <label>Shipment Type</label>
-                      <div className="controller-instructions-select-wrapper" ref={fieldRefs.shipmentTypeId}>
-                        <select
-                          className={`controller-instructions-dropdown ${fieldErrors.shipmentTypeId ? "controller-instructions-error-field" : ""}`}
-                          name="shipmentTypeId"
-                          value={formData.shipmentTypeId}
-                          onChange={handleShipmentTypeChange}
-                        >
-                          <option value="" disabled>
-                            Select Shipment
-                          </option>
-                          {shipmentTypes.map((type) => (
-                            <option key={type.shipkey} value={type.shipkey}>
-                              {type.shipmenttype}
-                            </option>
-                          ))}
-                        </select>
-                        <ErrorTooltip message={fieldErrors.shipmentTypeId} />
+                      <label>Booking Reference</label>
+                      <div className="controller-instructions-input-wrapper" ref={fieldRefs.bookingRef}>
+                        <input
+                          type="text"
+                          className={`controller-instructions-form-input ${fieldErrors.bookingRef ? "controller-instructions-error-field" : ""}`}
+                          placeholder="Enter booking ref"
+                          name="bookingRef"
+                          value={formData.bookingRef}
+                          onChange={handleInputChange}
+                          disabled={isReadOnly}
+                          style={isReadOnly ? readOnlyStyle : {}}
+                        />
+                        <ErrorTooltip message={fieldErrors.bookingRef} />
                       </div>
                     </div>
                     <div className="controller-instructions-form-field controller-instructions-small-field">
-                      <label>Name of Task</label>
-                      <div className="controller-instructions-input-wrapper" ref={fieldRefs.task}>
+                      <label>File Ref</label>
+                      <div className="controller-instructions-input-wrapper" ref={fieldRefs.fileRef}>
                         <input
                           type="text"
-                          className={`controller-instructions-form-input ${fieldErrors.task ? "controller-instructions-error-field" : ""}`}
-                          placeholder="Input Name of Task"
-                          name="task"
-                          value={formData.task}
+                          className={`controller-instructions-form-input ${fieldErrors.fileRef ? "controller-instructions-error-field" : ""}`}
+                          placeholder="Enter file ref"
+                          name="fileRef"
+                          value={formData.fileRef}
                           onChange={handleInputChange}
+                          disabled={isReadOnly}
+                          style={isReadOnly ? readOnlyStyle : {}}
                         />
-                        <ErrorTooltip message={fieldErrors.task} />
+                        <ErrorTooltip message={fieldErrors.fileRef} />
                       </div>
                     </div>
                     {/* Booking / File / VAT inline with task */}
@@ -5493,45 +5795,34 @@ const FCcontrollerinstructions = () => {
                     </div>
                   </div>
                   <div className="controller-instructions-form-field">
-                    <label>Pickup Location</label>
-                    <div className="controller-instructions-select-wrapper" ref={fieldRefs.pickup}>
-                      <select
-                        className={`controller-instructions-dropdown ${fieldErrors.pickup ? "controller-instructions-error-field" : ""}`}
-                        name="pickup"
-                        value={formData.pickup || ""}
-                        onChange={handlePickupChange}
-                      >
-                        <option value="" disabled>
-                          Select Pickup
-                        </option>
-                        {startingPoints.map((point) => (
-                          <option key={point.id} value={point.startingpoint}>
-                            {point.startingpoint}
-                          </option>
-                        ))}
-                      </select>
-                      <ErrorTooltip message={fieldErrors.pickup} />
+                    <label>Name of Task</label>
+                    <div className="controller-instructions-input-wrapper" ref={fieldRefs.task}>
+                      <input
+                        type="text"
+                        className={`controller-instructions-form-input ${fieldErrors.task ? "controller-instructions-error-field" : ""}`}
+                        placeholder="Input Name of Task"
+                        name="task"
+                        value={formData.task}
+                        onChange={handleInputChange}
+                        disabled={isReadOnly}
+                        style={isReadOnly ? readOnlyStyle : {}}
+                      />
+                      <ErrorTooltip message={fieldErrors.task} />
                     </div>
                   </div>
-                  <div className="controller-instructions-form-field">
-                    <label>Dropoff Location</label>
-                    <div className="controller-instructions-select-wrapper" ref={fieldRefs.dropoff}>
-                      <select
-                        className={`controller-instructions-dropdown ${fieldErrors.dropoff ? "controller-instructions-error-field" : ""}`}
-                        name="dropoff"
-                        value={formData.dropoff || ""}
-                        onChange={handleDropoffChange}
-                      >
-                        <option value="" disabled>
-                          Select Dropoff
-                        </option>
-                        {destinations.map((dest) => (
-                          <option key={dest.id} value={dest.destination}>
-                            {dest.destination}
-                          </option>
-                        ))}
-                      </select>
-                      <ErrorTooltip message={fieldErrors.dropoff} />
+                  <div className="controller-instructions-form-field" style={{ maxWidth: "120px" }}>
+                    <label>VAT Rate %</label>
+                    <div className="controller-instructions-input-wrapper">
+                      <input
+                        type="number"
+                        className="controller-instructions-form-input"
+                        name="vat"
+                        value={formData.vat || 15}
+                        onChange={handleInputChange}
+                        required
+                        disabled={isReadOnly}
+                        style={isReadOnly ? readOnlyStyle : {}}
+                      />
                     </div>
                   </div>
                   {!isCrossHaulShipment() && (
@@ -5545,6 +5836,8 @@ const FCcontrollerinstructions = () => {
                           name="vesselName"
                           value={formData.vesselName}
                           onChange={handleInputChange}
+                          disabled={isReadOnly}
+                          style={isReadOnly ? readOnlyStyle : {}}
                         />
                         <ErrorTooltip message={fieldErrors.vesselName} />
                       </div>
@@ -5560,6 +5853,8 @@ const FCcontrollerinstructions = () => {
                         name="description"
                         value={formData.description}
                         onChange={handleInputChange}
+                        disabled={isReadOnly}
+                        style={isReadOnly ? readOnlyStyle : {}}
                       />
                       <ErrorTooltip message={fieldErrors.description} />
                     </div>
@@ -5575,6 +5870,8 @@ const FCcontrollerinstructions = () => {
                       value={formData.pickupTime}
                       onChange={handleInputChange}
                       ref={fieldRefs.pickupTime}
+                      disabled={isReadOnly}
+                      style={isReadOnly ? readOnlyStyle : {}}
                     />
                     <ErrorTooltip message={fieldErrors.pickupTime} />
                   </div>
@@ -5589,6 +5886,8 @@ const FCcontrollerinstructions = () => {
                         onChange={handleInputChange}
                         min={today}
                         ref={pickupDateRef}
+                        disabled={isReadOnly}
+                        style={isReadOnly ? readOnlyStyle : {}}
                       />
                       <ErrorTooltip message={fieldErrors.pickupDate} />
                     </div>
@@ -5605,6 +5904,8 @@ const FCcontrollerinstructions = () => {
                           onChange={handleInputChange}
                           min={formData.pickupDate || today}
                           ref={etaDateRef}
+                          disabled={isReadOnly}
+                          style={isReadOnly ? readOnlyStyle : {}}
                         />
                         <ErrorTooltip message={fieldErrors.stackDate} />
                       </div>
@@ -5621,6 +5922,8 @@ const FCcontrollerinstructions = () => {
                         onChange={handleInputChange}
                         min={formData.pickupDate || today}
                         ref={deadlineDateRef}
+                        disabled={isReadOnly}
+                        style={isReadOnly ? readOnlyStyle : {}}
                       />
                       <ErrorTooltip message={fieldErrors.deadline} />
                     </div>
@@ -5639,14 +5942,37 @@ const FCcontrollerinstructions = () => {
                     {containerSuccessMessage || rateUpdateMessage}
                   </div>
                 )}
-                <div className="controller-instructions-container-table-wrapper">
-                  <table className="controller-instructions-container-table">
+                <div
+                  className="controller-instructions-container-table-wrapper"
+                  style={{
+                    overflowX: "auto",
+                    marginBottom: "20px",
+                  }}
+                >
+                  <table
+                    className="controller-instructions-container-table"
+                    style={{
+                      width: "100%",
+                      borderCollapse: "collapse",
+                      marginBottom: "10px",
+                    }}
+                  >
                     <thead>
                       <tr>
-                        <th>Container Type</th>
-                        <th>Container Number</th>
-                        {isImport && <th>Weight (kg)</th>}
-                        <th>Cargo Description</th>
+                        <th style={{ padding: "12px 8px", textAlign: "left", borderBottom: "2px solid #ddd" }}>
+                          Container Type
+                        </th>
+                        <th style={{ padding: "12px 8px", textAlign: "left", borderBottom: "2px solid #ddd" }}>
+                          Container Number
+                        </th>
+                        {isImport && (
+                          <th style={{ padding: "12px 8px", textAlign: "left", borderBottom: "2px solid #ddd" }}>
+                            Weight (kg)
+                          </th>
+                        )}
+                        <th style={{ padding: "12px 8px", textAlign: "left", borderBottom: "2px solid #ddd" }}>
+                          Cargo Description
+                        </th>
                       </tr>
                     </thead>
                     <tbody>
@@ -5666,9 +5992,22 @@ const FCcontrollerinstructions = () => {
                                 onChange={(e) => handleContainerChange(container.id, "containerNum", e.target.value)}
                                 placeholder="ABCD1234567"
                                 maxLength={11}
+                                disabled={isReadOnly}
+                                style={isReadOnly ? readOnlyStyle : {}}
                               />
                               {containerFieldErrors[`container-${container.id}`] && (
-                                <ErrorTooltip message={containerFieldErrors[`container-${container.id}`]} />
+                                <div
+                                  className="controller-instructions-container-error-text"
+                                  style={{
+                                    color: "#e74c3c",
+                                    fontSize: "12px",
+                                    marginTop: "4px",
+                                    fontWeight: "500",
+                                    display: "block",
+                                  }}
+                                >
+                                  {containerFieldErrors[`container-${container.id}`]}
+                                </div>
                               )}
                             </div>
                           </td>
@@ -5682,12 +6021,25 @@ const FCcontrollerinstructions = () => {
                                       ? "controller-instructions-error-field"
                                       : ""
                                   }`}
-                                  value={container.weight || ""}
+                                  value={container.weight === null ? "" : container.weight.toString()}
                                   onChange={(e) => handleContainerChange(container.id, "weight", e.target.value)}
                                   placeholder="0.00"
+                                  disabled={isReadOnly}
+                                  style={isReadOnly ? readOnlyStyle : {}}
                                 />
                                 {containerFieldErrors[`weight-${container.id}`] && (
-                                  <ErrorTooltip message={containerFieldErrors[`weight-${container.id}`]} />
+                                  <div
+                                    className="controller-instructions-container-error-text"
+                                    style={{
+                                      color: "#e74c3c",
+                                      fontSize: "12px",
+                                      marginTop: "4px",
+                                      fontWeight: "500",
+                                      display: "block",
+                                    }}
+                                  >
+                                    {containerFieldErrors[`weight-${container.id}`]}
+                                  </div>
                                 )}
                               </div>
                             </td>
@@ -5702,6 +6054,8 @@ const FCcontrollerinstructions = () => {
                                   handleContainerChange(container.id, "cargoDescription", e.target.value)
                                 }
                                 placeholder="Enter cargo description"
+                                disabled={isReadOnly}
+                                style={isReadOnly ? readOnlyStyle : {}}
                               />
                             </div>
                           </td>
@@ -5716,25 +6070,106 @@ const FCcontrollerinstructions = () => {
               </div>
             </div>
           )}
-          <div className="controller-instructions-form-actions" style={{ display: "flex", justifyContent: "center" }}>
-            <button
-              className="controller-instructions-save-button"
-              onClick={handleSaveChanges}
+          {!isReadOnly && (
+            <div className="controller-instructions-form-actions" style={{ display: "flex", justifyContent: "center" }}>
+              <button
+                className="controller-instructions-save-button"
+                onClick={handleSaveChanges}
+                style={{
+                  backgroundColor: "#4a90e2",
+                  color: "white",
+                  padding: "12px 24px",
+                  border: "none",
+                  borderRadius: "4px",
+                  cursor: "pointer",
+                  fontSize: "16px",
+                  fontWeight: "bold",
+                }}
+              >
+                Save Changes
+              </button>
+            </div>
+          )}
+
+          {isReadOnly && (
+            <div className="controller-instructions-form-actions" style={{ display: "flex", justifyContent: "center" }}>
+              <div
+                style={{
+                  backgroundColor: "#6c757d",
+                  color: "white",
+                  padding: "12px 24px",
+                  borderRadius: "4px",
+                  fontSize: "16px",
+                  fontWeight: "bold",
+                  textAlign: "center",
+                }}
+              >
+                This instruction is {formData.status} and cannot be edited
+              </div>
+            </div>
+          )}
+        </div>
+        {/* Confirmation Modal */}
+        {confirmationModal.isOpen && (
+          <div
+            className="controller-instructions-modal-overlay"
+            style={{
+              position: "fixed",
+              top: 0,
+              left: 0,
+              right: 0,
+              bottom: 0,
+              backgroundColor: "rgba(0, 0, 0, 0.5)",
+              display: "flex",
+              justifyContent: "center",
+              alignItems: "center",
+              zIndex: 1000,
+            }}
+          >
+            <div
+              className="controller-instructions-modal-content"
               style={{
-                backgroundColor: "#4a90e2",
-                color: "white",
-                padding: "12px 24px",
-                border: "none",
-                borderRadius: "4px",
-                cursor: "pointer",
-                fontSize: "16px",
-                fontWeight: "bold",
+                backgroundColor: "white",
+                padding: "24px",
+                borderRadius: "8px",
+                maxWidth: "500px",
+                width: "90%",
+                boxShadow: "0 4px 6px rgba(0, 0, 0, 0.1)",
               }}
             >
-              Save Changes
-            </button>
+              <h3 style={{ marginBottom: "16px", color: "#333" }}>Confirm Save</h3>
+              <p style={{ marginBottom: "24px", lineHeight: "1.5", color: "#666" }}>{confirmationModal.message}</p>
+              <div style={{ display: "flex", justifyContent: "flex-end", gap: "12px" }}>
+                <button
+                  onClick={handleCancelSave}
+                  style={{
+                    padding: "8px 16px",
+                    border: "1px solid #ddd",
+                    borderRadius: "4px",
+                    backgroundColor: "white",
+                    color: "#666",
+                    cursor: "pointer",
+                  }}
+                >
+                  No, Let Me Edit
+                </button>
+                <button
+                  onClick={handleConfirmSave}
+                  style={{
+                    padding: "8px 16px",
+                    border: "none",
+                    borderRadius: "4px",
+                    backgroundColor: "#4a90e2",
+                    color: "white",
+                    cursor: "pointer",
+                  }}
+                >
+                  Yes, Continue
+                </button>
+              </div>
+            </div>
           </div>
-        </div>
+        )}
       </div>
     </div>
   )

@@ -2122,41 +2122,49 @@ const Viewcontrollerinstructions = () => {
                     }}
                   >
                     <div className="controller-instructions-form-field">
-                      <label>Booking Reference</label>
-                      <div className="controller-instructions-input-wrapper" ref={fieldRefs.bookingRef}>
+                      <label>Shipment Type</label>
+                      <div className="controller-instructions-select-wrapper" ref={fieldRefs.shipmentTypeId}>
+                        <select
+                          className="controller-instructions-dropdown"
+                          name="shipmentTypeId"
+                          value={formData.shipmentTypeId}
+                          disabled={true}
+                          style={nonEditableStyle}
+                        >
+                          <option value="" disabled>
+                            Select Shipment
+                          </option>
+                          {shipmentTypes.map((type) => (
+                            <option key={type.shipkey} value={type.shipkey}>
+                              {type.shipmenttype}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                    </div>
+                    <div className="controller-instructions-form-field">
+                      <label>Pickup Location</label>
+                      <div className="controller-instructions-input-wrapper" ref={fieldRefs.pickup}>
                         <input
                           type="text"
                           className="controller-instructions-form-input"
-                          placeholder="Enter booking ref"
-                          name="bookingRef"
-                          value={formData.bookingRef}
+                          placeholder="Pickup location"
+                          name="pickup"
+                          value={formData.pickup || ""}
                           readOnly
                           style={nonEditableStyle}
                         />
                       </div>
                     </div>
                     <div className="controller-instructions-form-field">
-                      <label>File Ref</label>
-                      <div className="controller-instructions-input-wrapper" ref={fieldRefs.fileRef}>
+                      <label>Dropoff Location</label>
+                      <div className="controller-instructions-input-wrapper" ref={fieldRefs.dropoff}>
                         <input
                           type="text"
                           className="controller-instructions-form-input"
-                          placeholder="Enter file ref"
-                          name="fileRef"
-                          value={formData.fileRef}
-                          readOnly
-                          style={nonEditableStyle}
-                        />
-                      </div>
-                    </div>
-                    <div className="controller-instructions-form-field" style={{ maxWidth: "120px" }}>
-                      <label>VAT Rate %</label>
-                      <div className="controller-instructions-input-wrapper">
-                        <input
-                          type="number"
-                          className="controller-instructions-form-input"
-                          name="vat"
-                          value={formData.vat || 15}
+                          placeholder="Dropoff location"
+                          name="dropoff"
+                          value={formData.dropoff || ""}
                           readOnly
                           style={nonEditableStyle}
                         />
@@ -2250,35 +2258,28 @@ const Viewcontrollerinstructions = () => {
                       style={{ order: -1, marginBottom: "8px" }}
                     >
                       <div className="controller-instructions-form-field controller-instructions-small-field">
-                        <label>Shipment Type</label>
-                        <div className="controller-instructions-select-wrapper" ref={fieldRefs.shipmentTypeId}>
-                          <select
-                            className="controller-instructions-dropdown"
-                            name="shipmentTypeId"
-                            value={formData.shipmentTypeId}
-                            disabled={true}
-                            style={nonEditableStyle}
-                          >
-                            <option value="" disabled>
-                              Select Shipment
-                            </option>
-                            {shipmentTypes.map((type) => (
-                              <option key={type.shipkey} value={type.shipkey}>
-                                {type.shipmenttype}
-                              </option>
-                            ))}
-                          </select>
-                        </div>
-                      </div>
-                      <div className="controller-instructions-form-field controller-instructions-small-field">
-                        <label>Name of Task</label>
-                        <div className="controller-instructions-input-wrapper" ref={fieldRefs.task}>
+                        <label>Booking Reference</label>
+                        <div className="controller-instructions-input-wrapper" ref={fieldRefs.bookingRef}>
                           <input
                             type="text"
                             className="controller-instructions-form-input"
-                            placeholder="Input Name of Task"
-                            name="task"
-                            value={formData.task}
+                            placeholder="Enter booking ref"
+                            name="bookingRef"
+                            value={formData.bookingRef}
+                            readOnly
+                            style={nonEditableStyle}
+                          />
+                        </div>
+                      </div>
+                      <div className="controller-instructions-form-field controller-instructions-small-field">
+                        <label>File Ref</label>
+                        <div className="controller-instructions-input-wrapper" ref={fieldRefs.fileRef}>
+                          <input
+                            type="text"
+                            className="controller-instructions-form-input"
+                            placeholder="Enter file ref"
+                            name="fileRef"
+                            value={formData.fileRef}
                             readOnly
                             style={nonEditableStyle}
                           />
@@ -2286,28 +2287,27 @@ const Viewcontrollerinstructions = () => {
                       </div>
                     </div>
                     <div className="controller-instructions-form-field">
-                      <label>Pickup Location</label>
-                      <div className="controller-instructions-input-wrapper" ref={fieldRefs.pickup}>
+                      <label>Name of Task</label>
+                      <div className="controller-instructions-input-wrapper" ref={fieldRefs.task}>
                         <input
                           type="text"
                           className="controller-instructions-form-input"
-                          placeholder="Pickup location"
-                          name="pickup"
-                          value={formData.pickup || ""}
+                          placeholder="Input Name of Task"
+                          name="task"
+                          value={formData.task}
                           readOnly
                           style={nonEditableStyle}
                         />
                       </div>
                     </div>
-                    <div className="controller-instructions-form-field">
-                      <label>Dropoff Location</label>
-                      <div className="controller-instructions-input-wrapper" ref={fieldRefs.dropoff}>
+                    <div className="controller-instructions-form-field" style={{ maxWidth: "120px" }}>
+                      <label>VAT Rate %</label>
+                      <div className="controller-instructions-input-wrapper">
                         <input
-                          type="text"
+                          type="number"
                           className="controller-instructions-form-input"
-                          placeholder="Dropoff location"
-                          name="dropoff"
-                          value={formData.dropoff || ""}
+                          name="vat"
+                          value={formData.vat || 15}
                           readOnly
                           style={nonEditableStyle}
                         />
