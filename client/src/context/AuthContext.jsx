@@ -1,6 +1,6 @@
 "use client"
 
-import { createContext, useContext, useState, useEffect } from "react"
+import { createContext, useContext, useState, useEffect, useCallback } from "react"
 
 const AuthContext = createContext()
 
@@ -17,128 +17,181 @@ export const AuthProvider = ({ children }) => {
   const [token, setToken] = useState(null)
   const [loading, setLoading] = useState(true)
 
-  // Global token expiration checker
-  useEffect(() => {
-    let tokenCheckInterval = null
+  // Check if token is expired
+  const isTokenExpired = useCallback((token) => {
+    if (!token) return true
 
-    const checkTokenExpiration = () => {
-      const storedToken = localStorage.getItem("token")
-
-      if (!storedToken) {
-        return
-      }
-
-      try {
-        const payload = JSON.parse(atob(storedToken.split(".")[1]))
-        const currentTime = Date.now() / 1000
-        const timeUntilExpiry = payload.exp - currentTime
-
-        // If token expires in 5 minutes or less, show warning
-        if (timeUntilExpiry <= 300 && timeUntilExpiry > 0) {
-          // Dispatch custom event for notification component
-          window.dispatchEvent(
-            new CustomEvent("tokenExpiring", {
-              detail: { timeUntilExpiry: timeUntilExpiry * 1000 },
-            }),
-          )
-        } else if (timeUntilExpiry <= 0) {
-          // Token has expired
-          console.log("Token expired, logging out...")
-          logout()
-        }
-      } catch (error) {
-        console.error("Error checking token expiration:", error)
-        logout()
-      }
-    }
-
-    // Check token expiration every 30 seconds if user is authenticated
-    if (token) {
-      checkTokenExpiration() // Check immediately
-      tokenCheckInterval = setInterval(checkTokenExpiration, 30000)
-    }
-
-    return () => {
-      if (tokenCheckInterval) {
-        clearInterval(tokenCheckInterval)
-      }
-    }
-  }, [token])
-
-  useEffect(() => {
-    // Check for existing token on mount
-    const storedToken = localStorage.getItem("token")
-    const storedUser = localStorage.getItem("user")
-
-    if (storedToken && storedUser) {
-      try {
-        // Verify token is not expired
-        const payload = JSON.parse(atob(storedToken.split(".")[1]))
-        const currentTime = Date.now() / 1000
-
-        if (payload.exp > currentTime) {
-          setToken(storedToken)
-          setUser(JSON.parse(storedUser))
-        } else {
-          // Token expired, clear storage
-          localStorage.removeItem("token")
-          localStorage.removeItem("user")
-          localStorage.removeItem("userRole")
-        }
-      } catch (error) {
-        console.error("Error parsing stored token:", error)
-        localStorage.removeItem("token")
-        localStorage.removeItem("user")
-        localStorage.removeItem("userRole")
-      }
-    }
-
-    setLoading(false)
-
-    // Listen for token expiration events from API calls
-    const handleTokenExpiration = () => {
-      console.log("Token expiration event received in AuthContext")
-      logout()
-    }
-
-    window.addEventListener("tokenExpired", handleTokenExpiration)
-
-    return () => {
-      window.removeEventListener("tokenExpired", handleTokenExpiration)
+    try {
+      const payload = JSON.parse(atob(token.split(".")[1]))
+      const currentTime = Date.now() / 1000
+      return payload.exp < currentTime
+    } catch (error) {
+      console.error("Error checking token expiration:", error)
+      return true
     }
   }, [])
 
-  const login = (userData, authToken) => {
-    setUser(userData)
-    setToken(authToken)
-    localStorage.setItem("user", JSON.stringify(userData))
-    localStorage.setItem("token", authToken)
-    localStorage.setItem("userRole", userData.roleid || userData.role)
-  }
+  // Get token expiration time in milliseconds
+  const getTokenExpirationTime = useCallback((token) => {
+    if (!token) return null
 
-  const logout = () => {
+    try {
+      const payload = JSON.parse(atob(token.split(".")[1]))
+      return payload.exp * 1000 // Convert to milliseconds
+    } catch (error) {
+      console.error("Error getting token expiration time:", error)
+      return null
+    }
+  }, [])
+
+  // Logout function
+  const logout = useCallback(() => {
     console.log("Logging out user...")
-    setUser(null)
-    setToken(null)
-    localStorage.removeItem("user")
     localStorage.removeItem("token")
-    localStorage.removeItem("userRole")
+    localStorage.removeItem("user")
+    setToken(null)
+    setUser(null)
 
-    // Clear any intervals or timeouts
+    // Dispatch logout event
     window.dispatchEvent(new CustomEvent("userLoggedOut"))
 
     // Redirect to login page
     window.location.href = "/"
-  }
+  }, [])
+
+  // Login function
+  const login = useCallback((userData, authToken) => {
+    console.log("Logging in user:", userData.name)
+    localStorage.setItem("token", authToken)
+    localStorage.setItem("user", JSON.stringify(userData))
+    setToken(authToken)
+    setUser(userData)
+  }, [])
+
+  // Check token expiration and emit events
+  const checkTokenExpiration = useCallback(() => {
+    const currentToken = localStorage.getItem("token")
+    if (!currentToken) return
+
+    const expirationTime = getTokenExpirationTime(currentToken)
+    if (!expirationTime) {
+      console.log("Could not get token expiration time, logging out...")
+      logout()
+      return
+    }
+
+    const currentTime = Date.now()
+    const timeUntilExpiry = expirationTime - currentTime
+
+    console.log("Token check:", {
+      currentTime: new Date(currentTime).toISOString(),
+      expirationTime: new Date(expirationTime).toISOString(),
+      timeUntilExpiry: Math.floor(timeUntilExpiry / 1000) + " seconds",
+    })
+
+    // If token is expired
+    if (timeUntilExpiry <= 0) {
+      console.log("Token has expired, logging out...")
+      logout()
+      return
+    }
+
+    // If token expires in 5 minutes (300 seconds) or less, show warning
+    if (timeUntilExpiry <= 300000) {
+      // 5 minutes in milliseconds
+      console.log("Token expiring soon, showing warning...")
+      window.dispatchEvent(
+        new CustomEvent("tokenExpiring", {
+          detail: { timeUntilExpiry },
+        }),
+      )
+    }
+  }, [getTokenExpirationTime, logout])
+
+  // Initialize auth state
+  useEffect(() => {
+    const initializeAuth = () => {
+      const storedToken = localStorage.getItem("token")
+      const storedUser = localStorage.getItem("user")
+
+      if (storedToken && storedUser) {
+        try {
+          // Check if token is still valid
+          if (!isTokenExpired(storedToken)) {
+            setToken(storedToken)
+            setUser(JSON.parse(storedUser))
+            console.log("User authenticated from storage")
+          } else {
+            console.log("Stored token is expired, clearing storage...")
+            localStorage.removeItem("token")
+            localStorage.removeItem("user")
+          }
+        } catch (error) {
+          console.error("Error parsing stored user data:", error)
+          localStorage.removeItem("token")
+          localStorage.removeItem("user")
+        }
+      }
+
+      setLoading(false)
+    }
+
+    initializeAuth()
+  }, [isTokenExpired])
+
+  // Set up token expiration checking interval
+  useEffect(() => {
+    let intervalId
+
+    if (token && !isTokenExpired(token)) {
+      // Check token expiration every 10 seconds for more responsive detection
+      intervalId = setInterval(() => {
+        checkTokenExpiration()
+      }, 10000) // 10 seconds
+
+      // Also check immediately
+      checkTokenExpiration()
+    }
+
+    return () => {
+      if (intervalId) {
+        clearInterval(intervalId)
+      }
+    }
+  }, [token, isTokenExpired, checkTokenExpiration])
+
+  // Listen for token expiration events from API calls
+  useEffect(() => {
+    const handleTokenExpired = () => {
+      console.log("Received token expired event from API, logging out...")
+      logout()
+    }
+
+    const handleUserLoggedOut = () => {
+      console.log("User logged out event received")
+      setUser(null)
+      setToken(null)
+    }
+
+    window.addEventListener("tokenExpired", handleTokenExpired)
+    window.addEventListener("userLoggedOut", handleUserLoggedOut)
+
+    return () => {
+      window.removeEventListener("tokenExpired", handleTokenExpired)
+      window.removeEventListener("userLoggedOut", handleUserLoggedOut)
+    }
+  }, [logout])
 
   const value = {
     user,
     token,
+    loading,
     login,
     logout,
-    loading,
-    isAuthenticated: !!token,
+    isAuthenticated: !!token && !!user && !isTokenExpired(token),
   }
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>
 }
+
+export default AuthContext

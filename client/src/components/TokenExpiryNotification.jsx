@@ -1,13 +1,20 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useCallback } from "react"
 import { useAuth } from "../context/AuthContext"
-
 
 const TokenExpiryNotification = () => {
   const [showWarning, setShowWarning] = useState(false)
   const [timeLeft, setTimeLeft] = useState(0)
+  const [autoLogoutTimer, setAutoLogoutTimer] = useState(null)
   const { token, logout } = useAuth()
+
+  // Auto logout function
+  const performAutoLogout = useCallback(() => {
+    console.log("Auto logout triggered - user did not extend session")
+    setShowWarning(false)
+    logout()
+  }, [logout])
 
   useEffect(() => {
     let countdownInterval = null
@@ -16,31 +23,61 @@ const TokenExpiryNotification = () => {
       const { timeUntilExpiry } = event.detail
       const secondsLeft = Math.floor(timeUntilExpiry / 1000)
 
+      console.log("Token expiring event received, seconds left:", secondsLeft)
+
       setShowWarning(true)
       setTimeLeft(secondsLeft)
 
+      // Clear any existing auto logout timer
+      if (autoLogoutTimer) {
+        clearTimeout(autoLogoutTimer)
+      }
+
+      // Set auto logout timer for when countdown reaches 0
+      const newAutoLogoutTimer = setTimeout(() => {
+        performAutoLogout()
+      }, timeUntilExpiry)
+      setAutoLogoutTimer(newAutoLogoutTimer)
+
+      // Start countdown display
       countdownInterval = setInterval(() => {
         setTimeLeft((prev) => {
-          if (prev <= 1) {
+          const newTime = prev - 1
+          if (newTime <= 0) {
             clearInterval(countdownInterval)
-            setShowWarning(false)
+            // Don't call logout here - let the setTimeout handle it
             return 0
           }
-          return prev - 1
+          return newTime
         })
       }, 1000)
     }
 
     const handleTokenExpired = () => {
+      console.log("Token expired event received")
       setShowWarning(false)
-      if (countdownInterval) clearInterval(countdownInterval)
+      if (countdownInterval) {
+        clearInterval(countdownInterval)
+      }
+      if (autoLogoutTimer) {
+        clearTimeout(autoLogoutTimer)
+        setAutoLogoutTimer(null)
+      }
     }
 
     const handleUserLoggedOut = () => {
+      console.log("User logged out event received")
       setShowWarning(false)
-      if (countdownInterval) clearInterval(countdownInterval)
+      if (countdownInterval) {
+        clearInterval(countdownInterval)
+      }
+      if (autoLogoutTimer) {
+        clearTimeout(autoLogoutTimer)
+        setAutoLogoutTimer(null)
+      }
     }
 
+    // Listen for token expiration events
     window.addEventListener("tokenExpiring", handleTokenExpiring)
     window.addEventListener("tokenExpired", handleTokenExpired)
     window.addEventListener("userLoggedOut", handleUserLoggedOut)
@@ -49,14 +86,36 @@ const TokenExpiryNotification = () => {
       window.removeEventListener("tokenExpiring", handleTokenExpiring)
       window.removeEventListener("tokenExpired", handleTokenExpired)
       window.removeEventListener("userLoggedOut", handleUserLoggedOut)
-      if (countdownInterval) clearInterval(countdownInterval)
+      if (countdownInterval) {
+        clearInterval(countdownInterval)
+      }
+      if (autoLogoutTimer) {
+        clearTimeout(autoLogoutTimer)
+        setAutoLogoutTimer(null)
+      }
     }
-  }, [])
+  }, [autoLogoutTimer, performAutoLogout])
 
   const handleExtendSession = async () => {
     try {
+      console.log("User clicked extend session")
+
+      // Clear the auto logout timer
+      if (autoLogoutTimer) {
+        clearTimeout(autoLogoutTimer)
+        setAutoLogoutTimer(null)
+      }
+
       setShowWarning(false)
+
+      // Here you could implement actual token refresh logic
       console.log("Session extension requested - implement refresh token logic here")
+
+      // You could make an API call to refresh the token:
+      // const response = await api.post('/api/auth/refresh-token')
+      // if (response.data.token) {
+      //   login(response.data.user, response.data.token)
+      // }
     } catch (error) {
       console.error("Failed to extend session:", error)
       logout()
@@ -64,7 +123,19 @@ const TokenExpiryNotification = () => {
   }
 
   const handleDismiss = () => {
+    console.log("User dismissed warning - auto logout will still occur")
     setShowWarning(false)
+    // Note: Auto logout timer continues running even if dismissed
+  }
+
+  const handleLogoutNow = () => {
+    console.log("User chose to logout immediately")
+    if (autoLogoutTimer) {
+      clearTimeout(autoLogoutTimer)
+      setAutoLogoutTimer(null)
+    }
+    setShowWarning(false)
+    logout()
   }
 
   if (!showWarning || !token) return null
@@ -91,22 +162,22 @@ const TokenExpiryNotification = () => {
             </svg>
             <div>
               <h3>Session Expiring Soon</h3>
-              <p>Your session will expire automatically</p>
+              <p>You will be logged out automatically</p>
             </div>
           </div>
         </div>
         <div className="popup-content">
           <div className="countdown">
             <div className="timer-circle">
-              <span>{minutes}:{seconds.toString().padStart(2, "0")}</span>
+              <span>
+                {minutes}:{seconds.toString().padStart(2, "0")}
+              </span>
             </div>
             <p>Time remaining until automatic logout</p>
+            <p className="auto-logout-warning">You will be logged out automatically when the timer reaches zero</p>
           </div>
           <div className="progress-bar">
-            <div
-              className="progress-fill"
-              style={{ width: `${Math.max(0, (timeLeft / 300) * 100)}%` }}
-            />
+            <div className="progress-fill" style={{ width: `${Math.max(0, (timeLeft / 300) * 100)}%` }} />
           </div>
           <div className="action-buttons">
             <button className="continue-button" onClick={handleExtendSession}>
@@ -116,14 +187,14 @@ const TokenExpiryNotification = () => {
               <button className="dismiss-button" onClick={handleDismiss}>
                 Dismiss
               </button>
-              <button className="logout-button" onClick={logout}>
+              <button className="logout-button" onClick={handleLogoutNow}>
                 Logout Now
               </button>
             </div>
           </div>
         </div>
         <div className="popup-footer">
-          <p>For security reasons, inactive sessions are automatically terminated</p>
+          <p>For security reasons, inactive sessions are automatically terminated after the countdown expires</p>
         </div>
       </div>
     </div>
