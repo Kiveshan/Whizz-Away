@@ -1,3 +1,4 @@
+"use client"
 
 import { useState, useEffect, useRef, useMemo, useCallback } from "react"
 import "../../css/controllerinstruction.css"
@@ -815,7 +816,8 @@ const ControllerInstructions = () => {
       if (pickup && formData.clientId) {
         setIsLoading((prev) => ({ ...prev, destinations: true }))
         try {
-          const response = await api.get(`/api/instructions/client/${formData.clientId}/destinations/${pickup}`)
+          const encodedPickup = encodeURIComponent(pickup)
+          const response = await api.get(`/api/instructions/client/${formData.clientId}/destinations/${encodedPickup}`)
           const destinations = response.data.map((dest) => ({
             value: dest.destination,
             label: dest.destination,
