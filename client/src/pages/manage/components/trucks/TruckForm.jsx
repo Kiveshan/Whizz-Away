@@ -152,6 +152,16 @@ const TruckForm = ({ truck, loading, isEditing, onSave, onCancel, onChange, onDe
               onChange={(e) => onChange("purchase_price", e.target.value)}
             />
           </div>
+             <div className="manage-form-group">
+            <label style={{ fontWeight: "bold" }}>Git</label>
+            <input
+              type="number"
+              min="0"
+              step="0.01"
+              value={truck.git || ""}
+              onChange={(e) => onChange("git", e.target.value)}
+            />
+          </div>
 
           <div className="manage-form-group">
             <label style={{ fontWeight: "bold" }}>Current Evaluation</label>

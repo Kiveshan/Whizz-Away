@@ -231,13 +231,11 @@ export function useApi(state, actions) {
 
         const url = state.editingEmployeeId ? `/api/employees/${state.editingEmployeeId}` : "/api/employees"
         const method = state.editingEmployeeId ? "put" : "post"
-
         console.log(`Making ${method.toUpperCase()} request to: ${url}`)
 
         const response = await api[method](url, formData, {
           headers: { "Content-Type": "multipart/form-data" },
         })
-
         console.log("API response:", response.data)
 
         // Refresh current page
@@ -342,7 +340,7 @@ export function useApi(state, actions) {
       actions.setLoading(true)
       try {
         const formData = new FormData()
-        // Append all scalar fields
+        // Append all scalar fields including git
         Object.keys(truckData).forEach((key) => {
           if (key !== "documents" && truckData[key] !== undefined) {
             formData.append(key, truckData[key])
@@ -358,13 +356,11 @@ export function useApi(state, actions) {
 
         const url = state.editTruckId ? `/api/trucks/${state.editTruckId}` : "/api/trucks"
         const method = state.editTruckId ? "put" : "post"
-
         console.log(`Making ${method.toUpperCase()} request to: ${url}`)
 
         const response = await api[method](url, formData, {
           headers: { "Content-Type": "multipart/form-data" },
         })
-
         console.log("API response:", response.data)
 
         // Refresh current page
@@ -412,13 +408,11 @@ export function useApi(state, actions) {
 
         const url = state.editTrailerId ? `/api/trailers/${state.editTrailerId}` : "/api/trailers"
         const method = state.editTrailerId ? "put" : "post"
-
         console.log(`Making ${method.toUpperCase()} request to: ${url}`)
 
         const response = await api[method](url, formData, {
           headers: { "Content-Type": "multipart/form-data" },
         })
-
         console.log("API response:", response.data)
 
         // Refresh current page
@@ -462,11 +456,9 @@ export function useApi(state, actions) {
 
         const url = state.editingRateId ? `/api/driver-rates/${state.editingRateId}` : "/api/driver-rates"
         const method = state.editingRateId ? "put" : "post"
-
         console.log(`Making ${method.toUpperCase()} request to: ${url}`)
 
         const response = await api[method](url, cleanedDriverRate)
-
         console.log("API response:", response.data)
 
         // Refresh current page
@@ -543,7 +535,6 @@ export function useApi(state, actions) {
 
         const url = state.subcontractorId ? `/api/subcontractors/${state.subcontractorId}` : "/api/subcontractors"
         const method = state.subcontractorId ? "put" : "post"
-
         console.log(`Making ${method.toUpperCase()} request to: ${url}`)
 
         const response = await api[method](url, payload)
@@ -611,11 +602,9 @@ export function useApi(state, actions) {
 
         const url = `/api/client-rates/${clientId}`
         const method = "post"
-
         console.log(`Making ${method.toUpperCase()} request to: ${url}`)
 
         const response = await api[method](url, payload)
-
         console.log("API response:", response.data)
 
         // Refresh current page
@@ -668,7 +657,6 @@ export function useApi(state, actions) {
 
         const url = state.editingSupplierId ? `/api/suppliers/${state.editingSupplierId}` : "/api/suppliers"
         const method = state.editingSupplierId ? "put" : "post"
-
         console.log(`Making ${method.toUpperCase()} request to: ${url}`)
 
         const response = await api[method](url, preparedSupplierData)
@@ -715,7 +703,6 @@ export function useApi(state, actions) {
           ? `/api/expense-types/${state.editingExpenseTypeId}`
           : "/api/expense-types"
         const method = state.editingExpenseTypeId ? "put" : "post"
-
         console.log(`Making ${method.toUpperCase()} request to: ${url}`)
 
         const response = await api[method](url, preparedExpenseTypeData)
@@ -931,6 +918,7 @@ export function useApi(state, actions) {
       if (!window.confirm("Are you sure you want to delete this driver?")) {
         return false
       }
+
       actions.setLoading(true)
       try {
         await api.delete(`/api/subcontractors/drivers/${driverId}`)
@@ -962,6 +950,7 @@ export function useApi(state, actions) {
       if (!window.confirm("Are you sure you want to delete this truck?")) {
         return false
       }
+
       actions.setLoading(true)
       try {
         await api.delete(`/api/subcontractors/trucks/${truckId}`)
@@ -992,6 +981,7 @@ export function useApi(state, actions) {
       if (!window.confirm("Are you sure you want to delete this rate?")) {
         return false
       }
+
       actions.setLoading(true)
       try {
         await api.delete(`/api/client-rates/${rateId}`)
@@ -1073,7 +1063,6 @@ export function useApi(state, actions) {
         }
 
         console.log(`Loading ${type} for edit with ID:`, numericId, "Endpoint:", endpoint)
-
         const response = await api.get(endpoint)
         const data = response.data
 
