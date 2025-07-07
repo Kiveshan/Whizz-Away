@@ -133,6 +133,10 @@
   font-family: inherit;
 }
 
+.financial-docs-wrapper th {
+  font-weight: bold;
+}
+
 /* Table */
 .financial-docs-wrapper .t1 {
   width: 1000px;
