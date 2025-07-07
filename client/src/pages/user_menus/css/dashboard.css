@@ -33,16 +33,13 @@
   margin-bottom: 0;
 }
 
-
 .dashboard {
   display: flex;
   flex-direction: column;
-  gap: 60px;
+  gap: 30px;
   padding: 0 20px;
   max-width: 1200px;
   margin: 0 auto;
- 
-
 }
 
 .dashboard-row {
@@ -60,4 +57,3 @@
   justify-content: center;
   gap: 70px;
 }
-
