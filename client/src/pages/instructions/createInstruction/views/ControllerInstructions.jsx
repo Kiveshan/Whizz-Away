@@ -1,5 +1,4 @@
-﻿// "use client"
-
+﻿
 import { useState, useEffect, useRef, useMemo, useCallback } from "react"
 import "../../css/controllerinstruction.css"
 import { useNavigate, useLocation } from "react-router-dom"
@@ -137,6 +136,10 @@ const ControllerInstructions = () => {
   const [containerFieldErrors, setContainerFieldErrors] = useState({})
   const [submitError, setSubmitError] = useState("")
   const [isSubmitting, setIsSubmitting] = useState(false)
+
+  // Confirmation popup state
+  const [showConfirmationPopup, setShowConfirmationPopup] = useState(false)
+  const [confirmationMessage, setConfirmationMessage] = useState("")
 
   // State for client-specific locations
   const [clientStartingPoints, setClientStartingPoints] = useState([])
@@ -318,46 +321,58 @@ const ControllerInstructions = () => {
   )
 
   // Handle container input changes
-  const handleContainerChange = useCallback((id, field, value) => {
-    if (field === "containerNum") {
-      // Container number validation
-      if (value.length > 11) return
+  const handleContainerChange = useCallback(
+    (id, field, value) => {
+      if (field === "containerNum") {
+        // Container number validation
+        if (value.length > 11) return
 
-      // First 4 letters, then 7 numbers
-      let newValue = ""
-      for (let i = 0; i < value.length; i++) {
-        const char = value[i]
-        if (i < 4) {
-          if (/^[a-zA-Z]$/.test(char)) newValue += char
-        } else if (/^[0-9]$/.test(char)) {
-          newValue += char
+        // First 4 letters, then 7 numbers
+        let newValue = ""
+        for (let i = 0; i < value.length; i++) {
+          const char = value[i]
+          if (i < 4) {
+            if (/^[a-zA-Z]$/.test(char)) newValue += char
+          } else if (/^[0-9]$/.test(char)) {
+            newValue += char
+          }
         }
+
+        // Update field errors with format and uniqueness validation
+        let error = null
+        if (newValue.length > 0 && newValue.length < 11) {
+          error = "Does not match correct format (ABCD1234567)"
+        } else if (newValue.length === 11 && !/^[a-zA-Z]{4}[0-9]{7}$/.test(newValue)) {
+          error = "Does not match correct format (ABCD1234567)"
+        } else if (newValue.length === 11) {
+          // Check for duplicates in real-time
+          const upperCaseValue = newValue.toUpperCase()
+          const duplicateExists = containers.some(
+            (container) => container.id !== id && container.containerNum.toUpperCase() === upperCaseValue,
+          )
+          if (duplicateExists) {
+            error = "Container number must be unique"
+          }
+        }
+
+        setContainerFieldErrors((prev) => ({
+          ...prev,
+          [`container-${id}`]: error,
+        }))
+
+        value = newValue
+      } else if (field === "weight" && value !== "") {
+        // Only allow numbers and decimal point for weight
+        if (!/^\d*\.?\d*$/.test(value)) return
       }
 
-      // Update field errors
-      let error = null
-      if (newValue.length > 0 && newValue.length < 11) {
-        error = "Does not match correct format (ABCD1234567)"
-      } else if (newValue.length === 11 && !/^[a-zA-Z]{4}[0-9]{7}$/.test(newValue)) {
-        error = "Does not match correct format (ABCD1234567)"
-      }
-
-      setContainerFieldErrors((prev) => ({
-        ...prev,
-        [`container-${id}`]: error,
-      }))
-
-      value = newValue
-    } else if (field === "weight" && value !== "") {
-      // Only allow numbers and decimal point for weight
-      if (!/^\d*\.?\d*$/.test(value)) return
-    }
-
-    // Update container
-    setContainers((prev) =>
-      prev.map((container) => (container.id === id ? { ...container, [field]: value } : container)),
-    )
-  }, [])
+      // Update container
+      setContainers((prev) =>
+        prev.map((container) => (container.id === id ? { ...container, [field]: value } : container)),
+      )
+    },
+    [containers],
+  )
 
   // Initialize form data with preserved data if available, or default values
   const [formData, setFormData] = useState(() => {
@@ -683,18 +698,26 @@ const ControllerInstructions = () => {
     const sixMeterEnabled = formData.num_six_meters > 0
     const twelveMeterEnabled = formData.num_twelve_meters > 0
     const abnormalEnabled = formData.num_abnormal > 0
+    const breakBulkEnabled = formData.num_breakbulk > 0
 
     const newState = {
       sixMeter: sixMeterEnabled,
       twelveMeter: twelveMeterEnabled,
       abnormal: abnormalEnabled,
+      breakBulk: breakBulkEnabled,
     }
 
     // Only update state if it has changed
     if (JSON.stringify(rateFieldsEnabled) !== JSON.stringify(newState)) {
       setRateFieldsEnabled(newState)
     }
-  }, [formData.num_six_meters, formData.num_twelve_meters, formData.num_abnormal, rateFieldsEnabled])
+  }, [
+    formData.num_six_meters,
+    formData.num_twelve_meters,
+    formData.num_abnormal,
+    formData.num_breakbulk,
+    rateFieldsEnabled,
+  ])
 
   // Handle client selection - FIXED VERSION
   const handleClientChange = useCallback(
@@ -897,9 +920,10 @@ const ControllerInstructions = () => {
   )
 
   // Calendar helper function
+  // Calendar helper function - using focus instead of showPicker
   const openCalendar = useCallback((ref) => {
     if (ref.current) {
-      ref.current.showPicker()
+      ref.current.focus()
     }
   }, [])
 
@@ -956,6 +980,119 @@ const ControllerInstructions = () => {
     return errors
   }, [formData, isCrossHaul, isWeightBased])
 
+  // Container validation function
+  const validateContainers = useCallback(() => {
+    if (isWeightBased || !showContainerDetails || containers.length === 0) {
+      return true // No validation needed for weight-based or when no containers
+    }
+
+    const errors = {}
+    const containerNumbers = []
+    let isValid = true
+
+    // Check each container
+    for (const container of containers) {
+      const containerId = container.id
+
+      // Check if container number is required and present
+      if (!container.containerNum || container.containerNum.trim() === "") {
+        errors[`container-${containerId}`] = "Container number is required"
+        isValid = false
+      } else {
+        // Check format (existing validation)
+        if (container.containerNum.length !== 11 || !/^[a-zA-Z]{4}[0-9]{7}$/.test(container.containerNum)) {
+          errors[`container-${containerId}`] = "Does not match correct format (ABCD1234567)"
+          isValid = false
+        } else {
+          // Check for duplicates within current instruction
+          const upperCaseContainerNum = container.containerNum.toUpperCase()
+          if (containerNumbers.includes(upperCaseContainerNum)) {
+            errors[`container-${containerId}`] = "Container number must be unique"
+            isValid = false
+          } else {
+            containerNumbers.push(upperCaseContainerNum)
+          }
+        }
+      }
+    }
+
+    setContainerFieldErrors(errors)
+    return isValid
+  }, [isWeightBased, showContainerDetails, containers])
+
+  // Check for rate/count mismatch and generate confirmation message
+  const checkRateCountMismatch = useCallback(() => {
+    // Only check for container-based calculations
+    if (isWeightBased) {
+      return { needsConfirmation: false, message: "" }
+    }
+
+    const containerTypesWithRatesButZeroCount = []
+    const containerTypesWithCountAndRates = []
+
+    // Check 6m containers
+    const sixMeterRate = Number.parseFloat(formData.sixMeterRate) || 0
+    const sixMeterCount = formData.num_six_meters || 0
+    if (sixMeterRate > 0 && sixMeterCount === 0) {
+      containerTypesWithRatesButZeroCount.push("6m")
+    }
+    if (sixMeterCount > 0 && sixMeterRate > 0) {
+      containerTypesWithCountAndRates.push(`6m (${sixMeterCount} containers, Rate: R${sixMeterRate.toFixed(2)})`)
+    }
+
+    // Check 12m containers
+    const twelveMeterRate = Number.parseFloat(formData.twelveMeterRate) || 0
+    const twelveMeterCount = formData.num_twelve_meters || 0
+    if (twelveMeterRate > 0 && twelveMeterCount === 0) {
+      containerTypesWithRatesButZeroCount.push("12m")
+    }
+    if (twelveMeterCount > 0 && twelveMeterRate > 0) {
+      containerTypesWithCountAndRates.push(`12m (${twelveMeterCount} containers, Rate: R${twelveMeterRate.toFixed(2)})`)
+    }
+
+    // Check abnormal containers
+    const abnormalRate = Number.parseFloat(formData.abnormalRate) || 0
+    const abnormalCount = formData.num_abnormal || 0
+    if (abnormalRate > 0 && abnormalCount === 0) {
+      containerTypesWithRatesButZeroCount.push("Abnormal")
+    }
+    if (abnormalCount > 0 && abnormalRate > 0) {
+      containerTypesWithCountAndRates.push(`Abnormal (${abnormalCount} containers, Rate: R${abnormalRate.toFixed(2)})`)
+    }
+
+    // Check break bulk containers (only for cross-haul)
+    if (isCrossHaul) {
+      const breakBulkRate = Number.parseFloat(formData.rateper_breakbulk) || 0
+      const breakBulkCount = formData.num_breakbulk || 0
+      if (breakBulkRate > 0 && breakBulkCount === 0) {
+        containerTypesWithRatesButZeroCount.push("Break Bulk")
+      }
+      if (breakBulkCount > 0 && breakBulkRate > 0) {
+        containerTypesWithCountAndRates.push(
+          `Break Bulk (${breakBulkCount} containers, Rate: R${breakBulkRate.toFixed(2)})`,
+        )
+      }
+    }
+
+    // If there are rates set but counts are 0, show confirmation
+    if (containerTypesWithRatesButZeroCount.length > 0) {
+      let message = "You have containers with the following rates: "
+      if (containerTypesWithCountAndRates.length > 0) {
+        message += containerTypesWithCountAndRates.join(", ")
+        message += ". Are you sure you want to continue?"
+      } else {
+        message = "You have set rates for container types with 0 containers. Are you sure you want to continue?"
+      }
+
+      return {
+        needsConfirmation: true,
+        message: message,
+      }
+    }
+
+    return { needsConfirmation: false, message: "" }
+  }, [formData, isWeightBased, isCrossHaul])
+
   const handleSubmit = useCallback(
     async (e) => {
       e.preventDefault()
@@ -967,258 +1104,285 @@ const ControllerInstructions = () => {
         return
       }
 
-      setIsSubmitting(true)
-      setSubmitError("")
-
-      try {
-        console.log("=== STARTING TOTAL COST CALCULATION ===")
-
-        let totalCost = 0
-        const costBreakdown = {
-          calculationType: isWeightBased ? "weight-based" : "container-based",
-          isWeightBased,
-          isCrossHaul,
-          unitType: formData.rateWeight,
-          components: {},
-        }
-
-        if (isWeightBased) {
-          // Weight-based calculation
-          const weight = Number.parseFloat(formData.weight || 0)
-          const unitRate = Number.parseFloat(formData.unitrate || 0)
-          totalCost = weight * unitRate
-
-          costBreakdown.components = {
-            weight: weight,
-            unitRate: unitRate,
-            weightBasedCost: totalCost,
+      // Validate containers if container details are shown
+      if (!isWeightBased && showContainerDetails) {
+        const containerValidationPassed = validateContainers()
+        if (!containerValidationPassed) {
+          // Scroll to container details section
+          const containerSection = document.querySelector(".container-details-section")
+          if (containerSection) {
+            containerSection.scrollIntoView({ behavior: "smooth", block: "start" })
           }
-
-          console.log("WEIGHT-BASED CALCULATION:")
-          console.log(`  Weight: ${weight} ${formData.rateWeight}`)
-          console.log(`  Unit Rate: R${unitRate.toFixed(2)} per ${formData.rateWeight}`)
-          console.log(`  Base Cost: ${weight} × R${unitRate.toFixed(2)} = R${totalCost.toFixed(2)}`)
-        } else {
-          // Container-based calculation
-          const sixMeterRate = Number.parseFloat(formData.sixMeterRate) || 0
-          const twelveMeterRate = Number.parseFloat(formData.twelveMeterRate) || 0
-          const abnormalRate = Number.parseFloat(formData.abnormalRate) || 0
-          const breakBulkRate = Number.parseFloat(formData.rateper_breakbulk) || 0
-
-          const sixMeterCount = formData.num_six_meters || 0
-          const twelveMeterCount = formData.num_twelve_meters || 0
-          const abnormalCount = formData.num_abnormal || 0
-          const breakBulkCount = formData.num_breakbulk || 0
-
-          const sixMeterCost = sixMeterRate * sixMeterCount
-          const twelveMeterCost = twelveMeterRate * twelveMeterCount
-          const abnormalCost = abnormalRate * abnormalCount
-
-          // Break bulk cost only applies if it's cross-haul AND the rateWeight is 'Container'
-          const breakBulkCost = isCrossHaul && formData.rateWeight === "Container" ? breakBulkRate * breakBulkCount : 0
-
-          totalCost = sixMeterCost + twelveMeterCost + abnormalCost + breakBulkCost
-
-          costBreakdown.components = {
-            sixMeter: { count: sixMeterCount, rate: sixMeterRate, cost: sixMeterCost },
-            twelveMeter: { count: twelveMeterCount, rate: twelveMeterRate, cost: twelveMeterCost },
-            abnormal: { count: abnormalCount, rate: abnormalRate, cost: abnormalCost },
-            breakBulk: {
-              count: breakBulkCount,
-              rate: breakBulkRate,
-              cost: breakBulkCost,
-              applicable: isCrossHaul && formData.rateWeight === "Container",
-            },
-            containerBasedSubtotal: totalCost,
-          }
-
-          console.log("CONTAINER-BASED CALCULATION:")
-          console.log(`  6m Containers: ${sixMeterCount} × R${sixMeterRate.toFixed(2)} = R${sixMeterCost.toFixed(2)}`)
-          console.log(
-            `  12m Containers: ${twelveMeterCount} × R${twelveMeterRate.toFixed(2)} = R${twelveMeterCost.toFixed(2)}`,
-          )
-          console.log(
-            `  Abnormal Containers: ${abnormalCount} × R${abnormalRate.toFixed(2)} = R${abnormalCost.toFixed(2)}`,
-          )
-
-          if (isCrossHaul && formData.rateWeight === "Container") {
-            console.log(`  Break Bulk: ${breakBulkCount} × R${breakBulkRate.toFixed(2)} = R${breakBulkCost.toFixed(2)}`)
-          } else if (isCrossHaul) {
-            console.log(`  Break Bulk: Not applicable (Unit type: ${formData.rateWeight})`)
-          }
-
-          console.log(`  Container Subtotal: R${totalCost.toFixed(2)}`)
+          return
         }
-
-        // Add surcharges
-        const surchargeAmount = formData.surcharges ? Number.parseFloat(formData.surchargesAmount || 0) : 0
-        const subtotalBeforeVAT = totalCost + surchargeAmount
-
-        costBreakdown.components.surcharges = {
-          applied: formData.surcharges,
-          amount: surchargeAmount,
-        }
-        costBreakdown.components.subtotalBeforeVAT = subtotalBeforeVAT
-
-        console.log("SURCHARGES:")
-        console.log(`  Surcharges Applied: ${formData.surcharges ? "Yes" : "No"}`)
-        if (formData.surcharges) {
-          console.log(`  Surcharge Amount: R${surchargeAmount.toFixed(2)}`)
-        }
-        console.log(`  Subtotal (before VAT): R${subtotalBeforeVAT.toFixed(2)}`)
-
-        // Calculate VAT (for display purposes only - not added to total cost saved to DB)
-        const vatRate = formData.vat / 100
-        const vatAmount = subtotalBeforeVAT * vatRate
-        const totalWithVAT = subtotalBeforeVAT + vatAmount
-
-        costBreakdown.components.vat = {
-          rate: formData.vat,
-          rateDecimal: vatRate,
-          amount: vatAmount,
-        }
-        costBreakdown.components.totalWithVAT = totalWithVAT
-
-        console.log("VAT CALCULATION (for reference only - NOT added to saved total):")
-        console.log(`  VAT Rate: ${formData.vat}%`)
-        console.log(`  VAT Amount: R${subtotalBeforeVAT.toFixed(2)} × ${vatRate} = R${vatAmount.toFixed(2)}`)
-        console.log(`  Total with VAT: R${totalWithVAT.toFixed(2)}`)
-
-        // Set the total cost to save (WITHOUT VAT)
-        totalCost = subtotalBeforeVAT
-
-        costBreakdown.components.finalTotalSaved = totalCost
-
-        console.log("FINAL COST BREAKDOWN:")
-        console.log(`  Base Cost: R${(totalCost - surchargeAmount).toFixed(2)}`)
-        console.log(`  Surcharges: R${surchargeAmount.toFixed(2)}`)
-        console.log(`  TOTAL COST SAVED TO DB (excluding VAT): R${totalCost.toFixed(2)}`)
-        console.log(`  VAT (calculated but not saved): R${vatAmount.toFixed(2)}`)
-        console.log(`  Total with VAT (for reference): R${totalWithVAT.toFixed(2)}`)
-
-        console.log("=== COST BREAKDOWN SUMMARY ===")
-        console.log(JSON.stringify(costBreakdown, null, 2))
-        console.log("=== END TOTAL COST CALCULATION ===")
-
-        // Prepare instruction data with null values for cross-haul and weight-based
-        const instructionData = {
-          ...formData,
-          total_cost: totalCost, // This is now the subtotal without VAT
-          // Set vessel_name and stackdate to null for cross-haul
-          vessel_name: isCrossHaul ? null : formData.vesselName,
-          stackdate: isCrossHaul ? null : formData.stackDate,
-          // UPDATED RATE SAVING LOGIC: Set container rates to 0 if count is 0, null for weight-based
-          rateper_6: isWeightBased
-            ? null
-            : formData.num_six_meters === 0
-              ? 0
-              : formData.sixMeterRate === ""
-                ? null
-                : Number.parseFloat(formData.sixMeterRate || 0),
-          rateper_12: isWeightBased
-            ? null
-            : formData.num_twelve_meters === 0
-              ? 0
-              : formData.twelveMeterRate === ""
-                ? null
-                : Number.parseFloat(formData.twelveMeterRate || 0),
-          rateper_abnormal: isWeightBased
-            ? null
-            : formData.num_abnormal === 0
-              ? 0
-              : formData.abnormalRate === ""
-                ? null
-                : Number.parseFloat(formData.abnormalRate || 0),
-          // Break bulk rate is 0 if count is 0, null if weight-based OR not cross-haul OR not container unit type
-          rateper_breakbulk:
-            isWeightBased || !isCrossHaul || formData.rateWeight !== "Container"
-              ? null
-              : formData.num_breakbulk === 0
-                ? 0
-                : formData.rateper_breakbulk === ""
-                  ? null
-                  : Number.parseFloat(formData.rateper_breakbulk || 0),
-          // Set container counts to 0 for weight-based
-          num_six_meters: isWeightBased ? 0 : formData.num_six_meters || 0,
-          num_twelve_meters: isWeightBased ? 0 : formData.num_twelve_meters || 0,
-          num_abnormal: isWeightBased ? 0 : formData.num_abnormal || 0,
-          // Break bulk count is 0 if weight-based OR not cross-haul OR not container unit type
-          num_breakbulk:
-            isWeightBased || !isCrossHaul || formData.rateWeight !== "Container" ? 0 : formData.num_breakbulk || 0,
-          // Set weight and unitrate appropriately
-          weight: isWeightBased ? (formData.weight === "" ? null : Number.parseFloat(formData.weight || 0)) : null,
-          unitrate: isWeightBased
-            ? formData.unitrate === ""
-              ? null
-              : Number.parseFloat(formData.unitrate || 0)
-            : null,
-          // Map field names for backend
-          client: formData.clientId,
-          shipment_type: formData.shipmentTypeId,
-          pickuptime: formData.pickupTime,
-          pickupdate: formData.pickupDate,
-          deadline: formData.deadline,
-          fileref: formData.fileRef,
-          booking_ref: formData.bookingRef,
-          rateweight: formData.rateWeight,
-          status: "New",
-          vat: formData.vat,
-          surchages: formData.surcharges,
-          surcharge: surchargeAmount,
-        }
-
-        // Prepare container data (only for container-based calculations AND if unit type is Container)
-        const containerData =
-          !isWeightBased && formData.rateWeight === "Container"
-            ? containers.map((container) => ({
-                container_type: container.containerType,
-                containerNum: container.containerNum,
-                weight: isImport ? (container.weight === "" ? null : Number.parseFloat(container.weight || 0)) : null,
-                cargo_description: container.cargoDescription || "",
-              }))
-            : []
-
-        console.log("=== SUBMITTING TO DATABASE ===")
-        console.log("Instruction data being saved:", {
-          ...instructionData,
-          description: instructionData.description ? instructionData.description.substring(0, 50) + "..." : null, // Truncate for logging
-        })
-        console.log("Container data being saved:", containerData)
-        console.log("Final calculated total cost (WITHOUT VAT):", totalCost)
-        console.log("Rate saving logic applied:")
-        console.log(`  rateper_6: ${instructionData.rateper_6} (count: ${instructionData.num_six_meters})`)
-        console.log(`  rateper_12: ${instructionData.rateper_12} (count: ${instructionData.num_twelve_meters})`)
-        console.log(`  rateper_abnormal: ${instructionData.rateper_abnormal} (count: ${instructionData.num_abnormal})`)
-        console.log(
-          `  rateper_breakbulk: ${instructionData.rateper_breakbulk} (count: ${instructionData.num_breakbulk})`,
-        )
-
-        // Save the instruction
-        const response = await api.post("/api/instructions/save-instruction", {
-          controllerData: instructionData,
-          containerData: containerData,
-        })
-
-        if (response.data.success) {
-          console.log("=== INSTRUCTION SAVED SUCCESSFULLY ===")
-          console.log("Database response:", response.data)
-          // Navigate to dashboard on success
-          navigate("/ControllerDashboard")
-        } else {
-          throw new Error(response.data.message || "Failed to save instruction")
-        }
-      } catch (error) {
-        console.error("=== ERROR SAVING INSTRUCTION ===")
-        console.error("Error submitting form:", error)
-        setSubmitError(
-          error.response?.data?.message || error.message || "An error occurred while saving the instruction",
-        )
-      } finally {
-        setIsSubmitting(false)
       }
+
+      // Check for rate/count mismatch
+      const { needsConfirmation, message } = checkRateCountMismatch()
+      if (needsConfirmation) {
+        setConfirmationMessage(message)
+        setShowConfirmationPopup(true)
+        return
+      }
+
+      // Proceed with submission
+      await submitInstruction()
     },
-    [formData, isWeightBased, isCrossHaul, isImport, containers, navigate, validateForm],
+    [validateForm, validateContainers, checkRateCountMismatch, isWeightBased, showContainerDetails],
   )
+
+  const submitInstruction = useCallback(async () => {
+    setIsSubmitting(true)
+    setSubmitError("")
+
+    try {
+      console.log("=== STARTING TOTAL COST CALCULATION ===")
+
+      let totalCost = 0
+      const costBreakdown = {
+        calculationType: isWeightBased ? "weight-based" : "container-based",
+        isWeightBased,
+        isCrossHaul,
+        unitType: formData.rateWeight,
+        components: {},
+      }
+
+      if (isWeightBased) {
+        // Weight-based calculation
+        const weight = Number.parseFloat(formData.weight || 0)
+        const unitRate = Number.parseFloat(formData.unitrate || 0)
+        totalCost = weight * unitRate
+
+        costBreakdown.components = {
+          weight: weight,
+          unitRate: unitRate,
+          weightBasedCost: totalCost,
+        }
+
+        console.log("WEIGHT-BASED CALCULATION:")
+        console.log(`  Weight: ${weight} ${formData.rateWeight}`)
+        console.log(`  Unit Rate: R${unitRate.toFixed(2)} per ${formData.rateWeight}`)
+        console.log(`  Base Cost: ${weight} × R${unitRate.toFixed(2)} = R${totalCost.toFixed(2)}`)
+      } else {
+        // Container-based calculation
+        const sixMeterRate = Number.parseFloat(formData.sixMeterRate) || 0
+        const twelveMeterRate = Number.parseFloat(formData.twelveMeterRate) || 0
+        const abnormalRate = Number.parseFloat(formData.abnormalRate) || 0
+        const breakBulkRate = Number.parseFloat(formData.rateper_breakbulk) || 0
+
+        const sixMeterCount = formData.num_six_meters || 0
+        const twelveMeterCount = formData.num_twelve_meters || 0
+        const abnormalCount = formData.num_abnormal || 0
+        const breakBulkCount = formData.num_breakbulk || 0
+
+        const sixMeterCost = sixMeterRate * sixMeterCount
+        const twelveMeterCost = twelveMeterRate * twelveMeterCount
+        const abnormalCost = abnormalRate * abnormalCount
+
+        // Break bulk cost only applies if it's cross-haul AND the rateWeight is 'Container'
+        const breakBulkCost = isCrossHaul && formData.rateWeight === "Container" ? breakBulkRate * breakBulkCount : 0
+
+        totalCost = sixMeterCost + twelveMeterCost + abnormalCost + breakBulkCost
+
+        costBreakdown.components = {
+          sixMeter: { count: sixMeterCount, rate: sixMeterRate, cost: sixMeterCost },
+          twelveMeter: { count: twelveMeterCount, rate: twelveMeterRate, cost: twelveMeterCost },
+          abnormal: { count: abnormalCount, rate: abnormalRate, cost: abnormalCost },
+          breakBulk: {
+            count: breakBulkCount,
+            rate: breakBulkRate,
+            cost: breakBulkCost,
+            applicable: isCrossHaul && formData.rateWeight === "Container",
+          },
+          containerBasedSubtotal: totalCost,
+        }
+
+        console.log("CONTAINER-BASED CALCULATION:")
+        console.log(`  6m Containers: ${sixMeterCount} × R${sixMeterRate.toFixed(2)} = R${sixMeterCost.toFixed(2)}`)
+        console.log(
+          `  12m Containers: ${twelveMeterCount} × R${twelveMeterRate.toFixed(2)} = R${twelveMeterCost.toFixed(2)}`,
+        )
+        console.log(
+          `  Abnormal Containers: ${abnormalCount} × R${abnormalRate.toFixed(2)} = R${abnormalCost.toFixed(2)}`,
+        )
+
+        if (isCrossHaul && formData.rateWeight === "Container") {
+          console.log(`  Break Bulk: ${breakBulkCount} × R${breakBulkRate.toFixed(2)} = R${breakBulkCost.toFixed(2)}`)
+        } else if (isCrossHaul) {
+          console.log(`  Break Bulk: Not applicable (Unit type: ${formData.rateWeight})`)
+        }
+
+        console.log(`  Container Subtotal: R${totalCost.toFixed(2)}`)
+      }
+
+      // Add surcharges
+      const surchargeAmount = formData.surcharges ? Number.parseFloat(formData.surchargesAmount || 0) : 0
+      const subtotalBeforeVAT = totalCost + surchargeAmount
+
+      costBreakdown.components.surcharges = {
+        applied: formData.surcharges,
+        amount: surchargeAmount,
+      }
+      costBreakdown.components.subtotalBeforeVAT = subtotalBeforeVAT
+
+      console.log("SURCHARGES:")
+      console.log(`  Surcharges Applied: ${formData.surcharges ? "Yes" : "No"}`)
+      if (formData.surcharges) {
+        console.log(`  Surcharge Amount: R${surchargeAmount.toFixed(2)}`)
+      }
+      console.log(`  Subtotal (before VAT): R${subtotalBeforeVAT.toFixed(2)}`)
+
+      // Calculate VAT (for display purposes only - not added to total cost saved to DB)
+      const vatRate = formData.vat / 100
+      const vatAmount = subtotalBeforeVAT * vatRate
+      const totalWithVAT = subtotalBeforeVAT + vatAmount
+
+      costBreakdown.components.vat = {
+        rate: formData.vat,
+        rateDecimal: vatRate,
+        amount: vatAmount,
+      }
+      costBreakdown.components.totalWithVAT = totalWithVAT
+
+      console.log("VAT CALCULATION (for reference only - NOT added to saved total):")
+      console.log(`  VAT Rate: ${formData.vat}%`)
+      console.log(`  VAT Amount: R${subtotalBeforeVAT.toFixed(2)} × ${vatRate} = R${vatAmount.toFixed(2)}`)
+      console.log(`  Total with VAT: R${totalWithVAT.toFixed(2)}`)
+
+      // Set the total cost to save (WITHOUT VAT)
+      totalCost = subtotalBeforeVAT
+
+      costBreakdown.components.finalTotalSaved = totalCost
+
+      console.log("FINAL COST BREAKDOWN:")
+      console.log(`  Base Cost: R${(totalCost - surchargeAmount).toFixed(2)}`)
+      console.log(`  Surcharges: R${surchargeAmount.toFixed(2)}`)
+      console.log(`  TOTAL COST SAVED TO DB (excluding VAT): R${totalCost.toFixed(2)}`)
+      console.log(`  VAT (calculated but not saved): R${vatAmount.toFixed(2)}`)
+      console.log(`  Total with VAT (for reference): R${totalWithVAT.toFixed(2)}`)
+
+      console.log("=== COST BREAKDOWN SUMMARY ===")
+      console.log(JSON.stringify(costBreakdown, null, 2))
+      console.log("=== END TOTAL COST CALCULATION ===")
+
+      // Prepare instruction data with null values for cross-haul and weight-based
+      const instructionData = {
+        ...formData,
+        total_cost: totalCost, // This is now the subtotal without VAT
+        // Set vessel_name and stackdate to null for cross-haul
+        vessel_name: isCrossHaul ? null : formData.vesselName,
+        stackdate: isCrossHaul ? null : formData.stackDate,
+        // UPDATED RATE SAVING LOGIC: Set container rates to 0 if count is 0, null for weight-based
+        rateper_6: isWeightBased
+          ? null
+          : formData.num_six_meters === 0
+            ? 0
+            : formData.sixMeterRate === ""
+              ? null
+              : Number.parseFloat(formData.sixMeterRate || 0),
+        rateper_12: isWeightBased
+          ? null
+          : formData.num_twelve_meters === 0
+            ? 0
+            : formData.twelveMeterRate === ""
+              ? null
+              : Number.parseFloat(formData.twelveMeterRate || 0),
+        rateper_abnormal: isWeightBased
+          ? null
+          : formData.num_abnormal === 0
+            ? 0
+            : formData.abnormalRate === ""
+              ? null
+              : Number.parseFloat(formData.abnormalRate || 0),
+        // Break bulk rate is 0 if count is 0, null if weight-based OR not cross-haul OR not container unit type
+        rateper_breakbulk:
+          isWeightBased || !isCrossHaul || formData.rateWeight !== "Container"
+            ? null
+            : formData.num_breakbulk === 0
+              ? 0
+              : formData.rateper_breakbulk === ""
+                ? null
+                : Number.parseFloat(formData.rateper_breakbulk || 0),
+        // Set container counts to 0 for weight-based
+        num_six_meters: isWeightBased ? 0 : formData.num_six_meters || 0,
+        num_twelve_meters: isWeightBased ? 0 : formData.num_twelve_meters || 0,
+        num_abnormal: isWeightBased ? 0 : formData.num_abnormal || 0,
+        // Break bulk count is 0 if weight-based OR not cross-haul OR not container unit type
+        num_breakbulk:
+          isWeightBased || !isCrossHaul || formData.rateWeight !== "Container" ? 0 : formData.num_breakbulk || 0,
+        // Set weight and unitrate appropriately
+        weight: isWeightBased ? (formData.weight === "" ? null : Number.parseFloat(formData.weight || 0)) : null,
+        unitrate: isWeightBased ? (formData.unitrate === "" ? null : Number.parseFloat(formData.unitrate || 0)) : null,
+        // Map field names for backend
+        client: formData.clientId,
+        shipment_type: formData.shipmentTypeId,
+        pickuptime: formData.pickupTime,
+        pickupdate: formData.pickupDate,
+        deadline: formData.deadline,
+        fileref: formData.fileRef,
+        booking_ref: formData.bookingRef,
+        rateweight: formData.rateWeight,
+        status: "New",
+        vat: formData.vat,
+        surchages: formData.surcharges,
+        surcharge: surchargeAmount,
+      }
+
+      // Prepare container data (only for container-based calculations AND if unit type is Container)
+      const containerData =
+        !isWeightBased && formData.rateWeight === "Container"
+          ? containers.map((container) => ({
+              container_type: container.containerType,
+              containerNum: container.containerNum,
+              weight: isImport ? (container.weight === "" ? null : Number.parseFloat(container.weight || 0)) : null,
+              cargo_description: container.cargoDescription || "",
+            }))
+          : []
+
+      console.log("=== SUBMITTING TO DATABASE ===")
+      console.log("Instruction data being saved:", {
+        ...instructionData,
+        description: instructionData.description ? instructionData.description.substring(0, 50) + "..." : null, // Truncate for logging
+      })
+      console.log("Container data being saved:", containerData)
+      console.log("Final calculated total cost (WITHOUT VAT):", totalCost)
+      console.log("Rate saving logic applied:")
+      console.log(`  rateper_6: ${instructionData.rateper_6} (count: ${instructionData.num_six_meters})`)
+      console.log(`  rateper_12: ${instructionData.rateper_12} (count: ${instructionData.num_twelve_meters})`)
+      console.log(`  rateper_abnormal: ${instructionData.rateper_abnormal} (count: ${instructionData.num_abnormal})`)
+      console.log(`  rateper_breakbulk: ${instructionData.rateper_breakbulk} (count: ${instructionData.num_breakbulk})`)
+
+      // Save the instruction
+      const response = await api.post("/api/instructions/save-instruction", {
+        controllerData: instructionData,
+        containerData: containerData,
+      })
+
+      if (response.data.success) {
+        console.log("=== INSTRUCTION SAVED SUCCESSFULLY ===")
+        console.log("Database response:", response.data)
+        // Navigate to dashboard on success
+        navigate("/ControllerDashboard")
+      } else {
+        throw new Error(response.data.message || "Failed to save instruction")
+      }
+    } catch (error) {
+      console.error("=== ERROR SAVING INSTRUCTION ===")
+      console.error("Error submitting form:", error)
+      setSubmitError(error.response?.data?.message || error.message || "An error occurred while saving the instruction")
+    } finally {
+      setIsSubmitting(false)
+    }
+  }, [formData, isWeightBased, isCrossHaul, isImport, containers, navigate])
+
+  const handleConfirmSubmit = useCallback(async () => {
+    setShowConfirmationPopup(false)
+    await submitInstruction()
+  }, [submitInstruction])
+
+  const handleCancelSubmit = useCallback(() => {
+    setShowConfirmationPopup(false)
+  }, [])
 
   // ErrorTooltip component - Disabled
   const ErrorTooltip = () => null
@@ -1255,6 +1419,68 @@ const ControllerInstructions = () => {
   return (
     <div className="controller-instructions-unique-wrapper">
       <style>{spinnerKeyframes}</style>
+
+      {/* Confirmation Popup */}
+      {showConfirmationPopup && (
+        <div
+          className="modal-overlay"
+          style={{
+            position: "fixed",
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            backgroundColor: "rgba(0, 0, 0, 0.5)",
+            display: "flex",
+            justifyContent: "center",
+            alignItems: "center",
+            zIndex: 1000,
+          }}
+        >
+          <div
+            className="modal"
+            style={{
+              backgroundColor: "white",
+              padding: "20px",
+              borderRadius: "8px",
+              maxWidth: "500px",
+              width: "90%",
+              boxShadow: "0 4px 6px rgba(0, 0, 0, 0.1)",
+            }}
+          >
+            <h3 style={{ marginTop: 0, color: "#333" }}>Confirm Submission</h3>
+            <p style={{ marginBottom: "20px", lineHeight: "1.5" }}>{confirmationMessage}</p>
+            <div style={{ display: "flex", gap: "10px", justifyContent: "flex-end" }}>
+              <button
+                onClick={handleCancelSubmit}
+                style={{
+                  padding: "8px 16px",
+                  backgroundColor: "#6c757d",
+                  color: "white",
+                  border: "none",
+                  borderRadius: "4px",
+                  cursor: "pointer",
+                }}
+              >
+                No, Let Me Edit
+              </button>
+              <button
+                onClick={handleConfirmSubmit}
+                style={{
+                  padding: "8px 16px",
+                  backgroundColor: "#4a90e2",
+                  color: "white",
+                  border: "none",
+                  borderRadius: "4px",
+                  cursor: "pointer",
+                }}
+              >
+                Yes, Continue
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* No Rates Modal */}
       {showNoRatesModal && (
@@ -1475,20 +1701,6 @@ const ControllerInstructions = () => {
                 <ErrorTooltip message={fieldErrors.shipmentTypeId} />
               </div>
             </div>
-            {/* <div className="controller-instructions-form-field">
-              <label>Name of Task</label>
-              <div className="controller-instructions-input-wrapper" ref={fieldRefs.current.task}>
-                <input
-                  type="text"
-                  className={`controller-instructions-form-input ${fieldErrors.task ? "controller-instructions-error-field" : ""}`}
-                  placeholder="Input Name of Task"
-                  name="task"
-                  value={formData.task}
-                  onChange={handleInputChange}
-                />
-                <ErrorTooltip message={fieldErrors.task} />
-              </div>
-            </div> */}
           </div>
         </div>
         <div className="controller-instructions-form-section">
@@ -1728,10 +1940,10 @@ const ControllerInstructions = () => {
                           min="0"
                           name="num_breakbulk"
                           onChange={(e) => handleContainerCountChange("num_breakbulk", e.target.value)}
-                          disabled={disableBreakBulkFields}
+                          disabled={isWeightBased || !isCrossHaul}
                           style={{
-                            backgroundColor: disableBreakBulkFields ? "#f5f5f5" : "#fff",
-                            cursor: disableBreakBulkFields ? "not-allowed" : "text",
+                            backgroundColor: isWeightBased || !isCrossHaul ? "#f5f5f5" : "#fff",
+                            cursor: isWeightBased || !isCrossHaul ? "not-allowed" : "text",
                           }}
                         />
                         <div style={{ width: "50%" }}>
@@ -1767,26 +1979,22 @@ const ControllerInstructions = () => {
                                   rateper_breakbulk: Number.parseFloat(prev.rateper_breakbulk),
                                 }))
                               }
-                              if (formData.rateper_breakbulk !== "") {
-                                setFormData((prev) => ({
-                                  ...prev,
-                                  rateper_breakbulk: Number.parseFloat(prev.rateper_breakbulk),
-                                }))
-                              }
                             }}
                             style={{
                               width: "50%",
                               padding: "8px",
                               border: "1px solid #000",
                               borderRadius: "4px",
-                              backgroundColor: disableBreakBulkFields ? "#f5f5f5" : "#fff",
+                              backgroundColor:
+                                rateFieldsEnabled.breakBulk && !isWeightBased && isCrossHaul ? "#fff" : "#f5f5f5",
                               fontSize: "16px",
                               position: "relative",
                               zIndex: 1000,
-                              cursor: disableBreakBulkFields ? "not-allowed" : "text",
+                              cursor:
+                                rateFieldsEnabled.breakBulk && !isWeightBased && isCrossHaul ? "text" : "not-allowed",
                             }}
-                            disabled={disableBreakBulkFields}
-                            placeholder={!disableBreakBulkFields ? "0.00" : ""}
+                            disabled={!rateFieldsEnabled.breakBulk || isWeightBased || !isCrossHaul}
+                            placeholder={rateFieldsEnabled.breakBulk && !isWeightBased && isCrossHaul ? "0.00" : ""}
                           />
                           {fieldErrors.rateper_breakbulk && (
                             <div className="controller-instructions-error-message">{fieldErrors.rateper_breakbulk}</div>
@@ -1934,7 +2142,6 @@ const ControllerInstructions = () => {
                           }}
                         >
                           <option value="kg">kg</option>
-                        
                           <option value="ton">ton</option>
                           <option value="Container">Container</option>
                         </select>
@@ -2030,7 +2237,9 @@ const ControllerInstructions = () => {
                         disabled={isLoading.shipmentTypes || shipmentTypes.length === 0}
                         style={{ width: "100%" }}
                       >
-                        <option value="" disabled>Select Shipment</option>
+                        <option value="" disabled>
+                          Select Shipment
+                        </option>
                         {shipmentTypes.map((type) => (
                           <option key={type.shipkey} value={type.shipkey}>
                             {type.shipmenttype}
@@ -2136,7 +2345,7 @@ const ControllerInstructions = () => {
                   {!isCrossHaul && (
                     <div className="controller-instructions-form-field" style={{ flex: "0 0 140px" }}>
                       <label>{isImport ? "ETA" : "Stack Date"}</label>
-                      <div className="controller-instructions-input-wrapper" ref={fieldRefs.current.stackDate}>
+                      <div className="controller-instructions-input-wrapper" ref={etaDateRef}>
                         <input
                           type="date"
                           className={`controller-instructions-form-input ${fieldErrors.stackDate ? "controller-instructions-error-field" : ""}`}
@@ -2150,7 +2359,7 @@ const ControllerInstructions = () => {
                             border: "1px solid #ced4da",
                             borderRadius: "4px",
                             fontSize: "13px",
-                            height: "32px"
+                            height: "32px",
                           }}
                           min={formData.pickupDate || today}
                           disabled={!formData.pickupDate}
@@ -2200,7 +2409,7 @@ const ControllerInstructions = () => {
                           borderRadius: "4px",
                           fontSize: "14px",
                           boxSizing: "border-box",
-                          height: "36px"
+                          height: "36px",
                         }}
                       />
                       <ErrorTooltip message={fieldErrors.description} />
@@ -2221,7 +2430,14 @@ const ControllerInstructions = () => {
                         flexWrap: "wrap",
                       }}
                     >
-                      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(160px, 1fr))", gap: "24px", width: "100%" }}>
+                      <div
+                        style={{
+                          display: "grid",
+                          gridTemplateColumns: "repeat(auto-fill, minmax(160px, 1fr))",
+                          gap: "24px",
+                          width: "100%",
+                        }}
+                      >
                         {/* VAT Rate */}
                         <div className="controller-instructions-form-field" style={{ width: "100%" }}>
                           <label>VAT Rate</label>
@@ -2231,16 +2447,16 @@ const ControllerInstructions = () => {
                               className="controller-instructions-form-input"
                               value={`${formData.vat || 15}%`}
                               readOnly
-                              style={{ 
-                                width: "100%", 
-                                padding: "4px 6px", 
+                              style={{
+                                width: "100%",
+                                padding: "4px 6px",
                                 fontSize: "12px",
-                                height: "30px"
+                                height: "30px",
                               }}
                             />
                           </div>
                         </div>
-                        
+
                         {/* Vessel Name - Hidden for Cross-haul */}
                         {!isCrossHaul && (
                           <div className="controller-instructions-form-field" style={{ width: "100%" }}>
@@ -2259,7 +2475,7 @@ const ControllerInstructions = () => {
                                   border: "1px solid #ced4da",
                                   borderRadius: "4px",
                                   fontSize: "12px",
-                                  height: "30px"
+                                  height: "30px",
                                 }}
                               />
                               <ErrorTooltip message={fieldErrors.vesselName} />
@@ -2284,7 +2500,7 @@ const ControllerInstructions = () => {
                                 border: "1px solid #ced4da",
                                 borderRadius: "4px",
                                 fontSize: "12px",
-                                height: "30px"
+                                height: "30px",
                               }}
                             />
                             <ErrorTooltip message={fieldErrors.description} />
@@ -2298,9 +2514,7 @@ const ControllerInstructions = () => {
                       <div
                         className="controller-instructions-shipment-task-row"
                         style={{ order: -1, marginBottom: "8px" }}
-                      >
-                        
-                      </div>
+                      ></div>
                       <div
                         className="controller-instructions-date-time-row-1"
                         style={{
@@ -2309,11 +2523,15 @@ const ControllerInstructions = () => {
                           gridTemplateColumns: "repeat(auto-fill, minmax(140px, 1fr))",
                           gap: "12px",
                         }}
+                      ></div>
+                      <div
+                        className="controller-instructions-date-time-row-2"
+                        style={{
+                          display: "grid",
+                          gridTemplateColumns: "repeat(auto-fill, minmax(140px, 1fr))",
+                          gap: "12px",
+                        }}
                       >
-                      
-                       
-                      </div>
-                      <div className="controller-instructions-date-time-row-2" style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(140px, 1fr))", gap: "12px" }}>
                         {/* This space is left intentionally blank after moving the stack date field */}
                       </div>
                     </div>
@@ -2348,20 +2566,65 @@ const ControllerInstructions = () => {
                         <td>{container.id}</td>
                         <td>{container.containerType}</td>
                         <td>
-                          <input
-                            type="text"
-                            className={`form-control form-control-sm ${containerFieldErrors[`container-${container.id}`] ? "is-invalid" : ""}`}
-                            value={container.containerNum}
-                            onChange={(e) => handleContainerChange(container.id, "containerNum", e.target.value)}
-                            placeholder="ABCD1234567"
-                            maxLength={11}
-                            style={{ minWidth: "120px" }}
-                          />
-                          {containerFieldErrors[`container-${container.id}`] && (
-                            <div className="invalid-feedback d-block">
-                              {containerFieldErrors[`container-${container.id}`]}
-                            </div>
-                          )}
+                          <div style={{ position: "relative" }}>
+                            <input
+                              type="text"
+                              className={`form-control form-control-sm ${containerFieldErrors[`container-${container.id}`] ? "is-invalid" : ""}`}
+                              value={container.containerNum}
+                              onChange={(e) => handleContainerChange(container.id, "containerNum", e.target.value)}
+                              placeholder="ABCD1234567"
+                              maxLength={11}
+                              style={{
+                                minWidth: "120px",
+                                backgroundColor: containerFieldErrors[`container-${container.id}`]
+                                  ? "#ffebee"
+                                  : "white",
+                                borderColor: containerFieldErrors[`container-${container.id}`] ? "#f44336" : "#ced4da",
+                              }}
+                            />
+                            {containerFieldErrors[`container-${container.id}`] && (
+                              <div
+                                style={{
+                                  position: "fixed",
+                                  zIndex: 9999,
+                                  backgroundColor: "#f44336",
+                                  color: "white",
+                                  padding: "6px 10px",
+                                  borderRadius: "4px",
+                                  fontSize: "12px",
+                                  whiteSpace: "nowrap",
+                                  boxShadow: "0 4px 8px rgba(0,0,0,0.3)",
+                                  transform: "translateY(4px)",
+                                  pointerEvents: "none",
+                                  maxWidth: "250px",
+                                }}
+                                ref={(el) => {
+                                  if (el) {
+                                    const input = el.previousElementSibling
+                                    if (input) {
+                                      const rect = input.getBoundingClientRect()
+                                      el.style.left = `${rect.left}px`
+                                      el.style.top = `${rect.bottom}px`
+                                    }
+                                  }
+                                }}
+                              >
+                                {containerFieldErrors[`container-${container.id}`]}
+                                <div
+                                  style={{
+                                    position: "absolute",
+                                    top: "-4px",
+                                    left: "10px",
+                                    width: "0",
+                                    height: "0",
+                                    borderLeft: "4px solid transparent",
+                                    borderRight: "4px solid transparent",
+                                    borderBottom: "4px solid #f44336",
+                                  }}
+                                />
+                              </div>
+                            )}
+                          </div>
                         </td>
                         {isImport && (
                           <td>
@@ -2374,7 +2637,6 @@ const ControllerInstructions = () => {
                                 placeholder="0.00"
                                 style={{ textAlign: "right" }}
                               />
-                         
                             </div>
                             {containerFieldErrors[`weight-${container.id}`] && (
                               <div className="invalid-feedback d-block">

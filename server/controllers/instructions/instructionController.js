@@ -1,3 +1,4 @@
+
 import {
   getShipmentTypes,
   getContainersByInstructionId,
@@ -15,6 +16,39 @@ import {
   saveInstructionAndContainers,
   updateFCInstructionAndContainers,
 } from "../../models/instructions/instructionModel.js"
+
+// Helper function to calculate total cost based on rate weight type
+const calculateTotalCost = (instructionData) => {
+  const rateWeight = instructionData.rateweight || instructionData.rateWeight || "Container"
+  const surchargeAmount = instructionData.surchages ? Number(instructionData.surcharge || 0) : 0
+
+  let baseCost = 0
+
+  if (rateWeight === "Container") {
+    // Container-based calculation
+    const numSix = Number(instructionData.num_six_meters || 0)
+    const numTwelve = Number(instructionData.num_twelve_meters || 0)
+    const numAbnormal = Number(instructionData.num_abnormal || 0)
+    const numBreakBulk = Number(instructionData.num_breakbulk || 0)
+
+    const ratePer6 = numSix > 0 ? Number(instructionData.rateper_6 || 0) : 0
+    const ratePer12 = numTwelve > 0 ? Number(instructionData.rateper_12 || 0) : 0
+    const ratePerAbnormal = numAbnormal > 0 ? Number(instructionData.rateper_abnormal || 0) : 0
+    const ratePerBreakBulk = numBreakBulk > 0 ? Number(instructionData.rateper_breakbulk || 0) : 0
+
+    baseCost =
+      ratePer6 * numSix + ratePer12 * numTwelve + ratePerAbnormal * numAbnormal + ratePerBreakBulk * numBreakBulk
+  } else {
+    // Weight-based calculation (kg, ton, m³)
+    const weight = Number(instructionData.weight || 0)
+    const unitRate = Number(instructionData.unitrate || 0)
+
+    baseCost = weight * unitRate
+  }
+
+  const totalCost = baseCost + surchargeAmount
+  return Number(totalCost.toFixed(2))
+}
 
 export const getShipmentTypesHandler = async (req, res) => {
   try {
@@ -69,21 +103,30 @@ export const getContainersHandler = async (req, res) => {
 export const saveInstructionHandler = async (req, res) => {
   try {
     const { controllerData, containerData } = req.body
+
+    // Calculate total cost based on rate weight type
+    const calculatedTotalCost = calculateTotalCost(controllerData)
+    const updatedControllerData = {
+      ...controllerData,
+      total_cost: calculatedTotalCost,
+    }
+
     console.log("Received instruction data:", {
       controllerData: {
-        ...controllerData,
+        ...updatedControllerData,
         description: "...", // Truncate for logging
-        total_cost: controllerData.total_cost,
-        weight: controllerData.weight,
-        booking_ref: controllerData.booking_ref,
-        vessel_name: controllerData.vessel_name,
-        rateper_6: controllerData.rateper_6,
-        rateper_12: controllerData.rateper_12,
-        rateper_abnormal: controllerData.rateper_abnormal,
-        rateper_breakbulk: controllerData.rateper_breakbulk, // Added for logging
-        unitrate: controllerData.unitrate, // Added for logging
-        pickup: controllerData.startingPoints,
-        dropoff: controllerData.destinations,
+        total_cost: updatedControllerData.total_cost,
+        weight: updatedControllerData.weight,
+        booking_ref: updatedControllerData.booking_ref,
+        vessel_name: updatedControllerData.vessel_name,
+        rateper_6: updatedControllerData.rateper_6,
+        rateper_12: updatedControllerData.rateper_12,
+        rateper_abnormal: updatedControllerData.rateper_abnormal,
+        rateper_breakbulk: updatedControllerData.rateper_breakbulk,
+        unitrate: updatedControllerData.unitrate,
+        rateweight: updatedControllerData.rateweight,
+        pickup: updatedControllerData.startingPoints,
+        dropoff: updatedControllerData.destinations,
       },
       containerCount: containerData.length,
       containerDataSample:
@@ -94,7 +137,7 @@ export const saveInstructionHandler = async (req, res) => {
             }
           : "No containers",
     })
-    const result = await saveInstruction({ controllerData, containerData })
+    const result = await saveInstruction({ controllerData: updatedControllerData, containerData })
     res.json({ success: true, m1key: result.m1key })
   } catch (error) {
     console.error("Error in save-instruction endpoint:", error)
@@ -155,7 +198,7 @@ export const getInstructionByIdHandler = async (req, res) => {
       rateper_6: instruction.rateper_6,
       rateper_12: instruction.rateper_12,
       rateper_abnormal: instruction.rateper_abnormal,
-      rateper_breakbulk: instruction.rateper_breakbulk, // Added for logging
+      rateper_breakbulk: instruction.rateper_breakbulk,
       pickupdate: instruction.pickupdate,
       stackdate: instruction.stackdate,
       deadline: instruction.deadline,
@@ -172,7 +215,7 @@ export const getInstructionByIdHandler = async (req, res) => {
       rateper_6: instruction.rateper_6 || 0,
       rateper_12: instruction.rateper_12 || 0,
       rateper_abnormal: instruction.rateper_abnormal || 0,
-      rateper_breakbulk: instruction.rateper_breakbulk || 0, // Added
+      rateper_breakbulk: instruction.rateper_breakbulk || 0,
       // Add the field names the frontend expects for rates
       sixMeterRate: instruction.rateper_6 || 0,
       twelveMeterRate: instruction.rateper_12 || 0,
@@ -186,7 +229,7 @@ export const getInstructionByIdHandler = async (req, res) => {
       rateper_6: formattedInstruction.rateper_6,
       rateper_12: formattedInstruction.rateper_12,
       rateper_abnormal: formattedInstruction.rateper_abnormal,
-      rateper_breakbulk: formattedInstruction.rateper_breakbulk, // Added
+      rateper_breakbulk: formattedInstruction.rateper_breakbulk,
       pickupdate: formattedInstruction.pickupdate,
       stackdate: formattedInstruction.stackdate,
       deadline: formattedInstruction.deadline,
@@ -204,20 +247,30 @@ export const updateInstructionHandler = async (req, res) => {
   try {
     const instructionId = req.params.id
     const updatedData = req.body
+
+    // Calculate total cost based on rate weight type
+    const calculatedTotalCost = calculateTotalCost(updatedData)
+    const updatedDataWithCost = {
+      ...updatedData,
+      total_cost: calculatedTotalCost,
+    }
+
     console.log(`Updating instruction with ID: ${instructionId}`)
     console.log("Update data received:", {
-      ...updatedData,
-      description: updatedData.description ? updatedData.description.substring(0, 20) + "..." : null,
-      total_cost: updatedData.total_cost,
-      weight: updatedData.weight,
-      booking_ref: updatedData.booking_ref,
-      vessel_name: updatedData.vessel_name,
-      rateper_6: updatedData.rateper_6,
-      rateper_12: updatedData.rateper_12,
-      rateper_abnormal: updatedData.rateper_abnormal,
-      rateper_breakbulk: updatedData.rateper_breakbulk, // Added for logging
+      ...updatedDataWithCost,
+      description: updatedDataWithCost.description ? updatedDataWithCost.description.substring(0, 20) + "..." : null,
+      total_cost: updatedDataWithCost.total_cost,
+      weight: updatedDataWithCost.weight,
+      booking_ref: updatedDataWithCost.booking_ref,
+      vessel_name: updatedDataWithCost.vessel_name,
+      rateper_6: updatedDataWithCost.rateper_6,
+      rateper_12: updatedDataWithCost.rateper_12,
+      rateper_abnormal: updatedDataWithCost.rateper_abnormal,
+      rateper_breakbulk: updatedDataWithCost.rateper_breakbulk,
+      rateweight: updatedDataWithCost.rateweight,
+      unitrate: updatedDataWithCost.unitrate,
     })
-    const result = await updateInstruction(instructionId, updatedData)
+    const result = await updateInstruction(instructionId, updatedDataWithCost)
     if (!result) {
       return res.status(404).json({ error: "Instruction not found" })
     }
@@ -227,11 +280,10 @@ export const updateInstructionHandler = async (req, res) => {
       weight: result.weight,
       booking_ref: result.booking_ref,
       vessel_name: result.vessel_name,
-
       rateper_6: result.rateper_6,
       rateper_12: result.rateper_12,
       rateper_abnormal: result.rateper_abnormal,
-      rateper_breakbulk: result.rateper_breakbulk, // Added
+      rateper_breakbulk: result.rateper_breakbulk,
     })
     res.json({ success: true, data: result })
   } catch (error) {
@@ -427,9 +479,17 @@ export const getFCContainersHandler = async (req, res) => {
 export const saveFCInstructionHandler = async (req, res) => {
   try {
     const instructionData = req.body
+
+    // Calculate total cost based on rate weight type
+    const calculatedTotalCost = calculateTotalCost(instructionData)
+    const updatedInstructionData = {
+      ...instructionData,
+      total_cost: calculatedTotalCost,
+    }
+
     console.log(`[${new Date().toISOString()}] [FC] saveFCInstructionHandler: Saving instruction`)
 
-    const result = await saveInstruction(instructionData)
+    const result = await saveInstruction(updatedInstructionData)
     console.log(`[${new Date().toISOString()}] [FC] saveFCInstructionHandler: Instruction saved with ID: ${result.id}`)
 
     res.status(201).json(result)
@@ -461,9 +521,16 @@ export const updateFCInstructionHandler = async (req, res) => {
     const { id } = req.params
     const updateData = req.body
 
+    // Calculate total cost based on rate weight type
+    const calculatedTotalCost = calculateTotalCost(updateData)
+    const updatedDataWithCost = {
+      ...updateData,
+      total_cost: calculatedTotalCost,
+    }
+
     console.log(`[${new Date().toISOString()}] [FC] updateFCInstructionHandler: Updating instruction ${id}`)
 
-    const updatedInstruction = await updateInstruction(id, updateData)
+    const updatedInstruction = await updateInstruction(id, updatedDataWithCost)
     if (!updatedInstruction) {
       return res.status(404).json({ error: "Instruction not found" })
     }
@@ -555,7 +622,14 @@ export const getClientRatesController = async (req, res) => {
 export const saveInstructionController = async (req, res) => {
   const { controllerData, containerData } = req.body
   try {
-    const result = await saveInstructionAndContainers(controllerData, containerData)
+    // Calculate total cost based on rate weight type
+    const calculatedTotalCost = calculateTotalCost(controllerData)
+    const updatedControllerData = {
+      ...controllerData,
+      total_cost: calculatedTotalCost,
+    }
+
+    const result = await saveInstructionAndContainers(updatedControllerData, containerData)
     res
       .status(201)
       .json({ success: true, message: "Instruction saved successfully!", instructionId: result.instructionId })
@@ -567,35 +641,43 @@ export const saveInstructionController = async (req, res) => {
 
 export const updateFCInstructionAndContainersHandler = async (req, res) => {
   try {
-    const { id } = req.params;
-    const { instructionData, containers } = req.body;
-    
+    const { id } = req.params
+    const { instructionData, containers } = req.body
+
     // Validate input data
     if (!id) {
-      return res.status(400).json({ success: false, error: "Missing instruction ID" });
+      return res.status(400).json({ success: false, error: "Missing instruction ID" })
     }
-    
-    if (!instructionData) {
-      return res.status(400).json({ success: false, error: "Missing instruction data" });
-    }
-    
-    if (!containers || !Array.isArray(containers)) {
-      return res.status(400).json({ success: false, error: "Containers must be an array" });
-    }
-    
-    console.log(`[${new Date().toISOString()}] [CONTROLLER] updateFCInstructionAndContainersHandler: Processing request for instruction ${id} with ${containers.length} containers`);
-    
-    const result = await updateFCInstructionAndContainers(id, instructionData, containers);
-    res.status(200).json({ success: true, message: "Instruction and containers updated successfully", data: result });
-  } catch (error) {
-    console.error(`[${new Date().toISOString()}] [CONTROLLER] Error in updateFCInstructionAndContainersHandler:`, error);
-    res.status(500).json({ 
-      success: false, 
-      error: "Failed to update instruction and containers", 
-      message: error.message,
-      details: error.stack
-    });
-  }
-};
 
-// ... (rest of the code remains the same)
+    if (!instructionData) {
+      return res.status(400).json({ success: false, error: "Missing instruction data" })
+    }
+
+    if (!containers || !Array.isArray(containers)) {
+      return res.status(400).json({ success: false, error: "Containers must be an array" })
+    }
+
+    // Calculate total cost based on rate weight type
+    const calculatedTotalCost = calculateTotalCost(instructionData)
+    const updatedInstructionData = {
+      ...instructionData,
+      total_cost: calculatedTotalCost,
+    }
+
+    console.log(
+      `[${new Date().toISOString()}] [CONTROLLER] updateFCInstructionAndContainersHandler: Processing request for instruction ${id} with ${containers.length} containers`,
+    )
+    console.log(`[${new Date().toISOString()}] [CONTROLLER] Calculated total cost: ${calculatedTotalCost}`)
+
+    const result = await updateFCInstructionAndContainers(id, updatedInstructionData, containers)
+    res.status(200).json({ success: true, message: "Instruction and containers updated successfully", data: result })
+  } catch (error) {
+    console.error(`[${new Date().toISOString()}] [CONTROLLER] Error in updateFCInstructionAndContainersHandler:`, error)
+    res.status(500).json({
+      success: false,
+      error: "Failed to update instruction and containers",
+      message: error.message,
+      details: error.stack,
+    })
+  }
+}

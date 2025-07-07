@@ -1,3 +1,4 @@
+
 "use client"
 
 import { useState, useEffect } from "react"
@@ -130,7 +131,7 @@ const CompanyInstructions = () => {
           try {
             // Convert clientId to string for consistent comparison
             const clientIdStr = String(clientId).trim()
-            console.log('Filtering instructions for client ID:', clientIdStr)
+            console.log("Filtering instructions for client ID:", clientIdStr)
 
             // Apply flexible filtering
             filteredData = data.filter((item) => {
@@ -141,20 +142,22 @@ const CompanyInstructions = () => {
                 item.m5clientkey,
                 item.client_id,
                 item.client_key,
-                item.clientId
+                item.clientId,
               ]
-              
+
               // Check if any of the possible IDs match (case-insensitive and trimmed)
-              const hasMatch = possibleClientIds.some(id => 
-                id !== undefined && id !== null && String(id).trim() === clientIdStr
+              const hasMatch = possibleClientIds.some(
+                (id) => id !== undefined && id !== null && String(id).trim() === clientIdStr,
               )
 
               // Log detailed info for debugging
               if (!hasMatch) {
-                console.log('Instruction did not match client ID:', {
+                console.log("Instruction did not match client ID:", {
                   instructionId: item.m1key || item.id,
-                  possibleClientIds: possibleClientIds.map(id => (id !== undefined && id !== null ? String(id).trim() : 'null/undefined')),
-                  expectedClientId: clientIdStr
+                  possibleClientIds: possibleClientIds.map((id) =>
+                    id !== undefined && id !== null ? String(id).trim() : "null/undefined",
+                  ),
+                  expectedClientId: clientIdStr,
                 })
               }
 
@@ -163,10 +166,10 @@ const CompanyInstructions = () => {
 
             console.log(`Filtered to ${filteredData.length} instructions for clientId: ${clientId}`)
             if (filteredData.length === 0) {
-              console.warn('No instructions found for client ID. Full data:', data)
+              console.warn("No instructions found for client ID. Full data:", data)
             }
           } catch (error) {
-            console.error('Error filtering instructions by client ID:', error)
+            console.error("Error filtering instructions by client ID:", error)
             // In case of error, show all data to prevent empty results
             filteredData = data
           }
@@ -196,11 +199,11 @@ const CompanyInstructions = () => {
       case "New":
         return 1
       case "In progress":
-        return 2
-      case "Completed":
         return 3
+      case "Completed":
+        return 4
       default:
-        return 4 // Any other status will come after the specified ones
+        return 5 // Any other status will come after the specified ones
     }
   }
 
@@ -267,11 +270,20 @@ const CompanyInstructions = () => {
       }
     }
 
-    // Sort by status priority: New -> In progress -> Completed
+    // Sort by status priority first, then by instruction number (descending)
     filtered.sort((a, b) => {
+      // Primary sort: Status priority
       const priorityA = getStatusPriority(a.status)
       const priorityB = getStatusPriority(b.status)
-      return priorityA - priorityB
+
+      if (priorityA !== priorityB) {
+        return priorityA - priorityB
+      }
+
+      // Secondary sort: Instruction number (descending)
+      const instructionA = Number.parseInt(a.m1controllerkey || a.m1key || 0)
+      const instructionB = Number.parseInt(b.m1controllerkey || b.m1key || 0)
+      return instructionB - instructionA // Descending order
     })
 
     return filtered
@@ -444,39 +456,39 @@ const CompanyInstructions = () => {
                   </tr>
                 ) : (
                   currentInstructions.map((item) => (
-                      <tr key={item.m1controllerkey || item.m1key}>
-                        <td>Instruction {item.m1controllerkey || item.m1key}</td>
-                        <td>{item.fileno}</td>
-                        <td>
-                          {item.type_text ||
-                            (item.shipment_type === 1 || item.shipment_type === "1"
-                              ? "import"
-                              : item.shipment_type === 2 || item.shipment_type === "2"
-                                ? "export"
-                                : item.shipment_type === 3 || item.shipment_type === "3"
-                                  ? "cross-haul"
-                                  : item.type)}
-                        </td>
-                        <td>{renderStatus(item.status)}</td>
-                        <td>{new Date(item.startingdate || item.pickupdate).toLocaleDateString()}</td>
-                        <td>
-                          <button
-                            className="view-btn"
-                            onClick={() => handleViewInstruction(item.m1controllerkey || item.m1key)}
-                          >
-                            View
-                          </button>
-                        </td>
-                        <td>
-                          <button
-                            className="view-btn"
-                            onClick={() => handleViewAssignment(item.m1controllerkey || item.m1key)}
-                          >
-                            View
-                          </button>
-                        </td>
-                      </tr>
-                    ))
+                    <tr key={item.m1controllerkey || item.m1key}>
+                      <td>Instruction {item.m1controllerkey || item.m1key}</td>
+                      <td>{item.fileno}</td>
+                      <td>
+                        {item.type_text ||
+                          (item.shipment_type === 1 || item.shipment_type === "1"
+                            ? "import"
+                            : item.shipment_type === 2 || item.shipment_type === "2"
+                              ? "export"
+                              : item.shipment_type === 3 || item.shipment_type === "3"
+                                ? "cross-haul"
+                                : item.type)}
+                      </td>
+                      <td>{renderStatus(item.status)}</td>
+                      <td>{new Date(item.startingdate || item.pickupdate).toLocaleDateString()}</td>
+                      <td>
+                        <button
+                          className="view-btn"
+                          onClick={() => handleViewInstruction(item.m1controllerkey || item.m1key)}
+                        >
+                          View
+                        </button>
+                      </td>
+                      <td>
+                        <button
+                          className="view-btn"
+                          onClick={() => handleViewAssignment(item.m1controllerkey || item.m1key)}
+                        >
+                          View
+                        </button>
+                      </td>
+                    </tr>
+                  ))
                 )}
               </tbody>
             </table>
@@ -486,7 +498,7 @@ const CompanyInstructions = () => {
 
       {/* Pagination Component */}
       {!loading && !error && filteredInstructions.length > 0 && (
-        <div style={{ marginTop: '20px', display: 'flex', justifyContent: 'center' }}>
+        <div style={{ marginTop: "20px", display: "flex", justifyContent: "center" }}>
           <Pagination
             totalRecords={filteredInstructions.length}
             recordsPerPage={recordsPerPage}
@@ -500,5 +512,4 @@ const CompanyInstructions = () => {
 }
 
 export default CompanyInstructions
-
 

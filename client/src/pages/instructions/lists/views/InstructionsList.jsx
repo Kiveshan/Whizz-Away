@@ -158,11 +158,11 @@ const Instructions = () => {
       case "New":
         return 1 // Highest priority
       case "In progress":
-        return 2
-      case "Completed":
         return 3
+      case "Completed":
+        return 4
       default:
-        return 4 // Lowest priority
+        return 5 // Lowest priority
     }
   }
 
@@ -211,11 +211,20 @@ const Instructions = () => {
       }
     }
 
-    // Sort by status priority: New -> In progress -> Completed
+    // Sort by status priority first, then by instruction number (descending)
     filtered.sort((a, b) => {
+      // Primary sort: Status priority
       const priorityA = getStatusPriority(a.status)
       const priorityB = getStatusPriority(b.status)
-      return priorityA - priorityB
+
+      if (priorityA !== priorityB) {
+        return priorityA - priorityB
+      }
+
+      // Secondary sort: Instruction number (descending)
+      const instructionA = Number.parseInt(a.m1controllerkey || a.m1key || 0)
+      const instructionB = Number.parseInt(b.m1controllerkey || b.m1key || 0)
+      return instructionB - instructionA // Descending order
     })
 
     return filtered
