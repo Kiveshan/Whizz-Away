@@ -53,6 +53,9 @@ export default function DirectorAnalytics() {
   }
 
   const getChartWidth = (dataLength) => {
+    if (activeFilter === "turnoverPerMonth" || activeFilter === "agingAnalysis") {
+      return 600; // Fixed width for 1 or 2 bars in turnoverPerMonth, 1 bar group in agingAnalysis
+    }
     const minWidth = 1200
     const barWidth = 180
     return Math.max(minWidth, dataLength * barWidth)
@@ -138,7 +141,7 @@ export default function DirectorAnalytics() {
     try {
       console.log(`Fetching turnover data for month: ${month}, year: ${year}, clientId: ${clientId}`)
       const response = await api.get("/api/turnover-per-month", {
-        params: { month, year, clientId, _t: new Date().getTime() },
+        params: { month, year, clientId: clientId || undefined, _t: new Date().getTime() },
       })
       console.log("API response:", response.data)
       if (response.data.success) {
@@ -146,7 +149,7 @@ export default function DirectorAnalytics() {
           const turnover = Number.parseFloat(item.turnover)
           console.log(`Client ${item.client}: Turnover=${turnover}, Percentage=${item.percentage}%`)
           return {
-            name: item.client || "Total Turnover",
+            name: item.client,
             turnover: turnover,
             month: item.month_name.trim(),
             year: item.year,
@@ -167,23 +170,23 @@ export default function DirectorAnalytics() {
     }
   }
 
-  const fetchAgingAnalysisData = async (month, year) => {
+  const fetchAgingAnalysisData = async (month, year, clientId = "") => {
     setIsLoading(true)
     setError(null)
     try {
-      console.log(`Fetching aging analysis data for month: ${month}, year: ${year}`)
+      console.log(`Fetching aging analysis data for month: ${month}, year: ${year}, clientId: ${clientId}`)
       const response = await api.get("/api/aging-analysis", {
-        params: { month, year, _t: new Date().getTime() },
+        params: { month, year, clientId: clientId || undefined, _t: new Date().getTime() },
       })
       console.log("API response:", response.data)
       if (response.data.success) {
         console.log("Aging analysis data received:", response.data.data)
         const agingData = response.data.data.map((item) => ({
-          client: item.client,
-          current: item.current,
-          thirtyDays: item.thirtyDays,
-          sixtyDays: item.sixtyDays,
-          ninetyDays: item.ninetyDays,
+          name: item.client || "Total Aging",
+          current: Number(item.current) || 0,
+          thirtyDays: Number(item.thirtyDays) || 0,
+          sixtyDays: Number(item.sixtyDays) || 0,
+          ninetyDays: Number(item.ninetyDays) || 0,
           month: item.month,
           year: item.year,
         }))
@@ -425,7 +428,7 @@ export default function DirectorAnalytics() {
           data = await fetchTurnoverData(activeMonth, activeYear, selectedClient)
           break
         case "agingAnalysis":
-          data = await fetchAgingAnalysisData(activeMonth, activeYear)
+          data = await fetchAgingAnalysisData(activeMonth, activeYear, selectedClient)
           break
         case "turnoverVsDieselCost":
           data = await fetchTurnoverVsDieselCost(activeMonth, activeYear)
@@ -509,7 +512,7 @@ export default function DirectorAnalytics() {
     const percentage = payload.percentage ?? 0
     console.log("CustomBarLabelForTurnover - payload:", payload)
     return (
-      <text x={x + width / 2} y={y - 10} fill="#9C27B0" textAnchor="middle" dominantBaseline="middle" fontSize={12}>
+      <text x={x + width / 2} y={y - 10} fill={payload.name === "Total Turnover" ? "#9C27B0" : "#4169e1"} textAnchor="middle" dominantBaseline="middle" fontSize={12}>
         R{value?.toLocaleString?.()} ({percentage}%)
       </text>
     )
@@ -656,16 +659,18 @@ export default function DirectorAnalytics() {
               <>
                 <div className="chart-header">
                   <div className="chart-header-item">
-                    <span className="legend-color" style={{ backgroundColor: "#4169e1" }}></span>
-                    <span>Selected Client</span>
-                  </div>
-                  <div className="chart-header-item">
                     <span className="legend-color" style={{ backgroundColor: "#9C27B0" }}></span>
                     <span>Total Turnover</span>
                   </div>
+                  {chartData.length > 1 && (
+                    <div className="chart-header-item">
+                      <span className="legend-color" style={{ backgroundColor: "#4169e1" }}></span>
+                      <span>Selected Client</span>
+                    </div>
+                  )}
                 </div>
                 <div className="chart-scroll-container">
-                  <ResponsiveContainer width={Math.max(1200, chartData.length * 180)} height={500}>
+                  <ResponsiveContainer width={chartWidth} height={500}>
                     <BarChart data={chartData} margin={{ top: 40, right: 30, left: 60, bottom: 40 }}>
                       <XAxis dataKey="name" tick={{ fill: "#000" }} />
                       <YAxis
@@ -726,7 +731,7 @@ export default function DirectorAnalytics() {
                   <ResponsiveContainer width={chartWidth} height={500}>
                     <BarChart data={chartData} margin={{ top: 40, right: 30, left: 60, bottom: 100 }}>
                       <XAxis
-                        dataKey="client"
+                        dataKey="name"
                         angle={0}
                         textAnchor="middle"
                         height={120}
@@ -1102,7 +1107,7 @@ export default function DirectorAnalytics() {
               </option>
             ))}
           </select>
-          {activeFilter === "turnoverPerMonth" && (
+          {(activeFilter === "turnoverPerMonth" || activeFilter === "agingAnalysis") && (
             <select
               value={selectedClient}
               onChange={(e) => setSelectedClient(e.target.value)}

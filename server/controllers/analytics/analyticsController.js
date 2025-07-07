@@ -12,232 +12,202 @@ import {
 } from "../../models/analytics/analyticsModel.js";
 import { pool } from "../../config/database.js";
 
-const monthNames = {
-  January: 1,
-  February: 2,
-  March: 3,
-  April: 4,
-  May: 5,
-  June: 6,
-  July: 7,
-  August: 8,
-  September: 9,
-  October: 10,
-  November: 11,
-  December: 12,
-};
-
-const getFuelExpensesHandler = async (req, res) => {
-  let client;
+const getFuelExpensesController = async (req, res) => {
+  const { month, year } = req.query;
+  if (!month || !year) {
+    return res.status(400).json({ success: false, message: "Month and year are required" });
+  }
   try {
-    const { month, year } = req.query;
-    console.log(`Fetching fuel expenses for month: ${month}, year: ${year}`);
-    client = await pool.connect();
-    const result = await getFuelExpenses(client, month, year);
-    res.json({ success: true, data: result });
+    const client = await pool.connect();
+    try {
+      const data = await getFuelExpenses(client, month, year);
+      res.status(200).json({ success: true, data });
+    } finally {
+      client.release();
+    }
   } catch (error) {
     console.error("Error fetching fuel expenses:", error);
-    res.status(500).json({
-      success: false,
-      message: `Error fetching fuel expenses: ${error.message}`,
-      error: error.message,
-    });
-  } finally {
-    if (client) client.release();
+    res.status(500).json({ success: false, message: error.message });
   }
 };
 
-const getTurnoverPerMonthHandler = async (req, res) => {
-  let client;
+const getTurnoverPerMonthController = async (req, res) => {
+  const { month, year, clientId } = req.query;
+  if (!month || !year) {
+    return res.status(400).json({ success: false, message: "Month and year are required" });
+  }
   try {
-    const { month, year, clientId } = req.query;
-    console.log(`Fetching turnover for month: ${month} ${year}, clientId: ${clientId || 'all'}`);
-    client = await pool.connect();
-    const result = await getTurnoverPerMonth(client, month, year, clientId);
-    res.json({ success: true, data: result });
+    const client = await pool.connect();
+    try {
+      const data = await getTurnoverPerMonth(client, month, year, clientId || null);
+      res.status(200).json({ success: true, data });
+    } finally {
+      client.release();
+    }
   } catch (error) {
     console.error("Error fetching turnover per month:", error);
-    res.status(500).json({
-      success: false,
-      message: `Error fetching turnover per month: ${error.message}`,
-      error: error.message,
-    });
-  } finally {
-    if (client) client.release();
+    res.status(500).json({ success: false, message: error.message });
   }
 };
 
-const getAllClientsHandler = async (req, res) => {
-  let client;
+const getAllClientsController = async (req, res) => {
   try {
-    console.log("Fetching all clients");
-    client = await pool.connect();
-    const result = await getAllClients(client);
-    res.json({ success: true, data: result });
+    const client = await pool.connect();
+    try {
+      const data = await getAllClients(client);
+      res.status(200).json({ success: true, data });
+    } finally {
+      client.release();
+    }
   } catch (error) {
     console.error("Error fetching clients:", error);
-    res.status(500).json({
-      success: false,
-      message: `Error fetching clients: ${error.message}`,
-      error: error.message,
-    });
-  } finally {
-    if (client) client.release();
+    res.status(500).json({ success: false, message: error.message });
   }
 };
 
-const getAgingAnalysisHandler = async (req, res) => {
-  let client;
+const getAgingAnalysisController = async (req, res) => {
+  const { month, year, clientId } = req.query;
+  if (!month || !year) {
+    return res.status(400).json({ success: false, message: "Month and year are required" });
+  }
   try {
-    const { month, year } = req.query;
-    console.log(`Fetching aging analysis for month: ${month}, year: ${year}`);
-    client = await pool.connect();
-    const result = await getAgingAnalysis(client, month, year);
-    res.json({ success: true, data: result });
+    const client = await pool.connect();
+    try {
+      const data = await getAgingAnalysis(client, month, year, clientId || null);
+      res.status(200).json({ success: true, data });
+    } finally {
+      client.release();
+    }
   } catch (error) {
     console.error("Error fetching aging analysis:", error);
-    res.status(500).json({
-      success: false,
-      message: `Error fetching aging analysis: ${error.message}`,
-      error: error.message,
-    });
-  } finally {
-    if (client) client.release();
+    res.status(500).json({ success: false, message: error.message });
   }
 };
 
-const getTurnoverVsDieselCostHandler = async (req, res) => {
+const getTurnoverVsDieselCostController = async (req, res) => {
+  const { month, year } = req.query;
+  if (!month || !year) {
+    return res.status(400).json({ success: false, message: "Month and year are required" });
+  }
   try {
-    const { month, year } = req.query;
-    console.log(`Fetching turnover vs diesel cost for month: ${month}, year: ${year}`);
-    const numericMonth = monthNames[month];
+    const numericMonth = Object.keys(monthNames).find(
+      (key) => monthNames[key].toLowerCase() === month.toLowerCase()
+    );
     if (!numericMonth) {
-      return res.status(400).json({
-        success: false,
-        message: "Invalid month provided",
-      });
+      return res.status(400).json({ success: false, message: "Invalid month" });
     }
-    const result = await getTurnoverVsDieselCost(numericMonth, year);
-    res.json({ success: true, data: result });
+    const data = await getTurnoverVsDieselCost(numericMonth, year);
+    res.status(200).json({ success: true, data });
   } catch (error) {
     console.error("Error fetching turnover vs diesel cost:", error);
-    res.status(500).json({
-      success: false,
-      message: `Error fetching turnover vs diesel cost: ${error.message}`,
-      error: error.message,
-    });
+    res.status(500).json({ success: false, message: error.message });
   }
 };
 
-const getAllExpensesHandler = async (req, res) => {
-  let client;
+const getAllExpensesController = async (req, res) => {
+  const { month, year } = req.query;
+  if (!month || !year) {
+    return res.status(400).json({ success: false, message: "Month and year are required" });
+  }
   try {
-    const { month, year } = req.query;
-    console.log(`Fetching all expenses for month: ${month}, year: ${year}`);
-    client = await pool.connect();
-    const result = await getAllExpenses(client, month, year);
-    res.json({ success: true, data: result });
+    const client = await pool.connect();
+    try {
+      const data = await getAllExpenses(client, month, year);
+      res.status(200).json({ success: true, data });
+    } finally {
+      client.release();
+    }
   } catch (error) {
     console.error("Error fetching all expenses:", error);
-    res.status(500).json({
-      success: false,
-      message: `Error fetching all expenses: ${error.message}`,
-      error: error.message,
-    });
-  } finally {
-    if (client) client.release();
+    res.status(500).json({ success: false, message: error.message });
   }
 };
 
-const getTurnoverPerTruckHandler = async (req, res) => {
-  let client;
+const getTurnoverPerTruckController = async (req, res) => {
+  const { month, year } = req.query;
+  if (!month || !year) {
+    return res.status(400).json({ success: false, message: "Month and year are required" });
+  }
   try {
-    const { month, year } = req.query;
-    console.log(`Fetching turnover per truck for month: ${month}, year: ${year}`);
-    client = await pool.connect();
-    const result = await getTurnoverPerTruck(client, month, year);
-    res.json({ success: true, data: result });
+    const client = await pool.connect();
+    try {
+      const data = await getTurnoverPerTruck(client, month, year);
+      res.status(200).json({ success: true, data });
+    } finally {
+      client.release();
+    }
   } catch (error) {
     console.error("Error fetching turnover per truck:", error);
-    res.status(500).json({
-      success: false,
-      message: `Error fetching turnover per truck: ${error.message}`,
-      error: error.message,
-    });
-  } finally {
-    if (client) client.release();
+    res.status(500).json({ success: false, message: error.message });
   }
 };
 
-const getWagesPerMonthHandler = async (req, res) => {
-  let client;
+const getWagesPerMonthController = async (req, res) => {
+  const { month, year } = req.query;
+  if (!month || !year) {
+    return res.status(400).json({ success: false, message: "Month and year are required" });
+  }
   try {
-    const { month, year } = req.query;
-    console.log(`Fetching wages per month for month: ${month}, year: ${year}`);
-    client = await pool.connect();
-    const result = await getWagesPerMonth(client, month, year);
-    res.json({ success: true, data: result });
+    const client = await pool.connect();
+    try {
+      const data = await getWagesPerMonth(client, month, year);
+      res.status(200).json({ success: true, data });
+    } finally {
+      client.release();
+    }
   } catch (error) {
     console.error("Error fetching wages per month:", error);
-    res.status(500).json({
-      success: false,
-      message: `Error fetching wages per month: ${error.message}`,
-      error: error.message,
-    });
-  } finally {
-    if (client) client.release();
+    res.status(500).json({ success: false, message: error.message });
   }
 };
 
-const getSubcontractorTurnoverPerMonthHandler = async (req, res) => {
-  let client;
+const getSubcontractorTurnoverPerMonthController = async (req, res) => {
+  const { month, year } = req.query;
+  if (!month || !year) {
+    return res.status(400).json({ success: false, message: "Month and year are required" });
+  }
   try {
-    const { month, year } = req.query;
-    console.log(`Fetching subcontractor turnover for month: ${month}, year: ${year}`);
-    client = await pool.connect();
-    const result = await getSubcontractorTurnoverPerMonth(client, month, year);
-    res.json({ success: true, data: result });
+    const client = await pool.connect();
+    try {
+      const data = await getSubcontractorTurnoverPerMonth(client, month, year);
+      res.status(200).json({ success: true, data });
+    } finally {
+      client.release();
+    }
   } catch (error) {
     console.error("Error fetching subcontractor turnover:", error);
-    res.status(500).json({
-      success: false,
-      message: `Error fetching subcontractor turnover: ${error.message}`,
-      error: error.message,
-    });
-  } finally {
-    if (client) client.release();
+    res.status(500).json({ success: false, message: error.message });
   }
 };
 
-const getSubcontractorVsTurnoverHandler = async (req, res) => {
-  let client;
+const getSubcontractorVsTurnoverController = async (req, res) => {
+  const { month, year } = req.query;
+  if (!month || !year) {
+    return res.status(400).json({ success: false, message: "Month and year are required" });
+  }
   try {
-    const { month, year } = req.query;
-    console.log(`Fetching subcontractor vs turnover for month: ${month}, year: ${year}`);
-    client = await pool.connect();
-    const result = await getSubcontractorVsTurnover(client, month, year);
-    res.json({ success: true, data: result });
+    const client = await pool.connect();
+    try {
+      const data = await getSubcontractorVsTurnover(client, month, year);
+      res.status(200).json({ success: true, data });
+    } finally {
+      client.release();
+    }
   } catch (error) {
     console.error("Error fetching subcontractor vs turnover:", error);
-    res.status(500).json({
-      success: false,
-      message: `Error fetching subcontractor vs turnover: ${error.message}`,
-      error: error.message,
-    });
-  } finally {
-    if (client) client.release();
+    res.status(500).json({ success: false, message: error.message });
   }
 };
 
 export {
-  getFuelExpensesHandler,
-  getTurnoverPerMonthHandler,
-  getAllClientsHandler,
-  getAgingAnalysisHandler,
-  getTurnoverVsDieselCostHandler,
-  getAllExpensesHandler,
-  getTurnoverPerTruckHandler,
-  getWagesPerMonthHandler,
-  getSubcontractorTurnoverPerMonthHandler,
-  getSubcontractorVsTurnoverHandler,
+  getFuelExpensesController,
+  getTurnoverPerMonthController,
+  getAllClientsController,
+  getAgingAnalysisController,
+  getTurnoverVsDieselCostController,
+  getAllExpensesController,
+  getTurnoverPerTruckController,
+  getWagesPerMonthController,
+  getSubcontractorTurnoverPerMonthController,
+  getSubcontractorVsTurnoverController,
 };

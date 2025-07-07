@@ -128,7 +128,7 @@ const getTurnoverPerMonth = async (client, month, year, clientId = null) => {
         percentage: parseFloat(percentage),
       };
     });
-    turnoverData = [turnoverData[0], ...clientData]; // Total turnover first, then client data
+    turnoverData = [...clientData, turnoverData[0]]; // Client data first, then total
   }
 
   console.log("Processed turnover data:", turnoverData);
@@ -151,23 +151,31 @@ const getAllClients = async (client) => {
   }));
 };
 
-const getAgingAnalysis = async (client, month, year) => {
-  const query = `
-    SELECT c.client, 
-           SUM(a.current) as current_amount,
-           SUM(a."30days") as thirty_days,
-           SUM(a."60days") as sixty_days,
-           SUM(a."90days") as ninety_days,
-           to_char(s.generation_date, 'Month') as month_name,
-           EXTRACT(YEAR FROM s.generation_date) as year
+const getAgingAnalysis = async (client, month, year, clientId = null) => {
+  const params = [month, year];
+  let query = `
+    SELECT 
+      ${clientId ? 'c.client' : "'Total Aging' as client"}, 
+      SUM(a.current) as current_amount,
+      SUM(a."30days") as thirty_days,
+      SUM(a."60days") as sixty_days,
+      SUM(a."90days") as ninety_days,
+      to_char(s.generation_date, 'Month') as month_name,
+      EXTRACT(YEAR FROM s.generation_date) as year
     FROM aging_analysis a
     JOIN statements s ON a.aging_key = s.agingid
     JOIN m5_client c ON a.clientid = c.m5clientkey
     WHERE TRIM(to_char(s.generation_date, 'Month')) = $1
     AND EXTRACT(YEAR FROM s.generation_date)::text = $2
-    GROUP BY c.client, to_char(s.generation_date, 'Month'), EXTRACT(YEAR FROM s.generation_date)
   `;
-  const result = await client.query(query, [month, year]);
+  if (clientId) {
+    query += ` AND a.clientid = $3`;
+    params.push(clientId);
+  }
+  query += `
+    GROUP BY ${clientId ? 'c.client,' : ''} to_char(s.generation_date, 'Month'), EXTRACT(YEAR FROM s.generation_date)
+  `;
+  const result = await client.query(query, params);
   console.log("Raw query result:", result.rows);
   console.log(`Query returned ${result.rows.length} rows`);
 
@@ -450,14 +458,12 @@ const getSubcontractorVsTurnover = async (client, month, year) => {
     GROUP BY TO_CHAR(l.date, 'Month'), EXTRACT(YEAR FROM l.date)
   `;
 
-  // Fetch total turnover using getTurnoverPerMonth
   const turnoverData = await getTurnoverPerMonth(client, month, year);
   const totalTurnover = turnoverData.reduce(
     (sum, item) => sum + parseFloat(item.turnover || 0),
     0
   );
 
-  // Fetch subcontractor turnover
   const subcontractorResult = await client.query(subcontractorQuery, [month, year]);
 
   console.log("Subcontractor turnover query result:", subcontractorResult.rows);
@@ -482,8 +488,8 @@ const getSubcontractorVsTurnover = async (client, month, year) => {
     year: year.toString(),
     totalTurnover: totalTurnover,
     subcontractorTurnover: subcontractorTurnover,
-    turnoverPercentage,
-    subcontractorPercentage,
+    turnoverPercentage: turnoverPercentage,
+    subcontractorPercentage: subcontractorPercentage,
   }];
 };
 
