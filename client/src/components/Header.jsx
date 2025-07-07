@@ -67,9 +67,7 @@ const Header = ({ title }) => {
           alt="Business Logo"
         />
       </div>
-      <h1 style="font-size: 2.5rem; font-weight: bold; text-align: center; color: black;">
-        {title}
-      </h1>
+      <h1>{title}</h1>
       <div className="user-info">
         <img
           src={isLoggedIn ? "/images/lady.jpg" : "/images/mann.jpg"}
