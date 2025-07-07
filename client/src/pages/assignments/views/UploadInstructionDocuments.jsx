@@ -832,7 +832,8 @@ const canFinish = () => {
     >
       Delivery Notes:{" "}
       {documents.filter((doc) => doc.type === "Delivery Note").length}/
-      {isShipmentType3() ? "1+" : containersReachedCount}
+      {/* {isShipmentType3() ? "1+" : containersReachedCount} */}
+      {containersReachedCount}
     </li>
     {showEmptyTurningDepotOption() && !isShipmentType3() && (
       <li
