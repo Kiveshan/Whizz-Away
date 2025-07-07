@@ -423,7 +423,7 @@
   right: 1rem;
   background: none;
   border: none;
-  color: #6b7280;
+  color: whitesmoke;
   cursor: pointer;
   padding: 0.25rem;
   transition: color 0.2s ease;
@@ -472,12 +472,16 @@
   font-size: 1.25rem;
   font-weight: 700;
   margin: 0;
+  
+
 }
 
 .popup-header p {
   font-size: 0.875rem;
   color: #fef3c7;
   margin: 0;
+  text-align: center;
+ margin-right: 80px;
 }
 
 /* Content styles */

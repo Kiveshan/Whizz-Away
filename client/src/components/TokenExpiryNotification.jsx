@@ -111,11 +111,7 @@ const TokenExpiryNotification = () => {
       // Here you could implement actual token refresh logic
       console.log("Session extension requested - implement refresh token logic here")
 
-      // You could make an API call to refresh the token:
-      // const response = await api.post('/api/auth/refresh-token')
-      // if (response.data.token) {
-      //   login(response.data.user, response.data.token)
-      // }
+ 
     } catch (error) {
       console.error("Failed to extend session:", error)
       logout()
@@ -177,7 +173,7 @@ const TokenExpiryNotification = () => {
             <p className="auto-logout-warning">You will be logged out automatically when the timer reaches zero</p>
           </div>
           <div className="progress-bar">
-            <div className="progress-fill" style={{ width: `${Math.max(0, (timeLeft / 300) * 100)}%` }} />
+            <div className="progress-fill" style={{ width: `${Math.max(0, (timeLeft / 120) * 100)}%` }} />
           </div>
           <div className="action-buttons">
             <button className="continue-button" onClick={handleExtendSession}>

@@ -96,8 +96,8 @@ export const AuthProvider = ({ children }) => {
       return
     }
 
-    // If token expires in 5 minutes (300 seconds) or less, show warning
-    if (timeUntilExpiry <= 300000) {
+    // If token expires in 2 minutes (120 seconds) or less, show warning
+    if (timeUntilExpiry <= 120000) {
       // 5 minutes in milliseconds
       console.log("Token expiring soon, showing warning...")
       window.dispatchEvent(
