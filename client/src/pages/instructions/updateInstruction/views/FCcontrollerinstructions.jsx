@@ -2880,6 +2880,7 @@ const FCcontrollerinstructions = () => {
             <div className="controller-instructions-form-section">
               <div className="controller-instructions-container-details-section">
                 <h3>Container Details</h3>
+                <h5>Each container number must be unique</h5>
                 {(containerSuccessMessage || rateUpdateMessage) && (
                   <div className="controller-instructions-success-message">
                     {containerSuccessMessage || rateUpdateMessage}
