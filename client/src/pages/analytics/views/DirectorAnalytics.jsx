@@ -33,6 +33,8 @@ export default function DirectorAnalytics() {
   const [activeYear, setActiveYear] = useState(currentDate.getFullYear().toString())
   const [activeFilter, setActiveFilter] = useState("fuel")
   const [chartData, setChartData] = useState([])
+  const [clients, setClients] = useState([])
+  const [selectedClient, setSelectedClient] = useState("")
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState(null)
   const roleId = JSON.parse(localStorage.getItem("user"))?.roleid
@@ -50,33 +52,24 @@ export default function DirectorAnalytics() {
     return "bad"
   }
 
-  // Calculate dynamic chart width based on data length
   const getChartWidth = (dataLength) => {
-    const minWidth = 1200 // Increased minimum width
-    const barWidth = 180 // Increased width per bar/data point
+    const minWidth = 1200
+    const barWidth = 180
     return Math.max(minWidth, dataLength * barWidth)
   }
 
-  // Format client or company name for multi-line display
   const formatClientName = (name) => {
     if (typeof name !== "string") return ""
-
-    // Split the name by spaces and common separators
     const words = name.split(/[\s&,.-]+/).filter((word) => word.length > 0)
-
-    // If only one word or very short, return as is
     if (words.length <= 1 || name.length <= 8) {
       return name
     }
-
-    // Join words with line breaks for multi-line display
     return words.join("\n")
   }
 
   const CustomAxisTick = (props) => {
     const { x, y, payload } = props
     const lines = formatClientName(payload.value).split("\n")
-
     return (
       <g transform={`translate(${x},${y})`}>
         {lines.map((line, index) => (
@@ -88,6 +81,19 @@ export default function DirectorAnalytics() {
     )
   }
 
+  const fetchClients = async () => {
+    try {
+      const response = await api.get("/api/get-clients")
+      if (response.data.success) {
+        setClients(response.data.data)
+      } else {
+        setError("Failed to fetch clients")
+      }
+    } catch (err) {
+      setError(`Failed to fetch clients: ${err.message}`)
+    }
+  }
+
   const fetchFuelData = async (month, year) => {
     setIsLoading(true)
     setError(null)
@@ -97,7 +103,6 @@ export default function DirectorAnalytics() {
         params: { month, year, _t: new Date().getTime() },
       })
       console.log("API response:", response.data)
-
       if (response.data.success) {
         console.log("Fuel data received:", response.data.data)
         const fuelExpenses = response.data.data.map((expense) => {
@@ -127,13 +132,13 @@ export default function DirectorAnalytics() {
     }
   }
 
-  const fetchTurnoverData = async (month, year) => {
+  const fetchTurnoverData = async (month, year, clientId = "") => {
     setIsLoading(true)
     setError(null)
     try {
-      console.log(`Fetching turnover data for month: ${month}, year: ${year}`)
+      console.log(`Fetching turnover data for month: ${month}, year: ${year}, clientId: ${clientId}`)
       const response = await api.get("/api/turnover-per-month", {
-        params: { month, year, _t: new Date().getTime() },
+        params: { month, year, clientId, _t: new Date().getTime() },
       })
       console.log("API response:", response.data)
       if (response.data.success) {
@@ -141,7 +146,7 @@ export default function DirectorAnalytics() {
           const turnover = Number.parseFloat(item.turnover)
           console.log(`Client ${item.client}: Turnover=${turnover}, Percentage=${item.percentage}%`)
           return {
-            client: item.client,
+            name: item.client || "Total Turnover",
             turnover: turnover,
             month: item.month_name.trim(),
             year: item.year,
@@ -171,7 +176,6 @@ export default function DirectorAnalytics() {
         params: { month, year, _t: new Date().getTime() },
       })
       console.log("API response:", response.data)
-
       if (response.data.success) {
         console.log("Aging analysis data received:", response.data.data)
         const agingData = response.data.data.map((item) => ({
@@ -205,7 +209,6 @@ export default function DirectorAnalytics() {
       const response = await api.get("/api/turnover-vs-diesel-cost", {
         params: { month, year, _t: new Date().getTime() },
       })
-
       if (response.data.success) {
         const data = response.data.data.map((item) => {
           console.log(
@@ -311,7 +314,6 @@ export default function DirectorAnalytics() {
         params: { month, year, _t: new Date().getTime() },
       })
       console.log("API response:", response.data)
-
       if (response.data.success) {
         console.log("Wages per month data received:", response.data.data)
         const wagesData = response.data.data.map((item) => ({
@@ -408,6 +410,10 @@ export default function DirectorAnalytics() {
   }
 
   useEffect(() => {
+    fetchClients()
+  }, [])
+
+  useEffect(() => {
     const loadData = async () => {
       setChartData([])
       let data = []
@@ -416,7 +422,7 @@ export default function DirectorAnalytics() {
           data = await fetchFuelData(activeMonth, activeYear)
           break
         case "turnoverPerMonth":
-          data = await fetchTurnoverData(activeMonth, activeYear)
+          data = await fetchTurnoverData(activeMonth, activeYear, selectedClient)
           break
         case "agingAnalysis":
           data = await fetchAgingAnalysisData(activeMonth, activeYear)
@@ -446,7 +452,7 @@ export default function DirectorAnalytics() {
       setChartData(data)
     }
     loadData()
-  }, [activeFilter, activeMonth, activeYear])
+  }, [activeFilter, activeMonth, activeYear, selectedClient])
 
   const CustomTooltip = ({ active, payload, label }) => {
     if (active && payload && payload.length) {
@@ -500,7 +506,7 @@ export default function DirectorAnalytics() {
 
   const CustomBarLabelForTurnover = (props) => {
     const { x, y, width, value, payload = {} } = props
-    const percentage = payload.turnoverPercentage ?? 0
+    const percentage = payload.percentage ?? 0
     console.log("CustomBarLabelForTurnover - payload:", payload)
     return (
       <text x={x + width / 2} y={y - 10} fill="#9C27B0" textAnchor="middle" dominantBaseline="middle" fontSize={12}>
@@ -533,20 +539,14 @@ export default function DirectorAnalytics() {
 
   const CustomBarLabelForFuelAndTurnover = (props) => {
     const { x, y, width, value, index, dataKey } = props
-
     if (value === undefined || value === null) {
       console.log("CustomBarLabelForFuelAndTurnover: Value is undefined or null, skipping label")
       return null
     }
-
     console.log(`CustomBarLabelForFuelAndTurnover: index=${index}, dataKey=${dataKey}, chartData=`, chartData)
-
     const percentage = chartData[index]?.percentage || 0
-
     console.log(`Selected percentage: ${percentage}% for dataKey=${dataKey}`)
-
     const labelText = `R${value.toLocaleString()} (${percentage.toFixed(2)}%)`
-
     return (
       <text x={x + width / 2} y={y - 10} fill="#000" textAnchor="middle" dominantBaseline="middle" fontSize="12">
         {labelText}
@@ -556,14 +556,11 @@ export default function DirectorAnalytics() {
 
   const CustomBarLabelForDefault = (props) => {
     const { x, y, width, value } = props
-
     if (value === undefined || value === null) {
       console.log("CustomBarLabelForDefault: Value is undefined or null, skipping label")
       return null
     }
-
     const labelText = `R${value.toLocaleString()}`
-
     return (
       <text x={x + width / 2} y={y - 10} fill="#000" textAnchor="middle" dominantBaseline="middle" fontSize="12">
         {labelText}
@@ -656,32 +653,40 @@ export default function DirectorAnalytics() {
                 No turnover data available for {activeMonth} {activeYear}
               </div>
             ) : (
-              <div className="chart-scroll-container">
-                <ResponsiveContainer width={chartWidth} height={500}>
-                  <BarChart data={chartData} margin={{ top: 40, right: 30, left: 60, bottom: 100 }}>
-                    <XAxis
-                      dataKey="client"
-                      angle={0}
-                      textAnchor="middle"
-                      height={120}
-                      interval={0}
-                      tick={<CustomAxisTick />}
-                    />
-                    <YAxis
-                      label={{
-                        value: "Turnover (R)",
-                        angle: 0,
-                        position: "top",
-                        dy: -20,
-                      }}
-                    />
-                    <Tooltip content={<CustomTooltip />} />
-                    <Bar dataKey="turnover" name="Turnover" fill="#4169e1" radius={[4, 4, 0, 0]}>
-                      <LabelList dataKey="turnover" content={CustomBarLabelForFuelAndTurnover} position="top" />
-                    </Bar>
-                  </BarChart>
-                </ResponsiveContainer>
-              </div>
+              <>
+                <div className="chart-header">
+                  <div className="chart-header-item">
+                    <span className="legend-color" style={{ backgroundColor: "#4169e1" }}></span>
+                    <span>Selected Client</span>
+                  </div>
+                  <div className="chart-header-item">
+                    <span className="legend-color" style={{ backgroundColor: "#9C27B0" }}></span>
+                    <span>Total Turnover</span>
+                  </div>
+                </div>
+                <div className="chart-scroll-container">
+                  <ResponsiveContainer width={Math.max(1200, chartData.length * 180)} height={500}>
+                    <BarChart data={chartData} margin={{ top: 40, right: 30, left: 60, bottom: 40 }}>
+                      <XAxis dataKey="name" tick={{ fill: "#000" }} />
+                      <YAxis
+                        label={{
+                          value: "Turnover (R)",
+                          angle: 0,
+                          position: "top",
+                          dy: -20,
+                        }}
+                      />
+                      <Tooltip content={<CustomTooltip />} />
+                      <Bar dataKey="turnover" name="Turnover" radius={[4, 4, 0, 0]}>
+                        {chartData.map((entry, index) => (
+                          <Cell key={`cell-${index}`} fill={entry.name === "Total Turnover" ? "#9C27B0" : "#4169e1"} />
+                        ))}
+                        <LabelList dataKey="turnover" content={CustomBarLabelForTurnover} position="top" />
+                      </Bar>
+                    </BarChart>
+                  </ResponsiveContainer>
+                </div>
+              </>
             )}
           </div>
         )
@@ -835,7 +840,6 @@ export default function DirectorAnalytics() {
                         }}
                       />
                       <Tooltip content={<CustomTooltip />} />
-                      <Legend />
                       <Bar dataKey="totalTurnover" name="Total Turnover" fill="#9C27B0" radius={[4, 4, 0, 0]}>
                         <LabelList dataKey="totalTurnover" content={CustomBarLabelForTurnover} position="top" />
                       </Bar>
@@ -926,7 +930,6 @@ export default function DirectorAnalytics() {
                         }}
                       />
                       <Tooltip content={<CustomTooltip />} />
-                      <Legend />
                       <Bar dataKey="totalTurnover" name="Turnover" fill="#4169e1" radius={[4, 4, 0, 0]}>
                         <LabelList dataKey="totalTurnover" content={CustomBarLabelForTurnover} position="top" />
                       </Bar>
@@ -978,9 +981,7 @@ export default function DirectorAnalytics() {
                         {chartData.map((entry, index) => (
                           <Cell
                             key={`cell-${index}`}
-                            fill={
-                              entry.status === "high" ? "#4CAF50" : entry.status === "medium" ? "#FFC107" : "#F44336"
-                            }
+                            fill={entry.status === "high" ? "#4CAF50" : entry.status === "medium" ? "#FFC107" : "#F44336"}
                           />
                         ))}
                         <LabelList dataKey="total_turnover" content={CustomBarLabelForFuelAndTurnover} position="top" />
@@ -1101,6 +1102,20 @@ export default function DirectorAnalytics() {
               </option>
             ))}
           </select>
+          {activeFilter === "turnoverPerMonth" && (
+            <select
+              value={selectedClient}
+              onChange={(e) => setSelectedClient(e.target.value)}
+              className="client-select"
+            >
+              <option value="">Select Client</option>
+              {clients.map((client) => (
+                <option key={client.m5clientkey} value={client.m5clientkey}>
+                  {client.client}
+                </option>
+              ))}
+            </select>
+          )}
         </div>
 
         <div className="analytics-content">

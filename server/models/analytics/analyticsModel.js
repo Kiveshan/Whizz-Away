@@ -61,8 +61,9 @@ const getFuelExpenses = async (client, month, year) => {
   });
 };
 
-const getTurnoverPerMonth = async (client, month, year) => {
-  const query = `
+const getTurnoverPerMonth = async (client, month, year, clientId = null) => {
+  const params = [month, year];
+  let query = `
     SELECT 
       c.client, 
       SUM(m.total_cost) as turnover,
@@ -73,36 +74,85 @@ const getTurnoverPerMonth = async (client, month, year) => {
     JOIN m5_client c ON i.clientid = c.m5clientkey
     WHERE TRIM(to_char(i.date, 'Month')) = $1
     AND EXTRACT(YEAR FROM i.date)::text = $2
+  `;
+  if (clientId) {
+    query += ` AND i.clientid = $3`;
+    params.push(clientId);
+  }
+  query += `
     GROUP BY c.client, to_char(i.date, 'Month'), EXTRACT(YEAR FROM i.date)
     ORDER BY turnover DESC
   `;
-  const result = await client.query(query, [month, year]);
+  
+  // Fetch total turnover for all clients
+  const totalQuery = `
+    SELECT 
+      SUM(m.total_cost) as turnover,
+      to_char(i.date, 'Month') as month_name,
+      EXTRACT(YEAR FROM i.date) as year
+    FROM invoice i
+    JOIN m1_controller m ON i.m1key = m.m1key
+    WHERE TRIM(to_char(i.date, 'Month')) = $1
+    AND EXTRACT(YEAR FROM i.date)::text = $2
+    GROUP BY to_char(i.date, 'Month'), EXTRACT(YEAR FROM i.date)
+  `;
+  
+  const [result, totalResult] = await Promise.all([
+    client.query(query, params),
+    client.query(totalQuery, [month, year])
+  ]);
+  
   console.log("Raw query result:", result.rows);
   console.log(`Query returned ${result.rows ? result.rows.length : 0} rows`);
+  console.log("Total turnover query result:", totalResult.rows);
 
-  if (!result.rows) {
-    console.log(`No rows returned for ${month} ${year}. Check query or data.`);
-    return [];
-  }
-
-  const totalTurnover = result.rows.reduce(
-    (sum, row) => sum + parseFloat(row.turnover || 0),
-    0
-  );
+  const totalTurnover = parseFloat(totalResult.rows[0]?.turnover || 0);
   console.log(`Total turnover for ${month} ${year}: ${totalTurnover}`);
 
-  return result.rows.map((row) => {
-    const turnover = parseFloat(row.turnover || 0);
-    const percentage =
-      totalTurnover > 0 ? ((turnover / totalTurnover) * 100).toFixed(2) : 0;
-    return {
-      client: row.client,
-      turnover: turnover,
-      month_name: row.month_name.trim(),
-      year: row.year.toString(),
-      percentage: parseFloat(percentage),
-    };
-  });
+  let turnoverData = [];
+  if (result.rows && result.rows.length > 0) {
+    turnoverData = result.rows.map((row) => {
+      const turnover = parseFloat(row.turnover || 0);
+      const percentage =
+        totalTurnover > 0 ? ((turnover / totalTurnover) * 100).toFixed(2) : 0;
+      return {
+        client: row.client,
+        turnover: turnover,
+        month_name: row.month_name.trim(),
+        year: row.year.toString(),
+        percentage: parseFloat(percentage),
+      };
+    });
+  }
+
+  if (!clientId) {
+    turnoverData.push({
+      client: "Total Turnover",
+      turnover: totalTurnover,
+      month_name: month.trim(),
+      year: year.toString(),
+      percentage: 100,
+    });
+  }
+
+  console.log("Processed turnover data:", turnoverData);
+  return turnoverData;
+};
+
+const getAllClients = async (client) => {
+  const query = `
+    SELECT m5clientkey, client
+    FROM m5_client
+    WHERE status = true
+    ORDER BY client
+  `;
+  const result = await client.query(query);
+  console.log("Clients query result:", result.rows);
+  console.log(`Query returned ${result.rows.length} rows`);
+  return result.rows.map((row) => ({
+    m5clientkey: row.m5clientkey,
+    client: row.client,
+  }));
 };
 
 const getAgingAnalysis = async (client, month, year) => {
@@ -444,6 +494,7 @@ const getSubcontractorVsTurnover = async (client, month, year) => {
 export {
   getFuelExpenses,
   getTurnoverPerMonth,
+  getAllClients,
   getAgingAnalysis,
   getTurnoverVsDieselCost,
   getAllExpenses,
