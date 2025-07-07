@@ -1,7 +1,10 @@
 "use client"
+import { useState } from "react"
 import { extractFilenameFromUrl } from "../../utils/helpers"
 
 const TruckForm = ({ truck, loading, isEditing, onSave, onCancel, onChange, onDeleteDocument }) => {
+  const [errors, setErrors] = useState({})
+
   const handleSubmit = async (e) => {
     e.preventDefault()
 
@@ -36,7 +39,6 @@ const TruckForm = ({ truck, loading, isEditing, onSave, onCancel, onChange, onDe
         }
       }
     }
-    // Clear the input so the same file can be selected again if needed
     e.target.value = ""
   }
 
@@ -46,7 +48,6 @@ const TruckForm = ({ truck, loading, isEditing, onSave, onCancel, onChange, onDe
     onChange("documents", updatedDocs)
   }
 
-  // Helper function to check if license is expiring soon
   const isLicenseExpiringSoon = (expiryDate) => {
     if (!expiryDate) return false
     const today = new Date()
@@ -62,6 +63,41 @@ const TruckForm = ({ truck, loading, isEditing, onSave, onCancel, onChange, onDe
     return expiry < today
   }
 
+  const handleYearChange = (e) => {
+    const value = e.target.value
+    onChange("year", value)
+
+    if (value === "") {
+      setErrors((prev) => ({ ...prev, year: null }))
+      return
+    }
+
+    const yearNum = Number.parseInt(value, 10)
+    const currentYear = new Date().getFullYear()
+    if (!/^\d{4}$/.test(value)) {
+      setErrors((prev) => ({ ...prev, year: "Please enter a 4-digit year" }))
+    } else if (yearNum < 1900 || yearNum > currentYear + 5) {
+      setErrors((prev) => ({ ...prev, year: `Year must be between 1900 and ${currentYear + 5}` }))
+    } else {
+      setErrors((prev) => ({ ...prev, year: null }))
+    }
+  }
+
+  const handleVinChange = (e) => {
+    const value = e.target.value.toUpperCase()
+    onChange("vin_num", value)
+
+    if (value === "") {
+      setErrors((prev) => ({ ...prev, vin_num: null }))
+    } else if (value.length !== 17) {
+      setErrors((prev) => ({ ...prev, vin_num: "VIN must be exactly 17 characters long" }))
+    } else if (!/^[A-HJ-NPR-Z0-9]{17}$/.test(value)) {
+      setErrors((prev) => ({ ...prev, vin_num: "VIN must contain only A-H, J-N, P, R-Z, 0-9" }))
+    } else {
+      setErrors((prev) => ({ ...prev, vin_num: null }))
+    }
+  }
+
   return (
     <div className="manage-add-truck-form">
       <h2>{isEditing ? "Edit Truck" : "Add New Truck"}</h2>
@@ -69,7 +105,9 @@ const TruckForm = ({ truck, loading, isEditing, onSave, onCancel, onChange, onDe
       <form onSubmit={handleSubmit} noValidate>
         <div className="manage-truck-form-grid">
           <div className="manage-form-group">
-            <label style={{ fontWeight: "bold" }}>Truck Registration</label>
+            <label style={{ fontWeight: "bold" }}>
+              Truck Registration <span style={{ color: "red" }}>*</span>
+            </label>
             <input
               type="text"
               value={truck.truckregnum || ""}
@@ -84,37 +122,45 @@ const TruckForm = ({ truck, loading, isEditing, onSave, onCancel, onChange, onDe
               type="text"
               value={truck.trailersize || ""}
               onChange={(e) => onChange("trailersize", e.target.value)}
-              required
             />
           </div>
 
           <div className="manage-form-group">
             <label style={{ fontWeight: "bold" }}>Year</label>
-            <input type="text" value={truck.year || ""} onChange={(e) => onChange("year", e.target.value)} required />
+            <input
+              type="text"
+              value={truck.year || ""}
+              onChange={handleYearChange}
+              pattern="\d{4}"
+              title="Please enter a 4-digit year"
+            />
+            {errors.year && <small style={{ color: "red" }}>{errors.year}</small>}
           </div>
 
           <div className="manage-form-group">
             <label style={{ fontWeight: "bold" }}>Model</label>
-            <input type="text" value={truck.model || ""} onChange={(e) => onChange("model", e.target.value)} required />
+            <input type="text" value={truck.model || ""} onChange={(e) => onChange("model", e.target.value)} />
           </div>
 
           <div className="manage-form-group">
             <label style={{ fontWeight: "bold" }}>Purchase Price</label>
             <input
-              type="text"
+              type="number"
+              min="0"
+              step="0.01"
               value={truck.purchase_price || ""}
               onChange={(e) => onChange("purchase_price", e.target.value)}
-              required
             />
           </div>
 
           <div className="manage-form-group">
             <label style={{ fontWeight: "bold" }}>Current Evaluation</label>
             <input
-              type="text"
+              type="number"
+              min="0"
+              step="0.01"
               value={truck.current_evaluation || ""}
               onChange={(e) => onChange("current_evaluation", e.target.value)}
-              required
             />
           </div>
 
@@ -123,9 +169,11 @@ const TruckForm = ({ truck, loading, isEditing, onSave, onCancel, onChange, onDe
             <input
               type="text"
               value={truck.vin_num || ""}
-              onChange={(e) => onChange("vin_num", e.target.value)}
-              required
+              onChange={handleVinChange}
+              pattern="[A-HJ-NPR-Z0-9]{17}"
+              title="VIN must be 17 characters, containing only A-H, J-N, P, R-Z, 0-9"
             />
+            {errors.vin_num && <small style={{ color: "red" }}>{errors.vin_num}</small>}
           </div>
 
           <div className="manage-form-group">
@@ -134,13 +182,12 @@ const TruckForm = ({ truck, loading, isEditing, onSave, onCancel, onChange, onDe
               type="date"
               value={truck.truckpurchasedate ? new Date(truck.truckpurchasedate).toISOString().split("T")[0] : ""}
               onChange={(e) => onChange("truckpurchasedate", e.target.value)}
-              required
             />
           </div>
 
           <div className="manage-form-group">
             <label style={{ fontWeight: "bold" }}>
-              License Expiry Date
+              License Expiry Date <span style={{ color: "red" }}>*</span>
               {truck.truck_license_expiry && isLicenseExpired(truck.truck_license_expiry) && (
                 <span style={{ color: "red", marginLeft: "10px", fontSize: "0.9em" }}>⚠️ EXPIRED</span>
               )}
@@ -185,7 +232,6 @@ const TruckForm = ({ truck, loading, isEditing, onSave, onCancel, onChange, onDe
             )}
           </div>
 
-          {/* Document Upload */}
           <div className="manage-form-group" style={{ gridColumn: "1 / span 3" }}>
             <label>
               <strong>Upload Documents (PDF Only, Max 3)</strong>
@@ -213,7 +259,6 @@ const TruckForm = ({ truck, loading, isEditing, onSave, onCancel, onChange, onDe
               </small>
             </div>
 
-            {/* Document Lists */}
             <div style={{ marginTop: "15px" }}>
               {isEditing && truck.existingDocuments?.length > 0 && (
                 <>

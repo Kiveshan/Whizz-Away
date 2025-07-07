@@ -369,3 +369,241 @@
       position: fixed;
   }
   
+  /* tokennotfication */
+  /* Backdrop styles */
+.popup-backdrop {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: rgba(0, 0, 0, 0.5);
+  backdrop-filter: blur(4px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1rem;
+  z-index: 50;
+}
+
+/* Popup container styles */
+.popup-container {
+  background-color: #ffffff;
+  border-radius: 1.5rem;
+  box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+  max-width: 28rem;
+  width: 100%;
+  max-height: 80vh;
+  overflow-y: auto;
+  position: relative;
+  opacity: 0;
+  transform: scale(0.9);
+}
+
+/* Animation for popup entrance */
+.popup-show {
+  animation: popup-in 0.3s ease-out forwards;
+}
+
+@keyframes popup-in {
+  from {
+    opacity: 0;
+    transform: scale(0.9);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+/* Close button styles */
+.popup-close {
+  position: absolute;
+  top: 1rem;
+  right: 1rem;
+  background: none;
+  border: none;
+  color: #6b7280;
+  cursor: pointer;
+  padding: 0.25rem;
+  transition: color 0.2s ease;
+}
+
+.popup-close:hover {
+  color: #1f2937;
+}
+
+.close-icon {
+  width: 1.5rem;
+  height: 1.5rem;
+}
+
+/* Header styles */
+.popup-header {
+  background: linear-gradient(to right, #f59e0b, #f97316);
+  color: #ffffff;
+  padding: 1.5rem;
+  border-top-left-radius: 1.5rem;
+  border-top-right-radius: 1.5rem;
+}
+
+.header-content {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.warning-icon {
+  width: 2rem;
+  height: 2rem;
+  flex-shrink: 0;
+}
+
+.animate-pulse {
+  animation: pulse 1.5s infinite;
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.5; }
+}
+
+.popup-header h3 {
+  font-size: 1.25rem;
+  font-weight: 700;
+  margin: 0;
+}
+
+.popup-header p {
+  font-size: 0.875rem;
+  color: #fef3c7;
+  margin: 0;
+}
+
+/* Content styles */
+.popup-content {
+  padding: 1.5rem;
+}
+
+.countdown {
+  text-align: center;
+  margin-bottom: 1.5rem;
+}
+
+.timer-circle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 6rem;
+  height: 6rem;
+  background: linear-gradient(to bottom right, #fee2e2, #fed7aa);
+  border-radius: 50%;
+  margin-bottom: 1rem;
+}
+
+.timer-circle span {
+  font-size: 1.875rem;
+  font-weight: 700;
+  color: #dc2626;
+}
+
+.countdown p {
+  font-size: 1.125rem;
+  color: #4b5563;
+  margin: 0;
+}
+
+/* Progress bar styles */
+.progress-bar {
+  background-color: #e5e7eb;
+  border-radius: 9999px;
+  height: 0.5rem;
+  overflow: hidden;
+  margin-bottom: 1.5rem;
+}
+
+.progress-fill {
+  background: linear-gradient(to right, #ef4444, #f97316);
+  height: 100%;
+  transition: width 1s linear;
+}
+
+/* Button styles */
+.action-buttons {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.continue-button {
+  width: 100%;
+  background: linear-gradient(to right, #3b82f6, #2563eb);
+  color: #ffffff;
+  font-weight: 600;
+  padding: 0.75rem 1.5rem;
+  border: none;
+  border-radius: 0.75rem;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.continue-button:hover {
+  background: linear-gradient(to right, #2563eb, #1d4ed8);
+  transform: scale(1.05);
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+}
+
+.secondary-buttons {
+  display: flex;
+  gap: 0.75rem;
+}
+
+.dismiss-button, .logout-button {
+  flex: 1;
+  padding: 0.625rem 1rem;
+  border: none;
+  border-radius: 0.5rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.dismiss-button {
+  background-color: #f3f4f6;
+  color: #374151 0;
+}
+
+.dismiss-button:hover {
+  background-color: #e5e7eb;
+}
+
+.logout-button {
+  background-color: #fee2e2;
+  color: #b91c1c;
+}
+
+.logout-button:hover {
+  background-color: #fecaca;
+}
+
+/* Footer styles */
+.popup-footer {
+  background-color: #f9fafb;
+  padding: 1rem 1.5rem;
+  border-bottom-left-radius: 1.5rem;
+  border-bottom-right-radius: 1.5rem;
+  text-align: center;
+}
+
+.popup-footer p {
+  font-size: 0.75rem;
+  color: #6b7280;
+  margin: 0;
+}
+
+/* Responsive adjustments */
+@media (max-width: 640px) {
+  .secondary-buttons {
+    flex-direction: column;
+  }
+}
