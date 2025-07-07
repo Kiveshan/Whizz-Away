@@ -1,4 +1,3 @@
-
 "use client"
 
 import { useState, useEffect, useRef } from "react"
@@ -185,7 +184,7 @@ const FCcontrollerinstructions = () => {
   })
 
   // Check if the instruction should be read-only based on status
-  const isReadOnly = formData.status === "In Progress" || formData.status === "Completed"
+  const isReadOnly = formData.status === "In progress" || formData.status === "Completed"
 
   const [startingPoints, setStartingPoints] = useState([])
   const [destinations, setDestinations] = useState([])
@@ -995,9 +994,10 @@ const FCcontrollerinstructions = () => {
         })
       }
 
-      // Update shipment type
+      // Update shipment type and isImport state
       if (preservedFormData.shipmentTypeName) {
-        setIsImport(preservedFormData.shipmentTypeName.toLowerCase() === "import")
+        const isImportType = preservedFormData.shipmentTypeName.toLowerCase() === "import"
+        setIsImport(isImportType)
       }
 
       // Update rate values from preserved data - check multiple possible sources
@@ -1020,6 +1020,14 @@ const FCcontrollerinstructions = () => {
       }
     }
   }, [preservedFormData, containerCounts])
+
+  // Add a separate useEffect to handle isImport state when formData.shipmentTypeName changes
+  useEffect(() => {
+    if (formData.shipmentTypeName) {
+      const isImportType = formData.shipmentTypeName.toLowerCase() === "import"
+      setIsImport(isImportType)
+    }
+  }, [formData.shipmentTypeName])
 
   useEffect(() => {
     if (location.state?.preservedContainers) {
@@ -1128,7 +1136,7 @@ const FCcontrollerinstructions = () => {
         pickupTime: data.pickuptime ? data.pickuptime.substring(0, 5) : "",
         pickupDate: formatDateForInput(data.pickupdate) || "",
         stackDate: formatDateForInput(data.stackdate) || "",
-        deadline: data.deadline ? formatDateForInput(new Date(data.deadline).toLocaleDateString()) : "",
+        deadline: data.deadline ? formatDateForInput(data.deadline) : "",
         fileRef: data.fileref || "",
         bookingRef: data.booking_ref || "",
         rateWeight: data.rateweight || "Container",
@@ -1158,6 +1166,10 @@ const FCcontrollerinstructions = () => {
       }
 
       setFormData(newFormData)
+
+      // Update isImport state based on loaded shipment type
+      const isImportType = data.shipmenttype && data.shipmenttype.toLowerCase() === "import"
+      setIsImport(isImportType)
 
       // Set initial previous counts for existing instruction
       setPrevContainerCounts({
@@ -2880,7 +2892,6 @@ const FCcontrollerinstructions = () => {
             <div className="controller-instructions-form-section">
               <div className="controller-instructions-container-details-section">
                 <h3>Container Details</h3>
-                <h5>Each container number must be unique</h5>
                 {(containerSuccessMessage || rateUpdateMessage) && (
                   <div className="controller-instructions-success-message">
                     {containerSuccessMessage || rateUpdateMessage}
