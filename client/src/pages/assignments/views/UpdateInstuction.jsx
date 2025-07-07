@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useState, useEffect, useRef } from "react";
@@ -155,6 +156,33 @@ const modalAnimation = `
 }
 `;
 
+// Add this debug function at the top of the component
+const debugDriverData = (drivers) => {
+  if (!drivers || drivers.length === 0) {
+    console.log("No drivers to debug");
+    return;
+  }
+
+  console.log("Debugging driver data:");
+  drivers.forEach((driver, index) => {
+    console.log(`Driver ${index}:`);
+    console.log(`  ID: ${driver.id} (${typeof driver.id})`);
+    console.log(`  Driver ID: ${driver.driverid} (${typeof driver.driverid})`);
+    console.log(
+      `  Truck Reg: ${driver.truckregnumber} (${typeof driver.truckregnumber})`
+    );
+    console.log(
+      `  Container: ${
+        driver.containernumber
+      } (${typeof driver.containernumber})`
+    );
+    console.log(`  Container Type: ${driver.container_type}`);
+    console.log(`  Date: ${driver.date} (${typeof driver.date})`);
+    console.log(`  Full Name: ${driver.full_name}`);
+    console.log(`  Driver Rate: ${driver.driverRate}`);
+  });
+};
+
 const Plus = ({ onClick, disabled }) => (
   <button
     onClick={onClick}
@@ -250,7 +278,6 @@ function UpdateInstruction() {
   });
   // Add state for no drivers modal
   const [showNoDriversModal, setShowNoDriversModal] = useState(false);
-  const [showShipmentType3Modal, setShowShipmentType3Modal] = useState(false)
   // Add state for back button confirmation modal
   const [showBackConfirmModal, setShowBackConfirmModal] = useState(false);
   // Add state for driver removal confirmation modal
@@ -282,16 +309,9 @@ function UpdateInstruction() {
     containerNumber: "",
   });
 
+  // Add a new state variable to track which legs have been saved
+  // Add this after the other state variables (around line 200)
   const [savedLegs, setSavedLegs] = useState(new Set());
-    const isShipmentType3 = () => {
-  return shipmentType === 3
-}
-
-// NEW: Check if we can add more legs for shipment type 3
-const canAddLegForShipmentType3 = () => {
-  if (!isShipmentType3()) return true
-  return legs.length === 0
-}
 
   // Add these state variables after the other state declarations
   const [rates, setRates] = useState({
@@ -301,6 +321,8 @@ const canAddLegForShipmentType3 = () => {
     subbie_twelve_meter: 0,
   });
 
+  // Improve the refreshLegData function to ensure data is properly refreshed
+  // Update refreshLegData function to use Axios
   const refreshLegData = async () => {
     if (instructionId) {
       try {
@@ -373,6 +395,7 @@ const canAddLegForShipmentType3 = () => {
                 currentLeg.drivers
               );
               setDrivers(currentLeg.drivers);
+              debugDriverData(currentLeg.drivers);
             } else {
               setDrivers([]);
             }
@@ -401,7 +424,6 @@ const canAddLegForShipmentType3 = () => {
     });
     setShowRemoveLegModal(true);
   };
-
   useEffect(() => {
     const fetchData = async () => {
       try {
@@ -434,6 +456,24 @@ const canAddLegForShipmentType3 = () => {
     };
   }, [instructionId]);
 
+  // Add a useEffect to log driver data whenever it changes
+  useEffect(() => {
+    if (drivers && drivers.length > 0) {
+      console.log("Current drivers state:", JSON.stringify(drivers, null, 2));
+
+      // Check if all fields are properly populated in the form
+      drivers.forEach((driver, index) => {
+        console.log(`Driver ${index} form field values:`);
+        console.log(`  Driver ID: ${driver.driverid || "empty"}`);
+        console.log(`  Truck Reg: ${driver.truckregnumber || "empty"}`);
+        console.log(`  Container: ${driver.containernumber || "empty"}`);
+        console.log(`  Container Type: ${driver.container_type || "empty"}`);
+        console.log(`  Date: ${driver.date || "empty"}`);
+        console.log(`  Driver Rate: ${driver.driverRate || "empty"}`);
+      });
+    }
+  }, [drivers]);
+
   // Replace the entire useEffect that handles the selectedLegIndex with this version
   useEffect(() => {
     // Only run this effect once when the component mounts with a selectedLegIndex
@@ -442,6 +482,10 @@ const canAddLegForShipmentType3 = () => {
       selectedLegIndex !== undefined &&
       legs.length > 0
     ) {
+      console.log(
+        `Selecting leg at index ${selectedLegIndex} after navigation`
+      );
+
       // Make sure the selectedLegIndex is valid
       if (selectedLegIndex < legs.length) {
         // Force a clean state before selecting the leg
@@ -672,6 +716,7 @@ const canAddLegForShipmentType3 = () => {
               JSON.stringify(fetchedLegs[0].drivers, null, 2)
             );
             setDrivers(fetchedLegs[0].drivers);
+            debugDriverData(fetchedLegs[0].drivers);
           } else {
             console.log("No drivers for first leg, setting empty array");
             setDrivers([]);
@@ -1045,19 +1090,15 @@ const canAddLegForShipmentType3 = () => {
   };
 
   // Update the handleAddLeg function to only modify local state, not save to database
-const handleAddLeg = () => {
-  if (isCompleted) return
+  const handleAddLeg = () => {
+    if (isCompleted) return;
 
-  // NEW: Check if this is shipment type 3 and if we already have a leg
-  if (isShipmentType3() && !canAddLegForShipmentType3()) {
-    setShowShipmentType3Modal(true)
-    return
-  }
-
-  if (hasUnsavedChanges()) {
-    setShowUnsavedChangesModal(true)
-    return
-  }
+    // Check if there are unsaved changes in the current leg
+    if (hasUnsavedChanges()) {
+      // Show the unsaved changes modal
+      setShowUnsavedChangesModal(true);
+      return;
+    }
 
     // Save current leg data to local state if any
     if (currentLagIndex !== null) {
@@ -1190,6 +1231,7 @@ const handleAddLeg = () => {
           JSON.stringify(normalizedDrivers, null, 2)
         );
         setDrivers(normalizedDrivers);
+        debugDriverData(normalizedDrivers);
       } else {
         console.log("No drivers for selected leg, setting empty array");
         setDrivers([]);
@@ -1674,36 +1716,42 @@ const handleAddLeg = () => {
   };
 
   // Replace the handleFinalizeClick function with this updated version
-  // Lines 1423-1447: Update handleFinaliseClick function
-const handleFinaliseClick = async () => {
-  if (legs.length === 0) {
-    navigateToDocuments()
-    return
-  }
-
-  const hasDrivers = legs.some((leg) => leg.drivers && leg.drivers.length > 0)
-  if (!hasDrivers) {
-    setShowNoDriversModal(true)
-    return
-  }
-
-  if (hasUnsavedChanges()) {
-    setShowUnsavedChangesModal(true)
-    return
-  }
-
-  try {
-    const response = await api.get(`/instructions/${instructionId}/details`)
-    const instructionDetails = response.data
-    const pickup = instructionDetails.pickup
-    const dropoff = instructionDetails.dropoff
-
-    // NEW: For shipment type 3, skip container and destination validation
-    if (isShipmentType3()) {
-      console.log("Shipment type 3 detected, skipping validation checks")
-      navigateToDocuments()
-      return
+  const handleFinaliseClick = async () => {
+    if (legs.length === 0) {
+      // No legs, just proceed
+      navigateToDocuments();
+      return;
     }
+
+    // Check if there are any drivers added to any legs - do this check FIRST
+    const hasDrivers = legs.some(
+      (leg) => leg.drivers && leg.drivers.length > 0
+    );
+    if (!hasDrivers) {
+      // No drivers added, show the no drivers modal
+      setShowNoDriversModal(true);
+      return;
+    }
+
+    // Check if there are unsaved changes - do this check SECOND
+    if (hasUnsavedChanges()) {
+      // Show the unsaved changes modal
+      setShowUnsavedChangesModal(true);
+      return;
+    }
+
+    try {
+      // Fetch the instruction details to get the pickup and dropoff locations
+      const response = await fetch(
+        `http://localhost:5000/instructions/${instructionId}/details`
+      );
+      if (!response.ok) {
+        throw new Error("Failed to fetch instruction details");
+      }
+
+      const instructionDetails = await response.json();
+      const pickup = instructionDetails.pickup;
+      const dropoff = instructionDetails.dropoff;
 
       // First check if all containers reach the dropoff destination
       const missingContainers = await checkContainersReachDropoff(dropoff);
@@ -1815,10 +1863,13 @@ const handleFinaliseClick = async () => {
   const fetchShipmentType = async () => {
     if (instructionId) {
       try {
-        const response = await api.get(
-          `/instructions/${instructionId}/shipment-type`
+        const response = await fetch(
+          `http://localhost:5000/instructions/${instructionId}/shipment-type`
         );
-        const data = response.data;
+        if (!response.ok) {
+          throw new Error("Failed to fetch shipment type");
+        }
+        const data = await response.json();
         setShipmentType(data.shipment_type);
         console.log("Shipment type:", data.shipment_type);
       } catch (error) {
@@ -1919,40 +1970,40 @@ const handleFinaliseClick = async () => {
       setTimeout(() => setSavedMessage(""), 5000);
       return;
     }
-
     if (instructionId) {
       try {
-        const instructionResponse = await api.get(
-          `/instructions/${instructionId}`
+        const instructionResponse = await fetch(
+          `http://localhost:5000/instructions/${instructionId}`
         );
-        if (instructionResponse.status === 200) {
-          const instructionData = instructionResponse.data;
+        if (instructionResponse.ok) {
+          const instructionData = await instructionResponse.json();
 
           if (instructionData.status === "New") {
             // Update the status to "In Progress"
-            try {
-              const updateStatusResponse = await api.put(
-                `/instructions/${instructionId}/status`,
-                { status: "In Progress" }
-              );
-
-              if (updateStatusResponse.status === 200) {
-                console.log(
-                  `Updated instruction ${instructionId} status from New to In Progress`
-                );
-                setInstructionStatus("In Progress");
+            const updateStatusResponse = await fetch(
+              `http://localhost:5000/instructions/${instructionId}/status`,
+              {
+                method: "PUT",
+                headers: {
+                  "Content-Type": "application/json",
+                },
+                body: JSON.stringify({ status: "In Progress" }),
               }
-            } catch (error) {
-              console.error("Error updating instruction status:", error);
+            );
+
+            if (updateStatusResponse.ok) {
+              console.log(
+                `Updated instruction ${instructionId} status from New to In Progress`
+              );
+              setInstructionStatus("In Progress");
             }
           }
         }
       } catch (statusError) {
-        console.error("Error fetching instruction:", statusError);
+        console.error("Error updating instruction status:", statusError);
         // Don't throw the error, just log it to avoid interrupting the main flow
       }
     }
-
     // Validate required fields
     if (!formData.startingPoint || !formData.destination) {
       setSavedMessage("Starting point and destination are required");
@@ -2036,12 +2087,25 @@ const handleFinaliseClick = async () => {
       );
 
       // Send the data to the server
-      const response = await api.post("/legs/save", legData);
-      console.log("Server response:", response.data);
+      const response = await fetch(`http://localhost:5000/legs/save`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(legData),
+      });
 
-      const result = response.data;
+      const responseText = await response.text();
+      console.log("Server response:", responseText);
 
-      if (response.status !== 200) {
+      let result;
+      try {
+        result = JSON.parse(responseText);
+      } catch (e) {
+        throw new Error(`Invalid JSON response: ${responseText}`);
+      }
+
+      if (!response.ok) {
         throw new Error(result.message || "Failed to save leg data");
       }
 
@@ -2107,27 +2171,96 @@ const handleFinaliseClick = async () => {
     );
     return driver ? `${driver.name} ${driver.surname}` : "Unknown Driver";
   };
-  // Add this useEffect to check if we should hide the + button whenever legs or containers change
-useEffect(() => {
-  const checkContainersDestination = async () => {
-    if (!instructionId || legs.length === 0 || instructionContainers.length === 0) {
-      setShouldHideAddLegButton(false)
-      return
-    }
 
-    // NEW: For shipment type 3, hide add leg button if we already have 1 leg
-    if (isShipmentType3()) {
-      setShouldHideAddLegButton(legs.length >= 1)
-      return
+  // Replace the shouldDisableAddLeg function with this improved version
+  const shouldDisableAddLeg = async () => {
+    if (isCompleted) return true; // Always disable if completed
+    if (legs.length === 0) return false; // Allow adding the first leg
+
+    try {
+      // First, fetch the instruction details to get the dropoff location
+      const response = await fetch(
+        `http://localhost:5000/instructions/${instructionId}/details`
+      );
+      if (!response.ok) return false;
+
+      const instructionDetails = await response.json();
+      const dropoff = instructionDetails.dropoff;
+
+      // If we don't have a dropoff location, don't disable
+      if (!dropoff) return false;
+
+      // Check if the last leg's destination matches the dropoff
+      const lastLeg = legs[legs.length - 1];
+      if (lastLeg.destination !== dropoff) return false;
+
+      // Get all containers assigned to legs
+      const assignedContainers = new Set();
+      const containersReachingDropoff = new Set();
+
+      // Collect all containers from all legs
+      legs.forEach((leg) => {
+        if (leg.drivers && leg.drivers.length > 0) {
+          leg.drivers.forEach((driver) => {
+            if (driver.containernumber) {
+              assignedContainers.add(driver.containernumber);
+
+              // If this leg's destination is the dropoff, mark this container as reaching dropoff
+              if (leg.destination === dropoff) {
+                containersReachingDropoff.add(driver.containernumber);
+              }
+            }
+          });
+        }
+      });
+
+      // If no containers are assigned, don't disable
+      if (assignedContainers.size === 0) return false;
+
+      // Get all containers from the instruction
+      const allInstructionContainers = instructionContainers.map(
+        (c) => c.containernum
+      );
+
+      // If there are no instruction containers, don't disable
+      if (allInstructionContainers.length === 0) return false;
+
+      // Check if all instruction containers are assigned and reach dropoff
+      const allContainersReachDropoff = allInstructionContainers.every(
+        (container) => containersReachingDropoff.has(container)
+      );
+
+      // Only disable the + button if all containers reach the dropoff
+      return allContainersReachDropoff;
+    } catch (error) {
+      console.error("Error in shouldDisableAddLeg:", error);
+      return false; // On error, don't disable
     }
+  };
+
+  // Add this useEffect to check if we should hide the + button whenever legs or containers change
+  useEffect(() => {
+    const checkContainersDestination = async () => {
+      if (
+        !instructionId ||
+        legs.length === 0 ||
+        instructionContainers.length === 0
+      ) {
+        setShouldHideAddLegButton(false);
+        return;
+      }
 
       try {
         // Fetch the instruction details to get the dropoff location
-        const response = await api.get(
-          `/instructions/${instructionId}/details`
+        const response = await fetch(
+          `http://localhost:5000/instructions/${instructionId}/details`
         );
-        const instructionDetails = response.data;
+        if (!response.ok) {
+          setShouldHideAddLegButton(false);
+          return;
+        }
 
+        const instructionDetails = await response.json();
         const dropoff = instructionDetails.dropoff;
 
         // If we don't have a dropoff location, don't hide
@@ -2191,7 +2324,8 @@ useEffect(() => {
     };
 
     checkContainersDestination();
-  }, [legs, instructionContainers, instructionId, shipmentType])
+  }, [legs, instructionContainers, instructionId]);
+
   useEffect(() => {
     // Only update if we have drivers and rates
     if (
@@ -2235,6 +2369,8 @@ useEffect(() => {
     }
   }, [rates]);
 
+  // Add this useEffect to ensure driver rates are properly updated when rates change
+  // Replace the existing useEffect for rates with this one
   useEffect(() => {
     // Only update if we have drivers and rates
     if (drivers.length > 0) {
@@ -2344,7 +2480,7 @@ useEffect(() => {
           </button>
         ))}
         {!shouldHideAddLegButton && (
-          <Plus onClick={handleAddLeg} disabled={isCompleted} />
+          <Plus onClick={handleAddLeg} disabled={isCompleted || (shipmentType === 3 && legs.length >= 1)} />
         )}
       </div>
 
@@ -2448,6 +2584,7 @@ useEffect(() => {
           </div>
         </div>
 
+        {/* Driver Entries - Always show this section if we're on a leg */}
         {currentLagIndex !== null && (
           <div className="bg-blue-50 p-6 rounded-md mb-4">
             <h3 className="text-lg font-medium mb-4">Driver Information</h3>
@@ -3161,8 +3298,28 @@ useEffect(() => {
     <div className="modal-backdrop animate-fadeIn"></div>
     <div className="modal-container animate-scaleIn">
       <div className="modal-header">
-        <h3 className="modal-title">Container Destination Warning</h3>
-        <p className="modal-description">Some containers have not reached their final destination. Do you want to continue anyway?</p>
+        <div className="flex items-center gap-4">
+          <svg
+            xmlns="http://www.w3.org/2000/svg"
+            width="50"
+            height="50"
+            viewBox="0 0 24 24"
+            fill="#FEE2E2"
+            stroke="#DC2626"
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            className="text-red-600 drop-shadow-sm"
+          >
+            <path d="M12 2L2 19h20L12 2z" />
+            <path d="M12 8v4" />
+            <circle cx="12" cy="16" r="1" />
+          </svg>
+          <h3 className="modal-title">Container Destination Warning</h3>
+        </div>
+        <p className="modal-description">
+          All containers must reach the final destination.
+        </p>
       </div>
       <div className="modal-body">
         <div className="modal-item">
@@ -3181,14 +3338,20 @@ useEffect(() => {
         ))}
       </div>
       <div className="modal-footer">
-        <button className="modal-btn modal-btn-secondary" onClick={() => setShowContainerModal(false)}>
-          No, Go Back
+        <button
+          className="modal-btn modal-btn-secondary"
+          onClick={() => setShowContainerModal(false)}
+        >
+          Cancel
         </button>
-        <button className="modal-btn modal-btn-primary" onClick={() => {
-          setShowContainerModal(false)
-          navigateToDocuments()
-        }}>
-          Yes, Continue
+        <button
+          className="modal-btn modal-btn-primary"
+          onClick={() => {
+            setShowContainerModal(false);
+            navigateToDocuments();
+          }}
+        >
+          Proceed Anyway
         </button>
       </div>
     </div>
@@ -3401,7 +3564,32 @@ useEffect(() => {
                       };
 
                       // Send the data to the server
-                      const response = await api.post(`/legs/save`, legData);
+                      const response = await fetch(
+                        `http://localhost:5000/legs/save`,
+                        {
+                          method: "POST",
+                          headers: {
+                            "Content-Type": "application/json",
+                          },
+                          body: JSON.stringify(legData),
+                        }
+                      );
+
+                      const responseText = await response.text();
+                      let result;
+                      try {
+                        result = JSON.parse(responseText);
+                      } catch (e) {
+                        throw new Error(
+                          `Invalid JSON response: ${responseText}`
+                        );
+                      }
+
+                      if (!response.ok) {
+                        throw new Error(
+                          result.message || "Failed to save leg data"
+                        );
+                      }
 
                       // Show success message
                       setSavedMessage("Driver removed successfully!");

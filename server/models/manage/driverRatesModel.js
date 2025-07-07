@@ -95,22 +95,19 @@ const createDriverRate = async (driverRateData) => {
       subie_twelve_meter_rate,
     } = driverRateData
 
-    // Validate required fields
+    // Validate required fields (only starting point and destination)
     if (!startingpoint || !destination) {
       throw new Error("Starting point and destination are required")
     }
 
-    // Validate required driver rates
-    if (
-      driver_six_meter_rate == null ||
-      driver_six_meter_rate === "" ||
-      isNaN(Number.parseFloat(driver_six_meter_rate)) ||
-      driver_twelve_meter_rate == null ||
-      driver_twelve_meter_rate === "" ||
-      isNaN(Number.parseFloat(driver_twelve_meter_rate))
-    ) {
-      throw new Error("Driver 6m and 12m rates are required and must be valid numbers")
-    }
+    // Process driver rates - convert empty strings to null (now optional)
+    const processedDriverSixRate =
+      driver_six_meter_rate === "" || driver_six_meter_rate == null ? null : Number.parseFloat(driver_six_meter_rate)
+
+    const processedDriverTwelveRate =
+      driver_twelve_meter_rate === "" || driver_twelve_meter_rate == null
+        ? null
+        : Number.parseFloat(driver_twelve_meter_rate)
 
     // Process subie rates - convert empty strings to null
     const processedSubieSixRate =
@@ -121,12 +118,14 @@ const createDriverRate = async (driverRateData) => {
         ? null
         : Number.parseFloat(subie_twelve_meter_rate)
 
-    // Validate subie rates if they are provided (not null/empty)
+    // Validate all rates if they are provided (not null/empty)
     if (
+      (processedDriverSixRate !== null && isNaN(processedDriverSixRate)) ||
+      (processedDriverTwelveRate !== null && isNaN(processedDriverTwelveRate)) ||
       (processedSubieSixRate !== null && isNaN(processedSubieSixRate)) ||
       (processedSubieTwelveRate !== null && isNaN(processedSubieTwelveRate))
     ) {
-      throw new Error("Subie rates must be valid numbers if provided")
+      throw new Error("All rates must be valid numbers if provided")
     }
 
     const result = await client.query(
@@ -139,8 +138,8 @@ const createDriverRate = async (driverRateData) => {
       [
         startingpoint,
         destination,
-        Number.parseFloat(driver_six_meter_rate),
-        Number.parseFloat(driver_twelve_meter_rate),
+        processedDriverSixRate,
+        processedDriverTwelveRate,
         processedSubieSixRate,
         processedSubieTwelveRate,
       ],
@@ -188,12 +187,20 @@ const updateDriverRate = async (id, driverRateData) => {
     }
     if (driver_six_meter_rate !== undefined) {
       updateFields.push(`driver_six_meter_rate = $${paramCounter}`)
-      queryParams.push(Number.parseFloat(driver_six_meter_rate))
+      // Handle null/empty values for driver rates (now optional)
+      const processedValue =
+        driver_six_meter_rate === "" || driver_six_meter_rate == null ? null : Number.parseFloat(driver_six_meter_rate)
+      queryParams.push(processedValue)
       paramCounter++
     }
     if (driver_twelve_meter_rate !== undefined) {
       updateFields.push(`driver_twelve_meter_rate = $${paramCounter}`)
-      queryParams.push(Number.parseFloat(driver_twelve_meter_rate))
+      // Handle null/empty values for driver rates (now optional)
+      const processedValue =
+        driver_twelve_meter_rate === "" || driver_twelve_meter_rate == null
+          ? null
+          : Number.parseFloat(driver_twelve_meter_rate)
+      queryParams.push(processedValue)
       paramCounter++
     }
     if (subie_six_meter_rate !== undefined) {
