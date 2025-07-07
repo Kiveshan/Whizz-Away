@@ -761,7 +761,7 @@ export default function DirectorAnalytics() {
         return (
           <div className="chart-wrapper">
             {isLoading ? (
-              <div className="loading-indicator">Loading subcontractor turnover data...</div>
+              <div className="loading-indicator">Loading Subbie VS Turnover data...</div>
             ) : error ? (
               <div className="error-message">{error}</div>
             ) : !Array.isArray(chartData) || chartData.length === 0 ? (
@@ -803,7 +803,7 @@ export default function DirectorAnalytics() {
         return (
           <div className="chart-wrapper">
             {isLoading ? (
-              <div className="loading-indicator">Loading subcontractor vs turnover data...</div>
+              <div className="loading-indicator">Loading Turnover VS Total Subbie data...</div>
             ) : error ? (
               <div className="error-message">{error}</div>
             ) : !Array.isArray(chartData) || chartData.length === 0 ? (
@@ -859,7 +859,7 @@ export default function DirectorAnalytics() {
         return (
           <div className="chart-wrapper">
             {isLoading ? (
-              <div className="loading-indicator">Loading wages data...</div>
+              <div className="loading-indicator">Loading Wages per month VS Expenses data...</div>
             ) : error ? (
               <div className="error-message">{error}</div>
             ) : !Array.isArray(chartData) || chartData.length === 0 ? (
@@ -1115,7 +1115,7 @@ export default function DirectorAnalytics() {
               className={`filter-button ${activeFilter === "turnoverPerMonth" ? "active" : ""}`}
               onClick={() => setActiveFilter("turnoverPerMonth")}
             >
-              Turnover Per Month
+              Turnover per month vs Client
             </button>
             <button
               className={`filter-button ${activeFilter === "agingAnalysis" ? "active" : ""}`}
@@ -1127,19 +1127,19 @@ export default function DirectorAnalytics() {
               className={`filter-button ${activeFilter === "subcontractorTurnoverPerMonth" ? "active" : ""}`}
               onClick={() => setActiveFilter("subcontractorTurnoverPerMonth")}
             >
-              Subcontractor Turnover Per Month
+              Subbie VS Turnover
             </button>
             <button
               className={`filter-button ${activeFilter === "subcontractorVsTurnover" ? "active" : ""}`}
               onClick={() => setActiveFilter("subcontractorVsTurnover")}
             >
-              Subcontractor Turnover vs Turnover
+              Turnover VS Total Subbie
             </button>
             <button
               className={`filter-button ${activeFilter === "wagesPerMonth" ? "active" : ""}`}
               onClick={() => setActiveFilter("wagesPerMonth")}
             >
-              Wages (Total) Per Month
+              Wages (Total) Per Month VS Expenses
             </button>
             <button
               className={`filter-button ${activeFilter === "turnoverVsDieselCost" ? "active" : ""}`}
@@ -1164,12 +1164,12 @@ export default function DirectorAnalytics() {
           <div className="chart-area">
             <h2 className="chart-title">
               {activeFilter === "fuel" && `Fuel Expenses Per Truck (${activeMonth} ${activeYear})`}
-              {activeFilter === "turnoverPerMonth" && `Turnover Per Month (${activeMonth} ${activeYear})`}
+              {activeFilter === "turnoverPerMonth" && `Turnover per month vs Client (${activeMonth} ${activeYear})`}
               {activeFilter === "agingAnalysis" && `Aging Analysis (${activeMonth} ${activeYear})`}
               {activeFilter === "turnoverVsDieselCost" && `Turnover vs Diesel Cost (${activeMonth} ${activeYear})`}
-              {activeFilter === "subcontractorTurnoverPerMonth" && `Subcontractor Turnover Per Month (${activeMonth} ${activeYear})`}
-              {activeFilter === "subcontractorVsTurnover" && `Subcontractor Turnover vs Total Turnover (${activeMonth} ${activeYear})`}
-              {activeFilter === "wagesPerMonth" && `Wages Per Month (${activeMonth} ${activeYear})`}
+              {activeFilter === "subcontractorTurnoverPerMonth" && `Subbie VS Turnover Per Month (${activeMonth} ${activeYear})`}
+              {activeFilter === "subcontractorVsTurnover" && `Turnover VS Total Subbie (${activeMonth} ${activeYear})`}
+              {activeFilter === "wagesPerMonth" && `Wages Per Month VS Expenses (${activeMonth} ${activeYear})`}
               {activeFilter === "turnoverPerTruck" && `Turnover Per Truck (${activeMonth} ${activeYear})`}
               {activeFilter === "incomeVsExpense" && `Income vs Expenses (${activeMonth} ${activeYear})`}
             </h2>
