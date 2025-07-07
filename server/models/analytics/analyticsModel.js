@@ -63,7 +63,7 @@ const getFuelExpenses = async (client, month, year) => {
 
 const getTurnoverPerMonth = async (client, month, year, clientId = null) => {
   const params = [month, year];
-  let query = `
+  let clientQuery = `
     SELECT 
       c.client, 
       SUM(m.total_cost) as turnover,
@@ -76,15 +76,14 @@ const getTurnoverPerMonth = async (client, month, year, clientId = null) => {
     AND EXTRACT(YEAR FROM i.date)::text = $2
   `;
   if (clientId) {
-    query += ` AND i.clientid = $3`;
+    clientQuery += ` AND i.clientid = $3`;
     params.push(clientId);
   }
-  query += `
+  clientQuery += `
     GROUP BY c.client, to_char(i.date, 'Month'), EXTRACT(YEAR FROM i.date)
     ORDER BY turnover DESC
   `;
   
-  // Fetch total turnover for all clients
   const totalQuery = `
     SELECT 
       SUM(m.total_cost) as turnover,
@@ -97,21 +96,27 @@ const getTurnoverPerMonth = async (client, month, year, clientId = null) => {
     GROUP BY to_char(i.date, 'Month'), EXTRACT(YEAR FROM i.date)
   `;
   
-  const [result, totalResult] = await Promise.all([
-    client.query(query, params),
+  const [clientResult, totalResult] = await Promise.all([
+    clientId ? client.query(clientQuery, params) : Promise.resolve({ rows: [] }),
     client.query(totalQuery, [month, year])
   ]);
   
-  console.log("Raw query result:", result.rows);
-  console.log(`Query returned ${result.rows ? result.rows.length : 0} rows`);
+  console.log("Client query result:", clientResult.rows);
   console.log("Total turnover query result:", totalResult.rows);
 
   const totalTurnover = parseFloat(totalResult.rows[0]?.turnover || 0);
   console.log(`Total turnover for ${month} ${year}: ${totalTurnover}`);
 
-  let turnoverData = [];
-  if (result.rows && result.rows.length > 0) {
-    turnoverData = result.rows.map((row) => {
+  let turnoverData = [{
+    client: "Total Turnover",
+    turnover: totalTurnover,
+    month_name: month.trim(),
+    year: year.toString(),
+    percentage: 100,
+  }];
+
+  if (clientId && clientResult.rows.length > 0) {
+    const clientData = clientResult.rows.map((row) => {
       const turnover = parseFloat(row.turnover || 0);
       const percentage =
         totalTurnover > 0 ? ((turnover / totalTurnover) * 100).toFixed(2) : 0;
@@ -123,16 +128,7 @@ const getTurnoverPerMonth = async (client, month, year, clientId = null) => {
         percentage: parseFloat(percentage),
       };
     });
-  }
-
-  if (!clientId) {
-    turnoverData.push({
-      client: "Total Turnover",
-      turnover: totalTurnover,
-      month_name: month.trim(),
-      year: year.toString(),
-      percentage: 100,
-    });
+    turnoverData = [turnoverData[0], ...clientData]; // Total turnover first, then client data
   }
 
   console.log("Processed turnover data:", turnoverData);
