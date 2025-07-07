@@ -214,6 +214,7 @@ const FCcontrollerinstructions = () => {
   const [confirmationModal, setConfirmationModal] = useState({
     isOpen: false,
     message: "",
+    action: null
   })
 
   // Initialize containers based on container counts
@@ -615,6 +616,7 @@ const FCcontrollerinstructions = () => {
       setConfirmationModal({
         isOpen: true,
         message: message,
+        action: 'save'
       })
       return false // Don't proceed with save
     }
@@ -644,6 +646,58 @@ const FCcontrollerinstructions = () => {
 
     // Proceed with actual save logic
     await performSave()
+  }
+  
+  // Handle delete instruction
+  const handleDeleteInstruction = () => {
+    console.log("=== DELETE INSTRUCTION INITIATED ===")
+    
+    // Show confirmation modal
+    setConfirmationModal({
+      isOpen: true,
+      message: "Are you sure you want to delete this instruction? This action cannot be undone.",
+      action: 'delete'
+    })
+  }
+  
+  // Perform the actual delete operation
+  const performDelete = async () => {
+    try {
+      console.log(`Deleting instruction with ID: ${instructionId}`)
+      setIsContainerLoading(true)
+      
+      // Call the API to delete the instruction
+      const response = await api.delete(`/api/instructions/fc/instruction/${instructionId}`)
+      
+      console.log("Delete response:", response.data)
+      
+      // Show success message
+      setContainerSuccessMessage("Instruction deleted successfully!")
+      
+      // Navigate back to the instructions list after a short delay
+      setTimeout(() => {
+        navigate("/ViewClientInstruction", {
+          state: {
+            clientId,
+            clientName,
+            selectedMonth,
+            selectedYear,
+            activeFilter
+          }
+        })
+      }, 2000)
+      
+    } catch (error) {
+      console.error("Error deleting instruction:", error)
+      
+      // Show error modal
+      setErrorModal({
+        isOpen: true,
+        message: error.response?.data?.message || "Failed to delete instruction. Please try again."
+      })
+    } finally {
+      setIsContainerLoading(false)
+    }
   }
 
   // Extract the actual save logic into a separate function
@@ -836,13 +890,17 @@ const FCcontrollerinstructions = () => {
   }
 
   // Handle confirmation modal actions
-  const handleConfirmSave = async () => {
-    setConfirmationModal({ isOpen: false, message: "" })
-    await performSave()
+  const handleConfirmAction = async () => {
+    setConfirmationModal({ isOpen: false, message: "", action: null })
+    if (confirmationModal.action === 'save') {
+      await performSave()
+    } else if (confirmationModal.action === 'delete') {
+      await performDelete()
+    }
   }
 
-  const handleCancelSave = () => {
-    setConfirmationModal({ isOpen: false, message: "" })
+  const handleCancelAction = () => {
+    setConfirmationModal({ isOpen: false, message: "", action: null })
   }
 
   // Initialize containers when component mounts or container counts change
@@ -3026,7 +3084,7 @@ const FCcontrollerinstructions = () => {
             </div>
           )}
           {!isReadOnly && (
-            <div className="controller-instructions-form-actions" style={{ display: "flex", justifyContent: "center" }}>
+            <div className="controller-instructions-form-actions" style={{ display: "flex", justifyContent: "center", gap: "15px" }}>
               <button
                 className="controller-instructions-save-button"
                 onClick={handleSaveChanges}
@@ -3043,6 +3101,24 @@ const FCcontrollerinstructions = () => {
               >
                 Save Changes
               </button>
+              {formData.status === "New" && (
+                <button
+                  className="controller-instructions-delete-button"
+                  onClick={handleDeleteInstruction}
+                  style={{
+                    backgroundColor: "#e74c3c",
+                    color: "white",
+                    padding: "12px 24px",
+                    border: "none",
+                    borderRadius: "4px",
+                    cursor: "pointer",
+                    fontSize: "16px",
+                    fontWeight: "bold",
+                  }}
+                >
+                  Delete Instruction
+                </button>
+              )}
             </div>
           )}
 
@@ -3096,7 +3172,7 @@ const FCcontrollerinstructions = () => {
               <p style={{ marginBottom: "24px", lineHeight: "1.5", color: "#666" }}>{confirmationModal.message}</p>
               <div style={{ display: "flex", justifyContent: "flex-end", gap: "12px" }}>
                 <button
-                  onClick={handleCancelSave}
+                  onClick={handleCancelAction}
                   style={{
                     padding: "8px 16px",
                     border: "1px solid #ddd",
@@ -3109,7 +3185,7 @@ const FCcontrollerinstructions = () => {
                   No, Let Me Edit
                 </button>
                 <button
-                  onClick={handleConfirmSave}
+                  onClick={handleConfirmAction}
                   style={{
                     padding: "8px 16px",
                     border: "none",
