@@ -2,6 +2,7 @@ import {
   getFuelExpenses,
   getTurnoverPerMonth,
   getAllClients,
+  getAllSubcontractors,
   getAgingAnalysis,
   getTurnoverVsDieselCost,
   getAllExpenses,
@@ -11,6 +12,21 @@ import {
   getSubcontractorVsTurnover,
 } from "../../models/analytics/analyticsModel.js";
 import { pool } from "../../config/database.js";
+
+const monthNames = {
+  1: "January",
+  2: "February",
+  3: "March",
+  4: "April",
+  5: "May",
+  6: "June",
+  7: "July",
+  8: "August",
+  9: "September",
+  10: "October",
+  11: "November",
+  12: "December",
+};
 
 const getFuelExpensesController = async (req, res) => {
   const { month, year } = req.query;
@@ -61,6 +77,21 @@ const getAllClientsController = async (req, res) => {
     }
   } catch (error) {
     console.error("Error fetching clients:", error);
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+const getAllSubcontractorsController = async (req, res) => {
+  try {
+    const client = await pool.connect();
+    try {
+      const data = await getAllSubcontractors(client);
+      res.status(200).json({ success: true, data });
+    } finally {
+      client.release();
+    }
+  } catch (error) {
+    console.error("Error fetching subcontractors:", error);
     res.status(500).json({ success: false, message: error.message });
   }
 };
@@ -181,14 +212,14 @@ const getSubcontractorTurnoverPerMonthController = async (req, res) => {
 };
 
 const getSubcontractorVsTurnoverController = async (req, res) => {
-  const { month, year } = req.query;
+  const { month, year, subcontractorId } = req.query;
   if (!month || !year) {
     return res.status(400).json({ success: false, message: "Month and year are required" });
   }
   try {
     const client = await pool.connect();
     try {
-      const data = await getSubcontractorVsTurnover(client, month, year);
+      const data = await getSubcontractorVsTurnover(client, month, year, subcontractorId || null);
       res.status(200).json({ success: true, data });
     } finally {
       client.release();
@@ -203,6 +234,7 @@ export {
   getFuelExpensesController,
   getTurnoverPerMonthController,
   getAllClientsController,
+  getAllSubcontractorsController,
   getAgingAnalysisController,
   getTurnoverVsDieselCostController,
   getAllExpensesController,

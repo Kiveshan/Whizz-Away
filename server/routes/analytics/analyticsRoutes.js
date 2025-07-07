@@ -10,6 +10,7 @@ import {
   getWagesPerMonthController,
   getSubcontractorTurnoverPerMonthController,
   getSubcontractorVsTurnoverController,
+  getAllSubcontractorsController,
 } from "../../controllers/analytics/analyticsController.js";
 import { verifyToken } from "../../middleware/auth.js";
 
@@ -19,6 +20,7 @@ router.get("/api/fuel-expenses", verifyToken, getFuelExpensesController);
 router.get("/api/turnover-per-month", verifyToken, getTurnoverPerMonthController);
 router.get("/api/aging-analysis", verifyToken, getAgingAnalysisController);
 router.get("/api/get-clients", verifyToken, getAllClientsController);
+router.get("/get-subcontractors", verifyToken, getAllSubcontractorsController);
 router.get(
   "/api/turnover-vs-diesel-cost",
   verifyToken,
