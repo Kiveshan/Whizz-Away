@@ -1,5 +1,38 @@
 import { pool, query } from "../../config/database.js"
 
+// Helper function to calculate total cost based on rate weight type
+const calculateTotalCost = (instructionData) => {
+  const rateWeight = instructionData.rateweight || instructionData.rateWeight || "Container"
+  const surchargeAmount = instructionData.surchages ? Number(instructionData.surcharge || 0) : 0
+
+  let baseCost = 0
+
+  if (rateWeight === "Container") {
+    // Container-based calculation
+    const numSix = Number(instructionData.num_six_meters || 0)
+    const numTwelve = Number(instructionData.num_twelve_meters || 0)
+    const numAbnormal = Number(instructionData.num_abnormal || 0)
+    const numBreakBulk = Number(instructionData.num_breakbulk || 0)
+
+    const ratePer6 = numSix > 0 ? Number(instructionData.rateper_6 || 0) : 0
+    const ratePer12 = numTwelve > 0 ? Number(instructionData.rateper_12 || 0) : 0
+    const ratePerAbnormal = numAbnormal > 0 ? Number(instructionData.rateper_abnormal || 0) : 0
+    const ratePerBreakBulk = numBreakBulk > 0 ? Number(instructionData.rateper_breakbulk || 0) : 0
+
+    baseCost =
+      ratePer6 * numSix + ratePer12 * numTwelve + ratePerAbnormal * numAbnormal + ratePerBreakBulk * numBreakBulk
+  } else {
+    // Weight-based calculation (kg, ton, m³)
+    const weight = Number(instructionData.weight || 0)
+    const unitRate = Number(instructionData.unitrate || 0)
+
+    baseCost = weight * unitRate
+  }
+
+  const totalCost = baseCost + surchargeAmount
+  return Number(totalCost.toFixed(2))
+}
+
 export const getShipmentTypes = async () => {
   const sql = `
     SELECT shipkey, shipmenttype
@@ -134,7 +167,7 @@ export const saveInstruction = async ({ controllerData, containerData }) => {
       weight: controllerData.weight, // Already null if container-based from frontend
       unitrate: controllerData.unitrate, // Already null if container-based from frontend
       vat: controllerData.vat || 15,
-      total_cost: controllerData.total_cost || 0,
+      total_cost: controllerData.total_cost || calculateTotalCost(controllerData),
 
       // Container counts and rates (already handled for null/0 by frontend)
       num_six_meters: controllerData.num_six_meters || 0,
@@ -224,9 +257,26 @@ export const saveInstruction = async ({ controllerData, containerData }) => {
           $1, $2, $3, $4, $5
         )
       `
+
+      // Sanitize weight value
+      let sanitizedWeight = null
+      if (container.weight !== null && container.weight !== undefined && container.weight !== "") {
+        if (typeof container.weight === "string") {
+          const trimmedWeight = container.weight.trim()
+          if (trimmedWeight !== "") {
+            const parsedWeight = Number.parseFloat(trimmedWeight)
+            if (!isNaN(parsedWeight) && parsedWeight >= 0) {
+              sanitizedWeight = parsedWeight
+            }
+          }
+        } else if (typeof container.weight === "number" && container.weight >= 0) {
+          sanitizedWeight = container.weight
+        }
+      }
+
       const containerValues = [
         container.containerNum,
-        container.weight, // Already null if not import from frontend
+        sanitizedWeight, // Will be null for empty/invalid values
         m1key,
         container.container_type,
         container.cargo_description || "",
@@ -248,7 +298,7 @@ export const getClientInstructionStats = async () => {
   const statusCheckQuery = `
     SELECT DISTINCT status FROM public.m1_controller
   `
-  const query = `
+  const queryText = `
     SELECT 
       c.m5clientkey,
       c.client AS companyname,
@@ -277,7 +327,7 @@ export const getClientInstructionStats = async () => {
       "Available status values in database:",
       statusResult.rows.map((row) => row.status),
     )
-    const result = await client.query(query)
+    const result = await client.query(queryText)
     return result.rows
   } catch (error) {
     throw error
@@ -378,7 +428,10 @@ export const updateInstruction = async (instructionId, updatedData) => {
   try {
     await client.query("BEGIN")
 
-    const query = `
+    // Calculate total cost if not provided
+    const totalCost = updatedData.total_cost !== undefined ? updatedData.total_cost : calculateTotalCost(updatedData)
+
+    const queryText = `
       UPDATE public.m1_controller
       SET 
         client = $1,
@@ -409,8 +462,9 @@ export const updateInstruction = async (instructionId, updatedData) => {
         rateper_12 = $26,
         rateper_abnormal = $27,
         rateper_breakbulk = $28,
-        unitrate = $29
-      WHERE m1key = $30
+        unitrate = $29,
+        surcharge = $30
+      WHERE m1key = $31
       RETURNING *
     `
 
@@ -434,9 +488,9 @@ export const updateInstruction = async (instructionId, updatedData) => {
       updatedData.num_twelve_meters || 0,
       updatedData.num_abnormal || 0,
       updatedData.num_breakbulk || 0,
-      updatedData.total_cost,
+      totalCost,
       updatedData.weight,
-      updatedData.status || "In progress",
+      updatedData.status,
       updatedData.booking_ref,
       updatedData.vessel_name,
       updatedData.rateper_6,
@@ -444,10 +498,11 @@ export const updateInstruction = async (instructionId, updatedData) => {
       updatedData.rateper_abnormal,
       updatedData.rateper_breakbulk,
       updatedData.unitrate,
+      updatedData.surcharge,
       instructionId,
     ]
 
-    const result = await client.query(query, values)
+    const result = await client.query(queryText, values)
     await client.query("COMMIT")
     return result.rows.length > 0 ? result.rows[0] : null
   } catch (error) {
@@ -475,13 +530,28 @@ export const updateContainersByInstructionId = async (instructionId, containerDa
     const insertResults = []
     for (const container of containerData) {
       const containerNum = container.containernum || container.containerNum || ""
-      const weight =
-        container.weight !== null && container.weight !== undefined ? Number.parseFloat(container.weight) : null
+
+      // Sanitize weight value
+      let sanitizedWeight = null
+      if (container.weight !== null && container.weight !== undefined && container.weight !== "") {
+        if (typeof container.weight === "string") {
+          const trimmedWeight = container.weight.trim()
+          if (trimmedWeight !== "") {
+            const parsedWeight = Number.parseFloat(trimmedWeight)
+            if (!isNaN(parsedWeight) && parsedWeight >= 0) {
+              sanitizedWeight = parsedWeight
+            }
+          }
+        } else if (typeof container.weight === "number" && container.weight >= 0) {
+          sanitizedWeight = container.weight
+        }
+      }
+
       const containerType = container.containerType || container.container_type || ""
       const cargoDescription = container.cargoDescription || container.cargo_description || ""
 
       console.log(
-        `Inserting container: containerNum=${containerNum}, weight=${weight}, m1key=${instructionId}, container_type=${containerType}, cargo_description=${cargoDescription}`,
+        `Inserting container: containerNum=${containerNum}, weight=${sanitizedWeight}, m1key=${instructionId}, container_type=${containerType}, cargo_description=${cargoDescription}`,
       )
 
       const insertQuery = `
@@ -489,7 +559,7 @@ export const updateContainersByInstructionId = async (instructionId, containerDa
         VALUES ($1, $2, $3, $4, $5)
         RETURNING containerkey
       `
-      const values = [containerNum, weight, instructionId, containerType, cargoDescription]
+      const values = [containerNum, sanitizedWeight, instructionId, containerType, cargoDescription]
 
       const result = await client.query(insertQuery, values)
       console.log(`Inserted container with ID: ${result.rows[0].containerkey}`)
@@ -841,6 +911,52 @@ const compareContainers = (currentContainers, newContainers) => {
   return changes
 }
 
+// Helper function to sanitize numeric values - converts empty strings and invalid values to null
+const sanitizeNumericValue = (value) => {
+  // Handle null, undefined, or empty string
+  if (value === null || value === undefined || value === "" || value === "undefined") {
+    return null
+  }
+
+  // Handle string values
+  if (typeof value === "string") {
+    const trimmed = value.trim()
+    if (trimmed === "") {
+      return null
+    }
+    const parsed = Number.parseFloat(trimmed)
+    return isNaN(parsed) ? null : parsed
+  }
+
+  // Handle numeric values
+  if (typeof value === "number") {
+    return isNaN(value) ? null : value
+  }
+
+  // For any other type, try to convert to number
+  const parsed = Number.parseFloat(value)
+  return isNaN(parsed) ? null : parsed
+}
+
+// Helper function to preserve existing values but sanitize new ones
+const preserveExistingValue = (newValue, currentValue, fieldType = "string") => {
+  if (newValue === undefined || newValue === "undefined") {
+    return currentValue // Keep existing database value
+  }
+
+  // For numeric fields, sanitize the value
+  if (fieldType === "number") {
+    return sanitizeNumericValue(newValue)
+  }
+
+  // For string fields, convert empty strings to null if needed
+  if (fieldType === "string" && newValue === "") {
+    return null
+  }
+
+  return newValue
+}
+
 export const updateFCInstructionAndContainers = async (instructionId, instructionData, containerData) => {
   const client = await pool.connect()
   try {
@@ -864,211 +980,185 @@ export const updateFCInstructionAndContainers = async (instructionId, instructio
     const currentInstruction = currentResult.rows[0]
     console.log(`[${new Date().toISOString()}] [MODEL] Current instruction data fetched`)
 
-    // Helper function to handle undefined values - preserve existing values
-    const preserveExistingValue = (newValue, currentValue) => {
-      if (newValue === undefined || newValue === "undefined") {
-        return currentValue // Keep existing database value
-      }
-      return newValue
+    // Calculate total cost if not provided
+    const totalCost =
+      instructionData.total_cost !== undefined ? instructionData.total_cost : calculateTotalCost(instructionData)
+
+    // 2. Prepare instruction update data with proper null handling and numeric sanitization
+    const updateData = {
+      client: preserveExistingValue(instructionData.client, currentInstruction.client, "number"),
+      task: preserveExistingValue(instructionData.task, currentInstruction.task, "string"),
+      shipment_type: preserveExistingValue(instructionData.shipment_type, currentInstruction.shipment_type, "number"),
+      pickup: preserveExistingValue(instructionData.pickup, currentInstruction.pickup, "string"),
+      dropoff: preserveExistingValue(instructionData.dropoff, currentInstruction.dropoff, "string"),
+      hazardous: preserveExistingValue(instructionData.hazardous, currentInstruction.hazardous, "boolean"),
+      surchages: preserveExistingValue(instructionData.surchages, currentInstruction.surchages, "boolean"),
+      surcharge: preserveExistingValue(instructionData.surcharge, currentInstruction.surcharge, "number"),
+      pickuptime: preserveExistingValue(instructionData.pickuptime, currentInstruction.pickuptime, "string"),
+      pickupdate: preserveExistingValue(instructionData.pickupdate, currentInstruction.pickupdate, "string"),
+      stackdate: preserveExistingValue(instructionData.stackdate, currentInstruction.stackdate, "string"),
+      deadline: preserveExistingValue(instructionData.deadline, currentInstruction.deadline, "string"),
+      fileref: preserveExistingValue(instructionData.fileref, currentInstruction.fileref, "string"),
+      rateweight: preserveExistingValue(instructionData.rateweight, currentInstruction.rateweight, "string"),
+      description: preserveExistingValue(instructionData.description, currentInstruction.description, "string"),
+      status: preserveExistingValue(instructionData.status, currentInstruction.status, "string"),
+      vat: preserveExistingValue(instructionData.vat, currentInstruction.vat, "number"),
+      num_six_meters: preserveExistingValue(
+        instructionData.num_six_meters,
+        currentInstruction.num_six_meters,
+        "number",
+      ),
+      num_twelve_meters: preserveExistingValue(
+        instructionData.num_twelve_meters,
+        currentInstruction.num_twelve_meters,
+        "number",
+      ),
+      num_abnormal: preserveExistingValue(instructionData.num_abnormal, currentInstruction.num_abnormal, "number"),
+      num_breakbulk: preserveExistingValue(instructionData.num_breakbulk, currentInstruction.num_breakbulk, "number"),
+      weight: preserveExistingValue(instructionData.weight, currentInstruction.weight, "number"),
+      total_cost: sanitizeNumericValue(totalCost),
+      booking_ref: preserveExistingValue(instructionData.booking_ref, currentInstruction.booking_ref, "string"),
+      vessel_name: preserveExistingValue(instructionData.vessel_name, currentInstruction.vessel_name, "string"),
+      rateper_6: preserveExistingValue(instructionData.rateper_6, currentInstruction.rateper_6, "number"),
+      rateper_12: preserveExistingValue(instructionData.rateper_12, currentInstruction.rateper_12, "number"),
+      rateper_abnormal: preserveExistingValue(
+        instructionData.rateper_abnormal,
+        currentInstruction.rateper_abnormal,
+        "number",
+      ),
+      rateper_breakbulk: preserveExistingValue(
+        instructionData.rateper_breakbulk,
+        currentInstruction.rateper_breakbulk,
+        "number",
+      ),
+      unitrate: preserveExistingValue(instructionData.unitrate, currentInstruction.unitrate, "number"),
     }
 
-    // 2. Compare fields and build dynamic update query
-    const fieldsToUpdate = []
-    const valuesToUpdate = []
-    let paramIndex = 1
+    console.log(`[${new Date().toISOString()}] [MODEL] Sanitized update data:`, {
+      weight: updateData.weight,
+      rateper_6: updateData.rateper_6,
+      rateper_12: updateData.rateper_12,
+      rateper_abnormal: updateData.rateper_abnormal,
+      rateper_breakbulk: updateData.rateper_breakbulk,
+      unitrate: updateData.unitrate,
+      surcharge: updateData.surcharge,
+      total_cost: updateData.total_cost,
+    })
 
-    // Define field mappings with their types - EXCLUDE STATUS from updates
-    const fieldMappings = [
-      { db: "client", new: preserveExistingValue(instructionData.client, currentInstruction.client), type: "number" },
-      { db: "task", new: preserveExistingValue(instructionData.task, currentInstruction.task), type: "string" },
-      {
-        db: "shipment_type",
-        new: preserveExistingValue(instructionData.shipment_type, currentInstruction.shipment_type),
-        type: "number",
-      },
-      { db: "pickup", new: preserveExistingValue(instructionData.pickup, currentInstruction.pickup), type: "string" },
-      {
-        db: "dropoff",
-        new: preserveExistingValue(instructionData.dropoff, currentInstruction.dropoff),
-        type: "string",
-      },
-      {
-        db: "hazardous",
-        new: preserveExistingValue(instructionData.hazardous, currentInstruction.hazardous),
-        type: "boolean",
-      },
-      {
-        db: "surchages",
-        new: preserveExistingValue(instructionData.surchages, currentInstruction.surchages),
-        type: "boolean",
-      },
-      {
-        db: "pickuptime",
-        new: preserveExistingValue(instructionData.pickuptime, currentInstruction.pickuptime),
-        type: "time",
-      },
-      {
-        db: "pickupdate",
-        new: preserveExistingValue(instructionData.pickupdate, currentInstruction.pickupdate),
-        type: "date",
-      },
-      {
-        db: "stackdate",
-        new: preserveExistingValue(instructionData.stackdate, currentInstruction.stackdate),
-        type: "date",
-      },
-      {
-        db: "deadline",
-        new: preserveExistingValue(instructionData.deadline, currentInstruction.deadline),
-        type: "date",
-      },
-      {
-        db: "fileref",
-        new: preserveExistingValue(instructionData.fileref, currentInstruction.fileref),
-        type: "string",
-      },
-      {
-        db: "rateweight",
-        new: preserveExistingValue(instructionData.rateweight, currentInstruction.rateweight),
-        type: "string",
-      },
-      {
-        db: "description",
-        new: preserveExistingValue(instructionData.description, currentInstruction.description),
-        type: "string",
-      },
-      { db: "vat", new: preserveExistingValue(instructionData.vat, currentInstruction.vat) || 15, type: "number" },
-      {
-        db: "num_six_meters",
-        new: preserveExistingValue(instructionData.num_six_meters, currentInstruction.num_six_meters) || 0,
-        type: "number",
-      },
-      {
-        db: "num_twelve_meters",
-        new: preserveExistingValue(instructionData.num_twelve_meters, currentInstruction.num_twelve_meters) || 0,
-        type: "number",
-      },
-      {
-        db: "num_abnormal",
-        new: preserveExistingValue(instructionData.num_abnormal, currentInstruction.num_abnormal) || 0,
-        type: "number",
-      },
-      {
-        db: "num_breakbulk",
-        new: preserveExistingValue(instructionData.num_breakbulk, currentInstruction.num_breakbulk) || 0,
-        type: "number",
-      },
-      {
-        db: "total_cost",
-        new: preserveExistingValue(instructionData.total_cost, currentInstruction.total_cost),
-        type: "number",
-      },
-      { db: "weight", new: preserveExistingValue(instructionData.weight, currentInstruction.weight), type: "number" },
-      {
-        db: "booking_ref",
-        new: preserveExistingValue(instructionData.booking_ref, currentInstruction.booking_ref),
-        type: "string",
-      },
-      {
-        db: "vessel_name",
-        new: preserveExistingValue(instructionData.vessel_name, currentInstruction.vessel_name),
-        type: "string",
-      },
-      {
-        db: "rateper_6",
-        new: preserveExistingValue(instructionData.rateper_6, currentInstruction.rateper_6),
-        type: "number",
-      },
-      {
-        db: "rateper_12",
-        new: preserveExistingValue(instructionData.rateper_12, currentInstruction.rateper_12),
-        type: "number",
-      },
-      {
-        db: "rateper_abnormal",
-        new: preserveExistingValue(instructionData.rateper_abnormal, currentInstruction.rateper_abnormal),
-        type: "number",
-      },
-      {
-        db: "rateper_breakbulk",
-        new: preserveExistingValue(instructionData.rateper_breakbulk, currentInstruction.rateper_breakbulk),
-        type: "number",
-      },
-      {
-        db: "unitrate",
-        new: preserveExistingValue(instructionData.unitrate, currentInstruction.unitrate),
-        type: "number",
-      },
-      {
-        db: "surcharge",
-        new: preserveExistingValue(instructionData.surcharge, currentInstruction.surcharge),
-        type: "number",
-      },
+    // 3. Check if instruction needs updating
+    let instructionNeedsUpdate = false
+    const fieldsToCheck = [
+      { field: "client", type: "number" },
+      { field: "task", type: "string" },
+      { field: "shipment_type", type: "number" },
+      { field: "pickup", type: "string" },
+      { field: "dropoff", type: "string" },
+      { field: "hazardous", type: "boolean" },
+      { field: "surchages", type: "boolean" },
+      { field: "surcharge", type: "number" },
+      { field: "pickuptime", type: "time" },
+      { field: "pickupdate", type: "date" },
+      { field: "stackdate", type: "date" },
+      { field: "deadline", type: "date" },
+      { field: "fileref", type: "string" },
+      { field: "rateweight", type: "string" },
+      { field: "description", type: "string" },
+      { field: "status", type: "string" },
+      { field: "vat", type: "number" },
+      { field: "num_six_meters", type: "number" },
+      { field: "num_twelve_meters", type: "number" },
+      { field: "num_abnormal", type: "number" },
+      { field: "num_breakbulk", type: "number" },
+      { field: "weight", type: "number" },
+      { field: "total_cost", type: "number" },
+      { field: "booking_ref", type: "string" },
+      { field: "vessel_name", type: "string" },
+      { field: "rateper_6", type: "number" },
+      { field: "rateper_12", type: "number" },
+      { field: "rateper_abnormal", type: "number" },
+      { field: "rateper_breakbulk", type: "number" },
+      { field: "unitrate", type: "number" },
     ]
 
-    // Compare each field
-    for (const field of fieldMappings) {
-      const currentValue = currentInstruction[field.db]
-      const newValue = field.new
-
-      if (!compareValues(currentValue, newValue, field.type)) {
-        console.log(`[${new Date().toISOString()}] [MODEL] Field ${field.db} changed: ${currentValue} -> ${newValue}`)
-
-        fieldsToUpdate.push(`${field.db} = $${paramIndex}`)
-
-        // Format the value based on type
-        let formattedValue = newValue
-        if (field.type === "date") {
-          formattedValue = formatDateForComparison(newValue)
-        } else if (field.type === "time") {
-          formattedValue = formatTimeForComparison(newValue)
-        } else if (field.type === "number") {
-          // Handle weight field specially to prevent empty string errors
-          if (field.db === "weight" || field.db === "unitrate") {
-            if (newValue === null || newValue === undefined || newValue === "") {
-              formattedValue = null
-            } else {
-              const parsedValue = Number.parseFloat(String(newValue).trim())
-              formattedValue = isNaN(parsedValue) ? null : parsedValue
-            }
-          } else {
-            formattedValue = newValue === null || newValue === "" ? null : Number(newValue)
-          }
-        } else if (field.type === "boolean") {
-          formattedValue = Boolean(newValue)
-        } else {
-          // String type
-          formattedValue = newValue === null || newValue === "" ? null : String(newValue)
-        }
-
-        valuesToUpdate.push(formattedValue)
-        paramIndex++
+    for (const { field, type } of fieldsToCheck) {
+      if (!compareValues(currentInstruction[field], updateData[field], type)) {
+        console.log(
+          `[${new Date().toISOString()}] [MODEL] Field '${field}' changed: ${currentInstruction[field]} -> ${updateData[field]}`,
+        )
+        instructionNeedsUpdate = true
+        break
       }
     }
 
-    // 3. Update instruction if there are changes (STATUS IS NEVER UPDATED)
-    let instructionResult = currentInstruction
-    if (fieldsToUpdate.length > 0) {
-      const updateQuery = `
+    // 4. Update instruction if needed
+    if (instructionNeedsUpdate) {
+      console.log(`[${new Date().toISOString()}] [MODEL] Updating instruction ${instructionId}`)
+
+      const updateInstructionQuery = `
         UPDATE public.m1_controller
-        SET ${fieldsToUpdate.join(", ")}
-        WHERE m1key = $${paramIndex}
+        SET 
+          client = $1, task = $2, shipment_type = $3, pickup = $4, dropoff = $5,
+          hazardous = $6, surchages = $7, surcharge = $8, pickuptime = $9, pickupdate = $10,
+          stackdate = $11, deadline = $12, fileref = $13, rateweight = $14, description = $15,
+          status = $16, vat = $17, num_six_meters = $18, num_twelve_meters = $19, num_abnormal = $20,
+          num_breakbulk = $21, weight = $22, total_cost = $23, booking_ref = $24, vessel_name = $25,
+          rateper_6 = $26, rateper_12 = $27, rateper_abnormal = $28, rateper_breakbulk = $29, unitrate = $30
+        WHERE m1key = $31
         RETURNING *
       `
 
-      valuesToUpdate.push(instructionId)
+      const updateValues = [
+        updateData.client,
+        updateData.task,
+        updateData.shipment_type,
+        updateData.pickup,
+        updateData.dropoff,
+        updateData.hazardous,
+        updateData.surchages,
+        updateData.surcharge,
+        updateData.pickuptime,
+        updateData.pickupdate,
+        updateData.stackdate,
+        updateData.deadline,
+        updateData.fileref,
+        updateData.rateweight,
+        updateData.description,
+        updateData.status,
+        updateData.vat,
+        updateData.num_six_meters,
+        updateData.num_twelve_meters,
+        updateData.num_abnormal,
+        updateData.num_breakbulk,
+        updateData.weight,
+        updateData.total_cost,
+        updateData.booking_ref,
+        updateData.vessel_name,
+        updateData.rateper_6,
+        updateData.rateper_12,
+        updateData.rateper_abnormal,
+        updateData.rateper_breakbulk,
+        updateData.unitrate,
+        instructionId,
+      ]
 
-      console.log(`[${new Date().toISOString()}] [MODEL] Updating instruction with query:`, updateQuery)
-      console.log(`[${new Date().toISOString()}] [MODEL] Update values:`, valuesToUpdate)
+      console.log(`[${new Date().toISOString()}] [MODEL] Update values being sent to database:`, {
+        weight: updateValues[21], // $22
+        rateper_6: updateValues[25], // $26
+        rateper_12: updateValues[26], // $27
+        rateper_abnormal: updateValues[27], // $28
+        rateper_breakbulk: updateValues[28], // $29
+        unitrate: updateValues[29], // $30
+        surcharge: updateValues[7], // $8
+        total_cost: updateValues[22], // $23
+      })
 
-      const updateResult = await client.query(updateQuery, valuesToUpdate)
-      instructionResult = updateResult.rows[0]
-      console.log(`[${new Date().toISOString()}] [MODEL] Instruction updated successfully`)
+      const updateResult = await client.query(updateInstructionQuery, updateValues)
+      console.log(`[${new Date().toISOString()}] [MODEL] Instruction ${instructionId} updated successfully`)
     } else {
-      console.log(`[${new Date().toISOString()}] [MODEL] No instruction fields changed, skipping update`)
+      console.log(`[${new Date().toISOString()}] [MODEL] No changes detected for instruction ${instructionId}`)
     }
 
-    // 4. Handle container updates
+    // 5. Handle containers
     const getCurrentContainersQuery = `
       SELECT containerkey, containernum, weight, container_type, cargo_description
       FROM public.container
@@ -1078,17 +1168,16 @@ export const updateFCInstructionAndContainers = async (instructionId, instructio
     const currentContainersResult = await client.query(getCurrentContainersQuery, [instructionId])
     const currentContainers = currentContainersResult.rows
 
-    console.log(`[${new Date().toISOString()}] [MODEL] Current containers:`, currentContainers.length)
-    console.log(`[${new Date().toISOString()}] [MODEL] New containers:`, containerData.length)
+    console.log(
+      `[${new Date().toISOString()}] [MODEL] Current containers: ${currentContainers.length}, New containers: ${containerData.length}`,
+    )
 
-    // Compare containers
+    // Compare containers and determine changes
     const containerChanges = compareContainers(currentContainers, containerData)
 
-    console.log(`[${new Date().toISOString()}] [MODEL] Container changes:`, {
-      toUpdate: containerChanges.toUpdate.length,
-      toInsert: containerChanges.toInsert.length,
-      toDelete: containerChanges.toDelete.length,
-    })
+    console.log(
+      `[${new Date().toISOString()}] [MODEL] Container changes: ${containerChanges.toUpdate.length} to update, ${containerChanges.toInsert.length} to insert, ${containerChanges.toDelete.length} to delete`,
+    )
 
     // Delete containers
     for (const containerKey of containerChanges.toDelete) {
@@ -1099,14 +1188,30 @@ export const updateFCInstructionAndContainers = async (instructionId, instructio
 
     // Update containers
     for (const container of containerChanges.toUpdate) {
+      // Sanitize weight value
+      let sanitizedWeight = null
+      if (container.weight !== null && container.weight !== undefined && container.weight !== "") {
+        if (typeof container.weight === "string") {
+          const trimmedWeight = container.weight.trim()
+          if (trimmedWeight !== "") {
+            const parsedWeight = Number.parseFloat(trimmedWeight)
+            if (!isNaN(parsedWeight) && parsedWeight >= 0) {
+              sanitizedWeight = parsedWeight
+            }
+          }
+        } else if (typeof container.weight === "number" && container.weight >= 0) {
+          sanitizedWeight = container.weight
+        }
+      }
+
       const updateQuery = `
-        UPDATE public.container
+        UPDATE public.container 
         SET containernum = $1, weight = $2, container_type = $3, cargo_description = $4
         WHERE containerkey = $5
       `
       await client.query(updateQuery, [
         container.containernum,
-        container.weight,
+        sanitizedWeight, // Will be null for empty/invalid values
         container.container_type,
         container.cargo_description,
         container.containerkey,
@@ -1115,19 +1220,22 @@ export const updateFCInstructionAndContainers = async (instructionId, instructio
     }
 
     // Insert new containers
-    const insertResults = []
     for (const container of containerChanges.toInsert) {
       const containerNum = container.containernum || container.containerNum || ""
 
-      // Handle weight with proper validation
-      let weight = null
+      // Sanitize weight value
+      let sanitizedWeight = null
       if (container.weight !== null && container.weight !== undefined && container.weight !== "") {
-        const weightStr = String(container.weight).trim()
-        if (weightStr !== "") {
-          const parsedWeight = Number.parseFloat(weightStr)
-          if (!isNaN(parsedWeight)) {
-            weight = parsedWeight
+        if (typeof container.weight === "string") {
+          const trimmedWeight = container.weight.trim()
+          if (trimmedWeight !== "") {
+            const parsedWeight = Number.parseFloat(trimmedWeight)
+            if (!isNaN(parsedWeight) && parsedWeight >= 0) {
+              sanitizedWeight = parsedWeight
+            }
           }
+        } else if (typeof container.weight === "number" && container.weight >= 0) {
+          sanitizedWeight = container.weight
         }
       }
 
@@ -1139,26 +1247,44 @@ export const updateFCInstructionAndContainers = async (instructionId, instructio
         VALUES ($1, $2, $3, $4, $5)
         RETURNING containerkey
       `
-
-      const values = [containerNum, weight, instructionId, containerType, cargoDescription]
-      const result = await client.query(insertQuery, values)
-      insertResults.push(result.rows[0])
-      console.log(`[${new Date().toISOString()}] [MODEL] Inserted new container ${result.rows[0].containerkey}`)
+      const insertResult = await client.query(insertQuery, [
+        containerNum,
+        sanitizedWeight, // Will be null for empty/invalid values
+        instructionId,
+        containerType,
+        cargoDescription,
+      ])
+      console.log(`[${new Date().toISOString()}] [MODEL] Inserted new container ${insertResult.rows[0].containerkey}`)
     }
 
     // Commit transaction
     await client.query("COMMIT")
-    console.log(`[${new Date().toISOString()}] [MODEL] Transaction committed successfully`)
+    console.log(
+      `[${new Date().toISOString()}] [MODEL] Transaction committed successfully for instruction ${instructionId}`,
+    )
 
-    // Return combined result
+    // Return updated data
+    const finalInstructionQuery = `
+      SELECT * FROM public.m1_controller WHERE m1key = $1
+    `
+    const finalContainersQuery = `
+      SELECT * FROM public.container WHERE m1key = $1 ORDER BY containerkey
+    `
+
+    const [finalInstructionResult, finalContainersResult] = await Promise.all([
+      client.query(finalInstructionQuery, [instructionId]),
+      client.query(finalContainersQuery, [instructionId]),
+    ])
+
     return {
-      instruction: instructionResult,
-      containers: {
-        updated: containerChanges.toUpdate.length,
-        inserted: insertResults.length,
-        deleted: containerChanges.toDelete.length,
+      instruction: finalInstructionResult.rows[0],
+      containers: finalContainersResult.rows,
+      changes: {
+        instructionUpdated: instructionNeedsUpdate,
+        containersUpdated: containerChanges.toUpdate.length,
+        containersInserted: containerChanges.toInsert.length,
+        containersDeleted: containerChanges.toDelete.length,
       },
-      success: true,
     }
   } catch (error) {
     // Rollback transaction on error
@@ -1166,140 +1292,153 @@ export const updateFCInstructionAndContainers = async (instructionId, instructio
     console.error(`[${new Date().toISOString()}] [MODEL] Error in updateFCInstructionAndContainers:`, error)
     throw error
   } finally {
-    // Release client
     client.release()
   }
 }
 
 export const saveInstructionAndContainers = async (controllerData, containerData) => {
-  const {
-    client,
-    representative,
-    contactDetails,
-    email,
-    shipment_type,
-    task,
-    pickup,
-    dropoff,
-    hazardous,
-    surchages, // Note: This is 'surchages' in the DB, 'surcharges' in frontend
-    surcharge,
-    num_six_meters,
-    num_twelve_meters,
-    num_abnormal,
-    num_breakbulk,
-    pickuptime,
-    pickupdate,
-    stackdate,
-    deadline,
-    fileref,
-    booking_ref,
-    vessel_name,
-    rateweight,
-    weight,
-    unitrate,
-    vat,
-    description,
-    total_cost,
-    rateper_6,
-    rateper_12,
-    rateper_abnormal,
-    rateper_breakbulk,
-    status,
-  } = controllerData
-
-  // Start a transaction
-  const transaction = new query.Transaction()
-  await transaction.begin()
-
+  const client = await pool.connect()
   try {
-    // Insert into m5instructions
-    const instructionSql = `
-      INSERT INTO m5instructions (
-        client_id, representative, contact_details, email, shipment_type_id, task,
-        pickup_location, dropoff_location, hazardous, surcharges, surcharge_amount,
-        num_six_meters, num_twelve_meters, num_abnormal, num_breakbulk,
-        pickup_time, pickup_date, stack_date, deadline, file_ref, booking_ref,
-        vessel_name, rate_weight_unit, weight, unit_rate, vat_rate, description,
-        total_cost, rate_per_6m, rate_per_12m, rate_per_abnormal, rate_per_breakbulk, status
-      )
-      VALUES (
-        @client_id, @representative, @contact_details, @email, @shipment_type_id, @task,
-        @pickup_location, @dropoff_location, @hazardous, @surcharges, @surcharge_amount,
-        @num_six_meters, @num_twelve_meters, @num_abnormal, @num_breakbulk,
-        @pickup_time, @pickup_date, @stack_date, @deadline, @file_ref, @booking_ref,
-        @vessel_name, @rate_weight_unit, @weight, @unit_rate, @vat_rate, @description,
-        @total_cost, @rate_per_6m, @rate_per_12m, @rate_per_abnormal, @rate_per_breakbulk, @status
-      );
-      SELECT SCOPE_IDENTITY() AS instructionId;
+    await client.query("BEGIN")
+
+    // Calculate total cost if not provided
+    const totalCost =
+      controllerData.total_cost !== undefined ? controllerData.total_cost : calculateTotalCost(controllerData)
+
+    // Insert instruction
+    const instructionQuery = `
+      INSERT INTO public.m1_controller (
+        client, task, shipment_type, pickup, dropoff, hazardous, surchages, surcharge,
+        pickuptime, pickupdate, stackdate, deadline, fileref, rateweight, description,
+        status, vat, num_six_meters, num_twelve_meters, num_abnormal, num_breakbulk,
+        weight, total_cost, booking_ref, vessel_name, rateper_6, rateper_12,
+        rateper_abnormal, rateper_breakbulk, unitrate
+      ) VALUES (
+        $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17,
+        $18, $19, $20, $21, $22, $23, $24, $25, $26, $27, $28, $29, $30
+      ) RETURNING m1key
     `
 
-    const instructionResult = await transaction
-      .request()
-      .input("client_id", client)
-      .input("representative", representative)
-      .input("contact_details", contactDetails)
-      .input("email", email)
-      .input("shipment_type_id", shipment_type)
-      .input("task", task)
-      .input("pickup_location", pickup)
-      .input("dropoff_location", dropoff)
-      .input("hazardous", hazardous)
-      .input("surcharges", surchages) // Use surchages from frontend
-      .input("surcharge_amount", surcharge)
-      .input("num_six_meters", num_six_meters)
-      .input("num_twelve_meters", num_twelve_meters)
-      .input("num_abnormal", num_abnormal)
-      .input("num_breakbulk", num_breakbulk)
-      .input("pickup_time", pickuptime)
-      .input("pickup_date", pickupdate)
-      .input("stack_date", stackdate)
-      .input("deadline", deadline)
-      .input("file_ref", fileref)
-      .input("booking_ref", booking_ref)
-      .input("vessel_name", vessel_name)
-      .input("rate_weight_unit", rateweight)
-      .input("weight", weight)
-      .input("unit_rate", unitrate)
-      .input("vat_rate", vat)
-      .input("description", description)
-      .input("total_cost", total_cost)
-      .input("rate_per_6m", rateper_6)
-      .input("rate_per_12m", rateper_12)
-      .input("rate_per_abnormal", rateper_abnormal)
-      .input("rate_per_breakbulk", rateper_breakbulk)
-      .input("status", status)
-      .query(instructionSql)
+    const instructionValues = [
+      controllerData.client,
+      controllerData.task,
+      controllerData.shipment_type,
+      controllerData.pickup,
+      controllerData.dropoff,
+      controllerData.hazardous || false,
+      controllerData.surchages || false,
+      controllerData.surcharge || 0,
+      controllerData.pickuptime,
+      controllerData.pickupdate,
+      controllerData.stackdate,
+      controllerData.deadline,
+      controllerData.fileref,
+      controllerData.rateweight,
+      controllerData.description,
+      controllerData.status || "New",
+      controllerData.vat || 15,
+      controllerData.num_six_meters || 0,
+      controllerData.num_twelve_meters || 0,
+      controllerData.num_abnormal || 0,
+      controllerData.num_breakbulk || 0,
+      controllerData.weight,
+      totalCost,
+      controllerData.booking_ref,
+      controllerData.vessel_name,
+      controllerData.rateper_6,
+      controllerData.rateper_12,
+      controllerData.rateper_abnormal,
+      controllerData.rateper_breakbulk,
+      controllerData.unitrate,
+    ]
 
-    const instructionId = instructionResult.recordset[0].instructionId
+    const instructionResult = await client.query(instructionQuery, instructionValues)
+    const instructionId = instructionResult.rows[0].m1key
 
-    // Insert into m5containerdetails if containerData exists
-    if (containerData && containerData.length > 0) {
-      for (const container of containerData) {
-        const containerSql = `
-          INSERT INTO m5containerdetails (
-            instruction_id, container_type, container_number, weight_kg, cargo_description
-          )
-          VALUES (
-            @instructionId, @container_type, @container_number, @weight_kg, @cargo_description
-          )
-        `
-        await transaction
-          .request()
-          .input("instructionId", instructionId)
-          .input("container_type", container.container_type)
-          .input("container_number", container.containerNum)
-          .input("weight_kg", container.weight)
-          .input("cargo_description", container.cargo_description)
-          .query(containerSql)
+    // Insert containers
+    for (const container of containerData) {
+      // Sanitize weight value
+      let sanitizedWeight = null
+      if (container.weight !== null && container.weight !== undefined && container.weight !== "") {
+        if (typeof container.weight === "string") {
+          const trimmedWeight = container.weight.trim()
+          if (trimmedWeight !== "") {
+            const parsedWeight = Number.parseFloat(trimmedWeight)
+            if (!isNaN(parsedWeight) && parsedWeight >= 0) {
+              sanitizedWeight = parsedWeight
+            }
+          }
+        } else if (typeof container.weight === "number" && container.weight >= 0) {
+          sanitizedWeight = container.weight
+        }
       }
+
+      const containerQuery = `
+        INSERT INTO public.container (containernum, weight, m1key, container_type, cargo_description)
+        VALUES ($1, $2, $3, $4, $5)
+      `
+      const containerValues = [
+        container.containerNum || container.containernum || "",
+        sanitizedWeight, // Will be null for empty/invalid values
+        instructionId,
+        container.container_type || container.containerType || "",
+        container.cargo_description || container.cargoDescription || "",
+      ]
+      await client.query(containerQuery, containerValues)
     }
 
-    await transaction.commit()
+    await client.query("COMMIT")
     return { instructionId }
   } catch (error) {
-    await transaction.rollback()
-    console.error("Database transaction failed:", error)
-    throw new Error("Failed to save instruction and container details due to a database error.")
+    await client.query("ROLLBACK")
+    throw error
+  } finally {
+    client.release()
+  }
+}
+
+// Function to delete an instruction and its associated containers
+export const deleteInstruction = async (instructionId) => {
+  const client = await pool.connect()
+  try {
+    await client.query("BEGIN")
+
+    // First check if the instruction exists and has status "New"
+    const checkQuery = `
+      SELECT status FROM public.m1_controller 
+      WHERE m1key = $1
+    `
+    const checkResult = await client.query(checkQuery, [instructionId])
+    
+    if (checkResult.rows.length === 0) {
+      throw new Error("Instruction not found")
+    }
+    
+    if (checkResult.rows[0].status !== "New") {
+      throw new Error("Only instructions with 'New' status can be deleted")
+    }
+
+    // Delete containers first (due to foreign key constraints)
+    const deleteContainersQuery = `
+      DELETE FROM public.container 
+      WHERE m1key = $1
+    `
+    await client.query(deleteContainersQuery, [instructionId])
+
+    // Then delete the instruction
+    const deleteInstructionQuery = `
+      DELETE FROM public.m1_controller 
+      WHERE m1key = $1
+    `
+    const result = await client.query(deleteInstructionQuery, [instructionId])
+
+    await client.query("COMMIT")
+    return { success: true, deletedRows: result.rowCount }
+  } catch (error) {
+    await client.query("ROLLBACK")
+    console.error(`[${new Date().toISOString()}] Error in deleteInstruction:`, error)
+    throw error
+  } finally {
+    client.release()
   }
 }
