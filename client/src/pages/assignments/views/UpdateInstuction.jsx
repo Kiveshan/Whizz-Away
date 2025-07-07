@@ -1603,7 +1603,10 @@ function UpdateInstruction() {
             assignedContainers.add(driver.containernumber);
 
             // If this leg's destination is the dropoff, mark this container as reaching dropoff
-            if (leg.destination === dropoff) {
+            if (
+  leg.destination?.toLowerCase().replace(/\s/g, '') ===
+  dropoff?.toLowerCase().replace(/\s/g, '')
+) {
               containersReachingDropoff.add(driver.containernumber);
             }
           }
@@ -1654,10 +1657,10 @@ function UpdateInstruction() {
           leg.drivers.some(
             (driver) =>
               driver.containernumber === containerNumber &&
-              leg.destination ===
-                instructionContainers.find(
-                  (c) => c.containernum.toString() === containerNumber
-                )?.dropoff
+leg.destination?.toLowerCase().replace(/\s/g, '') ===
+  instructionContainers.find(
+    (c) => c.containernum.toString() === containerNumber
+  )?.dropoff?.toLowerCase().replace(/\s/g, '')
           )
         );
       });
@@ -1771,7 +1774,11 @@ function UpdateInstruction() {
       const lastLegDestination = lastLeg.destination;
 
       // If the destinations don't match, show the destination mismatch modal
-      if (lastLegDestination !== dropoff) {
+      // if (lastLegDestination !== dropoff) {
+      if (
+  lastLegDestination?.toLowerCase().replace(/\s/g, '') !==
+  dropoff?.toLowerCase().replace(/\s/g, '')
+) {
         setMismatchDetails({
           lastLegDestination,
           dropoff,
