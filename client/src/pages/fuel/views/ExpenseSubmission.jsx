@@ -13,7 +13,7 @@ const ExpenseSubmission = ({ onBack }) => {
 
   const [formData, setFormData] = useState({
     documentFrom: "Controller",
-    expenseCost: "500",
+    expenseCost: "0",
     driverName: "",
     driverFullName: "",
     orderno: "",
