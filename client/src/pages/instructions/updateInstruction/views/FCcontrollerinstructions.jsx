@@ -184,7 +184,7 @@ const FCcontrollerinstructions = () => {
   })
 
   // Check if the instruction should be read-only based on status
-  const isReadOnly = formData.status === "In progress" || formData.status === "Completed"
+  const isReadOnly = formData.status === "In Progress" || formData.status === "Completed"
 
   const [startingPoints, setStartingPoints] = useState([])
   const [destinations, setDestinations] = useState([])

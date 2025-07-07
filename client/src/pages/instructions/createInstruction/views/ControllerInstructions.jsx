@@ -365,6 +365,16 @@ const ControllerInstructions = () => {
       } else if (field === "weight" && value !== "") {
         // Only allow numbers and decimal point for weight
         if (!/^\d*\.?\d*$/.test(value)) return
+
+        // Clear weight error when user starts typing valid input
+        setContainerFieldErrors((prev) => {
+          const newErrors = { ...prev }
+          delete newErrors[`weight-${id}`]
+          return newErrors
+        })
+      } else if (field === "weight" && value === "") {
+        // Don't clear error immediately when field becomes empty for import
+        // Let validation handle it
       }
 
       // Update container
@@ -1016,11 +1026,25 @@ const ControllerInstructions = () => {
           }
         }
       }
+
+      // Add weight validation for import shipments
+      if (isImport) {
+        if (!container.weight || container.weight.trim() === "") {
+          errors[`weight-${containerId}`] = "Weight is required for import shipments"
+          isValid = false
+        } else if (!/^\d*\.?\d*$/.test(container.weight)) {
+          errors[`weight-${containerId}`] = "Weight must be a valid number"
+          isValid = false
+        } else if (Number.parseFloat(container.weight) <= 0) {
+          errors[`weight-${containerId}`] = "Weight must be greater than 0"
+          isValid = false
+        }
+      }
     }
 
     setContainerFieldErrors(errors)
     return isValid
-  }, [isWeightBased, showContainerDetails, containers])
+  }, [isWeightBased, showContainerDetails, containers, isImport])
 
   // Check for rate/count mismatch and generate confirmation message
   const checkRateCountMismatch = useCallback(() => {
@@ -2602,7 +2626,7 @@ const ControllerInstructions = () => {
                                 }}
                                 ref={(el) => {
                                   if (el) {
-                                    const input = el.previousElementSibling
+                                    const input = el.previousElementSibling?.querySelector("input")
                                     if (input) {
                                       const rect = input.getBoundingClientRect()
                                       el.style.left = `${rect.left}px`
@@ -2630,21 +2654,62 @@ const ControllerInstructions = () => {
                         </td>
                         {isImport && (
                           <td>
-                            <div className="input-group input-group-sm">
+                            <div style={{ position: "relative" }}>
                               <input
                                 type="text"
                                 className={`form-control form-control-sm ${containerFieldErrors[`weight-${container.id}`] ? "is-invalid" : ""}`}
                                 value={container.weight || ""}
                                 onChange={(e) => handleContainerChange(container.id, "weight", e.target.value)}
-                                placeholder="0.00"
-                                style={{ textAlign: "right" }}
+                                placeholder="Enter weight"
+                                style={{
+                                  minWidth: "80px",
+                                  backgroundColor: containerFieldErrors[`weight-${container.id}`] ? "#ffebee" : "white",
+                                  borderColor: containerFieldErrors[`weight-${container.id}`] ? "#f44336" : "#ced4da",
+                                }}
                               />
+                              {containerFieldErrors[`weight-${container.id}`] && (
+                                <div
+                                  style={{
+                                    position: "fixed",
+                                    zIndex: 9999,
+                                    backgroundColor: "#f44336",
+                                    color: "white",
+                                    padding: "6px 10px",
+                                    borderRadius: "4px",
+                                    fontSize: "12px",
+                                    whiteSpace: "nowrap",
+                                    boxShadow: "0 4px 8px rgba(0,0,0,0.3)",
+                                    transform: "translateY(4px)",
+                                    pointerEvents: "none",
+                                    maxWidth: "250px",
+                                  }}
+                                  ref={(el) => {
+                                    if (el) {
+                                      const input = el.previousElementSibling?.querySelector("input")
+                                      if (input) {
+                                        const rect = input.getBoundingClientRect()
+                                        el.style.left = `${rect.left}px`
+                                        el.style.top = `${rect.bottom}px`
+                                      }
+                                    }
+                                  }}
+                                >
+                                  {containerFieldErrors[`weight-${container.id}`]}
+                                  <div
+                                    style={{
+                                      position: "absolute",
+                                      top: "-4px",
+                                      left: "10px",
+                                      width: "0",
+                                      height: "0",
+                                      borderLeft: "4px solid transparent",
+                                      borderRight: "4px solid transparent",
+                                      borderBottom: "4px solid #f44336",
+                                    }}
+                                  />
+                                </div>
+                              )}
                             </div>
-                            {containerFieldErrors[`weight-${container.id}`] && (
-                              <div className="invalid-feedback d-block">
-                                {containerFieldErrors[`weight-${container.id}`]}
-                              </div>
-                            )}
                           </td>
                         )}
                         <td>

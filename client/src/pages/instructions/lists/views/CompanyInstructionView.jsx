@@ -232,21 +232,29 @@ const CompanyInstructionView = () => {
             <table style={tableStyle}>
               <thead className="bg-blue-300">
                 <tr>
-                  <th className="p-3">Company</th>
-                  <th className="p-3">Representative</th>
-                  <th className="p-3">Email</th>
-                  <th className="p-3" style={centeredCellStyle}>
+                  <th className="p-3" style={{ fontWeight: "bold" }}>
+                    Company
+                  </th>
+                  <th className="p-3" style={{ fontWeight: "bold" }}>
+                    Representative
+                  </th>
+                  <th className="p-3" style={{ fontWeight: "bold" }}>
+                    Email
+                  </th>
+                  <th className="p-3" style={{ ...centeredCellStyle, fontWeight: "bold" }}>
                     <div style={bellContainerStyle}>
                       New <BellIcon count={totalNewInstructions} />
                     </div>
                   </th>
-                  <th className="p-3" style={centeredCellStyle}>
+                  <th className="p-3" style={{ ...centeredCellStyle, fontWeight: "bold" }}>
                     In Progress
                   </th>
-                  <th className="p-3" style={centeredCellStyle}>
+                  <th className="p-3" style={{ ...centeredCellStyle, fontWeight: "bold" }}>
                     Completed
                   </th>
-                  <th className="p-3">Instructions</th>
+                  <th className="p-3" style={{ fontWeight: "bold" }}>
+                    Instructions
+                  </th>
                 </tr>
               </thead>
               <tbody>
