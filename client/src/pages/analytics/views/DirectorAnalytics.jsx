@@ -279,40 +279,60 @@ export default function DirectorAnalytics() {
     setIsLoading(true)
     setError(null)
     try {
-      console.log(`Fetching income vs expenses for month: ${month}, year: ${year}`)
-      const response = await api.get("/api/all-expenses", {
+      console.log(`Fetching income (total turnover) vs expenses for month: ${month}, year: ${year}`)
+      
+      // Fetch total turnover from /api/turnover-per-month
+      const turnoverResponse = await api.get("/api/turnover-per-month", {
         params: { month, year, _t: new Date().getTime() },
       })
-      console.log("API response:", response.data)
-      if (response.data.success) {
-        const totalExpenses = Number.parseFloat(response.data.data.expenses.reduce((sum, item) => sum + Number.parseFloat(item.total_cost || 0), 0)) || 0;
-        const income = Number.parseFloat(response.data.data.income) || 0;
-        const total = income + totalExpenses;
-        const incomePercentage = total > 0 ? (income / total) * 100 : 0;
-        const expensesPercentage = total > 0 ? (totalExpenses / total) * 100 : 0;
-        const data = [
-          {
-            name: "Income",
-            value: income,
-            type: "income",
-            percentage: incomePercentage.toFixed(2),
-            month: response.data.data.month,
-            year: response.data.data.year,
-          },
-          {
-            name: "Expenses",
-            value: totalExpenses,
-            type: "expenses",
-            percentage: expensesPercentage.toFixed(2),
-            month: response.data.data.month,
-            year: response.data.data.year,
-          }
-        ];
-        console.log("Processed income vs expenses data:", data)
-        return data
-      } else {
-        throw new Error(response.data.message || "Failed to fetch data")
+      
+      // Fetch expenses from /api/all-expenses
+      const expensesResponse = await api.get("/api/all-expenses", {
+        params: { month, year, _t: new Date().getTime() },
+      })
+
+      if (!turnoverResponse.data.success) {
+        throw new Error(turnoverResponse.data.message || "Failed to fetch turnover data")
       }
+      if (!expensesResponse.data.success) {
+        throw new Error(expensesResponse.data.message || "Failed to fetch expenses data")
+      }
+
+      // Extract Total Turnover
+      const turnoverData = turnoverResponse.data.data.find(item => item.client === "Total Turnover")
+      const income = turnoverData ? Number.parseFloat(turnoverData.turnover) || 0 : 0
+      
+      // Calculate total expenses
+      const totalExpenses = Number.parseFloat(
+        expensesResponse.data.data.expenses.reduce((sum, item) => sum + Number.parseFloat(item.total_cost || 0), 0)
+      ) || 0
+      
+      // Calculate percentages
+      const total = income + totalExpenses
+      const incomePercentage = total > 0 ? (income / total) * 100 : 0
+      const expensesPercentage = total > 0 ? (totalExpenses / total) * 100 : 0
+
+      const data = [
+        {
+          name: "Income",
+          value: income,
+          type: "income",
+          percentage: incomePercentage.toFixed(2),
+          month: month,
+          year: year,
+        },
+        {
+          name: "Expenses",
+          value: totalExpenses,
+          type: "expenses",
+          percentage: expensesPercentage.toFixed(2),
+          month: month,
+          year: year,
+        }
+      ]
+      
+      console.log("Processed income vs expenses data:", data)
+      return data
     } catch (err) {
       console.error("Error fetching income vs expenses:", err)
       setError(err.message)
