@@ -55,7 +55,7 @@ export default function DirectorAnalytics() {
   }
 
   const getChartWidth = (dataLength) => {
-    if (activeFilter === "turnoverPerMonth" || activeFilter === "agingAnalysis" || activeFilter === "subcontractorVsTurnover") {
+    if (activeFilter === "turnoverPerMonth" || activeFilter === "agingAnalysis" || activeFilter === "subcontractorVsTurnover" || activeFilter === "subcontractorTurnoverPerMonth") {
       return 600; // Fixed width for 1-2 bars
     }
     const minWidth = 1200
@@ -328,7 +328,7 @@ export default function DirectorAnalytics() {
     setError(null)
     try {
       console.log(`Fetching wages per month data for month: ${month}, year: ${year}`)
-      const response = api.get("/api/wages-per-month", {
+      const response = await api.get("/api/wages-per-month", {
         params: { month, year, _t: new Date().getTime() },
       })
       console.log("API response:", response.data)
@@ -357,30 +357,31 @@ export default function DirectorAnalytics() {
     setIsLoading(true)
     setError(null)
     try {
-      console.log(`Fetching subcontractor turnover for month: ${month}, year: ${year}`)
+      console.log(`Fetching turnover vs total subcontractor for month: ${month}, year: ${year}`)
       const response = await api.get("/api/subcontractor-turnover-per-month", {
         params: { month, year, _t: new Date().getTime() },
       })
       console.log("API response:", response.data)
       if (response.data.success) {
         const turnoverData = response.data.data.map((item) => {
-          const turnover = Number.parseFloat(item.turnover)
-          console.log(`Company ${item.companyname}: Turnover=${turnover}, Percentage=${item.percentage}%`)
+          const value = Number.parseFloat(item.value)
+          console.log(`Name ${item.name}: Value=${value}, Type=${item.type}, Percentage=${item.percentage}%`)
           return {
-            companyname: item.companyname,
-            turnover: turnover,
+            name: item.name,
+            value: value,
+            type: item.type,
+            percentage: Number(item.percentage) || 0,
             month: item.month.trim(),
             year: item.year,
-            percentage: item.percentage,
           }
         })
-        console.log("Processed subcontractor turnover data:", turnoverData)
+        console.log("Processed turnover vs total subcontractor data:", turnoverData)
         return turnoverData
       } else {
         throw new Error(response.data.message || "Failed to fetch data")
       }
     } catch (err) {
-      console.error("Error fetching subcontractor turnover data:", err)
+      console.error("Error fetching turnover vs total subcontractor data:", err)
       setError(err.message)
       return []
     } finally {
@@ -516,7 +517,7 @@ export default function DirectorAnalytics() {
         default:
           return "#4169e1"
       }
-    } else if (activeFilter === "subcontractorVsTurnover" && entry && entry.type) {
+    } else if ((activeFilter === "subcontractorVsTurnover" || activeFilter === "subcontractorTurnoverPerMonth") && entry && entry.type) {
       return entry.type === "total" ? "#9C27B0" : "#E91E63"
     }
     console.log("Falling back to default color")
@@ -776,40 +777,48 @@ export default function DirectorAnalytics() {
         return (
           <div className="chart-wrapper">
             {isLoading ? (
-              <div className="loading-indicator">Loading Subbie VS Turnover data...</div>
+              <div className="loading-indicator">Loading Turnover VS Total Subbie data...</div>
             ) : error ? (
               <div className="error-message">{error}</div>
             ) : !Array.isArray(chartData) || chartData.length === 0 ? (
               <div className="no-data-message">
-                No subcontractor turnover data available for {activeMonth} {activeYear}
+                No turnover vs total subcontractor data available for {activeMonth} {activeYear}
               </div>
             ) : (
-              <div className="chart-scroll-container">
-                <ResponsiveContainer width={chartWidth} height={500}>
-                  <BarChart data={chartData} margin={{ top: 40, right: 30, left: 60, bottom: 100 }}>
-                    <XAxis
-                      dataKey="companyname"
-                      angle={0}
-                      textAnchor="middle"
-                      height={120}
-                      interval={0}
-                      tick={<CustomAxisTick />}
-                    />
-                    <YAxis
-                      label={{
-                        value: "Turnover (R)",
-                        angle: 0,
-                        position: "top",
-                        dy: -20,
-                      }}
-                    />
-                    <Tooltip content={<CustomTooltip />} />
-                    <Bar dataKey="turnover" name="Subcontractor Turnover" fill="#4169e1" radius={[4, 4, 0, 0]}>
-                      <LabelList dataKey="turnover" content={CustomBarLabelForFuelAndTurnover} position="top" />
-                    </Bar>
-                  </BarChart>
-                </ResponsiveContainer>
-              </div>
+              <>
+                <div className="chart-header">
+                  <div className="chart-header-item">
+                    <span className="legend-color" style={{ backgroundColor: "#9C27B0" }}></span>
+                    <span>Total Turnover</span>
+                  </div>
+                  <div className="chart-header-item">
+                    <span className="legend-color" style={{ backgroundColor: "#E91E63" }}></span>
+                    <span>Total Subcontractor Turnover</span>
+                  </div>
+                </div>
+                <div className="chart-scroll-container">
+                  <ResponsiveContainer width={chartWidth} height={500}>
+                    <BarChart data={chartData} margin={{ top: 40, right: 30, left: 60, bottom: 40 }}>
+                      <XAxis dataKey="name" tick={{ fill: "#000" }} />
+                      <YAxis
+                        label={{
+                          value: "Amount (R)",
+                          angle: 0,
+                          position: "top",
+                          dy: -20,
+                        }}
+                      />
+                      <Tooltip content={<CustomTooltip />} />
+                      <Bar dataKey="value" name="Amount" radius={[4, 4, 0, 0]}>
+                        {chartData.map((entry, index) => (
+                          <Cell key={`cell-${index}`} fill={getBarFill(entry)} />
+                        ))}
+                        <LabelList dataKey="value" content={CustomBarLabelForTurnover} position="top" />
+                      </Bar>
+                    </BarChart>
+                  </ResponsiveContainer>
+                </div>
+              </>
             )}
           </div>
         )
@@ -818,7 +827,7 @@ export default function DirectorAnalytics() {
         return (
           <div className="chart-wrapper">
             {isLoading ? (
-              <div className="loading-indicator">Loading Turnover VS Total Subbie data...</div>
+              <div className="loading-indicator">Loading Subbie VS Turnover data...</div>
             ) : error ? (
               <div className="error-message">{error}</div>
             ) : !Array.isArray(chartData) || chartData.length === 0 ? (

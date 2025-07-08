@@ -285,10 +285,11 @@ const getAllExpenses = async (client, month, year) => {
     GROUP BY to_char(i.date, 'Month'), EXTRACT(YEAR FROM i.date)
   `;
 
-  const expensesResult = await client.query(expensesQuery, [month, year]);
+  const [expensesResult, incomeResult] = await Promise.all([
+    client.query(expensesQuery, [month, year]),
+    client.query(incomeQuery, [month, year])
+  ]);
   console.log("Expenses query result:", expensesResult.rows);
-
-  const incomeResult = await client.query(incomeQuery, [month, year]);
   console.log("Income query result:", incomeResult.rows);
 
   if (!expensesResult.rows || !incomeResult.rows) {
@@ -418,10 +419,9 @@ const getWagesPerMonth = async (client, month, year) => {
 };
 
 const getSubcontractorTurnoverPerMonth = async (client, month, year) => {
-  const query = `
+  const subcontractorQuery = `
     SELECT 
-      e.companyname,
-      SUM(l.driverrate) as turnover,
+      SUM(l.driverrate) as total_subcontractor_turnover,
       TO_CHAR(l.date, 'Month') as month_name,
       EXTRACT(YEAR FROM l.date) as year
     FROM legs_m2 l
@@ -429,35 +429,55 @@ const getSubcontractorTurnoverPerMonth = async (client, month, year) => {
     WHERE e.roleid = 6
       AND TRIM(TO_CHAR(l.date, 'Month')) = $1
       AND EXTRACT(YEAR FROM l.date)::text = $2
-    GROUP BY e.companyname, TO_CHAR(l.date, 'Month'), EXTRACT(YEAR FROM l.date)
-    ORDER BY turnover DESC
+    GROUP BY TO_CHAR(l.date, 'Month'), EXTRACT(YEAR FROM l.date)
   `;
-  const result = await client.query(query, [month, year]);
-  console.log("Subcontractor turnover query result:", result.rows);
-  console.log(`Query returned ${result.rows.length} rows`);
 
-  if (!result.rows || result.rows.length === 0) {
-    console.log(`No subcontractor turnover data returned for ${month} ${year}.`);
-    return [];
-  }
+  const totalTurnoverQuery = `
+    SELECT 
+      SUM(m.total_cost) as total_turnover,
+      TO_CHAR(i.date, 'Month') as month_name,
+      EXTRACT(YEAR FROM i.date) as year
+    FROM invoice i
+    JOIN m1_controller m ON i.m1key = m.m1key
+    WHERE TRIM(TO_CHAR(i.date, 'Month')) = $1
+    AND EXTRACT(YEAR FROM i.date)::text = $2
+    GROUP BY TO_CHAR(i.date, 'Month'), EXTRACT(YEAR FROM i.date)
+  `;
 
-  const totalTurnover = result.rows.reduce(
-    (sum, row) => sum + parseFloat(row.turnover || 0),
-    0
-  );
-  console.log(`Total subcontractor turnover for ${month} ${year}: ${totalTurnover}`);
+  const [subcontractorResult, totalTurnoverResult] = await Promise.all([
+    client.query(subcontractorQuery, [month, year]),
+    client.query(totalTurnoverQuery, [month, year])
+  ]);
 
-  return result.rows.map((row) => {
-    const turnover = parseFloat(row.turnover || 0);
-    const percentage = totalTurnover > 0 ? ((turnover / totalTurnover) * 100).toFixed(2) : 0;
-    return {
-      companyname: row.companyname,
-      turnover: turnover,
-      month: row.month_name.trim(),
-      year: row.year.toString(),
-      percentage: parseFloat(percentage),
-    };
-  });
+  console.log("Subcontractor turnover query result:", subcontractorResult.rows);
+  console.log("Total turnover query result:", totalTurnoverResult.rows);
+
+  const totalTurnover = parseFloat(totalTurnoverResult.rows[0]?.total_turnover || 0);
+  const totalSubcontractorTurnover = parseFloat(subcontractorResult.rows[0]?.total_subcontractor_turnover || 0);
+  console.log(`Total turnover for ${month} ${year}: ${totalTurnover}`);
+  console.log(`Total subcontractor turnover for ${month} ${year}: ${totalSubcontractorTurnover}`);
+
+  const turnoverData = [
+    {
+      name: "Total Turnover",
+      value: totalTurnover,
+      type: "total",
+      percentage: 100,
+      month: month.trim(),
+      year: year.toString(),
+    },
+    {
+      name: "Total Subcontractor Turnover",
+      value: totalSubcontractorTurnover,
+      type: "subcontractor",
+      percentage: totalTurnover > 0 ? ((totalSubcontractorTurnover / totalTurnover) * 100).toFixed(2) : 0,
+      month: month.trim(),
+      year: year.toString(),
+    }
+  ];
+
+  console.log("Processed turnover vs total subcontractor data:", turnoverData);
+  return turnoverData;
 };
 
 const getSubcontractorVsTurnover = async (client, month, year, subcontractorId = null) => {
