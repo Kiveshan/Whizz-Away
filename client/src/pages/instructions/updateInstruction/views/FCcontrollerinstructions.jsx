@@ -784,7 +784,7 @@ const FCcontrollerinstructions = () => {
         rateweight: formData.rateWeight,
         description: formData.description,
         status: formData.status,
-        vat: Number(formData.vat || 15),
+        vat: formData.vat === 0 ? 0 : (formData.vat || 15),
         num_six_meters: numSix,
         num_twelve_meters: numTwelve,
         num_abnormal: numAbnormal,
@@ -1203,7 +1203,7 @@ const FCcontrollerinstructions = () => {
         num_twelve_meters: data.num_twelve_meters || 0,
         num_abnormal: data.num_abnormal || 0,
         num_breakbulk: data.num_breakbulk || 0,
-        vat: data.vat || 15,
+        vat: data.vat === 0 ? 0 : (data.vat || 15),
         description: data.description || "",
         vesselName: data.vessel_name || "",
         unitRate: data.unitrate || 0,
@@ -2799,7 +2799,7 @@ const FCcontrollerinstructions = () => {
                             type="number"
                             className="controller-instructions-form-input"
                             name="vat"
-                            value={formData.vat || 15}
+                            value={formData.vat === 0 ? 0 : (formData.vat || 15)}
                             onChange={handleInputChange}
                             required
                           />
@@ -2830,7 +2830,7 @@ const FCcontrollerinstructions = () => {
                         type="number"
                         className="controller-instructions-form-input"
                         name="vat"
-                        value={formData.vat || 15}
+                        value={formData.vat === 0 ? 0 : (formData.vat || 15)}
                         onChange={handleInputChange}
                         required
                         disabled={isReadOnly}
