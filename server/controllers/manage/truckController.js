@@ -118,7 +118,15 @@ const createTruckHandler = async (req, res) => {
       vin_num,
       is_subcontractor,
       truck_license_expiry,
+      git,
     } = req.body
+
+    // Validate required fields
+    if (!truckregnum || !truck_license_expiry) {
+      return res.status(400).json({
+        error: "Missing required fields: Truck Registration and License Expiry Date are required",
+      })
+    }
 
     const fileLocations = (req.files || []).map((file) => file.location)
     console.log("Creating truck with data:", req.body, "Files:", fileLocations)
@@ -135,6 +143,7 @@ const createTruckHandler = async (req, res) => {
         vin_num,
         is_subcontractor,
         truck_license_expiry,
+        git,
       },
       fileLocations,
     )
@@ -159,7 +168,15 @@ const updateTruckHandler = async (req, res) => {
       vin_num,
       is_subcontractor,
       truck_license_expiry,
+      git,
     } = req.body
+
+    // Validate required fields
+    if (!truckregnum || !truck_license_expiry) {
+      return res.status(400).json({
+        error: "Missing required fields: Truck Registration and License Expiry Date are required",
+      })
+    }
 
     const newDocLocations = (req.files || []).map((file) => file.location)
     console.log(`Updating truck ID ${id}, New files:`, newDocLocations)
@@ -177,6 +194,7 @@ const updateTruckHandler = async (req, res) => {
         vin_num,
         is_subcontractor,
         truck_license_expiry,
+        git,
       },
       newDocLocations,
     )

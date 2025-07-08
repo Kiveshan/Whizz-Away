@@ -1,5 +1,3 @@
-
-
 import { pool, query } from "../../config/database.js"
 
 // Helper function to calculate total cost based on rate weight type
@@ -1399,3 +1397,48 @@ export const saveInstructionAndContainers = async (controllerData, containerData
   }
 }
 
+// Function to delete an instruction and its associated containers
+export const deleteInstruction = async (instructionId) => {
+  const client = await pool.connect()
+  try {
+    await client.query("BEGIN")
+
+    // First check if the instruction exists and has status "New"
+    const checkQuery = `
+      SELECT status FROM public.m1_controller 
+      WHERE m1key = $1
+    `
+    const checkResult = await client.query(checkQuery, [instructionId])
+    
+    if (checkResult.rows.length === 0) {
+      throw new Error("Instruction not found")
+    }
+    
+    if (checkResult.rows[0].status !== "New") {
+      throw new Error("Only instructions with 'New' status can be deleted")
+    }
+
+    // Delete containers first (due to foreign key constraints)
+    const deleteContainersQuery = `
+      DELETE FROM public.container 
+      WHERE m1key = $1
+    `
+    await client.query(deleteContainersQuery, [instructionId])
+
+    // Then delete the instruction
+    const deleteInstructionQuery = `
+      DELETE FROM public.m1_controller 
+      WHERE m1key = $1
+    `
+    const result = await client.query(deleteInstructionQuery, [instructionId])
+
+    await client.query("COMMIT")
+    return { success: true, deletedRows: result.rowCount }
+  } catch (error) {
+    await client.query("ROLLBACK")
+    console.error(`[${new Date().toISOString()}] Error in deleteInstruction:`, error)
+    throw error
+  } finally {
+    client.release()
+  }
+}

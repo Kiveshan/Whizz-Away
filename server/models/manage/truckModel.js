@@ -95,7 +95,35 @@ const createTruck = async (truckData, documentKeys) => {
       vin_num,
       is_subcontractor,
       truck_license_expiry,
+      git,
     } = truckData
+
+    // Helper function to convert empty strings to null
+    const toNullIfEmpty = (value) => {
+      if (value === "" || value === "null" || value === undefined || value === null) {
+        return null
+      }
+      return value
+    }
+
+    // Helper function to convert empty strings to null for numbers
+    const toNullIfEmptyNumber = (value) => {
+      if (value === "" || value === "null" || value === undefined || value === null) {
+        return null
+      }
+      const num = Number.parseFloat(value)
+      return isNaN(num) ? null : num
+    }
+
+    // Set non-required fields to null if empty or undefined
+    const trailersizeValue = toNullIfEmpty(trailersize)
+    const truckpurchasedateValue = toNullIfEmpty(truckpurchasedate)
+    const yearValue = toNullIfEmpty(year)
+    const modelValue = toNullIfEmpty(model)
+    const purchase_priceValue = toNullIfEmptyNumber(purchase_price)
+    const current_evaluationValue = toNullIfEmptyNumber(current_evaluation)
+    const vin_numValue = toNullIfEmpty(vin_num)
+    const gitValue = toNullIfEmpty(git)
 
     const document_url1 = documentKeys[0] || null
     const document_url2 = documentKeys[1] || null
@@ -105,20 +133,21 @@ const createTruck = async (truckData, documentKeys) => {
       `INSERT INTO m5_trucks (
          truckregnum, trailersize, truckpurchasedate, year, model,
          purchase_price, current_evaluation, vin_num, is_subcontractor,
-         truck_license_expiry, document_url1, document_url2, document_url3
-       ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
+         truck_license_expiry, git, document_url1, document_url2, document_url3
+       ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
        RETURNING *`,
       [
-        truckregnum,
-        trailersize,
-        truckpurchasedate,
-        year,
-        model,
-        purchase_price,
-        current_evaluation,
-        vin_num,
-        is_subcontractor || false, // Default to false for company trucks
-        truck_license_expiry,
+        truckregnum, // Required field
+        trailersizeValue,
+        truckpurchasedateValue,
+        yearValue,
+        modelValue,
+        purchase_priceValue,
+        current_evaluationValue,
+        vin_numValue,
+        is_subcontractor || false,
+        truck_license_expiry, // Required field
+        gitValue,
         document_url1,
         document_url2,
         document_url3,
@@ -148,7 +177,35 @@ const updateTruck = async (id, truckData, newDocKeys) => {
       vin_num,
       is_subcontractor,
       truck_license_expiry,
+      git,
     } = truckData
+
+    // Helper function to convert empty strings to null
+    const toNullIfEmpty = (value) => {
+      if (value === "" || value === "null" || value === undefined || value === null) {
+        return null
+      }
+      return value
+    }
+
+    // Helper function to convert empty strings to null for numbers
+    const toNullIfEmptyNumber = (value) => {
+      if (value === "" || value === "null" || value === undefined || value === null) {
+        return null
+      }
+      const num = Number.parseFloat(value)
+      return isNaN(num) ? null : num
+    }
+
+    // Set non-required fields to null if empty, undefined, or string "null"
+    const trailersizeValue = toNullIfEmpty(trailersize)
+    const truckpurchasedateValue = toNullIfEmpty(truckpurchasedate)
+    const yearValue = toNullIfEmpty(year)
+    const modelValue = toNullIfEmpty(model)
+    const purchase_priceValue = toNullIfEmptyNumber(purchase_price)
+    const current_evaluationValue = toNullIfEmptyNumber(current_evaluation)
+    const vin_numValue = toNullIfEmpty(vin_num)
+    const gitValue = toNullIfEmpty(git)
 
     const existingResult = await client.query(
       "SELECT document_url1, document_url2, document_url3 FROM m5_trucks WHERE m5truckskey = $1",
@@ -175,20 +232,21 @@ const updateTruck = async (id, truckData, newDocKeys) => {
        SET truckregnum = $1, trailersize = $2, truckpurchasedate = $3,
            year = $4, model = $5, purchase_price = $6,
            current_evaluation = $7, vin_num = $8, is_subcontractor = $9,
-           truck_license_expiry = $10, document_url1 = $11, document_url2 = $12, document_url3 = $13
-       WHERE m5truckskey = $14
+           truck_license_expiry = $10, git = $11, document_url1 = $12, document_url2 = $13, document_url3 = $14
+       WHERE m5truckskey = $15
        RETURNING *`,
       [
-        truckregnum,
-        trailersize,
-        truckpurchasedate,
-        year,
-        model,
-        purchase_price,
-        current_evaluation,
-        vin_num,
+        truckregnum, // Required field
+        trailersizeValue,
+        truckpurchasedateValue,
+        yearValue,
+        modelValue,
+        purchase_priceValue,
+        current_evaluationValue,
+        vin_numValue,
         is_subcontractor || false,
-        truck_license_expiry,
+        truck_license_expiry, // Required field
+        gitValue,
         document_url1,
         document_url2,
         document_url3,

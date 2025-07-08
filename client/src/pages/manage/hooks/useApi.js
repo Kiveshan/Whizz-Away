@@ -1,5 +1,4 @@
 "use client"
-
 import { useCallback } from "react"
 import api from "../../../api.js"
 
@@ -8,7 +7,6 @@ export function useApi(state, actions) {
     async (type, page = 1, itemsPerPage = 10, filters = {}) => {
       actions.setLoading(true)
       actions.setError(null)
-
       try {
         const endpoints = {
           employees: "/api/employees",
@@ -72,7 +70,6 @@ export function useApi(state, actions) {
       } catch (err) {
         console.error(`Error fetching ${type}:`, err)
         let errorMessage = `Failed to load ${type}. Please try again.`
-
         if (err.response) {
           const { status } = err.response
           if (status === 401 || status === 403) {
@@ -80,7 +77,6 @@ export function useApi(state, actions) {
           }
           errorMessage = err.response.data?.error || errorMessage
         }
-
         actions.setError(errorMessage)
         actions.setData(type, [])
       } finally {
@@ -96,7 +92,6 @@ export function useApi(state, actions) {
       console.log("Fetching ALL expense types for dropdown...")
       const response = await api.get("/api/expense-types/simple")
       console.log("Fetched all expense types:", response.data)
-
       // Update the expense types in state - use allExpenseTypes key
       actions.setData("allExpenseTypes", response.data || [])
       return response.data || []
@@ -120,7 +115,6 @@ export function useApi(state, actions) {
 
   const fetchAllData = useCallback(async () => {
     const { pagination, filters } = state
-
     await Promise.all([
       fetchPaginatedData(
         "employees",
@@ -175,7 +169,6 @@ export function useApi(state, actions) {
     async (type, page) => {
       const { pagination, filters } = state
       const currentPagination = pagination[type]
-
       if (page >= 1 && page <= currentPagination.totalPages) {
         await fetchPaginatedData(type, page, currentPagination.itemsPerPage, filters[type])
       }
@@ -205,7 +198,6 @@ export function useApi(state, actions) {
     async (employeeData, emailRef) => {
       actions.setLoading(true)
       emailRef.current?.setCustomValidity("")
-
       try {
         // Check duplicate email (only on create, not edit)
         if (!state.editingEmployeeId) {
@@ -222,7 +214,6 @@ export function useApi(state, actions) {
 
         // Build FormData
         const formData = new FormData()
-
         // Append all scalar fields
         Object.keys(employeeData).forEach((field) => {
           if (field === "password" && state.editingEmployeeId && !employeeData.password) return
@@ -240,10 +231,12 @@ export function useApi(state, actions) {
 
         const url = state.editingEmployeeId ? `/api/employees/${state.editingEmployeeId}` : "/api/employees"
         const method = state.editingEmployeeId ? "put" : "post"
+        console.log(`Making ${method.toUpperCase()} request to: ${url}`)
 
-        await api[method](url, formData, {
+        const response = await api[method](url, formData, {
           headers: { "Content-Type": "multipart/form-data" },
         })
+        console.log("API response:", response.data)
 
         // Refresh current page
         await fetchPaginatedData(
@@ -257,7 +250,6 @@ export function useApi(state, actions) {
         actions.resetFormData("Employee")
         actions.setEditing("Employee", null)
         actions.hideForm("showEmployeeForm")
-
         actions.showAlert(state.editingEmployeeId ? "Employee updated!" : "Employee added!")
         return true
       } catch (err) {
@@ -274,13 +266,11 @@ export function useApi(state, actions) {
   const saveClient = useCallback(
     async (clientData, emailRef) => {
       actions.setLoading(true)
-
       try {
         if (!state.isEditing) {
           const { data } = await api.get(
             `/api/m5Clients/check-email-existence?email=${encodeURIComponent(clientData.email)}`,
           )
-
           if (data.exists) {
             emailRef.current?.setCustomValidity("Email already exists. Please use a different one.")
             emailRef.current?.reportValidity()
@@ -348,11 +338,9 @@ export function useApi(state, actions) {
   const saveTruck = useCallback(
     async (truckData) => {
       actions.setLoading(true)
-
       try {
         const formData = new FormData()
-
-        // Append all scalar fields
+        // Append all scalar fields including git
         Object.keys(truckData).forEach((key) => {
           if (key !== "documents" && truckData[key] !== undefined) {
             formData.append(key, truckData[key])
@@ -366,15 +354,14 @@ export function useApi(state, actions) {
           })
         }
 
-        if (state.editTruckId) {
-          await api.put(`/api/trucks/${state.editTruckId}`, formData, {
-            headers: { "Content-Type": "multipart/form-data" },
-          })
-        } else {
-          await api.post("/api/trucks", formData, {
-            headers: { "Content-Type": "multipart/form-data" },
-          })
-        }
+        const url = state.editTruckId ? `/api/trucks/${state.editTruckId}` : "/api/trucks"
+        const method = state.editTruckId ? "put" : "post"
+        console.log(`Making ${method.toUpperCase()} request to: ${url}`)
+
+        const response = await api[method](url, formData, {
+          headers: { "Content-Type": "multipart/form-data" },
+        })
+        console.log("API response:", response.data)
 
         // Refresh current page
         await fetchPaginatedData(
@@ -387,7 +374,6 @@ export function useApi(state, actions) {
         actions.resetFormData("Truck")
         actions.setEditing("Truck", null)
         actions.hideForm("showTruckForm")
-
         actions.showAlert(state.editTruckId ? "Truck updated!" : "Truck added!")
         return true
       } catch (err) {
@@ -404,10 +390,8 @@ export function useApi(state, actions) {
   const saveTrailer = useCallback(
     async (trailerData) => {
       actions.setLoading(true)
-
       try {
         const formData = new FormData()
-
         // Append all scalar fields
         Object.keys(trailerData).forEach((key) => {
           if (key !== "documents" && trailerData[key] !== undefined) {
@@ -422,15 +406,14 @@ export function useApi(state, actions) {
           })
         }
 
-        if (state.editTrailerId) {
-          await api.put(`/api/trailers/${state.editTrailerId}`, formData, {
-            headers: { "Content-Type": "multipart/form-data" },
-          })
-        } else {
-          await api.post("/api/trailers", formData, {
-            headers: { "Content-Type": "multipart/form-data" },
-          })
-        }
+        const url = state.editTrailerId ? `/api/trailers/${state.editTrailerId}` : "/api/trailers"
+        const method = state.editTrailerId ? "put" : "post"
+        console.log(`Making ${method.toUpperCase()} request to: ${url}`)
+
+        const response = await api[method](url, formData, {
+          headers: { "Content-Type": "multipart/form-data" },
+        })
+        console.log("API response:", response.data)
 
         // Refresh current page
         await fetchPaginatedData(
@@ -443,7 +426,6 @@ export function useApi(state, actions) {
         actions.resetFormData("Trailer")
         actions.setEditing("Trailer", null)
         actions.hideForm("showTrailerForm")
-
         actions.showAlert(state.editTrailerId ? "Trailer updated!" : "Trailer added!")
         return true
       } catch (err) {
@@ -460,7 +442,6 @@ export function useApi(state, actions) {
   const saveDriverRate = useCallback(
     async (rateData) => {
       actions.setLoading(true)
-
       try {
         const cleanedDriverRate = {
           startingpoint: rateData.startingpoint,
@@ -473,11 +454,12 @@ export function useApi(state, actions) {
             rateData.subie_twelve_meter_rate === "" ? null : Number(rateData.subie_twelve_meter_rate),
         }
 
-        if (state.isEditingRate) {
-          await api.put(`/api/driver-rates/${state.editingRateId}`, cleanedDriverRate)
-        } else {
-          await api.post("/api/driver-rates", cleanedDriverRate)
-        }
+        const url = state.editingRateId ? `/api/driver-rates/${state.editingRateId}` : "/api/driver-rates"
+        const method = state.editingRateId ? "put" : "post"
+        console.log(`Making ${method.toUpperCase()} request to: ${url}`)
+
+        const response = await api[method](url, cleanedDriverRate)
+        console.log("API response:", response.data)
 
         // Refresh current page
         await fetchPaginatedData(
@@ -506,7 +488,6 @@ export function useApi(state, actions) {
   const saveSubcontractor = useCallback(
     async (subcontractorData) => {
       actions.setLoading(true)
-
       try {
         console.log("Raw subcontractor data:", subcontractorData)
         console.log("Current editing state:", {
@@ -529,7 +510,6 @@ export function useApi(state, actions) {
 
         // Validate drivers array - at least one driver is required
         const validDrivers = (subcontractorData.drivers || []).filter((driver) => driver.name && driver.name.trim())
-
         if (validDrivers.length === 0) {
           actions.showAlert("Please provide at least one driver name.")
           return false
@@ -553,9 +533,8 @@ export function useApi(state, actions) {
 
         console.log("Sending subcontractor payload:", payload)
 
-        const url = state.isEditMode ? `/api/subcontractors/${state.subcontractorId}` : "/api/subcontractors"
-        const method = state.isEditMode ? "put" : "post"
-
+        const url = state.subcontractorId ? `/api/subcontractors/${state.subcontractorId}` : "/api/subcontractors"
+        const method = state.subcontractorId ? "put" : "post"
         console.log(`Making ${method.toUpperCase()} request to: ${url}`)
 
         const response = await api[method](url, payload)
@@ -572,7 +551,7 @@ export function useApi(state, actions) {
         actions.resetFormData("Subcontractor")
         actions.setEditing("Subcontractor", null)
         actions.hideForm("showSubcontractorForm")
-        actions.showAlert(state.isEditMode ? "Subcontractor updated!" : "Subcontractor added!")
+        actions.showAlert(state.subcontractorId ? "Subcontractor updated!" : "Subcontractor added!")
         return true
       } catch (err) {
         console.error("Error saving subcontractor:", err)
@@ -589,7 +568,6 @@ export function useApi(state, actions) {
   const saveClientRates = useCallback(
     async (ratesData) => {
       actions.setLoading(true)
-
       try {
         const clientId = state.newClientRate.clientId
         console.log("Saving client rates:", { clientId, ratesData })
@@ -622,7 +600,12 @@ export function useApi(state, actions) {
           rates: validRates,
         }
 
-        await api.post(`/api/client-rates/${clientId}`, payload)
+        const url = `/api/client-rates/${clientId}`
+        const method = "post"
+        console.log(`Making ${method.toUpperCase()} request to: ${url}`)
+
+        const response = await api[method](url, payload)
+        console.log("API response:", response.data)
 
         // Refresh current page
         await fetchPaginatedData(
@@ -653,7 +636,6 @@ export function useApi(state, actions) {
       actions.setLoading(true)
       console.log("saveSupplier called with data:", supplierData)
       console.log("Is editing:", !!state.editingSupplierId)
-
       try {
         // Prepare supplier data with proper field mapping
         const preparedSupplierData = {
@@ -675,7 +657,6 @@ export function useApi(state, actions) {
 
         const url = state.editingSupplierId ? `/api/suppliers/${state.editingSupplierId}` : "/api/suppliers"
         const method = state.editingSupplierId ? "put" : "post"
-
         console.log(`Making ${method.toUpperCase()} request to: ${url}`)
 
         const response = await api[method](url, preparedSupplierData)
@@ -711,7 +692,6 @@ export function useApi(state, actions) {
       actions.setLoading(true)
       console.log("saveExpenseType called with data:", expenseTypeData)
       console.log("Is editing:", !!state.editingExpenseTypeId)
-
       try {
         const preparedExpenseTypeData = {
           expense: expenseTypeData.expense || "",
@@ -723,7 +703,6 @@ export function useApi(state, actions) {
           ? `/api/expense-types/${state.editingExpenseTypeId}`
           : "/api/expense-types"
         const method = state.editingExpenseTypeId ? "put" : "post"
-
         console.log(`Making ${method.toUpperCase()} request to: ${url}`)
 
         const response = await api[method](url, preparedExpenseTypeData)
@@ -841,51 +820,48 @@ export function useApi(state, actions) {
     [state, actions, fetchPaginatedData],
   )
 
-const toggleSupplierStatus = useCallback(
-  async (id) => {
-    actions.setLoading(true);
-    try {
-      // Validate ID
-      const supplierId = Number.parseInt(id);
-      if (isNaN(supplierId) || supplierId <= 0) {
-        throw new Error("Invalid supplier ID");
+  const toggleSupplierStatus = useCallback(
+    async (id) => {
+      actions.setLoading(true)
+      try {
+        // Validate ID
+        const supplierId = Number.parseInt(id)
+        if (isNaN(supplierId) || supplierId <= 0) {
+          throw new Error("Invalid supplier ID")
+        }
+
+        console.log(`Sending PUT request to toggle supplier ${supplierId}`)
+        await api.put(`/api/suppliers/${supplierId}/toggle-status`)
+
+        // Refresh current page
+        await fetchPaginatedData(
+          "suppliers",
+          state.pagination.suppliers.currentPage,
+          state.pagination.suppliers.itemsPerPage,
+          state.filters.suppliers,
+        )
+
+        actions.showAlert(`Supplier status toggled successfully!`)
+      } catch (err) {
+        console.error(`Error toggling supplier ${id}:`, {
+          message: err.message,
+          response: err.response?.data,
+          status: err.response?.status,
+          code: err.code,
+        })
+        actions.showAlert(`Error toggling supplier status: ${err.response?.data?.error || err.message}`)
+      } finally {
+        actions.setLoading(false)
       }
-
-      console.log(`Sending PUT request to toggle supplier ${supplierId}`);
-      await api.put(`/api/suppliers/${supplierId}/toggle-status`);
-
-      // Refresh current page
-      await fetchPaginatedData(
-        "suppliers",
-        state.pagination.suppliers.currentPage,
-        state.pagination.suppliers.itemsPerPage,
-        state.filters.suppliers,
-      );
-
-      actions.showAlert(`Supplier status toggled successfully!`);
-    } catch (err) {
-      console.error(`Error toggling supplier ${id}:`, {
-        message: err.message,
-        response: err.response?.data,
-        status: err.response?.status,
-        code: err.code,
-      });
-      actions.showAlert(
-        `Error toggling supplier status: ${err.response?.data?.error || err.message}`,
-      );
-    } finally {
-      actions.setLoading(false);
-    }
-  },
-  [state, actions, fetchPaginatedData],
-);
+    },
+    [state, actions, fetchPaginatedData],
+  )
 
   const deleteItem = useCallback(
     async (type, id) => {
       actions.setLoading(true)
       try {
         let endpoint
-
         switch (type) {
           case "client":
             endpoint = `/api/m5Clients/${id}`
@@ -1087,7 +1063,6 @@ const toggleSupplierStatus = useCallback(
         }
 
         console.log(`Loading ${type} for edit with ID:`, numericId, "Endpoint:", endpoint)
-
         const response = await api.get(endpoint)
         const data = response.data
 
@@ -1173,7 +1148,6 @@ const toggleSupplierStatus = useCallback(
           // Handle supplier data - ensure we have the supplier data
           const supplierData = data.supplier || data
           console.log("Supplier data for edit:", supplierData)
-
           actions.updateFormData(formType, {
             ...supplierData,
             expenseTypes: supplierData.expenseTypes || [],
@@ -1198,7 +1172,6 @@ const toggleSupplierStatus = useCallback(
         try {
           let endpoint
           let idField
-
           if (type === "employee") {
             endpoint = "/api/employees/delete-doc"
             idField = "employeeId"
@@ -1220,11 +1193,9 @@ const toggleSupplierStatus = useCallback(
           if (response.data.message === "Document deleted successfully") {
             const formType = type.charAt(0).toUpperCase() + type.slice(1)
             const currentData = state[`new${formType}`]
-
             actions.updateFormData(formType, {
               existingDocuments: currentData.existingDocuments.filter((doc) => doc !== url),
             })
-
             actions.showAlert("Document deleted successfully.")
           }
         } catch (error) {

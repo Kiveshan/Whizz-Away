@@ -1,4 +1,3 @@
-
 import {
   getShipmentTypes,
   getContainersByInstructionId,
@@ -15,6 +14,7 @@ import {
   checkClientHasRates,
   saveInstructionAndContainers,
   updateFCInstructionAndContainers,
+  deleteInstruction,
 } from "../../models/instructions/instructionModel.js"
 
 // Helper function to calculate total cost based on rate weight type
@@ -676,6 +676,55 @@ export const updateFCInstructionAndContainersHandler = async (req, res) => {
     res.status(500).json({
       success: false,
       error: "Failed to update instruction and containers",
+      message: error.message,
+      details: error.stack,
+    })
+  }
+}
+
+// Handler for deleting an instruction and its associated containers
+export const deleteInstructionHandler = async (req, res) => {
+  try {
+    const { id } = req.params
+    
+    // Validate input data
+    if (!id) {
+      return res.status(400).json({ success: false, error: "Missing instruction ID" })
+    }
+    
+    console.log(`[${new Date().toISOString()}] [CONTROLLER] deleteInstructionHandler: Processing request to delete instruction ${id}`)
+
+    // Call the model function to delete the instruction and its containers
+    const result = await deleteInstruction(id)
+
+    console.log(`[${new Date().toISOString()}] [CONTROLLER] deleteInstructionHandler: Delete successful for instruction ${id}`)
+
+    res.status(200).json({
+      success: true,
+      message: "Instruction and containers deleted successfully",
+      data: result,
+    })
+  } catch (error) {
+    console.error(`[${new Date().toISOString()}] [CONTROLLER] Error in deleteInstructionHandler:`, error)
+
+    // Provide appropriate error message based on the error
+    if (error.message === "Instruction not found") {
+      return res.status(404).json({
+        success: false,
+        error: "Instruction not found",
+        message: "The requested instruction could not be found",
+      })
+    } else if (error.message === "Only instructions with 'New' status can be deleted") {
+      return res.status(403).json({
+        success: false,
+        error: "Cannot delete instruction",
+        message: "Only instructions with 'New' status can be deleted",
+      })
+    }
+
+    res.status(500).json({
+      success: false,
+      error: "Failed to delete instruction and containers",
       message: error.message,
       details: error.stack,
     })

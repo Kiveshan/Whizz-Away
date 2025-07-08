@@ -1,5 +1,22 @@
 import { pool } from "../../config/database.js"
 
+// Helper function to convert empty strings to null
+const toNullIfEmpty = (value) => {
+  if (value === "" || value === undefined || value === "null") {
+    return null
+  }
+  return value
+}
+
+// Helper function to convert empty strings to null for numbers
+const toNullIfEmptyNumber = (value) => {
+  if (value === "" || value === undefined || value === "null") {
+    return null
+  }
+  const num = Number.parseFloat(value)
+  return isNaN(num) ? null : num
+}
+
 const getAllTrailers = async (options = {}) => {
   let client
   try {
@@ -96,6 +113,15 @@ const createTrailer = async (trailerData, documentKeys) => {
       trailer_license_expiry,
     } = trailerData
 
+    // Set non-required fields to null if empty or undefined
+    const trailersizeValue = toNullIfEmpty(trailersize)
+    const trailerpurchasedateValue = toNullIfEmpty(trailerpurchasedate)
+    const yearValue = toNullIfEmpty(year)
+    const modelValue = toNullIfEmpty(model)
+    const purchase_priceValue = toNullIfEmptyNumber(purchase_price)
+    const current_evaluationValue = toNullIfEmptyNumber(current_evaluation)
+    const vin_numValue = toNullIfEmpty(vin_num)
+
     const document_url1 = documentKeys[0] || null
     const document_url2 = documentKeys[1] || null
     const document_url3 = documentKeys[2] || null
@@ -109,13 +135,13 @@ const createTrailer = async (trailerData, documentKeys) => {
        RETURNING *`,
       [
         trailerregnum,
-        trailersize,
-        trailerpurchasedate,
-        year,
-        model,
-        purchase_price,
-        current_evaluation,
-        vin_num,
+        trailersizeValue,
+        trailerpurchasedateValue,
+        yearValue,
+        modelValue,
+        purchase_priceValue,
+        current_evaluationValue,
+        vin_numValue,
         trailer_license_expiry,
         document_url1,
         document_url2,
@@ -147,6 +173,15 @@ const updateTrailer = async (id, trailerData, newDocKeys) => {
       trailer_license_expiry,
     } = trailerData
 
+    // Set non-required fields to null if empty, undefined, or string "null"
+    const trailersizeValue = toNullIfEmpty(trailersize)
+    const trailerpurchasedateValue = toNullIfEmpty(trailerpurchasedate)
+    const yearValue = toNullIfEmpty(year)
+    const modelValue = toNullIfEmpty(model)
+    const purchase_priceValue = toNullIfEmptyNumber(purchase_price)
+    const current_evaluationValue = toNullIfEmptyNumber(current_evaluation)
+    const vin_numValue = toNullIfEmpty(vin_num)
+
     const existingResult = await client.query(
       "SELECT document_url1, document_url2, document_url3 FROM m5_trailers WHERE m5trailerskey = $1",
       [id],
@@ -177,13 +212,13 @@ const updateTrailer = async (id, trailerData, newDocKeys) => {
        RETURNING *`,
       [
         trailerregnum,
-        trailersize,
-        trailerpurchasedate,
-        year,
-        model,
-        purchase_price,
-        current_evaluation,
-        vin_num,
+        trailersizeValue,
+        trailerpurchasedateValue,
+        yearValue,
+        modelValue,
+        purchase_priceValue,
+        current_evaluationValue,
+        vin_numValue,
         trailer_license_expiry,
         document_url1,
         document_url2,
