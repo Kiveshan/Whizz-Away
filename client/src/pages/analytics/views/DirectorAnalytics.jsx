@@ -55,13 +55,13 @@ export default function DirectorAnalytics() {
   }
 
   const getChartWidth = (dataLength) => {
-    if (activeFilter === "turnoverPerMonth" ||
-      activeFilter === "agingAnalysis" ||
-      activeFilter === "subcontractorVsTurnover" ||
-      activeFilter === "subcontractorTurnoverPerMonth" ||
-      activeFilter === "wagesVsExpenses" ||
-      activeFilter === "incomeVsExpense" ||
-      activeFilter === "turnoverVsSubbieExpense") {
+    if (activeFilter === "turnoverPerMonth" || 
+        activeFilter === "agingAnalysis" || 
+        activeFilter === "subcontractorVsTurnover" || 
+        activeFilter === "subcontractorTurnoverPerMonth" || 
+        activeFilter === "wagesVsExpenses" || 
+        activeFilter === "incomeVsExpense" || 
+        activeFilter === "turnoverVsSubbieExpense") {
       return 1000;
     }
     const minWidth = 1000
@@ -166,7 +166,7 @@ export default function DirectorAnalytics() {
       })
       console.log("API response:", response.data)
       if (response.data.success) {
-        const turnoverData = response.data.data.map((item) => {
+        let turnoverData = response.data.data.map((item) => {
           const turnover = Number.parseFloat(item.turnover)
           console.log(`Client ${item.client}: Turnover=${turnover}, Percentage=${item.percentage}%`)
           return {
@@ -177,7 +177,18 @@ export default function DirectorAnalytics() {
             percentage: item.percentage,
           }
         })
-        console.log("Processed turnover data:", turnoverData)
+        console.log("Processed turnover data before sorting:", turnoverData)
+        
+        // Sort data: Total Turnover first, selected client last, others in between (alphabetically)
+        turnoverData = turnoverData.sort((a, b) => {
+          if (a.name === "Total Turnover") return -1
+          if (b.name === "Total Turnover") return 1
+          if (clientId && a.name === clients.find(c => c.m5clientkey === clientId)?.client) return 1
+          if (clientId && b.name === clients.find(c => c.m5clientkey === clientId)?.client) return -1
+          return a.name.localeCompare(b.name)
+        })
+        
+        console.log("Processed turnover data after sorting:", turnoverData)
         return turnoverData
       } else {
         throw new Error(response.data.message || "Failed to fetch data")
@@ -505,7 +516,7 @@ export default function DirectorAnalytics() {
       setChartData([]);
       setError(null);
       setIsLoading(true);
-
+      
       let data = [];
       try {
         switch (activeFilter) {
@@ -607,15 +618,15 @@ export default function DirectorAnalytics() {
         default:
           return "#4169e1"
       }
-    } else if ((activeFilter === "subcontractorVsTurnover" ||
-      activeFilter === "subcontractorTurnoverPerMonth" ||
-      activeFilter === "wagesVsExpenses" ||
-      activeFilter === "incomeVsExpense" ||
-      activeFilter === "turnoverVsSubbieExpense") && entry && entry.type) {
-      return entry.type === "total" ? "#9C27B0" :
-        entry.type === "subcontractor" ? "#E91E63" :
-          entry.type === "income" ? "#4169e1" :
-            entry.type === "expenses" ? "#ff6347" : "#4169e1"
+    } else if ((activeFilter === "subcontractorVsTurnover" || 
+                activeFilter === "subcontractorTurnoverPerMonth" || 
+                activeFilter === "wagesVsExpenses" || 
+                activeFilter === "incomeVsExpense" || 
+                activeFilter === "turnoverVsSubbieExpense") && entry && entry.type) {
+      return entry.type === "total" ? "#9C27B0" : 
+             entry.type === "subcontractor" ? "#E91E63" : 
+             entry.type === "income" ? "#4169e1" : 
+             entry.type === "expenses" ? "#ff6347" : "#4169e1"
     }
     console.log("Falling back to default color")
     return "#4169e1"
@@ -626,11 +637,11 @@ export default function DirectorAnalytics() {
     const percentage = payload.percentage ?? 0
     console.log("CustomBarLabelForTurnover - payload:", payload)
     return (
-      <text x={x + width / 2} y={y - 10}
-        fill="#000"
-        textAnchor="middle"
-        dominantBaseline="middle"
-        fontSize={12}>
+      <text x={x + width / 2} y={y - 10} 
+            fill="#000" 
+            textAnchor="middle" 
+            dominantBaseline="middle" 
+            fontSize={12}>
         R{value?.toLocaleString?.()} ({percentage}%)
       </text>
     )
