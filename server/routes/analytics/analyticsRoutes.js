@@ -7,10 +7,10 @@ import {
   getTurnoverVsDieselCostController,
   getAllExpensesController,
   getTurnoverPerTruckController,
-  getWagesPerMonthController,
   getSubcontractorTurnoverPerMonthController,
   getSubcontractorVsTurnoverController,
   getAllSubcontractorsController,
+  getWagesVsExpensesController,
 } from "../../controllers/analytics/analyticsController.js";
 import { verifyToken } from "../../middleware/auth.js";
 
@@ -28,10 +28,11 @@ router.get(
 );
 router.get("/api/all-expenses", verifyToken, getAllExpensesController);
 router.get("/api/turnover-per-truck", verifyToken, getTurnoverPerTruckController);
-router.get("/api/wages-per-month", verifyToken, getWagesPerMonthController);
 router.get("/api/subcontractor-turnover-per-month", verifyToken, 
   getSubcontractorTurnoverPerMonthController);
 router.get("/api/subcontractor-vs-turnover", verifyToken, 
   getSubcontractorVsTurnoverController);
+router.get("/api/wages-vs-expenses", verifyToken, 
+  getWagesVsExpensesController);
 
 export default router;

@@ -391,33 +391,6 @@ const getTurnoverPerTruck = async (client, month, year) => {
   });
 };
 
-const getWagesPerMonth = async (client, month, year) => {
-  const query = `
-    SELECT 
-      SUM(w.net_pay) as total_wages,
-      to_char(w.employee_date, 'Month') as month_name,
-      EXTRACT(YEAR FROM w.employee_date) as year
-    FROM wages w
-    WHERE TRIM(to_char(w.employee_date, 'Month')) = $1
-    AND EXTRACT(YEAR FROM w.employee_date)::text = $2
-    GROUP BY to_char(w.employee_date, 'Month'), EXTRACT(YEAR FROM w.employee_date)
-  `;
-  const result = await client.query(query, [month, year]);
-  console.log("Raw query result:", result.rows);
-  console.log(`Query returned ${result.rows.length} rows`);
-
-  if (!result.rows || result.rows.length === 0) {
-    console.log(`No wages data returned for ${month} ${year}.`);
-    return [];
-  }
-
-  return result.rows.map((row) => ({
-    month: row.month_name.trim(),
-    year: row.year.toString(),
-    wages: parseFloat(row.total_wages) || 0,
-  }));
-};
-
 const getSubcontractorTurnoverPerMonth = async (client, month, year) => {
   const subcontractorQuery = `
     SELECT 
@@ -556,6 +529,103 @@ const getSubcontractorVsTurnover = async (client, month, year, subcontractorId =
   return turnoverData;
 };
 
+const getWagesVsExpenses = async (client, month, year) => {
+  const wagesQuery = `
+    SELECT 
+      SUM(w.net_pay) as total_wages,
+      to_char(w.employee_date, 'Month') as month_name,
+      EXTRACT(YEAR FROM w.employee_date) as year
+    FROM wages w
+    WHERE TRIM(to_char(w.employee_date, 'Month')) = $1
+    AND EXTRACT(YEAR FROM w.employee_date)::text = $2
+    GROUP BY to_char(w.employee_date, 'Month'), EXTRACT(YEAR FROM w.employee_date)
+  `;
+
+  const fuelQuery = `
+    SELECT 
+      SUM(e.expensecost) as total_fuel_cost,
+      to_char(e.slipuploaddate, 'Month') as month_name,
+      EXTRACT(YEAR FROM e.slipuploaddate) as year
+    FROM expenses_m2 e
+    WHERE e.type = 'fuel'
+      AND TRIM(to_char(e.slipuploaddate, 'Month')) = $1
+      AND EXTRACT(YEAR FROM e.slipuploaddate)::text = $2
+    GROUP BY to_char(e.slipuploaddate, 'Month'), EXTRACT(YEAR FROM e.slipuploaddate)
+  `;
+
+  const purchaseOrderQuery = `
+    SELECT 
+      SUM(p.total) as total_po_cost,
+      to_char(p.date, 'Month') as month_name,
+      EXTRACT(YEAR FROM p.date) as year
+    FROM purchase_orders p
+    WHERE TRIM(to_char(p.date, 'Month')) = $1
+      AND EXTRACT(YEAR FROM p.date)::text = $2
+    GROUP BY to_char(p.date, 'Month'), EXTRACT(YEAR FROM p.date)
+  `;
+
+  const subcontractorQuery = `
+    SELECT 
+      SUM(l.driverrate) as total_subcontractor_expense,
+      TO_CHAR(l.date, 'Month') as month_name,
+      EXTRACT(YEAR FROM l.date) as year
+    FROM legs_m2 l
+    JOIN m5_employee e ON l.driverid = e.userid
+    WHERE e.roleid = 6
+      AND TRIM(TO_CHAR(l.date, 'Month')) = $1
+      AND EXTRACT(YEAR FROM l.date)::text = $2
+    GROUP BY TO_CHAR(l.date, 'Month'), EXTRACT(YEAR FROM l.date)
+  `;
+
+  const [wagesResult, fuelResult, purchaseOrderResult, subcontractorResult] = await Promise.all([
+    client.query(wagesQuery, [month, year]),
+    client.query(fuelQuery, [month, year]),
+    client.query(purchaseOrderQuery, [month, year]),
+    client.query(subcontractorQuery, [month, year])
+  ]);
+
+  console.log("Wages query result:", wagesResult.rows);
+  console.log("Fuel query result:", fuelResult.rows);
+  console.log("Purchase order query result:", purchaseOrderResult.rows);
+  console.log("Subcontractor expense query result:", subcontractorResult.rows);
+
+  const totalWages = parseFloat(wagesResult.rows[0]?.total_wages || 0);
+  const totalFuelCost = parseFloat(fuelResult.rows[0]?.total_fuel_cost || 0);
+  const totalPurchaseOrderCost = parseFloat(purchaseOrderResult.rows[0]?.total_po_cost || 0);
+  const totalSubcontractorExpense = parseFloat(subcontractorResult.rows[0]?.total_subcontractor_expense || 0);
+
+  const totalExpenses = totalFuelCost + totalPurchaseOrderCost + totalSubcontractorExpense;
+  const total = totalWages + totalExpenses;
+
+  console.log(`Total wages for ${month} ${year}: ${totalWages}`);
+  console.log(`Total fuel cost for ${month} ${year}: ${totalFuelCost}`);
+  console.log(`Total purchase order cost for ${month} ${year}: ${totalPurchaseOrderCost}`);
+  console.log(`Total subcontractor expense for ${month} ${year}: ${totalSubcontractorExpense}`);
+  console.log(`Total expenses for ${month} ${year}: ${totalExpenses}`);
+
+  const wagesVsExpensesData = [
+    {
+      name: "Wages",
+      value: totalWages,
+      type: "wages",
+      percentage: total > 0 ? ((totalWages / total) * 100).toFixed(2) : 0,
+      month: month.trim(),
+      year: year.toString(),
+    },
+    {
+      name: "Expenses",
+      value: totalExpenses,
+      type: "expenses",
+      percentage: total > 0 ? ((totalExpenses / total) * 100).toFixed(2) : 0,
+      month: month.trim(),
+      year: year.toString(),
+    }
+  ];
+
+  console.log("Processed wages vs expenses data:", wagesVsExpensesData);
+  return wagesVsExpensesData;
+};
+
 export {
   getFuelExpenses,
   getTurnoverPerMonth,
@@ -565,7 +635,7 @@ export {
   getTurnoverVsDieselCost,
   getAllExpenses,
   getTurnoverPerTruck,
-  getWagesPerMonth,
   getSubcontractorTurnoverPerMonth,
   getSubcontractorVsTurnover,
+  getWagesVsExpenses,
 };

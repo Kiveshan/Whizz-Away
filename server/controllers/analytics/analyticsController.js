@@ -8,9 +8,9 @@ import {
   getTurnoverVsDieselCost,
   getAllExpenses,
   getTurnoverPerTruck,
-  getWagesPerMonth,
   getSubcontractorTurnoverPerMonth,
   getSubcontractorVsTurnover,
+  getWagesVsExpenses,
 } from "../../models/analytics/analyticsModel.js";
 
 export const getFuelExpensesController = async (req, res) => {
@@ -205,32 +205,6 @@ export const getTurnoverPerTruckController = async (req, res) => {
   }
 };
 
-export const getWagesPerMonthController = async (req, res) => {
-  const { month, year } = req.query;
-  console.log(`Received request for wages per month: month=${month}, year=${year}`);
-
-  if (!month || !year) {
-    console.log("Missing month or year in request");
-    return res.status(400).json({ success: false, message: "Month and year are required" });
-  }
-
-  try {
-    const client = await pool.connect();
-    try {
-      console.log("Connected to database, executing query...");
-      const result = await getWagesPerMonth(client, month, year);
-      console.log("Query result:", result);
-      res.json({ success: true, data: result });
-    } finally {
-      client.release();
-      console.log("Database client released");
-    }
-  } catch (err) {
-    console.error("Error in getWagesPerMonthController:", err);
-    res.status(500).json({ success: false, message: `Server error: ${err.message}` });
-  }
-};
-
 export const getSubcontractorTurnoverPerMonthController = async (req, res) => {
   const { month, year } = req.query;
   console.log(`Received request for turnover vs total subcontractor: month=${month}, year=${year}`);
@@ -279,6 +253,32 @@ export const getSubcontractorVsTurnoverController = async (req, res) => {
     }
   } catch (err) {
     console.error("Error in getSubcontractorVsTurnoverController:", err);
+    res.status(500).json({ success: false, message: `Server error: ${err.message}` });
+  }
+};
+
+export const getWagesVsExpensesController = async (req, res) => {
+  const { month, year } = req.query;
+  console.log(`Received request for wages vs expenses: month=${month}, year=${year}`);
+
+  if (!month || !year) {
+    console.log("Missing month or year in request");
+    return res.status(400).json({ success: false, message: "Month and year are required" });
+  }
+
+  try {
+    const client = await pool.connect();
+    try {
+      console.log("Connected to database, executing query...");
+      const result = await getWagesVsExpenses(client, month, year);
+      console.log("Query result:", result);
+      res.json({ success: true, data: result });
+    } finally {
+      client.release();
+      console.log("Database client released");
+    }
+  } catch (err) {
+    console.error("Error in getWagesVsExpensesController:", err);
     res.status(500).json({ success: false, message: `Server error: ${err.message}` });
   }
 };

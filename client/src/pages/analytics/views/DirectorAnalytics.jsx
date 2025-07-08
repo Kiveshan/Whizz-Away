@@ -55,10 +55,10 @@ export default function DirectorAnalytics() {
   }
 
   const getChartWidth = (dataLength) => {
-    if (activeFilter === "turnoverPerMonth" || activeFilter === "agingAnalysis" || activeFilter === "subcontractorVsTurnover" || activeFilter === "subcontractorTurnoverPerMonth") {
-      return 600; // Fixed width for 1-2 bars
+    if (activeFilter === "turnoverPerMonth" || activeFilter === "agingAnalysis" || activeFilter === "subcontractorVsTurnover" || activeFilter === "subcontractorTurnoverPerMonth" || activeFilter === "wagesVsExpenses") {
+      return 1000; // Fixed width for 1-2 bars
     }
-    const minWidth = 1200
+    const minWidth = 1000
     const barWidth = 180
     return Math.max(minWidth, dataLength * barWidth)
   }
@@ -323,30 +323,37 @@ export default function DirectorAnalytics() {
     }
   }
 
-  const fetchWagesPerMonthData = async (month, year) => {
+  const fetchWagesVsExpenses = async (month, year) => {
     setIsLoading(true)
     setError(null)
     try {
-      console.log(`Fetching wages per month data for month: ${month}, year: ${year}`)
-      const response = await api.get("/api/wages-per-month", {
+      console.log(`Fetching wages vs expenses for month: ${month}, year: ${year}`)
+      const response = await api.get("/api/wages-vs-expenses", {
         params: { month, year, _t: new Date().getTime() },
       })
       console.log("API response:", response.data)
       if (response.data.success) {
-        console.log("Wages per month data received:", response.data.data)
-        const wagesData = response.data.data.map((item) => ({
-          month: item.month,
-          year: item.year,
-          wages: Number.parseFloat(item.wages) || 0,
-        }))
-        console.log("Processed wages per month data:", wagesData)
-        return wagesData
+        const data = response.data.data.map((item) => {
+          console.log(
+            `Received: name=${item.name}, value=${item.value}, type=${item.type}, percentage=${item.percentage}%`
+          )
+          return {
+            name: item.name,
+            value: Number(item.value) || 0,
+            type: item.type,
+            percentage: Number(item.percentage) || 0,
+            month: item.month,
+            year: item.year,
+          }
+        })
+        console.log("Processed wages vs expenses data:", data)
+        return data
       } else {
         throw new Error(response.data.message || "Failed to fetch data")
       }
     } catch (err) {
-      console.error("Error fetching wages per month data:", err.response ? err.response.data : err.message)
-      setError(`Failed to fetch wages per month data: ${err.message}`)
+      console.error("Error fetching wages vs expenses:", err)
+      setError(err.message)
       return []
     } finally {
       setIsLoading(false)
@@ -454,14 +461,14 @@ export default function DirectorAnalytics() {
         case "subcontractorVsTurnover":
           data = await fetchSubcontractorVsTurnover(activeMonth, activeYear, selectedSubcontractor)
           break
-        case "wagesPerMonth":
-          data = await fetchWagesPerMonthData(activeMonth, activeYear)
-          break
         case "turnoverPerTruck":
           data = await fetchTurnoverPerTruck(activeMonth, activeYear)
           break
         case "incomeVsExpense":
           data = await fetchIncomeVsExpenses(activeMonth, activeYear)
+          break
+        case "wagesVsExpenses":
+          data = await fetchWagesVsExpenses(activeMonth, activeYear)
           break
         default:
           data = []
@@ -517,8 +524,8 @@ export default function DirectorAnalytics() {
         default:
           return "#4169e1"
       }
-    } else if ((activeFilter === "subcontractorVsTurnover" || activeFilter === "subcontractorTurnoverPerMonth") && entry && entry.type) {
-      return entry.type === "total" ? "#9C27B0" : "#E91E63"
+    } else if ((activeFilter === "subcontractorVsTurnover" || activeFilter === "subcontractorTurnoverPerMonth" || activeFilter === "wagesVsExpenses") && entry && entry.type) {
+      return entry.type === "wages" ? "#4169e1" : entry.type === "expenses" ? "#ff6347" : entry.type === "total" ? "#9C27B0" : "#E91E63"
     }
     console.log("Falling back to default color")
     return "#4169e1"
@@ -875,41 +882,6 @@ export default function DirectorAnalytics() {
           </div>
         )
 
-      case "wagesPerMonth":
-        return (
-          <div className="chart-wrapper">
-            {isLoading ? (
-              <div className="loading-indicator">Loading Wages per month VS Expenses data...</div>
-            ) : error ? (
-              <div className="error-message">{error}</div>
-            ) : !Array.isArray(chartData) || chartData.length === 0 ? (
-              <div className="no-data-message">
-                No wages data available for {activeMonth} {activeYear}
-              </div>
-            ) : (
-              <div className="chart-scroll-container">
-                <ResponsiveContainer width={chartWidth} height={500}>
-                  <BarChart data={chartData} margin={{ top: 40, right: 30, left: 60, bottom: 40 }}>
-                    <XAxis dataKey="month" tickFormatter={() => `${activeMonth} ${activeYear}`} />
-                    <YAxis
-                      label={{
-                        value: "Wages (R)",
-                        angle: 0,
-                        position: "top",
-                        dy: -20,
-                      }}
-                    />
-                    <Tooltip content={<CustomTooltip />} />
-                    <Bar dataKey="wages" name="Wages" fill="#4169e1" radius={[4, 4, 0, 0]}>
-                      <LabelList dataKey="wages" content={CustomBarLabelForDefault} position="top" />
-                    </Bar>
-                  </BarChart>
-                </ResponsiveContainer>
-              </div>
-            )}
-          </div>
-        )
-
       case "turnoverVsDieselCost":
         return (
           <div className="chart-wrapper">
@@ -1081,6 +1053,69 @@ export default function DirectorAnalytics() {
           </div>
         )
 
+      case "wagesVsExpenses":
+        return (
+          <div className="chart-wrapper">
+            {isLoading ? (
+              <div className="loading-indicator">Loading wages vs expenses data...</div>
+            ) : error ? (
+              <div className="error-message">{error}</div>
+            ) : !Array.isArray(chartData) || chartData.length === 0 ? (
+              <div className="no-data-message">
+                No wages vs expenses data available for {activeMonth} {activeYear}
+              </div>
+            ) : (
+              <>
+                <div className="chart-header">
+                  <div className="chart-header-item">
+                    <span className="legend-color" style={{ backgroundColor: "#4169e1" }}></span>
+                    <span>Wages</span>
+                  </div>
+                  <div className="chart-header-item">
+                    <span className="legend-color" style={{ backgroundColor: "#ff6347" }}></span>
+                    <span>Expenses</span>
+                  </div>
+                </div>
+                <div className="chart-scroll-container">
+                  <ResponsiveContainer width={chartWidth} height={500}>
+                    <BarChart data={chartData} margin={{ top: 40, right: 30, left: 60, bottom: 120 }}>
+                      <XAxis
+                        dataKey="name"
+                        interval={0}
+                        tick={<CustomAxisTick />}
+                        height={150}
+                        tickMargin={10}
+                      />
+                      <YAxis
+                        label={{
+                          value: "Amount (R)",
+                          angle: 0,
+                          position: "top",
+                          dy: -20,
+                        }}
+                      />
+                      <Tooltip content={<CustomTooltip />} />
+                      <Bar
+                        dataKey="value"
+                        name="Amount"
+                        radius={[4, 4, 0, 0]}
+                        fillOpacity={0.9}
+                        isAnimationActive={true}
+                        animationDuration={500}
+                      >
+                        {chartData.map((entry, index) => (
+                          <Cell key={`cell-${index}`} fill={getBarFill(entry)} />
+                        ))}
+                        <LabelList dataKey="value" content={CustomBarLabelForTurnover} position="top" />
+                      </Bar>
+                    </BarChart>
+                  </ResponsiveContainer>
+                </div>
+              </>
+            )}
+          </div>
+        )
+
       default:
         return null
     }
@@ -1181,10 +1216,10 @@ export default function DirectorAnalytics() {
               Turnover VS Total Subbie
             </button>
             <button
-              className={`filter-button ${activeFilter === "wagesPerMonth" ? "active" : ""}`}
-              onClick={() => setActiveFilter("wagesPerMonth")}
+              className={`filter-button ${activeFilter === "wagesVsExpenses" ? "active" : ""}`}
+              onClick={() => setActiveFilter("wagesVsExpenses")}
             >
-              Wages (Total) Per Month VS Expenses
+              Wages per month VS Expenses
             </button>
             <button
               className={`filter-button ${activeFilter === "turnoverVsDieselCost" ? "active" : ""}`}
