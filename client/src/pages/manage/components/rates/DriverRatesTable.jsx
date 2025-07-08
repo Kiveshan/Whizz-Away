@@ -1,8 +1,31 @@
 "use client"
 
+import { useState } from "react"
 import { formatDate } from "../../utils/helpers"
 import Pagination from "../common/Pagination"
 import SearchFilter from "../common/SearchFilter"
+
+
+// Confirmation Popup Component
+const ConfirmationPopup = ({ isOpen, message, onConfirm, onCancel }) => {
+  if (!isOpen) return null
+
+  return (
+    <div className="popup-backdrop" onClick={onCancel}>
+      <div className="popup" onClick={(e) => e.stopPropagation()}>
+        <p>{message}</p>
+        <div className="popup-buttons">
+          <button className="confirm-button" onClick={onConfirm}>
+            Yes, delete
+          </button>
+          <button className="cancel-button" onClick={onCancel}>
+            Cancel
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
 
 const DriverRatesTable = ({
   driverRates,
@@ -18,6 +41,27 @@ const DriverRatesTable = ({
   onSearchChange,
   onApplyFilters,
 }) => {
+  const [showConfirmPopup, setShowConfirmPopup] = useState(false)
+  const [rateToDelete, setRateToDelete] = useState(null)
+
+  const handleDeleteClick = (rate) => {
+    setRateToDelete(rate)
+    setShowConfirmPopup(true)
+  }
+
+  const handleConfirmDelete = () => {
+    if (rateToDelete) {
+      onDelete(rateToDelete.m5ratekey)
+    }
+    setShowConfirmPopup(false)
+    setRateToDelete(null)
+  }
+
+  const handleCancelDelete = () => {
+    setShowConfirmPopup(false)
+    setRateToDelete(null)
+  }
+
   if (error) {
     return <div className="error">{error}</div>
   }
@@ -97,7 +141,7 @@ const DriverRatesTable = ({
                         </button>
                       </td>
                       <td>
-                        <button className="manage-delete-button" onClick={() => onDelete(rate.m5ratekey)}>
+                        <button className="manage-delete-button" onClick={() => handleDeleteClick(rate)}>
                           Delete
                         </button>
                       </td>
@@ -117,6 +161,15 @@ const DriverRatesTable = ({
             onItemsPerPageChange={onItemsPerPageChange}
           />
         </>
+      )}
+
+      {showConfirmPopup && rateToDelete && (
+        <ConfirmationPopup
+          isOpen={showConfirmPopup}
+          message={`Are you sure you want to delete the rate from ${rateToDelete.startingpoint} to ${rateToDelete.destination}?`}
+          onConfirm={handleConfirmDelete}
+          onCancel={handleCancelDelete}
+        />
       )}
     </div>
   )

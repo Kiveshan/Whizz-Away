@@ -55,7 +55,7 @@ const DriverRateForm = ({ driverRate, loading, isEditing, onSave, onCancel, onCh
         <div className="form-row">
           <div className="form-field">
             <label>
-              <strong>Driver Rate (6m) (Optional)</strong>
+              <strong>Driver Rate (6m)</strong>
             </label>
             <input
               type="number"
@@ -69,7 +69,7 @@ const DriverRateForm = ({ driverRate, loading, isEditing, onSave, onCancel, onCh
           </div>
           <div className="form-field">
             <label>
-              <strong>Driver Rate (12m) (Optional)</strong>
+              <strong>Driver Rate (12m)</strong>
             </label>
             <input
               type="number"
@@ -86,7 +86,7 @@ const DriverRateForm = ({ driverRate, loading, isEditing, onSave, onCancel, onCh
         <div className="form-row">
           <div className="form-field">
             <label>
-              <strong>Subbie Rate (6m) (Optional)</strong>
+              <strong>Subbie Rate (6m)</strong>
             </label>
             <input
               type="number"
@@ -100,7 +100,7 @@ const DriverRateForm = ({ driverRate, loading, isEditing, onSave, onCancel, onCh
           </div>
           <div className="form-field">
             <label>
-              <strong>Subbie Rate (12m) (Optional)</strong>
+              <strong>Subbie Rate (12m)</strong>
             </label>
             <input
               type="number"
@@ -109,7 +109,6 @@ const DriverRateForm = ({ driverRate, loading, isEditing, onSave, onCancel, onCh
               className="form-input"
               value={driverRate.subie_twelve_meter_rate || ""}
               onChange={(e) => handleNumberChange("subie_twelve_meter_rate", e.target.value)}
-              placeholder="Leave empty if not applicable"
             />
           </div>
         </div>
