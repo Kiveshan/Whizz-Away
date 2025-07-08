@@ -55,13 +55,13 @@ export default function DirectorAnalytics() {
   }
 
   const getChartWidth = (dataLength) => {
-    if (activeFilter === "turnoverPerMonth" || 
-        activeFilter === "agingAnalysis" || 
-        activeFilter === "subcontractorVsTurnover" || 
-        activeFilter === "subcontractorTurnoverPerMonth" || 
-        activeFilter === "wagesVsExpenses" || 
-        activeFilter === "incomeVsExpense" || 
-        activeFilter === "turnoverVsSubbieExpense") {
+    if (activeFilter === "turnoverPerMonth" ||
+      activeFilter === "agingAnalysis" ||
+      activeFilter === "subcontractorVsTurnover" ||
+      activeFilter === "subcontractorTurnoverPerMonth" ||
+      activeFilter === "wagesVsExpenses" ||
+      activeFilter === "incomeVsExpense" ||
+      activeFilter === "turnoverVsSubbieExpense") {
       return 1000;
     }
     const minWidth = 1000
@@ -505,7 +505,7 @@ export default function DirectorAnalytics() {
       setChartData([]);
       setError(null);
       setIsLoading(true);
-      
+
       let data = [];
       try {
         switch (activeFilter) {
@@ -607,14 +607,15 @@ export default function DirectorAnalytics() {
         default:
           return "#4169e1"
       }
-    } else if ((activeFilter === "subcontractorVsTurnover" || 
-                activeFilter === "subcontractorTurnoverPerMonth" || 
-                activeFilter === "wagesVsExpenses" || 
-                activeFilter === "incomeVsExpense" || 
-                activeFilter === "turnoverVsSubbieExpense") && entry && entry.type) {
-      return entry.type === "income" ? "#4169e1" : 
-             entry.type === "expenses" ? "#ff6347" : 
-             entry.type === "total" ? "#9C27B0" : "#E91E63"
+    } else if ((activeFilter === "subcontractorVsTurnover" ||
+      activeFilter === "subcontractorTurnoverPerMonth" ||
+      activeFilter === "wagesVsExpenses" ||
+      activeFilter === "incomeVsExpense" ||
+      activeFilter === "turnoverVsSubbieExpense") && entry && entry.type) {
+      return entry.type === "total" ? "#9C27B0" :
+        entry.type === "subcontractor" ? "#E91E63" :
+          entry.type === "income" ? "#4169e1" :
+            entry.type === "expenses" ? "#ff6347" : "#4169e1"
     }
     console.log("Falling back to default color")
     return "#4169e1"
@@ -625,11 +626,11 @@ export default function DirectorAnalytics() {
     const percentage = payload.percentage ?? 0
     console.log("CustomBarLabelForTurnover - payload:", payload)
     return (
-      <text x={x + width / 2} y={y - 10} 
-            fill={payload.type === "total" ? "#9C27B0" : 
-                  payload.type === "income" ? "#4169e1" : 
-                  payload.type === "expenses" ? "#ff6347" : "#E91E63"} 
-            textAnchor="middle" dominantBaseline="middle" fontSize={12}>
+      <text x={x + width / 2} y={y - 10}
+        fill="#000"
+        textAnchor="middle"
+        dominantBaseline="middle"
+        fontSize={12}>
         R{value?.toLocaleString?.()} ({percentage}%)
       </text>
     )
@@ -640,7 +641,7 @@ export default function DirectorAnalytics() {
     console.log("CustomBarLabelForDieselCost - payload:", payload)
     const percentage = payload.dieselCostPercentage ?? 0
     return (
-      <text x={x + width / 2} y={y - 10} fill="#ff6347" textAnchor="middle" dominantBaseline="middle" fontSize={12}>
+      <text x={x + width / 2} y={y - 10} fill="#000" textAnchor="middle" dominantBaseline="middle" fontSize={12}>
         R{value?.toLocaleString?.()} ({percentage}%)
       </text>
     )
@@ -671,7 +672,7 @@ export default function DirectorAnalytics() {
     }
     const labelText = `R${value.toLocaleString()}`
     return (
-      <text x={x + width / 2} y={y - 10} fill="#000" textAnchor="middle" dominantBaseline="middle" fontSize="12">
+      <text x={x + width / 2} y={y - 10} fill="#000" textAnchor="middle" dominantBaseline="middle" fontSize={12}>
         {labelText}
       </text>
     )
