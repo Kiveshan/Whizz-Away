@@ -580,11 +580,53 @@ const canFinish = () => {
     );
     return shipmentType !== 2;
   };
-  const countContainersReachingDestination = async () => {
+//   const countContainersReachingDestination = async () => {
+//   try {
+//     // Get instruction details to get the dropoff location
+//     const instructionResponse = await api.get(`/instructions/${instructionId}/details`);
+//     const dropoff = instructionResponse.data.dropoff;
+
+    
+    
+//     // Get all legs for this instruction
+//     const legsResponse = await api.get(`/legs/${instructionId}`);
+//     const legsData = legsResponse.data;
+    
+//     // Get all containers for this instruction
+//     const containersResponse = await api.get(`/containers/instruction/${instructionId}`);
+//     const instructionContainers = containersResponse.data;
+    
+//     // Track which containers reach the final destination
+//     const containersReachingDropoff = new Set();
+    
+//     legsData.forEach((leg) => {
+//       if (leg.destination === dropoff && leg.drivers && leg.drivers.length > 0) {
+//         leg.drivers.forEach((driver) => {
+//           if (driver.containernumber) {
+//             containersReachingDropoff.add(driver.containernumber.toString());
+//           }
+//         });
+//       }
+//     });
+    
+//     console.log("Containers reaching final destination:", Array.from(containersReachingDropoff));
+//     console.log("Total instruction containers:", instructionContainers.length);
+//     console.log("Containers reached count:", containersReachingDropoff.size);
+    
+//     return containersReachingDropoff.size;
+//   } catch (error) {
+//     console.error("Error counting containers reaching destination:", error);
+//     return 0;
+//   }
+// };
+const countContainersReachingDestination = async () => {
   try {
     // Get instruction details to get the dropoff location
     const instructionResponse = await api.get(`/instructions/${instructionId}/details`);
     const dropoff = instructionResponse.data.dropoff;
+    
+    // Normalize dropoff by converting to lowercase and removing spaces
+    const normalizedDropoff = dropoff?.toLowerCase().replace(/\s/g, '');
     
     // Get all legs for this instruction
     const legsResponse = await api.get(`/legs/${instructionId}`);
@@ -598,7 +640,9 @@ const canFinish = () => {
     const containersReachingDropoff = new Set();
     
     legsData.forEach((leg) => {
-      if (leg.destination === dropoff && leg.drivers && leg.drivers.length > 0) {
+      // Normalize leg destination by converting to lowercase and removing spaces
+      const normalizedLegDestination = leg.destination?.toLowerCase().replace(/\s/g, '');
+      if (normalizedLegDestination === normalizedDropoff && leg.drivers && leg.drivers.length > 0) {
         leg.drivers.forEach((driver) => {
           if (driver.containernumber) {
             containersReachingDropoff.add(driver.containernumber.toString());
