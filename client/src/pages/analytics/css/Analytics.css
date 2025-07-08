@@ -50,8 +50,8 @@
 }
 
 .analytics-page-wrapper .period-button.active {
-  background-color: #4169e1;
-  color: white;
+  background-color: white;
+  color: #4169e1;
 }
 
 .analytics-page-wrapper .analytics-content {
@@ -69,6 +69,7 @@
 
 .analytics-page-wrapper .filter-button {
   background-color: #3845fd;
+  color: white;
   border: 1px solid #ddd;
   padding: 10px;
   text-align: left;
@@ -78,12 +79,12 @@
 }
 
 .analytics-page-wrapper .filter-button:hover {
-  background-color: #e0e0e0;
+  background-color: #1a228b;
 }
 
 .analytics-page-wrapper .filter-button.active {
-  background-color: #05288f;
-  color: white;
+  background-color: white;
+  color: #05288f;
 }
 
 .analytics-page-wrapper .chart-area {
