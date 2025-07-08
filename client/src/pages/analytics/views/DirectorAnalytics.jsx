@@ -240,9 +240,10 @@ export default function DirectorAnalytics() {
     setIsLoading(true)
     setError(null)
     try {
-      console.log(`Fetching turnover vs diesel cost for month: ${month}, year: ${year}`)
+      const numericMonth = monthNames.indexOf(month) + 1 // Convert month name to numeric (1-12)
+      console.log(`Fetching turnover vs diesel cost for month: ${month} (numeric: ${numericMonth}), year: ${year}`)
       const response = await api.get("/api/turnover-vs-diesel-cost", {
-        params: { month, year, _t: new Date().getTime() },
+        params: { month: numericMonth, year, _t: new Date().getTime() },
       })
       if (response.data.success) {
         const data = response.data.data.map((item) => {
