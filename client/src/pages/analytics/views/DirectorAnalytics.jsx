@@ -1160,14 +1160,14 @@ export default function DirectorAnalytics() {
               30, 60, 90, Current
             </button>
             <button
-              className={`filter-button ${activeFilter === "subcontractorTurnoverPerMonth" ? "active" : ""}`}
-              onClick={() => setActiveFilter("subcontractorTurnoverPerMonth")}
+              className={`filter-button ${activeFilter === "subcontractorVsTurnover" ? "active" : ""}`}
+              onClick={() => setActiveFilter("subcontractorVsTurnover")}
             >
               Subbie VS Turnover
             </button>
             <button
-              className={`filter-button ${activeFilter === "subcontractorVsTurnover" ? "active" : ""}`}
-              onClick={() => setActiveFilter("subcontractorVsTurnover")}
+              className={`filter-button ${activeFilter === "subcontractorTurnoverPerMonth" ? "active" : ""}`}
+              onClick={() => setActiveFilter("subcontractorTurnoverPerMonth")}
             >
               Turnover VS Total Subbie
             </button>
