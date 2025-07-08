@@ -313,13 +313,13 @@ const DirectorDocs = () => {
   };
 
   // Determine if we should show the Empty Turning Depot Document option
-  const showEmptyTurningDepotOption = () => {
-    console.log(
-      "Checking if we should show Empty Turning Depot Document option. Shipment type:",
-      shipmentType
-    );
-    return shipmentType !== 2;
-  };
+const showAdditionalDocumentOptions = () => {
+  console.log(
+    "Checking if we should show additional document options. Shipment type:",
+    shipmentType
+  );
+  return shipmentType !== 3;
+};
 
   return (
     <div className="instruction-container">
@@ -387,67 +387,69 @@ const DirectorDocs = () => {
       </div>
 
       {/* Document requirements status */}
-      <div
-        style={{
-          margin: "20px 0",
-          padding: "15px",
-          backgroundColor: "#f5f5f5",
-          borderRadius: "4px",
-        }}
-      >
-        <h4 style={{ marginTop: 0 }}>Document Requirements:</h4>
-        <ul style={{ paddingLeft: "20px" }}>
-          <li
-            style={{
-              color:
-                documents.filter((doc) => doc.type === "Instruction Document")
-                  .length === 1
-                  ? "green"
-                  : "red",
-            }}
-          >
-            Instruction Document:{" "}
-            {
+<div
+  style={{
+    margin: "20px 0",
+    padding: "15px",
+    backgroundColor: "#f5f5f5",
+    borderRadius: "4px",
+  }}
+>
+  <h4 style={{ marginTop: 0 }}>Document Requirements:</h4>
+  <ul style={{ paddingLeft: "20px" }}>
+    {showAdditionalDocumentOptions() && (
+      <>
+        <li
+          style={{
+            color:
               documents.filter((doc) => doc.type === "Instruction Document")
-                .length
-            }
-            /1
-          </li>
-          <li
-            style={{
-              color:
-                documents.filter((doc) => doc.type === "Delivery Note")
-                  .length === containerCount
-                  ? "green"
-                  : "red",
-            }}
-          >
-            Delivery Notes:{" "}
-            {documents.filter((doc) => doc.type === "Delivery Note").length}/
-            {containerCount}
-          </li>
-          {showEmptyTurningDepotOption() && (
-            <li
-              style={{
-                color:
-                  documents.filter(
-                    (doc) => doc.type === "Empty Turning Depot Document"
-                  ).length === 1
-                    ? "green"
-                    : "red",
-              }}
-            >
-              Empty Turning Depot Document:{" "}
-              {
-                documents.filter(
-                  (doc) => doc.type === "Empty Turning Depot Document"
-                ).length
-              }
-              /1
-            </li>
-          )}
-        </ul>
-      </div>
+                .length === 1
+                ? "green"
+                : "red",
+          }}
+        >
+          Instruction Document:{" "}
+          {
+            documents.filter((doc) => doc.type === "Instruction Document")
+              .length
+          }
+          /1
+        </li>
+        <li
+          style={{
+            color:
+              documents.filter(
+                (doc) => doc.type === "Empty Turning Depot Document"
+              ).length === 1
+                ? "green"
+                : "red",
+          }}
+        >
+          Empty Turning Depot Document:{" "}
+          {
+            documents.filter(
+              (doc) => doc.type === "Empty Turning Depot Document"
+            ).length
+          }
+          /1
+        </li>
+      </>
+    )}
+    <li
+      style={{
+        color:
+          documents.filter((doc) => doc.type === "Delivery Note").length ===
+          containerCount
+            ? "green"
+            : "red",
+      }}
+    >
+      Delivery Notes:{" "}
+      {documents.filter((doc) => doc.type === "Delivery Note").length}/
+      {containerCount}
+    </li>
+  </ul>
+</div>
     </div>
   );
 };
