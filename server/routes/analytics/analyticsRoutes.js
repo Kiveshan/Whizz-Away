@@ -11,6 +11,7 @@ import {
   getSubcontractorVsTurnoverController,
   getAllSubcontractorsController,
   getWagesVsExpensesController,
+  getTurnoverVsSubbieExpenseController
 } from "../../controllers/analytics/analyticsController.js";
 import { verifyToken } from "../../middleware/auth.js";
 
@@ -34,5 +35,6 @@ router.get("/api/subcontractor-vs-turnover", verifyToken,
   getSubcontractorVsTurnoverController);
 router.get("/api/wages-vs-expenses", verifyToken, 
   getWagesVsExpensesController);
+router.get("/api/turnover-vs-subbie-expense", verifyToken, getTurnoverVsSubbieExpenseController);
 
 export default router;

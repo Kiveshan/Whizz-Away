@@ -55,8 +55,14 @@ export default function DirectorAnalytics() {
   }
 
   const getChartWidth = (dataLength) => {
-    if (activeFilter === "turnoverPerMonth" || activeFilter === "agingAnalysis" || activeFilter === "subcontractorVsTurnover" || activeFilter === "subcontractorTurnoverPerMonth" || activeFilter === "wagesVsExpenses" || activeFilter === "incomeVsExpense") {
-      return 1000; // Fixed width for 1-2 bars
+    if (activeFilter === "turnoverPerMonth" || 
+        activeFilter === "agingAnalysis" || 
+        activeFilter === "subcontractorVsTurnover" || 
+        activeFilter === "subcontractorTurnoverPerMonth" || 
+        activeFilter === "wagesVsExpenses" || 
+        activeFilter === "incomeVsExpense" || 
+        activeFilter === "turnoverVsSubbieExpense") {
+      return 1000;
     }
     const minWidth = 1000
     const barWidth = 180
@@ -450,51 +456,111 @@ export default function DirectorAnalytics() {
     }
   }
 
+  const fetchTurnoverVsSubbieExpense = async (month, year, subcontractorId = "") => {
+    setIsLoading(true)
+    setError(null)
+    try {
+      console.log(`Fetching turnover vs subbie expense for month: ${month}, year: ${year}, subcontractorId: ${subcontractorId}`)
+      const response = await api.get("/api/turnover-vs-subbie-expense", {
+        params: { month, year, subcontractorId: subcontractorId || undefined, _t: new Date().getTime() },
+      })
+      console.log("API response:", response.data)
+      if (response.data.success) {
+        const data = response.data.data.map((item) => {
+          console.log(
+            `Received: name=${item.name}, value=${item.value}, type=${item.type}, percentage=${item.percentage}%`
+          )
+          return {
+            name: item.name,
+            value: Number(item.value) || 0,
+            type: item.type,
+            percentage: Number(item.percentage) || 0,
+            month: item.month,
+            year: item.year,
+          }
+        })
+        console.log("Processed turnover vs subbie expense data:", data)
+        return data
+      } else {
+        throw new Error(response.data.message || "Failed to fetch data")
+      }
+    } catch (err) {
+      console.error("Error fetching turnover vs subbie expense:", err)
+      setError(err.message)
+      return []
+    } finally {
+      setIsLoading(false)
+    }
+  }
+
   useEffect(() => {
     fetchClients()
     fetchSubcontractors()
   }, [])
 
   useEffect(() => {
+    let isMounted = true;
     const loadData = async () => {
-      setChartData([])
-      let data = []
-      switch (activeFilter) {
-        case "fuel":
-          data = await fetchFuelData(activeMonth, activeYear)
-          break
-        case "turnoverPerMonth":
-          data = await fetchTurnoverData(activeMonth, activeYear, selectedClient)
-          break
-        case "agingAnalysis":
-          data = await fetchAgingAnalysisData(activeMonth, activeYear, selectedClient)
-          break
-        case "turnoverVsDieselCost":
-          data = await fetchTurnoverVsDieselCost(activeMonth, activeYear)
-          break
-        case "subcontractorTurnoverPerMonth":
-          data = await fetchSubcontractorTurnoverPerMonth(activeMonth, activeYear)
-          break
-        case "subcontractorVsTurnover":
-          data = await fetchSubcontractorVsTurnover(activeMonth, activeYear, selectedSubcontractor)
-          break
-        case "turnoverPerTruck":
-          data = await fetchTurnoverPerTruck(activeMonth, activeYear)
-          break
-        case "incomeVsExpense":
-          data = await fetchIncomeVsExpenses(activeMonth, activeYear)
-          break
-        case "wagesVsExpenses":
-          data = await fetchWagesVsExpenses(activeMonth, activeYear)
-          break
-        default:
-          data = []
+      // Clear chartData immediately when filter changes
+      setChartData([]);
+      setError(null);
+      setIsLoading(true);
+      
+      let data = [];
+      try {
+        switch (activeFilter) {
+          case "fuel":
+            data = await fetchFuelData(activeMonth, activeYear);
+            break;
+          case "turnoverPerMonth":
+            data = await fetchTurnoverData(activeMonth, activeYear, selectedClient);
+            break;
+          case "agingAnalysis":
+            data = await fetchAgingAnalysisData(activeMonth, activeYear, selectedClient);
+            break;
+          case "turnoverVsDieselCost":
+            data = await fetchTurnoverVsDieselCost(activeMonth, activeYear);
+            break;
+          case "subcontractorTurnoverPerMonth":
+            data = await fetchSubcontractorTurnoverPerMonth(activeMonth, activeYear);
+            break;
+          case "subcontractorVsTurnover":
+            data = await fetchSubcontractorVsTurnover(activeMonth, activeYear, selectedSubcontractor);
+            break;
+          case "turnoverPerTruck":
+            data = await fetchTurnoverPerTruck(activeMonth, activeYear);
+            break;
+          case "incomeVsExpense":
+            data = await fetchIncomeVsExpenses(activeMonth, activeYear);
+            break;
+          case "wagesVsExpenses":
+            data = await fetchWagesVsExpenses(activeMonth, activeYear);
+            break;
+          case "turnoverVsSubbieExpense":
+            data = await fetchTurnoverVsSubbieExpense(activeMonth, activeYear, selectedSubcontractor);
+            break;
+          default:
+            data = [];
+        }
+        if (isMounted) {
+          console.log("Setting chartData:", data);
+          setChartData(data);
+        }
+      } catch (err) {
+        if (isMounted) {
+          setError(`Failed to load data: ${err.message}`);
+        }
+      } finally {
+        if (isMounted) {
+          setIsLoading(false);
+        }
       }
-      console.log("Setting chartData:", data)
-      setChartData(data)
-    }
-    loadData()
-  }, [activeFilter, activeMonth, activeYear, selectedClient, selectedSubcontractor])
+    };
+    loadData();
+    return () => {
+      isMounted = false;
+    };
+  }, [activeFilter, activeMonth, activeYear, selectedClient, selectedSubcontractor]);
 
   const CustomTooltip = ({ active, payload, label }) => {
     if (active && payload && payload.length) {
@@ -541,8 +607,14 @@ export default function DirectorAnalytics() {
         default:
           return "#4169e1"
       }
-    } else if ((activeFilter === "subcontractorVsTurnover" || activeFilter === "subcontractorTurnoverPerMonth" || activeFilter === "wagesVsExpenses" || activeFilter === "incomeVsExpense") && entry && entry.type) {
-      return entry.type === "income" ? "#4169e1" : entry.type === "expenses" ? "#ff6347" : entry.type === "total" ? "#9C27B0" : "#E91E63"
+    } else if ((activeFilter === "subcontractorVsTurnover" || 
+                activeFilter === "subcontractorTurnoverPerMonth" || 
+                activeFilter === "wagesVsExpenses" || 
+                activeFilter === "incomeVsExpense" || 
+                activeFilter === "turnoverVsSubbieExpense") && entry && entry.type) {
+      return entry.type === "income" ? "#4169e1" : 
+             entry.type === "expenses" ? "#ff6347" : 
+             entry.type === "total" ? "#9C27B0" : "#E91E63"
     }
     console.log("Falling back to default color")
     return "#4169e1"
@@ -553,7 +625,11 @@ export default function DirectorAnalytics() {
     const percentage = payload.percentage ?? 0
     console.log("CustomBarLabelForTurnover - payload:", payload)
     return (
-      <text x={x + width / 2} y={y - 10} fill={payload.type === "total" ? "#9C27B0" : payload.type === "income" ? "#4169e1" : "#ff6347"} textAnchor="middle" dominantBaseline="middle" fontSize={12}>
+      <text x={x + width / 2} y={y - 10} 
+            fill={payload.type === "total" ? "#9C27B0" : 
+                  payload.type === "income" ? "#4169e1" : 
+                  payload.type === "expenses" ? "#ff6347" : "#E91E63"} 
+            textAnchor="middle" dominantBaseline="middle" fontSize={12}>
         R{value?.toLocaleString?.()} ({percentage}%)
       </text>
     )
@@ -899,6 +975,58 @@ export default function DirectorAnalytics() {
           </div>
         )
 
+      case "turnoverVsSubbieExpense":
+        return (
+          <div className="chart-wrapper">
+            {isLoading ? (
+              <div className="loading-indicator">Loading Turnover VS Subbie Expense data...</div>
+            ) : error ? (
+              <div className="error-message">{error}</div>
+            ) : !Array.isArray(chartData) || chartData.length === 0 ? (
+              <div className="no-data-message">
+                No turnover vs subbie expense data available for {activeMonth} {activeYear}
+              </div>
+            ) : (
+              <>
+                <div className="chart-header">
+                  <div className="chart-header-item">
+                    <span className="legend-color" style={{ backgroundColor: "#9C27B0" }}></span>
+                    <span>Total Turnover</span>
+                  </div>
+                  {chartData.some((entry) => entry.type === "subcontractor") && (
+                    <div className="chart-header-item">
+                      <span className="legend-color" style={{ backgroundColor: "#E91E63" }}></span>
+                      <span>Selected Subcontractor</span>
+                    </div>
+                  )}
+                </div>
+                <div className="chart-scroll-container">
+                  <ResponsiveContainer width={chartWidth} height={500}>
+                    <BarChart data={chartData} margin={{ top: 40, right: 30, left: 60, bottom: 40 }}>
+                      <XAxis dataKey="name" tick={{ fill: "#000" }} />
+                      <YAxis
+                        label={{
+                          value: "Amount (R)",
+                          angle: 0,
+                          position: "top",
+                          dy: -20,
+                        }}
+                      />
+                      <Tooltip content={<CustomTooltip />} />
+                      <Bar dataKey="value" name="Amount" radius={[4, 4, 0, 0]}>
+                        {chartData.map((entry, index) => (
+                          <Cell key={`cell-${index}`} fill={getBarFill(entry)} />
+                        ))}
+                        <LabelList dataKey="value" content={CustomBarLabelForTurnover} position="top" />
+                      </Bar>
+                    </BarChart>
+                  </ResponsiveContainer>
+                </div>
+              </>
+            )}
+          </div>
+        )
+
       case "turnoverVsDieselCost":
         return (
           <div className="chart-wrapper">
@@ -1038,14 +1166,8 @@ export default function DirectorAnalytics() {
                 </div>
                 <div className="chart-scroll-container">
                   <ResponsiveContainer width={chartWidth} height={500}>
-                    <BarChart data={chartData} margin={{ top: 40, right: 30, left: 60, bottom: 120 }}>
-                      <XAxis
-                        dataKey="name"
-                        interval={0}
-                        tick={<CustomAxisTick />}
-                        height={150}
-                        tickMargin={10}
-                      />
+                    <BarChart data={chartData} margin={{ top: 40, right: 30, left: 60, bottom: 40 }}>
+                      <XAxis dataKey="name" tick={{ fill: "#000" }} />
                       <YAxis
                         label={{
                           value: "Amount (R)",
@@ -1055,14 +1177,7 @@ export default function DirectorAnalytics() {
                         }}
                       />
                       <Tooltip content={<CustomTooltip />} />
-                      <Bar
-                        dataKey="value"
-                        name="Amount"
-                        radius={[4, 4, 0, 0]}
-                        fillOpacity={0.9}
-                        isAnimationActive={true}
-                        animationDuration={500}
-                      >
+                      <Bar dataKey="value" name="Amount" radius={[4, 4, 0, 0]}>
                         {chartData.map((entry, index) => (
                           <Cell key={`cell-${index}`} fill={getBarFill(entry)} />
                         ))}
@@ -1190,7 +1305,7 @@ export default function DirectorAnalytics() {
               ))}
             </select>
           )}
-          {activeFilter === "subcontractorVsTurnover" && (
+          {(activeFilter === "subcontractorVsTurnover" || activeFilter === "turnoverVsSubbieExpense") && (
             <select
               value={selectedSubcontractor}
               onChange={(e) => setSelectedSubcontractor(e.target.value)}
@@ -1262,6 +1377,12 @@ export default function DirectorAnalytics() {
             >
               Income vs Expense Per Month
             </button>
+            <button
+              className={`filter-button ${activeFilter === "turnoverVsSubbieExpense" ? "active" : ""}`}
+              onClick={() => setActiveFilter("turnoverVsSubbieExpense")}
+            >
+              Turnover VS Subbie Expense
+            </button>
           </div>
 
           <div className="chart-area">
@@ -1269,12 +1390,13 @@ export default function DirectorAnalytics() {
               {activeFilter === "fuel" && "Fuel Per Truck"}
               {activeFilter === "turnoverPerMonth" && "Turnover per month vs Client"}
               {activeFilter === "agingAnalysis" && "30, 60, 90, Current"}
-              {activeFilter === "subcontractorTurnoverPerMonth" && "Subbie VS Turnover"}
-              {activeFilter === "subcontractorVsTurnover" && "Turnover VS Total Subbie"}
+              {activeFilter === "subcontractorTurnoverPerMonth" && "Turnover VS Total Subbie"}
+              {activeFilter === "subcontractorVsTurnover" && "Subbie VS Turnover"}
               {activeFilter === "wagesVsExpenses" && "Wages per month VS Expenses"}
               {activeFilter === "turnoverVsDieselCost" && "Turnover vs Diesel Cost"}
               {activeFilter === "turnoverPerTruck" && "Turnover Per Truck"}
               {activeFilter === "incomeVsExpense" && "Income vs Expense Per Month"}
+              {activeFilter === "turnoverVsSubbieExpense" && "Turnover VS Subbie Expense"}
             </h2>
             {renderChart()}
           </div>

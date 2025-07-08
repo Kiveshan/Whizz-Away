@@ -673,6 +673,82 @@ const getWagesVsExpenses = async (client, month, year) => {
   return wagesVsExpensesData;
 };
 
+const getTurnoverVsSubbieExpense = async (client, month, year, subcontractorId = null) => {
+  const params = [month, year];
+  let subcontractorQuery = `
+    SELECT 
+      e.companyname,
+      COALESCE(SUM(l.driverrate), 0) as subcontractor_expense,
+      TO_CHAR(l.date, 'Month') as month_name,
+      EXTRACT(YEAR FROM l.date) as year
+    FROM legs_m2 l
+    JOIN m5_employee e ON l.driverid = e.userid
+    WHERE e.roleid = 6
+      AND TRIM(TO_CHAR(l.date, 'Month')) = $1
+      AND EXTRACT(YEAR FROM l.date)::text = $2
+  `;
+  if (subcontractorId) {
+    subcontractorQuery += ` AND e.userid = $3`;
+    params.push(subcontractorId);
+  }
+  subcontractorQuery += `
+    GROUP BY e.companyname, TO_CHAR(l.date, 'Month'), EXTRACT(YEAR FROM l.date)
+  `;
+
+  const totalTurnoverQuery = `
+    SELECT 
+      COALESCE(SUM(m.total_cost), 0) as total_turnover,
+      TO_CHAR(i.date, 'Month') as month_name,
+      EXTRACT(YEAR FROM i.date) as year
+    FROM invoice i
+    JOIN m1_controller m ON i.m1key = m.m1key
+    WHERE TRIM(TO_CHAR(i.date, 'Month')) = $1
+    AND EXTRACT(YEAR FROM i.date)::text = $2
+    GROUP BY TO_CHAR(i.date, 'Month'), EXTRACT(YEAR FROM i.date)
+  `;
+
+  const [subcontractorResult, totalTurnoverResult] = await Promise.all([
+    subcontractorId ? client.query(subcontractorQuery, params) : Promise.resolve({ rows: [] }),
+    client.query(totalTurnoverQuery, [month, year])
+  ]);
+
+  console.log("Subcontractor expense query result:", subcontractorResult.rows);
+  console.log("Total turnover query result:", totalTurnoverResult.rows);
+
+  const totalTurnover = parseFloat(totalTurnoverResult.rows[0]?.total_turnover || 0);
+  console.log(`Total turnover for ${month} ${year}: ${totalTurnover}`);
+
+  const turnoverData = [];
+
+  // Add total turnover entry
+  turnoverData.push({
+    name: "Total Turnover",
+    value: totalTurnover,
+    type: "total",
+    percentage: 100,
+    month: month.trim(),
+    year: year.toString(),
+  });
+
+  // Add subcontractor expense entry if subcontractorId is provided
+  if (subcontractorId && subcontractorResult.rows.length > 0) {
+    const row = subcontractorResult.rows[0];
+    const subcontractorExpense = parseFloat(row.subcontractor_expense || 0);
+    const percentage = totalTurnover > 0 ? ((subcontractorExpense / totalTurnover) * 100).toFixed(2) : 0;
+    turnoverData.push({
+      name: row.companyname,
+      value: subcontractorExpense,
+      type: "subcontractor",
+      percentage: parseFloat(percentage),
+      month: row.month_name.trim(),
+      year: row.year.toString(),
+    });
+  }
+
+  console.log("Processed turnover vs subbie expense data:", turnoverData);
+  return turnoverData;
+};
+
 export {
   getFuelExpenses,
   getTurnoverPerMonth,
@@ -685,4 +761,5 @@ export {
   getSubcontractorTurnoverPerMonth,
   getSubcontractorVsTurnover,
   getWagesVsExpenses,
+  getTurnoverVsSubbieExpense,
 };
