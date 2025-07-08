@@ -150,17 +150,11 @@ const getTurnoverPerTruckController = async (req, res) => {
 };
 
 const getSubcontractorTurnoverPerMonthController = async (req, res) => {
-  const { month, year } = req.query;
-  console.log(`Received request for subcontractor turnover: month=${month}, year=${year}`);
   try {
-    const client = await pool.connect();
-    try {
-      const data = await getSubcontractorTurnoverPerMonth(client, month, year);
-      console.log("Subcontractor turnover data:", data);
-      res.status(200).json({ success: true, data });
-    } finally {
-      client.release();
-    }
+    const { month, year } = req.query;
+    console.log(`Received request for subcontractor turnover per month: month=${month}, year=${year}`);
+    const data = await getSubcontractorTurnoverPerMonth(pool, month, year);
+    res.status(200).json({ success: true, data });
   } catch (error) {
     console.error("Error in getSubcontractorTurnoverPerMonthController:", error);
     res.status(500).json({ success: false, message: error.message });
@@ -168,17 +162,11 @@ const getSubcontractorTurnoverPerMonthController = async (req, res) => {
 };
 
 const getSubcontractorVsTurnoverController = async (req, res) => {
-  const { month, year, subcontractorId } = req.query;
-  console.log(`Received request for subcontractor vs turnover: month=${month}, year=${year}, subcontractorId=${subcontractorId}`);
   try {
-    const client = await pool.connect();
-    try {
-      const data = await getSubcontractorVsTurnover(client, month, year, subcontractorId);
-      console.log("Subcontractor vs turnover data:", data);
-      res.status(200).json({ success: true, data });
-    } finally {
-      client.release();
-    }
+    const { month, year, subcontractorId } = req.query;
+    console.log(`Received request for subcontractor vs turnover: month=${month}, year=${year}, subcontractorId=${subcontractorId}`);
+    const data = await getSubcontractorVsTurnover(pool, month, year, subcontractorId);
+    res.status(200).json({ success: true, data });
   } catch (error) {
     console.error("Error in getSubcontractorVsTurnoverController:", error);
     res.status(500).json({ success: false, message: error.message });
