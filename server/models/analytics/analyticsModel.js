@@ -473,17 +473,15 @@ const getSubcontractorTurnoverPerMonth = async (client, month, year) => {
       WHERE e.roleid = 6
         AND m.pickupdate IS NOT NULL
     ),
-    SubcontractorTurnover AS (
+    TotalSubcontractorTurnover AS (
       SELECT 
-        COALESCE(e.companyname, 'Unknown') AS companyname,
         SUM(ltc.turnover_contribution) AS total_subcontractor_turnover,
         TO_CHAR(ltc.pickupdate, 'Month') AS month_name,
         EXTRACT(YEAR FROM ltc.pickupdate)::TEXT AS year
       FROM LegDriverContributions ltc
-      JOIN m5_employee e ON ltc.driverid = e.userid
       WHERE TRIM(TO_CHAR(ltc.pickupdate, 'Month')) = $1
         AND EXTRACT(YEAR FROM ltc.pickupdate)::TEXT = $2
-      GROUP BY e.companyname, TO_CHAR(ltc.pickupdate, 'Month'), EXTRACT(YEAR FROM ltc.pickupdate)
+      GROUP BY TO_CHAR(ltc.pickupdate, 'Month'), EXTRACT(YEAR FROM ltc.pickupdate)
     ),
     TotalTurnover AS (
       SELECT 
@@ -506,13 +504,13 @@ const getSubcontractorTurnoverPerMonth = async (client, month, year) => {
     FROM TotalTurnover tt
     UNION ALL
     SELECT 
-      st.companyname AS name,
-      st.total_subcontractor_turnover AS value,
+      'Total Subcontractor Turnover' AS name,
+      tst.total_subcontractor_turnover AS value,
       'subcontractor' AS type,
-      (st.total_subcontractor_turnover / tt.total_turnover * 100)::NUMERIC(5,2) AS percentage,
-      st.month_name AS month,
-      st.year
-    FROM SubcontractorTurnover st
+      (tst.total_subcontractor_turnover / tt.total_turnover * 100)::NUMERIC(5,2) AS percentage,
+      tst.month_name AS month,
+      tst.year
+    FROM TotalSubcontractorTurnover tst
     CROSS JOIN TotalTurnover tt
     ORDER BY value DESC;
   `;
@@ -619,7 +617,7 @@ const getSubcontractorVsTurnover = async (client, month, year, subcontractorId =
   `;
 
   const [subcontractorResult, totalTurnoverResult] = await Promise.all([
-    client.query(subcontractorQuery, params),
+    subcontractorId ? client.query(subcontractorQuery, params) : Promise.resolve({ rows: [] }),
     client.query(totalTurnoverQuery, [month, year])
   ]);
 
@@ -640,21 +638,18 @@ const getSubcontractorVsTurnover = async (client, month, year, subcontractorId =
     }
   ];
 
-  if (subcontractorResult.rows.length > 0) {
-    turnoverData.push(
-      ...subcontractorResult.rows.map(row => {
-        const subcontractorTurnover = parseFloat(row.value || 0);
-        const percentage = totalTurnover > 0 ? ((subcontractorTurnover / totalTurnover) * 100).toFixed(2) : 0;
-        return {
-          name: row.name,
-          value: subcontractorTurnover,
-          type: "subcontractor",
-          percentage: parseFloat(percentage),
-          month: row.month.trim(),
-          year: row.year,
-        };
-      })
-    );
+  if (subcontractorId && subcontractorResult.rows.length > 0) {
+    const row = subcontractorResult.rows[0];
+    const subcontractorTurnover = parseFloat(row.value || 0);
+    const percentage = totalTurnover > 0 ? ((subcontractorTurnover / totalTurnover) * 100).toFixed(2) : 0;
+    turnoverData.push({
+      name: row.name,
+      value: subcontractorTurnover,
+      type: "subcontractor",
+      percentage: parseFloat(percentage),
+      month: row.month.trim(),
+      year: row.year,
+    });
   }
 
   console.log("Processed subcontractor vs turnover data:", turnoverData);
