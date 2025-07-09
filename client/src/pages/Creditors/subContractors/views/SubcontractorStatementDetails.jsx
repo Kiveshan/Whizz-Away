@@ -9,7 +9,7 @@ import html2pdf from "html2pdf.js";
 const SubcontractorStatementDetail = () => {
   const navigate = useNavigate();
   const location = useLocation();
-  console.log("Received state:", location.state); // Debug log
+  console.log("Received state:", location.state);
   const {
     statementId,
     subcontractorName,
@@ -38,22 +38,20 @@ const SubcontractorStatementDetail = () => {
     const fetchStatementDetail = async () => {
       try {
         setLoading(true);
-        // Parse legids string to extract legkey values
         let legKeys;
         try {
           const parsedLegids = JSON.parse(legids);
-          legKeys = parsedLegids.map((item) => item.legkey); // Extract only legkey
-          console.log("Parsed legKeys:", legKeys); // Debug log
+          legKeys = parsedLegids.map((item) => item.legkey);
+          console.log("Parsed legKeys:", legKeys);
         } catch (e) {
           console.error("Invalid legids JSON:", e, "Received:", legids);
-          legKeys = []; // Fallback to empty array if parsing fails
+          legKeys = [];
         }
 
         if (legKeys.length === 0) {
           throw new Error("No valid leg keys found in legids");
         }
 
-        // API call to fetch leg details
         const response = await api.get("/subcontractor/statement-details", {
           params: {
             statementId,
@@ -61,7 +59,7 @@ const SubcontractorStatementDetail = () => {
             subei_reg_num,
           },
         });
-        console.log("Statement details response:", response.data); // Debug log
+        console.log("Statement details response:", response.data);
 
         if (!response.data)
           throw new Error("Failed to fetch statement details");
@@ -75,13 +73,11 @@ const SubcontractorStatementDetail = () => {
           instruction: leg.m1_description || "N/A",
         }));
 
-        // Calculate total as sum of all rates (no additional tax/VAT)
         const totalAmount = workItems.reduce(
           (sum, item) => sum + (item.rate || 0),
           0
         );
 
-        // Fetch company info from usertable where roleid = 1 and status = 'active'
         const companyResponse = await api.get("/subcontractor/company-info", {
           params: { roleid: 1, status: "active" },
         });
@@ -95,7 +91,6 @@ const SubcontractorStatementDetail = () => {
           email: companyData.email || "billing@constructionpro.com",
         });
 
-        // Fetch subcontractor info
         const subResponse = await api.get("/subcontractor/info", {
           params: { subei_reg_num },
         });
@@ -113,8 +108,8 @@ const SubcontractorStatementDetail = () => {
           generationDate: date,
           workItems,
           summary: {
-            totalAmount, // Sum of all rates
-            finalAmount: totalAmount, // Same as totalAmount (no additional calculations)
+            totalAmount,
+            finalAmount: totalAmount,
           },
         });
       } catch (err) {
@@ -132,15 +127,29 @@ const SubcontractorStatementDetail = () => {
     if (isGenerating) return;
     setIsGenerating(true);
 
+    // Hide action buttons during PDF generation
+    const actionButtons = document.querySelector(".statement-actions");
+    if (actionButtons) {
+      actionButtons.style.display = "none";
+    }
+
     requestAnimationFrame(() => {
       const element = statementRef.current;
       const filename = `Subcontractor-Statement-${statementId}.pdf`;
 
       const opt = {
-        margin: [20, 15, 20, 15],
+        margin: [10, 10, 10, 10],
         filename: filename,
-        image: { type: "png", quality: 0.98 },
-        html2canvas: { scale: 1.2, useCORS: true, scrollY: 0, scrollX: 0 },
+        image: { type: "jpeg", quality: 0.98 },
+        html2canvas: {
+          scale: 2,
+          useCORS: true,
+          scrollY: 0,
+          scrollX: 0,
+          letterRendering: true,
+          allowTaint: false,
+          backgroundColor: "#ffffff",
+        },
         jsPDF: {
           unit: "mm",
           format: "a4",
@@ -154,10 +163,20 @@ const SubcontractorStatementDetail = () => {
         .set(opt)
         .from(element)
         .save()
-        .then(() => setIsGenerating(false))
+        .then(() => {
+          setIsGenerating(false);
+          // Show action buttons again
+          if (actionButtons) {
+            actionButtons.style.display = "flex";
+          }
+        })
         .catch((error) => {
           console.error("PDF generation error:", error);
           setIsGenerating(false);
+          // Show action buttons again
+          if (actionButtons) {
+            actionButtons.style.display = "flex";
+          }
         });
     });
   };
@@ -165,7 +184,7 @@ const SubcontractorStatementDetail = () => {
   if (loading)
     return (
       <div className="statement-detail-wrapper">
-        <div>Loading statement details...</div>
+        <div className="loading-message">Loading statement details...</div>
       </div>
     );
   if (error)
@@ -177,7 +196,9 @@ const SubcontractorStatementDetail = () => {
   if (!statement || !companyInfo || !subcontractorInfo)
     return (
       <div className="statement-detail-wrapper">
-        <div>Please select a statement from the list.</div>
+        <div className="loading-message">
+          Please select a statement from the list.
+        </div>
       </div>
     );
 
@@ -185,81 +206,140 @@ const SubcontractorStatementDetail = () => {
     <div className="statement-detail-wrapper">
       <div className="statement-page">
         <div className="statement-paper" ref={statementRef}>
+          {/* Professional Header */}
           <div className="statement-header">
-            <h1>{companyInfo.name}</h1>
-            <div className="company-details">
-              <p>{companyInfo.address}</p>
-              <p>
-                Phone: {companyInfo.phone} | Email: {companyInfo.email}
-              </p>
+            <div className="company-logo-section">
+              <h1 className="company-name">{companyInfo.name}</h1>
             </div>
           </div>
 
-          <div className="statement-info-section">
-            <div className="subcontractor-info">
-              <div className="to-label">To:</div>
-              <div className="subcontractor-name">
-                {subcontractorInfo.name}
-                <br />
-                {subcontractorInfo.location}
-                <br />
-                {subcontractorInfo.contact_person}
+          {/* Statement Title */}
+          <div className="statement-title-section">
+            <div className="statement-number">Statement #{statementId}</div>
+          </div>
+
+          {/* Billing Information */}
+          <div className="billing-section">
+            <div className="billing-info">
+              <div className="billing-header">Bill To:</div>
+              <div className="subcontractor-details">
+                <div className="subcontractor-name">
+                  {subcontractorInfo.name}
+                </div>
+                <div className="subcontractor-address">
+                  {subcontractorInfo.location}
+                </div>
+                <div className="contact-person">
+                  <span className="label">Contact:</span>{" "}
+                  {subcontractorInfo.contact_person}
+                </div>
               </div>
             </div>
-            <div className="statement-details">
-              <div className="statement-meta">
-                <p>
-                  <strong>Generated:</strong>{" "}
-                  {statement.generationDate.toLocaleDateString()}
-                </p>
+            <div className="statement-meta">
+              <div className="meta-row">
+                <span className="meta-label">Statement Date:</span>
+                <span className="meta-value">
+                  {new Date(statement.generationDate).toLocaleDateString(
+                    "en-US",
+                    {
+                      year: "numeric",
+                      month: "long",
+                      day: "numeric",
+                    }
+                  )}
+                </span>
+              </div>
+              <div className="meta-row">
+                <span className="meta-label">Subcontractor ID:</span>
+                <span className="meta-value">{subcontractorId}</span>
               </div>
             </div>
           </div>
 
-          <div className="statement-divider"></div>
-
+          {/* Work Items Table */}
           <div className="work-items-section">
-            <h3>Work Completed</h3>
-            <table className="work-items-table">
-              <thead>
-                <tr>
-                  <th>Date</th>
-                  <th>Starting</th>
-                  <th>Destination</th>
-                  <th>Rate</th>
-                  <th>Instruction</th>
-                </tr>
-              </thead>
-              <tbody>
-                {statement.workItems.map((item) => (
-                  <tr key={item.id}>
-                    <td>{new Date(item.date).toLocaleDateString()}</td>
-                    <td>{item.startingPoint}</td>
-                    <td>{item.destination}</td>
-                    <td>R{item.rate.toLocaleString()}</td>
-                    <td>{item.instruction}</td>
+            <h3 className="section-title">Work Completed</h3>
+            <div className="table-container">
+              <table className="work-items-table">
+                <thead>
+                  <tr>
+                    <th className="col-date">Date</th>
+                    <th className="col-starting">Starting Point</th>
+                    <th className="col-destination">Destination</th>
+                    <th className="col-rate">Rate</th>
+                    <th className="col-instruction">Instructions</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
+                </thead>
+                <tbody>
+                  {statement.workItems.map((item, index) => (
+                    <tr
+                      key={item.id}
+                      className={index % 2 === 0 ? "row-even" : "row-odd"}
+                    >
+                      <td className="col-date">
+                        {new Date(item.date).toLocaleDateString("en-US", {
+                          month: "short",
+                          day: "numeric",
+                          year: "numeric",
+                        })}
+                      </td>
+                      <td className="col-starting">{item.startingPoint}</td>
+                      <td className="col-destination">{item.destination}</td>
+                      <td className="col-rate">
+                        R
+                        {item.rate.toLocaleString("en-US", {
+                          minimumFractionDigits: 2,
+                          maximumFractionDigits: 2,
+                        })}
+                      </td>
+                      <td className="col-instruction">{item.instruction}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
           </div>
 
-          <div className="payment-summary">
-            <div className="summary-details">
-              <div className="summary-row total-row">
-                <span>
-                  <strong>Total Amount Due:</strong>
-                </span>
-                <span>
-                  <strong>
-                    R{statement.summary.finalAmount.toLocaleString()}
-                  </strong>
-                </span>
+          {/* Payment Summary */}
+          <div className="payment-summary-section">
+            <div className="summary-container">
+              <div className="summary-header">Payment Summary</div>
+              <div className="summary-content">
+                <div className="summary-row subtotal-row">
+                  <span className="summary-label">Subtotal:</span>
+                  <span className="summary-value">
+                    R
+                    {statement.summary.totalAmount.toLocaleString("en-US", {
+                      minimumFractionDigits: 2,
+                      maximumFractionDigits: 2,
+                    })}
+                  </span>
+                </div>
+                <div className="summary-divider"></div>
+                <div className="summary-row total-row">
+                  <span className="summary-label">Total Amount Due:</span>
+                  <span className="summary-value">
+                    R
+                    {statement.summary.finalAmount.toLocaleString("en-US", {
+                      minimumFractionDigits: 2,
+                      maximumFractionDigits: 2,
+                    })}
+                  </span>
+                </div>
               </div>
+            </div>
+          </div>
+
+          {/* Footer */}
+          <div className="statement-footer">
+            <div className="footer-text">
+              Thank you for your professional services and continued
+              partnership.
             </div>
           </div>
         </div>
 
+        {/* Action Buttons */}
         <div className="statement-actions">
           <button
             className="back-btn"
@@ -273,14 +353,14 @@ const SubcontractorStatementDetail = () => {
               })
             }
           >
-            Back to Statements
+            ← Back to Statements
           </button>
           <button
             className={`download-btn ${isGenerating ? "generating" : ""}`}
             onClick={generatePDF}
             disabled={isGenerating}
           >
-            {isGenerating ? "Generating PDF..." : "Download PDF"}
+            {isGenerating ? "Generating PDF..." : "📄 Download PDF"}
           </button>
         </div>
       </div>
