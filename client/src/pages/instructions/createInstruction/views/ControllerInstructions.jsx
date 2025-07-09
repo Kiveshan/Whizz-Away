@@ -69,7 +69,6 @@ const ControllerInstructions = () => {
       num_six_meters: 0,
       num_twelve_meters: 0,
       num_abnormal: 0,
-      num_breakbulk: 0,
       pickupTime: "",
       pickupDate: "",
       stackDate: "",
@@ -85,7 +84,6 @@ const ControllerInstructions = () => {
       sixMeterRate: "",
       twelveMeterRate: "",
       abnormalRate: "",
-      rateper_breakbulk: "",
       unitrate: "",
     }),
     [],
@@ -98,7 +96,6 @@ const ControllerInstructions = () => {
         "6m": 0,
         "12m": 0,
         Abnormal: 0,
-        BreakBulk: 0,
       },
     [location.state],
   )
@@ -527,7 +524,7 @@ const ControllerInstructions = () => {
   useEffect(() => {
     const weightBasedUnits = ["kg", "mÂ³", "ton"]
     const newIsWeightBased = weightBasedUnits.includes(formData.rateWeight)
-    const newIsCrossHaul = formData.shipmentTypeId === "3"
+    const newIsCrossHaul = formData.shipmentTypeId === "3" || formData.shipmentTypeId === "4"
     const newIsImport = formData.shipmentTypeId === "1"
 
     if (newIsWeightBased !== isWeightBased) {
@@ -877,15 +874,20 @@ const ControllerInstructions = () => {
     (e) => {
       const shipmentTypeId = e.target.value
       const selectedType = shipmentTypes.find((type) => type.shipkey === shipmentTypeId)
+      const isCrossHaulType = shipmentTypeId === "3" || shipmentTypeId === "4"
 
       setFormData((prev) => ({
         ...prev,
         shipmentTypeId: shipmentTypeId,
         shipmentTypeName: selectedType?.shipmenttype || "",
-        // Set vessel_name and stackDate to null for cross-haul
-        ...(shipmentTypeId === "3" && {
+        // Set vessel_name and stackDate to null for cross-haul types
+        ...(isCrossHaulType && {
           vesselName: "",
           stackDate: "",
+        }),
+        // Set unit per to "ton" for shipment type 4 (cross-haul/break bulk)
+        ...(shipmentTypeId === "4" && {
+          rateWeight: "ton"
         }),
       }))
 
@@ -956,7 +958,7 @@ const ControllerInstructions = () => {
     if (!formData.fileRef) errors.fileRef = "File reference is required"
     if (!formData.description) errors.description = "Description is required"
 
-    // Cross-haul specific validations (vessel name and stack date not required)
+    // Cross-haul specific validations (vessel name and stack date not required for cross-haul types)
     if (!isCrossHaul) {
       if (!formData.vesselName) errors.vesselName = "Vessel name is required"
       if (!formData.stackDate) errors.stackDate = "Stack date is required"
@@ -1295,7 +1297,7 @@ const ControllerInstructions = () => {
       const instructionData = {
         ...formData,
         total_cost: totalCost, // This is now the subtotal without VAT
-        // Set vessel_name and stackdate to null for cross-haul
+        // Set vessel_name and stackdate to null for cross-haul types
         vessel_name: isCrossHaul ? null : formData.vesselName,
         stackdate: isCrossHaul ? null : formData.stackDate,
         // UPDATED RATE SAVING LOGIC: Set container rates to 0 if count is 0, null for weight-based
@@ -1320,22 +1322,13 @@ const ControllerInstructions = () => {
             : formData.abnormalRate === ""
               ? null
               : Number.parseFloat(formData.abnormalRate || 0),
-        // Break bulk rate is 0 if count is 0, null if weight-based OR not cross-haul OR not container unit type
-        rateper_breakbulk:
-          isWeightBased || !isCrossHaul || formData.rateWeight !== "Container"
-            ? null
-            : formData.num_breakbulk === 0
-              ? 0
-              : formData.rateper_breakbulk === ""
-                ? null
-                : Number.parseFloat(formData.rateper_breakbulk || 0),
         // Set container counts to 0 for weight-based
         num_six_meters: isWeightBased ? 0 : formData.num_six_meters || 0,
         num_twelve_meters: isWeightBased ? 0 : formData.num_twelve_meters || 0,
         num_abnormal: isWeightBased ? 0 : formData.num_abnormal || 0,
-        // Break bulk count is 0 if weight-based OR not cross-haul OR not container unit type
-        num_breakbulk:
-          isWeightBased || !isCrossHaul || formData.rateWeight !== "Container" ? 0 : formData.num_breakbulk || 0,
+        // Set break bulk fields to null/0 as they've been removed from the UI
+        rateper_breakbulk: null,
+        num_breakbulk: 0,
         // Set weight and unitrate appropriately
         weight: isWeightBased ? (formData.weight === "" ? null : Number.parseFloat(formData.weight || 0)) : null,
         unitrate: isWeightBased ? (formData.unitrate === "" ? null : Number.parseFloat(formData.unitrate || 0)) : null,
@@ -1955,80 +1948,6 @@ const ControllerInstructions = () => {
                       </div>
                     </div>
                   </div>
-                  {isCrossHaul && (
-                    <div className="controller-instructions-container-input">
-                      <label>Break Bulk</label>
-                      <div className="controller-instructions-container-rate-group">
-                        <input
-                          type="number"
-                          className={fieldErrors.containers ? "controller-instructions-error-field" : ""}
-                          value={formData.num_breakbulk}
-                          min="0"
-                          name="num_breakbulk"
-                          onChange={(e) => handleContainerCountChange("num_breakbulk", e.target.value)}
-                          disabled={isWeightBased || !isCrossHaul}
-                          style={{
-                            backgroundColor: isWeightBased || !isCrossHaul ? "#f5f5f5" : "#fff",
-                            cursor: isWeightBased || !isCrossHaul ? "not-allowed" : "text",
-                          }}
-                        />
-                        <div style={{ width: "50%" }}>
-                          <input
-                            type="text"
-                            value={
-                              formData.rateper_breakbulk !== undefined && formData.rateper_breakbulk !== ""
-                                ? Number.parseFloat(formData.rateper_breakbulk).toFixed(2)
-                                : ""
-                            }
-                            onChange={(e) => {
-                              const value = e.target.value
-                              if (value === "" || /^\d*\.?\d*$/.test(value)) {
-                                setFormData((prev) => ({
-                                  ...prev,
-                                  rateper_breakbulk: value === "" ? "" : Number.parseFloat(value) || 0,
-                                }))
-                              }
-                            }}
-                            onFocus={(e) => {
-                              e.target.select()
-                              if (formData.rateper_breakbulk) {
-                                setFormData((prev) => ({
-                                  ...prev,
-                                  rateper_breakbulk: Number.parseFloat(prev.rateper_breakbulk).toString(),
-                                }))
-                              }
-                            }}
-                            onBlur={() => {
-                              if (formData.rateper_breakbulk !== "") {
-                                setFormData((prev) => ({
-                                  ...prev,
-                                  rateper_breakbulk: Number.parseFloat(prev.rateper_breakbulk),
-                                }))
-                              }
-                            }}
-                            style={{
-                              width: "50%",
-                              padding: "8px",
-                              border: "1px solid #000",
-                              borderRadius: "4px",
-                              backgroundColor:
-                                rateFieldsEnabled.breakBulk && !isWeightBased && isCrossHaul ? "#fff" : "#f5f5f5",
-                              fontSize: "16px",
-                              position: "relative",
-                              zIndex: 1000,
-                              cursor:
-                                rateFieldsEnabled.breakBulk && !isWeightBased && isCrossHaul ? "text" : "not-allowed",
-                            }}
-                            disabled={!rateFieldsEnabled.breakBulk || isWeightBased || !isCrossHaul}
-                            placeholder={rateFieldsEnabled.breakBulk && !isWeightBased && isCrossHaul ? "0.00" : ""}
-                          />
-                          {fieldErrors.rateper_breakbulk && (
-                            <div className="controller-instructions-error-message">{fieldErrors.rateper_breakbulk}</div>
-                          )}
-                        </div>
-                      </div>
-                    </div>
-                  )}
                   {fieldErrors.containerCount && (
                     <div
                       className="controller-instructions-error-message"
