@@ -3,8 +3,8 @@
 import { useNavigate, useLocation } from "react-router-dom";
 import { useState, useEffect, useRef } from "react";
 import api from "../../../../api";
+import jsPDF from "jspdf";
 import "../css/SubcontractorStatementDetail.css";
-import html2pdf from "html2pdf.js";
 
 const SubcontractorStatementDetail = () => {
   const navigate = useNavigate();
@@ -124,61 +124,177 @@ const SubcontractorStatementDetail = () => {
   }, [statementId, subcontractorId, subcontractorName, subei_reg_num, legids]);
 
   const generatePDF = () => {
-    if (isGenerating) return;
+    if (isGenerating || !statement || !companyInfo || !subcontractorInfo)
+      return;
     setIsGenerating(true);
 
-    // Hide action buttons during PDF generation
-    const actionButtons = document.querySelector(".statement-actions");
-    if (actionButtons) {
-      actionButtons.style.display = "none";
-    }
-
-    requestAnimationFrame(() => {
-      const element = statementRef.current;
-      const filename = `Subcontractor-Statement-${statementId}.pdf`;
-
-      const opt = {
-        margin: [10, 10, 10, 10],
-        filename: filename,
-        image: { type: "jpeg", quality: 0.98 },
-        html2canvas: {
-          scale: 2,
-          useCORS: true,
-          scrollY: 0,
-          scrollX: 0,
-          letterRendering: true,
-          allowTaint: false,
-          backgroundColor: "#ffffff",
-        },
-        jsPDF: {
-          unit: "mm",
-          format: "a4",
-          orientation: "portrait",
-          compress: true,
-        },
-        pagebreak: { mode: ["avoid-all", "css", "legacy"] },
-      };
-
-      html2pdf()
-        .set(opt)
-        .from(element)
-        .save()
-        .then(() => {
-          setIsGenerating(false);
-          // Show action buttons again
-          if (actionButtons) {
-            actionButtons.style.display = "flex";
-          }
-        })
-        .catch((error) => {
-          console.error("PDF generation error:", error);
-          setIsGenerating(false);
-          // Show action buttons again
-          if (actionButtons) {
-            actionButtons.style.display = "flex";
-          }
-        });
+    const doc = new jsPDF({
+      orientation: "portrait",
+      unit: "mm",
+      format: "a4",
     });
+
+    const margin = 10;
+    const pageWidth = 210 - 2 * margin;
+    let y = margin;
+
+    // Header
+    doc.setFontSize(24);
+    doc.setFont("helvetica", "bold");
+    doc.text(companyInfo.name, margin + pageWidth / 2, y, { align: "center" });
+    y += 10;
+
+    // Statement Title
+    doc.setFontSize(14);
+    doc.setFont("helvetica", "normal");
+    doc.text(`Statement #${statement.statementId}`, margin + pageWidth / 2, y, {
+      align: "center",
+    });
+    y += 15;
+
+    // Billing Information
+    doc.setFontSize(12);
+    doc.text("Bill To:", margin, y);
+    y += 5;
+    doc.setFont("helvetica", "bold");
+    doc.text(subcontractorInfo.name, margin, y);
+    y += 5;
+    doc.setFont("helvetica", "normal");
+    doc.text(subcontractorInfo.location, margin, y);
+    y += 5;
+    doc.text(`Contact: ${subcontractorInfo.contact_person}`, margin, y);
+    y += 5;
+
+    doc.text("Statement Date:", margin + pageWidth - 40, y, { align: "right" });
+    doc.text(
+      new Date(statement.generationDate).toLocaleDateString("en-US", {
+        year: "numeric",
+        month: "long",
+        day: "numeric",
+      }),
+      margin + pageWidth,
+      y,
+      { align: "right" }
+    );
+    y += 5;
+    doc.text("Subcontractor ID:", margin + pageWidth - 40, y, {
+      align: "right",
+    });
+    doc.text(statement.subcontractorId, margin + pageWidth, y, {
+      align: "right",
+    });
+    y += 10;
+
+    // Work Completed Table
+    doc.setFontSize(12);
+    doc.setFont("helvetica", "bold");
+    doc.text("Work Completed", margin, y);
+    y += 5;
+
+    const tableHeaders = [
+      "Date",
+      "Starting Point",
+      "Destination",
+      "Rate",
+      "Instructions",
+    ];
+    const tableY = y;
+    const colWidths = [25, 40, 40, 25, 50]; // Adjusted widths to ensure Rate column is distinct
+    let x = margin;
+
+    // Draw table headers
+    doc.setFillColor(44, 90, 160); // Blue gradient start color
+    doc.rect(margin, y, pageWidth, 8, "F");
+    x = margin;
+    tableHeaders.forEach((header, index) => {
+      doc.setTextColor(255, 255, 255);
+      doc.text(header, x + colWidths[index] / 2, y + 5, { align: "center" });
+      x += colWidths[index];
+    });
+    y += 8;
+
+    // Draw table rows
+    doc.setFont("helvetica", "normal");
+    doc.setTextColor(0, 0, 0);
+    statement.workItems.forEach((item, index) => {
+      x = margin;
+      const isEven = index % 2 === 0;
+      if (isEven) doc.setFillColor(248, 250, 252);
+      else doc.setFillColor(255, 255, 255);
+      doc.rect(margin, y, pageWidth, 8, "F");
+
+      doc.text(
+        new Date(item.date).toLocaleDateString("en-US", {
+          month: "short",
+          day: "numeric",
+          year: "numeric",
+        }),
+        x + colWidths[0] / 2,
+        y + 5,
+        { align: "center" }
+      );
+      x += colWidths[0];
+      doc.text(item.startingPoint, x + colWidths[1] / 2, y + 5, {
+        align: "center",
+      });
+      x += colWidths[1];
+      doc.text(item.destination, x + colWidths[2] / 2, y + 5, {
+        align: "center",
+      });
+      x += colWidths[2];
+      doc.text(`R${item.rate.toFixed(2)}`, x + colWidths[3] / 2, y + 5, {
+        align: "center",
+      }); // Right-aligned under Rate
+      x += colWidths[3];
+      doc.text(item.instruction, x + colWidths[4] / 2, y + 5, {
+        align: "center",
+      });
+      y += 8;
+
+      if (y > 280) {
+        // New page if nearing bottom
+        doc.addPage();
+        y = margin;
+        doc.setFillColor(44, 90, 160);
+        doc.rect(margin, y, pageWidth, 8, "F");
+        x = margin;
+        tableHeaders.forEach((header, index) => {
+          doc.setTextColor(255, 255, 255);
+          doc.text(header, x + colWidths[index] / 2, y + 5, {
+            align: "center",
+          });
+          x += colWidths[index];
+        });
+        y += 8;
+      }
+    });
+    y += 5;
+
+    // Payment Summary
+    doc.setFontSize(12);
+    doc.setFont("helvetica", "bold");
+    y += 5;
+    doc.setFont("helvetica", "normal");
+    y += 5;
+    doc.setFontSize(16); // Increased font size for Total Amount Due
+    doc.text(
+      `Total Amount Due: R${statement.summary.finalAmount.toFixed(2)}`,
+      margin + pageWidth - 40,
+      y,
+      { align: "right" }
+    );
+    y += 5;
+    doc.setFontSize(12);
+    doc.setDrawColor(44, 90, 160);
+    doc.line(margin, y, margin + pageWidth, y, "S"); // Line below Total Amount Due
+    y += 5;
+
+    // Footer
+    doc.setFontSize(10);
+
+    // Save PDF
+    doc.save(`Subcontractor-Statement-${statementId}.pdf`);
+    setIsGenerating(false);
   };
 
   if (loading)
@@ -360,7 +476,7 @@ const SubcontractorStatementDetail = () => {
             onClick={generatePDF}
             disabled={isGenerating}
           >
-            {isGenerating ? "Generating PDF..." : "📄 Download PDF"}
+            {isGenerating ? "Generating PDF..." : "Download PDF"}
           </button>
         </div>
       </div>
