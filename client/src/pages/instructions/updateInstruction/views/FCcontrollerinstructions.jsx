@@ -73,6 +73,13 @@ const FCcontrollerinstructions = () => {
   useEffect(() => {
     console.log("isImport state changed:", isImport)
   }, [isImport])
+  
+  // Check if instruction is already invoiced when component mounts
+  useEffect(() => {
+    if (instructionId) {
+      checkIfInvoiced()
+    }
+  }, [instructionId])
 
   // NEW: Track previous container counts to detect changes from 0 to >0
   const [prevContainerCounts, setPrevContainerCounts] = useState({
@@ -210,6 +217,7 @@ const FCcontrollerinstructions = () => {
   const [containerSuccessMessage, setContainerSuccessMessage] = useState("")
   const [isContainerLoading, setIsContainerLoading] = useState(false)
   const [isContainerDataModified, setIsContainerDataModified] = useState(false)
+  const [isInvoiced, setIsInvoiced] = useState(false)
 
   const [confirmationModal, setConfirmationModal] = useState({
     isOpen: false,
@@ -480,6 +488,27 @@ const FCcontrollerinstructions = () => {
     }
   }
 
+  // Check if instruction is already invoiced
+  const checkIfInvoiced = async () => {
+    try {
+      if (!instructionId) return
+      
+      // Get the instruction data to get the m1key
+      const instructionData = await fetchOriginalData()
+      if (!instructionData || !instructionData.m1key) {
+        console.error("No m1key found for instruction")
+        return
+      }
+      
+      // Check if m1key exists in invoice table
+      const response = await api.get(`/api/invoice/check/${instructionData.m1key}`)
+      setIsInvoiced(response.data.exists)
+    } catch (error) {
+      console.error("Error checking if instruction is invoiced:", error)
+      setIsInvoiced(false)
+    }
+  }
+
   // Validate container uniqueness
   const validateContainerUniqueness = () => {
     const containerNumbers = containers.map((c) => c.containerNum).filter((num) => num.trim() !== "")
@@ -660,6 +689,37 @@ const FCcontrollerinstructions = () => {
     })
   }
   
+  // Handle create invoice
+  const handleCreateInvoice = async () => {
+    console.log("=== CREATE INVOICE INITIATED ===")
+    
+    try {
+      // Get the instruction data to get the m1key
+      const instructionData = await fetchOriginalData()
+      if (!instructionData || !instructionData.m1key) {
+        console.error("No m1key found for instruction")
+        setErrorModal({
+          isOpen: true,
+          message: "Could not create invoice: No instruction ID found."
+        })
+        return
+      }
+      
+      // Show confirmation modal
+      setConfirmationModal({
+        isOpen: true,
+        message: "Are you sure you want to create an invoice for this instruction?",
+        action: 'invoice'
+      })
+    } catch (error) {
+      console.error("Error preparing invoice creation:", error)
+      setErrorModal({
+        isOpen: true,
+        message: "Error preparing invoice creation. Please try again."
+      })
+    }
+  }
+  
   // Perform the actual delete operation
   const performDelete = async () => {
     try {
@@ -694,6 +754,45 @@ const FCcontrollerinstructions = () => {
       setErrorModal({
         isOpen: true,
         message: error.response?.data?.message || "Failed to delete instruction. Please try again."
+      })
+    } finally {
+      setIsContainerLoading(false)
+    }
+  }
+  
+  // Perform the actual invoice creation
+  const performInvoiceCreation = async () => {
+    try {
+      console.log(`Creating invoice for instruction with ID: ${instructionId}`)
+      setIsContainerLoading(true)
+      
+      // Get the instruction data to get the m1key
+      const instructionData = await fetchOriginalData()
+      if (!instructionData || !instructionData.m1key) {
+        throw new Error("No m1key found for instruction")
+      }
+      
+      // Call the API to create an invoice for the instruction
+      const response = await api.post(`/api/invoice/create`, {
+        m1key: instructionData.m1key,
+        clientId: formData.clientId
+      })
+      
+      console.log("Invoice creation response:", response.data)
+      
+      // Show success message
+      setContainerSuccessMessage("Invoice created successfully!")
+      
+      // Update the isInvoiced state
+      setIsInvoiced(true)
+      
+    } catch (error) {
+      console.error("Error creating invoice:", error)
+      
+      // Show error modal
+      setErrorModal({
+        isOpen: true,
+        message: error.response?.data?.message || "Failed to create invoice. Please try again."
       })
     } finally {
       setIsContainerLoading(false)
@@ -890,13 +989,15 @@ const FCcontrollerinstructions = () => {
   }
 
   // Handle confirmation modal actions
-  const handleConfirmAction = async () => {
-    setConfirmationModal({ isOpen: false, message: "", action: null })
+  const handleConfirmAction = () => {
     if (confirmationModal.action === 'save') {
-      await performSave()
+      performSave()
     } else if (confirmationModal.action === 'delete') {
-      await performDelete()
+      performDelete()
+    } else if (confirmationModal.action === 'invoice') {
+      performInvoiceCreation()
     }
+    setConfirmationModal({ isOpen: false, message: "", action: null })
   }
 
   const handleCancelAction = () => {
@@ -2643,7 +2744,7 @@ const FCcontrollerinstructions = () => {
                           disabled={isReadOnly}
                         >
                           <option value="kg">kg</option>
-                          <option value="m³">m³</option>
+                        
                           <option value="ton">ton</option>
                           <option value="Container">Container</option>
                         </select>
@@ -2980,7 +3081,7 @@ const FCcontrollerinstructions = () => {
                         </th>
                         {isImport && (
                           <th style={{ padding: "12px 8px", textAlign: "left", borderBottom: "2px solid #ddd" }}>
-                            Weight (kg)
+                            Weight 
                           </th>
                         )}
                         <th style={{ padding: "12px 8px", textAlign: "left", borderBottom: "2px solid #ddd" }}>
@@ -3102,22 +3203,43 @@ const FCcontrollerinstructions = () => {
                 Save Changes
               </button>
               {formData.status === "New" && (
-                <button
-                  className="controller-instructions-delete-button"
-                  onClick={handleDeleteInstruction}
-                  style={{
-                    backgroundColor: "#e74c3c",
-                    color: "white",
-                    padding: "12px 24px",
-                    border: "none",
-                    borderRadius: "4px",
-                    cursor: "pointer",
-                    fontSize: "16px",
-                    fontWeight: "bold",
-                  }}
-                >
-                  Delete Instruction
-                </button>
+                <>
+                  <button
+                    className="controller-instructions-delete-button"
+                    onClick={handleDeleteInstruction}
+                    style={{
+                      backgroundColor: "#e74c3c",
+                      color: "white",
+                      padding: "12px 24px",
+                      border: "none",
+                      borderRadius: "4px",
+                      cursor: "pointer",
+                      fontSize: "16px",
+                      fontWeight: "bold",
+                      marginRight: "10px"
+                    }}
+                  >
+                    Delete Instruction
+                  </button>
+                  {!isInvoiced && (
+                    <button
+                      className="controller-instructions-invoice-button"
+                      onClick={handleCreateInvoice}
+                      style={{
+                        backgroundColor: "#27ae60",
+                        color: "white",
+                        padding: "12px 24px",
+                        border: "none",
+                        borderRadius: "4px",
+                        cursor: "pointer",
+                        fontSize: "16px",
+                        fontWeight: "bold",
+                      }}
+                    >
+                      Invoice
+                    </button>
+                  )}
+                </>
               )}
             </div>
           )}
