@@ -402,18 +402,17 @@ const FCcontrollerinstructions = () => {
         isValid = false
       }
 
-      // Weight validation for import shipments
-      if (isImport) {
-        if (container.weight === null || container.weight === undefined || container.weight === "") {
-          newErrors[`weight-${container.id}`] = "Field is required"
-          isValid = false
-        } else if (typeof container.weight === "string" && container.weight.trim() === "") {
-          newErrors[`weight-${container.id}`] = "Field is required"
-          isValid = false
-        } else if (container.weight !== null) {
-          const weightValue =
-            typeof container.weight === "number" ? container.weight : Number.parseFloat(container.weight)
+      // Weight validation for import shipments - only validate format if weight is provided
+      if (isImport && container.weight !== null && container.weight !== undefined && container.weight !== "") {
+        // If weight is provided, validate it's a positive number
+        if (typeof container.weight === "string" && container.weight.trim() !== "") {
+          const weightValue = Number.parseFloat(container.weight)
           if (isNaN(weightValue) || weightValue < 0) {
+            newErrors[`weight-${container.id}`] = "Must be a valid positive number"
+            isValid = false
+          }
+        } else if (typeof container.weight === "number") {
+          if (isNaN(container.weight) || container.weight < 0) {
             newErrors[`weight-${container.id}`] = "Must be a valid positive number"
             isValid = false
           }
@@ -547,6 +546,14 @@ const FCcontrollerinstructions = () => {
     if (!isCrossHaul) {
       requiredFields.push({ name: "vesselName", label: "Vessel Name" })
     }
+    
+    // Add weight and unitRate as required fields when rateWeight is ton or kg
+    if (formData.rateWeight === "ton" || formData.rateWeight === "kg") {
+      requiredFields.push(
+        { name: "weight", label: `Weight (${formData.rateWeight})` },
+        { name: "unitRate", label: `Rate per ${formData.rateWeight}` }
+      )
+    }
 
     requiredFields.forEach((field) => {
       if (!formData[field.name]) {
@@ -566,10 +573,8 @@ const FCcontrollerinstructions = () => {
         isValid = false
       }
 
-      if (isImport && (container.weight === "" || container.weight === null)) {
-        containerErrors[`weight-${container.id}`] = "Weight is required for import shipments"
-        isValid = false
-      } else if (isImport && container.weight && !/^[0-9]*\.?[0-9]*$/.test(container.weight)) {
+      // Weight validation - only validate format if weight is provided
+      if (isImport && container.weight && container.weight !== "" && !/^[0-9]*\.?[0-9]*$/.test(container.weight)) {
         containerErrors[`weight-${container.id}`] = "Weight must be a valid number"
         isValid = false
       }
@@ -610,12 +615,7 @@ const FCcontrollerinstructions = () => {
     if ((formData.rateper_abnormal > 0 || Number(formData.rateper_abnormal) > 0) && formData.num_abnormal === 0) {
       mismatches.push("Abnormal")
     }
-    if (
-      (formData.rateper_breakbulk > 0 || Number(formData.rateper_breakbulk) > 0) &&
-      (formData.num_breakbulk === 0 || !formData.num_breakbulk)
-    ) {
-      mismatches.push("Break Bulk")
-    }
+
 
     // If there are mismatches, collect container types with counts > 0
     if (mismatches.length > 0) {
@@ -630,11 +630,7 @@ const FCcontrollerinstructions = () => {
           `Abnormal (${formData.num_abnormal} containers, Rate: R${formData.rateper_abnormal})`,
         )
       }
-      if (formData.num_breakbulk > 0) {
-        containerTypesWithCounts.push(
-          `Break Bulk (${formData.num_breakbulk} containers, Rate: R${formData.rateper_breakbulk})`,
-        )
-      }
+
 
       // Show confirmation modal
       const message =
@@ -852,15 +848,13 @@ const FCcontrollerinstructions = () => {
       const numSix = formData.num_six_meters || 0
       const numTwelve = formData.num_twelve_meters || 0
       const numAbnormal = formData.num_abnormal || 0
-      const numBreakBulk = formData.num_breakbulk || 0
 
       const ratePer6 = numSix > 0 ? Number(formData.rateper_6 || 0) : 0
       const ratePer12 = numTwelve > 0 ? Number(formData.rateper_12 || 0) : 0
       const ratePerAbnormal = numAbnormal > 0 ? Number(formData.rateper_abnormal || 0) : 0
-      const ratePerBreakBulk = numBreakBulk > 0 ? Number(formData.rateper_breakbulk || 0) : 0
 
       const baseCost =
-        ratePer6 * numSix + ratePer12 * numTwelve + ratePerAbnormal * numAbnormal + ratePerBreakBulk * numBreakBulk
+        ratePer6 * numSix + ratePer12 * numTwelve + ratePerAbnormal * numAbnormal
       const surchargeAmount = formData.surchages ? Number(formData.surcharge || 0) : 0
       const totalCost = Number((baseCost + surchargeAmount).toFixed(2))
 
@@ -887,16 +881,18 @@ const FCcontrollerinstructions = () => {
         num_six_meters: numSix,
         num_twelve_meters: numTwelve,
         num_abnormal: numAbnormal,
-        num_breakbulk: numBreakBulk,
-        weight: formData.rateWeight !== "Container" ? Number(formData.weight || 0) : null,
+        num_breakbulk: 0,
+        // For ton or kg, weight must be provided and not defaulted to 0
+        weight: formData.rateWeight !== "Container" ? (formData.weight ? Number(formData.weight) : null) : null,
         total_cost: totalCost,
         booking_ref: formData.bookingRef,
         vessel_name: formData.vesselName,
         rateper_6: ratePer6,
         rateper_12: ratePer12,
         rateper_abnormal: ratePerAbnormal,
-        rateper_breakbulk: ratePerBreakBulk,
-        unitrate: formData.rateWeight !== "Container" ? Number(formData.unitRate || 0) : null,
+        rateper_breakbulk: 0,
+        // For ton or kg, unitRate must be provided and not defaulted to 0
+        unitrate: formData.rateWeight !== "Container" ? (formData.unitRate ? Number(formData.unitRate) : null) : null,
       }
 
       // Prepare container data with containerKey for smart updates
@@ -1589,21 +1585,36 @@ const FCcontrollerinstructions = () => {
     const selectedShipmentType = shipmentTypes.find((type) => type.shipkey.toString() === shipmentTypeId)
     const shipmentTypeName = selectedShipmentType ? selectedShipmentType.shipmenttype : ""
     const isImportType = shipmentTypeName.toLowerCase() === "import"
-    const isCrossHaul = shipmentTypeName.toLowerCase() === "cross-haul"
+    const isCrossHaul = shipmentTypeName.toLowerCase() === "cross-haul" || shipmentTypeId === "4"
 
     setIsImport(isImportType)
-    setFormData({
-      ...formData,
-      shipmentTypeId,
-      shipmentTypeName,
-    })
+    
+    // For cross-haul or type 4, clear vessel name and stack date
+    if (isCrossHaul || shipmentTypeId === "4") {
+      setFormData({
+        ...formData,
+        shipmentTypeId,
+        shipmentTypeName,
+        vesselName: "",
+        stackDate: "",
+        // Default unit per to 'ton' for shipment type 4
+        rateWeight: shipmentTypeId === "4" ? "ton" : formData.rateWeight
+      })
+    } else {
+      setFormData({
+        ...formData,
+        shipmentTypeId,
+        shipmentTypeName,
+      })
+    }
+    
     setFieldErrors((prev) => ({ ...prev, shipmentTypeId: "" }))
   }
 
   // Check if shipment type is Cross-haul
   const isCrossHaulShipment = () => {
     const selectedShipmentType = shipmentTypes.find((type) => type.shipkey.toString() === formData.shipmentTypeId)
-    return selectedShipmentType && selectedShipmentType.shipmenttype.toLowerCase() === "cross-haul"
+    return selectedShipmentType && (selectedShipmentType.shipmenttype.toLowerCase() === "cross-haul" || formData.shipmentTypeId === "4")
   }
 
   // Format date from any format to YYYY-MM-DD for input[type="date"]
@@ -1910,13 +1921,11 @@ const FCcontrollerinstructions = () => {
       const sixRate = Number(updatedFormData.rateper_6 || 0)
       const twelveRate = Number(updatedFormData.rateper_12 || 0)
       const abnormalRateNum = Number(updatedFormData.rateper_abnormal || 0)
-      const breakBulkRate = Number(updatedFormData.rateper_breakbulk || 0)
 
       updatedFormData.total_cost =
         (updatedFormData.num_six_meters || 0) * sixRate +
         (updatedFormData.num_twelve_meters || 0) * twelveRate +
-        (updatedFormData.num_abnormal || 0) * abnormalRateNum +
-        (updatedFormData.num_breakbulk || 0) * breakBulkRate
+        (updatedFormData.num_abnormal || 0) * abnormalRateNum
 
       setFormData(updatedFormData)
     }
@@ -1934,8 +1943,7 @@ const FCcontrollerinstructions = () => {
     const containerTypeMap = {
       num_six_meters: "6m",
       num_twelve_meters: "12m",
-      num_abnormal: "Abnormal",
-      num_breakbulk: "BreakBulk",
+      num_abnormal: "Abnormal"
     }
     const type = containerTypeMap[containerType]
     if (!type) return
@@ -1983,8 +1991,7 @@ const FCcontrollerinstructions = () => {
     const totalCost =
       (type === "num_six_meters" ? validValue : updatedFormData.num_six_meters) * sixRate +
       (type === "num_twelve_meters" ? validValue : updatedFormData.num_twelve_meters) * twelveRate +
-      (type === "num_abnormal" ? validValue : updatedFormData.num_abnormal) * abnormalRateNum +
-      (type === "num_breakbulk" ? validValue : updatedFormData.num_breakbulk || 0) * breakBulkRate
+      (type === "num_abnormal" ? validValue : updatedFormData.num_abnormal) * abnormalRateNum
 
     updatedFormData.total_cost = totalCost
 
@@ -1996,6 +2003,7 @@ const FCcontrollerinstructions = () => {
 
   const validateForm = () => {
     console.log("validateForm called")
+    // Check if shipment type is cross-haul or type 4
     const isCrossHaul = isCrossHaulShipment()
 
     const requiredFields = [
@@ -2075,13 +2083,32 @@ const FCcontrollerinstructions = () => {
       }
     }
 
-    if (formData.rateWeight !== "Container" && (formData.weight === "" || weight === "")) {
+    // For ton or kg, both weight and unitRate are required
+    if ((formData.rateWeight === "ton" || formData.rateWeight === "kg") && (formData.weight === "" || weight === "")) {
       errors.weight = "Please add weight"
       isValid = false
-    } else if (formData.weight !== "" || weight !== "") {
+    } 
+    
+    // For ton or kg, unitRate is required
+    if ((formData.rateWeight === "ton" || formData.rateWeight === "kg") && (!formData.unitRate || formData.unitRate === "" || formData.unitRate === "0")) {
+      errors.unitRate = `Rate per ${formData.rateWeight} is required`
+      isValid = false
+    }
+    
+    // Validate weight format if provided
+    if (formData.weight !== "" || weight !== "") {
       const weightValue = Number.parseFloat(formData.weight || weight)
       if (isNaN(weightValue) || weightValue <= 0) {
         errors.weight = "Weight must be a positive number"
+        isValid = false
+      }
+    }
+    
+    // Validate unitRate format if provided
+    if (formData.unitRate && formData.unitRate !== "") {
+      const unitRateValue = Number.parseFloat(formData.unitRate)
+      if (isNaN(unitRateValue) || unitRateValue <= 0) {
+        errors.unitRate = `Rate per ${formData.rateWeight} must be a positive number`
         isValid = false
       }
     }
@@ -2149,16 +2176,14 @@ const FCcontrollerinstructions = () => {
       const sixRate = Number(formData.rateper_6 || 0)
       const twelveRate = Number(formData.rateper_12 || 0)
       const abnormalRateNum = Number(formData.rateper_abnormal || 0)
-      const breakBulkRate = Number(formData.rateper_breakbulk || 0)
 
       const totalCost =
         formData.num_six_meters * sixRate +
         formData.num_twelve_meters * twelveRate +
-        formData.num_abnormal * abnormalRateNum +
-        formData.num_breakbulk * breakBulkRate
+        formData.num_abnormal * abnormalRateNum
 
       const totalContainers =
-        formData.num_six_meters + formData.num_twelve_meters + formData.num_abnormal + formData.num_breakbulk
+        formData.num_six_meters + formData.num_twelve_meters + formData.num_abnormal
 
       // IMPROVED: Create comprehensive form data with all current values
       const updatedFormData = {
@@ -2559,39 +2584,7 @@ const FCcontrollerinstructions = () => {
                         </div>
                       </div>
                     </div>
-                    {(formData.shipmentTypeId === "3" || formData.shipmentTypeName.toLowerCase() === "cross-haul") && (
-                      <div className="controller-instructions-container-input">
-                        <label>Break Bulk</label>
-                        <div className="controller-instructions-container-rate-group">
-                          <input
-                            type="number"
-                            className={fieldErrors.containers ? "controller-instructions-error-field" : ""}
-                            value={formData.num_breakbulk || 0}
-                            min="0"
-                            name="num_breakbulk"
-                            onChange={(e) => handleNumericInputChange(e)}
-                            disabled={formData.rateWeight !== "Container" || isReadOnly}
-                            style={isReadOnly ? readOnlyStyle : {}}
-                          />
-                          <div
-                            className="controller-instructions-input-wrapper controller-instructions-rate-input"
-                            ref={fieldRefs.rateper_breakbulk}
-                          >
-                            <input
-                              type="text"
-                              className={`controller-instructions-form-input ${fieldErrors.rateper_breakbulk ? "controller-instructions-error-field" : ""}`}
-                              placeholder="Rate"
-                              value={formData.rateper_breakbulk || ""}
-                              name="rateper_breakbulk"
-                              onChange={handleRateChange}
-                              disabled={formData.rateWeight !== "Container" || isReadOnly}
-                              style={isReadOnly ? readOnlyStyle : {}}
-                            />
-                            <ErrorTooltip message={fieldErrors.rateper_breakbulk} />
-                          </div>
-                        </div>
-                      </div>
-                    )}
+
                   </div>
 
                   {/* Hazardous and Surcharges Checkboxes - Horizontally Aligned */}

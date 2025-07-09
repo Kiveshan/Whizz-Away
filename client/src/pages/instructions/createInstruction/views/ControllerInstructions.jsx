@@ -1029,12 +1029,10 @@ const ControllerInstructions = () => {
         }
       }
 
-      // Add weight validation for import shipments
-      if (isImport) {
-        if (!container.weight || container.weight.trim() === "") {
-          errors[`weight-${containerId}`] = "Weight is required for import shipments"
-          isValid = false
-        } else if (!/^\d*\.?\d*$/.test(container.weight)) {
+      // Weight validation removed - weight is now optional for all containers
+      // Still validate the format if weight is provided
+      if (isImport && container.weight && container.weight.trim() !== "") {
+        if (!/^\d*\.?\d*$/.test(container.weight)) {
           errors[`weight-${containerId}`] = "Weight must be a valid number"
           isValid = false
         } else if (Number.parseFloat(container.weight) <= 0) {
@@ -2098,7 +2096,7 @@ const ControllerInstructions = () => {
                           style={{ display: "flex", alignItems: "center", gap: "4px" }}
                         >
                           <div style={{ display: "flex", gap: "4px", alignItems: "center" }}>
-                            <div className="controller-instructions-input-wrapper" style={{ width: "60px" }}>
+                            <div className="controller-instructions-input-wrapper" style={{ width: "100%" }}>
                               <input
                                 type="text"
                                 className={`controller-instructions-form-input ${fieldErrors.weight ? "controller-instructions-error-field" : ""}`}
@@ -2122,7 +2120,7 @@ const ControllerInstructions = () => {
                                 }}
                               />
                             </div>
-                            <div className="controller-instructions-input-wrapper" style={{ width: "70px" }}>
+                            <div className="controller-instructions-input-wrapper" style={{ width: "100%" }}>
                               <input
                                 type="text"
                                 className={`controller-instructions-form-input ${fieldErrors.unitrate ? "controller-instructions-error-field" : ""}`}
@@ -2545,11 +2543,11 @@ const ControllerInstructions = () => {
                                 }}
                                 ref={(el) => {
                                   if (el) {
-                                    const input = el.previousElementSibling?.querySelector("input")
+                                    const input = el.previousElementSibling
                                     if (input) {
                                       const rect = input.getBoundingClientRect()
                                       el.style.left = `${rect.left}px`
-                                      el.style.top = `${rect.bottom}px`
+                                      el.style.top = `${rect.bottom + 4}px`
                                     }
                                   }
                                 }}
@@ -2604,11 +2602,11 @@ const ControllerInstructions = () => {
                                   }}
                                   ref={(el) => {
                                     if (el) {
-                                      const input = el.previousElementSibling?.querySelector("input")
+                                      const input = el.previousElementSibling
                                       if (input) {
                                         const rect = input.getBoundingClientRect()
                                         el.style.left = `${rect.left}px`
-                                        el.style.top = `${rect.bottom}px`
+                                        el.style.top = `${rect.bottom + 4}px`
                                       }
                                     }
                                   }}

@@ -60,8 +60,7 @@ const Viewcontrollerinstructions = () => {
     status: "",
     vesselName: "",
     unitrate: "",
-    num_breakbulk: 0,
-    rateper_breakbulk: "",
+    // Break bulk fields removed
     rateper_6: 0,
     rateper_12: 0,
     rateper_abnormal: 0,
@@ -162,10 +161,13 @@ const Viewcontrollerinstructions = () => {
   // Track if initial data has been loaded
   const [initialDataLoaded, setInitialDataLoaded] = useState(false)
 
-  // Check if shipment type is Cross-haul
+  // Check if shipment type is Cross-haul or type 4
   const isCrossHaulShipment = () => {
     const selectedShipmentType = shipmentTypes.find((type) => type.shipkey.toString() === formData.shipmentTypeId)
-    return selectedShipmentType && selectedShipmentType.shipmenttype.toLowerCase() === "cross-haul"
+    return (
+      (selectedShipmentType && selectedShipmentType.shipmenttype.toLowerCase() === "cross-haul") ||
+      formData.shipmentTypeId === "4"
+    )
   }
 
   // Fetch all required data on component mount
@@ -269,8 +271,7 @@ const Viewcontrollerinstructions = () => {
         rateper_12: data.rateper_12 ? Number(data.rateper_12) : 0,
         rateper_abnormal: data.rateper_abnormal ? Number(data.rateper_abnormal) : 0,
         unitrate: data.unitrate || "",
-        num_breakbulk: Number(data.num_breakbulk) || 0,
-        rateper_breakbulk: data.rateper_breakbulk ? data.rateper_breakbulk.toString() : "",
+        // Break bulk fields removed
       }
 
       // Add detailed logging for VAT value
@@ -292,7 +293,7 @@ const Viewcontrollerinstructions = () => {
       // Set isCrossHaulOrSpecial based on shipment type or ID
       const isCrossHaul =
         shipmentTypeName.toLowerCase() === "cross-haul" || shipmentTypeName.toLowerCase() === "cross haul"
-      const isSpecialId = data.shipment_type?.toString() === "3"
+      const isSpecialId = data.shipment_type?.toString() === "3" || data.shipment_type?.toString() === "4"
       const isCrossHaulOrSpecialValue = isCrossHaul || isSpecialId
       console.log(
         "Setting isCrossHaulOrSpecial to:",
