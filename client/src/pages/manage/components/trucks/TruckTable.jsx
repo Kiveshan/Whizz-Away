@@ -1,8 +1,31 @@
 "use client"
 
+import { useState } from "react"
 import { formatDate } from "../../utils/helpers"
 import Pagination from "../common/Pagination"
 import SearchFilter from "../common/SearchFilter"
+
+
+// Confirmation Popup Component
+const ConfirmationPopup = ({ isOpen, message, onConfirm, onCancel }) => {
+  if (!isOpen) return null
+
+  return (
+    <div className="popup-backdrop" onClick={onCancel}>
+      <div className="popup" onClick={(e) => e.stopPropagation()}>
+        <p>{message}</p>
+        <div className="popup-buttons">
+          <button className="confirm-button" onClick={onConfirm}>
+            Yes, delete
+          </button>
+          <button className="cancel-button" onClick={onCancel}>
+            Cancel
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
 
 const TruckTable = ({
   trucks,
@@ -18,6 +41,27 @@ const TruckTable = ({
   onSearchChange,
   onApplyFilters,
 }) => {
+  const [showConfirmPopup, setShowConfirmPopup] = useState(false)
+  const [truckToDelete, setTruckToDelete] = useState(null)
+
+  const handleDeleteClick = (truck) => {
+    setTruckToDelete(truck)
+    setShowConfirmPopup(true)
+  }
+
+  const handleConfirmDelete = () => {
+    if (truckToDelete) {
+      onDelete(truckToDelete.m5truckskey)
+    }
+    setShowConfirmPopup(false)
+    setTruckToDelete(null)
+  }
+
+  const handleCancelDelete = () => {
+    setShowConfirmPopup(false)
+    setTruckToDelete(null)
+  }
+
   // Helper function to check license expiry status
   const getLicenseStatus = (expiryDate) => {
     if (!expiryDate) return { status: "unknown", text: "No Date", color: "#999" }
@@ -42,7 +86,6 @@ const TruckTable = ({
   return (
     <div>
       <div>
-      
         <button className="manage-add-truck-button" onClick={onAdd}>
           Add Truck
         </button>
@@ -118,7 +161,7 @@ const TruckTable = ({
                           </button>
                         </td>
                         <td>
-                          <button className="manage-delete-button" onClick={() => onDelete(truck.m5truckskey)}>
+                          <button className="manage-delete-button" onClick={() => handleDeleteClick(truck)}>
                             Delete
                           </button>
                         </td>
@@ -144,6 +187,16 @@ const TruckTable = ({
             onItemsPerPageChange={onItemsPerPageChange}
           />
         </div>
+      )}
+
+      {/* Confirmation Popup */}
+      {showConfirmPopup && truckToDelete && (
+        <ConfirmationPopup
+          isOpen={showConfirmPopup}
+          message={`Are you sure you want to delete the truck with registration ${truckToDelete.truckregnum}?`}
+          onConfirm={handleConfirmDelete}
+          onCancel={handleCancelDelete}
+        />
       )}
     </div>
   )

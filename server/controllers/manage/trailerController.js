@@ -17,7 +17,6 @@ const getAllTrailersHandler = async (req, res) => {
     console.log("Request headers:", req.headers.authorization ? "Token present" : "No token")
 
     const { page = 1, limit = 10, search = "" } = req.query
-
     const pageNum = Number.parseInt(page)
     const limitNum = Number.parseInt(limit)
     const offset = (pageNum - 1) * limitNum
@@ -133,6 +132,14 @@ const createTrailerHandler = async (req, res) => {
       trailer_license_expiry,
     } = req.body
 
+    // Server-side validation for required fields
+    if (!trailerregnum || !trailer_license_expiry) {
+      return res.status(400).json({
+        error: "Missing required fields",
+        details: "Trailer Registration and License Expiry Date are required",
+      })
+    }
+
     const fileLocations = (req.files || []).map((file) => file.location)
     console.log("Creating trailer with data:", req.body, "Files:", fileLocations)
 
@@ -171,6 +178,14 @@ const updateTrailerHandler = async (req, res) => {
       vin_num,
       trailer_license_expiry,
     } = req.body
+
+    // Server-side validation for required fields
+    if (!trailerregnum || !trailer_license_expiry) {
+      return res.status(400).json({
+        error: "Missing required fields",
+        details: "Trailer Registration and License Expiry Date are required",
+      })
+    }
 
     const newDocLocations = (req.files || []).map((file) => file.location)
     console.log(`Updating trailer ID ${id}, New files:`, newDocLocations)

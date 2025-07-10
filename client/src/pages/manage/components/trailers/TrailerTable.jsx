@@ -1,8 +1,31 @@
 "use client"
 
+import { useState } from "react"
 import { formatDate } from "../../utils/helpers"
 import Pagination from "../common/Pagination"
 import SearchFilter from "../common/SearchFilter"
+
+
+// Confirmation Popup Component
+const ConfirmationPopup = ({ isOpen, message, onConfirm, onCancel }) => {
+  if (!isOpen) return null
+
+  return (
+    <div className="popup-backdrop" onClick={onCancel}>
+      <div className="popup" onClick={(e) => e.stopPropagation()}>
+        <p>{message}</p>
+        <div className="popup-buttons">
+          <button className="confirm-button" onClick={onConfirm}>
+            Yes, delete
+          </button>
+          <button className="cancel-button" onClick={onCancel}>
+            Cancel
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
 
 const TrailerTable = ({
   trailers,
@@ -18,6 +41,27 @@ const TrailerTable = ({
   onSearchChange,
   onApplyFilters,
 }) => {
+  const [showConfirmPopup, setShowConfirmPopup] = useState(false)
+  const [trailerToDelete, setTrailerToDelete] = useState(null)
+
+  const handleDeleteClick = (trailer) => {
+    setTrailerToDelete(trailer)
+    setShowConfirmPopup(true)
+  }
+
+  const handleConfirmDelete = () => {
+    if (trailerToDelete) {
+      onDelete(trailerToDelete.m5trailerskey)
+    }
+    setShowConfirmPopup(false)
+    setTrailerToDelete(null)
+  }
+
+  const handleCancelDelete = () => {
+    setShowConfirmPopup(false)
+    setTrailerToDelete(null)
+  }
+
   // Helper function to check license expiry status
   const getLicenseStatus = (expiryDate) => {
     if (!expiryDate) return { status: "unknown", text: "No Date", color: "#999" }
@@ -117,7 +161,7 @@ const TrailerTable = ({
                           </button>
                         </td>
                         <td>
-                          <button className="manage-delete-button" onClick={() => onDelete(trailer.m5trailerskey)}>
+                          <button className="manage-delete-button" onClick={() => handleDeleteClick(trailer)}>
                             Delete
                           </button>
                         </td>
@@ -143,6 +187,16 @@ const TrailerTable = ({
             onItemsPerPageChange={onItemsPerPageChange}
           />
         </div>
+      )}
+
+      {/* Confirmation Popup */}
+      {showConfirmPopup && trailerToDelete && (
+        <ConfirmationPopup
+          isOpen={showConfirmPopup}
+          message={`Are you sure you want to delete the trailer with registration ${trailerToDelete.trailerregnum}?`}
+          onConfirm={handleConfirmDelete}
+          onCancel={handleCancelDelete}
+        />
       )}
     </div>
   )

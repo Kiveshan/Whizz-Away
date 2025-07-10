@@ -160,9 +160,9 @@ export const createMultiplePurchaseOrdersHandler = async (req, res) => {
 
 export const getPurchaseOrderListHandler = async (req, res) => {
   try {
-    const { supplierId, expenseTypeId, fromDate, toDate, poId } = req.query
+    const { supplierId, expenseTypeId, fromDate, toDate, poId, ponum } = req.query // ADD: ponum to query params
 
-    const purchaseOrders = await getPurchaseOrderList(supplierId, expenseTypeId, fromDate, toDate, poId)
+    const purchaseOrders = await getPurchaseOrderList(supplierId, expenseTypeId, fromDate, toDate, poId, ponum)
 
     res.json(purchaseOrders)
   } catch (error) {
