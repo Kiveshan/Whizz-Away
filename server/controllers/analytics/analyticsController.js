@@ -4,6 +4,7 @@ import {
   getTurnoverPerMonth,
   getAllClients,
   getAllSubcontractors,
+  getAllTrucks,
   getAgingAnalysis,
   getTurnoverVsDieselCost,
   getAllExpenses,
@@ -11,7 +12,8 @@ import {
   getSubcontractorTurnoverPerMonth,
   getSubcontractorVsTurnover,
   getWagesVsExpenses,
-  getTurnoverVsSubbieExpense
+  getTurnoverVsSubbieExpense,
+  getTurnoverVsFuelPerTruck,
 } from "../../models/analytics/analyticsModel.js";
 
 const getFuelExpensesController = async (req, res) => {
@@ -78,6 +80,22 @@ const getAllSubcontractorsController = async (req, res) => {
     }
   } catch (error) {
     console.error("Error in getAllSubcontractorsController:", error);
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+const getAllTrucksController = async (req, res) => {
+  try {
+    const client = await pool.connect();
+    try {
+      const data = await getAllTrucks(client);
+      console.log("Trucks data:", data);
+      res.status(200).json({ success: true, data });
+    } finally {
+      client.release();
+    }
+  } catch (error) {
+    console.error("Error in getAllTrucksController:", error);
     res.status(500).json({ success: false, message: error.message });
   }
 };
@@ -209,11 +227,30 @@ const getTurnoverVsSubbieExpenseController = async (req, res) => {
   }
 };
 
+const getTurnoverVsFuelPerTruckController = async (req, res) => {
+  const { month, year, truckId } = req.query;
+  console.log(`Received request for turnover vs fuel per truck: month=${month}, year=${year}, truckId=${truckId}`);
+  try {
+    const client = await pool.connect();
+    try {
+      const data = await getTurnoverVsFuelPerTruck(client, month, year, truckId);
+      console.log("Turnover vs fuel per truck data:", data);
+      res.status(200).json({ success: true, data });
+    } finally {
+      client.release();
+    }
+  } catch (error) {
+    console.error("Error in getTurnoverVsFuelPerTruckController:", error);
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
 export {
   getFuelExpensesController,
   getTurnoverPerMonthController,
   getAllClientsController,
   getAllSubcontractorsController,
+  getAllTrucksController,
   getAgingAnalysisController,
   getTurnoverVsDieselCostController,
   getAllExpensesController,
@@ -221,5 +258,6 @@ export {
   getSubcontractorTurnoverPerMonthController,
   getSubcontractorVsTurnoverController,
   getWagesVsExpensesController,
-  getTurnoverVsSubbieExpenseController
+  getTurnoverVsSubbieExpenseController,
+  getTurnoverVsFuelPerTruckController,
 };

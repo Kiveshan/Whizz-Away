@@ -3,15 +3,17 @@ import {
   getFuelExpensesController,
   getTurnoverPerMonthController,
   getAllClientsController,
+  getAllSubcontractorsController,
+  getAllTrucksController,
   getAgingAnalysisController,
   getTurnoverVsDieselCostController,
   getAllExpensesController,
   getTurnoverPerTruckController,
   getSubcontractorTurnoverPerMonthController,
   getSubcontractorVsTurnoverController,
-  getAllSubcontractorsController,
   getWagesVsExpensesController,
-  getTurnoverVsSubbieExpenseController
+  getTurnoverVsSubbieExpenseController,
+  getTurnoverVsFuelPerTruckController,
 } from "../../controllers/analytics/analyticsController.js";
 import { verifyToken } from "../../middleware/auth.js";
 
@@ -21,7 +23,8 @@ router.get("/api/fuel-expenses", verifyToken, getFuelExpensesController);
 router.get("/api/turnover-per-month", verifyToken, getTurnoverPerMonthController);
 router.get("/api/aging-analysis", verifyToken, getAgingAnalysisController);
 router.get("/api/get-clients", verifyToken, getAllClientsController);
-router.get("/get-subcontractors", verifyToken, getAllSubcontractorsController);
+router.get("/api/get-subcontractors", verifyToken, getAllSubcontractorsController);
+router.get("/api/get-trucks", verifyToken, getAllTrucksController);
 router.get(
   "/api/turnover-vs-diesel-cost",
   verifyToken,
@@ -35,6 +38,9 @@ router.get("/api/subcontractor-vs-turnover", verifyToken,
   getSubcontractorVsTurnoverController);
 router.get("/api/wages-vs-expenses", verifyToken, 
   getWagesVsExpensesController);
-router.get("/api/turnover-vs-subbie-expense", verifyToken, getTurnoverVsSubbieExpenseController);
+router.get("/api/turnover-vs-subbie-expense", verifyToken, 
+  getTurnoverVsSubbieExpenseController);
+router.get("/api/turnover-vs-fuel-per-truck", verifyToken, 
+  getTurnoverVsFuelPerTruckController);
 
 export default router;
