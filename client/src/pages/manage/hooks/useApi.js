@@ -857,6 +857,66 @@ export function useApi(state, actions) {
     [state, actions, fetchPaginatedData],
   )
 
+const toggleTruckStatus = useCallback(
+  async (id, currentStatus) => {
+    actions.setLoading(true)
+    try {
+      const newStatus = !currentStatus
+      console.log(`Toggling truck ${id} status from ${currentStatus} to ${newStatus}`)
+
+      // Use the correct endpoint: /api/trucks/:id/status
+      await api.put(`/api/trucks/${id}/status`, { status: newStatus })
+
+      // Refresh current page
+      await fetchPaginatedData(
+        "trucks",
+        state.pagination.trucks.currentPage,
+        state.pagination.trucks.itemsPerPage,
+        state.filters.trucks,
+      )
+
+      actions.showAlert(`Truck ${newStatus ? "enabled" : "disabled"}!`)
+    } catch (err) {
+      console.error(`Error toggling truck ${id}:`, err)
+      actions.showAlert(
+        `Error ${currentStatus ? "disabling" : "enabling"} truck: ${err.response?.data?.error || err.message}`,
+      )
+    } finally {
+      actions.setLoading(false)
+    }
+  },
+  [state, actions, fetchPaginatedData],
+)
+
+const toggleTrailerStatus = useCallback(
+  async (id, currentStatus) => {
+    actions.setLoading(true)
+    try {
+      const newStatus = !currentStatus
+      await api.put(`/api/trailers/${id}/toggle-status`, { status: newStatus })
+
+      // Refresh current page
+      await fetchPaginatedData(
+        "trailers",
+        state.pagination.trailers.currentPage,
+        state.pagination.trailers.itemsPerPage,
+        state.filters.trailers,
+      )
+
+      actions.showAlert(`Trailer ${newStatus ? "enabled" : "disabled"}!`)
+    } catch (err) {
+      console.error(`Error toggling trailer ${id}:`, err)
+      actions.showAlert(
+        `Error ${currentStatus ? "disabling" : "enabling"} trailer: ${err.response?.data?.error || err.message}`,
+      )
+    } finally {
+      actions.setLoading(false)
+    }
+  },
+  [state, actions, fetchPaginatedData],
+)
+  
+
   const deleteItem = useCallback(
     async (type, id) => {
       actions.setLoading(true)
@@ -1227,6 +1287,8 @@ export function useApi(state, actions) {
     toggleClientStatus,
     toggleSubcontractorStatus,
     toggleSupplierStatus,
+    toggleTruckStatus,
+    toggleTrailerStatus,
     deleteItem,
     deleteSubcontractorDriver,
     deleteSubcontractorTruck,
