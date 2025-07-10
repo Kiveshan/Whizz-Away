@@ -208,7 +208,6 @@ export default function DirectorAnalytics() {
             turnover: turnover,
             month: item.month_name.trim(),
             year: item.year,
-            percentage: item.percentage,
           }
         })
         console.log("Processed turnover data before sorting:", turnoverData)
@@ -290,8 +289,6 @@ export default function DirectorAnalytics() {
             year: item.year,
             totalTurnover: Number(item.totalTurnover) || 0,
             dieselCost: Number(item.dieselCost) || 0,
-            turnoverPercentage: item.turnoverPercentage ?? 0,
-            dieselCostPercentage: item.dieselCostPercentage ?? 0,
           }
         })
         console.log("Processed turnover vs diesel cost data:", data)
@@ -337,15 +334,12 @@ export default function DirectorAnalytics() {
       ) || 0
 
       const total = income + totalExpenses
-      const incomePercentage = total > 0 ? (income / total) * 100 : 0
-      const expensesPercentage = total > 0 ? (totalExpenses / total) * 100 : 0
 
       const data = [
         {
           name: "Income",
           value: income,
           type: "income",
-          percentage: incomePercentage.toFixed(2),
           month: month,
           year: year,
         },
@@ -353,7 +347,6 @@ export default function DirectorAnalytics() {
           name: "Expenses",
           value: totalExpenses,
           type: "expenses",
-          percentage: expensesPercentage.toFixed(2),
           month: month,
           year: year,
         }
@@ -424,7 +417,6 @@ export default function DirectorAnalytics() {
             name: item.name,
             value: Number(item.value) || 0,
             type: item.type,
-            percentage: Number(item.percentage) || 0,
             month: item.month,
             year: item.year,
           }
@@ -460,7 +452,6 @@ export default function DirectorAnalytics() {
             name: item.name,
             value: value,
             type: item.type,
-            percentage: Number(item.percentage) || 0,
             month: item.month.trim(),
             year: item.year,
           }
@@ -497,7 +488,6 @@ export default function DirectorAnalytics() {
             name: item.name,
             value: Number(item.value) || 0,
             type: item.type,
-            percentage: Number(item.percentage) || 0,
             month: item.month,
             year: item.year,
           }
@@ -534,7 +524,6 @@ export default function DirectorAnalytics() {
             name: item.name,
             value: Number(item.value) || 0,
             type: item.type,
-            percentage: Number(item.percentage) || 0,
             month: item.month,
             year: item.year,
           }
@@ -573,8 +562,6 @@ export default function DirectorAnalytics() {
             fuelCost: fuelCost,
             month: item.month_name.trim(),
             year: item.year,
-            turnoverPercentage: item.turnoverPercentage ?? 0,
-            fuelCostPercentage: item.fuelCostPercentage ?? 0,
             status,
           }
         })
@@ -741,7 +728,7 @@ export default function DirectorAnalytics() {
         dominantBaseline="middle"
         fontSize={12}
       >
-        {`R${value?.toLocaleString() || 0} (${percentage}%)`}
+        {`R${value?.toLocaleString() || 0}`}
       </text>
     )
   }
@@ -771,7 +758,7 @@ export default function DirectorAnalytics() {
     console.log(`CustomBarLabelForFuelAndTurnover: index=${index}, chartData=`, chartData)
     const percentage = chartData[index]?.percentage || 0
     console.log(`Selected percentage: ${percentage}%`)
-    const labelText = `R${value.toLocaleString()} (${percentage.toFixed(2)}%)`
+    const labelText = `R${value.toLocaleString()}`
     return (
       <text x={x + width / 2} y={y - 10} fill="#000" textAnchor="middle" dominantBaseline="middle" fontSize={12}>
         {labelText}
