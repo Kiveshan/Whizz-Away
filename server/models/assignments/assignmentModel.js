@@ -676,9 +676,13 @@ export const generateInvoice = async (instructionId) => {
       [instructionId]
     );
 
-    // If a record exists, exit early without doing anything
+    // If a record exists, return early without creating a new invoice
     if (existingInvoiceResult.rows.length > 0) {
-      return;
+      return {
+        success: true,
+        message: `Invoice already exists for instruction ID ${instructionId}`,
+        existingInvoiceId: existingInvoiceResult.rows[0].ikey,
+      };
     }
 
     const currentDate = new Date();

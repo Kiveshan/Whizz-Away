@@ -74,15 +74,15 @@ const FCcontrollerinstructions = () => {
 
   // Log the isImport state for debugging
   useEffect(() => {
-    console.log("isImport state changed:", isImport)
-  }, [isImport])
-  
+    console.log("isImport state changed:", isImport);
+  }, [isImport]);
+
   // Check if instruction is already invoiced when component mounts
   useEffect(() => {
     if (instructionId) {
-      checkIfInvoiced()
+      checkIfInvoiced();
     }
-  }, [instructionId])
+  }, [instructionId]);
 
   // NEW: Track previous container counts to detect changes from 0 to >0
   const [prevContainerCounts, setPrevContainerCounts] = useState({
@@ -221,12 +221,12 @@ const FCcontrollerinstructions = () => {
   );
 
   // Container state
-  const [containers, setContainers] = useState([])
-  const [containerFieldErrors, setContainerFieldErrors] = useState({})
-  const [containerSuccessMessage, setContainerSuccessMessage] = useState("")
-  const [isContainerLoading, setIsContainerLoading] = useState(false)
-  const [isContainerDataModified, setIsContainerDataModified] = useState(false)
-  const [isInvoiced, setIsInvoiced] = useState(false)
+  const [containers, setContainers] = useState([]);
+  const [containerFieldErrors, setContainerFieldErrors] = useState({});
+  const [containerSuccessMessage, setContainerSuccessMessage] = useState("");
+  const [isContainerLoading, setIsContainerLoading] = useState(false);
+  const [isContainerDataModified, setIsContainerDataModified] = useState(false);
+  const [isInvoiced, setIsInvoiced] = useState(false);
 
   const [confirmationModal, setConfirmationModal] = useState({
     isOpen: false,
@@ -266,7 +266,12 @@ const FCcontrollerinstructions = () => {
         id: containerId++,
         containerKey: null,
         containerNum: "",
-        weight: (isImport || formData.shipmentTypeId === "2" || formData.shipmentTypeId === "3") ? null : null, // Initialize weight for import, export, and cross-haul
+        weight:
+          isImport ||
+          formData.shipmentTypeId === "2" ||
+          formData.shipmentTypeId === "3"
+            ? null
+            : null, // Initialize weight for import, export, and cross-haul
         containerType: "6m",
         cargoDescription: "",
       });
@@ -278,7 +283,12 @@ const FCcontrollerinstructions = () => {
         id: containerId++,
         containerKey: null,
         containerNum: "",
-        weight: (isImport || formData.shipmentTypeId === "2" || formData.shipmentTypeId === "3") ? null : null, // Initialize weight for import, export, and cross-haul
+        weight:
+          isImport ||
+          formData.shipmentTypeId === "2" ||
+          formData.shipmentTypeId === "3"
+            ? null
+            : null, // Initialize weight for import, export, and cross-haul
         containerType: "12m",
         cargoDescription: "",
       });
@@ -290,7 +300,12 @@ const FCcontrollerinstructions = () => {
         id: containerId++,
         containerKey: null,
         containerNum: "",
-        weight: (isImport || formData.shipmentTypeId === "2" || formData.shipmentTypeId === "3") ? null : null, // Initialize weight for import, export, and cross-haul
+        weight:
+          isImport ||
+          formData.shipmentTypeId === "2" ||
+          formData.shipmentTypeId === "3"
+            ? null
+            : null, // Initialize weight for import, export, and cross-haul
         containerType: "Abnormal",
         cargoDescription: "",
       });
@@ -302,7 +317,12 @@ const FCcontrollerinstructions = () => {
         id: containerId++,
         containerKey: null,
         containerNum: "",
-        weight: (isImport || formData.shipmentTypeId === "2" || formData.shipmentTypeId === "3") ? null : null, // Initialize weight for import, export, and cross-haul
+        weight:
+          isImport ||
+          formData.shipmentTypeId === "2" ||
+          formData.shipmentTypeId === "3"
+            ? null
+            : null, // Initialize weight for import, export, and cross-haul
         containerType: "BreakBulk",
         cargoDescription: "",
       });
@@ -418,18 +438,30 @@ const FCcontrollerinstructions = () => {
       }
 
       // Weight validation for import, export, and cross-haul shipments - only validate format if weight is provided
-      if ((isImport || formData.shipmentTypeId === "2" || formData.shipmentTypeId === "3") && container.weight !== null && container.weight !== undefined && container.weight !== "") {
+      if (
+        (isImport ||
+          formData.shipmentTypeId === "2" ||
+          formData.shipmentTypeId === "3") &&
+        container.weight !== null &&
+        container.weight !== undefined &&
+        container.weight !== ""
+      ) {
         // If weight is provided, validate it's a positive number
-        if (typeof container.weight === "string" && container.weight.trim() !== "") {
-          const weightValue = Number.parseFloat(container.weight)
+        if (
+          typeof container.weight === "string" &&
+          container.weight.trim() !== ""
+        ) {
+          const weightValue = Number.parseFloat(container.weight);
           if (isNaN(weightValue) || weightValue < 0) {
-            newErrors[`weight-${container.id}`] = "Must be a valid positive number"
-            isValid = false
+            newErrors[`weight-${container.id}`] =
+              "Must be a valid positive number";
+            isValid = false;
           }
         } else if (typeof container.weight === "number") {
           if (isNaN(container.weight) || container.weight < 0) {
-            newErrors[`weight-${container.id}`] = "Must be a valid positive number"
-            isValid = false
+            newErrors[`weight-${container.id}`] =
+              "Must be a valid positive number";
+            isValid = false;
           }
         }
       }
@@ -504,28 +536,30 @@ const FCcontrollerinstructions = () => {
       console.error("Error fetching original data:", error);
       return null;
     }
-  }
+  };
 
   // Check if instruction is already invoiced
   const checkIfInvoiced = async () => {
     try {
-      if (!instructionId) return
-      
+      if (!instructionId) return;
+
       // Get the instruction data to get the m1key
-      const instructionData = await fetchOriginalData()
+      const instructionData = await fetchOriginalData();
       if (!instructionData || !instructionData.m1key) {
-        console.error("No m1key found for instruction")
-        return
+        console.error("No m1key found for instruction");
+        return;
       }
-      
+
       // Check if m1key exists in invoice table
-      const response = await api.get(`/api/invoice/check/${instructionData.m1key}`)
-      setIsInvoiced(response.data.exists)
+      const response = await api.get(
+        `/api/invoice/check/${instructionData.m1key}`
+      );
+      setIsInvoiced(response.data.exists);
     } catch (error) {
-      console.error("Error checking if instruction is invoiced:", error)
-      setIsInvoiced(false)
+      console.error("Error checking if instruction is invoiced:", error);
+      setIsInvoiced(false);
     }
-  }
+  };
 
   // Validate container uniqueness
   const validateContainerUniqueness = () => {
@@ -566,18 +600,24 @@ const FCcontrollerinstructions = () => {
 
     // Add vessel name and stack date specifically for import and export shipment types
     if (formData.shipmentTypeId === "1" || formData.shipmentTypeId === "2") {
-      requiredFields.push({ name: "vesselName", label: "Vessel Name" })
-      requiredFields.push({ name: "stackDate", label: formData.shipmentTypeId === "1" ? "ETA Date" : "Stack Date" })
-      
-      console.log("Validating vessel name and stack date for shipment type:", formData.shipmentTypeId)
+      requiredFields.push({ name: "vesselName", label: "Vessel Name" });
+      requiredFields.push({
+        name: "stackDate",
+        label: formData.shipmentTypeId === "1" ? "ETA Date" : "Stack Date",
+      });
+
+      console.log(
+        "Validating vessel name and stack date for shipment type:",
+        formData.shipmentTypeId
+      );
     }
-    
+
     // Add weight and unitRate as required fields when rateWeight is ton or kg
     if (formData.rateWeight === "ton" || formData.rateWeight === "kg") {
       requiredFields.push(
         { name: "weight", label: `Weight (${formData.rateWeight})` },
         { name: "unitRate", label: `Rate per ${formData.rateWeight}` }
-      )
+      );
     }
 
     requiredFields.forEach((field) => {
@@ -604,9 +644,15 @@ const FCcontrollerinstructions = () => {
       }
 
       // Weight validation - only validate format if weight is provided
-      if (isImport && container.weight && container.weight !== "" && !/^[0-9]*\.?[0-9]*$/.test(container.weight)) {
-        containerErrors[`weight-${container.id}`] = "Weight must be a valid number"
-        isValid = false
+      if (
+        isImport &&
+        container.weight &&
+        container.weight !== "" &&
+        !/^[0-9]*\.?[0-9]*$/.test(container.weight)
+      ) {
+        containerErrors[`weight-${container.id}`] =
+          "Weight must be a valid number";
+        isValid = false;
       }
     });
 
@@ -659,7 +705,6 @@ const FCcontrollerinstructions = () => {
       mismatches.push("Abnormal");
     }
 
-
     // If there are mismatches, collect container types with counts > 0
     if (mismatches.length > 0) {
       if (formData.num_six_meters > 0) {
@@ -677,7 +722,6 @@ const FCcontrollerinstructions = () => {
           `Abnormal (${formData.num_abnormal} containers, Rate: R${formData.rateper_abnormal})`
         );
       }
-
 
       // Show confirmation modal
       const message =
@@ -700,30 +744,48 @@ const FCcontrollerinstructions = () => {
 
   // Handle save changes with enhanced logic
   const handleSaveChanges = async () => {
-    console.log("=== SAVE CHANGES INITIATED ===")
-    
+    console.log("=== SAVE CHANGES INITIATED ===");
+
     // Special validation for vessel name and stack date for import and export shipment types
     if (formData.shipmentTypeId === "1" || formData.shipmentTypeId === "2") {
       const errors = {};
       let hasSpecialValidationErrors = false;
-      
+
       if (!formData.vesselName || !formData.vesselName.trim()) {
         errors.vesselName = "Vessel name is required";
         hasSpecialValidationErrors = true;
       }
-      
+
       if (!formData.stackDate || !formData.stackDate.trim()) {
-        errors.stackDate = `${formData.shipmentTypeId === "1" ? "ETA" : "Stack"} date is required`;
+        errors.stackDate = `${
+          formData.shipmentTypeId === "1" ? "ETA" : "Stack"
+        } date is required`;
         hasSpecialValidationErrors = true;
       }
-      
+
       if (hasSpecialValidationErrors) {
-        setFieldErrors(prev => ({ ...prev, ...errors }));
+        setFieldErrors((prev) => ({ ...prev, ...errors }));
         scrollToField(Object.keys(errors)[0]);
-        console.log("Special validation failed for vessel name or stack date:", errors);
+        console.log(
+          "Special validation failed for vessel name or stack date:",
+          errors
+        );
         setErrorModal({
           isOpen: true,
-          message: `Please provide ${Object.keys(errors).includes("vesselName") ? "vessel name" : ""} ${Object.keys(errors).includes("vesselName") && Object.keys(errors).includes("stackDate") ? "and" : ""} ${Object.keys(errors).includes("stackDate") ? (formData.shipmentTypeId === "1" ? "ETA date" : "stack date") : ""}`,
+          message: `Please provide ${
+            Object.keys(errors).includes("vesselName") ? "vessel name" : ""
+          } ${
+            Object.keys(errors).includes("vesselName") &&
+            Object.keys(errors).includes("stackDate")
+              ? "and"
+              : ""
+          } ${
+            Object.keys(errors).includes("stackDate")
+              ? formData.shipmentTypeId === "1"
+                ? "ETA date"
+                : "stack date"
+              : ""
+          }`,
         });
         return;
       }
@@ -756,42 +818,44 @@ const FCcontrollerinstructions = () => {
     // Show confirmation modal
     setConfirmationModal({
       isOpen: true,
-      message: "Are you sure you want to delete this instruction? This action cannot be undone.",
-      action: 'delete'
-    })
-  }
-  
+      message:
+        "Are you sure you want to delete this instruction? This action cannot be undone.",
+      action: "delete",
+    });
+  };
+
   // Handle create invoice
   const handleCreateInvoice = async () => {
-    console.log("=== CREATE INVOICE INITIATED ===")
-    
+    console.log("=== CREATE INVOICE INITIATED ===");
+
     try {
       // Get the instruction data to get the m1key
-      const instructionData = await fetchOriginalData()
+      const instructionData = await fetchOriginalData();
       if (!instructionData || !instructionData.m1key) {
-        console.error("No m1key found for instruction")
+        console.error("No m1key found for instruction");
         setErrorModal({
           isOpen: true,
-          message: "Could not create invoice: No instruction ID found."
-        })
-        return
+          message: "Could not create invoice: No instruction ID found.",
+        });
+        return;
       }
-      
+
       // Show confirmation modal
       setConfirmationModal({
         isOpen: true,
-        message: "Are you sure you want to create an invoice for this instruction?",
-        action: 'invoice'
-      })
+        message:
+          "Are you sure you want to create an invoice for this instruction?",
+        action: "invoice",
+      });
     } catch (error) {
-      console.error("Error preparing invoice creation:", error)
+      console.error("Error preparing invoice creation:", error);
       setErrorModal({
         isOpen: true,
-        message: "Error preparing invoice creation. Please try again."
-      })
+        message: "Error preparing invoice creation. Please try again.",
+      });
     }
-  }
-  
+  };
+
   // Perform the actual delete operation
   const performDelete = async () => {
     try {
@@ -833,46 +897,46 @@ const FCcontrollerinstructions = () => {
     } finally {
       setIsContainerLoading(false);
     }
-  }
-  
+  };
+
   // Perform the actual invoice creation
   const performInvoiceCreation = async () => {
     try {
-      console.log(`Creating invoice for instruction with ID: ${instructionId}`)
-      setIsContainerLoading(true)
-      
+      console.log(`Creating invoice for instruction with ID: ${instructionId}`);
+      setIsContainerLoading(true);
+
       // Get the instruction data to get the m1key
-      const instructionData = await fetchOriginalData()
+      const instructionData = await fetchOriginalData();
       if (!instructionData || !instructionData.m1key) {
-        throw new Error("No m1key found for instruction")
+        throw new Error("No m1key found for instruction");
       }
-      
+
       // Call the API to create an invoice for the instruction
-      const response = await api.post(`/api/invoice/create`, {
-        m1key: instructionData.m1key,
-        clientId: formData.clientId
-      })
-      
-      console.log("Invoice creation response:", response.data)
-      
+      const response = await api.post(
+        `/generate-invoice/${instructionData.m1key}`
+      );
+
+      console.log("Invoice creation response:", response.data);
+
       // Show success message
-      setContainerSuccessMessage("Invoice created successfully!")
-      
+      setContainerSuccessMessage("Invoice created successfully!");
+
       // Update the isInvoiced state
-      setIsInvoiced(true)
-      
+      setIsInvoiced(true);
     } catch (error) {
-      console.error("Error creating invoice:", error)
-      
+      console.error("Error creating invoice:", error);
+
       // Show error modal
       setErrorModal({
         isOpen: true,
-        message: error.response?.data?.message || "Failed to create invoice. Please try again."
-      })
+        message:
+          error.response?.data?.message ||
+          "Failed to create invoice. Please try again.",
+      });
     } finally {
-      setIsContainerLoading(false)
+      setIsContainerLoading(false);
     }
-  }
+  };
 
   // Extract the actual save logic into a separate function
   const performSave = async () => {
@@ -927,18 +991,23 @@ const FCcontrollerinstructions = () => {
       };
 
       // Recalculate total cost based on current values
-      const numSix = formData.num_six_meters || 0
-      const numTwelve = formData.num_twelve_meters || 0
-      const numAbnormal = formData.num_abnormal || 0
+      const numSix = formData.num_six_meters || 0;
+      const numTwelve = formData.num_twelve_meters || 0;
+      const numAbnormal = formData.num_abnormal || 0;
 
-      const ratePer6 = numSix > 0 ? Number(formData.rateper_6 || 0) : 0
-      const ratePer12 = numTwelve > 0 ? Number(formData.rateper_12 || 0) : 0
-      const ratePerAbnormal = numAbnormal > 0 ? Number(formData.rateper_abnormal || 0) : 0
+      const ratePer6 = numSix > 0 ? Number(formData.rateper_6 || 0) : 0;
+      const ratePer12 = numTwelve > 0 ? Number(formData.rateper_12 || 0) : 0;
+      const ratePerAbnormal =
+        numAbnormal > 0 ? Number(formData.rateper_abnormal || 0) : 0;
 
       const baseCost =
-        ratePer6 * numSix + ratePer12 * numTwelve + ratePerAbnormal * numAbnormal
-      const surchargeAmount = formData.surchages ? Number(formData.surcharge || 0) : 0
-      const totalCost = Number((baseCost + surchargeAmount).toFixed(2))
+        ratePer6 * numSix +
+        ratePer12 * numTwelve +
+        ratePerAbnormal * numAbnormal;
+      const surchargeAmount = formData.surchages
+        ? Number(formData.surcharge || 0)
+        : 0;
+      const totalCost = Number((baseCost + surchargeAmount).toFixed(2));
 
       // Prepare instruction update data with proper field mapping
       const instructionUpdateData = {
@@ -965,7 +1034,12 @@ const FCcontrollerinstructions = () => {
         num_abnormal: numAbnormal,
         num_breakbulk: 0,
         // For ton or kg, weight must be provided and not defaulted to 0
-        weight: formData.rateWeight !== "Container" ? (formData.weight ? Number(formData.weight) : null) : null,
+        weight:
+          formData.rateWeight !== "Container"
+            ? formData.weight
+              ? Number(formData.weight)
+              : null
+            : null,
         total_cost: totalCost,
         booking_ref: formData.bookingRef,
         vessel_name: formData.vesselName,
@@ -974,8 +1048,13 @@ const FCcontrollerinstructions = () => {
         rateper_abnormal: ratePerAbnormal,
         rateper_breakbulk: 0,
         // For ton or kg, unitRate must be provided and not defaulted to 0
-        unitrate: formData.rateWeight !== "Container" ? (formData.unitRate ? Number(formData.unitRate) : null) : null,
-      }
+        unitrate:
+          formData.rateWeight !== "Container"
+            ? formData.unitRate
+              ? Number(formData.unitRate)
+              : null
+            : null,
+      };
 
       // Prepare container data with containerKey for smart updates
       const containerData = containers.map((container) => {
@@ -1126,15 +1205,15 @@ const FCcontrollerinstructions = () => {
 
   // Handle confirmation modal actions
   const handleConfirmAction = () => {
-    if (confirmationModal.action === 'save') {
-      performSave()
-    } else if (confirmationModal.action === 'delete') {
-      performDelete()
-    } else if (confirmationModal.action === 'invoice') {
-      performInvoiceCreation()
+    if (confirmationModal.action === "save") {
+      performSave();
+    } else if (confirmationModal.action === "delete") {
+      performDelete();
+    } else if (confirmationModal.action === "invoice") {
+      performInvoiceCreation();
     }
-    setConfirmationModal({ isOpen: false, message: "", action: null })
-  }
+    setConfirmationModal({ isOpen: false, message: "", action: null });
+  };
 
   const handleCancelAction = () => {
     setConfirmationModal({ isOpen: false, message: "", action: null });
@@ -1853,14 +1932,19 @@ const FCcontrollerinstructions = () => {
   };
 
   const handleShipmentTypeChange = (e) => {
-    const shipmentTypeId = e.target.value
-    const selectedShipmentType = shipmentTypes.find((type) => type.shipkey.toString() === shipmentTypeId)
-    const shipmentTypeName = selectedShipmentType ? selectedShipmentType.shipmenttype : ""
-    const isImportType = shipmentTypeName.toLowerCase() === "import"
-    const isCrossHaul = shipmentTypeName.toLowerCase() === "cross-haul" || shipmentTypeId === "4"
+    const shipmentTypeId = e.target.value;
+    const selectedShipmentType = shipmentTypes.find(
+      (type) => type.shipkey.toString() === shipmentTypeId
+    );
+    const shipmentTypeName = selectedShipmentType
+      ? selectedShipmentType.shipmenttype
+      : "";
+    const isImportType = shipmentTypeName.toLowerCase() === "import";
+    const isCrossHaul =
+      shipmentTypeName.toLowerCase() === "cross-haul" || shipmentTypeId === "4";
 
-    setIsImport(isImportType)
-    
+    setIsImport(isImportType);
+
     // For cross-haul or type 4, clear vessel name and stack date
     if (isCrossHaul || shipmentTypeId === "4") {
       setFormData({
@@ -1870,24 +1954,30 @@ const FCcontrollerinstructions = () => {
         vesselName: "",
         stackDate: "",
         // Default unit per to 'ton' for shipment type 4
-        rateWeight: shipmentTypeId === "4" ? "ton" : formData.rateWeight
-      })
+        rateWeight: shipmentTypeId === "4" ? "ton" : formData.rateWeight,
+      });
     } else {
       setFormData({
         ...formData,
         shipmentTypeId,
         shipmentTypeName,
-      })
+      });
     }
-    
-    setFieldErrors((prev) => ({ ...prev, shipmentTypeId: "" }))
-  }
+
+    setFieldErrors((prev) => ({ ...prev, shipmentTypeId: "" }));
+  };
 
   // Check if shipment type is Cross-haul
   const isCrossHaulShipment = () => {
-    const selectedShipmentType = shipmentTypes.find((type) => type.shipkey.toString() === formData.shipmentTypeId)
-    return selectedShipmentType && (selectedShipmentType.shipmenttype.toLowerCase() === "cross-haul" || formData.shipmentTypeId === "4")
-  }
+    const selectedShipmentType = shipmentTypes.find(
+      (type) => type.shipkey.toString() === formData.shipmentTypeId
+    );
+    return (
+      selectedShipmentType &&
+      (selectedShipmentType.shipmenttype.toLowerCase() === "cross-haul" ||
+        formData.shipmentTypeId === "4")
+    );
+  };
 
   // Format date from any format to YYYY-MM-DD for input[type="date"]
   const formatDateForInput = (dateString) => {
@@ -2146,7 +2236,12 @@ const FCcontrollerinstructions = () => {
               id: nextId + i,
               containerKey: null,
               containerNum: "",
-              weight: (isImport || formData.shipmentTypeId === "2" || formData.shipmentTypeId === "3") ? "" : null,
+              weight:
+                isImport ||
+                formData.shipmentTypeId === "2" ||
+                formData.shipmentTypeId === "3"
+                  ? ""
+                  : null,
               containerType: containerType,
               cargoDescription: "",
             });
@@ -2246,14 +2341,14 @@ const FCcontrollerinstructions = () => {
       };
 
       // Recalculate total cost
-      const sixRate = Number(updatedFormData.rateper_6 || 0)
-      const twelveRate = Number(updatedFormData.rateper_12 || 0)
-      const abnormalRateNum = Number(updatedFormData.rateper_abnormal || 0)
+      const sixRate = Number(updatedFormData.rateper_6 || 0);
+      const twelveRate = Number(updatedFormData.rateper_12 || 0);
+      const abnormalRateNum = Number(updatedFormData.rateper_abnormal || 0);
 
       updatedFormData.total_cost =
         (updatedFormData.num_six_meters || 0) * sixRate +
         (updatedFormData.num_twelve_meters || 0) * twelveRate +
-        (updatedFormData.num_abnormal || 0) * abnormalRateNum
+        (updatedFormData.num_abnormal || 0) * abnormalRateNum;
 
       setFormData(updatedFormData);
     }
@@ -2275,10 +2370,10 @@ const FCcontrollerinstructions = () => {
     const containerTypeMap = {
       num_six_meters: "6m",
       num_twelve_meters: "12m",
-      num_abnormal: "Abnormal"
-    }
-    const type = containerTypeMap[containerType]
-    if (!type) return
+      num_abnormal: "Abnormal",
+    };
+    const type = containerTypeMap[containerType];
+    if (!type) return;
     if (isIncreasing) {
       const newContainers = [];
       const nextId =
@@ -2330,9 +2425,16 @@ const FCcontrollerinstructions = () => {
     const breakBulkRate = Number(formData.rateper_breakbulk || 0);
 
     const totalCost =
-      (type === "num_six_meters" ? validValue : updatedFormData.num_six_meters) * sixRate +
-      (type === "num_twelve_meters" ? validValue : updatedFormData.num_twelve_meters) * twelveRate +
-      (type === "num_abnormal" ? validValue : updatedFormData.num_abnormal) * abnormalRateNum
+      (type === "num_six_meters"
+        ? validValue
+        : updatedFormData.num_six_meters) *
+        sixRate +
+      (type === "num_twelve_meters"
+        ? validValue
+        : updatedFormData.num_twelve_meters) *
+        twelveRate +
+      (type === "num_abnormal" ? validValue : updatedFormData.num_abnormal) *
+        abnormalRateNum;
 
     updatedFormData.total_cost = totalCost;
 
@@ -2343,11 +2445,11 @@ const FCcontrollerinstructions = () => {
   };
 
   const validateForm = () => {
-    console.log("validateForm called")
-    console.log("Current formData:", formData)
+    console.log("validateForm called");
+    console.log("Current formData:", formData);
     // Check if shipment type is cross-haul or type 4
-    const isCrossHaul = isCrossHaulShipment()
-    console.log("Is cross-haul shipment:", isCrossHaul)
+    const isCrossHaul = isCrossHaulShipment();
+    console.log("Is cross-haul shipment:", isCrossHaul);
 
     const requiredFields = [
       "clientId",
@@ -2364,10 +2466,13 @@ const FCcontrollerinstructions = () => {
     ];
 
     // Add vessel name and stack date as required for import and export shipment types (1 and 2)
-    console.log("Checking shipment type for vessel name and stack date requirement:", formData.shipmentTypeId)
+    console.log(
+      "Checking shipment type for vessel name and stack date requirement:",
+      formData.shipmentTypeId
+    );
     if (formData.shipmentTypeId === "1" || formData.shipmentTypeId === "2") {
-      console.log("Adding vesselName and stackDate as required fields")
-      requiredFields.push("vesselName", "stackDate")
+      console.log("Adding vesselName and stackDate as required fields");
+      requiredFields.push("vesselName", "stackDate");
     }
 
     let isValid = true;
@@ -2441,35 +2546,51 @@ const FCcontrollerinstructions = () => {
     }
 
     // For ton or kg, both weight and unitRate are required
-    if ((formData.rateWeight === "ton" || formData.rateWeight === "kg") && (formData.weight === "" || weight === "")) {
-      errors.weight = "Please add weight"
-      isValid = false
-    } 
-    
-    // For ton or kg, unitRate is required
-    if ((formData.rateWeight === "ton" || formData.rateWeight === "kg") && (!formData.unitRate || formData.unitRate === "" || formData.unitRate === "0")) {
-      errors.unitRate = `Rate per ${formData.rateWeight} is required`
-      isValid = false
+    if (
+      (formData.rateWeight === "ton" || formData.rateWeight === "kg") &&
+      (formData.weight === "" || weight === "")
+    ) {
+      errors.weight = "Please add weight";
+      isValid = false;
     }
-    
+
+    // For ton or kg, unitRate is required
+    if (
+      (formData.rateWeight === "ton" || formData.rateWeight === "kg") &&
+      (!formData.unitRate ||
+        formData.unitRate === "" ||
+        formData.unitRate === "0")
+    ) {
+      errors.unitRate = `Rate per ${formData.rateWeight} is required`;
+      isValid = false;
+    }
+
     // Validate weight if provided for import, export, or cross-haul shipments
-    if ((isImport || formData.shipmentTypeId === "2" || formData.shipmentTypeId === "3") && (formData.weight !== "" || weight !== "")) {
-      const weightValue = Number.parseFloat(formData.weight || weight)
+    if (
+      (isImport ||
+        formData.shipmentTypeId === "2" ||
+        formData.shipmentTypeId === "3") &&
+      (formData.weight !== "" || weight !== "")
+    ) {
+      const weightValue = Number.parseFloat(formData.weight || weight);
       if (isNaN(weightValue) || weightValue <= 0) {
         errors.weight = "Weight must be a positive number";
         isValid = false;
       }
     }
-    
+
     // Validate unitRate format if provided
     if (formData.unitRate && formData.unitRate !== "") {
-      const unitRateValue = Number.parseFloat(formData.unitRate)
+      const unitRateValue = Number.parseFloat(formData.unitRate);
       if (isNaN(unitRateValue) || unitRateValue <= 0) {
-        errors.unitRate = `Rate per ${formData.rateWeight} must be a positive number`
-        isValid = false
+        errors.unitRate = `Rate per ${formData.rateWeight} must be a positive number`;
+        isValid = false;
       }
     }
-    const totalContainers = formData.num_six_meters + formData.num_twelve_meters + formData.num_abnormal
+    const totalContainers =
+      formData.num_six_meters +
+      formData.num_twelve_meters +
+      formData.num_abnormal;
     if (totalContainers <= 0) {
       errors.containers = "Please add at least one container";
       isValid = false;
@@ -2540,21 +2661,23 @@ const FCcontrollerinstructions = () => {
 
     // Special validation for vessel name and stack date for import and export shipment types
     let hasSpecialValidationErrors = false;
-    if ((formData.shipmentTypeId === "1" || formData.shipmentTypeId === "2")) {
+    if (formData.shipmentTypeId === "1" || formData.shipmentTypeId === "2") {
       const errors = {};
-      
+
       if (!formData.vesselName || !formData.vesselName.trim()) {
         errors.vesselName = "Vessel name is required";
         hasSpecialValidationErrors = true;
       }
-      
+
       if (!formData.stackDate || !formData.stackDate.trim()) {
-        errors.stackDate = `${formData.shipmentTypeId === "1" ? "ETA" : "Stack"} date is required`;
+        errors.stackDate = `${
+          formData.shipmentTypeId === "1" ? "ETA" : "Stack"
+        } date is required`;
         hasSpecialValidationErrors = true;
       }
-      
+
       if (hasSpecialValidationErrors) {
-        setFieldErrors(prev => ({ ...prev, ...errors }));
+        setFieldErrors((prev) => ({ ...prev, ...errors }));
         scrollToField(Object.keys(errors)[0]);
         console.log("Special validation failed:", errors);
         return;
@@ -2562,9 +2685,9 @@ const FCcontrollerinstructions = () => {
     }
 
     // Then validate the rest of the form
-    console.log("Validating form...")
-    const isValid = validateForm()
-    console.log("Form validation result:", isValid)
+    console.log("Validating form...");
+    const isValid = validateForm();
+    console.log("Form validation result:", isValid);
 
     if (!isValid) {
       console.log("Form validation failed");
@@ -2574,17 +2697,19 @@ const FCcontrollerinstructions = () => {
     try {
       console.log("Form is valid, proceeding with submission...");
       // Calculate total cost using individual rates
-      const sixRate = Number(formData.rateper_6 || 0)
-      const twelveRate = Number(formData.rateper_12 || 0)
-      const abnormalRateNum = Number(formData.rateper_abnormal || 0)
+      const sixRate = Number(formData.rateper_6 || 0);
+      const twelveRate = Number(formData.rateper_12 || 0);
+      const abnormalRateNum = Number(formData.rateper_abnormal || 0);
 
       const totalCost =
         formData.num_six_meters * sixRate +
         formData.num_twelve_meters * twelveRate +
-        formData.num_abnormal * abnormalRateNum
+        formData.num_abnormal * abnormalRateNum;
 
       const totalContainers =
-        formData.num_six_meters + formData.num_twelve_meters + formData.num_abnormal
+        formData.num_six_meters +
+        formData.num_twelve_meters +
+        formData.num_abnormal;
 
       // IMPROVED: Create comprehensive form data with all current values
       const updatedFormData = {
@@ -2598,8 +2723,14 @@ const FCcontrollerinstructions = () => {
         rateper_12: twelveRate,
         rateper_abnormal: abnormalRateNum,
         total_cost: totalCost,
-        weight: (isImport || formData.shipmentTypeId === "2" || formData.shipmentTypeId === "3") && formData.rateWeight !== "Container" ? formData.weight || weight : null,
-      }
+        weight:
+          (isImport ||
+            formData.shipmentTypeId === "2" ||
+            formData.shipmentTypeId === "3") &&
+          formData.rateWeight !== "Container"
+            ? formData.weight || weight
+            : null,
+      };
 
       const stateToPass = {
         controllerData: updatedFormData,
@@ -3080,7 +3211,6 @@ const FCcontrollerinstructions = () => {
                         </div>
                       </div>
                     </div>
-
                   </div>
 
                   {/* Hazardous and Surcharges Checkboxes - Horizontally Aligned */}
@@ -3296,7 +3426,7 @@ const FCcontrollerinstructions = () => {
                           disabled={isReadOnly}
                         >
                           <option value="kg">kg</option>
-                        
+
                           <option value="ton">ton</option>
                           <option value="Container">Container</option>
                         </select>
@@ -3541,12 +3671,16 @@ const FCcontrollerinstructions = () => {
                       />
                     </div>
                   </div>
-                  {(formData.shipmentTypeId === "1" || formData.shipmentTypeId === "2") && (
+                  {(formData.shipmentTypeId === "1" ||
+                    formData.shipmentTypeId === "2") && (
                     <div className="controller-instructions-form-field">
                       <label>
-                        Vessel Name <span style={{ color: 'red' }}>*</span>
+                        Vessel Name <span style={{ color: "red" }}>*</span>
                       </label>
-                      <div className="controller-instructions-input-wrapper" ref={fieldRefs.vesselName}>
+                      <div
+                        className="controller-instructions-input-wrapper"
+                        ref={fieldRefs.vesselName}
+                      >
                         <input
                           type="text"
                           className={`controller-instructions-form-input ${
@@ -3556,7 +3690,7 @@ const FCcontrollerinstructions = () => {
                           }`}
                           placeholder="Enter vessel name"
                           name="vesselName"
-                          value={formData.vesselName || ''}
+                          value={formData.vesselName || ""}
                           onChange={handleInputChange}
                           disabled={isReadOnly}
                           style={isReadOnly ? readOnlyStyle : {}}
@@ -3633,12 +3767,19 @@ const FCcontrollerinstructions = () => {
                       <ErrorTooltip message={fieldErrors.pickupDate} />
                     </div>
                   </div>
-                  {(formData.shipmentTypeId === "1" || formData.shipmentTypeId === "2") && (
+                  {(formData.shipmentTypeId === "1" ||
+                    formData.shipmentTypeId === "2") && (
                     <div className="controller-instructions-form-field">
                       <label>
-                        {formData.shipmentTypeId === "1" ? "ETA Date" : "Stack Date"} <span style={{ color: 'red' }}>*</span>
+                        {formData.shipmentTypeId === "1"
+                          ? "ETA Date"
+                          : "Stack Date"}{" "}
+                        <span style={{ color: "red" }}>*</span>
                       </label>
-                      <div className="controller-instructions-date-wrapper" ref={fieldRefs.stackDate}>
+                      <div
+                        className="controller-instructions-date-wrapper"
+                        ref={fieldRefs.stackDate}
+                      >
                         <input
                           type="date"
                           className={`controller-instructions-form-input ${
@@ -3647,7 +3788,7 @@ const FCcontrollerinstructions = () => {
                               : ""
                           }`}
                           name="stackDate"
-                          value={formData.stackDate || ''}
+                          value={formData.stackDate || ""}
                           onChange={handleInputChange}
                           min={formData.pickupDate || today}
                           ref={etaDateRef}
@@ -3732,9 +3873,17 @@ const FCcontrollerinstructions = () => {
                         >
                           Container Number
                         </th>
-                        {(isImport || formData.shipmentTypeId === "2" || formData.shipmentTypeId === "3") && (
-                          <th style={{ padding: "12px 8px", textAlign: "left", borderBottom: "2px solid #ddd" }}>
-                            Weight 
+                        {(isImport ||
+                          formData.shipmentTypeId === "2" ||
+                          formData.shipmentTypeId === "3") && (
+                          <th
+                            style={{
+                              padding: "12px 8px",
+                              textAlign: "left",
+                              borderBottom: "2px solid #ddd",
+                            }}
+                          >
+                            Weight
                           </th>
                         )}
                         <th
@@ -3798,7 +3947,9 @@ const FCcontrollerinstructions = () => {
                               )}
                             </div>
                           </td>
-                          {(isImport || formData.shipmentTypeId === "2" || formData.shipmentTypeId === "3") && (
+                          {(isImport ||
+                            formData.shipmentTypeId === "2" ||
+                            formData.shipmentTypeId === "3") && (
                             <td>
                               <div className="controller-instructions-input-wrapper">
                                 <input
@@ -3916,7 +4067,7 @@ const FCcontrollerinstructions = () => {
                       cursor: "pointer",
                       fontSize: "16px",
                       fontWeight: "bold",
-                      marginRight: "10px"
+                      marginRight: "10px",
                     }}
                   >
                     Delete Instruction
