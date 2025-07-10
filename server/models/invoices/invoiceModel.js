@@ -161,4 +161,96 @@ const getInvoiceDetails = async (id) => {
   }
 };
 
-export { getCompletedInvoices, getInvoiceDetails };
+// Check if an m1key exists in the invoice table
+const checkInvoiceExists = async (m1key) => {
+  try {
+    if (!pool) {
+      throw new Error(
+        "Database connection not established. Please try again later."
+      );
+    }
+
+    const queryText = `
+      SELECT COUNT(*) as count
+      FROM public.invoice
+      WHERE m1key = $1
+    `;
+
+    const result = await query(queryText, [m1key]);
+    const count = parseInt(result.rows[0].count, 10);
+
+    return {
+      success: true,
+      exists: count > 0
+    };
+  } catch (error) {
+    console.error("Error checking if invoice exists:", error);
+    return {
+      success: false,
+      message: error.message,
+      exists: false
+    };
+  }
+};
+
+// Create a new invoice for an instruction
+const createInvoice = async ({ m1key, clientId }) => {
+  try {
+    if (!pool) {
+      throw new Error(
+        "Database connection not established. Please try again later."
+      );
+    }
+
+    // Check if invoice already exists for this m1key
+    const existsCheck = await checkInvoiceExists(m1key);
+    if (existsCheck.exists) {
+      return {
+        success: false,
+        message: "Invoice already exists for this instruction"
+      };
+    }
+
+    // Generate invoice number (format: INV-YYYYMMDD-XXXX where XXXX is a sequential number)
+    const today = new Date();
+    const dateStr = today.toISOString().slice(0, 10).replace(/-/g, '');
+    
+    // Get the next sequential number for today
+    const seqQueryText = `
+      SELECT COUNT(*) as count
+      FROM public.invoice
+      WHERE invoice_num LIKE $1
+    `;
+    const seqResult = await query(seqQueryText, [`INV-${dateStr}-%`]);
+    const seqNum = parseInt(seqResult.rows[0].count, 10) + 1;
+    
+    // Format the invoice number
+    const invoiceNum = `INV-${dateStr}-${String(seqNum).padStart(4, '0')}`;
+    
+    // Insert the new invoice
+    const insertQueryText = `
+      INSERT INTO public.invoice
+      (clientid, m1key, invoice_num, date)
+      VALUES ($1, $2, $3, $4)
+      RETURNING ikey
+    `;
+
+    const result = await query(insertQueryText, [clientId, m1key, invoiceNum, today]);
+    
+    return {
+      success: true,
+      data: {
+        ikey: result.rows[0].ikey,
+        invoice_num: invoiceNum
+      }
+    };
+  } catch (error) {
+    console.error("Error creating invoice:", error);
+    return {
+      success: false,
+      message: error.message
+    };
+  }
+};
+
+export { getCompletedInvoices, getInvoiceDetails, checkInvoiceExists, createInvoice };
