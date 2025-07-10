@@ -257,7 +257,7 @@ const FCcontrollerinstructions = () => {
         id: containerId++,
         containerKey: null,
         containerNum: "",
-        weight: isImport ? null : null, // Always start with null
+        weight: (isImport || formData.shipmentTypeId === "2" || formData.shipmentTypeId === "3") ? null : null, // Initialize weight for import, export, and cross-haul
         containerType: "6m",
         cargoDescription: "",
       })
@@ -269,7 +269,7 @@ const FCcontrollerinstructions = () => {
         id: containerId++,
         containerKey: null,
         containerNum: "",
-        weight: isImport ? null : null, // Always start with null
+        weight: (isImport || formData.shipmentTypeId === "2" || formData.shipmentTypeId === "3") ? null : null, // Initialize weight for import, export, and cross-haul
         containerType: "12m",
         cargoDescription: "",
       })
@@ -281,7 +281,7 @@ const FCcontrollerinstructions = () => {
         id: containerId++,
         containerKey: null,
         containerNum: "",
-        weight: isImport ? null : null, // Always start with null
+        weight: (isImport || formData.shipmentTypeId === "2" || formData.shipmentTypeId === "3") ? null : null, // Initialize weight for import, export, and cross-haul
         containerType: "Abnormal",
         cargoDescription: "",
       })
@@ -293,7 +293,7 @@ const FCcontrollerinstructions = () => {
         id: containerId++,
         containerKey: null,
         containerNum: "",
-        weight: isImport ? null : null, // Always start with null
+        weight: (isImport || formData.shipmentTypeId === "2" || formData.shipmentTypeId === "3") ? null : null, // Initialize weight for import, export, and cross-haul
         containerType: "BreakBulk",
         cargoDescription: "",
       })
@@ -402,8 +402,8 @@ const FCcontrollerinstructions = () => {
         isValid = false
       }
 
-      // Weight validation for import shipments - only validate format if weight is provided
-      if (isImport && container.weight !== null && container.weight !== undefined && container.weight !== "") {
+      // Weight validation for import, export, and cross-haul shipments - only validate format if weight is provided
+      if ((isImport || formData.shipmentTypeId === "2" || formData.shipmentTypeId === "3") && container.weight !== null && container.weight !== undefined && container.weight !== "") {
         // If weight is provided, validate it's a positive number
         if (typeof container.weight === "string" && container.weight.trim() !== "") {
           const weightValue = Number.parseFloat(container.weight)
@@ -542,9 +542,12 @@ const FCcontrollerinstructions = () => {
       { name: "description", label: "Description" },
     ]
 
-    // Add vessel name only if not cross-haul
-    if (!isCrossHaul) {
+    // Add vessel name and stack date specifically for import and export shipment types
+    if (formData.shipmentTypeId === "1" || formData.shipmentTypeId === "2") {
       requiredFields.push({ name: "vesselName", label: "Vessel Name" })
+      requiredFields.push({ name: "stackDate", label: formData.shipmentTypeId === "1" ? "ETA Date" : "Stack Date" })
+      
+      console.log("Validating vessel name and stack date for shipment type:", formData.shipmentTypeId)
     }
     
     // Add weight and unitRate as required fields when rateWeight is ton or kg
@@ -652,6 +655,33 @@ const FCcontrollerinstructions = () => {
   // Handle save changes with enhanced logic
   const handleSaveChanges = async () => {
     console.log("=== SAVE CHANGES INITIATED ===")
+    
+    // Special validation for vessel name and stack date for import and export shipment types
+    if (formData.shipmentTypeId === "1" || formData.shipmentTypeId === "2") {
+      const errors = {};
+      let hasSpecialValidationErrors = false;
+      
+      if (!formData.vesselName || !formData.vesselName.trim()) {
+        errors.vesselName = "Vessel name is required";
+        hasSpecialValidationErrors = true;
+      }
+      
+      if (!formData.stackDate || !formData.stackDate.trim()) {
+        errors.stackDate = `${formData.shipmentTypeId === "1" ? "ETA" : "Stack"} date is required`;
+        hasSpecialValidationErrors = true;
+      }
+      
+      if (hasSpecialValidationErrors) {
+        setFieldErrors(prev => ({ ...prev, ...errors }));
+        scrollToField(Object.keys(errors)[0]);
+        console.log("Special validation failed for vessel name or stack date:", errors);
+        setErrorModal({
+          isOpen: true,
+          message: `Please provide ${Object.keys(errors).includes("vesselName") ? "vessel name" : ""} ${Object.keys(errors).includes("vesselName") && Object.keys(errors).includes("stackDate") ? "and" : ""} ${Object.keys(errors).includes("stackDate") ? (formData.shipmentTypeId === "1" ? "ETA date" : "stack date") : ""}`,
+        });
+        return;
+      }
+    }
 
     // Validate all fields first
     if (!validateAllFields()) {
@@ -1838,7 +1868,7 @@ const FCcontrollerinstructions = () => {
               id: nextId + i,
               containerKey: null,
               containerNum: "",
-              weight: isImport ? "" : null,
+              weight: (isImport || formData.shipmentTypeId === "2" || formData.shipmentTypeId === "3") ? "" : null,
               containerType: containerType,
               cargoDescription: "",
             })
@@ -2003,8 +2033,10 @@ const FCcontrollerinstructions = () => {
 
   const validateForm = () => {
     console.log("validateForm called")
+    console.log("Current formData:", formData)
     // Check if shipment type is cross-haul or type 4
     const isCrossHaul = isCrossHaulShipment()
+    console.log("Is cross-haul shipment:", isCrossHaul)
 
     const requiredFields = [
       "clientId",
@@ -2020,8 +2052,10 @@ const FCcontrollerinstructions = () => {
       "description",
     ]
 
-    // Add vessel name and stack date as required only if not cross-haul
-    if (!isCrossHaul) {
+    // Add vessel name and stack date as required for import and export shipment types (1 and 2)
+    console.log("Checking shipment type for vessel name and stack date requirement:", formData.shipmentTypeId)
+    if (formData.shipmentTypeId === "1" || formData.shipmentTypeId === "2") {
+      console.log("Adding vesselName and stackDate as required fields")
       requiredFields.push("vesselName", "stackDate")
     }
 
@@ -2095,8 +2129,8 @@ const FCcontrollerinstructions = () => {
       isValid = false
     }
     
-    // Validate weight format if provided
-    if (formData.weight !== "" || weight !== "") {
+    // Validate weight if provided for import, export, or cross-haul shipments
+    if ((isImport || formData.shipmentTypeId === "2" || formData.shipmentTypeId === "3") && (formData.weight !== "" || weight !== "")) {
       const weightValue = Number.parseFloat(formData.weight || weight)
       if (isNaN(weightValue) || weightValue <= 0) {
         errors.weight = "Weight must be a positive number"
@@ -2160,7 +2194,30 @@ const FCcontrollerinstructions = () => {
     console.log("handleSubmit called")
     e.preventDefault()
 
-    // First validate the form
+    // Special validation for vessel name and stack date for import and export shipment types
+    let hasSpecialValidationErrors = false;
+    if ((formData.shipmentTypeId === "1" || formData.shipmentTypeId === "2")) {
+      const errors = {};
+      
+      if (!formData.vesselName || !formData.vesselName.trim()) {
+        errors.vesselName = "Vessel name is required";
+        hasSpecialValidationErrors = true;
+      }
+      
+      if (!formData.stackDate || !formData.stackDate.trim()) {
+        errors.stackDate = `${formData.shipmentTypeId === "1" ? "ETA" : "Stack"} date is required`;
+        hasSpecialValidationErrors = true;
+      }
+      
+      if (hasSpecialValidationErrors) {
+        setFieldErrors(prev => ({ ...prev, ...errors }));
+        scrollToField(Object.keys(errors)[0]);
+        console.log("Special validation failed:", errors);
+        return;
+      }
+    }
+
+    // Then validate the rest of the form
     console.log("Validating form...")
     const isValid = validateForm()
     console.log("Form validation result:", isValid)
@@ -2197,7 +2254,7 @@ const FCcontrollerinstructions = () => {
         rateper_12: twelveRate,
         rateper_abnormal: abnormalRateNum,
         total_cost: totalCost,
-        weight: formData.rateWeight !== "Container" ? formData.weight || weight : null,
+        weight: (isImport || formData.shipmentTypeId === "2" || formData.shipmentTypeId === "3") && formData.rateWeight !== "Container" ? formData.weight || weight : null,
       }
 
       const stateToPass = {
@@ -2932,19 +2989,22 @@ const FCcontrollerinstructions = () => {
                       />
                     </div>
                   </div>
-                  {!isCrossHaulShipment() && (
+                  {(formData.shipmentTypeId === "1" || formData.shipmentTypeId === "2") && (
                     <div className="controller-instructions-form-field">
-                      <label>Vessel Name</label>
+                      <label>
+                        Vessel Name <span style={{ color: 'red' }}>*</span>
+                      </label>
                       <div className="controller-instructions-input-wrapper" ref={fieldRefs.vesselName}>
                         <input
                           type="text"
                           className={`controller-instructions-form-input ${fieldErrors.vesselName ? "controller-instructions-error-field" : ""}`}
                           placeholder="Enter vessel name"
                           name="vesselName"
-                          value={formData.vesselName}
+                          value={formData.vesselName || ''}
                           onChange={handleInputChange}
                           disabled={isReadOnly}
                           style={isReadOnly ? readOnlyStyle : {}}
+                          required={true}
                         />
                         <ErrorTooltip message={fieldErrors.vesselName} />
                       </div>
@@ -2999,20 +3059,23 @@ const FCcontrollerinstructions = () => {
                       <ErrorTooltip message={fieldErrors.pickupDate} />
                     </div>
                   </div>
-                  {!isCrossHaulShipment() && (
+                  {(formData.shipmentTypeId === "1" || formData.shipmentTypeId === "2") && (
                     <div className="controller-instructions-form-field">
-                      <label>{isImport ? "ETA Date" : "Stack Date"}</label>
+                      <label>
+                        {formData.shipmentTypeId === "1" ? "ETA Date" : "Stack Date"} <span style={{ color: 'red' }}>*</span>
+                      </label>
                       <div className="controller-instructions-date-wrapper" ref={fieldRefs.stackDate}>
                         <input
                           type="date"
                           className={`controller-instructions-form-input ${fieldErrors.stackDate ? "controller-instructions-error-field" : ""}`}
                           name="stackDate"
-                          value={formData.stackDate}
+                          value={formData.stackDate || ''}
                           onChange={handleInputChange}
                           min={formData.pickupDate || today}
                           ref={etaDateRef}
                           disabled={isReadOnly}
                           style={isReadOnly ? readOnlyStyle : {}}
+                          required={true}
                         />
                         <ErrorTooltip message={fieldErrors.stackDate} />
                       </div>
@@ -3072,7 +3135,7 @@ const FCcontrollerinstructions = () => {
                         <th style={{ padding: "12px 8px", textAlign: "left", borderBottom: "2px solid #ddd" }}>
                           Container Number
                         </th>
-                        {isImport && (
+                        {(isImport || formData.shipmentTypeId === "2" || formData.shipmentTypeId === "3") && (
                           <th style={{ padding: "12px 8px", textAlign: "left", borderBottom: "2px solid #ddd" }}>
                             Weight 
                           </th>
@@ -3118,7 +3181,7 @@ const FCcontrollerinstructions = () => {
                               )}
                             </div>
                           </td>
-                          {isImport && (
+                          {(isImport || formData.shipmentTypeId === "2" || formData.shipmentTypeId === "3") && (
                             <td>
                               <div className="controller-instructions-input-wrapper">
                                 <input

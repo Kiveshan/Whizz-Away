@@ -125,6 +125,7 @@ const ControllerInstructions = () => {
   })
 
   const [isImport, setIsImport] = useState(false)
+  const [isExport, setIsExport] = useState(false)
   const [isWeightBased, setIsWeightBased] = useState(false)
   const [isCrossHaul, setIsCrossHaul] = useState(false)
   const today = useMemo(() => new Date().toISOString().split("T")[0], [])
@@ -283,7 +284,8 @@ const ControllerInstructions = () => {
           id: containerId++,
           containerKey: null,
           containerNum: "",
-          weight: isImport ? "" : null,
+          // Initialize weight field for import, export, and cross-haul shipments
+          weight: (isImport || isExport || isCrossHaul) ? "" : null,
           containerType: type,
           cargoDescription: "",
         }
@@ -315,7 +317,7 @@ const ControllerInstructions = () => {
       // Show container details if there are any containers AND it's not weight-based
       setShowContainerDetails(containersList.length > 0 && !isWeightBased)
     },
-    [containers, isImport, isCrossHaul, isWeightBased],
+    [containers, isImport, isExport, isCrossHaul, isWeightBased],
   )
 
   // Handle container input changes
@@ -526,6 +528,7 @@ const ControllerInstructions = () => {
     const newIsWeightBased = weightBasedUnits.includes(formData.rateWeight)
     const newIsCrossHaul = formData.shipmentTypeId === "3" || formData.shipmentTypeId === "4"
     const newIsImport = formData.shipmentTypeId === "1"
+    const newIsExport = formData.shipmentTypeId === "2"
 
     if (newIsWeightBased !== isWeightBased) {
       setIsWeightBased(newIsWeightBased)
@@ -536,7 +539,10 @@ const ControllerInstructions = () => {
     if (newIsImport !== isImport) {
       setIsImport(newIsImport)
     }
-  }, [formData.rateWeight, formData.shipmentTypeId, isWeightBased, isCrossHaul, isImport])
+    if (newIsExport !== isExport) {
+      setIsExport(newIsExport)
+    }
+  }, [formData.rateWeight, formData.shipmentTypeId, isWeightBased, isCrossHaul, isImport, isExport])
 
   // Load initial data
   useEffect(() => {
@@ -875,6 +881,7 @@ const ControllerInstructions = () => {
       const shipmentTypeId = e.target.value
       const selectedType = shipmentTypes.find((type) => type.shipkey === shipmentTypeId)
       const isCrossHaulType = shipmentTypeId === "3" || shipmentTypeId === "4"
+      const isBreakBulkType = shipmentTypeId === "4"
 
       setFormData((prev) => ({
         ...prev,
@@ -885,8 +892,8 @@ const ControllerInstructions = () => {
           vesselName: "",
           stackDate: "",
         }),
-        // Set unit per to "ton" for shipment type 4 (cross-haul/break bulk)
-        ...(shipmentTypeId === "4" && {
+        // Set unit per to "ton" for shipment type 4 (cross-haul/break bulk) only
+        ...(isBreakBulkType && {
           rateWeight: "ton"
         }),
       }))
@@ -2073,20 +2080,28 @@ const ControllerInstructions = () => {
                           name="rateWeight"
                           value={formData.rateWeight}
                           onChange={handleInputChange}
+                          disabled={formData.shipmentTypeId === "4"}
                           style={{
                             width: "100%",
                             padding: "6px 8px",
                             border: "1px solid #ced4da",
                             borderRadius: "4px",
                             fontSize: "13px",
-                            backgroundColor: "#fff",
+                            backgroundColor: formData.shipmentTypeId === "4" ? "#e9ecef" : "#fff",
                             height: "32px",
                             lineHeight: "1",
+                            cursor: formData.shipmentTypeId === "4" ? "not-allowed" : "pointer",
                           }}
                         >
-                          <option value="kg">kg</option>
-                          <option value="ton">ton</option>
-                          <option value="Container">Container</option>
+                          {formData.shipmentTypeId === "4" ? (
+                            <option value="ton">ton</option>
+                          ) : (
+                            <>
+                              <option value="kg">kg</option>
+                              <option value="ton">ton</option>
+                              <option value="Container">Container</option>
+                            </>
+                          )}
                         </select>
                       </div>
                       {isWeightBased && (
@@ -2499,8 +2514,8 @@ const ControllerInstructions = () => {
                       <th style={{ width: "5%" }}>#</th>
                       <th style={{ width: "15%" }}>Container Type</th>
                       <th style={{ width: "20%" }}>Container Number</th>
-                      {isImport && <th style={{ width: "15%" }}>Weight</th>}
-                      <th style={{ width: isImport ? "45%" : "60%" }}>Cargo Description</th>
+                      {(isImport || isExport || isCrossHaul) && <th style={{ width: "15%" }}>Weight</th>}
+                      <th style={{ width: (isImport || isExport || isCrossHaul) ? "45%" : "60%" }}>Cargo Description</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -2569,7 +2584,7 @@ const ControllerInstructions = () => {
                             )}
                           </div>
                         </td>
-                        {isImport && (
+                        {(isImport || isExport || isCrossHaul) && (
                           <td>
                             <div style={{ position: "relative" }}>
                               <input
