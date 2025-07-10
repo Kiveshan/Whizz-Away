@@ -1,11 +1,13 @@
 .analytics-page-wrapper .analytics-container {
-  padding: 20px;
+  padding: 5px;
+  /* Further reduced from 10px to minimize top space */
   width: 100%;
   font-family: Arial, sans-serif;
 }
 
 .analytics-page-wrapper .header-actions {
-  margin-bottom: 20px;
+  margin-bottom: 5px;
+  /* Further reduced from 10px to minimize space below back button */
   display: flex;
   justify-content: space-between;
   align-items: center;
@@ -14,7 +16,8 @@
 .analytics-page-wrapper .period-filters {
   display: flex;
   justify-content: center;
-  margin-bottom: 30px;
+  margin-bottom: 10px;
+  /* Further reduced from 20px */
 }
 
 .analytics-page-wrapper .period-button {
@@ -39,6 +42,7 @@
   transition: background-color 0.3s;
   font-size: 14px;
   margin-top: 132px;
+  /* Kept as is to maintain back button position */
 }
 
 .analytics-page-wrapper .back-button:hover {
@@ -94,7 +98,6 @@
   padding: 20px;
   box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
   min-width: 0;
-  /* Remove fixed height to allow dynamic sizing */
 }
 
 .analytics-page-wrapper .chart-title {
@@ -106,23 +109,17 @@
 }
 
 .analytics-page-wrapper .chart-wrapper {
-  /* Remove fixed heights and let content determine size */
   overflow: visible;
 }
 
-/* Scrollable container - make it fit content exactly */
 .analytics-page-wrapper .chart-scroll-container {
   width: 100%;
   overflow-x: auto;
   overflow-y: visible;
   padding-bottom: 0;
-  /* Remove all bottom padding */
   margin-bottom: 0;
-  /* Remove all bottom margin */
-  /* Remove fixed height - let content determine size */
 }
 
-/* Custom scrollbar styling */
 .analytics-page-wrapper .chart-scroll-container::-webkit-scrollbar {
   height: 8px;
 }
@@ -141,7 +138,6 @@
   background: #3151c1;
 }
 
-/* Firefox scrollbar styling */
 .analytics-page-wrapper .chart-scroll-container {
   scrollbar-width: thin;
   scrollbar-color: #4169e1 #f1f1f1;
@@ -152,9 +148,7 @@
   justify-content: center;
   gap: 20px;
   margin-top: 10px;
-  /* Reduced from 20px */
   margin-bottom: 0;
-  /* Remove bottom margin */
   flex-wrap: wrap;
 }
 
@@ -228,7 +222,6 @@
   overflow: visible;
 }
 
-/* Loading and error states */
 .analytics-page-wrapper .loading-indicator,
 .analytics-page-wrapper .error-message,
 .analytics-page-wrapper .no-data-message {
@@ -279,7 +272,8 @@
   display: flex;
   justify-content: center;
   gap: 15px;
-  margin: 20px 0;
+  margin: 5px 0;
+  /* Further reduced from 10px to move date filters up */
   margin-left: 250px;
 }
 
