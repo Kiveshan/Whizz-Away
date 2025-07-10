@@ -170,7 +170,7 @@ const TokenExpiryNotification = () => {
               </span>
             </div>
             <p>Time remaining until automatic logout</p>
-            <p className="auto-logout-warning">You will be logged out automatically when the timer reaches zero</p>
+            
           </div>
           <div className="progress-bar">
             <div className="progress-fill" style={{ width: `${Math.max(0, (timeLeft / 120) * 100)}%` }} />
