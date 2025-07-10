@@ -134,63 +134,149 @@ const SubcontractorStatementDetail = () => {
       format: "a4",
     });
 
-    const margin = 10;
+    const margin = 15;
     const pageWidth = 210 - 2 * margin;
     let y = margin;
 
-    // Header
-    doc.setFontSize(24);
-    doc.setFont("helvetica", "bold");
-    doc.text(companyInfo.name, margin + pageWidth / 2, y, { align: "center" });
-    y += 10;
+    // Colors (RGB values)
+    const primaryBlue = [44, 90, 160]; // #2c5aa0
+    const lightBlue = [248, 251, 255]; // #f8fbff
+    const lightGray = [248, 250, 252]; // #f8fafc
+    const darkGray = [26, 54, 93]; // #1a365d
+    const mediumGray = [74, 85, 104]; // #4a5568
 
-    // Statement Title
-    doc.setFontSize(14);
+    // Professional Header with gradient-like background
+    doc.setFillColor(...lightBlue);
+    doc.roundedRect(margin - 5, y - 5, pageWidth + 10, 25, 3, 3, "F");
+
+    // Header border
+    doc.setDrawColor(...primaryBlue);
+    doc.setLineWidth(0.5);
+    doc.roundedRect(margin - 5, y - 5, pageWidth + 10, 25, 3, 3, "S");
+
+    // Company Name
+    doc.setFontSize(22);
+    doc.setFont("helvetica", "bold");
+    doc.setTextColor(...darkGray);
+    doc.text(companyInfo.name, margin + pageWidth / 2, y + 8, {
+      align: "center",
+    });
+
+    // Company Details
+    doc.setFontSize(9);
     doc.setFont("helvetica", "normal");
-    doc.text(`Statement #${statement.statementId}`, margin + pageWidth / 2, y, {
+    doc.setTextColor(...mediumGray);
+
+    y += 35;
+
+    // Document Title
+    doc.setFontSize(18);
+    doc.setFont("helvetica", "bold");
+    doc.setTextColor(...darkGray);
+    doc.text("SUBCONTRACTOR STATEMENT", margin + pageWidth / 2, y, {
       align: "center",
     });
     y += 15;
 
-    // Billing Information
-    doc.setFontSize(12);
-    doc.text("Bill To:", margin, y);
-    y += 5;
-    doc.setFont("helvetica", "bold");
-    doc.text(subcontractorInfo.name, margin, y);
-    y += 5;
-    doc.setFont("helvetica", "normal");
-    doc.text(subcontractorInfo.location, margin, y);
-    y += 5;
-    doc.text(`Contact: ${subcontractorInfo.contact_person}`, margin, y);
-    y += 5;
+    // Statement Info Boxes
+    const boxWidth = (pageWidth - 10) / 2;
 
-    doc.text("Statement Date:", margin + pageWidth - 40, y, { align: "right" });
+    // Statement Number Box
+    doc.setFillColor(...lightGray);
+    doc.roundedRect(margin, y, boxWidth, 15, 2, 2, "F");
+    doc.setDrawColor(226, 232, 240);
+    doc.setLineWidth(0.3);
+    doc.roundedRect(margin, y, boxWidth, 15, 2, 2, "S");
+
+    doc.setFontSize(8);
+    doc.setFont("helvetica", "bold");
+    doc.setTextColor(...primaryBlue);
+    doc.text("STATEMENT NUMBER", margin + boxWidth / 2, y + 5, {
+      align: "center",
+    });
+    doc.setFontSize(14);
+    doc.setTextColor(...darkGray);
+    doc.text(`#${statementId}`, margin + boxWidth / 2, y + 11, {
+      align: "center",
+    });
+
+    // Statement Date Box
+    doc.setFillColor(...lightGray);
+    doc.roundedRect(margin + boxWidth + 10, y, boxWidth, 15, 2, 2, "F");
+    doc.setDrawColor(226, 232, 240);
+    doc.roundedRect(margin + boxWidth + 10, y, boxWidth, 15, 2, 2, "S");
+
+    doc.setFontSize(8);
+    doc.setFont("helvetica", "bold");
+    doc.setTextColor(...primaryBlue);
+    doc.text("STATEMENT DATE", margin + boxWidth + 10 + boxWidth / 2, y + 5, {
+      align: "center",
+    });
+    doc.setFontSize(10);
+    doc.setTextColor(...darkGray);
     doc.text(
       new Date(statement.generationDate).toLocaleDateString("en-US", {
         year: "numeric",
         month: "long",
         day: "numeric",
       }),
-      margin + pageWidth,
-      y,
-      { align: "right" }
+      margin + boxWidth + 10 + boxWidth / 2,
+      y + 11,
+      { align: "center" }
     );
-    y += 5;
-    doc.text("Subcontractor ID:", margin + pageWidth - 40, y, {
-      align: "right",
-    });
-    doc.text(statement.subcontractorId, margin + pageWidth, y, {
-      align: "right",
-    });
-    y += 10;
 
-    // Work Completed Table
+    y += 25;
+
+    // Billing Section
+    doc.setFillColor(...lightGray);
+    doc.roundedRect(margin, y, pageWidth, 25, 3, 3, "F");
+    doc.setDrawColor(226, 232, 240);
+    doc.setLineWidth(0.3);
+    doc.roundedRect(margin, y, pageWidth, 25, 3, 3, "S");
+
+    // Bill To Header
+    doc.setFontSize(10);
+    doc.setFont("helvetica", "bold");
+    doc.setTextColor(...primaryBlue);
+    doc.text("BILL TO:", margin + 5, y + 8);
+
+    // Subcontractor Details
+    doc.setFontSize(14);
+    doc.setFont("helvetica", "bold");
+    doc.setTextColor(...darkGray);
+    doc.text(subcontractorInfo.name, margin + 5, y + 14);
+
+    doc.setFontSize(10);
+    doc.setFont("helvetica", "normal");
+    doc.setTextColor(...mediumGray);
+    doc.text(subcontractorInfo.location, margin + 5, y + 18);
+    doc.text(
+      `Contact: ${subcontractorInfo.contact_person}`,
+      margin + 5,
+      y + 22
+    );
+
+    // Subcontractor ID (right aligned)
+    doc.setFont("helvetica", "bold");
+    doc.setTextColor(...primaryBlue);
+    doc.setFont("helvetica", "normal");
+    doc.setTextColor(...darkGray);
+
+    y += 35;
+
+    // Work Items Section Header
     doc.setFontSize(12);
     doc.setFont("helvetica", "bold");
-    doc.text("Work Completed", margin, y);
-    y += 5;
+    doc.setTextColor(...darkGray);
+    doc.text("WORK COMPLETED", margin, y);
 
+    // Underline
+    doc.setDrawColor(226, 232, 240);
+    doc.setLineWidth(0.5);
+    doc.line(margin, y + 2, margin + pageWidth, y + 2);
+    y += 10;
+
+    // Table Setup
     const tableHeaders = [
       "Date",
       "Starting Point",
@@ -198,31 +284,95 @@ const SubcontractorStatementDetail = () => {
       "Rate",
       "Instructions",
     ];
-    const tableY = y;
-    const colWidths = [25, 40, 40, 25, 50]; // Adjusted widths to ensure Rate column is distinct
+    const colWidths = [25, 35, 35, 25, 60];
+    const rowHeight = 8;
     let x = margin;
 
-    // Draw table headers
-    doc.setFillColor(44, 90, 160); // Blue gradient start color
-    doc.rect(margin, y, pageWidth, 8, "F");
+    // Table Header
+    doc.setFillColor(...primaryBlue);
+    doc.rect(margin, y, pageWidth, rowHeight, "F");
+
+    // Header borders
+    doc.setDrawColor(255, 255, 255);
+    doc.setLineWidth(0.2);
+    x = margin;
+    for (let i = 0; i < colWidths.length - 1; i++) {
+      x += colWidths[i];
+      doc.line(x, y, x, y + rowHeight);
+    }
+
+    // Header text
+    doc.setFontSize(9);
+    doc.setFont("helvetica", "bold");
+    doc.setTextColor(255, 255, 255);
     x = margin;
     tableHeaders.forEach((header, index) => {
-      doc.setTextColor(255, 255, 255);
-      doc.text(header, x + colWidths[index] / 2, y + 5, { align: "center" });
+      const textX = x + colWidths[index] / 2;
+      doc.text(header.toUpperCase(), textX, y + 5, { align: "center" });
       x += colWidths[index];
     });
-    y += 8;
+    y += rowHeight;
 
-    // Draw table rows
+    // Table Rows
     doc.setFont("helvetica", "normal");
     doc.setTextColor(0, 0, 0);
-    statement.workItems.forEach((item, index) => {
-      x = margin;
-      const isEven = index % 2 === 0;
-      if (isEven) doc.setFillColor(248, 250, 252);
-      else doc.setFillColor(255, 255, 255);
-      doc.rect(margin, y, pageWidth, 8, "F");
+    doc.setDrawColor(226, 232, 240);
+    doc.setLineWidth(0.2);
 
+    statement.workItems.forEach((item, index) => {
+      // Check for page break
+      if (y > 250) {
+        doc.addPage();
+        y = margin;
+
+        // Redraw header on new page
+        doc.setFillColor(...primaryBlue);
+        doc.rect(margin, y, pageWidth, rowHeight, "F");
+        doc.setDrawColor(255, 255, 255);
+        x = margin;
+        for (let i = 0; i < colWidths.length - 1; i++) {
+          x += colWidths[i];
+          doc.line(x, y, x, y + rowHeight);
+        }
+        doc.setFontSize(9);
+        doc.setFont("helvetica", "bold");
+        doc.setTextColor(255, 255, 255);
+        x = margin;
+        tableHeaders.forEach((header, idx) => {
+          const textX = x + colWidths[idx] / 2;
+          doc.text(header.toUpperCase(), textX, y + 5, { align: "center" });
+          x += colWidths[idx];
+        });
+        y += rowHeight;
+        doc.setFont("helvetica", "normal");
+        doc.setTextColor(0, 0, 0);
+      }
+
+      // Alternating row colors
+      const isEven = index % 2 === 0;
+      if (isEven) {
+        doc.setFillColor(...lightGray);
+        doc.rect(margin, y, pageWidth, rowHeight, "F");
+      }
+
+      // Row borders
+      doc.setDrawColor(226, 232, 240);
+      doc.rect(margin, y, pageWidth, rowHeight, "S");
+
+      // Column separators
+      x = margin;
+      for (let i = 0; i < colWidths.length - 1; i++) {
+        x += colWidths[i];
+        doc.line(x, y, x, y + rowHeight);
+      }
+
+      // Row data
+      x = margin;
+      doc.setFontSize(8);
+
+      // Date
+      doc.setTextColor(...primaryBlue);
+      doc.setFont("helvetica", "bold");
       doc.text(
         new Date(item.date).toLocaleDateString("en-US", {
           month: "short",
@@ -234,63 +384,120 @@ const SubcontractorStatementDetail = () => {
         { align: "center" }
       );
       x += colWidths[0];
+
+      // Starting Point
+      doc.setTextColor(...darkGray);
+      doc.setFont("helvetica", "normal");
       doc.text(item.startingPoint, x + colWidths[1] / 2, y + 5, {
         align: "center",
       });
       x += colWidths[1];
+
+      // Destination
       doc.text(item.destination, x + colWidths[2] / 2, y + 5, {
         align: "center",
       });
       x += colWidths[2];
-      doc.text(`R${item.rate.toFixed(2)}`, x + colWidths[3] / 2, y + 5, {
-        align: "center",
-      }); // Right-aligned under Rate
-      x += colWidths[3];
-      doc.text(item.instruction, x + colWidths[4] / 2, y + 5, {
-        align: "center",
+
+      // Rate (right-aligned and styled)
+      doc.setTextColor(...primaryBlue);
+      doc.setFont("helvetica", "bold");
+      doc.text(`R${item.rate.toFixed(2)}`, x + colWidths[3] - 2, y + 5, {
+        align: "right",
       });
-      y += 8;
+      x += colWidths[3];
 
-      if (y > 280) {
-        // New page if nearing bottom
-        doc.addPage();
-        y = margin;
-        doc.setFillColor(44, 90, 160);
-        doc.rect(margin, y, pageWidth, 8, "F");
-        x = margin;
-        tableHeaders.forEach((header, index) => {
-          doc.setTextColor(255, 255, 255);
-          doc.text(header, x + colWidths[index] / 2, y + 5, {
-            align: "center",
-          });
-          x += colWidths[index];
-        });
-        y += 8;
-      }
+      // Instructions
+      doc.setTextColor(...mediumGray);
+      doc.setFont("helvetica", "normal");
+      const instruction =
+        item.instruction.length > 25
+          ? item.instruction.substring(0, 25) + "..."
+          : item.instruction;
+      doc.text(instruction, x + colWidths[4] / 2, y + 5, { align: "center" });
+
+      y += rowHeight;
     });
-    y += 5;
 
-    // Payment Summary
+    y += 10;
+
+    // Payment Summary Box
+    const summaryBoxWidth = 80;
+    const summaryBoxX = margin + pageWidth - summaryBoxWidth;
+
+    // Summary box background and border
+    doc.setFillColor(255, 255, 255);
+    doc.roundedRect(summaryBoxX, y, summaryBoxWidth, 25, 3, 3, "F");
+    doc.setDrawColor(...primaryBlue);
+    doc.setLineWidth(0.8);
+    doc.roundedRect(summaryBoxX, y, summaryBoxWidth, 25, 3, 3, "S");
+
+    // Summary header
+    doc.setFillColor(...primaryBlue);
+    doc.roundedRect(summaryBoxX, y, summaryBoxWidth, 8, 3, 3, "F");
+    doc.setFontSize(10);
+    doc.setFont("helvetica", "bold");
+    doc.setTextColor(255, 255, 255);
+    doc.text("PAYMENT SUMMARY", summaryBoxX + summaryBoxWidth / 2, y + 5, {
+      align: "center",
+    });
+
+    // Subtotal
+    doc.setFontSize(10);
+    doc.setFont("helvetica", "normal");
+    doc.setTextColor(...mediumGray);
+    doc.text("Subtotal:", summaryBoxX + 3, y + 13);
+    doc.setTextColor(...darkGray);
+    doc.setFont("helvetica", "bold");
+    doc.text(
+      `R${statement.summary.totalAmount.toFixed(2)}`,
+      summaryBoxX + summaryBoxWidth - 3,
+      y + 13,
+      {
+        align: "right",
+      }
+    );
+
+    // Divider line
+    doc.setDrawColor(...primaryBlue);
+    doc.setLineWidth(0.5);
+    doc.line(
+      summaryBoxX + 3,
+      y + 16,
+      summaryBoxX + summaryBoxWidth - 3,
+      y + 16
+    );
+
+    // Total Amount Due
     doc.setFontSize(12);
     doc.setFont("helvetica", "bold");
-    y += 5;
-    doc.setFont("helvetica", "normal");
-    y += 5;
-    doc.setFontSize(16); // Increased font size for Total Amount Due
+    doc.setTextColor(...darkGray);
+    doc.text("Total Amount Due:", summaryBoxX + 3, y + 21);
+    doc.setTextColor(...primaryBlue);
+    doc.setFontSize(14);
     doc.text(
-      `Total Amount Due: R${statement.summary.finalAmount.toFixed(2)}`,
-      margin + pageWidth - 40,
-      y,
-      { align: "right" }
+      `R${statement.summary.finalAmount.toFixed(2)}`,
+      summaryBoxX + summaryBoxWidth - 3,
+      y + 21,
+      {
+        align: "right",
+      }
     );
-    y += 5;
-    doc.setFontSize(12);
-    doc.setDrawColor(44, 90, 160);
-    doc.line(margin, y, margin + pageWidth, y, "S"); // Line below Total Amount Due
-    y += 5;
+
+    y += 35;
 
     // Footer
+    doc.setDrawColor(226, 232, 240);
+    doc.setLineWidth(0.3);
+    doc.line(margin, y, margin + pageWidth, y);
+    y += 5;
+
     doc.setFontSize(10);
+    doc.setFont("helvetica", "italic");
+    doc.setTextColor(...mediumGray);
+
+    doc.setFontSize(8);
+    doc.setFont("helvetica", "normal");
 
     // Save PDF
     doc.save(`Subcontractor-Statement-${statementId}.pdf`);
@@ -366,7 +573,7 @@ const SubcontractorStatementDetail = () => {
                 </span>
               </div>
               <div className="meta-row">
-                <span className="meta-label">Subcontractor ID:</span>
+                <span className="meta-label">Subcontractor Reg No :</span>
                 <span className="meta-value">{subcontractorId}</span>
               </div>
             </div>
@@ -445,14 +652,6 @@ const SubcontractorStatementDetail = () => {
               </div>
             </div>
           </div>
-
-          {/* Footer */}
-          <div className="statement-footer">
-            <div className="footer-text">
-              Thank you for your professional services and continued
-              partnership.
-            </div>
-          </div>
         </div>
 
         {/* Action Buttons */}
@@ -469,7 +668,7 @@ const SubcontractorStatementDetail = () => {
               })
             }
           >
-            ← Back to Statements
+            Back
           </button>
           <button
             className={`download-btn ${isGenerating ? "generating" : ""}`}
