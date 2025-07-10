@@ -670,6 +670,17 @@ export const getDocuments = async (instructionId) => {
 export const generateInvoice = async (instructionId) => {
   const client = await pool.connect();
   try {
+    // Check if a record already exists for this instructionId
+    const existingInvoiceResult = await client.query(
+      "SELECT ikey FROM invoice WHERE m1key = $1",
+      [instructionId]
+    );
+
+    // If a record exists, exit early without doing anything
+    if (existingInvoiceResult.rows.length > 0) {
+      return;
+    }
+
     const currentDate = new Date();
     const currentYear = currentDate.getFullYear();
     const currentMonth = currentDate.getMonth() + 1;
@@ -693,8 +704,10 @@ export const generateInvoice = async (instructionId) => {
       "SELECT client, m1key FROM m1_controller WHERE m1key = $1",
       [instructionId]
     );
+
     if (instructionResult.rows.length === 0)
       throw new Error(`Instruction with ID ${instructionId} not found`);
+
     const { client: clientId, m1key } = instructionResult.rows[0];
 
     const sequenceResult = await client.query(
