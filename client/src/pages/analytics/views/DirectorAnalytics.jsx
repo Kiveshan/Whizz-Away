@@ -1,7 +1,8 @@
+
 "use client"
 
 import { useState, useEffect } from "react"
-import { BarChart, Bar, XAxis, YAxis, Tooltip, Legend, ResponsiveContainer, Cell, LabelList } from "recharts"
+import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell, LabelList } from "recharts"
 import "../css/Analytics.css"
 import { useNavigate } from "react-router-dom"
 import api from "../../../api"
@@ -35,8 +36,10 @@ export default function DirectorAnalytics() {
   const [chartData, setChartData] = useState([])
   const [clients, setClients] = useState([])
   const [subcontractors, setSubcontractors] = useState([])
+  const [trucks, setTrucks] = useState([])
   const [selectedClient, setSelectedClient] = useState("")
   const [selectedSubcontractor, setSelectedSubcontractor] = useState("")
+  const [selectedTruck, setSelectedTruck] = useState("")
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState(null)
   const roleId = JSON.parse(localStorage.getItem("user"))?.roleid
@@ -55,14 +58,17 @@ export default function DirectorAnalytics() {
   }
 
   const getChartWidth = (dataLength) => {
-    if (activeFilter === "turnoverPerMonth" || 
-        activeFilter === "agingAnalysis" || 
-        activeFilter === "subcontractorVsTurnover" || 
-        activeFilter === "subcontractorTurnoverPerMonth" || 
-        activeFilter === "wagesVsExpenses" || 
-        activeFilter === "incomeVsExpense" || 
-        activeFilter === "turnoverVsSubbieExpense") {
-      return 1000;
+    if (
+      activeFilter === "turnoverPerMonth" ||
+      activeFilter === "agingAnalysis" ||
+      activeFilter === "subcontractorVsTurnover" ||
+      activeFilter === "subcontractorTurnoverPerMonth" ||
+      activeFilter === "wagesVsExpenses" ||
+      activeFilter === "incomeVsExpense" ||
+      activeFilter === "turnoverVsSubbieExpense" ||
+      activeFilter === "turnoverVsFuelPerTruck"
+    ) {
+      return 1000
     }
     const minWidth = 1000
     const barWidth = 180
@@ -78,8 +84,7 @@ export default function DirectorAnalytics() {
     return words.join("\n")
   }
 
-  const CustomAxisTick = (props) => {
-    const { x, y, payload } = props
+  const CustomAxisTick = ({ x, y, payload }) => {
     const lines = formatClientName(payload.value).split("\n")
     return (
       <g transform={`translate(${x},${y})`}>
@@ -107,7 +112,7 @@ export default function DirectorAnalytics() {
 
   const fetchSubcontractors = async () => {
     try {
-      const response = await api.get("/get-subcontractors")
+      const response = await api.get("/api/get-subcontractors")
       if (response.data.success) {
         setSubcontractors(response.data.data)
       } else {
@@ -115,6 +120,35 @@ export default function DirectorAnalytics() {
       }
     } catch (err) {
       setError(`Failed to fetch subcontractors: ${err.message}`)
+    }
+  }
+
+  const fetchTrucks = async () => {
+    try {
+      const response = await api.get("/api/get-trucks")
+      console.log("Raw /api/get-trucks response:", response) // Log full response
+      if (response.data.success) {
+        const truckData = response.data.data.filter(truck => !truck.issubcontractor)
+        console.log("Filtered trucks (non-subcontractors):", truckData)
+        if (truckData.length === 0) {
+          console.warn("No non-subcontractor trucks found in /api/get-trucks response")
+          setError("No trucks available")
+          setTrucks([])
+          return
+        }
+        setTrucks(truckData.map(truck => ({
+          ...truck,
+          truckregnumber: truck.truckregnum || truck.reg_number || truck.truck_reg || truck.registration_number || `Truck ID ${truck.m5truckskey}`
+        })))
+      } else {
+        console.error("API error in /api/get-trucks:", response.data.message)
+        setError("Failed to fetch trucks: " + response.data.message)
+        setTrucks([])
+      }
+    } catch (err) {
+      console.error("Error fetching trucks:", err)
+      setError(`Failed to fetch trucks: ${err.message}`)
+      setTrucks([])
     }
   }
 
@@ -174,12 +208,10 @@ export default function DirectorAnalytics() {
             turnover: turnover,
             month: item.month_name.trim(),
             year: item.year,
-            percentage: item.percentage,
           }
         })
         console.log("Processed turnover data before sorting:", turnoverData)
-        
-        // Sort data: Total Turnover first, selected client last, others in between (alphabetically)
+
         turnoverData = turnoverData.sort((a, b) => {
           if (a.name === "Total Turnover") return -1
           if (b.name === "Total Turnover") return 1
@@ -187,7 +219,7 @@ export default function DirectorAnalytics() {
           if (clientId && b.name === clients.find(c => c.m5clientkey === clientId)?.client) return -1
           return a.name.localeCompare(b.name)
         })
-        
+
         console.log("Processed turnover data after sorting:", turnoverData)
         return turnoverData
       } else {
@@ -240,7 +272,7 @@ export default function DirectorAnalytics() {
     setIsLoading(true)
     setError(null)
     try {
-      const numericMonth = monthNames.indexOf(month) + 1 // Convert month name to numeric (1-12)
+      const numericMonth = monthNames.indexOf(month) + 1
       console.log(`Fetching turnover vs diesel cost for month: ${month} (numeric: ${numericMonth}), year: ${year}`)
       const response = await api.get("/api/turnover-vs-diesel-cost", {
         params: { month: numericMonth, year, _t: new Date().getTime() },
@@ -257,8 +289,6 @@ export default function DirectorAnalytics() {
             year: item.year,
             totalTurnover: Number(item.totalTurnover) || 0,
             dieselCost: Number(item.dieselCost) || 0,
-            turnoverPercentage: item.turnoverPercentage ?? 0,
-            dieselCostPercentage: item.dieselCostPercentage ?? 0,
           }
         })
         console.log("Processed turnover vs diesel cost data:", data)
@@ -280,13 +310,11 @@ export default function DirectorAnalytics() {
     setError(null)
     try {
       console.log(`Fetching income (total turnover) vs expenses for month: ${month}, year: ${year}`)
-      
-      // Fetch total turnover from /api/turnover-per-month
+
       const turnoverResponse = await api.get("/api/turnover-per-month", {
         params: { month, year, _t: new Date().getTime() },
       })
-      
-      // Fetch expenses from /api/all-expenses
+
       const expensesResponse = await api.get("/api/all-expenses", {
         params: { month, year, _t: new Date().getTime() },
       })
@@ -298,26 +326,20 @@ export default function DirectorAnalytics() {
         throw new Error(expensesResponse.data.message || "Failed to fetch expenses data")
       }
 
-      // Extract Total Turnover
       const turnoverData = turnoverResponse.data.data.find(item => item.client === "Total Turnover")
       const income = turnoverData ? Number.parseFloat(turnoverData.turnover) || 0 : 0
-      
-      // Calculate total expenses
+
       const totalExpenses = Number.parseFloat(
         expensesResponse.data.data.expenses.reduce((sum, item) => sum + Number.parseFloat(item.total_cost || 0), 0)
       ) || 0
-      
-      // Calculate percentages
+
       const total = income + totalExpenses
-      const incomePercentage = total > 0 ? (income / total) * 100 : 0
-      const expensesPercentage = total > 0 ? (totalExpenses / total) * 100 : 0
 
       const data = [
         {
           name: "Income",
           value: income,
           type: "income",
-          percentage: incomePercentage.toFixed(2),
           month: month,
           year: year,
         },
@@ -325,12 +347,11 @@ export default function DirectorAnalytics() {
           name: "Expenses",
           value: totalExpenses,
           type: "expenses",
-          percentage: expensesPercentage.toFixed(2),
           month: month,
           year: year,
         }
       ]
-      
+
       console.log("Processed income vs expenses data:", data)
       return data
     } catch (err) {
@@ -396,7 +417,6 @@ export default function DirectorAnalytics() {
             name: item.name,
             value: Number(item.value) || 0,
             type: item.type,
-            percentage: Number(item.percentage) || 0,
             month: item.month,
             year: item.year,
           }
@@ -432,7 +452,6 @@ export default function DirectorAnalytics() {
             name: item.name,
             value: value,
             type: item.type,
-            percentage: Number(item.percentage) || 0,
             month: item.month.trim(),
             year: item.year,
           }
@@ -469,7 +488,6 @@ export default function DirectorAnalytics() {
             name: item.name,
             value: Number(item.value) || 0,
             type: item.type,
-            percentage: Number(item.percentage) || 0,
             month: item.month,
             year: item.year,
           }
@@ -506,7 +524,6 @@ export default function DirectorAnalytics() {
             name: item.name,
             value: Number(item.value) || 0,
             type: item.type,
-            percentage: Number(item.percentage) || 0,
             month: item.month,
             year: item.year,
           }
@@ -525,74 +542,114 @@ export default function DirectorAnalytics() {
     }
   }
 
+  const fetchTurnoverVsFuelPerTruck = async (month, year, truckId = "") => {
+    setIsLoading(true)
+    setError(null)
+    try {
+      console.log(`Fetching turnover vs fuel per truck for month: ${month}, year: ${year}, truckId: ${truckId}`)
+      const response = await api.get("/api/turnover-vs-fuel-per-truck", {
+        params: { month, year, truckId: truckId || undefined, _t: new Date().getTime() },
+      })
+      console.log("API response:", response.data)
+      if (response.data.success) {
+        const data = response.data.data.map((item) => {
+          const turnover = Number.parseFloat(item.total_turnover)
+          const fuelCost = Number.parseFloat(item.total_fuel_cost)
+          const status = calculateTurnoverStatus(turnover)
+          return {
+            truckId: item.truckregnumber,
+            turnover: turnover,
+            fuelCost: fuelCost,
+            month: item.month_name.trim(),
+            year: item.year,
+            status,
+          }
+        })
+        console.log("Processed turnover vs fuel per truck data:", data)
+        return data
+      } else {
+        throw new Error(response.data.message || "Failed to fetch data")
+      }
+    } catch (err) {
+      console.error("Error fetching turnover vs fuel per truck:", err)
+      setError(err.message)
+      return []
+    } finally {
+      setIsLoading(false)
+    }
+  }
+
   useEffect(() => {
     fetchClients()
     fetchSubcontractors()
+    fetchTrucks()
   }, [])
 
   useEffect(() => {
-    let isMounted = true;
+    let isMounted = true
     const loadData = async () => {
-      // Clear chartData immediately when filter changes
-      setChartData([]);
-      setError(null);
-      setIsLoading(true);
-      
-      let data = [];
+      setChartData([])
+      setError(null)
+      setIsLoading(true)
+
+      let data = []
       try {
         switch (activeFilter) {
           case "fuel":
-            data = await fetchFuelData(activeMonth, activeYear);
-            break;
+            data = await fetchFuelData(activeMonth, activeYear)
+            break
           case "turnoverPerMonth":
-            data = await fetchTurnoverData(activeMonth, activeYear, selectedClient);
-            break;
+            data = await fetchTurnoverData(activeMonth, activeYear, selectedClient)
+            break
           case "agingAnalysis":
-            data = await fetchAgingAnalysisData(activeMonth, activeYear, selectedClient);
-            break;
+            data = await fetchAgingAnalysisData(activeMonth, activeYear, selectedClient)
+            break
           case "turnoverVsDieselCost":
-            data = await fetchTurnoverVsDieselCost(activeMonth, activeYear);
-            break;
+            data = await fetchTurnoverVsDieselCost(activeMonth, activeYear)
+            break
           case "subcontractorTurnoverPerMonth":
-            data = await fetchSubcontractorTurnoverPerMonth(activeMonth, activeYear);
-            break;
+            data = await fetchSubcontractorTurnoverPerMonth(activeMonth, activeYear)
+            break
           case "subcontractorVsTurnover":
-            data = await fetchSubcontractorVsTurnover(activeMonth, activeYear, selectedSubcontractor);
-            break;
+            data = await fetchSubcontractorVsTurnover(activeMonth, activeYear, selectedSubcontractor)
+            break
           case "turnoverPerTruck":
-            data = await fetchTurnoverPerTruck(activeMonth, activeYear);
-            break;
+            data = await fetchTurnoverPerTruck(activeMonth, activeYear)
+            break
           case "incomeVsExpense":
-            data = await fetchIncomeVsExpenses(activeMonth, activeYear);
-            break;
+            data = await fetchIncomeVsExpenses(activeMonth, activeYear)
+            break
           case "wagesVsExpenses":
-            data = await fetchWagesVsExpenses(activeMonth, activeYear);
-            break;
+            data = await fetchWagesVsExpenses(activeMonth, activeYear)
+            break
           case "turnoverVsSubbieExpense":
-            data = await fetchTurnoverVsSubbieExpense(activeMonth, activeYear, selectedSubcontractor);
-            break;
+            data = await fetchTurnoverVsSubbieExpense(activeMonth, activeYear, selectedSubcontractor)
+            break
+          case "turnoverVsFuelPerTruck":
+            data = await fetchTurnoverVsFuelPerTruck(activeMonth, activeYear, selectedTruck)
+            break
           default:
-            data = [];
+            data = []
         }
         if (isMounted) {
-          console.log("Setting chartData:", data);
-          setChartData(data);
+          console.log("Setting chartData:", data)
+          setChartData(data)
         }
       } catch (err) {
         if (isMounted) {
-          setError(`Failed to load data: ${err.message}`);
+          setError(`Failed to load data: ${err.message}`)
         }
       } finally {
         if (isMounted) {
-          setIsLoading(false);
+          setIsLoading(false)
         }
       }
-    };
-    loadData();
+    }
+    loadData()
     return () => {
-      isMounted = false;
-    };
-  }, [activeFilter, activeMonth, activeYear, selectedClient, selectedSubcontractor]);
+      isMounted = false
+    }
+  }, [activeFilter, activeMonth, activeYear, selectedClient, selectedSubcontractor, selectedTruck])
 
   const CustomTooltip = ({ active, payload, label }) => {
     if (active && payload && payload.length) {
@@ -625,7 +682,7 @@ export default function DirectorAnalytics() {
         case "bad":
           return "#F44336"
         default:
-          return "#4169e1"
+          return "#4169E1"
       }
     } else if (activeFilter === "turnoverPerTruck" && entry && entry.status) {
       console.log(`Applying color for turnover status: ${entry.status}`)
@@ -637,67 +694,79 @@ export default function DirectorAnalytics() {
         case "low":
           return "#F44336"
         default:
-          return "#4169e1"
+          return "#4169E1"
       }
-    } else if ((activeFilter === "subcontractorVsTurnover" || 
-                activeFilter === "subcontractorTurnoverPerMonth" || 
-                activeFilter === "wagesVsExpenses" || 
-                activeFilter === "incomeVsExpense" || 
-                activeFilter === "turnoverVsSubbieExpense") && entry && entry.type) {
-      return entry.type === "total" ? "#9C27B0" : 
-             entry.type === "subcontractor" ? "#E91E63" : 
-             entry.type === "income" ? "#4169e1" : 
-             entry.type === "expenses" ? "#ff6347" : "#4169e1"
+    } else if (
+      (
+        activeFilter === "subcontractorVsTurnover" ||
+        activeFilter === "subcontractorTurnoverPerMonth" ||
+        activeFilter === "wagesVsExpenses" ||
+        activeFilter === "incomeVsExpense" ||
+        activeFilter === "turnoverVsSubbieExpense"
+      ) && entry && entry.type
+    ) {
+      return entry.type === "total" ? "#2196F3" :
+        entry.type === "subcontractor" ? "#FF6347" :
+          entry.type === "income" ? "#4169E1" :
+            entry.type === "expenses" ? "#FF6347" : "#4169E1"
+    } else if (activeFilter === "turnoverVsFuelPerTruck") {
+      return "#4169E1" // Default for turnoverVsFuelPerTruck, overridden in Bar components
     }
     console.log("Falling back to default color")
-    return "#4169e1"
+    return "#4169E1"
   }
 
-  const CustomBarLabelForTurnover = (props) => {
-    const { x, y, width, value, payload = {} } = props
+  const CustomBarLabelForTurnover = ({ x, y, width, value, payload = {} }) => {
     const percentage = payload.percentage ?? 0
     console.log("CustomBarLabelForTurnover - payload:", payload)
     return (
-      <text x={x + width / 2} y={y - 10} 
-            fill="#000" 
-            textAnchor="middle" 
-            dominantBaseline="middle" 
-            fontSize={12}>
-        R{value?.toLocaleString?.()} ({percentage}%)
+      <text
+        x={x + width / 2}
+        y={y - 10}
+        fill="#000"
+        textAnchor="middle"
+        dominantBaseline="middle"
+        fontSize={12}
+      >
+        {`R${value?.toLocaleString() || 0}`}
       </text>
     )
   }
 
-  const CustomBarLabelForDieselCost = (props) => {
-    const { x, y, width, value, payload = {} } = props
+  const CustomBarLabelForDieselCost = ({ x, y, width, value, payload = {} }) => {
     console.log("CustomBarLabelForDieselCost - payload:", payload)
     const percentage = payload.dieselCostPercentage ?? 0
     return (
-      <text x={x + width / 2} y={y - 10} fill="#000" textAnchor="middle" dominantBaseline="middle" fontSize={12}>
-        R{value?.toLocaleString?.()} ({percentage}%)
+      <text
+        x={x + width / 2}
+        y={y - 10}
+        fill="#000"
+        textAnchor="middle"
+        dominantBaseline="middle"
+        fontSize={12}
+      >
+        {`R${value?.toLocaleString() || 0} (${percentage}%)`}
       </text>
     )
   }
 
-  const CustomBarLabelForFuelAndTurnover = (props) => {
-    const { x, y, width, value, index, dataKey } = props
+  const CustomBarLabelForFuelAndTurnover = ({ x, y, width, value, index }) => {
     if (value === undefined || value === null) {
       console.log("CustomBarLabelForFuelAndTurnover: Value is undefined or null, skipping label")
       return null
     }
-    console.log(`CustomBarLabelForFuelAndTurnover: index=${index}, dataKey=${dataKey}, chartData=`, chartData)
+    console.log(`CustomBarLabelForFuelAndTurnover: index=${index}, chartData=`, chartData)
     const percentage = chartData[index]?.percentage || 0
-    console.log(`Selected percentage: ${percentage}% for dataKey=${dataKey}`)
-    const labelText = `R${value.toLocaleString()} (${percentage.toFixed(2)}%)`
+    console.log(`Selected percentage: ${percentage}%`)
+    const labelText = `R${value.toLocaleString()}`
     return (
-      <text x={x + width / 2} y={y - 10} fill="#000" textAnchor="middle" dominantBaseline="middle" fontSize="12">
+      <text x={x + width / 2} y={y - 10} fill="#000" textAnchor="middle" dominantBaseline="middle" fontSize={12}>
         {labelText}
       </text>
     )
   }
 
-  const CustomBarLabelForDefault = (props) => {
-    const { x, y, width, value } = props
+  const CustomBarLabelForDefault = ({ x, y, width, value }) => {
     if (value === undefined || value === null) {
       console.log("CustomBarLabelForDefault: Value is undefined or null, skipping label")
       return null
@@ -798,12 +867,12 @@ export default function DirectorAnalytics() {
               <>
                 <div className="chart-header">
                   <div className="chart-header-item">
-                    <span className="legend-color" style={{ backgroundColor: "#9C27B0" }}></span>
+                    <span className="legend-color" style={{ backgroundColor: "#2196F3" }}></span>
                     <span>Total Turnover</span>
                   </div>
                   {chartData.length > 1 && (
                     <div className="chart-header-item">
-                      <span className="legend-color" style={{ backgroundColor: "#4169e1" }}></span>
+                      <span className="legend-color" style={{ backgroundColor: "#4169E1" }}></span>
                       <span>Selected Client</span>
                     </div>
                   )}
@@ -823,7 +892,7 @@ export default function DirectorAnalytics() {
                       <Tooltip content={<CustomTooltip />} />
                       <Bar dataKey="turnover" name="Turnover" radius={[4, 4, 0, 0]}>
                         {chartData.map((entry, index) => (
-                          <Cell key={`cell-${index}`} fill={entry.name === "Total Turnover" ? "#9C27B0" : "#4169e1"} />
+                          <Cell key={`cell-${index}`} fill={entry.name === "Total Turnover" ? "#2196F3" : "#4169E1"} />
                         ))}
                         <LabelList dataKey="turnover" content={CustomBarLabelForTurnover} position="top" />
                       </Bar>
@@ -850,7 +919,7 @@ export default function DirectorAnalytics() {
               <>
                 <div className="chart-header">
                   <div className="chart-header-item">
-                    <span className="legend-color" style={{ backgroundColor: "#4169e1" }}></span>
+                    <span className="legend-color" style={{ backgroundColor: "#4169E1" }}></span>
                     <span>Current</span>
                   </div>
                   <div className="chart-header-item">
@@ -886,7 +955,7 @@ export default function DirectorAnalytics() {
                         }}
                       />
                       <Tooltip content={<CustomTooltip />} />
-                      <Bar dataKey="current" name="Current" fill="#4169e1" radius={[4, 4, 0, 0]}>
+                      <Bar dataKey="current" name="Current" fill="#4169E1" radius={[4, 4, 0, 0]}>
                         <LabelList dataKey="current" content={CustomBarLabelForDefault} position="top" />
                       </Bar>
                       <Bar dataKey="thirtyDays" name="30 Days" fill="#4CAF50" radius={[4, 4, 0, 0]}>
@@ -921,11 +990,11 @@ export default function DirectorAnalytics() {
               <>
                 <div className="chart-header">
                   <div className="chart-header-item">
-                    <span className="legend-color" style={{ backgroundColor: "#9C27B0" }}></span>
+                    <span className="legend-color" style={{ backgroundColor: "#2196F3" }}></span>
                     <span>Total Turnover</span>
                   </div>
                   <div className="chart-header-item">
-                    <span className="legend-color" style={{ backgroundColor: "#E91E63" }}></span>
+                    <span className="legend-color" style={{ backgroundColor: "#FF6347" }}></span>
                     <span>Total Subcontractor Turnover</span>
                   </div>
                 </div>
@@ -971,12 +1040,12 @@ export default function DirectorAnalytics() {
               <>
                 <div className="chart-header">
                   <div className="chart-header-item">
-                    <span className="legend-color" style={{ backgroundColor: "#9C27B0" }}></span>
+                    <span className="legend-color" style={{ backgroundColor: "#2196F3" }}></span>
                     <span>Total Turnover</span>
                   </div>
                   {chartData.some((entry) => entry.type === "subcontractor") && (
                     <div className="chart-header-item">
-                      <span className="legend-color" style={{ backgroundColor: "#E91E63" }}></span>
+                      <span className="legend-color" style={{ backgroundColor: "#FF6347" }}></span>
                       <span>Selected Subcontractor</span>
                     </div>
                   )}
@@ -1023,12 +1092,12 @@ export default function DirectorAnalytics() {
               <>
                 <div className="chart-header">
                   <div className="chart-header-item">
-                    <span className="legend-color" style={{ backgroundColor: "#9C27B0" }}></span>
+                    <span className="legend-color" style={{ backgroundColor: "#2196F3" }}></span>
                     <span>Total Turnover</span>
                   </div>
                   {chartData.some((entry) => entry.type === "subcontractor") && (
                     <div className="chart-header-item">
-                      <span className="legend-color" style={{ backgroundColor: "#E91E63" }}></span>
+                      <span className="legend-color" style={{ backgroundColor: "#FF6347" }}></span>
                       <span>Selected Subcontractor</span>
                     </div>
                   )}
@@ -1075,11 +1144,11 @@ export default function DirectorAnalytics() {
               <>
                 <div className="chart-header">
                   <div className="chart-header-item">
-                    <span className="legend-color" style={{ backgroundColor: "#4169e1" }}></span>
+                    <span className="legend-color" style={{ backgroundColor: "#2196F3" }}></span>
                     <span>Turnover</span>
                   </div>
                   <div className="chart-header-item">
-                    <span className="legend-color" style={{ backgroundColor: "#ff6347" }}></span>
+                    <span className="legend-color" style={{ backgroundColor: "#FF6347" }}></span>
                     <span>Diesel Cost</span>
                   </div>
                 </div>
@@ -1096,10 +1165,10 @@ export default function DirectorAnalytics() {
                         }}
                       />
                       <Tooltip content={<CustomTooltip />} />
-                      <Bar dataKey="totalTurnover" name="Turnover" fill="#4169e1" radius={[4, 4, 0, 0]}>
+                      <Bar dataKey="totalTurnover" name="Turnover" fill="#2196F3" radius={[4, 4, 0, 0]}>
                         <LabelList dataKey="totalTurnover" content={CustomBarLabelForTurnover} position="top" />
                       </Bar>
-                      <Bar dataKey="dieselCost" name="Diesel Cost" fill="#ff6347" radius={[4, 4, 0, 0]}>
+                      <Bar dataKey="dieselCost" name="Diesel Cost" fill="#FF6347" radius={[4, 4, 0, 0]}>
                         <LabelList dataKey="dieselCost" content={CustomBarLabelForDieselCost} position="top" />
                       </Bar>
                     </BarChart>
@@ -1189,11 +1258,11 @@ export default function DirectorAnalytics() {
               <>
                 <div className="chart-header">
                   <div className="chart-header-item">
-                    <span className="legend-color" style={{ backgroundColor: "#4169e1" }}></span>
+                    <span className="legend-color" style={{ backgroundColor: "#4169E1" }}></span>
                     <span>Income</span>
                   </div>
                   <div className="chart-header-item">
-                    <span className="legend-color" style={{ backgroundColor: "#ff6347" }}></span>
+                    <span className="legend-color" style={{ backgroundColor: "#FF6347" }}></span>
                     <span>Expenses</span>
                   </div>
                 </div>
@@ -1239,11 +1308,11 @@ export default function DirectorAnalytics() {
               <>
                 <div className="chart-header">
                   <div className="chart-header-item">
-                    <span className="legend-color" style={{ backgroundColor: "#4169e1" }}></span>
+                    <span className="legend-color" style={{ backgroundColor: "#4169E1" }}></span>
                     <span>Wages</span>
                   </div>
                   <div className="chart-header-item">
-                    <span className="legend-color" style={{ backgroundColor: "#ff6347" }}></span>
+                    <span className="legend-color" style={{ backgroundColor: "#FF6347" }}></span>
                     <span>Expenses</span>
                   </div>
                 </div>
@@ -1278,6 +1347,63 @@ export default function DirectorAnalytics() {
                           <Cell key={`cell-${index}`} fill={getBarFill(entry)} />
                         ))}
                         <LabelList dataKey="value" content={CustomBarLabelForTurnover} position="top" />
+                      </Bar>
+                    </BarChart>
+                  </ResponsiveContainer>
+                </div>
+              </>
+            )}
+          </div>
+        )
+
+      case "turnoverVsFuelPerTruck":
+        return (
+          <div className="chart-wrapper">
+            {isLoading ? (
+              <div className="loading-indicator">Loading turnover vs fuel per truck data...</div>
+            ) : error ? (
+              <div className="error-message">{error}</div>
+            ) : !Array.isArray(chartData) || chartData.length === 0 ? (
+              <div className="no-data-message">
+                No turnover vs fuel per truck data available for {activeMonth} {activeYear}
+              </div>
+            ) : (
+              <>
+                <div className="chart-header">
+                  <div className="chart-header-item">
+                    <span className="legend-color" style={{ backgroundColor: "#2196F3" }}></span>
+                    <span>Turnover</span>
+                  </div>
+                  <div className="chart-header-item">
+                    <span className="legend-color" style={{ backgroundColor: "#FF6347" }}></span>
+                    <span>Diesel Cost</span>
+                  </div>
+                </div>
+                <div className="chart-scroll-container">
+                  <ResponsiveContainer width={chartWidth} height={500}>
+                    <BarChart data={chartData} margin={{ top: 40, right: 30, left: 60, bottom: 120 }}>
+                      <XAxis
+                        dataKey="truckId"
+                        angle={0}
+                        textAnchor="middle"
+                        height={150}
+                        interval={0}
+                        tick={{ fontSize: 11 }}
+                      />
+                      <YAxis
+                        label={{
+                          value: "Amount (R)",
+                          angle: 0,
+                          position: "top",
+                          dy: -20,
+                        }}
+                      />
+                      <Tooltip content={<CustomTooltip />} />
+                      <Bar dataKey="turnover" name="Turnover" fill="#2196F3" radius={[4, 4, 0, 0]}>
+                        <LabelList dataKey="turnover" content={CustomBarLabelForTurnover} position="top" />
+                      </Bar>
+                      <Bar dataKey="fuelCost" name="Diesel Cost" fill="#FF6347" radius={[4, 4, 0, 0]}>
+                        <LabelList dataKey="fuelCost" content={CustomBarLabelForDieselCost} position="top" />
                       </Bar>
                     </BarChart>
                   </ResponsiveContainer>
@@ -1352,6 +1478,20 @@ export default function DirectorAnalytics() {
               ))}
             </select>
           )}
+          {activeFilter === "turnoverVsFuelPerTruck" && (
+            <select
+              value={selectedTruck}
+              onChange={(e) => setSelectedTruck(e.target.value)}
+              className="truck-select"
+            >
+              <option value="">All Trucks</option>
+              {trucks.map((truck) => (
+                <option key={truck.m5truckskey} value={truck.m5truckskey}>
+                  {truck.truckregnum || `Truck ID ${truck.m5truckskey}`}
+                </option>
+              ))}
+            </select>
+          )}
         </div>
 
         <div className="analytics-content">
@@ -1416,6 +1556,12 @@ export default function DirectorAnalytics() {
             >
               Turnover VS Subbie Expense
             </button>
+            <button
+              className={`filter-button ${activeFilter === "turnoverVsFuelPerTruck" ? "active" : ""}`}
+              onClick={() => setActiveFilter("turnoverVsFuelPerTruck")}
+            >
+              Turnover Per Truck VS Diesel
+            </button>
           </div>
 
           <div className="chart-area">
@@ -1430,6 +1576,7 @@ export default function DirectorAnalytics() {
               {activeFilter === "turnoverPerTruck" && "Turnover Per Truck"}
               {activeFilter === "incomeVsExpense" && "Income vs Expense Per Month"}
               {activeFilter === "turnoverVsSubbieExpense" && "Turnover VS Subbie Expense"}
+              {activeFilter === "turnoverVsFuelPerTruck" && "Turnover Per Truck VS Diesel"}
             </h2>
             {renderChart()}
           </div>
