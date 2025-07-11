@@ -1,38 +1,16 @@
+
 "use client"
 
-import { useState } from "react"
 import { formatDate } from "../../utils/helpers"
 import Pagination from "../common/Pagination"
 import SearchFilter from "../common/SearchFilter"
-
-
-// Confirmation Popup Component
-const ConfirmationPopup = ({ isOpen, message, onConfirm, onCancel }) => {
-  if (!isOpen) return null
-
-  return (
-    <div className="popup-backdrop" onClick={onCancel}>
-      <div className="popup" onClick={(e) => e.stopPropagation()}>
-        <p>{message}</p>
-        <div className="popup-buttons">
-          <button className="confirm-button" onClick={onConfirm}>
-            Yes, delete
-          </button>
-          <button className="cancel-button" onClick={onCancel}>
-            Cancel
-          </button>
-        </div>
-      </div>
-    </div>
-  )
-}
 
 const TrailerTable = ({
   trailers,
   loading,
   error,
   onEdit,
-  onDelete,
+  onToggleStatus,
   onAdd,
   pagination,
   onPageChange,
@@ -41,27 +19,6 @@ const TrailerTable = ({
   onSearchChange,
   onApplyFilters,
 }) => {
-  const [showConfirmPopup, setShowConfirmPopup] = useState(false)
-  const [trailerToDelete, setTrailerToDelete] = useState(null)
-
-  const handleDeleteClick = (trailer) => {
-    setTrailerToDelete(trailer)
-    setShowConfirmPopup(true)
-  }
-
-  const handleConfirmDelete = () => {
-    if (trailerToDelete) {
-      onDelete(trailerToDelete.m5trailerskey)
-    }
-    setShowConfirmPopup(false)
-    setTrailerToDelete(null)
-  }
-
-  const handleCancelDelete = () => {
-    setShowConfirmPopup(false)
-    setTrailerToDelete(null)
-  }
-
   // Helper function to check license expiry status
   const getLicenseStatus = (expiryDate) => {
     if (!expiryDate) return { status: "unknown", text: "No Date", color: "#999" }
@@ -76,6 +33,25 @@ const TrailerTable = ({
       return { status: "expiring", text: `${daysUntilExpiry} days`, color: "orange" }
     } else {
       return { status: "current", text: "Current", color: "green" }
+    }
+  }
+
+  // Helper function to get status display
+  const getStatusDisplay = (status) => {
+    return {
+      text: status ? "ACTIVE" : "INACTIVE",
+      color: status ? "green" : "red",
+      bgColor: status ? "#e8f5e8" : "#ffe8e8",
+    }
+  }
+
+  // Handle toggle status with error logging
+  const handleToggleStatus = async (trailerId, currentStatus) => {
+    try {
+      await onToggleStatus(trailerId, currentStatus)
+    } catch (err) {
+      console.error(`Failed to toggle trailer status for ID ${trailerId}:`, err)
+      alert(`Failed to ${currentStatus ? "disable" : "enable"} trailer. Please try again.`)
     }
   }
 
@@ -104,7 +80,7 @@ const TrailerTable = ({
       </div>
 
       {/* Table Content */}
-      <div className="table-content">
+      <div>
         {loading ? (
           <div className="loading">Loading trailers...</div>
         ) : (
@@ -118,6 +94,7 @@ const TrailerTable = ({
                   <th>Year</th>
                   <th>Purchase Date</th>
                   <th>License Status</th>
+                  <th>Status</th>
                   <th>Action</th>
                   <th></th>
                 </tr>
@@ -125,15 +102,17 @@ const TrailerTable = ({
               <tbody>
                 {trailers.length === 0 ? (
                   <tr>
-                    <td colSpan="8" className="no-data">
+                    <td colSpan="9" className="no-data">
                       No trailers found
                     </td>
                   </tr>
                 ) : (
                   trailers.map((trailer) => {
                     const licenseStatus = getLicenseStatus(trailer.trailer_license_expiry)
+                    const statusDisplay = getStatusDisplay(trailer.status)
+
                     return (
-                      <tr key={trailer.m5trailerskey}>
+                      <tr key={trailer.m5trailerskey} className={!trailer.status ? "disabled-row" : ""}>
                         <td>{trailer.trailerregnum}</td>
                         <td>{trailer.trailersize}</td>
                         <td>{trailer.model}</td>
@@ -156,13 +135,30 @@ const TrailerTable = ({
                           )}
                         </td>
                         <td>
+                          <span
+                            style={{
+                              color: statusDisplay.color,
+                              backgroundColor: statusDisplay.bgColor,
+                              padding: "4px 8px",
+                              borderRadius: "4px",
+                              fontSize: "0.85em",
+                              fontWeight: "bold",
+                            }}
+                          >
+                            {statusDisplay.text}
+                          </span>
+                        </td>
+                        <td>
                           <button className="manage-edit-button" onClick={() => onEdit(trailer.m5trailerskey)}>
                             Edit
                           </button>
                         </td>
                         <td>
-                          <button className="manage-delete-button" onClick={() => handleDeleteClick(trailer)}>
-                            Delete
+                          <button
+                            className={trailer.status ? "manage-delete-button" : "manage-enable-button"}
+                            onClick={() => handleToggleStatus(trailer.m5trailerskey, trailer.status)}
+                          >
+                            {trailer.status ? "Disable" : "Enable"}
                           </button>
                         </td>
                       </tr>
@@ -187,16 +183,6 @@ const TrailerTable = ({
             onItemsPerPageChange={onItemsPerPageChange}
           />
         </div>
-      )}
-
-      {/* Confirmation Popup */}
-      {showConfirmPopup && trailerToDelete && (
-        <ConfirmationPopup
-          isOpen={showConfirmPopup}
-          message={`Are you sure you want to delete the trailer with registration ${trailerToDelete.trailerregnum}?`}
-          onConfirm={handleConfirmDelete}
-          onCancel={handleCancelDelete}
-        />
       )}
     </div>
   )

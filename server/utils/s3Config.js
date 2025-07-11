@@ -106,7 +106,7 @@ const uploadEmployeeDocs = multer({
       }
     },
   }),
-  limits: { fileSize: 5 * 1024 * 1024 }, // 5 MB limit
+  limits: { fileSize: 50 * 1024 * 1024 }, // 50 MB limit
   fileFilter: (req, file, cb) => {
     const filetypes = /pdf/
     const extname = filetypes.test(file.originalname.toLowerCase().split(".").pop())
