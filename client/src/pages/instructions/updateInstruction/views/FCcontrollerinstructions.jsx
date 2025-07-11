@@ -1029,9 +1029,9 @@ const FCcontrollerinstructions = () => {
         description: formData.description,
         status: formData.status,
         vat: formData.vat === 0 ? 0 : formData.vat || 15,
-        num_six_meters: numSix,
-        num_twelve_meters: numTwelve,
-        num_abnormal: numAbnormal,
+        num_six_meters: formData.rateWeight === "kg" || formData.rateWeight === "ton" ? 0 : numSix,
+        num_twelve_meters: formData.rateWeight === "kg" || formData.rateWeight === "ton" ? 0 : numTwelve,
+        num_abnormal: formData.rateWeight === "kg" || formData.rateWeight === "ton" ? 0 : numAbnormal,
         num_breakbulk: 0,
         // For ton or kg, weight must be provided and not defaulted to 0
         weight:
@@ -1043,9 +1043,9 @@ const FCcontrollerinstructions = () => {
         total_cost: totalCost,
         booking_ref: formData.bookingRef,
         vessel_name: formData.vesselName,
-        rateper_6: ratePer6,
-        rateper_12: ratePer12,
-        rateper_abnormal: ratePerAbnormal,
+        rateper_6: formData.rateWeight === "kg" || formData.rateWeight === "ton" ? 0 : ratePer6,
+        rateper_12: formData.rateWeight === "kg" || formData.rateWeight === "ton" ? 0 : ratePer12,
+        rateper_abnormal: formData.rateWeight === "kg" || formData.rateWeight === "ton" ? 0 : ratePerAbnormal,
         rateper_breakbulk: 0,
         // For ton or kg, unitRate must be provided and not defaulted to 0
         unitrate:
@@ -1057,38 +1057,41 @@ const FCcontrollerinstructions = () => {
       };
 
       // Prepare container data with containerKey for smart updates
-      const containerData = containers.map((container) => {
-        // Sanitize weight value
-        let sanitizedWeight = null;
-        if (
-          container.weight !== null &&
-          container.weight !== undefined &&
-          container.weight !== ""
-        ) {
-          if (typeof container.weight === "string") {
-            const trimmedWeight = container.weight.trim();
-            if (trimmedWeight !== "") {
-              const parsedWeight = Number.parseFloat(trimmedWeight);
-              if (!isNaN(parsedWeight) && parsedWeight >= 0) {
-                sanitizedWeight = parsedWeight;
-              }
-            }
-          } else if (
-            typeof container.weight === "number" &&
-            container.weight >= 0
+      // When rateWeight is kg or ton, we don't save any container details
+      const containerData = formData.rateWeight === "kg" || formData.rateWeight === "ton" 
+        ? [] 
+        : containers.map((container) => {
+          // Sanitize weight value
+          let sanitizedWeight = null;
+          if (
+            container.weight !== null &&
+            container.weight !== undefined &&
+            container.weight !== ""
           ) {
-            sanitizedWeight = container.weight;
+            if (typeof container.weight === "string") {
+              const trimmedWeight = container.weight.trim();
+              if (trimmedWeight !== "") {
+                const parsedWeight = Number.parseFloat(trimmedWeight);
+                if (!isNaN(parsedWeight) && parsedWeight >= 0) {
+                  sanitizedWeight = parsedWeight;
+                }
+              }
+            } else if (
+              typeof container.weight === "number" &&
+              container.weight >= 0
+            ) {
+              sanitizedWeight = container.weight;
+            }
           }
-        }
 
-        return {
-          containerKey: container.containerKey, // Important for smart updates
-          containernum: container.containerNum || "",
-          weight: sanitizedWeight, // Will be null for empty/invalid values
-          container_type: container.containerType || "",
-          cargo_description: container.cargoDescription || "",
-        };
-      });
+          return {
+            containerKey: container.containerKey, // Important for smart updates
+            containernum: container.containerNum || "",
+            weight: sanitizedWeight, // Will be null for empty/invalid values
+            container_type: container.containerType || "",
+            cargo_description: container.cargoDescription || "",
+          };
+        });
 
       // Console log comparison between old and new data
       console.log("📋 DATA COMPARISON:");
