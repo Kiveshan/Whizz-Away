@@ -207,7 +207,21 @@ const Instructions = () => {
       } else if (activeFilter === "export") {
         filtered = filtered.filter((item) => item.type_text === "export" || item.type === "export")
       } else if (activeFilter === "cross-haul") {
-        filtered = filtered.filter((item) => item.type_text === "cross-haul" || item.type === "cross-haul")
+        filtered = filtered.filter(
+          (item) =>
+            item.type_text === "cross-haul" ||
+            item.type === "cross-haul" ||
+            item.shipment_type === 3 ||
+            item.shipment_type === "3"
+        )
+      } else if (activeFilter === "cross-haul-break-bulk") {
+        filtered = filtered.filter(
+          (item) =>
+            item.type_text === "cross-haul-break-bulk" ||
+            item.type === "cross-haul-break-bulk" ||
+            item.shipment_type === 4 ||
+            item.shipment_type === "4"
+        )
       }
     }
 
@@ -350,6 +364,12 @@ const Instructions = () => {
               Cross-Haul
             </button>
             <button
+              className={`btn btn-blue ${activeFilter === "cross-haul-break-bulk" ? "active" : ""}`}
+              onClick={() => handleFilterClick("cross-haul-break-bulk")}
+            >
+              Cross-Haul (Break Bulk)
+            </button>
+            <button
               className={`btn btn-blue ${activeFilter === "All" ? "active" : ""}`}
               onClick={() => handleFilterClick("All")}
             >
@@ -409,7 +429,11 @@ const Instructions = () => {
                             ? "import"
                             : item.shipment_type === 2 || item.shipment_type === "2"
                               ? "export"
-                              : item.type)}
+                              : item.shipment_type === 3 || item.shipment_type === "3"
+                                ? "cross-haul"
+                                : item.shipment_type === 4 || item.shipment_type === "4"
+                                  ? "cross-haul (break bulk)"
+                                  : item.type)}
                       </td>
                       <td>{renderStatus(item.status)}</td>
                       <td>{new Date(item.startingdate || item.pickupdate).toLocaleDateString()}</td>
