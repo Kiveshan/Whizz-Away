@@ -28,6 +28,7 @@ const getFuelExpenses = async (client, month, year) => {
     AND TRIM(to_char(e.slipuploaddate, 'Month')) = $1
     AND EXTRACT(YEAR FROM e.slipuploaddate)::text = $2
     AND t.is_subcontractor = false
+    AND t.status = true
     GROUP BY t.truckregnum, to_char(e.slipuploaddate, 'Month'), EXTRACT(YEAR FROM e.slipuploaddate)
     ORDER BY total_cost DESC
   `;
@@ -204,7 +205,7 @@ const getAllTrucks = async (client) => {
   const query = `
     SELECT m5truckskey, truckregnum
     FROM m5_trucks
-    WHERE is_subcontractor = false
+    WHERE is_subcontractor = false AND t.status = true
     ORDER BY truckregnum
   `;
   const result = await client.query(query);
@@ -484,6 +485,7 @@ const getTurnoverPerTruck = async (client, month, year) => {
       WHERE t.is_subcontractor = false
         AND TRIM(TO_CHAR(m.pickupdate, 'Month')) = $1
         AND EXTRACT(YEAR FROM m.pickupdate)::TEXT = $2
+        AND t.status = true
       GROUP BY l.truckregnumber, TO_CHAR(m.pickupdate, 'Month'), EXTRACT(YEAR FROM m.pickupdate)
     )
     SELECT 
@@ -1019,6 +1021,7 @@ const getTurnoverVsFuelPerTruck = async (client, month, year, truckId = null) =>
         WHERE t.is_subcontractor = false
           AND TRIM(TO_CHAR(m.pickupdate, 'Month')) = $1
           AND EXTRACT(YEAR FROM m.pickupdate)::TEXT = $2
+          AND t.status = true
         GROUP BY TO_CHAR(m.pickupdate, 'Month'), EXTRACT(YEAR FROM m.pickupdate)
       ),
       FuelPerTruck AS (
@@ -1032,6 +1035,7 @@ const getTurnoverVsFuelPerTruck = async (client, month, year, truckId = null) =>
           AND t.is_subcontractor = false
           AND TRIM(to_char(e.slipuploaddate, 'Month')) = $1
           AND EXTRACT(YEAR FROM e.slipuploaddate)::text = $2
+          AND t.status = true
         GROUP BY to_char(e.slipuploaddate, 'Month'), EXTRACT(YEAR FROM e.slipuploaddate)
       )
       SELECT 
@@ -1076,6 +1080,7 @@ const getTurnoverVsFuelPerTruck = async (client, month, year, truckId = null) =>
           AND TRIM(TO_CHAR(m.pickupdate, 'Month')) = $1
           AND EXTRACT(YEAR FROM m.pickupdate)::TEXT = $2
           AND t.m5truckskey = $3
+          AND t.status = true
         GROUP BY l.truckregnumber, TO_CHAR(m.pickupdate, 'Month'), EXTRACT(YEAR FROM m.pickupdate)
       ),
       FuelPerTruck AS (
@@ -1091,6 +1096,7 @@ const getTurnoverVsFuelPerTruck = async (client, month, year, truckId = null) =>
           AND TRIM(to_char(e.slipuploaddate, 'Month')) = $1
           AND EXTRACT(YEAR FROM e.slipuploaddate)::text = $2
           AND t.m5truckskey = $3
+          AND t.status = true
         GROUP BY t.truckregnum, to_char(e.slipuploaddate, 'Month'), EXTRACT(YEAR FROM e.slipuploaddate)
       )
       SELECT 
