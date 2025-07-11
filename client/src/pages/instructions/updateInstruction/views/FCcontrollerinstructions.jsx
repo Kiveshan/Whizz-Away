@@ -844,7 +844,7 @@ const FCcontrollerinstructions = () => {
       setConfirmationModal({
         isOpen: true,
         message:
-          "Are you sure you want to create an invoice for this instruction?",
+          "Are you sure you want to create an invoice before dispatching containers?",
         action: "invoice",
       });
     } catch (error) {
