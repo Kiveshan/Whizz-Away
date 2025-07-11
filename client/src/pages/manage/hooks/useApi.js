@@ -197,19 +197,12 @@ export function useApi(state, actions) {
   const saveEmployee = useCallback(
     async (employeeData, emailRef) => {
       actions.setLoading(true)
-      emailRef.current?.setCustomValidity("")
       try {
-        // Check duplicate email (only on create, not edit)
-        if (!state.editingEmployeeId) {
-          const { data } = await api.get(
-            `/api/employees/check-email-existence?email=${encodeURIComponent(employeeData.email)}`,
-          )
-          if (data.exists) {
-            emailRef.current?.setCustomValidity("Email already exists. Please use a different one.")
-            emailRef.current?.reportValidity()
-            actions.setLoading(false)
-            return false
-          }
+        // Validate required fields
+        if (!employeeData.name || !employeeData.surname) {
+          actions.showAlert("Name and surname are required.")
+          actions.setLoading(false)
+          return false
         }
 
         // Build FormData
@@ -410,7 +403,7 @@ export function useApi(state, actions) {
         const method = state.editTrailerId ? "put" : "post"
         console.log(`Making ${method.toUpperCase()} request to: ${url}`)
 
-        const response = await api[method](url, formData, {
+        const response = api[method](url, formData, {
           headers: { "Content-Type": "multipart/form-data" },
         })
         console.log("API response:", response.data)
@@ -561,9 +554,7 @@ export function useApi(state, actions) {
       } finally {
         actions.setLoading(false)
       }
-    },
-    [state, actions, fetchPaginatedData],
-  )
+    }, [state, actions, fetchPaginatedData])
 
   const saveClientRates = useCallback(
     async (ratesData) => {
@@ -857,65 +848,64 @@ export function useApi(state, actions) {
     [state, actions, fetchPaginatedData],
   )
 
-const toggleTruckStatus = useCallback(
-  async (id, currentStatus) => {
-    actions.setLoading(true)
-    try {
-      const newStatus = !currentStatus
-      console.log(`Toggling truck ${id} status from ${currentStatus} to ${newStatus}`)
+  const toggleTruckStatus = useCallback(
+    async (id, currentStatus) => {
+      actions.setLoading(true)
+      try {
+        const newStatus = !currentStatus
+        console.log(`Toggling truck ${id} status from ${currentStatus} to ${newStatus}`)
 
-      // Use the correct endpoint: /api/trucks/:id/status
-      await api.put(`/api/trucks/${id}/status`, { status: newStatus })
+        // Use the correct endpoint: /api/trucks/:id/status
+        await api.put(`/api/trucks/${id}/status`, { status: newStatus })
 
-      // Refresh current page
-      await fetchPaginatedData(
-        "trucks",
-        state.pagination.trucks.currentPage,
-        state.pagination.trucks.itemsPerPage,
-        state.filters.trucks,
-      )
+        // Refresh current page
+        await fetchPaginatedData(
+          "trucks",
+          state.pagination.trucks.currentPage,
+          state.pagination.trucks.itemsPerPage,
+          state.filters.trucks,
+        )
 
-      actions.showAlert(`Truck ${newStatus ? "enabled" : "disabled"}!`)
-    } catch (err) {
-      console.error(`Error toggling truck ${id}:`, err)
-      actions.showAlert(
-        `Error ${currentStatus ? "disabling" : "enabling"} truck: ${err.response?.data?.error || err.message}`,
-      )
-    } finally {
-      actions.setLoading(false)
-    }
-  },
-  [state, actions, fetchPaginatedData],
-)
+        actions.showAlert(`Truck ${newStatus ? "enabled" : "disabled"}!`)
+      } catch (err) {
+        console.error(`Error toggling truck ${id}:`, err)
+        actions.showAlert(
+          `Error ${currentStatus ? "disabling" : "enabling"} truck: ${err.response?.data?.error || err.message}`,
+        )
+      } finally {
+        actions.setLoading(false)
+      }
+    },
+    [state, actions, fetchPaginatedData],
+  )
 
-const toggleTrailerStatus = useCallback(
-  async (id, currentStatus) => {
-    actions.setLoading(true)
-    try {
-      const newStatus = !currentStatus
-      await api.put(`/api/trailers/${id}/toggle-status`, { status: newStatus })
+  const toggleTrailerStatus = useCallback(
+    async (id, currentStatus) => {
+      actions.setLoading(true)
+      try {
+        const newStatus = !currentStatus
+        await api.put(`/api/trailers/${id}/toggle-status`, { status: newStatus })
 
-      // Refresh current page
-      await fetchPaginatedData(
-        "trailers",
-        state.pagination.trailers.currentPage,
-        state.pagination.trailers.itemsPerPage,
-        state.filters.trailers,
-      )
+        // Refresh current page
+        await fetchPaginatedData(
+          "trailers",
+          state.pagination.trailers.currentPage,
+          state.pagination.trailers.itemsPerPage,
+          state.filters.trailers,
+        )
 
-      actions.showAlert(`Trailer ${newStatus ? "enabled" : "disabled"}!`)
-    } catch (err) {
-      console.error(`Error toggling trailer ${id}:`, err)
-      actions.showAlert(
-        `Error ${currentStatus ? "disabling" : "enabling"} trailer: ${err.response?.data?.error || err.message}`,
-      )
-    } finally {
-      actions.setLoading(false)
-    }
-  },
-  [state, actions, fetchPaginatedData],
-)
-  
+        actions.showAlert(`Trailer ${newStatus ? "enabled" : "disabled"}!`)
+      } catch (err) {
+        console.error(`Error toggling trailer ${id}:`, err)
+        actions.showAlert(
+          `Error ${currentStatus ? "disabling" : "enabling"} trailer: ${err.response?.data?.error || err.message}`,
+        )
+      } finally {
+        actions.setLoading(false)
+      }
+    },
+    [state, actions, fetchPaginatedData],
+  )
 
   const deleteItem = useCallback(
     async (type, id) => {
