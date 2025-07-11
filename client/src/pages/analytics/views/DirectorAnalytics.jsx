@@ -1,4 +1,3 @@
-
 "use client"
 
 import { useState, useEffect } from "react"
@@ -126,7 +125,7 @@ export default function DirectorAnalytics() {
   const fetchTrucks = async () => {
     try {
       const response = await api.get("/api/get-trucks")
-      console.log("Raw /api/get-trucks response:", response) // Log full response
+      console.log("Raw /api/get-trucks response:", response)
       if (response.data.success) {
         const truckData = response.data.data.filter(truck => !truck.issubcontractor)
         console.log("Filtered trucks (non-subcontractors):", truckData)
@@ -563,6 +562,8 @@ export default function DirectorAnalytics() {
             month: item.month_name.trim(),
             year: item.year,
             status,
+            turnoverPercentage: Number.parseFloat(item.turnoverPercentage) || 0,
+            fuelCostPercentage: Number.parseFloat(item.fuelCostPercentage) || 0,
           }
         })
         console.log("Processed turnover vs fuel per truck data:", data)
@@ -717,7 +718,7 @@ export default function DirectorAnalytics() {
   }
 
   const CustomBarLabelForTurnover = ({ x, y, width, value, payload = {} }) => {
-    const percentage = payload.percentage ?? 0
+    const percentage = payload.turnoverPercentage ?? payload.percentage ?? 0
     console.log("CustomBarLabelForTurnover - payload:", payload)
     return (
       <text
@@ -728,14 +729,14 @@ export default function DirectorAnalytics() {
         dominantBaseline="middle"
         fontSize={12}
       >
-        {`R${value?.toLocaleString() || 0}`}
+        {`R${value?.toLocaleString() || 0} (${percentage}%)`}
       </text>
     )
   }
 
   const CustomBarLabelForDieselCost = ({ x, y, width, value, payload = {} }) => {
     console.log("CustomBarLabelForDieselCost - payload:", payload)
-    const percentage = payload.dieselCostPercentage ?? 0
+    const percentage = payload.fuelCostPercentage ?? payload.dieselCostPercentage ?? 0
     return (
       <text
         x={x + width / 2}
@@ -758,7 +759,7 @@ export default function DirectorAnalytics() {
     console.log(`CustomBarLabelForFuelAndTurnover: index=${index}, chartData=`, chartData)
     const percentage = chartData[index]?.percentage || 0
     console.log(`Selected percentage: ${percentage}%`)
-    const labelText = `R${value.toLocaleString()}`
+    const labelText = `R${value.toLocaleString()} (${percentage}%)`
     return (
       <text x={x + width / 2} y={y - 10} fill="#000" textAnchor="middle" dominantBaseline="middle" fontSize={12}>
         {labelText}
@@ -1381,7 +1382,18 @@ export default function DirectorAnalytics() {
                 </div>
                 <div className="chart-scroll-container">
                   <ResponsiveContainer width={chartWidth} height={500}>
-                    <BarChart data={chartData} margin={{ top: 40, right: 30, left: 60, bottom: 120 }}>
+                    <BarChart
+                      data={selectedTruck ? chartData : [{
+                        truckId: "Totals",
+                        turnover: chartData.reduce((sum, item) => sum + item.turnover, 0),
+                        fuelCost: chartData.reduce((sum, item) => sum + item.fuelCost, 0),
+                        turnoverPercentage: 100,
+                        fuelCostPercentage: 100,
+                        month: chartData[0]?.month,
+                        year: chartData[0]?.year
+                      }]}
+                      margin={{ top: 40, right: 30, left: 60, bottom: 120 }}
+                    >
                       <XAxis
                         dataKey="truckId"
                         angle={0}
@@ -1484,10 +1496,10 @@ export default function DirectorAnalytics() {
               onChange={(e) => setSelectedTruck(e.target.value)}
               className="truck-select"
             >
-              <option value="">All Trucks</option>
+              <option value="">Totals</option>
               {trucks.map((truck) => (
                 <option key={truck.m5truckskey} value={truck.m5truckskey}>
-                  {truck.truckregnum || `Truck ID ${truck.m5truckskey}`}
+                  {truck.truckregnumber || `Truck ID ${truck.m5truckskey}`}
                 </option>
               ))}
             </select>
@@ -1496,72 +1508,23 @@ export default function DirectorAnalytics() {
 
         <div className="analytics-content">
           <div className="sidebar-filters">
-            <button
-              className={`filter-button ${activeFilter === "fuel" ? "active" : ""}`}
-              onClick={() => setActiveFilter("fuel")}
+            <select
+              value={activeFilter}
+              onChange={(e) => setActiveFilter(e.target.value)}
+              className="filter-select"
             >
-              Fuel Per Truck
-            </button>
-            <button
-              className={`filter-button ${activeFilter === "turnoverPerMonth" ? "active" : ""}`}
-              onClick={() => setActiveFilter("turnoverPerMonth")}
-            >
-              Turnover per month vs Client
-            </button>
-            <button
-              className={`filter-button ${activeFilter === "agingAnalysis" ? "active" : ""}`}
-              onClick={() => setActiveFilter("agingAnalysis")}
-            >
-              30, 60, 90, Current
-            </button>
-            <button
-              className={`filter-button ${activeFilter === "subcontractorVsTurnover" ? "active" : ""}`}
-              onClick={() => setActiveFilter("subcontractorVsTurnover")}
-            >
-              Subbie VS Turnover
-            </button>
-            <button
-              className={`filter-button ${activeFilter === "subcontractorTurnoverPerMonth" ? "active" : ""}`}
-              onClick={() => setActiveFilter("subcontractorTurnoverPerMonth")}
-            >
-              Turnover VS Total Subbie
-            </button>
-            <button
-              className={`filter-button ${activeFilter === "wagesVsExpenses" ? "active" : ""}`}
-              onClick={() => setActiveFilter("wagesVsExpenses")}
-            >
-              Wages per month VS Expenses
-            </button>
-            <button
-              className={`filter-button ${activeFilter === "turnoverVsDieselCost" ? "active" : ""}`}
-              onClick={() => setActiveFilter("turnoverVsDieselCost")}
-            >
-              Turnover vs Diesel Cost
-            </button>
-            <button
-              className={`filter-button ${activeFilter === "turnoverPerTruck" ? "active" : ""}`}
-              onClick={() => setActiveFilter("turnoverPerTruck")}
-            >
-              Turnover Per Truck
-            </button>
-            <button
-              className={`filter-button ${activeFilter === "incomeVsExpense" ? "active" : ""}`}
-              onClick={() => setActiveFilter("incomeVsExpense")}
-            >
-              Income vs Expense Per Month
-            </button>
-            <button
-              className={`filter-button ${activeFilter === "turnoverVsSubbieExpense" ? "active" : ""}`}
-              onClick={() => setActiveFilter("turnoverVsSubbieExpense")}
-            >
-              Turnover VS Subbie Expense
-            </button>
-            <button
-              className={`filter-button ${activeFilter === "turnoverVsFuelPerTruck" ? "active" : ""}`}
-              onClick={() => setActiveFilter("turnoverVsFuelPerTruck")}
-            >
-              Turnover Per Truck VS Diesel
-            </button>
+              <option value="fuel">Fuel Per Truck</option>
+              <option value="turnoverPerMonth">Turnover per month vs Client</option>
+              <option value="agingAnalysis">30, 60, 90, Current</option>
+              <option value="subcontractorVsTurnover">Subbie VS Turnover</option>
+              <option value="subcontractorTurnoverPerMonth">Turnover VS Total Subbie</option>
+              <option value="wagesVsExpenses">Wages per month VS Expenses</option>
+              <option value="turnoverVsDieselCost">Turnover vs Diesel Cost</option>
+              <option value="turnoverPerTruck">Turnover Per Truck</option>
+              <option value="incomeVsExpense">Income vs Expense Per Month</option>
+              <option value="turnoverVsSubbieExpense">Turnover VS Subbie Expense</option>
+              <option value="turnoverVsFuelPerTruck">Turnover Per Truck VS Diesel</option>
+            </select>
           </div>
 
           <div className="chart-area">
