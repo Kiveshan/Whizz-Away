@@ -1305,32 +1305,38 @@ const ControllerInstructions = () => {
         // Set vessel_name and stackdate to null for cross-haul types
         vessel_name: isCrossHaul ? null : formData.vesselName,
         stackdate: isCrossHaul ? null : formData.stackDate,
-        // UPDATED RATE SAVING LOGIC: Set container rates to 0 if count is 0, null for weight-based
-        rateper_6: isWeightBased
-          ? null
-          : formData.num_six_meters === 0
-            ? 0
-            : formData.sixMeterRate === ""
-              ? null
-              : Number.parseFloat(formData.sixMeterRate || 0),
-        rateper_12: isWeightBased
-          ? null
-          : formData.num_twelve_meters === 0
-            ? 0
-            : formData.twelveMeterRate === ""
-              ? null
-              : Number.parseFloat(formData.twelveMeterRate || 0),
-        rateper_abnormal: isWeightBased
-          ? null
-          : formData.num_abnormal === 0
-            ? 0
-            : formData.abnormalRate === ""
-              ? null
-              : Number.parseFloat(formData.abnormalRate || 0),
-        // Set container counts to 0 for weight-based
-        num_six_meters: isWeightBased ? 0 : formData.num_six_meters || 0,
-        num_twelve_meters: isWeightBased ? 0 : formData.num_twelve_meters || 0,
-        num_abnormal: isWeightBased ? 0 : formData.num_abnormal || 0,
+        // UPDATED RATE SAVING LOGIC: Set container rates to 0 if count is 0, null for weight-based, or 0 when unit is kg or ton
+        rateper_6: formData.rateWeight === "kg" || formData.rateWeight === "ton"
+          ? 0
+          : isWeightBased
+            ? null
+            : formData.num_six_meters === 0
+              ? 0
+              : formData.sixMeterRate === ""
+                ? null
+                : Number.parseFloat(formData.sixMeterRate || 0),
+        rateper_12: formData.rateWeight === "kg" || formData.rateWeight === "ton"
+          ? 0
+          : isWeightBased
+            ? null
+            : formData.num_twelve_meters === 0
+              ? 0
+              : formData.twelveMeterRate === ""
+                ? null
+                : Number.parseFloat(formData.twelveMeterRate || 0),
+        rateper_abnormal: formData.rateWeight === "kg" || formData.rateWeight === "ton"
+          ? 0
+          : isWeightBased
+            ? null
+            : formData.num_abnormal === 0
+              ? 0
+              : formData.abnormalRate === ""
+                ? null
+                : Number.parseFloat(formData.abnormalRate || 0),
+        // Set container counts to 0 for weight-based or when unit is kg or ton
+        num_six_meters: formData.rateWeight === "kg" || formData.rateWeight === "ton" ? 0 : formData.num_six_meters || 0,
+        num_twelve_meters: formData.rateWeight === "kg" || formData.rateWeight === "ton" ? 0 : formData.num_twelve_meters || 0,
+        num_abnormal: formData.rateWeight === "kg" || formData.rateWeight === "ton" ? 0 : formData.num_abnormal || 0,
         // Set break bulk fields to null/0 as they've been removed from the UI
         rateper_breakbulk: null,
         num_breakbulk: 0,
@@ -1353,8 +1359,9 @@ const ControllerInstructions = () => {
       }
 
       // Prepare container data (only for container-based calculations AND if unit type is Container)
+      // Also ensure container details are not saved when rateWeight is kg or ton
       const containerData =
-        !isWeightBased && formData.rateWeight === "Container"
+        !isWeightBased && formData.rateWeight === "Container" && formData.rateWeight !== "kg" && formData.rateWeight !== "ton"
           ? containers.map((container) => ({
               container_type: container.containerType,
               containerNum: container.containerNum,
