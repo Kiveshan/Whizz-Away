@@ -56,7 +56,7 @@ const EmployeeTable = ({
                   <th>Status</th>
                   <th>Employee No</th>
                   <th>Role</th>
-                  <th>Email</th>
+                  <th>Cell No</th>
                   <th>Actions</th>
                   <th></th>
                 </tr>
@@ -79,7 +79,7 @@ const EmployeeTable = ({
                       </td>
                       <td>{employee.employeenum}</td>
                       <td>{employee.rolename || employee.roleid}</td>
-                      <td>{employee.email}</td>
+                      <td>{employee.cellnum}</td>
                       <td>
                         <button className="manage-view-button" onClick={() => onEdit(employee.userid)}>
                           Edit
