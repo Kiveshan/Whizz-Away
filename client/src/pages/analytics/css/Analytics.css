@@ -71,6 +71,37 @@
   flex-shrink: 0;
 }
 
+.analytics-page-wrapper .sidebar-filters .filter-select {
+  -webkit-appearance: none;
+  -moz-appearance: none;
+  appearance: none;
+  width: 100%;
+  padding: 10px;
+  font-size: 14px;
+  color: white;
+  background-color: #3845fd;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: background-color 0.3s, border-color 0.2s ease;
+  background-image: none; /* Explicitly remove chevron */
+  outline: none;
+}
+
+.analytics-page-wrapper .sidebar-filters .filter-select:hover {
+  background-color: #1a228b;
+}
+
+.analytics-page-wrapper .sidebar-filters .filter-select:focus {
+  border-color: #4169e1;
+  background-color: #1a228b;
+}
+
+.analytics-page-wrapper .sidebar-filters .filter-select option {
+  background-color: white;
+  color: #333;
+}
+
 .analytics-page-wrapper .filter-button {
   background-color: #3845fd;
   color: white;
@@ -249,9 +280,9 @@
     gap: 5px;
   }
 
-  .analytics-page-wrapper .filter-button {
-    white-space: nowrap;
+  .analytics-page-wrapper .sidebar-filters .filter-select {
     min-width: 150px;
+    white-space: nowrap;
   }
 
   .analytics-page-wrapper .chart-scroll-container {
