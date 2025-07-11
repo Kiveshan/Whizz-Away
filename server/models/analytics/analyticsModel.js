@@ -453,6 +453,7 @@ const getAllExpenses = async (client, month, year) => {
 };
 
 const getTurnoverPerTruck = async (client, month, year) => {
+  const params = [month, year];
   const query = `
     WITH DistinctLegs AS (
       SELECT 
@@ -469,60 +470,65 @@ const getTurnoverPerTruck = async (client, month, year) => {
       FROM legs_m2
       GROUP BY m1key, legnumber
     ),
-    LegTruckContributions AS (
+    TurnoverPerTruck AS (
       SELECT 
-        l.m1key,
-        l.legnumber,
         l.truckregnumber,
-        m.total_cost,
-        dl.num_legs,
-        tcpl.trucks_per_leg,
-        (m.total_cost / dl.num_legs / tcpl.trucks_per_leg) AS turnover_contribution,
-        m.pickupdate
+        SUM(m.total_cost / dl.num_legs / tcpl.trucks_per_leg) AS total_turnover,
+        TO_CHAR(m.pickupdate, 'Month') AS month_name,
+        EXTRACT(YEAR FROM m.pickupdate)::TEXT AS year
       FROM legs_m2 l
       JOIN m1_controller m ON l.m1key = m.m1key
       JOIN DistinctLegs dl ON l.m1key = dl.m1key
       JOIN TruckCountsPerLeg tcpl ON l.m1key = tcpl.m1key AND l.legnumber = tcpl.legnumber
-      JOIN m5_trucks t ON l.truckregnumber = t.truckregnum AND t.is_subcontractor = false
-      WHERE m.pickupdate IS NOT NULL AND 
+      JOIN m5_trucks t ON l.truckregnumber = t.truckregnum
+      WHERE t.is_subcontractor = false
+        AND TRIM(TO_CHAR(m.pickupdate, 'Month')) = $1
+        AND EXTRACT(YEAR FROM m.pickupdate)::TEXT = $2
+      GROUP BY l.truckregnumber, TO_CHAR(m.pickupdate, 'Month'), EXTRACT(YEAR FROM m.pickupdate)
     )
     SELECT 
-      ltc.truckregnumber,
-      TO_CHAR(ltc.pickupdate, 'Month') AS month_name,
-      EXTRACT(YEAR FROM ltc.pickupdate)::TEXT AS year,
-      SUM(ltc.turnover_contribution) AS total_turnover
-    FROM LegTruckContributions ltc
-    WHERE TRIM(TO_CHAR(ltc.pickupdate, 'Month')) = $1
-      AND EXTRACT(YEAR FROM ltc.pickupdate)::TEXT = $2
-    GROUP BY ltc.truckregnumber, TO_CHAR(ltc.pickupdate, 'Month'), EXTRACT(YEAR FROM ltc.pickupdate)
-    ORDER BY total_turnover DESC;
+      truckregnumber,
+      COALESCE(total_turnover, 0) AS total_turnover,
+      month_name,
+      year
+    FROM TurnoverPerTruck
+    ORDER BY total_turnover DESC
   `;
-  const result = await client.query(query, [month, year]);
-  console.log("Raw query result for month", month, year, ":", result.rows);
-  console.log(`Query returned ${result.rows ? result.rows.length : 0} rows`);
 
-  if (!result.rows || result.rows.length === 0) {
-    console.log(`No rows returned for ${month} ${year}. Check query or data.`);
-    return [];
+  try {
+    const result = await client.query(query, params);
+    console.log("Turnover per Truck query result:", result.rows);
+    console.log(`Query returned ${result.rows.length} rows`);
+
+    if (!result.rows || result.rows.length === 0) {
+      console.log(`No rows returned for ${month} ${year}. Check query or data.`);
+      return [];
+    }
+
+    const totalTurnover = result.rows.reduce(
+      (sum, row) => sum + parseFloat(row.total_turnover || 0),
+      0
+    );
+    console.log(`Total turnover for ${month} ${year}: ${totalTurnover}`);
+
+    const data = result.rows.map((row) => {
+      const turnover = parseFloat(row.total_turnover || 0);
+      const percentage = totalTurnover > 0 ? ((turnover / totalTurnover) * 100).toFixed(2) : 0;
+      return {
+        truckregnumber: row.truckregnumber,
+        total_turnover: turnover,
+        month_name: row.month_name.trim(),
+        year: row.year,
+        percentage: parseFloat(percentage),
+      };
+    });
+
+    console.log("Processed turnover per truck data:", data);
+    return data;
+  } catch (err) {
+    console.error("Error executing turnover per truck query:", err);
+    throw new Error(`Database query failed: ${err.message}`);
   }
-
-  const totalTurnover = result.rows.reduce(
-    (sum, row) => sum + parseFloat(row.total_turnover || 0),
-    0
-  );
-  console.log(`Total turnover for ${month} ${year}: ${totalTurnover}`);
-
-  return result.rows.map((row) => {
-    const turnover = parseFloat(row.total_turnover || 0);
-    const percentage = totalTurnover > 0 ? ((turnover / totalTurnover) * 100).toFixed(2) : 0;
-    return {
-      truckregnumber: row.truckregnumber,
-      total_turnover: turnover,
-      month_name: row.month_name.trim(),
-      year: row.year,
-      percentage: parseFloat(percentage),
-    };
-  });
 };
 
 const getSubcontractorTurnoverPerMonth = async (client, month, year) => {
