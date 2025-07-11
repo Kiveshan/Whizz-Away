@@ -327,7 +327,7 @@ const ClientInvoice = () => {
           {/* Vessel/Ref and Destination */}
           <div className="vessel-destination">
             <div className="vessel">Starting : {invoiceData.pickup}</div>
-            <div className="destination">
+            <div className="destination" contentEditable>
               Destination : {invoiceData.dropoff}
             </div>
           </div>

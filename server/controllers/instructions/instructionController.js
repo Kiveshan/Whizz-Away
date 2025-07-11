@@ -202,6 +202,8 @@ export const getInstructionByIdHandler = async (req, res) => {
       pickupdate: instruction.pickupdate,
       stackdate: instruction.stackdate,
       deadline: instruction.deadline,
+      vat: instruction.vat,
+      vat_type: typeof instruction.vat
     })
 
     // Format dates to MM/DD/YYYY and ensure all fields are properly mapped
@@ -216,6 +218,8 @@ export const getInstructionByIdHandler = async (req, res) => {
       rateper_12: instruction.rateper_12 || 0,
       rateper_abnormal: instruction.rateper_abnormal || 0,
       rateper_breakbulk: instruction.rateper_breakbulk || 0,
+      // Ensure VAT is explicitly included and handled correctly
+      vat: instruction.vat !== null && instruction.vat !== undefined ? instruction.vat : 15,
       // Add the field names the frontend expects for rates
       sixMeterRate: instruction.rateper_6 || 0,
       twelveMeterRate: instruction.rateper_12 || 0,
@@ -233,6 +237,8 @@ export const getInstructionByIdHandler = async (req, res) => {
       pickupdate: formattedInstruction.pickupdate,
       stackdate: formattedInstruction.stackdate,
       deadline: formattedInstruction.deadline,
+      vat: formattedInstruction.vat,
+      vat_type: typeof formattedInstruction.vat
     })
 
     console.log(`Found instruction with ID: ${instructionId}`)

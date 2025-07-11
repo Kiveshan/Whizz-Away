@@ -3,14 +3,25 @@ import { pool } from "../../config/database.js"
 export const getPurchaseOrders = async () => {
   const query = `
     SELECT 
-      po.po_id,
-      po.date,
-      po.total,
+      po.ponum,
+      MIN(po.date) AS date,
+      SUM(po.total) AS total,
       et.expense AS expense_type,
-      s.supplier AS supplier_name
+      s.supplier AS supplier_name,
+      JSON_AGG(
+        JSON_BUILD_OBJECT(
+          'po_id', po.po_id,
+          'description', po.description,
+          'quantity', po.quantity,
+          'unit_price', po.unit_price,
+          'amount', po.quantity * po.unit_price
+        )
+      ) AS line_items
     FROM purchase_orders po
     JOIN expense_types et ON po.expense_type_id = et.id
     JOIN suppliers s ON po.supplier_id = s.supplier_id
+    GROUP BY po.ponum, et.expense, s.supplier
+    ORDER BY MIN(po.date) DESC
   `
 
   try {
@@ -337,12 +348,28 @@ export const createMultiplePurchaseOrders = async ({
   }
 }
 
-export const getPurchaseOrderList = async (supplierId, expenseTypeId, fromDate, toDate, poId) => {
+export const getPurchaseOrderList = async (supplierId, expenseTypeId, fromDate, toDate, poId, ponum) => {
   let query = `
-    SELECT po.po_id, po.ponum, po.date, s.supplier, e.expense,
-           po.description, po.quantity, po.unit_price,
-           (po.quantity * po.unit_price) as amount,
-           po.subbie, po.attention_to, po.received_by, po.reg_no
+    SELECT 
+      po.ponum,
+      po.date,
+      s.supplier,
+      s.supplier_id,
+      e.expense,
+      po.subbie,
+      po.attention_to,
+      po.received_by,
+      po.reg_no,
+      JSON_AGG(
+        JSON_BUILD_OBJECT(
+          'po_id', po.po_id,
+          'description', po.description,
+          'quantity', po.quantity,
+          'unit_price', po.unit_price,
+          'amount', po.quantity * po.unit_price
+        )
+      ) AS line_items,
+      SUM(po.quantity * po.unit_price) AS total_amount
     FROM purchase_orders po
     JOIN suppliers s ON po.supplier_id = s.supplier_id
     JOIN expense_types e ON po.expense_type_id = e.id
@@ -355,6 +382,11 @@ export const getPurchaseOrderList = async (supplierId, expenseTypeId, fromDate, 
   if (poId) {
     query += ` AND po.po_id = $${paramIndex++}`
     values.push(poId)
+  }
+
+  if (ponum) { // ADD: Support querying by ponum
+    query += ` AND po.ponum = $${paramIndex++}`
+    values.push(ponum)
   }
 
   if (supplierId) {
@@ -377,7 +409,8 @@ export const getPurchaseOrderList = async (supplierId, expenseTypeId, fromDate, 
     values.push(toDate)
   }
 
-  query += ` ORDER BY po.date DESC`
+  query += ` GROUP BY po.ponum, po.date, s.supplier, s.supplier_id, e.expense, po.subbie, po.attention_to, po.received_by, po.reg_no
+    ORDER BY po.date DESC`
 
   try {
     const result = await pool.query(query, values)
@@ -386,3 +419,5 @@ export const getPurchaseOrderList = async (supplierId, expenseTypeId, fromDate, 
     throw error
   }
 }
+
+// ... (other functions remain unchanged)

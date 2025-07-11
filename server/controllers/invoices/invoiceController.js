@@ -1,6 +1,8 @@
 import {
   getCompletedInvoices,
   getInvoiceDetails,
+  checkInvoiceExists,
+  createInvoice,
 } from "../../models/invoices/invoiceModel.js";
 
 const getCompletedInvoicesHandler = async (req, res) => {
@@ -72,4 +74,81 @@ const getInvoiceDetailsHandler = async (req, res) => {
   }
 };
 
-export { getCompletedInvoicesHandler, getInvoiceDetailsHandler };
+// Handler to check if an m1key exists in the invoice table
+const checkInvoiceExistsHandler = async (req, res) => {
+  try {
+    const { m1key } = req.params;
+    console.log(`Checking if invoice exists for m1key: ${m1key}`);
+    
+    if (!m1key) {
+      return res.status(400).json({
+        success: false,
+        message: "m1key parameter is required",
+      });
+    }
+
+    const result = await checkInvoiceExists(m1key);
+    
+    if (!result.success) {
+      return res.status(500).json({
+        success: false,
+        message: result.message,
+      });
+    }
+
+    res.json({
+      success: true,
+      exists: result.exists,
+    });
+  } catch (error) {
+    console.error("Error checking if invoice exists:", error);
+    res.status(500).json({
+      success: false,
+      message: error.message,
+      stack: process.env.NODE_ENV === "production" ? null : error.stack,
+    });
+  }
+};
+
+// Handler to create a new invoice for an instruction
+const createInvoiceHandler = async (req, res) => {
+  try {
+    const { m1key, clientId } = req.body;
+    console.log(`Creating invoice for m1key: ${m1key}, clientId: ${clientId}`);
+    
+    if (!m1key || !clientId) {
+      return res.status(400).json({
+        success: false,
+        message: "m1key and clientId are required",
+      });
+    }
+
+    const result = await createInvoice({ m1key, clientId });
+    
+    if (!result.success) {
+      return res.status(400).json({
+        success: false,
+        message: result.message,
+      });
+    }
+
+    res.json({
+      success: true,
+      data: result.data,
+    });
+  } catch (error) {
+    console.error("Error creating invoice:", error);
+    res.status(500).json({
+      success: false,
+      message: error.message,
+      stack: process.env.NODE_ENV === "production" ? null : error.stack,
+    });
+  }
+};
+
+export { 
+  getCompletedInvoicesHandler, 
+  getInvoiceDetailsHandler,
+  checkInvoiceExistsHandler,
+  createInvoiceHandler 
+};
