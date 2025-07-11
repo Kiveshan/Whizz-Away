@@ -484,7 +484,7 @@ const getTurnoverPerTruck = async (client, month, year) => {
       JOIN DistinctLegs dl ON l.m1key = dl.m1key
       JOIN TruckCountsPerLeg tcpl ON l.m1key = tcpl.m1key AND l.legnumber = tcpl.legnumber
       JOIN m5_trucks t ON l.truckregnumber = t.truckregnum AND t.is_subcontractor = false
-      WHERE m.pickupdate IS NOT NULL
+      WHERE m.pickupdate IS NOT NULL AND 
     )
     SELECT 
       ltc.truckregnumber,
@@ -980,73 +980,125 @@ const getTurnoverVsSubbieExpense = async (client, month, year, subcontractorId =
 
 const getTurnoverVsFuelPerTruck = async (client, month, year, truckId = null) => {
   const params = [month, year];
-  let query = `
-    WITH DistinctLegs AS (
+  let query;
+
+  if (!truckId) {
+    // Aggregate totals when no truckId is provided
+    query = `
+      WITH DistinctLegs AS (
+        SELECT 
+          m1key,
+          COUNT(DISTINCT legnumber) AS num_legs
+        FROM legs_m2
+        GROUP BY m1key
+      ),
+      TruckCountsPerLeg AS (
+        SELECT 
+          m1key,
+          legnumber,
+          COUNT(DISTINCT truckregnumber) AS trucks_per_leg
+        FROM legs_m2
+        GROUP BY m1key, legnumber
+      ),
+      TurnoverPerTruck AS (
+        SELECT 
+          SUM(m.total_cost / dl.num_legs / tcpl.trucks_per_leg) AS total_turnover,
+          TO_CHAR(m.pickupdate, 'Month') AS month_name,
+          EXTRACT(YEAR FROM m.pickupdate)::TEXT AS year
+        FROM legs_m2 l
+        JOIN m1_controller m ON l.m1key = m.m1key
+        JOIN DistinctLegs dl ON l.m1key = dl.m1key
+        JOIN TruckCountsPerLeg tcpl ON l.m1key = tcpl.m1key AND l.legnumber = tcpl.legnumber
+        JOIN m5_trucks t ON l.truckregnumber = t.truckregnum
+        WHERE t.is_subcontractor = false
+          AND TRIM(TO_CHAR(m.pickupdate, 'Month')) = $1
+          AND EXTRACT(YEAR FROM m.pickupdate)::TEXT = $2
+        GROUP BY TO_CHAR(m.pickupdate, 'Month'), EXTRACT(YEAR FROM m.pickupdate)
+      ),
+      FuelPerTruck AS (
+        SELECT 
+          COALESCE(SUM(e.expensecost), 0) AS total_fuel_cost,
+          to_char(e.slipuploaddate, 'Month') AS month_name,
+          EXTRACT(YEAR FROM e.slipuploaddate)::TEXT AS year
+        FROM expenses_m2 e
+        JOIN m5_trucks t ON e.truckid = t.m5truckskey
+        WHERE e.type = 'fuel'
+          AND t.is_subcontractor = false
+          AND TRIM(to_char(e.slipuploaddate, 'Month')) = $1
+          AND EXTRACT(YEAR FROM e.slipuploaddate)::text = $2
+        GROUP BY to_char(e.slipuploaddate, 'Month'), EXTRACT(YEAR FROM e.slipuploaddate)
+      )
       SELECT 
-        m1key,
-        COUNT(DISTINCT legnumber) AS num_legs
-      FROM legs_m2
-      GROUP BY m1key
-    ),
-    TruckCountsPerLeg AS (
+        'Total' AS truckregnumber,
+        COALESCE(tp.total_turnover, 0) AS total_turnover,
+        COALESCE(fp.total_fuel_cost, 0) AS total_fuel_cost,
+        COALESCE(tp.month_name, fp.month_name) AS month_name,
+        COALESCE(tp.year, fp.year) AS year
+      FROM TurnoverPerTruck tp
+      FULL OUTER JOIN FuelPerTruck fp ON tp.month_name = fp.month_name AND tp.year = fp.year
+    `;
+  } else {
+    // Existing query for specific truckId
+    query = `
+      WITH DistinctLegs AS (
+        SELECT 
+          m1key,
+          COUNT(DISTINCT legnumber) AS num_legs
+        FROM legs_m2
+        GROUP BY m1key
+      ),
+      TruckCountsPerLeg AS (
+        SELECT 
+          m1key,
+          legnumber,
+          COUNT(DISTINCT truckregnumber) AS trucks_per_leg
+        FROM legs_m2
+        GROUP BY m1key, legnumber
+      ),
+      TurnoverPerTruck AS (
+        SELECT 
+          l.truckregnumber,
+          SUM(m.total_cost / dl.num_legs / tcpl.trucks_per_leg) AS total_turnover,
+          TO_CHAR(m.pickupdate, 'Month') AS month_name,
+          EXTRACT(YEAR FROM m.pickupdate)::TEXT AS year
+        FROM legs_m2 l
+        JOIN m1_controller m ON l.m1key = m.m1key
+        JOIN DistinctLegs dl ON l.m1key = dl.m1key
+        JOIN TruckCountsPerLeg tcpl ON l.m1key = tcpl.m1key AND l.legnumber = tcpl.legnumber
+        JOIN m5_trucks t ON l.truckregnumber = t.truckregnum
+        WHERE t.is_subcontractor = false
+          AND TRIM(TO_CHAR(m.pickupdate, 'Month')) = $1
+          AND EXTRACT(YEAR FROM m.pickupdate)::TEXT = $2
+          AND t.m5truckskey = $3
+        GROUP BY l.truckregnumber, TO_CHAR(m.pickupdate, 'Month'), EXTRACT(YEAR FROM m.pickupdate)
+      ),
+      FuelPerTruck AS (
+        SELECT 
+          t.truckregnum,
+          COALESCE(SUM(e.expensecost), 0) AS total_fuel_cost,
+          to_char(e.slipuploaddate, 'Month') AS month_name,
+          EXTRACT(YEAR FROM e.slipuploaddate)::TEXT AS year
+        FROM expenses_m2 e
+        JOIN m5_trucks t ON e.truckid = t.m5truckskey
+        WHERE e.type = 'fuel'
+          AND t.is_subcontractor = false
+          AND TRIM(to_char(e.slipuploaddate, 'Month')) = $1
+          AND EXTRACT(YEAR FROM e.slipuploaddate)::text = $2
+          AND t.m5truckskey = $3
+        GROUP BY t.truckregnum, to_char(e.slipuploaddate, 'Month'), EXTRACT(YEAR FROM e.slipuploaddate)
+      )
       SELECT 
-        m1key,
-        legnumber,
-        COUNT(DISTINCT truckregnumber) AS trucks_per_leg
-      FROM legs_m2
-      GROUP BY m1key, legnumber
-    ),
-    TurnoverPerTruck AS (
-      SELECT 
-        l.truckregnumber,
-        SUM(m.total_cost / dl.num_legs / tcpl.trucks_per_leg) AS total_turnover,
-        TO_CHAR(m.pickupdate, 'Month') AS month_name,
-        EXTRACT(YEAR FROM m.pickupdate)::TEXT AS year
-      FROM legs_m2 l
-      JOIN m1_controller m ON l.m1key = m.m1key
-      JOIN DistinctLegs dl ON l.m1key = dl.m1key
-      JOIN TruckCountsPerLeg tcpl ON l.m1key = tcpl.m1key AND l.legnumber = tcpl.legnumber
-      JOIN m5_trucks t ON l.truckregnumber = t.truckregnum
-      WHERE t.is_subcontractor = false
-        AND TRIM(TO_CHAR(m.pickupdate, 'Month')) = $1
-        AND EXTRACT(YEAR FROM m.pickupdate)::TEXT = $2
-  `;
-  if (truckId) {
-    query += ` AND t.m5truckskey = $3`;
+        COALESCE(tp.truckregnumber, fp.truckregnum) AS truckregnumber,
+        COALESCE(tp.total_turnover, 0) AS total_turnover,
+        COALESCE(fp.total_fuel_cost, 0) AS total_fuel_cost,
+        COALESCE(tp.month_name, fp.month_name) AS month_name,
+        COALESCE(tp.year, fp.year) AS year
+      FROM TurnoverPerTruck tp
+      FULL OUTER JOIN FuelPerTruck fp ON tp.truckregnumber = fp.truckregnum
+      ORDER BY COALESCE(tp.total_turnover, 0) DESC, COALESCE(fp.total_fuel_cost, 0) DESC
+    `;
     params.push(truckId);
   }
-  query += `
-      GROUP BY l.truckregnumber, TO_CHAR(m.pickupdate, 'Month'), EXTRACT(YEAR FROM m.pickupdate)
-    ),
-    FuelPerTruck AS (
-      SELECT 
-        t.truckregnum,
-        COALESCE(SUM(e.expensecost), 0) AS total_fuel_cost,
-        to_char(e.slipuploaddate, 'Month') AS month_name,
-        EXTRACT(YEAR FROM e.slipuploaddate)::TEXT AS year
-      FROM expenses_m2 e
-      JOIN m5_trucks t ON e.truckid = t.m5truckskey
-      WHERE e.type = 'fuel'
-        AND t.is_subcontractor = false
-        AND TRIM(to_char(e.slipuploaddate, 'Month')) = $1
-        AND EXTRACT(YEAR FROM e.slipuploaddate)::text = $2
-  `;
-  if (truckId) {
-    query += ` AND t.m5truckskey = $3`;
-  }
-  query += `
-      GROUP BY t.truckregnum, to_char(e.slipuploaddate, 'Month'), EXTRACT(YEAR FROM e.slipuploaddate)
-    )
-    SELECT 
-      COALESCE(tp.truckregnumber, fp.truckregnum) AS truckregnumber,
-      COALESCE(tp.total_turnover, 0) AS total_turnover,
-      COALESCE(fp.total_fuel_cost, 0) AS total_fuel_cost,
-      COALESCE(tp.month_name, fp.month_name) AS month_name,
-      COALESCE(tp.year, fp.year) AS year
-    FROM TurnoverPerTruck tp
-    FULL OUTER JOIN FuelPerTruck fp ON tp.truckregnumber = fp.truckregnum
-    ORDER BY COALESCE(tp.total_turnover, 0) DESC, COALESCE(fp.total_fuel_cost, 0) DESC;
-  `;
 
   const result = await client.query(query, params);
   console.log("Turnover vs Fuel per Truck query result:", result.rows);
