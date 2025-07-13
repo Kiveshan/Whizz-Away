@@ -224,6 +224,9 @@ function DirectorManagerViewAssignment() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [isControllerRole, setIsControllerRole] = useState(false);
+  const [rateWeight, setRateWeight] = useState(null);
+const [isWeightBased, setIsWeightBased] = useState(false);
+const [weightUnit, setWeightUnit] = useState('kg');
 
   // Replace the useEffect that fetches legs with this updated version
   useEffect(() => {
@@ -235,6 +238,7 @@ function DirectorManagerViewAssignment() {
         await fetchDrivers();
         await fetchTruckRegNums();
         await fetchShipmentType();
+        await checkIfWeightBased();
 
         // If we have an instructionId, fetch containers for this instruction
         if (instructionId) {
@@ -474,6 +478,29 @@ function DirectorManagerViewAssignment() {
       console.error("Error fetching legs:", error);
     }
   };
+  const checkIfWeightBased = async () => {
+  if (!instructionId) return;
+
+  try {
+    const response = await api.get(`/instructions/${instructionId}/details`);
+    const rateWeightValue = response.data.rateweight;
+
+    console.log('Rate weight value:', rateWeightValue);
+    setRateWeight(rateWeightValue);
+
+    const isWeight = rateWeightValue && rateWeightValue.toLowerCase() !== 'container';
+    setIsWeightBased(isWeight);
+
+    // Determine weight unit from rateweight value
+    if (isWeight) {
+      const unit = rateWeightValue.toLowerCase().includes('ton') ? 'ton' : 'kg';
+      setWeightUnit(unit);
+      console.log(`Weight-based instruction detected. Unit: ${unit}`);
+    }
+  } catch (error) {
+    console.error('Error checking rate weight:', error);
+  }
+};
 
   const fetchContainersForInstruction = async (instructionId) => {
     try {
@@ -886,67 +913,67 @@ function DirectorManagerViewAssignment() {
                         />
                       </div>
 
-                      <div
-                        style={{
-                          width: "16.666%",
-                          padding: "0 0.5rem",
-                          marginBottom: "0.75rem",
-                        }}
-                      >
-                        <label
-                          style={{
-                            display: "block",
-                            color: "#374151",
-                            fontWeight: "500",
-                            marginBottom: "0.25rem",
-                          }}
-                        >
-                          Container Number
-                        </label>
-                        <input
-                          type="text"
-                          style={{
-                            width: "100%",
-                            padding: "0.5rem",
-                            border: "1px solid #d1d5db",
-                            borderRadius: "0.375rem",
-                            backgroundColor: "#f3f4f6",
-                          }}
-                          value={entry.containernumber || "None"}
-                          readOnly
-                        />
-                      </div>
+<div
+  style={{
+    width: "16.666%",
+    padding: "0 0.5rem",
+    marginBottom: "0.75rem",
+  }}
+>
+  <label
+    style={{
+      display: "block",
+      color: "#374151",
+      fontWeight: "500",
+      marginBottom: "0.25rem",
+    }}
+  >
+    {isWeightBased ? `Weight (${weightUnit})` : "Container Number"}
+  </label>
+  <input
+    type="text"
+    style={{
+      width: "100%",
+      padding: "0.5rem",
+      border: "1px solid #d1d5db",
+      borderRadius: "0.375rem",
+      backgroundColor: "#f3f4f6",
+    }}
+    value={entry.containernumber || "None"}
+    readOnly
+  />
+</div>
 
-                      <div
-                        style={{
-                          width: "16.666%",
-                          padding: "0 0.5rem",
-                          marginBottom: "0.75rem",
-                        }}
-                      >
-                        <label
-                          style={{
-                            display: "block",
-                            color: "#374151",
-                            fontWeight: "500",
-                            marginBottom: "0.25rem",
-                          }}
-                        >
-                          Type
-                        </label>
-                        <input
-                          type="text"
-                          style={{
-                            width: "100%",
-                            padding: "0.5rem",
-                            border: "1px solid #d1d5db",
-                            borderRadius: "0.375rem",
-                            backgroundColor: "#f3f4f6",
-                          }}
-                          value={entry.container_type || "None"}
-                          readOnly
-                        />
-                      </div>
+<div
+  style={{
+    width: "16.666%",
+    padding: "0 0.5rem",
+    marginBottom: "0.75rem",
+  }}
+>
+  <label
+    style={{
+      display: "block",
+      color: "#374151",
+      fontWeight: "500",
+      marginBottom: "0.25rem",
+    }}
+  >
+    Type
+  </label>
+  <input
+    type="text"
+    style={{
+      width: "100%",
+      padding: "0.5rem",
+      border: "1px solid #d1d5db",
+      borderRadius: "0.375rem",
+      backgroundColor: "#f3f4f6",
+    }}
+    value={isWeightBased ? weightUnit : (entry.container_type || "None")}
+    readOnly
+  />
+</div>
 
                       {!isControllerRole && (
                         <div

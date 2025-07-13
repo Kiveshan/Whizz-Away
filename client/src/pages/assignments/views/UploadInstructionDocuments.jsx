@@ -28,8 +28,13 @@ const UploadInstructionDocuments = () => {
   const [shipmentType, setShipmentType] = useState(null);
   const [debugInfo, setDebugInfo] = useState({});
 const [containerCount, setContainerCount] = useState(0);
+const [rateWeight, setRateWeight] = useState(null);
+const [weightUnit, setWeightUnit] = useState('kg');
 const [containersReachedCount, setContainersReachedCount] = useState(0);
   const [isDocumentPage, setIsDocumentPage] = useState(true);
+  const isWeightBasedInstruction = () => {
+  return rateWeight && rateWeight.toLowerCase() !== 'container';
+};
   // NEW: Check if shipment type is 3
 const isShipmentType3 = () => {
   return shipmentType === 3
@@ -37,11 +42,7 @@ const isShipmentType3 = () => {
 
 // NEW: Get available document types based on shipment type
 const getAvailableDocumentTypes = () => {
-  if (isShipmentType3()) {
-    return ["Delivery Note"] // Only Delivery Note for shipment type 3
-  }
 
-  // For other shipment types, show all options
   const types = ["Instruction Document", "Delivery Note"]
   if (showEmptyTurningDepotOption()) {
     types.push("Empty Turning Depot Document")
@@ -64,6 +65,7 @@ const getAvailableDocumentTypes = () => {
       fetchDocuments();
       fetchInstructionStatus();
       fetchContainers();
+      fetchInstructionRateWeightAndUnit();
 
       // Check if shipmentType was passed in location state
       if (location.state?.shipmentType !== undefined) {
@@ -78,9 +80,6 @@ const getAvailableDocumentTypes = () => {
           shipmentTypeFromState: location.state.shipmentType,
           shipmentTypeValueFromState: shipmentTypeValue,
         }));
-        if (shipmentTypeValue === 3) {
-    setDocType("Delivery Note");
-  }
       } else {
         // Otherwise fetch it
         fetchShipmentType();
@@ -133,9 +132,6 @@ const getAvailableDocumentTypes = () => {
         shipmentTypeFromAPI: response.data.shipment_type,
         shipmentTypeValueFromAPI: shipmentTypeValue,
       }));
-      if (shipmentTypeValue === 3) {
-      setDocType("Delivery Note")
-    }
     } catch (error) {
       console.error("Error fetching shipment type:", error);
       setDebugInfo((prev) => ({
@@ -193,29 +189,38 @@ const getAvailableDocumentTypes = () => {
     }
   };
 
-  const handleLegClick = (legNumber) => {
-    // Find the index of the leg with this number
-    const legIndex = legs.findIndex((leg) => leg.legnumber === legNumber);
+const handleLegClick = (legNumber) => {
+  // Find the index of the leg with this number
+  const legIndex = legs.findIndex((leg) => leg.legnumber === legNumber);
 
-    if (legIndex === -1) {
-      console.error(`Could not find leg with number ${legNumber}`);
-      return;
-    }
+  if (legIndex === -1) {
+    console.error(`Could not find leg with number ${legNumber}`);
+    return;
+  }
 
-    console.log(`Navigating to leg index ${legIndex}`);
+  console.log(`Navigating to leg index ${legIndex}`);
 
-    // Force a clean navigation by using a unique timestamp in the state
-    navigate("/update-instructions", {
-      state: {
-        clientId,
-        instructionId,
-        selectedLegIndex: legIndex,
-        timestamp: Date.now(), // Add a timestamp to force React to see this as new state
-      },
-      replace: true,
-    });
-    setIsDocumentPage(false);
-  };
+  // CRITICAL FIX: Clear any existing localStorage state before navigation
+  if (instructionId) {
+    localStorage.removeItem(`instruction_${instructionId}_state`);
+  }
+
+  // Force a clean navigation with state isolation
+  navigate("/update-instructions", {
+    state: {
+      clientId,
+      instructionId,
+      selectedLegIndex: legIndex,
+      timestamp: Date.now(),
+      // ADD THIS: Flag to indicate we're coming from documents page
+      fromDocumentsPage: true,
+      // ADD THIS: Force clean state
+      forceCleanState: true,
+    },
+    replace: true,
+  });
+  setIsDocumentPage(false);
+};
 
   const validateDocumentUpload = () => {
     // Check if file and document name are provided
@@ -232,15 +237,11 @@ const getAvailableDocumentTypes = () => {
     }
 
     // Check file size (10MB limit)
-    const maxSize = 10 * 1024 * 1024; // 10MB in bytes
+    const maxSize = 50 * 1024 * 1024; // 10MB in bytes
     if (selectedFile.size > maxSize) {
       setSubmitMessage("Error: File size exceeds 10MB limit");
       return false;
     }
-    if (isShipmentType3() && docType !== "Delivery Note") {
-    setSubmitMessage("Error: Only Delivery Note documents are allowed for this shipment type")
-    return false
-  }
 
     // For Instruction Document type
     if (docType === "Instruction Document") {
@@ -263,10 +264,10 @@ const getAvailableDocumentTypes = () => {
         (doc) => doc.type === "Delivery Note"
       );
 
-      if (legDeliveryNotes.length >= containersReachedCount) {
-        setSubmitMessage(`Error: Too many delivery notes`);
-        return false;
-      }
+if (!isWeightBasedInstruction() && legDeliveryNotes.length >= containersReachedCount) {
+      setSubmitMessage(`Error: Too many delivery notes`);
+      return false;
+    }
 
       return true;
     }
@@ -485,25 +486,19 @@ const deliveryNotes = documents.filter(
 );
 
 // NEW: For shipment type 3, only require delivery notes
-if (isShipmentType3()) {
-  if (deliveryNotes.length === 0) {
-    setSubmitMessage("Error: At least 1 Delivery Note is required");
-    return;
-  }
-} else {
   // For other shipment types, require instruction document
   if (instructionDocs.length !== 1) {
     setSubmitMessage("Error: Exactly 1 Instruction Document is required");
     return;
   }
 
-  if (deliveryNotes.length !== containersReachedCount) {
+if (!isWeightBasedInstruction() && deliveryNotes.length !== containersReachedCount) {
     setSubmitMessage(
-      `Error: Exactly ${containerCount} Delivery Notes are required (one per container)`
+      `Error: Exactly ${containersReachedCount} Delivery Notes are required (one per container)`
     );
     return;
   }
-}
+
     // Show confirmation modal
     setShowFinishConfirmModal(true);
   };
@@ -555,20 +550,13 @@ const canFinish = () => {
     (doc) => doc.type === "Empty Turning Depot Document"
   );
 
-  // NEW: For shipment type 3, only require delivery notes
-  if (isShipmentType3()) {
-    return deliveryNotes.length > 0;
-  }
-
   // Basic requirements for other shipment types
-  const basicRequirements =
-    instructionDocs.length === 1 && deliveryNotes.length === containersReachedCount;
-
-  // For Import shipments, also require an Empty Turning Depot Document
+const basicRequirements =
+    instructionDocs.length === 1 &&
+    (isWeightBasedInstruction() || deliveryNotes.length === containersReachedCount);
   if (showEmptyTurningDepotOption()) {
     return basicRequirements && emptyTurningDocs.length === 1;
   }
-
   return basicRequirements;
 };
 
@@ -659,6 +647,21 @@ const countContainersReachingDestination = async () => {
   } catch (error) {
     console.error("Error counting containers reaching destination:", error);
     return 0;
+  }
+};
+const fetchInstructionRateWeightAndUnit = async () => {
+  if (!instructionId) return;
+  try {
+    const response = await api.get(`/instructions/${instructionId}/details`);
+    const rateWeightValue = response.data.rateweight;
+    setRateWeight(rateWeightValue);
+    const isWeight = rateWeightValue && rateWeightValue.toLowerCase() !== 'container';
+    if (isWeight) {
+      const unit = rateWeightValue.toLowerCase().includes('ton') ? 'ton' : 'kg';
+      setWeightUnit(unit);
+    }
+  } catch (error) {
+    console.error('Error fetching rate weight:', error);
   }
 };
   return (
@@ -845,7 +848,6 @@ const countContainersReachingDestination = async () => {
 <div className="requirements-section">
   <h4>Document Requirements:</h4>
   <ul>
-    {!isShipmentType3() && (
       <li
         style={{
           color:
@@ -862,22 +864,21 @@ const countContainersReachingDestination = async () => {
         }
         /1
       </li>
-    )}
+    
     <li
       style={{
-        color: isShipmentType3()
-          ? documents.filter((doc) => doc.type === "Delivery Note").length > 0
-            ? "green"
-            : "red"
-          : documents.filter((doc) => doc.type === "Delivery Note").length === containersReachedCount
+        color: 
+        isWeightBasedInstruction() ||
+        
+           documents.filter((doc) => doc.type === "Delivery Note").length === containersReachedCount
             ? "green"
             : "red",
       }}
     >
-      Delivery Notes:{" "}
-      {documents.filter((doc) => doc.type === "Delivery Note").length}/
-      {/* {isShipmentType3() ? "1+" : containersReachedCount} */}
-      {containersReachedCount}
+      {/* Delivery Notes:{" "} */}
+{isWeightBasedInstruction() 
+    ? `Delivery Notes: ${documents.filter((doc) => doc.type === "Delivery Note").length}`
+    : `Delivery Notes: ${documents.filter((doc) => doc.type === "Delivery Note").length}/${containersReachedCount}`}
     </li>
     {showEmptyTurningDepotOption() && !isShipmentType3() && (
       <li
