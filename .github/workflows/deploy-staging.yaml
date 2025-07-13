@@ -48,7 +48,7 @@ jobs:
           mv client/build server/public
 
       - name: Generate deployment package
-        run: zip -r ${{ env.DEPLOYMENT_PACKAGE }} server -x '*.git*' *.env* '*.log' '*.md' 'node_modules/*' 'client/node_modules/*'
+        run: cd server && zip -r ../${{ env.DEPLOYMENT_PACKAGE }} . -x '*.git*' *.env* '*.log' '*.md' 'node_modules/*' 'client/node_modules/*'
 
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v1
