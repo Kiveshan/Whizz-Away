@@ -35,6 +35,11 @@ jobs:
       - name: Install client dependencies
         run: cd client && npm install
 
+      - name: Set React environment variables
+        run: |
+          cd client
+          echo "REACT_APP_API_URL=http://whizz-away.af-south-1.elasticbeanstalk.com" > .env
+
       - name: Build React app
         run: cd client && CI=false npm run build
 
