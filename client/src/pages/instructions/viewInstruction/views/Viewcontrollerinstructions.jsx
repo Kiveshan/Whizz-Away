@@ -161,13 +161,36 @@ const Viewcontrollerinstructions = () => {
   // Track if initial data has been loaded
   const [initialDataLoaded, setInitialDataLoaded] = useState(false)
 
-  // Check if shipment type is Cross-haul or type 4
+  // Check if shipment type is Cross-haul (type 3) or Cross-haul(break bulk) (type 4)
   const isCrossHaulShipment = () => {
+    console.log("Checking if cross-haul shipment:", {
+      shipmentTypeId: formData.shipmentTypeId,
+      shipmentTypeName: formData.shipmentTypeName,
+      shipmentTypes: shipmentTypes,
+    })
+
     const selectedShipmentType = shipmentTypes.find((type) => type.shipkey.toString() === formData.shipmentTypeId)
-    return (
-      (selectedShipmentType && selectedShipmentType.shipmenttype.toLowerCase() === "cross-haul") ||
-      formData.shipmentTypeId === "4"
-    )
+    console.log("Selected shipment type:", selectedShipmentType)
+
+    // Check both by ID and by name
+    const isCrossHaulById = formData.shipmentTypeId === "3" || formData.shipmentTypeId === "4"
+    const isCrossHaulByType =
+      selectedShipmentType && (
+        selectedShipmentType.shipmenttype.toLowerCase() === "cross-haul" ||
+        selectedShipmentType.shipmenttype.toLowerCase() === "cross-haul(break bulk)" ||
+        selectedShipmentType.shipmenttype.toLowerCase() === "cross haul" ||
+        selectedShipmentType.shipmenttype.toLowerCase() === "cross haul(break bulk)"
+      )
+    const isCrossHaulByName =
+      formData.shipmentTypeName.toLowerCase() === "cross-haul" ||
+      formData.shipmentTypeName.toLowerCase() === "cross-haul(break bulk)" ||
+      formData.shipmentTypeName.toLowerCase() === "cross haul" ||
+      formData.shipmentTypeName.toLowerCase() === "cross haul(break bulk)"
+
+    const result = isCrossHaulById || isCrossHaulByType || isCrossHaulByName
+    console.log("isCrossHaulShipment result:", result, "(byId:", isCrossHaulById, "byType:", isCrossHaulByType, "byName:", isCrossHaulByName, ")")
+
+    return result
   }
 
   // Fetch all required data on component mount
@@ -292,7 +315,10 @@ const Viewcontrollerinstructions = () => {
 
       // Set isCrossHaulOrSpecial based on shipment type or ID
       const isCrossHaul =
-        shipmentTypeName.toLowerCase() === "cross-haul" || shipmentTypeName.toLowerCase() === "cross haul"
+        shipmentTypeName.toLowerCase() === "cross-haul" || 
+        shipmentTypeName.toLowerCase() === "cross haul" ||
+        shipmentTypeName.toLowerCase() === "cross-haul(break bulk)" ||
+        shipmentTypeName.toLowerCase() === "cross haul(break bulk)"
       const isSpecialId = data.shipment_type?.toString() === "3" || data.shipment_type?.toString() === "4"
       const isCrossHaulOrSpecialValue = isCrossHaul || isSpecialId
       console.log(
@@ -374,18 +400,25 @@ const Viewcontrollerinstructions = () => {
       }
 
       console.log("Shipment types data received:", data.length, "records")
-      setShipmentTypes(data)
+      console.log("Shipment types data details:", JSON.stringify(data))
+      
+      // Ensure all shipment types have proper format
+      const formattedTypes = data.map(type => ({
+        shipkey: type.shipkey || type.id || 0,
+        shipmenttype: type.shipmenttype || type.name || "Unknown"
+      }))
+      
+      console.log("Formatted shipment types:", JSON.stringify(formattedTypes))
+      setShipmentTypes(formattedTypes)
       return true
     } catch (error) {
       console.error("Error fetching shipment types:", error)
       // Set default shipment types if API fails
       const defaultTypes = [
-        { id: 1, name: "Import" },
-        { id: 2, name: "Export" },
-        { id: 3, name: "Cross Dock" },
-        { id: 4, name: "Empty Return" },
-        { id: 5, name: "Empty Collection" },
-        { id: 6, name: "Other" },
+        { shipkey: "1", shipmenttype: "import" },
+        { shipkey: "2", shipmenttype: "export" },
+        { shipkey: "3", shipmenttype: "cross-haul" },
+        { shipkey: "4", shipmenttype: "cross-haul(break bulk)" },
       ]
       console.log("Using default shipment types")
       setShipmentTypes(defaultTypes)
@@ -776,7 +809,9 @@ const Viewcontrollerinstructions = () => {
                         </div>
                       </div>
                       {(formData.shipmentTypeId === "3" ||
-                        formData.shipmentTypeName.toLowerCase() === "cross-haul") && (
+                        formData.shipmentTypeId === "4" ||
+                        formData.shipmentTypeName.toLowerCase() === "cross-haul" ||
+                        formData.shipmentTypeName.toLowerCase() === "cross-haul(break bulk)") && (
                         <div className="controller-instructions-container-input">
                           <label>Break Bulk</label>
                           <div className="controller-instructions-container-rate-group">
@@ -880,11 +915,14 @@ const Viewcontrollerinstructions = () => {
                           <option value="" disabled>
                             Select Shipment
                           </option>
-                          {shipmentTypes.map((type) => (
-                            <option key={type.shipkey} value={type.shipkey}>
-                              {type.shipmenttype}
-                            </option>
-                          ))}
+                          {shipmentTypes.map((type) => {
+                            console.log("Rendering shipment type:", type);
+                            return (
+                              <option key={type.shipkey} value={type.shipkey}>
+                                {type.shipmenttype}
+                              </option>
+                            );
+                          })}
                         </select>
                       </div>
                     </div>
@@ -1165,7 +1203,7 @@ const Viewcontrollerinstructions = () => {
                         <tr>
                           <th>Container Type</th>
                           <th>Container Number</th>
-                          {isImport && <th>Weight (kg)</th>}
+                          {(isImport || formData.shipmentTypeId === "2" || formData.shipmentTypeId === "3") && <th>Weight (kg)</th>}
                           <th>Cargo Description</th>
                         </tr>
                       </thead>
@@ -1184,7 +1222,7 @@ const Viewcontrollerinstructions = () => {
                                 />
                               </div>
                             </td>
-                            {isImport && (
+                            {(isImport || formData.shipmentTypeId === "2" || formData.shipmentTypeId === "3" || formData.shipmentTypeId === "1") && (
                               <td>
                                 <div className="controller-instructions-input-wrapper">
                                   <input
