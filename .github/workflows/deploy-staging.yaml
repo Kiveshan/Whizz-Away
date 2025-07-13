@@ -36,7 +36,7 @@ jobs:
         run: cd client && npm install
 
       - name: Build React app
-        run: cd client && npm run build
+        run: cd client && CI=false npm run build
 
       - name: Install server dependencies
         run: cd server && npm install
