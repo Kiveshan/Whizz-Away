@@ -30,21 +30,27 @@ const PORT = process.env.PORT || 5000;
 app.use((req, res, next) => {
   const allowedOrigins = ["http://localhost:3000", "http://127.0.0.1:3000"];
   const origin = req.headers.origin;
-  
+
   if (allowedOrigins.includes(origin)) {
-    res.setHeader('Access-Control-Allow-Origin', origin);
+    res.setHeader("Access-Control-Allow-Origin", origin);
   }
-  
-  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, Cache-Control');
-  res.setHeader('Access-Control-Allow-Credentials', 'true');
-  res.setHeader('Access-Control-Expose-Headers', 'Authorization');
-  
+
+  res.setHeader(
+    "Access-Control-Allow-Methods",
+    "GET, POST, PUT, DELETE, OPTIONS"
+  );
+  res.setHeader(
+    "Access-Control-Allow-Headers",
+    "Content-Type, Authorization, Cache-Control"
+  );
+  res.setHeader("Access-Control-Allow-Credentials", "true");
+  res.setHeader("Access-Control-Expose-Headers", "Authorization");
+
   // Handle preflight requests
-  if (req.method === 'OPTIONS') {
+  if (req.method === "OPTIONS") {
     return res.sendStatus(200);
   }
-  
+
   next();
 });
 
@@ -63,14 +69,14 @@ const sessionConfig = {
     secure: process.env.NODE_ENV === "production",
     httpOnly: true,
     maxAge: 24 * 60 * 60 * 1000, // 24 hours
-    sameSite: process.env.NODE_ENV === "production" ? 'none' : 'lax',
+    sameSite: process.env.NODE_ENV === "production" ? "none" : "lax",
   },
-  name: 'whizzaway.sid' // Custom session cookie name
+  name: "whizzaway.sid", // Custom session cookie name
 };
 
 // In production, trust the first proxy
-if (process.env.NODE_ENV === 'production') {
-  app.set('trust proxy', 1);
+if (process.env.NODE_ENV === "production") {
+  app.set("trust proxy", 1);
   sessionConfig.cookie.secure = true;
 }
 
@@ -166,6 +172,13 @@ passport.deserializeUser(async (sessionUser, done) => {
 
 // Routes
 app.use("/", routes);
+
+app.use(express.static(path.join(__dirname, "public", "build")));
+
+// Handle all routes by serving index.html from 'public/build' (for React Router)
+app.get("*", (req, res) => {
+  res.sendFile(path.join(__dirname, "public", "build", "index.html"));
+});
 
 // Start server
 app.listen(PORT, () => {
