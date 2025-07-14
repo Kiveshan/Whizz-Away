@@ -215,6 +215,15 @@ const FCcontrollerinstructions = () => {
     isOpen: false,
     message: "",
   });
+
+  // State for warning modal
+  const [warningModal, setWarningModal] = useState({
+    isOpen: false,
+    message: "",
+    onConfirm: null,
+    shipmentTypeId: "",
+    shipmentTypeName: "",
+  });
   const [fieldErrors, setFieldErrors] = useState({});
   const [preservedContainers, setPreservedContainers] = useState(
     location.state?.preservedContainers || []
@@ -1993,6 +2002,42 @@ const FCcontrollerinstructions = () => {
     const isCrossHaul =
       shipmentTypeName.toLowerCase() === "cross-haul" || shipmentTypeId === "4";
     
+    // Check if changing to cross-haul (break bulk) (type 4) with non-zero container counts
+    if (shipmentTypeId === "4") {
+      const totalContainers = formData.num_six_meters + formData.num_twelve_meters + formData.num_abnormal;
+      if (totalContainers > 0) {
+        // Show warning modal
+        setWarningModal({
+          isOpen: true,
+          message: "Before changing to Cross-haul (break bulk), please set all container counts to 0.",
+          shipmentTypeId: shipmentTypeId,
+          shipmentTypeName: shipmentTypeName,
+          onConfirm: () => {
+            // Set all container counts to 0 and proceed with shipment type change
+            const updatedFormData = {
+              ...formData,
+              num_six_meters: 0,
+              num_twelve_meters: 0,
+              num_abnormal: 0,
+              shipmentTypeId: String(shipmentTypeId),
+              shipmentTypeName,
+              vesselName: "",
+              stackDate: "",
+              rateWeight: "ton"
+            };
+            setFormData(updatedFormData);
+            setIsImport(isImportType);
+            
+            // Re-initialize containers with zero counts
+            setTimeout(() => {
+              initializeContainers();
+            }, 0);
+          }
+        });
+        return; // Stop execution here until user responds to warning
+      }
+    }
+    
     // Determine if the new shipment type should have weight fields
     const shouldHaveWeight = 
       isImportType || 
@@ -2011,18 +2056,50 @@ const FCcontrollerinstructions = () => {
     console.log(`Shipment type changed to: ${shipmentTypeId} (${shipmentTypeName}), isImport set to: ${isImportType}`);
     console.log(`New shipment type should have weight fields: ${shouldHaveWeight}`);
 
-    // For cross-haul or type 4, clear vessel name and stack date
-    if (isCrossHaul || shipmentTypeId === "4") {
+    // For cross-haul (break bulk) - type 4, clear vessel name and stack date and set rateWeight to 'ton'
+    if (shipmentTypeId === "4") {
       setFormData({
         ...formData,
         shipmentTypeId: String(shipmentTypeId), // Ensure it's stored as string
         shipmentTypeName,
         vesselName: "",
         stackDate: "",
-        // Default unit per to 'ton' for shipment type 4
-        rateWeight: shipmentTypeId === "4" ? "ton" : formData.rateWeight,
+        // Default unit per to 'ton' for shipment type 4 (Cross-haul break bulk)
+        rateWeight: "ton",
       });
-    } else {
+    } 
+    // For Import, Export, or Cross-haul (types 1, 2, 3), set rateWeight to 'Container'
+    else if (shipmentTypeId === "1" || shipmentTypeId === "2" || shipmentTypeId === "3") {
+      // Check if we're switching between container-based shipment types (1, 2, 3)
+      const previousShipmentType = formData.shipmentTypeId;
+      const isContainerTypeSwitch = ["1", "2", "3"].includes(previousShipmentType);
+      
+      // Preserve container rates and counts when switching between container-based types
+      setFormData({
+        ...formData,
+        shipmentTypeId: String(shipmentTypeId), // Ensure it's stored as string
+        shipmentTypeName,
+        // Set unit per to 'Container' for shipment types 1, 2, 3
+        rateWeight: "Container",
+        // Only initialize these to 0 if not already a container type
+        num_six_meters: isContainerTypeSwitch ? formData.num_six_meters : 0,
+        num_twelve_meters: isContainerTypeSwitch ? formData.num_twelve_meters : 0,
+        num_abnormal: isContainerTypeSwitch ? formData.num_abnormal : 0,
+        rateper_6: isContainerTypeSwitch ? formData.rateper_6 : 0,
+        rateper_12: isContainerTypeSwitch ? formData.rateper_12 : 0,
+        rateper_abnormal: isContainerTypeSwitch ? formData.rateper_abnormal : 0
+      });
+      
+      // Only re-initialize containers if not switching between container types
+      if (!isContainerTypeSwitch) {
+        setTimeout(() => {
+          initializeContainers();
+        }, 0);
+      }
+      return; // Skip the rest of the function
+    } 
+    // For any other shipment type
+    else {
       setFormData({
         ...formData,
         shipmentTypeId: String(shipmentTypeId), // Ensure it's stored as string
@@ -2057,26 +2134,39 @@ const FCcontrollerinstructions = () => {
       );
     }
     
-    // Force re-initialize containers if needed (for container count changes)
-    console.log("Re-initializing containers for new shipment type");
-    setTimeout(() => {
-      // Only re-initialize if container counts have changed
-      if (formData.num_six_meters > 0 || formData.num_twelve_meters > 0 || 
-          formData.num_abnormal > 0 || formData.num_breakbulk > 0) {
-        initializeContainers();
-      }
-      
-      console.log("AFTER CHANGE - Containers updated with shipment type:", shipmentTypeId, "(type: " + typeof shipmentTypeId + ")");
-      console.log("AFTER CHANGE - formData.shipmentTypeId:", formData.shipmentTypeId, "(type: " + typeof formData.shipmentTypeId + ")");
-      console.log("AFTER CHANGE - Weight column should show:", 
-        isImportType || String(shipmentTypeId) === "2" || String(shipmentTypeId) === "3");
-      console.log("AFTER CHANGE - Updated containers:", containers.map(c => ({ 
-        id: c.id, 
-        type: c.containerType, 
-        weight: c.weight, 
-        weightType: typeof c.weight 
-      })));
-    }, 100);
+    // Check if we're switching between import (1), export (2), or cross-haul (3) types
+    const isImportExportCrossHaulSwitch = 
+      // Current shipment type is one of import, export, or cross-haul
+      (formData.shipmentTypeId === "1" || formData.shipmentTypeId === "2" || formData.shipmentTypeId === "3") &&
+      // New shipment type is also one of import, export, or cross-haul
+      (shipmentTypeId === "1" || shipmentTypeId === "2" || shipmentTypeId === "3");
+    
+    // Only re-initialize containers if NOT switching between import, export, and cross-haul
+    // or if we're switching to/from cross-haul break bulk (type 4)
+    if (!isImportExportCrossHaulSwitch || shipmentTypeId === "4" || formData.shipmentTypeId === "4") {
+      console.log("Re-initializing containers for new shipment type");
+      setTimeout(() => {
+        // Only re-initialize if container counts have changed
+        if (formData.num_six_meters > 0 || formData.num_twelve_meters > 0 || 
+            formData.num_abnormal > 0 || formData.num_breakbulk > 0) {
+          initializeContainers();
+        }
+        
+        console.log("AFTER CHANGE - Containers updated with shipment type:", shipmentTypeId, "(type: " + typeof shipmentTypeId + ")");
+        console.log("AFTER CHANGE - formData.shipmentTypeId:", formData.shipmentTypeId, "(type: " + typeof formData.shipmentTypeId + ")");
+        console.log("AFTER CHANGE - Weight column should show:", 
+          isImportType || String(shipmentTypeId) === "2" || String(shipmentTypeId) === "3");
+        console.log("AFTER CHANGE - Updated containers:", containers.map(c => ({ 
+          id: c.id, 
+          type: c.containerType, 
+          weight: c.weight, 
+          weightType: typeof c.weight 
+        })));
+      }, 100);
+    } else {
+      console.log("Preserving container details when switching between import, export, and cross-haul types");
+      console.log("AFTER CHANGE - Containers preserved with shipment type:", shipmentTypeId);
+    }
   };
 
   // Check if shipment type is Cross-haul
@@ -2996,10 +3086,23 @@ const FCcontrollerinstructions = () => {
           errorModal.message.includes("Failed to fetch") && (
             <ErrorModal
               isOpen={errorModal.isOpen}
-              onClose={() => setErrorModal({ ...errorModal, isOpen: false })}
               message={errorModal.message}
+              onClose={() => setErrorModal({ isOpen: false, message: "" })}
+              type="error"
             />
           )}
+        {warningModal.isOpen && (
+          <ErrorModal
+            isOpen={warningModal.isOpen}
+            message={warningModal.message}
+            onClose={() => setWarningModal(prev => ({ ...prev, isOpen: false }))}
+            onConfirm={warningModal.onConfirm}
+            type="warning"
+            showConfirmButton={true}
+            confirmButtonText="Reset Counts & Continue"
+            cancelButtonText="Cancel"
+          />
+        )}
         <div className="controller-instructions-header">
           <button
             className="controller-instructions-back-button"
@@ -3538,10 +3641,19 @@ const FCcontrollerinstructions = () => {
                           ref={fieldRefs.rateWeight}
                           disabled={isReadOnly}
                         >
-                          <option value="kg">kg</option>
-
-                          <option value="ton">ton</option>
-                          <option value="Container">Container</option>
+                          {/* Show kg and ton options only for Cross-haul (break bulk) - type 4 */}
+                          {formData.shipmentTypeId === "4" && (
+                            <>
+                              <option value="kg">kg</option>
+                              <option value="ton">ton</option>
+                            </>
+                          )}
+                          {/* Show Container option only for Import, Export, and Cross-haul - types 1, 2, 3 */}
+                          {(formData.shipmentTypeId === "1" || 
+                            formData.shipmentTypeId === "2" || 
+                            formData.shipmentTypeId === "3") && (
+                            <option value="Container">Container</option>
+                          )}
                         </select>
                       </div>
 
@@ -3949,13 +4061,15 @@ const FCcontrollerinstructions = () => {
             shipmentTypeName: formData.shipmentTypeName,
             stringComparison: {
               isEqual2: String(formData.shipmentTypeId) === "2",
-              isEqual3: String(formData.shipmentTypeId) === "3"
+              isEqual3: String(formData.shipmentTypeId) === "3",
+              isEqual4: String(formData.shipmentTypeId) === "4"
             },
             shouldShowWeight: isImport || String(formData.shipmentTypeId) === "2" || String(formData.shipmentTypeId) === "3",
             weightColumnCondition: Boolean(isImport || String(formData.shipmentTypeId) === "2" || String(formData.shipmentTypeId) === "3"),
             containers: containers.map(c => ({ id: c.id, type: c.containerType, weight: c.weight }))
           })}
-          {containers.length > 0 && (
+          {/* Only show container details table when shipment type is NOT cross-haul (break bulk) (type 4) */}
+          {containers.length > 0 && formData.shipmentTypeId !== "4" && (
             <div className="controller-instructions-form-section">
               <div className="controller-instructions-container-details-section">
                 <h3>Container Details</h3>

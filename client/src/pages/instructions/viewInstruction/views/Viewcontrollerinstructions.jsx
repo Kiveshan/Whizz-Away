@@ -808,34 +808,6 @@ const Viewcontrollerinstructions = () => {
                           </div>
                         </div>
                       </div>
-                      {(formData.shipmentTypeId === "3" ||
-                        formData.shipmentTypeId === "4" ||
-                        formData.shipmentTypeName.toLowerCase() === "cross-haul" ||
-                        formData.shipmentTypeName.toLowerCase() === "cross-haul(break bulk)") && (
-                        <div className="controller-instructions-container-input">
-                          <label>Break Bulk</label>
-                          <div className="controller-instructions-container-rate-group">
-                            <input
-                              type="number"
-                              value={formData.num_breakbulk || 0}
-                              min="0"
-                              name="num_breakbulk"
-                              readOnly
-                              style={nonEditableStyle}
-                            />
-                            <div className="controller-instructions-input-wrapper controller-instructions-rate-input">
-                              <input
-                                type="text"
-                                className="controller-instructions-form-input"
-                                placeholder="Rate"
-                                value={formData.rateper_breakbulk || ""}
-                                readOnly
-                                style={nonEditableStyle}
-                              />
-                            </div>
-                          </div>
-                        </div>
-                      )}
                     </div>
 
                     {/* Hazardous and Surcharges Checkboxes - Horizontally Aligned */}
