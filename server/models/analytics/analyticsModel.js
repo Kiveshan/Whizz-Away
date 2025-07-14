@@ -205,7 +205,7 @@ const getAllTrucks = async (client) => {
   const query = `
     SELECT m5truckskey, truckregnum
     FROM m5_trucks
-    WHERE is_subcontractor = false AND t.status = true
+    WHERE is_subcontractor = false AND status = true
     ORDER BY truckregnum
   `;
   const result = await client.query(query);
