@@ -11,8 +11,5 @@
   },
   "devDependencies": {
     "concurrently": "^9.1.2"
-  },
-  "dependencies": {
-    "sweetalert2": "^11.22.2"
   }
 }

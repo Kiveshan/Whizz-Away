@@ -27,8 +27,6 @@ import purchaseOrderRoutes from "./purchaseOrder/purchaseOrderRoutes.js";
 import instructionRoutes from "./instructions/instructionRoutes.js";
 import assignmentRoutes from "./assignments/assignmentRoutes.js";
 import subcontractorsRoutes from "./subcontractors/subContractorRoutes.js";
-
-
 const router = express.Router();
 
 router.use(authroutes);

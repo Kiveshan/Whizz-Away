@@ -103,12 +103,15 @@ const createEmployeeHandler = async (req, res) => {
       deduction_savings,
       deduction_loan,
       deduction_damage,
-      company_reg_num,
     } = req.body
 
-    // Validate required fields
-    if (!name || !surname) {
-      return res.status(400).json({ error: "Name and surname are required" })
+    if (!password) {
+      return res.status(400).json({ error: "Password is required" })
+    }
+
+    const company_reg_num = req.user.company_reg_num
+    if (!company_reg_num) {
+      return res.status(400).json({ error: "Missing company registration number" })
     }
 
     const urls = (req.files || []).map((f) => f.location)
@@ -126,7 +129,7 @@ const createEmployeeHandler = async (req, res) => {
         email,
         password,
         base_salary,
-        company_reg_num: company_reg_num || req.user.company_reg_num,
+        company_reg_num,
         income_tax_rate,
         deduction_other_deductions,
         deduction_uif,
@@ -140,7 +143,7 @@ const createEmployeeHandler = async (req, res) => {
     res.status(201).json(newEmployee)
   } catch (err) {
     console.error("Error in /api/employees POST:", err)
-    res.status(500).json({ error: err.message || "Failed to create employee" })
+    res.status(500).json({ error: "Failed to create employee" })
   }
 }
 
@@ -173,11 +176,6 @@ const updateEmployeeHandler = async (req, res) => {
       deduction_loan,
       deduction_damage,
     } = req.body
-
-    // Validate required fields
-    if (!name || !surname) {
-      return res.status(400).json({ error: "Name and surname are required" })
-    }
 
     const newFileUrls = (req.files || []).map((f) => f.location)
 

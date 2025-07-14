@@ -267,14 +267,6 @@ const CompanyInstructions = () => {
             item.shipment_type === 3 ||
             item.shipment_type === "3",
         )
-      } else if (activeFilter === "cross-haul-break-bulk") {
-        filtered = filtered.filter(
-          (item) =>
-            item.type_text === "cross-haul-break-bulk" ||
-            item.type === "cross-haul-break-bulk" ||
-            item.shipment_type === 4 ||
-            item.shipment_type === "4",
-        )
       }
     }
 
@@ -413,12 +405,6 @@ const CompanyInstructions = () => {
               Cross-haul
             </button>
             <button
-              className={`btn btn-blue ${activeFilter === "cross-haul-break-bulk" ? "active" : ""}`}
-              onClick={() => handleFilterClick("cross-haul-break-bulk")}
-            >
-              Cross-haul (Break Bulk)
-            </button>
-            <button
               className={`btn btn-blue ${activeFilter === "All" ? "active" : ""}`}
               onClick={() => handleFilterClick("All")}
             >
@@ -481,9 +467,7 @@ const CompanyInstructions = () => {
                               ? "export"
                               : item.shipment_type === 3 || item.shipment_type === "3"
                                 ? "cross-haul"
-                                : item.shipment_type === 4 || item.shipment_type === "4"
-                                  ? "cross-haul (break bulk)"
-                                  : item.type)}
+                                : item.type)}
                       </td>
                       <td>{renderStatus(item.status)}</td>
                       <td>{new Date(item.startingdate || item.pickupdate).toLocaleDateString()}</td>

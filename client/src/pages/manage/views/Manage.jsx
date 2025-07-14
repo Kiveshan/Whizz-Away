@@ -466,7 +466,6 @@ const Manage = () => {
               loading={state.loading}
               error={state.error}
               onEdit={handleTruckEdit}
-              onToggleStatus={api.toggleTruckStatus}
               onDelete={(id) => api.deleteItem("truck", id)}
               onAdd={handleTruckAdd}
               pagination={state.pagination.trucks}
@@ -499,7 +498,6 @@ const Manage = () => {
               loading={state.loading}
               error={state.error}
               onEdit={handleTrailerEdit}
-              onToggleStatus={api.toggleTrailerStatus}
               onDelete={(id) => api.deleteItem("trailer", id)}
               onAdd={handleTrailerAdd}
               pagination={state.pagination.trailers}

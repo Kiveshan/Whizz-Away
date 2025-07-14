@@ -130,8 +130,8 @@ const createTrailer = async (trailerData, documentKeys) => {
       `INSERT INTO m5_trailers (
          trailerregnum, trailersize, trailerpurchasedate, year, model,
          purchase_price, current_evaluation, vin_num,
-         trailer_license_expiry, document_url1, document_url2, document_url3, status
-       ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
+         trailer_license_expiry, document_url1, document_url2, document_url3
+       ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
        RETURNING *`,
       [
         trailerregnum,
@@ -146,7 +146,6 @@ const createTrailer = async (trailerData, documentKeys) => {
         document_url1,
         document_url2,
         document_url3,
-        true, // Default status to enabled
       ],
     )
     return result.rows[0]
@@ -239,27 +238,6 @@ const updateTrailer = async (id, trailerData, newDocKeys) => {
   }
 }
 
-// New function to toggle trailer status
-const toggleTrailerStatus = async (id, newStatus) => {
-  let client
-  try {
-    client = await pool.connect()
-    const result = await client.query("UPDATE m5_trailers SET status = $1 WHERE m5trailerskey = $2 RETURNING *", [
-      newStatus,
-      id,
-    ])
-    if (!result.rowCount) {
-      return { success: false, message: "Trailer not found" }
-    }
-    return { success: true, data: result.rows[0] }
-  } catch (err) {
-    console.error(`Error toggling trailer status ${id}:`, err)
-    throw err
-  } finally {
-    if (client) client.release()
-  }
-}
-
 // New function to get trailers with expiring licenses
 const getTrailersWithExpiringLicenses = async (daysAhead = 30) => {
   let client
@@ -273,7 +251,6 @@ const getTrailersWithExpiringLicenses = async (daysAhead = 30) => {
       WHERE trailer_license_expiry IS NOT NULL 
         AND trailer_license_expiry <= CURRENT_DATE + INTERVAL '${daysAhead} days'
         AND trailer_license_expiry >= CURRENT_DATE
-         AND status = true 
       ORDER BY trailer_license_expiry ASC
     `
 
@@ -299,7 +276,6 @@ const getTrailersWithExpiredLicenses = async () => {
       FROM m5_trailers 
       WHERE trailer_license_expiry IS NOT NULL 
         AND trailer_license_expiry < CURRENT_DATE
-         AND status = true 
       ORDER BY trailer_license_expiry ASC
     `
 
@@ -355,13 +331,31 @@ const deleteTrailerDocument = async (trailerId, url) => {
   }
 }
 
+const deleteTrailer = async (id) => {
+  let client
+  try {
+    client = await pool.connect()
+    const checkResult = await client.query("SELECT m5trailerskey FROM m5_trailers WHERE m5trailerskey = $1", [id])
+    if (!checkResult.rows.length) {
+      return { success: false, message: "Trailer not found" }
+    }
+    await client.query("DELETE FROM m5_trailers WHERE m5trailerskey = $1", [id])
+    return { success: true, message: "Trailer deleted successfully" }
+  } catch (err) {
+    console.error(`Error deleting trailer ${id}:`, err)
+    throw err
+  } finally {
+    if (client) client.release()
+  }
+}
+
 export {
   getAllTrailers,
   getTrailerById,
   createTrailer,
   updateTrailer,
   deleteTrailerDocument,
-  toggleTrailerStatus,
+  deleteTrailer,
   getTrailersWithExpiringLicenses,
   getTrailersWithExpiredLicenses,
 }

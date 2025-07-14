@@ -81,7 +81,9 @@ const getAllEmployees = async (options = {}) => {
     if (search && search.trim() !== "") {
       whereClause += ` AND (
         LOWER(e.name) LIKE LOWER($${paramIndex}) OR 
-        LOWER(e.surname) LIKE LOWER($${paramIndex})
+        LOWER(e.surname) LIKE LOWER($${paramIndex}) OR 
+        LOWER(e.email) LIKE LOWER($${paramIndex}) OR
+        LOWER(e.employeenum) LIKE LOWER($${paramIndex})
       )`
       queryParams.push(`%${search.trim()}%`)
       paramIndex++
@@ -180,12 +182,7 @@ const createEmployee = async (employeeData, documentUrls) => {
       deduction_damage,
     } = employeeData
 
-    // Validate required fields
-    if (!name || !surname) {
-      throw new Error("Name and surname are required")
-    }
-
-    const hashedPassword = password ? await bcrypt.hash(password, 10) : null
+    const hashedPassword = await bcrypt.hash(password, 10)
     const deductionDate = new Date()
 
     const insertEmployeeQuery = `
@@ -201,17 +198,17 @@ const createEmployee = async (employeeData, documentUrls) => {
     const insertValues = [
       name,
       surname,
-      telephonenum || null,
-      cellnum || null,
-      employeenum || null,
-      roleid || null,
-      email || null,
+      telephonenum,
+      cellnum,
+      employeenum,
+      roleid,
+      email,
       hashedPassword,
-      base_salary || null,
-      company_reg_num || null,
-      documentUrls[0] || null,
-      documentUrls[1] || null,
-      documentUrls[2] || null,
+      base_salary,
+      company_reg_num,
+      documentUrls[0],
+      documentUrls[1],
+      documentUrls[2],
     ]
     const result = await client.query(insertEmployeeQuery, insertValues)
     const newEmployee = result.rows[0]
@@ -272,11 +269,6 @@ const updateEmployee = async (id, employeeData, documentUrls) => {
       deduction_damage,
     } = employeeData
 
-    // Validate required fields
-    if (!name || !surname) {
-      throw new Error("Name and surname are required")
-    }
-
     const existingResult = await client.query(
       "SELECT document_url1, document_url2, document_url3 FROM m5_employee WHERE userid = $1",
       [id],
@@ -323,16 +315,16 @@ const updateEmployee = async (id, employeeData, documentUrls) => {
     const updateValues = [
       name,
       surname,
-      telephonenum || null,
-      cellnum || null,
-      employeenum || null,
-      roleid || null,
-      email || null,
+      telephonenum,
+      cellnum,
+      employeenum,
+      roleid,
+      email,
       hashedPassword,
-      base_salary || null,
-      document_url1 || null,
-      document_url2 || null,
-      document_url3 || null,
+      base_salary,
+      document_url1,
+      document_url2,
+      document_url3,
       id,
     ]
     const result = await client.query(updateEmpQuery, updateValues)

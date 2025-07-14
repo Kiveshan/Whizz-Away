@@ -27,11 +27,9 @@
     "passport": "^0.7.0",
     "passport-local": "^1.0.0",
     "pg": "^8.14.1",
-    "puppeteer": "^24.5.0",
-    "sweetalert2": "^11.22.2"
+    "puppeteer": "^24.5.0"
   },
   "scripts": {
-    "server": "nodemon server.js",
-    "start": "node server.js"
+    "server": "nodemon server.js"
   }
 }

@@ -1,16 +1,38 @@
-
 "use client"
 
+import { useState } from "react"
 import { formatDate } from "../../utils/helpers"
 import Pagination from "../common/Pagination"
 import SearchFilter from "../common/SearchFilter"
+
+
+// Confirmation Popup Component
+const ConfirmationPopup = ({ isOpen, message, onConfirm, onCancel }) => {
+  if (!isOpen) return null
+
+  return (
+    <div className="popup-backdrop" onClick={onCancel}>
+      <div className="popup" onClick={(e) => e.stopPropagation()}>
+        <p>{message}</p>
+        <div className="popup-buttons">
+          <button className="confirm-button" onClick={onConfirm}>
+            Yes, delete
+          </button>
+          <button className="cancel-button" onClick={onCancel}>
+            Cancel
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
 
 const TruckTable = ({
   trucks,
   loading,
   error,
   onEdit,
-  onToggleStatus,
+  onDelete,
   onAdd,
   pagination,
   onPageChange,
@@ -19,6 +41,27 @@ const TruckTable = ({
   onSearchChange,
   onApplyFilters,
 }) => {
+  const [showConfirmPopup, setShowConfirmPopup] = useState(false)
+  const [truckToDelete, setTruckToDelete] = useState(null)
+
+  const handleDeleteClick = (truck) => {
+    setTruckToDelete(truck)
+    setShowConfirmPopup(true)
+  }
+
+  const handleConfirmDelete = () => {
+    if (truckToDelete) {
+      onDelete(truckToDelete.m5truckskey)
+    }
+    setShowConfirmPopup(false)
+    setTruckToDelete(null)
+  }
+
+  const handleCancelDelete = () => {
+    setShowConfirmPopup(false)
+    setTruckToDelete(null)
+  }
+
   // Helper function to check license expiry status
   const getLicenseStatus = (expiryDate) => {
     if (!expiryDate) return { status: "unknown", text: "No Date", color: "#999" }
@@ -36,25 +79,6 @@ const TruckTable = ({
     }
   }
 
-  // Helper function to get status display
-  const getStatusDisplay = (status) => {
-    return {
-      text: status ? "ACTIVE" : "INACTIVE",
-      color: status ? "green" : "red",
-      bgColor: status ? "#e8f5e8" : "#ffe8e8",
-    }
-  }
-
-  // Handle toggle status with error logging
-  const handleToggleStatus = async (truckId, currentStatus) => {
-    try {
-      await onToggleStatus(truckId, currentStatus);
-    } catch (err) {
-      console.error(`Failed to toggle truck status for ID ${truckId}:`, err);
-      alert(`Failed to ${currentStatus ? "disable" : "enable"} truck. Please try again.`);
-    }
-  };
-
   if (error) {
     return <div className="error">{error}</div>
   }
@@ -62,7 +86,6 @@ const TruckTable = ({
   return (
     <div>
       <div>
-        
         <button className="manage-add-truck-button" onClick={onAdd}>
           Add Truck
         </button>
@@ -81,7 +104,7 @@ const TruckTable = ({
       </div>
 
       {/* Table Content */}
-      <div>
+      <div className="table-content">
         {loading ? (
           <div className="loading">Loading trucks...</div>
         ) : (
@@ -95,7 +118,6 @@ const TruckTable = ({
                   <th>Year</th>
                   <th>Purchase Date</th>
                   <th>License Status</th>
-                  <th>Status</th>
                   <th>Action</th>
                   <th></th>
                 </tr>
@@ -103,16 +125,15 @@ const TruckTable = ({
               <tbody>
                 {trucks.length === 0 ? (
                   <tr>
-                    <td colSpan="9" className="no-data">
+                    <td colSpan="8" className="no-data">
                       No trucks found
                     </td>
                   </tr>
                 ) : (
                   trucks.map((truck) => {
                     const licenseStatus = getLicenseStatus(truck.truck_license_expiry)
-                    const statusDisplay = getStatusDisplay(truck.status)
                     return (
-                      <tr key={truck.m5truckskey} className={!truck.status ? "disabled-row" : ""}>
+                      <tr key={truck.m5truckskey}>
                         <td>{truck.truckregnum}</td>
                         <td>{truck.trailersize}</td>
                         <td>{truck.model}</td>
@@ -135,30 +156,13 @@ const TruckTable = ({
                           )}
                         </td>
                         <td>
-                          <span
-                            style={{
-                              color: statusDisplay.color,
-                              backgroundColor: statusDisplay.bgColor,
-                              padding: "4px 8px",
-                              borderRadius: "4px",
-                              fontSize: "0.85em",
-                              fontWeight: "bold",
-                            }}
-                          >
-                            {statusDisplay.text}
-                          </span>
-                        </td>
-                        <td>
                           <button className="manage-edit-button" onClick={() => onEdit(truck.m5truckskey)}>
                             Edit
                           </button>
                         </td>
                         <td>
-                          <button
-                            className={truck.status ? "manage-delete-button" : "manage-enable-button"}
-                            onClick={() => handleToggleStatus(truck.m5truckskey, truck.status)}
-                          >
-                            {truck.status ? "Disable" : "Enable"}
+                          <button className="manage-delete-button" onClick={() => handleDeleteClick(truck)}>
+                            Delete
                           </button>
                         </td>
                       </tr>
@@ -183,6 +187,16 @@ const TruckTable = ({
             onItemsPerPageChange={onItemsPerPageChange}
           />
         </div>
+      )}
+
+      {/* Confirmation Popup */}
+      {showConfirmPopup && truckToDelete && (
+        <ConfirmationPopup
+          isOpen={showConfirmPopup}
+          message={`Are you sure you want to delete the truck with registration ${truckToDelete.truckregnum}?`}
+          onConfirm={handleConfirmDelete}
+          onCancel={handleCancelDelete}
+        />
       )}
     </div>
   )

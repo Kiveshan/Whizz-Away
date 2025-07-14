@@ -64,7 +64,7 @@ const DriverRateForm = ({ driverRate, loading, isEditing, onSave, onCancel, onCh
               className="form-input"
               value={driverRate.driver_six_meter_rate || ""}
               onChange={(e) => handleNumberChange("driver_six_meter_rate", e.target.value)}
-              
+              placeholder="Leave empty if not applicable"
             />
           </div>
           <div className="form-field">
@@ -78,7 +78,7 @@ const DriverRateForm = ({ driverRate, loading, isEditing, onSave, onCancel, onCh
               className="form-input"
               value={driverRate.driver_twelve_meter_rate || ""}
               onChange={(e) => handleNumberChange("driver_twelve_meter_rate", e.target.value)}
-              
+              placeholder="Leave empty if not applicable"
             />
           </div>
         </div>
@@ -95,7 +95,7 @@ const DriverRateForm = ({ driverRate, loading, isEditing, onSave, onCancel, onCh
               className="form-input"
               value={driverRate.subie_six_meter_rate || ""}
               onChange={(e) => handleNumberChange("subie_six_meter_rate", e.target.value)}
-              
+              placeholder="Leave empty if not applicable"
             />
           </div>
           <div className="form-field">

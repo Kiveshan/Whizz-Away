@@ -4,7 +4,7 @@ import {
   createTrailer,
   updateTrailer,
   deleteTrailerDocument,
-  toggleTrailerStatus,
+  deleteTrailer,
   getTrailersWithExpiringLicenses,
   getTrailersWithExpiredLicenses,
 } from "../../models/manage/trailerModel.js"
@@ -215,29 +215,6 @@ const updateTrailerHandler = async (req, res) => {
   }
 }
 
-// New handler to toggle trailer status
-const toggleTrailerStatusHandler = async (req, res) => {
-  try {
-    const { id } = req.params
-    const { status } = req.body
-
-    console.log(`Toggling trailer ${id} status to ${status}`)
-
-    const result = await toggleTrailerStatus(id, status)
-    if (!result.success) {
-      return res.status(404).json({ error: result.message })
-    }
-
-    res.json({
-      message: `Trailer ${status ? "enabled" : "disabled"} successfully`,
-      trailer: result.data,
-    })
-  } catch (err) {
-    console.error(`Error toggling trailer status ${req.params.id}:`, err)
-    res.status(500).json({ error: "Failed to toggle trailer status" })
-  }
-}
-
 // New endpoint to get trailers with expiring licenses
 const getTrailersWithExpiringLicensesHandler = async (req, res) => {
   try {
@@ -294,13 +271,28 @@ const deleteTrailerDocumentHandler = async (req, res) => {
   }
 }
 
+const deleteTrailerHandler = async (req, res) => {
+  try {
+    const { id } = req.params
+    console.log(`Deleting trailer ID ${id}`)
+    const result = await deleteTrailer(id)
+    if (!result.success) {
+      return res.status(404).json({ message: result.message })
+    }
+    res.json({ message: result.message })
+  } catch (err) {
+    console.error(`Error deleting trailer ${req.params.id}:`, err)
+    res.status(500).json({ error: "Failed to delete trailer" })
+  }
+}
+
 export {
   getAllTrailersHandler,
   getTrailerByIdHandler,
   createTrailerHandler,
   updateTrailerHandler,
   deleteTrailerDocumentHandler,
-  toggleTrailerStatusHandler,
+  deleteTrailerHandler,
   getTrailersWithExpiringLicensesHandler,
   getTrailersWithExpiredLicensesHandler,
 }

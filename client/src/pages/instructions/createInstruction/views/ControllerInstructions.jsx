@@ -1365,7 +1365,7 @@ const ControllerInstructions = () => {
           ? containers.map((container) => ({
               container_type: container.containerType,
               containerNum: container.containerNum,
-              weight: (isImport || isExport || isCrossHaul) ? (container.weight === "" ? null : Number.parseFloat(container.weight || 0)) : null,
+              weight: isImport ? (container.weight === "" ? null : Number.parseFloat(container.weight || 0)) : null,
               cargo_description: container.cargoDescription || "",
             }))
           : []
