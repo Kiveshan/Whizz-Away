@@ -882,6 +882,19 @@ const ControllerInstructions = () => {
       const selectedType = shipmentTypes.find((type) => type.shipkey === shipmentTypeId)
       const isCrossHaulType = shipmentTypeId === "3" || shipmentTypeId === "4"
       const isBreakBulkType = shipmentTypeId === "4"
+      const isImportType = shipmentTypeId === "1"
+      const isExportType = shipmentTypeId === "2"
+      const isRegularCrossHaulType = shipmentTypeId === "3"
+
+      // Set appropriate rateWeight based on shipment type
+      let newRateWeight = prev => prev.rateWeight;
+      if (isImportType || isExportType || isRegularCrossHaulType) {
+        // For import, export, and regular cross-haul, default to Container
+        newRateWeight = "Container";
+      } else if (isBreakBulkType) {
+        // For cross-haul (break bulk), default to ton
+        newRateWeight = "ton";
+      }
 
       setFormData((prev) => ({
         ...prev,
@@ -892,10 +905,8 @@ const ControllerInstructions = () => {
           vesselName: "",
           stackDate: "",
         }),
-        // Set unit per to "ton" for shipment type 4 (cross-haul/break bulk) only
-        ...(isBreakBulkType && {
-          rateWeight: "ton"
-        }),
+        // Set appropriate rateWeight based on shipment type
+        rateWeight: newRateWeight,
       }))
 
       // Clear any existing errors
@@ -2087,21 +2098,26 @@ const ControllerInstructions = () => {
                           name="rateWeight"
                           value={formData.rateWeight}
                           onChange={handleInputChange}
-                          disabled={formData.shipmentTypeId === "4"}
+                          disabled={formData.shipmentTypeId === "1" || formData.shipmentTypeId === "2" || formData.shipmentTypeId === "3"}
                           style={{
                             width: "100%",
                             padding: "6px 8px",
                             border: "1px solid #ced4da",
                             borderRadius: "4px",
                             fontSize: "13px",
-                            backgroundColor: formData.shipmentTypeId === "4" ? "#e9ecef" : "#fff",
+                            backgroundColor: (formData.shipmentTypeId === "1" || formData.shipmentTypeId === "2" || formData.shipmentTypeId === "3" || formData.shipmentTypeId === "4") ? "#e9ecef" : "#fff",
                             height: "32px",
                             lineHeight: "1",
-                            cursor: formData.shipmentTypeId === "4" ? "not-allowed" : "pointer",
+                            cursor: (formData.shipmentTypeId === "1" || formData.shipmentTypeId === "2" || formData.shipmentTypeId === "3") ? "not-allowed" : "pointer",
                           }}
                         >
-                          {formData.shipmentTypeId === "4" ? (
-                            <option value="ton">ton</option>
+                          {formData.shipmentTypeId === "1" || formData.shipmentTypeId === "2" || formData.shipmentTypeId === "3" ? (
+                            <option value="Container">Container</option>
+                          ) : formData.shipmentTypeId === "4" ? (
+                            <>
+                              <option value="kg">kg</option>
+                              <option value="ton">ton</option>
+                            </>
                           ) : (
                             <>
                               <option value="kg">kg</option>

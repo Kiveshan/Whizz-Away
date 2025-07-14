@@ -9,6 +9,8 @@ const normalizeString = (str) => {
   if (!str) return '';
   return str.toLowerCase().replace(/\s+/g, '').trim();
 };
+
+  const API_BASE_URL = process.env.REACT_APP_API_URL || "http://localhost:5000";
 const modalAnimation = `
   @keyframes fadeIn {
     from { opacity: 0; }
@@ -1786,7 +1788,7 @@ const hasContainerReachedDropoff = (containerNumber) => {
     try {
       // Fetch the instruction details to get the pickup and dropoff locations
       const response = await fetch(
-        `http://localhost:5000/instructions/${instructionId}/details`
+        `${API_BASE_URL}/instructions/${instructionId}/details`
       );
       if (!response.ok) {
         throw new Error("Failed to fetch instruction details");
@@ -1918,7 +1920,7 @@ const missingItems = await checkContainersReachDropoff(dropoff);
     if (instructionId) {
       try {
         const response = await fetch(
-          `http://localhost:5000/instructions/${instructionId}/shipment-type`
+          `${API_BASE_URL}/instructions/${instructionId}/shipment-type`
         );
         if (!response.ok) {
           throw new Error("Failed to fetch shipment type");
@@ -2027,7 +2029,7 @@ const missingItems = await checkContainersReachDropoff(dropoff);
     if (instructionId) {
       try {
         const instructionResponse = await fetch(
-          `http://localhost:5000/instructions/${instructionId}`
+          `${API_BASE_URL}/instructions/${instructionId}`
         );
         if (instructionResponse.ok) {
           const instructionData = await instructionResponse.json();
@@ -2035,7 +2037,7 @@ const missingItems = await checkContainersReachDropoff(dropoff);
           if (instructionData.status === "New") {
             // Update the status to "In Progress"
             const updateStatusResponse = await fetch(
-              `http://localhost:5000/instructions/${instructionId}/status`,
+              `${API_BASE_URL}/instructions/${instructionId}/status`,
               {
                 method: "PUT",
                 headers: {
@@ -2139,7 +2141,7 @@ drivers: drivers.map((driver) => {
       );
 
       // Send the data to the server
-      const response = await fetch(`http://localhost:5000/legs/save`, {
+      const response = await fetch(`${API_BASE_URL}/legs/save`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -2230,7 +2232,7 @@ const shouldDisableAddLeg = async () => {
   if (legs.length === 0) return false;
 
   try {
-    const response = await fetch(`http://localhost:5000/instructions/${instructionId}/details`);
+    const response = await fetch(`${API_BASE_URL}/instructions/${instructionId}/details`);
     if (!response.ok) return false;
 
     const instructionDetails = await response.json();
@@ -2270,7 +2272,7 @@ const checkContainersDestination = async () => {
   try {
     // Fetch the instruction details to get the dropoff location
     const response = await fetch(
-      `http://localhost:5000/instructions/${instructionId}/details`
+      `${API_BASE_URL}/instructions/${instructionId}/details`
     );
     if (!response.ok) {
       setShouldHideAddLegButton(false);
@@ -3617,7 +3619,7 @@ disabled={isCompleted}
 
                       // Send the data to the server
                       const response = await fetch(
-                        `http://localhost:5000/legs/save`,
+                        `${API_BASE_URL}/legs/save`,
                         {
                           method: "POST",
                           headers: {
