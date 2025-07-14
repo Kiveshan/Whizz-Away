@@ -729,7 +729,7 @@ export default function DirectorAnalytics() {
         dominantBaseline="middle"
         fontSize={12}
       >
-        {`R${value?.toLocaleString() || 0} (${percentage}%)`}
+        {`R${value?.toLocaleString() || 0}`}
       </text>
     )
   }
