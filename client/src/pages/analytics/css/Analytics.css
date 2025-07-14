@@ -84,7 +84,8 @@
   border-radius: 4px;
   cursor: pointer;
   transition: background-color 0.3s, border-color 0.2s ease;
-  background-image: none; /* Explicitly remove chevron */
+  background-image: none;
+  /* Explicitly remove chevron */
   outline: none;
 }
 
@@ -94,7 +95,6 @@
 
 .analytics-page-wrapper .sidebar-filters .filter-select:focus {
   border-color: #4169e1;
-  background-color: #1a228b;
 }
 
 .analytics-page-wrapper .sidebar-filters .filter-select option {
@@ -331,4 +331,103 @@
 
 .analytics-page-wrapper .date-filters select.year-select {
   width: 100px;
+}
+
+/* Base styles for all dropdowns to match date-filters select */
+.analytics-page-wrapper select {
+  -webkit-appearance: none;
+  -moz-appearance: none;
+  appearance: none;
+  padding: 8px 30px 8px 12px; /* Match original date-filters padding, with space for chevron */
+  border: 1px solid #ccc;
+  border-radius: 4px;
+  background-color: #fff;
+  font-size: 1rem;
+  color: #333;
+  cursor: pointer;
+  outline: none;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease, background-color 0.2s ease;
+  background-image: url("data:image/svg+xml;utf8,<svg fill='%236169e1' height='16' viewBox='0 0 20 20' width='16' xmlns='http://www.w3.org/2000/svg'><path d='M5.516 7.548l4.484 4.482 4.484-4.482 1.516 1.516-6 6-6-6z'/></svg>");
+  background-repeat: no-repeat;
+  background-position: right 10px center;
+  background-size: 12px;
+}
+
+/* Hover state for all dropdowns */
+.analytics-page-wrapper select:hover {
+  background-color: #f8f9fa; /* Subtle gray for hover, similar to button hover */
+  border-color: #4169e1;
+}
+
+/* Focus state for all dropdowns */
+.analytics-page-wrapper select:focus {
+  border-color: #4169e1;
+  box-shadow: 0 0 0 2px rgba(65, 105, 225, 0.3); /* Blue glow for focus */
+}
+
+/* Specific widths for date-filters dropdowns */
+.analytics-page-wrapper .date-filters select {
+  width: 120px; /* Slightly wider for consistency */
+}
+
+/* Year select in date-filters */
+.analytics-page-wrapper .date-filters select.year-select {
+  width: 100px;
+}
+
+/* Client, subcontractor, and truck selects */
+.analytics-page-wrapper .date-filters select.client-select,
+.analytics-page-wrapper .date-filters select.subcontractor-select,
+.analytics-page-wrapper .date-filters select.truck-select {
+  width: 180px; /* Wider for longer content */
+}
+
+/* Sidebar filter select to match date-filters */
+.analytics-page-wrapper .sidebar-filters .filter-select {
+  width: 100%;
+  padding: 8px 30px 8px 12px; /* Match date-filters padding */
+  background-color: #fff; /* White background like date-filters */
+  color: #333; /* Dark text for readability */
+  border: 1px solid #ccc; /* Match date-filters border */
+  border-radius: 4px;
+  background-image: url("data:image/svg+xml;utf8,<svg fill='%236169e1' height='16' viewBox='0 0 20 20' width='16' xmlns='http://www.w3.org/2000/svg'><path d='M5.516 7.548l4.484 4.482 4.484-4.482 1.516 1.516-6 6-6-6z'/></svg>");
+  background-repeat: no-repeat;
+  background-position: right 10px center;
+  background-size: 12px;
+}
+
+/* Hover state for sidebar filter select */
+.analytics-page-wrapper .sidebar-filters .filter-select:hover {
+  background-color: #f8f9fa;
+  border-color: #4169e1;
+}
+
+/* Focus state for sidebar filter select */
+.analytics-page-wrapper .sidebar-filters .filter-select:focus {
+  border-color: #4169e1;
+}
+
+/* Option styling */
+.analytics-page-wrapper select option {
+  background-color: #fff;
+  color: #333;
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+  .analytics-page-wrapper .date-filters select {
+    width: 100px;
+    font-size: 0.9rem;
+  }
+
+  .analytics-page-wrapper .date-filters select.client-select,
+  .analytics-page-wrapper .date-filters select.subcontractor-select,
+  .analytics-page-wrapper .date-filters select.truck-select {
+    min-width: 120px;
+  }
+
+  .analytics-page-wrapper .sidebar-filters .filter-select {
+    min-width: 150px;
+    font-size: 0.9rem;
+  }
 }
