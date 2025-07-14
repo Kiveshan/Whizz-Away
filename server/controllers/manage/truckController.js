@@ -3,6 +3,7 @@ import {
   getTruckById,
   createTruck,
   updateTruck,
+  toggleTruckStatus,
   deleteTruckDocument,
   deleteTruck,
   getTrucksWithExpiringLicenses,
@@ -13,7 +14,6 @@ import { s3Trucks, getSignedUrl } from "../../utils/s3Config.js"
 const getAllTrucksHandler = async (req, res) => {
   try {
     const { page = 1, limit = 10, search = "" } = req.query
-
     const pageNum = Number.parseInt(page)
     const limitNum = Number.parseInt(limit)
     const offset = (pageNum - 1) * limitNum
@@ -43,10 +43,13 @@ const getTruckByIdHandler = async (req, res) => {
   try {
     const { id } = req.params
     console.log(`Fetching truck ID ${id}`)
+
     const result = await getTruckById(id)
+
     if (!result.success) {
       return res.status(404).json({ error: result.message })
     }
+
     const truck = result.data
 
     // Format dates for proper display in date inputs
@@ -147,6 +150,7 @@ const createTruckHandler = async (req, res) => {
       },
       fileLocations,
     )
+
     res.status(201).json(newTruck)
   } catch (err) {
     console.error("Error creating truck:", err)
@@ -198,13 +202,39 @@ const updateTruckHandler = async (req, res) => {
       },
       newDocLocations,
     )
+
     if (!result.success) {
       return res.status(404).json({ error: result.message })
     }
+
     res.json(result.data)
   } catch (err) {
     console.error("Error updating truck:", err)
     res.status(500).json({ error: "Failed to update truck" })
+  }
+}
+
+// New handler for toggling truck status
+const toggleTruckStatusHandler = async (req, res) => {
+  try {
+    const { id } = req.params
+    const { status } = req.body
+
+    console.log(`Toggling truck status - ID: ${id}, New Status: ${status}`)
+
+    const result = await toggleTruckStatus(id, status)
+
+    if (!result.success) {
+      return res.status(404).json({ error: result.message })
+    }
+
+    res.json({
+      message: `Truck ${status ? "enabled" : "disabled"} successfully`,
+      truck: result.data,
+    })
+  } catch (err) {
+    console.error(`Error toggling truck status ${req.params.id}:`, err)
+    res.status(500).json({ error: "Failed to toggle truck status" })
   }
 }
 
@@ -234,11 +264,13 @@ const getTrucksWithExpiredLicensesHandler = async (req, res) => {
 const deleteTruckDocumentHandler = async (req, res) => {
   try {
     const { truckId, url } = req.body
+
     if (!truckId || !url) {
       return res.status(400).json({ message: "Missing truck ID or document URL" })
     }
 
     console.log(`Deleting document for truck ID ${truckId}`)
+
     let s3Key
     try {
       s3Key = decodeURIComponent(new URL(url).pathname.substring(1))
@@ -254,9 +286,11 @@ const deleteTruckDocumentHandler = async (req, res) => {
       .promise()
 
     const result = await deleteTruckDocument(truckId, s3Key)
+
     if (!result.success) {
       return res.status(404).json({ message: result.message })
     }
+
     res.json({ message: result.message })
   } catch (error) {
     console.error("Failed to delete truck document:", error)
@@ -268,10 +302,13 @@ const deleteTruckHandler = async (req, res) => {
   try {
     const { id } = req.params
     console.log(`Deleting truck ID ${id}`)
+
     const result = await deleteTruck(id)
+
     if (!result.success) {
       return res.status(404).json({ message: result.message })
     }
+
     res.json({ message: result.message })
   } catch (err) {
     console.error(`Error deleting truck ${req.params.id}:`, err)
@@ -284,6 +321,7 @@ export {
   getTruckByIdHandler,
   createTruckHandler,
   updateTruckHandler,
+  toggleTruckStatusHandler,
   deleteTruckDocumentHandler,
   deleteTruckHandler,
   getTrucksWithExpiringLicensesHandler,
