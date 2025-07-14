@@ -5,6 +5,7 @@ import styles from "../css/register.module.css"; // Updated to CSS Module
 import { Eye, EyeOff } from "lucide-react";
 
 const Register = ({ switchToLogin, closePopup }) => {
+  const API_BASE_URL = process.env.REACT_APP_API_URL || "http://localhost:5000";
   const [formData, setFormData] = useState({
     name: "",
     surname: "",
@@ -126,7 +127,7 @@ const Register = ({ switchToLogin, closePopup }) => {
     try {
       setIsCheckingEmail(true);
       const response = await fetch(
-        `http://localhost:5000/check-email?email=${encodeURIComponent(email)}`
+        `${API_BASE_URL}/check-email?email=${encodeURIComponent(email)}`
       );
       const data = await response.json();
 
@@ -215,10 +216,18 @@ const Register = ({ switchToLogin, closePopup }) => {
     const numericFields = [
       { name: "cell_num", label: "Cell Number", required: true },
       { name: "cell_num2", label: "Alternate Cell", required: false },
-      { name: "vat_reg_num", label: "VAT Registration Number", required: false },
+      {
+        name: "vat_reg_num",
+        label: "VAT Registration Number",
+        required: false,
+      },
       { name: "account_num", label: "Account Number", required: true },
       { name: "branch_code", label: "Branch Code", required: true },
-      { name: "company_reg_num", label: "Company Registration Number", required: true },
+      {
+        name: "company_reg_num",
+        label: "Company Registration Number",
+        required: true,
+      },
     ];
 
     for (const field of numericFields) {
@@ -261,7 +270,7 @@ const Register = ({ switchToLogin, closePopup }) => {
     setIsLoading(true);
 
     try {
-      const response = await fetch("http://localhost:5000/register", {
+      const response = await fetch(`${API_BASE_URL}/register`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(formData),
@@ -270,7 +279,9 @@ const Register = ({ switchToLogin, closePopup }) => {
       const data = await response.json();
 
       if (response.ok) {
-        setSuccessMessage("Registration successful! Your account is pending approval.");
+        setSuccessMessage(
+          "Registration successful! Your account is pending approval."
+        );
         setShowSuccessPopup(true);
       } else {
         if (data.message === "Email already registered") {
@@ -278,8 +289,12 @@ const Register = ({ switchToLogin, closePopup }) => {
             "This email is already registered. Please use a different email or login."
           );
           setShowErrorPopup(true);
-        } else if (data.message === "Company registration number already exists") {
-          setErrorMessage("This company registration number is already registered.");
+        } else if (
+          data.message === "Company registration number already exists"
+        ) {
+          setErrorMessage(
+            "This company registration number is already registered."
+          );
           setShowErrorPopup(true);
         } else {
           setErrorMessage(data.message || "Registration failed");
@@ -365,7 +380,9 @@ const Register = ({ switchToLogin, closePopup }) => {
                 name="email"
                 value={formData.email}
                 onChange={handleChange}
-                onBlur={(e) => e.target.value && checkEmailExists(e.target.value)}
+                onBlur={(e) =>
+                  e.target.value && checkEmailExists(e.target.value)
+                }
                 placeholder="Email"
                 className={styles.formInput}
                 required
@@ -635,7 +652,7 @@ const Register = ({ switchToLogin, closePopup }) => {
                 : "Submit"}
             </button>
           </div>
-<br />
+          <br />
           <div className={styles.loginLink} style={{ marginTop: "20px" }}>
             <button onClick={switchToLogin} className={styles.linkButton}>
               Already have a profile? Login here

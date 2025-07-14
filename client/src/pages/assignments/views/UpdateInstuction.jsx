@@ -1,10 +1,11 @@
-
 "use client";
 
 import { useState, useEffect, useRef } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import "../css/UpdateInstruction.css";
 import api from "../../../api";
+
+const API_BASE_URL = process.env.REACT_APP_API_URL || "http://localhost:5000";
 
 const modalAnimation = `
   @keyframes fadeIn {
@@ -1604,9 +1605,9 @@ function UpdateInstruction() {
 
             // If this leg's destination is the dropoff, mark this container as reaching dropoff
             if (
-  leg.destination?.toLowerCase().replace(/\s/g, '') ===
-  dropoff?.toLowerCase().replace(/\s/g, '')
-) {
+              leg.destination?.toLowerCase().replace(/\s/g, "") ===
+              dropoff?.toLowerCase().replace(/\s/g, "")
+            ) {
               containersReachingDropoff.add(driver.containernumber);
             }
           }
@@ -1657,10 +1658,11 @@ function UpdateInstruction() {
           leg.drivers.some(
             (driver) =>
               driver.containernumber === containerNumber &&
-leg.destination?.toLowerCase().replace(/\s/g, '') ===
-  instructionContainers.find(
-    (c) => c.containernum.toString() === containerNumber
-  )?.dropoff?.toLowerCase().replace(/\s/g, '')
+              leg.destination?.toLowerCase().replace(/\s/g, "") ===
+                instructionContainers
+                  .find((c) => c.containernum.toString() === containerNumber)
+                  ?.dropoff?.toLowerCase()
+                  .replace(/\s/g, "")
           )
         );
       });
@@ -1746,7 +1748,7 @@ leg.destination?.toLowerCase().replace(/\s/g, '') ===
     try {
       // Fetch the instruction details to get the pickup and dropoff locations
       const response = await fetch(
-        `http://localhost:5000/instructions/${instructionId}/details`
+        `${API_BASE_URL}/instructions/${instructionId}/details`
       );
       if (!response.ok) {
         throw new Error("Failed to fetch instruction details");
@@ -1776,9 +1778,9 @@ leg.destination?.toLowerCase().replace(/\s/g, '') ===
       // If the destinations don't match, show the destination mismatch modal
       // if (lastLegDestination !== dropoff) {
       if (
-  lastLegDestination?.toLowerCase().replace(/\s/g, '') !==
-  dropoff?.toLowerCase().replace(/\s/g, '')
-) {
+        lastLegDestination?.toLowerCase().replace(/\s/g, "") !==
+        dropoff?.toLowerCase().replace(/\s/g, "")
+      ) {
         setMismatchDetails({
           lastLegDestination,
           dropoff,
@@ -1871,7 +1873,7 @@ leg.destination?.toLowerCase().replace(/\s/g, '') ===
     if (instructionId) {
       try {
         const response = await fetch(
-          `http://localhost:5000/instructions/${instructionId}/shipment-type`
+          `${API_BASE_URL}/instructions/${instructionId}/shipment-type`
         );
         if (!response.ok) {
           throw new Error("Failed to fetch shipment type");
@@ -1980,7 +1982,7 @@ leg.destination?.toLowerCase().replace(/\s/g, '') ===
     if (instructionId) {
       try {
         const instructionResponse = await fetch(
-          `http://localhost:5000/instructions/${instructionId}`
+          `${API_BASE_URL}/instructions/${instructionId}`
         );
         if (instructionResponse.ok) {
           const instructionData = await instructionResponse.json();
@@ -1988,7 +1990,7 @@ leg.destination?.toLowerCase().replace(/\s/g, '') ===
           if (instructionData.status === "New") {
             // Update the status to "In Progress"
             const updateStatusResponse = await fetch(
-              `http://localhost:5000/instructions/${instructionId}/status`,
+              `${API_BASE_URL}/instructions/${instructionId}/status`,
               {
                 method: "PUT",
                 headers: {
@@ -2094,7 +2096,7 @@ leg.destination?.toLowerCase().replace(/\s/g, '') ===
       );
 
       // Send the data to the server
-      const response = await fetch(`http://localhost:5000/legs/save`, {
+      const response = await fetch(`${API_BASE_URL}/legs/save`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -2187,7 +2189,7 @@ leg.destination?.toLowerCase().replace(/\s/g, '') ===
     try {
       // First, fetch the instruction details to get the dropoff location
       const response = await fetch(
-        `http://localhost:5000/instructions/${instructionId}/details`
+        `${API_BASE_URL}/instructions/${instructionId}/details`
       );
       if (!response.ok) return false;
 
@@ -2260,7 +2262,7 @@ leg.destination?.toLowerCase().replace(/\s/g, '') ===
       try {
         // Fetch the instruction details to get the dropoff location
         const response = await fetch(
-          `http://localhost:5000/instructions/${instructionId}/details`
+          `${API_BASE_URL}/instructions/${instructionId}/details`
         );
         if (!response.ok) {
           setShouldHideAddLegButton(false);
@@ -2487,7 +2489,10 @@ leg.destination?.toLowerCase().replace(/\s/g, '') ===
           </button>
         ))}
         {!shouldHideAddLegButton && (
-          <Plus onClick={handleAddLeg} disabled={isCompleted || (shipmentType === 3 && legs.length >= 1)} />
+          <Plus
+            onClick={handleAddLeg}
+            disabled={isCompleted || (shipmentType === 3 && legs.length >= 1)}
+          />
         )}
       </div>
 
@@ -3300,70 +3305,74 @@ leg.destination?.toLowerCase().replace(/\s/g, '') ===
         </div>
       )}
 
-{showContainerModal && (
-  <div className="modal-wrapper">
-    <div className="modal-backdrop animate-fadeIn"></div>
-    <div className="modal-container animate-scaleIn">
-      <div className="modal-header">
-        <div className="flex items-center gap-4">
-          <svg
-            xmlns="http://www.w3.org/2000/svg"
-            width="50"
-            height="50"
-            viewBox="0 0 24 24"
-            fill="#FEE2E2"
-            stroke="#DC2626"
-            strokeWidth="2"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            className="text-red-600 drop-shadow-sm"
-          >
-            <path d="M12 2L2 19h20L12 2z" />
-            <path d="M12 8v4" />
-            <circle cx="12" cy="16" r="1" />
-          </svg>
-          <h3 className="modal-title">Container Destination Warning</h3>
-        </div>
-        <p className="modal-description">
-          All containers must reach the final destination.
-        </p>
-      </div>
-      <div className="modal-body">
-        <div className="modal-item">
-          <div className="modal-bullet"></div>
-          <span className="modal-item-text">
-            Final Destination: <strong>{containerValidationDetails.dropoff}</strong>
-          </span>
-        </div>
-        {containerValidationDetails.missingContainers.map((container, index) => (
-          <div key={index} className="modal-item">
-            <div className="modal-bullet"></div>
-            <span className="modal-item-text">
-              Container <strong>{container}</strong> does not reach final destination
-            </span>
+      {showContainerModal && (
+        <div className="modal-wrapper">
+          <div className="modal-backdrop animate-fadeIn"></div>
+          <div className="modal-container animate-scaleIn">
+            <div className="modal-header">
+              <div className="flex items-center gap-4">
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  width="50"
+                  height="50"
+                  viewBox="0 0 24 24"
+                  fill="#FEE2E2"
+                  stroke="#DC2626"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  className="text-red-600 drop-shadow-sm"
+                >
+                  <path d="M12 2L2 19h20L12 2z" />
+                  <path d="M12 8v4" />
+                  <circle cx="12" cy="16" r="1" />
+                </svg>
+                <h3 className="modal-title">Container Destination Warning</h3>
+              </div>
+              <p className="modal-description">
+                All containers must reach the final destination.
+              </p>
+            </div>
+            <div className="modal-body">
+              <div className="modal-item">
+                <div className="modal-bullet"></div>
+                <span className="modal-item-text">
+                  Final Destination:{" "}
+                  <strong>{containerValidationDetails.dropoff}</strong>
+                </span>
+              </div>
+              {containerValidationDetails.missingContainers.map(
+                (container, index) => (
+                  <div key={index} className="modal-item">
+                    <div className="modal-bullet"></div>
+                    <span className="modal-item-text">
+                      Container <strong>{container}</strong> does not reach
+                      final destination
+                    </span>
+                  </div>
+                )
+              )}
+            </div>
+            <div className="modal-footer">
+              <button
+                className="modal-btn modal-btn-secondary"
+                onClick={() => setShowContainerModal(false)}
+              >
+                Cancel
+              </button>
+              <button
+                className="modal-btn modal-btn-primary"
+                onClick={() => {
+                  setShowContainerModal(false);
+                  navigateToDocuments();
+                }}
+              >
+                Proceed Anyway
+              </button>
+            </div>
           </div>
-        ))}
-      </div>
-      <div className="modal-footer">
-        <button
-          className="modal-btn modal-btn-secondary"
-          onClick={() => setShowContainerModal(false)}
-        >
-          Cancel
-        </button>
-        <button
-          className="modal-btn modal-btn-primary"
-          onClick={() => {
-            setShowContainerModal(false);
-            navigateToDocuments();
-          }}
-        >
-          Proceed Anyway
-        </button>
-      </div>
-    </div>
-  </div>
-)}
+        </div>
+      )}
 
       {/* Unsaved Changes Modal */}
       {showUnsavedChangesModal && (
@@ -3572,7 +3581,7 @@ leg.destination?.toLowerCase().replace(/\s/g, '') ===
 
                       // Send the data to the server
                       const response = await fetch(
-                        `http://localhost:5000/legs/save`,
+                        `${API_BASE_URL}/legs/save`,
                         {
                           method: "POST",
                           headers: {

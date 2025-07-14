@@ -1,6 +1,7 @@
 "use client"
 import { useCallback } from "react"
 import api from "../../../api.js"
+import { showConfirmDialog, showAlert } from '../utils/alertUtils.js';
 
 export function useApi(state, actions) {
   const fetchPaginatedData = useCallback(
@@ -197,19 +198,12 @@ export function useApi(state, actions) {
   const saveEmployee = useCallback(
     async (employeeData, emailRef) => {
       actions.setLoading(true)
-      emailRef.current?.setCustomValidity("")
       try {
-        // Check duplicate email (only on create, not edit)
-        if (!state.editingEmployeeId) {
-          const { data } = await api.get(
-            `/api/employees/check-email-existence?email=${encodeURIComponent(employeeData.email)}`,
-          )
-          if (data.exists) {
-            emailRef.current?.setCustomValidity("Email already exists. Please use a different one.")
-            emailRef.current?.reportValidity()
-            actions.setLoading(false)
-            return false
-          }
+        // Validate required fields
+        if (!employeeData.name || !employeeData.surname) {
+          actions.showAlert("Name and surname are required.")
+          actions.setLoading(false)
+          return false
         }
 
         // Build FormData
@@ -410,7 +404,7 @@ export function useApi(state, actions) {
         const method = state.editTrailerId ? "put" : "post"
         console.log(`Making ${method.toUpperCase()} request to: ${url}`)
 
-        const response = await api[method](url, formData, {
+        const response = api[method](url, formData, {
           headers: { "Content-Type": "multipart/form-data" },
         })
         console.log("API response:", response.data)
@@ -561,9 +555,7 @@ export function useApi(state, actions) {
       } finally {
         actions.setLoading(false)
       }
-    },
-    [state, actions, fetchPaginatedData],
-  )
+    }, [state, actions, fetchPaginatedData])
 
   const saveClientRates = useCallback(
     async (ratesData) => {
@@ -857,6 +849,65 @@ export function useApi(state, actions) {
     [state, actions, fetchPaginatedData],
   )
 
+  const toggleTruckStatus = useCallback(
+    async (id, currentStatus) => {
+      actions.setLoading(true)
+      try {
+        const newStatus = !currentStatus
+        console.log(`Toggling truck ${id} status from ${currentStatus} to ${newStatus}`)
+
+        // Use the correct endpoint: /api/trucks/:id/status
+        await api.put(`/api/trucks/${id}/status`, { status: newStatus })
+
+        // Refresh current page
+        await fetchPaginatedData(
+          "trucks",
+          state.pagination.trucks.currentPage,
+          state.pagination.trucks.itemsPerPage,
+          state.filters.trucks,
+        )
+
+        actions.showAlert(`Truck ${newStatus ? "enabled" : "disabled"}!`)
+      } catch (err) {
+        console.error(`Error toggling truck ${id}:`, err)
+        actions.showAlert(
+          `Error ${currentStatus ? "disabling" : "enabling"} truck: ${err.response?.data?.error || err.message}`,
+        )
+      } finally {
+        actions.setLoading(false)
+      }
+    },
+    [state, actions, fetchPaginatedData],
+  )
+
+  const toggleTrailerStatus = useCallback(
+    async (id, currentStatus) => {
+      actions.setLoading(true)
+      try {
+        const newStatus = !currentStatus
+        await api.put(`/api/trailers/${id}/toggle-status`, { status: newStatus })
+
+        // Refresh current page
+        await fetchPaginatedData(
+          "trailers",
+          state.pagination.trailers.currentPage,
+          state.pagination.trailers.itemsPerPage,
+          state.filters.trailers,
+        )
+
+        actions.showAlert(`Trailer ${newStatus ? "enabled" : "disabled"}!`)
+      } catch (err) {
+        console.error(`Error toggling trailer ${id}:`, err)
+        actions.showAlert(
+          `Error ${currentStatus ? "disabling" : "enabling"} trailer: ${err.response?.data?.error || err.message}`,
+        )
+      } finally {
+        actions.setLoading(false)
+      }
+    },
+    [state, actions, fetchPaginatedData],
+  )
+
   const deleteItem = useCallback(
     async (type, id) => {
       actions.setLoading(true)
@@ -913,100 +964,118 @@ export function useApi(state, actions) {
   )
 
   // NEW: Delete individual subcontractor driver
-  const deleteSubcontractorDriver = useCallback(
-    async (driverId) => {
-      if (!window.confirm("Are you sure you want to delete this driver?")) {
-        return false
-      }
+// deleteSubcontractorDriver
+const deleteSubcontractorDriver = useCallback(
+  async (driverId) => {
+    const confirmed = await showConfirmDialog(
+      'Are you sure?',
+      'You want to delete this driver?',
+      'Yes, delete it!'
+    );
 
-      actions.setLoading(true)
-      try {
-        await api.delete(`/api/subcontractors/drivers/${driverId}`)
+    if (!confirmed) {
+      return false;
+    }
 
-        // Refresh current page
-        await fetchPaginatedData(
-          "subcontractors",
-          state.pagination.subcontractors.currentPage,
-          state.pagination.subcontractors.itemsPerPage,
-          state.filters.subcontractors,
-        )
+    actions.setLoading(true);
+    try {
+      await api.delete(`/api/subcontractors/drivers/${driverId}`);
 
-        actions.showAlert("Driver deleted successfully!")
-        return true
-      } catch (err) {
-        console.error("Error deleting driver:", err)
-        actions.showAlert(`Error deleting driver: ${err.response?.data?.error || err.message}`)
-        return false
-      } finally {
-        actions.setLoading(false)
-      }
-    },
-    [state, actions, fetchPaginatedData],
-  )
+      // Refresh current page
+      await fetchPaginatedData(
+        'subcontractors',
+        state.pagination.subcontractors.currentPage,
+        state.pagination.subcontractors.itemsPerPage,
+        state.filters.subcontractors
+      );
+
+      await showAlert('Success', 'Driver deleted successfully!', 'success');
+      return true;
+    } catch (err) {
+      console.error('Error deleting driver:', err);
+      await showAlert('Error', `Error deleting driver: ${err.response?.data?.error || err.message}`, 'error');
+      return false;
+    } finally {
+      actions.setLoading(false);
+    }
+  },
+  [state, actions, fetchPaginatedData]
+);
 
   // NEW: Delete individual subcontractor truck
-  const deleteSubcontractorTruck = useCallback(
-    async (truckId) => {
-      if (!window.confirm("Are you sure you want to delete this truck?")) {
-        return false
-      }
+const deleteSubcontractorTruck = useCallback(
+  async (truckId) => {
+    const confirmed = await showConfirmDialog(
+      'Are you sure?',
+      'You want to delete this truck?',
+      'Yes, delete it!'
+    );
 
-      actions.setLoading(true)
-      try {
-        await api.delete(`/api/subcontractors/trucks/${truckId}`)
+    if (!confirmed) {
+      return false;
+    }
 
-        // Refresh current page
-        await fetchPaginatedData(
-          "subcontractors",
-          state.pagination.subcontractors.currentPage,
-          state.pagination.subcontractors.itemsPerPage,
-          state.filters.subcontractors,
-        )
+    actions.setLoading(true);
+    try {
+      await api.delete(`/api/subcontractors/trucks/${truckId}`);
 
-        actions.showAlert("Truck deleted successfully!")
-        return true
-      } catch (err) {
-        console.error("Error deleting truck:", err)
-        actions.showAlert(`Error deleting truck: ${err.response?.data?.error || err.message}`)
-        return false
-      } finally {
-        actions.setLoading(false)
-      }
-    },
-    [state, actions, fetchPaginatedData],
-  )
+      // Refresh current page
+      await fetchPaginatedData(
+        'subcontractors',
+        state.pagination.subcontractors.currentPage,
+        state.pagination.subcontractors.itemsPerPage,
+        state.filters.subcontractors
+      );
 
-  const deleteClientRate = useCallback(
-    async (rateId) => {
-      if (!window.confirm("Are you sure you want to delete this rate?")) {
-        return false
-      }
+      await showAlert('Success', 'Truck deleted successfully!', 'success');
+      return true;
+    } catch (err) {
+      console.error('Error deleting truck:', err);
+      await showAlert('Error', `Error deleting truck: ${err.response?.data?.error || err.message}`, 'error');
+      return false;
+    } finally {
+      actions.setLoading(false);
+    }
+  },
+  [state, actions, fetchPaginatedData]
+);
 
-      actions.setLoading(true)
-      try {
-        await api.delete(`/api/client-rates/${rateId}`)
+const deleteClientRate = useCallback(
+  async (rateId) => {
+    const confirmed = await showConfirmDialog(
+      'Are you sure?',
+      'You want to delete this rate?',
+      'Yes, delete it!'
+    );
 
-        // Refresh current page
-        await fetchPaginatedData(
-          "clientRates",
-          state.pagination.clientRates.currentPage,
-          state.pagination.clientRates.itemsPerPage,
-          state.filters.clientRates,
-        )
+    if (!confirmed) {
+      return false;
+    }
 
-        actions.showAlert("Client rate deleted successfully!")
-        return true
-      } catch (err) {
-        console.error("Error deleting client rate:", err)
-        actions.showAlert(`Error deleting client rate: ${err.response?.data?.error || err.message}`)
-        return false
-      } finally {
-        actions.setLoading(false)
-      }
-    },
-    [state, actions, fetchPaginatedData],
-  )
+    actions.setLoading(true);
+    try {
+      await api.delete(`/api/client-rates/${rateId}`);
 
+      // Refresh current page
+      await fetchPaginatedData(
+        'clientRates',
+        state.pagination.clientRates.currentPage,
+        state.pagination.clientRates.itemsPerPage,
+        state.filters.clientRates
+      );
+
+      await showAlert('Success', 'Client rate deleted successfully!', 'success');
+      return true;
+    } catch (err) {
+      console.error('Error deleting client rate:', err);
+      await showAlert('Error', `Error deleting client rate: ${err.response?.data?.error || err.message}`, 'error');
+      return false;
+    } finally {
+      actions.setLoading(false);
+    }
+  },
+  [state, actions, fetchPaginatedData]
+);
   const loadItemForEdit = useCallback(
     async (type, id) => {
       try {
@@ -1166,46 +1235,52 @@ export function useApi(state, actions) {
     [actions],
   )
 
-  const deleteDocument = useCallback(
-    async (type, itemId, url) => {
-      if (window.confirm("Are you sure you want to delete this document?")) {
-        try {
-          let endpoint
-          let idField
-          if (type === "employee") {
-            endpoint = "/api/employees/delete-doc"
-            idField = "employeeId"
-          } else if (type === "truck") {
-            endpoint = "/api/trucks/delete-doc"
-            idField = "truckId"
-          } else if (type === "trailer") {
-            endpoint = "/api/trailers/delete-doc"
-            idField = "trailerId"
-          } else {
-            throw new Error("Invalid document type")
-          }
+const deleteDocument = useCallback(
+  async (type, itemId, url) => {
+    const confirmed = await showConfirmDialog(
+      'Are you sure?',
+      'You want to delete this document?',
+      'Yes, delete it!'
+    );
 
-          const response = await api.post(endpoint, {
-            [idField]: itemId,
-            url,
-          })
-
-          if (response.data.message === "Document deleted successfully") {
-            const formType = type.charAt(0).toUpperCase() + type.slice(1)
-            const currentData = state[`new${formType}`]
-            actions.updateFormData(formType, {
-              existingDocuments: currentData.existingDocuments.filter((doc) => doc !== url),
-            })
-            actions.showAlert("Document deleted successfully.")
-          }
-        } catch (error) {
-          console.error(`Failed to delete ${type} document:`, error)
-          actions.showAlert("Error occurred while deleting document.")
+    if (confirmed) {
+      try {
+        let endpoint;
+        let idField;
+        if (type === 'employee') {
+          endpoint = '/api/employees/delete-doc';
+          idField = 'employeeId';
+        } else if (type === 'truck') {
+          endpoint = '/api/trucks/delete-doc';
+          idField = 'truckId';
+        } else if (type === 'trailer') {
+          endpoint = '/api/trailers/delete-doc';
+          idField = 'trailerId';
+        } else {
+          throw new Error('Invalid document type');
         }
+
+        const response = await api.post(endpoint, {
+          [idField]: itemId,
+          url,
+        });
+
+        if (response.data.message === 'Document deleted successfully') {
+          const formType = type.charAt(0).toUpperCase() + type.slice(1);
+          const currentData = state[`new${formType}`];
+          actions.updateFormData(formType, {
+            existingDocuments: currentData.existingDocuments.filter((doc) => doc !== url),
+          });
+          await showAlert('Success', 'Document deleted successfully.', 'success');
+        }
+      } catch (error) {
+        console.error(`Failed to delete ${type} document:`, error);
+        await showAlert('Error', 'Error occurred while deleting document.', 'error');
       }
-    },
-    [state, actions],
-  )
+    }
+  },
+  [state, actions]
+);
 
   return {
     fetchAllData,
@@ -1227,6 +1302,8 @@ export function useApi(state, actions) {
     toggleClientStatus,
     toggleSubcontractorStatus,
     toggleSupplierStatus,
+    toggleTruckStatus,
+    toggleTrailerStatus,
     deleteItem,
     deleteSubcontractorDriver,
     deleteSubcontractorTruck,

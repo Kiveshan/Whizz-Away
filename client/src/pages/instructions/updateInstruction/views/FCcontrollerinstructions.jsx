@@ -198,7 +198,7 @@ const FCcontrollerinstructions = () => {
 
   // Check if the instruction should be read-only based on status
   const isReadOnly =
-    formData.status === "In Progress" || formData.status === "Completed";
+    formData.status === "In progress" || formData.status === "Completed";
 
   const [startingPoints, setStartingPoints] = useState([]);
   const [destinations, setDestinations] = useState([]);
@@ -268,9 +268,9 @@ const FCcontrollerinstructions = () => {
         containerNum: "",
         weight:
           isImport ||
-          formData.shipmentTypeId === "2" ||
-          formData.shipmentTypeId === "3"
-            ? null
+          String(formData.shipmentTypeId) === "2" ||
+          String(formData.shipmentTypeId) === "3"
+            ? ""
             : null, // Initialize weight for import, export, and cross-haul
         containerType: "6m",
         cargoDescription: "",
@@ -285,9 +285,9 @@ const FCcontrollerinstructions = () => {
         containerNum: "",
         weight:
           isImport ||
-          formData.shipmentTypeId === "2" ||
-          formData.shipmentTypeId === "3"
-            ? null
+          String(formData.shipmentTypeId) === "2" ||
+          String(formData.shipmentTypeId) === "3"
+            ? ""
             : null, // Initialize weight for import, export, and cross-haul
         containerType: "12m",
         cargoDescription: "",
@@ -302,9 +302,9 @@ const FCcontrollerinstructions = () => {
         containerNum: "",
         weight:
           isImport ||
-          formData.shipmentTypeId === "2" ||
-          formData.shipmentTypeId === "3"
-            ? null
+          String(formData.shipmentTypeId) === "2" ||
+          String(formData.shipmentTypeId) === "3"
+            ? ""
             : null, // Initialize weight for import, export, and cross-haul
         containerType: "Abnormal",
         cargoDescription: "",
@@ -319,9 +319,9 @@ const FCcontrollerinstructions = () => {
         containerNum: "",
         weight:
           isImport ||
-          formData.shipmentTypeId === "2" ||
-          formData.shipmentTypeId === "3"
-            ? null
+          String(formData.shipmentTypeId) === "2" ||
+          String(formData.shipmentTypeId) === "3"
+            ? ""
             : null, // Initialize weight for import, export, and cross-haul
         containerType: "BreakBulk",
         cargoDescription: "",
@@ -375,25 +375,41 @@ const FCcontrollerinstructions = () => {
       // Clear error when user starts typing
       clearContainerFieldError(id, "weight");
 
+      // Check if this container should have weight field based on shipment type
+      const shouldHaveWeight = 
+        isImport || 
+        String(formData.shipmentTypeId) === "2" || 
+        String(formData.shipmentTypeId) === "3";
+      
+      if (!shouldHaveWeight) {
+        console.log("Weight field not applicable for this shipment type");
+        return;
+      }
+
       // Sanitize weight value - convert empty string to null, validate numeric input
-      let sanitizedValue = null;
+      let sanitizedValue = "";
       if (value && value.trim() !== "") {
         // Only allow valid numeric input (including decimals)
         if (/^[0-9]*\.?[0-9]*$/.test(value.trim())) {
           const numValue = Number.parseFloat(value.trim());
           if (!isNaN(numValue) && numValue >= 0) {
             sanitizedValue = numValue;
+            console.log(`Container ${id} weight updated to:`, sanitizedValue, `(type: ${typeof sanitizedValue})`);
           } else {
             // Invalid number, keep as string for user feedback but will be sanitized on save
             sanitizedValue = value;
+            console.log(`Container ${id} weight set to string value:`, sanitizedValue);
           }
         } else {
           // Invalid format, don't update
+          console.log(`Container ${id} weight invalid format:`, value);
           return;
         }
+      } else {
+        console.log(`Container ${id} weight set to empty string`);
       }
 
-      // Update with sanitized value (null for empty, number for valid input)
+      // Update with sanitized value (empty string for empty, number for valid input)
       setContainers((prevContainers) =>
         prevContainers.map((container) =>
           container.id === id
@@ -414,58 +430,42 @@ const FCcontrollerinstructions = () => {
     setIsContainerDataModified(true);
   };
 
-  // Validate containers
+  // Validate container data
   const validateContainers = () => {
     const counts = countContainersByType();
     const newErrors = {};
     let isValid = true;
 
-    // Validate container numbers and weights
-    for (const container of containers) {
+    containers.forEach((container) => {
+      // Validate container number format: 4 letters followed by 7 numbers
       if (!container.containerNum) {
-        newErrors[`container-${container.id}`] = "Field is required";
+        newErrors[`container-${container.id}`] = "Container number is required";
         isValid = false;
-      }
-      // Check container number format (11 chars: 4 letters followed by 7 numbers)
-      else if (container.containerNum.length !== 11) {
-        newErrors[`container-${container.id}`] =
-          "Does not match correct format (ABCD1234567)";
-        isValid = false;
-      } else if (!/^[a-zA-Z]{4}[0-9]{7}$/.test(container.containerNum)) {
-        newErrors[`container-${container.id}`] =
-          "Does not match correct format (ABCD1234567)";
+      } else if (!/^[A-Za-z]{4}[0-9]{7}$/.test(container.containerNum)) {
+        newErrors[
+          `container-${container.id}`
+        ] = `Invalid format. Must be 4 letters followed by 7 numbers`;
         isValid = false;
       }
 
-      // Weight validation for import, export, and cross-haul shipments - only validate format if weight is provided
+      // Validate weight for import, export, and cross-haul shipment types
       if (
         (isImport ||
-          formData.shipmentTypeId === "2" ||
-          formData.shipmentTypeId === "3") &&
-        container.weight !== null &&
-        container.weight !== undefined &&
-        container.weight !== ""
+          String(formData.shipmentTypeId) === "2" ||
+          String(formData.shipmentTypeId) === "3")
       ) {
-        // If weight is provided, validate it's a positive number
+        // Weight is required and must be a positive number
         if (
-          typeof container.weight === "string" &&
-          container.weight.trim() !== ""
+          container.weight === null ||
+          container.weight === "" ||
+          isNaN(Number(container.weight)) ||
+          Number(container.weight) <= 0
         ) {
-          const weightValue = Number.parseFloat(container.weight);
-          if (isNaN(weightValue) || weightValue < 0) {
-            newErrors[`weight-${container.id}`] =
-              "Must be a valid positive number";
-            isValid = false;
-          }
-        } else if (typeof container.weight === "number") {
-          if (isNaN(container.weight) || container.weight < 0) {
-            newErrors[`weight-${container.id}`] =
-              "Must be a valid positive number";
-            isValid = false;
-          }
+          newErrors[`weight-${container.id}`] = "Valid weight is required";
+          isValid = false;
         }
       }
-    }
+    });
 
     setContainerFieldErrors(newErrors);
     return isValid;
@@ -844,7 +844,7 @@ const FCcontrollerinstructions = () => {
       setConfirmationModal({
         isOpen: true,
         message:
-          "Are you sure you want to create an invoice for this instruction?",
+          "Are you sure you want to create an invoice before dispatching containers?",
         action: "invoice",
       });
     } catch (error) {
@@ -1654,17 +1654,64 @@ const FCcontrollerinstructions = () => {
           "Processing containers from instruction data:",
           data.containers
         );
-        const containersList = data.containers.map((container, index) => ({
-          id: container.containerkey || index + 1,
-          containerKey: container.containerkey,
-          containerNum: container.containernum || "",
-          weight:
-            container.weight !== null && container.weight !== undefined
-              ? container.weight
-              : null,
-          containerType: container.container_type || "6m",
-          cargoDescription: container.cargo_description || "",
-        }));
+        
+        // Determine if weight should be loaded based on shipment type
+        const shouldLoadWeight = 
+          isImportType || 
+          String(data.shipment_type) === "2" || 
+          String(data.shipment_type) === "3";
+        
+        console.log("Should load weight for containers:", {
+          shipmentType: data.shipment_type,
+          shipmentTypeString: String(data.shipment_type),
+          isImportType,
+          shouldLoadWeight
+        });
+        
+        // Log raw container data from database
+        console.log("Raw container data from database:", 
+          data.containers.map(c => ({
+            containerkey: c.containerkey,
+            containernum: c.containernum,
+            weight: c.weight,
+            weight_type: typeof c.weight,
+            container_type: c.container_type
+          }))
+        );
+        
+        const containersList = data.containers.map((container, index) => {
+          // Process each container's weight value
+          let weightValue;
+          if (shouldLoadWeight) {
+            // For export and cross-haul, ensure weight is properly handled
+            // Convert any numeric string to number, null/undefined to empty string
+            if (container.weight !== null && container.weight !== undefined) {
+              // Convert string weights to numbers
+              if (typeof container.weight === 'string' && container.weight.trim() !== '') {
+                weightValue = parseFloat(container.weight);
+                if (isNaN(weightValue)) weightValue = "";
+              } else {
+                weightValue = container.weight;
+              }
+              console.log(`Container ${container.containernum} weight set to:`, weightValue, `(type: ${typeof weightValue})`);
+            } else {
+              weightValue = ""; // Empty string for editable types
+              console.log(`Container ${container.containernum} has no weight, initializing as empty string`);
+            }
+          } else {
+            weightValue = null; // Null for non-editable types
+            console.log(`Container ${container.containernum} weight set to null (non-editable)`);
+          }
+          
+          return {
+            id: container.containerkey || index + 1,
+            containerKey: container.containerkey,
+            containerNum: container.containernum || "",
+            weight: weightValue,
+            containerType: container.container_type || "6m",
+            cargoDescription: container.cargo_description || "",
+          };
+        });
 
         console.log(
           "Setting containers from instruction data:",
@@ -1945,14 +1992,30 @@ const FCcontrollerinstructions = () => {
     const isImportType = shipmentTypeName.toLowerCase() === "import";
     const isCrossHaul =
       shipmentTypeName.toLowerCase() === "cross-haul" || shipmentTypeId === "4";
+    
+    // Determine if the new shipment type should have weight fields
+    const shouldHaveWeight = 
+      isImportType || 
+      String(shipmentTypeId) === "2" || 
+      String(shipmentTypeId) === "3";
 
+    console.log("BEFORE CHANGE - Current containers:", containers.map(c => ({ id: c.id, type: c.containerType, weight: c.weight, weightType: typeof c.weight })));
+    console.log("BEFORE CHANGE - isImport:", isImport);
+    console.log("BEFORE CHANGE - formData.shipmentTypeId:", formData.shipmentTypeId, "(type: " + typeof formData.shipmentTypeId + ")");
+    console.log("BEFORE CHANGE - Weight column should show:", 
+      isImport || String(formData.shipmentTypeId) === "2" || String(formData.shipmentTypeId) === "3");
+    
+    // Update isImport state based on shipment type
     setIsImport(isImportType);
+    
+    console.log(`Shipment type changed to: ${shipmentTypeId} (${shipmentTypeName}), isImport set to: ${isImportType}`);
+    console.log(`New shipment type should have weight fields: ${shouldHaveWeight}`);
 
     // For cross-haul or type 4, clear vessel name and stack date
     if (isCrossHaul || shipmentTypeId === "4") {
       setFormData({
         ...formData,
-        shipmentTypeId,
+        shipmentTypeId: String(shipmentTypeId), // Ensure it's stored as string
         shipmentTypeName,
         vesselName: "",
         stackDate: "",
@@ -1962,12 +2025,58 @@ const FCcontrollerinstructions = () => {
     } else {
       setFormData({
         ...formData,
-        shipmentTypeId,
+        shipmentTypeId: String(shipmentTypeId), // Ensure it's stored as string
         shipmentTypeName,
       });
     }
 
+    // Clear any field errors
     setFieldErrors((prev) => ({ ...prev, shipmentTypeId: "" }));
+    
+    // Update container weight fields based on new shipment type
+    if (containers && containers.length > 0) {
+      console.log("Updating container weight fields for new shipment type");
+      
+      // Update container weight fields directly without re-initializing
+      setContainers(prevContainers => 
+        prevContainers.map(container => {
+          // If the new shipment type should have weight fields
+          if (shouldHaveWeight) {
+            // If container already has a weight value, keep it
+            // Otherwise initialize with empty string
+            const weightValue = 
+              container.weight !== null && container.weight !== undefined ? container.weight : "";
+            console.log(`Container ${container.id} weight updated for new shipment type:`, weightValue);
+            return { ...container, weight: weightValue };
+          } else {
+            // For shipment types that don't need weight, set to null
+            console.log(`Container ${container.id} weight set to null for new shipment type`);
+            return { ...container, weight: null };
+          }
+        })
+      );
+    }
+    
+    // Force re-initialize containers if needed (for container count changes)
+    console.log("Re-initializing containers for new shipment type");
+    setTimeout(() => {
+      // Only re-initialize if container counts have changed
+      if (formData.num_six_meters > 0 || formData.num_twelve_meters > 0 || 
+          formData.num_abnormal > 0 || formData.num_breakbulk > 0) {
+        initializeContainers();
+      }
+      
+      console.log("AFTER CHANGE - Containers updated with shipment type:", shipmentTypeId, "(type: " + typeof shipmentTypeId + ")");
+      console.log("AFTER CHANGE - formData.shipmentTypeId:", formData.shipmentTypeId, "(type: " + typeof formData.shipmentTypeId + ")");
+      console.log("AFTER CHANGE - Weight column should show:", 
+        isImportType || String(shipmentTypeId) === "2" || String(shipmentTypeId) === "3");
+      console.log("AFTER CHANGE - Updated containers:", containers.map(c => ({ 
+        id: c.id, 
+        type: c.containerType, 
+        weight: c.weight, 
+        weightType: typeof c.weight 
+      })));
+    }, 100);
   };
 
   // Check if shipment type is Cross-haul
@@ -1978,7 +2087,7 @@ const FCcontrollerinstructions = () => {
     return (
       selectedShipmentType &&
       (selectedShipmentType.shipmenttype.toLowerCase() === "cross-haul" ||
-        formData.shipmentTypeId === "4")
+        String(formData.shipmentTypeId) === "4")
     );
   };
 
@@ -2797,7 +2906,8 @@ const FCcontrollerinstructions = () => {
     border: "1px solid #e9ecef",
   };
 
-  const ErrorTooltip = ({ message }) => {
+  // Inner tooltip component with different styling
+  const InstructionErrorTooltip = ({ message }) => {
     if (!message) return null;
     return (
       <div className="controller-instructions-error-tooltip">
@@ -2950,7 +3060,7 @@ const FCcontrollerinstructions = () => {
                       </option>
                     ))}
                   </select>
-                  <ErrorTooltip message={fieldErrors.clientId} />
+                  <InstructionErrorTooltip message={fieldErrors.clientId} />
                 </div>
               </div>
               <div className="controller-instructions-form-field">
@@ -2966,7 +3076,7 @@ const FCcontrollerinstructions = () => {
                   onChange={handleInputChange}
                   disabled={true}
                 />
-                <ErrorTooltip message={fieldErrors.representative} />
+                <InstructionErrorTooltip message={fieldErrors.representative} />
               </div>
               <div className="controller-instructions-form-field">
                 <label>Contact Details</label>
@@ -3028,7 +3138,7 @@ const FCcontrollerinstructions = () => {
                       </option>
                     ))}
                   </select>
-                  <ErrorTooltip message={fieldErrors.shipmentTypeId} />
+                  <InstructionErrorTooltip message={fieldErrors.shipmentTypeId} />
                 </div>
               </div>
               <div className="controller-instructions-form-field">
@@ -3051,7 +3161,7 @@ const FCcontrollerinstructions = () => {
                     disabled={isReadOnly}
                     style={isReadOnly ? readOnlyStyle : {}}
                   />
-                  <ErrorTooltip message={fieldErrors.task} />
+                  <InstructionErrorTooltip message={fieldErrors.task} />
                 </div>
               </div>
             </div>
@@ -3122,7 +3232,7 @@ const FCcontrollerinstructions = () => {
                             }
                             style={isReadOnly ? readOnlyStyle : {}}
                           />
-                          <ErrorTooltip message={fieldErrors.rateper_6} />
+                          <InstructionErrorTooltip message={fieldErrors.rateper_6} />
                         </div>
                       </div>
                     </div>
@@ -3165,7 +3275,7 @@ const FCcontrollerinstructions = () => {
                             }
                             style={isReadOnly ? readOnlyStyle : {}}
                           />
-                          <ErrorTooltip message={fieldErrors.rateper_12} />
+                          <InstructionErrorTooltip message={fieldErrors.rateper_12} />
                         </div>
                       </div>
                     </div>
@@ -3334,7 +3444,7 @@ const FCcontrollerinstructions = () => {
                           </option>
                         ))}
                       </select>
-                      <ErrorTooltip message={fieldErrors.shipmentTypeId} />
+                      <InstructionErrorTooltip message={fieldErrors.shipmentTypeId} />
                     </div>
                   </div>
                   <div className="controller-instructions-form-field">
@@ -3364,7 +3474,7 @@ const FCcontrollerinstructions = () => {
                           </option>
                         ))}
                       </select>
-                      <ErrorTooltip message={fieldErrors.pickup} />
+                      <InstructionErrorTooltip message={fieldErrors.pickup} />
                     </div>
                   </div>
                   <div className="controller-instructions-form-field">
@@ -3394,7 +3504,7 @@ const FCcontrollerinstructions = () => {
                           </option>
                         ))}
                       </select>
-                      <ErrorTooltip message={fieldErrors.dropoff} />
+                      <InstructionErrorTooltip message={fieldErrors.dropoff} />
                     </div>
                   </div>
                   {/* This surchages section has been moved to be next to the checkbox */}
@@ -3480,7 +3590,7 @@ const FCcontrollerinstructions = () => {
                                 disabled={isReadOnly}
                                 style={isReadOnly ? readOnlyStyle : {}}
                               />
-                              <ErrorTooltip message={fieldErrors.unitRate} />
+                              <InstructionErrorTooltip message={fieldErrors.unitRate} />
                             </div>
                           </div>
 
@@ -3516,7 +3626,7 @@ const FCcontrollerinstructions = () => {
                                 disabled={isReadOnly}
                                 style={isReadOnly ? readOnlyStyle : {}}
                               />
-                              <ErrorTooltip message={fieldErrors.quantity} />
+                              <InstructionErrorTooltip message={fieldErrors.quantity} />
                             </div>
                           </div>
                         </div>
@@ -3552,7 +3662,7 @@ const FCcontrollerinstructions = () => {
                           disabled={isReadOnly}
                           style={isReadOnly ? readOnlyStyle : {}}
                         />
-                        <ErrorTooltip message={fieldErrors.bookingRef} />
+                        <InstructionErrorTooltip message={fieldErrors.bookingRef} />
                       </div>
                     </div>
                     <div className="controller-instructions-form-field controller-instructions-small-field">
@@ -3575,7 +3685,7 @@ const FCcontrollerinstructions = () => {
                           disabled={isReadOnly}
                           style={isReadOnly ? readOnlyStyle : {}}
                         />
-                        <ErrorTooltip message={fieldErrors.fileRef} />
+                        <InstructionErrorTooltip message={fieldErrors.fileRef} />
                       </div>
                     </div>
                     {/* Booking / File / VAT inline with task */}
@@ -3653,7 +3763,7 @@ const FCcontrollerinstructions = () => {
                         disabled={isReadOnly}
                         style={isReadOnly ? readOnlyStyle : {}}
                       />
-                      <ErrorTooltip message={fieldErrors.task} />
+                      <InstructionErrorTooltip message={fieldErrors.task} />
                     </div>
                   </div>
                   <div
@@ -3699,7 +3809,7 @@ const FCcontrollerinstructions = () => {
                           style={isReadOnly ? readOnlyStyle : {}}
                           required={true}
                         />
-                        <ErrorTooltip message={fieldErrors.vesselName} />
+                        <InstructionErrorTooltip message={fieldErrors.vesselName} />
                       </div>
                     </div>
                   )}
@@ -3723,7 +3833,7 @@ const FCcontrollerinstructions = () => {
                         disabled={isReadOnly}
                         style={isReadOnly ? readOnlyStyle : {}}
                       />
-                      <ErrorTooltip message={fieldErrors.description} />
+                      <InstructionErrorTooltip message={fieldErrors.description} />
                     </div>
                   </div>
                 </div>
@@ -3744,7 +3854,7 @@ const FCcontrollerinstructions = () => {
                       disabled={isReadOnly}
                       style={isReadOnly ? readOnlyStyle : {}}
                     />
-                    <ErrorTooltip message={fieldErrors.pickupTime} />
+                    <InstructionErrorTooltip message={fieldErrors.pickupTime} />
                   </div>
                   <div className="controller-instructions-form-field">
                     <label>Pickup Date</label>
@@ -3767,7 +3877,7 @@ const FCcontrollerinstructions = () => {
                         disabled={isReadOnly}
                         style={isReadOnly ? readOnlyStyle : {}}
                       />
-                      <ErrorTooltip message={fieldErrors.pickupDate} />
+                      <InstructionErrorTooltip message={fieldErrors.pickupDate} />
                     </div>
                   </div>
                   {(formData.shipmentTypeId === "1" ||
@@ -3799,7 +3909,7 @@ const FCcontrollerinstructions = () => {
                           style={isReadOnly ? readOnlyStyle : {}}
                           required={true}
                         />
-                        <ErrorTooltip message={fieldErrors.stackDate} />
+                        <InstructionErrorTooltip message={fieldErrors.stackDate} />
                       </div>
                     </div>
                   )}
@@ -3824,7 +3934,7 @@ const FCcontrollerinstructions = () => {
                         disabled={isReadOnly}
                         style={isReadOnly ? readOnlyStyle : {}}
                       />
-                      <ErrorTooltip message={fieldErrors.deadline} />
+                      <InstructionErrorTooltip message={fieldErrors.deadline} />
                     </div>
                   </div>
                 </div>
@@ -3832,6 +3942,19 @@ const FCcontrollerinstructions = () => {
             </div>
           </div>
           {/* Container Details Table */}
+          {console.log("Debug weight column visibility:", {
+            isImport,
+            shipmentTypeId: formData.shipmentTypeId,
+            shipmentTypeIdType: typeof formData.shipmentTypeId,
+            shipmentTypeName: formData.shipmentTypeName,
+            stringComparison: {
+              isEqual2: String(formData.shipmentTypeId) === "2",
+              isEqual3: String(formData.shipmentTypeId) === "3"
+            },
+            shouldShowWeight: isImport || String(formData.shipmentTypeId) === "2" || String(formData.shipmentTypeId) === "3",
+            weightColumnCondition: Boolean(isImport || String(formData.shipmentTypeId) === "2" || String(formData.shipmentTypeId) === "3"),
+            containers: containers.map(c => ({ id: c.id, type: c.containerType, weight: c.weight }))
+          })}
           {containers.length > 0 && (
             <div className="controller-instructions-form-section">
               <div className="controller-instructions-container-details-section">
@@ -3876,9 +3999,10 @@ const FCcontrollerinstructions = () => {
                         >
                           Container Number
                         </th>
+                        {/* Force string comparison for shipmentTypeId */}
                         {(isImport ||
-                          formData.shipmentTypeId === "2" ||
-                          formData.shipmentTypeId === "3") && (
+                          String(formData.shipmentTypeId) === "2" ||
+                          String(formData.shipmentTypeId) === "3") && (
                           <th
                             style={{
                               padding: "12px 8px",
@@ -3950,9 +4074,10 @@ const FCcontrollerinstructions = () => {
                               )}
                             </div>
                           </td>
+                          {/* Force string comparison for shipmentTypeId */}
                           {(isImport ||
-                            formData.shipmentTypeId === "2" ||
-                            formData.shipmentTypeId === "3") && (
+                            String(formData.shipmentTypeId) === "2" ||
+                            String(formData.shipmentTypeId) === "3") && (
                             <td>
                               <div className="controller-instructions-input-wrapper">
                                 <input
@@ -3965,10 +4090,19 @@ const FCcontrollerinstructions = () => {
                                       : ""
                                   }`}
                                   value={
-                                    container.weight === null
+                                    container.weight === null || container.weight === undefined
                                       ? ""
-                                      : container.weight.toString()
+                                      : typeof container.weight === 'number'
+                                        ? container.weight.toString()
+                                        : container.weight
                                   }
+                                  onFocus={() => {
+                                    console.log(`Weight input focus - container ${container.id}:`, {
+                                      weightValue: container.weight,
+                                      weightType: typeof container.weight,
+                                      displayValue: container.weight === null ? "" : container.weight.toString()
+                                    });
+                                  }}
                                   onChange={(e) =>
                                     handleContainerChange(
                                       container.id,
