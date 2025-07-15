@@ -99,9 +99,11 @@ const ExpenseTypeTable = ({
                         </button>
                       </td>
                       <td>
-                        <button className="manage-delete-button" onClick={() => handleDelete(expenseType)}>
-                          Delete
-                        </button>
+                        {expenseType.expense && expenseType.expense.toLowerCase() !== "fuel" && (
+                          <button className="manage-delete-button" onClick={() => handleDelete(expenseType)}>
+                            Delete
+                          </button>
+                        )}
                       </td>
                     </tr>
                   ))
