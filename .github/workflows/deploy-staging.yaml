@@ -4,9 +4,6 @@ on:
     branches:
       - staging
 
-  pull_request:
-    branches:
-      - staging
 env:
   AWS_REGION: af-south-1
   EB_APPLICATION_NAME: Whizz-Away
