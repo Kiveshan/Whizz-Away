@@ -1,7 +1,8 @@
 "use client"
-import { useRef } from "react"
+import { useRef, useState,useEffect } from "react"
 import { useNavigate, useLocation } from "react-router-dom"
 import html2pdf from "html2pdf.js"
+import { Upload } from "lucide-react"
 import "../css/PO.css"
 import "../css/ViewPOForm-print.css"
 import CompanyHeader from "../../../../components/CompanyHeader"
@@ -10,8 +11,47 @@ const ViewPOForm = () => {
   const navigate = useNavigate()
   const printRef = useRef()
   const location = useLocation()
+  
   const { poData } = location.state || {}
-
+  const ponum = poData?.ponum || "";
+  const truckId = location.state?.truckId || null;
+const truckRegNum = location.state?.truckRegNum || "";
+  const [uploadFile, setUploadFile] = useState(null)
+  const [completePOData, setCompletePOData] = useState(null);
+  const [slipStatus, setSlipStatus] = useState({ hasSlip: false, loading: true });
+const [uploadSuccess, setUploadSuccess] = useState(location.state?.uploadSuccess || false);
+useEffect(() => {
+  const fetchCompletePOData = async () => {
+    if (ponum) {
+      try {
+        const response = await fetch(`/api/po-form/details/${ponum}`);
+        const data = await response.json();
+        setCompletePOData(data);
+        console.log("Complete PO Data:", data);
+      } catch (error) {
+        console.error('Error fetching complete PO data:', error);
+      }
+    }
+  };
+  
+  fetchCompletePOData();
+}, [ponum]);
+useEffect(() => {
+  const checkSlipStatus = async () => {
+    if (ponum) {
+      try {
+        const response = await fetch(`/api/po-form/slip-status/${ponum}`);
+        const data = await response.json();
+        setSlipStatus({ ...data, loading: false });
+      } catch (error) {
+        console.error('Error checking slip status:', error);
+        setSlipStatus({ hasSlip: false, loading: false });
+      }
+    }
+  };
+  
+  checkSlipStatus();
+}, [ponum, uploadSuccess]);
   if (!poData) {
     return (
       <div className="po-form-container">
@@ -24,14 +64,31 @@ const ViewPOForm = () => {
   }
 
   const lineItems = poData.line_items || []
-  const subtotal = lineItems.reduce((sum, item) => sum + Number(item.amount || 0), 0)
-  const vat = subtotal * 0.15
-  const total = subtotal + vat
+  const isFuelExpense = poData.expense === "Fuel" 
+
+  // Only calculate totals for non-fuel expenses
+  const subtotal = isFuelExpense ? 0 : lineItems.reduce((sum, item) => sum + Number(item.amount || 0), 0)
+  const vat = isFuelExpense ? 0 : subtotal * 0.15
+  const total = isFuelExpense ? 0 : subtotal + vat
 
   const handleBack = () => {
     navigate("/Creditors/PurchaseOrders")
   }
-
+const handleViewSlip = async () => {
+  try {
+    const response = await fetch(`/api/po-form/view-slip/${ponum}`);
+    const data = await response.json();
+    
+    if (data.success && data.url) {
+      window.open(data.url, '_blank');
+    } else {
+      alert('Error: Could not load slip');
+    }
+  } catch (error) {
+    console.error('Error viewing slip:', error);
+    alert('Error viewing slip. Please try again.');
+  }
+};
   const handleDownload = () => {
     const element = printRef.current
     if (!element) {
@@ -106,57 +163,88 @@ const ViewPOForm = () => {
 
           <div className="line-items">
             <table className="line-items-table">
-              <thead>
-                <tr>
-                  <th>Description</th>
-                  <th>Quantity</th>
-                  <th>Unit Price</th>
-                  <th>Amount</th>
-                </tr>
-              </thead>
-              <tbody>
-                {lineItems.length > 0 ? (
-                  lineItems.map((item, index) => (
-                    <tr key={index}>
-                      <td>{item.description || ""}</td>
-                      <td>{item.quantity || 0}</td>
-                      <td>R {(item.unit_price || 0).toFixed(2)}</td>
-                      <td>R {(item.amount || 0).toFixed(2)}</td>
-                    </tr>
-                  ))
-                ) : (
-                  <tr>
-                    <td colSpan="4">No line items found</td>
-                  </tr>
-                )}
-              </tbody>
+ <thead>
+  <tr>
+    <th>Description</th>
+    <th>{isFuelExpense ? "Trucks" : "Quantity"}</th>
+  </tr>
+</thead>
+<tbody>
+  {lineItems.length > 0 ? (
+    lineItems.map((item, index) => (
+      <tr key={index}>
+        <td>{item.description || ""}</td>
+        <td>{isFuelExpense ? item.truckregnum || "Unknown" : item.quantity || 0}</td>
+      </tr>
+    ))
+  ) : (
+    <tr>
+      <td colSpan="2">No line items found</td>
+    </tr>
+  )}
+</tbody>
+
             </table>
           </div>
 
-          <div className="totals-section">
-            <table className="totals-table">
-              <tbody>
-                <tr>
-                  <td className="label-cell">Sub-Total</td>
-                  <td className="amount-cell">R {subtotal.toFixed(2)}</td>
-                </tr>
-                <tr>
-                  <td className="label-cell">VAT(15%)</td>
-                  <td className="amount-cell">R {vat.toFixed(2)}</td>
-                </tr>
-                <tr>
-                  <td className="label-cell">Total</td>
-                  <td className="amount-cell">R {total.toFixed(2)}</td>
-                </tr>
-              </tbody>
-            </table>
-          </div>
+
         </div>
-        <div className="submit-section">
-          <button type="button" className="view-btn" onClick={handleDownload}>
-            Download
-          </button>
-        </div>
+
+        {/* MODIFY THIS: Add upload button next to download */}
+<div className="submit-section">
+  <button type="button" className="view-btn" onClick={handleDownload}>
+    Download
+  </button>
+{!slipStatus.loading && (
+  slipStatus.hasSlip ? (
+    <button
+      type="button"
+      className="view-btn"
+      style={{ marginLeft: "10px", cursor: "pointer" }}
+      onClick={handleViewSlip}
+    >
+      View Slip
+    </button>
+  ) : (
+    <button
+      type="button"
+      className="view-btn upload-btn"
+      style={{ marginLeft: "10px", cursor: "pointer" }}
+onClick={() => {
+  // Use completePOData if available, otherwise fall back to poData
+  const poDataToUse = completePOData || poData;
+  const finalTruckId = poDataToUse.truckid;
+  const finalTruckRegNum = poDataToUse.truckregnum || poDataToUse.reg_no;
+  
+  console.log("Navigation data from PO:", {
+    finalTruckId,
+    finalTruckRegNum,
+    ponum,
+    expenseType: poDataToUse.expense === "Fuel" ? 5 : null,
+    poDataToUse // Log entire poData to see what's available
+  });
+  
+  if (!finalTruckId && poDataToUse.expense === "Fuel") {
+    alert("Error: No truck information found in this purchase order");
+    return;
+  }
+  
+  navigate("/ExpenseSubmission", {
+    state: {
+      truckId: finalTruckId,
+      truckRegNum: finalTruckRegNum,
+      ponum,
+      expenseType: poDataToUse.expense === "Fuel" ? 5 : null, 
+    },
+  });
+}}
+    >
+      <Upload size={16} style={{ marginRight: "5px" }} />
+      Upload
+    </button>
+  )
+)}
+</div>
       </div>
     </div>
   )

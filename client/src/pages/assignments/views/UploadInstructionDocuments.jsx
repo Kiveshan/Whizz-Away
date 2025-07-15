@@ -198,27 +198,20 @@ const handleLegClick = (legNumber) => {
     return;
   }
 
-  console.log(`Navigating to leg index ${legIndex}`);
+  console.log(`Navigating to leg index ${legIndex} (leg number ${legNumber})`);
 
-  // CRITICAL FIX: Clear any existing localStorage state before navigation
-  if (instructionId) {
-    localStorage.removeItem(`instruction_${instructionId}_state`);
-  }
-
-  // Force a clean navigation with state isolation
+  // Navigate with the leg index
   navigate("/update-instructions", {
     state: {
       clientId,
       instructionId,
-      selectedLegIndex: legIndex,
-      timestamp: Date.now(),
-      // ADD THIS: Flag to indicate we're coming from documents page
-      fromDocumentsPage: true,
-      // ADD THIS: Force clean state
-      forceCleanState: true,
+      selectedLegIndex: legIndex, // This should be 0 for Leg 1
+      isCompleted: isCompleted,
+      shipmentType: shipmentType,
     },
     replace: true,
   });
+  
   setIsDocumentPage(false);
 };
 
@@ -468,6 +461,7 @@ if (!isWeightBasedInstruction() && legDeliveryNotes.length >= containersReachedC
       state: {
         clientId,
         instructionId,
+        selectedLegIndex: 0,
         timestamp: Date.now(), // Add a timestamp to force React to see this as new state
       },
       replace: true,
@@ -566,7 +560,7 @@ const basicRequirements =
       "Checking if we should show Empty Turning Depot Document option. Shipment type:",
       shipmentType
     );
-    return shipmentType !== 2;
+    return shipmentType === 1;
   };
 //   const countContainersReachingDestination = async () => {
 //   try {

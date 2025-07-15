@@ -457,6 +457,7 @@ const Instructions = () => {
                               selectedMonth,
                               selectedYear,
                               activeFilter,
+                              selectedLegIndex: 0,
                             }
 
                             // Log the state being passed to update-instructions

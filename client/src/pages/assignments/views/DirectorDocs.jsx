@@ -182,6 +182,7 @@ const DirectorDocs = () => {
   const [shipmentType, setShipmentType] = useState(null);
   const [debugInfo, setDebugInfo] = useState({});
   const [containerCount, setContainerCount] = useState(0);
+  const [containersReachedCount, setContainersReachedCount] = useState(0);
   const [isWeightBased, setIsWeightBased] = useState(false);
 const [weightUnit, setWeightUnit] = useState('kg');
 
@@ -192,6 +193,7 @@ const [weightUnit, setWeightUnit] = useState('kg');
       fetchDocuments();
       checkIfWeightBased();
       fetchContainers();
+
       // Check if shipmentType was passed in location state
       if (location.state?.shipmentType !== undefined) {
         console.log(
@@ -211,25 +213,29 @@ const [weightUnit, setWeightUnit] = useState('kg');
       }
     }
   }, [instructionId]);
-
-  const fetchContainers = async () => {
-    try {
-      if (!isWeightBased) {
-        // Only fetch if NOT weight-based
-        const response = await api.get(`/containers/instruction/${instructionId}`)
-        console.log("Containers for instruction:", response.data)
-        setContainerCount(response.data.length)
-      } else {
-
-        setContainerCount(0)
-        console.log("Weight-based instruction: Skipping container count fetch.")
-      }
-    } catch (error) {
-      console.error("Error fetching containers:", error)
+const fetchContainers = async () => {
+  try {
+    if (!isWeightBased) {
+      // Only fetch if NOT weight-based
+      const response = await api.get(`/containers/instruction/${instructionId}`)
+      console.log("Containers for instruction:", response.data)
+      setContainerCount(response.data.length)
+      
+      // Fetch the reached count
+      const reachedCount = await countContainersReachingDestination();
+      setContainersReachedCount(reachedCount);
+      console.log("Containers reached final destination count:", reachedCount);
+    } else {
       setContainerCount(0)
+      setContainersReachedCount(0)
+      console.log("Weight-based instruction: Skipping container count fetch.")
     }
+  } catch (error) {
+    console.error("Error fetching containers:", error)
+    setContainerCount(0)
+    setContainersReachedCount(0)
   }
-
+}
   const fetchShipmentType = async () => {
     try {
       console.log("Fetching shipment type for instruction ID:", instructionId);
@@ -277,7 +283,41 @@ const [weightUnit, setWeightUnit] = useState('kg');
     console.error('Error checking rate weight:', error);
   }
 };
-
+const countContainersReachingDestination = async () => {
+  try {
+    // Get instruction details to get the dropoff location
+    const instructionResponse = await api.get(`/instructions/${instructionId}/details`);
+    const dropoff = instructionResponse.data.dropoff;
+    
+    // Normalize dropoff by converting to lowercase and removing spaces
+    const normalizedDropoff = dropoff?.toLowerCase().replace(/\s/g, '');
+    
+    // Get all legs for this instruction
+    const legsResponse = await api.get(`/legs/${instructionId}`);
+    const legsData = legsResponse.data;
+    
+    // Track which containers reach the final destination
+    const containersReachingDropoff = new Set();
+    
+    legsData.forEach((leg) => {
+      // Normalize leg destination by converting to lowercase and removing spaces
+      const normalizedLegDestination = leg.destination?.toLowerCase().replace(/\s/g, '');
+      if (normalizedLegDestination === normalizedDropoff && leg.drivers && leg.drivers.length > 0) {
+        leg.drivers.forEach((driver) => {
+          if (driver.containernumber) {
+            containersReachingDropoff.add(driver.containernumber.toString());
+          }
+        });
+      }
+    });
+    
+    console.log("Containers reaching final destination:", Array.from(containersReachingDropoff));
+    return containersReachingDropoff.size;
+  } catch (error) {
+    console.error("Error counting containers reaching destination:", error);
+    return 0;
+  }
+};
   const fetchLegs = async () => {
     try {
       const response = await api.get(`/legs/${instructionId}`);
@@ -468,7 +508,7 @@ const [weightUnit, setWeightUnit] = useState('kg');
           ? "green"
           : "red"
         : documents.filter((doc) => doc.type === "Delivery Note").length ===
-          containerCount
+          containersReachedCount
         ? "green"
         : "red",
     }}
@@ -479,7 +519,7 @@ const [weightUnit, setWeightUnit] = useState('kg');
         }`
       : `Delivery Notes: ${
           documents.filter((doc) => doc.type === "Delivery Note").length
-        }/${containerCount}`}
+        }/${containersReachedCount}`}
   </li>
 </ul>
 </div>

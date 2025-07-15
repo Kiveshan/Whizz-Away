@@ -133,7 +133,7 @@ export const getInstructions = async () => {
 };
 
 export const getTruckRegNums = async () => {
-  const query = "SELECT truckregnum FROM m5_trucks ORDER BY truckregnum";
+  const query = "SELECT truckregnum FROM m5_trucks WHERE status = true ORDER BY truckregnum";
   try {
     const result = await pool.query(query);
     return result.rows.map((row) => row.truckregnum);
@@ -144,7 +144,7 @@ export const getTruckRegNums = async () => {
 
 export const getTrucks = async () => {
   const query =
-    "SELECT m5truckskey as truckid, truckregnum as registration FROM m5_trucks ORDER BY truckregnum";
+    "SELECT m5truckskey as truckid, truckregnum as registration FROM m5_trucks WHERE status = true ORDER BY truckregnum";
   try {
     const result = await pool.query(query);
     return result.rows;
