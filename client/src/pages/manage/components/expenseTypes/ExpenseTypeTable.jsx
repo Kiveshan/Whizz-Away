@@ -47,8 +47,10 @@ const ExpenseTypeTable = ({
     }
   }
 
-  // Ensure expenseTypes is always an array
-  const safeExpenseTypes = Array.isArray(expenseTypes) ? expenseTypes : []
+  // Ensure expenseTypes is always an array and sort by ID in ascending order
+  const safeExpenseTypes = Array.isArray(expenseTypes) 
+    ? [...expenseTypes].sort((a, b) => a.id - b.id) 
+    : []
 
   if (error) {
     return <div className="error">{error}</div>
