@@ -3,6 +3,10 @@ on:
   push:
     branches:
       - staging
+
+  pull_request:
+    branches:
+      - staging
 env:
   AWS_REGION: af-south-1
   EB_APPLICATION_NAME: Whizz-Away
@@ -48,6 +52,7 @@ jobs:
           rm -rf server/public
           mkdir -p server/public
           mv client/build server/public
+          mv .platform server/
 
       - name: Generate deployment package
         run: cd server && zip -r ../${{ env.DEPLOYMENT_PACKAGE }} . -x '*.git*' *.env* '*.log' '*.md' 'node_modules/*' 'client/node_modules/*'
