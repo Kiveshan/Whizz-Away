@@ -124,10 +124,29 @@ const getExpenseDocumentById = async (id) => {
 
   return { success: true, data: result.rows[0] };
 };
+const getPOExpensesByTruckId = async (truckId) => {
+  const queryText = `
+    SELECT 
+      e.*,
+      po.ponum,
+      po.slip_s3key as po_slip_s3key,
+      po.invoice_number,
+      CASE 
+        WHEN po.ponum IS NOT NULL THEN CONCAT(e.documentfrom, ' (PO: ', po.ponum, ')')
+        ELSE e.documentfrom
+      END as documentfrom_display
+    FROM public.expenses_m2 e
+    LEFT JOIN public.purchase_orders po ON e.orderno::text = po.ponum
+    WHERE e.truckid = $1
+    ORDER BY e.slipuploaddate DESC
+  `;
+  const result = await pool.query(queryText, [truckId]);
+  return result.rows;
+};
 
 export {
   getExpensesByTruckId,
   insertFuelExpense,
   insertFuelExpenseWithoutS3Key,
-  getExpenseDocumentById,
+  getExpenseDocumentById,getPOExpensesByTruckId
 };

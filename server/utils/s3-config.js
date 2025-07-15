@@ -52,6 +52,23 @@ const uploadPaymentProof = multer({
     }
   },
 });
+const uploadPurchaseOrder = multer({
+  storage: storage,
+  limits: {
+    fileSize: 50 * 1024 * 1024, // 50MB limit
+  },
+  fileFilter: (req, file, cb) => {
+    const filetypes = /jpeg|jpg|png|pdf/;
+    const extname = filetypes.test(path.extname(file.originalname).toLowerCase());
+    const mimetype = filetypes.test(file.mimetype);
+
+    if (mimetype && extname) {
+      return cb(null, true);
+    } else {
+      cb(new Error("Only image and PDF files are allowed!"));
+    }
+  },
+});
 
 const uploadInstruction = multer({
   storage: storage,
@@ -108,4 +125,5 @@ export {
   uploadPaymentProof,
   getSignedUrl,
   bucketName,
+  uploadPurchaseOrder
 };

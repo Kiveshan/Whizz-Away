@@ -98,31 +98,42 @@ const ExpenseDetails = () => {
     }
   };
 
-  const handleViewDocument = async (expense) => {
-    try {
-      if (expense.ekey) {
-        const response = await api.get(`/expenses/document/${expense.ekey}`);
-
-        if (response.data.success && response.data.url) {
-          window.open(response.data.url, "_blank");
-          return;
-        } else {
-          console.error("Error response:", response.data);
-        }
+const handleViewDocument = async (expense) => {
+  try {
+    // First try to get document from expenses_m2 table
+    if (expense.ekey) {
+      const response = await api.get(`/expenses/document/${expense.ekey}`);
+      if (response.data.success && response.data.url) {
+        window.open(response.data.url, "_blank");
+        return;
       }
-
-      if (expense.slipname) {
-        const url = `http://localhost:5000/uploads/${expense.slipname}`;
-        window.open(url, "_blank");
-      } else {
-        alert("No document available to view");
-      }
-    } catch (err) {
-      console.error("Error viewing document:", err);
-      alert("Error viewing document. Please try again.");
     }
-  };
+    
+    // If that fails, try to get PO slip if this expense has a PO number
+    if (expense.ponum) {
+      try {
+        const poResponse = await api.get(`/api/po-form/view-slip/${expense.ponum}`);
+        if (poResponse.data.success && poResponse.data.url) {
+          window.open(poResponse.data.url, "_blank");
+          return;
+        }
+      } catch (poError) {
+        console.log("No PO slip found, trying other methods");
+      }
+    }
 
+    // Fallback methods
+    if (expense.slipname) {
+      const url = `http://localhost:5000/uploads/${expense.slipname}`;
+      window.open(url, "_blank");
+    } else {
+      alert("No document available to view");
+    }
+  } catch (err) {
+    console.error("Error viewing document:", err);
+    alert("Error viewing document. Please try again.");
+  }
+};
   const handleDownloadDocument = async (expense) => {
     try {
       if (expense.ekey) {
@@ -328,14 +339,6 @@ const ExpenseDetails = () => {
           />
         </>
       )}
-
-      <button
-        className="add-btn"
-        onClick={handleAddExpense}
-        style={{ marginBottom: "90px" }}
-      >
-        Add Fuel Expense
-      </button>
 
       {viewerOpen && (
         <div className="fullscreen-viewer">

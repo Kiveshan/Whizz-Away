@@ -133,7 +133,7 @@ export const getInstructions = async () => {
 };
 
 export const getTruckRegNums = async () => {
-  const query = "SELECT truckregnum FROM m5_trucks ORDER BY truckregnum";
+  const query = "SELECT truckregnum FROM m5_trucks WHERE status = true ORDER BY truckregnum";
   try {
     const result = await pool.query(query);
     return result.rows.map((row) => row.truckregnum);
@@ -144,7 +144,7 @@ export const getTruckRegNums = async () => {
 
 export const getTrucks = async () => {
   const query =
-    "SELECT m5truckskey as truckid, truckregnum as registration FROM m5_trucks ORDER BY truckregnum";
+    "SELECT m5truckskey as truckid, truckregnum as registration FROM m5_trucks WHERE status = true ORDER BY truckregnum";
   try {
     const result = await pool.query(query);
     return result.rows;
@@ -266,7 +266,6 @@ export const getContainerTypes = async () => {
     throw error;
   }
 };
-
 export const saveLeg = async ({
   legkey,
   legnumber,
@@ -306,31 +305,53 @@ export const saveLeg = async ({
         );
         legId = insertResult.rows[0].legkey;
       }
+
       if (drivers && drivers.length > 0) {
         for (const [index, driver] of drivers.entries()) {
           if (
             !driver.driverid &&
             !driver.truckregnumber &&
             !driver.containernumber &&
+            !driver.vgm &&
             !driver.date
           )
             continue;
+
           const driverId = driver.driverid
             ? Number.parseInt(driver.driverid)
             : null;
           const truckRegNumber = driver.truckregnumber || null;
-          let containerNumber = driver.containernumber
-            ? driver.containernumber.toString()
-            : null;
+          
+          // UPDATED: Handle both container number and weight (vgm)
+          let containerNumber = null;
+          let vgmValue = null;
+          
+          if (driver.containernumber) {
+            containerNumber = driver.containernumber.toString();
+          }
+          
+          if (driver.vgm !== null && driver.vgm !== undefined) {
+            vgmValue = parseFloat(driver.vgm);
+          }
+
           const date = driver.date ? new Date(driver.date) : null;
           const driverSpecificRate = driver.driverRate || driverrate;
+
           if (!isNewLeg && legId && index === 0) {
             await client.query(
-              `UPDATE legs_m2 SET driverid = $1, truckregnumber = $2, containernumber = $3, date = $4, driverrate = $5 WHERE legkey = $6`,
+              `UPDATE legs_m2 SET 
+                driverid = $1, 
+                truckregnumber = $2, 
+                containernumber = $3, 
+                vgm = $4,
+                date = $5, 
+                driverrate = $6 
+              WHERE legkey = $7`,
               [
                 driverId,
                 truckRegNumber,
                 containerNumber,
+                vgmValue,
                 date,
                 driverSpecificRate,
                 legId,
@@ -338,7 +359,18 @@ export const saveLeg = async ({
             );
           } else {
             const insertResult = await client.query(
-              `INSERT INTO legs_m2 (legnumber, startingpoint, destination, driverrate, m1key, driverid, truckregnumber, containernumber, date) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) RETURNING legkey`,
+              `INSERT INTO legs_m2 (
+                legnumber, 
+                startingpoint, 
+                destination, 
+                driverrate, 
+                m1key, 
+                driverid, 
+                truckregnumber, 
+                containernumber, 
+                vgm,
+                date
+              ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10) RETURNING legkey`,
               [
                 legnumber,
                 startingpoint,
@@ -348,6 +380,7 @@ export const saveLeg = async ({
                 driverId,
                 truckRegNumber,
                 containerNumber,
+                vgmValue,
                 date,
               ]
             );
@@ -356,6 +389,7 @@ export const saveLeg = async ({
         }
       }
     }
+
     await client.query("COMMIT");
     return { legId, isUpdate: !isNewLeg };
   } catch (error) {
@@ -365,18 +399,117 @@ export const saveLeg = async ({
     client.release();
   }
 };
+// export const saveLeg = async ({
+//   legkey,
+//   legnumber,
+//   startingpoint,
+//   destination,
+//   driverrate,
+//   m1key,
+//   drivers,
+// }) => {
+//   const client = await pool.connect();
+//   try {
+//     await client.query("BEGIN");
+//     const isNewLeg = !legkey || legkey === null;
+
+//     if (!isNewLeg) {
+//       await client.query(
+//         `DELETE FROM legs_m2 WHERE m1key = $1 AND legnumber = $2 AND legkey != $3`,
+//         [m1key, legnumber, legkey]
+//       );
+//       await client.query(
+//         `UPDATE legs_m2 SET startingpoint = $1, destination = $2, driverrate = $3 WHERE legkey = $4`,
+//         [startingpoint, destination, driverrate, legkey]
+//       );
+//     } else {
+//       await client.query(
+//         `DELETE FROM legs_m2 WHERE m1key = $1 AND legnumber = $2`,
+//         [m1key, legnumber]
+//       );
+//     }
+
+//     let legId = legkey;
+//     if (isNewLeg || (drivers && drivers.length > 0)) {
+//       if (isNewLeg && (!drivers || drivers.length === 0)) {
+//         const insertResult = await client.query(
+//           `INSERT INTO legs_m2 (legnumber, startingpoint, destination, driverrate, m1key) VALUES ($1, $2, $3, $4, $5) RETURNING legkey`,
+//           [legnumber, startingpoint, destination, driverrate, m1key]
+//         );
+//         legId = insertResult.rows[0].legkey;
+//       }
+//       if (drivers && drivers.length > 0) {
+//         for (const [index, driver] of drivers.entries()) {
+//           if (
+//             !driver.driverid &&
+//             !driver.truckregnumber &&
+//             !driver.containernumber &&
+//             !driver.date
+//           )
+//             continue;
+//           const driverId = driver.driverid
+//             ? Number.parseInt(driver.driverid)
+//             : null;
+//           const truckRegNumber = driver.truckregnumber || null;
+//           let containerNumber = driver.containernumber
+//             ? driver.containernumber.toString()
+//             : null;
+//           const date = driver.date ? new Date(driver.date) : null;
+//           const driverSpecificRate = driver.driverRate || driverrate;
+//           if (!isNewLeg && legId && index === 0) {
+//             await client.query(
+//               `UPDATE legs_m2 SET driverid = $1, truckregnumber = $2, containernumber = $3, date = $4, driverrate = $5 WHERE legkey = $6`,
+//               [
+//                 driverId,
+//                 truckRegNumber,
+//                 containerNumber,
+//                 date,
+//                 driverSpecificRate,
+//                 legId,
+//               ]
+//             );
+//           } else {
+//             const insertResult = await client.query(
+//               `INSERT INTO legs_m2 (legnumber, startingpoint, destination, driverrate, m1key, driverid, truckregnumber, containernumber, date) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) RETURNING legkey`,
+//               [
+//                 legnumber,
+//                 startingpoint,
+//                 destination,
+//                 driverSpecificRate,
+//                 m1key,
+//                 driverId,
+//                 truckRegNumber,
+//                 containerNumber,
+//                 date,
+//               ]
+//             );
+//             if (isNewLeg && index === 0) legId = insertResult.rows[0].legkey;
+//           }
+//         }
+//       }
+//     }
+//     await client.query("COMMIT");
+//     return { legId, isUpdate: !isNewLeg };
+//   } catch (error) {
+//     await client.query("ROLLBACK");
+//     throw error;
+//   } finally {
+//     client.release();
+//   }
+// };
 
 export const getLegsByInstructionId = async (instructionId) => {
   const query = `
     SELECT 
-      l.legkey, 
-      l.legnumber, 
-      l.startingpoint, 
-      l.destination, 
+      l.legkey,
+      l.legnumber,
+      l.startingpoint,
+      l.destination,
       l.driverrate,
       l.driverid,
       l.truckregnumber,
       l.containernumber,
+      l.vgm,
       l.date,
       e.name AS driver_name,
       e.surname AS driver_surname,
@@ -391,9 +524,11 @@ export const getLegsByInstructionId = async (instructionId) => {
       l.m1key = $1
     ORDER BY 
       l.legnumber, l.legkey`;
+
   try {
     const result = await pool.query(query, [instructionId]);
     const legMap = new Map();
+
     for (const row of result.rows) {
       const legnumber = row.legnumber;
       if (!legMap.has(legnumber)) {
@@ -406,14 +541,16 @@ export const getLegsByInstructionId = async (instructionId) => {
           drivers: [],
         });
       }
+
       const leg = legMap.get(legnumber);
       leg.drivers.push({
         id: row.legkey,
         driverid: row.driverid ? row.driverid.toString() : "",
         truckregnumber: row.truckregnumber || "",
-        containernumber: row.containernumber
-          ? row.containernumber.toString()
-          : "",
+        // UPDATED: Use vgm for weight-based, containernumber for container-based
+        containernumber: row.vgm 
+          ? row.vgm.toString() 
+          : (row.containernumber ? row.containernumber.toString() : ""),
         container_type: row.container_type || "",
         driverRate: row.driverrate ? row.driverrate.toString() : "",
         date: row.date || null,
@@ -427,6 +564,7 @@ export const getLegsByInstructionId = async (instructionId) => {
             : "Unknown Driver",
       });
     }
+
     const legs = Array.from(legMap.values());
     legs.forEach(
       (leg) =>
@@ -438,12 +576,12 @@ export const getLegsByInstructionId = async (instructionId) => {
             driver.date
         ))
     );
+
     return legs;
   } catch (error) {
     throw error;
   }
 };
-
 export const deleteLeg = async (legId) => {
   const client = await pool.connect();
   try {
@@ -493,8 +631,29 @@ export const completeInstruction = async (instructionId, status) => {
   }
 };
 
+// export const getInstructionDetails = async (instructionId) => {
+//   const query = `SELECT m1key, client, pickup, dropoff, status FROM m1_controller WHERE m1key = $1`;
+//   try {
+//     const result = await pool.query(query, [instructionId]);
+//     return result.rows.length > 0 ? result.rows[0] : null;
+//   } catch (error) {
+//     throw error;
+//   }
+// };
+// Add this new function to your database service
 export const getInstructionDetails = async (instructionId) => {
-  const query = `SELECT m1key, client, pickup, dropoff, status FROM m1_controller WHERE m1key = $1`;
+  const query = `
+    SELECT 
+      m1key, 
+      client, 
+      pickup, 
+      dropoff, 
+      status, 
+      rateweight,
+      weight
+    FROM m1_controller 
+    WHERE m1key = $1
+  `;
   try {
     const result = await pool.query(query, [instructionId]);
     return result.rows.length > 0 ? result.rows[0] : null;

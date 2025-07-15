@@ -1,29 +1,31 @@
 import { pool } from "../../config/database.js"
-
 export const getPurchaseOrders = async () => {
   const query = `
-    SELECT 
-      po.ponum,
-      MIN(po.date) AS date,
-      SUM(po.total) AS total,
-      et.expense AS expense_type,
-      s.supplier AS supplier_name,
-      JSON_AGG(
-        JSON_BUILD_OBJECT(
-          'po_id', po.po_id,
-          'description', po.description,
-          'quantity', po.quantity,
-          'unit_price', po.unit_price,
-          'amount', po.quantity * po.unit_price
-        )
-      ) AS line_items
+SELECT 
+  po.ponum,
+  MIN(po.date) AS date,
+  et.expense AS expense_type,
+  s.supplier AS supplier_name,
+  SUM(po.total) AS total,
+  JSON_AGG(
+    JSON_BUILD_OBJECT(
+      'po_id', po.po_id,
+      'description', po.description,
+      'quantity', po.quantity,
+      'truckid', po.truckid
+    )
+  ) AS line_items,
+      CASE 
+        WHEN COUNT(po.slip_s3key) FILTER (WHERE po.slip_s3key IS NOT NULL) = COUNT(*) 
+        THEN 'Submitted'
+        ELSE 'Pending'
+      END AS status
     FROM purchase_orders po
     JOIN expense_types et ON po.expense_type_id = et.id
     JOIN suppliers s ON po.supplier_id = s.supplier_id
     GROUP BY po.ponum, et.expense, s.supplier
     ORDER BY MIN(po.date) DESC
   `
-
   try {
     const result = await pool.query(query)
     return result.rows
@@ -31,6 +33,52 @@ export const getPurchaseOrders = async () => {
     throw error
   }
 }
+
+export const getPurchaseOrderByPonum = async (ponum) => {
+  const query = `
+    SELECT 
+      po.*,
+      s.supplier,
+      e.expense,
+      t.truckregnum,
+      t.m5truckskey as truckid
+    FROM purchase_orders po
+    JOIN suppliers s ON po.supplier_id = s.supplier_id
+    JOIN expense_types e ON po.expense_type_id = e.id
+    LEFT JOIN m5_trucks t ON po.truckid = t.m5truckskey
+    WHERE po.ponum = $1
+  `;
+  
+  try {
+    const result = await pool.query(query, [ponum]);
+    if (result.rows.length === 0) {
+      return null;
+    }
+    
+    // Group line items for this PO
+    const poData = result.rows[0];
+    const lineItemsQuery = `
+      SELECT 
+        po_id,
+        description,
+        quantity,
+        truckid,
+        t.truckregnum
+      FROM purchase_orders po
+      LEFT JOIN m5_trucks t ON po.truckid = t.m5truckskey
+      WHERE ponum = $1
+    `;
+    
+    const lineItemsResult = await pool.query(lineItemsQuery, [ponum]);
+    
+    return {
+      ...poData,
+      line_items: lineItemsResult.rows
+    };
+  } catch (error) {
+    throw error;
+  }
+};
 
 export const getExpenseTypes = async () => {
   const query = `
@@ -48,27 +96,19 @@ export const getExpenseTypes = async () => {
 }
 
 export const getStatements = async (supplierId, fromDate, toDate) => {
-  let query = `
-    SELECT 
-      po.po_id,
-      po.ponum,
-      po.date,
-      s.supplier,
-      s.supplier_id,
-      e.expense AS expense_type,
-      po.total,
-      po.description,
-      po.quantity,
-      po.unit_price,
-      po.subbie,
-      po.attention_to,
-      po.received_by,
-      po.reg_no
-    FROM purchase_orders po
-    JOIN suppliers s ON po.supplier_id = s.supplier_id
-    LEFT JOIN expense_types e ON po.expense_type_id = e.id
-    WHERE 1=1
-  `
+let query = `
+  SELECT 
+    po.ponum,
+    MIN(po.date) AS date,
+    s.supplier,
+    s.supplier_id,
+    STRING_AGG(DISTINCT e.expense, ', ') AS expense_type,
+    SUM(po.total) AS total
+  FROM purchase_orders po
+  JOIN suppliers s ON po.supplier_id = s.supplier_id
+  LEFT JOIN expense_types e ON po.expense_type_id = e.id
+  WHERE 1=1
+`
 
   const values = []
   let paramIndex = 1
@@ -88,7 +128,7 @@ export const getStatements = async (supplierId, fromDate, toDate) => {
     values.push(toDate)
   }
 
-  query += ` ORDER BY po.date DESC`
+ query += ` GROUP BY po.ponum, s.supplier, s.supplier_id ORDER BY MIN(po.date) DESC`
 
   try {
     const result = await pool.query(query, values)
@@ -100,16 +140,16 @@ export const getStatements = async (supplierId, fromDate, toDate) => {
 
 export const getSupplierSummary = async (year, month) => {
   let query = `
-    SELECT 
-      s.supplier_id,
-      s.supplier,
-      EXTRACT(YEAR FROM po.date) as year,
-      EXTRACT(MONTH FROM po.date) as month,
-      TO_CHAR(po.date, 'Month') as month_name,
-      COUNT(po.po_id) as order_count,
-      SUM(po.total) as total_amount,
-      MIN(po.date) as first_order_date,
-      MAX(po.date) as last_order_date
+SELECT 
+  s.supplier_id,
+  s.supplier,
+  EXTRACT(YEAR FROM po.date) as year,
+  EXTRACT(MONTH FROM po.date) as month,
+  TO_CHAR(po.date, 'Month') as month_name,
+  COUNT(po.po_id) as order_count,
+  MIN(po.date) as first_order_date,
+  MAX(po.date) as last_order_date,
+  SUM(po.total) as total_amount
     FROM purchase_orders po
     JOIN suppliers s ON po.supplier_id = s.supplier_id
     WHERE 1=1
@@ -198,11 +238,10 @@ export const createPurchaseOrder = async ({
   attentionTo,
   receivedBy,
   quantity,
-  unitPrice,
   description,
   subbie,
   date,
-  total,
+  truckid,
 }) => {
   const currentDate = new Date()
   const datePrefix = `PO-${currentDate.getFullYear()}${(currentDate.getMonth() + 1)
@@ -231,10 +270,10 @@ export const createPurchaseOrder = async ({
   const query = `
     INSERT INTO purchase_orders (
       expense_type_id, supplier_id, reg_no, attention_to, received_by,
-      quantity, unit_price, description, subbie, date, ponum, total
+      quantity, unit_price, description, subbie, date, ponum, total, truckid
     )
-    VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
-    RETURNING po_id
+    VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
+    RETURNING po_id, truckid
   `
 
   const values = [
@@ -243,24 +282,26 @@ export const createPurchaseOrder = async ({
     regNo,
     attentionTo,
     receivedBy,
-    quantity,
-    unitPrice,
+    expenseTypeId === 5 ? 0 : quantity,
+    0,
     description,
     subbie,
     date || new Date().toISOString().split("T")[0],
     poNum,
-    total,
+    0,
+    expenseTypeId === 5 ? truckid : null,
   ]
 
   try {
+    console.log("Inserting purchase order with values:", values)
     const result = await pool.query(query, values)
-    return { poId: result.rows[0].po_id, poNum }
+    return { poId: result.rows[0].po_id, poNum, truckid: result.rows[0].truckid }
   } catch (error) {
+    console.error("Error in createPurchaseOrder:", error)
     throw error
   }
 }
 
-// New function for creating multiple purchase orders with same PO number
 export const createMultiplePurchaseOrders = async ({
   supplierId,
   date,
@@ -269,14 +310,12 @@ export const createMultiplePurchaseOrders = async ({
   regNo,
   subbie,
   lineItems,
-  totals,
 }) => {
   const client = await pool.connect()
 
   try {
     await client.query("BEGIN")
 
-    // Generate PO number
     const currentDate = new Date()
     const datePrefix = `PO-${currentDate.getFullYear()}${(currentDate.getMonth() + 1)
       .toString()
@@ -301,36 +340,50 @@ export const createMultiplePurchaseOrders = async ({
 
     const poNum = `${datePrefix}-${sequenceNumber.toString().padStart(3, "0")}`
 
-    // Insert each line item as a separate record with the same PO number
     const insertQuery = `
       INSERT INTO purchase_orders (
         expense_type_id, supplier_id, reg_no, attention_to, received_by,
-        quantity, unit_price, description, subbie, date, ponum, total
+        quantity, unit_price, description, subbie, date, ponum, total, truckid
       )
-      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
-      RETURNING po_id
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
+      RETURNING po_id, truckid
     `
 
     const insertedIds = []
 
     for (const item of lineItems) {
-      const values = [
-        item.expenseTypeId,
-        supplierId,
-        regNo,
-        attentionTo,
-        receivedBy,
-        item.quantity,
-        item.unitPrice,
-        item.description,
-        subbie,
-        date || new Date().toISOString().split("T")[0],
-        poNum,
-        item.amount, // Individual line item amount
-      ]
+      console.log(`Raw line item: ${JSON.stringify(item)}`) // Log raw item
+      const expenseTypeId = Number(item.expenseTypeId)
+const truckId = expenseTypeId === 5 && item.truckid ? Number(item.truckid) : null
+      if (item.expenseTypeId === "5" && !truckId) {
+        console.error(`Missing or invalid truckid for fuel expense line item: ${JSON.stringify(item)}`)
+        throw new Error("truckid is required for fuel expense purchase orders")
+      }
+// Calculate total only once for the entire PO
+const isFirstItem = lineItems.indexOf(item) === 0;
+const totalAmount = 0;
 
+const values = [
+  expenseTypeId,
+  supplierId,
+  regNo,
+  attentionTo,
+  receivedBy,
+  expenseTypeId === 5 ? 0 : item.quantity,
+  0,
+  item.description,
+  subbie,
+  date || new Date().toISOString().split("T")[0],
+  poNum,
+  totalAmount,  // Only set total for first item
+  expenseTypeId === 5 ? truckId : null,
+]
+
+
+      console.log("Inserting line item with values:", values)
       const result = await client.query(insertQuery, values)
       insertedIds.push(result.rows[0].po_id)
+      console.log("Inserted purchase order, returned truckid:", result.rows[0].truckid)
     }
 
     await client.query("COMMIT")
@@ -342,10 +395,24 @@ export const createMultiplePurchaseOrders = async ({
     }
   } catch (error) {
     await client.query("ROLLBACK")
+    console.error("Error in createMultiplePurchaseOrders:", error)
     throw error
   } finally {
     client.release()
   }
+}
+
+export const getCompanyOwnedTrucks = async () => {
+  const query = `
+    SELECT 
+      m5truckskey AS truckid, 
+      truckregnum 
+    FROM m5_trucks
+    WHERE is_subcontractor IS DISTINCT FROM TRUE AND status= true
+    ORDER BY truckregnum
+  `
+  const result = await pool.query(query)
+  return result.rows
 }
 
 export const getPurchaseOrderList = async (supplierId, expenseTypeId, fromDate, toDate, poId, ponum) => {
@@ -365,14 +432,14 @@ export const getPurchaseOrderList = async (supplierId, expenseTypeId, fromDate, 
           'po_id', po.po_id,
           'description', po.description,
           'quantity', po.quantity,
-          'unit_price', po.unit_price,
-          'amount', po.quantity * po.unit_price
+          'truckid', po.truckid,
+'truckregnum', t.truckregnum
         )
-      ) AS line_items,
-      SUM(po.quantity * po.unit_price) AS total_amount
+      ) AS line_items
     FROM purchase_orders po
     JOIN suppliers s ON po.supplier_id = s.supplier_id
     JOIN expense_types e ON po.expense_type_id = e.id
+    LEFT JOIN m5_trucks t ON po.truckid = t.m5truckskey
     WHERE 1=1
   `
 
@@ -384,7 +451,7 @@ export const getPurchaseOrderList = async (supplierId, expenseTypeId, fromDate, 
     values.push(poId)
   }
 
-  if (ponum) { // ADD: Support querying by ponum
+  if (ponum) {
     query += ` AND po.ponum = $${paramIndex++}`
     values.push(ponum)
   }
@@ -409,7 +476,11 @@ export const getPurchaseOrderList = async (supplierId, expenseTypeId, fromDate, 
     values.push(toDate)
   }
 
-  query += ` GROUP BY po.ponum, po.date, s.supplier, s.supplier_id, e.expense, po.subbie, po.attention_to, po.received_by, po.reg_no
+  query += ` 
+GROUP BY 
+  po.ponum, po.date, s.supplier, s.supplier_id, e.expense,
+  po.subbie, po.attention_to, po.received_by, po.reg_no
+
     ORDER BY po.date DESC`
 
   try {
@@ -419,5 +490,3 @@ export const getPurchaseOrderList = async (supplierId, expenseTypeId, fromDate, 
     throw error
   }
 }
-
-// ... (other functions remain unchanged)

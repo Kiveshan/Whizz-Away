@@ -8,7 +8,14 @@ import {
   createPurchaseOrder,
   createMultiplePurchaseOrders, // New function
   getPurchaseOrderList,
+  getCompanyOwnedTrucks,
+  getPurchaseOrderByPonum
 } from "../../models/purchaseOrder/purchaseOrderModel.js"
+import { s3, bucketName } from "../../utils/s3-config.js"
+import path from "path"
+import { v4 as uuidv4 } from "uuid"
+import { pool } from "../../config/database.js"
+import { getSignedUrl } from "../../utils/s3-config.js"
 
 export const getPurchaseOrdersHandler = async (req, res) => {
   try {
@@ -17,6 +24,168 @@ export const getPurchaseOrdersHandler = async (req, res) => {
   } catch (error) {
     console.error("Error fetching purchase orders:", error)
     res.status(500).json({ error: "Internal server error" })
+  }
+}
+export const getPurchaseOrderByPonumHandler = async (req, res) => {
+  try {
+    const { ponum } = req.params;
+    const purchaseOrder = await getPurchaseOrderByPonum(ponum);
+    
+    if (!purchaseOrder) {
+      return res.status(404).json({ error: "Purchase order not found" });
+    }
+    
+    res.json(purchaseOrder);
+  } catch (error) {
+    console.error("Error fetching purchase order:", error);
+    res.status(500).json({ error: "Failed to fetch purchase order" });
+  }
+};
+export const uploadPurchaseOrderSlipHandler = async (req, res) => {
+  const { ponum, expenseCost, expenseType, truckRegNum, invoiceNumber, documentFrom, driverId } = req.body
+  const file = req.file
+
+  if (!ponum || !expenseCost || !file || !invoiceNumber) {
+    return res.status(400).json({ error: "Missing required fields" })
+  }
+
+  // Generate S3 key based on expense type
+  let folderKey;
+  let uniqueFileName;
+  const fileExt = path.extname(file.originalname);
+
+  if (expenseType === "5" || expenseType === 5) {
+    // Fuel expenses go to trucks folder
+    folderKey = `Trucks/${truckRegNum}`;
+    uniqueFileName = `${truckRegNum}-${uuidv4()}${fileExt}`;
+  } else {
+    // Other purchase orders go to purchaseOrders folder
+    folderKey = `purchaseOrders/${ponum}`;
+    uniqueFileName = `${ponum}-${uuidv4()}${fileExt}`;
+  }
+
+  const s3Key = `${folderKey}/${uniqueFileName}`;
+
+  try {
+    // Upload to S3
+    await s3
+      .putObject({
+        Bucket: bucketName,
+        Key: s3Key,
+        Body: file.buffer,
+        ContentType: file.mimetype,
+      })
+      .promise()
+await pool.query(
+  `UPDATE purchase_orders SET slip_s3key = $1, invoice_number = $2 WHERE ponum = $3`,
+  [s3Key, invoiceNumber, ponum]
+)
+
+// Update total only for the first record of this PONUM
+await pool.query(
+  `UPDATE purchase_orders 
+   SET total = $1 
+   WHERE ponum = $2 AND po_id = (
+     SELECT MIN(po_id) FROM purchase_orders WHERE ponum = $2
+   )`,
+  [parseFloat(expenseCost), ponum]
+)
+
+    // If this is a fuel expense (expenseType = 5), also save to expenses_m2 table
+    if (expenseType === "5" || expenseType === 5) {
+      const truckId = req.body.truckId;
+      const uploadDate = new Date().toISOString().split("T")[0];
+      
+      // Get document source info
+      let documentSource = documentFrom || "Controller";
+      let userId = null;
+
+      if (documentFrom === "Driver" && driverId) {
+        try {
+          const driverResult = await pool.query(
+            "SELECT CONCAT(name, ' ', surname) as fullname FROM m5_employee WHERE userid = $1",
+            [parseInt(driverId)]
+          );
+          if (driverResult.rows.length > 0) {
+            documentSource = driverResult.rows[0].fullname;
+            userId = parseInt(driverId);
+          }
+        } catch (driverErr) {
+          console.error("Error fetching driver name:", driverErr);
+        }
+      } else if (documentFrom === "Manager") {
+        try {
+          const managerResult = await pool.query(
+            "SELECT * FROM usertable WHERE roleid = 1 AND userid = 1"
+          );
+          if (managerResult.rows.length > 0) {
+            documentSource = `${managerResult.rows[0].name} ${managerResult.rows[0].surname}`;
+            userId = managerResult.rows[0].userid;
+          }
+        } catch (managerErr) {
+          console.error("Error fetching manager name:", managerErr);
+        }
+      } else if (documentFrom === "Controller") {
+        try {
+          const controllerResult = await pool.query(
+            "SELECT userid, CONCAT(name, ' ', surname) as fullname FROM m5_employee WHERE roleid = 2 LIMIT 1"
+          );
+          if (controllerResult.rows.length > 0) {
+            documentSource = controllerResult.rows[0].fullname;
+            userId = controllerResult.rows[0].userid;
+          }
+        } catch (controllerErr) {
+          console.error("Error fetching controller name:", controllerErr);
+        }
+      }
+
+      // Insert into expenses_m2 table
+      try {
+        const expenseQuery = `
+          INSERT INTO expenses_m2 
+          (type, documentfrom, expensecost, description, slipname, s3key, slipuploaddate, truckid, driverid, orderno)
+          VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+          RETURNING ekey
+        `;
+        
+        const expenseValues = [
+          "fuel",
+          documentSource,
+          parseFloat(expenseCost),
+          `Fuel expense for PO: ${ponum}`,
+          file.originalname,
+          s3Key,
+          uploadDate,
+          truckId ? parseInt(truckId) : null,
+          userId,
+          ponum
+        ];
+
+        const expenseResult = await pool.query(expenseQuery, expenseValues);
+        console.log("Expense record created with ID:", expenseResult.rows[0].ekey);
+        
+      } catch (expenseError) {
+        console.error("Error creating expense record:", expenseError);
+      }
+    }
+
+    res.status(200).json({
+      success: true,
+      message: "PO document uploaded and purchase order updated",
+      s3Key,
+    })
+  } catch (err) {
+    console.error("Upload PO slip failed:", err)
+    res.status(500).json({ error: "Failed to upload and update purchase order" })
+  }
+}
+export const getCompanyOwnedTrucksHandler = async (req, res) => {
+  try {
+    const trucks = await getCompanyOwnedTrucks()
+    res.json(trucks)
+  } catch (error) {
+    console.error("Error fetching company trucks:", error)
+    res.status(500).json({ error: "Failed to fetch company trucks" })
   }
 }
 
@@ -170,3 +339,56 @@ export const getPurchaseOrderListHandler = async (req, res) => {
     res.status(500).json({ error: "Failed to fetch purchase orders" })
   }
 }
+export const checkSlipStatusHandler = async (req, res) => {
+  try {
+    const { ponum } = req.params;
+    const query = `
+      SELECT slip_s3key, invoice_number 
+      FROM purchase_orders 
+      WHERE ponum = $1
+    `;
+    const result = await pool.query(query, [ponum]);
+    
+    if (result.rows.length === 0) {
+      return res.json({ hasSlip: false });
+    }
+    
+    const slip = result.rows[0];
+    res.json({ 
+      hasSlip: !!slip.slip_s3key,
+      s3Key: slip.slip_s3key,
+      invoiceNumber: slip.invoice_number
+    });
+  } catch (error) {
+    console.error('Error checking slip status:', error);
+    res.status(500).json({ error: 'Failed to check slip status' });
+  }
+};
+
+export const viewSlipHandler = async (req, res) => {
+  try {
+    const { ponum } = req.params;
+    const query = `
+      SELECT slip_s3key 
+      FROM purchase_orders 
+      WHERE ponum = $1 AND slip_s3key IS NOT NULL
+    `;
+    const result = await pool.query(query, [ponum]);
+    
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: 'No slip found for this PO' });
+    }
+    
+    const s3Key = result.rows[0].slip_s3key;
+    const signedUrl = getSignedUrl(s3Key, 3600); // 1 hour expiry
+    
+    res.json({ 
+      success: true, 
+      url: signedUrl,
+      s3Key: s3Key
+    });
+  } catch (error) {
+    console.error('Error getting slip URL:', error);
+    res.status(500).json({ error: 'Failed to get slip URL' });
+  }
+};

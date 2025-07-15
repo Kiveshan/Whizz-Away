@@ -1,12 +1,16 @@
+
 "use client";
 
 import { useState, useEffect, useRef } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import "../css/UpdateInstruction.css";
 import api from "../../../api";
+const normalizeString = (str) => {
+  if (!str) return '';
+  return str.toLowerCase().replace(/\s+/g, '').trim();
+};
 
-const API_BASE_URL = process.env.REACT_APP_API_URL || "http://localhost:5000";
-
+  const API_BASE_URL = process.env.REACT_APP_API_URL || "http://localhost:5000";
 const modalAnimation = `
   @keyframes fadeIn {
     from { opacity: 0; }
@@ -238,6 +242,7 @@ function UpdateInstruction() {
   const [employeeDrivers, setEmployeeDrivers] = useState([]);
   const [truckRegOptions, setTruckRegOptions] = useState([]);
   const [containerOptions, setContainerOptions] = useState([]);
+  const [hasUnsavedNewLeg, setHasUnsavedNewLeg] = useState(false);
   const [containerDetailsMap, setContainerDetailsMap] = useState({}); // Map to store container details by number
   const [saving, setSaving] = useState(false);
   const [savedMessage, setSavedMessage] = useState("");
@@ -297,12 +302,14 @@ function UpdateInstruction() {
   const [instructionStatus, setInstructionStatus] = useState("");
   // Add this state variable at the top with other state variables
   const [shouldHideAddLegButton, setShouldHideAddLegButton] = useState(false);
-
+const [hasProcessedSelectedLeg, setHasProcessedSelectedLeg] = useState(false);
   // Add this state variable with the other state variables
   const [showDuplicateDriverModal, setShowDuplicateDriverModal] =
     useState(false);
   const [duplicateDriverInfo, setDuplicateDriverInfo] = useState(null);
-
+  const [rateWeight, setRateWeight] = useState(null);
+const [isWeightBased, setIsWeightBased] = useState(false);
+const [weightUnit, setWeightUnit] = useState('kg');
   // Add this state for container already reached dropoff modal
   const [showContainerReachedModal, setShowContainerReachedModal] =
     useState(false);
@@ -321,7 +328,30 @@ function UpdateInstruction() {
     subbie_six_meter: 0,
     subbie_twelve_meter: 0,
   });
-
+  const checkIfWeightBased = async () => {
+  if (!instructionId) return;
+  
+  try {
+    const response = await api.get(`/instructions/${instructionId}/details`);
+    const rateWeightValue = response.data.rateweight;
+    
+    console.log('Rate weight value:', rateWeightValue);
+    setRateWeight(rateWeightValue);
+    
+    const isWeight = rateWeightValue && rateWeightValue.toLowerCase() !== 'container';
+    setIsWeightBased(isWeight);
+    
+    // Determine weight unit from rateweight value
+    if (isWeight) {
+      const unit = rateWeightValue.toLowerCase().includes('ton') ? 'ton' : 'kg';
+      setWeightUnit(unit);
+      console.log(`Weight-based instruction detected. Unit: ${unit}`);
+    }
+    
+  } catch (error) {
+    console.error('Error checking rate weight:', error);
+  }
+};
   // Improve the refreshLegData function to ensure data is properly refreshed
   // Update refreshLegData function to use Axios
   const refreshLegData = async () => {
@@ -425,93 +455,63 @@ function UpdateInstruction() {
     });
     setShowRemoveLegModal(true);
   };
-  useEffect(() => {
-    const fetchData = async () => {
-      try {
-        await fetchDrivers();
-        await fetchTruckRegNums();
-        await fetchShipmentType();
+useEffect(() => {
+  const fetchData = async () => {
+    try {
+      await fetchDrivers();
+      await fetchTruckRegNums();
+      await fetchShipmentType();
+      await checkIfWeightBased();
 
-        if (instructionId) {
-          await fetchContainersForInstruction(instructionId);
-          await fetchLegsForInstruction(instructionId);
-          await fetchStartingPoints();
-          await fetchDestinations();
-          setInitialDataLoaded(true);
-        } else {
-          await fetchStartingPoints();
-          await fetchDestinations();
-          await fetchAllContainers();
-          setInitialDataLoaded(true);
-        }
-      } catch (error) {
-        console.error("Error fetching initial data:", error);
+      if (instructionId) {
+        await fetchContainersForInstruction(instructionId);
+        await fetchLegsForInstruction(instructionId);
+        await fetchStartingPoints();
+        await fetchDestinations();
+        setInitialDataLoaded(true);
+      } else {
+        await fetchStartingPoints();
+        await fetchDestinations();
+        await fetchAllContainers();
         setInitialDataLoaded(true);
       }
-    };
-
-    fetchData();
-
-    return () => {
-      isFromDocumentsPage.current = false;
-    };
-  }, [instructionId]);
-
-  // Add a useEffect to log driver data whenever it changes
-  useEffect(() => {
-    if (drivers && drivers.length > 0) {
-      console.log("Current drivers state:", JSON.stringify(drivers, null, 2));
-
-      // Check if all fields are properly populated in the form
-      drivers.forEach((driver, index) => {
-        console.log(`Driver ${index} form field values:`);
-        console.log(`  Driver ID: ${driver.driverid || "empty"}`);
-        console.log(`  Truck Reg: ${driver.truckregnumber || "empty"}`);
-        console.log(`  Container: ${driver.containernumber || "empty"}`);
-        console.log(`  Container Type: ${driver.container_type || "empty"}`);
-        console.log(`  Date: ${driver.date || "empty"}`);
-        console.log(`  Driver Rate: ${driver.driverRate || "empty"}`);
-      });
+    } catch (error) {
+      console.error("Error fetching initial data:", error);
+      setInitialDataLoaded(true);
     }
-  }, [drivers]);
+  };
+
+  fetchData();
+
+  return () => {
+    // Cleanup function
+    isFromDocumentsPage.current = false;
+    setHasProcessedSelectedLeg(false);
+    handleSelectLeg.isProcessing = false; // Reset processing flag
+    
+    // Clear any pending timeouts or intervals if needed
+    if (instructionId) {
+      console.log("Cleaning up UpdateInstruction component");
+    }
+  };
+}, [instructionId]);
 
   // Replace the entire useEffect that handles the selectedLegIndex with this version
-  useEffect(() => {
-    // Only run this effect once when the component mounts with a selectedLegIndex
-    if (
-      initialDataLoaded &&
-      selectedLegIndex !== undefined &&
-      legs.length > 0
-    ) {
-      console.log(
-        `Selecting leg at index ${selectedLegIndex} after navigation`
-      );
-
-      // Make sure the selectedLegIndex is valid
-      if (selectedLegIndex < legs.length) {
-        // Force a clean state before selecting the leg
-        setCurrentLagIndex(null);
-        setDrivers([]);
-
-        // Use setTimeout to ensure this happens after the current render cycle
-        setTimeout(() => {
-          handleSelectLeg(selectedLegIndex);
-
-          // Ensure rates are fetched after selecting the leg
-          const selectedLeg = legs[selectedLegIndex];
-          if (selectedLeg.startingPoint && selectedLeg.destination) {
-            fetchRate(selectedLeg.startingPoint, selectedLeg.destination);
-          }
-        }, 0);
-      } else {
-        console.error(
-          `Selected leg index ${selectedLegIndex} is out of bounds (max: ${
-            legs.length - 1
-          })`
-        );
-      }
-    }
-  }, [initialDataLoaded, legs.length, selectedLegIndex]);
+useEffect(() => {
+  // Only run once when we have a selectedLegIndex from navigation
+  if (
+    initialDataLoaded &&
+    selectedLegIndex !== undefined &&
+    legs.length > 0 &&
+    !hasProcessedSelectedLeg && // Add this check
+    selectedLegIndex < legs.length
+  ) {
+    console.log(`Processing selectedLegIndex ${selectedLegIndex} - ONE TIME ONLY`);
+    
+    handleSelectLeg(selectedLegIndex);
+    setHasProcessedSelectedLeg(true); // Mark as processed
+  }
+}, [initialDataLoaded, legs.length, selectedLegIndex, hasProcessedSelectedLeg]);
 
   // Replace the fetchLegsForInstruction function with this updated version
   // Update fetchInstructionDetails in useEffect
@@ -729,11 +729,11 @@ function UpdateInstruction() {
     }
   };
 
-  const fetchContainersForInstruction = async (instructionId) => {
-    try {
-      const response = await api.get(
-        `/containers/instruction/${instructionId}`
-      );
+const fetchContainersForInstruction = async (instructionId) => {
+  try {
+    // Only fetch containers if this is NOT a weight-based instruction
+    if (!isWeightBased) {
+      const response = await api.get(`/containers/instruction/${instructionId}`);
       const data = response.data;
       console.log("Containers for instruction:", data);
 
@@ -753,11 +753,20 @@ function UpdateInstruction() {
       setContainerOptions(
         data.map((container) => container.containernum.toString())
       );
-    } catch (error) {
-      console.error("Error fetching containers for instruction:", error);
+    } else {
+      // For weight-based instructions, clear container-related state
+      setInstructionContainers([]);
+      setContainerDetailsMap({});
+      setContainerOptions([]);
+      console.log("Weight-based instruction - skipping container fetch");
+    }
+  } catch (error) {
+    console.error("Error fetching containers for instruction:", error);
+    if (!isWeightBased) {
       fetchAllContainers();
     }
-  };
+  }
+};
 
   // Update fetchAllContainers to use Axios
   const fetchAllContainers = async () => {
@@ -1075,208 +1084,196 @@ function UpdateInstruction() {
   const addDriver = () => {
     if (currentLagIndex === null || isCompleted) return;
 
-    const newDriver = {
-      id: Date.now(),
-      driverid: "",
-      truckregnumber: "",
-      containernumber: "",
-      container_type: "",
-      date: "",
-      driverRate: "",
-      isAbnormal: false,
-    };
+const newDriver = {
+  id: Date.now(),
+  driverid: "",
+  truckregnumber: "",
+  containernumber: "",
+  container_type: "",
+  date: "",
+  driverRate: isWeightBased ? "0" : "",
+  isAbnormal: false,
+};
 
     // Add the new driver
     setDrivers((prevDrivers) => [...prevDrivers, newDriver]);
   };
 
-  // Update the handleAddLeg function to only modify local state, not save to database
-  const handleAddLeg = () => {
-    if (isCompleted) return;
-
-    // Check if there are unsaved changes in the current leg
-    if (hasUnsavedChanges()) {
-      // Show the unsaved changes modal
-      setShowUnsavedChangesModal(true);
-      return;
-    }
-
-    // Save current leg data to local state if any
-    if (currentLagIndex !== null) {
-      const updatedLegs = [...legs];
-      updatedLegs[currentLagIndex] = {
-        ...updatedLegs[currentLagIndex],
-        ...formData,
-        drivers: [...drivers],
-      };
-      setLegs(updatedLegs);
-    }
-    const newLeg = {
-      id: `temp-${Date.now()}`, // Temporary ID to indicate this is not saved to DB yet
-      legnumber: legs.length + 1,
-      startingPoint: "",
-      driverRate: "",
-      destination: "",
-      drivers: [], // Always start with empty drivers array
-      isNew: true, // Flag to indicate this is a new leg not yet saved to database
-    };
-
-    setLegs([...legs, newLeg]);
-    setCurrentLagIndex(legs.length);
-    setFormData({
-      startingPoint: "",
-      driverRate: "",
-      destination: "",
-    });
-    setDrivers([]); // Explicitly clear the drivers state when adding a new leg
-
-    // Make sure the new leg is NOT in the savedLegs set
-    setSavedLegs((prevSavedLegs) => {
-      const newSavedLegs = new Set(prevSavedLegs);
-      // Ensure the new leg index is not in the saved legs
-      newSavedLegs.delete(legs.length);
-      return newSavedLegs;
-    });
-
-    // Show a message to remind user to save
-    setSavedMessage(
-      "New leg added. Remember to click Save after entering details."
-    );
+const handleAddLeg = () => {
+  if (isCompleted) return;
+  
+  // Prevent adding another leg if there's already an unsaved new leg
+  if (hasUnsavedNewLeg) {
+    setSavedMessage("Please save the current new leg before adding another.");
     setTimeout(() => setSavedMessage(""), 6000);
+    return;
+  }
+  
+  // Check if there are unsaved changes in the current leg (if any)
+  if (currentLagIndex !== null && hasUnsavedChanges()) {
+    setShowUnsavedChangesModal(true);
+    return;
+  }
+  
+  // Save current leg data to local state if any
+  if (currentLagIndex !== null && currentLagIndex < legs.length) {
+    console.log("Saving current leg data before adding new leg");
+    const updatedLegs = [...legs];
+    updatedLegs[currentLagIndex] = {
+      ...updatedLegs[currentLagIndex],
+      startingPoint: formData.startingPoint,
+      destination: formData.destination,
+      driverRate: formData.driverRate,
+      drivers: JSON.parse(JSON.stringify(drivers)),
+    };
+    setLegs(updatedLegs);
+  }
+  
+  // Clear localStorage before creating a new leg
+  if (instructionId) {
+    console.log(`Clearing localStorage for instruction_${instructionId}_state`);
+    localStorage.removeItem(`instruction_${instructionId}_state`);
+  }
+  
+  const newLeg = {
+    id: `temp-${Date.now()}`,
+    legnumber: legs.length + 1,
+    startingPoint: "",
+    driverRate: "",
+    destination: "",
+    drivers: [],
+    isNew: true,
   };
-
-  // Replace the handleSelectLeg function with this updated version
-  // Replace the handleSelectLeg function with this updated version
-  const handleSelectLeg = (index) => {
-    console.log(`Selecting leg at index ${index}`);
-
-    // First, save the current leg's data to the legs array if we're on a valid leg
-    if (currentLagIndex !== null && !isCompleted) {
-      const updatedLegs = [...legs];
-
-      // Save the current drivers to the current leg before switching
-      updatedLegs[currentLagIndex] = {
-        ...updatedLegs[currentLagIndex],
-        startingPoint: formData.startingPoint,
-        destination: formData.destination,
-        driverRate: formData.driverRate,
-        drivers: JSON.parse(JSON.stringify(drivers)), // Create a deep copy of the drivers array
-      };
-
-      console.log(
-        `Saving leg ${currentLagIndex} data before switching:`,
-        updatedLegs[currentLagIndex]
-      );
-
-      // Update the legs state with the saved data
-      setLegs(updatedLegs);
+  
+  // IMMEDIATELY clear drivers state
+  console.log("Immediately clearing drivers for new leg");
+  setDrivers([]);
+  
+  // Update legs state
+  setLegs(prevLegs => [...prevLegs, newLeg]);
+  
+  // Clear form state
+  setFormData({
+    startingPoint: "",
+    driverRate: "",
+    destination: "",
+  });
+  
+  // Reset edited fields
+  setEditedFields({
+    startingPoint: false,
+    destination: false,
+    driverRate: false,
+    drivers: {},
+  });
+  
+  // Set the current leg index to the new leg
+  const newLegIndex = legs.length;
+  setCurrentLagIndex(newLegIndex);
+  console.log(`Navigating to new leg at index: ${newLegIndex}`);
+  
+  // Update saved legs
+  setSavedLegs(prevSavedLegs => {
+    const newSavedLegs = new Set(prevSavedLegs);
+    newSavedLegs.delete(newLegIndex);
+    return newSavedLegs;
+  });
+  
+  setHasUnsavedNewLeg(true);
+  setSavedMessage("New leg added. Remember to click Save after entering details.");
+  setTimeout(() => setSavedMessage(""), 6000);
+};
+const handleSelectLeg = (index) => {
+  console.log(`Selecting leg at index ${index}`);
+  
+  // Prevent selecting the same leg that's already selected
+  if (currentLagIndex === index) {
+    console.log("Same leg already selected, skipping");
+    return;
+  }
+  
+  // Validate index
+  if (index < 0 || index >= legs.length) {
+    console.error(`Invalid leg index: ${index}`);
+    return;
+  }
+  
+  // Save current leg's data if we're on a valid leg and it's not completed
+  if (currentLagIndex !== null && !isCompleted && currentLagIndex < legs.length && currentLagIndex !== index) {
+    console.log(`Saving current leg ${currentLagIndex} data before switching`);
+    const updatedLegs = [...legs];
+    updatedLegs[currentLagIndex] = {
+      ...updatedLegs[currentLagIndex],
+      startingPoint: formData.startingPoint,
+      destination: formData.destination,
+      driverRate: formData.driverRate,
+      drivers: JSON.parse(JSON.stringify(drivers)),
+    };
+    setLegs(updatedLegs);
+  }
+  
+  // FORCE CLEAR drivers state immediately
+  console.log("Force clearing drivers before leg switch");
+  setDrivers([]);
+  
+  // Get the selected leg data
+  const selectedLeg = legs[index];
+  
+  if (!selectedLeg) {
+    console.error(`No leg found at index ${index}`);
+    return;
+  }
+  
+  console.log(`Loading leg data:`, selectedLeg);
+  
+  // Set the current leg index
+  setCurrentLagIndex(index);
+  
+  // Update form data based on the selected leg
+  setFormData({
+    startingPoint: selectedLeg.startingPoint || "",
+    driverRate: selectedLeg.driverRate || "",
+    destination: selectedLeg.destination || "",
+  });
+  
+  // Reset edited fields tracking
+  setEditedFields({
+    startingPoint: false,
+    destination: false,
+    driverRate: false,
+    drivers: {},
+  });
+  
+  // Use setTimeout to ensure state is cleared before setting new drivers
+  setTimeout(() => {
+    if (selectedLeg.drivers && selectedLeg.drivers.length > 0) {
+      console.log(`Setting ${selectedLeg.drivers.length} drivers for leg ${index}`);
+      const cleanDrivers = selectedLeg.drivers.map(driver => ({
+        ...driver,
+        id: driver.id || Date.now() + Math.random(),
+        driverid: driver.driverid || "",
+        truckregnumber: driver.truckregnumber || "",
+        containernumber: driver.containernumber || "",
+        container_type: driver.container_type || "",
+        date: driver.date || "",
+        driverRate: driver.driverRate || "",
+        isAbnormal: driver.container_type === "abnormal"
+      }));
+      setDrivers(cleanDrivers);
+      debugDriverData(cleanDrivers);
+    } else {
+      console.log(`No drivers for leg ${index}, keeping empty array`);
+      setDrivers([]);
+      debugDriverData([]);
     }
-
-    // Now set the current leg index to the new index
-    setCurrentLagIndex(index);
-
-    // Get the selected leg data
-    const selectedLeg = legs[index];
-
-    // Update the form data
-    setFormData({
-      startingPoint: selectedLeg.startingPoint || "",
-      driverRate: selectedLeg.driverRate || "",
-      destination: selectedLeg.destination || "",
-    });
-
-    // IMPORTANT: Clear the drivers state first to avoid any state mixing
-    setDrivers([]);
-
-    // Then load the drivers for the selected leg after a delay to ensure state is properly cleared
-    setTimeout(() => {
-      // Ensure we're setting the drivers state correctly
-      if (selectedLeg.drivers && selectedLeg.drivers.length > 0) {
-        console.log(
-          "Setting drivers for selected leg:",
-          JSON.stringify(selectedLeg.drivers, null, 2)
-        );
-
-        // Make a deep copy of the driver data to ensure no references are shared between legs
-        const normalizedDrivers = JSON.parse(
-          JSON.stringify(selectedLeg.drivers)
-        ).map((driver) => {
-          // Ensure all fields are properly formatted
-          return {
-            id: driver.id || Date.now() + Math.random(),
-            driverid: driver.driverid ? driver.driverid.toString() : "",
-            truckregnumber: driver.truckregnumber || "",
-            containernumber:
-              driver.containernumber !== null
-                ? driver.containernumber.toString()
-                : "",
-            container_type: driver.container_type || "",
-            driverRate: driver.driverRate || driver.driverate || "", // Add driverate as fallback
-            date: driver.date || "",
-            driver_name: driver.driver_name || "",
-            driver_surname: driver.driver_surname || "",
-            isAbnormal:
-              driver.container_type === "abnormal" || driver.isAbnormal,
-            full_name:
-              driver.full_name ||
-              (driver.driver_name && driver.driver_surname
-                ? `${driver.driver_name} ${driver.driver_surname}`
-                : driver.driverid
-                ? `Driver ID: ${driver.driverid}`
-                : "Unknown Driver"),
-          };
-        });
-
-        console.log(
-          "Normalized drivers:",
-          JSON.stringify(normalizedDrivers, null, 2)
-        );
-        setDrivers(normalizedDrivers);
-        debugDriverData(normalizedDrivers);
-      } else {
-        console.log("No drivers for selected leg, setting empty array");
-        setDrivers([]);
-      }
-    }, 100); // Increased timeout to ensure state updates are complete
-
-    // Reset edited fields tracking
-    setEditedFields({
-      startingPoint: false,
-      destination: false,
-      driverRate: false,
-      drivers: {},
-    });
-
-    // Check if this route has no rates before fetching
-    if (selectedLeg.startingPoint && selectedLeg.destination) {
-      const routeKey = `${selectedLeg.startingPoint}-${selectedLeg.destination}`;
-
-      if (noRatesRoutes.has(routeKey)) {
-        console.log(
-          `Route ${routeKey} is known to have no rates, setting rates to 0`
-        );
-
-        // Set rates to 0
-        setRates({
-          six_meter: 0,
-          twelve_meter: 0,
-          subbie_six_meter: 0,
-          subbie_twelve_meter: 0,
-        });
-
-        return;
-      }
-
-      // Only fetch rates if the route is not known to have no rates
-      console.log(
-        "Fetching rates after selecting leg:",
-        selectedLeg.startingPoint,
-        selectedLeg.destination
-      );
-      fetchRate(selectedLeg.startingPoint, selectedLeg.destination);
-    }
-  };
-
+  }, 50); // Small delay to ensure state clearing
+  
+  // Fetch rates if both starting point and destination exist
+  if (selectedLeg.startingPoint && selectedLeg.destination) {
+    console.log(`Fetching rates for ${selectedLeg.startingPoint} -> ${selectedLeg.destination}`);
+    fetchRate(selectedLeg.startingPoint, selectedLeg.destination);
+  }
+};
   // Replace the handleStartingPointChange function with this updated version
   // Replace the handleStartingPointChange function with this updated version
   const handleStartingPointChange = (e) => {
@@ -1559,120 +1556,177 @@ function UpdateInstruction() {
   };
 
   // Replace the handleBackClick function with this version
-  const handleBackClick = () => {
-    // Save current leg data before checking for unsaved changes
-    if (currentLagIndex !== null && !isCompleted) {
-      const updatedLegs = [...legs];
-      updatedLegs[currentLagIndex] = {
-        ...updatedLegs[currentLagIndex],
-        ...formData,
-        drivers: [...drivers],
-      };
-      setLegs(updatedLegs);
-    }
+const handleBackClick = () => {
+  // Clear any localStorage state that might interfere
+  if (instructionId) {
+    localStorage.removeItem(`instruction_${instructionId}_state`);
+  }
+  
+  // Reset navigation flag
+  isFromDocumentsPage.current = false;
+  
+  // Save current leg data before checking for unsaved changes
+  if (currentLagIndex !== null && !isCompleted) {
+    const updatedLegs = [...legs];
+    updatedLegs[currentLagIndex] = {
+      ...updatedLegs[currentLagIndex],
+      ...formData,
+      drivers: [...drivers],
+    };
+    setLegs(updatedLegs);
+  }
 
-    // Check if there are unsaved changes
-    if (hasUnsavedChanges()) {
-      // Show confirmation modal
-      setShowBackConfirmModal(true);
-    } else {
-      // No unsaved changes, navigate directly
-      navigateBack();
-    }
-  };
-
+  // Check if there are unsaved changes
+  if (hasUnsavedChanges()) {
+    // Show confirmation modal
+    setShowBackConfirmModal(true);
+  } else {
+    // No unsaved changes, navigate directly
+    navigateBack();
+  }
+};
   // Helper function to navigate back
-  const navigateBack = () => {
-    // Force a clean navigation state
-    navigate("/instructions", {
-      state: { clientId },
-      replace: true,
-    });
-  };
+const navigateBack = () => {
+  // Clear all state before navigation
+  setCurrentLagIndex(null);
+  setDrivers([]);
+  setFormData({
+    startingPoint: "",
+    driverRate: "",
+    destination: "",
+  });
+  
+  // Clear localStorage
+  if (instructionId) {
+    localStorage.removeItem(`instruction_${instructionId}_state`);
+  }
+  
+  // Force a clean navigation state
+  navigate("/instructions", {
+    state: { 
+      clientId,
+      timestamp: Date.now() // Force new state
+    },
+    replace: true,
+  });
+};
 
   // Function to check if all containers reach the dropoff destination
-  const checkContainersReachDropoff = async (dropoff) => {
-    // Get all containers assigned to legs
-    const assignedContainers = new Set();
-    const containersReachingDropoff = new Set();
+const checkContainersReachDropoff = async (dropoff) => {
+  // Get all containers/weights assigned to legs
+  const assignedItems = new Set();
+  const itemsReachingDropoff = new Set();
+  let totalWeightAssigned = 0;
+  let totalWeightReachingDropoff = 0;
 
-    // Collect all containers from all legs
-    legs.forEach((leg) => {
-      if (leg.drivers && leg.drivers.length > 0) {
-        leg.drivers.forEach((driver) => {
-          if (driver.containernumber) {
-            assignedContainers.add(driver.containernumber);
+  // Normalize the dropoff destination for comparison
+  const normalizedDropoff = normalizeString(dropoff);
 
-            // If this leg's destination is the dropoff, mark this container as reaching dropoff
-            if (
-              leg.destination?.toLowerCase().replace(/\s/g, "") ===
-              dropoff?.toLowerCase().replace(/\s/g, "")
-            ) {
-              containersReachingDropoff.add(driver.containernumber);
+  // Collect all containers/weights from all legs
+  legs.forEach((leg) => {
+    // Normalize leg destination for comparison
+    const normalizedLegDestination = normalizeString(leg.destination);
+    
+    if (leg.drivers && leg.drivers.length > 0) {
+      leg.drivers.forEach((driver) => {
+        if (driver.containernumber) {
+          if (isWeightBased) {
+            // For weight-based instructions
+            const weight = parseFloat(driver.containernumber) || 0;
+            totalWeightAssigned += weight;
+            
+            // If this leg's destination matches the dropoff, add weight to reaching total
+            if (normalizedLegDestination === normalizedDropoff) {
+              totalWeightReachingDropoff += weight;
+            }
+          } else {
+            // For container-based instructions (existing logic)
+            assignedItems.add(driver.containernumber);
+            
+            // If this leg's destination matches the dropoff, mark container as reaching dropoff
+            if (normalizedLegDestination === normalizedDropoff) {
+              itemsReachingDropoff.add(driver.containernumber);
             }
           }
-        });
-      }
-    });
+        }
+      });
+    }
+  });
 
-    // Get all containers from the instruction
+  if (isWeightBased) {
+    // For weight-based instructions, get total weight from instruction
+    try {
+      const response = await api.get(`/instructions/${instructionId}/details`);
+      const totalInstructionWeight = parseFloat(response.data.weight) || 0;
+      
+      console.log("Weight check:", {
+        totalInstructionWeight,
+        totalWeightAssigned,
+        totalWeightReachingDropoff,
+        weightUnit,
+      });
+
+      // Return missing weight (weight that doesn't reach dropoff)
+      const missingWeight = totalInstructionWeight - totalWeightReachingDropoff;
+      return missingWeight > 0 ? [missingWeight] : [];
+    } catch (error) {
+      console.error("Error checking weight:", error);
+      return [];
+    }
+  } else {
+    // Existing container logic (unchanged)
     const allInstructionContainers = instructionContainers.map((c) =>
       c.containernum.toString()
     );
 
-    // Find containers that don't reach the dropoff
-    // First, check containers that are assigned but don't reach dropoff
-    const assignedButNotReaching = Array.from(assignedContainers).filter(
-      (container) => !containersReachingDropoff.has(container)
+    const assignedButNotReaching = Array.from(assignedItems).filter(
+      (container) => !itemsReachingDropoff.has(container)
     );
 
-    // Then, check if there are any containers in the instruction that aren't assigned to any leg
     const notAssigned = allInstructionContainers.filter(
-      (container) => !assignedContainers.has(container)
+      (container) => !assignedItems.has(container)
     );
 
-    // Combine both lists for the final missing containers list
     const missingContainers = [...assignedButNotReaching, ...notAssigned];
 
     console.log("Containers check:", {
       allContainers: allInstructionContainers,
-      assignedContainers: Array.from(assignedContainers),
-      containersReachingDropoff: Array.from(containersReachingDropoff),
+      assignedContainers: Array.from(assignedItems),
+      containersReachingDropoff: Array.from(itemsReachingDropoff),
       assignedButNotReaching,
       notAssigned,
       missingContainers,
     });
 
     return missingContainers;
-  };
-
+  }
+};
   // Function to check if a container has reached the dropoff destination
-  const hasContainerReachedDropoff = (containerNumber) => {
-    if (!containerNumber) return false;
+const hasContainerReachedDropoff = (containerNumber) => {
+  if (!containerNumber) return false;
 
-    try {
-      // Get the dropoff destination from the instruction
-      const dropoff = legs.find((leg) => {
-        return (
-          leg.drivers &&
-          leg.drivers.some(
-            (driver) =>
-              driver.containernumber === containerNumber &&
-              leg.destination?.toLowerCase().replace(/\s/g, "") ===
-                instructionContainers
-                  .find((c) => c.containernum.toString() === containerNumber)
-                  ?.dropoff?.toLowerCase()
-                  .replace(/\s/g, "")
-          )
-        );
-      });
+  try {
+    // Get the dropoff destination from the instruction
+    const dropoff = legs.find((leg) => {
+      return (
+        leg.drivers &&
+        leg.drivers.some(
+          (driver) =>
+            driver.containernumber === containerNumber &&
+            normalizeString(leg.destination) === 
+            normalizeString(instructionContainers.find(
+              (c) => c.containernum.toString() === containerNumber
+            )?.dropoff)
+        )
+      );
+    });
 
-      return !!dropoff;
-    } catch (error) {
-      console.error("Error checking if container reached dropoff:", error);
-      return false;
-    }
-  };
+    return !!dropoff;
+  } catch (error) {
+    console.error("Error checking if container reached dropoff:", error);
+    return false;
+  }
+};
 
   // Function to check if there are unsaved changes
   const hasUnsavedChanges = () => {
@@ -1759,115 +1813,147 @@ function UpdateInstruction() {
       const dropoff = instructionDetails.dropoff;
 
       // First check if all containers reach the dropoff destination
-      const missingContainers = await checkContainersReachDropoff(dropoff);
+const missingItems = await checkContainersReachDropoff(dropoff);
 
-      if (missingContainers.length > 0) {
-        // Some containers don't reach the dropoff, show warning modal
+    if (missingItems.length > 0) {
+      if (isWeightBased) {
+        // For weight-based instructions
         setContainerValidationDetails({
-          missingContainers,
+          missingWeight: missingItems[0],
+          totalWeight: parseFloat(instructionDetails.weight) || 0,
+          weightUnit,
           dropoff,
+          isWeightBased: true,
         });
-        setShowContainerModal(true);
-        return; // Stop execution here until user responds to modal
-      }
-
-      // If all containers reach dropoff, check if the last leg destination matches the dropoff
-      const lastLeg = legs[legs.length - 1];
-      const lastLegDestination = lastLeg.destination;
-
-      // If the destinations don't match, show the destination mismatch modal
-      // if (lastLegDestination !== dropoff) {
-      if (
-        lastLegDestination?.toLowerCase().replace(/\s/g, "") !==
-        dropoff?.toLowerCase().replace(/\s/g, "")
-      ) {
-        setMismatchDetails({
-          lastLegDestination,
+      } else {
+        // For container-based instructions
+        setContainerValidationDetails({
+          missingContainers: missingItems,
           dropoff,
+          isWeightBased: false,
         });
-        setShowMismatchModal(true);
-        return; // Stop execution here until user responds to modal
       }
-
-      // If all checks pass, proceed to documents
-      navigateToDocuments();
-    } catch (error) {
-      console.error("Error checking destinations:", error);
-      // If there's an error, proceed anyway to avoid blocking the user
-      navigateToDocuments();
+      setShowContainerModal(true);
+      return;
     }
-  };
+
+    // Check if the last leg destination matches the dropoff (case-insensitive)
+    const lastLeg = legs[legs.length - 1];
+    const lastLegDestination = lastLeg.destination;
+
+    // Use normalized comparison for destination matching
+    if (normalizeString(lastLegDestination) !== normalizeString(dropoff)) {
+      setMismatchDetails({
+        lastLegDestination,
+        dropoff,
+      });
+      setShowMismatchModal(true);
+      return;
+    }
+
+    // If all checks pass, proceed to documents
+    navigateToDocuments();
+  } catch (error) {
+    console.error("Error checking destinations:", error);
+    navigateToDocuments();
+  }
+};
 
   // Helper function to navigate to documents page
-  const navigateToDocuments = () => {
-    // Store the current state in localStorage before navigating
-    if (currentLagIndex !== null && legs.length > 0) {
-      const currentLeg = legs[currentLagIndex];
-      const stateToStore = {
-        legId: currentLeg.id,
-        legIndex: currentLagIndex,
-        drivers: drivers.map((driver) => ({
-          ...driver,
-          container_type: driver.container_type || "",
-          driverRate: driver.driverRate || "",
-        })),
-      };
-      localStorage.setItem(
-        `instruction_${instructionId}_state`,
-        JSON.stringify(stateToStore)
-      );
+const navigateToDocuments = () => {
+  // Clear any localStorage state before navigating
+  if (instructionId) {
+    localStorage.removeItem(`instruction_${instructionId}_state`);
+  }
+
+  // Reset component state
+  setHasProcessedSelectedLeg(false);
+  isFromDocumentsPage.current = false;
+
+  // Navigate back to documents with clean state
+  navigate("/Upload-Instruction-Documents", {
+    state: {
+      clientId,
+      instructionId,
+      isCompleted: isCompleted,
+      shipmentType: shipmentType,
+      timestamp: Date.now(), // Force new state
+    },
+    replace: true,
+  });
+};
+// Add this useEffect after your other useEffects
+// Add this useEffect after your existing useEffects
+useEffect(() => {
+  // Force re-render of leg buttons when currentLagIndex changes
+  if (currentLagIndex !== null && legs.length > 0) {
+    console.log(`Current leg index is now: ${currentLagIndex}`);
+    
+    // Ensure only the current leg is highlighted
+    const currentLeg = legs[currentLagIndex];
+    if (currentLeg && (currentLeg.isNew || currentLeg.id?.toString().startsWith("temp-"))) {
+      console.log("New leg is now selected and should be highlighted");
     }
+  }
+}, [currentLagIndex, legs.length]);
 
-    // Force a clean navigation state
-    navigate("/Upload-Instruction-Documents", {
-      state: {
-        clientId,
-        instructionId,
-        isCompleted: isCompleted,
-        shipmentType: shipmentType,
-        // Don't pass the selectedLegIndex to avoid getting stuck
-      },
-      replace: true,
-    });
-  };
-
-  // Add a useEffect to restore state when returning from documents page
-  useEffect(() => {
-    if (instructionId && legs.length > 0 && currentLagIndex !== null) {
-      const savedState = localStorage.getItem(
-        `instruction_${instructionId}_state`
-      );
-      if (savedState) {
-        try {
-          const parsedState = JSON.parse(savedState);
-
-          // Find the leg index that matches the saved leg ID
-          const legIndex = legs.findIndex(
-            (leg) => leg.id === parsedState.legId
-          );
-
-          if (legIndex >= 0) {
-            // Update the drivers with the saved state
+useEffect(() => {
+  if (instructionId && legs.length > 0 && currentLagIndex !== null) {
+    const savedState = localStorage.getItem(`instruction_${instructionId}_state`);
+    if (savedState) {
+      try {
+        const parsedState = JSON.parse(savedState);
+        const legIndex = legs.findIndex((leg) => leg.id === parsedState.legId);
+        
+        // Only restore state if the leg exists, is not new, and matches the current leg index
+        if (
+          legIndex >= 0 &&
+          !legs[legIndex].isNew &&
+          !legs[legIndex].id?.toString().startsWith("temp-") &&
+          legIndex === currentLagIndex
+        ) {
+          console.log(`Restoring state for leg ${legIndex} with ID ${parsedState.legId}`);
+          
+          // CLEAR drivers first, then set restored drivers
+          setDrivers([]);
+          
+          setTimeout(() => {
             const updatedDrivers = parsedState.drivers.map((driver) => ({
               ...driver,
-              // Ensure these fields are preserved
               container_type: driver.container_type || "",
               driverRate: driver.driverRate || "",
+              isAbnormal: driver.container_type === "abnormal",
             }));
-
             setDrivers(updatedDrivers);
-
+            debugDriverData(updatedDrivers);
+            
             // Update the legs array with the restored drivers
             const updatedLegs = [...legs];
             updatedLegs[legIndex].drivers = updatedDrivers;
             setLegs(updatedLegs);
-          }
-        } catch (error) {
-          console.error("Error restoring state:", error);
+          }, 50);
+        } else {
+          console.log("Not restoring state - ensuring clean driver state");
+          // Ensure drivers are cleared for new legs or mismatched states
+          setDrivers([]);
+          debugDriverData([]);
         }
+      } catch (error) {
+        console.error("Error restoring state from localStorage:", error);
+        // Clear drivers on error
+        setDrivers([]);
+        debugDriverData([]);
+      }
+    } else {
+      console.log("No saved state found - ensuring clean driver state");
+      // If no saved state and current leg is new, ensure drivers are empty
+      if (legs[currentLagIndex]?.isNew) {
+        setDrivers([]);
+        debugDriverData([]);
       }
     }
-  }, [instructionId, legs.length, currentLagIndex]);
+  }
+}, [instructionId, legs.length, currentLagIndex]); // Removed legs from dependencies to prevent loops
 
   const fetchShipmentType = async () => {
     if (instructionId) {
@@ -2050,44 +2136,42 @@ function UpdateInstruction() {
         destination: currentLeg.destination || formData.destination,
         driverrate: calculateLegDriverRate(drivers, rates),
         m1key: instructionId,
-        drivers: drivers.map((driver) => {
-          let driverRateToSave = driver.driverRate || "0";
-          if (!driver.driverRate || driver.driverRate === "") {
-            // Check if driver is a subcontractor (roleid = 6)
-            const isSubcontractor =
-              employeeDrivers.find(
-                (d) => d.userid.toString() === driver.driverid
-              )?.roleid === 6;
+drivers: drivers.map((driver) => {
+  let driverRateToSave = driver.driverRate || "0";
+  if (!driver.driverRate || driver.driverRate === "") {
+    const isSubcontractor =
+      employeeDrivers.find((d) => d.userid.toString() === driver.driverid)
+        ?.roleid === 6;
 
-            if (driver.container_type === "12m") {
-              driverRateToSave = isSubcontractor
-                ? rates.subbie_twelve_meter.toString()
-                : rates.twelve_meter.toString();
-            } else if (driver.container_type === "abnormal") {
-              driverRateToSave = driver.driverRate || "0"; // Use user input for abnormal
-            } else {
-              // Default to appropriate 6m rate
-              driverRateToSave = isSubcontractor
-                ? rates.subbie_six_meter.toString()
-                : rates.six_meter.toString();
-            }
-          }
+    if (driver.container_type === "12m") {
+      driverRateToSave = isSubcontractor
+        ? rates.subbie_twelve_meter.toString()
+        : rates.twelve_meter.toString();
+    } else if (driver.container_type === "abnormal") {
+      driverRateToSave = driver.driverRate || "0";
+    } else {
+      driverRateToSave = isSubcontractor
+        ? rates.subbie_six_meter.toString()
+        : rates.six_meter.toString();
+    }
+  }
 
-          // Log individual driver rate for debugging
-          console.log(
-            `Driver ${driver.driverid} with container type ${driver.container_type} has rate: ${driverRateToSave}`
-          );
+  console.log(
+    `Driver ${driver.driverid} with container type ${driver.container_type} has rate: ${driverRateToSave}`
+  );
 
-          return {
-            id: driver.id, // Include the driver ID if it exists
-            driverid: driver.driverid || null,
-            truckregnumber: driver.truckregnumber || null,
-            containernumber: driver.containernumber || null,
-            container_type: driver.container_type || null,
-            driverRate: driverRateToSave,
-            date: driver.date || null,
-          };
-        }),
+  return {
+    id: driver.id,
+    driverid: driver.driverid || null,
+    truckregnumber: driver.truckregnumber || null,
+    // UPDATED: Store weight in vgm column for weight-based, container number for container-based
+    containernumber: isWeightBased ? null : (driver.containernumber || null),
+    vgm: isWeightBased ? (parseFloat(driver.containernumber) || null) : null,
+    container_type: driver.container_type || null,
+    driverRate: driverRateToSave,
+    date: driver.date || null,
+  };
+}),
       };
 
       console.log(
@@ -2121,15 +2205,16 @@ function UpdateInstruction() {
       console.log("Leg saved successfully:", result);
 
       // Update the leg ID with the one from the database if this was a new leg
-      if (result.legId && isNewLeg) {
-        updatedLegs[currentLagIndex] = {
-          ...updatedLegs[currentLagIndex],
-          id: result.legId,
-          isNew: false, // Clear the isNew flag
-        };
-        setLegs(updatedLegs);
-        console.log(`New leg saved to database with ID: ${result.legId}`);
-      }
+if (result.legId && isNewLeg) {
+  updatedLegs[currentLagIndex] = {
+    ...updatedLegs[currentLagIndex],
+    id: result.legId,
+    isNew: false, // Clear the isNew flag
+  };
+  setLegs(updatedLegs);
+  console.log(`New leg saved to database with ID: ${result.legId}`);
+  setHasUnsavedNewLeg(false); // NEW: Mark that the new leg is now saved
+}
 
       // Ensure the current leg is marked as saved
       setSavedLegs((prev) => {
@@ -2182,95 +2267,61 @@ function UpdateInstruction() {
   };
 
   // Replace the shouldDisableAddLeg function with this improved version
-  const shouldDisableAddLeg = async () => {
-    if (isCompleted) return true; // Always disable if completed
-    if (legs.length === 0) return false; // Allow adding the first leg
+const shouldDisableAddLeg = async () => {
+  if (isCompleted) return true;
+  if (legs.length === 0) return false;
 
-    try {
-      // First, fetch the instruction details to get the dropoff location
-      const response = await fetch(
-        `${API_BASE_URL}/instructions/${instructionId}/details`
-      );
-      if (!response.ok) return false;
+  try {
+    const response = await fetch(`${API_BASE_URL}/instructions/${instructionId}/details`);
+    if (!response.ok) return false;
 
-      const instructionDetails = await response.json();
-      const dropoff = instructionDetails.dropoff;
+    const instructionDetails = await response.json();
+    const dropoff = instructionDetails.dropoff;
 
-      // If we don't have a dropoff location, don't disable
-      if (!dropoff) return false;
+    if (!dropoff) return false;
 
-      // Check if the last leg's destination matches the dropoff
-      const lastLeg = legs[legs.length - 1];
-      if (lastLeg.destination !== dropoff) return false;
+    const normalizedDropoff = normalizeString(dropoff);
 
-      // Get all containers assigned to legs
-      const assignedContainers = new Set();
-      const containersReachingDropoff = new Set();
+    // Check if the last leg's destination matches the dropoff
+    const lastLeg = legs[legs.length - 1];
+    if (normalizeString(lastLeg.destination) !== normalizedDropoff) return false;
 
-      // Collect all containers from all legs
-      legs.forEach((leg) => {
-        if (leg.drivers && leg.drivers.length > 0) {
-          leg.drivers.forEach((driver) => {
-            if (driver.containernumber) {
-              assignedContainers.add(driver.containernumber);
+    // Use the unified checkContainersReachDropoff function
+    const missingItems = await checkContainersReachDropoff(dropoff);
 
-              // If this leg's destination is the dropoff, mark this container as reaching dropoff
-              if (leg.destination === dropoff) {
-                containersReachingDropoff.add(driver.containernumber);
-              }
-            }
-          });
-        }
-      });
-
-      // If no containers are assigned, don't disable
-      if (assignedContainers.size === 0) return false;
-
-      // Get all containers from the instruction
-      const allInstructionContainers = instructionContainers.map(
-        (c) => c.containernum
-      );
-
-      // If there are no instruction containers, don't disable
-      if (allInstructionContainers.length === 0) return false;
-
-      // Check if all instruction containers are assigned and reach dropoff
-      const allContainersReachDropoff = allInstructionContainers.every(
-        (container) => containersReachingDropoff.has(container)
-      );
-
-      // Only disable the + button if all containers reach the dropoff
-      return allContainersReachDropoff;
-    } catch (error) {
-      console.error("Error in shouldDisableAddLeg:", error);
-      return false; // On error, don't disable
-    }
-  };
+    // Only disable the + button if all items (containers or weight) reach the dropoff
+    return missingItems.length === 0;
+  } catch (error) {
+    console.error("Error in shouldDisableAddLeg:", error);
+    return false;
+  }
+};
 
   // Add this useEffect to check if we should hide the + button whenever legs or containers change
   useEffect(() => {
-    const checkContainersDestination = async () => {
-      if (
-        !instructionId ||
-        legs.length === 0 ||
-        instructionContainers.length === 0
-      ) {
-        setShouldHideAddLegButton(false);
-        return;
-      }
+const checkContainersDestination = async () => {
+  if (
+    !instructionId ||
+    legs.length === 0 ||
+    instructionContainers.length === 0 && !isWeightBased
+  ) {
+    setShouldHideAddLegButton(false);
+    return;
+  }
 
-      try {
-        // Fetch the instruction details to get the dropoff location
-        const response = await fetch(
-          `${API_BASE_URL}/instructions/${instructionId}/details`
-        );
-        if (!response.ok) {
-          setShouldHideAddLegButton(false);
-          return;
-        }
+  try {
+    // Fetch the instruction details to get the dropoff location
+    const response = await fetch(
+      `${API_BASE_URL}/instructions/${instructionId}/details`
+    );
+    if (!response.ok) {
+      setShouldHideAddLegButton(false);
+      return;
+    }
 
-        const instructionDetails = await response.json();
-        const dropoff = instructionDetails.dropoff;
+    const instructionDetails = await response.json();
+    const dropoff = instructionDetails.dropoff;
+    const normalizedDropoff = normalizeString(dropoff); // ← Move this AFTER dropoff is defined
 
         // If we don't have a dropoff location, don't hide
         if (!dropoff) {
@@ -2280,60 +2331,25 @@ function UpdateInstruction() {
 
         // Check if the last leg's destination matches the dropoff
         const lastLeg = legs[legs.length - 1];
-        if (lastLeg.destination !== dropoff) {
+        if (normalizeString(lastLeg.destination) !== normalizeString(dropoff)) {
           setShouldHideAddLegButton(false);
           return;
         }
 
-        // Get all containers assigned to legs
-        const assignedContainers = new Set();
-        const containersReachingDropoff = new Set();
+const missingItems = await checkContainersReachDropoff(dropoff);
 
-        // Collect all containers from all legs
-        legs.forEach((leg) => {
-          if (leg.drivers && leg.drivers.length > 0) {
-            leg.drivers.forEach((driver) => {
-              if (driver.containernumber) {
-                assignedContainers.add(driver.containernumber);
+      console.log("Destination check result (missing items):", missingItems);
 
-                // If this leg's destination is the dropoff, mark this container as reaching dropoff
-                if (leg.destination === dropoff) {
-                  containersReachingDropoff.add(driver.containernumber);
-                }
-              }
-            });
-          }
-        });
+      // Set the state based on whether all items reach the dropoff
+      setShouldHideAddLegButton(missingItems.length === 0);
+    } catch (error) {
+      console.error("Error checking container/weight destinations:", error);
+      setShouldHideAddLegButton(false);
+    }
+  };
 
-        // Get all containers from the instruction
-        const allInstructionContainers = instructionContainers.map(
-          (c) => c.containernum
-        );
-
-        // Check if all instruction containers reach dropoff
-        const allContainersReachDropoff = allInstructionContainers.every(
-          (container) => containersReachingDropoff.has(container)
-        );
-
-        console.log("Container destination check:", {
-          dropoff,
-          lastLegDestination: lastLeg.destination,
-          allInstructionContainers,
-          assignedContainers: Array.from(assignedContainers),
-          containersReachingDropoff: Array.from(containersReachingDropoff),
-          allContainersReachDropoff,
-        });
-
-        // Set the state based on whether all containers reach the dropoff
-        setShouldHideAddLegButton(allContainersReachDropoff);
-      } catch (error) {
-        console.error("Error checking container destinations:", error);
-        setShouldHideAddLegButton(false);
-      }
-    };
-
-    checkContainersDestination();
-  }, [legs, instructionContainers, instructionId]);
+  checkContainersDestination();
+}, [instructionId, legs, instructionContainers, isWeightBased]);
 
   useEffect(() => {
     // Only update if we have drivers and rates
@@ -2452,6 +2468,13 @@ function UpdateInstruction() {
     formData.destination,
     noRatesRoutes,
   ]);
+  useEffect(() => {
+  // Cleanup function to prevent state leakage between legs
+  return () => {
+    console.log("Cleaning up driver state");
+    setDrivers([]);
+  };
+}, [currentLagIndex]);
 
   return (
     <div className="min-h-screen bg-white" style={{ paddingBottom: 200 }}>
@@ -2465,36 +2488,43 @@ function UpdateInstruction() {
       <br />
       {/* Lag Buttons & Plus */}
 
-      <div className="flex gap-4 mb-4" style={{ marginLeft: "15px" }}>
-        {legs.map((leg, index) => (
-          <button
-            key={leg.id || index}
-            className={`px-4 py-2 rounded-md ${
-              currentLagIndex === index
-                ? "bg-green-500 text-white"
-                : leg.isNew || leg.id?.toString().startsWith("temp-")
-                ? "bg-yellow-200 text-gray-800" // Yellow background for unsaved legs
-                : "bg-gray-200 text-gray-800"
-            }`}
-            onClick={() => handleSelectLeg(index)}
-          >
-            Leg {index + 1}
-            {leg.isNew || leg.id?.toString().startsWith("temp-") ? " *" : ""}
-            {leg.drivers && leg.drivers.length > 0 && (
-              <span className="ml-2 text-xs">
-                ({leg.drivers.length} driver
-                {leg.drivers.length !== 1 ? "s" : ""})
-              </span>
-            )}
-          </button>
-        ))}
-        {!shouldHideAddLegButton && (
-          <Plus
-            onClick={handleAddLeg}
-            disabled={isCompleted || (shipmentType === 3 && legs.length >= 1)}
-          />
+<div className="flex gap-4 mb-4" style={{ marginLeft: "15px" }}>
+  {legs.map((leg, index) => {
+    // Explicitly determine the button style
+    let buttonClass = "px-4 py-2 rounded-md ";
+    
+    if (currentLagIndex === index) {
+      // Currently selected leg - always green
+      buttonClass += "bg-green-500 text-white";
+    } else if (leg.isNew || leg.id?.toString().startsWith("temp-")) {
+      // Unsaved leg but not selected - yellow
+      buttonClass += "bg-yellow-200 text-gray-800";
+    } else {
+      // Regular saved leg - gray
+      buttonClass += "bg-gray-200 text-gray-800";
+    }
+    
+    return (
+      <button
+        key={leg.id || index}
+        className={buttonClass}
+        onClick={() => handleSelectLeg(index)}
+      >
+        Leg {index + 1}
+        {leg.isNew || leg.id?.toString().startsWith("temp-") ? " *" : ""}
+        {leg.drivers && leg.drivers.length > 0 && (
+          <span className="ml-2 text-xs">
+            ({leg.drivers.length} driver
+            {leg.drivers.length !== 1 ? "s" : ""})
+          </span>
         )}
-      </div>
+      </button>
+    );
+  })}
+  {!shouldHideAddLegButton && (
+    <Plus onClick={handleAddLeg} disabled={isCompleted || hasUnsavedNewLeg} />
+  )}
+</div>
 
       {legs.length > 0 && (
         <div className="finalise-btn">
@@ -2805,36 +2835,76 @@ function UpdateInstruction() {
                         </select>
                       </div>
 
-                      <div
-                        style={{
-                          width: "16.666%",
-                          padding: "0 0.5rem",
-                          marginBottom: "0.75rem",
-                        }}
-                      >
-                        <label
-                          style={{
-                            display: "block",
-                            color: "#374151",
-                            fontWeight: "500",
-                            marginBottom: "0.25rem",
-                          }}
-                        >
-                          Container Number
-                        </label>
-                        <select
-                          style={{
-                            width: "100%",
-                            padding: "0.5rem",
-                            border: "1px solid #d1d5db",
-                            borderRadius: "0.375rem",
-                            backgroundColor: isCompleted ? "#f3f4f6" : "white",
-                          }}
-                          className="dropdown"
-                          value={entry.containernumber || ""}
-                          onChange={(e) => {
-                            if (isCompleted) return;
-                            const containerValue = e.target.value;
+<div
+  style={{
+    width: "16.666%",
+    padding: "0 0.5rem",
+    marginBottom: "0.75rem",
+  }}
+>
+  <label
+    style={{
+      display: "block",
+      color: "#374151",
+      fontWeight: "500",
+      marginBottom: "0.25rem",
+    }}
+  >
+    {isWeightBased ? `Weight (${weightUnit})` : "Container Number"}
+  </label>
+  {isWeightBased ? (
+    <input
+      type="number"
+      step="0.01"
+      min="0"
+      style={{
+        width: "100%",
+        padding: "0.5rem",
+        border: "1px solid #d1d5db",
+        borderRadius: "0.375rem",
+        backgroundColor: isCompleted ? "#f3f4f6" : "white",
+      }}
+      value={entry.containernumber || ""}
+      onChange={(e) => {
+        if (isCompleted) return;
+        const weightValue = e.target.value;
+
+        const updatedDrivers = [...drivers];
+        updatedDrivers[index].containernumber = weightValue;
+
+        // For weight-based, we don't auto-fill container type
+        updatedDrivers[index].container_type = "";
+        updatedDrivers[index].driverRate = formData.driverRate || "0";
+
+        // Mark this driver field as edited
+        setEditedFields((prev) => ({
+          ...prev,
+          drivers: {
+            ...prev.drivers,
+            [updatedDrivers[index].id]: true,
+          },
+        }));
+
+        setDrivers(updatedDrivers);
+        console.log(`Updated weight for driver at index ${index}:`, weightValue);
+      }}
+      disabled={isCompleted}
+      placeholder={`Enter weight in ${weightUnit}`}
+    />
+  ) : (
+    <select
+      style={{
+        width: "100%",
+        padding: "0.5rem",
+        border: "1px solid #d1d5db",
+        borderRadius: "0.375rem",
+        backgroundColor: isCompleted ? "#f3f4f6" : "white",
+      }}
+      className="dropdown"
+      value={entry.containernumber || ""}
+      onChange={(e) => {
+        if (isCompleted) return;
+        const containerValue = e.target.value;
 
                             // Store current rates for debugging
                             console.log("Current rates:", rates);
@@ -2980,24 +3050,22 @@ function UpdateInstruction() {
                               updatedDrivers[index]
                             );
                           }}
-                          disabled={isCompleted}
-                        >
-                          <option value="">Select Container</option>
-                          {containerOptions
-                            .filter((container) => {
-                              // For the first leg, show all containers
-                              if (currentLagIndex === 0) return true;
-
-                              // For subsequent legs, hide containers that have reached dropoff
-                              return !hasContainerReachedDropoff(container);
-                            })
-                            .map((container) => (
-                              <option key={container} value={container}>
-                                {container}
-                              </option>
-                            ))}
-                        </select>
-                      </div>
+disabled={isCompleted}
+    >
+      <option value="">Select Container</option>
+      {containerOptions
+        .filter((container) => {
+          if (currentLagIndex === 0) return true;
+          return !hasContainerReachedDropoff(container);
+        })
+        .map((container) => (
+          <option key={container} value={container}>
+            {container}
+          </option>
+        ))}
+    </select>
+  )}
+</div>
 
                       <div
                         style={{
@@ -3025,7 +3093,7 @@ function UpdateInstruction() {
                             borderRadius: "0.375rem",
                             backgroundColor: "#f3f4f6",
                           }}
-                          value={entry.container_type || ""}
+                          value={isWeightBased ? weightUnit : (entry.container_type || "")}
                           readOnly
                         />
                       </div>
@@ -3058,13 +3126,13 @@ function UpdateInstruction() {
                             padding: "0.5rem",
                             border: "1px solid #d1d5db",
                             borderRadius: "0.375rem",
-                            backgroundColor: entry.isAbnormal
+                            backgroundColor: (entry.isAbnormal || isWeightBased)
                               ? "white"
                               : "#f3f4f6",
                           }}
                           value={entry.driverRate || ""}
                           onChange={(e) => {
-                            if (isCompleted || !entry.isAbnormal) return;
+                            if (isCompleted || (!entry.isAbnormal && !isWeightBased)) return;
 
                             // Only allow numbers and decimal points
                             const value = e.target.value;
@@ -3087,7 +3155,7 @@ function UpdateInstruction() {
                               setDrivers(updatedDrivers);
                             }
                           }}
-                          readOnly={!entry.isAbnormal}
+                          readOnly={!entry.isAbnormal && !isWeightBased}
                         />
                       </div>
 
@@ -3305,74 +3373,90 @@ function UpdateInstruction() {
         </div>
       )}
 
-      {showContainerModal && (
-        <div className="modal-wrapper">
-          <div className="modal-backdrop animate-fadeIn"></div>
-          <div className="modal-container animate-scaleIn">
-            <div className="modal-header">
-              <div className="flex items-center gap-4">
-                <svg
-                  xmlns="http://www.w3.org/2000/svg"
-                  width="50"
-                  height="50"
-                  viewBox="0 0 24 24"
-                  fill="#FEE2E2"
-                  stroke="#DC2626"
-                  strokeWidth="2"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  className="text-red-600 drop-shadow-sm"
-                >
-                  <path d="M12 2L2 19h20L12 2z" />
-                  <path d="M12 8v4" />
-                  <circle cx="12" cy="16" r="1" />
-                </svg>
-                <h3 className="modal-title">Container Destination Warning</h3>
-              </div>
-              <p className="modal-description">
-                All containers must reach the final destination.
-              </p>
-            </div>
-            <div className="modal-body">
-              <div className="modal-item">
-                <div className="modal-bullet"></div>
-                <span className="modal-item-text">
-                  Final Destination:{" "}
-                  <strong>{containerValidationDetails.dropoff}</strong>
-                </span>
-              </div>
-              {containerValidationDetails.missingContainers.map(
-                (container, index) => (
-                  <div key={index} className="modal-item">
-                    <div className="modal-bullet"></div>
-                    <span className="modal-item-text">
-                      Container <strong>{container}</strong> does not reach
-                      final destination
-                    </span>
-                  </div>
-                )
-              )}
-            </div>
-            <div className="modal-footer">
-              <button
-                className="modal-btn modal-btn-secondary"
-                onClick={() => setShowContainerModal(false)}
-              >
-                Cancel
-              </button>
-              <button
-                className="modal-btn modal-btn-primary"
-                onClick={() => {
-                  setShowContainerModal(false);
-                  navigateToDocuments();
-                }}
-              >
-                Proceed Anyway
-              </button>
-            </div>
-          </div>
+{showContainerModal && (
+  <div className="modal-wrapper">
+    <div className="modal-backdrop animate-fadeIn"></div>
+    <div className="modal-container animate-scaleIn">
+      <div className="modal-header">
+        <div className="flex items-center gap-4">
+          <svg
+            xmlns="http://www.w3.org/2000/svg"
+            width="50"
+            height="50"
+            viewBox="0 0 24 24"
+            fill="#FEE2E2"
+            stroke="#DC2626"
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            className="text-red-600 drop-shadow-sm"
+          >
+            <path d="M12 2L2 19h20L12 2z" />
+            <path d="M12 8v4" />
+            <circle cx="12" cy="16" r="1" />
+          </svg>
+<h3 className="modal-title">
+  {containerValidationDetails.isWeightBased 
+    ? (containerValidationDetails.missingWeight > 0 ? "Weight Destination Warning" : "Excess Weight Warning")
+    : "Container Destination Warning"}
+</h3>
         </div>
-      )}
+<p className="modal-description">
+  {containerValidationDetails.isWeightBased
+    ? (containerValidationDetails.missingWeight > 0 
+        ? "Not all weight reaches the final destination."
+        : "More weight is assigned than the instruction total.")
+    : "All containers must reach the final destination."}
+</p>
+      </div>
+      <div className="modal-body">
+        <div className="modal-item">
+          <div className="modal-bullet"></div>
+          <span className="modal-item-text">
+            Final Destination: <strong>{containerValidationDetails.dropoff}</strong>
+          </span>
+        </div>
+        {containerValidationDetails.isWeightBased ? (
+          <div className="modal-item">
+            <div className="modal-bullet"></div>
+<span className="modal-item-text">
+  Weight reaching destination: <strong>
+    {(containerValidationDetails.totalWeight - Math.abs(containerValidationDetails.missingWeight)).toFixed(2)}/
+    {containerValidationDetails.totalWeight.toFixed(2)} {containerValidationDetails.weightUnit}
+  </strong>
+</span>
+          </div>
+        ) : (
+          containerValidationDetails.missingContainers?.map((container, index) => (
+            <div key={index} className="modal-item">
+              <div className="modal-bullet"></div>
+              <span className="modal-item-text">
+                Container <strong>{container}</strong> does not reach final destination
+              </span>
+            </div>
+          ))
+        )}
+      </div>
+      <div className="modal-footer">
+        <button
+          className="modal-btn modal-btn-secondary"
+          onClick={() => setShowContainerModal(false)}
+        >
+          Cancel
+        </button>
+        <button
+          className="modal-btn modal-btn-primary"
+          onClick={() => {
+            setShowContainerModal(false);
+            navigateToDocuments();
+          }}
+        >
+          Proceed Anyway
+        </button>
+      </div>
+    </div>
+  </div>
+)}
 
       {/* Unsaved Changes Modal */}
       {showUnsavedChangesModal && (

@@ -79,10 +79,10 @@ const ViewStatement = () => {
       .padStart(2, "0")}/${date.getFullYear()}`;
   };
 
-  const formatAmount = (amount) => {
-    if (amount === null || amount === undefined) return "N/A";
-    return `R${Number.parseFloat(amount).toFixed(2)}`;
-  };
+const formatAmount = (amount) => {
+  if (amount === null || amount === undefined || amount === 0) return "N/A";
+  return `R${Number.parseFloat(amount).toFixed(2)}`;
+};
 
   const handleDownload = () => {
     const element = printRef.current;

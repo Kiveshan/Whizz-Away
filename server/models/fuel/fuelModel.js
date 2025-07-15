@@ -1,16 +1,5 @@
 import { pool } from "../../config/database.js";
 
-// const getTrucksWithFuelExpenses = async () => {
-//   const queryText = `
-//     SELECT DISTINCT m.truckid, t.truckregnum, t.is_subcontractor 
-//     FROM expenses_m2 m
-//     JOIN m5_trucks t ON m.truckid = t.m5truckskey
-//     WHERE m.truckid IS NOT NULL
-//     ORDER BY t.truckregnum
-//   `;
-//   const result = await pool.query(queryText);
-//   return result.rows;
-// };
 const getAllCompanyOwnedTrucks = async () => {
   const query = `
     SELECT 

@@ -39,6 +39,7 @@ const POTable = ({ showFilterButtons = true }) => {
               amount: formatAmount(po.total),
               details: po.ponum,
               id: po.ponum,
+              status: po.status,
               lineItems: po.line_items,
             }))
           : response.data.map((row) => ({
@@ -78,11 +79,12 @@ const POTable = ({ showFilterButtons = true }) => {
     return `${(date.getMonth() + 1).toString().padStart(2, "0")}/${date.getDate().toString().padStart(2, "0")}/${date.getFullYear()}`
   }
 
-  const formatAmount = (amount) => {
-    if (amount === null || amount === undefined) return "N/A"
-    return `R ${Number.parseFloat(amount).toFixed(2)}`
-  }
-
+// Updated formatAmount function to handle 0 values
+const formatAmount = (amount) => {
+  // Check for null, undefined, or 0
+  if (amount === null || amount === undefined || amount === 0) return "N/A"
+  return `R ${Number.parseFloat(amount).toFixed(2)}`
+}
   const handleFilterClick = (filter) => {
     setActiveFilter(filter)
     setIsDropdownOpen(false)
@@ -320,6 +322,7 @@ const POTable = ({ showFilterButtons = true }) => {
                         <th>Type</th>
                         <th>Supplied By</th>
                         <th>Date</th>
+                        <th>Status</th>
                         <th>Amount</th>
                         <th>Details</th>
                       </>
@@ -346,6 +349,7 @@ const POTable = ({ showFilterButtons = true }) => {
                             <td>{expense.type}</td>
                             <td>{expense.suppliedBy}</td>
                             <td>{expense.date}</td>
+                            <td>{expense.status}</td>
                             <td>{expense.amount}</td>
                             <td>
                               <button className="view-button" onClick={() => handleViewClick(expense)}>
