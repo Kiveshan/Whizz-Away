@@ -1153,30 +1153,37 @@ const handleAddLeg = () => {
     isNew: true,
   };
 
-  // Update legs state
-  setLegs(prevLegs => [...prevLegs, newLeg]);
+const newLegIndex = legs.length;
 
-  // Clear form state
-  setFormData({
-    startingPoint: "",
-    driverRate: "",
-    destination: "",
-  });
+// CRITICAL FIX: Use functional updates to ensure proper state synchronization
+setLegs(prevLegs => {
+  const updatedLegs = [...prevLegs, newLeg];
+  
+  // Set currentLagIndex in the same render cycle using a callback
+  setTimeout(() => {
+    setCurrentLagIndex(newLegIndex);
+  }, 0);
+  
+  return updatedLegs;
+});
 
-  // SIMPLE driver clearing - like old code
-  setDrivers([]);
+// Clear form state
+setFormData({
+  startingPoint: "",
+  driverRate: "",
+  destination: "",
+});
 
-  // Reset edited fields
-  setEditedFields({
-    startingPoint: false,
-    destination: false,
-    driverRate: false,
-    drivers: {},
-  });
+// Clear drivers
+setDrivers([]);
 
-  // Set the current leg index to the new leg
-  const newLegIndex = legs.length;
-  setCurrentLagIndex(newLegIndex);
+// Reset edited fields
+setEditedFields({
+  startingPoint: false,
+  destination: false,
+  driverRate: false,
+  drivers: {},
+});
   console.log(`Navigating to new leg at index: ${newLegIndex}`);
 
   // Update saved legs
