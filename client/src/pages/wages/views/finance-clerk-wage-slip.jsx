@@ -110,6 +110,53 @@ const FinanceClerkWageSlip = () => {
       return { exists: false, error: true };
     }
   };
+  const checkStoredWageData = async (employeeId, month, year) => {
+  try {
+    console.log(`Checking for stored wage data: employeeId=${employeeId}, month=${month}, year=${year}`);
+    const response = await api.get(
+      `/api/stored-wage-data/${employeeId}?month=${encodeURIComponent(month)}&year=${encodeURIComponent(year)}`
+    );
+    
+    if (response.data?.exists) {
+      // Check if we're still in the same month as the wage data
+      const currentDate = new Date();
+      const currentMonth = currentDate.getMonth() + 1; // 1-based
+      const currentYear = currentDate.getFullYear();
+      
+      const monthNames = [
+        "January", "February", "March", "April", "May", "June",
+        "July", "August", "September", "October", "November", "December"
+      ];
+      const wageMonth = monthNames.indexOf(month) + 1;
+      const wageYear = parseInt(year);
+      
+      // If we're viewing a past month (not current month), use stored data
+      const isPastMonth = (wageYear < currentYear) || 
+                         (wageYear === currentYear && wageMonth < currentMonth);
+      
+      if (isPastMonth) {
+        console.log(`✅ Using stored wage data for past month ${month} ${year}`);
+        return {
+          exists: true,
+          totalEarnings: response.data.totalEarnings,
+          totalPayable: response.data.totalPayable,
+          useStored: true
+        };
+      } else {
+        console.log(`🔄 Current month detected, will recalculate and update stored data`);
+        return {
+          exists: true,
+          useStored: false // Allow recalculation for current month
+        };
+      }
+    }
+    
+    return { exists: false, useStored: false };
+  } catch (error) {
+    console.error('Error checking stored wage data:', error);
+    return { exists: false, useStored: false };
+  }
+};
 
   // Create a separate function for saving wage data to avoid duplicate code
   const saveWageData = async (wagePayload) => {
@@ -236,6 +283,24 @@ const FinanceClerkWageSlip = () => {
             : [];
 
           setLegs(allLegsArray);
+          const storedWageResult = await checkStoredWageData(
+  cleanId,
+  selectedMonth,
+  selectedYear
+);
+
+let useStoredData = storedWageResult.useStored;
+let storedTotalEarnings = 0;
+let storedTotalPayable = 0;
+
+if (useStoredData) {
+  // Use stored historical data (past months only)
+  storedTotalEarnings = storedWageResult.totalEarnings;
+  storedTotalPayable = storedWageResult.totalPayable;
+  console.log(`✅ Using stored wage data - Earnings: R${storedTotalEarnings.toFixed(2)}, Payable: R${storedTotalPayable.toFixed(2)}`);
+} else {
+  console.log(`🔄 Calculating fresh wage slip (current month or no stored data)`);
+}
 
           // Group legs by instruction ID
           const legsByInstruction = {};
@@ -255,34 +320,49 @@ const FinanceClerkWageSlip = () => {
             0
           );
 
-          // Format earnings data - include base salary and each leg
-          const earnings = [];
-          let totalEarningsAmount = 0;
+const earnings = [];
+let totalEarningsAmount = 0;
 
-          // Add base salary if available
-          if (response.data.base_salary) {
-            const baseSalary = parseAmount(response.data.base_salary);
-            totalEarningsAmount += baseSalary;
-            earnings.push({
-              description: "Base Salary",
-              amount: `R ${baseSalary.toFixed(2)}`,
-            });
-          }
+// If using stored data, use stored values, otherwise calculate fresh
+if (useStoredData) {
+  totalEarningsAmount = storedTotalEarnings;
+} else {
+  // Add base salary if available
+  if (response.data.base_salary) {
+    const baseSalary = parseAmount(response.data.base_salary);
+    totalEarningsAmount += baseSalary;
+  }
 
-          // Add each leg as a separate earning, grouped by instruction
-          Object.keys(legsByInstruction).forEach((instructionId) => {
-            legsByInstruction[instructionId].forEach((leg, index) => {
-              const legAmount = parseAmount(leg.driverrate);
-              totalEarningsAmount += legAmount;
-              earnings.push({
-                description: `INS${instructionId}-Leg${
-                  leg.legnumber || index + 1
-                } `,
-                amount: `R ${legAmount.toFixed(2)}`,
-              });
-            });
-          });
+  // Add legs earnings
+  Object.keys(legsByInstruction).forEach((instructionId) => {
+    legsByInstruction[instructionId].forEach((leg, index) => {
+      const legAmount = parseAmount(leg.driverrate);
+      totalEarningsAmount += legAmount;
+    });
+  });
+}
 
+// Always show the breakdown for display purposes (regardless of stored vs fresh)
+if (response.data.base_salary) {
+  const baseSalary = parseAmount(response.data.base_salary);
+  earnings.push({
+    description: "Base Salary",
+    amount: `R ${baseSalary.toFixed(2)}`,
+  });
+}
+
+// Add each leg as a separate earning, grouped by instruction
+Object.keys(legsByInstruction).forEach((instructionId) => {
+  legsByInstruction[instructionId].forEach((leg, index) => {
+    const legAmount = parseAmount(leg.driverrate);
+    earnings.push({
+      description: `INS${instructionId}-Leg${
+        leg.legnumber || index + 1
+      } `,
+      amount: `R ${legAmount.toFixed(2)}`,
+    });
+  });
+});
           // If no earnings data is available, add dummy data for testing
           if (allLegsArray.length === 0 && !response.data.base_salary) {
             earnings.push({
@@ -311,16 +391,14 @@ const FinanceClerkWageSlip = () => {
               deductionsResponse.status
             );
 
-            let deductions = [];
-            let totalDeductionsAmount = 0;
-            let deductionsData = {}; // Store deductions data for later use
+let deductions = [];
+let totalDeductionsAmount = 0;
+let deductionsData = {}; // Store deductions data for later use
+let additions = [];
+let totalAdditionsAmount = 0;
 
-            if (deductionsResponse.data) {
-              deductionsData = deductionsResponse.data;
-              console.log(
-                "Deductions data from API (includes historical values if applicable):",
-                deductionsData
-              );
+if (deductionsResponse.data) {
+  deductionsData = deductionsResponse.data;
 
               // Define all possible deduction fields
               const deductionFields = [
@@ -354,52 +432,10 @@ const FinanceClerkWageSlip = () => {
                 },
               ];
 
-              // Process each deduction field
-              deductionFields.forEach((field) => {
-                if (
-                  deductionsData &&
-                  deductionsData[field.key] !== null &&
-                  deductionsData[field.key] !== undefined
-                ) {
-                  const rawValue = parseAmount(deductionsData[field.key]);
-
-                  // Handle rate-based deductions (like UIF)
-                  let amount = rawValue;
-                  if (field.isRate && rawValue > 0) {
-                    // Convert percentage to decimal and multiply by total earnings
-                    amount = (rawValue / 100) * totalEarningsAmount;
-                    console.log(
-                      `${field.label} rate:`,
-                      rawValue,
-                      "% of",
-                      totalEarningsAmount,
-                      "=",
-                      amount
-                    );
-                  }
-
-                  console.log(
-                    `${field.label} amount:`,
-                    amount,
-                    "Type:",
-                    typeof deductionsData[field.key],
-                    "Raw value:",
-                    deductionsData[field.key],
-                    field.isRate ? "(Rate)" : ""
-                  );
-
-                  if (!isNaN(amount) && amount > 0) {
-                    totalDeductionsAmount += amount;
-                    deductions.push({
-                      description: field.isRate
-                        ? `${field.label} (Rate: ${rawValue.toFixed(2)}%)`
-                        : field.label,
-                      amount: `R ${amount.toFixed(2)}`,
-                    });
-                  }
-                }
-              });
-            } else {
+            }
+            
+            
+            else {
               console.log(
                 "Failed to fetch deductions data:",
                 deductionsResponse.status
@@ -419,7 +455,66 @@ const FinanceClerkWageSlip = () => {
               ];
               totalDeductionsAmount = 2000; // Mock total
             }
+// Add loan deduction as negative earning (Less Loans) after we have deductionsData
+let loanAmount = 0;
+if (deductionsData && deductionsData.deduction_loan) {
+  loanAmount = parseAmount(deductionsData.deduction_loan);
+  if (loanAmount > 0) {
+    earnings.push({
+      description: "Less Loans",
+      amount: `R ${loanAmount.toFixed(2)}`,
+      isDeduction: true
+    });
+    
+    // Only subtract from total if we're not using stored data
+    if (!useStoredData) {
+      totalEarningsAmount -= loanAmount;
+    }
+  }
+}
+const additionFields = [
+  { key: "uif_rate", label: "UIF", rate: 1.0 },
+  { key: "sdl_rate", label: "SDL", rate: 1.0 },
+  { key: "coid_rate", label: "COID", rate: 2.48 }
+];
 
+// let additions = [];
+// let totalAdditionsAmount = 0;
+// let totalPayableAmount = 0;
+let totalPayableAmount = 0;
+
+if (useStoredData) {
+  // Use stored total payable
+  totalPayableAmount = storedTotalPayable;
+  
+  // Calculate additions for display based on stored earnings
+  const earningsForAdditions = totalEarningsAmount; // This is the stored earnings after loan
+  additionFields.forEach((field) => {
+    const amount = (field.rate / 100) * earningsForAdditions;
+    totalAdditionsAmount += amount;
+    additions.push({
+      description: `${field.label} (${field.rate}% of earnings)`,
+      amount: `R ${amount.toFixed(2)}`,
+    });
+  });
+} else {
+  // Calculate fresh additions
+  additionFields.forEach((field) => {
+    const amount = (field.rate / 100) * totalEarningsAmount;
+    totalAdditionsAmount += amount;
+    additions.push({
+      description: `${field.label} (${field.rate}% of earnings)`,
+      amount: `R ${amount.toFixed(2)}`,
+    });
+  });
+  
+  // Calculate total payable
+  totalPayableAmount = totalEarningsAmount + totalAdditionsAmount;
+}
+
+console.log("Final additions:", additions);
+console.log("Total additions amount:", totalAdditionsAmount);
+console.log("Total payable amount:", totalPayableAmount);
             // If no deductions were found, use default placeholder deductions
             if (deductions.length === 0) {
               console.log("No deductions found, using default placeholders");
@@ -450,47 +545,40 @@ const FinanceClerkWageSlip = () => {
             );
 
             // Update UI with calculated data
-            setWageData({
-              payPeriod: `${formattedFirstDay} - ${formattedLastDay}`,
-              payDate: formattedLastDay,
-              earnings: earnings,
-              deductions: deductions,
-              totalEarnings: `R ${totalEarningsAmount.toFixed(2)}`,
-              totalDeductions: `R ${totalDeductionsAmount.toFixed(2)}`,
-              netPay: `R ${netPayAmount.toFixed(2)}`,
-            });
+// Calculate total payable to labour consultant (total earnings + additions)
+// Update UI with calculated data
+setWageData({
+  payPeriod: `${formattedFirstDay} - ${formattedLastDay}`,
+  payDate: formattedLastDay,
+  earnings: earnings,
+  additions: additions,
+  totalEarnings: `R ${totalEarningsAmount.toFixed(2)}`,
+  totalAdditions: `R ${totalAdditionsAmount.toFixed(2)}`,
+  totalPayable: `R ${totalPayableAmount.toFixed(2)}`,
+});
 
             // Only attempt to save if we haven't found an existing wage slip
-            if (!wageSlipExists) {
-              // Calculate income tax based on rate
-              const incomeTaxRate = parseAmount(
-                deductionsData.income_tax_rate || 0
-              );
-              const calculatedIncomeTax =
-                (incomeTaxRate / 100) * totalEarningsAmount;
+// Only attempt to save if we're not using stored data (allows updates for current month)
+if (!useStoredData) {
+  // Create wage payload
+  const wagePayload = {
+    employeeId: cleanId,
+    month: monthIndexForPayPeriod + 1,
+    year: Number.parseInt(selectedYear),
+    totalEarnings: totalEarningsAmount, // This is earnings after loan deduction
+    totalDeductions: 0, // We're not using traditional deductions anymore
+    netPay: totalPayableAmount, // This is "Total Payable to Labour Consultant"
+    date: getLastDayOfMonth(
+      Number.parseInt(selectedYear),
+      monthIndexForPayPeriod
+    ),
+  };
 
-              // Create wage payload with individual deduction values
-              const wagePayload = {
-                employeeId: cleanId,
-                month: monthIndexForPayPeriod + 1,
-                year: Number.parseInt(selectedYear),
-                totalEarnings: totalEarningsAmount,
-                totalDeductions: totalDeductionsAmount,
-                netPay: netPayAmount,
-                calculatedIncomeTax: calculatedIncomeTax, // Add the calculated income tax
-                date: getLastDayOfMonth(
-                  Number.parseInt(selectedYear),
-                  monthIndexForPayPeriod
-                ),
-              };
-
-              console.log("Wage payload:", wagePayload);
-
-              // Use the separate function to save wage data
-              await saveWageData(wagePayload);
-            } else {
-              console.log("Wage slip already exists, skipping save operation");
-            }
+  console.log("Saving/updating wage payload:", wagePayload);
+  await saveWageData(wagePayload); // The UPSERT will handle insert/update automatically
+} else {
+  console.log("Using stored historical data, skipping save operation");
+}
           } catch (deductionsError) {
             console.error("Error fetching deductions data:", deductionsError);
 
@@ -736,51 +824,50 @@ const FinanceClerkWageSlip = () => {
                   </table>
                 </div>
 
-                {/* Deductions Table */}
-                <div className="wageslip-table-container">
-                  <table className="wageslip-table">
-                    <thead>
-                      <tr>
-                        <th className="wageslip-table-header wageslip-table-cell-left">
-                          Deductions
-                        </th>
-                        <th className="wageslip-table-header wageslip-table-cell-right">
-                          Amount
-                        </th>
-                      </tr>
-                    </thead>
+{/* Additions Table */}
+<div className="wageslip-table-container">
+  <table className="wageslip-table">
+    <thead>
+      <tr>
+        <th className="wageslip-table-header wageslip-table-cell-left">
+          Additions
+        </th>
+        <th className="wageslip-table-header wageslip-table-cell-right">
+          Amount
+        </th>
+      </tr>
+    </thead>
                     <tbody>
-                      {wageData.deductions.map((item, index) => (
-                        <tr
-                          key={index}
-                          style={{
-                            backgroundColor:
-                              index % 2 === 0 ? "#fff" : "#f9fafb",
-                          }}
-                        >
-                          <td className="wageslip-table-cell wageslip-table-cell-left">
-                            {item.description}
-                          </td>
-                          <td className="wageslip-table-cell wageslip-table-cell-right">
-                            {item.amount}
-                          </td>
-                        </tr>
-                      ))}
-                      {/* Total Deductions row */}
-                      <tr style={{ backgroundColor: "#f0f0f0" }}>
-                        <td
-                          className="wageslip-table-cell wageslip-table-cell-left"
-                          style={{ fontWeight: 700 }}
-                        >
-                          Total Deductions
-                        </td>
-                        <td
-                          className="wageslip-table-cell wageslip-table-cell-right"
-                          style={{ fontWeight: 700 }}
-                        >
-                          {wageData.totalDeductions}
-                        </td>
-                      </tr>
+{wageData.additions.map((item, index) => (
+  <tr
+    key={index}
+    style={{
+      backgroundColor: index % 2 === 0 ? "#fff" : "#f9fafb",
+    }}
+  >
+    <td className="wageslip-table-cell wageslip-table-cell-left">
+      {item.description}
+    </td>
+    <td className="wageslip-table-cell wageslip-table-cell-right">
+      {item.amount}
+    </td>
+  </tr>
+))}
+{/* Total Additions row */}
+<tr style={{ backgroundColor: "#f0f0f0" }}>
+  <td
+    className="wageslip-table-cell wageslip-table-cell-left"
+    style={{ fontWeight: 700 }}
+  >
+    Total Additions
+  </td>
+  <td
+    className="wageslip-table-cell wageslip-table-cell-right"
+    style={{ fontWeight: 700 }}
+  >
+    {wageData.totalAdditions}
+  </td>
+</tr>
                     </tbody>
                   </table>
                 </div>
@@ -790,9 +877,9 @@ const FinanceClerkWageSlip = () => {
                   <table className="wageslip-table">
                     <thead>
                       <tr>
-                        <th className="wageslip-table-header wageslip-table-cell-left">
-                          Net Pay
-                        </th>
+<th className="wageslip-table-header wageslip-table-cell-left">
+  Total Payable to Labour Consultant
+</th>
                         <th className="wageslip-table-header wageslip-table-cell-right">
                           Amount
                         </th>
@@ -800,18 +887,18 @@ const FinanceClerkWageSlip = () => {
                     </thead>
                     <tbody>
                       <tr style={{ backgroundColor: "#f9fafb" }}>
-                        <td
-                          className="wageslip-table-cell wageslip-table-cell-left"
-                          style={{ fontWeight: 600 }}
-                        >
-                          Net Pay
-                        </td>
-                        <td
-                          className="wageslip-table-cell wageslip-table-cell-right"
-                          style={{ fontWeight: 600 }}
-                        >
-                          {wageData.netPay}
-                        </td>
+<td
+  className="wageslip-table-cell wageslip-table-cell-left"
+  style={{ fontWeight: 600 }}
+>
+  Total Payable to Labour Consultant
+</td>
+<td
+  className="wageslip-table-cell wageslip-table-cell-right"
+  style={{ fontWeight: 600 }}
+>
+  {wageData.totalPayable}
+</td>
                       </tr>
                     </tbody>
                   </table>

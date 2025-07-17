@@ -1434,7 +1434,7 @@ export default function DirectorAnalytics() {
     if (roleId == 1) {
       navigate("/Dashboard")
     } else if (roleId == 4) {
-      navigate("/DirectorDashboard")
+      navigate("/analytics-reports")
     }
   }
 

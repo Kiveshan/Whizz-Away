@@ -1,0 +1,1 @@
+export { default as WageReports } from "./views/WageReportsPage.jsx";
