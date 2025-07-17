@@ -370,7 +370,7 @@
 /* Table styling to match screenshot */
 .wage-table-container {
   padding: 0 20px;
-  margin-top: 5px; /* Added margin to move the table down */
+  margin-top: 80px; /* Added margin to move the table down */
 }
 
 .wage-table1 {
@@ -379,7 +379,7 @@
   border: 2px solid #87ceeb; /* Changed border color to match finance-clerk-wage-details.jsx */
   border-radius: 8px;
   overflow: hidden;
-  margin-left: 460px;
+  margin-left: calc(50% - 300px + 20px);
   margin-top: -30px;
 }
 .wage-table1 thead{
