@@ -5,31 +5,26 @@ import { extractFilenameFromUrl } from "../../utils/helpers"
 
 const EmployeeForm = ({ employee, loading, isEditing, onSave, onCancel, onChange, onDeleteDocument }) => {
   const emailRef = useRef(null)
+  const [alert, setAlert] = useState({ show: false, message: "" })
 
   // Validate required fields on submit
   const validateForm = () => {
     let isValid = true
-    
-    // Validate required fields
     const requiredFields = ['name', 'surname', 'roleid', 'cellnum']
     requiredFields.forEach(field => {
       if (!employee[field]) {
         isValid = false
       }
     })
-
     return isValid
   }
 
   const handleSubmit = async (e) => {
     e.preventDefault()
-
-    // Perform custom validation
     if (!validateForm()) {
       e.target.reportValidity()
       return
     }
-
     const success = await onSave(employee, emailRef)
     if (!success) {
       return
@@ -38,7 +33,22 @@ const EmployeeForm = ({ employee, loading, isEditing, onSave, onCancel, onChange
 
   const handleFileUpload = (e) => {
     const file = e.target.files[0]
-    if (file && file.type === "application/pdf" && (employee.documents?.length || 0) < 3) {
+    const maxSizeInBytes = 5 * 1024 * 1024 // 5MB in bytes
+
+    if (file) {
+      if (file.type !== "application/pdf") {
+        setAlert({ show: true, message: "Only PDF files are allowed." })
+        return
+      }
+      if (file.size > maxSizeInBytes) {
+        setAlert({ show: true, message: "File size exceeds the 5MB limit." })
+        return
+      }
+      if ((employee.documents?.length || 0) >= 3) {
+        setAlert({ show: true, message: "Maximum of 3 documents allowed." })
+        return
+      }
+      setAlert({ show: false, message: "" }) // Clear alert on success
       onChange("documents", [...(employee.documents || []), file])
     }
   }
@@ -49,9 +59,14 @@ const EmployeeForm = ({ employee, loading, isEditing, onSave, onCancel, onChange
     onChange("documents", updatedDocs)
   }
 
+  const closeAlert = () => {
+    setAlert({ show: false, message: "" })
+  }
+
   return (
     <form className="manage-add-employee-form" onSubmit={handleSubmit} noValidate>
       <h3>{isEditing ? "Edit Employee" : "Add New Employee"}</h3>
+
 
       <div
         className="manage-form-grid"
@@ -117,7 +132,7 @@ const EmployeeForm = ({ employee, loading, isEditing, onSave, onCancel, onChange
           </label>
           <input
             type="text"
-            value={employee.employeenum || ""}
+            value={employee.erializationnum || ""}
             onChange={(e) => onChange("employeenum", e.target.value)}
           />
         </div>
@@ -260,9 +275,23 @@ const EmployeeForm = ({ employee, loading, isEditing, onSave, onCancel, onChange
         </div>
 
         {/* Document Upload */}
+         {/* Alert Component */}
+      {alert.show && (
+        <div className="alert-box">
+          <span>{alert.message}</span>
+          <button
+            type="button"
+            className="alert-close"
+            onClick={closeAlert}
+            aria-label="Close alert"
+          >
+            &times;
+          </button>
+        </div>
+      )}
         <div className="manage-form-group" style={{ gridColumn: "1 / span 3" }}>
           <label>
-            <strong>Upload Documents (PDF Only, Max 3)</strong>
+            <strong>Upload Documents (PDF Only, Max 3, 5MB each)</strong>
           </label>
           <div
             style={{
@@ -282,7 +311,7 @@ const EmployeeForm = ({ employee, loading, isEditing, onSave, onCancel, onChange
             <small>
               {(employee.documents?.length || 0) >= 3
                 ? "Maximum of 3 PDF documents uploaded"
-                : "Upload PDF documents only"}
+                : "Upload PDF documents only (max 5MB each)"}
             </small>
           </div>
 
