@@ -191,10 +191,31 @@ for (const employee of employees) {
       let totalEarningsAmount = 0
 
       // Add base salary if available
-      if (employeeData?.base_salary) {
-        totalEarningsAmount += parseFloat(employeeData.base_salary) || 0
-        console.log(`Base salary: ${employeeData.base_salary}`)
-      }
+let baseSalary = 0;
+try {
+  console.log(`Fetching base salary for employee ${cleanId}, month: ${monthName}, year: ${selectedYear}`);
+  const baseSalaryResponse = await api.get(
+    `/api/base-salary-history/${cleanId}?month=${encodeURIComponent(monthName)}&year=${encodeURIComponent(selectedYear)}`
+  );
+  
+  if (baseSalaryResponse.data?.exists) {
+    baseSalary = parseFloat(baseSalaryResponse.data.baseSalary) || 0;
+    console.log(`✅ Using historical base salary: R${baseSalary.toFixed(2)}`);
+  }
+} catch (error) {
+  console.error('Error fetching historical base salary:', error);
+  // Fallback to current base salary from employee data
+  if (employeeData?.base_salary) {
+    baseSalary = parseFloat(employeeData.base_salary) || 0;
+    console.log(`⚠️ Using fallback base salary: R${baseSalary.toFixed(2)}`);
+  }
+}
+
+// Add base salary to total earnings
+if (baseSalary > 0) {
+  totalEarningsAmount += baseSalary;
+  console.log(`Base salary: R${baseSalary.toFixed(2)}`);
+}
 
       // Add legs earnings
       const totalLegsAmount = allLegsArray.reduce(

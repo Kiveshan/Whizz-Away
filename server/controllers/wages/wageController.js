@@ -8,6 +8,8 @@ import {
   getDriverInstructions,
   getDriverLegsByMonth,
   getStoredWageData,
+  getBaseSalaryHistory
+
 } from "../../models/wages/wageModel.js";
 import {
   getTaxAmountForDate,
@@ -29,6 +31,24 @@ const getStoredWageDataHandler = async (req, res) => {
   } catch (error) {
     console.error(`Error fetching stored wage data for employee ${employeeId}:`, error);
     res.status(500).json({ error: "Failed to fetch stored wage data" });
+  }
+};
+const getBaseSalaryHistoryHandler = async (req, res) => {
+  const { employeeId } = req.params;
+  const { month, year } = req.query;
+  
+  console.log(`Route /api/base-salary-history/${employeeId} was accessed with month=${month}, year=${year}`);
+  
+  if (!month || !year) {
+    return res.status(400).json({ error: "Month and year are required query parameters" });
+  }
+  
+  try {
+    const result = await getBaseSalaryHistory(employeeId, month, year);
+    res.json(result);
+  } catch (error) {
+    console.error(`Error fetching base salary history for employee ${employeeId}:`, error);
+    res.status(500).json({ error: "Failed to fetch base salary history" });
   }
 };
 const saveWageDataHandler = async (req, res) => {
@@ -241,5 +261,6 @@ export {
   getDriverWageDetailsHandler,
   getDriverInstructionsHandler,
   getDriverLegsByMonthHandler,
-  getStoredWageDataHandler
+  getStoredWageDataHandler,
+  getBaseSalaryHistoryHandler
 };

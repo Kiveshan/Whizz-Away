@@ -85,7 +85,83 @@ return {
     if (client) client.release();
   }
 };
-
+const getBaseSalaryHistory = async (employeeId, month, year) => {
+  let client;
+  try {
+    client = await pool.connect();
+    
+    // Convert month name to number if it's a string
+    let monthNumber = month;
+    if (typeof month === 'string') {
+      const monthNames = [
+        "January", "February", "March", "April", "May", "June",
+        "July", "August", "September", "October", "November", "December"
+      ];
+      monthNumber = monthNames.indexOf(month) + 1;
+      
+      if (monthNumber === 0) {
+        return { exists: false, error: 'Invalid month name' };
+      }
+    }
+    
+    // Get the last day of the requested month
+    const lastDayOfMonth = new Date(parseInt(year), monthNumber, 0);
+    const monthEndDate = lastDayOfMonth.toISOString().split('T')[0];
+    
+    console.log(`Getting base salary for employee ${employeeId} as of ${monthEndDate}`);
+    
+    // Query to get the most recent base salary on or before the month end
+    const historyQuery = `
+      SELECT base, date 
+      FROM base_salary_history 
+      WHERE userid = $1 AND date <= $2 
+      ORDER BY date DESC 
+      LIMIT 1
+    `;
+    
+    const historyResult = await client.query(historyQuery, [employeeId, monthEndDate]);
+    
+    if (historyResult.rows.length > 0) {
+      console.log(`✅ Found historical base salary: ${historyResult.rows[0].base} as of ${historyResult.rows[0].date}`);
+      return {
+        exists: true,
+        baseSalary: parseFloat(historyResult.rows[0].base),
+        effectiveDate: historyResult.rows[0].date,
+        source: 'historical'
+      };
+    } else {
+      // Fallback to current base salary from m5_employee table
+      console.log('No historical base salary found, checking current base salary');
+      const currentQuery = `
+        SELECT base_salary 
+        FROM m5_employee 
+        WHERE userid = $1
+      `;
+      
+      const currentResult = await client.query(currentQuery, [employeeId]);
+      
+      if (currentResult.rows.length > 0 && currentResult.rows[0].base_salary) {
+        console.log(`⚠️ Using current base salary: ${currentResult.rows[0].base_salary}`);
+        return {
+          exists: true,
+          baseSalary: parseFloat(currentResult.rows[0].base_salary),
+          effectiveDate: null,
+          source: 'current'
+        };
+      } else {
+        console.log('❌ No base salary found');
+        return {
+          exists: false,
+          baseSalary: 0,
+          source: 'none'
+        };
+      }
+    }
+    
+  } finally {
+    if (client) client.release();
+  }
+};
 const checkWageSlip = async (employeeId, month, year) => {
   // Normalize the date to the last day of the month
   const targetDate = new Date(Number.parseInt(year), Number.parseInt(month), 0);
@@ -616,5 +692,6 @@ export {
   getDriverWageDetails,
   getDriverInstructions,
   getDriverLegsByMonth,
-  getStoredWageData
+  getStoredWageData,
+  getBaseSalaryHistory
 };
