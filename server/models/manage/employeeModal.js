@@ -207,7 +207,7 @@ const createEmployee = async (employeeData, documentUrls) => {
       roleid || null,
       email || null,
       hashedPassword,
-      base_salary || null,
+      base_salary != null ? Number.parseFloat(base_salary) : null,
       company_reg_num || null,
       documentUrls[0] || null,
       documentUrls[1] || null,
@@ -215,6 +215,20 @@ const createEmployee = async (employeeData, documentUrls) => {
     ]
     const result = await client.query(insertEmployeeQuery, insertValues)
     const newEmployee = result.rows[0]
+
+    // Insert into base_salary_history if base_salary is provided
+    if (base_salary != null) {
+      const insertSalaryHistoryQuery = `
+        INSERT INTO base_salary_history (userid, base, date)
+        VALUES ($1, $2, $3)
+      `
+      const salaryHistoryValues = [
+        newEmployee.userid,
+        Number.parseFloat(base_salary),
+        deductionDate,
+      ]
+      await client.query(insertSalaryHistoryQuery, salaryHistoryValues)
+    }
 
     const insertHistoryQuery = `
       INSERT INTO employee_deduction_history (
@@ -278,14 +292,14 @@ const updateEmployee = async (id, employeeData, documentUrls) => {
     }
 
     const existingResult = await client.query(
-      "SELECT document_url1, document_url2, document_url3 FROM m5_employee WHERE userid = $1",
+      "SELECT document_url1, document_url2, document_url3, base_salary FROM m5_employee WHERE userid = $1",
       [id],
     )
     if (!existingResult.rows.length) {
       throw new Error("Employee not found")
     }
 
-    let { document_url1, document_url2, document_url3 } = existingResult.rows[0]
+    let { document_url1, document_url2, document_url3, base_salary: currentBaseSalary } = existingResult.rows[0]
     const currentDocs = [document_url1, document_url2, document_url3]
 
     let newIndex = 0
@@ -329,7 +343,7 @@ const updateEmployee = async (id, employeeData, documentUrls) => {
       roleid || null,
       email || null,
       hashedPassword,
-      base_salary || null,
+      base_salary != null ? Number.parseFloat(base_salary) : null,
       document_url1 || null,
       document_url2 || null,
       document_url3 || null,
@@ -337,6 +351,47 @@ const updateEmployee = async (id, employeeData, documentUrls) => {
     ]
     const result = await client.query(updateEmpQuery, updateValues)
     const updatedEmployee = result.rows[0]
+
+    // Handle base_salary_history update or insert
+    if (base_salary != null && Number.parseFloat(base_salary) !== Number.parseFloat(currentBaseSalary)) {
+      const currentDate = new Date();
+      const dateTruncated = currentDate.toISOString().split('T')[0]; // Get YYYY-MM-DD
+
+      // Check if a record exists for the same user and date
+      const checkSalaryHistoryQuery = `
+        SELECT id FROM base_salary_history
+        WHERE userid = $1 AND date_trunc('day', date) = $2
+        LIMIT 1
+      `
+      const checkSalaryHistoryValues = [updatedEmployee.userid, dateTruncated];
+      const checkResult = await client.query(checkSalaryHistoryQuery, checkSalaryHistoryValues);
+
+      if (checkResult.rows.length > 0) {
+        // Update existing record
+        const updateSalaryHistoryQuery = `
+          UPDATE base_salary_history
+          SET base = $1
+          WHERE id = $2
+        `
+        const updateSalaryHistoryValues = [
+          Number.parseFloat(base_salary),
+          checkResult.rows[0].id
+        ]
+        await client.query(updateSalaryHistoryQuery, updateSalaryHistoryValues);
+      } else {
+        // Insert new record
+        const insertSalaryHistoryQuery = `
+          INSERT INTO base_salary_history (userid, base, date)
+          VALUES ($1, $2, $3)
+        `
+        const salaryHistoryValues = [
+          updatedEmployee.userid,
+          Number.parseFloat(base_salary),
+          currentDate,
+        ]
+        await client.query(insertSalaryHistoryQuery, salaryHistoryValues);
+      }
+    }
 
     const newValues = {
       income_tax: Number.parseFloat(income_tax_rate || 0),
