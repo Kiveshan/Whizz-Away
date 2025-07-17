@@ -21,6 +21,9 @@ import {
   DirectorCreditorsOther,
   CreditorsOther,
   CreditorsDashboard,
+  AnalyticsReportsPage,
+  ReportsPage
+  
 } from "./pages/user_menus"
 import { Login, Register } from "./pages/auth"
 import {
@@ -80,6 +83,10 @@ import {
   SubcontractorStatements,
   SubcontractorStatementDetails,
 } from "./pages/Creditors"
+
+import {
+  WageReports
+}from "./pages/Reports"
 
 // CSS Imports
 import "./css/components.css"
@@ -155,6 +162,9 @@ function DynamicHeader() {
     "/Creditors/SubcontractorList": "Subcontractors",
     "/Creditors/SubcontractorStatements": "Subcontractors",
     "/Creditors/SubcontractorStatementDetails": "Subcontractor Statement",
+    "/analytics-reports": "Analytics & Reports",
+    "/reports" : "Reports",
+    "/wage-reports" : "Wage Reports"
   }
 
   const getTitle = () => {
@@ -261,6 +271,10 @@ function ContentWrapper() {
         <Route path="/FClerkLegDetails" element={<FClerkLegDetails />} />
         <Route path="/FCcontrollerinstructions" element={<FCcontrollerinstructions />} />
         <Route path="/FCcontrollerInstructionDetails" element={<FCcontrollerInstructionDetails />} />
+        <Route path="/analytics-reports" element={<AnalyticsReportsPage />} />
+        <Route path="/reports" element={<ReportsPage />} /> 
+        <Route path="/wage-reports" element={<WageReports />} />
+
       </Routes>
       {shouldShowFooter && <Footer />} {/* Conditionally render footer */}
     </div>
@@ -280,6 +294,8 @@ function App() {
     "/InstructionsList": "Instructions List",
     "/Viewcontrollerinstructions": "Viewcontrollerinstructions",
     "/ViewcontrollerInstructionDetails": "ViewcontrollerInstructionDetails",
+    "/reports": "Reports",
+    "/wage-reports": "Wage Reports" 
   }
 
   // Set page title based on current route
