@@ -271,6 +271,7 @@ function UpdateInstruction() {
     dropoff: "",
   });
   const [instructionContainers, setInstructionContainers] = useState([]);
+  const [isLegSwitching, setIsLegSwitching] = useState(false);
   // New state for unsaved changes modal
   const [showUnsavedChangesModal, setShowUnsavedChangesModal] = useState(false);
   // Add state for missing fields modal
@@ -286,6 +287,7 @@ function UpdateInstruction() {
   const [showNoDriversModal, setShowNoDriversModal] = useState(false);
   // Add state for back button confirmation modal
   const [showBackConfirmModal, setShowBackConfirmModal] = useState(false);
+
   // Add state for driver removal confirmation modal
   const [showRemoveDriverModal, setShowRemoveDriverModal] = useState(false);
   const [driverToRemove, setDriverToRemove] = useState({
@@ -462,7 +464,6 @@ useEffect(() => {
       await fetchTruckRegNums();
       await fetchShipmentType();
       await checkIfWeightBased();
-
       if (instructionId) {
         await fetchContainersForInstruction(instructionId);
         await fetchLegsForInstruction(instructionId);
@@ -484,32 +485,46 @@ useEffect(() => {
   fetchData();
 
   return () => {
-    // Cleanup function
-    isFromDocumentsPage.current = false;
-    setHasProcessedSelectedLeg(false);
-    handleSelectLeg.isProcessing = false; // Reset processing flag
+    // Enhanced cleanup function
+    console.log("Cleaning up UpdateInstruction component - clearing all state");
     
-    // Clear any pending timeouts or intervals if needed
+    // Clear all component state
+    setDrivers([]);
+    setCurrentLagIndex(null);
+    isFromDocumentsPage.current = false;
+    setHasProcessedSelectedLeg(false); // UNCOMMENT this line
+    
+    // Clear localStorage
     if (instructionId) {
-      console.log("Cleaning up UpdateInstruction component");
+      localStorage.removeItem(`instruction_${instructionId}_state`);
+      console.log("Cleared localStorage for instruction:", instructionId);
     }
   };
 }, [instructionId]);
-
   // Replace the entire useEffect that handles the selectedLegIndex with this version
+// Replace the complex selectedLegIndex useEffect with this simpler version
 useEffect(() => {
-  // Only run once when we have a selectedLegIndex from navigation
-  if (
-    initialDataLoaded &&
-    selectedLegIndex !== undefined &&
-    legs.length > 0 &&
-    !hasProcessedSelectedLeg && // Add this check
-    selectedLegIndex < legs.length
-  ) {
-    console.log(`Processing selectedLegIndex ${selectedLegIndex} - ONE TIME ONLY`);
-    
-    handleSelectLeg(selectedLegIndex);
-    setHasProcessedSelectedLeg(true); // Mark as processed
+  // Only run this effect once when the component mounts with a selectedLegIndex
+  if (initialDataLoaded && selectedLegIndex !== undefined && legs.length > 0 && !hasProcessedSelectedLeg) {
+    console.log(`Selecting leg at index ${selectedLegIndex} after navigation`);
+    // Make sure the selectedLegIndex is valid
+    if (selectedLegIndex < legs.length) {
+      // Force a clean state before selecting the leg
+      setCurrentLagIndex(null);
+      setDrivers([]);
+      // Use setTimeout to ensure this happens after the current render cycle
+      setTimeout(() => {
+        handleSelectLeg(selectedLegIndex);
+        setHasProcessedSelectedLeg(true); // Mark as processed
+        // Ensure rates are fetched after selecting the leg
+        const selectedLeg = legs[selectedLegIndex];
+        if (selectedLeg.startingPoint && selectedLeg.destination) {
+          fetchRate(selectedLeg.startingPoint, selectedLeg.destination);
+        }
+      }, 0);
+    } else {
+      console.error(`Selected leg index ${selectedLegIndex} is out of bounds (max: ${legs.length - 1})`);
+    }
   }
 }, [initialDataLoaded, legs.length, selectedLegIndex, hasProcessedSelectedLeg]);
 
@@ -1101,20 +1116,13 @@ const newDriver = {
 
 const handleAddLeg = () => {
   if (isCompleted) return;
-  
-  // Prevent adding another leg if there's already an unsaved new leg
-  if (hasUnsavedNewLeg) {
-    setSavedMessage("Please save the current new leg before adding another.");
-    setTimeout(() => setSavedMessage(""), 6000);
-    return;
-  }
-  
+
   // Check if there are unsaved changes in the current leg (if any)
   if (currentLagIndex !== null && hasUnsavedChanges()) {
     setShowUnsavedChangesModal(true);
     return;
   }
-  
+
   // Save current leg data to local state if any
   if (currentLagIndex !== null && currentLagIndex < legs.length) {
     console.log("Saving current leg data before adding new leg");
@@ -1128,37 +1136,36 @@ const handleAddLeg = () => {
     };
     setLegs(updatedLegs);
   }
-  
+
   // Clear localStorage before creating a new leg
   if (instructionId) {
     console.log(`Clearing localStorage for instruction_${instructionId}_state`);
     localStorage.removeItem(`instruction_${instructionId}_state`);
   }
-  
+
   const newLeg = {
     id: `temp-${Date.now()}`,
     legnumber: legs.length + 1,
     startingPoint: "",
     driverRate: "",
     destination: "",
-    drivers: [],
+    drivers: [], // Always start with empty drivers array
     isNew: true,
   };
-  
-  // IMMEDIATELY clear drivers state
-  console.log("Immediately clearing drivers for new leg");
-  setDrivers([]);
-  
+
   // Update legs state
   setLegs(prevLegs => [...prevLegs, newLeg]);
-  
+
   // Clear form state
   setFormData({
     startingPoint: "",
     driverRate: "",
     destination: "",
   });
-  
+
+  // SIMPLE driver clearing - like old code
+  setDrivers([]);
+
   // Reset edited fields
   setEditedFields({
     startingPoint: false,
@@ -1166,76 +1173,102 @@ const handleAddLeg = () => {
     driverRate: false,
     drivers: {},
   });
-  
+
   // Set the current leg index to the new leg
   const newLegIndex = legs.length;
   setCurrentLagIndex(newLegIndex);
   console.log(`Navigating to new leg at index: ${newLegIndex}`);
-  
+
   // Update saved legs
   setSavedLegs(prevSavedLegs => {
     const newSavedLegs = new Set(prevSavedLegs);
     newSavedLegs.delete(newLegIndex);
     return newSavedLegs;
   });
-  
+
   setHasUnsavedNewLeg(true);
   setSavedMessage("New leg added. Remember to click Save after entering details.");
   setTimeout(() => setSavedMessage(""), 6000);
 };
 const handleSelectLeg = (index) => {
   console.log(`Selecting leg at index ${index}`);
-  
-  // Prevent selecting the same leg that's already selected
   if (currentLagIndex === index) {
-    console.log("Same leg already selected, skipping");
+    console.log("Already on this leg, skipping switch");
     return;
   }
-  
-  // Validate index
-  if (index < 0 || index >= legs.length) {
-    console.error(`Invalid leg index: ${index}`);
-    return;
-  }
-  
-  // Save current leg's data if we're on a valid leg and it's not completed
-  if (currentLagIndex !== null && !isCompleted && currentLagIndex < legs.length && currentLagIndex !== index) {
-    console.log(`Saving current leg ${currentLagIndex} data before switching`);
+
+  // First, save the current leg's data to the legs array if we're on a valid leg
+  if (currentLagIndex !== null && !isCompleted) {
     const updatedLegs = [...legs];
+    // Save the current drivers to the current leg before switching
     updatedLegs[currentLagIndex] = {
       ...updatedLegs[currentLagIndex],
       startingPoint: formData.startingPoint,
       destination: formData.destination,
       driverRate: formData.driverRate,
-      drivers: JSON.parse(JSON.stringify(drivers)),
+      drivers: JSON.parse(JSON.stringify(drivers)), // Create a deep copy of the drivers array
     };
+    console.log(`Saving leg ${currentLagIndex} data before switching:`, updatedLegs[currentLagIndex]);
+    // Update the legs state with the saved data
     setLegs(updatedLegs);
   }
-  
-  // FORCE CLEAR drivers state immediately
-  console.log("Force clearing drivers before leg switch");
-  setDrivers([]);
-  
+
+  // Now set the current leg index to the new index
+  setCurrentLagIndex(index);
+
   // Get the selected leg data
   const selectedLeg = legs[index];
-  
-  if (!selectedLeg) {
-    console.error(`No leg found at index ${index}`);
-    return;
-  }
-  
-  console.log(`Loading leg data:`, selectedLeg);
-  
-  // Set the current leg index
-  setCurrentLagIndex(index);
-  
-  // Update form data based on the selected leg
+
+  // Update the form data
   setFormData({
     startingPoint: selectedLeg.startingPoint || "",
     driverRate: selectedLeg.driverRate || "",
     destination: selectedLeg.destination || "",
   });
-  
+
+  // IMPORTANT: Clear the drivers state first to avoid any state mixing
+  setDrivers([]);
+
+  // Add a flag to prevent rate updates during leg switching
+  const switchingLegs = true;
+
+  // Then load the drivers for the selected leg after a delay to ensure state is properly cleared
+  setTimeout(() => {
+    // Ensure we're setting the drivers state correctly
+    if (selectedLeg.drivers && selectedLeg.drivers.length > 0) {
+      console.log("Setting drivers for selected leg:", JSON.stringify(selectedLeg.drivers, null, 2));
+      // Make a deep copy of the driver data to ensure no references are shared between legs
+      const normalizedDrivers = JSON.parse(JSON.stringify(selectedLeg.drivers)).map((driver) => {
+        // Ensure all fields are properly formatted
+        return {
+          id: driver.id || Date.now() + Math.random(),
+          driverid: driver.driverid ? driver.driverid.toString() : "",
+          truckregnumber: driver.truckregnumber || "",
+          containernumber: driver.containernumber !== null ? driver.containernumber.toString() : "",
+          container_type: driver.container_type || "",
+          driverRate: driver.driverRate || driver.driverate || "", // Add driverate as fallback
+          date: driver.date || "",
+          driver_name: driver.driver_name || "",
+          driver_surname: driver.driver_surname || "",
+          isAbnormal: driver.container_type === "abnormal" || driver.isAbnormal,
+          full_name:
+            driver.full_name ||
+            (driver.driver_name && driver.driver_surname
+              ? `${driver.driver_name} ${driver.driver_surname}`
+              : driver.driverid
+                ? `Driver ID: ${driver.driverid}`
+                : "Unknown Driver"),
+        };
+      });
+      console.log("Normalized drivers:", JSON.stringify(normalizedDrivers, null, 2));
+      setDrivers(normalizedDrivers);
+      debugDriverData(normalizedDrivers);
+    } else {
+      console.log("No drivers for selected leg, setting empty array");
+      setDrivers([]);
+    }
+  }, 150); // Slightly increased timeout to ensure state updates are complete
+
   // Reset edited fields tracking
   setEditedFields({
     startingPoint: false,
@@ -1243,34 +1276,23 @@ const handleSelectLeg = (index) => {
     driverRate: false,
     drivers: {},
   });
-  
-  // Use setTimeout to ensure state is cleared before setting new drivers
-  setTimeout(() => {
-    if (selectedLeg.drivers && selectedLeg.drivers.length > 0) {
-      console.log(`Setting ${selectedLeg.drivers.length} drivers for leg ${index}`);
-      const cleanDrivers = selectedLeg.drivers.map(driver => ({
-        ...driver,
-        id: driver.id || Date.now() + Math.random(),
-        driverid: driver.driverid || "",
-        truckregnumber: driver.truckregnumber || "",
-        containernumber: driver.containernumber || "",
-        container_type: driver.container_type || "",
-        date: driver.date || "",
-        driverRate: driver.driverRate || "",
-        isAbnormal: driver.container_type === "abnormal"
-      }));
-      setDrivers(cleanDrivers);
-      debugDriverData(cleanDrivers);
-    } else {
-      console.log(`No drivers for leg ${index}, keeping empty array`);
-      setDrivers([]);
-      debugDriverData([]);
-    }
-  }, 50); // Small delay to ensure state clearing
-  
-  // Fetch rates if both starting point and destination exist
+
+  // Check if this route has no rates before fetching
   if (selectedLeg.startingPoint && selectedLeg.destination) {
-    console.log(`Fetching rates for ${selectedLeg.startingPoint} -> ${selectedLeg.destination}`);
+    const routeKey = `${selectedLeg.startingPoint}-${selectedLeg.destination}`;
+    if (noRatesRoutes.has(routeKey)) {
+      console.log(`Route ${routeKey} is known to have no rates, setting rates to 0`);
+      // Set rates to 0
+      setRates({
+        six_meter: 0,
+        twelve_meter: 0,
+        subbie_six_meter: 0,
+        subbie_twelve_meter: 0,
+      });
+      return;
+    }
+    // Only fetch rates if the route is not known to have no rates
+    console.log("Fetching rates after selecting leg:", selectedLeg.startingPoint, selectedLeg.destination);
     fetchRate(selectedLeg.startingPoint, selectedLeg.destination);
   }
 };
@@ -1884,76 +1906,6 @@ const navigateToDocuments = () => {
 };
 // Add this useEffect after your other useEffects
 // Add this useEffect after your existing useEffects
-useEffect(() => {
-  // Force re-render of leg buttons when currentLagIndex changes
-  if (currentLagIndex !== null && legs.length > 0) {
-    console.log(`Current leg index is now: ${currentLagIndex}`);
-    
-    // Ensure only the current leg is highlighted
-    const currentLeg = legs[currentLagIndex];
-    if (currentLeg && (currentLeg.isNew || currentLeg.id?.toString().startsWith("temp-"))) {
-      console.log("New leg is now selected and should be highlighted");
-    }
-  }
-}, [currentLagIndex, legs.length]);
-
-useEffect(() => {
-  if (instructionId && legs.length > 0 && currentLagIndex !== null) {
-    const savedState = localStorage.getItem(`instruction_${instructionId}_state`);
-    if (savedState) {
-      try {
-        const parsedState = JSON.parse(savedState);
-        const legIndex = legs.findIndex((leg) => leg.id === parsedState.legId);
-        
-        // Only restore state if the leg exists, is not new, and matches the current leg index
-        if (
-          legIndex >= 0 &&
-          !legs[legIndex].isNew &&
-          !legs[legIndex].id?.toString().startsWith("temp-") &&
-          legIndex === currentLagIndex
-        ) {
-          console.log(`Restoring state for leg ${legIndex} with ID ${parsedState.legId}`);
-          
-          // CLEAR drivers first, then set restored drivers
-          setDrivers([]);
-          
-          setTimeout(() => {
-            const updatedDrivers = parsedState.drivers.map((driver) => ({
-              ...driver,
-              container_type: driver.container_type || "",
-              driverRate: driver.driverRate || "",
-              isAbnormal: driver.container_type === "abnormal",
-            }));
-            setDrivers(updatedDrivers);
-            debugDriverData(updatedDrivers);
-            
-            // Update the legs array with the restored drivers
-            const updatedLegs = [...legs];
-            updatedLegs[legIndex].drivers = updatedDrivers;
-            setLegs(updatedLegs);
-          }, 50);
-        } else {
-          console.log("Not restoring state - ensuring clean driver state");
-          // Ensure drivers are cleared for new legs or mismatched states
-          setDrivers([]);
-          debugDriverData([]);
-        }
-      } catch (error) {
-        console.error("Error restoring state from localStorage:", error);
-        // Clear drivers on error
-        setDrivers([]);
-        debugDriverData([]);
-      }
-    } else {
-      console.log("No saved state found - ensuring clean driver state");
-      // If no saved state and current leg is new, ensure drivers are empty
-      if (legs[currentLagIndex]?.isNew) {
-        setDrivers([]);
-        debugDriverData([]);
-      }
-    }
-  }
-}, [instructionId, legs.length, currentLagIndex]); // Removed legs from dependencies to prevent loops
 
   const fetchShipmentType = async () => {
     if (instructionId) {
@@ -2297,6 +2249,7 @@ const shouldDisableAddLeg = async () => {
   }
 };
 
+// Simplified sync - only when absolutely necessary
   // Add this useEffect to check if we should hide the + button whenever legs or containers change
   useEffect(() => {
 const checkContainersDestination = async () => {
@@ -2397,84 +2350,91 @@ const missingItems = await checkContainersReachDropoff(dropoff);
   // Add this useEffect to ensure driver rates are properly updated when rates change
   // Replace the existing useEffect for rates with this one
   useEffect(() => {
-    // Only update if we have drivers and rates
-    if (drivers.length > 0) {
-      console.log("Rates changed, updating driver rates:", rates);
+  // Set switching flag when leg changes
+  setIsLegSwitching(true);
+  const timer = setTimeout(() => {
+    setIsLegSwitching(false);
+  }, 300); // Allow 300ms for leg switching to complete
 
-      // Create a new array instead of modifying the existing one
-      const updatedDrivers = drivers.map((driver) => {
-        const newDriver = { ...driver };
+  return () => clearTimeout(timer);
+}, [currentLagIndex]);
 
-        // Check if driver is a subcontractor (roleid = 6)
-        const isSubcontractor =
-          employeeDrivers.find((d) => d.userid.toString() === driver.driverid)
-            ?.roleid === 6;
+// Replace the problematic rate update useEffect with this version
+useEffect(() => {
+  // Don't update rates if we're currently switching legs
+  if (isLegSwitching || drivers.length === 0) {
+    return;
+  }
+
+  console.log("Rates changed, updating driver rates:", rates);
+
+  // Create a new array instead of modifying the existing one
+  const updatedDrivers = drivers.map((driver) => {
+    const newDriver = { ...driver };
+
+    // Check if driver is a subcontractor (roleid = 6)
+    const isSubcontractor =
+      employeeDrivers.find((d) => d.userid.toString() === driver.driverid)
+        ?.roleid === 6;
+    console.log(
+      `Driver ${driver.driverid} is subcontractor: ${isSubcontractor}`
+    );
+
+    // Check if current route has no rates
+    if (formData.startingPoint && formData.destination) {
+      const routeKey = `${formData.startingPoint}-${formData.destination}`;
+      if (noRatesRoutes.has(routeKey)) {
+        newDriver.driverRate = "0";
         console.log(
-          `Driver ${driver.driverid} is subcontractor: ${isSubcontractor}`
-        );
-
-        // Check if current route has no rates
-        if (formData.startingPoint && formData.destination) {
-          const routeKey = `${formData.startingPoint}-${formData.destination}`;
-          if (noRatesRoutes.has(routeKey)) {
-            newDriver.driverRate = "0";
-            console.log(
-              `Using 0 rate for driver ${driver.driverid} because route ${routeKey} has no rates`
-            );
-            return newDriver;
-          }
-        }
-
-        if (newDriver.container_type === "12m") {
-          newDriver.driverRate = isSubcontractor
-            ? rates.subbie_twelve_meter
-              ? rates.subbie_twelve_meter.toString()
-              : "0"
-            : rates.twelve_meter
-            ? rates.twelve_meter.toString()
-            : "0";
-        } else if (newDriver.container_type === "abnormal") {
-          // For abnormal container types, keep existing rate or set to 0
-          if (!newDriver.driverRate) {
-            newDriver.driverRate = "0";
-          }
-          newDriver.isAbnormal = true; // Mark as abnormal to allow editing
-        } else {
-          newDriver.driverRate = isSubcontractor
-            ? rates.subbie_six_meter
-              ? rates.subbie_six_meter.toString()
-              : "0"
-            : rates.six_meter
-            ? rates.six_meter.toString()
-            : "0";
-        }
-
-        console.log(
-          `Updated driver ${driver.driverid} rate to ${newDriver.driverRate}`
+          `Using 0 rate for driver ${driver.driverid} because route ${routeKey} has no rates`
         );
         return newDriver;
-      });
-
-      // Only update state if there are actual changes
-      if (JSON.stringify(updatedDrivers) !== JSON.stringify(drivers)) {
-        console.log("Updated driver rates based on new rates:", updatedDrivers);
-        setDrivers(updatedDrivers);
       }
     }
-  }, [
-    rates,
-    employeeDrivers,
-    formData.startingPoint,
-    formData.destination,
-    noRatesRoutes,
-  ]);
-  useEffect(() => {
-  // Cleanup function to prevent state leakage between legs
-  return () => {
-    console.log("Cleaning up driver state");
-    setDrivers([]);
-  };
-}, [currentLagIndex]);
+
+    if (newDriver.container_type === "12m") {
+      newDriver.driverRate = isSubcontractor
+        ? rates.subbie_twelve_meter
+          ? rates.subbie_twelve_meter.toString()
+          : "0"
+        : rates.twelve_meter
+        ? rates.twelve_meter.toString()
+        : "0";
+    } else if (newDriver.container_type === "abnormal") {
+      // For abnormal container types, keep existing rate or set to 0
+      if (!newDriver.driverRate) {
+        newDriver.driverRate = "0";
+      }
+      newDriver.isAbnormal = true; // Mark as abnormal to allow editing
+    } else {
+      newDriver.driverRate = isSubcontractor
+        ? rates.subbie_six_meter
+          ? rates.subbie_six_meter.toString()
+          : "0"
+        : rates.six_meter
+        ? rates.six_meter.toString()
+        : "0";
+    }
+
+    console.log(
+      `Updated driver ${driver.driverid} rate to ${newDriver.driverRate}`
+    );
+    return newDriver;
+  });
+
+  // Only update state if there are actual changes
+  if (JSON.stringify(updatedDrivers) !== JSON.stringify(drivers)) {
+    console.log("Updated driver rates based on new rates:", updatedDrivers);
+    setDrivers(updatedDrivers);
+  }
+}, [
+  rates,
+  employeeDrivers,
+  formData.startingPoint,
+  formData.destination,
+  noRatesRoutes,
+  isLegSwitching, // Add this dependency
+]);
 
   return (
     <div className="min-h-screen bg-white" style={{ paddingBottom: 200 }}>

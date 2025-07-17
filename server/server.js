@@ -173,12 +173,12 @@ passport.deserializeUser(async (sessionUser, done) => {
 // Routes
 app.use("/", routes);
 
-app.use(express.static(path.join(__dirname, "public", "build")));
+// app.use(express.static(path.join(__dirname, "public", "build")));
 
-// Handle all routes by serving index.html from 'public/build' (for React Router)
-app.get("*", (req, res) => {
-  res.sendFile(path.join(__dirname, "public", "build", "index.html"));
-});
+// // Handle all routes by serving index.html from 'public/build' (for React Router)
+// app.get("*", (req, res) => {
+//   res.sendFile(path.join(__dirname, "public", "build", "index.html"));
+// });
 
 // Start server
 app.listen(PORT, () => {

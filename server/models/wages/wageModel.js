@@ -46,38 +46,38 @@ const saveWageData = async ({
 
     // Insert wage record with tax history
     const insertQuery = `
-      INSERT INTO wages (
-        employeeid, total_earnings, total_deductions, net_pay,
-        employee_date
-      ) VALUES ($1, $2, $3, $4, $5)
-      ON CONFLICT ON CONSTRAINT unique_wage_per_employee_month_year
-      DO UPDATE SET
-        total_earnings = EXCLUDED.total_earnings,
-        total_deductions = EXCLUDED.total_deductions,
-        net_pay = EXCLUDED.net_pay
-      RETURNING wageskey
-    `;
+INSERT INTO wages (
+    employeeid, total_earnings, total_deductions, net_pay,
+    employee_date
+  ) VALUES ($1, $2, $3, $4, $5)
+  ON CONFLICT ON CONSTRAINT unique_wage_per_employee_month_year
+  DO UPDATE SET
+    total_earnings = EXCLUDED.total_earnings,
+    total_deductions = EXCLUDED.total_deductions,
+    net_pay = EXCLUDED.net_pay
+  RETURNING wageskey
+`;
 
-    const params = [
-      employeeId,
-      Number(totalEarnings.toFixed(2)),
-      Number(totalDeductions.toFixed(2)),
-      Number(netPay.toFixed(2)),
-      normalizedDate,
-    ];
+const params = [
+  employeeId,
+  Number(totalEarnings.toFixed(2)), // Total earnings after loan deduction
+  Number(totalDeductions.toFixed(2)), // This can be 0 or actual deductions
+  Number(netPay.toFixed(2)), // This is now "Total Payable to Labour Consultant"
+  normalizedDate,
+];
 
-    const result = await client.query(insertQuery, params);
-    await client.query("COMMIT");
+const result = await client.query(insertQuery, params);
 
-    console.log(
-      `✅ Wage saved with latest tax amount: R${taxInfo.tax} included in total deductions`
-    );
+await client.query("COMMIT");
 
-    return {
-      success: true,
-      wagesKey: result.rows[0].wageskey,
-      taxAmount: taxInfo.tax,
-    };
+console.log(
+  `✅ Wage saved - Total Earnings: R${totalEarnings.toFixed(2)}, Total Payable: R${netPay.toFixed(2)}`
+);
+
+return {
+  success: true,
+  wagesKey: result.rows[0].wageskey,
+};
   } catch (error) {
     if (client) await client.query("ROLLBACK");
     throw error;
@@ -131,7 +131,50 @@ const checkWageSlip = async (employeeId, month, year) => {
     return { exists: false };
   }
 };
-
+const getStoredWageData = async (employeeId, month, year) => {
+  let client;
+  try {
+    client = await pool.connect();
+    
+    // Convert month name to number if it's a string
+    let monthNumber = month;
+    if (typeof month === 'string') {
+      const monthNames = [
+        "January", "February", "March", "April", "May", "June",
+        "July", "August", "September", "October", "November", "December"
+      ];
+      monthNumber = monthNames.indexOf(month) + 1;
+    }
+    
+    const query = `
+      SELECT 
+        total_earnings,
+        net_pay as total_payable,
+        employee_date
+      FROM wages 
+      WHERE employeeid = $1 
+      AND EXTRACT(MONTH FROM employee_date) = $2 
+      AND EXTRACT(YEAR FROM employee_date) = $3
+    `;
+    
+    const result = await client.query(query, [employeeId, monthNumber, year]);
+    
+    if (result.rows.length > 0) {
+      console.log(`Found stored wage data for employee ${employeeId} - ${month} ${year}`);
+      return {
+        exists: true,
+        totalEarnings: parseFloat(result.rows[0].total_earnings),
+        totalPayable: parseFloat(result.rows[0].total_payable),
+        date: result.rows[0].employee_date
+      };
+    }
+    
+    return { exists: false };
+    
+  } finally {
+    if (client) client.release();
+  }
+};
 const getEmployeeDeductions = async (employeeId, month, year) => {
   let client;
   try {
@@ -573,4 +616,5 @@ export {
   getDriverWageDetails,
   getDriverInstructions,
   getDriverLegsByMonth,
+  getStoredWageData
 };

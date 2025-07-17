@@ -7,12 +7,30 @@ import {
   getDriverWageDetails,
   getDriverInstructions,
   getDriverLegsByMonth,
+  getStoredWageData,
 } from "../../models/wages/wageModel.js";
 import {
   getTaxAmountForDate,
   getDeductionsForDate,
 } from "../../utils/wagesUtils.js";
-
+const getStoredWageDataHandler = async (req, res) => {
+  const { employeeId } = req.params;
+  const { month, year } = req.query;
+  
+  console.log(`Route /api/stored-wage-data/${employeeId} was accessed with month=${month}, year=${year}`);
+  
+  if (!month || !year) {
+    return res.status(400).json({ error: "Month and year are required query parameters" });
+  }
+  
+  try {
+    const result = await getStoredWageData(employeeId, month, year);
+    res.json(result);
+  } catch (error) {
+    console.error(`Error fetching stored wage data for employee ${employeeId}:`, error);
+    res.status(500).json({ error: "Failed to fetch stored wage data" });
+  }
+};
 const saveWageDataHandler = async (req, res) => {
   const { employeeId, month, year, totalEarnings, totalDeductions, netPay } =
     req.body;
@@ -223,4 +241,5 @@ export {
   getDriverWageDetailsHandler,
   getDriverInstructionsHandler,
   getDriverLegsByMonthHandler,
+  getStoredWageDataHandler
 };

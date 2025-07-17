@@ -9,7 +9,7 @@ const dashboardData = [
     image: "/images/monitor.jpeg",
     path: "/CompanyInstructionView",
   },
-  { title: "Analytics", image: "/images/analytics.jpg", path: "/DirectorAnalytics" },
+  { title: "Analytics & Reports", image: "/images/analytics.jpg", path: "/analytics-reports" },
   { title: "Debtors", image: "/images/clientDocs.jpeg", path: "/debtors" },
   { title: "Wages", image: "/images/wages.jpeg", path: "/finance-clerk-wage" },
   {
@@ -23,12 +23,14 @@ const dashboardData = [
 
 const Dashboard = () => {
   const navigate = useNavigate();
+
   const handleNavigation = (path) => {
-    if (path === "/finance-clerk-wage") {
+    if (path === "/finance-clerk-wage" || path === "/analytics-reports") {
       localStorage.setItem("dashboardRoute", "/Dashboard");
     }
     navigate(path);
   };
+
   return (
     <div className="dashboard">
       <div className="dashboard-row top-row">
