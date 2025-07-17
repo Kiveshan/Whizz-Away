@@ -13,6 +13,7 @@
     "concurrently": "^9.1.2"
   },
   "dependencies": {
+    "exceljs": "^4.4.0",
     "sweetalert2": "^11.22.2"
   }
 }

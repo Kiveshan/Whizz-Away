@@ -462,3 +462,67 @@
 .custom-swal-cancel:hover {
   background-color: #b32d2d !important;
 }
+
+/* Alert */
+
+/* Alert Box Styling */
+.alert-box {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background-color: #ffebee; /* Light red background */
+  color: #c62828; /* Dark red text */
+  padding: 12px 16px;
+  border-radius: 8px;
+  margin-bottom: 16px;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  font-size: 0.9rem;
+  font-weight: 500;
+  animation: slideIn 0.3s ease-in-out;
+  max-width: 400px;
+  width: 100%;
+  position: relative;
+  border-left: 4px solid #c62828; /* Red accent border */
+}
+
+/* Close Button */
+.alert-close {
+  background: none;
+  border: none;
+  color: #c62828;
+  font-size: 1.2rem;
+  cursor: pointer;
+  padding: 0 8px;
+  transition: color 0.2s ease;
+}
+
+.alert-close:hover {
+  color: #b71c1c; /* Darker red on hover */
+}
+
+/* Animation for alert appearance */
+@keyframes slideIn {
+  from {
+    opacity: 0;
+    transform: translateY(-10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Ensure alert is visually distinct in both light and dark themes */
+@media (prefers-color-scheme: dark) {
+  .alert-box {
+    background-color: #4c2c2c; /* Darker red for dark mode */
+    color: #ffcccb; /* Light red text */
+    border-left-color: #ffcccb;
+  }
+  .alert-close {
+    color: #ffcccb;
+  }
+  .alert-close:hover {
+    color: #ff9999;
+  }
+}
