@@ -323,16 +323,37 @@ if (useStoredData) {
 const earnings = [];
 let totalEarningsAmount = 0;
 
+// Fetch historical base salary for the specific month
+let baseSalary = 0;
+
+try {
+  console.log(`Fetching base salary for employee ${cleanId}, month: ${selectedMonth}, year: ${selectedYear}`);
+  const baseSalaryResponse = await api.get(
+    `/api/base-salary-history/${cleanId}?month=${encodeURIComponent(selectedMonth)}&year=${encodeURIComponent(selectedYear)}`
+  );
+  
+  if (baseSalaryResponse.data?.exists) {
+    baseSalary = parseAmount(baseSalaryResponse.data.baseSalary);
+    console.log(`✅ Using base salary: R${baseSalary.toFixed(2)}`);
+  }
+} catch (error) {
+  console.error('Error fetching base salary:', error);
+  // Fallback to current base salary from employee data
+  if (response.data.base_salary) {
+    baseSalary = parseAmount(response.data.base_salary);
+    console.log(`⚠️ Using fallback base salary: R${baseSalary.toFixed(2)}`);
+  }
+}
+
 // If using stored data, use stored values, otherwise calculate fresh
 if (useStoredData) {
   totalEarningsAmount = storedTotalEarnings;
 } else {
-  // Add base salary if available
-  if (response.data.base_salary) {
-    const baseSalary = parseAmount(response.data.base_salary);
+  // Add base salary to total earnings
+  if (baseSalary > 0) {
     totalEarningsAmount += baseSalary;
   }
-
+  
   // Add legs earnings
   Object.keys(legsByInstruction).forEach((instructionId) => {
     legsByInstruction[instructionId].forEach((leg, index) => {
@@ -343,8 +364,7 @@ if (useStoredData) {
 }
 
 // Always show the breakdown for display purposes (regardless of stored vs fresh)
-if (response.data.base_salary) {
-  const baseSalary = parseAmount(response.data.base_salary);
+if (baseSalary > 0) {
   earnings.push({
     description: "Base Salary",
     amount: `R ${baseSalary.toFixed(2)}`,
@@ -598,38 +618,52 @@ if (!useStoredData) {
               netPay: `R ${totalEarningsAmount.toFixed(2)}`,
             });
           }
-        } catch (legsError) {
-          console.error("Error fetching legs data:", legsError);
-          // Add dummy data for testing
-          const earnings = [
-            { description: "Error fetching legs data", amount: "R 0.00" },
-          ];
-
-          let totalEarningsAmount = 0;
-          if (response.data.base_salary) {
-            const baseSalary = parseAmount(response.data.base_salary);
-            totalEarningsAmount = baseSalary;
-            earnings.unshift({
-              description: "Base Salary",
-              amount: `R ${baseSalary.toFixed(2)}`,
-            });
-          }
-
-          const totalAmount = parseAmount(response.data.base_salary) || 0;
-
-          setWageData({
-            payPeriod: `${formattedFirstDay} - ${formattedLastDay}`,
-            payDate: formattedLastDay,
-            earnings: earnings,
-            deductions: [
-              { description: "Tax", amount: "R 0.00" },
-              { description: "Insurance", amount: "R 0.00" },
-            ],
-            totalEarnings: `R ${totalEarningsAmount.toFixed(2)}`,
-            totalDeductions: "R 0.00",
-            netPay: `R ${totalAmount.toFixed(2)}`,
-          });
-        }
+} catch (legsError) {
+  console.error("Error fetching legs data:", legsError);
+  // Add dummy data for testing
+  const earnings = [
+    { description: "Error fetching legs data", amount: "R 0.00" },
+  ];
+  let totalEarningsAmount = 0;
+  
+  // Fetch base salary for error case too
+  let baseSalary = 0;
+  try {
+    const baseSalaryResponse = await api.get(
+      `/api/base-salary-history/${cleanId}?month=${encodeURIComponent(selectedMonth)}&year=${encodeURIComponent(selectedYear)}`
+    );
+    
+    if (baseSalaryResponse.data?.exists) {
+      baseSalary = parseAmount(baseSalaryResponse.data.baseSalary);
+    }
+  } catch (error) {
+    // Fallback to current base salary from employee data
+    if (response.data.base_salary) {
+      baseSalary = parseAmount(response.data.base_salary);
+    }
+  }
+  
+  if (baseSalary > 0) {
+    totalEarningsAmount = baseSalary;
+    earnings.unshift({
+      description: "Base Salary",
+      amount: `R ${baseSalary.toFixed(2)}`,
+    });
+  }
+  
+  setWageData({
+    payPeriod: `${formattedFirstDay} - ${formattedLastDay}`,
+    payDate: formattedLastDay,
+    earnings: earnings,
+    deductions: [
+      { description: "Tax", amount: "R 0.00" },
+      { description: "Insurance", amount: "R 0.00" },
+    ],
+    totalEarnings: `R ${totalEarningsAmount.toFixed(2)}`,
+    totalDeductions: "R 0.00",
+    netPay: `R ${totalEarningsAmount.toFixed(2)}`,
+  });
+}
 
         setLoading(false);
       } catch (error) {
