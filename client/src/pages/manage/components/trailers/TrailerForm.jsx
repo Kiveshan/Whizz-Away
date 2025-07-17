@@ -1,20 +1,11 @@
 "use client"
+
 import React, { useState } from "react"
 import { extractFilenameFromUrl } from "../../utils/helpers"
 
 const TrailerForm = ({ trailer, loading, isEditing, onSave, onCancel, onChange, onDeleteDocument }) => {
   const [errors, setErrors] = useState({})
-
-  // Debug logging
-  console.log("TrailerForm props:", {
-    trailer: !!trailer,
-    loading,
-    isEditing,
-    onSave: typeof onSave,
-    onCancel: typeof onCancel,
-    onChange: typeof onChange,
-    onDeleteDocument: typeof onDeleteDocument,
-  })
+  const [alert, setAlert] = useState({ show: false, message: "" })
 
   const handleSubmit = async (e) => {
     e.preventDefault()
@@ -28,35 +19,39 @@ const TrailerForm = ({ trailer, loading, isEditing, onSave, onCancel, onChange, 
       return false
     }
 
-    console.log("About to call onSave with:", trailer)
-    console.log("onSave type:", typeof onSave)
-
-    if (typeof onSave !== "function") {
-      console.error("onSave is not a function! Received:", onSave)
-      return false
-    }
-
     const success = await onSave(trailer)
     return success
   }
 
   const handleFileUpload = (e) => {
     const files = e.target.files
+    const maxSizeInBytes = 5 * 1024 * 1024 // 5MB in bytes
+
     if (files && files.length > 0) {
-      const newFiles = Array.from(files).filter(
-        (file) => file.type === "application/pdf" && (trailer.documents?.length || 0) < 3,
-      )
+      const currentDocs = trailer.documents || []
+      const newFiles = Array.from(files).filter((file) => {
+        if (file.type !== "application/pdf") {
+          setAlert({ show: true, message: `File "${file.name}" is not a PDF. Only PDF files are allowed.` })
+          return false
+        }
+        if (file.size > maxSizeInBytes) {
+          setAlert({ show: true, message: `File "${file.name}" exceeds the 5MB limit.` })
+          return false
+        }
+        return true
+      })
 
       if (newFiles.length > 0) {
-        const currentDocs = trailer.documents || []
         const totalDocs = currentDocs.length + newFiles.length
-
-        if (totalDocs <= 3) {
-          onChange("documents", [...currentDocs, ...newFiles])
-        } else {
+        if (totalDocs > 3) {
+          setAlert({ show: true, message: `Cannot add ${newFiles.length} file(s). Maximum of 3 documents allowed.` })
           const allowedFiles = newFiles.slice(0, 3 - currentDocs.length)
-          onChange("documents", [...currentDocs, ...allowedFiles])
-          alert(`Only ${allowedFiles.length} files were added to stay within the 3-file limit.`)
+          if (allowedFiles.length > 0) {
+            onChange("documents", [...currentDocs, ...allowedFiles])
+          }
+        } else {
+          setAlert({ show: false, message: "" }) // Clear alert on success
+          onChange("documents", [...currentDocs, ...newFiles])
         }
       }
     }
@@ -67,6 +62,10 @@ const TrailerForm = ({ trailer, loading, isEditing, onSave, onCancel, onChange, 
     const updatedDocs = [...(trailer.documents || [])]
     updatedDocs.splice(index, 1)
     onChange("documents", updatedDocs)
+  }
+
+  const closeAlert = () => {
+    setAlert({ show: false, message: "" })
   }
 
   const isLicenseExpiringSoon = (expiryDate) => {
@@ -118,9 +117,13 @@ const TrailerForm = ({ trailer, loading, isEditing, onSave, onCancel, onChange, 
     <div className="manage-add-truck-form">
       <h2>{isEditing ? "Edit Trailer" : "Add New Trailer"}</h2>
       <form onSubmit={handleSubmit} noValidate>
+      
+
         <div className="manage-truck-form-grid">
           <div className="manage-form-group">
-            <label style={{ fontWeight: "bold" }}>Trailer Registration</label>
+            <label style={{ fontWeight: "bold" }}>
+              Trailer Registration <span style={{ color: "red" }}>*</span>
+            </label>
             <input
               type="text"
               value={trailer.trailerregnum || ""}
@@ -196,7 +199,7 @@ const TrailerForm = ({ trailer, loading, isEditing, onSave, onCancel, onChange, 
           </div>
           <div className="manage-form-group">
             <label style={{ fontWeight: "bold" }}>
-              License Expiry Date
+              License Expiry Date <span style={{ color: "red" }}>*</span>
               {trailer.trailer_license_expiry && isLicenseExpired(trailer.trailer_license_expiry) && (
                 <span style={{ color: "red", marginLeft: "10px", fontSize: "0.9em" }}>⚠️ EXPIRED</span>
               )}
@@ -240,9 +243,23 @@ const TrailerForm = ({ trailer, loading, isEditing, onSave, onCancel, onChange, 
               </small>
             )}
           </div>
+            {/* Alert Component */}
+        {alert.show && (
+          <div className="alert-box">
+            <span>{alert.message}</span>
+            <button
+              type="button"
+              className="alert-close"
+              onClick={closeAlert}
+              aria-label="Close alert"
+            >
+              ×
+            </button>
+          </div>
+        )}
           <div className="manage-form-group" style={{ gridColumn: "1 / span 3" }}>
             <label>
-              <strong>Upload Documents (PDF Only, Max 3)</strong>
+              <strong>Upload Documents (PDF Only, Max 3, 5MB each)</strong>
             </label>
             <div
               style={{
@@ -263,7 +280,7 @@ const TrailerForm = ({ trailer, loading, isEditing, onSave, onCancel, onChange, 
               <small>
                 {(trailer.documents?.length || 0) >= 3
                   ? "Maximum of 3 PDF documents uploaded"
-                  : "Upload PDF documents only"}
+                  : "Upload PDF documents only (max 5MB each)"}
               </small>
             </div>
             <div style={{ marginTop: "15px" }}>
@@ -294,7 +311,7 @@ const TrailerForm = ({ trailer, loading, isEditing, onSave, onCancel, onChange, 
                           fontSize: "0.85rem"
                         }}
                       >
-                        View
+                        Download
                       </a>
                       <button
                         type="button"
