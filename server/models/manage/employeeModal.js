@@ -45,7 +45,6 @@ const getAllEmployees = async (options = {}) => {
   try {
     client = await pool.connect()
 
-    // If no options provided, return all employees (backward compatibility)
     if (Object.keys(options).length === 0) {
       const query = `
         SELECT
@@ -69,15 +68,12 @@ const getAllEmployees = async (options = {}) => {
       return result.rows
     }
 
-    // New pagination and search logic
     const { offset = 0, limit = 10, search = "", status = "all" } = options
 
-    // Build WHERE clause for filtering
     let whereClause = "WHERE e.roleid != 6"
     const queryParams = []
     let paramIndex = 1
 
-    // Search filter
     if (search && search.trim() !== "") {
       whereClause += ` AND (
         LOWER(e.name) LIKE LOWER($${paramIndex}) OR 
@@ -87,14 +83,12 @@ const getAllEmployees = async (options = {}) => {
       paramIndex++
     }
 
-    // Status filter
     if (status !== "all") {
       whereClause += ` AND e.status = $${paramIndex}`
       queryParams.push(status === "active")
       paramIndex++
     }
 
-    // Get total count for pagination
     const countQuery = `
       SELECT COUNT(*) 
       FROM m5_employee e
@@ -104,7 +98,6 @@ const getAllEmployees = async (options = {}) => {
     const countResult = await client.query(countQuery, queryParams)
     const totalCount = Number.parseInt(countResult.rows[0].count)
 
-    // Get paginated results
     const dataQuery = `
       SELECT
         e.*,
@@ -180,7 +173,6 @@ const createEmployee = async (employeeData, documentUrls) => {
       deduction_damage,
     } = employeeData
 
-    // Validate required fields
     if (!name || !surname) {
       throw new Error("Name and surname are required")
     }
@@ -216,7 +208,6 @@ const createEmployee = async (employeeData, documentUrls) => {
     const result = await client.query(insertEmployeeQuery, insertValues)
     const newEmployee = result.rows[0]
 
-    // Insert into base_salary_history if base_salary is provided
     if (base_salary != null) {
       const insertSalaryHistoryQuery = `
         INSERT INTO base_salary_history (userid, base, date)
@@ -286,20 +277,19 @@ const updateEmployee = async (id, employeeData, documentUrls) => {
       deduction_damage,
     } = employeeData
 
-    // Validate required fields
     if (!name || !surname) {
       throw new Error("Name and surname are required")
     }
 
     const existingResult = await client.query(
-      "SELECT document_url1, document_url2, document_url3, base_salary FROM m5_employee WHERE userid = $1",
+      "SELECT document_url1, document_url2, document_url3, base_salary, password FROM m5_employee WHERE userid = $1",
       [id],
     )
     if (!existingResult.rows.length) {
       throw new Error("Employee not found")
     }
 
-    let { document_url1, document_url2, document_url3, base_salary: currentBaseSalary } = existingResult.rows[0]
+    let { document_url1, document_url2, document_url3, base_salary: currentBaseSalary, password: currentPassword } = existingResult.rows[0]
     const currentDocs = [document_url1, document_url2, document_url3]
 
     let newIndex = 0
@@ -317,13 +307,9 @@ const updateEmployee = async (id, employeeData, documentUrls) => {
     }
     ;[document_url1, document_url2, document_url3] = currentDocs
 
-    let hashedPassword
-    if (password) {
+    let hashedPassword = currentPassword
+    if (password && password.trim() !== "") {
       hashedPassword = await bcrypt.hash(password, 10)
-    } else {
-      const { rows } = await client.query("SELECT password FROM m5_employee WHERE userid = $1", [id])
-      if (!rows.length) throw new Error("Employee not found")
-      hashedPassword = rows[0].password
     }
 
     const updateEmpQuery = `
@@ -352,22 +338,19 @@ const updateEmployee = async (id, employeeData, documentUrls) => {
     const result = await client.query(updateEmpQuery, updateValues)
     const updatedEmployee = result.rows[0]
 
-    // Handle base_salary_history update or insert
     if (base_salary != null && Number.parseFloat(base_salary) !== Number.parseFloat(currentBaseSalary)) {
-      const currentDate = new Date();
-      const dateTruncated = currentDate.toISOString().split('T')[0]; // Get YYYY-MM-DD
+      const currentDate = new Date()
+      const dateTruncated = currentDate.toISOString().split('T')[0]
 
-      // Check if a record exists for the same user and date
       const checkSalaryHistoryQuery = `
         SELECT id FROM base_salary_history
         WHERE userid = $1 AND date_trunc('day', date) = $2
         LIMIT 1
       `
-      const checkSalaryHistoryValues = [updatedEmployee.userid, dateTruncated];
-      const checkResult = await client.query(checkSalaryHistoryQuery, checkSalaryHistoryValues);
+      const checkSalaryHistoryValues = [updatedEmployee.userid, dateTruncated]
+      const checkResult = await client.query(checkSalaryHistoryQuery, checkSalaryHistoryValues)
 
       if (checkResult.rows.length > 0) {
-        // Update existing record
         const updateSalaryHistoryQuery = `
           UPDATE base_salary_history
           SET base = $1
@@ -377,9 +360,8 @@ const updateEmployee = async (id, employeeData, documentUrls) => {
           Number.parseFloat(base_salary),
           checkResult.rows[0].id
         ]
-        await client.query(updateSalaryHistoryQuery, updateSalaryHistoryValues);
+        await client.query(updateSalaryHistoryQuery, updateSalaryHistoryValues)
       } else {
-        // Insert new record
         const insertSalaryHistoryQuery = `
           INSERT INTO base_salary_history (userid, base, date)
           VALUES ($1, $2, $3)
@@ -389,7 +371,7 @@ const updateEmployee = async (id, employeeData, documentUrls) => {
           Number.parseFloat(base_salary),
           currentDate,
         ]
-        await client.query(insertSalaryHistoryQuery, salaryHistoryValues);
+        await client.query(insertSalaryHistoryQuery, salaryHistoryValues)
       }
     }
 
@@ -480,7 +462,14 @@ const getEmployeeDetails = async (id) => {
   let client
   try {
     client = await pool.connect()
-    const result = await client.query("SELECT * FROM m5_employee WHERE userid = $1", [id])
+    const result = await client.query(`
+      SELECT 
+        userid, name, surname, telephonenum, cellnum, employeenum,
+        roleid, email, base_salary, company_reg_num, status,
+        document_url1, document_url2, document_url3
+      FROM m5_employee 
+      WHERE userid = $1
+    `, [id])
     if (!result.rows.length) {
       return { success: false, message: "Employee not found" }
     }
