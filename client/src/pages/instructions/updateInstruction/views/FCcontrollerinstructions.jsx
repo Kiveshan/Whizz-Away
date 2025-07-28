@@ -197,8 +197,7 @@ const FCcontrollerinstructions = () => {
   });
 
   // Check if the instruction should be read-only based on status
-  const isReadOnly =
-    formData.status === "In Progress" || formData.status === "Completed";
+  const isReadOnly = formData.status === "In Progress" || formData.status === "Completed";
 
   const [startingPoints, setStartingPoints] = useState([]);
   const [destinations, setDestinations] = useState([]);
@@ -4496,13 +4495,14 @@ const FCcontrollerinstructions = () => {
                   )}
                 </>
               )}
+              {/* Invoice button for In Progress moved to read-only section */}
             </div>
           )}
 
           {isReadOnly && (
             <div
               className="controller-instructions-form-actions"
-              style={{ display: "flex", justifyContent: "center" }}
+              style={{ display: "flex", justifyContent: "center", gap: "15px" }}
             >
               <div
                 style={{
@@ -4517,6 +4517,26 @@ const FCcontrollerinstructions = () => {
               >
                 This instruction is {formData.status} and cannot be edited
               </div>
+              
+              {/* Display invoice button for In Progress instructions */}
+              {formData.status === "In Progress" && !isInvoiced && (
+                <button
+                  className="controller-instructions-invoice-button"
+                  onClick={handleCreateInvoice}
+                  style={{
+                    backgroundColor: "#27ae60",
+                    color: "white",
+                    padding: "12px 24px",
+                    border: "none",
+                    borderRadius: "4px",
+                    cursor: "pointer",
+                    fontSize: "16px",
+                    fontWeight: "bold",
+                  }}
+                >
+                  Invoice
+                </button>
+              )}
             </div>
           )}
         </div>
