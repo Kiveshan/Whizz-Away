@@ -4,9 +4,23 @@ const getPendingUsers = async () => {
   let client;
   try {
     client = await pool.connect();
-    const result = await client.query(
-      "SELECT userid, name, surname, email, companyname, roleid, status, dateofreg FROM usertable WHERE status = 'pending'"
-    );
+    const result = await client.query(`
+      SELECT 
+        u.userid, 
+        e.name, 
+        e.surname, 
+        e.email, 
+        e.is_business_manager,
+        u.companyname, 
+        u.company_reg_num,
+        u.roleid, 
+        u.status, 
+        u.dateofreg,
+        e.status AS employee_status
+      FROM usertable u
+      INNER JOIN m5_employee e ON u.company_reg_num = e.company_reg_num
+      WHERE u.status = 'pending' AND e.is_business_manager = TRUE
+    `);
     return result.rows;
   } catch (err) {
     console.error("Error fetching pending users:", err);
@@ -16,15 +30,41 @@ const getPendingUsers = async () => {
   }
 };
 
+
+
 const approveUser = async (userid, roleid) => {
   let client;
   try {
     client = await pool.connect();
+    await client.query('BEGIN');
+
+    // Get company_reg_num from usertable
+    const userResult = await client.query(
+      `SELECT company_reg_num FROM usertable WHERE userid = $1`,
+      [userid]
+    );
+
+    if (userResult.rows.length === 0) {
+      throw new Error('User not found');
+    }
+
+    const company_reg_num = userResult.rows[0].company_reg_num;
+
+    // Update usertable
     await client.query(
-      "UPDATE usertable SET status = 'active', roleid = $1 WHERE userid = $2",
+      `UPDATE usertable SET status = 'active', roleid = $1 WHERE userid = $2`,
       [roleid, userid]
     );
+
+    // Update m5_employee status to TRUE
+    await client.query(
+      `UPDATE m5_employee SET status = TRUE WHERE company_reg_num = $1`,
+      [company_reg_num]
+    );
+
+    await client.query('COMMIT');
   } catch (err) {
+    await client.query('ROLLBACK');
     console.error("Error approving user:", err);
     throw err;
   } finally {
@@ -80,21 +120,20 @@ const getCompanyList = async () => {
     const result = await client.query(`
       SELECT 
         u.userid, 
-        u.name, 
-        u.surname, 
-        u.email, 
+        e.name, 
+        e.surname, 
+        e.email, 
+        e.is_business_manager,
         u.companyname, 
         u.company_reg_num, 
         u.status, 
         u.dateofreg,
-        (SELECT COUNT(*) FROM usertable WHERE company_reg_num = u.company_reg_num) + 
+        e.status AS employee_status,
         (SELECT COUNT(*) FROM m5_employee WHERE company_reg_num = u.company_reg_num) as total_count
-      FROM 
-        usertable u
-      WHERE 
-        u.roleid = 1
-      ORDER BY 
-        u.companyname ASC
+      FROM usertable u
+      INNER JOIN m5_employee e ON u.company_reg_num = e.company_reg_num
+      WHERE u.roleid = 1 AND e.is_business_manager = TRUE
+      ORDER BY u.companyname ASC
     `);
     return result.rows;
   } catch (err) {
@@ -104,6 +143,8 @@ const getCompanyList = async () => {
     if (client) client.release();
   }
 };
+
+
 
 const deactivateCompany = async (company_reg_num) => {
   let client;

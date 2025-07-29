@@ -186,6 +186,7 @@ const EmployeeForm = ({ employee, loading, isEditing, onSave, onCancel, onChange
             required
           >
             <option value="" disabled>Select Role</option>
+            <option value="1">Business Manager</option>
             <option value="2">Controller</option>
             <option value="4">Director</option>
             <option value="5">Driver</option>

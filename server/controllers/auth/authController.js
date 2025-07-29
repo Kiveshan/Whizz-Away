@@ -183,6 +183,79 @@ const checkEmail = async (req, res) => {
   }
 };
 
+// const register = async (req, res) => {
+//   const {
+//     name,
+//     surname,
+//     email,
+//     password,
+//     companyname,
+//     company_reg_num,
+//     cell_num,
+//     cell_num2,
+//     vat_reg_num,
+//     account_num,
+//     name_of_acc,
+//     bank,
+//     branch,
+//     branch_code,
+//     address,
+//     suburb,
+//     swift_code,
+//     cluster_box,
+//   } = req.body;
+
+//   try {
+//     if (await checkEmailExists(email)) {
+//       return res.status(400).json({ message: "Email already registered" });
+//     }
+
+//     if (await checkCompanyRegNumExists(company_reg_num)) {
+//       return res
+//         .status(400)
+//         .json({ message: "Company registration number already exists" });
+//     }
+
+//     const user = await registerUser({
+//       name,
+//       surname,
+//       email,
+//       password,
+//       companyname,
+//       company_reg_num,
+//       cell_num,
+//       cell_num2,
+//       vat_reg_num,
+//       account_num,
+//       name_of_acc,
+//       bank,
+//       branch,
+//       branch_code,
+//       address,
+//       suburb,
+//       swift_code,
+//       cluster_box,
+//     });
+
+//     return res.status(201).json({
+//       message: "Registration successful! Your account is pending approval.",
+//       user,
+//     });
+//   } catch (error) {
+//     if (error.code === "23505") {
+//       if (error.constraint.includes("email")) {
+//         return res.status(400).json({ message: "Email already registered" });
+//       } else if (error.constraint.includes("company_reg_num")) {
+//         return res
+//           .status(400)
+//           .json({ message: "Company registration number already exists" });
+//       }
+//     }
+//     return res
+//       .status(500)
+//       .json({ message: "Server error during registration" });
+//   }
+// };
 const register = async (req, res) => {
   const {
     name,
@@ -191,7 +264,7 @@ const register = async (req, res) => {
     password,
     companyname,
     company_reg_num,
-    cell_num,
+    cellnum,
     cell_num2,
     vat_reg_num,
     account_num,
@@ -223,7 +296,7 @@ const register = async (req, res) => {
       password,
       companyname,
       company_reg_num,
-      cell_num,
+      cellnum,
       cell_num2,
       vat_reg_num,
       account_num,
