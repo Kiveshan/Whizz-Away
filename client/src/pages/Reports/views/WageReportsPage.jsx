@@ -131,7 +131,7 @@ const generateReport = async (monthName) => {
 
     // Fetch all employees/drivers (same as finance-clerk-wage.jsx)
     console.log('Fetching employees/drivers...')
-    const employeesResponse = await api.get('/employees/drivers')
+    const employeesResponse = await api.get('/all-employees')
     const employees = employeesResponse.data
     console.log(`Found ${employees.length} employees`)
 

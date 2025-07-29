@@ -3362,19 +3362,19 @@ disabled={isCompleted}
             <path d="M12 8v4" />
             <circle cx="12" cy="16" r="1" />
           </svg>
-<h3 className="modal-title">
-  {containerValidationDetails.isWeightBased 
-    ? (containerValidationDetails.missingWeight > 0 ? "Weight Destination Warning" : "Excess Weight Warning")
-    : "Container Destination Warning"}
-</h3>
+          <h3 className="modal-title">
+            {containerValidationDetails.isWeightBased 
+              ? (containerValidationDetails.missingWeight > 0 ? "Weight Destination Warning" : "Excess Weight Warning")
+              : "Container Destination Warning"}
+          </h3>
         </div>
-<p className="modal-description">
-  {containerValidationDetails.isWeightBased
-    ? (containerValidationDetails.missingWeight > 0 
-        ? "Not all weight reaches the final destination."
-        : "More weight is assigned than the instruction total.")
-    : "All containers must reach the final destination."}
-</p>
+        <p className="modal-description">
+          {containerValidationDetails.isWeightBased
+            ? (containerValidationDetails.missingWeight > 0 
+                ? "Not all weight reaches the final destination."
+                : "More weight is assigned than the instruction total.")
+            : "All containers must reach the final destination."}
+        </p>
       </div>
       <div className="modal-body">
         <div className="modal-item">
@@ -3386,12 +3386,12 @@ disabled={isCompleted}
         {containerValidationDetails.isWeightBased ? (
           <div className="modal-item">
             <div className="modal-bullet"></div>
-<span className="modal-item-text">
-  Weight reaching destination: <strong>
-    {(containerValidationDetails.totalWeight - Math.abs(containerValidationDetails.missingWeight)).toFixed(2)}/
-    {containerValidationDetails.totalWeight.toFixed(2)} {containerValidationDetails.weightUnit}
-  </strong>
-</span>
+            <span className="modal-item-text">
+              Weight reaching destination: <strong>
+                {(containerValidationDetails.totalWeight - Math.abs(containerValidationDetails.missingWeight)).toFixed(2)}/
+                {containerValidationDetails.totalWeight.toFixed(2)} {containerValidationDetails.weightUnit}
+              </strong>
+            </span>
           </div>
         ) : (
           containerValidationDetails.missingContainers?.map((container, index) => (
@@ -3406,25 +3406,15 @@ disabled={isCompleted}
       </div>
       <div className="modal-footer">
         <button
-          className="modal-btn modal-btn-secondary"
+          className="modal-btn modal-btn-primary"
           onClick={() => setShowContainerModal(false)}
         >
-          Cancel
-        </button>
-        <button
-          className="modal-btn modal-btn-primary"
-          onClick={() => {
-            setShowContainerModal(false);
-            navigateToDocuments();
-          }}
-        >
-          Proceed Anyway
+          Okay
         </button>
       </div>
     </div>
   </div>
 )}
-
       {/* Unsaved Changes Modal */}
       {showUnsavedChangesModal && (
         <div className="modal-wrapper">

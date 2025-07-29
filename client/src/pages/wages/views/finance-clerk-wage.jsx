@@ -17,7 +17,7 @@ const FinanceClerkWage = () => {
   useEffect(() => {
     // Fetch drivers data
     api
-      .get("/employees/drivers")
+      .get("/all-employees")
       .then((response) => {
         setDrivers(response.data);
         console.log(response.data);
