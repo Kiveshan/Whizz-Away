@@ -754,7 +754,7 @@ if (!useStoredData) {
             {/* Content */}
             <div className="wageslip-content">
               {/* Title */}
-              <h1 className="wageslip-title">Monthly Wage Slip</h1>
+              <h1 className="wageslip-title">Monthly Employee CTC</h1>
 
               {/* Month and Year */}
               <div className="wageslip-month-year-info">

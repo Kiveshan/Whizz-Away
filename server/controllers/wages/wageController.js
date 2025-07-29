@@ -8,7 +8,8 @@ import {
   getDriverInstructions,
   getDriverLegsByMonth,
   getStoredWageData,
-  getBaseSalaryHistory
+  getBaseSalaryHistory,
+  getAllEmployees
 
 } from "../../models/wages/wageModel.js";
 import {
@@ -31,6 +32,15 @@ const getStoredWageDataHandler = async (req, res) => {
   } catch (error) {
     console.error(`Error fetching stored wage data for employee ${employeeId}:`, error);
     res.status(500).json({ error: "Failed to fetch stored wage data" });
+  }
+};
+const getAllEmployeesHandler = async (req, res) => {
+  try {
+    const employees = await getAllEmployees();
+    res.status(200).json(employees);
+  } catch (error) {
+    console.error("Error fetching all employees:", error);
+    res.status(500).json({ error: "Failed to fetch employees" });
   }
 };
 const getBaseSalaryHistoryHandler = async (req, res) => {
@@ -262,5 +272,6 @@ export {
   getDriverInstructionsHandler,
   getDriverLegsByMonthHandler,
   getStoredWageDataHandler,
-  getBaseSalaryHistoryHandler
+  getBaseSalaryHistoryHandler,
+   getAllEmployeesHandler
 };

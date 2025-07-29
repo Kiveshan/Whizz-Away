@@ -9,11 +9,13 @@ import {
   getDriverInstructionsHandler,
   getDriverLegsByMonthHandler,
   getStoredWageDataHandler,
-  getBaseSalaryHistoryHandler
+  getBaseSalaryHistoryHandler,
+  getAllEmployeesHandler
 } from "../../controllers/wages/wageController.js";
 
 const router = express.Router();
 router.get("/api/stored-wage-data/:employeeId", getStoredWageDataHandler);
+router.get("/all-employees", getAllEmployeesHandler);
 router.post("/api/save-wage-data", saveWageDataHandler);
 router.get("/api/check-wage-slip", checkWageSlipHandler);
 router.get(
