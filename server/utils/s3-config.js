@@ -36,7 +36,7 @@ checkBucket(bucketName);
 const uploadPaymentProof = multer({
   storage: storage,
   limits: {
-    fileSize: 100 * 1024 * 1024, // 10MB file size limit
+    fileSize: 50 * 1024 * 1024, // 10MB file size limit
   },
   fileFilter: (req, file, cb) => {
     const filetypes = /jpeg|jpg|png|pdf/;
