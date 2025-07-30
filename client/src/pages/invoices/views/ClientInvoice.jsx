@@ -150,7 +150,7 @@ const ClientInvoice = () => {
     try {
       const containers = invoiceData.containers || [];
       const containerCount = containers.length;
-      const isCompactLayout = containerCount <= 10;
+      const isCompactLayout = true;
 
       // Create new PDF document
       const doc = new jsPDF({
