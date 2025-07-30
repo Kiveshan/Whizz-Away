@@ -2,8 +2,9 @@
 import { useState, useEffect, useRef } from "react";
 import { useNavigate, useParams, useLocation } from "react-router-dom";
 import "../css/InvoiceTemplate.css";
-import html2pdf from "html2pdf.js";
-import api from "../../../api"; // Import the axios instance
+import jsPDF from "jspdf";
+import autoTable from "jspdf-autotable";
+import api from "../../../api";
 
 // Utility function for formatting dates
 const formatDate = (dateString) => {
@@ -46,7 +47,6 @@ const ClientInvoice = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [pdfLoading, setPdfLoading] = useState(false);
-  const [isPrinting, setIsPrinting] = useState(false);
 
   const invoiceRef = useRef(null);
 
@@ -66,13 +66,11 @@ const ClientInvoice = () => {
         const requestUrl = `/api/invoices/${id}`;
         debug("Fetching invoice data from:", requestUrl);
 
-        // Using axios instead of fetch
         const response = await api.get(requestUrl);
 
         debug("Response status:", response.status);
         debug("Received invoice data:", response.data);
 
-        // Normalize container data
         if (response.data.data && response.data.data.containers) {
           response.data.data.containers = response.data.data.containers.map(
             (container) => ({
@@ -94,17 +92,13 @@ const ClientInvoice = () => {
           let errorMessage = "Failed to load invoice data";
 
           if (err.response) {
-            // The request was made and the server responded with a status code
-            // that falls out of the range of 2xx
             const { status, data } = err.response;
 
             if (status === 401 || status === 403) {
-              // Handle unauthorized or forbidden
               navigate("/");
               return;
             }
 
-            // Check if response is HTML (proxy configuration issue)
             if (
               typeof data === "string" &&
               (data.trim().startsWith("<!DOCTYPE") ||
@@ -118,11 +112,9 @@ const ClientInvoice = () => {
               }`;
             }
           } else if (err.request) {
-            // The request was made but no response was received
             errorMessage =
               "No response received from server. Please check your connection.";
           } else {
-            // Something happened in setting up the request that triggered an Error
             errorMessage = err.message;
           }
 
@@ -134,95 +126,330 @@ const ClientInvoice = () => {
 
     fetchInvoiceData();
 
-    // Cleanup function
     return () => {
       isMounted = false;
     };
   }, [id, navigate]);
 
-  // Calculate VAT based on percentage from database or use vat_amount if available
   const calculateVAT = (amount) => {
-    // If we have a vat_amount from the invoice table, use that
     if (invoiceData?.invoice?.vat_amount !== undefined) {
       return Number(invoiceData.invoice.vat_amount);
     }
 
-    // Otherwise calculate based on percentage
     if (invoiceData?.vat !== undefined && invoiceData?.vat !== null && amount) {
-      // Convert percentage to decimal (e.g., 15 becomes 0.15)
       const vatRate = Number(invoiceData.vat) / 100;
       return amount * vatRate;
     }
 
-    // If no VAT value is provided or amount is 0, return 0 (no VAT)
     return 0;
   };
 
   const generatePDF = () => {
-    // Set printing mode before generating
-    setIsPrinting(true);
     setPdfLoading(true);
 
-    // Use requestAnimationFrame instead of setTimeout for better browser compatibility
-    requestAnimationFrame(() => {
-      const element = invoiceRef.current;
-      const filename = `Invoice-${invoiceData.invoice_num}.pdf`;
+    try {
+      const containers = invoiceData.containers || [];
+      const containerCount = containers.length;
+      const isCompactLayout = containerCount <= 10;
 
-      const opt = {
-        margin: [15, 15, 15, 15], // Slightly increased margins from your current 10
-        filename: filename,
-        image: { type: "png", quality: 1.0 },
-        html2canvas: {
-          scale: 2, // Balance between quality and performance
-          useCORS: true,
-          letterRendering: true,
-          allowTaint: true,
-          backgroundColor: "#FFFFFF",
-        },
-        jsPDF: {
-          unit: "mm",
-          format: "a4",
-          orientation: "portrait",
-          compress: false,
-          precision: 16,
-          putOnlyUsedFonts: true,
-        },
-        pagebreak: { mode: ["avoid-all", "css", "legacy"] }, // Add this line to improve page breaks
+      // Create new PDF document
+      const doc = new jsPDF({
+        orientation: "portrait",
+        unit: "mm",
+        format: "a4",
+      });
+
+      // Set up fonts and sizes based on layout
+      const fonts = isCompactLayout
+        ? {
+            title: 18,
+            header: 14,
+            normal: 11,
+            small: 10,
+            tiny: 9,
+          }
+        : {
+            title: 20,
+            header: 16,
+            normal: 12,
+            small: 11,
+            tiny: 10,
+          };
+
+      // Reduced margins for maximum space utilization
+      const margins = {
+        left: isCompactLayout ? 10 : 15,
+        right: isCompactLayout ? 10 : 15,
+        top: isCompactLayout ? 10 : 15,
       };
 
-      // Add CSS to handle page breaks properly
-      const style = document.createElement("style");
-      style.innerHTML = `
-        @media print {
-          .container-section { page-break-inside: avoid; }
-          .banking-details { page-break-inside: avoid; }
-          table { page-break-inside: avoid; }
-          tr { page-break-inside: avoid; }
-          td { page-break-inside: avoid; }
-          th { page-break-inside: avoid; }
-        }
-      `;
-      document.head.appendChild(style);
+      const pageWidth = doc.internal.pageSize.getWidth();
+      let currentY = margins.top;
 
-      html2pdf()
-        .set(opt)
-        .from(element)
-        .save()
-        .then(() => {
-          document.head.removeChild(style); // Clean up the added style
-          setPdfLoading(false);
-          setIsPrinting(false); // Reset printing mode
-        })
-        .catch((error) => {
-          document.head.removeChild(style); // Clean up the added style
-          console.error("PDF generation error:", error);
-          setPdfLoading(false);
-          setIsPrinting(false);
-        });
-    });
+      // Company Header
+      doc.setFontSize(fonts.title);
+      doc.setFont("helvetica", "bold");
+      doc.text(invoiceData.companyname || "", margins.left, currentY);
+      currentY += isCompactLayout ? 6 : 8;
+
+      // Company Details
+      doc.setFontSize(fonts.small);
+      doc.setFont("helvetica", "normal");
+      const companyDetails = [
+        invoiceData.cluster_box,
+        invoiceData.address,
+        invoiceData.suburb,
+        `VAT Reg No: ${invoiceData.vat_reg_num}`,
+        `Cellphone: ${invoiceData.phonenumber}`,
+      ].filter(Boolean);
+
+      companyDetails.forEach((detail) => {
+        doc.text(detail, margins.left, currentY);
+        currentY += isCompactLayout ? 5 : 6;
+      });
+
+      currentY += isCompactLayout ? 8 : 10;
+
+      // Invoice Title and Document Number (side by side)
+      doc.setFontSize(fonts.header);
+      doc.setFont("helvetica", "bold");
+      doc.text("Tax Invoice", margins.left, currentY);
+
+      // Document number on the right side
+      doc.setFontSize(fonts.normal);
+      doc.setFont("helvetica", "normal");
+      doc.text(
+        `Document No: ${invoiceData.doc_num}`,
+        pageWidth - margins.right,
+        currentY,
+        { align: "right" }
+      );
+      currentY += isCompactLayout ? 12 : 15;
+
+      // Client Details
+      doc.setFontSize(fonts.small);
+      const clientDetails = [
+        invoiceData.client_name,
+        invoiceData.client_address,
+        invoiceData.client_suburb,
+        `Telephone: ${invoiceData.client_telephone}`,
+        `Date: ${formatDate(invoiceData.date)}`,
+        `Email: ${invoiceData.client_email}`,
+        `VAT Reg No: ${invoiceData.client_vat}`,
+      ].filter(Boolean);
+
+      clientDetails.forEach((detail) => {
+        doc.text(detail, margins.left, currentY);
+        currentY += isCompactLayout ? 5 : 6;
+      });
+
+      currentY += isCompactLayout ? 8 : 10;
+
+      // Destination Table
+      const destinationRoute = `${invoiceData.pickup || ""} to ${
+        invoiceData.dropoff || ""
+      }`;
+      const destinationData = [["Destination", destinationRoute]];
+
+      autoTable(doc, {
+        startY: currentY,
+        head: [],
+        body: destinationData,
+        theme: "grid",
+        styles: {
+          fontSize: fonts.small,
+          cellPadding: isCompactLayout ? 1.5 : 2.5,
+          lineWidth: 0.1,
+        },
+        columnStyles: {
+          0: { fontStyle: "bold", cellWidth: 35 },
+          1: { cellWidth: "auto" },
+        },
+        margin: { left: margins.left, right: margins.right },
+      });
+
+      currentY = doc.lastAutoTable.finalY + (isCompactLayout ? 5 : 7);
+
+      // Invoice Details Table
+      const invoiceDetailsData = [
+        ["Booking Ref", invoiceData.booking_ref || ""],
+        ["File Number", invoiceData.file_no || ""],
+        ["Description", invoiceData.description || ""],
+        ["Vessel/Ref", invoiceData.vessel_name || ""],
+      ];
+
+      autoTable(doc, {
+        startY: currentY,
+        head: [],
+        body: invoiceDetailsData,
+        theme: "grid",
+        styles: {
+          fontSize: fonts.small,
+          cellPadding: isCompactLayout ? 1.5 : 2.5,
+          lineWidth: 0.1,
+        },
+        columnStyles: {
+          0: { fontStyle: "bold", cellWidth: 35 },
+          1: { cellWidth: "auto" },
+        },
+        margin: { left: margins.left, right: margins.right },
+      });
+
+      currentY = doc.lastAutoTable.finalY + (isCompactLayout ? 5 : 7);
+
+      // Container Table
+      const hasWeights = containers.some(
+        (container) => container.weight && container.weight !== "N/A"
+      );
+      const containerHeaders = hasWeights
+        ? ["Container Number", "Weight"]
+        : ["Container Number"];
+
+      const containerData =
+        containers.length > 0
+          ? containers.map((container) => {
+              const row = [container.container_number || "N/A"];
+              if (
+                hasWeights &&
+                container.weight &&
+                container.weight !== "N/A"
+              ) {
+                row.push(container.weight);
+              }
+              return row;
+            })
+          : [["No container information"]];
+
+      autoTable(doc, {
+        startY: currentY,
+        head: [containerHeaders],
+        body: containerData,
+        theme: "grid",
+        styles: {
+          fontSize: isCompactLayout ? fonts.tiny : fonts.small,
+          cellPadding: isCompactLayout ? 1.5 : 2.5,
+          lineWidth: 0.1,
+        },
+        headStyles: {
+          fillColor: [70, 130, 180],
+          textColor: [255, 255, 255],
+          fontStyle: "bold",
+        },
+        margin: { left: margins.left, right: margins.right },
+      });
+
+      currentY = doc.lastAutoTable.finalY + (isCompactLayout ? 8 : 10);
+
+      // Calculate invoice values
+      const amount = invoiceData.invoice?.amount || invoiceData.total_cost || 0;
+      const vat = calculateVAT(amount);
+      const total = invoiceData.invoice?.total_amount || amount + vat;
+
+      // Store the Y position for the side-by-side layout
+      const sectionStartY = currentY;
+
+      // Banking Details on the LEFT side
+      const leftColumnWidth = (pageWidth - margins.left - margins.right) * 0.55; // 55% of available width
+
+      doc.setFontSize(fonts.normal);
+      doc.setFont("helvetica", "bold");
+      doc.text("Banking Details", margins.left, currentY);
+      currentY += isCompactLayout ? 6 : 8;
+
+      doc.setFontSize(fonts.small);
+      doc.setFont("helvetica", "normal");
+
+      const bankingDetails = [
+        `Account Name: ${invoiceData.name_of_acc || ""}`,
+        `Bank Name: ${invoiceData.bank || ""}`,
+        `Account Number: ${invoiceData.account_num || ""}`,
+        `Branch Code: ${invoiceData.branch_code || ""}`,
+        `SWIFT Code: ${invoiceData.swift_code || ""}`,
+        `Reference: ${invoiceData.invoice_num || ""}`,
+      ];
+
+      bankingDetails.forEach((detail) => {
+        doc.text(detail, margins.left, currentY);
+        currentY += isCompactLayout ? 5 : 6;
+      });
+
+      // Invoice Summary Table on the RIGHT side
+      const rightColumnStart = margins.left + leftColumnWidth + 5; // 5mm gap
+      const rightColumnWidth = (pageWidth - margins.left - margins.right) * 0.4; // 40% of available width
+
+      const summaryData = [["Amount (excl. VAT)", formatCurrency(amount)]];
+
+      if (vat > 0) {
+        summaryData.push([`VAT (${invoiceData.vat}%)`, formatCurrency(vat)]);
+      }
+
+      summaryData.push(["Total Amount", formatCurrency(total)]);
+
+      autoTable(doc, {
+        startY: sectionStartY,
+        head: [["Invoice Summary", ""]],
+        body: summaryData,
+        theme: "grid",
+        styles: {
+          fontSize: fonts.small,
+          cellPadding: isCompactLayout ? 1.5 : 2.5,
+          lineWidth: 0.1,
+        },
+        headStyles: {
+          fillColor: [34, 139, 34],
+          textColor: [255, 255, 255],
+          fontStyle: "bold",
+        },
+        bodyStyles: {
+          0: { fontStyle: "normal" },
+          1: { fontStyle: "normal" },
+        },
+        columnStyles: {
+          0: { cellWidth: rightColumnWidth * 0.6 },
+          1: { cellWidth: rightColumnWidth * 0.4, halign: "right" },
+        },
+        didParseCell: (data) => {
+          if (data.row.index === summaryData.length - 1) {
+            data.cell.styles.fontStyle = "bold";
+            data.cell.styles.fillColor = [220, 220, 220];
+          }
+        },
+        margin: { left: rightColumnStart, right: margins.right },
+      });
+
+      // Calculate the final Y position (whichever section is lower)
+      const bankingEndY = currentY;
+      const summaryEndY = doc.lastAutoTable.finalY;
+      currentY =
+        Math.max(bankingEndY, summaryEndY) + (isCompactLayout ? 8 : 10);
+
+      // Payment note and thank you message
+      doc.setFontSize(fonts.tiny);
+      doc.text(
+        "Please ensure the invoice number is referenced when making payment.",
+        margins.left,
+        currentY
+      );
+      currentY += isCompactLayout ? 4 : 5;
+
+      doc.setFontSize(fonts.small);
+      doc.text(
+        `Thank you for choosing ${invoiceData.companyname}.`,
+        margins.left,
+        currentY
+      );
+
+      // Save the PDF
+      const filename = `Invoice-${invoiceData.invoice_num}.pdf`;
+      doc.save(filename);
+
+      setPdfLoading(false);
+    } catch (error) {
+      console.error("PDF generation error:", error);
+      setPdfLoading(false);
+    }
   };
 
-  // Loading, error, and no data states
   if (loading) {
     return (
       <div className="client-invoice-wrapper">
@@ -268,23 +495,17 @@ const ClientInvoice = () => {
     );
   }
 
-  // Calculate invoice values - use values from invoice table if available
   const amount = invoiceData.invoice?.amount || invoiceData.total_cost || 0;
   const vat = calculateVAT(amount);
   const total = invoiceData.invoice?.total_amount || amount + vat;
   const roleId = JSON.parse(localStorage.getItem("user")).roleid;
-  console.log(roleId);
 
-  // Ensure containers exist
   const containers = invoiceData.containers || [];
 
   return (
     <div className="client-invoice-wrapper">
       <div className="invoice-page">
-        <div
-          className={`invoice-paper ${isPrinting ? "printing-mode" : ""}`}
-          ref={invoiceRef}
-        >
+        <div className="invoice-paper" ref={invoiceRef}>
           {/* Transport and Logistics section */}
           <div className="transport-section">
             <div className="section-title">{invoiceData.companyname}</div>
@@ -327,7 +548,7 @@ const ClientInvoice = () => {
           {/* Vessel/Ref and Destination */}
           <div className="vessel-destination">
             <div className="vessel">Starting : {invoiceData.pickup}</div>
-            <div className="destination" contentEditable>
+            <div className="destination">
               Destination : {invoiceData.dropoff}
             </div>
           </div>
@@ -363,7 +584,6 @@ const ClientInvoice = () => {
                     <th className="container-number-header">
                       Container Number
                     </th>
-                    {/* Only show weight header if at least one container has a non-empty weight */}
                     {containers.some(
                       (container) =>
                         container.weight && container.weight !== "N/A"
@@ -394,6 +614,7 @@ const ClientInvoice = () => {
                   )}
                 </tbody>
               </table>
+
               {/* Summary Table */}
               <div className="summary-section">
                 <table className="container-table5">
@@ -411,7 +632,6 @@ const ClientInvoice = () => {
                         {formatCurrency(amount)}
                       </td>
                     </tr>
-                    {/* Only show VAT row if VAT exists */}
                     {vat > 0 && (
                       <tr>
                         <td className="summary-label">
@@ -455,7 +675,6 @@ const ClientInvoice = () => {
             className="back-btn"
             onClick={() => {
               if (roleId == 3) {
-                // If we came from client view, go back to the filtered invoices list
                 navigate("/invoices", {
                   state: {
                     clientId,
@@ -486,7 +705,7 @@ const ClientInvoice = () => {
             onClick={generatePDF}
             disabled={pdfLoading}
           >
-            {pdfLoading ? "Generating High-Quality PDF..." : "Download PDF"}
+            {pdfLoading ? "Generating PDF..." : "Download PDF"}
           </button>
         </div>
       </div>
