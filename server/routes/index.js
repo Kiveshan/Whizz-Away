@@ -11,6 +11,7 @@ import manageTrailerRoutes from "./manage/trailerRoutes.js";
 import supplierRoutes from "./manage/supplierRoutes.js"
 import expenseTypeRoutes from "./manage/expenseTypeRoutes.js"
 import manageClientRateRoutes from "./manage/clientRateRoutes.js";
+import manageCompanyRoutes from "./manage/companyRoutes.js";
 import paymentRoutes from "./payments/paymentRoutes.js";
 import clientRoutes from "./clients/clientRoutes.js";
 import invoiceRoutes from "./invoices/invoiceRoutes.js";
@@ -41,6 +42,7 @@ router.use(manageDriverRatesRoutes);
 router.use(manageSubbieRoutes);
 router.use(manageTrailerRoutes);
 router.use(manageClientRateRoutes);
+router.use(manageCompanyRoutes);
 router.use(supplierRoutes);
 router.use(expenseTypeRoutes);
 router.use(invoiceRoutes);

@@ -20,6 +20,7 @@ const initialState = {
   suppliers: [],
   expenseTypes: [],
   allExpenseTypes: [], // For dropdowns - contains ALL expense types
+  company: {},
 
   // Pagination State
   pagination: {
@@ -124,6 +125,7 @@ const initialState = {
   showClientRateForm: false,
   showSupplierForm: false,
   showExpenseTypeForm: false,
+  showCompanyForm: false,
 
   // Edit States
   editingEmployeeId: null,
@@ -138,6 +140,7 @@ const initialState = {
   editingClientRateId: null,
   editingSupplierId: null,
   editingExpenseTypeId: null,
+  editingCompanyId: null,
 
   // Form Data
   newEmployee: {
@@ -263,6 +266,22 @@ const initialState = {
     expense: "",
   },
 
+  newCompany: {
+    companyname: "",
+    company_reg_num: "",
+    cell_num2: "",
+    vat_reg_num: "",
+    account_num: "",
+    name_of_acc: "",
+    bank: "",
+    branch: "",
+    branch_code: "",
+    address: "",
+    suburb: "",
+    swift_code: "",
+    cluster_box: "",
+  },
+
   // Alert
   showAlert: false,
   alertMessage: "",
@@ -335,6 +354,7 @@ function manageReducer(state, action) {
         ...(action.payload === "showClientRateForm" && { editingClientRateId: null }),
         ...(action.payload === "showSupplierForm" && { editingSupplierId: null }),
         ...(action.payload === "showExpenseTypeForm" && { editingExpenseTypeId: null }),
+        ...(action.payload === "showCompanyForm" && { editingCompanyId: null }),
       }
 
     case "SET_EDITING":
@@ -352,6 +372,7 @@ function manageReducer(state, action) {
         ...(action.payload.type === "ClientRate" && { editingClientRateId: action.payload.id }),
         ...(action.payload.type === "Supplier" && { editingSupplierId: action.payload.id }),
         ...(action.payload.type === "ExpenseType" && { editingExpenseTypeId: action.payload.id }),
+        ...(action.payload.type === "Company" && { editingCompanyId: action.payload.id }),
       }
 
     case "UPDATE_FORM_DATA":
