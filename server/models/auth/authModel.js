@@ -317,8 +317,8 @@ const registerUser = async (userData) => {
     // Insert into m5_employee with status defaulting to FALSE, is_business_manager to TRUE, and roleid to 1
     await client.query(
       `INSERT INTO m5_employee (
-        name, surname, email, password, cellnum, company_reg_num, status, is_business_manager, roleid
-      ) VALUES ($1, $2, $3, $4, $5, $6, FALSE, TRUE, 1)`,
+        name, surname, email, password, cellnum, company_reg_num, status, roleid
+      ) VALUES ($1, $2, $3, $4, $5, $6, FALSE, 1)`,
       [
         name,
         surname,

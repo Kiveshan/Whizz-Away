@@ -10,7 +10,6 @@ const getPendingUsers = async () => {
         e.name, 
         e.surname, 
         e.email, 
-        e.is_business_manager,
         u.companyname, 
         u.company_reg_num,
         u.roleid, 
@@ -19,7 +18,7 @@ const getPendingUsers = async () => {
         e.status AS employee_status
       FROM usertable u
       INNER JOIN m5_employee e ON u.company_reg_num = e.company_reg_num
-      WHERE u.status = 'pending' AND e.is_business_manager = TRUE
+      WHERE u.status = 'pending' 
     `);
     return result.rows;
   } catch (err) {
@@ -132,7 +131,7 @@ const getCompanyList = async () => {
         (SELECT COUNT(*) FROM m5_employee WHERE company_reg_num = u.company_reg_num) as total_count
       FROM usertable u
       INNER JOIN m5_employee e ON u.company_reg_num = e.company_reg_num
-      WHERE u.roleid = 1 AND e.is_business_manager = TRUE
+      WHERE e.roleid = 1 
       ORDER BY u.companyname ASC
     `);
     return result.rows;
