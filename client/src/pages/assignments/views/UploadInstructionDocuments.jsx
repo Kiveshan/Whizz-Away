@@ -16,7 +16,7 @@ const UploadInstructionDocuments = () => {
   const [selectedFile, setSelectedFile] = useState(null);
   const [docName, setDocName] = useState("");
   // const [docType, setDocType] = useState("Instruction Document");
-  const [docType, setDocType] = useState("Delivery Note")
+  const [docType, setDocType] = useState("Delivery Note");
   const [legNumber, setLegNumber] = useState("");
   const [loading, setLoading] = useState(false);
   const [legs, setLegs] = useState([]);
@@ -27,28 +27,27 @@ const UploadInstructionDocuments = () => {
   const [isSubmitting, setIsSubmitting] = useState(isCompleted);
   const [shipmentType, setShipmentType] = useState(null);
   const [debugInfo, setDebugInfo] = useState({});
-const [containerCount, setContainerCount] = useState(0);
-const [rateWeight, setRateWeight] = useState(null);
-const [weightUnit, setWeightUnit] = useState('kg');
-const [containersReachedCount, setContainersReachedCount] = useState(0);
+  const [containerCount, setContainerCount] = useState(0);
+  const [rateWeight, setRateWeight] = useState(null);
+  const [weightUnit, setWeightUnit] = useState("kg");
+  const [containersReachedCount, setContainersReachedCount] = useState(0);
   const [isDocumentPage, setIsDocumentPage] = useState(true);
   const isWeightBasedInstruction = () => {
-  return rateWeight && rateWeight.toLowerCase() !== 'container';
-};
+    return rateWeight && rateWeight.toLowerCase() !== "container";
+  };
   // NEW: Check if shipment type is 3
-const isShipmentType3 = () => {
-  return shipmentType === 3
-}
+  const isShipmentType3 = () => {
+    return shipmentType === 3;
+  };
 
-// NEW: Get available document types based on shipment type
-const getAvailableDocumentTypes = () => {
-
-  const types = ["Instruction Document", "Delivery Note"]
-  if (showEmptyTurningDepotOption()) {
-    types.push("Empty Turning Depot Document")
-  }
-  return types
-}
+  // NEW: Get available document types based on shipment type
+  const getAvailableDocumentTypes = () => {
+    const types = ["Instruction Document", "Delivery Note"];
+    if (showEmptyTurningDepotOption()) {
+      types.push("Empty Turning Depot Document");
+    }
+    return types;
+  };
 
   // Add state for modals
   const [showFinishConfirmModal, setShowFinishConfirmModal] = useState(false);
@@ -100,19 +99,21 @@ const getAvailableDocumentTypes = () => {
   //   }
   // };
   const fetchContainers = async () => {
-  try {
-    const response = await api.get(`/containers/instruction/${instructionId}`);
-    console.log("Containers for instruction:", response.data);
-    setContainerCount(response.data.length);
-    
-    const reachedCount = await countContainersReachingDestination();
-    setContainersReachedCount(reachedCount);
-  } catch (error) {
-    console.error("Error fetching containers:", error);
-    setContainerCount(0);
-    setContainersReachedCount(0);
-  }
-};
+    try {
+      const response = await api.get(
+        `/containers/instruction/${instructionId}`
+      );
+      console.log("Containers for instruction:", response.data);
+      setContainerCount(response.data.length);
+
+      const reachedCount = await countContainersReachingDestination();
+      setContainersReachedCount(reachedCount);
+    } catch (error) {
+      console.error("Error fetching containers:", error);
+      setContainerCount(0);
+      setContainersReachedCount(0);
+    }
+  };
 
   const fetchShipmentType = async () => {
     try {
@@ -189,31 +190,33 @@ const getAvailableDocumentTypes = () => {
     }
   };
 
-const handleLegClick = (legNumber) => {
-  // Find the index of the leg with this number
-  const legIndex = legs.findIndex((leg) => leg.legnumber === legNumber);
+  const handleLegClick = (legNumber) => {
+    // Find the index of the leg with this number
+    const legIndex = legs.findIndex((leg) => leg.legnumber === legNumber);
 
-  if (legIndex === -1) {
-    console.error(`Could not find leg with number ${legNumber}`);
-    return;
-  }
+    if (legIndex === -1) {
+      console.error(`Could not find leg with number ${legNumber}`);
+      return;
+    }
 
-  console.log(`Navigating to leg index ${legIndex} (leg number ${legNumber})`);
+    console.log(
+      `Navigating to leg index ${legIndex} (leg number ${legNumber})`
+    );
 
-  // Navigate with the leg index
-  navigate("/update-instructions", {
-    state: {
-      clientId,
-      instructionId,
-      selectedLegIndex: legIndex, // This should be 0 for Leg 1
-      isCompleted: isCompleted,
-      shipmentType: shipmentType,
-    },
-    replace: true,
-  });
-  
-  setIsDocumentPage(false);
-};
+    // Navigate with the leg index
+    navigate("/update-instructions", {
+      state: {
+        clientId,
+        instructionId,
+        selectedLegIndex: legIndex, // This should be 0 for Leg 1
+        isCompleted: isCompleted,
+        shipmentType: shipmentType,
+      },
+      replace: true,
+    });
+
+    setIsDocumentPage(false);
+  };
 
   const validateDocumentUpload = () => {
     // Check if file and document name are provided
@@ -230,7 +233,7 @@ const handleLegClick = (legNumber) => {
     }
 
     // Check file size (10MB limit)
-    const maxSize = 50 * 1024 * 1024; // 10MB in bytes
+    const maxSize = 100 * 1024 * 1024; // 10MB in bytes
     if (selectedFile.size > maxSize) {
       setSubmitMessage("Error: File size exceeds 10MB limit");
       return false;
@@ -257,10 +260,13 @@ const handleLegClick = (legNumber) => {
         (doc) => doc.type === "Delivery Note"
       );
 
-if (!isWeightBasedInstruction() && legDeliveryNotes.length >= containersReachedCount) {
-      setSubmitMessage(`Error: Too many delivery notes`);
-      return false;
-    }
+      if (
+        !isWeightBasedInstruction() &&
+        legDeliveryNotes.length >= containersReachedCount
+      ) {
+        setSubmitMessage(`Error: Too many delivery notes`);
+        return false;
+      }
 
       return true;
     }
@@ -470,28 +476,31 @@ if (!isWeightBasedInstruction() && legDeliveryNotes.length >= containersReachedC
 
   // Modified to show confirmation modal instead of directly completing
   const handleFinish = () => {
-//     // Check if we have all required documents
-// // Check if we have all required documents
-const instructionDocs = documents.filter(
-  (doc) => doc.type === "Instruction Document"
-);
-const deliveryNotes = documents.filter(
-  (doc) => doc.type === "Delivery Note"
-);
-
-// NEW: For shipment type 3, only require delivery notes
-  // For other shipment types, require instruction document
-  if (instructionDocs.length !== 1) {
-    setSubmitMessage("Error: Exactly 1 Instruction Document is required");
-    return;
-  }
-
-if (!isWeightBasedInstruction() && deliveryNotes.length !== containersReachedCount) {
-    setSubmitMessage(
-      `Error: Exactly ${containersReachedCount} Delivery Notes are required (one per container)`
+    //     // Check if we have all required documents
+    // // Check if we have all required documents
+    const instructionDocs = documents.filter(
+      (doc) => doc.type === "Instruction Document"
     );
-    return;
-  }
+    const deliveryNotes = documents.filter(
+      (doc) => doc.type === "Delivery Note"
+    );
+
+    // NEW: For shipment type 3, only require delivery notes
+    // For other shipment types, require instruction document
+    if (instructionDocs.length !== 1) {
+      setSubmitMessage("Error: Exactly 1 Instruction Document is required");
+      return;
+    }
+
+    if (
+      !isWeightBasedInstruction() &&
+      deliveryNotes.length !== containersReachedCount
+    ) {
+      setSubmitMessage(
+        `Error: Exactly ${containersReachedCount} Delivery Notes are required (one per container)`
+      );
+      return;
+    }
 
     // Show confirmation modal
     setShowFinishConfirmModal(true);
@@ -533,26 +542,27 @@ if (!isWeightBasedInstruction() && deliveryNotes.length !== containersReachedCou
   };
 
   // Check if we can finish the instruction
-const canFinish = () => {
-  const instructionDocs = documents.filter(
-    (doc) => doc.type === "Instruction Document"
-  );
-  const deliveryNotes = documents.filter(
-    (doc) => doc.type === "Delivery Note"
-  );
-  const emptyTurningDocs = documents.filter(
-    (doc) => doc.type === "Empty Turning Depot Document"
-  );
+  const canFinish = () => {
+    const instructionDocs = documents.filter(
+      (doc) => doc.type === "Instruction Document"
+    );
+    const deliveryNotes = documents.filter(
+      (doc) => doc.type === "Delivery Note"
+    );
+    const emptyTurningDocs = documents.filter(
+      (doc) => doc.type === "Empty Turning Depot Document"
+    );
 
-  // Basic requirements for other shipment types
-const basicRequirements =
-    instructionDocs.length === 1 &&
-    (isWeightBasedInstruction() || deliveryNotes.length === containersReachedCount);
-  if (showEmptyTurningDepotOption()) {
-    return basicRequirements && emptyTurningDocs.length === 1;
-  }
-  return basicRequirements;
-};
+    // Basic requirements for other shipment types
+    const basicRequirements =
+      instructionDocs.length === 1 &&
+      (isWeightBasedInstruction() ||
+        deliveryNotes.length === containersReachedCount);
+    if (showEmptyTurningDepotOption()) {
+      return basicRequirements && emptyTurningDocs.length === 1;
+    }
+    return basicRequirements;
+  };
 
   // Determine if we should show the Empty Turning Depot Document option
   const showEmptyTurningDepotOption = () => {
@@ -562,102 +572,119 @@ const basicRequirements =
     );
     return shipmentType === 1;
   };
-//   const countContainersReachingDestination = async () => {
-//   try {
-//     // Get instruction details to get the dropoff location
-//     const instructionResponse = await api.get(`/instructions/${instructionId}/details`);
-//     const dropoff = instructionResponse.data.dropoff;
+  //   const countContainersReachingDestination = async () => {
+  //   try {
+  //     // Get instruction details to get the dropoff location
+  //     const instructionResponse = await api.get(`/instructions/${instructionId}/details`);
+  //     const dropoff = instructionResponse.data.dropoff;
 
-    
-    
-//     // Get all legs for this instruction
-//     const legsResponse = await api.get(`/legs/${instructionId}`);
-//     const legsData = legsResponse.data;
-    
-//     // Get all containers for this instruction
-//     const containersResponse = await api.get(`/containers/instruction/${instructionId}`);
-//     const instructionContainers = containersResponse.data;
-    
-//     // Track which containers reach the final destination
-//     const containersReachingDropoff = new Set();
-    
-//     legsData.forEach((leg) => {
-//       if (leg.destination === dropoff && leg.drivers && leg.drivers.length > 0) {
-//         leg.drivers.forEach((driver) => {
-//           if (driver.containernumber) {
-//             containersReachingDropoff.add(driver.containernumber.toString());
-//           }
-//         });
-//       }
-//     });
-    
-//     console.log("Containers reaching final destination:", Array.from(containersReachingDropoff));
-//     console.log("Total instruction containers:", instructionContainers.length);
-//     console.log("Containers reached count:", containersReachingDropoff.size);
-    
-//     return containersReachingDropoff.size;
-//   } catch (error) {
-//     console.error("Error counting containers reaching destination:", error);
-//     return 0;
-//   }
-// };
-const countContainersReachingDestination = async () => {
-  try {
-    // Get instruction details to get the dropoff location
-    const instructionResponse = await api.get(`/instructions/${instructionId}/details`);
-    const dropoff = instructionResponse.data.dropoff;
-    
-    // Normalize dropoff by converting to lowercase and removing spaces
-    const normalizedDropoff = dropoff?.toLowerCase().replace(/\s/g, '');
-    
-    // Get all legs for this instruction
-    const legsResponse = await api.get(`/legs/${instructionId}`);
-    const legsData = legsResponse.data;
-    
-    // Get all containers for this instruction
-    const containersResponse = await api.get(`/containers/instruction/${instructionId}`);
-    const instructionContainers = containersResponse.data;
-    
-    // Track which containers reach the final destination
-    const containersReachingDropoff = new Set();
-    
-    legsData.forEach((leg) => {
-      // Normalize leg destination by converting to lowercase and removing spaces
-      const normalizedLegDestination = leg.destination?.toLowerCase().replace(/\s/g, '');
-      if (normalizedLegDestination === normalizedDropoff && leg.drivers && leg.drivers.length > 0) {
-        leg.drivers.forEach((driver) => {
-          if (driver.containernumber) {
-            containersReachingDropoff.add(driver.containernumber.toString());
-          }
-        });
-      }
-    });
-    
-    console.log("Containers reaching final destination:", Array.from(containersReachingDropoff));
-    console.log("Total instruction containers:", instructionContainers.length);
-    console.log("Containers reached count:", containersReachingDropoff.size);
-    
-    return containersReachingDropoff.size;
-  } catch (error) {
-    console.error("Error counting containers reaching destination:", error);
-    return 0;
-  }
-};
-const fetchInstructionRateWeightAndUnit = async () => {
-  if (!instructionId) return;
-  try {
-    const response = await api.get(`/instructions/${instructionId}/details`);
-    const rateWeightValue = response.data.rateweight;
-    setRateWeight(rateWeightValue);
-    const isWeight = rateWeightValue && rateWeightValue.toLowerCase() !== 'container';
-    if (isWeight) {
-      const unit = rateWeightValue.toLowerCase().includes('ton') ? 'ton' : 'kg';
-      setWeightUnit(unit);
+  //     // Get all legs for this instruction
+  //     const legsResponse = await api.get(`/legs/${instructionId}`);
+  //     const legsData = legsResponse.data;
+
+  //     // Get all containers for this instruction
+  //     const containersResponse = await api.get(`/containers/instruction/${instructionId}`);
+  //     const instructionContainers = containersResponse.data;
+
+  //     // Track which containers reach the final destination
+  //     const containersReachingDropoff = new Set();
+
+  //     legsData.forEach((leg) => {
+  //       if (leg.destination === dropoff && leg.drivers && leg.drivers.length > 0) {
+  //         leg.drivers.forEach((driver) => {
+  //           if (driver.containernumber) {
+  //             containersReachingDropoff.add(driver.containernumber.toString());
+  //           }
+  //         });
+  //       }
+  //     });
+
+  //     console.log("Containers reaching final destination:", Array.from(containersReachingDropoff));
+  //     console.log("Total instruction containers:", instructionContainers.length);
+  //     console.log("Containers reached count:", containersReachingDropoff.size);
+
+  //     return containersReachingDropoff.size;
+  //   } catch (error) {
+  //     console.error("Error counting containers reaching destination:", error);
+  //     return 0;
+  //   }
+  // };
+  const countContainersReachingDestination = async () => {
+    try {
+      // Get instruction details to get the dropoff location
+      const instructionResponse = await api.get(
+        `/instructions/${instructionId}/details`
+      );
+      const dropoff = instructionResponse.data.dropoff;
+
+      // Normalize dropoff by converting to lowercase and removing spaces
+      const normalizedDropoff = dropoff?.toLowerCase().replace(/\s/g, "");
+
+      // Get all legs for this instruction
+      const legsResponse = await api.get(`/legs/${instructionId}`);
+      const legsData = legsResponse.data;
+
+      // Get all containers for this instruction
+      const containersResponse = await api.get(
+        `/containers/instruction/${instructionId}`
+      );
+      const instructionContainers = containersResponse.data;
+
+      // Track which containers reach the final destination
+      const containersReachingDropoff = new Set();
+
+      legsData.forEach((leg) => {
+        // Normalize leg destination by converting to lowercase and removing spaces
+        const normalizedLegDestination = leg.destination
+          ?.toLowerCase()
+          .replace(/\s/g, "");
+        if (
+          normalizedLegDestination === normalizedDropoff &&
+          leg.drivers &&
+          leg.drivers.length > 0
+        ) {
+          leg.drivers.forEach((driver) => {
+            if (driver.containernumber) {
+              containersReachingDropoff.add(driver.containernumber.toString());
+            }
+          });
+        }
+      });
+
+      console.log(
+        "Containers reaching final destination:",
+        Array.from(containersReachingDropoff)
+      );
+      console.log(
+        "Total instruction containers:",
+        instructionContainers.length
+      );
+      console.log("Containers reached count:", containersReachingDropoff.size);
+
+      return containersReachingDropoff.size;
+    } catch (error) {
+      console.error("Error counting containers reaching destination:", error);
+      return 0;
     }
-  } catch (error) {
-    console.error('Error fetching rate weight:', error);
-  }
-};
+  };
+  const fetchInstructionRateWeightAndUnit = async () => {
+    if (!instructionId) return;
+    try {
+      const response = await api.get(`/instructions/${instructionId}/details`);
+      const rateWeightValue = response.data.rateweight;
+      setRateWeight(rateWeightValue);
+      const isWeight =
+        rateWeightValue && rateWeightValue.toLowerCase() !== "container";
+      if (isWeight) {
+        const unit = rateWeightValue.toLowerCase().includes("ton")
+          ? "ton"
+          : "kg";
+        setWeightUnit(unit);
+      }
+    } catch (error) {
+      console.error("Error fetching rate weight:", error);
+    }
+  };
   return (
     <div className="instruction-container">
       <div>
@@ -839,75 +866,79 @@ const fetchInstructionRateWeightAndUnit = async () => {
         )}
       </div>
 
-<div className="requirements-section">
-  <h4>Document Requirements:</h4>
-  <ul>
-      <li
-        style={{
-          color:
-            documents.filter((doc) => doc.type === "Instruction Document")
-              .length === 1
-              ? "green"
-              : "red",
-        }}
-      >
-        Instruction Document:{" "}
-        {
-          documents.filter((doc) => doc.type === "Instruction Document")
-            .length
-        }
-        /1
-      </li>
-    
-    <li
-      style={{
-        color: 
-        isWeightBasedInstruction() ||
-        
-           documents.filter((doc) => doc.type === "Delivery Note").length === containersReachedCount
-            ? "green"
-            : "red",
-      }}
-    >
-      {/* Delivery Notes:{" "} */}
-{isWeightBasedInstruction() 
-    ? `Delivery Notes: ${documents.filter((doc) => doc.type === "Delivery Note").length}`
-    : `Delivery Notes: ${documents.filter((doc) => doc.type === "Delivery Note").length}/${containersReachedCount}`}
-    </li>
-    {showEmptyTurningDepotOption() && !isShipmentType3() && (
-      <li
-        style={{
-          color:
-            documents.filter(
-              (doc) => doc.type === "Empty Turning Depot Document"
-            ).length === 1
-              ? "green"
-              : "red",
-        }}
-      >
-        Empty Turning Depot Document:{" "}
-        {
-          documents.filter(
-            (doc) => doc.type === "Empty Turning Depot Document"
-          ).length
-        }
-        /1
-      </li>
-    )}
-  </ul>
-</div>
+      <div className="requirements-section">
+        <h4>Document Requirements:</h4>
+        <ul>
+          <li
+            style={{
+              color:
+                documents.filter((doc) => doc.type === "Instruction Document")
+                  .length === 1
+                  ? "green"
+                  : "red",
+            }}
+          >
+            Instruction Document:{" "}
+            {
+              documents.filter((doc) => doc.type === "Instruction Document")
+                .length
+            }
+            /1
+          </li>
 
-<button
-  className="finish-btn"
-  onClick={handleFinish}
-  disabled={!canFinish() || isCompleted}
-  style={{
-    opacity: canFinish() && !isCompleted ? 1 : 0.5,
-    cursor: canFinish() && !isCompleted ? "pointer" : "not-allowed",
-  }}
->
-  Finish Instruction
-</button>
+          <li
+            style={{
+              color:
+                isWeightBasedInstruction() ||
+                documents.filter((doc) => doc.type === "Delivery Note")
+                  .length === containersReachedCount
+                  ? "green"
+                  : "red",
+            }}
+          >
+            {/* Delivery Notes:{" "} */}
+            {isWeightBasedInstruction()
+              ? `Delivery Notes: ${
+                  documents.filter((doc) => doc.type === "Delivery Note").length
+                }`
+              : `Delivery Notes: ${
+                  documents.filter((doc) => doc.type === "Delivery Note").length
+                }/${containersReachedCount}`}
+          </li>
+          {showEmptyTurningDepotOption() && !isShipmentType3() && (
+            <li
+              style={{
+                color:
+                  documents.filter(
+                    (doc) => doc.type === "Empty Turning Depot Document"
+                  ).length === 1
+                    ? "green"
+                    : "red",
+              }}
+            >
+              Empty Turning Depot Document:{" "}
+              {
+                documents.filter(
+                  (doc) => doc.type === "Empty Turning Depot Document"
+                ).length
+              }
+              /1
+            </li>
+          )}
+        </ul>
+      </div>
+
+      <button
+        className="finish-btn"
+        onClick={handleFinish}
+        disabled={!canFinish() || isCompleted}
+        style={{
+          opacity: canFinish() && !isCompleted ? 1 : 0.5,
+          cursor: canFinish() && !isCompleted ? "pointer" : "not-allowed",
+        }}
+      >
+        Finish Instruction
+      </button>
 
       {/* Finish Confirmation Modal */}
       {showFinishConfirmModal && (

@@ -207,6 +207,15 @@ const checkWageSlip = async (employeeId, month, year) => {
     return { exists: false };
   }
 };
+const getAllEmployees = async () => {
+  const sql = `
+    SELECT userid, name, surname, roleid
+    FROM m5_employee
+    ORDER BY name, surname
+  `;
+  const result = await query(sql);
+  return result.rows;
+};
 const getStoredWageData = async (employeeId, month, year) => {
   let client;
   try {
@@ -693,5 +702,6 @@ export {
   getDriverInstructions,
   getDriverLegsByMonth,
   getStoredWageData,
-  getBaseSalaryHistory
+  getBaseSalaryHistory,
+   getAllEmployees
 };
