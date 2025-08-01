@@ -132,7 +132,7 @@ const EmployeeForm = ({ employee, loading, isEditing, onSave, onCancel, onChange
           </label>
           <input
             type="text"
-            value={employee.erializationnum || ""}
+            value={employee.employeenum || ""}
             onChange={(e) => onChange("employeenum", e.target.value)}
           />
         </div>
