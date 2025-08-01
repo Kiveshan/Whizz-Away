@@ -19,11 +19,19 @@ export function useApi(state, actions) {
           clientRates: "/api/client-rates",
           suppliers: "/api/suppliers",
           expenseTypes: "/api/expense-types",
+          company: "/api/companies",
         }
 
         const endpoint = endpoints[type]
         if (!endpoint) {
           throw new Error(`Invalid data type: ${type}`)
+        }
+
+        // Skip pagination for company since there's only one record
+        if (type === "company") {
+          const response = await api.get(endpoint)
+          actions.setData("company", response.data || {})
+          return
         }
 
         // Build query parameters
@@ -79,7 +87,7 @@ export function useApi(state, actions) {
           errorMessage = err.response.data?.error || errorMessage
         }
         actions.setError(errorMessage)
-        actions.setData(type, [])
+        actions.setData(type, type === "company" ? {} : [])
       } finally {
         actions.setLoading(false)
       }
@@ -111,6 +119,30 @@ export function useApi(state, actions) {
         actions.setData("allExpenseTypes", [])
         return []
       }
+    }
+  }, [actions])
+
+  const fetchCompany = useCallback(async () => {
+    actions.setLoading(true)
+    actions.setError(null)
+    try {
+      const response = await api.get("/api/companies")
+      console.log("Fetched company:", response.data)
+      actions.setData("company", response.data || {})
+    } catch (err) {
+      console.error("Error fetching company:", err)
+      let errorMessage = "Failed to load company details. Please try again."
+      if (err.response) {
+        const { status } = err.response
+        if (status === 401 || status === 403) {
+          return
+        }
+        errorMessage = err.response.data?.error || errorMessage
+      }
+      actions.setError(errorMessage)
+      actions.setData("company", {})
+    } finally {
+      actions.setLoading(false)
     }
   }, [actions])
 
@@ -163,11 +195,13 @@ export function useApi(state, actions) {
       ),
       // Also fetch all expense types for dropdowns
       fetchAllExpenseTypes(),
+      fetchCompany(),
     ])
-  }, [state, fetchPaginatedData, fetchAllExpenseTypes])
+  }, [state, fetchPaginatedData, fetchAllExpenseTypes, fetchCompany])
 
   const changePage = useCallback(
     async (type, page) => {
+      if (type === "company") return // No pagination for company
       const { pagination, filters } = state
       const currentPagination = pagination[type]
       if (page >= 1 && page <= currentPagination.totalPages) {
@@ -179,6 +213,7 @@ export function useApi(state, actions) {
 
   const changeItemsPerPage = useCallback(
     async (type, itemsPerPage) => {
+      if (type === "company") return // No pagination for company
       const { filters } = state
       actions.resetPagination(type)
       await fetchPaginatedData(type, 1, itemsPerPage, filters[type])
@@ -188,6 +223,7 @@ export function useApi(state, actions) {
 
   const applyFilters = useCallback(
     async (type) => {
+      if (type === "company") return // No filters for company
       const { filters } = state
       actions.resetPagination(type)
       await fetchPaginatedData(type, 1, state.pagination[type].itemsPerPage, filters[type])
@@ -404,7 +440,7 @@ export function useApi(state, actions) {
         const method = state.editTrailerId ? "put" : "post"
         console.log(`Making ${method.toUpperCase()} request to: ${url}`)
 
-        const response = api[method](url, formData, {
+        const response = await api[method](url, formData, {
           headers: { "Content-Type": "multipart/form-data" },
         })
         console.log("API response:", response.data)
@@ -728,6 +764,58 @@ export function useApi(state, actions) {
     [state, actions, fetchPaginatedData, fetchAllExpenseTypes],
   )
 
+  const saveCompany = useCallback(
+    async (companyData) => {
+      actions.setLoading(true)
+      try {
+        if (!companyData.companyname || !companyData.company_reg_num) {
+          actions.showAlert("Company name and registration number are required.")
+          return false
+        }
+
+        const preparedCompanyData = {
+          companyname: companyData.companyname || "",
+          company_reg_num: companyData.company_reg_num || "",
+          cell_num2: companyData.cell_num2 || "",
+          vat_reg_num: companyData.vat_reg_num || "",
+          account_num: companyData.account_num || "",
+          name_of_acc: companyData.name_of_acc || "",
+          bank: companyData.bank || "",
+          branch: companyData.branch || "",
+          branch_code: companyData.branch_code || "",
+          address: companyData.address || "",
+          suburb: companyData.suburb || "",
+          swift_code: companyData.swift_code || "",
+          cluster_box: companyData.cluster_box || "",
+        }
+
+        console.log("Prepared company data:", preparedCompanyData)
+
+        const url = "/api/companies"
+        const method = "put"
+        console.log(`Making ${method.toUpperCase()} request to: ${url}`)
+
+        const response = await api[method](url, preparedCompanyData)
+        console.log("API response:", response.data)
+
+        await fetchCompany()
+
+        actions.resetFormData("Company")
+        actions.setEditing("Company", null)
+        actions.hideForm("showCompanyForm")
+        actions.showAlert("Company details updated!")
+        return true
+      } catch (err) {
+        console.error("Error saving company:", err)
+        actions.showAlert(`Error saving company: ${err.response?.data?.error || err.message}`)
+        return false
+      } finally {
+        actions.setLoading(false)
+      }
+    },
+    [state, actions, fetchCompany],
+  )
+
   const toggleEmployeeStatus = useCallback(
     async (id, currentStatus) => {
       actions.setLoading(true)
@@ -963,175 +1051,179 @@ export function useApi(state, actions) {
     [state, actions, fetchPaginatedData, fetchAllExpenseTypes],
   )
 
-  // NEW: Delete individual subcontractor driver
-// deleteSubcontractorDriver
-const deleteSubcontractorDriver = useCallback(
-  async (driverId) => {
-    const confirmed = await showConfirmDialog(
-      'Are you sure?',
-      'You want to delete this driver?',
-      'Yes, delete it!'
-    );
-
-    if (!confirmed) {
-      return false;
-    }
-
-    actions.setLoading(true);
-    try {
-      await api.delete(`/api/subcontractors/drivers/${driverId}`);
-
-      // Refresh current page
-      await fetchPaginatedData(
-        'subcontractors',
-        state.pagination.subcontractors.currentPage,
-        state.pagination.subcontractors.itemsPerPage,
-        state.filters.subcontractors
+  const deleteSubcontractorDriver = useCallback(
+    async (driverId) => {
+      const confirmed = await showConfirmDialog(
+        'Are you sure?',
+        'You want to delete this driver?',
+        'Yes, delete it!'
       );
 
-      await showAlert('Success', 'Driver deleted successfully!', 'success');
-      return true;
-    } catch (err) {
-      console.error('Error deleting driver:', err);
-      await showAlert('Error', `Error deleting driver: ${err.response?.data?.error || err.message}`, 'error');
-      return false;
-    } finally {
-      actions.setLoading(false);
-    }
-  },
-  [state, actions, fetchPaginatedData]
-);
+      if (!confirmed) {
+        return false;
+      }
 
-  // NEW: Delete individual subcontractor truck
-const deleteSubcontractorTruck = useCallback(
-  async (truckId) => {
-    const confirmed = await showConfirmDialog(
-      'Are you sure?',
-      'You want to delete this truck?',
-      'Yes, delete it!'
-    );
+      actions.setLoading(true);
+      try {
+        await api.delete(`/api/subcontractors/drivers/${driverId}`);
 
-    if (!confirmed) {
-      return false;
-    }
+        // Refresh current page
+        await fetchPaginatedData(
+          'subcontractors',
+          state.pagination.subcontractors.currentPage,
+          state.pagination.subcontractors.itemsPerPage,
+          state.filters.subcontractors
+        );
 
-    actions.setLoading(true);
-    try {
-      await api.delete(`/api/subcontractors/trucks/${truckId}`);
+        await showAlert('Success', 'Driver deleted successfully!', 'success');
+        return true;
+      } catch (err) {
+        console.error('Error deleting driver:', err);
+        await showAlert('Error', `Error deleting driver: ${err.response?.data?.error || err.message}`, 'error');
+        return false;
+      } finally {
+        actions.setLoading(false);
+      }
+    },
+    [state, actions, fetchPaginatedData]
+  );
 
-      // Refresh current page
-      await fetchPaginatedData(
-        'subcontractors',
-        state.pagination.subcontractors.currentPage,
-        state.pagination.subcontractors.itemsPerPage,
-        state.filters.subcontractors
+  const deleteSubcontractorTruck = useCallback(
+    async (truckId) => {
+      const confirmed = await showConfirmDialog(
+        'Are you sure?',
+        'You want to delete this truck?',
+        'Yes, delete it!'
       );
 
-      await showAlert('Success', 'Truck deleted successfully!', 'success');
-      return true;
-    } catch (err) {
-      console.error('Error deleting truck:', err);
-      await showAlert('Error', `Error deleting truck: ${err.response?.data?.error || err.message}`, 'error');
-      return false;
-    } finally {
-      actions.setLoading(false);
-    }
-  },
-  [state, actions, fetchPaginatedData]
-);
+      if (!confirmed) {
+        return false;
+      }
 
-const deleteClientRate = useCallback(
-  async (rateId) => {
-    const confirmed = await showConfirmDialog(
-      'Are you sure?',
-      'You want to delete this rate?',
-      'Yes, delete it!'
-    );
+      actions.setLoading(true);
+      try {
+        await api.delete(`/api/subcontractors/trucks/${truckId}`);
 
-    if (!confirmed) {
-      return false;
-    }
+        // Refresh current page
+        await fetchPaginatedData(
+          'subcontractors',
+          state.pagination.subcontractors.currentPage,
+          state.pagination.subcontractors.itemsPerPage,
+          state.filters.subcontractors
+        );
 
-    actions.setLoading(true);
-    try {
-      await api.delete(`/api/client-rates/${rateId}`);
+        await showAlert('Success', 'Truck deleted successfully!', 'success');
+        return true;
+      } catch (err) {
+        console.error('Error deleting truck:', err);
+        await showAlert('Error', `Error deleting truck: ${err.response?.data?.error || err.message}`, 'error');
+        return false;
+      } finally {
+        actions.setLoading(false);
+      }
+    },
+    [state, actions, fetchPaginatedData]
+  );
 
-      // Refresh current page
-      await fetchPaginatedData(
-        'clientRates',
-        state.pagination.clientRates.currentPage,
-        state.pagination.clientRates.itemsPerPage,
-        state.filters.clientRates
+  const deleteClientRate = useCallback(
+    async (rateId) => {
+      const confirmed = await showConfirmDialog(
+        'Are you sure?',
+        'You want to delete this rate?',
+        'Yes, delete it!'
       );
 
-      await showAlert('Success', 'Client rate deleted successfully!', 'success');
-      return true;
-    } catch (err) {
-      console.error('Error deleting client rate:', err);
-      await showAlert('Error', `Error deleting client rate: ${err.response?.data?.error || err.message}`, 'error');
-      return false;
-    } finally {
-      actions.setLoading(false);
-    }
-  },
-  [state, actions, fetchPaginatedData]
-);
+      if (!confirmed) {
+        return false;
+      }
+
+      actions.setLoading(true);
+      try {
+        await api.delete(`/api/client-rates/${rateId}`);
+
+        // Refresh current page
+        await fetchPaginatedData(
+          'clientRates',
+          state.pagination.clientRates.currentPage,
+          state.pagination.clientRates.itemsPerPage,
+          state.filters.clientRates
+        );
+
+        await showAlert('Success', 'Client rate deleted successfully!', 'success');
+        return true;
+      } catch (err) {
+        console.error('Error deleting client rate:', err);
+        await showAlert('Error', `Error deleting client rate: ${err.response?.data?.error || err.message}`, 'error');
+        return false;
+      } finally {
+        actions.setLoading(false);
+      }
+    },
+    [state, actions, fetchPaginatedData]
+  );
+
   const loadItemForEdit = useCallback(
     async (type, id) => {
       try {
         let endpoint
         let formType
 
-        // Validate ID before making the request
-        const numericId = Number.parseInt(id)
-        if (isNaN(numericId) || numericId <= 0) {
-          console.error(`Invalid ID for ${type}:`, id)
-          actions.showAlert(`Invalid ${type} ID provided.`)
-          return
+        if (type === "company") {
+          endpoint = "/api/companies"
+          formType = "Company"
+        } else {
+          // Validate ID before making the request
+          const numericId = Number.parseInt(id)
+          if (isNaN(numericId) || numericId <= 0) {
+            console.error(`Invalid ID for ${type}:`, id)
+            actions.showAlert(`Invalid ${type} ID provided.`)
+            return
+          }
+
+          switch (type) {
+            case "employee":
+              endpoint = `/api/employees/${numericId}/details`
+              formType = "Employee"
+              break
+            case "client":
+              endpoint = `/api/m5Clients/${numericId}`
+              formType = "Client"
+              break
+            case "truck":
+              endpoint = `/api/trucks/${numericId}`
+              formType = "Truck"
+              break
+            case "trailer":
+              endpoint = `/api/trailers/${numericId}`
+              formType = "Trailer"
+              break
+            case "rate":
+              endpoint = `/api/driver-rates/${numericId}`
+              formType = "DriverRate"
+              break
+            case "subcontractor":
+              endpoint = `/api/subcontractors/${numericId}`
+              formType = "Subcontractor"
+              break
+            case "clientRate":
+              endpoint = `/api/client-rates/client/${numericId}`
+              formType = "ClientRate"
+              break
+            case "supplier":
+              endpoint = `/api/suppliers/${numericId}`
+              formType = "Supplier"
+              break
+            case "expenseType":
+              endpoint = `/api/expense-types/${numericId}`
+              formType = "ExpenseType"
+              break
+            default:
+              throw new Error("Invalid type")
+          }
+          id = numericId // Use numericId for consistency
         }
 
-        switch (type) {
-          case "employee":
-            endpoint = `/api/employees/${numericId}/details`
-            formType = "Employee"
-            break
-          case "client":
-            endpoint = `/api/m5Clients/${numericId}`
-            formType = "Client"
-            break
-          case "truck":
-            endpoint = `/api/trucks/${numericId}`
-            formType = "Truck"
-            break
-          case "trailer":
-            endpoint = `/api/trailers/${numericId}`
-            formType = "Trailer"
-            break
-          case "rate":
-            endpoint = `/api/driver-rates/${numericId}`
-            formType = "DriverRate"
-            break
-          case "subcontractor":
-            endpoint = `/api/subcontractors/${numericId}`
-            formType = "Subcontractor"
-            break
-          case "clientRate":
-            endpoint = `/api/client-rates/client/${numericId}`
-            formType = "ClientRate"
-            break
-          case "supplier":
-            endpoint = `/api/suppliers/${numericId}`
-            formType = "Supplier"
-            break
-          case "expenseType":
-            endpoint = `/api/expense-types/${numericId}`
-            formType = "ExpenseType"
-            break
-          default:
-            throw new Error("Invalid type")
-        }
-
-        console.log(`Loading ${type} for edit with ID:`, numericId, "Endpoint:", endpoint)
+        console.log(`Loading ${type} for edit with ID:`, id, "Endpoint:", endpoint)
         const response = await api.get(endpoint)
         const data = response.data
 
@@ -1202,7 +1294,7 @@ const deleteClientRate = useCallback(
           // Handle client rates - data should include client info and rates
           actions.updateFormData(formType, {
             ...data,
-            clientId: numericId,
+            clientId: id,
             rates: data.rates || [
               {
                 starting_point: "",
@@ -1221,11 +1313,28 @@ const deleteClientRate = useCallback(
             ...supplierData,
             expenseTypes: supplierData.expenseTypes || [],
           })
+        } else if (type === "company") {
+          actions.updateFormData(formType, {
+            ...data,
+            companyname: data.companyname || "",
+            company_reg_num: data.company_reg_num || "",
+            cell_num2: data.cell_num2 || "",
+            vat_reg_num: data.vat_reg_num || "",
+            account_num: data.account_num || "",
+            name_of_acc: data.name_of_acc || "",
+            bank: data.bank || "",
+            branch: data.branch || "",
+            branch_code: data.branch_code || "",
+            address: data.address || "",
+            suburb: data.suburb || "",
+            swift_code: data.swift_code || "",
+            cluster_box: data.cluster_box || "",
+          })
         } else {
           actions.updateFormData(formType, data)
         }
 
-        actions.setEditing(type.charAt(0).toUpperCase() + type.slice(1), numericId)
+        actions.setEditing(type.charAt(0).toUpperCase() + type.slice(1), id)
         actions.showForm(`show${formType}Form`)
       } catch (error) {
         console.error(`Error loading ${type} for edit:`, error)
@@ -1235,57 +1344,58 @@ const deleteClientRate = useCallback(
     [actions],
   )
 
-const deleteDocument = useCallback(
-  async (type, itemId, url) => {
-    const confirmed = await showConfirmDialog(
-      'Are you sure?',
-      'You want to delete this document?',
-      'Yes, delete it!'
-    );
+  const deleteDocument = useCallback(
+    async (type, itemId, url) => {
+      const confirmed = await showConfirmDialog(
+        'Are you sure?',
+        'You want to delete this document?',
+        'Yes, delete it!'
+      );
 
-    if (confirmed) {
-      try {
-        let endpoint;
-        let idField;
-        if (type === 'employee') {
-          endpoint = '/api/employees/delete-doc';
-          idField = 'employeeId';
-        } else if (type === 'truck') {
-          endpoint = '/api/trucks/delete-doc';
-          idField = 'truckId';
-        } else if (type === 'trailer') {
-          endpoint = '/api/trailers/delete-doc';
-          idField = 'trailerId';
-        } else {
-          throw new Error('Invalid document type');
-        }
+      if (confirmed) {
+        try {
+          let endpoint;
+          let idField;
+          if (type === 'employee') {
+            endpoint = '/api/employees/delete-doc';
+            idField = 'employeeId';
+          } else if (type === 'truck') {
+            endpoint = '/api/trucks/delete-doc';
+            idField = 'truckId';
+          } else if (type === 'trailer') {
+            endpoint = '/api/trailers/delete-doc';
+            idField = 'trailerId';
+          } else {
+            throw new Error('Invalid document type');
+          }
 
-        const response = await api.post(endpoint, {
-          [idField]: itemId,
-          url,
-        });
-
-        if (response.data.message === 'Document deleted successfully') {
-          const formType = type.charAt(0).toUpperCase() + type.slice(1);
-          const currentData = state[`new${formType}`];
-          actions.updateFormData(formType, {
-            existingDocuments: currentData.existingDocuments.filter((doc) => doc !== url),
+          const response = await api.post(endpoint, {
+            [idField]: itemId,
+            url,
           });
-          await showAlert('Success', 'Document deleted successfully.', 'success');
+
+          if (response.data.message === 'Document deleted successfully') {
+            const formType = type.charAt(0).toUpperCase() + type.slice(1);
+            const currentData = state[`new${formType}`];
+            actions.updateFormData(formType, {
+              existingDocuments: currentData.existingDocuments.filter((doc) => doc !== url),
+            });
+            await showAlert('Success', 'Document deleted successfully.', 'success');
+          }
+        } catch (error) {
+          console.error(`Failed to delete ${type} document:`, error);
+          await showAlert('Error', 'Error occurred while deleting document.', 'error');
         }
-      } catch (error) {
-        console.error(`Failed to delete ${type} document:`, error);
-        await showAlert('Error', 'Error occurred while deleting document.', 'error');
       }
-    }
-  },
-  [state, actions]
-);
+    },
+    [state, actions]
+  );
 
   return {
     fetchAllData,
     fetchPaginatedData,
     fetchAllExpenseTypes,
+    fetchCompany,
     changePage,
     changeItemsPerPage,
     applyFilters,
@@ -1298,6 +1408,7 @@ const deleteDocument = useCallback(
     saveClientRates,
     saveSupplier,
     saveExpenseType,
+    saveCompany,
     toggleEmployeeStatus,
     toggleClientStatus,
     toggleSubcontractorStatus,
