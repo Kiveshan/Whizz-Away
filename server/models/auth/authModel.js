@@ -110,6 +110,155 @@ const checkCompanyRegNumExists = async (company_reg_num) => {
   }
 };
 
+// const registerUser = async (userData) => {
+//   const {
+//     name,
+//     surname,
+//     email,
+//     password,
+//     companyname,
+//     company_reg_num,
+//     cell_num,
+//     cell_num2,
+//     vat_reg_num,
+//     account_num,
+//     name_of_acc,
+//     bank,
+//     branch,
+//     branch_code,
+//     address,
+//     suburb,
+//     swift_code,
+//     cluster_box,
+//   } = userData;
+
+//   let client;
+//   try {
+//     client = await pool.connect();
+//     const hashedPassword = await bcrypt.hash(password, 10);
+//     const result = await client.query(
+//       `INSERT INTO usertable (
+//         name, surname, email, password, companyname, company_reg_num, dateofreg, status,
+//         cell_num, cell_num2, vat_reg_num, account_num, name_of_acc, bank, branch,
+//         branch_code, address, suburb, swift_code, cluster_box
+//       ) VALUES ($1, $2, $3, $4, $5, $6, CURRENT_DATE, 'pending', $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18) RETURNING *`,
+//       [
+//         name,
+//         surname,
+//         email,
+//         hashedPassword,
+//         companyname,
+//         company_reg_num,
+//         cell_num,
+//         cell_num2 || null,
+//         vat_reg_num || null,
+//         account_num,
+//         name_of_acc,
+//         bank,
+//         branch,
+//         branch_code,
+//         address,
+//         suburb,
+//         swift_code || null,
+//         cluster_box || null,
+//       ]
+//     );
+//     const user = result.rows[0];
+//     delete user.password;
+//     return user;
+//   } catch (error) {
+//     console.error("Registration error:", error);
+//     throw error;
+//   } finally {
+//     if (client) client.release();
+//   }
+// };
+// const registerUser = async (userData) => {
+//   const {
+//     name,
+//     surname,
+//     email,
+//     password,
+//     companyname,
+//     company_reg_num,
+//     cellnum,
+//     cell_num2,
+//     vat_reg_num,
+//     account_num,
+//     name_of_acc,
+//     bank,
+//     branch,
+//     branch_code,
+//     address,
+//     suburb,
+//     swift_code,
+//     cluster_box,
+//   } = userData;
+
+//   let client;
+//   try {
+//     client = await pool.connect();
+    
+//     // Begin transaction
+//     await client.query('BEGIN');
+    
+//     const hashedPassword = await bcrypt.hash(password, 10);
+    
+//     // Insert into usertable
+//     const userResult = await client.query(
+//       `INSERT INTO usertable (
+//         companyname, company_reg_num, dateofreg, status,
+//         cell_num2, vat_reg_num, account_num, name_of_acc, bank, branch,
+//         branch_code, address, suburb, swift_code, cluster_box
+//       ) VALUES ($1, $2, CURRENT_DATE, 'pending', $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13) RETURNING *`,
+//       [
+//         companyname,
+//         company_reg_num,
+//         cell_num2 || null,
+//         vat_reg_num || null,
+//         account_num,
+//         name_of_acc,
+//         bank,
+//         branch,
+//         branch_code,
+//         address,
+//         suburb,
+//         swift_code || null,
+//         cluster_box || null,
+//       ]
+//     );
+
+//     // Insert into m5_employee (added company_reg_num)
+//     await client.query(
+//       `INSERT INTO m5_employee (
+//         name, surname, email, password, cellnum, company_reg_num
+//       ) VALUES ($1, $2, $3, $4, $5, $6)`,
+//       [
+//         name,
+//         surname,
+//         email,
+//         hashedPassword,
+//         cellnum,
+//         company_reg_num
+//       ]
+//     );
+
+//     // Commit transaction
+//     await client.query('COMMIT');
+    
+//     const user = userResult.rows[0];
+//     return user;
+//   } catch (error) {
+//     // Rollback transaction on error
+//     if (client) await client.query('ROLLBACK');
+//     console.error("Registration error:", error);
+//     throw error;
+//   } finally {
+//     if (client) client.release();
+//   }
+// };
+
+//added is_business_manager check
 const registerUser = async (userData) => {
   const {
     name,
@@ -118,7 +267,7 @@ const registerUser = async (userData) => {
     password,
     companyname,
     company_reg_num,
-    cell_num,
+    cellnum,
     cell_num2,
     vat_reg_num,
     account_num,
@@ -135,21 +284,22 @@ const registerUser = async (userData) => {
   let client;
   try {
     client = await pool.connect();
+    
+    // Begin transaction
+    await client.query('BEGIN');
+    
     const hashedPassword = await bcrypt.hash(password, 10);
-    const result = await client.query(
+    
+    // Insert into usertable (removed roleid)
+    const userResult = await client.query(
       `INSERT INTO usertable (
-        name, surname, email, password, companyname, company_reg_num, dateofreg, status,
-        cell_num, cell_num2, vat_reg_num, account_num, name_of_acc, bank, branch,
+        companyname, company_reg_num, dateofreg, status,
+        cell_num2, vat_reg_num, account_num, name_of_acc, bank, branch,
         branch_code, address, suburb, swift_code, cluster_box
-      ) VALUES ($1, $2, $3, $4, $5, $6, CURRENT_DATE, 'pending', $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18) RETURNING *`,
+      ) VALUES ($1, $2, CURRENT_DATE, 'pending', $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13) RETURNING *`,
       [
-        name,
-        surname,
-        email,
-        hashedPassword,
         companyname,
         company_reg_num,
-        cell_num,
         cell_num2 || null,
         vat_reg_num || null,
         account_num,
@@ -163,16 +313,37 @@ const registerUser = async (userData) => {
         cluster_box || null,
       ]
     );
-    const user = result.rows[0];
-    delete user.password;
+
+    // Insert into m5_employee with status defaulting to FALSE, is_business_manager to TRUE, and roleid to 1
+    await client.query(
+      `INSERT INTO m5_employee (
+        name, surname, email, password, cellnum, company_reg_num, status, roleid
+      ) VALUES ($1, $2, $3, $4, $5, $6, FALSE, 1)`,
+      [
+        name,
+        surname,
+        email,
+        hashedPassword,
+        cellnum,
+        company_reg_num
+      ]
+    );
+
+    // Commit transaction
+    await client.query('COMMIT');
+    
+    const user = userResult.rows[0];
     return user;
   } catch (error) {
+    // Rollback transaction on error
+    if (client) await client.query('ROLLBACK');
     console.error("Registration error:", error);
     throw error;
   } finally {
     if (client) client.release();
   }
 };
+
 
 const checkCompanyStatus = async (company_reg_num) => {
   let client;

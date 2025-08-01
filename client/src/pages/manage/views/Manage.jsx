@@ -47,6 +47,10 @@ import ClientRatesForm from "../components/clientRates/ClientRatesForm"
 // Creditors Components
 import CreditorsTab from "../components/creditors/CreditorsTab"
 
+// Company Components
+import CompanyTable from "../components/company/CompanyTable"
+import CompanyForm from "../components/company/CompanyForm"
+
 const Manage = () => {
   const navigate = useNavigate()
   const { state, actions } = useManageState()
@@ -70,6 +74,20 @@ const Manage = () => {
     }
   }, [state.showAlert, actions])
 
+  // Debug company tab state
+  useEffect(() => {
+    if (state.activeTab === "company") {
+      console.log("Company tab active, showCompanyForm:", state.showCompanyForm)
+      // Ensure form is hidden unless explicitly editing
+      if (state.showCompanyForm && !state.editingCompanyId) {
+        console.log("Resetting showCompanyForm to false")
+        actions.hideForm("showCompanyForm")
+        actions.resetFormData("Company")
+        actions.setEditing("Company", null)
+      }
+    }
+  }, [state.activeTab, state.showCompanyForm, state.editingCompanyId, actions])
+
   const handleBack = () => {
     // Check if any form is currently showing
     const isAnyFormShowing =
@@ -81,7 +99,8 @@ const Manage = () => {
       state.showDriverRateForm ||
       state.showSubcontractorForm ||
       state.showSupplierForm ||
-      state.showExpenseTypeForm
+      state.showExpenseTypeForm ||
+      state.showCompanyForm
 
     if (isAnyFormShowing) {
       // If a form is showing, hide it and return to the table
@@ -94,6 +113,7 @@ const Manage = () => {
       actions.hideForm("showSubcontractorForm")
       actions.hideForm("showSupplierForm")
       actions.hideForm("showExpenseTypeForm")
+      actions.hideForm("showCompanyForm")
 
       // Reset all form data and editing states
       actions.resetFormData("Employee")
@@ -105,6 +125,7 @@ const Manage = () => {
       actions.resetFormData("Subcontractor")
       actions.resetFormData("Supplier")
       actions.resetFormData("ExpenseType")
+      actions.resetFormData("Company")
       actions.setEditing("Employee", null)
       actions.setEditing("Client", null)
       actions.setEditing("ClientRate", null)
@@ -114,6 +135,7 @@ const Manage = () => {
       actions.setEditing("Subcontractor", null)
       actions.setEditing("Supplier", null)
       actions.setEditing("ExpenseType", null)
+      actions.setEditing("Company", null)
     } else {
       // If no form is showing (we're in table view), navigate to dashboard
       navigate("/Dashboard")
@@ -273,6 +295,23 @@ const Manage = () => {
     actions.hideForm("showClientRateForm")
   }
 
+  // Company handlers
+  const handleCompanyFormChange = (field, value) => {
+    actions.updateFormData("Company", { [field]: value })
+  }
+
+  const handleCompanyEdit = () => {
+    console.log("Editing company")
+    api.loadItemForEdit("company", "company")
+  }
+
+  const handleCompanyCancel = () => {
+    console.log("Cancelling company form")
+    actions.resetFormData("Company")
+    actions.setEditing("Company", null)
+    actions.hideForm("showCompanyForm")
+  }
+
   return (
     <div className="manage-container">
       {/* Header */}
@@ -348,6 +387,19 @@ const Manage = () => {
             onRefresh={refreshTrailerNotifications}
             type="trailer"
           />
+        </button>
+        <button
+          className={`manage-tab-button ${state.activeTab === "company" ? "active" : ""}`}
+          onClick={() => {
+            console.log("Switching to company tab")
+            actions.setActiveTab("company")
+            // Ensure form is hidden when switching to company tab
+            actions.hideForm("showCompanyForm")
+            actions.resetFormData("Company")
+            actions.setEditing("Company", null)
+          }}
+        >
+          Company details
         </button>
       </div>
 
@@ -578,6 +630,29 @@ const Manage = () => {
 
       {/* Creditors Tab */}
       {state.activeTab === "creditors" && <CreditorsTab state={state} actions={actions} api={api} />}
+
+      {/* Company Tab */}
+      {state.activeTab === "company" && (
+        <>
+          {state.showCompanyForm ? (
+            <CompanyForm
+              company={state.newCompany}
+              loading={state.loading}
+              isEditing={!!state.editingCompanyId}
+              onSave={api.saveCompany}
+              onCancel={handleCompanyCancel}
+              onChange={handleCompanyFormChange}
+            />
+          ) : (
+            <CompanyTable
+              company={state.company}
+              loading={state.loading}
+              error={state.error}
+              onEdit={handleCompanyEdit}
+            />
+          )}
+        </>
+      )}
     </div>
   )
 }
