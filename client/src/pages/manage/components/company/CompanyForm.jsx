@@ -16,10 +16,10 @@ const CompanyForm = ({ company, loading, isEditing, onSave, onCancel, onChange }
 
   return (
     <div className="manage-container">
-      <form onSubmit={handleSubmit} className="manage-driver-rate-form" noValidate>
+      <form onSubmit={handleSubmit} className="manage-driver-rate-form company-form" noValidate>
         <h2 className="manage-form-title">{isEditing ? "Edit Company Details" : "Company Details"}</h2>
         <div className="manage-form-group">
-          <div className="form-row">
+          <div className="form-row company-form-row">
             <div className="form-field">
               <label>
                 <strong>Company Name *</strong>
@@ -34,7 +34,7 @@ const CompanyForm = ({ company, loading, isEditing, onSave, onCancel, onChange }
             </div>
             <div className="form-field">
               <label>
-                <strong>Company Registration Number *</strong>
+                <strong>Company Reg Number *</strong>
               </label>
               <input
                 type="text"
@@ -44,8 +44,6 @@ const CompanyForm = ({ company, loading, isEditing, onSave, onCancel, onChange }
                 required
               />
             </div>
-          </div>
-          <div className="form-row">
             <div className="form-field">
               <label>
                 <strong>Contact Number</strong>
@@ -59,7 +57,7 @@ const CompanyForm = ({ company, loading, isEditing, onSave, onCancel, onChange }
             </div>
             <div className="form-field">
               <label>
-                <strong>VAT Registration Number</strong>
+                <strong>VAT Reg Number</strong>
               </label>
               <input
                 type="text"
@@ -69,7 +67,7 @@ const CompanyForm = ({ company, loading, isEditing, onSave, onCancel, onChange }
               />
             </div>
           </div>
-          <div className="form-row">
+          <div className="form-row company-form-row">
             <div className="form-field">
               <label>
                 <strong>Account Number</strong>
@@ -92,8 +90,6 @@ const CompanyForm = ({ company, loading, isEditing, onSave, onCancel, onChange }
                 onChange={(e) => onChange("name_of_acc", e.target.value)}
               />
             </div>
-          </div>
-          <div className="form-row">
             <div className="form-field">
               <label>
                 <strong>Bank</strong>
@@ -117,7 +113,7 @@ const CompanyForm = ({ company, loading, isEditing, onSave, onCancel, onChange }
               />
             </div>
           </div>
-          <div className="form-row">
+          <div className="form-row company-form-row">
             <div className="form-field">
               <label>
                 <strong>Branch Code</strong>
@@ -140,8 +136,6 @@ const CompanyForm = ({ company, loading, isEditing, onSave, onCancel, onChange }
                 onChange={(e) => onChange("address", e.target.value)}
               />
             </div>
-          </div>
-          <div className="form-row">
             <div className="form-field">
               <label>
                 <strong>Suburb</strong>
@@ -165,7 +159,7 @@ const CompanyForm = ({ company, loading, isEditing, onSave, onCancel, onChange }
               />
             </div>
           </div>
-          <div className="form-row">
+          <div className="form-row company-form-row">
             <div className="form-field">
               <label>
                 <strong>Cluster Box</strong>
@@ -177,6 +171,9 @@ const CompanyForm = ({ company, loading, isEditing, onSave, onCancel, onChange }
                 onChange={(e) => onChange("cluster_box", e.target.value)}
               />
             </div>
+            <div className="form-field"></div>
+            <div className="form-field"></div>
+            <div className="form-field"></div>
           </div>
         </div>
         <div className="manage-form-actions">
