@@ -247,7 +247,7 @@ const ClientInvoice = () => {
 
       // Destination Table
       const destinationRoute = `${invoiceData.pickup || ""} to ${
-        invoiceData.dropoff || ""
+        `${document.getElementById("dropoff").innerHTML}` || ""
       }`;
       const destinationData = [["Destination", destinationRoute]];
 
@@ -548,8 +548,11 @@ const ClientInvoice = () => {
           {/* Vessel/Ref and Destination */}
           <div className="vessel-destination">
             <div className="vessel">Starting : {invoiceData.pickup}</div>
-            <div className="destination">
-              Destination : {invoiceData.dropoff}
+            <div className="destination" id="destination">
+              Destination :
+              <div className="dropoff" id="dropoff" contentEditable>
+                {invoiceData.dropoff}
+              </div>
             </div>
           </div>
 
