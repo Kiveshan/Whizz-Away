@@ -29,6 +29,7 @@ const getYearOptions = () => {
   
   return years
 }
+
 // Add this new function after getYearOptions()
 const checkStoredWageDataForReport = async (employeeId, month, year) => {
   try {
@@ -99,10 +100,11 @@ const generateReport = async (monthName) => {
     const worksheet = workbook.addWorksheet('Labour Consultant Report')
 
     // Set up the headers with styling
-    worksheet.columns = [
-      { header: 'Employee Name', key: 'employeeName', width: 25 },
-      { header: 'Total Payable to Labour Consultant', key: 'totalPayable', width: 35 }
-    ]
+worksheet.columns = [
+  { header: 'Employee Name', key: 'employeeName', width: 25 },
+  { header: 'Role', key: 'roleName', width: 20 },
+  { header: 'Total Payable to Labour Consultant', key: 'totalPayable', width: 35 }
+]
 
     // Style the header row
     worksheet.getRow(1).font = { bold: true, size: 12 }
@@ -119,8 +121,8 @@ const generateReport = async (monthName) => {
     }
 
     // Add title row
-    worksheet.insertRow(1, [`Labour Consultant Report - ${monthName} ${selectedYear}`])
-    worksheet.mergeCells('A1:B1')
+worksheet.insertRow(1, [`Labour Consultant Report - ${monthName} ${selectedYear}`])
+worksheet.mergeCells('A1:C1')
     worksheet.getRow(1).font = { bold: true, size: 14 }
     worksheet.getRow(1).alignment = { horizontal: 'center' }
     worksheet.getRow(1).fill = {
@@ -134,6 +136,9 @@ const generateReport = async (monthName) => {
     const employeesResponse = await api.get('/all-employees')
     const employees = employeesResponse.data
     console.log(`Found ${employees.length} employees`)
+    console.log('Fetching roles...')
+const rolesResponse = await api.get('/api/roles')
+const rolesMap = new Map(rolesResponse.data.map(role => [role.roleid, role.rolename]));
 
     if (!employees || employees.length === 0) {
       alert('No employees found in the system')
@@ -143,6 +148,7 @@ const generateReport = async (monthName) => {
 
     let rowIndex = 3 // Start from row 3 (after title and headers)
     let processedCount = 0
+    let totalSum = 0;
     
 for (const employee of employees) {
   try {
@@ -295,12 +301,14 @@ if (baseSalary > 0) {
       console.log(`Skipping ${employee.name} - no earnings`)
       continue
     }
-
+    totalSum += totalPayable;
     // Add row to worksheet
-    const row = worksheet.addRow({
-      employeeName: `${employee.name} ${employee.surname}`,
-      totalPayable: `R ${totalPayable.toFixed(2)}`
-    })
+const row = worksheet.addRow({
+  employeeName: `${employee.name} ${employee.surname}`,
+  roleName: rolesMap.get(employee.roleid) || 'Unknown',
+  totalPayable: `R ${totalPayable.toFixed(2)}`
+})
+    
 
     // Style the data rows
     row.border = {
@@ -325,16 +333,38 @@ if (baseSalary > 0) {
   } catch (error) {
     console.error(`Error processing employee ${employee.name}:`, error)
     // Add error entry
-    const errorRow = worksheet.addRow({
-      employeeName: `${employee.name} ${employee.surname}`,
-      totalPayable: 'Error calculating'
-    })
-    errorRow.getCell(2).font = { color: { argb: 'FFFF0000' } } // Red text for errors
+const errorRow = worksheet.addRow({
+  employeeName: `${employee.name} ${employee.surname}`,
+  roleName: rolesMap.get(employee.roleid) || 'Unknown',
+  totalPayable: 'Error calculating'
+})
+errorRow.getCell(3).font = { color: { argb: 'FFFF0000' } }
     rowIndex++
   }
 }
 
     console.log(`Processed ${processedCount} employees successfully`)
+
+    worksheet.addRow({}); // Add a blank row for separation
+rowIndex++;
+const totalRow = worksheet.addRow({
+  employeeName: 'Total',
+  roleName: '',
+  totalPayable: `R ${totalSum.toFixed(2)}`
+});
+totalRow.font = { bold: true, size: 12 };
+totalRow.fill = {
+  type: 'pattern',
+  pattern: 'solid',
+  fgColor: { argb: 'FFE6F3FF' }
+};
+totalRow.border = {
+  top: { style: 'thin' },
+  left: { style: 'thin' },
+  bottom: { style: 'thin' },
+  right: { style: 'thin' }
+};
+totalRow.getCell(2).alignment = { horizontal: 'right' };
 
     if (processedCount === 0) {
       alert(`No employees found with earnings for ${monthName} ${selectedYear}`)

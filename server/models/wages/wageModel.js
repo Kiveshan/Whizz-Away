@@ -691,7 +691,16 @@ const getDriverLegsByMonth = async (driverId, month, year) => {
     }
   }
 };
-
+const getAllRoles = async () => {
+  const sql = `
+    SELECT roleid, rolename
+    FROM public.roles
+    ORDER BY rolename
+  `;
+  const result = await query(sql);
+  console.log(`Found ${result.rows.length} roles`);
+  return result.rows;
+};
 export {
   saveWageData,
   checkWageSlip,
@@ -703,5 +712,6 @@ export {
   getDriverLegsByMonth,
   getStoredWageData,
   getBaseSalaryHistory,
-   getAllEmployees
+   getAllEmployees,
+   getAllRoles
 };

@@ -10,7 +10,8 @@ import {
   getDriverLegsByMonthHandler,
   getStoredWageDataHandler,
   getBaseSalaryHistoryHandler,
-  getAllEmployeesHandler
+  getAllEmployeesHandler,
+  getAllRolesHandler
 } from "../../controllers/wages/wageController.js";
 
 const router = express.Router();
@@ -37,5 +38,6 @@ router.get(
   getDriverLegsByMonthHandler
 );
 router.get("/api/base-salary-history/:employeeId", getBaseSalaryHistoryHandler);
+router.get("/api/roles", getAllRolesHandler);
 
 export default router;

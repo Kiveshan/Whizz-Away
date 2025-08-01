@@ -162,7 +162,7 @@ function DynamicHeader() {
     "/Creditors/SubcontractorList": "Subcontractors",
     "/Creditors/SubcontractorStatements": "Subcontractors",
     "/Creditors/SubcontractorStatementDetails": "Subcontractor Statement",
-    "/analytics-reports": "Analytics & Reports",
+    "/analytics-reports": "Insights",
     "/reports" : "Reports",
     "/wage-reports" : "Wage Reports"
   }
