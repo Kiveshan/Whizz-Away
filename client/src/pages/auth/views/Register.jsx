@@ -16,8 +16,8 @@ const Register = ({ switchToLogin, closePopup }) => {
     cluster_box: "",
     address: "",
     suburb: "",
-    cell_num: "",
-    cell_num2: "",
+    cellnum: "",
+    cellnum2: "",
     vat_reg_num: "",
     account_num: "",
     name_of_acc: "",
@@ -73,8 +73,8 @@ const Register = ({ switchToLogin, closePopup }) => {
     const { name, value } = e.target;
 
     const numericFields = [
-      "cell_num",
-      "cell_num2",
+      "cellnum",
+      "cellnum2",
       "vat_reg_num",
       "account_num",
       "branch_code",
@@ -214,8 +214,8 @@ const Register = ({ switchToLogin, closePopup }) => {
     }
 
     const numericFields = [
-      { name: "cell_num", label: "Cell Number", required: true },
-      { name: "cell_num2", label: "Alternate Cell", required: false },
+      { name: "cellnum", label: "Cell Number", required: true },
+      { name: "cellnum2", label: "Alternate Cell", required: false },
       {
         name: "vat_reg_num",
         label: "VAT Registration Number",
@@ -243,13 +243,13 @@ const Register = ({ switchToLogin, closePopup }) => {
       }
     }
 
-    if (formData.cell_num && formData.cell_num.length !== 10) {
+    if (formData.cellnum && formData.cellnum.length !== 10) {
       setErrorMessage("Cell Number must be exactly 10 digits.");
       setShowErrorPopup(true);
       return;
     }
 
-    if (formData.cell_num2 && formData.cell_num2.length !== 10) {
+    if (formData.cellnum2 && formData.cellnum2.length !== 10) {
       setErrorMessage("Alternate Cell Number must be exactly 10 digits.");
       setShowErrorPopup(true);
       return;
@@ -482,8 +482,8 @@ const Register = ({ switchToLogin, closePopup }) => {
               <label>Cell Number</label>
               <input
                 type="text"
-                name="cell_num"
-                value={formData.cell_num}
+                name="cellnum"
+                value={formData.cellnum}
                 onChange={handleChange}
                 placeholder="Cell Number"
                 className={styles.formInput}
@@ -501,8 +501,8 @@ const Register = ({ switchToLogin, closePopup }) => {
               <label>Alternate Cell</label>
               <input
                 type="text"
-                name="cell_num2"
-                value={formData.cell_num2}
+                name="cellnum2"
+                value={formData.cellnum2}
                 onChange={handleChange}
                 placeholder="Alternate Cell"
                 className={styles.formInput}

@@ -13,6 +13,10 @@
   box-sizing: inherit;
 }
 
+.client-invoice-wrapper .destination .dropoff {
+  max-width: 100%;
+}
+
 .client-invoice-wrapper .invoice-page {
   padding: 20px;
   font-family: Arial, sans-serif;

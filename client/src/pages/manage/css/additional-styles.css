@@ -526,3 +526,47 @@
     color: #ff9999;
   }
 }
+
+/* Additional styles for EmployeeForm component */
+/* Existing universal styles assumed to remain unchanged */
+/* Adding new classes specific to CompanyForm for 4-column layout */
+
+.company-form .company-form-row {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 20px;
+  margin-bottom: 15px;
+}
+
+.company-form .form-field {
+  display: flex;
+  flex-direction: column;
+}
+
+.company-form .form-input {
+  padding: 10px;
+  font-size: 14px;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.company-form .form-input:focus {
+  outline: none;
+  border-color: #007bff;
+  box-shadow: 0 0 5px rgba(0, 123, 255, 0.3);
+}
+
+/* Responsive adjustments for CompanyForm */
+@media (max-width: 768px) {
+  .company-form .company-form-row {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (max-width: 480px) {
+  .company-form .company-form-row {
+    grid-template-columns: 1fr;
+  }
+}
