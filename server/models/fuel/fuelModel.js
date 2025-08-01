@@ -53,7 +53,9 @@ const getAllExpenses = async () => {
   return result.rows;
 };
 
-export { //getTrucksWithFuelExpenses 
-  getAllCompanyOwnedTrucks
-  , getExpensesByTruckId,
-   getAllExpenses };
+export {
+  //getTrucksWithFuelExpenses
+  getAllCompanyOwnedTrucks,
+  getExpensesByTruckId,
+  getAllExpenses,
+};
