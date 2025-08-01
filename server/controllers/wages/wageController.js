@@ -9,7 +9,8 @@ import {
   getDriverLegsByMonth,
   getStoredWageData,
   getBaseSalaryHistory,
-  getAllEmployees
+  getAllEmployees,
+  getAllRoles
 
 } from "../../models/wages/wageModel.js";
 import {
@@ -261,7 +262,15 @@ const getDriverLegsByMonthHandler = async (req, res) => {
     res.status(500).json({ error: "Failed to fetch driver legs by month" });
   }
 };
-
+const getAllRolesHandler = async (req, res) => {
+  try {
+    const roles = await getAllRoles();
+    res.status(200).json(roles);
+  } catch (error) {
+    console.error("Error fetching roles:", error);
+    res.status(500).json({ error: "Failed to fetch roles" });
+  }
+};
 export {
   saveWageDataHandler,
   checkWageSlipHandler,
@@ -273,5 +282,6 @@ export {
   getDriverLegsByMonthHandler,
   getStoredWageDataHandler,
   getBaseSalaryHistoryHandler,
-   getAllEmployeesHandler
+   getAllEmployeesHandler,
+   getAllRolesHandler
 };

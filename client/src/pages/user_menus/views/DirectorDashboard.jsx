@@ -10,7 +10,7 @@ const dashboardData = [
     path: "/CompanyInstructionView",
   },
   {
-    title: "Analytics & Reports",
+    title: "Insights",
     image: "/images/analytics.jpg",
     path: "/analytics-reports",
   },
