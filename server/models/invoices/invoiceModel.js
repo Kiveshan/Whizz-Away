@@ -177,18 +177,18 @@ const checkInvoiceExists = async (m1key) => {
     `;
 
     const result = await query(queryText, [m1key]);
-    const count = parseInt(result.rows[0].count, 10);
+    const count = Number.parseInt(result.rows[0].count, 10);
 
     return {
       success: true,
-      exists: count > 0
+      exists: count > 0,
     };
   } catch (error) {
     console.error("Error checking if invoice exists:", error);
     return {
       success: false,
       message: error.message,
-      exists: false
+      exists: false,
     };
   }
 };
@@ -207,14 +207,14 @@ const createInvoice = async ({ m1key, clientId }) => {
     if (existsCheck.exists) {
       return {
         success: false,
-        message: "Invoice already exists for this instruction"
+        message: "Invoice already exists for this instruction",
       };
     }
 
     // Generate invoice number (format: INV-YYYYMMDD-XXXX where XXXX is a sequential number)
     const today = new Date();
-    const dateStr = today.toISOString().slice(0, 10).replace(/-/g, '');
-    
+    const dateStr = today.toISOString().slice(0, 10).replace(/-/g, "");
+
     // Get the next sequential number for today
     const seqQueryText = `
       SELECT COUNT(*) as count
@@ -222,11 +222,11 @@ const createInvoice = async ({ m1key, clientId }) => {
       WHERE invoice_num LIKE $1
     `;
     const seqResult = await query(seqQueryText, [`INV-${dateStr}-%`]);
-    const seqNum = parseInt(seqResult.rows[0].count, 10) + 1;
-    
+    const seqNum = Number.parseInt(seqResult.rows[0].count, 10) + 1;
+
     // Format the invoice number
-    const invoiceNum = `INV-${dateStr}-${String(seqNum).padStart(4, '0')}`;
-    
+    const invoiceNum = `INV-${dateStr}-${String(seqNum).padStart(4, "0")}`;
+
     // Insert the new invoice
     const insertQueryText = `
       INSERT INTO public.invoice
@@ -235,22 +235,118 @@ const createInvoice = async ({ m1key, clientId }) => {
       RETURNING ikey
     `;
 
-    const result = await query(insertQueryText, [clientId, m1key, invoiceNum, today]);
-    
+    const result = await query(insertQueryText, [
+      clientId,
+      m1key,
+      invoiceNum,
+      today,
+    ]);
+
     return {
       success: true,
       data: {
         ikey: result.rows[0].ikey,
-        invoice_num: invoiceNum
-      }
+        invoice_num: invoiceNum,
+      },
     };
   } catch (error) {
     console.error("Error creating invoice:", error);
     return {
       success: false,
-      message: error.message
+      message: error.message,
     };
   }
 };
 
-export { getCompletedInvoices, getInvoiceDetails, checkInvoiceExists, createInvoice };
+const updateInstructionDetails = async ({ m1key, dropoff, rate }) => {
+  try {
+    if (!pool) {
+      throw new Error(
+        "Database connection not established. Please try again later."
+      );
+    }
+
+    // Validate inputs
+    if (!m1key) {
+      return {
+        success: false,
+        message: "m1key is required",
+      };
+    }
+
+    if (rate !== undefined && (isNaN(rate) || rate < 0)) {
+      return {
+        success: false,
+        message: "Rate must be a positive number",
+      };
+    }
+
+    // Build dynamic query based on provided fields
+    const updateFields = [];
+    const queryParams = [];
+    let paramIndex = 1;
+
+    if (dropoff !== undefined) {
+      updateFields.push(`dropoff = $${paramIndex}`);
+      queryParams.push(dropoff);
+      paramIndex++;
+    }
+
+    if (rate !== undefined) {
+      updateFields.push(`total_cost = $${paramIndex}`);
+      queryParams.push(rate);
+      paramIndex++;
+    }
+
+    if (updateFields.length === 0) {
+      return {
+        success: false,
+        message: "No fields to update",
+      };
+    }
+
+    // Add m1key as the last parameter for WHERE clause
+    queryParams.push(m1key);
+
+    const queryText = `
+      UPDATE public.m1_controller
+      SET ${updateFields.join(", ")}
+      WHERE m1key = $${paramIndex}
+      RETURNING m1key, dropoff, total_cost
+    `;
+
+    console.log(
+      "Executing update query:",
+      queryText,
+      "with params:",
+      queryParams
+    );
+    const result = await query(queryText, queryParams);
+
+    if (result.rows.length === 0) {
+      return {
+        success: false,
+        message: "Instruction not found",
+      };
+    }
+
+    return {
+      success: true,
+      data: result.rows[0],
+    };
+  } catch (error) {
+    console.error("Error updating instruction details:", error);
+    return {
+      success: false,
+      message: error.message,
+    };
+  }
+};
+
+export {
+  getCompletedInvoices,
+  getInvoiceDetails,
+  checkInvoiceExists,
+  createInvoice,
+  updateInstructionDetails,
+};

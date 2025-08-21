@@ -48,6 +48,15 @@ const ClientInvoice = () => {
   const [error, setError] = useState(null);
   const [pdfLoading, setPdfLoading] = useState(false);
 
+  const [isEditMode, setIsEditMode] = useState(false);
+  const [editData, setEditData] = useState({
+    dropoff: "",
+    amount: "",
+  });
+  const [saveLoading, setSaveLoading] = useState(false);
+  const [saveError, setSaveError] = useState(null);
+  const [showConfirmDialog, setShowConfirmDialog] = useState(false);
+
   const invoiceRef = useRef(null);
 
   useEffect(() => {
@@ -450,6 +459,109 @@ const ClientInvoice = () => {
     }
   };
 
+  const handleEditClick = () => {
+    if (invoiceData) {
+      setEditData({
+        dropoff: invoiceData.dropoff || "",
+        amount: (
+          invoiceData.invoice?.amount ||
+          invoiceData.total_cost ||
+          0
+        ).toString(),
+      });
+      setIsEditMode(true);
+      setSaveError(null);
+    }
+  };
+
+  const handleCancelEdit = () => {
+    setIsEditMode(false);
+    setEditData({ dropoff: "", amount: "" });
+    setSaveError(null);
+  };
+
+  const handleInputChange = (field, value) => {
+    if (field === "amount") {
+      // Remove any non-numeric characters except decimal point
+      const numericValue = value.replace(/[^0-9.]/g, "");
+
+      // Ensure only one decimal point
+      const parts = numericValue.split(".");
+      if (parts.length > 2) {
+        return; // Don't update if more than one decimal point
+      }
+
+      // Prevent negative values
+      if (Number.parseFloat(numericValue) < 0) {
+        return;
+      }
+
+      setEditData((prev) => ({ ...prev, [field]: numericValue }));
+    } else {
+      setEditData((prev) => ({ ...prev, [field]: value }));
+    }
+  };
+
+  const handleSaveClick = () => {
+    // Validate amount
+    const amount = Number.parseFloat(editData.amount);
+    if (isNaN(amount) || amount < 0) {
+      setSaveError("Amount must be a valid positive number");
+      return;
+    }
+
+    setShowConfirmDialog(true);
+  };
+
+  const handleConfirmSave = async () => {
+    setSaveLoading(true);
+    setSaveError(null);
+    setShowConfirmDialog(false);
+
+    try {
+      const updateData = {
+        m1key: invoiceData.m1key,
+        dropoff: editData.dropoff.trim(),
+        rate: Number.parseFloat(editData.amount),
+      };
+
+      console.log("Sending update request:", updateData);
+
+      const response = await api.put(
+        "/api/invoice/update-instruction",
+        updateData
+      );
+
+      console.log("Update response:", response.data);
+
+      if (response.data.success) {
+        // Update local state with new data
+        setInvoiceData((prev) => ({
+          ...prev,
+          dropoff: editData.dropoff.trim(),
+          total_cost: Number.parseFloat(editData.amount),
+          invoice: {
+            ...prev.invoice,
+            amount: Number.parseFloat(editData.amount),
+          },
+        }));
+
+        setIsEditMode(false);
+        setEditData({ dropoff: "", amount: "" });
+      } else {
+        setSaveError(response.data.message || "Failed to update instruction");
+      }
+    } catch (err) {
+      console.error("Error updating instruction:", err);
+      setSaveError(
+        err.response?.data?.message ||
+          "Failed to update instruction. Please try again."
+      );
+    } finally {
+      setSaveLoading(false);
+    }
+  };
+
   if (loading) {
     return (
       <div className="client-invoice-wrapper">
@@ -550,9 +662,19 @@ const ClientInvoice = () => {
             <div className="vessel">Starting : {invoiceData.pickup}</div>
             <div className="destination" id="destination">
               Destination :
-              <div className="dropoff" id="dropoff" contentEditable>
-                {invoiceData.dropoff}
-              </div>
+              {isEditMode ? (
+                <input
+                  type="text"
+                  value={editData.dropoff}
+                  onChange={(e) => handleInputChange("dropoff", e.target.value)}
+                  className="edit-input dropoff-input"
+                  placeholder="Enter destination"
+                />
+              ) : (
+                <div className="dropoff" id="dropoff">
+                  {invoiceData.dropoff}
+                </div>
+              )}
             </div>
           </div>
 
@@ -632,7 +754,19 @@ const ClientInvoice = () => {
                     <tr>
                       <td className="summary-label">Amount (excl. VAT)</td>
                       <td className="summary-value">
-                        {formatCurrency(amount)}
+                        {isEditMode ? (
+                          <input
+                            type="text"
+                            value={editData.amount}
+                            onChange={(e) =>
+                              handleInputChange("amount", e.target.value)
+                            }
+                            className="edit-input amount-input"
+                            placeholder="0.00"
+                          />
+                        ) : (
+                          formatCurrency(amount)
+                        )}
                       </td>
                     </tr>
                     {vat > 0 && (
@@ -673,43 +807,95 @@ const ClientInvoice = () => {
           </div>
         </div>
 
+        {showConfirmDialog && (
+          <div className="confirmation-dialog-overlay">
+            <div className="confirmation-dialog">
+              <h3>Confirm Changes</h3>
+              <p>Are you sure you want to save these changes?</p>
+              <div className="dialog-buttons">
+                <button
+                  className="cancel-btn"
+                  onClick={() => setShowConfirmDialog(false)}
+                  disabled={saveLoading}
+                >
+                  Cancel
+                </button>
+                <button
+                  className="confirm-btn"
+                  onClick={handleConfirmSave}
+                  disabled={saveLoading}
+                >
+                  {saveLoading ? "Saving..." : "Confirm"}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
         <div className="invoicedownloadbtn1">
-          <button
-            className="back-btn"
-            onClick={() => {
-              if (roleId == 3) {
-                navigate("/invoices", {
-                  state: {
-                    clientId,
-                    clientName,
-                  },
-                });
-              } else if (roleId == 4) {
-                navigate("/DirectorClientDocuments", {
-                  state: {
-                    clientId: invoiceData.m5clientkey,
-                    clientName: invoiceData.client_name,
-                  },
-                });
-              } else if (roleId == 1) {
-                navigate("/client-documents", {
-                  state: {
-                    clientId: invoiceData.m5clientkey,
-                    clientName: invoiceData.client_name,
-                  },
-                });
-              }
-            }}
-          >
-            Back
-          </button>
-          <button
-            className="download-btn"
-            onClick={generatePDF}
-            disabled={pdfLoading}
-          >
-            {pdfLoading ? "Generating PDF..." : "Download PDF"}
-          </button>
+          {isEditMode ? (
+            <div className="edit-controls">
+              {saveError && <div className="error-message">{saveError}</div>}
+              <button
+                className="cancel-edit-btn"
+                onClick={handleCancelEdit}
+                disabled={saveLoading}
+              >
+                Cancel
+              </button>
+              <button
+                className="save-btn"
+                onClick={handleSaveClick}
+                disabled={saveLoading}
+              >
+                {saveLoading ? "Saving..." : "Save Changes"}
+              </button>
+            </div>
+          ) : (
+            <>
+              {roleId == 3 && (
+                <button className="edit-btn" onClick={handleEditClick}>
+                  Edit
+                </button>
+              )}
+              <button
+                className="back-btn"
+                onClick={() => {
+                  if (roleId == 3) {
+                    navigate("/invoices", {
+                      state: {
+                        clientId,
+                        clientName,
+                      },
+                    });
+                  } else if (roleId == 4) {
+                    navigate("/DirectorClientDocuments", {
+                      state: {
+                        clientId: invoiceData.m5clientkey,
+                        clientName: invoiceData.client_name,
+                      },
+                    });
+                  } else if (roleId == 1) {
+                    navigate("/client-documents", {
+                      state: {
+                        clientId: invoiceData.m5clientkey,
+                        clientName: invoiceData.client_name,
+                      },
+                    });
+                  }
+                }}
+              >
+                Back
+              </button>
+              <button
+                className="download-btn"
+                onClick={generatePDF}
+                disabled={pdfLoading}
+              >
+                {pdfLoading ? "Generating PDF..." : "Download PDF"}
+              </button>
+            </>
+          )}
         </div>
       </div>
     </div>
