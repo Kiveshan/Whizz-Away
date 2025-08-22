@@ -10,6 +10,7 @@ const ClientRatesForm = ({ clientData, loading, onSave, onCancel }) => {
       "6m_rate": "",
       "12m_rate": "",
       surcharges: "",
+      hazardous: "",
     },
   ])
 
@@ -25,6 +26,7 @@ const ClientRatesForm = ({ clientData, loading, onSave, onCancel }) => {
             "6m_rate": rate["6m_rate"] || "",
             "12m_rate": rate["12m_rate"] || "",
             surcharges: rate.surcharges || "",
+            hazardous: rate.hazardous || "",
           })),
         )
       } else {
@@ -35,6 +37,7 @@ const ClientRatesForm = ({ clientData, loading, onSave, onCancel }) => {
             "6m_rate": "",
             "12m_rate": "",
             surcharges: "",
+            hazardous: "",
           },
         ])
       }
@@ -67,6 +70,7 @@ const ClientRatesForm = ({ clientData, loading, onSave, onCancel }) => {
         "6m_rate": "",
         "12m_rate": "",
         surcharges: "",
+        hazardous: "",
       },
     ])
   }
@@ -183,7 +187,7 @@ const ClientRatesForm = ({ clientData, loading, onSave, onCancel }) => {
 
                   <div className="manage-form-group">
                     <label>
-                      <strong>Surcharges (R) - Optional</strong>
+                      <strong>Surcharges (R)</strong>
                     </label>
                     <input
                       type="number"
@@ -191,6 +195,20 @@ const ClientRatesForm = ({ clientData, loading, onSave, onCancel }) => {
                       step="0.01"
                       value={rate.surcharges}
                       onChange={(e) => handleRateChange(rowIndex * 5 + index, "surcharges", e.target.value)}
+                      placeholder="0.00"
+                    />
+                  </div>
+
+                  <div className="manage-form-group">
+                    <label>
+                      <strong>Hazardous (R)</strong>
+                    </label>
+                    <input
+                      type="number"
+                      min="0"
+                      step="0.01"
+                      value={rate.hazardous}
+                      onChange={(e) => handleRateChange(rowIndex * 5 + index, "hazardous", e.target.value)}
                       placeholder="0.00"
                     />
                   </div>
