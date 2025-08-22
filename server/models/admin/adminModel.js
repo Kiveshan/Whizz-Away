@@ -29,13 +29,11 @@ const getPendingUsers = async () => {
   }
 };
 
-
-
 const approveUser = async (userid, roleid) => {
   let client;
   try {
     client = await pool.connect();
-    await client.query('BEGIN');
+    await client.query("BEGIN");
 
     // Get company_reg_num from usertable
     const userResult = await client.query(
@@ -44,7 +42,7 @@ const approveUser = async (userid, roleid) => {
     );
 
     if (userResult.rows.length === 0) {
-      throw new Error('User not found');
+      throw new Error("User not found");
     }
 
     const company_reg_num = userResult.rows[0].company_reg_num;
@@ -61,9 +59,9 @@ const approveUser = async (userid, roleid) => {
       [company_reg_num]
     );
 
-    await client.query('COMMIT');
+    await client.query("COMMIT");
   } catch (err) {
-    await client.query('ROLLBACK');
+    await client.query("ROLLBACK");
     console.error("Error approving user:", err);
     throw err;
   } finally {
@@ -122,7 +120,6 @@ const getCompanyList = async () => {
         e.name, 
         e.surname, 
         e.email, 
-        e.is_business_manager,
         u.companyname, 
         u.company_reg_num, 
         u.status, 
@@ -142,8 +139,6 @@ const getCompanyList = async () => {
     if (client) client.release();
   }
 };
-
-
 
 const deactivateCompany = async (company_reg_num) => {
   let client;
