@@ -32,6 +32,7 @@ import {
   getDriverLegsHandler,
   getDocumentsHandler,
   generateInvoiceHandler,
+  updateLegNumberHandler
 } from "../../controllers/assignments/assignmentController.js";
 
 const router = express.Router();
@@ -67,6 +68,7 @@ router.get("/api/container-types", getContainerTypesHandler);
 router.post("/legs/save", saveLegHandler);
 router.get("/legs/:instructionId", getLegsByInstructionIdHandler);
 router.delete("/legs/:legId", deleteLegHandler);
+router.put("/legs/:legId/update-number", updateLegNumberHandler);
 router.get(
   "/containers/instruction/:instructionId",
   getContainersByInstructionIdHandler

@@ -28,7 +28,7 @@ body {
   font-weight: bold;
   flex-grow: 1;
   text-align: center;
-  margin-right: 20px; /* Balance the layout with the back button */
+  margin-right: 20px;
 }
 
 /* Center and align the month and year filters */
@@ -51,7 +51,7 @@ body {
 .button-group {
   display: flex;
   flex-wrap: wrap;
-  justify-content: center; /* Center the button group */
+  justify-content: center;
   align-items: center;
   margin-bottom: 15px;
 }
@@ -59,7 +59,7 @@ body {
 .filter-buttons {
   display: flex;
   gap: 7px;
-  justify-content: center; /* Center the filter buttons */
+  justify-content: center;
   align-items: center;
   margin-top: 10px;
 }
@@ -89,10 +89,10 @@ body {
 }
 
 .btn.active {
-    background-color: #0056b3;
-    color: white;
-    font-weight: bold;
-  }
+  background-color: #0056b3;
+  color: white;
+  font-weight: bold;
+}
 
 .btn:hover {
   opacity: 0.8;
@@ -101,48 +101,50 @@ body {
 .table-container {
   overflow-x: auto;
   display: flex;
-  justify-content: center; /* Center the table container */
-  padding: 0 10px; /* Added padding for responsive margins */
+  justify-content: center;
+  padding: 0 10px;
   align-items: center;
+  overflow: visible;
 }
 
 .tables-container {
   display: flex;
   justify-content: center;
   width: 100%;
+  overflow: visible;
 }
 
 table th,
 table td {
   text-align: left;
-  border-bottom: 1px solid #eee; /* Lighter border */
-  font-size: 13px; /* Slightly smaller font */
-  padding: 12px 5px 5px 10px; /* More compact */
+  border-bottom: 1px solid #eee;
+  font-size: 13px;
+  padding: 12px 5px 5px 10px;
   text-align: left;
 }
 
 .t2 {
-  margin-left: 0; /* Remove left margin to center the table */
+  margin-left: 0;
 }
 
 table {
-  width: 1000px; /* Reduce width slightly */
+  width: 1000px;
   border-collapse: collapse;
   margin-bottom: 20px;
-  box-shadow: 0 0 5px rgba(0, 0, 0, 0.05); /* Softer shadow */
+  box-shadow: 0 0 5px rgba(0, 0, 0, 0.05);
   border-radius: 6px;
-  overflow: hidden;
+  overflow: visible;
   background-color: white;
 }
 
 table th {
-  background-color: #bae6fd; /* Softer blue */
-  color: #333; /* Darker text for better readability */
-  font-weight: normal; /* Less bold header */
+  background-color: #bae6fd;
+  color: #333;
+  font-weight: normal;
 }
 
 table tr:nth-child(even) {
-  background-color: #fcfcfc; /* Very light alternate row color */
+  background-color: #fcfcfc;
 }
 
 table tr:hover {
@@ -159,7 +161,60 @@ table tr:hover {
 }
 
 .view-btn:hover {
-  background-color: #0056b3; /* Darker shade for hover effect */
+  background-color: #0056b3;
+}
+
+.view-btn.disabled {
+  background-color: #cccccc;
+  cursor: not-allowed;
+  opacity: 0.6;
+  pointer-events: none;
+}
+
+/* Tooltip styling */
+.tooltip-wrapper {
+  position: relative;
+  display: inline-block;
+  cursor: not-allowed; /* Added to show warning cursor */
+}
+
+.tooltip-wrapper .tooltip-text {
+  visibility: hidden;
+  width: 220px;
+  background-color: #2c3e50;
+  color: #ffffff;
+  text-align: center;
+  border-radius: 6px;
+  padding: 8px 12px;
+  position: absolute;
+  z-index: 1000;
+  top: -40px;
+  left: 20%;
+  transform: translateX(-50%);
+  opacity: 0;
+  transition: opacity 0.3s ease, transform 0.3s ease;
+  font-family: Arial, sans-serif;
+  font-size: 13px;
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+}
+
+/* Add an arrow pointing to the button */
+.tooltip-wrapper .tooltip-text::after {
+  content: '';
+  position: absolute;
+  top: 100%;
+  left: 50%;
+  transform: translateX(-50%);
+  border-width: 6px;
+  border-style: solid;
+  border-color: #2c3e50 transparent transparent transparent;
+}
+
+/* Show tooltip on hover */
+.tooltip-wrapper:hover .tooltip-text {
+  visibility: visible;
+  opacity: 1;
+  transform: translateX(-50%) translateY(-5px);
 }
 
 @media screen and (max-width: 768px) {
@@ -181,13 +236,12 @@ table tr:hover {
   .dropdown-container74 {
     flex-direction: column;
     gap: 10px;
-  
   }
 
   .button-group {
     flex-direction: column;
     gap: 10px;
-    align-items: stretch; /* Align buttons to stretch full width */
+    align-items: stretch;
   }
 
   .filter-buttons {
@@ -203,17 +257,25 @@ table tr:hover {
     max-width: 1000px;
     border-radius: 6px;
     margin: 0 auto;
+    overflow: visible;
   }
 
   th,
   td {
-    padding: 15px; /* Slightly adjusted padding for smaller screens */
-    font-size: 12px; /* Adjusted font size for mobile */
+    padding: 15px;
+    font-size: 12px;
   }
 
   .btn {
-    font-size: 12px; /* Smaller buttons on mobile */
-    padding: 8px 12px; /* Smaller padding for mobile view */
+    font-size: 12px;
+    padding: 8px 12px;
+  }
+
+  /* Adjust tooltip for smaller screens */
+  .tooltip-wrapper .tooltip-text {
+    width: 180px;
+    font-size: 12px;
+    left: 50%;
+    top: -35px;
   }
 }
-

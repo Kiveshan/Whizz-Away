@@ -444,11 +444,6 @@ const [weightUnit, setWeightUnit] = useState('kg');
   // Add this function to handle leg removal
   // Update handleRemoveLeg to use Axios
   const handleRemoveLeg = async (legIndex, legId) => {
-    if (legIndex === 0) {
-      setSavedMessage("Cannot remove the first leg");
-      setTimeout(() => setSavedMessage(""), 3000);
-      return;
-    }
 
     setLegToRemove({
       index: legIndex,
@@ -2456,24 +2451,24 @@ useEffect(() => {
       {/* Lag Buttons & Plus */}
 
 <div className="flex gap-4 mb-4" style={{ marginLeft: "15px" }}>
-  {legs.map((leg, index) => {
-    // Explicitly determine the button style
-    let buttonClass = "px-4 py-2 rounded-md ";
-    
-    if (currentLagIndex === index) {
-      // Currently selected leg - always green
-      buttonClass += "bg-green-500 text-white";
-    } else if (leg.isNew || leg.id?.toString().startsWith("temp-")) {
-      // Unsaved leg but not selected - yellow
-      buttonClass += "bg-yellow-200 text-gray-800";
-    } else {
-      // Regular saved leg - gray
-      buttonClass += "bg-gray-200 text-gray-800";
-    }
-    
-    return (
+{legs.map((leg, index) => {
+  // Explicitly determine the button style
+  let buttonClass = "px-4 py-2 rounded-md ";
+  
+  if (currentLagIndex === index) {
+    // Currently selected leg - always green
+    buttonClass += "bg-green-500 text-white";
+  } else if (leg.isNew || leg.id?.toString().startsWith("temp-")) {
+    // Unsaved leg but not selected - yellow
+    buttonClass += "bg-yellow-200 text-gray-800";
+  } else {
+    // Regular saved leg - gray
+    buttonClass += "bg-gray-200 text-gray-800";
+  }
+  
+  return (
+    <div key={leg.id || index} className="relative">
       <button
-        key={leg.id || index}
         className={buttonClass}
         onClick={() => handleSelectLeg(index)}
       >
@@ -2486,11 +2481,33 @@ useEffect(() => {
           </span>
         )}
       </button>
-    );
-  })}
-  {!shouldHideAddLegButton && (
-    <Plus onClick={handleAddLeg} disabled={isCompleted || hasUnsavedNewLeg} />
-  )}
+      {!isCompleted && (
+        <div
+          className="bin-icon-wrapper"
+          onClick={() => handleRemoveLeg(index, legs[index].id)}
+        >
+          <svg
+            xmlns="http://www.w3.org/2000/svg"
+            fill="none"
+            viewBox="0 0 24 24"
+            stroke="currentColor"
+            className="w-3 h-3"
+          >
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth={2}
+              d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
+            />
+          </svg>
+        </div>
+      )}
+    </div>
+  );
+})}
+{!shouldHideAddLegButton && (
+  <Plus onClick={handleAddLeg} disabled={isCompleted || hasUnsavedNewLeg} />
+)}
 </div>
 
       {legs.length > 0 && (

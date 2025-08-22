@@ -340,30 +340,43 @@ export const getInstructions = async (clientId) => {
   let sql = `
     SELECT 
       m.m1key,
-      m.fileref as fileno,
+      m.fileref AS fileno,
       m.shipment_type,
-      s.shipmenttype as type_text,
+      s.shipmenttype AS type_text,
       m.status,
       m.pickupdate,
       m.client,
-      c.client AS companyname
+      c.client AS companyname,
+      COALESCE(m.num_six_meters, 0) AS num_six_meters,
+      COALESCE(m.num_twelve_meters, 0) AS num_twelve_meters,
+      COALESCE(m.num_abnormal, 0) AS num_abnormal
     FROM 
       public.m1_controller m
     JOIN 
       public.m5_client c ON m.client = c.m5clientkey
     LEFT JOIN
       public.shipment s ON m.shipment_type = s.shipkey
-  `
-  const queryParams = []
+  `;
+  const queryParams = [];
   if (clientId) {
-    sql += ` WHERE m.client = $1`
-    queryParams.push(clientId)
+    sql += ` WHERE m.client = $1`;
+    queryParams.push(clientId);
   }
-  sql += ` ORDER BY m.pickupdate DESC`
+  sql += ` ORDER BY COALESCE(m.pickupdate, '1970-01-01') DESC`;
 
-  const result = await query(sql, queryParams)
-  return result.recordset || result.rows
-}
+  try {
+    console.log(`[${new Date().toISOString()}] Executing getInstructions query:`, { sql, queryParams });
+    const result = await query(sql, queryParams);
+    const rows = result.rows || result.recordset || [];
+    console.log(`[${new Date().toISOString()}] getInstructions: Found ${rows.length} instructions`, {
+      sample: rows.slice(0, 2),
+    });
+    return rows;
+  } catch (error) {
+    console.error(`[${new Date().toISOString()}] Error in getInstructions:`, error);
+    throw error;
+  }
+};
 
 export const getInstructionById = async (instructionId) => {
   const sql = `

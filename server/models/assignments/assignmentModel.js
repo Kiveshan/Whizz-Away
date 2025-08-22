@@ -611,7 +611,26 @@ export const deleteLeg = async (legId) => {
     client.release();
   }
 };
-
+export const updateLegNumber = async (legId, legnumber) => {
+  const client = await pool.connect();
+  try {
+    await client.query("BEGIN");
+    const result = await client.query(
+      `UPDATE legs_m2 SET legnumber = $1 WHERE legkey = $2 RETURNING legkey`,
+      [legnumber, legId]
+    );
+    if (result.rows.length === 0) {
+      throw new Error(`Leg with ID ${legId} not found`);
+    }
+    await client.query("COMMIT");
+    return { updatedLegId: result.rows[0].legkey, legnumber };
+  } catch (error) {
+    await client.query("ROLLBACK");
+    throw error;
+  } finally {
+    client.release();
+  }
+};
 export const getContainersByInstructionId = async (instructionId) => {
   const query = `SELECT * FROM container WHERE m1key = $1`;
   try {
