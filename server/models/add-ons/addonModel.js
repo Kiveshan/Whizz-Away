@@ -64,7 +64,7 @@ const createAddon = async (addonData) => {
     // Get the next sequential number for today
     const seqQueryText = `
       SELECT COUNT(*) as count
-      FROM public.addons
+      FROM public.add_ons
       WHERE invoice_number LIKE $1
     `;
     const seqResult = await query(seqQueryText, [`ADN-${dateStr}-%`]);
@@ -75,7 +75,7 @@ const createAddon = async (addonData) => {
 
     // Insert the new add-on
     const insertQueryText = `
-      INSERT INTO public.addons (
+      INSERT INTO public.add_ons (
         client_id, 
         description, 
         amount, 
@@ -135,7 +135,7 @@ const getAddonById = async (addonId) => {
         a.invoice_number,
         a.created_at,
         c.client as client_name
-      FROM public.addons a
+      FROM public.add_ons a
       LEFT JOIN public.m5_client c ON a.client_id = c.m5clientkey
       WHERE a.addon_id = $1
     `;
@@ -174,7 +174,7 @@ const updateAddon = async (addonId, addonData) => {
     }
 
     const queryText = `
-      UPDATE public.addons 
+      UPDATE public.add_ons 
       SET description = $1, amount = $2, category = $3, date = $4
       WHERE addon_id = $5
       RETURNING addon_id, description, amount, category, date, invoice_number
@@ -223,7 +223,7 @@ const deleteAddon = async (addonId) => {
       );
     }
 
-    const queryText = `DELETE FROM public.addons WHERE addon_id = $1`;
+    const queryText = `DELETE FROM public.add_ons WHERE addon_id = $1`;
     const result = await query(queryText, [addonId]);
 
     if (result.rowCount === 0) {

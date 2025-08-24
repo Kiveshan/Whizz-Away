@@ -102,7 +102,7 @@ const AddOnList = () => {
   };
 
   const handleCreateAddOn = () => {
-    navigate(`/addon-form/create`, {
+    navigate(`/add-on-form`, {
       state: { clientId, clientName },
     });
   };
@@ -112,8 +112,8 @@ const AddOnList = () => {
   };
 
   const handleViewAddOn = (addonId) => {
-    navigate(`/addon-form/${addonId}`, {
-      state: { clientId, clientName },
+    navigate(`/add-on-form`, {
+      state: { clientId, clientName, addonId },
     });
   };
 

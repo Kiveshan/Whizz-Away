@@ -1,17 +1,16 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { useNavigate, useLocation, useParams } from "react-router-dom";
+import { useNavigate, useLocation } from "react-router-dom";
 import api from "../../../api";
 import "../css/AddOnForm.css";
 
 const AddOnForm = () => {
   const navigate = useNavigate();
   const location = useLocation();
-  const { addonId } = useParams(); // Get addon ID from URL params to determine view/create mode
-  const { clientId, clientName } = location.state || {};
+  const { clientId, clientName, addonId } = location.state || {};
 
-  const isViewMode = !!addonId && addonId !== "create";
+  const isViewMode = !!addonId;
 
   const [formData, setFormData] = useState({
     category: "",
