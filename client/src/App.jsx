@@ -82,6 +82,7 @@ import {
   SubcontractorList,
   SubcontractorStatements,
   SubcontractorStatementDetails,
+  CredClientList
 } from "./pages/Creditors"
 
 import {
@@ -164,7 +165,8 @@ function DynamicHeader() {
     "/Creditors/SubcontractorStatementDetails": "Subcontractor Statement",
     "/analytics-reports": "Insights",
     "/reports" : "Reports",
-    "/wage-reports" : "Wage Reports"
+    "/wage-reports" : "Wage Reports",
+    "/CredClientList":"Clients"
   }
 
   const getTitle = () => {
@@ -199,6 +201,7 @@ function ContentWrapper() {
         </div>
       )}
       <Routes>
+        <Route path="/CredClientList" element={<CredClientList />} />
         <Route path="/" element={<Landing />} />
         <Route path="/client-payments" element={<ClientPayments />} />
         <Route path="/client-list-payments" element={<ClientListPay />} />
