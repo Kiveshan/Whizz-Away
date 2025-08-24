@@ -94,17 +94,18 @@ export const saveInstruction = async ({ controllerData, containerData }) => {
 
     const controllerQuery = `
       INSERT INTO public.m1_controller (
-        client, task, shipment_type, pickup, dropoff, 
-        hazardous, surchages, surcharge, pickuptime, pickupdate, 
-        stackdate, deadline, fileref, rateweight, 
+        client, "ksmFileRef", shipment_type, pickup, dropoff, 
+        hazardous, surchages, surcharge, 
+        stackdate, "lastFreeDate", "clientFileRef", rateweight, 
         description, status, vat,
         num_six_meters, num_twelve_meters, num_abnormal, num_breakbulk,
         weight, total_cost, booking_ref, vessel_name,
-        rateper_6, rateper_12, rateper_abnormal, rateper_breakbulk, unitrate
+        rateper_6, rateper_12, rateper_abnormal, rateper_breakbulk, unitrate,
+        created_at
       ) VALUES (
-        $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, 
-        $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21,
-        $22, $23, $24, $25, $26, $27, $28, $29, $30
+        $1, $2, $3, $4, $5, $6, $7, $8, 
+        $9, $10, $11, $12, $13, $14, $15, $16, $17, $18,
+        $19, $20, $21, $22, $23, $24, $25, $26, $27, $28, $29
       ) RETURNING m1key
     `
 
@@ -148,13 +149,13 @@ export const saveInstruction = async ({ controllerData, containerData }) => {
       pickupDate: controllerData.pickupDate || controllerData.pickupdate,
       pickupTime: controllerData.pickupTime || controllerData.pickuptime,
       stackDate: controllerData.stackDate || controllerData.stackdate,
-      deadline: controllerData.deadline,
+      lastFreeDate: controllerData.lastFreeDate || controllerData.lastfreedate || controllerData.deadline, // renamed from deadline
 
       // File reference
-      fileRef: controllerData.fileRef || controllerData.file_ref || controllerData.fileref,
+      clientFileRef: controllerData.clientFileRef || controllerData.fileRef || controllerData.file_ref || controllerData.fileref, // renamed from fileRef
 
       // Other fields
-      task: controllerData.task,
+      ksmFileRef: controllerData.ksmFileRef || controllerData.task, // renamed from task
       pickup: controllerData.pickup,
       dropoff: controllerData.dropoff,
       hazardous: Boolean(controllerData.hazardous) || false,
@@ -182,18 +183,17 @@ export const saveInstruction = async ({ controllerData, containerData }) => {
 
     console.log("Processed fields for saving:", {
       client: fields.client,
-      task: fields.task,
+      ksmFileRef: fields.ksmFileRef, // renamed from task
       shipmentType: fields.shipmentType,
       pickup: fields.pickup,
       dropoff: fields.dropoff,
       hazardous: fields.hazardous,
       surcharges: fields.surcharges,
       surchargeAmount: fields.surchargeAmount,
-      pickupTime: formatTime(fields.pickupTime),
-      pickupDate: formatDate(fields.pickupDate),
+      // pickupTime and pickupDate fields removed
       stackDate: formatDate(fields.stackDate),
-      deadline: formatDate(fields.deadline),
-      fileRef: fields.fileRef,
+      lastFreeDate: formatDate(fields.lastFreeDate), // renamed from deadline
+      clientFileRef: fields.clientFileRef, // renamed from fileRef
       rateWeight: fields.rateWeight,
       description: fields.description,
       status: "New",
@@ -211,22 +211,21 @@ export const saveInstruction = async ({ controllerData, containerData }) => {
       rateper_abnormal: fields.rateper_abnormal,
       rateper_breakbulk: fields.rateper_breakbulk,
       unitrate: fields.unitrate,
+      created_at: formatDate(new Date()),
     })
 
     const controllerValues = [
       fields.client,
-      fields.task,
+      fields.ksmFileRef, // renamed from task
       fields.shipmentType,
       fields.pickup,
       fields.dropoff,
       fields.hazardous,
       fields.surcharges,
       fields.surchargeAmount,
-      formatTime(fields.pickupTime),
-      formatDate(fields.pickupDate),
       formatDate(fields.stackDate), // Will be null if cross-haul
-      formatDate(fields.deadline),
-      fields.fileRef,
+      formatDate(fields.lastFreeDate), // renamed from deadline
+      fields.clientFileRef, // renamed from fileRef
       fields.rateWeight,
       fields.description,
       "New",
@@ -244,6 +243,7 @@ export const saveInstruction = async ({ controllerData, containerData }) => {
       fields.rateper_abnormal, // Will be null if weight-based
       fields.rateper_breakbulk, // Will be null if weight-based or not cross-haul/container
       fields.unitrate, // Will be null if container-based
+      formatDate(new Date()) // Current date for created_at
     ]
 
     const controllerResult = await client.query(controllerQuery, controllerValues)
@@ -305,7 +305,7 @@ export const getClientInstructionStats = async () => {
       c.representative,
       c.email,
       c.cellnum,
-      MAX(m.pickupdate) as latest_date,
+      MAX(m."lastFreeDate") as latest_date, -- Changed from pickupdate to lastFreeDate
       SUM(CASE WHEN m.status = 'New' THEN 1 ELSE 0 END) as new_count,
       SUM(CASE WHEN LOWER(m.status) = 'in progress' THEN 1 ELSE 0 END) as in_progress_count,
       SUM(CASE WHEN m.status = 'Completed' THEN 1 ELSE 0 END) as completed_count
@@ -336,17 +336,69 @@ export const getClientInstructionStats = async () => {
   }
 }
 
+// Function to check if created_at column exists and add it if it doesn't
+export const ensureCreatedAtColumnExists = async () => {
+  console.log(`[${new Date().toISOString()}] Checking if created_at column exists in m1_controller table`)
+  
+  try {
+    // Check if the column exists
+    const checkColumnSql = `
+      SELECT column_name 
+      FROM information_schema.columns 
+      WHERE table_name = 'm1_controller' 
+      AND column_name = 'created_at'
+    `
+    
+    const result = await query(checkColumnSql)
+    const columnExists = (result.rows && result.rows.length > 0) || (result.recordset && result.recordset.length > 0)
+    
+    if (!columnExists) {
+      console.log(`[${new Date().toISOString()}] created_at column does not exist, adding it now`)
+      
+      // Add the column if it doesn't exist
+      const addColumnSql = `
+        ALTER TABLE public.m1_controller 
+        ADD COLUMN created_at DATE DEFAULT CURRENT_DATE
+      `
+      
+      await query(addColumnSql)
+      console.log(`[${new Date().toISOString()}] created_at column added successfully`)
+      
+      // Update existing records to have a created_at value
+      const updateExistingSql = `
+        UPDATE public.m1_controller 
+        SET created_at = CURRENT_DATE 
+        WHERE created_at IS NULL
+      `
+      
+      await query(updateExistingSql)
+      console.log(`[${new Date().toISOString()}] Updated existing records with created_at values`)
+    } else {
+      console.log(`[${new Date().toISOString()}] created_at column already exists`)
+    }
+  } catch (error) {
+    console.error(`[${new Date().toISOString()}] Error ensuring created_at column exists:`, error)
+    throw error
+  }
+}
+
 export const getInstructions = async (clientId) => {
+  console.log(`[${new Date().toISOString()}] getInstructions: Starting with clientId:`, clientId)
+  
+  // Ensure the created_at column exists before querying
+  await ensureCreatedAtColumnExists()
+  
   let sql = `
     SELECT 
       m.m1key,
-      m.fileref as fileno,
+      m."clientFileRef" as fileno,
       m.shipment_type,
       s.shipmenttype as type_text,
       m.status,
-      m.pickupdate,
+      m."lastFreeDate", -- Changed from pickupdate to lastFreeDate
       m.client,
-      c.client AS companyname
+      c.client AS companyname,
+      m.created_at as startingdate -- Use created_at field for the creation date
     FROM 
       public.m1_controller m
     JOIN 
@@ -359,10 +411,26 @@ export const getInstructions = async (clientId) => {
     sql += ` WHERE m.client = $1`
     queryParams.push(clientId)
   }
-  sql += ` ORDER BY m.pickupdate DESC`
+  sql += ` ORDER BY m.created_at DESC` // Order by creation date
 
-  const result = await query(sql, queryParams)
-  return result.recordset || result.rows
+  console.log(`[${new Date().toISOString()}] getInstructions: Executing SQL:`, sql)
+  console.log(`[${new Date().toISOString()}] getInstructions: With params:`, queryParams)
+  
+  try {
+    const result = await query(sql, queryParams)
+    const rows = result.recordset || result.rows || []
+    
+    console.log(`[${new Date().toISOString()}] getInstructions: Query completed, found ${rows.length} instructions`)
+    if (rows.length > 0) {
+      console.log(`[${new Date().toISOString()}] getInstructions: Sample first row:`, rows[0])
+      console.log(`[${new Date().toISOString()}] getInstructions: created_at/startingdate value:`, rows[0].startingdate)
+    }
+    
+    return rows
+  } catch (error) {
+    console.error(`[${new Date().toISOString()}] getInstructions: Error executing query:`, error)
+    throw error
+  }
 }
 
 export const getInstructionById = async (instructionId) => {
@@ -435,52 +503,50 @@ export const updateInstruction = async (instructionId, updatedData) => {
       UPDATE public.m1_controller
       SET 
         client = $1,
-        task = $2,
+        "ksmFileRef" = $2, -- renamed from task
         shipment_type = $3,
         pickup = $4,
         dropoff = $5,
         hazardous = $6,
         surchages = $7,
-        pickuptime = $8,
-        pickupdate = $9,
-        stackdate = $10,
-        deadline = $11,
-        fileref = $12,
-        rateweight = $13,
-        description = $14,
-        vat = $15,
-        num_six_meters = $16,
-        num_twelve_meters = $17,
-        num_abnormal = $18,
-        num_breakbulk = $19,
-        total_cost = $20,
-        weight = $21,
-        status = $22,
-        booking_ref = $23,
-        vessel_name = $24,
-        rateper_6 = $25,
-        rateper_12 = $26,
-        rateper_abnormal = $27,
-        rateper_breakbulk = $28,
-        unitrate = $29,
-        surcharge = $30
-      WHERE m1key = $31
+        -- pickuptime and pickupdate fields removed
+        stackdate = $8,
+        "lastFreeDate" = $9, -- renamed from deadline
+        "clientFileRef" = $10, -- renamed from fileref, adjusted parameter numbers due to removed fields
+        rateweight = $11,
+        description = $12,
+        vat = $13,
+        num_six_meters = $14,
+        num_twelve_meters = $15,
+        num_abnormal = $16,
+        num_breakbulk = $17,
+        total_cost = $18, -- adjusted parameter numbers due to removed fields
+        weight = $19,
+        status = $20,
+        booking_ref = $21,
+        vessel_name = $22,
+        rateper_6 = $23,
+        rateper_12 = $24,
+        rateper_abnormal = $25,
+        rateper_breakbulk = $26,
+        unitrate = $27,
+        surcharge = $28 -- adjusted parameter number
+      WHERE m1key = $29 -- adjusted parameter number
       RETURNING *
     `
 
     const values = [
       updatedData.client,
-      updatedData.task,
+      updatedData.ksmFileRef || updatedData.task, // Use ksmFileRef if available, fall back to task
       updatedData.shipment_type,
       updatedData.pickup,
       updatedData.dropoff,
       updatedData.hazardous,
       updatedData.surchages,
-      updatedData.pickuptime,
-      updatedData.pickupdate,
+      // pickuptime and pickupdate fields removed
       updatedData.stackdate,
-      updatedData.deadline,
-      updatedData.fileref,
+      updatedData.lastFreeDate || updatedData.lastfreedate || updatedData.deadline, // renamed from deadline
+      updatedData.clientFileRef || updatedData.fileref, // renamed from fileref
       updatedData.rateweight,
       updatedData.description,
       updatedData.vat || 15,
@@ -987,18 +1053,17 @@ export const updateFCInstructionAndContainers = async (instructionId, instructio
     // 2. Prepare instruction update data with proper null handling and numeric sanitization
     const updateData = {
       client: preserveExistingValue(instructionData.client, currentInstruction.client, "number"),
-      task: preserveExistingValue(instructionData.task, currentInstruction.task, "string"),
+      task: preserveExistingValue(instructionData.ksmFileRef || instructionData.task, currentInstruction.ksmFileRef || currentInstruction.task, "string"), // renamed from task to ksmFileRef
       shipment_type: preserveExistingValue(instructionData.shipment_type, currentInstruction.shipment_type, "number"),
       pickup: preserveExistingValue(instructionData.pickup, currentInstruction.pickup, "string"),
       dropoff: preserveExistingValue(instructionData.dropoff, currentInstruction.dropoff, "string"),
       hazardous: preserveExistingValue(instructionData.hazardous, currentInstruction.hazardous, "boolean"),
       surchages: preserveExistingValue(instructionData.surchages, currentInstruction.surchages, "boolean"),
       surcharge: preserveExistingValue(instructionData.surcharge, currentInstruction.surcharge, "number"),
-      pickuptime: preserveExistingValue(instructionData.pickuptime, currentInstruction.pickuptime, "string"),
-      pickupdate: preserveExistingValue(instructionData.pickupdate, currentInstruction.pickupdate, "string"),
+      // pickuptime and pickupdate fields removed
       stackdate: preserveExistingValue(instructionData.stackdate, currentInstruction.stackdate, "string"),
-      deadline: preserveExistingValue(instructionData.deadline, currentInstruction.deadline, "string"),
-      fileref: preserveExistingValue(instructionData.fileref, currentInstruction.fileref, "string"),
+      lastfreedate: preserveExistingValue(instructionData.lastFreeDate || instructionData.lastfreedate, currentInstruction.lastfreedate || currentInstruction.deadline, "string"), // renamed from deadline
+      clientFileRef: preserveExistingValue(instructionData.clientFileRef || instructionData.fileref, currentInstruction.clientFileRef || currentInstruction.fileref, "string"), // renamed from fileref
       rateweight: preserveExistingValue(instructionData.rateweight, currentInstruction.rateweight, "string"),
       description: preserveExistingValue(instructionData.description, currentInstruction.description, "string"),
       status: preserveExistingValue(instructionData.status, currentInstruction.status, "string"),
@@ -1049,18 +1114,17 @@ export const updateFCInstructionAndContainers = async (instructionId, instructio
     let instructionNeedsUpdate = false
     const fieldsToCheck = [
       { field: "client", type: "number" },
-      { field: "task", type: "string" },
+      { field: "ksmFileRef", type: "string" }, // renamed from task
       { field: "shipment_type", type: "number" },
       { field: "pickup", type: "string" },
       { field: "dropoff", type: "string" },
       { field: "hazardous", type: "boolean" },
       { field: "surchages", type: "boolean" },
       { field: "surcharge", type: "number" },
-      { field: "pickuptime", type: "time" },
-      { field: "pickupdate", type: "date" },
+      // pickuptime and pickupdate fields removed
       { field: "stackdate", type: "date" },
-      { field: "deadline", type: "date" },
-      { field: "fileref", type: "string" },
+      { field: "lastfreedate", type: "date" }, // renamed from deadline
+      { field: "clientFileRef", type: "string" }, // renamed from fileref
       { field: "rateweight", type: "string" },
       { field: "description", type: "string" },
       { field: "status", type: "string" },
@@ -1097,30 +1161,29 @@ export const updateFCInstructionAndContainers = async (instructionId, instructio
       const updateInstructionQuery = `
         UPDATE public.m1_controller
         SET 
-          client = $1, task = $2, shipment_type = $3, pickup = $4, dropoff = $5,
-          hazardous = $6, surchages = $7, surcharge = $8, pickuptime = $9, pickupdate = $10,
-          stackdate = $11, deadline = $12, fileref = $13, rateweight = $14, description = $15,
-          status = $16, vat = $17, num_six_meters = $18, num_twelve_meters = $19, num_abnormal = $20,
-          num_breakbulk = $21, weight = $22, total_cost = $23, booking_ref = $24, vessel_name = $25,
-          rateper_6 = $26, rateper_12 = $27, rateper_abnormal = $28, rateper_breakbulk = $29, unitrate = $30
-        WHERE m1key = $31
+          client = $1, "ksmFileRef" = $2, shipment_type = $3, pickup = $4, dropoff = $5,
+          hazardous = $6, surchages = $7, surcharge = $8, 
+          stackdate = $9, "lastFreeDate" = $10, "clientFileRef" = $11, rateweight = $12, description = $13,
+          status = $14, vat = $15, num_six_meters = $16, num_twelve_meters = $17, num_abnormal = $18,
+          num_breakbulk = $19, weight = $20, total_cost = $21, booking_ref = $22, vessel_name = $23,
+          rateper_6 = $24, rateper_12 = $25, rateper_abnormal = $26, rateper_breakbulk = $27, unitrate = $28
+        WHERE m1key = $29
         RETURNING *
       `
 
       const updateValues = [
         updateData.client,
-        updateData.task,
+        updateData.ksmFileRef || updateData.task, // renamed from task
         updateData.shipment_type,
         updateData.pickup,
         updateData.dropoff,
         updateData.hazardous,
         updateData.surchages,
         updateData.surcharge,
-        updateData.pickuptime,
-        updateData.pickupdate,
+        // pickuptime and pickupdate fields removed
         updateData.stackdate,
-        updateData.deadline,
-        updateData.fileref,
+        updateData.lastfreedate || updateData.deadline, // renamed from deadline
+        updateData.clientFileRef || updateData.fileref, // renamed from fileref
         updateData.rateweight,
         updateData.description,
         updateData.status,
@@ -1308,31 +1371,30 @@ export const saveInstructionAndContainers = async (controllerData, containerData
     // Insert instruction
     const instructionQuery = `
       INSERT INTO public.m1_controller (
-        client, task, shipment_type, pickup, dropoff, hazardous, surchages, surcharge,
-        pickuptime, pickupdate, stackdate, deadline, fileref, rateweight, description,
+        client, "ksmFileRef", shipment_type, pickup, dropoff, hazardous, surchages, surcharge,
+        stackdate, "lastFreeDate", "clientFileRef", rateweight, description,
         status, vat, num_six_meters, num_twelve_meters, num_abnormal, num_breakbulk,
         weight, total_cost, booking_ref, vessel_name, rateper_6, rateper_12,
         rateper_abnormal, rateper_breakbulk, unitrate
       ) VALUES (
-        $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17,
-        $18, $19, $20, $21, $22, $23, $24, $25, $26, $27, $28, $29, $30
+        $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15,
+        $16, $17, $18, $19, $20, $21, $22, $23, $24, $25, $26, $27, $28
       ) RETURNING m1key
     `
 
     const instructionValues = [
       controllerData.client,
-      controllerData.task,
+      controllerData.ksmFileRef || controllerData.task, // renamed from task
       controllerData.shipment_type,
       controllerData.pickup,
       controllerData.dropoff,
       controllerData.hazardous || false,
       controllerData.surchages || false,
       controllerData.surcharge || 0,
-      controllerData.pickuptime,
-      controllerData.pickupdate,
+      // pickuptime and pickupdate fields removed
       controllerData.stackdate,
-      controllerData.deadline,
-      controllerData.fileref,
+      controllerData.lastFreeDate || controllerData.deadline, // renamed from deadline
+      controllerData.clientFileRef || controllerData.fileref, // renamed from fileref
       controllerData.rateweight,
       controllerData.description,
       controllerData.status || "New",

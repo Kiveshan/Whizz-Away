@@ -41,22 +41,21 @@ const FCcontrollerinstructions = () => {
   const selectedYear = location.state?.selectedYear;
   const activeFilter = location.state?.activeFilter;
 
-  const pickupDateRef = useRef(null);
+  // pickupDateRef removed
   const etaDateRef = useRef(null);
-  const deadlineDateRef = useRef(null);
+  const lastFreeDateRef = useRef(null);
 
   const fieldRefs = {
     clientId: useRef(null),
     shipmentTypeId: useRef(null),
-    task: useRef(null),
+    ksmFileRef: useRef(null),
     pickup: useRef(null),
     dropoff: useRef(null),
-    pickupTime: useRef(null),
-    pickupDate: useRef(null),
+    // pickupTime and pickupDate refs removed
     stackDate: useRef(null),
-    deadline: useRef(null),
+    lastFreeDate: useRef(null),
     bookingRef: useRef(null),
-    fileRef: useRef(null),
+    clientFileRef: useRef(null),
     sixMeterRate: useRef(null),
     twelveMeterRate: useRef(null),
     abnormalRate: useRef(null),
@@ -105,7 +104,7 @@ const FCcontrollerinstructions = () => {
       email: "",
       shipmentTypeId: "",
       shipmentTypeName: "",
-      task: "",
+      ksmFileRef: "",
       pickup: "",
       dropoff: "",
       hazardous: false,
@@ -113,8 +112,8 @@ const FCcontrollerinstructions = () => {
       pickupTime: "",
       pickupDate: "",
       stackDate: "",
-      deadline: "",
-      fileRef: "",
+      lastFreeDate: "",
+      clientFileRef: "",
       bookingRef: "",
       rateWeight: "Container",
       weight: "",
@@ -173,7 +172,7 @@ const FCcontrollerinstructions = () => {
       email: "",
       shipmentTypeId: "",
       shipmentTypeName: "",
-      task: "",
+      ksmFileRef: "",
       pickup: "",
       dropoff: "",
       hazardous: false,
@@ -181,8 +180,8 @@ const FCcontrollerinstructions = () => {
       pickupTime: "",
       pickupDate: "",
       stackDate: "",
-      deadline: "",
-      fileRef: "",
+      lastFreeDate: "",
+      clientFileRef: "",
       bookingRef: "",
       rateWeight: "Container",
       weight: "",
@@ -606,9 +605,9 @@ const FCcontrollerinstructions = () => {
       { name: "shipmentTypeId", label: "Shipment Type" },
       { name: "pickup", label: "Pickup Location" },
       { name: "dropoff", label: "Dropoff Location" },
-      { name: "pickupDate", label: "Pickup Date" },
-      { name: "task", label: "Task" },
-      { name: "fileRef", label: "File Reference" },
+      // pickupDate field removed
+      { name: "ksmFileRef", label: "KSM File Reference" },
+      { name: "clientFileRef", label: "Client File Reference" },
       { name: "bookingRef", label: "Booking Reference" },
       { name: "description", label: "Description" },
     ];
@@ -653,8 +652,9 @@ const FCcontrollerinstructions = () => {
         container.containerNum.length !== 11 ||
         !/^[a-zA-Z]{4}[0-9]{7}$/.test(container.containerNum)
       ) {
-        containerErrors[`container-${container.id}`] =
-          "Does not match correct format (ABCD1234567)";
+        containerErrors[
+          `container-${container.id}`
+        ] = `Does not match correct format (ABCD1234567)`;
         isValid = false;
       }
 
@@ -1028,18 +1028,17 @@ const FCcontrollerinstructions = () => {
       const instructionUpdateData = {
         // Map frontend fields to backend database fields
         client: formData.clientId,
-        task: formData.task,
+        ksmFileRef: formData.ksmFileRef, // Updated from task to ksmFileRef to match DB schema
         shipment_type: formData.shipmentTypeId,
         pickup: formData.pickup,
         dropoff: formData.dropoff,
         hazardous: Boolean(formData.hazardous),
         surchages: Boolean(formData.surchages),
         surcharge: surchargeAmount,
-        pickuptime: formatTimeForDB(formData.pickupTime),
-        pickupdate: formatDateForDB(formData.pickupDate),
+        // pickuptime and pickupdate fields removed
         stackdate: formatDateForDB(formData.stackDate),
-        deadline: formatDateForDB(formData.deadline),
-        fileref: formData.fileRef,
+        lastFreeDate: formatDateForDB(formData.lastFreeDate),
+        clientFileRef: formData.clientFileRef,
         rateweight: formData.rateWeight,
         description: formData.description,
         status: formData.status,
@@ -1408,9 +1407,9 @@ const FCcontrollerinstructions = () => {
       // Format dates before setting form data
       const formattedData = {
         ...preservedFormData,
-        pickupDate: formatDateForInput(preservedFormData.pickupDate),
+        // pickupDate field removed
         stackDate: formatDateForInput(preservedFormData.stackDate),
-        deadline: preservedFormData.deadline
+        lastFreeDate: preservedFormData.deadline
           ? formatDateForInput(preservedFormData.deadline)
           : "",
       };
@@ -1615,17 +1614,16 @@ const FCcontrollerinstructions = () => {
         email: data.email || "",
         shipmentTypeId: data.shipment_type ? data.shipment_type.toString() : "",
         shipmentTypeName: data.shipmenttype || "",
-        task: data.task || "",
+        ksmFileRef: data.ksmFileRef || "", // Updated from task to ksmFileRef
         pickup: data.pickup || "",
         dropoff: data.dropoff || "",
         hazardous: data.hazardous || false,
         surchages: data.surchages || false,
         surcharge: data.surcharge || 0,
-        pickupTime: data.pickuptime ? data.pickuptime.substring(0, 5) : "",
-        pickupDate: formatDateForInput(data.pickupdate) || "",
+        // pickupTime and pickupDate fields removed
         stackDate: formatDateForInput(data.stackdate) || "",
-        deadline: data.deadline ? formatDateForInput(data.deadline) : "",
-        fileRef: data.fileref || "",
+        lastFreeDate: data.lastFreeDate ? formatDateForInput(data.lastFreeDate) : "", // Updated from deadline to lastFreeDate
+        clientFileRef: data.clientFileRef || "", // Updated from fileref to clientFileRef
         bookingRef: data.booking_ref || "",
         rateWeight: data.rateweight || "Container",
         weight: data.weight || "",
@@ -2625,11 +2623,11 @@ const FCcontrollerinstructions = () => {
           formData.stackDate && new Date(formData.stackDate) <= new Date(value)
             ? ""
             : formData.stackDate,
-        deadline:
-          formData.deadline &&
-          new Date(formData.deadline) <= new Date(value) <= new Date(value)
+        lastFreeDate:
+          formData.lastFreeDate &&
+          new Date(formData.lastFreeDate) <= new Date(value) <= new Date(value)
             ? ""
-            : formData.deadline,
+            : formData.lastFreeDate,
       });
       setFieldErrors((prev) => ({ ...prev, pickupDate: "" }));
     } else {
@@ -2769,9 +2767,9 @@ const FCcontrollerinstructions = () => {
       "dropoff",
       "pickupTime",
       "pickupDate",
-      "deadline",
+      "lastFreeDate",
       "bookingRef",
-      "fileRef",
+      "clientFileRef",
       "description",
     ];
 
@@ -2916,19 +2914,18 @@ const FCcontrollerinstructions = () => {
       isValid = false;
     }
     if (
-      formData.deadline &&
-      formData.pickupDate &&
-      new Date(formData.deadline) < new Date(formData.pickupDate)
+      formData.lastFreeDate &&
+      new Date(formData.lastFreeDate) < new Date(today)
     ) {
-      errors.deadline = "Deadline cannot be before pickup date";
+      errors.lastFreeDate = "Last Free Date cannot be in the past";
       isValid = false;
     }
     if (
-      formData.deadline &&
+      formData.lastFreeDate &&
       formData.stackDate &&
-      new Date(formData.deadline) < new Date(formData.stackDate)
+      new Date(formData.lastFreeDate) < new Date(formData.stackDate)
     ) {
-      errors.deadline = `Deadline cannot be before ${
+      errors.lastFreeDate = `Last Free Date cannot be before ${
         isImport ? "ETA" : "stack date"
       }`;
       isValid = false;
@@ -3360,12 +3357,12 @@ const FCcontrollerinstructions = () => {
                 <label>Name of Task</label>
                 <div
                   className="controller-instructions-input-wrapper"
-                  ref={fieldRefs.task}
+                  ref={fieldRefs.ksmFileRef}
                 >
                   <input
                     type="text"
                     className={`controller-instructions-form-input ${
-                      fieldErrors.task
+                      fieldErrors.ksmFileRef
                         ? "controller-instructions-error-field"
                         : ""
                     }`}
@@ -3376,7 +3373,7 @@ const FCcontrollerinstructions = () => {
                     disabled={isReadOnly}
                     style={isReadOnly ? readOnlyStyle : {}}
                   />
-                  <InstructionErrorTooltip message={fieldErrors.task} />
+                  <InstructionErrorTooltip message={fieldErrors.ksmFileRef} />
                 </div>
               </div>
             </div>
@@ -3902,27 +3899,27 @@ const FCcontrollerinstructions = () => {
                       </div>
                     </div>
                     <div className="controller-instructions-form-field controller-instructions-small-field">
-                      <label>File Ref</label>
+                      <label>Client File Ref</label>
                       <div
                         className="controller-instructions-input-wrapper"
-                        ref={fieldRefs.fileRef}
+                        ref={fieldRefs.clientFileRef}
                       >
                         <input
                           type="text"
                           className={`controller-instructions-form-input ${
-                            fieldErrors.fileRef
+                            fieldErrors.clientFileRef
                               ? "controller-instructions-error-field"
                               : ""
                           }`}
-                          placeholder="Enter file ref"
-                          name="fileRef"
-                          value={formData.fileRef}
+                          placeholder="Enter client file ref"
+                          name="clientFileRef"
+                          value={formData.clientFileRef}
                           onChange={handleInputChange}
                           disabled={isReadOnly}
                           style={isReadOnly ? readOnlyStyle : {}}
                         />
                         <InstructionErrorTooltip
-                          message={fieldErrors.fileRef}
+                          message={fieldErrors.clientFileRef}
                         />
                       </div>
                     </div>
@@ -3951,14 +3948,14 @@ const FCcontrollerinstructions = () => {
                         className="controller-instructions-form-field controller-instructions-small-field"
                         style={{ flex: "0 1 160px" }}
                       >
-                        <label>File Ref</label>
+                        <label>Client File Ref</label>
                         <div className="controller-instructions-input-wrapper">
                           <input
                             type="text"
                             className="controller-instructions-form-input"
-                            placeholder="Enter file ref"
-                            name="fileRef"
-                            value={formData.fileRef}
+                            placeholder="Enter client file ref"
+                            name="clientFileRef"
+                            value={formData.clientFileRef}
                             onChange={handleInputChange}
                           />
                         </div>
@@ -3985,23 +3982,23 @@ const FCcontrollerinstructions = () => {
                     <label>Name of Task</label>
                     <div
                       className="controller-instructions-input-wrapper"
-                      ref={fieldRefs.task}
+                      ref={fieldRefs.ksmFileRef}
                     >
                       <input
                         type="text"
                         className={`controller-instructions-form-input ${
-                          fieldErrors.task
+                          fieldErrors.ksmFileRef
                             ? "controller-instructions-error-field"
                             : ""
                         }`}
-                        placeholder="Input Name of Task"
-                        name="task"
-                        value={formData.task}
+                        placeholder="Input KSM File Reference"
+                        name="ksmFileRef"
+                        value={formData.ksmFileRef}
                         onChange={handleInputChange}
                         disabled={isReadOnly}
                         style={isReadOnly ? readOnlyStyle : {}}
                       />
-                      <InstructionErrorTooltip message={fieldErrors.task} />
+                      <InstructionErrorTooltip message={fieldErrors.ksmFileRef} />
                     </div>
                   </div>
                   <div
@@ -4080,50 +4077,8 @@ const FCcontrollerinstructions = () => {
                   </div>
                 </div>
                 <div className="controller-instructions-date-time-group">
-                  <div className="controller-instructions-form-field">
-                    <label>Pickup Time</label>
-                    <input
-                      type="time"
-                      className={`controller-instructions-form-input ${
-                        fieldErrors.pickupTime
-                          ? "controller-instructions-error-field"
-                          : ""
-                      }`}
-                      name="pickupTime"
-                      value={formData.pickupTime}
-                      onChange={handleInputChange}
-                      ref={fieldRefs.pickupTime}
-                      disabled={isReadOnly}
-                      style={isReadOnly ? readOnlyStyle : {}}
-                    />
-                    <InstructionErrorTooltip message={fieldErrors.pickupTime} />
-                  </div>
-                  <div className="controller-instructions-form-field">
-                    <label>Pickup Date</label>
-                    <div
-                      className="controller-instructions-date-wrapper"
-                      ref={fieldRefs.pickupDate}
-                    >
-                      <input
-                        type="date"
-                        className={`controller-instructions-form-input ${
-                          fieldErrors.pickupDate
-                            ? "controller-instructions-error-field"
-                            : ""
-                        }`}
-                        name="pickupDate"
-                        value={formData.pickupDate}
-                        onChange={handleInputChange}
-                        min={today}
-                        ref={pickupDateRef}
-                        disabled={isReadOnly}
-                        style={isReadOnly ? readOnlyStyle : {}}
-                      />
-                      <InstructionErrorTooltip
-                        message={fieldErrors.pickupDate}
-                      />
-                    </div>
-                  </div>
+                  {/* Pickup Time field removed */}
+                  {/* Pickup Date field removed */}
                   {(formData.shipmentTypeId === "1" ||
                     formData.shipmentTypeId === "2") && (
                     <div className="controller-instructions-form-field">
@@ -4147,7 +4102,7 @@ const FCcontrollerinstructions = () => {
                           name="stackDate"
                           value={formData.stackDate || ""}
                           onChange={handleInputChange}
-                          min={formData.pickupDate || today}
+                          min={today}
                           ref={etaDateRef}
                           disabled={isReadOnly}
                           style={isReadOnly ? readOnlyStyle : {}}
@@ -4160,27 +4115,29 @@ const FCcontrollerinstructions = () => {
                     </div>
                   )}
                   <div className="controller-instructions-form-field">
-                    <label>Deadline</label>
+                    <label>Last Free Date</label>
                     <div
                       className="controller-instructions-date-wrapper"
-                      ref={fieldRefs.deadline}
+                      ref={fieldRefs.lastFreeDate}
                     >
                       <input
                         type="date"
                         className={`controller-instructions-form-input ${
-                          fieldErrors.deadline
+                          fieldErrors.lastFreeDate
                             ? "controller-instructions-error-field"
                             : ""
                         }`}
-                        name="deadline"
-                        value={formData.deadline}
+                        name="lastFreeDate"
+                        value={formData.lastFreeDate}
                         onChange={handleInputChange}
-                        min={formData.pickupDate || today}
-                        ref={deadlineDateRef}
+                        min={today}
+                        ref={lastFreeDateRef}
                         disabled={isReadOnly}
                         style={isReadOnly ? readOnlyStyle : {}}
                       />
-                      <InstructionErrorTooltip message={fieldErrors.deadline} />
+                      <InstructionErrorTooltip
+                        message={fieldErrors.lastFreeDate}
+                      />
                     </div>
                   </div>
                 </div>

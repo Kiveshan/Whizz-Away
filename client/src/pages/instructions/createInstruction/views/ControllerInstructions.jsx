@@ -69,10 +69,8 @@ const ControllerInstructions = () => {
       num_six_meters: 0,
       num_twelve_meters: 0,
       num_abnormal: 0,
-      pickupTime: "",
-      pickupDate: "",
       stackDate: "",
-      deadline: "",
+      lastFreeDate: "",
       fileRef: "",
       bookingRef: "",
       vesselName: "",
@@ -100,9 +98,8 @@ const ControllerInstructions = () => {
     [location.state],
   )
 
-  const pickupDateRef = useRef(null)
   const etaDateRef = useRef(null)
-  const deadlineDateRef = useRef(null)
+  const lastFreeDateRef = useRef(null)
 
   const fieldRefs = useRef({
     clientId: null,
@@ -110,10 +107,8 @@ const ControllerInstructions = () => {
     task: null,
     pickup: null,
     dropoff: null,
-    pickupTime: null,
-    pickupDate: null,
     stackDate: null,
-    deadline: null,
+    lastFreeDate: null,
     bookingRef: null,
     fileRef: null,
     sixMeterRate: null,
@@ -410,10 +405,8 @@ const ControllerInstructions = () => {
       hazardous: false,
       surcharges: false,
       surchargesAmount: "",
-      pickupTime: "",
-      pickupDate: "",
       stackDate: "",
-      deadline: "",
+      lastFreeDate: "",
       fileRef: "",
       bookingRef: "",
       vesselName: "",
@@ -966,14 +959,13 @@ const ControllerInstructions = () => {
     // Required fields
     if (!formData.clientId) errors.clientId = "Client is required"
     if (!formData.shipmentTypeId) errors.shipmentTypeId = "Shipment type is required"
-    if (!formData.task) errors.task = "Task is required"
+    if (!formData.task) errors.task = "KSM File Reference is required"
     if (!formData.pickup) errors.pickup = "Pickup location is required"
     if (!formData.dropoff) errors.dropoff = "Dropoff location is required"
-    if (!formData.pickupTime) errors.pickupTime = "Pickup time is required"
-    if (!formData.pickupDate) errors.pickupDate = "Pickup date is required"
-    if (!formData.deadline) errors.deadline = "Deadline is required"
+
+    if (!formData.lastFreeDate) errors.lastFreeDate = "Last Free Date is required"
     if (!formData.bookingRef) errors.bookingRef = "Booking reference is required"
-    if (!formData.fileRef) errors.fileRef = "File reference is required"
+    if (!formData.fileRef) errors.fileRef = "Client File Reference is required"
     if (!formData.description) errors.description = "Description is required"
 
     // Cross-haul specific validations (vessel name and stack date not required for cross-haul types)
@@ -2250,12 +2242,12 @@ const ControllerInstructions = () => {
 
                   {/* File Ref */}
                   <div className="controller-instructions-form-field" style={{ flex: "1 1 120px" }}>
-                    <label>File Ref</label>
+                    <label>Client File Reference</label>
                     <div className="controller-instructions-input-wrapper" ref={fieldRefs.current.fileRef}>
                       <input
                         type="text"
                         className={`controller-instructions-form-input ${fieldErrors.fileRef ? "controller-instructions-error-field" : ""}`}
-                        placeholder="File ref"
+                        placeholder="Client File Reference"
                         name="fileRef"
                         value={formData.fileRef}
                         onChange={handleInputChange}
@@ -2267,12 +2259,12 @@ const ControllerInstructions = () => {
 
                   {/* Name of Task */}
                   <div className="controller-instructions-form-field" style={{ flex: "1 1 160px" }}>
-                    <label>Name of Task</label>
+                    <label>KSM File Reference</label>
                     <div className="controller-instructions-input-wrapper" ref={fieldRefs.current.task}>
                       <input
                         type="text"
                         className={`controller-instructions-form-input ${fieldErrors.task ? "controller-instructions-error-field" : ""}`}
-                        placeholder="Name of Task"
+                        placeholder="KSM File Reference"
                         name="task"
                         value={formData.task}
                         onChange={handleInputChange}
@@ -2283,44 +2275,8 @@ const ControllerInstructions = () => {
                   </div>
                 </div>
 
-                {/* Pick-up Time, Pick-up Date, Stack Date, and Deadline row */}
+                {/* Stack Date and Last Free Date row */}
                 <div style={{ display: "flex", gap: "12px", flexWrap: "wrap", width: "100%", marginBottom: "12px" }}>
-                  {/* Pick-up Time */}
-
-                  {/* Pick-up Time */}
-                  <div className="controller-instructions-form-field" style={{ flex: "0 0 120px" }}>
-                    <label>Pick-up Time</label>
-                    <div className="controller-instructions-input-wrapper" ref={fieldRefs.current.pickupTime}>
-                      <input
-                        type="time"
-                        className={`controller-instructions-form-input ${fieldErrors.pickupTime ? "controller-instructions-error-field" : ""}`}
-                        placeholder="Time here"
-                        name="pickupTime"
-                        value={formData.pickupTime}
-                        onChange={handleInputChange}
-                        style={{ width: "100%" }}
-                      />
-                      <ErrorTooltip message={fieldErrors.pickupTime} />
-                    </div>
-                  </div>
-
-                  {/* Pick-up Date */}
-                  <div className="controller-instructions-form-field" style={{ flex: "0 0 140px" }}>
-                    <label>Pick-up Date</label>
-                    <div className="controller-instructions-input-wrapper" ref={fieldRefs.current.pickupDate}>
-                      <input
-                        type="date"
-                        className={`controller-instructions-form-input ${fieldErrors.pickupDate ? "controller-instructions-error-field" : ""}`}
-                        ref={pickupDateRef}
-                        placeholder="Date here"
-                        name="pickupDate"
-                        value={formData.pickupDate}
-                        onChange={handleInputChange}
-                        style={{ width: "100%" }}
-                      />
-                      <ErrorTooltip message={fieldErrors.pickupDate} />
-                    </div>
-                  </div>
 
                   {/* Stack/ETA Date - Hidden for Cross-haul */}
                   {!isCrossHaul && (
@@ -2342,31 +2298,31 @@ const ControllerInstructions = () => {
                             fontSize: "13px",
                             height: "32px",
                           }}
-                          min={formData.pickupDate || today}
-                          disabled={!formData.pickupDate}
-                          onClick={() => formData.pickupDate && openCalendar(etaDateRef)}
+                          min={today}
+                          disabled={false}
+                          onClick={() => openCalendar(etaDateRef)}
                         />
                         <ErrorTooltip message={fieldErrors.stackDate} />
                       </div>
                     </div>
                   )}
 
-                  {/* Deadline */}
+                  {/* Last Free Date */}
                   <div className="controller-instructions-form-field" style={{ flex: "0 0 140px" }}>
-                    <label>Deadline</label>
-                    <div className="controller-instructions-input-wrapper" ref={fieldRefs.current.deadline}>
+                    <label>Last Free Date</label>
+                    <div className="controller-instructions-input-wrapper" ref={fieldRefs.current.lastFreeDate}>
                       <input
                         type="date"
-                        className={`controller-instructions-form-input ${fieldErrors.deadline ? "controller-instructions-error-field" : ""}`}
-                        ref={deadlineDateRef}
+                        className={`controller-instructions-form-input ${fieldErrors.lastFreeDate ? "controller-instructions-error-field" : ""}`}
+                        ref={lastFreeDateRef}
                         placeholder="Date here"
-                        name="deadline"
-                        value={formData.deadline}
+                        name="lastFreeDate"
+                        value={formData.lastFreeDate}
                         onChange={handleInputChange}
-                        min={formData.pickupDate || today}
+                        min={today}
                         style={{ width: "100%" }}
                       />
-                      <ErrorTooltip message={fieldErrors.deadline} />
+                      <ErrorTooltip message={fieldErrors.lastFreeDate} />
                     </div>
                   </div>
                 </div>
@@ -2720,3 +2676,6 @@ const ControllerInstructions = () => {
 }
 
 export default ControllerInstructions
+
+
+
