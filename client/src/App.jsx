@@ -104,7 +104,7 @@ import {
 
 import { WageReports } from "./pages/Reports";
 
-import { ClientList } from "./pages/add-on's";
+import { ClientList, AddOnList, AddOnForm } from "./pages/add-on's";
 
 // CSS Imports
 import "./css/components.css";
@@ -184,6 +184,8 @@ function DynamicHeader() {
     "/reports": "Reports",
     "/wage-reports": "Wage Reports",
     "/view-client-list": "Add On's",
+    "/view-add-on-list": "Add On's",
+    "/add-on-form": "Add On's",
   };
 
   const getTitle = () => {
@@ -379,6 +381,8 @@ function ContentWrapper() {
         <Route path="/reports" element={<ReportsPage />} />
         <Route path="/wage-reports" element={<WageReports />} />
         <Route path="/view-client-list" element={<ClientList />} />
+        <Route path="/view-add-on-list" element={<AddOnList />} />
+        <Route path="/add-on-form" element={<AddOnForm />} />
       </Routes>
       {shouldShowFooter && <Footer />} {/* Conditionally render footer */}
     </div>

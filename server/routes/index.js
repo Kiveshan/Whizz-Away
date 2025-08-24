@@ -8,8 +8,8 @@ import manageTruckRoutes from "./manage/truckRoutes.js";
 import manageDriverRatesRoutes from "./manage/driverRatesRoutes.js";
 import manageSubbieRoutes from "./manage/subbieRoutes.js";
 import manageTrailerRoutes from "./manage/trailerRoutes.js";
-import supplierRoutes from "./manage/supplierRoutes.js"
-import expenseTypeRoutes from "./manage/expenseTypeRoutes.js"
+import supplierRoutes from "./manage/supplierRoutes.js";
+import expenseTypeRoutes from "./manage/expenseTypeRoutes.js";
 import manageClientRateRoutes from "./manage/clientRateRoutes.js";
 import manageCompanyRoutes from "./manage/companyRoutes.js";
 import paymentRoutes from "./payments/paymentRoutes.js";
@@ -28,7 +28,7 @@ import purchaseOrderRoutes from "./purchaseOrder/purchaseOrderRoutes.js";
 import instructionRoutes from "./instructions/instructionRoutes.js";
 import assignmentRoutes from "./assignments/assignmentRoutes.js";
 import subcontractorsRoutes from "./subcontractors/subContractorRoutes.js";
-
+import addonRoutes from "./add-ons/addonRoutes.js";
 
 const router = express.Router();
 
@@ -61,5 +61,6 @@ router.use(purchaseOrderRoutes);
 router.use("/api/instructions", instructionRoutes);
 router.use(assignmentRoutes);
 router.use(subcontractorsRoutes);
+router.use(addonRoutes);
 
 export default router;

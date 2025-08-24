@@ -76,7 +76,7 @@ const ClientList = () => {
   const handleViewInvoices = useCallback(
     (client) => {
       // Navigate to invoices page with client information
-      navigate("/invoices", {
+      navigate("/view-add-on-list", {
         state: {
           clientId: client.m5clientkey,
           clientName: client.companyname,
