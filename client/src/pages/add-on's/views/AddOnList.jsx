@@ -179,25 +179,25 @@ const AddOnList = () => {
 
   if (loading)
     return (
-      <div className="client-payment-dashboard-wrapper">
+      <div className="add-on-list-wrapper">
         <div>Loading add-ons...</div>
       </div>
     );
   if (error)
     return (
-      <div className="client-payment-dashboard-wrapper">
+      <div className="add-on-list-wrapper">
         <div className="error-message">Error: {error}</div>
       </div>
     );
   if (!clientId)
     return (
-      <div className="client-payment-dashboard-wrapper">
+      <div className="add-on-list-wrapper">
         <div>Please select a client from the previous page.</div>
       </div>
     );
 
   return (
-    <div className="client-payment-dashboard-wrapper">
+    <div className="add-on-list-wrapper">
       <div className="client-payment-container">
         <div className="header-actions">
           <button onClick={handleBack} className="back-button">

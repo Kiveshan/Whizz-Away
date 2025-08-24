@@ -206,7 +206,9 @@ const AddOnForm = () => {
   if (!clientId) {
     return (
       <div className="addon-form-wrapper">
-        <div>Please select a client from the previous page.</div>
+        <div className="addon-form-container">
+          <div>Please select a client from the previous page.</div>
+        </div>
       </div>
     );
   }
@@ -237,118 +239,204 @@ const AddOnForm = () => {
   return (
     <div className="addon-form-wrapper">
       <div className="addon-form-container">
-        <div className="header-actions">
-          <button onClick={handleBack} className="back-button">
-            Back
-          </button>
-          <h2>
-            {isViewMode
-              ? `Add-On Details for ${clientName}`
-              : `Create Add-On for ${clientName}`}
-          </h2>
+        <div className="invoice-header">
+          <div className="company-info">
+            <h1 className="company-name">Your Company Name</h1>
+            <p className="company-address">
+              123 Business Street
+              <br />
+              City, Province 12345
+              <br />
+              Phone: (123) 456-7890
+            </p>
+          </div>
+          <div className="invoice-details">
+            <h2 className="invoice-title">
+              {isViewMode ? "ADD-ON INVOICE" : "CREATE ADD-ON INVOICE"}
+            </h2>
+            {isViewMode && formData.invoice_number && (
+              <p className="invoice-number">
+                Invoice #: {formData.invoice_number}
+              </p>
+            )}
+            <p className="invoice-date">
+              Date: {new Date().toLocaleDateString()}
+            </p>
+          </div>
         </div>
 
-        <form onSubmit={handleSubmit} className="addon-form">
-          {error && <div className="error-message">{error}</div>}
-
-          {isViewMode && (
-            <div className="form-group">
-              <label htmlFor="invoice_number">Invoice Number</label>
-              <input
-                type="text"
-                id="invoice_number"
-                name="invoice_number"
-                value={formData.invoice_number}
-                className="form-input"
-                readOnly
-              />
-            </div>
-          )}
-
-          <div className="form-group">
-            <label htmlFor="category">Category *</label>
-            <select
-              id="category"
-              name="category"
-              value={formData.category}
-              onChange={handleInputChange}
-              className="dropdown"
-              required
-              disabled={isViewMode} // Disable in view mode
-            >
-              <option value="">Select Category</option>
-              {categories.map((cat, index) => (
-                <option key={index} value={cat}>
-                  {cat}
-                </option>
-              ))}
-            </select>
+        <div className="client-section">
+          <div className="bill-to">
+            <h3>Bill To:</h3>
+            <p className="client-name">{clientName}</p>
           </div>
-
-          <div className="form-group">
-            <label htmlFor="amount">Amount (R) *</label>
-            <input
-              type="text"
-              id="amount"
-              name="amount"
-              value={formData.amount}
-              onChange={handleInputChange}
-              placeholder="0.00"
-              className="form-input"
-              required
-              readOnly={isViewMode} // Read-only in view mode
-            />
-          </div>
-
-          <div className="form-group">
-            <label htmlFor="date">Date *</label>
-            <input
-              type="date"
-              id="date"
-              name="date"
-              value={formData.date}
-              onChange={handleInputChange}
-              className="form-input"
-              required
-              readOnly={isViewMode} // Read-only in view mode
-            />
-          </div>
-
-          <div className="form-group">
-            <label htmlFor="description">Description *</label>
-            <textarea
-              id="description"
-              name="description"
-              value={formData.description}
-              onChange={handleInputChange}
-              placeholder="Enter detailed description of the add-on service..."
-              className="form-textarea"
-              rows="4"
-              required
-              readOnly={isViewMode} // Read-only in view mode
-            />
-          </div>
-
-          <div className="form-actions">
-            <button
-              type="button"
-              onClick={handleBack}
-              className="cancel-button"
-              disabled={loading}
-            >
-              {isViewMode ? "Back to List" : "Cancel"}
+          <div className="invoice-actions">
+            <button onClick={handleBack} className="back-button">
+              ← Back
             </button>
-            {!isViewMode && (
+          </div>
+        </div>
+
+        <div className="invoice-form-section">
+          <form onSubmit={handleSubmit} className="invoice-form">
+            {error && <div className="error-message">{error}</div>}
+
+            <div className="invoice-items-header">
+              <h3>Add-On Service Details</h3>
+            </div>
+
+            <div className="invoice-items-table">
+              <div className="form-row">
+                <div className="form-group">
+                  <label htmlFor="category">Service Category *</label>
+                  <select
+                    id="category"
+                    name="category"
+                    value={formData.category}
+                    onChange={handleInputChange}
+                    className="form-input"
+                    required
+                    disabled={isViewMode}
+                  >
+                    <option value="">Select Service Category</option>
+                    {categories.map((cat, index) => (
+                      <option key={index} value={cat}>
+                        {cat}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div className="form-group">
+                  <label htmlFor="date">Service Date *</label>
+                  <input
+                    type="date"
+                    id="date"
+                    name="date"
+                    value={formData.date}
+                    onChange={handleInputChange}
+                    className="form-input"
+                    required
+                    readOnly={isViewMode}
+                  />
+                </div>
+              </div>
+
+              <div className="form-group full-width">
+                <label htmlFor="description">Service Description *</label>
+                <textarea
+                  id="description"
+                  name="description"
+                  value={formData.description}
+                  onChange={handleInputChange}
+                  placeholder="Enter detailed description of the add-on service..."
+                  className="form-textarea"
+                  rows="4"
+                  required
+                  readOnly={isViewMode}
+                />
+              </div>
+
+              <div className="invoice-summary">
+                <div className="summary-row">
+                  <span className="summary-label">Service Amount:</span>
+                  <div className="amount-input-wrapper">
+                    <span className="currency-symbol">R</span>
+                    <input
+                      type="text"
+                      id="amount"
+                      name="amount"
+                      value={formData.amount}
+                      onChange={handleInputChange}
+                      placeholder="0.00"
+                      className="amount-input"
+                      required
+                      readOnly={isViewMode}
+                    />
+                  </div>
+                </div>
+
+                <div className="summary-row subtotal">
+                  <span className="summary-label">Subtotal:</span>
+                  <span className="summary-amount">
+                    R
+                    {formData.amount
+                      ? Number.parseFloat(formData.amount || 0).toLocaleString(
+                          "en-ZA",
+                          { minimumFractionDigits: 2 }
+                        )
+                      : "0.00"}
+                  </span>
+                </div>
+
+                <div className="summary-row vat">
+                  <span className="summary-label">VAT (15%):</span>
+                  <span className="summary-amount">
+                    R
+                    {formData.amount
+                      ? (
+                          Number.parseFloat(formData.amount || 0) * 0.15
+                        ).toLocaleString("en-ZA", {
+                          minimumFractionDigits: 2,
+                        })
+                      : "0.00"}
+                  </span>
+                </div>
+
+                <div className="summary-row total">
+                  <span className="summary-label">Total Amount:</span>
+                  <span className="summary-amount">
+                    R
+                    {formData.amount
+                      ? (
+                          Number.parseFloat(formData.amount || 0) * 1.15
+                        ).toLocaleString("en-ZA", {
+                          minimumFractionDigits: 2,
+                        })
+                      : "0.00"}
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            <div className="invoice-actions-footer">
               <button
-                type="submit"
-                className="upload-button"
+                type="button"
+                onClick={handleBack}
+                className="cancel-button"
                 disabled={loading}
               >
-                {loading ? "Creating..." : "Create Add-On"}
+                {isViewMode ? "Back to List" : "Cancel"}
               </button>
-            )}
+              {!isViewMode && (
+                <button
+                  type="submit"
+                  className="create-invoice-button"
+                  disabled={loading}
+                >
+                  {loading ? "Creating Invoice..." : "Create Add-On Invoice"}
+                </button>
+              )}
+            </div>
+          </form>
+        </div>
+
+        <div className="invoice-footer">
+          <div className="footer-notes">
+            <h4>Terms & Conditions:</h4>
+            <p>
+              Payment is due within 30 days of invoice date. Late payments may
+              incur additional charges.
+            </p>
           </div>
-        </form>
+          <div className="footer-contact">
+            <p>Thank you for your business!</p>
+            <p>
+              For questions about this invoice, please contact us at
+              billing@yourcompany.com
+            </p>
+          </div>
+        </div>
       </div>
     </div>
   );
