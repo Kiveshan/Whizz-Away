@@ -110,6 +110,30 @@
   transform: translateY(-1px);
 }
 
+/* Added print button styling */
+.print-button {
+  padding: 10px 20px;
+  background: linear-gradient(135deg, #3498db 0%, #2980b9 100%);
+  color: white;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 500;
+  transition: all 0.3s ease;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-left: 10px;
+  box-shadow: 0 2px 8px rgba(52, 152, 219, 0.3);
+}
+
+.print-button:hover {
+  background: linear-gradient(135deg, #2980b9 0%, #1f5f99 100%);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(52, 152, 219, 0.4);
+}
+
 /* Added invoice form section styling */
 .invoice-form-section {
   padding: 30px;

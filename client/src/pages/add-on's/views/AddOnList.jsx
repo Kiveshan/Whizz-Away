@@ -102,7 +102,7 @@ const AddOnList = () => {
   };
 
   const handleCreateAddOn = () => {
-    navigate(`/add-on-form`, {
+    navigate(`/addon-form`, {
       state: { clientId, clientName },
     });
   };
@@ -112,7 +112,7 @@ const AddOnList = () => {
   };
 
   const handleViewAddOn = (addonId) => {
-    navigate(`/add-on-form`, {
+    navigate(`/addon-form`, {
       state: { clientId, clientName, addonId },
     });
   };
@@ -203,7 +203,6 @@ const AddOnList = () => {
           <button onClick={handleBack} className="back-button">
             Back
           </button>
-          <h2>Add-Ons for {clientName}</h2>
         </div>
 
         <div className="action-bar">

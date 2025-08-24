@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import api from "../../../api";
 import "../css/AddOnForm.css";
+import jsPDF from "jspdf";
 
 const AddOnForm = () => {
   const navigate = useNavigate();
@@ -203,6 +204,70 @@ const AddOnForm = () => {
     });
   };
 
+  const handlePrint = () => {
+    const doc = new jsPDF();
+
+    // Company Header
+    doc.setFontSize(20);
+    doc.setFont("helvetica", "bold");
+    doc.text("Your Company Name", 20, 30);
+
+    doc.setFontSize(10);
+    doc.setFont("helvetica", "normal");
+    doc.text("123 Business Street", 20, 40);
+    doc.text("City, Province 12345", 20, 45);
+    doc.text("Phone: (123) 456-7890", 20, 50);
+
+    // Invoice Title and Details
+    doc.setFontSize(16);
+    doc.setFont("helvetica", "bold");
+    doc.text("ADD-ON INVOICE", 140, 30);
+
+    doc.setFontSize(10);
+    doc.setFont("helvetica", "normal");
+    if (formData.invoice_number) {
+      doc.text(`Invoice #: ${formData.invoice_number}`, 140, 40);
+    }
+    doc.text(`Date: ${new Date().toLocaleDateString()}`, 140, 45);
+
+    // Client Information
+    doc.setFontSize(12);
+    doc.setFont("helvetica", "bold");
+    doc.text("Bill To:", 20, 70);
+    doc.setFont("helvetica", "normal");
+    doc.text(clientName, 20, 80);
+
+    // Service Details
+    doc.setFontSize(12);
+    doc.setFont("helvetica", "bold");
+    doc.text("Service Details:", 20, 100);
+
+    doc.setFont("helvetica", "normal");
+    doc.text(`Category: ${formData.category}`, 20, 110);
+    doc.text(`Date: ${new Date(formData.date).toLocaleDateString()}`, 20, 120);
+    doc.text(`Description: ${formData.description}`, 20, 130);
+
+    // Financial Summary
+    const amount = Number.parseFloat(formData.amount || 0);
+    const vat = amount * 0.15;
+    const total = amount + vat;
+
+    doc.text(`Service Amount: R${amount.toFixed(2)}`, 20, 150);
+    doc.text(`VAT (15%): R${vat.toFixed(2)}`, 20, 160);
+    doc.setFont("helvetica", "bold");
+    doc.text(`Total Amount: R${total.toFixed(2)}`, 20, 170);
+
+    // Terms
+    doc.setFontSize(10);
+    doc.setFont("helvetica", "normal");
+    doc.text("Terms & Conditions:", 20, 190);
+    doc.text("Payment is due within 30 days of invoice date.", 20, 200);
+    doc.text("Thank you for your business!", 20, 220);
+
+    // Save the PDF
+    doc.save(`addon-invoice-${formData.invoice_number || "new"}.pdf`);
+  };
+
   if (!clientId) {
     return (
       <div className="addon-form-wrapper">
@@ -274,6 +339,11 @@ const AddOnForm = () => {
             <button onClick={handleBack} className="back-button">
               ← Back
             </button>
+            {isViewMode && (
+              <button onClick={handlePrint} className="print-button">
+                🖨️ Print Invoice
+              </button>
+            )}
           </div>
         </div>
 
