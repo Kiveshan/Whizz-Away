@@ -10,6 +10,11 @@ const reportsData = [
     image: "/images/reports.jpg", // Update with the correct image path
     path: "/wage-reports", // Define the path for Wage Reports
   },
+  {
+    title: "Profit & Loss Report",
+    image: "/images/reports.jpg",
+    path: "/income-expenditure-reports",
+  },
 ]
 
 const ReportsPage = () => {
