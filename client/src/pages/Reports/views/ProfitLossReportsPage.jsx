@@ -37,22 +37,27 @@ const ProfitLossReportsPage = () => {
             console.log(`Starting Profit & Loss report generation for ${monthName} ${selectedYear}`)
             const response = await api.get('/profit-loss-report', {
                 params: { month: monthName, year: selectedYear },
-            }, { responseType: 'blob' }); // Expecting a binary file response
+                responseType: 'blob', // Moved inside the config object
+            });
 
-            const url = window.URL.createObjectURL(new Blob([response.data]));
+            const url = window.URL.createObjectURL(new Blob([response.data], {
+                type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+            }));
             const link = document.createElement('a');
             link.href = url;
             link.download = `Profit_Loss_Report_${monthName}_${selectedYear}.xlsx`;
+            document.body.appendChild(link);
             link.click();
+            document.body.removeChild(link);
             window.URL.revokeObjectURL(url);
 
             console.log(`Report generated successfully: Profit_Loss_Report_${monthName}_${selectedYear}.xlsx`);
         } catch (error) {
-            console.error('Error generating report:', error)
-            alert(`Failed to generate report: ${error.message}`)
+            console.error('Error generating report:', error);
+            alert(`Failed to generate report: ${error.message}`);
         }
 
-        setGeneratingReport(false)
+        setGeneratingReport(false);
     }
 
     const buttons = [

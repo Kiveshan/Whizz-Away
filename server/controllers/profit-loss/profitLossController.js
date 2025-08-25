@@ -70,9 +70,15 @@ const generateProfitLossReport = async (req, res) => {
         // Generate and send file
         const filename = `Profit_Loss_Report_${month}_${year}.xlsx`;
         const buffer = await workbook.xlsx.writeBuffer();
+        console.log('Buffer length:', buffer.length); // Debug log
+
+        // Save to disk for verification (optional, uncomment and adjust path)
+        // const fs = require('fs');
+        // fs.writeFileSync(`/tmp/${filename}`, buffer);
+
         res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
         res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
-        res.send(Buffer.from(buffer));
+        res.send(buffer); // Send buffer directly, avoid Buffer.from()
     } catch (error) {
         console.error('Error generating report:', error);
         res.status(500).json({ error: 'Failed to generate report' });
