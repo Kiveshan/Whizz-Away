@@ -2,9 +2,14 @@ import { pool, query } from "../../config/database.js"
 
 // Helper function to calculate total cost based on rate weight type
 const calculateTotalCost = (instructionData) => {
+  // If the frontend has already calculated the total cost, use that value
+  if (instructionData.total_cost && !isNaN(Number(instructionData.total_cost))) {
+    return Number(Number(instructionData.total_cost).toFixed(2))
+  }
+  
   const rateWeight = instructionData.rateweight || instructionData.rateWeight || "Container"
-  const surchargeAmount = instructionData.surchages ? Number(instructionData.surcharge || 0) : 0
-
+  
+  // Calculate base cost without surcharges
   let baseCost = 0
 
   if (rateWeight === "Container") {
@@ -29,7 +34,12 @@ const calculateTotalCost = (instructionData) => {
     baseCost = weight * unitRate
   }
 
+  // Add surcharge amount if applicable
+  // Note: This is a simplified calculation that doesn't account for per-container surcharges
+  // The frontend should be calculating the total surcharge amount correctly
+  const surchargeAmount = instructionData.surcharges ? Number(instructionData.surchargesAmount || 0) : 0
   const totalCost = baseCost + surchargeAmount
+  
   return Number(totalCost.toFixed(2))
 }
 
@@ -47,7 +57,16 @@ export const getContainersByInstructionId = async (instructionId) => {
   // Convert instructionId to string to match database type
   const instructionIdStr = String(instructionId)
   const sql = `
-    SELECT containerkey, containernum, weight, m1key, container_type, cargo_description
+    SELECT 
+      containerkey, 
+      containernum, 
+      weight, 
+      m1key, 
+      container_type, 
+      cargo_description, 
+      "Hazardous", 
+      "Add Surcharges",
+      "Surcharge Amount"
     FROM public.container
     WHERE m1key = $1
     ORDER BY containerkey
@@ -73,8 +92,36 @@ export const getContainersByInstructionId = async (instructionId) => {
       duration: `${duration}ms`,
       sampleRows: (result.rows || result.recordset || []).slice(0, 3), // Log first 3 rows as sample
     })
+    
+    // Log the raw results to debug column names and values
+    console.log(`[${new Date().toISOString()}] getContainersByInstructionId: Raw container data:`, {
+      firstRow: result.rows?.[0] || result.recordset?.[0] || {},
+      columnNames: result.rows?.[0] ? Object.keys(result.rows[0]) : [],
+      hazardousValue: result.rows?.[0]?.["Hazardous"],
+      addSurchargesValue: result.rows?.[0]?.["Add Surcharges"],
+      hazardousType: result.rows?.[0]?.["Hazardous"] !== undefined ? typeof result.rows[0]["Hazardous"] : 'undefined',
+      addSurchargesType: result.rows?.[0]?.["Add Surcharges"] !== undefined ? typeof result.rows[0]["Add Surcharges"] : 'undefined',
+    })
 
-    return result.rows || result.recordset || []
+    // Process the results to ensure boolean values are properly converted
+    const processedContainers = (result.rows || result.recordset || []).map(container => ({
+      ...container,
+      "Hazardous": container["Hazardous"] === true || container["Hazardous"] === 'true' || false,
+      "Add Surcharges": container["Add Surcharges"] === true || container["Add Surcharges"] === 'true' || false,
+      "Surcharge Amount": container["Surcharge Amount"] || 0
+    }))
+
+    console.log(`[${new Date().toISOString()}] getContainersByInstructionId: Processed containers:`, {
+      processedContainers: processedContainers.slice(0, 2),
+      booleanValues: processedContainers.map(c => ({
+        containerkey: c.containerkey,
+        "Hazardous": c["Hazardous"],
+        "Add Surcharges": c["Add Surcharges"],
+        "Surcharge Amount": c["Surcharge Amount"]
+      }))
+    })
+
+    return processedContainers
   } catch (error) {
     console.error(`[${new Date().toISOString()}] Error in getContainersByInstructionId:`, {
       error: error.message,
@@ -95,7 +142,6 @@ export const saveInstruction = async ({ controllerData, containerData }) => {
     const controllerQuery = `
       INSERT INTO public.m1_controller (
         client, "ksmFileRef", shipment_type, pickup, dropoff, 
-        hazardous, surchages, surcharge, 
         stackdate, "lastFreeDate", "clientFileRef", rateweight, 
         description, status, vat,
         num_six_meters, num_twelve_meters, num_abnormal, num_breakbulk,
@@ -103,9 +149,9 @@ export const saveInstruction = async ({ controllerData, containerData }) => {
         rateper_6, rateper_12, rateper_abnormal, rateper_breakbulk, unitrate,
         created_at
       ) VALUES (
-        $1, $2, $3, $4, $5, $6, $7, $8, 
-        $9, $10, $11, $12, $13, $14, $15, $16, $17, $18,
-        $19, $20, $21, $22, $23, $24, $25, $26, $27, $28, $29
+        $1, $2, $3, $4, $5, 
+        $6, $7, $8, $9, $10, $11, $12, $13, $14, $15,
+        $16, $17, $18, $19, $20, $21, $22, $23, $24, $25, $26
       ) RETURNING m1key
     `
 
@@ -160,7 +206,7 @@ export const saveInstruction = async ({ controllerData, containerData }) => {
       dropoff: controllerData.dropoff,
       hazardous: Boolean(controllerData.hazardous) || false,
       surcharges: Boolean(controllerData.surcharges) || false,
-      surchargeAmount: controllerData.surcharge || 0, // Use the already calculated surcharge
+      surchargesAmount: controllerData.surchargesAmount || 0, // Use the surcharge amount from client rate
       rateWeight: controllerData.rateWeight,
       description: controllerData.description,
       bookingRef: controllerData.booking_ref || controllerData.bookingRef,
@@ -168,7 +214,9 @@ export const saveInstruction = async ({ controllerData, containerData }) => {
       weight: controllerData.weight, // Already null if container-based from frontend
       unitrate: controllerData.unitrate, // Already null if container-based from frontend
       vat: controllerData.vat || 15,
-      total_cost: controllerData.total_cost || calculateTotalCost(controllerData),
+      total_cost: controllerData.total_cost ? Number(Number(controllerData.total_cost).toFixed(2)) : calculateTotalCost(controllerData), // Directly use frontend total_cost if available
+      // Debug log for total cost
+      _debug_frontend_total_cost: controllerData.total_cost,
 
       // Container counts and rates (already handled for null/0 by frontend)
       num_six_meters: controllerData.num_six_meters || 0,
@@ -181,6 +229,8 @@ export const saveInstruction = async ({ controllerData, containerData }) => {
       rateper_breakbulk: controllerData.rateper_breakbulk,
     }
 
+    console.log("MODEL: Original total_cost from controller:", controllerData.total_cost);
+    console.log("MODEL: Calculated/processed total_cost being saved:", fields.total_cost);
     console.log("Processed fields for saving:", {
       client: fields.client,
       ksmFileRef: fields.ksmFileRef, // renamed from task
@@ -214,15 +264,14 @@ export const saveInstruction = async ({ controllerData, containerData }) => {
       created_at: formatDate(new Date()),
     })
 
+    console.log("MODEL: Total cost value right before SQL insertion:", fields.total_cost);
+    
     const controllerValues = [
       fields.client,
       fields.ksmFileRef, // renamed from task
       fields.shipmentType,
       fields.pickup,
       fields.dropoff,
-      fields.hazardous,
-      fields.surcharges,
-      fields.surchargeAmount,
       formatDate(fields.stackDate), // Will be null if cross-haul
       formatDate(fields.lastFreeDate), // renamed from deadline
       fields.clientFileRef, // renamed from fileRef
@@ -235,7 +284,7 @@ export const saveInstruction = async ({ controllerData, containerData }) => {
       fields.num_abnormal,
       fields.num_breakbulk,
       fields.weight, // Will be null if container-based
-      fields.total_cost,
+      fields.total_cost, // This is the value being inserted into the database
       fields.bookingRef,
       fields.vesselName, // Will be null if cross-haul
       fields.rateper_6, // Will be null if weight-based
@@ -248,13 +297,20 @@ export const saveInstruction = async ({ controllerData, containerData }) => {
 
     const controllerResult = await client.query(controllerQuery, controllerValues)
     const m1key = controllerResult.rows[0].m1key
+    
+    console.log("MODEL: SQL query executed. Inserted m1key:", m1key);
+    
+    // Verify the saved total_cost
+    const verifyQuery = `SELECT total_cost FROM public.m1_controller WHERE m1key = $1`;
+    const verifyResult = await client.query(verifyQuery, [m1key]);
+    console.log("MODEL: Verified total_cost in database:", verifyResult.rows[0]?.total_cost);
 
     for (const container of containerData) {
       const containerQuery = `
         INSERT INTO public.container (
-          containernum, weight, m1key, container_type, cargo_description
+          containernum, weight, m1key, container_type, cargo_description, "Hazardous", "Add Surcharges", "Surcharge Amount"
         ) VALUES (
-          $1, $2, $3, $4, $5
+          $1, $2, $3, $4, $5, $6, $7, $8
         )
       `
 
@@ -275,11 +331,14 @@ export const saveInstruction = async ({ controllerData, containerData }) => {
       }
 
       const containerValues = [
-        container.containerNum,
+        container.containerNum || container.containernum || "",
         sanitizedWeight, // Will be null for empty/invalid values
         m1key,
-        container.container_type,
-        container.cargo_description || "",
+        container.container_type || container.containerType || "",
+        container.cargo_description || container.cargoDescription || "",
+        container["Hazardous"] || container.hazardous || false,
+        container["Add Surcharges"] || container.surcharges || false,
+        (container["Add Surcharges"] || container.surcharges) ? (container["Surcharge Amount"] || fields.surchargesAmount || 0) : 0, // Use container surcharge amount or the global surcharge amount if surcharges are enabled
       ]
       await client.query(containerQuery, containerValues)
     }
@@ -459,7 +518,10 @@ export const getInstructionById = async (instructionId) => {
         weight,
         container_type,
         cargo_description,
-        m1key
+        m1key,
+        "Hazardous",
+        "Add Surcharges",
+        "Surcharge Amount"
       FROM 
         public.container
       WHERE 
@@ -476,7 +538,10 @@ export const getInstructionById = async (instructionId) => {
               'weight', c.weight,
               'container_type', c.container_type,
               'cargo_description', c.cargo_description,
-              'm1key', c.m1key
+              'm1key', c.m1key,
+              'Hazardous', COALESCE(c."Hazardous", false),
+              'Add Surcharges', COALESCE(c."Add Surcharges", false),
+              'Surcharge Amount', COALESCE(c."Surcharge Amount", 0)
             )
             ORDER BY c.containerkey
           )
@@ -507,30 +572,28 @@ export const updateInstruction = async (instructionId, updatedData) => {
         shipment_type = $3,
         pickup = $4,
         dropoff = $5,
-        hazardous = $6,
-        surchages = $7,
         -- pickuptime and pickupdate fields removed
-        stackdate = $8,
-        "lastFreeDate" = $9, -- renamed from deadline
-        "clientFileRef" = $10, -- renamed from fileref, adjusted parameter numbers due to removed fields
-        rateweight = $11,
-        description = $12,
-        vat = $13,
-        num_six_meters = $14,
-        num_twelve_meters = $15,
-        num_abnormal = $16,
-        num_breakbulk = $17,
-        total_cost = $18, -- adjusted parameter numbers due to removed fields
-        weight = $19,
-        status = $20,
-        booking_ref = $21,
-        vessel_name = $22,
-        rateper_6 = $23,
-        rateper_12 = $24,
-        rateper_abnormal = $25,
-        rateper_breakbulk = $26,
-        unitrate = $27,
-        surcharge = $28 -- adjusted parameter number
+        stackdate = $6,
+        "lastFreeDate" = $7, -- renamed from deadline
+        "clientFileRef" = $8, -- renamed from fileref, adjusted parameter numbers due to removed fields
+        rateweight = $9,
+        description = $10,
+        vat = $11,
+        num_six_meters = $12,
+        num_twelve_meters = $13,
+        num_abnormal = $14,
+        num_breakbulk = $15,
+        total_cost = $16, -- adjusted parameter numbers due to removed fields
+        weight = $17,
+        status = $18,
+        booking_ref = $19,
+        vessel_name = $20,
+        rateper_6 = $21,
+        rateper_12 = $22,
+        rateper_abnormal = $23,
+        rateper_breakbulk = $24,
+        unitrate = $25,
+        
       WHERE m1key = $29 -- adjusted parameter number
       RETURNING *
     `
@@ -615,17 +678,22 @@ export const updateContainersByInstructionId = async (instructionId, containerDa
 
       const containerType = container.containerType || container.container_type || ""
       const cargoDescription = container.cargoDescription || container.cargo_description || ""
+      
+      // Get hazardous and surcharge flags with fallbacks
+      const hazardous = container.hazardous !== undefined ? container.hazardous : false
+      const addSurcharges = container.addSurcharges !== undefined ? container.addSurcharges : false
+      const surchargeAmount = container.surchargeAmount || container["Surcharge Amount"] || 0
 
       console.log(
-        `Inserting container: containerNum=${containerNum}, weight=${sanitizedWeight}, m1key=${instructionId}, container_type=${containerType}, cargo_description=${cargoDescription}`,
+        `Inserting container: containerNum=${containerNum}, weight=${sanitizedWeight}, m1key=${instructionId}, container_type=${containerType}, cargo_description=${cargoDescription}, hazardous=${hazardous}, addSurcharges=${addSurcharges}, surchargeAmount=${surchargeAmount}`,
       )
 
       const insertQuery = `
-        INSERT INTO public.container (containernum, weight, m1key, container_type, cargo_description)
-        VALUES ($1, $2, $3, $4, $5)
+        INSERT INTO public.container (containernum, weight, m1key, container_type, cargo_description, "Hazardous", "Add Surcharges", "Surcharge Amount")
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
         RETURNING containerkey
       `
-      const values = [containerNum, sanitizedWeight, instructionId, containerType, cargoDescription]
+      const values = [containerNum, sanitizedWeight, instructionId, containerType, cargoDescription, hazardous, addSurcharges, surchargeAmount]
 
       const result = await client.query(insertQuery, values)
       console.log(`Inserted container with ID: ${result.rows[0].containerkey}`)
@@ -945,11 +1013,31 @@ const compareContainers = (currentContainers, newContainers) => {
         const containerType = newContainer.containerType || newContainer.container_type || ""
         const cargoDescription = newContainer.cargoDescription || newContainer.cargo_description || ""
 
+        // Handle surcharge and hazardous flags with proper boolean comparison
+        const currentHazardous = Boolean(currentContainer["Hazardous"])
+        const newHazardous = Boolean(newContainer["Hazardous"] || newContainer.hazardous)
+        const currentAddSurcharges = Boolean(currentContainer["Add Surcharges"])
+        const newAddSurcharges = Boolean(newContainer["Add Surcharges"] || newContainer.addSurcharges)
+        const currentSurchargeAmount = Number(currentContainer["Surcharge Amount"] || 0)
+        const newSurchargeAmount = Number(newContainer["Surcharge Amount"] || newContainer.surchargeAmount || 0)
+
         const hasChanges =
           currentContainer.containernum !== containerNum ||
           currentContainer.weight !== weight ||
           currentContainer.container_type !== containerType ||
-          currentContainer.cargo_description !== cargoDescription
+          currentContainer.cargo_description !== cargoDescription ||
+          currentHazardous !== newHazardous ||
+          currentAddSurcharges !== newAddSurcharges ||
+          currentSurchargeAmount !== newSurchargeAmount
+
+        console.log(`[${new Date().toISOString()}] [MODEL] Comparing container ${key}:`, {
+          containerNum: { current: currentContainer.containernum, new: containerNum, changed: currentContainer.containernum !== containerNum },
+          weight: { current: currentContainer.weight, new: weight, changed: currentContainer.weight !== weight },
+          hazardous: { current: currentHazardous, new: newHazardous, changed: currentHazardous !== newHazardous },
+          addSurcharges: { current: currentAddSurcharges, new: newAddSurcharges, changed: currentAddSurcharges !== newAddSurcharges },
+          surchargeAmount: { current: currentSurchargeAmount, new: newSurchargeAmount, changed: currentSurchargeAmount !== newSurchargeAmount },
+          hasChanges
+        })
 
         if (hasChanges) {
           changes.toUpdate.push({
@@ -958,6 +1046,9 @@ const compareContainers = (currentContainers, newContainers) => {
             weight: weight,
             container_type: containerType,
             cargo_description: cargoDescription,
+            "Hazardous": newHazardous,
+            "Add Surcharges": newAddSurcharges,
+            "Surcharge Amount": newSurchargeAmount,
           })
         }
       } else {
@@ -1057,9 +1148,6 @@ export const updateFCInstructionAndContainers = async (instructionId, instructio
       shipment_type: preserveExistingValue(instructionData.shipment_type, currentInstruction.shipment_type, "number"),
       pickup: preserveExistingValue(instructionData.pickup, currentInstruction.pickup, "string"),
       dropoff: preserveExistingValue(instructionData.dropoff, currentInstruction.dropoff, "string"),
-      hazardous: preserveExistingValue(instructionData.hazardous, currentInstruction.hazardous, "boolean"),
-      surchages: preserveExistingValue(instructionData.surchages, currentInstruction.surchages, "boolean"),
-      surcharge: preserveExistingValue(instructionData.surcharge, currentInstruction.surcharge, "number"),
       // pickuptime and pickupdate fields removed
       stackdate: preserveExistingValue(instructionData.stackdate, currentInstruction.stackdate, "string"),
       lastfreedate: preserveExistingValue(instructionData.lastFreeDate || instructionData.lastfreedate, currentInstruction.lastfreedate || currentInstruction.deadline, "string"), // renamed from deadline
@@ -1118,7 +1206,6 @@ export const updateFCInstructionAndContainers = async (instructionId, instructio
       { field: "shipment_type", type: "number" },
       { field: "pickup", type: "string" },
       { field: "dropoff", type: "string" },
-      { field: "hazardous", type: "boolean" },
       { field: "surchages", type: "boolean" },
       { field: "surcharge", type: "number" },
       // pickuptime and pickupdate fields removed
@@ -1162,12 +1249,11 @@ export const updateFCInstructionAndContainers = async (instructionId, instructio
         UPDATE public.m1_controller
         SET 
           client = $1, "ksmFileRef" = $2, shipment_type = $3, pickup = $4, dropoff = $5,
-          hazardous = $6, surchages = $7, surcharge = $8, 
-          stackdate = $9, "lastFreeDate" = $10, "clientFileRef" = $11, rateweight = $12, description = $13,
-          status = $14, vat = $15, num_six_meters = $16, num_twelve_meters = $17, num_abnormal = $18,
-          num_breakbulk = $19, weight = $20, total_cost = $21, booking_ref = $22, vessel_name = $23,
-          rateper_6 = $24, rateper_12 = $25, rateper_abnormal = $26, rateper_breakbulk = $27, unitrate = $28
-        WHERE m1key = $29
+          stackdate = $6, "lastFreeDate" = $7, "clientFileRef" = $8, rateweight = $9, description = $10,
+          status = $11, vat = $12, num_six_meters = $13, num_twelve_meters = $14, num_abnormal = $15,
+          num_breakbulk = $16, weight = $17, total_cost = $18, booking_ref = $19, vessel_name = $20,
+          rateper_6 = $21, rateper_12 = $22, rateper_abnormal = $23, rateper_breakbulk = $24, unitrate = $25
+        WHERE m1key = $26
         RETURNING *
       `
 
@@ -1177,9 +1263,6 @@ export const updateFCInstructionAndContainers = async (instructionId, instructio
         updateData.shipment_type,
         updateData.pickup,
         updateData.dropoff,
-        updateData.hazardous,
-        updateData.surchages,
-        updateData.surcharge,
         // pickuptime and pickupdate fields removed
         updateData.stackdate,
         updateData.lastfreedate || updateData.deadline, // renamed from deadline
@@ -1205,14 +1288,15 @@ export const updateFCInstructionAndContainers = async (instructionId, instructio
       ]
 
       console.log(`[${new Date().toISOString()}] [MODEL] Update values being sent to database:`, {
-        weight: updateValues[21], // $22
-        rateper_6: updateValues[25], // $26
-        rateper_12: updateValues[26], // $27
-        rateper_abnormal: updateValues[27], // $28
-        rateper_breakbulk: updateValues[28], // $29
-        unitrate: updateValues[29], // $30
-        surcharge: updateValues[7], // $8
-        total_cost: updateValues[22], // $23
+        weight: updateValues[16], // $17
+        total_cost: updateValues[17], // $18
+        booking_ref: updateValues[18], // $19
+        vessel_name: updateValues[19], // $20
+        rateper_6: updateValues[20], // $21
+        rateper_12: updateValues[21], // $22
+        rateper_abnormal: updateValues[22], // $23
+        rateper_breakbulk: updateValues[23], // $24
+        unitrate: updateValues[24], // $25
       })
 
       const updateResult = await client.query(updateInstructionQuery, updateValues)
@@ -1223,7 +1307,7 @@ export const updateFCInstructionAndContainers = async (instructionId, instructio
 
     // 5. Handle containers
     const getCurrentContainersQuery = `
-      SELECT containerkey, containernum, weight, container_type, cargo_description
+      SELECT containerkey, containernum, weight, container_type, cargo_description, "Add Surcharges", "Hazardous", "Surcharge Amount"
       FROM public.container
       WHERE m1key = $1
       ORDER BY containerkey
@@ -1267,19 +1351,35 @@ export const updateFCInstructionAndContainers = async (instructionId, instructio
         }
       }
 
+      // Debug log container data before update
+      console.log(`[${new Date().toISOString()}] [MODEL] Updating container ${container.containerkey} with data:`, {
+        containernum: container.containernum,
+        weight: sanitizedWeight,
+        container_type: container.container_type,
+        cargo_description: container.cargo_description,
+        "Add Surcharges": container["Add Surcharges"] || container.addSurcharges || false,
+        "Hazardous": container["Hazardous"] || container.hazardous || false,
+        "Surcharge Amount": container["Surcharge Amount"] || container.surchargeAmount || 0,
+        containerkey: container.containerkey,
+        containerKeyType: typeof container.containerkey
+      })
+
       const updateQuery = `
         UPDATE public.container 
-        SET containernum = $1, weight = $2, container_type = $3, cargo_description = $4
-        WHERE containerkey = $5
+        SET containernum = $1, weight = $2, container_type = $3, cargo_description = $4, "Add Surcharges" = $5, "Hazardous" = $6, "Surcharge Amount" = $7
+        WHERE containerkey = $8
       `
-      await client.query(updateQuery, [
+      const updateResult = await client.query(updateQuery, [
         container.containernum,
         sanitizedWeight, // Will be null for empty/invalid values
         container.container_type,
         container.cargo_description,
+        container["Add Surcharges"] || container.addSurcharges || false,
+        container["Hazardous"] || container.hazardous || false,
+        container["Surcharge Amount"] || container.surchargeAmount || 0,
         container.containerkey,
       ])
-      console.log(`[${new Date().toISOString()}] [MODEL] Updated container ${container.containerkey}`)
+      console.log(`[${new Date().toISOString()}] [MODEL] Container ${container.containerkey} update result: ${updateResult.rowCount} rows affected`)
     }
 
     // Insert new containers
@@ -1306,8 +1406,8 @@ export const updateFCInstructionAndContainers = async (instructionId, instructio
       const cargoDescription = container.cargoDescription || container.cargo_description || ""
 
       const insertQuery = `
-        INSERT INTO public.container (containernum, weight, m1key, container_type, cargo_description)
-        VALUES ($1, $2, $3, $4, $5)
+        INSERT INTO public.container (containernum, weight, m1key, container_type, cargo_description, "Add Surcharges", "Hazardous", "Surcharge Amount")
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
         RETURNING containerkey
       `
       const insertResult = await client.query(insertQuery, [
@@ -1316,6 +1416,9 @@ export const updateFCInstructionAndContainers = async (instructionId, instructio
         instructionId,
         containerType,
         cargoDescription,
+        container["Add Surcharges"] || container.surcharges || false,
+        container["Hazardous"] || container.hazardous || false,
+        container["Surcharge Amount"] || container.surchargeAmount || 0,
       ])
       console.log(`[${new Date().toISOString()}] [MODEL] Inserted new container ${insertResult.rows[0].containerkey}`)
     }
@@ -1371,14 +1474,14 @@ export const saveInstructionAndContainers = async (controllerData, containerData
     // Insert instruction
     const instructionQuery = `
       INSERT INTO public.m1_controller (
-        client, "ksmFileRef", shipment_type, pickup, dropoff, hazardous, surchages, surcharge,
+        client, "ksmFileRef", shipment_type, pickup, dropoff, surchages, surcharge,
         stackdate, "lastFreeDate", "clientFileRef", rateweight, description,
         status, vat, num_six_meters, num_twelve_meters, num_abnormal, num_breakbulk,
         weight, total_cost, booking_ref, vessel_name, rateper_6, rateper_12,
         rateper_abnormal, rateper_breakbulk, unitrate
       ) VALUES (
-        $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15,
-        $16, $17, $18, $19, $20, $21, $22, $23, $24, $25, $26, $27, $28
+        $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14,
+        $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25, $26, $27
       ) RETURNING m1key
     `
 
@@ -1388,7 +1491,6 @@ export const saveInstructionAndContainers = async (controllerData, containerData
       controllerData.shipment_type,
       controllerData.pickup,
       controllerData.dropoff,
-      controllerData.hazardous || false,
       controllerData.surchages || false,
       controllerData.surcharge || 0,
       // pickuptime and pickupdate fields removed
@@ -1436,8 +1538,8 @@ export const saveInstructionAndContainers = async (controllerData, containerData
       }
 
       const containerQuery = `
-        INSERT INTO public.container (containernum, weight, m1key, container_type, cargo_description)
-        VALUES ($1, $2, $3, $4, $5)
+        INSERT INTO public.container (containernum, weight, m1key, container_type, cargo_description, "Add Surcharges", "Hazardous", "Surcharge Amount")
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
       `
       const containerValues = [
         container.containerNum || container.containernum || "",
@@ -1445,6 +1547,9 @@ export const saveInstructionAndContainers = async (controllerData, containerData
         instructionId,
         container.container_type || container.containerType || "",
         container.cargo_description || container.cargoDescription || "",
+        container["Add Surcharges"] || container.surcharges || false,
+        container["Hazardous"] || container.hazardous || false,
+        container["Surcharge Amount"] || 0, // Add surcharge amount, default to 0 if not provided
       ]
       await client.query(containerQuery, containerValues)
     }

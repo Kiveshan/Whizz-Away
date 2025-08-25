@@ -283,6 +283,9 @@ const ControllerInstructions = () => {
           weight: (isImport || isExport || isCrossHaul) ? "" : null,
           containerType: type,
           cargoDescription: "",
+          // Initialize hazardous and surcharges properties for each container
+          hazardous: false,
+          surcharges: false,
         }
       }
 
@@ -319,43 +322,39 @@ const ControllerInstructions = () => {
   const handleContainerChange = useCallback(
     (id, field, value) => {
       if (field === "containerNum") {
-        // Container number validation
-        if (value.length > 11) return
+        // For export shipments, no validation is needed
+        if (isExport || formData.shipmentTypeId === "2") {
+          // Just ensure it doesn't exceed 20 characters
+          if (value.length > 20) return
+          
+          // Clear any existing errors
+          setContainerFieldErrors((prev) => {
+            const newErrors = { ...prev }
+            delete newErrors[`container-${id}`]
+            return newErrors
+          })
+        } else {
+          // For other shipment types, only check for uniqueness
+          // No format validation, just ensure it doesn't exceed 20 characters
+          if (value.length > 20) return
 
-        // First 4 letters, then 7 numbers
-        let newValue = ""
-        for (let i = 0; i < value.length; i++) {
-          const char = value[i]
-          if (i < 4) {
-            if (/^[a-zA-Z]$/.test(char)) newValue += char
-          } else if (/^[0-9]$/.test(char)) {
-            newValue += char
-          }
-        }
-
-        // Update field errors with format and uniqueness validation
-        let error = null
-        if (newValue.length > 0 && newValue.length < 11) {
-          error = "Does not match correct format (ABCD1234567)"
-        } else if (newValue.length === 11 && !/^[a-zA-Z]{4}[0-9]{7}$/.test(newValue)) {
-          error = "Does not match correct format (ABCD1234567)"
-        } else if (newValue.length === 11) {
           // Check for duplicates in real-time
-          const upperCaseValue = newValue.toUpperCase()
-          const duplicateExists = containers.some(
-            (container) => container.id !== id && container.containerNum.toUpperCase() === upperCaseValue,
-          )
-          if (duplicateExists) {
-            error = "Container number must be unique"
+          let error = null
+          if (value.trim() !== "") {
+            const upperCaseValue = value.toUpperCase()
+            const duplicateExists = containers.some(
+              (container) => container.id !== id && container.containerNum.toUpperCase() === upperCaseValue,
+            )
+            if (duplicateExists) {
+              error = "Container number must be unique"
+            }
           }
+
+          setContainerFieldErrors((prev) => ({
+            ...prev,
+            [`container-${id}`]: error,
+          }))
         }
-
-        setContainerFieldErrors((prev) => ({
-          ...prev,
-          [`container-${id}`]: error,
-        }))
-
-        value = newValue
       } else if (field === "weight" && value !== "") {
         // Only allow numbers and decimal point for weight
         if (!/^\d*\.?\d*$/.test(value)) return
@@ -402,8 +401,6 @@ const ControllerInstructions = () => {
       dropoff: "",
 
       // Other form fields
-      hazardous: false,
-      surcharges: false,
       surchargesAmount: "",
       stackDate: "",
       lastFreeDate: "",
@@ -506,8 +503,6 @@ const ControllerInstructions = () => {
         "",
 
       // Other special cases
-      hazardous: Boolean(preservedFormData?.hazardous || false),
-      surcharges: Boolean(preservedFormData?.surcharges || false),
       vat: Number(preservedFormData?.vat) || 15,
       total_cost: Number(preservedFormData?.total_cost) || 0,
     }
@@ -656,15 +651,16 @@ const ControllerInstructions = () => {
               updates.rateper_breakbulk = ""
             }
 
-            // Handle surcharges - only set the amount, don't auto-check the box
+            // Store the surcharge amount from rates for later use with container surcharges
             if (rates.surcharges !== undefined) {
               const surchargesNum = Number.parseFloat(rates.surcharges)
               const hasSurcharges = !isNaN(surchargesNum) && surchargesNum > 0
+              
+              // Log the surcharge amount from the API
+              console.log("Surcharge amount from API:", rates.surcharges, "Parsed value:", surchargesNum)
 
-              // Only set the amount, don't change the surcharges checkbox state here
-              updates.surchargesAmount = hasSurcharges ? surchargesNum.toString() : ""
-              updates.surcharges = hasSurcharges // Auto-check if there's a value from DB
-              updates.preserveSurcharges = hasSurcharges
+              // Only store the amount for reference, don't auto-check any boxes
+              updates.surchargesAmount = hasSurcharges ? surchargesNum.toString() : "0"
             }
           } else {
             // Clear all rate fields when no rates are found
@@ -673,7 +669,6 @@ const ControllerInstructions = () => {
             updates.abnormalRate = ""
             updates.rateper_breakbulk = ""
             updates.surchargesAmount = ""
-            updates.surcharges = false // Uncheck surcharges if no rates
             newRateLockStatus.sixMeter = false
             newRateLockStatus.twelveMeter = false
           }
@@ -683,17 +678,16 @@ const ControllerInstructions = () => {
         })
       } catch (error) {
         console.error("Error in fetchAndUpdateRates:", error)
-        // Clear rates and unlock fields on error
-        setFormData((prev) => ({
-          ...prev,
-          sixMeterRate: "",
-          twelveMeterRate: "",
-          abnormalRate: "",
-          rateper_breakbulk: "",
-          surchargesAmount: "",
-          surcharges: false,
-        }))
-        setRateLockStatus({ sixMeter: false, twelveMeter: false })
+          // Clear rates and unlock fields on error
+          setFormData((prev) => ({
+            ...prev,
+            sixMeterRate: "",
+            twelveMeterRate: "",
+            abnormalRate: "",
+            rateper_breakbulk: "",
+            surchargesAmount: "",
+          }))
+          setRateLockStatus({ sixMeter: false, twelveMeter: false })
       }
     }
 
@@ -751,7 +745,6 @@ const ControllerInstructions = () => {
         abnormalRate: "",
         rateper_breakbulk: "",
         surchargesAmount: "",
-        surcharges: false, // Uncheck surcharges when client changes
       }))
       setRateLockStatus({ sixMeter: false, twelveMeter: false })
 
@@ -1014,18 +1007,18 @@ const ControllerInstructions = () => {
     const containerNumbers = []
     let isValid = true
 
+    // For export shipments, skip container number validation
+    const isExportShipment = isExport || formData.shipmentTypeId === "2"
+
     // Check each container
     for (const container of containers) {
       const containerId = container.id
 
-      // Check if container number is required and present
-      if (!container.containerNum || container.containerNum.trim() === "") {
-        errors[`container-${containerId}`] = "Container number is required"
-        isValid = false
-      } else {
-        // Check format (existing validation)
-        if (container.containerNum.length !== 11 || !/^[a-zA-Z]{4}[0-9]{7}$/.test(container.containerNum)) {
-          errors[`container-${containerId}`] = "Does not match correct format (ABCD1234567)"
+      // For export shipments, File Reference is optional
+      if (!isExportShipment) {
+        // Check if container number is required and present
+        if (!container.containerNum || container.containerNum.trim() === "") {
+          errors[`container-${containerId}`] = "Container number is required"
           isValid = false
         } else {
           // Check for duplicates within current instruction
@@ -1251,21 +1244,48 @@ const ControllerInstructions = () => {
         console.log(`  Container Subtotal: R${totalCost.toFixed(2)}`)
       }
 
-      // Add surcharges
-      const surchargeAmount = formData.surcharges ? Number.parseFloat(formData.surchargesAmount || 0) : 0
-      const subtotalBeforeVAT = totalCost + surchargeAmount
+      // Calculate surcharges for each container with surcharges checked
+      let totalSurchargeAmount = 0;
+      
+      // Only process surcharges for container-based calculations
+      if (!isWeightBased && formData.rateWeight === "Container") {
+        // Get the client's surcharge rate from the client rates
+        // Default to 0 if not available
+        let clientSurchargeRate = 0;
+        
+        // Try to get the surcharge amount from formData
+        if (formData.surchargesAmount !== undefined && formData.surchargesAmount !== null && formData.surchargesAmount !== "") {
+          const parsedRate = Number.parseFloat(formData.surchargesAmount);
+          if (!isNaN(parsedRate)) {
+            clientSurchargeRate = parsedRate;
+          }
+        }
+        
+        console.log("Client Surcharge Rate:", clientSurchargeRate);
+        
+        // Calculate surcharges for each container that has surcharges checked
+        const containersWithSurcharges = containers.filter(c => c.surcharges);
+        console.log("Containers with surcharges:", containersWithSurcharges.length);
+        
+        // Add surcharge amount for each container with surcharges checked
+        containersWithSurcharges.forEach(() => {
+          totalSurchargeAmount += clientSurchargeRate;
+        });
+        
+        console.log("Total Surcharge Amount calculated:", totalSurchargeAmount);
+      }
+      
+      const subtotalBeforeVAT = totalCost + totalSurchargeAmount;
 
       costBreakdown.components.surcharges = {
-        applied: formData.surcharges,
-        amount: surchargeAmount,
-      }
-      costBreakdown.components.subtotalBeforeVAT = subtotalBeforeVAT
+        applied: totalSurchargeAmount > 0,
+        amount: totalSurchargeAmount,
+      };
+      costBreakdown.components.subtotalBeforeVAT = subtotalBeforeVAT;
 
-      console.log("SURCHARGES:")
-      console.log(`  Surcharges Applied: ${formData.surcharges ? "Yes" : "No"}`)
-      if (formData.surcharges) {
-        console.log(`  Surcharge Amount: R${surchargeAmount.toFixed(2)}`)
-      }
+      console.log("SURCHARGES:");
+      console.log(`  Containers with Surcharges: ${containers.filter(c => c.surcharges).length}`);
+      console.log(`  Total Surcharge Amount: R${totalSurchargeAmount.toFixed(2)}`);
       console.log(`  Subtotal (before VAT): R${subtotalBeforeVAT.toFixed(2)}`)
 
       // Calculate VAT (for display purposes only - not added to total cost saved to DB)
@@ -1291,8 +1311,8 @@ const ControllerInstructions = () => {
       costBreakdown.components.finalTotalSaved = totalCost
 
       console.log("FINAL COST BREAKDOWN:")
-      console.log(`  Base Cost: R${(totalCost - surchargeAmount).toFixed(2)}`)
-      console.log(`  Surcharges: R${surchargeAmount.toFixed(2)}`)
+      console.log(`  Base Cost: R${(totalCost - totalSurchargeAmount).toFixed(2)}`)
+      console.log(`  Surcharges: R${totalSurchargeAmount.toFixed(2)}`)
       console.log(`  TOTAL COST SAVED TO DB (excluding VAT): R${totalCost.toFixed(2)}`)
       console.log(`  VAT (calculated but not saved): R${vatAmount.toFixed(2)}`)
       console.log(`  Total with VAT (for reference): R${totalWithVAT.toFixed(2)}`)
@@ -1302,8 +1322,10 @@ const ControllerInstructions = () => {
       console.log("=== END TOTAL COST CALCULATION ===")
 
       // Prepare instruction data with null values for cross-haul and weight-based
+      // Remove hazardous and surcharges fields from formData to prevent them from being sent to m1_controller table
+      const { hazardous, surcharges, ...formDataWithoutContainerFields } = formData;
       const instructionData = {
-        ...formData,
+        ...formDataWithoutContainerFields,
         total_cost: totalCost, // This is now the subtotal without VAT
         // Set vessel_name and stackdate to null for cross-haul types
         vessel_name: isCrossHaul ? null : formData.vesselName,
@@ -1357,12 +1379,20 @@ const ControllerInstructions = () => {
         rateweight: formData.rateWeight,
         status: "New",
         vat: formData.vat,
-        surchages: formData.surcharges,
-        surcharge: surchargeAmount,
+        // Note: surcharge_amount is now stored in container table, not in instruction table
       }
 
       // Prepare container data (only for container-based calculations AND if unit type is Container)
       // Also ensure container details are not saved when rateWeight is kg or ton
+      // Get the client's surcharge rate for container calculations
+      let clientSurchargeRate = 0;
+      if (formData.surchargesAmount !== undefined && formData.surchargesAmount !== null && formData.surchargesAmount !== "") {
+        const parsedRate = Number.parseFloat(formData.surchargesAmount);
+        if (!isNaN(parsedRate)) {
+          clientSurchargeRate = parsedRate;
+        }
+      }
+      
       const containerData =
         !isWeightBased && formData.rateWeight === "Container" && formData.rateWeight !== "kg" && formData.rateWeight !== "ton"
           ? containers.map((container) => ({
@@ -1370,6 +1400,9 @@ const ControllerInstructions = () => {
               containerNum: container.containerNum,
               weight: (isImport || isExport || isCrossHaul) ? (container.weight === "" ? null : Number.parseFloat(container.weight || 0)) : null,
               cargo_description: container.cargoDescription || "",
+              "Hazardous": container.hazardous || false,
+              "Add Surcharges": container.surcharges || false,
+              "Surcharge Amount": container.surcharges ? clientSurchargeRate : 0, // Add surcharge amount if surcharges is checked
             }))
           : []
 
@@ -1757,7 +1790,7 @@ const ControllerInstructions = () => {
                 >
                   <div className="controller-instructions-container-input">
                     <label>6m</label>
-                    <div className="controller-instructions-container-rate-group">
+                    <div className="controller-instructions-container-rate-group" style={{ display: "flex", width: "100%" }}>
                       <input
                         type="number"
                         className={fieldErrors.containers ? "controller-instructions-error-field" : ""}
@@ -1767,7 +1800,7 @@ const ControllerInstructions = () => {
                         onChange={(e) => handleContainerCountChange("num_six_meters", e.target.value)}
                         disabled={isWeightBased}
                       />
-                      <div style={{ width: "100%" }}>
+                      <div style={{ width: "100%", marginLeft: "10px" }}>
                         <input
                           type="text"
                           value={
@@ -1805,7 +1838,7 @@ const ControllerInstructions = () => {
                             }
                           }}
                           style={{
-                            width: "50%",
+                            width: "100%",
                             padding: "8px",
                             border: "1px solid #000",
                             borderRadius: "4px",
@@ -1831,7 +1864,7 @@ const ControllerInstructions = () => {
                   </div>
                   <div className="controller-instructions-container-input">
                     <label>12m</label>
-                    <div className="controller-instructions-container-rate-group">
+                    <div className="controller-instructions-container-rate-group" style={{ display: "flex", width: "100%" }}>
                       <input
                         type="number"
                         className={fieldErrors.containers ? "controller-instructions-error-field" : ""}
@@ -1841,7 +1874,7 @@ const ControllerInstructions = () => {
                         onChange={(e) => handleContainerCountChange("num_twelve_meters", e.target.value)}
                         disabled={isWeightBased}
                       />
-                      <div style={{ width: "50%" }}>
+                      <div style={{ width: "100%", marginLeft: "10px" }}>
                         <input
                           type="text"
                           value={
@@ -1876,7 +1909,7 @@ const ControllerInstructions = () => {
                             }
                           }}
                           style={{
-                            width: "50%",
+                            width: "100%",
                             padding: "8px",
                             border: "1px solid #000",
                             borderRadius: "4px",
@@ -1902,7 +1935,7 @@ const ControllerInstructions = () => {
                   </div>
                   <div className="controller-instructions-container-input">
                     <label>Abnormal</label>
-                    <div className="controller-instructions-container-rate-group">
+                    <div className="controller-instructions-container-rate-group" style={{ display: "flex", width: "100%" }}>
                       <input
                         type="number"
                         className={fieldErrors.containers ? "controller-instructions-error-field" : ""}
@@ -1912,7 +1945,7 @@ const ControllerInstructions = () => {
                         onChange={(e) => handleContainerCountChange("num_abnormal", e.target.value)}
                         disabled={isWeightBased}
                       />
-                      <div style={{ width: "50%" }}>
+                      <div style={{ width: "100%", marginLeft: "10px" }}>
                         <input
                           type="text"
                           value={
@@ -1947,7 +1980,7 @@ const ControllerInstructions = () => {
                             }
                           }}
                           style={{
-                            width: "50%",
+                            width: "100%",
                             padding: "8px",
                             border: "1px solid #000",
                             borderRadius: "4px",
@@ -1981,7 +2014,7 @@ const ControllerInstructions = () => {
                     </div>
                   )}
                 </div>
-                {/* Hazardous, Surcharges, and Rates per - Horizontally Aligned */}
+                {/* Rates per - Horizontally Aligned */}
                 <div className="controller-instructions-form-row" style={{ margin: "16px 0", padding: "0 10px" }}>
                   <div
                     style={{
@@ -1995,84 +2028,6 @@ const ControllerInstructions = () => {
                       minWidth: 0,
                     }}
                   >
-                    {/* Hazardous Checkbox */}
-                    <label className="controller-instructions-checkbox-container" style={{ margin: "5px 0" }}>
-                      <input
-                        type="checkbox"
-                        name="hazardous"
-                        checked={formData.hazardous || false}
-                        onChange={handleInputChange}
-                      />
-                      <span className="controller-instructions-checkmark"></span>
-                      Hazardous
-                    </label>
-                    {/* Surcharges Checkbox */}
-                    <div
-                      style={{
-                        display: "flex",
-                        alignItems: "center",
-                        gap: "8px",
-                        whiteSpace: "nowrap",
-                        flexShrink: 0,
-                      }}
-                    >
-                      <label className="controller-instructions-checkbox-container" style={{ margin: "5px 0" }}>
-                        <input
-                          type="checkbox"
-                          name="surcharges"
-                          checked={!!formData.surcharges}
-                          onChange={(e) => {
-                            const checked = e.target.checked
-                            setFormData((prev) => ({
-                              ...prev,
-                              surcharges: checked,
-                              // Only clear surchargesAmount when unchecking and there's no surcharge from the API
-                              ...(!checked && !prev.sixMeterRate && !prev.twelveMeterRate && { surchargesAmount: "" }),
-                            }))
-                          }}
-                        />
-                        <span className="controller-instructions-checkmark"></span>
-                        Add Surcharges
-                      </label>
-                      {/* Surcharge Input */}
-                      {formData.surcharges && (
-                        <div className="controller-instructions-input-wrapper" style={{ width: "160px" }}>
-                          <input
-                            type="number"
-                            className="controller-instructions-form-input"
-                            placeholder="Enter surcharge"
-                            value={formData.surchargesAmount || ""}
-                            onChange={(e) => {
-                              const value = e.target.value
-                              setFormData((prev) => ({
-                                ...prev,
-                                surchargesAmount: value,
-                                surcharges: value !== "" && value !== "0",
-                                preserveSurcharges: true,
-                              }))
-                            }}
-                            onFocus={() => {
-                              if (!formData.surcharges) {
-                                setFormData((prev) => ({
-                                  ...prev,
-                                  surcharges: true,
-                                }))
-                              }
-                            }}
-                            min="0"
-                            step="0.01"
-                            style={{
-                              width: "100%",
-                              padding: "8px",
-                              border: "1px solid #ccc",
-                              borderRadius: "4px",
-                              fontSize: "14px",
-                              backgroundColor: formData.surcharges ? "#f8f9fa" : "#fff",
-                            }}
-                          />
-                        </div>
-                      )}
-                    </div>
                     {/* unit per Section */}
                     <div
                       style={{
@@ -2492,9 +2447,11 @@ const ControllerInstructions = () => {
                     <tr>
                       <th style={{ width: "5%" }}>#</th>
                       <th style={{ width: "15%" }}>Container Type</th>
-                      <th style={{ width: "20%" }}>Container Number</th>
-                      {(isImport || isExport || isCrossHaul) && <th style={{ width: "15%" }}>Weight</th>}
-                      <th style={{ width: (isImport || isExport || isCrossHaul) ? "45%" : "60%" }}>Cargo Description</th>
+                      <th style={{ width: "20%" }}>{isExport || formData.shipmentTypeId === "2" ? "File Reference" : "Container Number"}</th>
+                      {(isImport || isExport || isCrossHaul) && <th style={{ width: "10%" }}>Weight</th>}
+                      <th style={{ width: (isImport || isExport || isCrossHaul) ? "30%" : "40%" }}>Cargo Description</th>
+                      <th style={{ width: "10%" }}>Hazardous</th>
+                      <th style={{ width: "10%" }}>Add Surcharges</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -2509,8 +2466,8 @@ const ControllerInstructions = () => {
                               className={`form-control form-control-sm ${containerFieldErrors[`container-${container.id}`] ? "is-invalid" : ""}`}
                               value={container.containerNum}
                               onChange={(e) => handleContainerChange(container.id, "containerNum", e.target.value)}
-                              placeholder="ABCD1234567"
-                              maxLength={11}
+                              placeholder={isExport || formData.shipmentTypeId === "2" ? "Enter file reference" : "Enter container number"}
+                              maxLength={20}
                               style={{
                                 minWidth: "120px",
                                 backgroundColor: containerFieldErrors[`container-${container.id}`]
@@ -2631,6 +2588,28 @@ const ControllerInstructions = () => {
                             onChange={(e) => handleContainerChange(container.id, "cargoDescription", e.target.value)}
                             placeholder="Enter cargo description"
                           />
+                        </td>
+                        <td style={{ textAlign: "center" }}>
+                          <div className="form-check" style={{ display: "flex", justifyContent: "center" }}>
+                            <input
+                              type="checkbox"
+                              className="form-check-input"
+                              checked={container.hazardous || false}
+                              onChange={(e) => handleContainerChange(container.id, "hazardous", e.target.checked)}
+                              style={{ cursor: "pointer" }}
+                            />
+                          </div>
+                        </td>
+                        <td style={{ textAlign: "center" }}>
+                          <div className="form-check" style={{ display: "flex", justifyContent: "center" }}>
+                            <input
+                              type="checkbox"
+                              className="form-check-input"
+                              checked={container.surcharges || false}
+                              onChange={(e) => handleContainerChange(container.id, "surcharges", e.target.checked)}
+                              style={{ cursor: "pointer" }}
+                            />
+                          </div>
                         </td>
                       </tr>
                     ))}

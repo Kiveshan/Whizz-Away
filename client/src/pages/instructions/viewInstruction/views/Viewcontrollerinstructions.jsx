@@ -125,6 +125,9 @@ const Viewcontrollerinstructions = () => {
   // State to track if shipment type is Import
   const [isImport, setIsImport] = useState(false)
 
+  // State to track if shipment type is Export
+  const [isExport, setIsExport] = useState(false)
+
   // State to track if shipment type is cross-haul or shipmentID is 3
   const [isCrossHaulOrSpecial, setIsCrossHaulOrSpecial] = useState(false)
 
@@ -302,11 +305,15 @@ const Viewcontrollerinstructions = () => {
             console.log("Formatted data before setFormData:", formattedData)
       setFormData(formattedData)
 
-      // Set isImport based on the fetched shipment type
+      // Set isImport and isExport based on the fetched shipment type
       const shipmentTypeName = data.shipmenttype || ""
-      const isImportValue = shipmentTypeName.toLowerCase() === "import"
+      const shipmentTypeIdValue = data.shipment_type?.toString() || ""
+      const isImportValue = shipmentTypeName.toLowerCase() === "import" || shipmentTypeIdValue === "1"
+      const isExportValue = shipmentTypeName.toLowerCase() === "export" || shipmentTypeIdValue === "2"
       console.log("Setting isImport to:", isImportValue)
+      console.log("Setting isExport to:", isExportValue)
       setIsImport(isImportValue)
+      setIsExport(isExportValue)
 
       // Set isCrossHaulOrSpecial based on shipment type or ID
       const isCrossHaul =
@@ -451,6 +458,8 @@ const Viewcontrollerinstructions = () => {
         weight: "",
         containerType: "6m",
         cargoDescription: "",
+        hazardous: false,
+        addSurcharges: false
       })
     }
 
@@ -463,6 +472,8 @@ const Viewcontrollerinstructions = () => {
         weight: "",
         containerType: "12m",
         cargoDescription: "",
+        hazardous: false,
+        addSurcharges: false
       })
     }
 
@@ -475,6 +486,8 @@ const Viewcontrollerinstructions = () => {
         weight: "",
         containerType: "Abnormal",
         cargoDescription: "",
+        hazardous: false,
+        addSurcharges: false
       })
     }
 
@@ -528,14 +541,38 @@ const Viewcontrollerinstructions = () => {
 
       if (data && data.length > 0) {
         // Map container data to match the expected format
-        const containersList = data.map((container, index) => ({
-          id: index + 1,
-          containerKey: container.containerkey,
-          containerNum: container.containernum ? container.containernum.toString() : "",
-          weight: container.weight !== null ? container.weight.toString() : "",
-          containerType: container.container_type || determineContainerType(index, formData),
-          cargoDescription: container.cargo_description || "",
-        }))
+        const containersList = data.map((container, index) => {
+          // Ensure container is not null or undefined before accessing properties
+          if (!container) {
+            console.log(`Container at index ${index} is null or undefined`);
+            return {
+              id: index + 1,
+              containerKey: null,
+              containerNum: "",
+              weight: "",
+              containerType: determineContainerType(index, formData),
+              cargoDescription: "",
+              hazardous: false,
+              addSurcharges: false
+            };
+          }
+          
+          // Log the container data to debug
+          console.log(`Container ${index} data:`, container);
+          
+          return {
+            id: index + 1,
+            containerKey: container.containerkey || null,
+            containerNum: container.containernum ? String(container.containernum) : "",
+            weight: container.weight != null ? String(container.weight) : "",
+            containerType: container.container_type || determineContainerType(index, formData),
+            cargoDescription: container.cargo_description || "",
+            // The column names in PostgreSQL are case-sensitive with quotes
+            // These fields might be missing if the backend query doesn't select them
+            hazardous: container["Hazardous"] === true || false,
+            addSurcharges: container["Add Surcharges"] === true || false,
+          };
+        })
         console.log("Mapped containers list:", containersList)
         setContainers(containersList)
       } else {
@@ -805,57 +842,7 @@ const Viewcontrollerinstructions = () => {
                       </div>
                     </div>
 
-                    {/* Hazardous and Surcharges Checkboxes - Horizontally Aligned */}
-                    <div
-                      className="controller-instructions-form-row"
-                      style={{ marginTop: "16px", marginBottom: "16px", marginLeft: "10px" }}
-                    >
-                      <div
-                        className="controller-instructions-form-field"
-                        style={{ display: "flex", flexDirection: "row", gap: "30px", alignItems: "center" }}
-                      >
-                        <label className="controller-instructions-checkbox-container" style={{ margin: "5px 0" }}>
-                          <input
-                            type="checkbox"
-                            name="hazardous"
-                            checked={formData.hazardous || false}
-                            disabled={true}
-                            style={nonEditableStyle}
-                          />
-                          <span className="controller-instructions-checkmark"></span>
-                          Hazardous Materials
-                        </label>
-                        <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
-                          <label className="controller-instructions-checkbox-container" style={{ margin: "5px 0" }}>
-                            <input
-                              type="checkbox"
-                              name="surchages"
-                              checked={formData.surchages || false}
-                              disabled={true}
-                              style={nonEditableStyle}
-                            />
-                            <span className="controller-instructions-checkmark"></span>
-                            Add Surcharges
-                          </label>
-                          {formData.surchages && (
-                            <div
-                              className="controller-instructions-input-wrapper"
-                              style={{ width: "150px", marginLeft: "10px" }}
-                            >
-                              <input
-                                type="number"
-                                className="controller-instructions-form-input"
-                                name="surcharge"
-                                value={formData.surcharge || ""}
-                                readOnly
-                                style={{ ...nonEditableStyle, width: "100%", padding: "4px 8px" }}
-                                placeholder="Amount"
-                              />
-                            </div>
-                          )}
-                        </div>
-                      </div>
-                    </div>
+                    {/* Hazardous and Surcharges Checkboxes removed */}
                   </div>
 
                   {/* Booking Vertical Group */}
@@ -1144,9 +1131,11 @@ const Viewcontrollerinstructions = () => {
                       <thead>
                         <tr>
                           <th>Container Type</th>
-                          <th>Container Number</th>
+                          <th>{isExport || formData.shipmentTypeId === "2" ? "File Reference" : "Container Number"}</th>
                           {(isImport || formData.shipmentTypeId === "2" || formData.shipmentTypeId === "3") && <th>Weight (kg)</th>}
                           <th>Cargo Description</th>
+                          <th>Hazardous</th>
+                          <th>Add Surcharges</th>
                         </tr>
                       </thead>
                       <tbody>
@@ -1187,6 +1176,24 @@ const Viewcontrollerinstructions = () => {
                                   style={nonEditableStyle}
                                 />
                               </div>
+                            </td>
+                            <td className="text-center">
+                              <input
+                                type="checkbox"
+                                checked={container.hazardous || false}
+                                readOnly
+                                disabled
+                                style={nonEditableStyle}
+                              />
+                            </td>
+                            <td className="text-center">
+                              <input
+                                type="checkbox"
+                                checked={container.addSurcharges || false}
+                                readOnly
+                                disabled
+                                style={nonEditableStyle}
+                              />
                             </td>
                           </tr>
                         ))}

@@ -97,7 +97,6 @@ const FCcontrollerinstructions = () => {
       rateper_6: preservedFormData?.rateper_6 || 0,
       rateper_12: preservedFormData?.rateper_12 || 0,
       rateper_abnormal: preservedFormData?.rateper_abnormal || 0,
-      surcharge: preservedFormData?.surcharge || 0,
       clientId: "",
       representative: "",
       contactDetails: "",
@@ -107,8 +106,6 @@ const FCcontrollerinstructions = () => {
       ksmFileRef: "",
       pickup: "",
       dropoff: "",
-      hazardous: false,
-      surchages: false,
       pickupTime: "",
       pickupDate: "",
       stackDate: "",
@@ -175,8 +172,6 @@ const FCcontrollerinstructions = () => {
       ksmFileRef: "",
       pickup: "",
       dropoff: "",
-      hazardous: false,
-      surchages: false,
       pickupTime: "",
       pickupDate: "",
       stackDate: "",
@@ -281,6 +276,9 @@ const FCcontrollerinstructions = () => {
             : null, // Initialize weight for import, export, and cross-haul
         containerType: "6m",
         cargoDescription: "",
+        hazardous: false,
+        addSurcharges: false,
+        surchargeAmount: 0,
       });
     }
 
@@ -298,6 +296,9 @@ const FCcontrollerinstructions = () => {
             : null, // Initialize weight for import, export, and cross-haul
         containerType: "12m",
         cargoDescription: "",
+        hazardous: false,
+        addSurcharges: false,
+        surchargeAmount: 0,
       });
     }
 
@@ -315,6 +316,9 @@ const FCcontrollerinstructions = () => {
             : null, // Initialize weight for import, export, and cross-haul
         containerType: "Abnormal",
         cargoDescription: "",
+        hazardous: false,
+        addSurcharges: false,
+        surchargeAmount: 0,
       });
     }
 
@@ -332,6 +336,9 @@ const FCcontrollerinstructions = () => {
             : null, // Initialize weight for import, export, and cross-haul
         containerType: "BreakBulk",
         cargoDescription: "",
+        hazardous: false,
+        addSurcharges: false,
+        surchargeAmount: 0,
       });
     }
 
@@ -346,26 +353,19 @@ const FCcontrollerinstructions = () => {
       const container = containers.find((c) => c.id === id);
       const currentValue = container ? container.containerNum : "";
 
-      // For container numbers, enforce the format: 4 letters followed by 7 numbers
-      if (value.length > 11) {
-        // Prevent entering more than 11 characters
+      // For container numbers, limit to 20 characters and allow alphanumeric only
+      if (value.length > 20) {
+        // Prevent entering more than 20 characters
         return;
       }
 
-      // Create a new value by validating each character
+      // Create a new value by validating each character (alphanumeric only)
       let newValue = "";
       for (let i = 0; i < value.length; i++) {
         const char = value[i];
-        if (i < 4) {
-          // First 4 positions: only allow letters
-          if (/^[a-zA-Z]$/.test(char)) {
-            newValue += char;
-          }
-        } else {
-          // Positions 5-11: only allow numbers
-          if (/^[0-9]$/.test(char)) {
-            newValue += char;
-          }
+        // Allow only alphanumeric characters
+        if (/^[a-zA-Z0-9]$/.test(char)) {
+          newValue += char;
         }
       }
 
@@ -435,7 +435,46 @@ const FCcontrollerinstructions = () => {
       return;
     }
 
-    // Update the container value
+    // Handle hazardous and addSurcharges checkbox fields
+    if (field === "hazardous" || field === "addSurcharges") {
+      if (field === "addSurcharges") {
+        console.log(`🔄 Surcharge checkbox ${value ? 'CHECKED' : 'UNCHECKED'} for container ${id}`);
+        if (value) {
+          // Checkbox checked - update state immediately, then fetch surcharge amount
+          setContainers((prevContainers) =>
+            prevContainers.map((container) =>
+              container.id === id 
+                ? { ...container, [field]: true }
+                : container
+            )
+          );
+          console.log(`📞 Calling fetchSurchargeAmount for container ${id}`);
+          fetchSurchargeAmount(id);
+        } else {
+          // Checkbox unchecked - reset surcharge amount to 0
+          setContainers((prevContainers) =>
+            prevContainers.map((container) =>
+              container.id === id 
+                ? { ...container, [field]: value, surchargeAmount: 0 }
+                : container
+            )
+          );
+          console.log(`🔄 Surcharge unchecked - reset amount to 0 for container ${id}`);
+          recalculateTotalCost();
+        }
+      } else {
+        // Handle hazardous checkbox normally
+        setContainers((prevContainers) =>
+          prevContainers.map((container) =>
+            container.id === id ? { ...container, [field]: value } : container
+          )
+        );
+      }
+      setIsContainerDataModified(true);
+      return;
+    }
+
+    // Update the container value for other fields
     setContainers((prevContainers) =>
       prevContainers.map((container) =>
         container.id === id ? { ...container, [field]: value } : container
@@ -451,16 +490,14 @@ const FCcontrollerinstructions = () => {
     let isValid = true;
 
     containers.forEach((container) => {
-      // Validate container number format: 4 letters followed by 7 numbers
-      if (!container.containerNum) {
-        newErrors[`container-${container.id}`] = "Container number is required";
-        isValid = false;
-      } else if (!/^[A-Za-z]{4}[0-9]{7}$/.test(container.containerNum)) {
-        newErrors[
-          `container-${container.id}`
-        ] = `Invalid format. Must be 4 letters followed by 7 numbers`;
-        isValid = false;
+      // Only validate container number if not export shipment type
+      if (String(formData.shipmentTypeId) !== "2") {
+        if (!container.containerNum) {
+          newErrors[`container-${container.id}`] = "Container number is required";
+          isValid = false;
+        }
       }
+      // No format validation - allowing any alphanumeric characters up to 20 characters
 
       // Validate weight for import, export, and cross-haul shipment types
       if (
@@ -644,19 +681,13 @@ const FCcontrollerinstructions = () => {
     // Container validation
     const containerErrors = {};
     containers.forEach((container) => {
-      if (!container.containerNum) {
+      // Only validate container number if not export shipment type
+      if (String(formData.shipmentTypeId) !== "2" && !container.containerNum) {
         containerErrors[`container-${container.id}`] =
           "Container number is required";
         isValid = false;
-      } else if (
-        container.containerNum.length !== 11 ||
-        !/^[a-zA-Z]{4}[0-9]{7}$/.test(container.containerNum)
-      ) {
-        containerErrors[
-          `container-${container.id}`
-        ] = `Does not match correct format (ABCD1234567)`;
-        isValid = false;
       }
+      // No format validation - allowing any alphanumeric characters up to 20 characters
 
       // Weight validation - only validate format if weight is provided
       if (
@@ -1019,10 +1050,14 @@ const FCcontrollerinstructions = () => {
         ratePer6 * numSix +
         ratePer12 * numTwelve +
         ratePerAbnormal * numAbnormal;
-      const surchargeAmount = formData.surchages
-        ? Number(formData.surcharge || 0)
-        : 0;
-      const totalCost = Number((baseCost + surchargeAmount).toFixed(2));
+      // Calculate total surcharge from containers
+      const totalSurchargeAmount = containers.reduce((total, container) => {
+        if (container.addSurcharges && container.surchargeAmount) {
+          return total + Number(container.surchargeAmount || 0);
+        }
+        return total;
+      }, 0);
+      const totalCost = Number((baseCost + totalSurchargeAmount).toFixed(2));
 
       // Prepare instruction update data with proper field mapping
       const instructionUpdateData = {
@@ -1032,9 +1067,6 @@ const FCcontrollerinstructions = () => {
         shipment_type: formData.shipmentTypeId,
         pickup: formData.pickup,
         dropoff: formData.dropoff,
-        hazardous: Boolean(formData.hazardous),
-        surchages: Boolean(formData.surchages),
-        surcharge: surchargeAmount,
         // pickuptime and pickupdate fields removed
         stackdate: formatDateForDB(formData.stackDate),
         lastFreeDate: formatDateForDB(formData.lastFreeDate),
@@ -1123,8 +1155,27 @@ const FCcontrollerinstructions = () => {
                 weight: sanitizedWeight, // Will be null for empty/invalid values
                 container_type: container.containerType || "",
                 cargo_description: container.cargoDescription || "",
+                "Hazardous": Boolean(container.hazardous),
+                "Add Surcharges": Boolean(container.addSurcharges),
+                "Surcharge Amount": Number(container.surchargeAmount || 0),
               };
             });
+
+      // Debug: Log the container data being sent to server
+      console.log("🚀 CONTAINER DATA BEING SENT TO SERVER:");
+      console.log("==========================================");
+      containerData.forEach((container, index) => {
+        console.log(`Container ${index}:`, {
+          containerKey: container.containerKey,
+          containernum: container.containernum,
+          "Add Surcharges": container["Add Surcharges"],
+          "Surcharge Amount": container["Surcharge Amount"],
+          "Hazardous": container["Hazardous"],
+          addSurchargesType: typeof container["Add Surcharges"],
+          surchargeAmountType: typeof container["Surcharge Amount"],
+          hazardousType: typeof container["Hazardous"]
+        });
+      });
 
       // Console log comparison between old and new data
       console.log("📋 DATA COMPARISON:");
@@ -1617,9 +1668,6 @@ const FCcontrollerinstructions = () => {
         ksmFileRef: data.ksmFileRef || "", // Updated from task to ksmFileRef
         pickup: data.pickup || "",
         dropoff: data.dropoff || "",
-        hazardous: data.hazardous || false,
-        surchages: data.surchages || false,
-        surcharge: data.surcharge || 0,
         // pickupTime and pickupDate fields removed
         stackDate: formatDateForInput(data.stackdate) || "",
         lastFreeDate: data.lastFreeDate ? formatDateForInput(data.lastFreeDate) : "", // Updated from deadline to lastFreeDate
@@ -1700,7 +1748,7 @@ const FCcontrollerinstructions = () => {
           shouldLoadWeight,
         });
 
-        // Log raw container data from database
+        // Log raw container data from database with all properties
         console.log(
           "Raw container data from database:",
           data.containers.map((c) => ({
@@ -1709,8 +1757,30 @@ const FCcontrollerinstructions = () => {
             weight: c.weight,
             weight_type: typeof c.weight,
             container_type: c.container_type,
+            cargo_description: c.cargo_description,
+            // Log the exact property names and values for surcharge flags
+            hazardous_flag: c["Hazardous"],
+            hazardous_flag_type: typeof c["Hazardous"],
+            hazardous_flag_value: String(c["Hazardous"]),
+            hazardous_flag_boolean: Boolean(c["Hazardous"]),
+            add_surcharges_flag: c["Add Surcharges"],
+            add_surcharges_flag_type: typeof c["Add Surcharges"],
+            add_surcharges_flag_value: String(c["Add Surcharges"]),
+            add_surcharges_flag_boolean: Boolean(c["Add Surcharges"]),
+            // Log all available properties on the container
+            all_properties: Object.keys(c),
           }))
         );
+        
+        // Log the raw JSON string to see exact values without any conversion
+        if (data.containers.length > 0) {
+          console.log("First container raw JSON:", JSON.stringify(data.containers[0]));
+        }
+        
+        // Log the first container object in full JSON format to see exact structure
+        if (data.containers.length > 0) {
+          console.log("First container full JSON:", JSON.stringify(data.containers[0], null, 2));
+        }
 
         const containersList = data.containers.map((container, index) => {
           // Process each container's weight value
@@ -1747,6 +1817,42 @@ const FCcontrollerinstructions = () => {
             );
           }
 
+          // Log individual container properties before mapping
+          console.log(`Processing container ${index}:`, {
+            containerkey: container.containerkey,
+            containernum: container.containernum,
+            hazardous_flag: container["Hazardous"],
+            hazardous_flag_exists: "Hazardous" in container,
+            add_surcharges_flag: container["Add Surcharges"],
+            add_surcharges_flag_exists: "Add Surcharges" in container,
+          });
+          
+          // Try alternative property access methods with explicit boolean conversion
+          // Add more detailed logging to diagnose the issue
+          console.log(`Container ${index} property check:`, {
+            hasHazardousProperty: "Hazardous" in container,
+            hasAddSurchargesProperty: "Add Surcharges" in container,
+            rawHazardousValue: container["Hazardous"],
+            rawAddSurchargesValue: container["Add Surcharges"],
+          });
+          
+          // Handle the hazardous flag - using the original column names from the database
+          let hazardousValue = false;
+          if (container["Hazardous"] !== undefined) {
+            hazardousValue = container["Hazardous"] === true || container["Hazardous"] === 'true';
+          }
+            
+          // Handle the add surcharges flag - using the original column names from the database
+          let addSurchargesValue = false;
+          if (container["Add Surcharges"] !== undefined) {
+            addSurchargesValue = container["Add Surcharges"] === true || container["Add Surcharges"] === 'true';
+          }
+          
+          console.log(`Container ${index} resolved flags:`, {
+            hazardous: hazardousValue,
+            addSurcharges: addSurchargesValue
+          });
+          
           return {
             id: container.containerkey || index + 1,
             containerKey: container.containerkey,
@@ -1754,12 +1860,27 @@ const FCcontrollerinstructions = () => {
             weight: weightValue,
             containerType: container.container_type || "6m",
             cargoDescription: container.cargo_description || "",
+            // Map the database column names to component property names with fallbacks
+            hazardous: hazardousValue,
+            addSurcharges: addSurchargesValue,
+            surchargeAmount: Number(container["Surcharge Amount"] || 0),
           };
         });
 
         console.log(
           "Setting containers from instruction data:",
           containersList
+        );
+        
+        // Log detailed information about hazardous and surcharge flags in the mapped containers
+        console.log("Container hazardous and surcharge flags:", 
+          containersList.map(c => ({
+            containerNum: c.containerNum,
+            hazardous: c.hazardous,
+            hazardous_type: typeof c.hazardous,
+            addSurcharges: c.addSurcharges,
+            addSurcharges_type: typeof c.addSurcharges
+          }))
         );
         setContainers(containersList);
         setIsContainerDataModified(false);
@@ -1803,6 +1924,53 @@ const FCcontrollerinstructions = () => {
     }
   }, [formData.clientId, formData.pickup]);
 
+  // useEffect to recalculate total cost when container surcharges change
+  useEffect(() => {
+    if (containers.length > 0) {
+      recalculateTotalCost();
+    }
+  }, [containers.map(c => c.addSurcharges).join(','), containers.map(c => c.surchargeAmount).join(',')]);
+
+  // Function to fetch surcharge amount from client rates
+  const fetchSurchargeAmount = async (containerId) => {
+    try {
+      console.log(`🌐 Fetching surcharge rates for client ${formData.clientId}, route: ${formData.pickup} → ${formData.dropoff}`);
+      const response = await api.get(
+        `/api/instructions/client/${formData.clientId}/rates`,
+        {
+          params: {
+            start: formData.pickup,
+            destination: formData.dropoff
+          }
+        }
+      );
+      
+      const surchargeAmount = response.data.surcharges || 0;
+      console.log(`💰 Fetched surcharge amount: ${surchargeAmount} for container ${containerId}`);
+      
+      setContainers(prevContainers =>
+        prevContainers.map(container =>
+          container.id === containerId
+            ? { ...container, surchargeAmount }
+            : container
+        )
+      );
+      
+      recalculateTotalCost();
+    } catch (error) {
+      console.error('❌ Error fetching surcharge amount:', error);
+      // Fallback to 0 if fetch fails
+      setContainers(prevContainers =>
+        prevContainers.map(container =>
+          container.id === containerId
+            ? { ...container, surchargeAmount: 0 }
+            : container
+        )
+      );
+      console.log(`⚠️ Using fallback surcharge amount: 0 for container ${containerId}`);
+    }
+  };
+
   // Helper function to calculate total cost from individual rates
   const calculateTotalCostFromRates = (
     rate6,
@@ -1812,7 +1980,28 @@ const FCcontrollerinstructions = () => {
     count12,
     countAbnormal
   ) => {
-    return rate6 * count6 + rate12 * count12 + rateAbnormal * countAbnormal;
+    const baseCost = rate6 * count6 + rate12 * count12 + rateAbnormal * countAbnormal;
+    
+    // Add container surcharge amounts
+    const surchargeTotal = containers
+      .filter(container => container.addSurcharges === true)
+      .reduce((total, container) => total + (container.surchargeAmount || 0), 0);
+    
+    return baseCost + surchargeTotal;
+  };
+
+  // Function for real-time total cost recalculation
+  const recalculateTotalCost = () => {
+    const newTotalCost = calculateTotalCostFromRates(
+      formData.rateper_6 || 0,
+      formData.rateper_12 || 0,
+      formData.rateper_abnormal || 0,
+      formData.num_six_meters || 0,
+      formData.num_twelve_meters || 0,
+      formData.num_abnormal || 0
+    );
+    
+    setFormData(prev => ({ ...prev, total_cost: newTotalCost }));
   };
 
   const fetchClients = async () => {
@@ -3354,7 +3543,7 @@ const FCcontrollerinstructions = () => {
                 </div>
               </div>
               <div className="controller-instructions-form-field">
-                <label>Name of Task</label>
+                <label>KSM File Reference</label>
                 <div
                   className="controller-instructions-input-wrapper"
                   ref={fieldRefs.ksmFileRef}
@@ -3366,7 +3555,7 @@ const FCcontrollerinstructions = () => {
                         ? "controller-instructions-error-field"
                         : ""
                     }`}
-                    placeholder="Input Name of Task"
+                    placeholder="Input KSM File Reference"
                     name="task"
                     value={formData.task}
                     onChange={handleInputChange}
@@ -3542,85 +3731,7 @@ const FCcontrollerinstructions = () => {
                     </div>
                   </div>
 
-                  {/* Hazardous and Surcharges Checkboxes - Horizontally Aligned */}
-                  <div
-                    className="controller-instructions-form-row"
-                    style={{
-                      marginTop: "16px",
-                      marginBottom: "16px",
-                      marginLeft: "10px",
-                    }}
-                  >
-                    <div
-                      className="controller-instructions-form-field"
-                      style={{
-                        display: "flex",
-                        flexDirection: "row",
-                        gap: "30px",
-                        alignItems: "center",
-                      }}
-                    >
-                      <label
-                        className="controller-instructions-checkbox-container"
-                        style={{ margin: "5px 0" }}
-                      >
-                        <input
-                          type="checkbox"
-                          name="hazardous"
-                          checked={formData.hazardous || false}
-                          onChange={handleInputChange}
-                          disabled={isReadOnly}
-                        />
-                        <span className="controller-instructions-checkmark"></span>
-                        Hazardous Materials
-                      </label>
-                      <div
-                        style={{
-                          display: "flex",
-                          alignItems: "center",
-                          gap: "10px",
-                        }}
-                      >
-                        <label
-                          className="controller-instructions-checkbox-container"
-                          style={{ margin: "5px 0" }}
-                        >
-                          <input
-                            type="checkbox"
-                            name="surchages"
-                            checked={formData.surchages || false}
-                            onChange={handleInputChange}
-                            disabled={isReadOnly}
-                          />
-                          <span className="controller-instructions-checkmark"></span>
-                          Add Surcharges
-                        </label>
-                        {formData.surchages && (
-                          <div
-                            className="controller-instructions-input-wrapper"
-                            style={{ width: "150px", marginLeft: "10px" }}
-                          >
-                            <input
-                              type="number"
-                              className="controller-instructions-form-input"
-                              name="surcharge"
-                              value={formData.surcharge || ""}
-                              onChange={handleInputChange}
-                              min="0"
-                              step="0.01"
-                              placeholder="Amount"
-                              style={{
-                                width: "100%",
-                                padding: "4px 8px",
-                                ...(isReadOnly ? readOnlyStyle : {}),
-                              }}
-                              disabled={isReadOnly}
-                            />
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                  </div>
+                  {/* Hazardous and Surcharges checkboxes have been removed from this section */}
                 </div>
                 {/* Main form section */}
                 <div
@@ -3979,7 +4090,7 @@ const FCcontrollerinstructions = () => {
                     </div>
                   </div>
                   <div className="controller-instructions-form-field">
-                    <label>Name of Task</label>
+                    <label>KSM File Reference</label>
                     <div
                       className="controller-instructions-input-wrapper"
                       ref={fieldRefs.ksmFileRef}
@@ -4213,7 +4324,7 @@ const FCcontrollerinstructions = () => {
                             borderBottom: "2px solid #ddd",
                           }}
                         >
-                          Container Number
+                          {String(formData.shipmentTypeId) === "2" ? "File Reference" : "Container Number"}
                         </th>
                         {/* Force string comparison for shipmentTypeId */}
                         {(isImport ||
@@ -4237,6 +4348,24 @@ const FCcontrollerinstructions = () => {
                           }}
                         >
                           Cargo Description
+                        </th>
+                        <th
+                          style={{
+                            padding: "12px 8px",
+                            textAlign: "center",
+                            borderBottom: "2px solid #ddd",
+                          }}
+                        >
+                          Hazardous
+                        </th>
+                        <th
+                          style={{
+                            padding: "12px 8px",
+                            textAlign: "center",
+                            borderBottom: "2px solid #ddd",
+                          }}
+                        >
+                          Add Surcharges
                         </th>
                       </tr>
                     </thead>
@@ -4263,8 +4392,8 @@ const FCcontrollerinstructions = () => {
                                     e.target.value
                                   )
                                 }
-                                placeholder="ABCD1234567"
-                                maxLength={11}
+                                placeholder="Up to 20 alphanumeric characters"
+                                maxLength={20}
                                 disabled={isReadOnly}
                                 style={isReadOnly ? readOnlyStyle : {}}
                               />
@@ -4376,6 +4505,48 @@ const FCcontrollerinstructions = () => {
                                 placeholder="Enter cargo description"
                                 disabled={isReadOnly}
                                 style={isReadOnly ? readOnlyStyle : {}}
+                              />
+                            </div>
+                          </td>
+                          <td style={{ textAlign: "center" }}>
+                            <div className="controller-instructions-checkbox-wrapper">
+                              <input
+                                type="checkbox"
+                                className="controller-instructions-form-checkbox"
+                                checked={container.hazardous === true}
+                                onChange={(e) =>
+                                  handleContainerChange(
+                                    container.id,
+                                    "hazardous",
+                                    e.target.checked
+                                  )
+                                }
+                                disabled={isReadOnly}
+                                style={{
+                                  transform: "scale(1.2)",
+                                  cursor: isReadOnly ? "default" : "pointer"
+                                }}
+                              />
+                            </div>
+                          </td>
+                          <td style={{ textAlign: "center" }}>
+                            <div className="controller-instructions-checkbox-wrapper">
+                              <input
+                                type="checkbox"
+                                className="controller-instructions-form-checkbox"
+                                checked={container.addSurcharges === true}
+                                onChange={(e) =>
+                                  handleContainerChange(
+                                    container.id,
+                                    "addSurcharges",
+                                    e.target.checked
+                                  )
+                                }
+                                disabled={isReadOnly}
+                                style={{
+                                  transform: "scale(1.2)",
+                                  cursor: isReadOnly ? "default" : "pointer"
+                                }}
                               />
                             </div>
                           </td>

@@ -79,6 +79,19 @@ const FCcontrollerInstructionDetails = () => {
         Abnormal: updatedControllerData.num_abnormal || 0,
       })
 
+      // Get the client's surcharge rate for container calculations
+      let clientSurchargeRate = 0;
+      if (updatedControllerData.surchargesAmount !== undefined && 
+          updatedControllerData.surchargesAmount !== null && 
+          updatedControllerData.surchargesAmount !== "") {
+        const parsedRate = Number.parseFloat(updatedControllerData.surchargesAmount);
+        if (!isNaN(parsedRate)) {
+          clientSurchargeRate = parsedRate;
+        }
+      }
+      
+      console.log("Client surcharge rate for containers:", clientSurchargeRate);
+      
       // Add 6m containers
       for (let i = 0; i < (updatedControllerData.num_six_meters || 0); i++) {
         containersList.push({
@@ -88,6 +101,9 @@ const FCcontrollerInstructionDetails = () => {
           weight: isImport ? "" : null,
           containerType: "6m",
           cargoDescription: "", // Add cargo description field
+          hazardous: false, // Add hazardous field
+          surcharges: Boolean(updatedControllerData.surcharges), // Add surcharges field
+          "Surcharge Amount": Boolean(updatedControllerData.surcharges) ? clientSurchargeRate : 0, // Add surcharge amount
         })
       }
 
@@ -100,6 +116,9 @@ const FCcontrollerInstructionDetails = () => {
           weight: isImport ? "" : null,
           containerType: "12m",
           cargoDescription: "", // Add cargo description field
+          hazardous: false, // Add hazardous field
+          surcharges: Boolean(updatedControllerData.surcharges), // Add surcharges field
+          "Surcharge Amount": Boolean(updatedControllerData.surcharges) ? clientSurchargeRate : 0, // Add surcharge amount
         })
       }
 
@@ -112,6 +131,9 @@ const FCcontrollerInstructionDetails = () => {
           weight: isImport ? "" : null,
           containerType: "Abnormal",
           cargoDescription: "", // Add cargo description field
+          hazardous: false, // Add hazardous field
+          surcharges: Boolean(updatedControllerData.surcharges), // Add surcharges field
+          "Surcharge Amount": Boolean(updatedControllerData.surcharges) ? clientSurchargeRate : 0, // Add surcharge amount
         })
       }
 
@@ -212,14 +234,20 @@ const FCcontrollerInstructionDetails = () => {
 
       if (response.data && response.data.length > 0) {
         // Map container data to our format
-        const containersList = response.data.map((container, index) => ({
-          id: index + 1,
-          containerKey: container.containerkey,
-          containerNum: container.containernum ? container.containernum.toString() : "",
-          weight: container.weight !== null ? container.weight.toString() : "",
-          containerType: container.container_type || "Unknown",
-          cargoDescription: container.cargo_description || "", // Add cargo description field
-        }))
+        const containersList = response.data.map((container, index) => {
+          console.log("Processing container:", container);
+          return {
+            id: index + 1,
+            containerKey: container.containerkey,
+            containerNum: container.containernum ? container.containernum.toString() : "",
+            weight: container.weight !== null ? container.weight.toString() : "",
+            containerType: container.container_type || "Unknown",
+            cargoDescription: container.cargo_description || "", // Add cargo description field
+            hazardous: container["Hazardous"] === true || container.hazardous === true || false, // Handle case-sensitive column name
+            surcharges: container["Add Surcharges"] === true || container.surcharges === true || Boolean(updatedControllerData.surcharges) || false, // Handle case-sensitive column name
+            "Surcharge Amount": container["Surcharge Amount"] || 0
+          };
+        })
 
         // Ensure the number of containers matches the counts in controllerData
         const updatedContainersList = syncContainersWithCounts(containersList)
@@ -249,92 +277,89 @@ const FCcontrollerInstructionDetails = () => {
     }
   }
 
-  // Sync containers with the counts from controllerData
-  const syncContainersWithCounts = (containersList) => {
-    if (!updatedControllerData) return containersList
+  // Sync containers with counts in controllerData
+  const syncContainersWithCounts = (existingContainers) => {
+    if (!updatedControllerData) return existingContainers
 
-    const sixMCount = updatedControllerData.num_six_meters || 0
-    const twelveMCount = updatedControllerData.num_twelve_meters || 0
-    const abnormalCount = updatedControllerData.num_abnormal || 0
+    const counts = {
+      "6m": updatedControllerData.num_six_meters || 0,
+      "12m": updatedControllerData.num_twelve_meters || 0,
+      Abnormal: updatedControllerData.num_abnormal || 0,
+    }
 
-    // Count current containers by type
     const currentCounts = {
       "6m": 0,
       "12m": 0,
       Abnormal: 0,
     }
 
-    containersList.forEach((container) => {
-      currentCounts[container.containerType]++
+    // Count existing containers by type
+    existingContainers.forEach((container) => {
+      if (container.containerType in currentCounts) {
+        currentCounts[container.containerType]++
+      }
     })
 
-    let result = [...containersList]
-    let nextId = containersList.length > 0 ? Math.max(...containersList.map((c) => c.id)) + 1 : 1
+    // Create a new list with the correct number of containers
+    const newContainers = [...existingContainers]
+    let containerId = existingContainers.length + 1
+
+    // Get the client's surcharge rate for container calculations
+    let clientSurchargeRate = 0;
+    if (updatedControllerData.surchargesAmount !== undefined && 
+        updatedControllerData.surchargesAmount !== null && 
+        updatedControllerData.surchargesAmount !== "") {
+      const parsedRate = Number.parseFloat(updatedControllerData.surchargesAmount);
+      if (!isNaN(parsedRate)) {
+        clientSurchargeRate = parsedRate;
+      }
+    }
 
     // Add missing containers
-    for (let i = currentCounts["6m"]; i < sixMCount; i++) {
-      result.push({
-        id: nextId++,
-        containerKey: null,
-        containerNum: "",
-        weight: isImport ? "" : null,
-        containerType: "6m",
-        cargoDescription: "", // Add cargo description field
-      })
-    }
-
-    for (let i = currentCounts["12m"]; i < twelveMCount; i++) {
-      result.push({
-        id: nextId++,
-        containerKey: null,
-        containerNum: "",
-        weight: isImport ? "" : null,
-        containerType: "12m",
-        cargoDescription: "", // Add cargo description field
-      })
-    }
-
-    for (let i = currentCounts["Abnormal"]; i < abnormalCount; i++) {
-      result.push({
-        id: nextId++,
-        containerKey: null,
-        containerNum: "",
-        weight: isImport ? "" : null,
-        containerType: "Abnormal",
-        cargoDescription: "", // Add cargo description field
-      })
-    }
-
-    // Remove excess containers - remove the most recently added containers first
-    if (
-      currentCounts["6m"] > sixMCount ||
-      currentCounts["12m"] > twelveMCount ||
-      currentCounts["Abnormal"] > abnormalCount
-    ) {
-      // For each container type, keep only the required number
-      // Sort containers by type and then by ID (to ensure we remove the most recently added first)
-      const containersByType = {
-        "6m": result.filter((c) => c.containerType === "6m").sort((a, b) => a.id - b.id),
-        "12m": result.filter((c) => c.containerType === "12m").sort((a, b) => a.id - b.id),
-        Abnormal: result.filter((c) => c.containerType === "Abnormal").sort((a, b) => a.id - b.id),
+    Object.keys(counts).forEach((type) => {
+      const diff = counts[type] - currentCounts[type]
+      if (diff > 0) {
+        for (let i = 0; i < diff; i++) {
+          newContainers.push({
+            id: containerId++,
+            containerKey: null,
+            containerNum: "",
+            weight: isImport ? "" : null,
+            containerType: type,
+            cargoDescription: "", // Add cargo description field
+            hazardous: false, // Initialize hazardous field
+            surcharges: Boolean(updatedControllerData.surcharges), // Initialize surcharges field
+            "Surcharge Amount": Boolean(updatedControllerData.surcharges) ? clientSurchargeRate : 0, // Initialize surcharge amount
+          })
+        }
       }
+    })
 
-      // Keep only the required number of each type
-      const filteredContainers = [
-        ...containersByType["6m"].slice(0, sixMCount),
-        ...containersByType["12m"].slice(0, twelveMCount),
-        ...containersByType["Abnormal"].slice(0, abnormalCount),
-      ]
+    // Remove extra containers (from the end of each type group)
+    Object.keys(counts).forEach((type) => {
+      const diff = currentCounts[type] - counts[type]
+      if (diff > 0) {
+        // Find the indices of containers of this type, in reverse order
+        const indices = []
+        for (let i = newContainers.length - 1; i >= 0; i--) {
+          if (newContainers[i].containerType === type) {
+            indices.push(i)
+            if (indices.length === diff) break
+          }
+        }
+        // Remove containers at these indices
+        indices.forEach((index) => {
+          newContainers.splice(index, 1)
+        })
+      }
+    })
 
-      // Sort by ID to maintain the original order
-      result = filteredContainers.sort((a, b) => a.id - b.id)
-    }
+    // Renumber container IDs
+    newContainers.forEach((container, index) => {
+      container.id = index + 1
+    })
 
-    // Reassign IDs to maintain sequential order
-    return result.map((container, index) => ({
-      ...container,
-      id: index + 1,
-    }))
+    return newContainers
   }
 
   // Handle container input change with real-time validation
@@ -405,6 +430,17 @@ const FCcontrollerInstructionDetails = () => {
 
   // Update the handleAddContainer function to use the state variable
   const handleAddContainer = (containerType) => {
+    // Get the client's surcharge rate for container calculations
+    let clientSurchargeRate = 0;
+    if (updatedControllerData.surchargesAmount !== undefined && 
+        updatedControllerData.surchargesAmount !== null && 
+        updatedControllerData.surchargesAmount !== "") {
+      const parsedRate = Number.parseFloat(updatedControllerData.surchargesAmount);
+      if (!isNaN(parsedRate)) {
+        clientSurchargeRate = parsedRate;
+      }
+    }
+    
     setContainers((prevContainers) => [
       ...prevContainers,
       {
@@ -414,6 +450,9 @@ const FCcontrollerInstructionDetails = () => {
         weight: isImport ? "" : null,
         containerType: containerType,
         cargoDescription: "", // Add cargo description field
+        hazardous: false, // Initialize hazardous field
+        surcharges: Boolean(updatedControllerData.surcharges), // Initialize surcharges field
+        "Surcharge Amount": Boolean(updatedControllerData.surcharges) ? clientSurchargeRate : 0, // Initialize surcharge amount
       },
     ])
 
@@ -839,14 +878,16 @@ const FCcontrollerInstructionDetails = () => {
                     <th>Container Type</th>
                     <th>Container Number</th>
                     {isImport && <th>Weight</th>}
-                    <th>Cargo Description</th> {/* Add new column header */}
+                    <th>Cargo Description</th>
+                    <th>Hazardous</th>
+                    <th>Add Surcharges</th>
                     <th>Actions</th>
                   </tr>
                 </thead>
                 <tbody>
                   {containers.length === 0 ? (
                     <tr>
-                      <td colSpan={isImport ? 6 : 5} style={{ textAlign: "center", padding: "20px" }}>
+                      <td colSpan={isImport ? 8 : 7} style={{ textAlign: "center", padding: "20px" }}>
                         No containers to display. Please check the container counts in the previous form.
                       </td>
                     </tr>
@@ -899,7 +940,7 @@ const FCcontrollerInstructionDetails = () => {
                             </div>
                           </td>
                         )}
-                        {/* Add new Cargo Description cell */}
+                        {/* Cargo Description cell */}
                         <td className="input-cell">
                           <div className="input-wrapper">
                             <input
@@ -912,6 +953,28 @@ const FCcontrollerInstructionDetails = () => {
                               placeholder="Enter cargo description"
                             />
                           </div>
+                        </td>
+                        {/* Hazardous checkbox cell */}
+                        <td className="checkbox-cell" style={{ textAlign: 'center' }}>
+                          <input
+                            type="checkbox"
+                            checked={container.hazardous}
+                            onChange={(e) => {
+                              handleContainerChange(container.id, "hazardous", e.target.checked)
+                            }}
+                            className="container-checkbox"
+                          />
+                        </td>
+                        {/* Add Surcharges checkbox cell */}
+                        <td className="checkbox-cell" style={{ textAlign: 'center' }}>
+                          <input
+                            type="checkbox"
+                            checked={container.surcharges}
+                            onChange={(e) => {
+                              handleContainerChange(container.id, "surcharges", e.target.checked)
+                            }}
+                            className="container-checkbox"
+                          />
                         </td>
                         <td>
                           <button
