@@ -4090,7 +4090,7 @@ const FCcontrollerinstructions = () => {
                     </div>
                   </div>
                   <div className="controller-instructions-form-field">
-                    <label>KSM File Reference</label>
+                    <label></label>
                     <div
                       className="controller-instructions-input-wrapper"
                       ref={fieldRefs.ksmFileRef}
