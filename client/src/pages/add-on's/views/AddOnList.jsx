@@ -18,6 +18,7 @@ const AddOnList = () => {
     year: currentDate.getFullYear().toString(),
     month: (currentDate.getMonth() + 1).toString(),
   });
+  const roleId = JSON.parse(localStorage.getItem("user")).roleid;
 
   // Pagination state
   const [currentPage, setCurrentPage] = useState(1);
@@ -204,7 +205,6 @@ const AddOnList = () => {
             Back
           </button>
         </div>
-
         <div className="action-bar">
           <div className="filter-section46">
             <div className="dropdown-container">
@@ -236,13 +236,11 @@ const AddOnList = () => {
             </div>
           </div>
         </div>
-
         {/* Pagination Info */}
         <div className="pagination-info">
           Showing {startIndex + 1} to {Math.min(endIndex, totalRecords)} of{" "}
           {totalRecords} add-ons
         </div>
-
         <table className="payment-table1">
           <thead>
             <tr>
@@ -282,7 +280,6 @@ const AddOnList = () => {
             )}
           </tbody>
         </table>
-
         {/* Pagination Controls */}
         {totalPages > 1 && (
           <div className="pagination-container">
@@ -329,14 +326,16 @@ const AddOnList = () => {
           </div>
         )}
 
-        <div
-          className="upload-section"
-          style={{ marginTop: "20px", textAlign: "center" }}
-        >
-          <button className="upload-button" onClick={handleCreateAddOn}>
-            Create Add-On
-          </button>
-        </div>
+        {roleId == 3 && (
+          <div
+            className="upload-section"
+            style={{ marginTop: "20px", textAlign: "center" }}
+          >
+            <button className="upload-button" onClick={handleCreateAddOn}>
+              Create Add-On
+            </button>
+          </div>
+        )}
       </div>
     </div>
   );
