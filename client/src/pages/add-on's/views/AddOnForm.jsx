@@ -238,7 +238,7 @@ const AddOnForm = () => {
       if (response.data.success) {
         setSuccess(true);
         setTimeout(() => {
-          navigate(`/addons/${encodeURIComponent(clientName)}`, {
+          navigate(`/view-add-on-list`, {
             state: { clientId, clientName },
           });
         }, 2000);
@@ -331,7 +331,7 @@ const AddOnForm = () => {
       // Invoice Title and Number
       doc.setFontSize(fonts.header);
       doc.setFont("helvetica", "bold");
-      doc.text("Add-On Invoice", margins.left, currentY);
+      doc.text("Invoice", margins.left, currentY);
       doc.setFontSize(fonts.normal);
       doc.setFont("helvetica", "normal");
       doc.text(
