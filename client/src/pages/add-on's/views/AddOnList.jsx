@@ -102,17 +102,17 @@ const AddOnList = () => {
   };
 
   const handleCreateAddOn = () => {
-    navigate(`/addon-form`, {
+    navigate(`/add-on-form`, {
       state: { clientId, clientName },
     });
   };
 
   const handleBack = () => {
-    navigate("/client-list-payments");
+    navigate("/view-client-list");
   };
 
   const handleViewAddOn = (addonId) => {
-    navigate(`/addon-form`, {
+    navigate(`/add-on-form`, {
       state: { clientId, clientName, addonId },
     });
   };

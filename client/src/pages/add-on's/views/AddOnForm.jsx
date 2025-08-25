@@ -199,7 +199,7 @@ const AddOnForm = () => {
   };
 
   const handleBack = () => {
-    navigate(`/addons/${encodeURIComponent(clientName)}`, {
+    navigate(`/view-add-on-list`, {
       state: { clientId, clientName },
     });
   };
@@ -305,16 +305,6 @@ const AddOnForm = () => {
     <div className="addon-form-wrapper">
       <div className="addon-form-container">
         <div className="invoice-header">
-          <div className="company-info">
-            <h1 className="company-name">Your Company Name</h1>
-            <p className="company-address">
-              123 Business Street
-              <br />
-              City, Province 12345
-              <br />
-              Phone: (123) 456-7890
-            </p>
-          </div>
           <div className="invoice-details">
             <h2 className="invoice-title">
               {isViewMode ? "ADD-ON INVOICE" : "CREATE ADD-ON INVOICE"}
@@ -352,13 +342,13 @@ const AddOnForm = () => {
             {error && <div className="error-message">{error}</div>}
 
             <div className="invoice-items-header">
-              <h3>Add-On Service Details</h3>
+              <h3> Details</h3>
             </div>
 
             <div className="invoice-items-table">
               <div className="form-row">
                 <div className="form-group">
-                  <label htmlFor="category">Service Category *</label>
+                  <label htmlFor="category">Category</label>
                   <select
                     id="category"
                     name="category"
@@ -378,7 +368,7 @@ const AddOnForm = () => {
                 </div>
 
                 <div className="form-group">
-                  <label htmlFor="date">Service Date *</label>
+                  <label htmlFor="date">Date</label>
                   <input
                     type="date"
                     id="date"
@@ -393,7 +383,7 @@ const AddOnForm = () => {
               </div>
 
               <div className="form-group full-width">
-                <label htmlFor="description">Service Description *</label>
+                <label htmlFor="description">Description</label>
                 <textarea
                   id="description"
                   name="description"
@@ -409,7 +399,7 @@ const AddOnForm = () => {
 
               <div className="invoice-summary">
                 <div className="summary-row">
-                  <span className="summary-label">Service Amount:</span>
+                  <span className="summary-label">Amount:</span>
                   <div className="amount-input-wrapper">
                     <span className="currency-symbol">R</span>
                     <input
