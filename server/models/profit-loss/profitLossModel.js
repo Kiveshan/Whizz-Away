@@ -1,10 +1,11 @@
 import { pool, query } from "../../config/database.js";
 
 const getProfitLossData = async (month, year) => {
-    const monthNum = new Date(`${month} 1, ${year}`).getMonth() + 1; // Convert month name to 1-based number
+  const monthNum = new Date(`${month} 1, ${year}`).getMonth() + 1; // Convert month name to 1-based number
 
-    const profitQuery = `
+  const profitQuery = `
     SELECT 
+      'Invoice' AS source,
       i.date,
       m1.total_cost AS amount
     FROM invoice i
@@ -12,52 +13,70 @@ const getProfitLossData = async (month, year) => {
     WHERE EXTRACT(MONTH FROM i.date) = $1 AND EXTRACT(YEAR FROM i.date) = $2
     UNION ALL
     SELECT 
+      'Payment' AS source,
       fileupload AS date,
       amount
     FROM payment_m3
     WHERE EXTRACT(MONTH FROM fileupload) = $1 AND EXTRACT(YEAR FROM fileupload) = $2
   `;
 
-    const lossQuery = `
+  const lossQuery = `
     SELECT 
+      'Expense' AS source,
       slipuploaddate AS date,
       expensecost AS amount
     FROM expenses_m2
     WHERE EXTRACT(MONTH FROM slipuploaddate) = $1 AND EXTRACT(YEAR FROM slipuploaddate) = $2
     UNION ALL
     SELECT 
-      CURRENT_DATE AS date, -- Since no date applies, use current date as placeholder
+      'Wage' AS source,
+      CURRENT_DATE AS date, -- Placeholder since no date applies
       net_pay AS amount
     FROM wages
     UNION ALL
     SELECT 
+      'Purchase Order' AS source,
       date,
       total AS amount
     FROM purchase_orders
     WHERE EXTRACT(MONTH FROM date) = $1 AND EXTRACT(YEAR FROM date) = $2
     UNION ALL
     SELECT 
+      'Leg' AS source,
       date,
       driverrate AS amount
     FROM legs_m2
     WHERE EXTRACT(MONTH FROM date) = $1 AND EXTRACT(YEAR FROM date) = $2
   `;
 
-    try {
-        const profitResult = await query(profitQuery, [monthNum, year]);
-        const lossResult = await query(lossQuery, [monthNum, year]);
+  try {
+    const profitResult = await query(profitQuery, [monthNum, year]);
+    const lossResult = await query(lossQuery, [monthNum, year]);
 
-        const totalProfit = profitResult.rows.reduce((sum, row) => sum + parseFloat(row.amount || 0), 0);
-        const totalLoss = lossResult.rows.reduce((sum, row) => sum + parseFloat(row.amount || 0), 0);
+    const profitDetails = profitResult.rows.map(row => ({
+      source: row.source,
+      date: row.date.toISOString().split('T')[0], // Format date as YYYY-MM-DD
+      amount: parseFloat(row.amount || 0),
+    }));
+    const lossDetails = lossResult.rows.map(row => ({
+      source: row.source,
+      date: row.date.toISOString().split('T')[0], // Format date as YYYY-MM-DD
+      amount: parseFloat(row.amount || 0),
+    }));
 
-        return {
-            profit: totalProfit,
-            loss: totalLoss,
-            net: totalProfit - totalLoss,
-        };
-    } catch (error) {
-        throw new Error(`Database error: ${error.message}`);
-    }
+    const totalProfit = profitDetails.reduce((sum, row) => sum + row.amount, 0);
+    const totalLoss = lossDetails.reduce((sum, row) => sum + row.amount, 0);
+
+    return {
+      profitDetails,
+      lossDetails,
+      totalProfit,
+      totalLoss,
+      net: totalProfit - totalLoss,
+    };
+  } catch (error) {
+    throw new Error(`Database error: ${error.message}`);
+  }
 };
 
 export { getProfitLossData };

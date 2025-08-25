@@ -9,7 +9,7 @@ const generateProfitLossReport = async (req, res) => {
     }
 
     try {
-        const { profit, loss, net } = await getProfitLossData(month, year);
+        const { profitDetails, lossDetails, totalProfit, totalLoss, net } = await getProfitLossData(month, year);
 
         const workbook = new ExcelJS.Workbook();
         const worksheet = workbook.addWorksheet('Profit & Loss Report');
@@ -17,6 +17,7 @@ const generateProfitLossReport = async (req, res) => {
         // Set up headers
         worksheet.columns = [
             { header: 'Category', key: 'category', width: 20 },
+            { header: 'Date', key: 'date', width: 15 },
             { header: 'Amount (R)', key: 'amount', width: 20 },
         ];
 
@@ -36,7 +37,7 @@ const generateProfitLossReport = async (req, res) => {
 
         // Add title row
         worksheet.insertRow(1, [`Profit & Loss Report - ${month} ${year}`]);
-        worksheet.mergeCells('A1:B1');
+        worksheet.mergeCells('A1:C1');
         worksheet.getRow(1).font = { bold: true, size: 14 };
         worksheet.getRow(1).alignment = { horizontal: 'center' };
         worksheet.getRow(1).fill = {
@@ -45,20 +46,39 @@ const generateProfitLossReport = async (req, res) => {
             fgColor: { argb: 'FFD4E6F1' },
         };
 
-        // Add data
-        worksheet.addRow({ category: 'Total Profit', amount: `R ${profit.toFixed(2)}` });
-        worksheet.addRow({ category: 'Total Loss', amount: `R ${loss.toFixed(2)}` });
-        worksheet.addRow({ category: 'Net Profit/Loss', amount: `R ${net.toFixed(2)}` });
+        // Add profit details
+        profitDetails.forEach(detail => {
+            worksheet.addRow({
+                category: detail.source,
+                date: detail.date,
+                amount: `R ${detail.amount.toFixed(2)}`,
+            });
+        });
 
-        // Style data rows
-        worksheet.getRows(2, 3).forEach(row => {
+        // Add loss details
+        lossDetails.forEach(detail => {
+            worksheet.addRow({
+                category: detail.source,
+                date: detail.date,
+                amount: `R -${detail.amount.toFixed(2)}`, // Negative to indicate loss
+            });
+        });
+
+        // Add totals
+        const startRow = worksheet.rowCount + 2;
+        worksheet.addRow({ category: 'Total Profit', date: '', amount: `R ${totalProfit.toFixed(2)}` });
+        worksheet.addRow({ category: 'Total Loss', date: '', amount: `R ${totalLoss.toFixed(2)}` });
+        worksheet.addRow({ category: 'Net Profit/Loss', date: '', amount: `R ${net.toFixed(2)}` });
+
+        // Style data rows and totals
+        worksheet.getRows(2, worksheet.rowCount - 1).forEach(row => {
             row.border = {
                 top: { style: 'thin' },
                 left: { style: 'thin' },
                 bottom: { style: 'thin' },
                 right: { style: 'thin' },
             };
-            if (row.number % 2 === 0) {
+            if (row.number % 2 === 0 && row.number < startRow) {
                 row.fill = {
                     type: 'pattern',
                     pattern: 'solid',
@@ -66,19 +86,23 @@ const generateProfitLossReport = async (req, res) => {
                 };
             }
         });
+        worksheet.getRows(startRow, 3).forEach(row => {
+            row.font = { bold: true, size: 12 };
+            row.fill = {
+                type: 'pattern',
+                pattern: 'solid',
+                fgColor: { argb: 'FFE6F3FF' },
+            };
+        });
 
         // Generate and send file
         const filename = `Profit_Loss_Report_${month}_${year}.xlsx`;
         const buffer = await workbook.xlsx.writeBuffer();
-        console.log('Buffer length:', buffer.length); // Debug log
-
-        // Save to disk for verification (optional, uncomment and adjust path)
-        // const fs = require('fs');
-        // fs.writeFileSync(`/tmp/${filename}`, buffer);
+        console.log('Buffer length:', buffer.length);
 
         res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
         res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
-        res.send(buffer); // Send buffer directly, avoid Buffer.from()
+        res.send(buffer);
     } catch (error) {
         console.error('Error generating report:', error);
         res.status(500).json({ error: 'Failed to generate report' });
