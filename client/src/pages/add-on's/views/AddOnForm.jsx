@@ -20,6 +20,7 @@ const AddOnForm = () => {
     date: new Date().toISOString().split("T")[0],
     description: "",
     invoice_number: "",
+    group_id: "",
   });
 
   const [companyInfo, setCompanyInfo] = useState({
@@ -145,6 +146,7 @@ const AddOnForm = () => {
               date: new Date(addon.date).toISOString().split("T")[0] || "",
               description: addon.description || "",
               invoice_number: addon.invoice_number || "",
+              group_id: addon.group_id || "",
             });
           } else {
             throw new Error(
@@ -236,6 +238,11 @@ const AddOnForm = () => {
         },
       });
       if (response.data.success) {
+        setFormData((prev) => ({
+          ...prev,
+          invoice_number: response.data.data.invoice_number,
+          group_id: response.data.data.group_id,
+        }));
         setSuccess(true);
         setTimeout(() => {
           navigate(`/view-add-on-list`, {
@@ -339,7 +346,7 @@ const AddOnForm = () => {
         currentY,
         { align: "right" }
       );
-      currentY += 12;
+      currentY += 7;
 
       // Client Details
       doc.setFontSize(fonts.small);

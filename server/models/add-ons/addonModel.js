@@ -58,6 +58,7 @@ const createAddon = async (addonData) => {
     const today = new Date();
     const dateStr = today.toISOString().slice(0, 10).replace(/-/g, "");
 
+    // Generate invoice_number
     const seqQueryText = `
       SELECT COUNT(*) as count
       FROM public.add_ons
@@ -65,9 +66,29 @@ const createAddon = async (addonData) => {
     `;
     const seqResult = await query(seqQueryText, [`ADN-${dateStr}-%`]);
     const seqNum = Number.parseInt(seqResult.rows[0].count, 10) + 1;
-
     const invoiceNumber = `ADN-${dateStr}-${String(seqNum).padStart(3, "0")}`;
 
+    // Generate group_id
+    const currentYear = today.getFullYear();
+    const currentMonth = today.getMonth() + 1;
+    const monthNames = [
+      "JANUARY",
+      "FEBRUARY",
+      "MARCH",
+      "APRIL",
+      "MAY",
+      "JUNE",
+      "JULY",
+      "AUGUST",
+      "SEPTEMBER",
+      "OCTOBER",
+      "NOVEMBER",
+      "DECEMBER",
+    ];
+    const monthName = monthNames[currentMonth - 1];
+    const groupId = `${addonData.client_id}-${monthName}${currentYear}`;
+
+    // Insert into add_ons table
     const insertQueryText = `
       INSERT INTO public.add_ons (
         client_id, 
@@ -76,9 +97,10 @@ const createAddon = async (addonData) => {
         category, 
         date, 
         invoice_number,
+        group_id,
         created_at
-      ) VALUES ($1, $2, $3, $4, $5, $6, $7)
-      RETURNING addon_id
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+      RETURNING addon_id, invoice_number, group_id
     `;
 
     const result = await query(insertQueryText, [
@@ -88,6 +110,7 @@ const createAddon = async (addonData) => {
       addonData.category,
       addonData.date,
       invoiceNumber,
+      groupId,
       today,
     ]);
 
@@ -95,7 +118,8 @@ const createAddon = async (addonData) => {
       success: true,
       data: {
         addon_id: result.rows[0].addon_id,
-        invoice_number: invoiceNumber,
+        invoice_number: result.rows[0].invoice_number,
+        group_id: result.rows[0].group_id,
         ...addonData,
       },
     };
