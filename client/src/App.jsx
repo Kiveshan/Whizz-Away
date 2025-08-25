@@ -164,7 +164,8 @@ function DynamicHeader() {
     "/Creditors/SubcontractorStatementDetails": "Subcontractor Statement",
     "/analytics-reports": "Insights",
     "/reports" : "Reports",
-    "/wage-reports" : "Wage Reports"
+    "/wage-reports" : "Wage Reports",
+    "/profit-loss-reports" : "Profit & Loss Reports"
   }
 
   const getTitle = () => {
@@ -295,7 +296,8 @@ function App() {
     "/Viewcontrollerinstructions": "Viewcontrollerinstructions",
     "/ViewcontrollerInstructionDetails": "ViewcontrollerInstructionDetails",
     "/reports": "Reports",
-    "/wage-reports": "Wage Reports" 
+    "/wage-reports": "Wage Reports",
+    "/profit-loss-reports" : "Profit & Loss Reports"
   }
 
   // Set page title based on current route
