@@ -52,17 +52,6 @@ const AddOnForm = () => {
   const [fetchingData, setFetchingData] = useState(isViewMode);
   const [fetchingInfo, setFetchingInfo] = useState(true);
 
-  const categories = [
-    "Additional Services",
-    "Extra Materials",
-    "Rush Delivery",
-    "Special Handling",
-    "Overtime Work",
-    "Equipment Rental",
-    "Consultation",
-    "Other",
-  ];
-
   useEffect(() => {
     const fetchCompanyAndClientInfo = async () => {
       try {
@@ -208,7 +197,7 @@ const AddOnForm = () => {
 
   const validateForm = () => {
     if (!formData.category.trim()) {
-      setError("Please select a category");
+      setError("Please enter a category");
       return false;
     }
     if (!formData.amount || Number.parseFloat(formData.amount) <= 0) {
@@ -528,13 +517,9 @@ const AddOnForm = () => {
             <p>{companyInfo.address}</p>
             <p>{companyInfo.city}</p>
             <p>Phone: {companyInfo.phone}</p>
-            <p>Email: {companyInfo.email}</p>
             <p>VAT Reg No: {companyInfo.vat_reg_num}</p>
           </div>
           <div className="invoice-details">
-            <h2 className="invoice-title">
-              {isViewMode ? "ADD-ON INVOICE" : "CREATE ADD-ON INVOICE"}
-            </h2>
             {isViewMode && formData.invoice_number && (
               <p className="invoice-number">
                 Invoice #: {formData.invoice_number}
@@ -577,29 +562,24 @@ const AddOnForm = () => {
             {error && <div className="error-message">{error}</div>}
 
             <div className="invoice-items-header">
-              <h3>Service Details</h3>
+              <h3>Details</h3>
             </div>
 
             <div className="invoice-items-table">
               <div className="form-row">
                 <div className="form-group">
                   <label htmlFor="category">Category</label>
-                  <select
+                  <input
+                    type="text"
                     id="category"
                     name="category"
                     value={formData.category}
                     onChange={handleInputChange}
+                    placeholder="Enter service category..."
                     className="form-input"
                     required
-                    disabled={isViewMode}
-                  >
-                    <option value="">Select Service Category</option>
-                    {categories.map((cat, index) => (
-                      <option key={index} value={cat}>
-                        {cat}
-                      </option>
-                    ))}
-                  </select>
+                    readOnly={isViewMode}
+                  />
                 </div>
 
                 <div className="form-group">
@@ -675,14 +655,6 @@ const AddOnForm = () => {
             </div>
 
             <div className="invoice-actions-footer">
-              <button
-                type="button"
-                onClick={handleBack}
-                className="cancel-button"
-                disabled={loading}
-              >
-                {isViewMode ? "Back to List" : "Cancel"}
-              </button>
               {!isViewMode && (
                 <button
                   type="submit"
@@ -694,23 +666,6 @@ const AddOnForm = () => {
               )}
             </div>
           </form>
-        </div>
-
-        <div className="invoice-footer">
-          <div className="footer-notes">
-            <h4>Terms & Conditions:</h4>
-            <p>
-              Payment is due within 30 days of invoice date. Late payments may
-              incur additional charges.
-            </p>
-          </div>
-          <div className="footer-contact">
-            <p>Thank you for your business!</p>
-            <p>
-              For questions about this invoice, please contact us at{" "}
-              {companyInfo.email || "our email"}
-            </p>
-          </div>
         </div>
       </div>
     </div>
