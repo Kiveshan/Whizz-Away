@@ -13,7 +13,7 @@ const reportsData = [
   {
     title: "Profit & Loss Report",
     image: "/images/reports.jpg",
-    path: "/income-expenditure-reports",
+    path: "/profit-loss-reports",
   },
 ]
 
