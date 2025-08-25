@@ -282,7 +282,6 @@ const AddOnForm = () => {
   const handlePrint = () => {
     setPdfLoading(true);
     try {
-      const isCompactLayout = true;
       const doc = new jsPDF({
         orientation: "portrait",
         unit: "mm",
