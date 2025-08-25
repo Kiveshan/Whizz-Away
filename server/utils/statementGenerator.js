@@ -49,7 +49,7 @@ function logDateInfo(dates) {
     `Previous Month: ${dates.previousMonth}, Previous Year: ${dates.previousYear}`
   );
   console.log(
-    `Generating statements for invoices confirmed between ${dates.formattedInvoiceStartDate} and ${dates.formattedInvoiceEndDate}`
+    `Generating statements for invoices and add-ons confirmed between ${dates.formattedInvoiceStartDate} and ${dates.formattedInvoiceEndDate}`
   );
   console.log(
     `Fetching payments between ${dates.formattedPaymentStartDate} and ${dates.formattedPaymentEndDate}`
@@ -148,12 +148,14 @@ async function fetchClientInvoices(
 ) {
   const invoicesQuery = `
     SELECT 
-      SUM(m1.total_cost) as total_amount,
-      i.groupid as invoice_group_id
+      COALESCE(SUM(m1.total_cost), 0) + COALESCE(SUM(a.amount), 0) as total_amount,
+      COALESCE(i.groupid, a.group_id) as invoice_group_id
     FROM invoice i
-    JOIN m1_controller m1 ON i.m1key = m1.m1key
-    WHERE i.clientid = $1 AND i.date BETWEEN $2 AND $3
-    GROUP BY i.groupid
+    FULL OUTER JOIN m1_controller m1 ON i.m1key = m1.m1key
+    FULL OUTER JOIN add_ons a ON a.client_id = i.clientid AND a.date = i.date
+    WHERE (i.clientid = $1 OR a.client_id = $1) 
+      AND (i.date BETWEEN $2 AND $3 OR a.date BETWEEN $2 AND $3)
+    GROUP BY i.groupid, a.group_id
   `;
 
   const invoiceParams = [
@@ -402,7 +404,7 @@ async function processClient(dbClient, clientId, dates, paymentsMap) {
   let updateRequired = false;
 
   if (isUpdate) {
-    // Check if there are any invoices or payments that would change the statement
+    // Check if there are any invoices, add-ons, or payments that would change the statement
     const invoices = await fetchClientInvoices(
       dbClient,
       clientId,
@@ -411,21 +413,21 @@ async function processClient(dbClient, clientId, dates, paymentsMap) {
     );
     const totalPayments = paymentsMap.get(clientId) || 0;
 
-    // If no invoices or payments for this period, skip update
+    // If no invoices, add-ons, or payments for this period, skip update
     if (invoices.length === 0 && totalPayments === 0) {
       console.log(
-        `Client ${clientId}: No invoices or payments found for period, skipping update`
+        `Client ${clientId}: No invoices, add-ons, or payments found for period, skipping update`
       );
       return { processed: true, created: false, updated: false };
     }
 
     console.log(
-      `Client ${clientId}: Update required - found invoices or payments for period`
+      `Client ${clientId}: Update required - found invoices, add-ons, or payments for period`
     );
     updateRequired = true;
   }
 
-  // Only fetch invoices and payments if we're creating new statement or update is required
+  // Only fetch invoices/add-ons and payments if we're creating new statement or update is required
   if (!isUpdate || updateRequired) {
     const invoices = await fetchClientInvoices(
       dbClient,
@@ -446,7 +448,7 @@ async function processClient(dbClient, clientId, dates, paymentsMap) {
 
     if (invoices.length === 0 && totalPayments === 0) {
       console.log(
-        `Client ${clientId}: No invoices or payments found, skipping`
+        `Client ${clientId}: No invoices, add-ons, or payments found, skipping`
       );
       return { processed: false, created: false, updated: false };
     }
@@ -455,10 +457,12 @@ async function processClient(dbClient, clientId, dates, paymentsMap) {
     if (invoices.length > 0) {
       invoice_group_id = invoices[0].invoice_group_id;
       console.log(
-        `Client ${clientId}: Using invoice groupid ${invoice_group_id}`
+        `Client ${clientId}: Using invoice/add-on groupid ${invoice_group_id}`
       );
     } else {
-      console.log(`Client ${clientId}: No invoices, setting groupid to null`);
+      console.log(
+        `Client ${clientId}: No invoices or add-ons, setting groupid to null`
+      );
     }
 
     const { openingBalance, agingData } = await fetchPreviousStatementAging(

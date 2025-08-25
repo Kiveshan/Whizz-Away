@@ -37,6 +37,7 @@ const ClientStatement = () => {
         if (response.data.success) {
           console.log("Statement data received:", response.data.data); // Debug log
           console.log("Invoices data:", response.data.data.invoices); // Debug log for invoices
+          console.log("Addons data:", response.data.data.addons); // Debug log for addons
           console.log("Payments data:", response.data.data.payments); // Debug log for payments
           setStatement(response.data.data);
         } else {
@@ -84,7 +85,8 @@ const ClientStatement = () => {
       const filename = `Statement-${statement.statement_key}.pdf`;
 
       // Check if the table is small (few rows) to determine if we need page breaks
-      const isSmallTable = statement.invoices.length <= 3;
+      const isSmallTable =
+        statement.invoices.length + statement.addons.length <= 3;
 
       const opt = {
         margin: [20, 15, 20, 15],
@@ -175,7 +177,11 @@ const ClientStatement = () => {
         <div>Please select a statement from the list.</div>
       </div>
     );
-  if (statement.invoices.length === 0 && statement.payments.length === 0)
+  if (
+    statement.invoices.length === 0 &&
+    statement.addons.length === 0 &&
+    statement.payments.length === 0
+  )
     return (
       <div className="client-statement-wrapper">
         <div>No transactions for this statement period.</div>
@@ -183,10 +189,9 @@ const ClientStatement = () => {
     );
 
   // Calculate totals (include payments)
-  const invoicedAmount = statement.invoices.reduce(
-    (sum, inv) => sum + inv.amount,
-    0
-  );
+  const invoicedAmount =
+    statement.invoices.reduce((sum, inv) => sum + inv.amount, 0) +
+    statement.addons.reduce((sum, addon) => sum + addon.amount, 0);
   const amountPaid = statement.payments.reduce(
     (sum, payment) => sum + payment.amount,
     0
@@ -194,34 +199,44 @@ const ClientStatement = () => {
   const openingBalance = statement.opening_balance; // Use the stored opening balance
   const balanceDue = openingBalance - amountPaid + invoicedAmount;
 
-  // Helper function to format pickup + dropoff details
-  const formatInvoiceDetails = (invoice) => {
-    const pickup = invoice.pickup || "";
-    const dropoff = invoice.dropoff || "";
-
-    // Debug log to see what we're working with
-    console.log("Invoice details:", { pickup, dropoff, invoice });
-
-    if (pickup && dropoff) {
-      return `${pickup} → ${dropoff}`;
-    } else if (pickup) {
-      return pickup;
-    } else if (dropoff) {
-      return `→ ${dropoff}`;
-    } else {
-      // Fallback to task or invoice number if pickup/dropoff are empty
-      return invoice.task || invoice.invoice_num || `Invoice #${invoice.ikey}`;
+  // Helper function to format invoice and addon details
+  const formatDetails = (item, type) => {
+    if (type === "Invoice") {
+      const pickup = item.pickup || "";
+      const dropoff = item.dropoff || "";
+      console.log("Invoice details:", { pickup, dropoff, item }); // Debug log
+      if (pickup && dropoff) {
+        return `${pickup} → ${dropoff}`;
+      } else if (pickup) {
+        return pickup;
+      } else if (dropoff) {
+        return `→ ${dropoff}`;
+      } else {
+        return item.task || item.invoice_num || `Invoice #${item.ikey}`;
+      }
+    } else if (type === "Add-on") {
+      console.log("Addon details:", { item }); // Debug log
+      return item.description || item.invoice_num || `Add-on #${item.addon_id}`;
     }
+    return "";
   };
 
-  // Combine invoices and payments into a single transactions array
+  // Combine invoices, addons, and payments into a single transactions array
   const transactions = [
     ...statement.invoices.map((invoice) => ({
       type: "Invoice",
       date: new Date(invoice.date),
-      details: formatInvoiceDetails(invoice), // Use the helper function
+      details: formatDetails(invoice, "Invoice"),
       reference: "", // Invoices don't have references
       amount: invoice.amount,
+      payment: null,
+    })),
+    ...statement.addons.map((addon) => ({
+      type: "Add-on",
+      date: new Date(addon.date),
+      details: formatDetails(addon, "Add-on"),
+      reference: "", // Add-ons don't have references
+      amount: addon.amount,
       payment: null,
     })),
     ...statement.payments.map((payment) => {
@@ -243,7 +258,7 @@ const ClientStatement = () => {
   // Calculate running balance
   let runningBalance = openingBalance; // Start with the opening balance
   const transactionsWithBalance = transactions.map((tx) => {
-    if (tx.type === "Invoice") {
+    if (tx.type === "Invoice" || tx.type === "Add-on") {
       runningBalance += tx.amount;
     } else {
       runningBalance -= tx.payment;
@@ -254,7 +269,6 @@ const ClientStatement = () => {
   // Determine if this is a small table that should fit on one page
   const isSmallTable = transactions.length <= 3; // Update to consider total transactions
 
-  // Update the date formatting in the transactions table to ensure it fits in the column
   return (
     <div className="client-statement-wrapper">
       <div className="statement-page">

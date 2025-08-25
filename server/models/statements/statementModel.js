@@ -73,6 +73,11 @@ const getStatementDetails = async (statementId) => {
         m1.pickup,
         m1.dropoff,
         i.invoice_num,
+        a2.addon_id,
+        a2.date AS addon_date,
+        a2.amount AS addon_amount,
+        a2.description AS addon_description,
+        a2.invoice_number AS addon_invoice_number,
         ut.companyname
       FROM 
         statements s
@@ -84,6 +89,8 @@ const getStatementDetails = async (statementId) => {
         invoice i ON i.groupid = s.groupid
       LEFT JOIN 
         m1_controller m1 ON i.m1key = m1.m1key
+      LEFT JOIN 
+        add_ons a2 ON a2.group_id = s.groupid
       INNER JOIN
         usertable ut ON ut.roleid = 1 AND ut.status = 'active'
       WHERE 
@@ -180,6 +187,15 @@ const getStatementDetails = async (statementId) => {
           invoice_num: row.invoice_num,
           pickup: row.pickup,
           dropoff: row.dropoff,
+        })),
+      addons: result.rows
+        .filter((row) => row.addon_id !== null)
+        .map((row) => ({
+          addon_id: row.addon_id,
+          date: row.addon_date,
+          amount: Number.parseFloat(row.addon_amount || 0),
+          description: row.addon_description,
+          invoice_num: row.addon_invoice_number,
         })),
       payments: payments,
     };
