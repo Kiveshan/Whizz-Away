@@ -84,9 +84,7 @@ import {
   SubcontractorStatementDetails,
 } from "./pages/Creditors"
 
-import {
-  WageReports
-}from "./pages/Reports"
+import { WageReports, ProfitLossReportsPage } from "./pages/Reports"
 
 // CSS Imports
 import "./css/components.css"
@@ -275,6 +273,7 @@ function ContentWrapper() {
         <Route path="/analytics-reports" element={<AnalyticsReportsPage />} />
         <Route path="/reports" element={<ReportsPage />} /> 
         <Route path="/wage-reports" element={<WageReports />} />
+        <Route path="/profit-loss-reports" element={<ProfitLossReportsPage />} />
 
       </Routes>
       {shouldShowFooter && <Footer />} {/* Conditionally render footer */}
