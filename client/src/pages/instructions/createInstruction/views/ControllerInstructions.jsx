@@ -1790,7 +1790,7 @@ const ControllerInstructions = () => {
                 >
                   <div className="controller-instructions-container-input">
                     <label>6m</label>
-                    <div className="controller-instructions-container-rate-group" style={{ display: "flex", width: "100%" }}>
+                    <div className="controller-instructions-container-rate-group" style={{ display: "flex", width: "100px" }}>
                       <input
                         type="number"
                         className={fieldErrors.containers ? "controller-instructions-error-field" : ""}
@@ -1838,7 +1838,7 @@ const ControllerInstructions = () => {
                             }
                           }}
                           style={{
-                            width: "100%",
+                            width: "90px",
                             padding: "8px",
                             border: "1px solid #000",
                             borderRadius: "4px",
@@ -1864,7 +1864,7 @@ const ControllerInstructions = () => {
                   </div>
                   <div className="controller-instructions-container-input">
                     <label>12m</label>
-                    <div className="controller-instructions-container-rate-group" style={{ display: "flex", width: "100%" }}>
+                    <div className="controller-instructions-container-rate-group" style={{ display: "flex", width: "100px" }}>
                       <input
                         type="number"
                         className={fieldErrors.containers ? "controller-instructions-error-field" : ""}
@@ -1909,7 +1909,7 @@ const ControllerInstructions = () => {
                             }
                           }}
                           style={{
-                            width: "100%",
+                            width: "90px",
                             padding: "8px",
                             border: "1px solid #000",
                             borderRadius: "4px",
@@ -1935,7 +1935,7 @@ const ControllerInstructions = () => {
                   </div>
                   <div className="controller-instructions-container-input">
                     <label>Abnormal</label>
-                    <div className="controller-instructions-container-rate-group" style={{ display: "flex", width: "100%" }}>
+                    <div className="controller-instructions-container-rate-group" style={{ display: "flex", width: "100px" }}>
                       <input
                         type="number"
                         className={fieldErrors.containers ? "controller-instructions-error-field" : ""}
@@ -1980,7 +1980,7 @@ const ControllerInstructions = () => {
                             }
                           }}
                           style={{
-                            width: "100%",
+                            width: "90px",
                             padding: "8px",
                             border: "1px solid #000",
                             borderRadius: "4px",

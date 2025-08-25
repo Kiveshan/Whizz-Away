@@ -139,7 +139,7 @@ Unique wrapper for ControllerInstructions component only
 .controller-instructions-unique-wrapper .controller-instructions-container-section {
   display: flex;
   flex-direction: row;
-  gap: 30px;
+  gap: 90px;
   padding: 4px 0;
   margin-bottom: 4px;
   align-items: flex-start;
