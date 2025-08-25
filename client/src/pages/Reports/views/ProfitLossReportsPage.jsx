@@ -1,8 +1,8 @@
-// src/pages/Reports/ProfitLossReportsPage.jsx
 "use client"
 import { useState } from "react"
 import { useNavigate } from "react-router-dom"
-import "../css/wageReports.css" // Reuse the same CSS for similar styling; can create a new one later if needed
+import "../css/wageReports.css"
+import api from "../../../api.js"
 
 const ProfitLossReportsPage = () => {
     const navigate = useNavigate()
@@ -34,15 +34,19 @@ const ProfitLossReportsPage = () => {
         setSelectedMonth(monthName)
 
         try {
-            console.log(`Placeholder: Generating Profit & Loss report for ${monthName} ${selectedYear}`)
-            // TODO: Implement actual report generation logic here (e.g., fetch data, create Excel with ExcelJS, etc.)
-            // For now, this is just a placeholder to simulate the view and button interaction
-            // You can add the full logic similar to WageReportsPage later
+            console.log(`Starting Profit & Loss report generation for ${monthName} ${selectedYear}`)
+            const response = await api.get('/profit-loss-report', {
+                params: { month: monthName, year: selectedYear },
+            }, { responseType: 'blob' }); // Expecting a binary file response
 
-            // Simulate a delay for report generation
-            await new Promise(resolve => setTimeout(resolve, 1000))
+            const url = window.URL.createObjectURL(new Blob([response.data]));
+            const link = document.createElement('a');
+            link.href = url;
+            link.download = `Profit_Loss_Report_${monthName}_${selectedYear}.xlsx`;
+            link.click();
+            window.URL.revokeObjectURL(url);
 
-            alert(`Profit & Loss report generated for ${monthName} ${selectedYear}! (Placeholder action)`)
+            console.log(`Report generated successfully: Profit_Loss_Report_${monthName}_${selectedYear}.xlsx`);
         } catch (error) {
             console.error('Error generating report:', error)
             alert(`Failed to generate report: ${error.message}`)
@@ -52,22 +56,12 @@ const ProfitLossReportsPage = () => {
     }
 
     const buttons = [
-        "January",
-        "February",
-        "March",
-        "April",
-        "May",
-        "June",
-        "July",
-        "August",
-        "September",
-        "October",
-        "November",
-        "December",
+        "January", "February", "March", "April", "May", "June",
+        "July", "August", "September", "October", "November", "December",
     ]
 
     return (
-        <div className="wage-reports-wrapper"> {/* Reusing the class for similar layout; adjust if needed */}
+        <div className="wage-reports-wrapper">
             <div className="dashboard">
                 <div className="header-actions">
                     <button onClick={handleBack} className="back-button">
@@ -75,7 +69,6 @@ const ProfitLossReportsPage = () => {
                     </button>
                 </div>
 
-                {/* Year Filter Dropdown */}
                 <div className="dropdown-container74">
                     <select
                         value={selectedYear}
@@ -91,7 +84,6 @@ const ProfitLossReportsPage = () => {
                     </select>
                 </div>
 
-                {/* 12 Buttons (6 on each side) labeled as months */}
                 <div className="dashboard-row">
                     <div className="button-column">
                         {buttons.slice(0, 6).map((button, index) => (
@@ -119,7 +111,6 @@ const ProfitLossReportsPage = () => {
                     </div>
                 </div>
 
-                {/* Loading indicator */}
                 {generatingReport && (
                     <div style={{ textAlign: 'center', marginTop: '20px' }}>
                         <p>Generating Profit & Loss report for {selectedMonth} {selectedYear}...</p>

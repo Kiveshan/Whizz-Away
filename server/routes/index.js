@@ -28,6 +28,7 @@ import purchaseOrderRoutes from "./purchaseOrder/purchaseOrderRoutes.js";
 import instructionRoutes from "./instructions/instructionRoutes.js";
 import assignmentRoutes from "./assignments/assignmentRoutes.js";
 import subcontractorsRoutes from "./subcontractors/subContractorRoutes.js";
+import profitLossRoutes from './profit-loss/profitLossRoutes.js';
 
 
 const router = express.Router();
@@ -61,5 +62,6 @@ router.use(purchaseOrderRoutes);
 router.use("/api/instructions", instructionRoutes);
 router.use(assignmentRoutes);
 router.use(subcontractorsRoutes);
+router.use(profitLossRoutes);
 
 export default router;
