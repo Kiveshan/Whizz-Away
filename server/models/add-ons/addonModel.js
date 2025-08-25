@@ -25,14 +25,12 @@ const getAddonsByClient = async (clientId, filters = {}) => {
     const queryParams = [clientId];
     let paramIndex = 2;
 
-    // Add year filter if provided
     if (filters.year) {
       queryText += ` AND EXTRACT(YEAR FROM date) = $${paramIndex}`;
       queryParams.push(filters.year);
       paramIndex++;
     }
 
-    // Add month filter if provided
     if (filters.month) {
       queryText += ` AND EXTRACT(MONTH FROM date) = $${paramIndex}`;
       queryParams.push(filters.month);
@@ -57,11 +55,9 @@ const createAddon = async (addonData) => {
       );
     }
 
-    // Generate invoice number (format: ADN-YYYYMMDD-XXX where XXX is a sequential number)
     const today = new Date();
     const dateStr = today.toISOString().slice(0, 10).replace(/-/g, "");
 
-    // Get the next sequential number for today
     const seqQueryText = `
       SELECT COUNT(*) as count
       FROM public.add_ons
@@ -70,10 +66,8 @@ const createAddon = async (addonData) => {
     const seqResult = await query(seqQueryText, [`ADN-${dateStr}-%`]);
     const seqNum = Number.parseInt(seqResult.rows[0].count, 10) + 1;
 
-    // Format the invoice number
     const invoiceNumber = `ADN-${dateStr}-${String(seqNum).padStart(3, "0")}`;
 
-    // Insert the new add-on
     const insertQueryText = `
       INSERT INTO public.add_ons (
         client_id, 
@@ -165,7 +159,6 @@ const updateAddon = async (addonId, addonData) => {
       );
     }
 
-    // Validate inputs
     if (!addonId) {
       return {
         success: false,
@@ -246,10 +239,75 @@ const deleteAddon = async (addonId) => {
   }
 };
 
+const getCompanyInfo = async () => {
+  try {
+    if (!pool) {
+      throw new Error(
+        "Database connection not established. Please try again later."
+      );
+    }
+    const queryText = `
+      SELECT 
+        companyname AS name,
+        address,
+        suburb AS city,
+        cell_num AS phone,
+        email,
+        vat_reg_num,
+        account_num,
+        name_of_acc,
+        bank,
+        branch_code,
+        swift_code
+      FROM public.usertable 
+      WHERE userid = 1 AND status = 'active'
+    `;
+    const result = await query(queryText);
+    if (result.rows.length === 0) {
+      return { success: false, message: "Company info not found" };
+    }
+    return { success: true, data: result.rows[0] };
+  } catch (error) {
+    console.error("Error fetching company info:", error);
+    throw error;
+  }
+};
+
+const getClientById = async (clientId) => {
+  try {
+    if (!pool) {
+      throw new Error(
+        "Database connection not established. Please try again later."
+      );
+    }
+    const queryText = `
+      SELECT 
+        client AS name,
+        streetaddress AS address,
+        city,
+        cellnum AS telephone,
+        email,
+        vatregno AS vat_reg_num
+      FROM public.m5_client
+      WHERE m5clientkey = $1 AND status = true
+    `;
+    const result = await query(queryText, [clientId]);
+    if (result.rows.length === 0) {
+      return { success: false, message: "Client not found" };
+    }
+    return { success: true, data: result.rows[0] };
+  } catch (error) {
+    console.error("Error fetching client info:", error);
+    throw error;
+  }
+};
+
 export {
   getAddonsByClient,
   createAddon,
   getAddonById,
   updateAddon,
   deleteAddon,
+  getCompanyInfo,
+  getClientById,
 };

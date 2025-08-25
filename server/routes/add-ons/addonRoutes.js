@@ -6,6 +6,8 @@ import {
   getAddonByIdHandler,
   updateAddonHandler,
   deleteAddonHandler,
+  getCompanyInfoHandler,
+  getClientByIdHandler,
 } from "../../controllers/add-ons/addonController.js";
 
 const router = express.Router();
@@ -24,5 +26,11 @@ router.put("/api/addons/:addonId", verifyToken, updateAddonHandler);
 
 // Delete an add-on
 router.delete("/api/addons/:addonId", verifyToken, deleteAddonHandler);
+
+// Get company info
+router.get("/api/companyinfo", verifyToken, getCompanyInfoHandler);
+
+// Get client info by ID
+router.get("/api/add-on/client/:clientId", verifyToken, getClientByIdHandler);
 
 export default router;

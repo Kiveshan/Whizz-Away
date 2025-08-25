@@ -4,6 +4,8 @@ import {
   getAddonById,
   updateAddon,
   deleteAddon,
+  getCompanyInfo,
+  getClientById,
 } from "../../models/add-ons/addonModel.js";
 
 const getClientAddonsHandler = async (req, res) => {
@@ -47,7 +49,6 @@ const createAddonHandler = async (req, res) => {
     console.log("Creating add-on with data:", req.body);
     const { client_id, description, amount, category, date } = req.body;
 
-    // Validation
     if (!client_id || !description || !amount || !category || !date) {
       return res.status(400).json({
         success: false,
@@ -56,7 +57,6 @@ const createAddonHandler = async (req, res) => {
       });
     }
 
-    // Validate amount is positive number
     const numAmount = Number.parseFloat(amount);
     if (isNaN(numAmount) || numAmount <= 0) {
       return res.status(400).json({
@@ -149,7 +149,6 @@ const updateAddonHandler = async (req, res) => {
       });
     }
 
-    // Validation
     if (!description || !amount || !category || !date) {
       return res.status(400).json({
         success: false,
@@ -157,7 +156,6 @@ const updateAddonHandler = async (req, res) => {
       });
     }
 
-    // Validate amount is positive number
     const numAmount = Number.parseFloat(amount);
     if (isNaN(numAmount) || numAmount <= 0) {
       return res.status(400).json({
@@ -230,10 +228,70 @@ const deleteAddonHandler = async (req, res) => {
   }
 };
 
+const getCompanyInfoHandler = async (req, res) => {
+  try {
+    console.log("Received request for company info");
+    const result = await getCompanyInfo();
+    if (!result.success) {
+      return res.status(404).json({
+        success: false,
+        message: result.message,
+      });
+    }
+    res.json({ success: true, data: result.data });
+  } catch (error) {
+    console.error("Error fetching company info:", error);
+    res.status(500).json({
+      success: false,
+      message: error.message,
+      stack: process.env.NODE_ENV === "production" ? null : error.stack,
+    });
+  }
+};
+
+const getClientByIdHandler = async (req, res) => {
+  try {
+    console.log(
+      "Received request for client info with ID:",
+      req.params.clientId
+    );
+    const { clientId } = req.params;
+
+    if (!clientId) {
+      return res.status(400).json({
+        success: false,
+        message: "Client ID is required",
+      });
+    }
+
+    const result = await getClientById(clientId);
+    if (!result.success) {
+      return res.status(404).json({
+        success: false,
+        message: result.message,
+      });
+    }
+
+    res.json({
+      success: true,
+      data: result.data,
+    });
+  } catch (error) {
+    console.error("Error fetching client info:", error);
+    res.status(500).json({
+      success: false,
+      message: error.message,
+      stack: process.env.NODE_ENV === "production" ? null : error.stack,
+    });
+  }
+};
+
 export {
   getClientAddonsHandler,
   createAddonHandler,
   getAddonByIdHandler,
   updateAddonHandler,
   deleteAddonHandler,
+  getCompanyInfoHandler,
+  getClientByIdHandler,
 };
