@@ -8,6 +8,85 @@ import api from "../../../../api"
 const ControllerInstructions = () => {
   const navigate = useNavigate()
   const location = useLocation()
+  const isMounted = useRef(true)
+
+  // Inline styles for the vessel name field
+  const vesselNameStyles = useMemo(
+    () => ({
+      container: {
+        width: "150px",
+        minWidth: "150px",
+        maxWidth: "150px",
+        margin: "0",
+        padding: "0",
+        flex: "0 0 150px",
+        position: "relative",
+        zIndex: 1,
+      },
+      input: {
+        width: "100%",
+        minWidth: "100%",
+        maxWidth: "100%",
+        padding: "6px 8px",
+        fontSize: "0.9rem",
+        height: "32px",
+        boxSizing: "border-box",
+        margin: "0",
+        display: "block",
+        flex: "0 0 100%",
+        border: "1px solid #ced4da",
+        borderRadius: "4px",
+      },
+      label: {
+        fontSize: "0.85rem",
+        marginBottom: "4px",
+        display: "block",
+      },
+      wrapper: {
+        padding: "4px 0",
+        width: "100%",
+        margin: "0",
+      },
+    }),
+    [],
+  )
+
+  // Memoize initial data to prevent recreation on re-renders
+  const initialData = useMemo(
+    () => ({
+      clientId: "",
+      representative: "",
+      contactDetails: "",
+      email: "",
+      shipmentTypeId: "",
+      shipmentTypeName: "",
+      task: "",
+      pickup: "",
+      dropoff: "",
+      hazardous: false,
+      surcharges: false,
+      surchargesAmount: "",
+      num_six_meters: 0,
+      num_twelve_meters: 0,
+      num_abnormal: 0,
+      stackDate: "",
+      lastFreeDate: "",
+      fileRef: "",
+      bookingRef: "",
+      vesselName: "",
+      rateWeight: "Container",
+      weight: "",
+      vat: 15,
+      description: "",
+      total_cost: 0,
+      sixMeterRate: "",
+      twelveMeterRate: "",
+      abnormalRate: "",
+      unitrate: "",
+    }),
+    [],
+  )
+
   const preservedFormData = useMemo(() => location.state?.preservedFormData || null, [location.state])
   const containerCounts = useMemo(
     () =>
@@ -18,8 +97,10 @@ const ControllerInstructions = () => {
       },
     [location.state],
   )
+
   const etaDateRef = useRef(null)
   const lastFreeDateRef = useRef(null)
+
   const fieldRefs = useRef({
     clientId: null,
     shipmentTypeId: null,
@@ -37,24 +118,30 @@ const ControllerInstructions = () => {
     description: null,
     vesselName: null,
   })
+
   const [isImport, setIsImport] = useState(false)
   const [isExport, setIsExport] = useState(false)
   const [isWeightBased, setIsWeightBased] = useState(false)
   const [isCrossHaul, setIsCrossHaul] = useState(false)
   const today = useMemo(() => new Date().toISOString().split("T")[0], [])
+
   // Form validation state
   const [fieldErrors, setFieldErrors] = useState({})
   const [containerFieldErrors, setContainerFieldErrors] = useState({})
   const [submitError, setSubmitError] = useState("")
   const [isSubmitting, setIsSubmitting] = useState(false)
+
   // Confirmation popup state
   const [showConfirmationPopup, setShowConfirmationPopup] = useState(false)
   const [confirmationMessage, setConfirmationMessage] = useState("")
+
   // State for client-specific locations
   const [clientStartingPoints, setClientStartingPoints] = useState([])
   const [clientDestinations, setClientDestinations] = useState([])
   const [isLoadingLocations, setIsLoadingLocations] = useState(false)
+  const [locationError, setLocationError] = useState(null)
   const [showNoRatesModal, setShowNoRatesModal] = useState(false)
+
   // Data loading states
   const [isLoading, setIsLoading] = useState({
     clients: true,
@@ -62,23 +149,30 @@ const ControllerInstructions = () => {
     startingPoints: true,
     destinations: true,
   })
+
   // Data states
   const [clients, setClients] = useState([])
   const [shipmentTypes, setShipmentTypes] = useState([])
+  const [startingPoints, setStartingPoints] = useState([])
+  const [destinations, setDestinations] = useState([])
+
   // Container states
   const [containers, setContainers] = useState([])
   const [showContainerDetails, setShowContainerDetails] = useState(false)
+
   // New state for rate locking
   const [rateLockStatus, setRateLockStatus] = useState({
     sixMeter: false,
     twelveMeter: false,
   })
+
   // Track which rate fields should be enabled
   const [rateFieldsEnabled, setRateFieldsEnabled] = useState({
     sixMeter: false,
     twelveMeter: false,
     abnormal: false,
   })
+
   // Helper function to check if a field is valid
   const isFieldValid = useCallback(
     (fieldName, value) => {
@@ -108,6 +202,7 @@ const ControllerInstructions = () => {
     },
     [isCrossHaul, isWeightBased],
   )
+
   const handleInputChange = useCallback(
     (e) => {
       const { name, value, type, checked } = e.target
@@ -140,6 +235,7 @@ const ControllerInstructions = () => {
     },
     [fieldErrors, isFieldValid],
   )
+
   // Initialize containers based on counts while preserving existing container data
   const initializeContainers = useCallback(
     (containerCounts = null) => {
@@ -221,6 +317,7 @@ const ControllerInstructions = () => {
     },
     [containers, isImport, isExport, isCrossHaul, isWeightBased],
   )
+
   // Handle container input changes
   const handleContainerChange = useCallback(
     (id, field, value) => {
@@ -280,6 +377,7 @@ const ControllerInstructions = () => {
     },
     [containers],
   )
+
   // Initialize form data with preserved data if available, or default values
   const [formData, setFormData] = useState(() => {
     // Default form data structure
@@ -411,6 +509,7 @@ const ControllerInstructions = () => {
 
     return formData
   })
+
   // Update unit type and cross-haul states when form data changes
   useEffect(() => {
     const weightBasedUnits = ["kg", "mÂ³", "ton"]
@@ -556,6 +655,9 @@ const ControllerInstructions = () => {
             if (rates.surcharges !== undefined) {
               const surchargesNum = Number.parseFloat(rates.surcharges)
               const hasSurcharges = !isNaN(surchargesNum) && surchargesNum > 0
+              
+              // Log the surcharge amount from the API
+              console.log("Surcharge amount from API:", rates.surcharges, "Parsed value:", surchargesNum)
 
               // Only store the amount for reference, don't auto-check any boxes
               updates.surchargesAmount = hasSurcharges ? surchargesNum.toString() : "0"
@@ -835,6 +937,8 @@ const ControllerInstructions = () => {
     ],
   )
 
+  // Calendar helper function
+  // Calendar helper function - using focus instead of showPicker
   const openCalendar = useCallback((ref) => {
     if (ref.current) {
       ref.current.focus()
@@ -1061,6 +1165,8 @@ const ControllerInstructions = () => {
     setSubmitError("")
 
     try {
+      console.log("=== STARTING TOTAL COST CALCULATION ===")
+
       let totalCost = 0
       const costBreakdown = {
         calculationType: isWeightBased ? "weight-based" : "container-based",
@@ -1081,6 +1187,11 @@ const ControllerInstructions = () => {
           unitRate: unitRate,
           weightBasedCost: totalCost,
         }
+
+        console.log("WEIGHT-BASED CALCULATION:")
+        console.log(`  Weight: ${weight} ${formData.rateWeight}`)
+        console.log(`  Unit Rate: R${unitRate.toFixed(2)} per ${formData.rateWeight}`)
+        console.log(`  Base Cost: ${weight} × R${unitRate.toFixed(2)} = R${totalCost.toFixed(2)}`)
       } else {
         // Container-based calculation
         const sixMeterRate = Number.parseFloat(formData.sixMeterRate) || 0
@@ -1114,6 +1225,23 @@ const ControllerInstructions = () => {
           },
           containerBasedSubtotal: totalCost,
         }
+
+        console.log("CONTAINER-BASED CALCULATION:")
+        console.log(`  6m Containers: ${sixMeterCount} × R${sixMeterRate.toFixed(2)} = R${sixMeterCost.toFixed(2)}`)
+        console.log(
+          `  12m Containers: ${twelveMeterCount} × R${twelveMeterRate.toFixed(2)} = R${twelveMeterCost.toFixed(2)}`,
+        )
+        console.log(
+          `  Abnormal Containers: ${abnormalCount} × R${abnormalRate.toFixed(2)} = R${abnormalCost.toFixed(2)}`,
+        )
+
+        if (isCrossHaul && formData.rateWeight === "Container") {
+          console.log(`  Break Bulk: ${breakBulkCount} × R${breakBulkRate.toFixed(2)} = R${breakBulkCost.toFixed(2)}`)
+        } else if (isCrossHaul) {
+          console.log(`  Break Bulk: Not applicable (Unit type: ${formData.rateWeight})`)
+        }
+
+        console.log(`  Container Subtotal: R${totalCost.toFixed(2)}`)
       }
 
       // Calculate surcharges for each container with surcharges checked
@@ -1133,13 +1261,18 @@ const ControllerInstructions = () => {
           }
         }
         
+        console.log("Client Surcharge Rate:", clientSurchargeRate);
+        
         // Calculate surcharges for each container that has surcharges checked
         const containersWithSurcharges = containers.filter(c => c.surcharges);
+        console.log("Containers with surcharges:", containersWithSurcharges.length);
         
         // Add surcharge amount for each container with surcharges checked
         containersWithSurcharges.forEach(() => {
           totalSurchargeAmount += clientSurchargeRate;
         });
+        
+        console.log("Total Surcharge Amount calculated:", totalSurchargeAmount);
       }
       
       const subtotalBeforeVAT = totalCost + totalSurchargeAmount;
@@ -1149,6 +1282,11 @@ const ControllerInstructions = () => {
         amount: totalSurchargeAmount,
       };
       costBreakdown.components.subtotalBeforeVAT = subtotalBeforeVAT;
+
+      console.log("SURCHARGES:");
+      console.log(`  Containers with Surcharges: ${containers.filter(c => c.surcharges).length}`);
+      console.log(`  Total Surcharge Amount: R${totalSurchargeAmount.toFixed(2)}`);
+      console.log(`  Subtotal (before VAT): R${subtotalBeforeVAT.toFixed(2)}`)
 
       // Calculate VAT (for display purposes only - not added to total cost saved to DB)
       const vatRate = formData.vat / 100
@@ -1162,11 +1300,29 @@ const ControllerInstructions = () => {
       }
       costBreakdown.components.totalWithVAT = totalWithVAT
 
+      console.log("VAT CALCULATION (for reference only - NOT added to saved total):")
+      console.log(`  VAT Rate: ${formData.vat}%`)
+      console.log(`  VAT Amount: R${subtotalBeforeVAT.toFixed(2)} × ${vatRate} = R${vatAmount.toFixed(2)}`)
+      console.log(`  Total with VAT: R${totalWithVAT.toFixed(2)}`)
+
       // Set the total cost to save (WITHOUT VAT)
       totalCost = subtotalBeforeVAT
 
       costBreakdown.components.finalTotalSaved = totalCost
 
+      console.log("FINAL COST BREAKDOWN:")
+      console.log(`  Base Cost: R${(totalCost - totalSurchargeAmount).toFixed(2)}`)
+      console.log(`  Surcharges: R${totalSurchargeAmount.toFixed(2)}`)
+      console.log(`  TOTAL COST SAVED TO DB (excluding VAT): R${totalCost.toFixed(2)}`)
+      console.log(`  VAT (calculated but not saved): R${vatAmount.toFixed(2)}`)
+      console.log(`  Total with VAT (for reference): R${totalWithVAT.toFixed(2)}`)
+
+      console.log("=== COST BREAKDOWN SUMMARY ===")
+      console.log(JSON.stringify(costBreakdown, null, 2))
+      console.log("=== END TOTAL COST CALCULATION ===")
+
+      // Prepare instruction data with null values for cross-haul and weight-based
+      // Remove hazardous and surcharges fields from formData to prevent them from being sent to m1_controller table
       const { hazardous, surcharges, ...formDataWithoutContainerFields } = formData;
       const instructionData = {
         ...formDataWithoutContainerFields,
@@ -1250,6 +1406,19 @@ const ControllerInstructions = () => {
             }))
           : []
 
+      console.log("=== SUBMITTING TO DATABASE ===")
+      console.log("Instruction data being saved:", {
+        ...instructionData,
+        description: instructionData.description ? instructionData.description.substring(0, 50) + "..." : null, // Truncate for logging
+      })
+      console.log("Container data being saved:", containerData)
+      console.log("Final calculated total cost (WITHOUT VAT):", totalCost)
+      console.log("Rate saving logic applied:")
+      console.log(`  rateper_6: ${instructionData.rateper_6} (count: ${instructionData.num_six_meters})`)
+      console.log(`  rateper_12: ${instructionData.rateper_12} (count: ${instructionData.num_twelve_meters})`)
+      console.log(`  rateper_abnormal: ${instructionData.rateper_abnormal} (count: ${instructionData.num_abnormal})`)
+      console.log(`  rateper_breakbulk: ${instructionData.rateper_breakbulk} (count: ${instructionData.num_breakbulk})`)
+
       // Save the instruction
       const response = await api.post("/api/instructions/save-instruction", {
         controllerData: instructionData,
@@ -1257,6 +1426,8 @@ const ControllerInstructions = () => {
       })
 
       if (response.data.success) {
+        console.log("=== INSTRUCTION SAVED SUCCESSFULLY ===")
+        console.log("Database response:", response.data)
         // Navigate to dashboard on success
         navigate("/ControllerDashboard")
       } else {
@@ -1292,6 +1463,15 @@ const ControllerInstructions = () => {
     [],
   )
 
+  const disabledRateStyle = useMemo(
+    () => ({
+      backgroundColor: "#f5f5f5",
+      color: "rgba(0, 0, 0, 0.38)",
+      cursor: "not-allowed",
+    }),
+    [],
+  )
+
   // Spinner styles
   const spinnerKeyframes = `
     @keyframes spin {
@@ -1299,6 +1479,9 @@ const ControllerInstructions = () => {
       100% { transform: rotate(360deg); }
     }
   `
+
+  // Determine if break bulk fields should be disabled
+  const disableBreakBulkFields = formData.rateWeight !== "Container" || !isCrossHaul
 
   return (
     <div className="controller-instructions-unique-wrapper">
@@ -2472,3 +2655,6 @@ const ControllerInstructions = () => {
 }
 
 export default ControllerInstructions
+
+
+
