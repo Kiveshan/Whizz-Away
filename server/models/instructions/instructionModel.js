@@ -1,61 +1,73 @@
-import { pool, query } from "../../config/database.js"
+import { pool, query } from "../../config/database.js";
 
 // Helper function to calculate total cost based on rate weight type
 const calculateTotalCost = (instructionData) => {
   // If the frontend has already calculated the total cost, use that value
-  if (instructionData.total_cost && !isNaN(Number(instructionData.total_cost))) {
-    return Number(Number(instructionData.total_cost).toFixed(2))
+  if (
+    instructionData.total_cost &&
+    !isNaN(Number(instructionData.total_cost))
+  ) {
+    return Number(Number(instructionData.total_cost).toFixed(2));
   }
-  
-  const rateWeight = instructionData.rateweight || instructionData.rateWeight || "Container"
-  
+
+  const rateWeight =
+    instructionData.rateweight || instructionData.rateWeight || "Container";
+
   // Calculate base cost without surcharges
-  let baseCost = 0
+  let baseCost = 0;
 
   if (rateWeight === "Container") {
     // Container-based calculation
-    const numSix = Number(instructionData.num_six_meters || 0)
-    const numTwelve = Number(instructionData.num_twelve_meters || 0)
-    const numAbnormal = Number(instructionData.num_abnormal || 0)
-    const numBreakBulk = Number(instructionData.num_breakbulk || 0)
+    const numSix = Number(instructionData.num_six_meters || 0);
+    const numTwelve = Number(instructionData.num_twelve_meters || 0);
+    const numAbnormal = Number(instructionData.num_abnormal || 0);
+    const numBreakBulk = Number(instructionData.num_breakbulk || 0);
 
-    const ratePer6 = numSix > 0 ? Number(instructionData.rateper_6 || 0) : 0
-    const ratePer12 = numTwelve > 0 ? Number(instructionData.rateper_12 || 0) : 0
-    const ratePerAbnormal = numAbnormal > 0 ? Number(instructionData.rateper_abnormal || 0) : 0
-    const ratePerBreakBulk = numBreakBulk > 0 ? Number(instructionData.rateper_breakbulk || 0) : 0
+    const ratePer6 = numSix > 0 ? Number(instructionData.rateper_6 || 0) : 0;
+    const ratePer12 =
+      numTwelve > 0 ? Number(instructionData.rateper_12 || 0) : 0;
+    const ratePerAbnormal =
+      numAbnormal > 0 ? Number(instructionData.rateper_abnormal || 0) : 0;
+    const ratePerBreakBulk =
+      numBreakBulk > 0 ? Number(instructionData.rateper_breakbulk || 0) : 0;
 
     baseCost =
-      ratePer6 * numSix + ratePer12 * numTwelve + ratePerAbnormal * numAbnormal + ratePerBreakBulk * numBreakBulk
+      ratePer6 * numSix +
+      ratePer12 * numTwelve +
+      ratePerAbnormal * numAbnormal +
+      ratePerBreakBulk * numBreakBulk;
   } else {
     // Weight-based calculation (kg, ton, m³)
-    const weight = Number(instructionData.weight || 0)
-    const unitRate = Number(instructionData.unitrate || 0)
+    const weight = Number(instructionData.weight || 0);
+    const unitRate = Number(instructionData.unitrate || 0);
 
-    baseCost = weight * unitRate
+    baseCost = weight * unitRate;
   }
 
   // Add surcharge amount if applicable
   // Note: This is a simplified calculation that doesn't account for per-container surcharges
   // The frontend should be calculating the total surcharge amount correctly
-  const surchargeAmount = instructionData.surcharges ? Number(instructionData.surchargesAmount || 0) : 0
-  const totalCost = baseCost + surchargeAmount
-  
-  return Number(totalCost.toFixed(2))
-}
+  const surchargeAmount = instructionData.surcharges
+    ? Number(instructionData.surchargesAmount || 0)
+    : 0;
+  const totalCost = baseCost + surchargeAmount;
+
+  return Number(totalCost.toFixed(2));
+};
 
 export const getShipmentTypes = async () => {
   const sql = `
     SELECT shipkey, shipmenttype
     FROM public.shipment
     ORDER BY shipkey
-  `
-  const result = await query(sql)
-  return result.recordset || result.rows
-}
+  `;
+  const result = await query(sql);
+  return result.recordset || result.rows;
+};
 
 export const getContainersByInstructionId = async (instructionId) => {
   // Convert instructionId to string to match database type
-  const instructionIdStr = String(instructionId)
+  const instructionIdStr = String(instructionId);
   const sql = `
     SELECT 
       containerkey, 
@@ -70,76 +82,107 @@ export const getContainersByInstructionId = async (instructionId) => {
     FROM public.container
     WHERE m1key = $1
     ORDER BY containerkey
-  `
+  `;
 
-  console.log(`[${new Date().toISOString()}] getContainersByInstructionId: Executing query`, {
-    sql,
-    params: [instructionIdStr],
-    instructionId,
-    instructionIdType: typeof instructionId,
-    instructionIdStr,
-    instructionIdStrType: typeof instructionIdStr,
-  })
+  console.log(
+    `[${new Date().toISOString()}] getContainersByInstructionId: Executing query`,
+    {
+      sql,
+      params: [instructionIdStr],
+      instructionId,
+      instructionIdType: typeof instructionId,
+      instructionIdStr,
+      instructionIdStrType: typeof instructionIdStr,
+    }
+  );
 
   try {
-    const result = await query(sql, [instructionIdStr])
-    const duration = result.duration || 0
+    const result = await query(sql, [instructionIdStr]);
+    const duration = result.duration || 0;
 
-    console.log(`[${new Date().toISOString()}] getContainersByInstructionId: Query completed`, {
-      instructionId,
-      instructionIdStr,
-      rowCount: result.rowCount || result.recordset?.length || 0,
-      duration: `${duration}ms`,
-      sampleRows: (result.rows || result.recordset || []).slice(0, 3), // Log first 3 rows as sample
-    })
-    
+    console.log(
+      `[${new Date().toISOString()}] getContainersByInstructionId: Query completed`,
+      {
+        instructionId,
+        instructionIdStr,
+        rowCount: result.rowCount || result.recordset?.length || 0,
+        duration: `${duration}ms`,
+        sampleRows: (result.rows || result.recordset || []).slice(0, 3), // Log first 3 rows as sample
+      }
+    );
+
     // Log the raw results to debug column names and values
-    console.log(`[${new Date().toISOString()}] getContainersByInstructionId: Raw container data:`, {
-      firstRow: result.rows?.[0] || result.recordset?.[0] || {},
-      columnNames: result.rows?.[0] ? Object.keys(result.rows[0]) : [],
-      hazardousValue: result.rows?.[0]?.["Hazardous"],
-      addSurchargesValue: result.rows?.[0]?.["Add Surcharges"],
-      hazardousType: result.rows?.[0]?.["Hazardous"] !== undefined ? typeof result.rows[0]["Hazardous"] : 'undefined',
-      addSurchargesType: result.rows?.[0]?.["Add Surcharges"] !== undefined ? typeof result.rows[0]["Add Surcharges"] : 'undefined',
-    })
+    console.log(
+      `[${new Date().toISOString()}] getContainersByInstructionId: Raw container data:`,
+      {
+        firstRow: result.rows?.[0] || result.recordset?.[0] || {},
+        columnNames: result.rows?.[0] ? Object.keys(result.rows[0]) : [],
+        hazardousValue: result.rows?.[0]?.["Hazardous"],
+        addSurchargesValue: result.rows?.[0]?.["Add Surcharges"],
+        hazardousType:
+          result.rows?.[0]?.["Hazardous"] !== undefined
+            ? typeof result.rows[0]["Hazardous"]
+            : "undefined",
+        addSurchargesType:
+          result.rows?.[0]?.["Add Surcharges"] !== undefined
+            ? typeof result.rows[0]["Add Surcharges"]
+            : "undefined",
+      }
+    );
 
     // Process the results to ensure boolean values are properly converted
-    const processedContainers = (result.rows || result.recordset || []).map(container => ({
-      ...container,
-      "Hazardous": container["Hazardous"] === true || container["Hazardous"] === 'true' || false,
-      "Add Surcharges": container["Add Surcharges"] === true || container["Add Surcharges"] === 'true' || false,
-      "Surcharge Amount": container["Surcharge Amount"] || 0
-    }))
+    const processedContainers = (result.rows || result.recordset || []).map(
+      (container) => ({
+        ...container,
+        Hazardous:
+          container["Hazardous"] === true ||
+          container["Hazardous"] === "true" ||
+          false,
+        "Add Surcharges":
+          container["Add Surcharges"] === true ||
+          container["Add Surcharges"] === "true" ||
+          false,
+        "Surcharge Amount": container["Surcharge Amount"] || 0,
+      })
+    );
 
-    console.log(`[${new Date().toISOString()}] getContainersByInstructionId: Processed containers:`, {
-      processedContainers: processedContainers.slice(0, 2),
-      booleanValues: processedContainers.map(c => ({
-        containerkey: c.containerkey,
-        "Hazardous": c["Hazardous"],
-        "Add Surcharges": c["Add Surcharges"],
-        "Surcharge Amount": c["Surcharge Amount"]
-      }))
-    })
+    console.log(
+      `[${new Date().toISOString()}] getContainersByInstructionId: Processed containers:`,
+      {
+        processedContainers: processedContainers.slice(0, 2),
+        booleanValues: processedContainers.map((c) => ({
+          containerkey: c.containerkey,
+          Hazardous: c["Hazardous"],
+          "Add Surcharges": c["Add Surcharges"],
+          "Surcharge Amount": c["Surcharge Amount"],
+        })),
+      }
+    );
 
-    return processedContainers
+    return processedContainers;
   } catch (error) {
-    console.error(`[${new Date().toISOString()}] Error in getContainersByInstructionId:`, {
-      error: error.message,
-      stack: error.stack,
-      instructionId,
-      instructionIdStr,
-      sql,
-    })
-    throw error
+    console.error(
+      `[${new Date().toISOString()}] Error in getContainersByInstructionId:`,
+      {
+        error: error.message,
+        stack: error.stack,
+        instructionId,
+        instructionIdStr,
+        sql,
+      }
+    );
+    throw error;
   }
-}
+};
 
 export const saveInstruction = async ({ controllerData, containerData }) => {
-  const client = await pool.connect()
+  const client = await pool.connect();
   try {
-    await client.query("BEGIN")
-    
-    console.log(`DEBUG: saveInstruction called with ${containerData.length} containers`)
+    await client.query("BEGIN");
+
+    console.log(
+      `DEBUG: saveInstruction called with ${containerData.length} containers`
+    );
 
     const controllerQuery = `
       INSERT INTO public.m1_controller (
@@ -155,35 +198,38 @@ export const saveInstruction = async ({ controllerData, containerData }) => {
         $6, $7, $8, $9, $10, $11, $12, $13, $14, $15,
         $16, $17, $18, $19, $20, $21, $22, $23, $24, $25, $26
       ) RETURNING m1key
-    `
+    `;
 
     // Helper function to format date to YYYY-MM-DD
     const formatDate = (dateStr) => {
-      if (!dateStr) return null
+      if (!dateStr) return null;
       try {
-        const date = new Date(dateStr)
-        return date.toISOString().split("T")[0] // Returns YYYY-MM-DD
+        const date = new Date(dateStr);
+        return date.toISOString().split("T")[0]; // Returns YYYY-MM-DD
       } catch (e) {
-        console.error("Error formatting date:", e)
-        return null
+        console.error("Error formatting date:", e);
+        return null;
       }
-    }
+    };
 
     // Helper function to format time to HH:MM:SS
     const formatTime = (timeStr) => {
-      if (!timeStr) return null
+      if (!timeStr) return null;
       try {
         // Handle both 'HH:MM' and 'HH:MM:SS' formats
-        const [hours, minutes] = timeStr.split(":")
-        return `${hours.padStart(2, "0")}:${minutes.padStart(2, "0")}:00`
+        const [hours, minutes] = timeStr.split(":");
+        return `${hours.padStart(2, "0")}:${minutes.padStart(2, "0")}:00`;
       } catch (e) {
-        console.error("Error formatting time:", e)
-        return null
+        console.error("Error formatting time:", e);
+        return null;
       }
-    }
+    };
 
     // Log all received fields for debugging
-    console.log("Raw controller data received for saving:", JSON.stringify(controllerData, null, 2))
+    console.log(
+      "Raw controller data received for saving:",
+      JSON.stringify(controllerData, null, 2)
+    );
 
     // Extract all possible field name variations and ensure correct types/nulls
     const fields = {
@@ -191,16 +237,24 @@ export const saveInstruction = async ({ controllerData, containerData }) => {
       client: controllerData.client || controllerData.clientId,
 
       // Shipment
-      shipmentType: controllerData.shipmentTypeId || controllerData.shipment_type,
+      shipmentType:
+        controllerData.shipmentTypeId || controllerData.shipment_type,
 
       // Dates
       pickupDate: controllerData.pickupDate || controllerData.pickupdate,
       pickupTime: controllerData.pickupTime || controllerData.pickuptime,
       stackDate: controllerData.stackDate || controllerData.stackdate,
-      lastFreeDate: controllerData.lastFreeDate || controllerData.lastfreedate || controllerData.deadline, // renamed from deadline
+      lastFreeDate:
+        controllerData.lastFreeDate ||
+        controllerData.lastfreedate ||
+        controllerData.deadline, // renamed from deadline
 
       // File reference
-      clientFileRef: controllerData.clientFileRef || controllerData.fileRef || controllerData.file_ref || controllerData.fileref, // renamed from fileRef
+      clientFileRef:
+        controllerData.clientFileRef ||
+        controllerData.fileRef ||
+        controllerData.file_ref ||
+        controllerData.fileref, // renamed from fileRef
 
       // Other fields
       ksmFileRef: controllerData.ksmFileRef || controllerData.task, // renamed from task
@@ -216,7 +270,9 @@ export const saveInstruction = async ({ controllerData, containerData }) => {
       weight: controllerData.weight, // Already null if container-based from frontend
       unitrate: controllerData.unitrate, // Already null if container-based from frontend
       vat: controllerData.vat || 15,
-      total_cost: controllerData.total_cost ? Number(Number(controllerData.total_cost).toFixed(2)) : calculateTotalCost(controllerData), // Directly use frontend total_cost if available
+      total_cost: controllerData.total_cost
+        ? Number(Number(controllerData.total_cost).toFixed(2))
+        : calculateTotalCost(controllerData), // Directly use frontend total_cost if available
       // Debug log for total cost
       _debug_frontend_total_cost: controllerData.total_cost,
 
@@ -229,10 +285,16 @@ export const saveInstruction = async ({ controllerData, containerData }) => {
       rateper_12: controllerData.rateper_12,
       rateper_abnormal: controllerData.rateper_abnormal,
       rateper_breakbulk: controllerData.rateper_breakbulk,
-    }
+    };
 
-    console.log("MODEL: Original total_cost from controller:", controllerData.total_cost);
-    console.log("MODEL: Calculated/processed total_cost being saved:", fields.total_cost);
+    console.log(
+      "MODEL: Original total_cost from controller:",
+      controllerData.total_cost
+    );
+    console.log(
+      "MODEL: Calculated/processed total_cost being saved:",
+      fields.total_cost
+    );
     console.log("Processed fields for saving:", {
       client: fields.client,
       ksmFileRef: fields.ksmFileRef, // renamed from task
@@ -264,10 +326,13 @@ export const saveInstruction = async ({ controllerData, containerData }) => {
       rateper_breakbulk: fields.rateper_breakbulk,
       unitrate: fields.unitrate,
       created_at: formatDate(new Date()),
-    })
+    });
 
-    console.log("MODEL: Total cost value right before SQL insertion:", fields.total_cost);
-    
+    console.log(
+      "MODEL: Total cost value right before SQL insertion:",
+      fields.total_cost
+    );
+
     const controllerValues = [
       fields.client,
       fields.ksmFileRef, // renamed from task
@@ -294,58 +359,184 @@ export const saveInstruction = async ({ controllerData, containerData }) => {
       fields.rateper_abnormal, // Will be null if weight-based
       fields.rateper_breakbulk, // Will be null if weight-based or not cross-haul/container
       fields.unitrate, // Will be null if container-based
-      formatDate(new Date()) // Current date for created_at
-    ]
+      formatDate(new Date()), // Current date for created_at
+    ];
 
-    const controllerResult = await client.query(controllerQuery, controllerValues)
-    const m1key = controllerResult.rows[0].m1key
-    
+    const controllerResult = await client.query(
+      controllerQuery,
+      controllerValues
+    );
+    const m1key = controllerResult.rows[0].m1key;
+
     console.log("MODEL: SQL query executed. Inserted m1key:", m1key);
-    
+
     // Verify the saved total_cost
     const verifyQuery = `SELECT total_cost FROM public.m1_controller WHERE m1key = $1`;
     const verifyResult = await client.query(verifyQuery, [m1key]);
-    console.log("MODEL: Verified total_cost in database:", verifyResult.rows[0]?.total_cost);
+    console.log(
+      "MODEL: Verified total_cost in database:",
+      verifyResult.rows[0]?.total_cost
+    );
 
-    for (const container of containerData) {
+    // Define clientId, pickup, and dropoff variables before container processing
+  let clientId = controllerData.client || controllerData.clientId;
+  let pickup = controllerData.pickup || controllerData.selectedStartingPoint || 
+      (Array.isArray(controllerData.startingPoints) ? null : controllerData.startingPoints);
+  let dropoff = controllerData.dropoff || controllerData.selectedDestination || 
+      (Array.isArray(controllerData.destinations) ? null : controllerData.destinations);
+
+  for (const container of containerData) {
+      // Define the container insert query with parameter placeholders
       const containerQuery = `
         INSERT INTO public.container (
-          containernum, weight, m1key, container_type, cargo_description, "Hazardous", "Add Surcharges", "Surcharge Amount"
+          containernum, weight, m1key, container_type, cargo_description, "Hazardous", "Add Surcharges", "Surcharge Amount", "Hazardous Amount"
         ) VALUES (
-          $1, $2, $3, $4, $5, $6, $7, $8
+          $1, $2, $3, $4, $5, $6, $7, $8, $9
         )
-      `
+      `;
+      
+      // Debug statement moved after variable definition
+      console.log(`DEBUG: Container insert SQL columns: containernum, weight, m1key, container_type, cargo_description, "Hazardous", "Add Surcharges", "Surcharge Amount", "Hazardous Amount"`);
 
       // Sanitize weight value
-      let sanitizedWeight = null
-      if (container.weight !== null && container.weight !== undefined && container.weight !== "") {
+      let sanitizedWeight = null;
+      if (
+        container.weight !== null &&
+        container.weight !== undefined &&
+        container.weight !== ""
+      ) {
         if (typeof container.weight === "string") {
-          const trimmedWeight = container.weight.trim()
+          const trimmedWeight = container.weight.trim();
           if (trimmedWeight !== "") {
-            const parsedWeight = Number.parseFloat(trimmedWeight)
+            const parsedWeight = Number.parseFloat(trimmedWeight);
             if (!isNaN(parsedWeight) && parsedWeight >= 0) {
-              sanitizedWeight = parsedWeight
+              sanitizedWeight = parsedWeight;
             }
           }
-        } else if (typeof container.weight === "number" && container.weight >= 0) {
-          sanitizedWeight = container.weight
+        } else if (
+          typeof container.weight === "number" &&
+          container.weight >= 0
+        ) {
+          sanitizedWeight = container.weight;
         }
       }
 
+      // Using previously defined clientId, pickup, and dropoff variables
+
+      console.log(`DEBUG: controllerData keys:`, Object.keys(controllerData));
+      console.log(
+        `DEBUG: client: ${controllerData.client}, pickup: ${controllerData.pickup}, dropoff: ${controllerData.dropoff}`
+      );
+      console.log(
+        `DEBUG: startingPoints: ${controllerData.startingPoints}, destinations: ${controllerData.destinations}`
+      );
+
       // Fetch surcharge amount if addSurcharges is true
-      let surchargeAmount = 0
-      const addSurcharges = container["Add Surcharges"] || container.addSurcharges || false
+      let surchargeAmount = 0;
+      const addSurcharges =
+        container["Add Surcharges"] || container.addSurcharges || false;
+
+      // <CHANGE> Fetch hazardous amount if hazardous is true
+      let hazardousAmount = 0;
+      const isHazardous =
+        container["Hazardous"] || container.hazardous || false;
+
+      console.log(
+        `DEBUG: Container ${
+          container.containerNum || "unnamed"
+        } - isHazardous: ${isHazardous}`
+      );
       
-      console.log(`DEBUG: Container ${container.containerNum || 'unnamed'} - addSurcharges: ${addSurcharges}`)
-      console.log(`DEBUG: controllerData keys:`, Object.keys(controllerData))
-      console.log(`DEBUG: client: ${controllerData.client}, pickup: ${controllerData.pickup}, dropoff: ${controllerData.dropoff}`)
-      console.log(`DEBUG: startingPoints: ${controllerData.startingPoints}, destinations: ${controllerData.destinations}`)
-      
-      // Fix parameter mapping - use string fields, not arrays
-      const clientId = controllerData.client || controllerData.clientId
-      const pickup = controllerData.pickup || controllerData.selectedStartingPoint || (Array.isArray(controllerData.startingPoints) ? null : controllerData.startingPoints)
-      const dropoff = controllerData.dropoff || controllerData.selectedDestination || (Array.isArray(controllerData.destinations) ? null : controllerData.destinations)
-      
+      console.log(`DEBUG: Preparing container insert with hazardous=${isHazardous}, hazardousAmount=${hazardousAmount}`);
+
+      if (isHazardous) {
+        // First check if we already have a hazardous amount directly from container data
+        if (container["Hazardous Amount"] && !isNaN(Number(container["Hazardous Amount"])) && Number(container["Hazardous Amount"]) > 0) {
+          hazardousAmount = Number(container["Hazardous Amount"]);
+          console.log(`DEBUG: Using existing hazardous amount from container data: ${hazardousAmount}`);
+        } 
+        // If we don't have a hazardous amount or it's 0, fetch from the database
+        else if (clientId && pickup && dropoff) {
+          try {
+            const hazardousQuery = `
+        SELECT hazardous
+        FROM public.m5_client_rate
+        WHERE clientid = $1
+          AND starting_point = $2
+          AND destination = $3
+        ORDER BY client_rate_id DESC
+        LIMIT 1
+      `;
+            console.log(
+              `DEBUG: Executing hazardous query with exact params: clientId='${clientId}', pickup='${pickup}', dropoff='${dropoff}'`
+            );
+
+            const hazardousResult = await client.query(hazardousQuery, [
+              clientId,
+              pickup,
+              dropoff,
+            ]);
+
+            console.log(
+              `DEBUG: Hazardous query result rows: ${hazardousResult.rows.length}`
+            );
+            console.log(
+              `DEBUG: Raw hazardous result rows:`,
+              JSON.stringify(hazardousResult.rows)
+            );
+            if (hazardousResult.rows.length > 0) {
+              console.log(
+                `DEBUG: First row hazardous value:`,
+                hazardousResult.rows[0].hazardous
+              );
+              if (hazardousResult.rows[0].hazardous) {
+                const fetchedAmount = Number.parseFloat(
+                  hazardousResult.rows[0].hazardous
+                );
+                console.log(`DEBUG: Parsed hazardous amount: ${fetchedAmount}`);
+                if (!isNaN(fetchedAmount) && fetchedAmount > 0) {
+                  hazardousAmount = fetchedAmount;
+                  console.log(
+                    `SUCCESS: Fetched hazardous amount: ${hazardousAmount} for container ${
+                      container.containerNum || "unnamed"
+                    }`
+                  );
+                } else {
+                  console.log(
+                    `DEBUG: Hazardous amount is NaN or <= 0: ${fetchedAmount}`
+                  );
+                }
+              } else {
+                console.log(`DEBUG: No hazardous value in database row`);
+              }
+            } else {
+              console.log(
+                `DEBUG: No matching rates found in m5_client_rate table for hazardous`
+              );
+            }
+          } catch (error) {
+            console.error(
+              `Error fetching hazardous amount for container ${
+                container.containerNum || "unnamed"
+              }:`,
+              error
+            );
+            console.log(`API call failed for hazardous amount, defaulting to 0`);
+            // Continue with hazardousAmount = 0 on error
+          }
+        } else {
+          console.log(
+            `WARN: Hazardous requested but missing parameters. clientId=${clientId}, pickup=${pickup}, dropoff=${dropoff}`
+          );
+        }
+      }
+
+      console.log(
+        `DEBUG: Container ${
+          container.containerNum || "unnamed"
+        } - addSurcharges: ${addSurcharges}`
+      );
+
       if (addSurcharges && clientId && pickup && dropoff) {
         try {
           const surchargeQuery = `
@@ -356,42 +547,103 @@ export const saveInstruction = async ({ controllerData, containerData }) => {
               AND destination = $3
             ORDER BY client_rate_id DESC
             LIMIT 1
-          `
-          console.log(`DEBUG: Executing surcharge query with exact params: clientId='${clientId}', pickup='${pickup}', dropoff='${dropoff}'`)
-          console.log(`DEBUG: Verifying SQL: SELECT * FROM public.m5_client_rate WHERE clientid='${clientId}' AND starting_point='${pickup}' AND destination='${dropoff}' LIMIT 1`)
-          
+          `;
+          console.log(
+            `DEBUG: Executing surcharge query with exact params: clientId='${clientId}', pickup='${pickup}', dropoff='${dropoff}'`
+          );
+          console.log(
+            `DEBUG: Verifying SQL: SELECT * FROM public.m5_client_rate WHERE clientid='${clientId}' AND starting_point='${pickup}' AND destination='${dropoff}' LIMIT 1`
+          );
+
           const surchargeResult = await client.query(surchargeQuery, [
             clientId,
             pickup,
-            dropoff
-          ])
-          
-          console.log(`DEBUG: Query result rows: ${surchargeResult.rows.length}`)
-          console.log(`DEBUG: Raw result rows:`, JSON.stringify(surchargeResult.rows))
+            dropoff,
+          ]);
+
+          console.log(
+            `DEBUG: Query result rows: ${surchargeResult.rows.length}`
+          );
+          console.log(
+            `DEBUG: Raw result rows:`,
+            JSON.stringify(surchargeResult.rows)
+          );
           if (surchargeResult.rows.length > 0) {
-            console.log(`DEBUG: First row surcharges value:`, surchargeResult.rows[0].surcharges)
+            console.log(
+              `DEBUG: First row surcharges value:`,
+              surchargeResult.rows[0].surcharges
+            );
             if (surchargeResult.rows[0].surcharges) {
-              const fetchedAmount = Number.parseFloat(surchargeResult.rows[0].surcharges)
-              console.log(`DEBUG: Parsed surcharge amount: ${fetchedAmount}`)
+              const fetchedAmount = Number.parseFloat(
+                surchargeResult.rows[0].surcharges
+              );
+              console.log(`DEBUG: Parsed surcharge amount: ${fetchedAmount}`);
               if (!isNaN(fetchedAmount) && fetchedAmount > 0) {
-                surchargeAmount = fetchedAmount
-                console.log(`SUCCESS: Fetched surcharge amount: ${surchargeAmount} for container ${container.containerNum || 'unnamed'}`)
+                surchargeAmount = fetchedAmount;
+                console.log(
+                  `SUCCESS: Fetched surcharge amount: ${surchargeAmount} for container ${
+                    container.containerNum || "unnamed"
+                  }`
+                );
               } else {
-                console.log(`DEBUG: Surcharge amount is NaN or <= 0: ${fetchedAmount}`)
+                console.log(
+                  `DEBUG: Surcharge amount is NaN or <= 0: ${fetchedAmount}`
+                );
               }
             } else {
-              console.log(`DEBUG: No surcharges value in database row`)
+              console.log(`DEBUG: No surcharges value in database row`);
             }
           } else {
-            console.log(`DEBUG: No matching rates found in m5_client_rate table`)
+            console.log(
+              `DEBUG: No matching rates found in m5_client_rate table`
+            );
           }
         } catch (error) {
-          console.error(`Error fetching surcharge amount for container ${container.containerNum || 'unnamed'}:`, error)
+          console.error(
+            `Error fetching surcharge amount for container ${
+              container.containerNum || "unnamed"
+            }:`,
+            error
+          );
           // Continue with surchargeAmount = 0 on error
         }
       } else if (addSurcharges) {
-        console.log(`WARN: Surcharge requested but missing parameters. clientId=${clientId}, pickup=${pickup}, dropoff=${dropoff}`)
+        console.log(
+          `WARN: Surcharge requested but missing parameters. clientId=${clientId}, pickup=${pickup}, dropoff=${dropoff}`
+        );
       }
+
+      console.log(
+        `DEBUG: === CONTAINER INSERT VALUES (Container: ${container.containerNum || container.containernum || "unnamed"}) ===`
+      );
+      console.log(
+        `DEBUG: containerNum: ${container.containerNum || container.containernum || ""}`
+      );
+      console.log(`DEBUG: weight: ${sanitizedWeight}`);
+      console.log(`DEBUG: m1key: ${m1key}`);
+      console.log(
+        `DEBUG: container_type: ${container.container_type || container.containerType || ""}`
+      );
+      console.log(
+        `DEBUG: cargo_description: ${container.cargo_description || container.cargoDescription || ""}`
+      );
+      console.log(`DEBUG: isHazardous: ${isHazardous}`);
+      console.log(`DEBUG: addSurcharges: ${addSurcharges}`);
+      console.log(`DEBUG: surchargeAmount: ${surchargeAmount}`);
+      console.log(`DEBUG: hazardousAmount: ${hazardousAmount}`);
+      console.log(
+        `DEBUG: Container SQL parameters: ${[
+          container.containerNum || container.containernum || "",
+          sanitizedWeight,
+          m1key,
+          container.container_type || container.containerType || "",
+          container.cargo_description || container.cargoDescription || "",
+          isHazardous,
+          addSurcharges,
+          surchargeAmount,
+          hazardousAmount,
+        ].join(", ")}`
+      );
 
       const containerValues = [
         container.containerNum || container.containernum || "",
@@ -399,25 +651,27 @@ export const saveInstruction = async ({ controllerData, containerData }) => {
         m1key,
         container.container_type || container.containerType || "",
         container.cargo_description || container.cargoDescription || "",
-        container["Hazardous"] || container.hazardous || false,
+        isHazardous,
         addSurcharges,
         surchargeAmount, // Backend-calculated surcharge amount
-      ]
-      await client.query(containerQuery, containerValues)
+        hazardousAmount, // Backend-calculated hazardous amount
+      ];
+
+      console.log(`DEBUG: Executing container insert query with ${containerValues.length} parameters`);
+      console.log(`DEBUG: Container insert query: ${containerQuery}`);
+      await client.query(containerQuery, containerValues);
     }
 
     // After all containers are processed with surcharge amounts, recalculate total cost
-    const containersWithSurcharges = []
+    const containersWithSurcharges = [];
     for (const container of containerData) {
-      const addSurcharges = container["Add Surcharges"] || container.addSurcharges || false
-      let surchargeAmount = 0
-      
+      const addSurcharges =
+        container["Add Surcharges"] || container.addSurcharges || false;
+      let surchargeAmount = 0;
+
       if (addSurcharges) {
-        // Re-fetch the surcharge amount that was calculated above
-        const clientId = controllerData.client || controllerData.clientId
-        const pickup = controllerData.pickup || controllerData.selectedStartingPoint || (Array.isArray(controllerData.startingPoints) ? null : controllerData.startingPoints)
-        const dropoff = controllerData.dropoff || controllerData.selectedDestination || (Array.isArray(controllerData.destinations) ? null : controllerData.destinations)
-        
+        // Re-use the previously defined clientId, pickup, dropoff variables
+
         if (clientId && pickup && dropoff) {
           try {
             const surchargeQuery = `
@@ -428,97 +682,187 @@ export const saveInstruction = async ({ controllerData, containerData }) => {
                 AND destination = $3
               ORDER BY client_rate_id DESC
               LIMIT 1
-            `
-            const surchargeResult = await client.query(surchargeQuery, [clientId, pickup, dropoff])
-            
-            if (surchargeResult.rows.length > 0 && surchargeResult.rows[0].surcharges) {
-              const fetchedAmount = Number.parseFloat(surchargeResult.rows[0].surcharges)
+            `;
+            const surchargeResult = await client.query(surchargeQuery, [
+              clientId,
+              pickup,
+              dropoff,
+            ]);
+
+            if (
+              surchargeResult.rows.length > 0 &&
+              surchargeResult.rows[0].surcharges
+            ) {
+              const fetchedAmount = Number.parseFloat(
+                surchargeResult.rows[0].surcharges
+              );
               if (!isNaN(fetchedAmount) && fetchedAmount > 0) {
-                surchargeAmount = fetchedAmount
+                surchargeAmount = fetchedAmount;
               }
             }
           } catch (error) {
-            console.error(`Error re-fetching surcharge for total calculation:`, error)
+            console.error(
+              `Error re-fetching surcharge for total calculation:`,
+              error
+            );
           }
         } else {
-          console.log(`WARN: Recalc surcharge requested but missing parameters. clientId=${clientId}, pickup=${pickup}, dropoff=${dropoff}`)
+          console.log(
+            `WARN: Recalc surcharge requested but missing parameters. clientId=${clientId}, pickup=${pickup}, dropoff=${dropoff}`
+          );
         }
       }
+
+      // Add hazardous information for each container
+      const isHazardous = container["Hazardous"] || container.hazardous || false;
+      let hazardousAmount = 0;
       
+      if (isHazardous) {
+        // First check if the container already has a hazardous amount
+        if (container["Hazardous Amount"] && !isNaN(Number(container["Hazardous Amount"])) && Number(container["Hazardous Amount"]) > 0) {
+          hazardousAmount = Number(container["Hazardous Amount"]);
+          console.log(`DEBUG: Using existing hazardous amount for total cost calculation: ${hazardousAmount}`);
+        }
+        // If not, try to fetch from the database
+        else if (clientId && pickup && dropoff) {
+          try {
+            const hazardousQuery = `
+              SELECT hazardous
+              FROM public.m5_client_rate
+              WHERE clientid = $1
+                AND starting_point = $2
+                AND destination = $3
+              ORDER BY client_rate_id DESC
+              LIMIT 1
+            `;
+            
+            const hazardousResult = await client.query(hazardousQuery, [
+              clientId,
+              pickup,
+              dropoff,
+            ]);
+            
+            if (hazardousResult.rows.length > 0 && hazardousResult.rows[0].hazardous) {
+              const fetchedAmount = Number.parseFloat(hazardousResult.rows[0].hazardous);
+              if (!isNaN(fetchedAmount) && fetchedAmount > 0) {
+                hazardousAmount = fetchedAmount;
+                console.log(`DEBUG: Re-fetched hazardous amount from database for total cost calculation: ${hazardousAmount}`);
+              }
+            }
+          } catch (error) {
+            console.error(`Error re-fetching hazardous for total calculation:`, error);
+          }
+        } else {
+          console.log(`DEBUG: Hazardous is true but couldn't determine hazardous amount for total cost calculation. clientId=${clientId}, pickup=${pickup}, dropoff=${dropoff}`);
+        }
+      }
+
       containersWithSurcharges.push({
         "Add Surcharges": addSurcharges,
-        "Surcharge Amount": surchargeAmount
-      })
+        "Surcharge Amount": surchargeAmount,
+        "Hazardous": isHazardous,
+        "Hazardous Amount": hazardousAmount
+      });
     }
 
     // Calculate total cost including surcharges (local implementation)
-    const calculateTotalCostWithSurcharges = (instructionData, containers = []) => {
-      const rateWeight = instructionData.rateweight || instructionData.rateWeight || "Container"
-      
-      let baseCost = 0
+    const calculateTotalCostWithSurcharges = (
+      instructionData,
+      containers = []
+    ) => {
+      const rateWeight =
+        instructionData.rateweight || instructionData.rateWeight || "Container";
+
+      let baseCost = 0;
 
       if (rateWeight === "Container") {
         // Container-based calculation
-        const numSix = Number(instructionData.num_six_meters || 0)
-        const numTwelve = Number(instructionData.num_twelve_meters || 0)
-        const numAbnormal = Number(instructionData.num_abnormal || 0)
-        const numBreakBulk = Number(instructionData.num_breakbulk || 0)
+        const numSix = Number(instructionData.num_six_meters || 0);
+        const numTwelve = Number(instructionData.num_twelve_meters || 0);
+        const numAbnormal = Number(instructionData.num_abnormal || 0);
+        const numBreakBulk = Number(instructionData.num_breakbulk || 0);
 
-        const ratePer6 = numSix > 0 ? Number(instructionData.rateper_6 || 0) : 0
-        const ratePer12 = numTwelve > 0 ? Number(instructionData.rateper_12 || 0) : 0
-        const ratePerAbnormal = numAbnormal > 0 ? Number(instructionData.rateper_abnormal || 0) : 0
-        const ratePerBreakBulk = numBreakBulk > 0 ? Number(instructionData.rateper_breakbulk || 0) : 0
+        const ratePer6 =
+          numSix > 0 ? Number(instructionData.rateper_6 || 0) : 0;
+        const ratePer12 =
+          numTwelve > 0 ? Number(instructionData.rateper_12 || 0) : 0;
+        const ratePerAbnormal =
+          numAbnormal > 0 ? Number(instructionData.rateper_abnormal || 0) : 0;
+        const ratePerBreakBulk =
+          numBreakBulk > 0 ? Number(instructionData.rateper_breakbulk || 0) : 0;
 
-        baseCost = ratePer6 * numSix + ratePer12 * numTwelve + ratePerAbnormal * numAbnormal + ratePerBreakBulk * numBreakBulk
+        baseCost =
+          ratePer6 * numSix +
+          ratePer12 * numTwelve +
+          ratePerAbnormal * numAbnormal +
+          ratePerBreakBulk * numBreakBulk;
       } else {
         // Weight-based calculation (kg, ton, m³)
-        const weight = Number(instructionData.weight || 0)
-        const unitRate = Number(instructionData.unitrate || 0)
-        baseCost = weight * unitRate
+        const weight = Number(instructionData.weight || 0);
+        const unitRate = Number(instructionData.unitrate || 0);
+        baseCost = weight * unitRate;
       }
 
       // Calculate total surcharge from containers
       const totalSurchargeAmount = containers.reduce((total, container) => {
         if (container["Add Surcharges"] && container["Surcharge Amount"]) {
-          return total + Number(container["Surcharge Amount"] || 0)
+          return total + Number(container["Surcharge Amount"] || 0);
         }
-        return total
-      }, 0)
+        return total;
+      }, 0);
 
-      const totalCost = baseCost + totalSurchargeAmount
-      return Number(totalCost.toFixed(2))
-    }
-    
-    const recalculatedTotalCost = calculateTotalCostWithSurcharges(controllerData, containersWithSurcharges)
-    
-    console.log(`DEBUG: Original total cost: ${controllerData.total_cost}`)
-    console.log(`DEBUG: Recalculated total cost with surcharges: ${recalculatedTotalCost}`)
-    
+      // Calculate total hazardous amount from containers
+      const totalHazardousAmount = containers.reduce((total, container) => {
+        if (container["Hazardous"] && container["Hazardous Amount"]) {
+          return total + Number(container["Hazardous Amount"] || 0);
+        }
+        return total;
+      }, 0);
+
+      console.log(`DEBUG: Base cost: ${baseCost}, Surcharges: ${totalSurchargeAmount}, Hazardous: ${totalHazardousAmount}`);
+      const totalCost = baseCost + totalSurchargeAmount + totalHazardousAmount;
+      return Number(totalCost.toFixed(2));
+    };
+
+    const recalculatedTotalCost = calculateTotalCostWithSurcharges(
+      controllerData,
+      containersWithSurcharges
+    );
+
+    console.log(`DEBUG: Original total cost: ${controllerData.total_cost}`);
+    console.log(
+      `DEBUG: Recalculated total cost with surcharges: ${recalculatedTotalCost}`
+    );
+
     // Update the total cost in the database if it changed
-    if (Math.abs(recalculatedTotalCost - Number(controllerData.total_cost)) > 0.01) {
-      console.log(`DEBUG: Updating total cost from ${controllerData.total_cost} to ${recalculatedTotalCost}`)
+    if (
+      Math.abs(recalculatedTotalCost - Number(controllerData.total_cost)) > 0.01
+    ) {
+      console.log(
+        `DEBUG: Updating total cost from ${controllerData.total_cost} to ${recalculatedTotalCost}`
+      );
       const updateTotalCostQuery = `
         UPDATE public.m1_controller 
         SET total_cost = $1 
         WHERE m1key = $2
-      `
-      await client.query(updateTotalCostQuery, [recalculatedTotalCost, m1key])
+      `;
+      await client.query(updateTotalCostQuery, [recalculatedTotalCost, m1key]);
     }
 
-    await client.query("COMMIT")
-    return { m1key, finalTotalCost: recalculatedTotalCost }
+    await client.query("COMMIT");
+    return { m1key, finalTotalCost: recalculatedTotalCost };
   } catch (error) {
-    await client.query("ROLLBACK")
-    throw error
+    await client.query("ROLLBACK");
+    throw error;
   } finally {
-    client.release()
+    client.release();
   }
-}
+};
 
 export const getClientInstructionStats = async () => {
   const statusCheckQuery = `
     SELECT DISTINCT status FROM public.m1_controller
-  `
+  `;
   const queryText = `
     SELECT 
       c.m5clientkey,
@@ -540,27 +884,29 @@ export const getClientInstructionStats = async () => {
       c.m5clientkey, c.client, c.representative, c.email
     ORDER BY 
       c.client
-  `
-  const client = await pool.connect()
+  `;
+  const client = await pool.connect();
   try {
-    const statusResult = await client.query(statusCheckQuery)
+    const statusResult = await client.query(statusCheckQuery);
     console.log(
       "Available status values in database:",
-      statusResult.rows.map((row) => row.status),
-    )
-    const result = await client.query(queryText)
-    return result.rows
+      statusResult.rows.map((row) => row.status)
+    );
+    const result = await client.query(queryText);
+    return result.rows;
   } catch (error) {
-    throw error
+    throw error;
   } finally {
-    client.release()
+    client.release();
   }
-}
+};
 
 // Function to check if created_at column exists and add it if it doesn't
 export const ensureCreatedAtColumnExists = async () => {
-  console.log(`[${new Date().toISOString()}] Checking if created_at column exists in m1_controller table`)
-  
+  console.log(
+    `[${new Date().toISOString()}] Checking if created_at column exists in m1_controller table`
+  );
+
   try {
     // Check if the column exists
     const checkColumnSql = `
@@ -568,47 +914,63 @@ export const ensureCreatedAtColumnExists = async () => {
       FROM information_schema.columns 
       WHERE table_name = 'm1_controller' 
       AND column_name = 'created_at'
-    `
-    
-    const result = await query(checkColumnSql)
-    const columnExists = (result.rows && result.rows.length > 0) || (result.recordset && result.recordset.length > 0)
-    
+    `;
+
+    const result = await query(checkColumnSql);
+    const columnExists =
+      (result.rows && result.rows.length > 0) ||
+      (result.recordset && result.recordset.length > 0);
+
     if (!columnExists) {
-      console.log(`[${new Date().toISOString()}] created_at column does not exist, adding it now`)
-      
+      console.log(
+        `[${new Date().toISOString()}] created_at column does not exist, adding it now`
+      );
+
       // Add the column if it doesn't exist
       const addColumnSql = `
         ALTER TABLE public.m1_controller 
         ADD COLUMN created_at DATE DEFAULT CURRENT_DATE
-      `
-      
-      await query(addColumnSql)
-      console.log(`[${new Date().toISOString()}] created_at column added successfully`)
-      
+      `;
+
+      await query(addColumnSql);
+      console.log(
+        `[${new Date().toISOString()}] created_at column added successfully`
+      );
+
       // Update existing records to have a created_at value
       const updateExistingSql = `
         UPDATE public.m1_controller 
         SET created_at = CURRENT_DATE 
         WHERE created_at IS NULL
-      `
-      
-      await query(updateExistingSql)
-      console.log(`[${new Date().toISOString()}] Updated existing records with created_at values`)
+      `;
+
+      await query(updateExistingSql);
+      console.log(
+        `[${new Date().toISOString()}] Updated existing records with created_at values`
+      );
     } else {
-      console.log(`[${new Date().toISOString()}] created_at column already exists`)
+      console.log(
+        `[${new Date().toISOString()}] created_at column already exists`
+      );
     }
   } catch (error) {
-    console.error(`[${new Date().toISOString()}] Error ensuring created_at column exists:`, error)
-    throw error
+    console.error(
+      `[${new Date().toISOString()}] Error ensuring created_at column exists:`,
+      error
+    );
+    throw error;
   }
-}
+};
 
 export const getInstructions = async (clientId) => {
-  console.log(`[${new Date().toISOString()}] getInstructions: Starting with clientId:`, clientId)
-  
+  console.log(
+    `[${new Date().toISOString()}] getInstructions: Starting with clientId:`,
+    clientId
+  );
+
   // Ensure the created_at column exists before querying
-  await ensureCreatedAtColumnExists()
-  
+  await ensureCreatedAtColumnExists();
+
   let sql = `
     SELECT 
       m.m1key,
@@ -626,33 +988,52 @@ export const getInstructions = async (clientId) => {
       public.m5_client c ON m.client = c.m5clientkey
     LEFT JOIN
       public.shipment s ON m.shipment_type = s.shipkey
-  `
-  const queryParams = []
+  `;
+  const queryParams = [];
   if (clientId) {
-    sql += ` WHERE m.client = $1`
-    queryParams.push(clientId)
+    sql += ` WHERE m.client = $1`;
+    queryParams.push(clientId);
   }
-  sql += ` ORDER BY m.created_at DESC` // Order by creation date
+  sql += ` ORDER BY m.created_at DESC`; // Order by creation date
 
-  console.log(`[${new Date().toISOString()}] getInstructions: Executing SQL:`, sql)
-  console.log(`[${new Date().toISOString()}] getInstructions: With params:`, queryParams)
-  
+  console.log(
+    `[${new Date().toISOString()}] getInstructions: Executing SQL:`,
+    sql
+  );
+  console.log(
+    `[${new Date().toISOString()}] getInstructions: With params:`,
+    queryParams
+  );
+
   try {
-    const result = await query(sql, queryParams)
-    const rows = result.recordset || result.rows || []
-    
-    console.log(`[${new Date().toISOString()}] getInstructions: Query completed, found ${rows.length} instructions`)
+    const result = await query(sql, queryParams);
+    const rows = result.recordset || result.rows || [];
+
+    console.log(
+      `[${new Date().toISOString()}] getInstructions: Query completed, found ${
+        rows.length
+      } instructions`
+    );
     if (rows.length > 0) {
-      console.log(`[${new Date().toISOString()}] getInstructions: Sample first row:`, rows[0])
-      console.log(`[${new Date().toISOString()}] getInstructions: created_at/startingdate value:`, rows[0].startingdate)
+      console.log(
+        `[${new Date().toISOString()}] getInstructions: Sample first row:`,
+        rows[0]
+      );
+      console.log(
+        `[${new Date().toISOString()}] getInstructions: created_at/startingdate value:`,
+        rows[0].startingdate
+      );
     }
-    
-    return rows
+
+    return rows;
   } catch (error) {
-    console.error(`[${new Date().toISOString()}] getInstructions: Error executing query:`, error)
-    throw error
+    console.error(
+      `[${new Date().toISOString()}] getInstructions: Error executing query:`,
+      error
+    );
+    throw error;
   }
-}
+};
 
 export const getInstructionById = async (instructionId) => {
   const sql = `
@@ -713,18 +1094,23 @@ export const getInstructionById = async (instructionId) => {
         '[]'::json
       ) AS containers
     FROM 
-      instruction_data i`
-  const result = await query(sql, [instructionId])
-  return (result.recordset || result.rows || []).length > 0 ? (result.recordset || result.rows)[0] : null
-}
+      instruction_data i`;
+  const result = await query(sql, [instructionId]);
+  return (result.recordset || result.rows || []).length > 0
+    ? (result.recordset || result.rows)[0]
+    : null;
+};
 
 export const updateInstruction = async (instructionId, updatedData) => {
-  const client = await pool.connect()
+  const client = await pool.connect();
   try {
-    await client.query("BEGIN")
+    await client.query("BEGIN");
 
     // Calculate total cost if not provided
-    const totalCost = updatedData.total_cost !== undefined ? updatedData.total_cost : calculateTotalCost(updatedData)
+    const totalCost =
+      updatedData.total_cost !== undefined
+        ? updatedData.total_cost
+        : calculateTotalCost(updatedData);
 
     const queryText = `
       UPDATE public.m1_controller
@@ -758,7 +1144,7 @@ export const updateInstruction = async (instructionId, updatedData) => {
         
       WHERE m1key = $29 -- adjusted parameter number
       RETURNING *
-    `
+    `;
 
     const values = [
       updatedData.client,
@@ -770,7 +1156,9 @@ export const updateInstruction = async (instructionId, updatedData) => {
       updatedData.surchages,
       // pickuptime and pickupdate fields removed
       updatedData.stackdate,
-      updatedData.lastFreeDate || updatedData.lastfreedate || updatedData.deadline, // renamed from deadline
+      updatedData.lastFreeDate ||
+        updatedData.lastfreedate ||
+        updatedData.deadline, // renamed from deadline
       updatedData.clientFileRef || updatedData.fileref, // renamed from fileref
       updatedData.rateweight,
       updatedData.description,
@@ -791,95 +1179,126 @@ export const updateInstruction = async (instructionId, updatedData) => {
       updatedData.unitrate,
       updatedData.surcharge,
       instructionId,
-    ]
+    ];
 
-    const result = await client.query(queryText, values)
-    await client.query("COMMIT")
-    return result.rows.length > 0 ? result.rows[0] : null
+    const result = await client.query(queryText, values);
+    await client.query("COMMIT");
+    return result.rows.length > 0 ? result.rows[0] : null;
   } catch (error) {
-    await client.query("ROLLBACK")
-    throw error
+    await client.query("ROLLBACK");
+    throw error;
   } finally {
-    client.release()
+    client.release();
   }
-}
+};
 
-export const updateContainersByInstructionId = async (instructionId, containerData) => {
-  const client = await pool.connect()
+export const updateContainersByInstructionId = async (
+  instructionId,
+  containerData
+) => {
+  const client = await pool.connect();
   try {
-    await client.query("BEGIN")
+    await client.query("BEGIN");
 
     // Delete existing containers
     const deleteQuery = `
       DELETE FROM public.container
       WHERE m1key = $1
-    `
-    const deleteResult = await client.query(deleteQuery, [instructionId])
-    console.log(`Deleted ${deleteResult.rowCount} existing containers for instruction ID: ${instructionId}`)
+    `;
+    const deleteResult = await client.query(deleteQuery, [instructionId]);
+    console.log(
+      `Deleted ${deleteResult.rowCount} existing containers for instruction ID: ${instructionId}`
+    );
 
     // Insert new containers
-    const insertResults = []
+    const insertResults = [];
     for (const container of containerData) {
-      const containerNum = container.containernum || container.containerNum || ""
+      const containerNum =
+        container.containernum || container.containerNum || "";
 
       // Sanitize weight value
-      let sanitizedWeight = null
-      if (container.weight !== null && container.weight !== undefined && container.weight !== "") {
+      let sanitizedWeight = null;
+      if (
+        container.weight !== null &&
+        container.weight !== undefined &&
+        container.weight !== ""
+      ) {
         if (typeof container.weight === "string") {
-          const trimmedWeight = container.weight.trim()
+          const trimmedWeight = container.weight.trim();
           if (trimmedWeight !== "") {
-            const parsedWeight = Number.parseFloat(trimmedWeight)
+            const parsedWeight = Number.parseFloat(trimmedWeight);
             if (!isNaN(parsedWeight) && parsedWeight >= 0) {
-              sanitizedWeight = parsedWeight
+              sanitizedWeight = parsedWeight;
             }
           }
-        } else if (typeof container.weight === "number" && container.weight >= 0) {
-          sanitizedWeight = container.weight
+        } else if (
+          typeof container.weight === "number" &&
+          container.weight >= 0
+        ) {
+          sanitizedWeight = container.weight;
         }
       }
 
-      const containerType = container.containerType || container.container_type || ""
-      const cargoDescription = container.cargoDescription || container.cargo_description || ""
-      
+      const containerType =
+        container.containerType || container.container_type || "";
+      const cargoDescription =
+        container.cargoDescription || container.cargo_description || "";
+
       // Get hazardous and surcharge flags with fallbacks
-      const hazardous = container.hazardous !== undefined ? container.hazardous : false
-      const addSurcharges = container.addSurcharges !== undefined ? container.addSurcharges : false
-      const surchargeAmount = container.surchargeAmount || container["Surcharge Amount"] || 0
+      const hazardous =
+        container.hazardous !== undefined ? container.hazardous : false;
+      const addSurcharges =
+        container.addSurcharges !== undefined ? container.addSurcharges : false;
+      const surchargeAmount =
+        container.surchargeAmount || container["Surcharge Amount"] || 0;
 
       console.log(
-        `Inserting container: containerNum=${containerNum}, weight=${sanitizedWeight}, m1key=${instructionId}, container_type=${containerType}, cargo_description=${cargoDescription}, hazardous=${hazardous}, addSurcharges=${addSurcharges}, surchargeAmount=${surchargeAmount}`,
-      )
+        `Inserting container: containerNum=${containerNum}, weight=${sanitizedWeight}, m1key=${instructionId}, container_type=${containerType}, cargo_description=${cargoDescription}, hazardous=${hazardous}, addSurcharges=${addSurcharges}, surchargeAmount=${surchargeAmount}`
+      );
 
       const insertQuery = `
         INSERT INTO public.container (containernum, weight, m1key, container_type, cargo_description, "Hazardous", "Add Surcharges", "Surcharge Amount")
         VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
         RETURNING containerkey
-      `
-      const values = [containerNum, sanitizedWeight, instructionId, containerType, cargoDescription, hazardous, addSurcharges, surchargeAmount]
+      `;
+      const values = [
+        containerNum,
+        sanitizedWeight,
+        instructionId,
+        containerType,
+        cargoDescription,
+        hazardous,
+        addSurcharges,
+        surchargeAmount,
+      ];
 
-      const result = await client.query(insertQuery, values)
-      console.log(`Inserted container with ID: ${result.rows[0].containerkey}`)
-      insertResults.push(result.rows[0])
+      const result = await client.query(insertQuery, values);
+      console.log(`Inserted container with ID: ${result.rows[0].containerkey}`);
+      insertResults.push(result.rows[0]);
     }
 
-    await client.query("COMMIT")
-    console.log(`Successfully inserted ${insertResults.length} containers for instruction ID: ${instructionId}`)
+    await client.query("COMMIT");
+    console.log(
+      `Successfully inserted ${insertResults.length} containers for instruction ID: ${instructionId}`
+    );
 
     // Verify insertion
     const verifyQuery = `
       SELECT COUNT(*) FROM public.container WHERE m1key = $1
-    `
-    const verifyResult = await client.query(verifyQuery, [instructionId])
-    console.log(`Verification: ${verifyResult.rows[0].count} containers now exist for instruction ID: ${instructionId}`)
+    `;
+    const verifyResult = await client.query(verifyQuery, [instructionId]);
+    console.log(
+      `Verification: ${verifyResult.rows[0].count} containers now exist for instruction ID: ${instructionId}`
+    );
 
-    return { data: insertResults }
+    return { data: insertResults };
   } catch (error) {
-    await client.query("ROLLBACK")
-    throw error
+    await client.query("ROLLBACK");
+    throw error;
   } finally {
-    client.release()
+    client.release();
   }
-}
+};
 
 export const getActiveClients = async () => {
   const sql = `
@@ -895,23 +1314,23 @@ export const getActiveClients = async () => {
       status = true
     ORDER BY 
       client
-  `
+  `;
 
-  console.log("Executing getActiveClients query:", sql)
+  console.log("Executing getActiveClients query:", sql);
 
   try {
-    const result = await query(sql)
-    const clients = result.recordset || result.rows || []
-    console.log(`Found ${clients.length} active clients`)
+    const result = await query(sql);
+    const clients = result.recordset || result.rows || [];
+    console.log(`Found ${clients.length} active clients`);
     if (clients.length > 0) {
-      console.log("Sample client data:", clients[0])
+      console.log("Sample client data:", clients[0]);
     }
-    return clients
+    return clients;
   } catch (error) {
-    console.error("Error in getActiveClients:", error)
-    throw error
+    console.error("Error in getActiveClients:", error);
+    throw error;
   }
-}
+};
 
 export const getClientStartingPoints = async (clientId) => {
   const sql = `
@@ -921,26 +1340,29 @@ export const getClientStartingPoints = async (clientId) => {
       AND starting_point IS NOT NULL 
       AND starting_point IS DISTINCT FROM ''
     ORDER BY starting_point
-  `
-  console.log(`[MODEL] Executing query for client ${clientId}:`, sql)
+  `;
+  console.log(`[MODEL] Executing query for client ${clientId}:`, sql);
 
   try {
-    const result = await query(sql, [clientId])
-    const startingPoints = result.recordset || result.rows || []
+    const result = await query(sql, [clientId]);
+    const startingPoints = result.recordset || result.rows || [];
     console.log(`[MODEL] Query result for client ${clientId}:`, {
       rowCount: result.rowCount || startingPoints.length,
       rows: startingPoints,
-    })
-    return startingPoints
+    });
+    return startingPoints;
   } catch (error) {
-    console.error(`[MODEL] Error in getClientStartingPoints for client ${clientId}:`, error)
-    throw error
+    console.error(
+      `[MODEL] Error in getClientStartingPoints for client ${clientId}:`,
+      error
+    );
+    throw error;
   }
-}
+};
 
 export const getClientDestinations = async (clientId, startingPoint) => {
   if (!clientId || !startingPoint) {
-    throw new Error("Both clientId and startingPoint are required")
+    throw new Error("Both clientId and startingPoint are required");
   }
 
   const sql = `
@@ -951,20 +1373,22 @@ export const getClientDestinations = async (clientId, startingPoint) => {
       AND destination IS NOT NULL 
       AND destination != ''
     ORDER BY destination
-  `
+  `;
 
   try {
-    const result = await query(sql, [clientId, startingPoint])
-    const destinations = result.recordset || result.rows || []
+    const result = await query(sql, [clientId, startingPoint]);
+    const destinations = result.recordset || result.rows || [];
     if (destinations.length === 0) {
-      console.warn(`No destinations found for client ${clientId} and starting point ${startingPoint}`)
+      console.warn(
+        `No destinations found for client ${clientId} and starting point ${startingPoint}`
+      );
     }
-    return destinations
+    return destinations;
   } catch (error) {
-    console.error("Error fetching destinations:", error)
-    throw error
+    console.error("Error fetching destinations:", error);
+    throw error;
   }
-}
+};
 
 export const checkClientHasRates = async (clientId) => {
   const sql = `
@@ -975,22 +1399,23 @@ export const checkClientHasRates = async (clientId) => {
       AND starting_point IS NOT NULL 
       AND starting_point IS DISTINCT FROM ''
     ) as has_rates
-  `
+  `;
 
   try {
-    const result = await query(sql, [clientId])
-    const hasRates = (result.recordset || result.rows || [])[0]?.has_rates || false
-    console.log(`Client ${clientId} has rates with starting points:`, hasRates)
-    return hasRates
+    const result = await query(sql, [clientId]);
+    const hasRates =
+      (result.recordset || result.rows || [])[0]?.has_rates || false;
+    console.log(`Client ${clientId} has rates with starting points:`, hasRates);
+    return hasRates;
   } catch (error) {
-    console.error("Error in checkClientHasRates:", error)
-    throw error
+    console.error("Error in checkClientHasRates:", error);
+    throw error;
   }
-}
+};
 
 export const getClientRates = async (clientId, start, destination) => {
   if (!clientId || !start || !destination) {
-    throw new Error("clientId, start, and destination are required")
+    throw new Error("clientId, start, and destination are required");
   }
 
   const sql = `
@@ -998,6 +1423,7 @@ export const getClientRates = async (clientId, start, destination) => {
       "6m_rate" as "sixMeterRate",
       "12m_rate" as "twelveMeterRate",
       surcharges,
+      hazardous,
       starting_point as "startingPoint",
       destination
     FROM public.m5_client_rate
@@ -1006,182 +1432,208 @@ export const getClientRates = async (clientId, start, destination) => {
       AND destination = $3
     ORDER BY client_rate_id DESC
     LIMIT 1
-  `
+  `;
 
   try {
-    console.log(`[getClientRates] Querying rates for client: ${clientId}, start: ${start}, destination: ${destination}`)
-    console.log(`[getClientRates] Executing query:`, sql, `with params:`, [clientId, start, destination])
+    console.log(
+      `[getClientRates] Querying rates for client: ${clientId}, start: ${start}, destination: ${destination}`
+    );
+    console.log(`[getClientRates] Executing query:`, sql, `with params:`, [
+      clientId,
+      start,
+      destination,
+    ]);
 
-    const result = await query(sql, [clientId, start, destination])
-    const rates = result.recordset || result.rows || []
+    const result = await query(sql, [clientId, start, destination]);
+    const rates = result.recordset || result.rows || [];
 
     console.log(`[getClientRates] Query result:`, {
       rowCount: result.rowCount || rates.length,
       rows: rates,
-    })
+    });
 
     if (rates.length === 0) {
       console.log(
-        `[getClientRates] No rates found for client ${clientId}, start: ${start}, destination: ${destination}`,
-      )
-      return {}
+        `[getClientRates] No rates found for client ${clientId}, start: ${start}, destination: ${destination}`
+      );
+      return {};
     }
 
-    const rateData = rates[0]
+    const rateData = rates[0];
     console.log("[getClientRates] Retrieved rates:", {
       rawRow: rateData,
       sixMeterRate: rateData.sixMeterRate,
       twelveMeterRate: rateData.twelveMeterRate,
       surcharges: rateData.surcharges,
+      hazardous: rateData.hazardous,
       startingPoint: rateData.startingPoint,
       destination: rateData.destination,
-    })
+    });
 
-    return rateData
+    return rateData;
   } catch (error) {
-    console.error("Error fetching client rates:", error)
-    throw error
+    console.error("Error fetching client rates:", error);
+    throw error;
   }
-}
+};
 
 // Helper functions for formatting and comparison
 const formatDateForComparison = (dateValue) => {
-  if (!dateValue) return null
+  if (!dateValue) return null;
 
   try {
     // Handle different date formats
-    let date
+    let date;
     if (typeof dateValue === "string") {
       // Handle MM/DD/YYYY format
       if (dateValue.includes("/")) {
-        const [month, day, year] = dateValue.split("/")
-        date = new Date(year, month - 1, day)
+        const [month, day, year] = dateValue.split("/");
+        date = new Date(year, month - 1, day);
       } else {
-        date = new Date(dateValue)
+        date = new Date(dateValue);
       }
     } else {
-      date = new Date(dateValue)
+      date = new Date(dateValue);
     }
 
     if (isNaN(date.getTime())) {
-      console.warn(`Invalid date value: ${dateValue}`)
-      return null
+      console.warn(`Invalid date value: ${dateValue}`);
+      return null;
     }
 
-    return date.toISOString().split("T")[0] // Returns YYYY-MM-DD
+    return date.toISOString().split("T")[0]; // Returns YYYY-MM-DD
   } catch (error) {
-    console.error(`Error formatting date ${dateValue}:`, error)
-    return null
+    console.error(`Error formatting date ${dateValue}:`, error);
+    return null;
   }
-}
+};
 
 const formatTimeForComparison = (timeValue) => {
-  if (!timeValue) return null
+  if (!timeValue) return null;
 
   try {
     // Handle different time formats
-    const timeStr = String(timeValue).trim()
-    const parts = timeStr.split(":")
+    const timeStr = String(timeValue).trim();
+    const parts = timeStr.split(":");
 
     if (parts.length >= 2) {
-      const hours = parts[0].padStart(2, "0")
-      const minutes = parts[1].padStart(2, "0")
-      const seconds = parts[2] ? parts[2].padStart(2, "0") : "00"
-      return `${hours}:${minutes}:${seconds}`
+      const hours = parts[0].padStart(2, "0");
+      const minutes = parts[1].padStart(2, "0");
+      const seconds = parts[2] ? parts[2].padStart(2, "0") : "00";
+      return `${hours}:${minutes}:${seconds}`;
     }
 
-    console.warn(`Invalid time format: ${timeValue}`)
-    return null
+    console.warn(`Invalid time format: ${timeValue}`);
+    return null;
   } catch (error) {
-    console.error(`Error formatting time ${timeValue}:`, error)
-    return null
+    console.error(`Error formatting time ${timeValue}:`, error);
+    return null;
   }
-}
+};
 
 const compareValues = (currentValue, newValue, fieldType = "string") => {
   // Handle null/undefined cases
-  if (currentValue === null && newValue === null) return true
-  if (currentValue === undefined && newValue === undefined) return true
-  if (currentValue === null && (newValue === "" || newValue === undefined)) return true
-  if ((currentValue === "" || currentValue === undefined) && newValue === null) return true
+  if (currentValue === null && newValue === null) return true;
+  if (currentValue === undefined && newValue === undefined) return true;
+  if (currentValue === null && (newValue === "" || newValue === undefined))
+    return true;
+  if ((currentValue === "" || currentValue === undefined) && newValue === null)
+    return true;
 
   // Handle different field types
   switch (fieldType) {
     case "date":
-      const currentDate = formatDateForComparison(currentValue)
-      const newDate = formatDateForComparison(newValue)
-      return currentDate === newDate
+      const currentDate = formatDateForComparison(currentValue);
+      const newDate = formatDateForComparison(newValue);
+      return currentDate === newDate;
 
     case "time":
-      const currentTime = formatTimeForComparison(currentValue)
-      const newTime = formatTimeForComparison(newValue)
-      return currentTime === newTime
+      const currentTime = formatTimeForComparison(currentValue);
+      const newTime = formatTimeForComparison(newValue);
+      return currentTime === newTime;
 
     case "number":
-      const currentNum = currentValue === null ? null : Number(currentValue)
-      const newNum = newValue === null || newValue === "" ? null : Number(newValue)
-      return currentNum === newNum
+      const currentNum = currentValue === null ? null : Number(currentValue);
+      const newNum =
+        newValue === null || newValue === "" ? null : Number(newValue);
+      return currentNum === newNum;
 
     case "boolean":
-      return Boolean(currentValue) === Boolean(newValue)
+      return Boolean(currentValue) === Boolean(newValue);
 
     default:
       // String comparison
-      const currentStr = currentValue === null ? null : String(currentValue)
-      const newStr = newValue === null || newValue === "" ? null : String(newValue)
-      return currentStr === newStr
+      const currentStr = currentValue === null ? null : String(currentValue);
+      const newStr =
+        newValue === null || newValue === "" ? null : String(newValue);
+      return currentStr === newStr;
   }
-}
+};
 
 const compareContainers = (currentContainers, newContainers) => {
   // Create maps for easier comparison
-  const currentMap = new Map()
-  const newMap = new Map()
+  const currentMap = new Map();
+  const newMap = new Map();
 
   // Map current containers by containerkey
   currentContainers.forEach((container) => {
     if (container.containerkey) {
-      currentMap.set(container.containerkey, container)
+      currentMap.set(container.containerkey, container);
     }
-  })
+  });
 
   // Map new containers by containerKey (if exists) or create temporary keys
   newContainers.forEach((container, index) => {
-    const key = container.containerKey || `new_${index}`
-    newMap.set(key, container)
-  })
+    const key = container.containerKey || `new_${index}`;
+    newMap.set(key, container);
+  });
 
   const changes = {
     toUpdate: [],
     toInsert: [],
     toDelete: [],
-  }
+  };
 
   // Find containers to update or insert
   for (const [key, newContainer] of newMap) {
-    const keyStr = String(key) // Convert key to string for comparison
+    const keyStr = String(key); // Convert key to string for comparison
     if (keyStr.startsWith("new_")) {
       // This is a new container
-      changes.toInsert.push(newContainer)
+      changes.toInsert.push(newContainer);
     } else {
-      const currentContainer = currentMap.get(Number(key)) // Convert back to number for map lookup
+      const currentContainer = currentMap.get(Number(key)); // Convert back to number for map lookup
       if (currentContainer) {
         // Compare container fields
-        const containerNum = newContainer.containernum || newContainer.containerNum || ""
+        const containerNum =
+          newContainer.containernum || newContainer.containerNum || "";
         const weight =
-          newContainer.weight !== null && newContainer.weight !== undefined && newContainer.weight !== ""
+          newContainer.weight !== null &&
+          newContainer.weight !== undefined &&
+          newContainer.weight !== ""
             ? Number.parseFloat(newContainer.weight)
-            : null
-        const containerType = newContainer.containerType || newContainer.container_type || ""
-        const cargoDescription = newContainer.cargoDescription || newContainer.cargo_description || ""
+            : null;
+        const containerType =
+          newContainer.containerType || newContainer.container_type || "";
+        const cargoDescription =
+          newContainer.cargoDescription || newContainer.cargo_description || "";
 
         // Handle surcharge and hazardous flags with proper boolean comparison
-        const currentHazardous = Boolean(currentContainer["Hazardous"])
-        const newHazardous = Boolean(newContainer["Hazardous"] || newContainer.hazardous)
-        const currentAddSurcharges = Boolean(currentContainer["Add Surcharges"])
-        const newAddSurcharges = Boolean(newContainer["Add Surcharges"] || newContainer.addSurcharges)
-        const currentSurchargeAmount = Number(currentContainer["Surcharge Amount"] || 0)
-        const newSurchargeAmount = Number(newContainer["Surcharge Amount"] || newContainer.surchargeAmount || 0)
+        const currentHazardous = Boolean(currentContainer["Hazardous"]);
+        const newHazardous = Boolean(
+          newContainer["Hazardous"] || newContainer.hazardous
+        );
+        const currentAddSurcharges = Boolean(
+          currentContainer["Add Surcharges"]
+        );
+        const newAddSurcharges = Boolean(
+          newContainer["Add Surcharges"] || newContainer.addSurcharges
+        );
+        const currentSurchargeAmount = Number(
+          currentContainer["Surcharge Amount"] || 0
+        );
+        const newSurchargeAmount = Number(
+          newContainer["Surcharge Amount"] || newContainer.surchargeAmount || 0
+        );
 
         const hasChanges =
           currentContainer.containernum !== containerNum ||
@@ -1190,16 +1642,39 @@ const compareContainers = (currentContainers, newContainers) => {
           currentContainer.cargo_description !== cargoDescription ||
           currentHazardous !== newHazardous ||
           currentAddSurcharges !== newAddSurcharges ||
-          currentSurchargeAmount !== newSurchargeAmount
+          currentSurchargeAmount !== newSurchargeAmount;
 
-        console.log(`[${new Date().toISOString()}] [MODEL] Comparing container ${key}:`, {
-          containerNum: { current: currentContainer.containernum, new: containerNum, changed: currentContainer.containernum !== containerNum },
-          weight: { current: currentContainer.weight, new: weight, changed: currentContainer.weight !== weight },
-          hazardous: { current: currentHazardous, new: newHazardous, changed: currentHazardous !== newHazardous },
-          addSurcharges: { current: currentAddSurcharges, new: newAddSurcharges, changed: currentAddSurcharges !== newAddSurcharges },
-          surchargeAmount: { current: currentSurchargeAmount, new: newSurchargeAmount, changed: currentSurchargeAmount !== newSurchargeAmount },
-          hasChanges
-        })
+        console.log(
+          `[${new Date().toISOString()}] [MODEL] Comparing container ${key}:`,
+          {
+            containerNum: {
+              current: currentContainer.containernum,
+              new: containerNum,
+              changed: currentContainer.containernum !== containerNum,
+            },
+            weight: {
+              current: currentContainer.weight,
+              new: weight,
+              changed: currentContainer.weight !== weight,
+            },
+            hazardous: {
+              current: currentHazardous,
+              new: newHazardous,
+              changed: currentHazardous !== newHazardous,
+            },
+            addSurcharges: {
+              current: currentAddSurcharges,
+              new: newAddSurcharges,
+              changed: currentAddSurcharges !== newAddSurcharges,
+            },
+            surchargeAmount: {
+              current: currentSurchargeAmount,
+              new: newSurchargeAmount,
+              changed: currentSurchargeAmount !== newSurchargeAmount,
+            },
+            hasChanges,
+          }
+        );
 
         if (hasChanges) {
           changes.toUpdate.push({
@@ -1208,14 +1683,14 @@ const compareContainers = (currentContainers, newContainers) => {
             weight: weight,
             container_type: containerType,
             cargo_description: cargoDescription,
-            "Hazardous": newHazardous,
+            Hazardous: newHazardous,
             "Add Surcharges": newAddSurcharges,
             "Surcharge Amount": newSurchargeAmount,
-          })
+          });
         }
       } else {
         // Container with key doesn't exist in current, treat as new
-        changes.toInsert.push(newContainer)
+        changes.toInsert.push(newContainer);
       }
     }
   }
@@ -1223,145 +1698,245 @@ const compareContainers = (currentContainers, newContainers) => {
   // Find containers to delete
   for (const [key, currentContainer] of currentMap) {
     if (!newMap.has(key)) {
-      changes.toDelete.push(currentContainer.containerkey)
+      changes.toDelete.push(currentContainer.containerkey);
     }
   }
 
-  return changes
-}
+  return changes;
+};
 
 // Helper function to sanitize numeric values - converts empty strings and invalid values to null
 const sanitizeNumericValue = (value) => {
   // Handle null, undefined, or empty string
-  if (value === null || value === undefined || value === "" || value === "undefined") {
-    return null
+  if (
+    value === null ||
+    value === undefined ||
+    value === "" ||
+    value === "undefined"
+  ) {
+    return null;
   }
 
   // Handle string values
   if (typeof value === "string") {
-    const trimmed = value.trim()
+    const trimmed = value.trim();
     if (trimmed === "") {
-      return null
+      return null;
     }
-    const parsed = Number.parseFloat(trimmed)
-    return isNaN(parsed) ? null : parsed
+    const parsed = Number.parseFloat(trimmed);
+    return isNaN(parsed) ? null : parsed;
   }
 
   // Handle numeric values
   if (typeof value === "number") {
-    return isNaN(value) ? null : value
+    return isNaN(value) ? null : value;
   }
 
   // For any other type, try to convert to number
-  const parsed = Number.parseFloat(value)
-  return isNaN(parsed) ? null : parsed
-}
+  const parsed = Number.parseFloat(value);
+  return isNaN(parsed) ? null : parsed;
+};
 
 // Helper function to preserve existing values but sanitize new ones
-const preserveExistingValue = (newValue, currentValue, fieldType = "string") => {
+const preserveExistingValue = (
+  newValue,
+  currentValue,
+  fieldType = "string"
+) => {
   if (newValue === undefined || newValue === "undefined") {
-    return currentValue // Keep existing database value
+    return currentValue; // Keep existing database value
   }
 
   // For numeric fields, sanitize the value
   if (fieldType === "number") {
-    return sanitizeNumericValue(newValue)
+    return sanitizeNumericValue(newValue);
   }
 
   // For string fields, convert empty strings to null if needed
   if (fieldType === "string" && newValue === "") {
-    return null
+    return null;
   }
 
-  return newValue
-}
+  return newValue;
+};
 
-export const updateFCInstructionAndContainers = async (instructionId, instructionData, containerData) => {
-  const client = await pool.connect()
+export const updateFCInstructionAndContainers = async (
+  instructionId,
+  instructionData,
+  containerData
+) => {
+  const client = await pool.connect();
   try {
     // Start transaction
-    await client.query("BEGIN")
+    await client.query("BEGIN");
 
     console.log(
-      `[${new Date().toISOString()}] [MODEL] updateFCInstructionAndContainers: Starting transaction for instruction ${instructionId}`,
-    )
+      `[${new Date().toISOString()}] [MODEL] updateFCInstructionAndContainers: Starting transaction for instruction ${instructionId}`
+    );
 
     // 1. Fetch current instruction data
     const getCurrentQuery = `
       SELECT * FROM public.m1_controller WHERE m1key = $1
-    `
-    const currentResult = await client.query(getCurrentQuery, [instructionId])
+    `;
+    const currentResult = await client.query(getCurrentQuery, [instructionId]);
 
     if (currentResult.rows.length === 0) {
-      throw new Error(`Instruction with ID ${instructionId} not found`)
+      throw new Error(`Instruction with ID ${instructionId} not found`);
     }
 
-    const currentInstruction = currentResult.rows[0]
-    console.log(`[${new Date().toISOString()}] [MODEL] Current instruction data fetched`)
+    const currentInstruction = currentResult.rows[0];
+    console.log(
+      `[${new Date().toISOString()}] [MODEL] Current instruction data fetched`
+    );
 
     // Calculate total cost if not provided
     const totalCost =
-      instructionData.total_cost !== undefined ? instructionData.total_cost : calculateTotalCost(instructionData)
+      instructionData.total_cost !== undefined
+        ? instructionData.total_cost
+        : calculateTotalCost(instructionData);
 
     // 2. Prepare instruction update data with proper null handling and numeric sanitization
     const updateData = {
-      client: preserveExistingValue(instructionData.client, currentInstruction.client, "number"),
-      task: preserveExistingValue(instructionData.ksmFileRef || instructionData.task, currentInstruction.ksmFileRef || currentInstruction.task, "string"), // renamed from task to ksmFileRef
-      shipment_type: preserveExistingValue(instructionData.shipment_type, currentInstruction.shipment_type, "number"),
-      pickup: preserveExistingValue(instructionData.pickup, currentInstruction.pickup, "string"),
-      dropoff: preserveExistingValue(instructionData.dropoff, currentInstruction.dropoff, "string"),
+      client: preserveExistingValue(
+        instructionData.client,
+        currentInstruction.client,
+        "number"
+      ),
+      task: preserveExistingValue(
+        instructionData.ksmFileRef || instructionData.task,
+        currentInstruction.ksmFileRef || currentInstruction.task,
+        "string"
+      ), // renamed from task to ksmFileRef
+      shipment_type: preserveExistingValue(
+        instructionData.shipment_type,
+        currentInstruction.shipment_type,
+        "number"
+      ),
+      pickup: preserveExistingValue(
+        instructionData.pickup,
+        currentInstruction.pickup,
+        "string"
+      ),
+      dropoff: preserveExistingValue(
+        instructionData.dropoff,
+        currentInstruction.dropoff,
+        "string"
+      ),
       // pickuptime and pickupdate fields removed
-      stackdate: preserveExistingValue(instructionData.stackdate, currentInstruction.stackdate, "string"),
-      lastfreedate: preserveExistingValue(instructionData.lastFreeDate || instructionData.lastfreedate, currentInstruction.lastfreedate || currentInstruction.deadline, "string"), // renamed from deadline
-      clientFileRef: preserveExistingValue(instructionData.clientFileRef || instructionData.fileref, currentInstruction.clientFileRef || currentInstruction.fileref, "string"), // renamed from fileref
-      rateweight: preserveExistingValue(instructionData.rateweight, currentInstruction.rateweight, "string"),
-      description: preserveExistingValue(instructionData.description, currentInstruction.description, "string"),
-      status: preserveExistingValue(instructionData.status, currentInstruction.status, "string"),
-      vat: preserveExistingValue(instructionData.vat, currentInstruction.vat, "number"),
+      stackdate: preserveExistingValue(
+        instructionData.stackdate,
+        currentInstruction.stackdate,
+        "string"
+      ),
+      lastfreedate: preserveExistingValue(
+        instructionData.lastFreeDate || instructionData.lastfreedate,
+        currentInstruction.lastfreedate || currentInstruction.deadline,
+        "string"
+      ), // renamed from deadline
+      clientFileRef: preserveExistingValue(
+        instructionData.clientFileRef || instructionData.fileref,
+        currentInstruction.clientFileRef || currentInstruction.fileref,
+        "string"
+      ), // renamed from fileref
+      rateweight: preserveExistingValue(
+        instructionData.rateweight,
+        currentInstruction.rateweight,
+        "string"
+      ),
+      description: preserveExistingValue(
+        instructionData.description,
+        currentInstruction.description,
+        "string"
+      ),
+      status: preserveExistingValue(
+        instructionData.status,
+        currentInstruction.status,
+        "string"
+      ),
+      vat: preserveExistingValue(
+        instructionData.vat,
+        currentInstruction.vat,
+        "number"
+      ),
       num_six_meters: preserveExistingValue(
         instructionData.num_six_meters,
         currentInstruction.num_six_meters,
-        "number",
+        "number"
       ),
       num_twelve_meters: preserveExistingValue(
         instructionData.num_twelve_meters,
         currentInstruction.num_twelve_meters,
-        "number",
+        "number"
       ),
-      num_abnormal: preserveExistingValue(instructionData.num_abnormal, currentInstruction.num_abnormal, "number"),
-      num_breakbulk: preserveExistingValue(instructionData.num_breakbulk, currentInstruction.num_breakbulk, "number"),
-      weight: preserveExistingValue(instructionData.weight, currentInstruction.weight, "number"),
+      num_abnormal: preserveExistingValue(
+        instructionData.num_abnormal,
+        currentInstruction.num_abnormal,
+        "number"
+      ),
+      num_breakbulk: preserveExistingValue(
+        instructionData.num_breakbulk,
+        currentInstruction.num_breakbulk,
+        "number"
+      ),
+      weight: preserveExistingValue(
+        instructionData.weight,
+        currentInstruction.weight,
+        "number"
+      ),
       total_cost: sanitizeNumericValue(totalCost),
-      booking_ref: preserveExistingValue(instructionData.booking_ref, currentInstruction.booking_ref, "string"),
-      vessel_name: preserveExistingValue(instructionData.vessel_name, currentInstruction.vessel_name, "string"),
-      rateper_6: preserveExistingValue(instructionData.rateper_6, currentInstruction.rateper_6, "number"),
-      rateper_12: preserveExistingValue(instructionData.rateper_12, currentInstruction.rateper_12, "number"),
+      booking_ref: preserveExistingValue(
+        instructionData.booking_ref,
+        currentInstruction.booking_ref,
+        "string"
+      ),
+      vessel_name: preserveExistingValue(
+        instructionData.vessel_name,
+        currentInstruction.vessel_name,
+        "string"
+      ),
+      rateper_6: preserveExistingValue(
+        instructionData.rateper_6,
+        currentInstruction.rateper_6,
+        "number"
+      ),
+      rateper_12: preserveExistingValue(
+        instructionData.rateper_12,
+        currentInstruction.rateper_12,
+        "number"
+      ),
       rateper_abnormal: preserveExistingValue(
         instructionData.rateper_abnormal,
         currentInstruction.rateper_abnormal,
-        "number",
+        "number"
       ),
       rateper_breakbulk: preserveExistingValue(
         instructionData.rateper_breakbulk,
         currentInstruction.rateper_breakbulk,
-        "number",
+        "number"
       ),
-      unitrate: preserveExistingValue(instructionData.unitrate, currentInstruction.unitrate, "number"),
-    }
+      unitrate: preserveExistingValue(
+        instructionData.unitrate,
+        currentInstruction.unitrate,
+        "number"
+      ),
+    };
 
-    console.log(`[${new Date().toISOString()}] [MODEL] Sanitized update data:`, {
-      weight: updateData.weight,
-      rateper_6: updateData.rateper_6,
-      rateper_12: updateData.rateper_12,
-      rateper_abnormal: updateData.rateper_abnormal,
-      rateper_breakbulk: updateData.rateper_breakbulk,
-      unitrate: updateData.unitrate,
-      surcharge: updateData.surcharge,
-      total_cost: updateData.total_cost,
-    })
+    console.log(
+      `[${new Date().toISOString()}] [MODEL] Sanitized update data:`,
+      {
+        weight: updateData.weight,
+        rateper_6: updateData.rateper_6,
+        rateper_12: updateData.rateper_12,
+        rateper_abnormal: updateData.rateper_abnormal,
+        rateper_breakbulk: updateData.rateper_breakbulk,
+        unitrate: updateData.unitrate,
+        surcharge: updateData.surcharge,
+        total_cost: updateData.total_cost,
+      }
+    );
 
     // 3. Check if instruction needs updating
-    let instructionNeedsUpdate = false
+    let instructionNeedsUpdate = false;
     const fieldsToCheck = [
       { field: "client", type: "number" },
       { field: "ksmFileRef", type: "string" }, // renamed from task
@@ -1391,21 +1966,25 @@ export const updateFCInstructionAndContainers = async (instructionId, instructio
       { field: "rateper_abnormal", type: "number" },
       { field: "rateper_breakbulk", type: "number" },
       { field: "unitrate", type: "number" },
-    ]
+    ];
 
     for (const { field, type } of fieldsToCheck) {
       if (!compareValues(currentInstruction[field], updateData[field], type)) {
         console.log(
-          `[${new Date().toISOString()}] [MODEL] Field '${field}' changed: ${currentInstruction[field]} -> ${updateData[field]}`,
-        )
-        instructionNeedsUpdate = true
-        break
+          `[${new Date().toISOString()}] [MODEL] Field '${field}' changed: ${
+            currentInstruction[field]
+          } -> ${updateData[field]}`
+        );
+        instructionNeedsUpdate = true;
+        break;
       }
     }
 
     // 4. Update instruction if needed
     if (instructionNeedsUpdate) {
-      console.log(`[${new Date().toISOString()}] [MODEL] Updating instruction ${instructionId}`)
+      console.log(
+        `[${new Date().toISOString()}] [MODEL] Updating instruction ${instructionId}`
+      );
 
       const updateInstructionQuery = `
         UPDATE public.m1_controller
@@ -1417,7 +1996,7 @@ export const updateFCInstructionAndContainers = async (instructionId, instructio
           rateper_6 = $21, rateper_12 = $22, rateper_abnormal = $23, rateper_breakbulk = $24, unitrate = $25
         WHERE m1key = $26
         RETURNING *
-      `
+      `;
 
       const updateValues = [
         updateData.client,
@@ -1447,24 +2026,34 @@ export const updateFCInstructionAndContainers = async (instructionId, instructio
         updateData.rateper_breakbulk,
         updateData.unitrate,
         instructionId,
-      ]
+      ];
 
-      console.log(`[${new Date().toISOString()}] [MODEL] Update values being sent to database:`, {
-        weight: updateValues[16], // $17
-        total_cost: updateValues[17], // $18
-        booking_ref: updateValues[18], // $19
-        vessel_name: updateValues[19], // $20
-        rateper_6: updateValues[20], // $21
-        rateper_12: updateValues[21], // $22
-        rateper_abnormal: updateValues[22], // $23
-        rateper_breakbulk: updateValues[23], // $24
-        unitrate: updateValues[24], // $25
-      })
+      console.log(
+        `[${new Date().toISOString()}] [MODEL] Update values being sent to database:`,
+        {
+          weight: updateValues[16], // $17
+          total_cost: updateValues[17], // $18
+          booking_ref: updateValues[18], // $19
+          vessel_name: updateValues[19], // $20
+          rateper_6: updateValues[20], // $21
+          rateper_12: updateValues[21], // $22
+          rateper_abnormal: updateValues[22], // $23
+          rateper_breakbulk: updateValues[23], // $24
+          unitrate: updateValues[24], // $25
+        }
+      );
 
-      const updateResult = await client.query(updateInstructionQuery, updateValues)
-      console.log(`[${new Date().toISOString()}] [MODEL] Instruction ${instructionId} updated successfully`)
+      const updateResult = await client.query(
+        updateInstructionQuery,
+        updateValues
+      );
+      console.log(
+        `[${new Date().toISOString()}] [MODEL] Instruction ${instructionId} updated successfully`
+      );
     } else {
-      console.log(`[${new Date().toISOString()}] [MODEL] No changes detected for instruction ${instructionId}`)
+      console.log(
+        `[${new Date().toISOString()}] [MODEL] No changes detected for instruction ${instructionId}`
+      );
     }
 
     // 5. Handle containers
@@ -1473,64 +2062,149 @@ export const updateFCInstructionAndContainers = async (instructionId, instructio
       FROM public.container
       WHERE m1key = $1
       ORDER BY containerkey
-    `
-    const currentContainersResult = await client.query(getCurrentContainersQuery, [instructionId])
-    const currentContainers = currentContainersResult.rows
+    `;
+    const currentContainersResult = await client.query(
+      getCurrentContainersQuery,
+      [instructionId]
+    );
+    const currentContainers = currentContainersResult.rows;
 
     console.log(
-      `[${new Date().toISOString()}] [MODEL] Current containers: ${currentContainers.length}, New containers: ${containerData.length}`,
-    )
+      `[${new Date().toISOString()}] [MODEL] Current containers: ${
+        currentContainers.length
+      }, New containers: ${containerData.length}`
+    );
 
     // Compare containers and determine changes
-    const containerChanges = compareContainers(currentContainers, containerData)
+    const containerChanges = compareContainers(
+      currentContainers,
+      containerData
+    );
 
     console.log(
-      `[${new Date().toISOString()}] [MODEL] Container changes: ${containerChanges.toUpdate.length} to update, ${containerChanges.toInsert.length} to insert, ${containerChanges.toDelete.length} to delete`,
-    )
+      `[${new Date().toISOString()}] [MODEL] Container changes: ${
+        containerChanges.toUpdate.length
+      } to update, ${containerChanges.toInsert.length} to insert, ${
+        containerChanges.toDelete.length
+      } to delete`
+    );
 
     // Delete containers
     for (const containerKey of containerChanges.toDelete) {
-      const deleteQuery = `DELETE FROM public.container WHERE containerkey = $1`
-      await client.query(deleteQuery, [containerKey])
-      console.log(`[${new Date().toISOString()}] [MODEL] Deleted container ${containerKey}`)
+      const deleteQuery = `DELETE FROM public.container WHERE containerkey = $1`;
+      await client.query(deleteQuery, [containerKey]);
+      console.log(
+        `[${new Date().toISOString()}] [MODEL] Deleted container ${containerKey}`
+      );
     }
 
     // Update containers
     for (const container of containerChanges.toUpdate) {
       // Sanitize weight value
-      let sanitizedWeight = null
-      if (container.weight !== null && container.weight !== undefined && container.weight !== "") {
+      let sanitizedWeight = null;
+      if (
+        container.weight !== null &&
+        container.weight !== undefined &&
+        container.weight !== ""
+      ) {
         if (typeof container.weight === "string") {
-          const trimmedWeight = container.weight.trim()
+          const trimmedWeight = container.weight.trim();
           if (trimmedWeight !== "") {
-            const parsedWeight = Number.parseFloat(trimmedWeight)
+            const parsedWeight = Number.parseFloat(trimmedWeight);
             if (!isNaN(parsedWeight) && parsedWeight >= 0) {
-              sanitizedWeight = parsedWeight
+              sanitizedWeight = parsedWeight;
             }
           }
-        } else if (typeof container.weight === "number" && container.weight >= 0) {
-          sanitizedWeight = container.weight
+        } else if (
+          typeof container.weight === "number" &&
+          container.weight >= 0
+        ) {
+          sanitizedWeight = container.weight;
+        }
+      }
+      
+      // Fetch hazardous amount if container is marked as hazardous
+      let hazardousAmount = container["Hazardous Amount"] || container.hazardousAmount || 0;
+      const isHazardous = container["Hazardous"] || container.hazardous || false;
+      
+      if (isHazardous && hazardousAmount === 0) {
+        try {
+          // Get current instruction data to access client ID, pickup and dropoff
+          const currentInstructionResult = await client.query(
+            "SELECT client, pickup, dropoff FROM public.m1_controller WHERE m1key = $1",
+            [instructionId]
+          );
+          
+          if (currentInstructionResult.rows.length > 0) {
+            const { client: clientId, pickup, dropoff } = currentInstructionResult.rows[0];
+            
+            console.log(
+              `[${new Date().toISOString()}] [MODEL] Container ${container.containerkey} is hazardous, fetching hazardous amount for client ${clientId}, pickup ${pickup}, dropoff ${dropoff}`
+            );
+            
+            // Query to fetch hazardous amount from m5_client_rate table
+            const hazardousRateQuery = `
+              SELECT hazardous
+              FROM public.m5_client_rate
+              WHERE clientid = $1
+                AND starting_point = $2
+                AND destination = $3
+              ORDER BY client_rate_id DESC
+              LIMIT 1
+            `;
+            
+            const hazardousRateResult = await client.query(hazardousRateQuery, [
+              clientId,
+              pickup,
+              dropoff
+            ]);
+            
+            if (hazardousRateResult.rows.length > 0) {
+              hazardousAmount = hazardousRateResult.rows[0].hazardous || 0;
+              console.log(
+                `[${new Date().toISOString()}] [MODEL] Found hazardous amount ${hazardousAmount} for container ${container.containerkey}`
+              );
+            } else {
+              console.log(
+                `[${new Date().toISOString()}] [MODEL] No hazardous rate found for client ${clientId}, pickup ${pickup}, dropoff ${dropoff}`
+              );
+            }
+          }
+        } catch (error) {
+          console.error(
+            `[${new Date().toISOString()}] [MODEL] Error fetching hazardous amount:`,
+            error.message
+          );
+          // Continue with hazardous amount as 0 if there's an error
         }
       }
 
       // Debug log container data before update
-      console.log(`[${new Date().toISOString()}] [MODEL] Updating container ${container.containerkey} with data:`, {
-        containernum: container.containernum,
-        weight: sanitizedWeight,
-        container_type: container.container_type,
-        cargo_description: container.cargo_description,
-        "Add Surcharges": container["Add Surcharges"] || container.addSurcharges || false,
-        "Hazardous": container["Hazardous"] || container.hazardous || false,
-        "Surcharge Amount": container["Surcharge Amount"] || container.surchargeAmount || 0,
-        containerkey: container.containerkey,
-        containerKeyType: typeof container.containerkey
-      })
+      console.log(
+        `[${new Date().toISOString()}] [MODEL] Updating container ${
+          container.containerkey
+        } with data:`,
+        {
+          containernum: container.containernum,
+          weight: sanitizedWeight,
+          container_type: container.container_type,
+          cargo_description: container.cargo_description,
+          "Add Surcharges":
+            container["Add Surcharges"] || container.addSurcharges || false,
+          Hazardous: container["Hazardous"] || container.hazardous || false,
+          "Surcharge Amount":
+            container["Surcharge Amount"] || container.surchargeAmount || 0,
+          "Hazardous Amount": hazardousAmount,
+          containerkey: container.containerkey,
+          containerKeyType: typeof container.containerkey,
+        }
+      );
 
       const updateQuery = `
         UPDATE public.container 
-        SET containernum = $1, weight = $2, container_type = $3, cargo_description = $4, "Add Surcharges" = $5, "Hazardous" = $6, "Surcharge Amount" = $7
-        WHERE containerkey = $8
-      `
+        SET containernum = $1, weight = $2, container_type = $3, cargo_description = $4, "Add Surcharges" = $5, "Hazardous" = $6, "Surcharge Amount" = $7, "Hazardous Amount" = $8
+        WHERE containerkey = $9
+      `;
       const updateResult = await client.query(updateQuery, [
         container.containernum,
         sanitizedWeight, // Will be null for empty/invalid values
@@ -1539,39 +2213,110 @@ export const updateFCInstructionAndContainers = async (instructionId, instructio
         container["Add Surcharges"] || container.addSurcharges || false,
         container["Hazardous"] || container.hazardous || false,
         container["Surcharge Amount"] || container.surchargeAmount || 0,
+        hazardousAmount, // Use the hazardous amount we fetched or calculated
         container.containerkey,
-      ])
-      console.log(`[${new Date().toISOString()}] [MODEL] Container ${container.containerkey} update result: ${updateResult.rowCount} rows affected`)
+      ]);
+      console.log(
+        `[${new Date().toISOString()}] [MODEL] Container ${
+          container.containerkey
+        } update result: ${updateResult.rowCount} rows affected`
+      );
     }
 
     // Insert new containers
     for (const container of containerChanges.toInsert) {
-      const containerNum = container.containernum || container.containerNum || ""
+      const containerNum =
+        container.containernum || container.containerNum || "";
 
       // Sanitize weight value
-      let sanitizedWeight = null
-      if (container.weight !== null && container.weight !== undefined && container.weight !== "") {
+      let sanitizedWeight = null;
+      if (
+        container.weight !== null &&
+        container.weight !== undefined &&
+        container.weight !== ""
+      ) {
         if (typeof container.weight === "string") {
-          const trimmedWeight = container.weight.trim()
+          const trimmedWeight = container.weight.trim();
           if (trimmedWeight !== "") {
-            const parsedWeight = Number.parseFloat(trimmedWeight)
+            const parsedWeight = Number.parseFloat(trimmedWeight);
             if (!isNaN(parsedWeight) && parsedWeight >= 0) {
-              sanitizedWeight = parsedWeight
+              sanitizedWeight = parsedWeight;
             }
           }
-        } else if (typeof container.weight === "number" && container.weight >= 0) {
-          sanitizedWeight = container.weight
+        } else if (
+          typeof container.weight === "number" &&
+          container.weight >= 0
+        ) {
+          sanitizedWeight = container.weight;
+        }
+      }
+      
+      // Fetch hazardous amount if container is marked as hazardous
+      let hazardousAmount = container["Hazardous Amount"] || container.hazardousAmount || 0;
+      const isHazardous = container["Hazardous"] || container.hazardous || false;
+      
+      if (isHazardous && hazardousAmount === 0) {
+        try {
+          // Get current instruction data to access client ID, pickup and dropoff
+          const currentInstructionResult = await client.query(
+            "SELECT client, pickup, dropoff FROM public.m1_controller WHERE m1key = $1",
+            [instructionId]
+          );
+          
+          if (currentInstructionResult.rows.length > 0) {
+            const { client: clientId, pickup, dropoff } = currentInstructionResult.rows[0];
+            
+            console.log(
+              `[${new Date().toISOString()}] [MODEL] New container is hazardous, fetching hazardous amount for client ${clientId}, pickup ${pickup}, dropoff ${dropoff}`
+            );
+            
+            // Query to fetch hazardous amount from m5_client_rate table
+            const hazardousRateQuery = `
+              SELECT hazardous
+              FROM public.m5_client_rate
+              WHERE clientid = $1
+                AND starting_point = $2
+                AND destination = $3
+              ORDER BY client_rate_id DESC
+              LIMIT 1
+            `;
+            
+            const hazardousRateResult = await client.query(hazardousRateQuery, [
+              clientId,
+              pickup,
+              dropoff
+            ]);
+            
+            if (hazardousRateResult.rows.length > 0) {
+              hazardousAmount = hazardousRateResult.rows[0].hazardous || 0;
+              console.log(
+                `[${new Date().toISOString()}] [MODEL] Found hazardous amount ${hazardousAmount} for new container`
+              );
+            } else {
+              console.log(
+                `[${new Date().toISOString()}] [MODEL] No hazardous rate found for client ${clientId}, pickup ${pickup}, dropoff ${dropoff}`
+              );
+            }
+          }
+        } catch (error) {
+          console.error(
+            `[${new Date().toISOString()}] [MODEL] Error fetching hazardous amount for new container:`,
+            error.message
+          );
+          // Continue with hazardous amount as 0 if there's an error
         }
       }
 
-      const containerType = container.containerType || container.container_type || ""
-      const cargoDescription = container.cargoDescription || container.cargo_description || ""
+      const containerType =
+        container.containerType || container.container_type || "";
+      const cargoDescription =
+        container.cargoDescription || container.cargo_description || "";
 
       const insertQuery = `
-        INSERT INTO public.container (containernum, weight, m1key, container_type, cargo_description, "Add Surcharges", "Hazardous", "Surcharge Amount")
-        VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+        INSERT INTO public.container (containernum, weight, m1key, container_type, cargo_description, "Add Surcharges", "Hazardous", "Surcharge Amount", "Hazardous Amount")
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
         RETURNING containerkey
-      `
+      `;
       const insertResult = await client.query(insertQuery, [
         containerNum,
         sanitizedWeight, // Will be null for empty/invalid values
@@ -1581,28 +2326,33 @@ export const updateFCInstructionAndContainers = async (instructionId, instructio
         container["Add Surcharges"] || container.surcharges || false,
         container["Hazardous"] || container.hazardous || false,
         container["Surcharge Amount"] || container.surchargeAmount || 0,
-      ])
-      console.log(`[${new Date().toISOString()}] [MODEL] Inserted new container ${insertResult.rows[0].containerkey}`)
+        hazardousAmount,
+      ]);
+      console.log(
+        `[${new Date().toISOString()}] [MODEL] Inserted new container ${
+          insertResult.rows[0].containerkey
+        } with hazardous=${isHazardous}, hazardousAmount=${hazardousAmount}`
+      );
     }
 
     // Commit transaction
-    await client.query("COMMIT")
+    await client.query("COMMIT");
     console.log(
-      `[${new Date().toISOString()}] [MODEL] Transaction committed successfully for instruction ${instructionId}`,
-    )
+      `[${new Date().toISOString()}] [MODEL] Transaction committed successfully for instruction ${instructionId}`
+    );
 
     // Return updated data
     const finalInstructionQuery = `
       SELECT * FROM public.m1_controller WHERE m1key = $1
-    `
+    `;
     const finalContainersQuery = `
       SELECT * FROM public.container WHERE m1key = $1 ORDER BY containerkey
-    `
+    `;
 
     const [finalInstructionResult, finalContainersResult] = await Promise.all([
       client.query(finalInstructionQuery, [instructionId]),
       client.query(finalContainersQuery, [instructionId]),
-    ])
+    ]);
 
     return {
       instruction: finalInstructionResult.rows[0],
@@ -1613,25 +2363,35 @@ export const updateFCInstructionAndContainers = async (instructionId, instructio
         containersInserted: containerChanges.toInsert.length,
         containersDeleted: containerChanges.toDelete.length,
       },
-    }
+    };
   } catch (error) {
     // Rollback transaction on error
-    await client.query("ROLLBACK")
-    console.error(`[${new Date().toISOString()}] [MODEL] Error in updateFCInstructionAndContainers:`, error)
-    throw error
+    await client.query("ROLLBACK");
+    console.error(
+      `[${new Date().toISOString()}] [MODEL] Error in updateFCInstructionAndContainers:`,
+      error
+    );
+    throw error;
   } finally {
-    client.release()
+    client.release();
   }
-}
+};
 
-export const saveInstructionAndContainers = async (controllerData, containerData) => {
-  const client = await pool.connect()
+export const saveInstructionAndContainers = async (
+  controllerData,
+  containerData
+) => {
+  const client = await pool.connect();
   try {
-    await client.query("BEGIN")
+    await client.query("BEGIN");
+
+    // clientId, pickup, and dropoff variables are already defined above
 
     // Calculate total cost if not provided
     const totalCost =
-      controllerData.total_cost !== undefined ? controllerData.total_cost : calculateTotalCost(controllerData)
+      controllerData.total_cost !== undefined
+        ? controllerData.total_cost
+        : calculateTotalCost(controllerData);
 
     // Insert instruction
     const instructionQuery = `
@@ -1645,20 +2405,19 @@ export const saveInstructionAndContainers = async (controllerData, containerData
         $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14,
         $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25, $26, $27
       ) RETURNING m1key
-    `
+    `;
 
     const instructionValues = [
       controllerData.client,
-      controllerData.ksmFileRef || controllerData.task, // renamed from task
+      controllerData.ksmFileRef || controllerData.task,
       controllerData.shipment_type,
       controllerData.pickup,
       controllerData.dropoff,
       controllerData.surchages || false,
       controllerData.surcharge || 0,
-      // pickuptime and pickupdate fields removed
       controllerData.stackdate,
-      controllerData.lastFreeDate || controllerData.deadline, // renamed from deadline
-      controllerData.clientFileRef || controllerData.fileref, // renamed from fileref
+      controllerData.lastFreeDate || controllerData.deadline,
+      controllerData.clientFileRef || controllerData.fileref,
       controllerData.rateweight,
       controllerData.description,
       controllerData.status || "New",
@@ -1676,98 +2435,220 @@ export const saveInstructionAndContainers = async (controllerData, containerData
       controllerData.rateper_abnormal,
       controllerData.rateper_breakbulk,
       controllerData.unitrate,
-    ]
+    ];
 
-    const instructionResult = await client.query(instructionQuery, instructionValues)
-    const instructionId = instructionResult.rows[0].m1key
+    const instructionResult = await client.query(
+      instructionQuery,
+      instructionValues
+    );
+    const instructionId = instructionResult.rows[0].m1key;
 
     // Insert containers
     for (const container of containerData) {
       // Sanitize weight value
-      let sanitizedWeight = null
-      if (container.weight !== null && container.weight !== undefined && container.weight !== "") {
+      let sanitizedWeight = null;
+      if (
+        container.weight !== null &&
+        container.weight !== undefined &&
+        container.weight !== ""
+      ) {
         if (typeof container.weight === "string") {
-          const trimmedWeight = container.weight.trim()
+          const trimmedWeight = container.weight.trim();
           if (trimmedWeight !== "") {
-            const parsedWeight = Number.parseFloat(trimmedWeight)
+            const parsedWeight = Number.parseFloat(trimmedWeight);
             if (!isNaN(parsedWeight) && parsedWeight >= 0) {
-              sanitizedWeight = parsedWeight
+              sanitizedWeight = parsedWeight;
             }
           }
-        } else if (typeof container.weight === "number" && container.weight >= 0) {
-          sanitizedWeight = container.weight
+        } else if (
+          typeof container.weight === "number" &&
+          container.weight >= 0
+        ) {
+          sanitizedWeight = container.weight;
         }
       }
 
+      // <CHANGE> Fetch surcharge amount if surcharges is true
+      let surchargeAmount = 0;
+      const addSurcharges = container["Add Surcharges"] || container.surcharges || false;
+
+      console.log(`DEBUG: Container ${container.containerNum || 'unnamed'} - addSurcharges: ${addSurcharges}`);
+
+      if (addSurcharges && clientId && pickup && dropoff) {
+        try {
+          const surchargeQuery = `
+            SELECT surcharges
+            FROM public.m5_client_rate
+            WHERE clientid = $1
+              AND starting_point = $2
+              AND destination = $3
+            ORDER BY client_rate_id DESC
+            LIMIT 1
+          `;
+          console.log(`DEBUG: Executing surcharge query with exact params: clientId='${clientId}', pickup='${pickup}', dropoff='${dropoff}'`);
+          
+          const surchargeResult = await client.query(surchargeQuery, [
+            clientId,
+            pickup,
+            dropoff
+          ]);
+          
+          console.log(`DEBUG: Surcharge query result rows: ${surchargeResult.rows.length}`);
+          console.log(`DEBUG: Raw surcharge result rows:`, JSON.stringify(surchargeResult.rows));
+          if (surchargeResult.rows.length > 0) {
+            console.log(`DEBUG: First row surcharge value:`, surchargeResult.rows[0].surcharges);
+            if (surchargeResult.rows[0].surcharges) {
+              const fetchedAmount = Number.parseFloat(surchargeResult.rows[0].surcharges);
+              console.log(`DEBUG: Parsed surcharge amount: ${fetchedAmount}`);
+              if (!isNaN(fetchedAmount) && fetchedAmount > 0) {
+                surchargeAmount = fetchedAmount;
+                console.log(`SUCCESS: Fetched surcharge amount: ${surchargeAmount} for container ${container.containerNum || 'unnamed'}`);
+              } else {
+                console.log(`DEBUG: Surcharge amount is NaN or <= 0: ${fetchedAmount}`);
+              }
+            } else {
+              console.log(`DEBUG: No surcharge value in database row`);
+            }
+          } else {
+            console.log(`DEBUG: No matching rates found in m5_client_rate table for surcharge`);
+          }
+        } catch (error) {
+          console.error(`Error fetching surcharge amount for container ${container.containerNum || 'unnamed'}:`, error);
+          console.log(`API call failed for surcharge amount, defaulting to 0`);
+          // Continue with surchargeAmount = 0 on error
+        }
+      } else if (addSurcharges) {
+        console.log(`WARN: Surcharges requested but missing parameters. clientId=${clientId}, pickup=${pickup}, dropoff=${dropoff}`);
+      }
+
+      // <CHANGE> Fetch hazardous amount if hazardous is true
+      let hazardousAmount = 0;
+      const isHazardous = container["Hazardous"] || container.hazardous || false;
+
+      console.log(`DEBUG: Container ${container.containerNum || 'unnamed'} - isHazardous: ${isHazardous}`);
+
+      if (isHazardous && clientId && pickup && dropoff) {
+        try {
+          const hazardousQuery = `
+            SELECT hazardous
+            FROM public.m5_client_rate
+            WHERE clientid = $1
+              AND starting_point = $2
+              AND destination = $3
+            ORDER BY client_rate_id DESC
+            LIMIT 1
+          `;
+          console.log(`DEBUG: Executing hazardous query with exact params: clientId='${clientId}', pickup='${pickup}', dropoff='${dropoff}'`);
+          
+          const hazardousResult = await client.query(hazardousQuery, [
+            clientId,
+            pickup,
+            dropoff
+          ]);
+          
+          console.log(`DEBUG: Hazardous query result rows: ${hazardousResult.rows.length}`);
+          console.log(`DEBUG: Raw hazardous result rows:`, JSON.stringify(hazardousResult.rows));
+          if (hazardousResult.rows.length > 0) {
+            console.log(`DEBUG: First row hazardous value:`, hazardousResult.rows[0].hazardous);
+            if (hazardousResult.rows[0].hazardous) {
+              const fetchedAmount = Number.parseFloat(hazardousResult.rows[0].hazardous);
+              console.log(`DEBUG: Parsed hazardous amount: ${fetchedAmount}`);
+              if (!isNaN(fetchedAmount) && fetchedAmount > 0) {
+                hazardousAmount = fetchedAmount;
+                console.log(`SUCCESS: Fetched hazardous amount: ${hazardousAmount} for container ${container.containerNum || 'unnamed'}`);
+              } else {
+                console.log(`DEBUG: Hazardous amount is NaN or <= 0: ${fetchedAmount}`);
+              }
+            } else {
+              console.log(`DEBUG: No hazardous value in database row`);
+            }
+          } else {
+            console.log(`DEBUG: No matching rates found in m5_client_rate table for hazardous`);
+          }
+        } catch (error) {
+          console.error(`Error fetching hazardous amount for container ${container.containerNum || 'unnamed'}:`, error);
+          console.log(`API call failed for hazardous amount, defaulting to 0`);
+          // Continue with hazardousAmount = 0 on error
+        }
+      } else if (isHazardous) {
+        console.log(`WARN: Hazardous requested but missing parameters. clientId=${clientId}, pickup=${pickup}, dropoff=${dropoff}`);
+      }
+
+      // <CHANGE> Updated container query to include Hazardous Amount
       const containerQuery = `
-        INSERT INTO public.container (containernum, weight, m1key, container_type, cargo_description, "Add Surcharges", "Hazardous", "Surcharge Amount")
-        VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
-      `
+        INSERT INTO public.container (containernum, weight, m1key, container_type, cargo_description, "Add Surcharges", "Hazardous", "Surcharge Amount", "Hazardous Amount")
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+      `;
       const containerValues = [
         container.containerNum || container.containernum || "",
-        sanitizedWeight, // Will be null for empty/invalid values
+        sanitizedWeight,
         instructionId,
         container.container_type || container.containerType || "",
         container.cargo_description || container.cargoDescription || "",
-        container["Add Surcharges"] || container.surcharges || false,
-        container["Hazardous"] || container.hazardous || false,
-        container["Surcharge Amount"] || 0, // Add surcharge amount, default to 0 if not provided
-      ]
-      await client.query(containerQuery, containerValues)
+        addSurcharges,
+        isHazardous,
+        surchargeAmount, // Backend-calculated surcharge amount
+        hazardousAmount, // Backend-calculated hazardous amount
+      ];
+      await client.query(containerQuery, containerValues);
     }
 
-    await client.query("COMMIT")
-    return { instructionId }
+    await client.query("COMMIT");
+    return instructionId;
   } catch (error) {
-    await client.query("ROLLBACK")
-    throw error
+    await client.query("ROLLBACK");
+    console.error("Error saving instruction and containers:", error);
+    throw error;
   } finally {
-    client.release()
+    client.release();
   }
-}
+};
 
 // Function to delete an instruction and its associated containers
 export const deleteInstruction = async (instructionId) => {
-  const client = await pool.connect()
+  const client = await pool.connect();
   try {
-    await client.query("BEGIN")
+    await client.query("BEGIN");
 
     // First check if the instruction exists and has status "New"
     const checkQuery = `
       SELECT status FROM public.m1_controller 
       WHERE m1key = $1
-    `
-    const checkResult = await client.query(checkQuery, [instructionId])
-    
+    `;
+    const checkResult = await client.query(checkQuery, [instructionId]);
+
     if (checkResult.rows.length === 0) {
-      throw new Error("Instruction not found")
+      throw new Error("Instruction not found");
     }
-    
+
     if (checkResult.rows[0].status !== "New") {
-      throw new Error("Only instructions with 'New' status can be deleted")
+      throw new Error("Only instructions with 'New' status can be deleted");
     }
 
     // Delete containers first (due to foreign key constraints)
     const deleteContainersQuery = `
       DELETE FROM public.container 
       WHERE m1key = $1
-    `
-    await client.query(deleteContainersQuery, [instructionId])
+    `;
+    await client.query(deleteContainersQuery, [instructionId]);
 
     // Then delete the instruction
     const deleteInstructionQuery = `
       DELETE FROM public.m1_controller 
       WHERE m1key = $1
-    `
-    const result = await client.query(deleteInstructionQuery, [instructionId])
+    `;
+    const result = await client.query(deleteInstructionQuery, [instructionId]);
 
-    await client.query("COMMIT")
-    return { success: true, deletedRows: result.rowCount }
+    await client.query("COMMIT");
+    return { success: true, deletedRows: result.rowCount };
   } catch (error) {
-    await client.query("ROLLBACK")
-    console.error(`[${new Date().toISOString()}] Error in deleteInstruction:`, error)
-    throw error
+    await client.query("ROLLBACK");
+    console.error(
+      `[${new Date().toISOString()}] Error in deleteInstruction:`,
+      error
+    );
+    throw error;
   } finally {
-    client.release()
+    client.release();
   }
-}
+};

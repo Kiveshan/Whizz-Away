@@ -53,7 +53,15 @@ const calculateTotalCost = (instructionData, containers = []) => {
     return total
   }, 0)
 
-  const totalCost = baseCost + totalSurchargeAmount
+  // <CHANGE> Calculate total hazardous amount from containers
+  const totalHazardousAmount = containers.reduce((total, container) => {
+    if (container["Hazardous"] && container["Hazardous Amount"]) {
+      return total + Number(container["Hazardous Amount"] || 0)
+    }
+    return total
+  }, 0)
+
+  const totalCost = baseCost + totalSurchargeAmount + totalHazardousAmount
   return Number(totalCost.toFixed(2))
 }
 

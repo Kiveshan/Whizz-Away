@@ -280,6 +280,7 @@ const FCcontrollerinstructions = () => {
         hazardous: false,
         addSurcharges: false,
         surchargeAmount: 0,
+        hazardousAmount: 0,
       });
     }
 
@@ -300,6 +301,7 @@ const FCcontrollerinstructions = () => {
         hazardous: false,
         addSurcharges: false,
         surchargeAmount: 0,
+        hazardousAmount: 0,
       });
     }
 
@@ -320,6 +322,7 @@ const FCcontrollerinstructions = () => {
         hazardous: false,
         addSurcharges: false,
         surchargeAmount: 0,
+        hazardousAmount: 0,
       });
     }
 
@@ -340,6 +343,7 @@ const FCcontrollerinstructions = () => {
         hazardous: false,
         addSurcharges: false,
         surchargeAmount: 0,
+        hazardousAmount: 0,
       });
     }
 
@@ -436,6 +440,52 @@ const FCcontrollerinstructions = () => {
       return;
     }
 
+    const fetchHazardousAmount = async (containerId) => {
+  const container = containers.find(c => c.id === containerId)
+  if (!container) return
+
+  try {
+    console.log(`🌐 Fetching hazardous rates for client ${formData.clientId}, route: ${formData.pickup} → ${formData.dropoff}`);
+    const response = await api.get(
+      `/api/instructions/client/${formData.clientId}/rates`,
+      {
+        params: {
+          start: formData.pickup,
+          destination: formData.dropoff
+        }
+      }
+    )
+    
+    const hazardousAmount = response.data.hazardous || 0;
+    console.log(`☣️ Fetched hazardous amount: ${hazardousAmount} for container ${container.containerNum || containerId}`);
+    
+    // Update container with hazardous amount
+    setContainers(prevContainers => {
+      const updatedContainers = prevContainers.map(c =>
+        c.id === containerId
+          ? { ...c, hazardousAmount: Number(hazardousAmount) }
+          : c
+      );
+      console.log(`🔄 Updated container ${containerId} with hazardous amount: ${hazardousAmount}`);
+      return updatedContainers;
+    });
+    
+    // Force immediate recalculation to include hazardous amount
+    setTimeout(() => recalculateTotalCost(), 0);
+  } catch (error) {
+    console.error('❌ Error fetching hazardous amount:', error);
+    // Fallback to 0 if fetch fails
+    setContainers(prevContainers =>
+      prevContainers.map(c =>
+        c.id === containerId
+          ? { ...c, hazardousAmount: 0 }
+          : c
+      )
+    );
+    console.log(`⚠️ Using fallback hazardous amount: 0 for container ${container.containerNum || containerId}`);
+  }
+}
+
     // Handle hazardous and addSurcharges checkbox fields
     if (field === "hazardous" || field === "addSurcharges") {
       if (field === "addSurcharges") {
@@ -463,13 +513,32 @@ const FCcontrollerinstructions = () => {
           console.log(`🔄 Surcharge unchecked - reset amount to 0 for container ${id}`);
           recalculateTotalCost();
         }
-      } else {
-        // Handle hazardous checkbox normally
-        setContainers((prevContainers) =>
-          prevContainers.map((container) =>
-            container.id === id ? { ...container, [field]: value } : container
-          )
-        );
+      } else if (field === "hazardous") {
+        // Handle hazardous checkbox with rate fetching
+        console.log(`☢️ Hazardous checkbox ${value ? 'CHECKED' : 'UNCHECKED'} for container ${id}`);
+        if (value) {
+          // Checkbox checked - update state immediately, then fetch hazardous amount
+          setContainers((prevContainers) =>
+            prevContainers.map((container) =>
+              container.id === id 
+                ? { ...container, [field]: true }
+                : container
+            )
+          );
+          console.log(`📞 Calling fetchHazardousAmount for container ${id}`);
+          fetchHazardousAmount(id);
+        } else {
+          // Checkbox unchecked - reset hazardous amount to 0
+          setContainers((prevContainers) =>
+            prevContainers.map((container) =>
+              container.id === id 
+                ? { ...container, [field]: value, hazardousAmount: 0 }
+                : container
+            )
+          );
+          console.log(`🔄 Hazardous unchecked - reset amount to 0 for container ${id}`);
+          recalculateTotalCost();
+        }
       }
       setIsContainerDataModified(true);
       return;
@@ -1925,12 +1994,17 @@ const FCcontrollerinstructions = () => {
     }
   }, [formData.clientId, formData.pickup]);
 
-  // useEffect to recalculate total cost when container surcharges change
+  // useEffect to recalculate total cost when container surcharges or hazardous flags/amounts change
   useEffect(() => {
     if (containers.length > 0) {
       recalculateTotalCost();
     }
-  }, [containers.map(c => c.addSurcharges).join(','), containers.map(c => c.surchargeAmount).join(',')]);
+  }, [
+    containers.map(c => c.addSurcharges).join(','), 
+    containers.map(c => c.surchargeAmount).join(','),
+    containers.map(c => c.hazardous).join(','),
+    containers.map(c => c.hazardousAmount).join(',')
+  ]);
 
   // Function to fetch surcharge amount from client rates
   const fetchSurchargeAmount = async (containerId) => {
@@ -1986,9 +2060,19 @@ const FCcontrollerinstructions = () => {
     // Add container surcharge amounts
     const surchargeTotal = containers
       .filter(container => container.addSurcharges === true)
-      .reduce((total, container) => total + (container.surchargeAmount || 0), 0);
+      .reduce((total, container) => total + (Number(container.surchargeAmount) || 0), 0);
     
-    return baseCost + surchargeTotal;
+    // Add container hazardous amounts
+    const hazardousTotal = containers
+      .filter(container => container.hazardous === true)
+      .reduce((total, container) => {
+        const hazAmount = Number(container.hazardousAmount) || 0;
+        console.log(`☢️ Container ${container.id} hazardous amount: ${hazAmount}`);
+        return total + hazAmount;
+      }, 0);
+    
+    console.log(`💲 Total cost calculation - Base: ${baseCost}, Surcharges: ${surchargeTotal}, Hazardous: ${hazardousTotal}`);
+    return baseCost + surchargeTotal + hazardousTotal;
   };
 
   // Function for real-time total cost recalculation
@@ -4091,7 +4175,7 @@ const FCcontrollerinstructions = () => {
                     </div>
                   </div>
                   <div className="controller-instructions-form-field">
-                    <label></label>
+                    <label>Ksm File Reference</label>
                     <div
                       className="controller-instructions-input-wrapper"
                       ref={fieldRefs.ksmFileRef}
