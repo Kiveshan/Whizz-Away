@@ -86,6 +86,10 @@ const ClientInvoice = () => {
               container_number:
                 container.container_number || container.containernum || "",
               weight: container.weight || null,
+              add_surcharges: container.add_surcharges || false,
+              hazardous: container.hazardous || false,
+              surcharge_amount: container.surcharge_amount || 0,
+              hazardous_amount: container.hazardous_amount || 0,
             })
           );
         }
@@ -310,9 +314,18 @@ const ClientInvoice = () => {
       const hasWeights = containers.some(
         (container) => container.weight && container.weight !== "N/A"
       );
-      const containerHeaders = hasWeights
-        ? ["Container Number", "Weight"]
-        : ["Container Number"];
+      const hasSurcharges = containers.some(
+        (container) =>
+          container.add_surcharges || container.surcharge_amount > 0
+      );
+      const hasHazardous = containers.some(
+        (container) => container.hazardous || container.hazardous_amount > 0
+      );
+
+      const containerHeaders = ["Container Number"];
+      if (hasWeights) containerHeaders.push("Weight");
+      if (hasSurcharges) containerHeaders.push("Surcharges");
+      if (hasHazardous) containerHeaders.push("Hazardous");
 
       const containerData =
         containers.length > 0
@@ -324,6 +337,26 @@ const ClientInvoice = () => {
                 container.weight !== "N/A"
               ) {
                 row.push(container.weight);
+              }
+              if (hasSurcharges) {
+                const surchargeText = container.add_surcharges
+                  ? `Yes${
+                      container.surcharge_amount > 0
+                        ? ` (${formatCurrency(container.surcharge_amount)})`
+                        : ""
+                    }`
+                  : "No";
+                row.push(surchargeText);
+              }
+              if (hasHazardous) {
+                const hazardText = container.hazardous
+                  ? `Yes${
+                      container.hazardous_amount > 0
+                        ? ` (${formatCurrency(container.hazardous_amount)})`
+                        : ""
+                    }`
+                  : "No";
+                row.push(hazardText);
               }
               return row;
             })
@@ -713,26 +746,93 @@ const ClientInvoice = () => {
                       (container) =>
                         container.weight && container.weight !== "N/A"
                     ) && <th className="weight-header">Weight</th>}
+                    {containers.some(
+                      (container) =>
+                        container.add_surcharges ||
+                        container.surcharge_amount > 0
+                    ) && <th className="surcharge-header">Surcharges</th>}
+                    {containers.some(
+                      (container) =>
+                        container.hazardous || container.hazardous_amount > 0
+                    ) && <th className="hazardous-header">Hazardous</th>}
                   </tr>
                 </thead>
                 <tbody>
                   {containers.length > 0 ? (
                     containers.map((container, index) => {
+                      const hasWeight =
+                        container.weight && container.weight !== "N/A";
+                      const hasSurcharge =
+                        container.add_surcharges ||
+                        container.surcharge_amount > 0;
+                      const hasHazard =
+                        container.hazardous || container.hazardous_amount > 0;
+
                       return (
                         <tr key={index}>
                           <td className="container-number">
                             {container.container_number ||
                               `Container ${index + 1}`}
                           </td>
-                          {container.weight && container.weight !== "N/A" && (
-                            <td className="weight">{container.weight}</td>
+                          {containers.some(
+                            (c) => c.weight && c.weight !== "N/A"
+                          ) && (
+                            <td className="weight">
+                              {hasWeight ? container.weight : "N/A"}
+                            </td>
+                          )}
+                          {containers.some(
+                            (c) => c.add_surcharges || c.surcharge_amount > 0
+                          ) && (
+                            <td className="surcharge">
+                              {container.add_surcharges ? (
+                                <span>
+                                  Yes
+                                  {container.surcharge_amount > 0 && (
+                                    <span>
+                                      {" "}
+                                      (
+                                      {formatCurrency(
+                                        container.surcharge_amount
+                                      )}
+                                      )
+                                    </span>
+                                  )}
+                                </span>
+                              ) : (
+                                "No"
+                              )}
+                            </td>
+                          )}
+                          {containers.some(
+                            (c) => c.hazardous || c.hazardous_amount > 0
+                          ) && (
+                            <td className="hazardous">
+                              {container.hazardous ? (
+                                <span>
+                                  Yes
+                                  {container.hazardous_amount > 0 && (
+                                    <span>
+                                      {" "}
+                                      (
+                                      {formatCurrency(
+                                        container.hazardous_amount
+                                      )}
+                                      )
+                                    </span>
+                                  )}
+                                </span>
+                              ) : (
+                                "No"
+                              )}
+                            </td>
                           )}
                         </tr>
                       );
                     })
                   ) : (
                     <tr>
-                      <td className="container-number">
+                      <td className="container-number" colSpan="4">
                         No container information
                       </td>
                     </tr>

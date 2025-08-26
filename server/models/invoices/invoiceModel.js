@@ -131,10 +131,15 @@ const getInvoiceDetails = async (id) => {
       return { success: false, message: "Instruction not found" };
     }
 
+    // Updated container query to include hazard and surcharge fields
     const containerQuery = `
       SELECT 
         containernum as container_number, 
-        weight
+        weight,
+        "Add Surcharges" as add_surcharges,
+        "Hazardous" as hazardous,
+        "Surcharge Amount" as surcharge_amount,
+        "Hazardous Amount" as hazardous_amount
       FROM 
         public.container c
       INNER JOIN
