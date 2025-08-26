@@ -279,6 +279,8 @@ const ControllerInstructions = () => {
           id: containerId++,
           containerKey: null,
           containerNum: "",
+          // Initialize file reference field for export shipments
+          fileRef: "",
           // Initialize weight field for import, export, and cross-haul shipments
           weight: (isImport || isExport || isCrossHaul) ? "" : null,
           containerType: type,
@@ -363,6 +365,16 @@ const ControllerInstructions = () => {
         setContainerFieldErrors((prev) => {
           const newErrors = { ...prev }
           delete newErrors[`weight-${id}`]
+          return newErrors
+        })
+      } else if (field === "fileRef") {
+        // Just ensure it doesn't exceed 20 characters
+        if (value.length > 20) return
+        
+        // Clear any existing errors
+        setContainerFieldErrors((prev) => {
+          const newErrors = { ...prev }
+          delete newErrors[`file-ref-${id}`]
           return newErrors
         })
       } else if (field === "weight" && value === "") {
@@ -1353,6 +1365,7 @@ const ControllerInstructions = () => {
           ? containers.map((container) => ({
               container_type: container.containerType,
               containerNum: container.containerNum,
+              file_ref: container.fileRef || "", // Include file reference field for export shipments
               weight: (isImport || isExport || isCrossHaul) ? (container.weight === "" ? null : Number.parseFloat(container.weight || 0)) : null,
               cargo_description: container.cargoDescription || "",
               "Hazardous": container.hazardous || false,
@@ -2404,9 +2417,10 @@ const ControllerInstructions = () => {
                     <tr>
                       <th style={{ width: "5%" }}>#</th>
                       <th style={{ width: "15%" }}>Container Type</th>
-                      <th style={{ width: "20%" }}>{isExport || formData.shipmentTypeId === "2" ? "File Reference" : "Container Number"}</th>
+                      <th style={{ width: "15%" }}>Container Number</th>
+                      {(isExport || formData.shipmentTypeId === "2") && <th style={{ width: "15%" }}>File Reference</th>}
                       {(isImport || isExport || isCrossHaul) && <th style={{ width: "10%" }}>Weight</th>}
-                      <th style={{ width: (isImport || isExport || isCrossHaul) ? "30%" : "40%" }}>Cargo Description</th>
+                      <th style={{ width: (isImport || isExport || isCrossHaul) ? "25%" : "40%" }}>Cargo Description</th>
                       <th style={{ width: "10%" }}>Hazardous</th>
                       <th style={{ width: "10%" }}>Add Surcharges</th>
                     </tr>
@@ -2423,7 +2437,7 @@ const ControllerInstructions = () => {
                               className={`form-control form-control-sm ${containerFieldErrors[`container-${container.id}`] ? "is-invalid" : ""}`}
                               value={container.containerNum}
                               onChange={(e) => handleContainerChange(container.id, "containerNum", e.target.value)}
-                              placeholder={isExport || formData.shipmentTypeId === "2" ? "Enter file reference" : "Enter container number"}
+                              placeholder="Enter container number"
                               maxLength={20}
                               style={{
                                 minWidth: "120px",
@@ -2477,6 +2491,69 @@ const ControllerInstructions = () => {
                             )}
                           </div>
                         </td>
+                        {(isExport || formData.shipmentTypeId === "2") && (
+                          <td>
+                            <div style={{ position: "relative" }}>
+                              <input
+                                type="text"
+                                className={`form-control form-control-sm ${containerFieldErrors[`file-ref-${container.id}`] ? "is-invalid" : ""}`}
+                                value={container.fileRef || ""}
+                                onChange={(e) => handleContainerChange(container.id, "fileRef", e.target.value)}
+                                placeholder="Enter file reference"
+                                maxLength={20}
+                                style={{
+                                  minWidth: "120px",
+                                  backgroundColor: containerFieldErrors[`file-ref-${container.id}`]
+                                    ? "#ffebee"
+                                    : "white",
+                                  borderColor: containerFieldErrors[`file-ref-${container.id}`] ? "#f44336" : "#ced4da",
+                                }}
+                              />
+                              {containerFieldErrors[`file-ref-${container.id}`] && (
+                                <div
+                                  style={{
+                                    position: "fixed",
+                                    zIndex: 9999,
+                                    backgroundColor: "#f44336",
+                                    color: "white",
+                                    padding: "6px 10px",
+                                    borderRadius: "4px",
+                                    fontSize: "12px",
+                                    whiteSpace: "nowrap",
+                                    boxShadow: "0 4px 8px rgba(0,0,0,0.3)",
+                                    transform: "translateY(4px)",
+                                    pointerEvents: "none",
+                                    maxWidth: "250px",
+                                  }}
+                                  ref={(el) => {
+                                    if (el) {
+                                      const input = el.previousElementSibling
+                                      if (input) {
+                                        const rect = input.getBoundingClientRect()
+                                        el.style.left = `${rect.left}px`
+                                        el.style.top = `${rect.bottom + 4}px`
+                                      }
+                                    }
+                                  }}
+                                >
+                                  {containerFieldErrors[`file-ref-${container.id}`]}
+                                  <div
+                                    style={{
+                                      position: "absolute",
+                                      top: "-4px",
+                                      left: "10px",
+                                      width: "0",
+                                      height: "0",
+                                      borderLeft: "4px solid transparent",
+                                      borderRight: "4px solid transparent",
+                                      borderBottom: "4px solid #f44336",
+                                    }}
+                                  />
+                                </div>
+                              )}
+                            </div>
+                          </td>
+                        )}
                         {(isImport || isExport || isCrossHaul) && (
                           <td>
                             <div style={{ position: "relative" }}>

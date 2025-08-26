@@ -169,6 +169,20 @@ export const saveInstructionHandler = async (req, res) => {
             }
           : "No containers",
     })
+    
+    // Debug each container's file_ref field
+    if (containerData && containerData.length > 0) {
+      console.log("CONTROLLER: Container data details:")
+      containerData.forEach((container, index) => {
+        console.log(`Container ${index} details:`, {
+          containerNum: container.containerNum || container.containernum,
+          file_ref: container.file_ref,
+          fileRef: container.fileRef,
+          // Include all properties for debugging
+          ...container
+        })
+      })
+    }
     const result = await saveInstruction({ controllerData: updatedControllerData, containerData })
     res.json({ success: true, m1key: result.m1key })
   } catch (error) {

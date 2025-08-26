@@ -387,11 +387,18 @@ export const saveInstruction = async ({ controllerData, containerData }) => {
 
   for (const container of containerData) {
       // Define the container insert query with parameter placeholders
+      // Debug logging for container data
+      console.log(`Processing container for saveInstruction:`, {
+        containerNum: container.containerNum || container.containernum,
+        file_ref: container.file_ref,
+        properties: Object.keys(container),
+      });
+      
       const containerQuery = `
         INSERT INTO public.container (
-          containernum, weight, m1key, container_type, cargo_description, "Hazardous", "Add Surcharges", "Surcharge Amount", "Hazardous Amount"
+          containernum, weight, m1key, container_type, cargo_description, "Hazardous", "Add Surcharges", "Surcharge Amount", "Hazardous Amount", file_ref
         ) VALUES (
-          $1, $2, $3, $4, $5, $6, $7, $8, $9
+          $1, $2, $3, $4, $5, $6, $7, $8, $9, $10
         )
       `;
       
@@ -655,7 +662,22 @@ export const saveInstruction = async ({ controllerData, containerData }) => {
         addSurcharges,
         surchargeAmount, // Backend-calculated surcharge amount
         hazardousAmount, // Backend-calculated hazardous amount
+        container.file_ref || container.fileRef || "", // File reference field for export shipments
       ];
+      
+      // Debug log for container values
+      console.log("Container values array:", {
+        containerNum: containerValues[0],
+        weight: containerValues[1],
+        m1key: containerValues[2],
+        container_type: containerValues[3],
+        cargo_description: containerValues[4],
+        hazardous: containerValues[5],
+        addSurcharges: containerValues[6],
+        surchargeAmount: containerValues[7],
+        hazardousAmount: containerValues[8],
+        file_ref: containerValues[9]
+      });
 
       console.log(`DEBUG: Executing container insert query with ${containerValues.length} parameters`);
       console.log(`DEBUG: Container insert query: ${containerQuery}`);
@@ -2574,10 +2596,18 @@ export const saveInstructionAndContainers = async (
         console.log(`WARN: Hazardous requested but missing parameters. clientId=${clientId}, pickup=${pickup}, dropoff=${dropoff}`);
       }
 
-      // <CHANGE> Updated container query to include Hazardous Amount
+      // Debug log for container data
+      console.log(`Processing container for DB insertion:`, {
+        containerNum: container.containerNum || container.containernum,
+        file_ref: container.fileRef || container.file_ref,
+        addSurcharges,
+        isHazardous
+      });
+
+      // <CHANGE> Updated container query to include Hazardous Amount and File Reference
       const containerQuery = `
-        INSERT INTO public.container (containernum, weight, m1key, container_type, cargo_description, "Add Surcharges", "Hazardous", "Surcharge Amount", "Hazardous Amount")
-        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+        INSERT INTO public.container (containernum, weight, m1key, container_type, cargo_description, "Add Surcharges", "Hazardous", "Surcharge Amount", "Hazardous Amount", file_ref)
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
       `;
       const containerValues = [
         container.containerNum || container.containernum || "",
@@ -2589,6 +2619,9 @@ export const saveInstructionAndContainers = async (
         isHazardous,
         surchargeAmount, // Backend-calculated surcharge amount
         hazardousAmount, // Backend-calculated hazardous amount
+        // Extract file_ref value, ensuring proper case handling for all possible variations
+        (container.file_ref !== undefined ? container.file_ref : 
+         container.fileRef !== undefined ? container.fileRef : ""), // New file reference field for export shipments
       ];
       await client.query(containerQuery, containerValues);
     }
