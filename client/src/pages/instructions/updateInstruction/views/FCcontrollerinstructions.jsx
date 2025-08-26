@@ -67,7 +67,8 @@ const FCcontrollerinstructions = () => {
   };
 
   const [isImport, setIsImport] = useState(location.state?.isImport || false);
-  const today = new Date().toISOString().split("T")[0];
+  const todayDate = new Date();
+  const today = `${todayDate.getFullYear()}-${String(todayDate.getMonth() + 1).padStart(2, '0')}-${String(todayDate.getDate()).padStart(2, '0')}`;  // Fixed timezone handling
   const [weight, setWeight] = useState("");
   const [rateUpdateMessage, setRateUpdateMessage] = useState("");
 
@@ -1015,7 +1016,7 @@ const FCcontrollerinstructions = () => {
           // Try to parse as Date object
           const date = new Date(dateString);
           if (!isNaN(date.getTime())) {
-            return date.toISOString().split("T")[0];
+            return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;  // Fixed timezone handling
           }
           return null;
         } catch (e) {
@@ -2497,7 +2498,7 @@ const FCcontrollerinstructions = () => {
     try {
       const date = new Date(dateString);
       if (!isNaN(date.getTime())) {
-        return date.toISOString().split("T")[0];
+        return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;  // Fixed timezone handling
       }
     } catch (e) {
       console.error("Error formatting date:", e);
