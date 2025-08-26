@@ -14,11 +14,12 @@ const generateProfitLossReport = async (req, res) => {
         const workbook = new ExcelJS.Workbook();
         const worksheet = workbook.addWorksheet('Profit & Loss Report');
 
-        //Headers
         worksheet.columns = [
             { header: 'Category', key: 'category', width: 20 },
             { header: 'Date', key: 'date', width: 15 },
-            { header: 'Amount (R)', key: 'amount', width: 20 },
+            { header: 'Profit (R)', key: 'profit', width: 20 },
+            { header: 'Loss (R)', key: 'loss', width: 20 },
+            { header: 'Net (R)', key: 'net', width: 20 },
         ];
 
         worksheet.getRow(1).font = { bold: true, size: 12 };
@@ -34,9 +35,8 @@ const generateProfitLossReport = async (req, res) => {
             right: { style: 'thin' },
         };
 
-        //Title row
         worksheet.insertRow(1, [`Profit & Loss Report - ${month} ${year}`]);
-        worksheet.mergeCells('A1:C1');
+        worksheet.mergeCells('A1:E1');
         worksheet.getRow(1).font = { bold: true, size: 14 };
         worksheet.getRow(1).alignment = { horizontal: 'center' };
         worksheet.getRow(1).fill = {
@@ -49,7 +49,9 @@ const generateProfitLossReport = async (req, res) => {
             worksheet.addRow({
                 category: detail.source,
                 date: detail.date,
-                amount: `R ${detail.amount.toFixed(2)}`,
+                profit: `R ${detail.amount.toFixed(2)}`,
+                loss: '',
+                net: '',
             });
         });
 
@@ -57,15 +59,20 @@ const generateProfitLossReport = async (req, res) => {
             worksheet.addRow({
                 category: detail.source,
                 date: detail.date,
-                amount: `R -${detail.amount.toFixed(2)}`,
+                profit: '',
+                loss: `R ${Math.abs(detail.amount).toFixed(2)}`,
+                net: '',
             });
         });
 
-        //Totals
-        const startRow = worksheet.rowCount + 2;
-        worksheet.addRow({ category: 'Total Profit', date: '', amount: `R ${totalProfit.toFixed(2)}` });
-        worksheet.addRow({ category: 'Total Loss', date: '', amount: `R ${totalLoss.toFixed(2)}` });
-        worksheet.addRow({ category: 'Net Profit/Loss', date: '', amount: `R ${net.toFixed(2)}` });
+        const startRow = worksheet.rowCount + 1;
+        worksheet.addRow({
+            category: 'Totals',
+            date: '',
+            profit: `R ${totalProfit.toFixed(2)}`,
+            loss: `R ${Math.abs(totalLoss).toFixed(2)}`,
+            net: net >= 0 ? `R ${net.toFixed(2)}` : `R -${Math.abs(net).toFixed(2)}`,
+        });
 
         worksheet.getRows(2, worksheet.rowCount - 1).forEach(row => {
             row.border = {
@@ -82,16 +89,14 @@ const generateProfitLossReport = async (req, res) => {
                 };
             }
         });
-        worksheet.getRows(startRow, 3).forEach(row => {
-            row.font = { bold: true, size: 12 };
-            row.fill = {
-                type: 'pattern',
-                pattern: 'solid',
-                fgColor: { argb: 'FFE6F3FF' },
-            };
-        });
+        worksheet.getRow(startRow).font = { bold: true, size: 12 };
+        worksheet.getRow(startRow).fill = {
+            type: 'pattern',
+            pattern: 'solid',
+            fgColor: { argb: 'FFE6F3FF' },
+        };
 
-        //Generating the excel file
+        //Generating the file
         const filename = `Profit_Loss_Report_${month}_${year}.xlsx`;
         const buffer = await workbook.xlsx.writeBuffer();
         console.log('Buffer length:', buffer.length);
