@@ -37,7 +37,7 @@ const ProfitLossReportsPage = () => {
             console.log(`Starting Profit & Loss report generation for ${monthName} ${selectedYear}`)
             const response = await api.get('/profit-loss-report', {
                 params: { month: monthName, year: selectedYear },
-                responseType: 'blob', // Moved inside the config object
+                responseType: 'blob',
             });
 
             const url = window.URL.createObjectURL(new Blob([response.data], {
