@@ -4188,8 +4188,7 @@ const FCcontrollerinstructions = () => {
                   </div>
                 </div>
                 <div className="controller-instructions-date-time-group">
-                  {/* Pickup Time field removed */}
-                  {/* Pickup Date field removed */}
+                 
                   {(formData.shipmentTypeId === "1" ||
                     formData.shipmentTypeId === "2") && (
                     <div className="controller-instructions-form-field">
@@ -4218,6 +4217,7 @@ const FCcontrollerinstructions = () => {
                           disabled={isReadOnly}
                           style={isReadOnly ? readOnlyStyle : {}}
                           required={true}
+                          onKeyDown={(e) => e.preventDefault()}
                         />
                         <InstructionErrorTooltip
                           message={fieldErrors.stackDate}
@@ -4245,6 +4245,8 @@ const FCcontrollerinstructions = () => {
                         ref={lastFreeDateRef}
                         disabled={isReadOnly}
                         style={isReadOnly ? readOnlyStyle : {}}
+                        onKeyDown={(e) => e.preventDefault()} // stops typing
+                        
                       />
                       <InstructionErrorTooltip
                         message={fieldErrors.lastFreeDate}

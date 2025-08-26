@@ -283,9 +283,9 @@ const ControllerInstructions = () => {
           weight: (isImport || isExport || isCrossHaul) ? "" : null,
           containerType: type,
           cargoDescription: "",
-          // Initialize hazardous and surcharges properties for each container
+          // Initialize hazardous and addSurcharges properties for each container
           hazardous: false,
-          surcharges: false,
+          addSurcharges: false,
         }
       }
 
@@ -651,17 +651,8 @@ const ControllerInstructions = () => {
               updates.rateper_breakbulk = ""
             }
 
-            // Store the surcharge amount from rates for later use with container surcharges
-            if (rates.surcharges !== undefined) {
-              const surchargesNum = Number.parseFloat(rates.surcharges)
-              const hasSurcharges = !isNaN(surchargesNum) && surchargesNum > 0
-              
-              // Log the surcharge amount from the API
-              console.log("Surcharge amount from API:", rates.surcharges, "Parsed value:", surchargesNum)
-
-              // Only store the amount for reference, don't auto-check any boxes
-              updates.surchargesAmount = hasSurcharges ? surchargesNum.toString() : "0"
-            }
+            // Surcharge amounts will be calculated by backend on submit
+            // No need to fetch or store surcharge amounts in frontend
           } else {
             // Clear all rate fields when no rates are found
             updates.sixMeterRate = ""
@@ -1244,48 +1235,19 @@ const ControllerInstructions = () => {
         console.log(`  Container Subtotal: R${totalCost.toFixed(2)}`)
       }
 
-      // Calculate surcharges for each container with surcharges checked
-      let totalSurchargeAmount = 0;
-      
-      // Only process surcharges for container-based calculations
-      if (!isWeightBased && formData.rateWeight === "Container") {
-        // Get the client's surcharge rate from the client rates
-        // Default to 0 if not available
-        let clientSurchargeRate = 0;
-        
-        // Try to get the surcharge amount from formData
-        if (formData.surchargesAmount !== undefined && formData.surchargesAmount !== null && formData.surchargesAmount !== "") {
-          const parsedRate = Number.parseFloat(formData.surchargesAmount);
-          if (!isNaN(parsedRate)) {
-            clientSurchargeRate = parsedRate;
-          }
-        }
-        
-        console.log("Client Surcharge Rate:", clientSurchargeRate);
-        
-        // Calculate surcharges for each container that has surcharges checked
-        const containersWithSurcharges = containers.filter(c => c.surcharges);
-        console.log("Containers with surcharges:", containersWithSurcharges.length);
-        
-        // Add surcharge amount for each container with surcharges checked
-        containersWithSurcharges.forEach(() => {
-          totalSurchargeAmount += clientSurchargeRate;
-        });
-        
-        console.log("Total Surcharge Amount calculated:", totalSurchargeAmount);
-      }
-      
-      const subtotalBeforeVAT = totalCost + totalSurchargeAmount;
+      // Note: Surcharge amounts are now calculated by the backend on submit
+      // Frontend only tracks which containers have surcharges enabled
+      const subtotalBeforeVAT = totalCost;
 
       costBreakdown.components.surcharges = {
-        applied: totalSurchargeAmount > 0,
-        amount: totalSurchargeAmount,
+        applied: containers.some(c => c.addSurcharges),
+        amount: 0, // Backend will calculate actual amount
       };
       costBreakdown.components.subtotalBeforeVAT = subtotalBeforeVAT;
 
       console.log("SURCHARGES:");
-      console.log(`  Containers with Surcharges: ${containers.filter(c => c.surcharges).length}`);
-      console.log(`  Total Surcharge Amount: R${totalSurchargeAmount.toFixed(2)}`);
+      console.log(`  Containers with Surcharges: ${containers.filter(c => c.addSurcharges).length}`);
+      console.log(`  Surcharge amounts will be calculated by backend on submit`);
       console.log(`  Subtotal (before VAT): R${subtotalBeforeVAT.toFixed(2)}`)
 
       // Calculate VAT (for display purposes only - not added to total cost saved to DB)
@@ -1311,8 +1273,8 @@ const ControllerInstructions = () => {
       costBreakdown.components.finalTotalSaved = totalCost
 
       console.log("FINAL COST BREAKDOWN:")
-      console.log(`  Base Cost: R${(totalCost - totalSurchargeAmount).toFixed(2)}`)
-      console.log(`  Surcharges: R${totalSurchargeAmount.toFixed(2)}`)
+      console.log(`  Base Cost: R${totalCost.toFixed(2)}`)
+      console.log(`  Surcharges: Will be calculated by backend`)
       console.log(`  TOTAL COST SAVED TO DB (excluding VAT): R${totalCost.toFixed(2)}`)
       console.log(`  VAT (calculated but not saved): R${vatAmount.toFixed(2)}`)
       console.log(`  Total with VAT (for reference): R${totalWithVAT.toFixed(2)}`)
@@ -1384,14 +1346,7 @@ const ControllerInstructions = () => {
 
       // Prepare container data (only for container-based calculations AND if unit type is Container)
       // Also ensure container details are not saved when rateWeight is kg or ton
-      // Get the client's surcharge rate for container calculations
-      let clientSurchargeRate = 0;
-      if (formData.surchargesAmount !== undefined && formData.surchargesAmount !== null && formData.surchargesAmount !== "") {
-        const parsedRate = Number.parseFloat(formData.surchargesAmount);
-        if (!isNaN(parsedRate)) {
-          clientSurchargeRate = parsedRate;
-        }
-      }
+      // Note: Surcharge amounts will be calculated by backend based on client rates
       
       const containerData =
         !isWeightBased && formData.rateWeight === "Container" && formData.rateWeight !== "kg" && formData.rateWeight !== "ton"
@@ -1401,8 +1356,8 @@ const ControllerInstructions = () => {
               weight: (isImport || isExport || isCrossHaul) ? (container.weight === "" ? null : Number.parseFloat(container.weight || 0)) : null,
               cargo_description: container.cargoDescription || "",
               "Hazardous": container.hazardous || false,
-              "Add Surcharges": container.surcharges || false,
-              "Surcharge Amount": container.surcharges ? clientSurchargeRate : 0, // Add surcharge amount if surcharges is checked
+              "Add Surcharges": container.addSurcharges || false,
+              // Note: "Surcharge Amount" will be calculated by backend
             }))
           : []
 
@@ -2256,6 +2211,7 @@ const ControllerInstructions = () => {
                           min={today}
                           disabled={false}
                           onClick={() => openCalendar(etaDateRef)}
+                          onKeyDown={(e) => e.preventDefault()}
                         />
                         <ErrorTooltip message={fieldErrors.stackDate} />
                       </div>
@@ -2276,6 +2232,7 @@ const ControllerInstructions = () => {
                         onChange={handleInputChange}
                         min={today}
                         style={{ width: "100%" }}
+                        onKeyDown={(e) => e.preventDefault()}
                       />
                       <ErrorTooltip message={fieldErrors.lastFreeDate} />
                     </div>
@@ -2605,8 +2562,8 @@ const ControllerInstructions = () => {
                             <input
                               type="checkbox"
                               className="form-check-input"
-                              checked={container.surcharges || false}
-                              onChange={(e) => handleContainerChange(container.id, "surcharges", e.target.checked)}
+                              checked={container.addSurcharges || false}
+                              onChange={(e) => handleContainerChange(container.id, "addSurcharges", e.target.checked)}
                               style={{ cursor: "pointer" }}
                             />
                           </div>

@@ -138,6 +138,8 @@ export const saveInstruction = async ({ controllerData, containerData }) => {
   const client = await pool.connect()
   try {
     await client.query("BEGIN")
+    
+    console.log(`DEBUG: saveInstruction called with ${containerData.length} containers`)
 
     const controllerQuery = `
       INSERT INTO public.m1_controller (
@@ -330,6 +332,67 @@ export const saveInstruction = async ({ controllerData, containerData }) => {
         }
       }
 
+      // Fetch surcharge amount if addSurcharges is true
+      let surchargeAmount = 0
+      const addSurcharges = container["Add Surcharges"] || container.addSurcharges || false
+      
+      console.log(`DEBUG: Container ${container.containerNum || 'unnamed'} - addSurcharges: ${addSurcharges}`)
+      console.log(`DEBUG: controllerData keys:`, Object.keys(controllerData))
+      console.log(`DEBUG: client: ${controllerData.client}, pickup: ${controllerData.pickup}, dropoff: ${controllerData.dropoff}`)
+      console.log(`DEBUG: startingPoints: ${controllerData.startingPoints}, destinations: ${controllerData.destinations}`)
+      
+      // Fix parameter mapping - use string fields, not arrays
+      const clientId = controllerData.client || controllerData.clientId
+      const pickup = controllerData.pickup || controllerData.selectedStartingPoint || (Array.isArray(controllerData.startingPoints) ? null : controllerData.startingPoints)
+      const dropoff = controllerData.dropoff || controllerData.selectedDestination || (Array.isArray(controllerData.destinations) ? null : controllerData.destinations)
+      
+      if (addSurcharges && clientId && pickup && dropoff) {
+        try {
+          const surchargeQuery = `
+            SELECT surcharges
+            FROM public.m5_client_rate
+            WHERE clientid = $1
+              AND starting_point = $2
+              AND destination = $3
+            ORDER BY client_rate_id DESC
+            LIMIT 1
+          `
+          console.log(`DEBUG: Executing surcharge query with exact params: clientId='${clientId}', pickup='${pickup}', dropoff='${dropoff}'`)
+          console.log(`DEBUG: Verifying SQL: SELECT * FROM public.m5_client_rate WHERE clientid='${clientId}' AND starting_point='${pickup}' AND destination='${dropoff}' LIMIT 1`)
+          
+          const surchargeResult = await client.query(surchargeQuery, [
+            clientId,
+            pickup,
+            dropoff
+          ])
+          
+          console.log(`DEBUG: Query result rows: ${surchargeResult.rows.length}`)
+          console.log(`DEBUG: Raw result rows:`, JSON.stringify(surchargeResult.rows))
+          if (surchargeResult.rows.length > 0) {
+            console.log(`DEBUG: First row surcharges value:`, surchargeResult.rows[0].surcharges)
+            if (surchargeResult.rows[0].surcharges) {
+              const fetchedAmount = Number.parseFloat(surchargeResult.rows[0].surcharges)
+              console.log(`DEBUG: Parsed surcharge amount: ${fetchedAmount}`)
+              if (!isNaN(fetchedAmount) && fetchedAmount > 0) {
+                surchargeAmount = fetchedAmount
+                console.log(`SUCCESS: Fetched surcharge amount: ${surchargeAmount} for container ${container.containerNum || 'unnamed'}`)
+              } else {
+                console.log(`DEBUG: Surcharge amount is NaN or <= 0: ${fetchedAmount}`)
+              }
+            } else {
+              console.log(`DEBUG: No surcharges value in database row`)
+            }
+          } else {
+            console.log(`DEBUG: No matching rates found in m5_client_rate table`)
+          }
+        } catch (error) {
+          console.error(`Error fetching surcharge amount for container ${container.containerNum || 'unnamed'}:`, error)
+          // Continue with surchargeAmount = 0 on error
+        }
+      } else if (addSurcharges) {
+        console.log(`WARN: Surcharge requested but missing parameters. clientId=${clientId}, pickup=${pickup}, dropoff=${dropoff}`)
+      }
+
       const containerValues = [
         container.containerNum || container.containernum || "",
         sanitizedWeight, // Will be null for empty/invalid values
@@ -337,14 +400,113 @@ export const saveInstruction = async ({ controllerData, containerData }) => {
         container.container_type || container.containerType || "",
         container.cargo_description || container.cargoDescription || "",
         container["Hazardous"] || container.hazardous || false,
-        container["Add Surcharges"] || container.surcharges || false,
-        (container["Add Surcharges"] || container.surcharges) ? (container["Surcharge Amount"] || fields.surchargesAmount || 0) : 0, // Use container surcharge amount or the global surcharge amount if surcharges are enabled
+        addSurcharges,
+        surchargeAmount, // Backend-calculated surcharge amount
       ]
       await client.query(containerQuery, containerValues)
     }
 
+    // After all containers are processed with surcharge amounts, recalculate total cost
+    const containersWithSurcharges = []
+    for (const container of containerData) {
+      const addSurcharges = container["Add Surcharges"] || container.addSurcharges || false
+      let surchargeAmount = 0
+      
+      if (addSurcharges) {
+        // Re-fetch the surcharge amount that was calculated above
+        const clientId = controllerData.client || controllerData.clientId
+        const pickup = controllerData.pickup || controllerData.selectedStartingPoint || (Array.isArray(controllerData.startingPoints) ? null : controllerData.startingPoints)
+        const dropoff = controllerData.dropoff || controllerData.selectedDestination || (Array.isArray(controllerData.destinations) ? null : controllerData.destinations)
+        
+        if (clientId && pickup && dropoff) {
+          try {
+            const surchargeQuery = `
+              SELECT surcharges
+              FROM public.m5_client_rate
+              WHERE clientid = $1
+                AND starting_point = $2
+                AND destination = $3
+              ORDER BY client_rate_id DESC
+              LIMIT 1
+            `
+            const surchargeResult = await client.query(surchargeQuery, [clientId, pickup, dropoff])
+            
+            if (surchargeResult.rows.length > 0 && surchargeResult.rows[0].surcharges) {
+              const fetchedAmount = Number.parseFloat(surchargeResult.rows[0].surcharges)
+              if (!isNaN(fetchedAmount) && fetchedAmount > 0) {
+                surchargeAmount = fetchedAmount
+              }
+            }
+          } catch (error) {
+            console.error(`Error re-fetching surcharge for total calculation:`, error)
+          }
+        } else {
+          console.log(`WARN: Recalc surcharge requested but missing parameters. clientId=${clientId}, pickup=${pickup}, dropoff=${dropoff}`)
+        }
+      }
+      
+      containersWithSurcharges.push({
+        "Add Surcharges": addSurcharges,
+        "Surcharge Amount": surchargeAmount
+      })
+    }
+
+    // Calculate total cost including surcharges (local implementation)
+    const calculateTotalCostWithSurcharges = (instructionData, containers = []) => {
+      const rateWeight = instructionData.rateweight || instructionData.rateWeight || "Container"
+      
+      let baseCost = 0
+
+      if (rateWeight === "Container") {
+        // Container-based calculation
+        const numSix = Number(instructionData.num_six_meters || 0)
+        const numTwelve = Number(instructionData.num_twelve_meters || 0)
+        const numAbnormal = Number(instructionData.num_abnormal || 0)
+        const numBreakBulk = Number(instructionData.num_breakbulk || 0)
+
+        const ratePer6 = numSix > 0 ? Number(instructionData.rateper_6 || 0) : 0
+        const ratePer12 = numTwelve > 0 ? Number(instructionData.rateper_12 || 0) : 0
+        const ratePerAbnormal = numAbnormal > 0 ? Number(instructionData.rateper_abnormal || 0) : 0
+        const ratePerBreakBulk = numBreakBulk > 0 ? Number(instructionData.rateper_breakbulk || 0) : 0
+
+        baseCost = ratePer6 * numSix + ratePer12 * numTwelve + ratePerAbnormal * numAbnormal + ratePerBreakBulk * numBreakBulk
+      } else {
+        // Weight-based calculation (kg, ton, m³)
+        const weight = Number(instructionData.weight || 0)
+        const unitRate = Number(instructionData.unitrate || 0)
+        baseCost = weight * unitRate
+      }
+
+      // Calculate total surcharge from containers
+      const totalSurchargeAmount = containers.reduce((total, container) => {
+        if (container["Add Surcharges"] && container["Surcharge Amount"]) {
+          return total + Number(container["Surcharge Amount"] || 0)
+        }
+        return total
+      }, 0)
+
+      const totalCost = baseCost + totalSurchargeAmount
+      return Number(totalCost.toFixed(2))
+    }
+    
+    const recalculatedTotalCost = calculateTotalCostWithSurcharges(controllerData, containersWithSurcharges)
+    
+    console.log(`DEBUG: Original total cost: ${controllerData.total_cost}`)
+    console.log(`DEBUG: Recalculated total cost with surcharges: ${recalculatedTotalCost}`)
+    
+    // Update the total cost in the database if it changed
+    if (Math.abs(recalculatedTotalCost - Number(controllerData.total_cost)) > 0.01) {
+      console.log(`DEBUG: Updating total cost from ${controllerData.total_cost} to ${recalculatedTotalCost}`)
+      const updateTotalCostQuery = `
+        UPDATE public.m1_controller 
+        SET total_cost = $1 
+        WHERE m1key = $2
+      `
+      await client.query(updateTotalCostQuery, [recalculatedTotalCost, m1key])
+    }
+
     await client.query("COMMIT")
-    return { m1key }
+    return { m1key, finalTotalCost: recalculatedTotalCost }
   } catch (error) {
     await client.query("ROLLBACK")
     throw error
