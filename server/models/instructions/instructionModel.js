@@ -1084,6 +1084,7 @@ export const getInstructionById = async (instructionId) => {
         container_type,
         cargo_description,
         m1key,
+        file_ref,
         "Hazardous",
         "Add Surcharges",
         "Surcharge Amount"
@@ -1103,6 +1104,7 @@ export const getInstructionById = async (instructionId) => {
               'weight', c.weight,
               'container_type', c.container_type,
               'cargo_description', c.cargo_description,
+              'file_ref', c.file_ref,
               'm1key', c.m1key,
               'Hazardous', COALESCE(c."Hazardous", false),
               'Add Surcharges', COALESCE(c."Add Surcharges", false),
@@ -1279,10 +1281,15 @@ export const updateContainersByInstructionId = async (
       );
 
       const insertQuery = `
-        INSERT INTO public.container (containernum, weight, m1key, container_type, cargo_description, "Hazardous", "Add Surcharges", "Surcharge Amount")
-        VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+        INSERT INTO public.container (containernum, weight, m1key, container_type, cargo_description, "Hazardous", "Add Surcharges", "Surcharge Amount", file_ref)
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
         RETURNING containerkey
       `;
+      // Get file_ref value from container with proper fallback
+      const fileRef = container.file_ref || container.fileRef || "";
+      
+      console.log(`File Reference for container: ${fileRef}`);
+      
       const values = [
         containerNum,
         sanitizedWeight,
@@ -1292,6 +1299,7 @@ export const updateContainersByInstructionId = async (
         hazardous,
         addSurcharges,
         surchargeAmount,
+        fileRef, // Add file_ref to query values
       ];
 
       const result = await client.query(insertQuery, values);
@@ -1708,6 +1716,7 @@ const compareContainers = (currentContainers, newContainers) => {
             Hazardous: newHazardous,
             "Add Surcharges": newAddSurcharges,
             "Surcharge Amount": newSurchargeAmount,
+            file_ref: newContainer.file_ref || "", // Add file_ref field to update
           });
         }
       } else {
@@ -2211,6 +2220,7 @@ export const updateFCInstructionAndContainers = async (
           weight: sanitizedWeight,
           container_type: container.container_type,
           cargo_description: container.cargo_description,
+          file_ref: container.file_ref || "",
           "Add Surcharges":
             container["Add Surcharges"] || container.addSurcharges || false,
           Hazardous: container["Hazardous"] || container.hazardous || false,
@@ -2224,7 +2234,7 @@ export const updateFCInstructionAndContainers = async (
 
       const updateQuery = `
         UPDATE public.container 
-        SET containernum = $1, weight = $2, container_type = $3, cargo_description = $4, "Add Surcharges" = $5, "Hazardous" = $6, "Surcharge Amount" = $7, "Hazardous Amount" = $8
+        SET containernum = $1, weight = $2, container_type = $3, cargo_description = $4, "Add Surcharges" = $5, "Hazardous" = $6, "Surcharge Amount" = $7, "Hazardous Amount" = $8, file_ref = $10
         WHERE containerkey = $9
       `;
       const updateResult = await client.query(updateQuery, [
@@ -2237,6 +2247,7 @@ export const updateFCInstructionAndContainers = async (
         container["Surcharge Amount"] || container.surchargeAmount || 0,
         hazardousAmount, // Use the hazardous amount we fetched or calculated
         container.containerkey,
+        container.file_ref || "", // Add file_ref parameter
       ]);
       console.log(
         `[${new Date().toISOString()}] [MODEL] Container ${
@@ -2335,8 +2346,8 @@ export const updateFCInstructionAndContainers = async (
         container.cargoDescription || container.cargo_description || "";
 
       const insertQuery = `
-        INSERT INTO public.container (containernum, weight, m1key, container_type, cargo_description, "Add Surcharges", "Hazardous", "Surcharge Amount", "Hazardous Amount")
-        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+        INSERT INTO public.container (containernum, weight, m1key, container_type, cargo_description, "Add Surcharges", "Hazardous", "Surcharge Amount", "Hazardous Amount", file_ref)
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
         RETURNING containerkey
       `;
       const insertResult = await client.query(insertQuery, [
@@ -2349,11 +2360,12 @@ export const updateFCInstructionAndContainers = async (
         container["Hazardous"] || container.hazardous || false,
         container["Surcharge Amount"] || container.surchargeAmount || 0,
         hazardousAmount,
+        container.file_ref || "", // Add file_ref parameter
       ]);
       console.log(
         `[${new Date().toISOString()}] [MODEL] Inserted new container ${
           insertResult.rows[0].containerkey
-        } with hazardous=${isHazardous}, hazardousAmount=${hazardousAmount}`
+        } with hazardous=${isHazardous}, hazardousAmount=${hazardousAmount}, file_ref=${container.file_ref || ""}`
       );
     }
 

@@ -269,6 +269,7 @@ const FCcontrollerinstructions = () => {
         id: containerId++,
         containerKey: null,
         containerNum: "",
+        fileRef: "", // Added fileRef field
         weight:
           isImport ||
           String(formData.shipmentTypeId) === "2" ||
@@ -290,6 +291,7 @@ const FCcontrollerinstructions = () => {
         id: containerId++,
         containerKey: null,
         containerNum: "",
+        fileRef: "", // Added fileRef field
         weight:
           isImport ||
           String(formData.shipmentTypeId) === "2" ||
@@ -311,6 +313,7 @@ const FCcontrollerinstructions = () => {
         id: containerId++,
         containerKey: null,
         containerNum: "",
+        fileRef: "", // Added fileRef field
         weight:
           isImport ||
           String(formData.shipmentTypeId) === "2" ||
@@ -332,6 +335,7 @@ const FCcontrollerinstructions = () => {
         id: containerId++,
         containerKey: null,
         containerNum: "",
+        fileRef: "", // Added fileRef field
         weight:
           isImport ||
           String(formData.shipmentTypeId) === "2" ||
@@ -353,6 +357,10 @@ const FCcontrollerinstructions = () => {
 
   // Handle container input change with real-time validation
   const handleContainerChange = (id, field, value) => {
+    // Handle both camelCase and snake_case for file reference field
+    if (field === "file_ref") {
+      field = "fileRef"; // Convert to camelCase for consistency
+    }
     if (field === "containerNum") {
       // Get the current container
       const container = containers.find((c) => c.id === id);
@@ -381,6 +389,21 @@ const FCcontrollerinstructions = () => {
 
       // Clear error when user starts typing
       clearContainerFieldError(id, "container");
+    } else if (field === "fileRef") {
+      // Limit file reference to 20 characters (no special validation needed)
+      if (value.length > 20) {
+        return;
+      }
+      
+      // Update the container fileRef value
+      setContainers((prevContainers) =>
+        prevContainers.map((container) =>
+          container.id === id ? { ...container, fileRef: value } : container
+        )
+      );
+      setIsContainerDataModified(true);
+      console.log(`📄 Updated File Reference for container ${id} to: ${value}`);
+      // Don't return - allow the function to continue processing
     }
 
     if (field === "weight") {
@@ -1222,6 +1245,7 @@ const FCcontrollerinstructions = () => {
               return {
                 containerKey: container.containerKey, // Important for smart updates
                 containernum: container.containerNum || "",
+                file_ref: container.fileRef || "", // Added fileRef field
                 weight: sanitizedWeight, // Will be null for empty/invalid values
                 container_type: container.containerType || "",
                 cargo_description: container.cargoDescription || "",
@@ -1238,12 +1262,14 @@ const FCcontrollerinstructions = () => {
         console.log(`Container ${index}:`, {
           containerKey: container.containerKey,
           containernum: container.containernum,
+          file_ref: container.file_ref,
           "Add Surcharges": container["Add Surcharges"],
           "Surcharge Amount": container["Surcharge Amount"],
           "Hazardous": container["Hazardous"],
           addSurchargesType: typeof container["Add Surcharges"],
           surchargeAmountType: typeof container["Surcharge Amount"],
-          hazardousType: typeof container["Hazardous"]
+          hazardousType: typeof container["Hazardous"],
+          fileRefType: typeof container.file_ref
         });
       });
 
@@ -1412,12 +1438,17 @@ const FCcontrollerinstructions = () => {
             id: container.containerkey || index + 1,
             containerKey: container.containerkey,
             containerNum: container.containernum || "",
+            fileRef: container.file_ref || "", // Added fileRef mapping
             weight:
               container.weight !== null && container.weight !== undefined
                 ? container.weight
                 : null,
             containerType: container.container_type || "6m",
             cargoDescription: container.cargo_description || "",
+            hazardous: container.Hazardous || false,
+            addSurcharges: container["Add Surcharges"] || false,
+            surchargeAmount: container["Surcharge Amount"] || 0,
+            hazardousAmount: container["Hazardous Amount"] || 0,
           }));
 
           console.log("Setting containers from API:", containersList);
@@ -1828,6 +1859,10 @@ const FCcontrollerinstructions = () => {
             weight_type: typeof c.weight,
             container_type: c.container_type,
             cargo_description: c.cargo_description,
+            // Log file_ref field from container data
+            file_ref: c.file_ref,
+            file_ref_exists: 'file_ref' in c,
+            file_ref_type: typeof c.file_ref,
             // Log the exact property names and values for surcharge flags
             hazardous_flag: c["Hazardous"],
             hazardous_flag_type: typeof c["Hazardous"],
@@ -1927,6 +1962,7 @@ const FCcontrollerinstructions = () => {
             id: container.containerkey || index + 1,
             containerKey: container.containerkey,
             containerNum: container.containernum || "",
+            fileRef: container.file_ref || "", // Add file_ref field from database
             weight: weightValue,
             containerType: container.container_type || "6m",
             cargoDescription: container.cargo_description || "",
@@ -4411,8 +4447,20 @@ const FCcontrollerinstructions = () => {
                             borderBottom: "2px solid #ddd",
                           }}
                         >
-                          {String(formData.shipmentTypeId) === "2" ? "File Reference" : "Container Number"}
+                          Container Number
                         </th>
+                        {/* Add File Reference header for export shipments */}
+                        {String(formData.shipmentTypeId) === "2" && (
+                          <th
+                            style={{
+                              padding: "12px 8px",
+                              textAlign: "left",
+                              borderBottom: "2px solid #ddd",
+                            }}
+                          >
+                            File Reference
+                          </th>
+                        )}
                         {/* Force string comparison for shipmentTypeId */}
                         {(isImport ||
                           String(formData.shipmentTypeId) === "2" ||
@@ -4506,6 +4554,29 @@ const FCcontrollerinstructions = () => {
                               )}
                             </div>
                           </td>
+                          {/* Add File Reference field only for export shipments */}
+                          {String(formData.shipmentTypeId) === "2" && (
+                            <td>
+                              <div className="controller-instructions-input-wrapper">
+                                <input
+                                  type="text"
+                                  className="controller-instructions-form-input"
+                                  value={container.fileRef}
+                                  onChange={(e) =>
+                                    handleContainerChange(
+                                      container.id,
+                                      "fileRef",
+                                      e.target.value
+                                    )
+                                  }
+                                  placeholder="Enter file reference"
+                                  maxLength={20}
+                                  disabled={isReadOnly}
+                                  style={isReadOnly ? readOnlyStyle : {}}
+                                />
+                              </div>
+                            </td>
+                          )}
                           {/* Force string comparison for shipmentTypeId */}
                           {(isImport ||
                             String(formData.shipmentTypeId) === "2" ||
