@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import api from "../../../api";
+import Pagination from "../../../components/Pagination"; // Import the Pagination component
 import "../css/AddOnList.css";
 
 const AddOnList = () => {
@@ -118,66 +119,6 @@ const AddOnList = () => {
     });
   };
 
-  // Pagination calculations
-  const totalRecords = addOns.length;
-  const totalPages = Math.ceil(totalRecords / recordsPerPage);
-  const startIndex = (currentPage - 1) * recordsPerPage;
-  const endIndex = startIndex + recordsPerPage;
-  const currentRecords = addOns.slice(startIndex, endIndex);
-
-  // Pagination handlers
-  const goToPage = (pageNumber) => {
-    setCurrentPage(pageNumber);
-  };
-
-  const goToPreviousPage = () => {
-    if (currentPage > 1) {
-      setCurrentPage(currentPage - 1);
-    }
-  };
-
-  const goToNextPage = () => {
-    if (currentPage < totalPages) {
-      setCurrentPage(currentPage + 1);
-    }
-  };
-
-  // Generate page numbers for pagination
-  const getPageNumbers = () => {
-    const pageNumbers = [];
-    const maxVisiblePages = 5;
-
-    if (totalPages <= maxVisiblePages) {
-      for (let i = 1; i <= totalPages; i++) {
-        pageNumbers.push(i);
-      }
-    } else {
-      if (currentPage <= 3) {
-        for (let i = 1; i <= 4; i++) {
-          pageNumbers.push(i);
-        }
-        pageNumbers.push("...");
-        pageNumbers.push(totalPages);
-      } else if (currentPage >= totalPages - 2) {
-        pageNumbers.push(1);
-        pageNumbers.push("...");
-        for (let i = totalPages - 3; i <= totalPages; i++) {
-          pageNumbers.push(i);
-        }
-      } else {
-        pageNumbers.push(1);
-        pageNumbers.push("...");
-        for (let i = currentPage - 1; i <= currentPage + 1; i++) {
-          pageNumbers.push(i);
-        }
-        pageNumbers.push("...");
-        pageNumbers.push(totalPages);
-      }
-    }
-
-    return pageNumbers;
-  };
-
   if (loading)
     return (
       <div className="add-on-list-wrapper">
@@ -236,11 +177,6 @@ const AddOnList = () => {
             </div>
           </div>
         </div>
-        {/* Pagination Info */}
-        <div className="pagination-info">
-          Showing {startIndex + 1} to {Math.min(endIndex, totalRecords)} of{" "}
-          {totalRecords} add-ons
-        </div>
         <table className="payment-table1">
           <thead>
             <tr>
@@ -251,8 +187,12 @@ const AddOnList = () => {
             </tr>
           </thead>
           <tbody>
-            {currentRecords.length > 0 ? (
-              currentRecords.map((addon, index) => (
+            {addOns
+              .slice(
+                (currentPage - 1) * recordsPerPage,
+                currentPage * recordsPerPage
+              )
+              .map((addon, index) => (
                 <tr key={addon.addon_id || index}>
                   <td>{new Date(addon.date).toLocaleDateString()}</td>
                   <td>R{addon.amount.toLocaleString()}</td>
@@ -262,66 +202,20 @@ const AddOnList = () => {
                       className="view-button"
                       onClick={() => handleViewAddOn(addon.addon_id)}
                     >
-                      View Details
+                      View
                     </button>
                   </td>
                 </tr>
-              ))
-            ) : (
+              ))}
+            {addOns.length === 0 && (
               <tr>
-                <td colSpan="6" className="p-3 text-center">
+                <td colSpan="4" className="p-3 text-center">
                   No add-ons found
                 </td>
               </tr>
             )}
           </tbody>
         </table>
-        {/* Pagination Controls */}
-        {totalPages > 1 && (
-          <div className="pagination-container">
-            <div className="pagination-controls">
-              <button
-                className="pagination-btn prev-btn"
-                onClick={goToPreviousPage}
-                disabled={currentPage === 1}
-              >
-                ← Previous
-              </button>
-
-              <div className="pagination-numbers">
-                {getPageNumbers().map((pageNum, index) => (
-                  <span key={index}>
-                    {pageNum === "..." ? (
-                      <span className="pagination-ellipsis">...</span>
-                    ) : (
-                      <button
-                        className={`pagination-number ${
-                          currentPage === pageNum ? "active" : ""
-                        }`}
-                        onClick={() => goToPage(pageNum)}
-                      >
-                        {pageNum}
-                      </button>
-                    )}
-                  </span>
-                ))}
-              </div>
-
-              <button
-                className="pagination-btn next-btn"
-                onClick={goToNextPage}
-                disabled={currentPage === totalPages}
-              >
-                Next →
-              </button>
-            </div>
-
-            <div className="pagination-summary">
-              Page {currentPage} of {totalPages}
-            </div>
-          </div>
-        )}
-
         {roleId == 3 && (
           <div
             className="upload-section"
@@ -332,6 +226,12 @@ const AddOnList = () => {
             </button>
           </div>
         )}
+        <Pagination
+          totalRecords={addOns.length}
+          recordsPerPage={recordsPerPage}
+          currentPage={currentPage}
+          onPageChange={setCurrentPage}
+        />
       </div>
     </div>
   );
