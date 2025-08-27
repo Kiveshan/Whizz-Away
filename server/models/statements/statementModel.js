@@ -69,7 +69,7 @@ const getStatementDetails = async (statementId) => {
         i.ikey,
         i.date AS invoice_date,
         m1.total_cost AS invoice_amount,
-        m1.task AS invoice_task,
+        m1."ksmFileRef" AS invoice_task,
         m1.pickup,
         m1.dropoff,
         i.invoice_num,

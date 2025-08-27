@@ -11,7 +11,7 @@ const getCompletedInvoices = async ({ year, month, type, clientId }) => {
     let queryText = `
       SELECT 
         m1.m1key, 
-        m1.task as instruction_no, 
+        m1."ksmFileRef" as instruction_no, 
         s.shipmenttype as shipment_type, 
         m1.fileref as file_no, 
         m1.status,
@@ -78,7 +78,7 @@ const getInvoiceDetails = async (id) => {
     const queryText = `
       SELECT 
         m1.m1key,
-        m1.task as instruction_no,
+        m1."ksmFileRef" as instruction_no,
         s.shipmenttype as shipment_type,
         m1.fileref as file_no,
         c.client as client_name,
