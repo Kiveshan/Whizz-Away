@@ -134,10 +134,36 @@ const getStatementDetails = async (statementId) => {
         p.clientid = $1
         AND p.fileupload BETWEEN $2 AND $3
     `;
-    const paymentsResult = await query(paymentsQuery, [
-      clientId,
-      formattedPaymentStartDate,
-      formattedPaymentEndDate,
+    const creditNotesQuery = `
+      SELECT 
+        cn.creditnote_id,
+        cn.creditnote_date AS date,
+        SUM(cn_amount.amount) AS amount,
+        cn.doc_no AS reference,
+        cn.description
+      FROM 
+        credit_notes cn
+      CROSS JOIN LATERAL unnest(cn.amount) AS cn_amount(amount)
+      WHERE 
+        cn.client_id = $1
+        AND cn.creditnote_date BETWEEN $2 AND $3
+      GROUP BY 
+        cn.creditnote_id,
+        cn.creditnote_date,
+        cn.doc_no,
+        cn.description
+    `;
+    const [paymentsResult, creditNotesResult] = await Promise.all([
+      query(paymentsQuery, [
+        clientId,
+        formattedPaymentStartDate,
+        formattedPaymentEndDate,
+      ]),
+      query(creditNotesQuery, [
+        clientId,
+        formattedPaymentStartDate,
+        formattedPaymentEndDate,
+      ]),
     ]);
 
     const payments = paymentsResult.rows.map((row) => ({
@@ -148,12 +174,29 @@ const getStatementDetails = async (statementId) => {
       invoice_num: row.invoice_num || "",
     }));
 
+    const creditNotes = creditNotesResult.rows.map((row) => ({
+      creditnote_id: row.creditnote_id,
+      date: row.date,
+      amount: Number.parseFloat(row.amount || 0),
+      reference: row.doc_no || "",
+      description: row.description || "",
+    }));
+
     console.log(
       `Fetched ${payments.length} payments for client ${clientId} between ${formattedPaymentStartDate} and ${formattedPaymentEndDate}`
+    );
+    console.log(
+      `Fetched ${creditNotes.length} credit notes for client ${clientId} between ${formattedPaymentStartDate} and ${formattedPaymentEndDate}`
     );
 
     if (payments.length > 0) {
       console.log("Sample payment data:", JSON.stringify(payments[0], null, 2));
+    }
+    if (creditNotes.length > 0) {
+      console.log(
+        "Sample credit note data:",
+        JSON.stringify(creditNotes[0], null, 2)
+      );
     }
 
     const statementData = {
@@ -196,6 +239,7 @@ const getStatementDetails = async (statementId) => {
           items: row.addon_items,
         })),
       payments: payments,
+      credit_notes: creditNotes,
     };
 
     return { success: true, data: statementData };

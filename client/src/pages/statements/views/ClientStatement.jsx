@@ -180,7 +180,8 @@ const ClientStatement = () => {
   if (
     statement.invoices.length === 0 &&
     statement.addons.length === 0 &&
-    statement.payments.length === 0
+    statement.payments.length === 0 &&
+    statement.credit_notes?.length === 0
   )
     return (
       <div className="client-statement-wrapper">
@@ -188,7 +189,7 @@ const ClientStatement = () => {
       </div>
     );
 
-  // Calculate totals (include payments)
+  // Calculate totals (include payments and credit notes)
   const invoicedAmount =
     statement.invoices.reduce((sum, inv) => sum + inv.amount, 0) +
     statement.addons.reduce((sum, addon) => sum + addon.amount, 0);
@@ -196,8 +197,14 @@ const ClientStatement = () => {
     (sum, payment) => sum + payment.amount,
     0
   );
+  const creditNotesAmount =
+    statement.credit_notes?.reduce(
+      (sum, creditNote) => sum + creditNote.amount,
+      0
+    ) || 0;
+  const totalAmountPaid = amountPaid + creditNotesAmount;
   const openingBalance = statement.opening_balance; // Use the stored opening balance
-  const balanceDue = openingBalance - amountPaid + invoicedAmount;
+  const balanceDue = openingBalance - totalAmountPaid + invoicedAmount;
 
   // Helper function to format invoice and addon details
   const formatDetails = (item, type) => {
@@ -217,11 +224,14 @@ const ClientStatement = () => {
     } else if (type === "Add-on") {
       console.log("Addon details:", { item }); // Debug log
       return item.description || item.invoice_num || `Add-on #${item.addon_id}`;
+    } else if (type === "Credit Note") {
+      console.log("Credit Note details:", { item }); // Debug log
+      return item.description || `Credit Note #${item.credit_note_id}`;
     }
     return "";
   };
 
-  // Combine invoices, addons, and payments into a single transactions array
+  // Combine invoices, addons, payments, and credit notes into a single transactions array
   const transactions = [
     ...statement.invoices.map((invoice) => ({
       type: "Invoice",
@@ -250,10 +260,18 @@ const ClientStatement = () => {
         payment: payment.amount,
       };
     }),
+    ...(statement.credit_notes || []).map((creditNote) => {
+      console.log("Processing credit note:", creditNote); // Debug log
+      return {
+        type: "Credit Note",
+        date: new Date(creditNote.date),
+        details: formatDetails(creditNote, "Credit Note"),
+        reference: creditNote.reference || "", // Credit note reference
+        amount: null,
+        payment: creditNote.amount, // Credit notes reduce the balance like payments
+      };
+    }),
   ].sort((a, b) => a.date - b.date); // Sort by date
-
-  // Debug log for transactions
-  console.log("Final transactions array:", transactions);
 
   // Calculate running balance
   let runningBalance = openingBalance; // Start with the opening balance
@@ -323,7 +341,9 @@ const ClientStatement = () => {
                   </tr>
                   <tr>
                     <td className="summary-label">Amount Paid</td>
-                    <td className="summary-value">R{amountPaid.toFixed(2)}</td>
+                    <td className="summary-value">
+                      R{totalAmountPaid.toFixed(2)}
+                    </td>
                   </tr>
                   <tr>
                     <td className="summary-label">Balance Due:</td>
