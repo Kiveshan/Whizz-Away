@@ -2,7 +2,6 @@ import { pool, query } from "../../config/database.js";
 
 const getProfitLossData = async (month, year) => {
   const monthNum = new Date(`${month} 1, ${year}`).getMonth() + 1;
-  //I need to add Add ons
   const profitQuery = `
     SELECT 
       'Invoice' AS source,
@@ -18,8 +17,14 @@ const getProfitLossData = async (month, year) => {
       amount
     FROM payment_m3
     WHERE EXTRACT(MONTH FROM fileupload) = $1 AND EXTRACT(YEAR FROM fileupload) = $2
+    UNION ALL
+    SELECT 
+      'Add-on' AS source,
+      date,
+      amount
+    FROM add_ons
+    WHERE EXTRACT(MONTH FROM date) = $1 AND EXTRACT(YEAR FROM date) = $2
   `;
-  // I need to add Credit notes
   const lossQuery = `
     SELECT 
       'Expense' AS source,
@@ -47,6 +52,13 @@ const getProfitLossData = async (month, year) => {
       driverrate AS amount
     FROM legs_m2
     WHERE EXTRACT(MONTH FROM date) = $1 AND EXTRACT(YEAR FROM date) = $2
+    UNION ALL
+    SELECT 
+      'Credit Note' AS source,
+      creditnote_date AS date,
+      amount[1] AS amount
+    FROM credit_notes
+    WHERE EXTRACT(MONTH FROM creditnote_date) = $1 AND EXTRACT(YEAR FROM creditnote_date) = $2
   `;
 
   try {
