@@ -16,6 +16,9 @@ const DirectorDebtors = () => {
     navigate("/DirectorFinancialDocumentsView");
   };
 
+  const handleAddOnClick = () => {
+    navigate("/view-client-list");
+  };
   return (
     <div className="debtors-container">
       <div className="header-actions">
@@ -39,6 +42,14 @@ const DirectorDebtors = () => {
           </div>
           <div className="card-title">
             <h3>Financial Documents</h3>
+          </div>
+        </div>
+        <div className="card" onClick={handleAddOnClick}>
+          <div className="card-image-container">
+            <img src="/images/Add-On's.jpg" alt="Add On" />
+          </div>
+          <div className="card-title">
+            <h3>Add On's</h3>
           </div>
         </div>
       </div>

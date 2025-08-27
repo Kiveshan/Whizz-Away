@@ -17,6 +17,7 @@ const ClientList = () => {
   const [clients, setClients] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const roleId = JSON.parse(localStorage.getItem("user")).roleid;
 
   // Pagination state
   const [currentPage, setCurrentPage] = useState(1);
@@ -104,12 +105,32 @@ const ClientList = () => {
       <div className="view-client-invoice-container">
         {/* Back Button */}
         <div className="client-payments-header">
-          <button
-            className="back-button"
-            onClick={() => navigate("/DebtorsDashboard")}
-          >
-            Back
-          </button>
+          {roleId == 3 && (
+            <button
+              className="back-button"
+              onClick={() => navigate("/DebtorsDashboard")}
+            >
+              Back
+            </button>
+          )}
+
+          {roleId == 1 && (
+            <button
+              className="back-button"
+              onClick={() => navigate("/debtors")}
+            >
+              Back
+            </button>
+          )}
+
+          {roleId == 4 && (
+            <button
+              className="back-button"
+              onClick={() => navigate("/DebtorsDashboard")}
+            >
+              Back
+            </button>
+          )}
         </div>
 
         {/* Table */}

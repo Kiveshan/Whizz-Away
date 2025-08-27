@@ -640,7 +640,7 @@ const AddOnForm = () => {
                   onClick={addItem}
                   className="add-item-button"
                 >
-                  + Add Item
+                  Add
                 </button>
               )}
             </div>
