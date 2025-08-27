@@ -13,6 +13,7 @@ const ClientRatesForm = ({ clientData, loading, onSave, onCancel }) => {
       hazardous: "",
     },
   ])
+  const [isFormValid, setIsFormValid] = useState(false)
 
   useEffect(() => {
     console.log("ClientRatesForm received clientData:", clientData)
@@ -43,6 +44,17 @@ const ClientRatesForm = ({ clientData, loading, onSave, onCancel }) => {
       }
     }
   }, [clientData])
+
+  useEffect(() => {
+    // Validate that each rate has starting_point, destination, and at least one of 6m_rate or 12m_rate
+    const isValid = rates.every(
+      (rate) =>
+        rate.starting_point.trim() &&
+        rate.destination.trim() &&
+        (rate["6m_rate"].toString().trim() || rate["12m_rate"].toString().trim()),
+    )
+    setIsFormValid(isValid)
+  }, [rates])
 
   if (loading) {
     return <div className="loading">Loading client rates...</div>
@@ -84,14 +96,11 @@ const ClientRatesForm = ({ clientData, loading, onSave, onCancel }) => {
 
   const handleSubmit = async (e) => {
     e.preventDefault()
-    const validRates = rates.filter(
-      (rate) => rate.starting_point.trim() && rate.destination.trim() && (rate["6m_rate"] || rate["12m_rate"]),
-    )
-    if (validRates.length === 0) {
-      alert("Please provide at least one complete rate with starting point, destination, and either 6m or 12m rate.")
+    if (!isFormValid) {
+      alert("Please provide at least one complete rate with starting point, destination, and either 6m or 12m rate for each route.")
       return
     }
-    const success = await onSave(validRates)
+    const success = await onSave(rates) // Send all rates since they're validated
     if (success) {
       // Form will be closed by parent component
     }
@@ -108,9 +117,6 @@ const ClientRatesForm = ({ clientData, loading, onSave, onCancel }) => {
       <div className="rates-section">
         <div className="rates-header">
           <h3>Client Rates</h3>
-          <button type="button" onClick={addRate} className="add-rate-button">
-            + Add Another Rate
-          </button>
         </div>
 
         {rateRows.map((row, rowIndex) => (
@@ -124,8 +130,9 @@ const ClientRatesForm = ({ clientData, loading, onSave, onCancel }) => {
                       type="button"
                       onClick={() => removeRate(rowIndex * 5 + index)}
                       className="remove-rate-button"
+                      aria-label="Remove rate"
                     >
-                      Remove
+                      🗑️
                     </button>
                   )}
                 </div>
@@ -224,7 +231,9 @@ const ClientRatesForm = ({ clientData, loading, onSave, onCancel }) => {
             {
               rates.filter(
                 (rate) =>
-                  rate.starting_point.trim() && rate.destination.trim() && (rate["6m_rate"] || rate["12m_rate"]),
+                  rate.starting_point.trim() &&
+                  rate.destination.trim() &&
+                  (rate["6m_rate"].toString().trim() || rate["12m_rate"].toString().trim()),
               ).length
             }
           </p>
@@ -233,11 +242,11 @@ const ClientRatesForm = ({ clientData, loading, onSave, onCancel }) => {
       </div>
 
       <div className="manage-button-container">
-        <button type="submit" className="manage-save-button" disabled={loading}>
-          {loading ? "Saving..." : "Save All Rates"}
+        <button type="submit" className="manage-save-button" disabled={loading || !isFormValid}>
+          {loading ? "Saving..." : "Save"}
         </button>
-        <button type="button" onClick={onCancel} className="manage-cancel-button">
-          Cancel
+        <button type="button" onClick={addRate} className="add-rate-button">
+          + Add
         </button>
       </div>
     </form>
