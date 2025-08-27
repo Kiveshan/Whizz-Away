@@ -431,3 +431,15 @@ body {
 .bin-icon-wrapper:hover svg {
   stroke: #b91c1c; /* Red-700 for the icon on hover */
 }
+/* Driver icon styling */
+.driver-icon {
+  width: 12px;
+  height: 12px;
+  margin-left: 0.25rem; /* Equivalent to ml-1 */
+  fill: none;
+  stroke: currentColor; /* Inherit color from parent (e.g., text-white or text-gray-800) */
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  vertical-align: middle; /* Ensure alignment with text */
+}

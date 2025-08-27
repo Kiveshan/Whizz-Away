@@ -49,43 +49,26 @@ if (month) {
   }
 };
 
-const getInstructions = async (clientId, { year, month }) => {
+const getInstructions = async (clientId) => {
   let client;
   try {
-    if (!pool) {
-      throw new Error("Database connection not established. Please try again later.");
-    }
     client = await pool.connect();
 
-    let queryText = `
+    const queryText = `
       SELECT m1key
       FROM m1_controller
       WHERE client = $1
+      ORDER BY m1key ASC
     `;
     const queryParams = [clientId];
-    let paramIndex = 2;
-
-    if (year) {
-      queryText += ` AND EXTRACT(YEAR FROM deadline) = $${paramIndex}`;
-      queryParams.push(year);
-      paramIndex++;
-    }
-    if (month) {
-      queryText += ` AND EXTRACT(MONTH FROM deadline) = $${paramIndex}`;
-      queryParams.push(month);
-      paramIndex++;
-    }
-
-    queryText += ` ORDER BY deadline ASC`;
 
     const result = await client.query(queryText, queryParams);
     return { success: true, data: result.rows };
-  } catch (error) {
-    throw error;
   } finally {
     if (client) client.release();
   }
 };
+
 
 const getContainers = async (m1key) => {
   let client;
@@ -214,7 +197,7 @@ const getInstructionDetails = async (m1key) => {
     client = await pool.connect();
 
     const queryText = `
-      SELECT dropoff, vessel_name, fileref
+      SELECT dropoff, vessel_name, "clientFileRef", vat
       FROM m1_controller
       WHERE m1key = $1
     `;

@@ -58,9 +58,40 @@ const CredClientList = () => {
     <div className="payment-client-wrapper">
       {/* Back Button */}
       <div className="client-payments-header">
-        <button className="back-button" onClick={() => navigate("/CreditorsDashboard")}>
-          Back
-        </button>
+<button
+  className="back-button"
+  onClick={() => {
+    let roleId = null;
+
+    const userData = localStorage.getItem("user");
+    if (userData) {
+      try {
+        roleId = JSON.parse(userData).roleid;
+      } catch (error) {
+        console.error("Error parsing user data:", error);
+      }
+    }
+
+    if (!roleId) {
+      roleId = Number(
+        localStorage.getItem("roleId") || localStorage.getItem("userRoleId")
+      );
+    }
+
+    // Navigate based on role
+    if (roleId === 8) {
+      navigate("/CreditorsDashboard");
+    } else if (roleId === 1 || roleId === 4) {
+      navigate("/DirectorCreditorsOther");
+    } else {
+      navigate("/CreditorsDashboard"); // fallback
+    }
+  }}
+>
+  Back
+</button>
+
+
       </div>
 
       {/* Loading and Error States */}

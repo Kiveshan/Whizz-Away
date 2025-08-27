@@ -14,19 +14,20 @@ const CreditNoteView = () => {
   const { clientId, clientName } = state || {};
   const creditNoteId = params.creditNoteId;
 
-  const [formData, setFormData] = useState({
-    accountNo: "",
-    documentNo: "",
-    documentDate: "",
-    instructionNo: "",
-    vessel: "",
-    destination: "",
-    refNo: "",
-    items: [],
-    subTotal: "",
-    vat: "",
-    totalAmount: "",
-  });
+const [formData, setFormData] = useState({
+  accountNo: "",
+  documentNo: "",
+  documentDate: "",
+  instructionNo: "",
+  vessel: "",
+  destination: "",
+  refNo: "",
+  items: [],
+  subTotal: "",
+  vat: "",
+  totalAmount: "",
+  vatRate: 0.15, // Default VAT rate, will be updated by instruction from DB
+});
   const [companyDetails, setCompanyDetails] = useState({
     companyname: "",
     company_reg_num: "",
@@ -43,48 +44,54 @@ const CreditNoteView = () => {
   const [clientError, setClientError] = useState(null);
 
   useEffect(() => {
-    const fetchCreditNote = async () => {
-      try {
-        setLoading(true);
-        const response = await api.get(`/api/credit-notes/by-id/${creditNoteId}`);
-        const creditNote = response.data.data || {};
+const fetchCreditNote = async () => {
+  try {
+    setLoading(true);
+    const response = await api.get(`/api/credit-notes/by-id/${creditNoteId}`);
+    const creditNote = response.data.data || {};
 
-        // Reconstruct items from arrays and description
-        const descriptions = creditNote.description ? creditNote.description.split('\n') : [];
-        const containernumArray = creditNote.containernum ? creditNote.containernum.split(', ') : [];
-        const items = creditNote.amount.map((amount, index) => ({
-          description: descriptions[index] || "",
-          containerNumber: containernumArray[index] || "",
-          total: amount.toFixed(2),
-        }));
-        // Fetch instruction details using m1key
-        let instructionDetails = {};
-        if (creditNote.m1key) {
-          const instructionResponse = await api.get(`/api/instruction-details/${creditNote.m1key}`);
-          instructionDetails = instructionResponse.data.data || {};
-        }
+    // Fetch instruction details using m1key
+    let instructionDetails = {};
+    if (creditNote.m1key) {
+      const instructionResponse = await api.get(`/api/instruction-details/${creditNote.m1key}`);
+      instructionDetails = instructionResponse.data.data || {};
+    }
 
-        setFormData({
-          accountNo: creditNote.account_no || "",
-          documentNo: creditNote.doc_no || "",
-          documentDate: creditNote.creditnote_date ? creditNote.creditnote_date.split('T')[0] : "",
-          instructionNo: creditNote.m1key || "",
-          vessel: instructionDetails.vessel_name || "",
-          destination: instructionDetails.dropoff || "",
-          refNo: instructionDetails.fileref || "",
-          items,
-          subTotal: creditNote.amount.reduce((sum, amt) => sum + (parseFloat(amt) || 0), 0).toFixed(2),
-          vat: (creditNote.amount.reduce((sum, amt) => sum + (parseFloat(amt) || 0), 0) * 0.15).toFixed(2),
-          totalAmount: (creditNote.amount.reduce((sum, amt) => sum + (parseFloat(amt) || 0), 0) * 1.15).toFixed(2),
-        });
+    // Reconstruct items from arrays and description
+    const descriptions = creditNote.description ? creditNote.description.split('\n') : [];
+    const containernumArray = creditNote.containernum ? creditNote.containernum.split(', ') : [];
+    const items = (creditNote.amount || []).map((amount, index) => ({
+      description: descriptions[index] || "",
+      containerNumber: containernumArray[index] || "",
+      total: parseFloat(amount).toFixed(2),
+    }));
 
-      } catch (err) {
-        setError("Failed to fetch credit note or instruction details");
-        console.error("Error fetching credit note or instruction details:", err);
-      } finally {
-        setLoading(false);
-      }
-    };
+    const subTotal = (creditNote.amount || []).reduce((sum, amt) => sum + (parseFloat(amt) || 0), 0);
+    const vatRate = instructionDetails.vat ? instructionDetails.vat / 100 : 0.15; // Pull VAT from DB and convert to decimal
+    const vat = subTotal * vatRate;
+    const totalAmount = subTotal + vat;
+
+    setFormData({
+      accountNo: creditNote.account_no || "",
+      documentNo: creditNote.doc_no || "",
+      documentDate: creditNote.creditnote_date ? creditNote.creditnote_date.split('T')[0] : "",
+      instructionNo: creditNote.m1key || "",
+      vessel: instructionDetails.vessel_name || "",
+      destination: instructionDetails.dropoff || "",
+      refNo: instructionDetails.clientFileRef || "", 
+      items,
+      subTotal: subTotal.toFixed(2),
+      vat: vat.toFixed(2),
+      totalAmount: totalAmount.toFixed(2),
+      vatRate, 
+    });
+  } catch (err) {
+    setError("Failed to fetch credit note or instruction details");
+    console.error("Error fetching credit note or instruction details:", err);
+  } finally {
+    setLoading(false);
+  }
+};
 
     const fetchCompanyDetails = async () => {
       try {
@@ -136,56 +143,43 @@ const handleDownloadPDF = async () => {
   }
 
   try {
-    // Temporarily hide the download button
-    const downloadButton = document.querySelector(".download-button-container");
-    if (downloadButton) {
-      downloadButton.classList.add("hidden-for-pdf");
-    }
-
-    // Capture the form container as a canvas
+    // Capture the form container as a canvas, excluding the download button
     const canvas = await html2canvas(element, {
-      scale: 2, // Increase resolution for better quality
+      scale: 2, // High resolution
       useCORS: true,
       logging: false,
+      ignoreElements: (el) => el.classList.contains("download-button-container"), // 👈 skip the button
     });
 
-    // Restore the download button visibility
-    if (downloadButton) {
-      downloadButton.classList.remove("hidden-for-pdf");
-    }
-
-    // Create a new jsPDF instance
+    // Create PDF
     const pdf = new jsPDF({
       orientation: "portrait",
       unit: "mm",
       format: "a4",
     });
 
-    // Calculate dimensions
-    const imgWidth = 190; // Width in mm (A4 is 210mm wide, leaving margins)
-    const pageHeight = 297; // A4 height in mm
+    const imgWidth = 190;
+    const pageHeight = 297;
     const imgHeight = (canvas.height * imgWidth) / canvas.width;
     let heightLeft = imgHeight;
-    let position = 10; // Start position (top margin)
+    let position = 10;
 
-    // Add the first page
     pdf.addImage(canvas.toDataURL("image/png"), "PNG", 10, position, imgWidth, imgHeight);
 
-    // Handle multi-page PDF if content exceeds one page
-    heightLeft -= pageHeight - 20; // Account for margins
+    heightLeft -= pageHeight - 20;
     while (heightLeft > 0) {
       pdf.addPage();
-      position = heightLeft - imgHeight + 10; // Adjust position for new page
+      position = heightLeft - imgHeight + 10;
       pdf.addImage(canvas.toDataURL("image/png"), "PNG", 10, position, imgWidth, imgHeight);
       heightLeft -= pageHeight - 20;
     }
 
-    // Download the PDF
     pdf.save(`Credit_Note_${formData.documentNo || creditNoteId}.pdf`);
   } catch (err) {
     console.error("Error generating PDF:", err);
   }
 };
+
 
   if (loading) {
     return <div>Loading credit note...</div>;
@@ -359,13 +353,13 @@ const handleDownloadPDF = async () => {
               </div>
             </div>
 
-            <div className="form-group">
-              <label htmlFor="vat">VAT(15%)</label>
-              <div className="input-with-currency">
-                <span className="currency-symbol">R</span>
-                <input type="text" id="vat" value={formData.vat} readOnly placeholder="0.00" />
+              <div className="form-group">
+                <label htmlFor="vat">VAT ({(formData.vatRate * 100).toFixed(0)}%)</label>
+                <div className="input-with-currency">
+                  <span className="currency-symbol">R</span>
+                  <input type="text" id="vat" value={formData.vat} readOnly placeholder="0.00" />
+                </div>
               </div>
-            </div>
 
             <div className="form-group">
               <label htmlFor="totalAmount">Total</label>

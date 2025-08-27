@@ -19,7 +19,7 @@ const CreditNoteList = () => {
     year: currentDate.getFullYear().toString(),
     month: (currentDate.getMonth() + 1).toString(),
   });
-
+const [roleId, setRoleId] = useState(null);
   const [currentPage, setCurrentPage] = useState(1);
   const recordsPerPage = 5;
 
@@ -48,7 +48,21 @@ const CreditNoteList = () => {
     "November",
     "December",
   ];
-
+useEffect(() => {
+  let rId = null;
+  const userData = localStorage.getItem("user");
+  if (userData) {
+    try {
+      rId = JSON.parse(userData).roleid;
+    } catch (error) {
+      console.error("Error parsing user data:", error);
+    }
+  }
+  if (!rId) {
+    rId = Number(localStorage.getItem("roleId") || localStorage.getItem("userRoleId"));
+  }
+  setRoleId(rId);
+}, []);
   useEffect(() => {
     if (!clientId) {
       setError("No client selected");
@@ -314,14 +328,17 @@ const CreditNoteList = () => {
           </div>
         )}
 
-        <div
-          className="upload-section"
-          style={{ marginTop: "20px", textAlign: "center" }}
-        >
-          <button className="upload-button" onClick={handleUpload}>
-            Add Credit Note
-          </button>
-        </div>
+          {roleId !== 1 && roleId !== 4 && (
+            <div
+              className="upload-section"
+              style={{ marginTop: "20px", textAlign: "center" }}
+            >
+              <button className="upload-button" onClick={handleUpload}>
+                Add Credit Note
+              </button>
+            </div>
+          )}
+
       </div>
     </div>
   );

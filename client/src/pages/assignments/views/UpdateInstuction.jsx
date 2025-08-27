@@ -2475,9 +2475,16 @@ useEffect(() => {
           Leg {index + 1}
           {leg.isNew || leg.id?.toString().startsWith("temp-") ? " *" : ""}
           {leg.drivers && leg.drivers.length > 0 && (
-            <span className="ml-2 text-xs">
-              ({leg.drivers.length} driver
-              {leg.drivers.length !== 1 ? "s" : ""})
+<span className="ml-2 text-xs flex items-center">
+              ({leg.drivers.length}{" "}
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                viewBox="0 0 24 24"
+                className="driver-icon"
+              >
+                <circle cx="12" cy="7" r="4" />
+                <path d="M5 21a7 7 0 0 1 14 0" />
+              </svg>)
             </span>
           )}
         </button>
@@ -3278,7 +3285,7 @@ disabled={isCompleted}
                 </button>
 
                 {/* Only show remove leg button for the last leg AND only if it has been saved */}
-                {currentLagIndex === legs.length - 1 &&
+                {/* {currentLagIndex === legs.length - 1 &&
                   savedLegs.has(currentLagIndex) && (
                     <button
                       className="bg-red-500 hover:bg-red-600 text-white px-4 py-2 rounded-md transition-colors"
@@ -3291,7 +3298,7 @@ disabled={isCompleted}
                     >
                       Remove Leg
                     </button>
-                  )}
+                  )} */}
               </div>
             )}
 
