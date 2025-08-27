@@ -541,6 +541,7 @@ const FCcontrollerinstructions = () => {
         console.log(`☢️ Hazardous checkbox ${value ? 'CHECKED' : 'UNCHECKED'} for container ${id}`);
         if (value) {
           // Checkbox checked - update state immediately, then fetch hazardous amount
+          console.log(`☢️ Hazardous checkbox CHECKED for container ${id} - updating state and fetching rate`);
           setContainers((prevContainers) =>
             prevContainers.map((container) =>
               container.id === id 
@@ -552,6 +553,7 @@ const FCcontrollerinstructions = () => {
           fetchHazardousAmount(id);
         } else {
           // Checkbox unchecked - reset hazardous amount to 0
+          console.log(`☢️ Hazardous checkbox UNCHECKED for container ${id} - updating state and resetting amount to 0`);
           setContainers((prevContainers) =>
             prevContainers.map((container) =>
               container.id === id 
@@ -560,6 +562,7 @@ const FCcontrollerinstructions = () => {
             )
           );
           console.log(`🔄 Hazardous unchecked - reset amount to 0 for container ${id}`);
+          console.log(`💲 Recalculating total cost due to hazardous flag change`);
           recalculateTotalCost();
         }
       }
@@ -1150,7 +1153,15 @@ const FCcontrollerinstructions = () => {
         }
         return total;
       }, 0);
-      const totalCost = Number((baseCost + totalSurchargeAmount).toFixed(2));
+      // Calculate total hazardous amount from containers
+      const totalHazardousAmount = containers.reduce((total, container) => {
+        if (container.hazardous && container.hazardousAmount) {
+          return total + Number(container.hazardousAmount || 0);
+        }
+        return total;
+      }, 0);
+      console.log(`💲 Total cost components - Base: ${baseCost}, Surcharges: ${totalSurchargeAmount}, Hazardous: ${totalHazardousAmount}`);
+      const totalCost = Number((baseCost + totalSurchargeAmount + totalHazardousAmount).toFixed(2));
 
       // Prepare instruction update data with proper field mapping
       const instructionUpdateData = {
@@ -1250,6 +1261,7 @@ const FCcontrollerinstructions = () => {
                 container_type: container.containerType || "",
                 cargo_description: container.cargoDescription || "",
                 "Hazardous": Boolean(container.hazardous),
+                "Hazardous Amount": Number(container.hazardousAmount || 0),
                 "Add Surcharges": Boolean(container.addSurcharges),
                 "Surcharge Amount": Number(container.surchargeAmount || 0),
               };
@@ -1266,9 +1278,11 @@ const FCcontrollerinstructions = () => {
           "Add Surcharges": container["Add Surcharges"],
           "Surcharge Amount": container["Surcharge Amount"],
           "Hazardous": container["Hazardous"],
+          "Hazardous Amount": container["Hazardous Amount"],
           addSurchargesType: typeof container["Add Surcharges"],
           surchargeAmountType: typeof container["Surcharge Amount"],
           hazardousType: typeof container["Hazardous"],
+          hazardousAmountType: typeof container["Hazardous Amount"],
           fileRefType: typeof container.file_ref
         });
       });
