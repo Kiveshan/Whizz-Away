@@ -11,10 +11,12 @@ const ProfitLossDetailPage = () => {
     const navigate = useNavigate()
     const [reportData, setReportData] = useState(null)
     const [loading, setLoading] = useState(true)
+    const [companyData, setCompanyData] = useState(null)
 
     useEffect(() => {
         if (month && year) {
             fetchReport()
+            fetchCompanyDetails()
         }
     }, [month, year])
 
@@ -30,6 +32,16 @@ const ProfitLossDetailPage = () => {
             alert(`Failed to fetch report: ${error.message}`)
         }
         setLoading(false)
+    }
+
+    const fetchCompanyDetails = async () => {
+        try {
+            const response = await api.get("/company-details")
+            setCompanyData(response.data)
+        } catch (error) {
+            console.error("Error fetching company details:", error)
+            setCompanyData({ companyname: "KSM Carriers" })
+        }
     }
 
     const aggregateData = (details) => {
@@ -50,73 +62,142 @@ const ProfitLossDetailPage = () => {
             format: "a4",
         })
 
-        // Header
-        doc.setFontSize(18)
+        const pageWidth = doc.internal.pageSize.getWidth()
+        const pageHeight = doc.internal.pageSize.getHeight()
+        const margin = 20
+        const contentWidth = pageWidth - margin * 2
+
+        doc.setFillColor(66, 133, 244)
+        doc.rect(0, 0, pageWidth, 35, "F")
+
+        doc.setTextColor(255, 255, 255)
+        doc.setFontSize(22)
         doc.setFont("helvetica", "bold")
+        const companyName = companyData?.companyname || "KSM Carriers"
+        doc.text(companyName, pageWidth / 2, 20, { align: "center" })
 
         doc.setFontSize(12)
         doc.setFont("helvetica", "normal")
-        doc.text(`Date: ${new Date().toLocaleDateString()}`, 20, 35)
-
-        // Title with background
-        doc.setFillColor(34, 139, 34)
-        doc.rect(20, 45, 170, 15, "F")
-        doc.setTextColor(255, 255, 255)
-        doc.setFontSize(14)
-        doc.setFont("helvetica", "bold")
-        doc.text("Profit & Loss Statement", 25, 55)
-        doc.text(`${year}`, 150, 55)
-        doc.text("current year", 150, 62)
 
         doc.setTextColor(0, 0, 0)
-        let yPos = 75
+        doc.setFontSize(11)
+        doc.text(`Generated: ${new Date().toLocaleDateString()}`, margin, 50)
+        doc.text(`Report Period: ${month} ${year}`, pageWidth - margin, 50, { align: "right" })
 
-        // Revenue Section
-        doc.setFontSize(12)
+        doc.setFillColor(52, 168, 83)
+        doc.rect(margin, 60, contentWidth, 20, "F")
+        doc.setTextColor(255, 255, 255)
+        doc.setFontSize(16)
         doc.setFont("helvetica", "bold")
-        doc.text("Revenue", 20, yPos)
-        yPos += 8
+        doc.text("PROFIT & LOSS STATEMENT", margin + 10, 72)
+        doc.text(`${year}`, pageWidth - margin - 10, 72, { align: "right" })
 
-        doc.setFont("helvetica", "normal")
+        doc.setDrawColor(52, 168, 83)
+        doc.setLineWidth(1)
+        doc.line(margin, 85, pageWidth - margin, 85)
+
+        let yPos = 100
+        doc.setTextColor(0, 0, 0)
+
+        const addSectionHeader = (title, yPosition) => {
+            doc.setFillColor(240, 248, 255)
+            doc.rect(margin, yPosition - 5, contentWidth, 12, "F")
+            doc.setDrawColor(66, 133, 244)
+            doc.setLineWidth(0.5)
+            doc.rect(margin, yPosition - 5, contentWidth, 12)
+
+            doc.setFontSize(14)
+            doc.setFont("helvetica", "bold")
+            doc.setTextColor(66, 133, 244)
+            doc.text(title, margin + 5, yPosition + 3)
+            doc.text("Amount (R)", pageWidth - margin - 5, yPosition + 3, { align: "right" })
+            return yPosition + 15
+        }
+
+        const addTableRow = (label, amount, yPosition, isBold = false, isTotal = false) => {
+            if (yPosition > pageHeight - 40) {
+                doc.addPage()
+                yPosition = 30
+            }
+
+            if (isTotal) {
+                doc.setFillColor(245, 245, 245)
+                doc.rect(margin, yPosition - 3, contentWidth, 10, "F")
+                doc.setDrawColor(100, 100, 100)
+                doc.setLineWidth(0.3)
+                doc.line(margin, yPosition - 3, pageWidth - margin, yPosition - 3)
+                doc.line(margin, yPosition + 7, pageWidth - margin, yPosition + 7)
+            }
+
+            doc.setFontSize(11)
+            doc.setFont("helvetica", isBold || isTotal ? "bold" : "normal")
+            doc.setTextColor(0, 0, 0)
+
+            doc.text(label, margin + (isTotal ? 5 : 10), yPosition + 2)
+            doc.text(amount, pageWidth - margin - 5, yPosition + 2, { align: "right" })
+
+            return yPosition + (isTotal ? 15 : 8)
+        }
+
+        yPos = addSectionHeader("INCOME", yPos)
+
         const profitAgg = aggregateData(reportData.profitDetails)
         Object.entries(profitAgg).forEach(([source, amount]) => {
-            doc.text(source, 25, yPos)
-            doc.text(`R ${amount.toFixed(2)}`, 170, yPos, { align: "right" })
-            yPos += 6
+            yPos = addTableRow(source, `R ${amount.toLocaleString("en-ZA", { minimumFractionDigits: 2 })}`, yPos)
         })
 
-        // Total Revenue
-        doc.setFont("helvetica", "bold")
-        doc.text("Total Revenue & Gains", 25, yPos)
-        doc.text(`R ${reportData.totalProfit.toFixed(2)}`, 170, yPos, { align: "right" })
+        yPos = addTableRow(
+            "Total Income",
+            `R ${reportData.totalProfit.toLocaleString("en-ZA", { minimumFractionDigits: 2 })}`,
+            yPos,
+            true,
+            true,
+        )
+
         yPos += 15
+        yPos = addSectionHeader("EXPENDITURE", yPos)
 
-        // Expenses Section
-        doc.text("Expenses", 20, yPos)
-        yPos += 8
-
-        doc.setFont("helvetica", "normal")
         const lossAgg = aggregateData(reportData.lossDetails)
         Object.entries(lossAgg).forEach(([source, amount]) => {
-            doc.text(source, 25, yPos)
-            doc.text(`R ${amount.toFixed(2)}`, 170, yPos, { align: "right" })
-            yPos += 6
+            yPos = addTableRow(source, `R ${amount.toLocaleString("en-ZA", { minimumFractionDigits: 2 })}`, yPos)
         })
 
-        // Total Expenses
-        doc.setFont("helvetica", "bold")
-        doc.text("Total Expenses", 25, yPos)
-        doc.text(`R ${Math.abs(reportData.totalLoss).toFixed(2)}`, 170, yPos, { align: "right" })
+        yPos = addTableRow(
+            "Total Expenditure",
+            `R ${Math.abs(reportData.totalLoss).toLocaleString("en-ZA", { minimumFractionDigits: 2 })}`,
+            yPos,
+            true,
+            true,
+        )
+
         yPos += 15
+        const net = reportData.net;
+        const isProfit = net >= 0;
+        doc.setFillColor(isProfit ? (232, 245, 233) : (255, 235, 238));
+        doc.rect(margin, yPos - 5, contentWidth, 20, "F");
+        doc.setDrawColor(isProfit ? (76, 175, 80) : (244, 67, 54));
+        doc.setLineWidth(2);
+        doc.rect(margin, yPos - 5, contentWidth, 20);
 
-        // Net Profit/Loss
-        doc.text("Net Profit (Loss)", 20, yPos)
-        yPos += 8
-        const net = reportData.net
-        const netText = net >= 0 ? `R ${net.toFixed(2)}` : `R (${Math.abs(net).toFixed(2)})`
-        doc.text(netText, 170, yPos, { align: "right" })
+        doc.setFontSize(16);
+        doc.setFont("helvetica", "bold");
+        doc.setTextColor(isProfit ? (27, 94, 32) : (183, 28, 28));
+        doc.text("NET PROFIT (LOSS)", margin + 10, yPos + 5);
 
-        doc.save(`Profit_Loss_Statement_${month}_${year}.pdf`)
+        const netText = isProfit
+            ? `R ${net.toLocaleString("en-ZA", { minimumFractionDigits: 2 })}`
+            : `R (${Math.abs(net).toLocaleString("en-ZA", { minimumFractionDigits: 2 })})`
+        doc.text(netText, pageWidth - margin - 10, yPos + 5, { align: "right" })
+
+        doc.setFontSize(9)
+        doc.setFont("helvetica", "normal")
+        doc.setTextColor(100, 100, 100)
+        doc.text(`© ${new Date().getFullYear()} ${companyName}. All rights reserved.`, pageWidth / 2, pageHeight - 15, {
+            align: "center",
+        })
+        doc.text(`Page 1 of 1`, pageWidth - margin, pageHeight - 10, { align: "right" })
+
+        doc.save(`Income_Expenditure_Statement_${month}_${year}.pdf`)
     }
 
     const handleBack = () => {
@@ -159,7 +240,11 @@ const ProfitLossDetailPage = () => {
         <div className="pl-enhanced-wrapper">
             <div className="pl-enhanced-page">
                 <div className="pl-enhanced-paper">
-                    {/* Report Title */}
+                    <div className="pl-company-header">
+                        <div className="pl-company-name">{companyData?.companyname || "KSM Carriers"}</div>
+                        <div className="pl-report-date">Date: {new Date().toLocaleDateString()}</div>
+                    </div>
+
                     <div className="pl-title-section">
                         <div className="pl-title">Profit & Loss Statement</div>
                         <div className="pl-period">
@@ -167,7 +252,6 @@ const ProfitLossDetailPage = () => {
                         </div>
                     </div>
 
-                    {/* Revenue Section */}
                     <div className="pl-section">
                         <table className="pl-section-table">
                             <thead className="pl-section-header">
@@ -191,7 +275,6 @@ const ProfitLossDetailPage = () => {
                         </table>
                     </div>
 
-                    {/* Expenses Section */}
                     <div className="pl-section">
                         <table className="pl-section-table">
                             <thead className="pl-section-header">
@@ -215,7 +298,6 @@ const ProfitLossDetailPage = () => {
                         </table>
                     </div>
 
-                    {/* Net Profit/Loss Section */}
                     <div className="pl-section pl-net-section">
                         <table className="pl-section-table">
                             <thead className="pl-section-header pl-net-header">
@@ -243,7 +325,7 @@ const ProfitLossDetailPage = () => {
                         Back
                     </button>
                     <button className="pl-btn pl-download-btn" onClick={downloadPDF}>
-                        Download PDF
+                        Download
                     </button>
                 </div>
             </div>
