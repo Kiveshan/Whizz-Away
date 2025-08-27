@@ -1,4 +1,4 @@
-import { getProfitLossData } from '../../models/profit-loss/profitLossModel.js';
+import { getProfitLossData, getCompanyDetails } from '../../models/profit-loss/profitLossModel.js';
 
 const generateProfitLossReport = async (req, res) => {
     const { month, year } = req.query;
@@ -27,4 +27,14 @@ const generateProfitLossReport = async (req, res) => {
     }
 };
 
-export { generateProfitLossReport };
+const getCompanyDetailsHandler = async (req, res) => {
+    try {
+        const companyname = await getCompanyDetails();
+        res.json({ companyname });
+    } catch (error) {
+        console.error('Error fetching company details:', error);
+        res.status(500).json({ error: 'Failed to fetch company details' });
+    }
+};
+
+export { generateProfitLossReport, getCompanyDetailsHandler };

@@ -1,7 +1,8 @@
 import express from 'express';
-import { generateProfitLossReport } from '../../controllers/profit-loss/profitLossController.js';
+import { generateProfitLossReport, getCompanyDetailsHandler } from '../../controllers/profit-loss/profitLossController.js';
 
 const router = express.Router();
 router.get('/profit-loss-report', generateProfitLossReport);
+router.get('/company-details', getCompanyDetailsHandler);
 
 export default router;

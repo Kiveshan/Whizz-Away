@@ -79,4 +79,20 @@ const getProfitLossData = async (month, year) => {
   }
 };
 
-export { getProfitLossData };
+const getCompanyDetails = async () => {
+  const companyQuery = `
+    SELECT companyname
+    FROM usertable
+    WHERE status = 'active'
+    LIMIT 1
+  `;
+
+  try {
+    const result = await query(companyQuery);
+    return result.rows[0].companyname;
+  } catch (error) {
+    throw new Error(`Database error: ${error.message}`);
+  }
+};
+
+export { getProfitLossData, getCompanyDetails };

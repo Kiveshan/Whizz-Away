@@ -40,7 +40,7 @@ const ProfitLossDetailPage = () => {
             setCompanyData(response.data)
         } catch (error) {
             console.error("Error fetching company details:", error)
-            setCompanyData({ companyname: "KSM Carriers" })
+            setCompanyData({ companyname:"Test" })
         }
     }
 
@@ -73,7 +73,7 @@ const ProfitLossDetailPage = () => {
         doc.setTextColor(255, 255, 255)
         doc.setFontSize(22)
         doc.setFont("helvetica", "bold")
-        const companyName = companyData?.companyname || "KSM Carriers"
+        const companyName = companyData?.companyname || 'N/A'
         doc.text(companyName, pageWidth / 2, 20, { align: "center" })
 
         doc.setFontSize(12)
@@ -241,14 +241,14 @@ const ProfitLossDetailPage = () => {
             <div className="pl-enhanced-page">
                 <div className="pl-enhanced-paper">
                     <div className="pl-company-header">
-                        <div className="pl-company-name">{companyData?.companyname || "KSM Carriers"}</div>
+                        <div className="pl-company-name">{companyData?.companyname || "N/A"}</div>
                         <div className="pl-report-date">Date: {new Date().toLocaleDateString()}</div>
                     </div>
 
                     <div className="pl-title-section">
                         <div className="pl-title">Profit & Loss Statement</div>
                         <div className="pl-period">
-                            {year} - {month}
+                            {month} - {year}
                         </div>
                     </div>
 
