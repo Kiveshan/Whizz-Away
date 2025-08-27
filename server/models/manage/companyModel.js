@@ -61,6 +61,8 @@ const updateCompany = async (userId, companyData) => {
   let client;
   try {
     client = await pool.connect();
+    await client.query("BEGIN"); // Start a transaction
+
     // Get company_reg_num from m5_employee
     const employeeResult = await client.query(
       `
@@ -192,8 +194,23 @@ const updateCompany = async (userId, companyData) => {
     `;
 
     const result = await client.query(updateQuery, queryParams);
+
+    // Update company_reg_num in m5_employee for all active employees if company_reg_num is updated
+    if (company_reg_num !== undefined && company_reg_num !== companyRegNum) {
+      await client.query(
+        `
+        UPDATE m5_employee
+        SET company_reg_num = $1
+        WHERE company_reg_num = $2 AND status = true
+        `,
+        [company_reg_num, companyRegNum]
+      );
+    }
+
+    await client.query("COMMIT");
     return { success: true, data: result.rows[0] };
   } catch (err) {
+    await client.query("ROLLBACK");
     console.error(`Error updating company for user ${userId}:`, err);
     throw err;
   } finally {
