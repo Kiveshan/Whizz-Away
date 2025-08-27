@@ -583,19 +583,36 @@ const AddOnForm = () => {
             <p>Email: {clientInfo.email}</p>
             <p>VAT Reg No: {clientInfo.vat_reg_num}</p>
           </div>
-          <div className="invoice-actions">
-            <button onClick={handleBack} className="back-button">
-              ← Back
-            </button>
-            {isViewMode && (
-              <button
-                onClick={handlePrint}
-                className="print-button"
-                disabled={pdfLoading}
-              >
-                {pdfLoading ? "Generating PDF..." : "🖨️ Print"}
+          <div className="client-actions">
+            <div className="form-group date-group">
+              <label htmlFor="date">Invoice Date</label>
+              <input
+                type="date"
+                id="date"
+                name="date"
+                value={formData.date}
+                onChange={(e) =>
+                  setFormData((prev) => ({ ...prev, date: e.target.value }))
+                }
+                className="form-input"
+                required
+                readOnly={isViewMode}
+              />
+            </div>
+            <div className="invoice-actions">
+              <button onClick={handleBack} className="back-button">
+                ← Back
               </button>
-            )}
+              {isViewMode && (
+                <button
+                  onClick={handlePrint}
+                  className="print-button"
+                  disabled={pdfLoading}
+                >
+                  {pdfLoading ? "Generating PDF..." : "🖨️ Print"}
+                </button>
+              )}
+            </div>
           </div>
         </div>
 
@@ -628,7 +645,7 @@ const AddOnForm = () => {
                         name="category"
                         value={item.category}
                         onChange={(e) => handleInputChange(index, e)}
-                        placeholder="Service category"
+                        placeholder="Category"
                         className="form-input"
                         required
                         readOnly={isViewMode}
@@ -652,21 +669,23 @@ const AddOnForm = () => {
                         />
                       </div>
                     </div>
-                  </div>
 
-                  <div className="form-group full-width">
-                    <label htmlFor={`description-${index}`}>Description</label>
-                    <textarea
-                      id={`description-${index}`}
-                      name="description"
-                      value={item.description}
-                      onChange={(e) => handleInputChange(index, e)}
-                      placeholder="Service description"
-                      className="form-textarea"
-                      rows="3"
-                      required
-                      readOnly={isViewMode}
-                    />
+                    <div className="form-group">
+                      <label htmlFor={`description-${index}`}>
+                        Description
+                      </label>
+                      <textarea
+                        id={`description-${index}`}
+                        name="description"
+                        value={item.description}
+                        onChange={(e) => handleInputChange(index, e)}
+                        placeholder="Description"
+                        className="form-textarea"
+                        rows="1"
+                        required
+                        readOnly={isViewMode}
+                      />
+                    </div>
                   </div>
 
                   {!isViewMode && formData.items.length > 1 && (
@@ -680,22 +699,6 @@ const AddOnForm = () => {
                   )}
                 </div>
               ))}
-
-              <div className="form-group date-group">
-                <label htmlFor="date">Invoice Date</label>
-                <input
-                  type="date"
-                  id="date"
-                  name="date"
-                  value={formData.date}
-                  onChange={(e) =>
-                    setFormData((prev) => ({ ...prev, date: e.target.value }))
-                  }
-                  className="form-input"
-                  required
-                  readOnly={isViewMode}
-                />
-              </div>
 
               <div className="invoice-summary">
                 <div className="summary-row subtotal">

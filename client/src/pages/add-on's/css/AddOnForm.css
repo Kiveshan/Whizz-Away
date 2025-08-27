@@ -66,6 +66,10 @@
   background-color: #fafafa;
 }
 
+.addon-form-wrapper .bill-to {
+  flex: 1;
+}
+
 .addon-form-wrapper .bill-to h3 {
   color: #1a3c5e;
   font-size: 14px;
@@ -78,6 +82,13 @@
   line-height: 1.4;
   margin: 3px 0;
   color: #2c3e50;
+}
+
+.addon-form-wrapper .client-actions {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 8px;
 }
 
 .addon-form-wrapper .invoice-actions {
@@ -175,8 +186,8 @@
 
 .addon-form-wrapper .item-row {
   border-bottom: 1px solid #e5e7eb;
-  padding-bottom: 12px;
-  margin-bottom: 12px;
+  padding-bottom: 8px;
+  margin-bottom: 8px;
 }
 
 .addon-form-wrapper .remove-item-button {
@@ -189,7 +200,7 @@
   font-size: 13px;
   font-weight: 500;
   transition: all 0.2s ease;
-  margin-top: 8px;
+  margin-top: 6px;
   display: block;
   width: fit-content;
 }
@@ -214,27 +225,22 @@
 
 .addon-form-wrapper .form-row {
   display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 12px;
-  margin-bottom: 12px;
-}
-
-.addon-form-wrapper .form-group {
+  grid-template-columns: 2fr 1fr 3fr;
+  gap: 10px;
   margin-bottom: 8px;
 }
 
-.addon-form-wrapper .form-group.full-width {
-  grid-column: 1 / -1;
+.addon-form-wrapper .form-group {
+  margin-bottom: 6px;
 }
 
 .addon-form-wrapper .form-group.date-group {
-  grid-column: 1 / 2;
-  max-width: 200px;
+  max-width: 160px;
 }
 
 .addon-form-wrapper .form-group label {
   display: block;
-  margin-bottom: 4px;
+  margin-bottom: 3px;
   font-weight: 600;
   color: #1a3c5e;
   font-size: 12px;
@@ -243,7 +249,7 @@
 .addon-form-wrapper .form-input,
 .addon-form-wrapper .form-textarea {
   width: 100%;
-  padding: 8px 12px;
+  padding: 6px 10px;
   border: 1px solid #d1d5db;
   border-radius: 5px;
   font-size: 13px;
@@ -268,7 +274,7 @@
 
 .addon-form-wrapper .form-textarea {
   resize: vertical;
-  min-height: 60px;
+  min-height: 32px;
   font-family: inherit;
 }
 
@@ -338,7 +344,7 @@
 
 .addon-form-wrapper .currency-symbol {
   background-color: #e5e7eb;
-  padding: 8px 12px;
+  padding: 6px 10px;
   font-weight: bold;
   color: #1a3c5e;
   border-right: 1px solid #d1d5db;
@@ -347,7 +353,7 @@
 
 .addon-form-wrapper .amount-input {
   border: none;
-  padding: 8px 12px;
+  padding: 6px 10px;
   font-size: 13px;
   font-weight: 600;
   background-color: transparent;
@@ -411,7 +417,6 @@
   font-size: 13px;
 }
 
-/* Success Message */
 .addon-form-wrapper .success-message {
   text-align: center;
   padding: 20px;
@@ -454,12 +459,19 @@
     padding: 12px;
   }
 
-  .addon-form-wrapper .form-row {
-    grid-template-columns: 1fr;
+  .addon-form-wrapper .client-actions {
+    align-items: flex-start;
+    width: 100%;
   }
 
   .addon-form-wrapper .form-group.date-group {
     max-width: none;
+    width: 100%;
+  }
+
+  .addon-form-wrapper .form-row {
+    grid-template-columns: 1fr;
+    gap: 8px;
   }
 
   .addon-form-wrapper .invoice-summary {
@@ -486,11 +498,11 @@
   .addon-form-wrapper .form-textarea,
   .addon-form-wrapper .amount-input {
     font-size: 12px;
-    padding: 6px 10px;
+    padding: 5px 8px;
   }
 
   .addon-form-wrapper .currency-symbol {
-    padding: 6px 10px;
+    padding: 5px 8px;
     font-size: 12px;
   }
 
