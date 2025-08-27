@@ -22,8 +22,7 @@ import {
   CreditorsOther,
   CreditorsDashboard,
   AnalyticsReportsPage,
-  ReportsPage
-  
+  ReportsPage,
 } from "./pages/user_menus"
 import { Login, Register } from "./pages/auth"
 import {
@@ -84,7 +83,7 @@ import {
   SubcontractorStatementDetails,
 } from "./pages/Creditors"
 
-import { WageReports, ProfitLossReportsPage } from "./pages/Reports"
+import { WageReports, ProfitLossReportsPage, ProfitLossDetailPage } from "./pages/Reports"
 
 // CSS Imports
 import "./css/components.css"
@@ -161,9 +160,10 @@ function DynamicHeader() {
     "/Creditors/SubcontractorStatements": "Subcontractors",
     "/Creditors/SubcontractorStatementDetails": "Subcontractor Statement",
     "/analytics-reports": "Insights",
-    "/reports" : "Reports",
-    "/wage-reports" : "Wage Reports",
-    "/profit-loss-reports" : "Profit & Loss Reports"
+    "/reports": "Reports",
+    "/wage-reports": "Wage Reports",
+    "/profit-loss-reports": "Income & Expenditure Reports",
+    "/profit-loss-reports/:month/:year": "Income & Expenditure",
   }
 
   const getTitle = () => {
@@ -271,10 +271,10 @@ function ContentWrapper() {
         <Route path="/FCcontrollerinstructions" element={<FCcontrollerinstructions />} />
         <Route path="/FCcontrollerInstructionDetails" element={<FCcontrollerInstructionDetails />} />
         <Route path="/analytics-reports" element={<AnalyticsReportsPage />} />
-        <Route path="/reports" element={<ReportsPage />} /> 
+        <Route path="/reports" element={<ReportsPage />} />
         <Route path="/wage-reports" element={<WageReports />} />
         <Route path="/profit-loss-reports" element={<ProfitLossReportsPage />} />
-
+        <Route path="/profit-loss-reports/:month/:year" element={<ProfitLossDetailPage />} />
       </Routes>
       {shouldShowFooter && <Footer />} {/* Conditionally render footer */}
     </div>
@@ -296,7 +296,8 @@ function App() {
     "/ViewcontrollerInstructionDetails": "ViewcontrollerInstructionDetails",
     "/reports": "Reports",
     "/wage-reports": "Wage Reports",
-    "/profit-loss-reports" : "Profit & Loss Reports"
+    "/profit-loss-reports": "Income & Expenditure",
+    "/profit-loss-reports/:month/:year": "Income & Expenditure",
   }
 
   // Set page title based on current route

@@ -11,7 +11,7 @@ const reportsData = [
     path: "/wage-reports", // Define the path for Wage Reports
   },
   {
-    title: "Profit & Loss Report",
+    title: "Income & Expenditure",
     image: "/images/reports.jpg",
     path: "/profit-loss-reports",
   },
