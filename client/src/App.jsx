@@ -82,7 +82,10 @@ import {
   SubcontractorList,
   SubcontractorStatements,
   SubcontractorStatementDetails,
-  CredClientList
+  CredClientList,
+  CreditNoteList,
+  CreditNoteForm,
+  CreditNoteView
 } from "./pages/Creditors"
 
 import {
@@ -166,7 +169,11 @@ function DynamicHeader() {
     "/analytics-reports": "Insights",
     "/reports" : "Reports",
     "/wage-reports" : "Wage Reports",
-    "/CredClientList":"Clients"
+    "/CredClientList":"Clients",
+    "/credit-note-list": "Credit Notes",
+    "/credit-note-form": "Credit Note Form",
+    "/view-credit-note/:clientName/:creditNoteId": "Credit Note"
+
   }
 
   const getTitle = () => {
@@ -176,6 +183,7 @@ function DynamicHeader() {
     if (location.pathname.startsWith("/finance-clerk-wage-details/")) return "Wages"
     if (location.pathname.startsWith("/DirectorExpenses/")) return "Fuel Expenses"
     if (location.pathname.startsWith("/finance-clerk-wage-slip/")) return "Wages"
+    if (location.pathname.startsWith("/view-credit-note/")) return "Credit Note" 
     return titleMap[location.pathname] || "Unknown Page"
   }
 
@@ -201,6 +209,9 @@ function ContentWrapper() {
         </div>
       )}
       <Routes>
+        <Route path="/view-credit-note/:clientName/:creditNoteId" element={<CreditNoteView />} />
+        <Route path="/credit-note-form" element={<CreditNoteForm />} />
+        <Route path="/credit-note-list" element={<CreditNoteList />} />
         <Route path="/CredClientList" element={<CredClientList />} />
         <Route path="/" element={<Landing />} />
         <Route path="/client-payments" element={<ClientPayments />} />

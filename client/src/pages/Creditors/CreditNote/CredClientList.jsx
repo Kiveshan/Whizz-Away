@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
-import api from "../../../api"; // Import the configured Axios instance
+import api from "../../../api.js"; // Import the configured Axios instance
 import "../../payments/css/ClientPayments.css";
 import Pagination from "../../../components/Pagination.jsx";
 
@@ -58,7 +58,7 @@ const CredClientList = () => {
     <div className="payment-client-wrapper">
       {/* Back Button */}
       <div className="client-payments-header">
-        <button className="back-button" onClick={() => navigate("/debtors")}>
+        <button className="back-button" onClick={() => navigate("/CreditorsDashboard")}>
           Back
         </button>
       </div>
@@ -90,7 +90,7 @@ const CredClientList = () => {
                       <button
                         className="view-butn"
                         onClick={() =>
-                          navigate("/client-payments", {
+                          navigate("/credit-note-list", {
                             state: {
                               clientId: client.m5clientkey,
                               clientName: client.companyname,

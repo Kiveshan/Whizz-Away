@@ -8,3 +8,6 @@ export { default as SubcontractorList } from "./subContractors/views/Subcontract
 export { default as SubcontractorStatementDetails } from "./subContractors/views/SubcontractorStatementDetails.jsx";
 export { default as SubcontractorStatements } from "./subContractors/views/SubcontractorStatements.jsx";
 export {default as CredClientList} from "./CreditNote/CredClientList.jsx"
+export {default as CreditNoteList} from "./CreditNote/CreditNoteList.jsx"
+export {default as CreditNoteForm} from "./CreditNote/CreditNoteForm.jsx"
+export {default as CreditNoteView} from "./CreditNote/CreditNoteView.jsx"
