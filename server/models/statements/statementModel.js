@@ -76,8 +76,7 @@ const getStatementDetails = async (statementId) => {
         a2.addon_id,
         a2.date AS addon_date,
         a2.amount AS addon_amount,
-        a2.description AS addon_description,
-        a2.invoice_number AS addon_invoice_number,
+        a2.items AS addon_items,
         ut.companyname
       FROM 
         statements s
@@ -194,8 +193,7 @@ const getStatementDetails = async (statementId) => {
           addon_id: row.addon_id,
           date: row.addon_date,
           amount: Number.parseFloat(row.addon_amount || 0),
-          description: row.addon_description,
-          invoice_num: row.addon_invoice_number,
+          items: row.addon_items,
         })),
       payments: payments,
     };
