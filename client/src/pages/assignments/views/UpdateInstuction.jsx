@@ -5,6 +5,7 @@ import { useState, useEffect, useRef } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import "../css/UpdateInstruction.css";
 import api from "../../../api";
+import { FaTruckFast } from "react-icons/fa6";
 const normalizeString = (str) => {
   if (!str) return '';
   return str.toLowerCase().replace(/\s+/g, '').trim();
@@ -444,11 +445,6 @@ const [weightUnit, setWeightUnit] = useState('kg');
   // Add this function to handle leg removal
   // Update handleRemoveLeg to use Axios
   const handleRemoveLeg = async (legIndex, legId) => {
-    if (legIndex === 0) {
-      setSavedMessage("Cannot remove the first leg");
-      setTimeout(() => setSavedMessage(""), 3000);
-      return;
-    }
 
     setLegToRemove({
       index: legIndex,
@@ -2472,20 +2468,43 @@ useEffect(() => {
     }
     
     return (
-      <button
-        key={leg.id || index}
-        className={buttonClass}
-        onClick={() => handleSelectLeg(index)}
-      >
-        Leg {index + 1}
-        {leg.isNew || leg.id?.toString().startsWith("temp-") ? " *" : ""}
-        {leg.drivers && leg.drivers.length > 0 && (
-          <span className="ml-2 text-xs">
-            ({leg.drivers.length} driver
-            {leg.drivers.length !== 1 ? "s" : ""})
-          </span>
+      <div key={leg.id || index} className="relative">
+        <button
+          className={buttonClass}
+          onClick={() => handleSelectLeg(index)}
+        >
+          Leg {index + 1}
+          {leg.isNew || leg.id?.toString().startsWith("temp-") ? " *" : ""}
+          {leg.drivers && leg.drivers.length > 0 && (
+<span className="ml-2 text-xs flex items-center">
+  ({leg.drivers.length}{" "}
+  <FaTruckFast className="driver-icon" />)
+</span>
+          )}
+        </button>
+        {/* Only show delete icon if there is more than one leg */}
+        {legs.length > 1 && !isCompleted && (
+          <div
+            className="bin-icon-wrapper"
+            onClick={() => handleRemoveLeg(index, legs[index].id)}
+          >
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+              className="w-3 h-3"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
+              />
+            </svg>
+          </div>
         )}
-      </button>
+      </div>
     );
   })}
   {!shouldHideAddLegButton && (
@@ -3260,7 +3279,7 @@ disabled={isCompleted}
                 </button>
 
                 {/* Only show remove leg button for the last leg AND only if it has been saved */}
-                {currentLagIndex === legs.length - 1 &&
+                {/* {currentLagIndex === legs.length - 1 &&
                   savedLegs.has(currentLagIndex) && (
                     <button
                       className="bg-red-500 hover:bg-red-600 text-white px-4 py-2 rounded-md transition-colors"
@@ -3273,7 +3292,7 @@ disabled={isCompleted}
                     >
                       Remove Leg
                     </button>
-                  )}
+                  )} */}
               </div>
             )}
 

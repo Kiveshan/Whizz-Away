@@ -998,12 +998,15 @@ export const getInstructions = async (clientId) => {
       m.m1key,
       m."clientFileRef" as fileno,
       m.shipment_type,
-      s.shipmenttype as type_text,
+      s.shipmenttype AS type_text,
       m.status,
       m."lastFreeDate", -- Changed from pickupdate to lastFreeDate
       m.client,
       c.client AS companyname,
-      m.created_at as startingdate -- Use created_at field for the creation date
+      m.created_at as startingdate ,
+      COALESCE(m.num_six_meters, 0) AS num_six_meters,
+      COALESCE(m.num_twelve_meters, 0) AS num_twelve_meters,
+      COALESCE(m.num_abnormal, 0) AS num_abnormal
     FROM 
       public.m1_controller m
     JOIN 
