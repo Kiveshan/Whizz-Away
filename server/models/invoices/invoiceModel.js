@@ -13,7 +13,7 @@ const getCompletedInvoices = async ({ year, month, type, clientId }) => {
         m1.m1key, 
         m1."ksmFileRef" as instruction_no, 
         s.shipmenttype as shipment_type, 
-        m1.fileref as file_no, 
+        m1."clientFileRef" as file_no, 
         m1.status,
         i.ikey,
         i.date as date
@@ -41,21 +41,21 @@ const getCompletedInvoices = async ({ year, month, type, clientId }) => {
     }
 
     if (year && month) {
-      queryText += ` AND EXTRACT(YEAR FROM m1.pickupdate) = $${paramIndex} 
-                    AND EXTRACT(MONTH FROM m1.pickupdate) = $${paramIndex + 1}`;
+      queryText += ` AND EXTRACT(YEAR FROM i.date) = $${paramIndex} 
+                    AND EXTRACT(MONTH FROM i.date) = $${paramIndex + 1}`;
       queryParams.push(year, month);
       paramIndex += 2;
     } else if (year) {
-      queryText += ` AND EXTRACT(YEAR FROM m1.pickupdate) = $${paramIndex}`;
+      queryText += ` AND EXTRACT(YEAR FROM i.date) = $${paramIndex}`;
       queryParams.push(year);
       paramIndex++;
     } else if (month) {
-      queryText += ` AND EXTRACT(MONTH FROM m1.pickupdate) = $${paramIndex}`;
+      queryText += ` AND EXTRACT(MONTH FROM i.date) = $${paramIndex}`;
       queryParams.push(month);
       paramIndex++;
     }
 
-    queryText += ` ORDER BY m1.pickupdate DESC`;
+    queryText += ` ORDER BY i.date DESC`;
 
     console.log("Executing query:", queryText, "with params:", queryParams);
     const result = await query(queryText, queryParams);
@@ -80,7 +80,7 @@ const getInvoiceDetails = async (id) => {
         m1.m1key,
         m1."ksmFileRef" as instruction_no,
         s.shipmenttype as shipment_type,
-        m1.fileref as file_no,
+        m1."clientFileRef" as file_no,
         c.client as client_name,
         c.m5clientkey,
         c.companyaddress as client_address,
@@ -88,9 +88,6 @@ const getInvoiceDetails = async (id) => {
         c.email as client_email,
         c.vatregno as client_vat,
         c.suburb as client_suburb,
-        m1.pickup,
-        m1.dropoff,
-        m1.pickupdate,
         m1.description,
         m1.total_cost,  
         m1.vat,

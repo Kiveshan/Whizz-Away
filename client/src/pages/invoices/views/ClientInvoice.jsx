@@ -339,23 +339,17 @@ const ClientInvoice = () => {
                 row.push(container.weight);
               }
               if (hasSurcharges) {
-                const surchargeText = container.add_surcharges
-                  ? `Yes${
-                      container.surcharge_amount > 0
-                        ? ` (${formatCurrency(container.surcharge_amount)})`
-                        : ""
-                    }`
-                  : "No";
+                const surchargeText =
+                  container.surcharge_amount > 0
+                    ? formatCurrency(container.surcharge_amount)
+                    : "-";
                 row.push(surchargeText);
               }
               if (hasHazardous) {
-                const hazardText = container.hazardous
-                  ? `Yes${
-                      container.hazardous_amount > 0
-                        ? ` (${formatCurrency(container.hazardous_amount)})`
-                        : ""
-                    }`
-                  : "No";
+                const hazardText =
+                  container.hazardous_amount > 0
+                    ? formatCurrency(container.hazardous_amount)
+                    : "-";
                 row.push(hazardText);
               }
               return row;
@@ -785,46 +779,18 @@ const ClientInvoice = () => {
                             (c) => c.add_surcharges || c.surcharge_amount > 0
                           ) && (
                             <td className="surcharge">
-                              {container.add_surcharges ? (
-                                <span>
-                                  Yes
-                                  {container.surcharge_amount > 0 && (
-                                    <span>
-                                      {" "}
-                                      (
-                                      {formatCurrency(
-                                        container.surcharge_amount
-                                      )}
-                                      )
-                                    </span>
-                                  )}
-                                </span>
-                              ) : (
-                                "No"
-                              )}
+                              {container.surcharge_amount > 0
+                                ? formatCurrency(container.surcharge_amount)
+                                : "-"}
                             </td>
                           )}
                           {containers.some(
                             (c) => c.hazardous || c.hazardous_amount > 0
                           ) && (
                             <td className="hazardous">
-                              {container.hazardous ? (
-                                <span>
-                                  Yes
-                                  {container.hazardous_amount > 0 && (
-                                    <span>
-                                      {" "}
-                                      (
-                                      {formatCurrency(
-                                        container.hazardous_amount
-                                      )}
-                                      )
-                                    </span>
-                                  )}
-                                </span>
-                              ) : (
-                                "No"
-                              )}
+                              {container.hazardous_amount > 0
+                                ? formatCurrency(container.hazardous_amount)
+                                : "-"}
                             </td>
                           )}
                         </tr>
