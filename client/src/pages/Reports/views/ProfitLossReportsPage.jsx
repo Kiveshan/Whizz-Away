@@ -10,7 +10,6 @@ const ProfitLossReportsPage = () => {
         navigate(`/income-expenditure-reports/${month}/${year}`)
     }
 
-    // Generate months for current year
     const currentYear = new Date().getFullYear()
     const months = [
         "January",
@@ -31,6 +30,9 @@ const ProfitLossReportsPage = () => {
         navigate("/reports");
     };
 
+    const firstHalfMonths = months.slice(0, 6)
+    const secondHalfMonths = months.slice(6)
+
     return (
         <div className="wage-reports-wrapper">
             <div className="dashboard">
@@ -46,9 +48,21 @@ const ProfitLossReportsPage = () => {
 
                 <div className="dashboard-row">
                     <div className="button-column">
-                        {months.map((month, index) => (
+                        {firstHalfMonths.map((month, index) => (
                             <button
                                 key={index}
+                                className="filter-button"
+                                onClick={() => handleMonthClick(month, currentYear)}
+                                disabled={loading}
+                            >
+                                {month} {currentYear}
+                            </button>
+                        ))}
+                    </div>
+                    <div className="button-column">
+                        {secondHalfMonths.map((month, index) => (
+                            <button
+                                key={index + 6}
                                 className="filter-button"
                                 onClick={() => handleMonthClick(month, currentYear)}
                                 disabled={loading}
