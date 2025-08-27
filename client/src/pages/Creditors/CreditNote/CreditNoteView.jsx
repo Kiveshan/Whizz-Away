@@ -373,7 +373,7 @@ const handleDownloadPDF = async () => {
 
         <div className="download-button-container">
           <button onClick={handleDownloadPDF} className="download-button">
-            Download PDF
+            Download
           </button>
         </div>
       </div>

@@ -5,6 +5,7 @@ import { useState, useEffect, useRef } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import "../css/UpdateInstruction.css";
 import api from "../../../api";
+import { FaTruckFast } from "react-icons/fa6";
 const normalizeString = (str) => {
   if (!str) return '';
   return str.toLowerCase().replace(/\s+/g, '').trim();
@@ -2476,16 +2477,9 @@ useEffect(() => {
           {leg.isNew || leg.id?.toString().startsWith("temp-") ? " *" : ""}
           {leg.drivers && leg.drivers.length > 0 && (
 <span className="ml-2 text-xs flex items-center">
-              ({leg.drivers.length}{" "}
-              <svg
-                xmlns="http://www.w3.org/2000/svg"
-                viewBox="0 0 24 24"
-                className="driver-icon"
-              >
-                <circle cx="12" cy="7" r="4" />
-                <path d="M5 21a7 7 0 0 1 14 0" />
-              </svg>)
-            </span>
+  ({leg.drivers.length}{" "}
+  <FaTruckFast className="driver-icon" />)
+</span>
           )}
         </button>
         {/* Only show delete icon if there is more than one leg */}

@@ -49,19 +49,29 @@ const [roleId, setRoleId] = useState(null);
     "December",
   ];
 useEffect(() => {
-  let rId = null;
-  const userData = localStorage.getItem("user");
-  if (userData) {
-    try {
-      rId = JSON.parse(userData).roleid;
-    } catch (error) {
-      console.error("Error parsing user data:", error);
+  const fetchRoleId = () => {
+    let rId = null;
+    const userData = localStorage.getItem("user");
+    if (userData) {
+      try {
+        const parsedData = JSON.parse(userData);
+        rId = Number(parsedData.roleid) || null;
+      } catch (error) {
+        console.error("Error parsing user data:", error);
+      }
     }
-  }
-  if (!rId) {
-    rId = Number(localStorage.getItem("roleId") || localStorage.getItem("userRoleId"));
-  }
-  setRoleId(rId);
+    if (!rId) {
+      const roleIdStr = localStorage.getItem("roleId") || localStorage.getItem("userRoleId");
+      rId = roleIdStr ? Number(roleIdStr) : null;
+      if (isNaN(rId)) {
+        rId = null;
+      }
+    }
+    console.log("Fetched roleId:", rId); // Debug log
+    setRoleId(rId);
+  };
+
+  fetchRoleId();
 }, []);
   useEffect(() => {
     if (!clientId) {
@@ -328,16 +338,16 @@ useEffect(() => {
           </div>
         )}
 
-          {roleId !== 1 && roleId !== 4 && (
-            <div
-              className="upload-section"
-              style={{ marginTop: "20px", textAlign: "center" }}
-            >
-              <button className="upload-button" onClick={handleUpload}>
-                Add Credit Note
-              </button>
-            </div>
-          )}
+            {roleId !== null && roleId !== 1 && roleId !== 4 && (
+              <div
+                className="upload-section"
+                style={{ marginTop: "20px", textAlign: "center" }}
+              >
+                <button className="upload-button" onClick={handleUpload}>
+                  Add 
+                </button>
+              </div>
+            )}
 
       </div>
     </div>
