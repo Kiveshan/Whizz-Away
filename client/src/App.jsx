@@ -163,7 +163,7 @@ function DynamicHeader() {
     "/reports": "Reports",
     "/wage-reports": "Wage Reports",
     "/profit-loss-reports": "Income & Expenditure Reports",
-    "/profit-loss-reports/:month/:year": "Income & Expenditure",
+    "/income-expenditure-reports/:month/:year": "Income & Expenditure Report",
   }
 
   const getTitle = () => {
@@ -173,6 +173,7 @@ function DynamicHeader() {
     if (location.pathname.startsWith("/finance-clerk-wage-details/")) return "Wages"
     if (location.pathname.startsWith("/DirectorExpenses/")) return "Fuel Expenses"
     if (location.pathname.startsWith("/finance-clerk-wage-slip/")) return "Wages"
+    if (location.pathname.startsWith("/income-expenditure-reports/")) return "Income & Expenditure Report"
     return titleMap[location.pathname] || "Unknown Page"
   }
 
@@ -274,7 +275,7 @@ function ContentWrapper() {
         <Route path="/reports" element={<ReportsPage />} />
         <Route path="/wage-reports" element={<WageReports />} />
         <Route path="/profit-loss-reports" element={<ProfitLossReportsPage />} />
-        <Route path="/profit-loss-reports/:month/:year" element={<ProfitLossDetailPage />} />
+        <Route path="/income-expenditure-reports/:month/:year" element={<ProfitLossDetailPage />} />
       </Routes>
       {shouldShowFooter && <Footer />} {/* Conditionally render footer */}
     </div>
@@ -296,8 +297,8 @@ function App() {
     "/ViewcontrollerInstructionDetails": "ViewcontrollerInstructionDetails",
     "/reports": "Reports",
     "/wage-reports": "Wage Reports",
-    "/profit-loss-reports": "Income & Expenditure",
-    "/profit-loss-reports/:month/:year": "Income & Expenditure",
+    "/profit-loss-reports": "Income & Expenditure Reports",
+    "/income-expenditure-reports/:month/:year": "Income & Expenditure Report",
   }
 
   // Set page title based on current route
