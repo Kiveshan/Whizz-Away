@@ -278,6 +278,71 @@
   font-family: inherit;
 }
 
+/* VAT Toggle Styling */
+.addon-form-wrapper .vat-toggle {
+  margin: 10px 0;
+  display: flex;
+  justify-content: flex-end;
+}
+
+.addon-form-wrapper .vat-toggle-label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  font-weight: 600;
+  color: #1a3c5e;
+  cursor: pointer;
+}
+
+.addon-form-wrapper .vat-toggle input[type="checkbox"] {
+  display: none;
+}
+
+.addon-form-wrapper .vat-toggle .vat-toggle-slider {
+  width: 36px;
+  height: 20px;
+  background-color: #d1d5db;
+  border-radius: 10px;
+  position: relative;
+  transition: background-color 0.2s ease;
+}
+
+.addon-form-wrapper .vat-toggle .vat-toggle-slider::before {
+  content: "";
+  position: absolute;
+  width: 16px;
+  height: 16px;
+  background-color: white;
+  border-radius: 50%;
+  top: 2px;
+  left: 2px;
+  transition: transform 0.2s ease;
+}
+
+.addon-form-wrapper
+  .vat-toggle
+  input[type="checkbox"]:checked
+  + .vat-toggle-slider {
+  background: linear-gradient(135deg, #16a34a 0%, #22c55e 100%);
+}
+
+.addon-form-wrapper
+  .vat-toggle
+  input[type="checkbox"]:checked
+  + .vat-toggle-slider::before {
+  transform: translateX(16px);
+}
+
+.addon-form-wrapper
+  .vat-toggle
+  input[type="checkbox"]:disabled
+  + .vat-toggle-slider {
+  background-color: #e5e7eb;
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
 /* Invoice Summary Styling */
 .addon-form-wrapper .invoice-summary {
   margin-top: 12px;
@@ -474,6 +539,10 @@
     gap: 8px;
   }
 
+  .addon-form-wrapper .vat-toggle {
+    justify-content: flex-start;
+  }
+
   .addon-form-wrapper .invoice-summary {
     padding: 10px;
   }
@@ -519,5 +588,28 @@
     width: 100%;
     padding: 8px;
     font-size: 12px;
+  }
+
+  .addon-form-wrapper .vat-toggle-label {
+    font-size: 12px;
+  }
+
+  .addon-form-wrapper .vat-toggle .vat-toggle-slider {
+    width: 32px;
+    height: 18px;
+  }
+
+  .addon-form-wrapper .vat-toggle .vat-toggle-slider::before {
+    width: 14px;
+    height: 14px;
+    top: 2px;
+    left: 2px;
+  }
+
+  .addon-form-wrapper
+    .vat-toggle
+    input[type="checkbox"]:checked
+    + .vat-toggle-slider::before {
+    transform: translateX(14px);
   }
 }

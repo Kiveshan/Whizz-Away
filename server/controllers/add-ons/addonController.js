@@ -47,19 +47,20 @@ const getClientAddonsHandler = async (req, res) => {
 const createAddonHandler = async (req, res) => {
   try {
     console.log("Creating add-on with data:", req.body);
-    const { client_id, items, date } = req.body;
+    const { client_id, items, date, vat_applied } = req.body;
 
     if (
       !client_id ||
       !items ||
       !Array.isArray(items) ||
       items.length === 0 ||
-      !date
+      !date ||
+      typeof vat_applied !== "boolean"
     ) {
       return res.status(400).json({
         success: false,
         message:
-          "All fields are required: client_id, items (non-empty array), date",
+          "All fields are required: client_id, items (non-empty array), date, vat_applied (boolean)",
       });
     }
 
@@ -88,6 +89,7 @@ const createAddonHandler = async (req, res) => {
         item_amount: Number.parseFloat(item.item_amount),
       })),
       date,
+      vat_applied,
     });
 
     if (!result.success) {
@@ -157,19 +159,20 @@ const updateAddonHandler = async (req, res) => {
       req.body
     );
     const { addonId } = req.params;
-    const { items, date } = req.body;
+    const { items, date, vat_applied } = req.body;
 
-    if (!addonId) {
+    if (
+      !addonId ||
+      !items ||
+      !Array.isArray(items) ||
+      items.length === 0 ||
+      !date ||
+      typeof vat_applied !== "boolean"
+    ) {
       return res.status(400).json({
         success: false,
-        message: "Add-on ID is required",
-      });
-    }
-
-    if (!items || !Array.isArray(items) || items.length === 0 || !date) {
-      return res.status(400).json({
-        success: false,
-        message: "All fields are required: items (non-empty array), date",
+        message:
+          "All fields are required: addonId, items (non-empty array), date, vat_applied (boolean)",
       });
     }
 
@@ -197,6 +200,7 @@ const updateAddonHandler = async (req, res) => {
         item_amount: Number.parseFloat(item.item_amount),
       })),
       date,
+      vat_applied,
     });
 
     if (!result.success) {

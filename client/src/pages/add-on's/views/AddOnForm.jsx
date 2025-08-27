@@ -19,6 +19,7 @@ const AddOnForm = () => {
     date: new Date().toISOString().split("T")[0],
     invoice_number: "",
     group_id: "",
+    vat_applied: true, // New field for VAT toggle
   });
 
   const [companyInfo, setCompanyInfo] = useState({
@@ -143,6 +144,8 @@ const AddOnForm = () => {
               date: new Date(addon.date).toISOString().split("T")[0] || "",
               invoice_number: addon.invoice_number || "",
               group_id: addon.group_id || "",
+              vat_applied:
+                addon.vat_applied !== undefined ? addon.vat_applied : true,
             });
           } else {
             throw new Error(
@@ -186,6 +189,12 @@ const AddOnForm = () => {
       newItems[index] = { ...newItems[index], [name]: value };
     }
     setFormData((prev) => ({ ...prev, items: newItems }));
+    if (error) setError(null);
+  };
+
+  const handleVatToggle = () => {
+    if (isViewMode) return;
+    setFormData((prev) => ({ ...prev, vat_applied: !prev.vat_applied }));
     if (error) setError(null);
   };
 
@@ -250,6 +259,7 @@ const AddOnForm = () => {
           item_amount: Number.parseFloat(item.item_amount),
         })),
         date: formData.date,
+        vat_applied: formData.vat_applied,
       };
       const response = await api.post("/api/addons", submitData, {
         headers: {
@@ -311,7 +321,7 @@ const AddOnForm = () => {
       (sum, item) => sum + Number.parseFloat(item.item_amount || 0),
       0
     );
-    const vat = subtotal * 0.15;
+    const vat = formData.vat_applied ? subtotal * 0.15 : 0;
     const total = subtotal + vat;
     return { subtotal, vat, total };
   };
@@ -457,7 +467,9 @@ const AddOnForm = () => {
       const rightColumnWidth = (pageWidth - margins.left - margins.right) * 0.4;
       const summaryData = [
         ["Subtotal (excl. VAT)", formatCurrency(subtotal)],
-        ["VAT (15%)", formatCurrency(vat)],
+        ...(formData.vat_applied
+          ? [["VAT (15%)", formatCurrency(vat)]]
+          : [["VAT", "Not Applied"]]),
         ["Total Amount", formatCurrency(total)],
       ];
       autoTable(doc, {
@@ -700,6 +712,19 @@ const AddOnForm = () => {
                 </div>
               ))}
 
+              <div className="vat-toggle">
+                <label className="vat-toggle-label">
+                  <input
+                    type="checkbox"
+                    checked={formData.vat_applied}
+                    onChange={handleVatToggle}
+                    disabled={isViewMode}
+                  />
+                  <span className="vat-toggle-slider"></span>
+                  Apply VAT (15%)
+                </label>
+              </div>
+
               <div className="invoice-summary">
                 <div className="summary-row subtotal">
                   <span className="summary-label">Subtotal:</span>
@@ -711,7 +736,9 @@ const AddOnForm = () => {
                 <div className="summary-row vat">
                   <span className="summary-label">VAT (15%):</span>
                   <span className="summary-amount">
-                    {formatCurrency(calculateTotals().vat)}
+                    {formData.vat_applied
+                      ? formatCurrency(calculateTotals().vat)
+                      : "Not Applied"}
                   </span>
                 </div>
 

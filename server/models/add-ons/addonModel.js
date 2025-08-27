@@ -17,7 +17,8 @@ const getAddonsByClient = async (clientId, filters = {}) => {
         date,
         invoice_number,
         created_at,
-        group_id
+        group_id,
+        vat_applied
       FROM public.add_ons 
       WHERE client_id = $1
     `;
@@ -89,10 +90,11 @@ const createAddon = async (addonData) => {
     const groupId = `${addonData.client_id}-${monthName}${currentYear}`;
 
     // Calculate total amount from items
-    const totalAmount = addonData.items.reduce(
+    const subtotal = addonData.items.reduce(
       (sum, item) => sum + Number(item.item_amount),
       0
     );
+    const totalAmount = addonData.vat_applied ? subtotal * 1.15 : subtotal;
 
     // Insert into add_ons table
     const insertQueryText = `
@@ -103,9 +105,10 @@ const createAddon = async (addonData) => {
         date, 
         invoice_number,
         group_id,
-        created_at
-      ) VALUES ($1, $2, $3, $4, $5, $6, $7)
-      RETURNING addon_id, items, amount, date, invoice_number, group_id
+        created_at,
+        vat_applied
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+      RETURNING addon_id, items, amount, date, invoice_number, group_id, vat_applied
     `;
 
     const result = await query(insertQueryText, [
@@ -116,6 +119,7 @@ const createAddon = async (addonData) => {
       invoiceNumber,
       groupId,
       today,
+      addonData.vat_applied,
     ]);
 
     return {
@@ -128,6 +132,7 @@ const createAddon = async (addonData) => {
         invoice_number: result.rows[0].invoice_number,
         group_id: result.rows[0].group_id,
         client_id: addonData.client_id,
+        vat_applied: result.rows[0].vat_applied,
       },
     };
   } catch (error) {
@@ -158,6 +163,7 @@ const getAddonById = async (addonId) => {
         a.date,
         a.invoice_number,
         a.created_at,
+        a.vat_applied,
         c.client as client_name
       FROM public.add_ons a
       LEFT JOIN public.m5_client c ON a.client_id = c.m5clientkey
@@ -197,28 +203,31 @@ const updateAddon = async (addonId, addonData) => {
     }
 
     // Calculate total amount from items
-    const totalAmount = addonData.items.reduce(
+    const subtotal = addonData.items.reduce(
       (sum, item) => sum + Number(item.item_amount),
       0
     );
+    const totalAmount = addonData.vat_applied ? subtotal * 1.15 : subtotal;
 
     const queryText = `
       UPDATE public.add_ons 
-      SET items = $1, amount = $2, date = $3
-      WHERE addon_id = $4
-      RETURNING addon_id, items, amount, date, invoice_number
+      SET items = $1, amount = $2, date = $3, vat_applied = $4
+      WHERE addon_id = $5
+      RETURNING addon_id, items, amount, date, invoice_number, vat_applied
     `;
 
     console.log("Executing update query:", queryText, "with params:", [
       JSON.stringify(addonData.items),
       totalAmount,
       addonData.date,
+      addonData.vat_applied,
       addonId,
     ]);
     const result = await query(queryText, [
       JSON.stringify(addonData.items),
       totalAmount,
       addonData.date,
+      addonData.vat_applied,
       addonId,
     ]);
 
