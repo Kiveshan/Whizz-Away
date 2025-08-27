@@ -191,11 +191,16 @@ const CreditNoteList = () => {
                 onChange={handleFilterChange}
               >
                 <option>Year</option>
-                <option>2025</option>
-                <option>2024</option>
-                <option>2023</option>
-                <option>2022</option>
+                {[...Array(5)].map((_, i) => {
+                  const year = currentDate.getFullYear() - i;
+                  return (
+                    <option key={year} value={year}>
+                      {year}
+                    </option>
+                  );
+                })}
               </select>
+
               <select
                 name="month"
                 className="dropdown"
