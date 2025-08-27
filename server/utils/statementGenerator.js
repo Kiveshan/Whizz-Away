@@ -52,7 +52,7 @@ function logDateInfo(dates) {
     `Generating statements for invoices and add-ons confirmed between ${dates.formattedInvoiceStartDate} and ${dates.formattedInvoiceEndDate}`
   );
   console.log(
-    `Fetching payments between ${dates.formattedPaymentStartDate} and ${dates.formattedPaymentEndDate}`
+    `Fetching payments and credit notes between ${dates.formattedPaymentStartDate} and ${dates.formattedPaymentEndDate}`
   );
 }
 
@@ -84,7 +84,7 @@ function validateClients(clients, specificClientId) {
   return { success: true };
 }
 
-// ==================== PAYMENT UTILITIES ====================
+// ==================== PAYMENT AND CREDIT NOTE UTILITIES ====================
 async function fetchPaymentsMap(
   dbClient,
   formattedPaymentStartDate,
@@ -114,6 +114,36 @@ async function fetchPaymentsMap(
   return paymentsMap;
 }
 
+async function fetchCreditNotesMap(
+  dbClient,
+  formattedPaymentStartDate,
+  formattedPaymentEndDate
+) {
+  const creditNotesResult = await dbClient.query(
+    `SELECT 
+       cn.client_id,
+       SUM(cn_amount.amount) as total_credit_notes
+     FROM credit_notes cn
+     CROSS JOIN LATERAL unnest(cn.amount) AS cn_amount(amount)
+     WHERE cn.creditnote_date BETWEEN $1 AND $2
+     GROUP BY cn.client_id`,
+    [formattedPaymentStartDate, formattedPaymentEndDate]
+  );
+
+  const creditNotesMap = new Map(
+    creditNotesResult.rows.map((row) => [
+      row.client_id,
+      Number.parseFloat(row.total_credit_notes) || 0,
+    ])
+  );
+
+  console.log(
+    `Fetched credit notes for ${creditNotesResult.rows.length} clients between ${formattedPaymentStartDate} and ${formattedPaymentEndDate}`
+  );
+
+  return creditNotesMap;
+}
+
 async function fetchClientPayments(
   dbClient,
   clientId,
@@ -125,18 +155,34 @@ async function fetchClientPayments(
     FROM payment_m3
     WHERE clientid = $1 AND fileupload BETWEEN $2 AND $3
   `;
+  const creditNotesQuery = `
+    SELECT SUM(cn_amount.amount) as total_credit_notes
+    FROM credit_notes cn
+    CROSS JOIN LATERAL unnest(cn.amount) AS cn_amount(amount)
+    WHERE cn.client_id = $1 AND cn.creditnote_date BETWEEN $2 AND $3
+  `;
 
   const paymentParams = [
     clientId,
     formattedPaymentStartDate,
     formattedPaymentEndDate,
   ];
-  const clientPaymentsResult = await dbClient.query(
-    paymentsQuery,
-    paymentParams
+  const [paymentsResult, creditNotesResult] = await Promise.all([
+    dbClient.query(paymentsQuery, paymentParams),
+    dbClient.query(creditNotesQuery, paymentParams),
+  ]);
+
+  const totalPayments =
+    Number.parseFloat(paymentsResult.rows[0]?.total_payments) || 0;
+  const totalCreditNotes =
+    Number.parseFloat(creditNotesResult.rows[0]?.total_credit_notes) || 0;
+  const totalReductions = totalPayments + totalCreditNotes;
+
+  console.log(
+    `Client ${clientId}: Total payments R${totalPayments}, Total credit notes R${totalCreditNotes}, Total reductions R${totalReductions}`
   );
 
-  return Number.parseFloat(clientPaymentsResult.rows[0]?.total_payments) || 0;
+  return totalReductions;
 }
 
 // ==================== INVOICE UTILITIES ====================
@@ -233,12 +279,12 @@ async function fetchPreviousStatementAging(
 function calculateAgingBuckets(
   previousAging,
   totalInvoices,
-  totalPayments,
+  totalReductions,
   isUpdate = false
 ) {
   if (!previousAging) {
     const newCurrent = totalInvoices;
-    const remaining30days = 0 - totalPayments;
+    const remaining30days = 0 - totalReductions;
 
     return {
       newCurrent,
@@ -250,7 +296,7 @@ function calculateAgingBuckets(
 
   const newCurrent = totalInvoices;
   const raw30days = Number.parseFloat(previousAging.current) || 0;
-  const remaining30days = raw30days - totalPayments;
+  const remaining30days = raw30days - totalReductions;
   let new30days, new60days, new90days;
 
   if (remaining30days < 0) {
@@ -266,11 +312,11 @@ function calculateAgingBuckets(
     } else if (remaining60days < 0) {
       new30days = 0;
       new60days = 0;
-      const excessPayment = -remaining60days;
+      const excessReduction = -remaining60days;
       const raw90days =
         (Number.parseFloat(previousAging["60days"]) || 0) +
         (Number.parseFloat(previousAging["90days"]) || 0);
-      new90days = raw90days - excessPayment;
+      new90days = raw90days - excessReduction;
     } else {
       new30days = 0;
       new60days = remaining60days;
@@ -385,7 +431,13 @@ async function updateStatement(
 }
 
 // ==================== CLIENT PROCESSING ====================
-async function processClient(dbClient, clientId, dates, paymentsMap) {
+async function processClient(
+  dbClient,
+  clientId,
+  dates,
+  paymentsMap,
+  creditNotesMap
+) {
   const {
     formattedGenDate,
     formattedInvoiceStartDate,
@@ -404,7 +456,7 @@ async function processClient(dbClient, clientId, dates, paymentsMap) {
   let updateRequired = false;
 
   if (isUpdate) {
-    // Check if there are any invoices, add-ons, or payments that would change the statement
+    // Check if there are any invoices, add-ons, payments, or credit notes that would change the statement
     const invoices = await fetchClientInvoices(
       dbClient,
       clientId,
@@ -412,22 +464,27 @@ async function processClient(dbClient, clientId, dates, paymentsMap) {
       formattedInvoiceEndDate
     );
     const totalPayments = paymentsMap.get(clientId) || 0;
+    const totalCreditNotes = creditNotesMap.get(clientId) || 0;
 
-    // If no invoices, add-ons, or payments for this period, skip update
-    if (invoices.length === 0 && totalPayments === 0) {
+    // If no invoices, add-ons, payments, or credit notes for this period, skip update
+    if (
+      invoices.length === 0 &&
+      totalPayments === 0 &&
+      totalCreditNotes === 0
+    ) {
       console.log(
-        `Client ${clientId}: No invoices, add-ons, or payments found for period, skipping update`
+        `Client ${clientId}: No invoices, add-ons, payments, or credit notes found for period, skipping update`
       );
       return { processed: true, created: false, updated: false };
     }
 
     console.log(
-      `Client ${clientId}: Update required - found invoices, add-ons, or payments for period`
+      `Client ${clientId}: Update required - found invoices, add-ons, payments, or credit notes for period`
     );
     updateRequired = true;
   }
 
-  // Only fetch invoices/add-ons and payments if we're creating new statement or update is required
+  // Only fetch invoices/add-ons and payments/credit notes if we're creating new statement or update is required
   if (!isUpdate || updateRequired) {
     const invoices = await fetchClientInvoices(
       dbClient,
@@ -435,7 +492,7 @@ async function processClient(dbClient, clientId, dates, paymentsMap) {
       formattedInvoiceStartDate,
       formattedInvoiceEndDate
     );
-    const totalPayments = await fetchClientPayments(
+    const totalReductions = await fetchClientPayments(
       dbClient,
       clientId,
       formattedPaymentStartDate,
@@ -443,12 +500,12 @@ async function processClient(dbClient, clientId, dates, paymentsMap) {
     );
 
     console.log(
-      `Client ${clientId}: Total payments from ${formattedPaymentStartDate} to ${formattedPaymentEndDate}: R${totalPayments}`
+      `Client ${clientId}: Total reductions (payments + credit notes) from ${formattedPaymentStartDate} to ${formattedPaymentEndDate}: R${totalReductions}`
     );
 
-    if (invoices.length === 0 && totalPayments === 0) {
+    if (invoices.length === 0 && totalReductions === 0) {
       console.log(
-        `Client ${clientId}: No invoices, add-ons, or payments found, skipping`
+        `Client ${clientId}: No invoices, add-ons, payments, or credit notes found, skipping`
       );
       return { processed: false, created: false, updated: false };
     }
@@ -481,7 +538,12 @@ async function processClient(dbClient, clientId, dates, paymentsMap) {
 
     // Calculate aging buckets
     const { newCurrent, new30days, new60days, new90days } =
-      calculateAgingBuckets(agingData, totalInvoices, totalPayments, isUpdate);
+      calculateAgingBuckets(
+        agingData,
+        totalInvoices,
+        totalReductions,
+        isUpdate
+      );
 
     if (isUpdate) {
       console.log(
@@ -569,12 +631,19 @@ async function generateMonthlyStatements(specificClientId = null) {
       return validation;
     }
 
-    // Fetch payments for all clients
-    const paymentsMap = await fetchPaymentsMap(
-      dbClient,
-      dates.formattedPaymentStartDate,
-      dates.formattedPaymentEndDate
-    );
+    // Fetch payments and credit notes for all clients
+    const [paymentsMap, creditNotesMap] = await Promise.all([
+      fetchPaymentsMap(
+        dbClient,
+        dates.formattedPaymentStartDate,
+        dates.formattedPaymentEndDate
+      ),
+      fetchCreditNotesMap(
+        dbClient,
+        dates.formattedPaymentStartDate,
+        dates.formattedPaymentEndDate
+      ),
+    ]);
 
     let processedCount = 0;
     let updatedCount = 0;
@@ -587,7 +656,8 @@ async function generateMonthlyStatements(specificClientId = null) {
         dbClient,
         clientId,
         dates,
-        paymentsMap
+        paymentsMap,
+        creditNotesMap
       );
 
       if (result.processed) processedCount++;
