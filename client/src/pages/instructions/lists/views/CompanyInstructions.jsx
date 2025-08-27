@@ -123,6 +123,7 @@ const CompanyInstructions = () => {
 
         const data = response.data
         console.log("All instructions fetched:", data.length)
+        console.log("Sample instruction data:", data.length > 0 ? data[0] : 'No data')
 
         // Apply client filtering in the component
         let filteredData = data
@@ -175,6 +176,8 @@ const CompanyInstructions = () => {
           }
         }
 
+        console.log("Setting instructions with data:", filteredData.length, "items")
+        console.log("First item sample:", filteredData.length > 0 ? filteredData[0] : 'No data')
         setInstructions(filteredData)
         setLoading(false)
       } catch (error) {
@@ -213,7 +216,8 @@ const CompanyInstructions = () => {
     // Filter by month and year if selected
     if (selectedMonth) {
       filtered = filtered.filter((item) => {
-        const date = new Date(item.startingdate || item.pickupdate)
+        if (!item.startingdate) return false;
+        const date = new Date(item.startingdate)
         const monthNames = [
           "January",
           "February",
@@ -234,7 +238,8 @@ const CompanyInstructions = () => {
 
     if (selectedYear) {
       filtered = filtered.filter((item) => {
-        const date = new Date(item.startingdate || item.pickupdate)
+        if (!item.startingdate) return false;
+        const date = new Date(item.startingdate)
         return date.getFullYear().toString() === selectedYear
       })
     }
@@ -458,7 +463,7 @@ const CompanyInstructions = () => {
                   <th>File No</th>
                   <th>Type</th>
                   <th>Status</th>
-                  <th>Starting Date</th>
+                  <th>Creation Date</th>
                   <th>Instruction</th>
                   <th>Assignment</th>
                 </tr>
@@ -486,7 +491,7 @@ const CompanyInstructions = () => {
                                   : item.type)}
                       </td>
                       <td>{renderStatus(item.status)}</td>
-                      <td>{new Date(item.startingdate || item.pickupdate).toLocaleDateString()}</td>
+                      <td>{item.startingdate ? new Date(item.startingdate).toLocaleDateString() : 'N/A'}</td>
                       <td>
                         <button
                           className="view-btn"
