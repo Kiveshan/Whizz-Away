@@ -245,6 +245,7 @@ const ClientRatesForm = ({ clientData, loading, onSave, onCancel }) => {
         <button type="submit" className="manage-save-button" disabled={loading || !isFormValid}>
           {loading ? "Saving..." : "Save"}
         </button>
+        
         <button type="button" onClick={addRate} className="add-rate-button">
           + Add
         </button>
