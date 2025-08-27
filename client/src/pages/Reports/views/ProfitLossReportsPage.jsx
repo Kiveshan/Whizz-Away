@@ -9,7 +9,7 @@ const ProfitLossReportsPage = () => {
     const [selectedYear, setSelectedYear] = useState(currentYear)
 
     const handleMonthClick = (month, year) => {
-        navigate(`/profit-loss-reports/${month}/${year}`)
+        navigate(`/income-expenditure-reports/${month}/${year}`)
     }
 
     // Generate months
