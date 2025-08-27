@@ -247,8 +247,6 @@ const AddOnList = () => {
               <th>Date</th>
               <th>Amount</th>
               <th>Invoice Number</th>
-              <th>Category</th>
-              <th>Description</th>
               <th>Actions</th>
             </tr>
           </thead>
@@ -259,8 +257,6 @@ const AddOnList = () => {
                   <td>{new Date(addon.date).toLocaleDateString()}</td>
                   <td>R{addon.amount.toLocaleString()}</td>
                   <td>{addon.invoice_number}</td>
-                  <td>{addon.category}</td>
-                  <td>{addon.description}</td>
                   <td>
                     <button
                       className="view-button"
