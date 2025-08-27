@@ -29,9 +29,11 @@ import instructionRoutes from "./instructions/instructionRoutes.js";
 import assignmentRoutes from "./assignments/assignmentRoutes.js";
 import subcontractorsRoutes from "./subcontractors/subContractorRoutes.js";
 import addonRoutes from "./add-ons/addonRoutes.js";
+import creditNoteRoutes from "./creditNote/creditNoteRoutes.js";
 
 const router = express.Router();
 
+router.use(creditNoteRoutes);
 router.use(authroutes);
 router.use(adminroutes);
 router.use(testroutes);

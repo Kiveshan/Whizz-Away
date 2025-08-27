@@ -76,6 +76,11 @@ const saveClientRatesHandler = async (req, res) => {
       if (!rate["6m_rate"] && !rate["12m_rate"]) {
         return res.status(400).json({ error: "At least one rate (6m or 12m) is required for each entry" })
       }
+
+      // Validate hazardous if provided
+      if (rate.hazardous !== undefined && rate.hazardous !== "" && (isNaN(rate.hazardous) || Number.parseFloat(rate.hazardous) < 0)) {
+        return res.status(400).json({ error: "Hazardous must be a non-negative number" })
+      }
     }
 
     const result = await saveClientRates(clientId, rates)
