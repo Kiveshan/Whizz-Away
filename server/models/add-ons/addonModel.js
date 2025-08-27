@@ -12,12 +12,12 @@ const getAddonsByClient = async (clientId, filters = {}) => {
       SELECT 
         addon_id,
         client_id,
-        description,
+        items,
         amount,
-        category,
         date,
         invoice_number,
-        created_at
+        created_at,
+        group_id
       FROM public.add_ons 
       WHERE client_id = $1
     `;
@@ -88,26 +88,30 @@ const createAddon = async (addonData) => {
     const monthName = monthNames[currentMonth - 1];
     const groupId = `${addonData.client_id}-${monthName}${currentYear}`;
 
+    // Calculate total amount from items
+    const totalAmount = addonData.items.reduce(
+      (sum, item) => sum + Number(item.item_amount),
+      0
+    );
+
     // Insert into add_ons table
     const insertQueryText = `
       INSERT INTO public.add_ons (
         client_id, 
-        description, 
+        items, 
         amount, 
-        category, 
         date, 
         invoice_number,
         group_id,
         created_at
-      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
-      RETURNING addon_id, invoice_number, group_id
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7)
+      RETURNING addon_id, items, amount, date, invoice_number, group_id
     `;
 
     const result = await query(insertQueryText, [
       addonData.client_id,
-      addonData.description,
-      addonData.amount,
-      addonData.category,
+      JSON.stringify(addonData.items),
+      totalAmount,
       addonData.date,
       invoiceNumber,
       groupId,
@@ -118,9 +122,12 @@ const createAddon = async (addonData) => {
       success: true,
       data: {
         addon_id: result.rows[0].addon_id,
+        items: result.rows[0].items,
+        amount: result.rows[0].amount,
+        date: result.rows[0].date,
         invoice_number: result.rows[0].invoice_number,
         group_id: result.rows[0].group_id,
-        ...addonData,
+        client_id: addonData.client_id,
       },
     };
   } catch (error) {
@@ -146,9 +153,8 @@ const getAddonById = async (addonId) => {
       SELECT 
         a.addon_id,
         a.client_id,
-        a.description,
+        a.items,
         a.amount,
-        a.category,
         a.date,
         a.invoice_number,
         a.created_at,
@@ -190,24 +196,28 @@ const updateAddon = async (addonId, addonData) => {
       };
     }
 
+    // Calculate total amount from items
+    const totalAmount = addonData.items.reduce(
+      (sum, item) => sum + Number(item.item_amount),
+      0
+    );
+
     const queryText = `
       UPDATE public.add_ons 
-      SET description = $1, amount = $2, category = $3, date = $4
-      WHERE addon_id = $5
-      RETURNING addon_id, description, amount, category, date, invoice_number
+      SET items = $1, amount = $2, date = $3
+      WHERE addon_id = $4
+      RETURNING addon_id, items, amount, date, invoice_number
     `;
 
     console.log("Executing update query:", queryText, "with params:", [
-      addonData.description,
-      addonData.amount,
-      addonData.category,
+      JSON.stringify(addonData.items),
+      totalAmount,
       addonData.date,
       addonId,
     ]);
     const result = await query(queryText, [
-      addonData.description,
-      addonData.amount,
-      addonData.category,
+      JSON.stringify(addonData.items),
+      totalAmount,
       addonData.date,
       addonId,
     ]);

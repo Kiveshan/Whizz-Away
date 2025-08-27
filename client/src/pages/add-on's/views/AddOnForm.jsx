@@ -15,10 +15,8 @@ const AddOnForm = () => {
   const isViewMode = !!addonId;
 
   const [formData, setFormData] = useState({
-    category: "",
-    amount: "",
+    items: [{ category: "", description: "", item_amount: "" }],
     date: new Date().toISOString().split("T")[0],
-    description: "",
     invoice_number: "",
     group_id: "",
   });
@@ -26,7 +24,7 @@ const AddOnForm = () => {
   const [companyInfo, setCompanyInfo] = useState({
     name: "",
     address: "",
-    city: "", // Maps to suburb from usertable
+    city: "",
     phone: "",
     email: "",
     vat_reg_num: "",
@@ -57,7 +55,6 @@ const AddOnForm = () => {
     const fetchCompanyAndClientInfo = async () => {
       try {
         setFetchingInfo(true);
-        // Fetch company information
         const companyResponse = await api.get("/api/companyinfo", {
           headers: {
             Authorization: `Bearer ${localStorage.getItem("token")}`,
@@ -67,7 +64,7 @@ const AddOnForm = () => {
           setCompanyInfo({
             name: companyResponse.data.data.name || "",
             address: companyResponse.data.data.address || "",
-            city: companyResponse.data.data.city || "", // Maps to suburb
+            city: companyResponse.data.data.city || "",
             phone: companyResponse.data.data.phone || "",
             email: companyResponse.data.data.email || "",
             vat_reg_num: companyResponse.data.data.vat_reg_num || "",
@@ -83,7 +80,6 @@ const AddOnForm = () => {
           );
         }
 
-        // Fetch client information
         if (clientId) {
           const clientResponse = await api.get(
             `/api/add-on/client/${clientId}`,
@@ -141,10 +137,10 @@ const AddOnForm = () => {
           if (response.data.success) {
             const addon = response.data.data;
             setFormData({
-              category: addon.category || "",
-              amount: addon.amount.toString() || "",
+              items: addon.items || [
+                { category: "", description: "", item_amount: "" },
+              ],
               date: new Date(addon.date).toISOString().split("T")[0] || "",
-              description: addon.description || "",
               invoice_number: addon.invoice_number || "",
               group_id: addon.group_id || "",
             });
@@ -174,44 +170,66 @@ const AddOnForm = () => {
     }
   }, [isViewMode, addonId, clientId, clientName, navigate]);
 
-  const handleInputChange = (e) => {
+  const handleInputChange = (index, e) => {
     if (isViewMode) return;
     const { name, value } = e.target;
-    if (name === "amount") {
+    const newItems = [...formData.items];
+    if (name === "item_amount") {
       const numericValue = value.replace(/[^0-9.]/g, "");
       if (
         numericValue === "" ||
         (!isNaN(numericValue) && Number.parseFloat(numericValue) >= 0)
       ) {
-        setFormData((prev) => ({
-          ...prev,
-          [name]: numericValue,
-        }));
+        newItems[index] = { ...newItems[index], [name]: numericValue };
       }
     } else {
-      setFormData((prev) => ({
-        ...prev,
-        [name]: value,
-      }));
+      newItems[index] = { ...newItems[index], [name]: value };
     }
+    setFormData((prev) => ({ ...prev, items: newItems }));
     if (error) setError(null);
   };
 
+  const addItem = () => {
+    if (isViewMode) return;
+    setFormData((prev) => ({
+      ...prev,
+      items: [
+        ...prev.items,
+        { category: "", description: "", item_amount: "" },
+      ],
+    }));
+  };
+
+  const removeItem = (index) => {
+    if (isViewMode || formData.items.length === 1) return;
+    const newItems = formData.items.filter((_, i) => i !== index);
+    setFormData((prev) => ({ ...prev, items: newItems }));
+  };
+
   const validateForm = () => {
-    if (!formData.category.trim()) {
-      setError("Please enter a category");
+    if (formData.items.length === 0) {
+      setError("At least one item is required");
       return false;
     }
-    if (!formData.amount || Number.parseFloat(formData.amount) <= 0) {
-      setError("Please enter a valid amount greater than 0");
-      return false;
+    for (let i = 0; i < formData.items.length; i++) {
+      const item = formData.items[i];
+      if (!item.category.trim()) {
+        setError(`Please enter a category for item ${i + 1}`);
+        return false;
+      }
+      if (!item.description.trim()) {
+        setError(`Please enter a description for item ${i + 1}`);
+        return false;
+      }
+      if (!item.item_amount || Number.parseFloat(item.item_amount) <= 0) {
+        setError(
+          `Please enter a valid amount greater than 0 for item ${i + 1}`
+        );
+        return false;
+      }
     }
     if (!formData.date) {
       setError("Please select a date");
-      return false;
-    }
-    if (!formData.description.trim()) {
-      setError("Please enter a description");
       return false;
     }
     return true;
@@ -226,10 +244,12 @@ const AddOnForm = () => {
     try {
       const submitData = {
         client_id: clientId,
-        category: formData.category.trim(),
-        amount: Number.parseFloat(formData.amount),
+        items: formData.items.map((item) => ({
+          category: item.category.trim(),
+          description: item.description.trim(),
+          item_amount: Number.parseFloat(item.item_amount),
+        })),
         date: formData.date,
-        description: formData.description.trim(),
       };
       const response = await api.post("/api/addons", submitData, {
         headers: {
@@ -286,6 +306,16 @@ const AddOnForm = () => {
     return new Date(date).toLocaleDateString("en-ZA");
   };
 
+  const calculateTotals = () => {
+    const subtotal = formData.items.reduce(
+      (sum, item) => sum + Number.parseFloat(item.item_amount || 0),
+      0
+    );
+    const vat = subtotal * 0.15;
+    const total = subtotal + vat;
+    return { subtotal, vat, total };
+  };
+
   const handlePrint = () => {
     setPdfLoading(true);
     try {
@@ -296,11 +326,11 @@ const AddOnForm = () => {
       });
 
       const fonts = {
-        title: 18,
-        header: 14,
-        normal: 11,
-        small: 10,
-        tiny: 9,
+        title: 16,
+        header: 12,
+        normal: 10,
+        small: 9,
+        tiny: 8,
       };
 
       const margins = {
@@ -316,23 +346,23 @@ const AddOnForm = () => {
       doc.setFontSize(fonts.title);
       doc.setFont("helvetica", "bold");
       doc.text(companyInfo.name || "Company Name", margins.left, currentY);
-      currentY += 6;
+      currentY += 5;
 
       // Company Details
       doc.setFontSize(fonts.small);
       doc.setFont("helvetica", "normal");
       const companyDetails = [
         companyInfo.address,
-        companyInfo.city, // Maps to suburb
+        companyInfo.city,
         `Phone: ${companyInfo.phone}`,
         `Email: ${companyInfo.email}`,
         `VAT Reg No: ${companyInfo.vat_reg_num}`,
       ].filter(Boolean);
       companyDetails.forEach((detail) => {
         doc.text(detail, margins.left, currentY);
-        currentY += 5;
+        currentY += 4;
       });
-      currentY += 8;
+      currentY += 6;
 
       // Invoice Title and Number
       doc.setFontSize(fonts.header);
@@ -346,7 +376,7 @@ const AddOnForm = () => {
         currentY,
         { align: "right" }
       );
-      currentY += 7;
+      currentY += 6;
 
       // Client Details
       doc.setFontSize(fonts.small);
@@ -361,19 +391,20 @@ const AddOnForm = () => {
       ].filter(Boolean);
       clientDetails.forEach((detail) => {
         doc.text(detail, margins.left, currentY);
-        currentY += 5;
+        currentY += 4;
       });
-      currentY += 8;
+      currentY += 6;
 
       // Service Details Table
-      const serviceData = [
-        ["Category", formData.category || "N/A"],
-        ["Description", formData.description || "N/A"],
-        ["Date", formatDate(formData.date)],
-      ];
+      const serviceData = formData.items.map((item) => [
+        item.category || "N/A",
+        item.description || "N/A",
+        formatDate(formData.date),
+        formatCurrency(item.item_amount || 0),
+      ]);
       autoTable(doc, {
         startY: currentY,
-        head: [],
+        head: [["Category", "Description", "Date", "Amount"]],
         body: serviceData,
         theme: "grid",
         styles: {
@@ -382,17 +413,22 @@ const AddOnForm = () => {
           lineWidth: 0.1,
         },
         columnStyles: {
-          0: { fontStyle: "bold", cellWidth: 35 },
+          0: { cellWidth: 30 },
           1: { cellWidth: "auto" },
+          2: { cellWidth: 25 },
+          3: { cellWidth: 25, halign: "right" },
+        },
+        headStyles: {
+          fillColor: [34, 139, 34],
+          textColor: [255, 255, 255],
+          fontStyle: "bold",
         },
         margin: { left: margins.left, right: margins.right },
       });
       currentY = doc.lastAutoTable.finalY + 5;
 
       // Financial Summary
-      const amount = Number.parseFloat(formData.amount || 0);
-      const vat = amount * 0.15;
-      const total = amount + vat;
+      const { subtotal, vat, total } = calculateTotals();
       const sectionStartY = currentY;
 
       // Banking Details (Left)
@@ -400,7 +436,7 @@ const AddOnForm = () => {
       doc.setFontSize(fonts.normal);
       doc.setFont("helvetica", "bold");
       doc.text("Banking Details", margins.left, currentY);
-      currentY += 6;
+      currentY += 5;
       doc.setFontSize(fonts.small);
       doc.setFont("helvetica", "normal");
       const bankingDetails = [
@@ -413,14 +449,14 @@ const AddOnForm = () => {
       ].filter(Boolean);
       bankingDetails.forEach((detail) => {
         doc.text(detail, margins.left, currentY);
-        currentY += 5;
+        currentY += 4;
       });
 
       // Invoice Summary (Right)
       const rightColumnStart = margins.left + leftColumnWidth + 5;
       const rightColumnWidth = (pageWidth - margins.left - margins.right) * 0.4;
       const summaryData = [
-        ["Amount (excl. VAT)", formatCurrency(amount)],
+        ["Subtotal (excl. VAT)", formatCurrency(subtotal)],
         ["VAT (15%)", formatCurrency(vat)],
         ["Total Amount", formatCurrency(total)],
       ];
@@ -455,7 +491,7 @@ const AddOnForm = () => {
       // Finalize Y position
       const bankingEndY = currentY;
       const summaryEndY = doc.lastAutoTable.finalY;
-      currentY = Math.max(bankingEndY, summaryEndY) + 8;
+      currentY = Math.max(bankingEndY, summaryEndY) + 6;
 
       // Footer Notes
       doc.setFontSize(fonts.tiny);
@@ -543,7 +579,7 @@ const AddOnForm = () => {
             <p>{clientInfo.name}</p>
             <p>{clientInfo.address}</p>
             <p>{clientInfo.city}</p>
-            <p>Telephone: {clientInfo.telephone}</p>
+            <p>Tel: {clientInfo.telephone}</p>
             <p>Email: {clientInfo.email}</p>
             <p>VAT Reg No: {clientInfo.vat_reg_num}</p>
           </div>
@@ -557,7 +593,7 @@ const AddOnForm = () => {
                 className="print-button"
                 disabled={pdfLoading}
               >
-                {pdfLoading ? "Generating PDF..." : "🖨️ Print Invoice"}
+                {pdfLoading ? "Generating PDF..." : "🖨️ Print"}
               </button>
             )}
           </div>
@@ -568,109 +604,134 @@ const AddOnForm = () => {
             {error && <div className="error-message">{error}</div>}
 
             <div className="invoice-items-header">
-              <h3>Details</h3>
+              <h3>Invoice Details</h3>
+              {!isViewMode && (
+                <button
+                  type="button"
+                  onClick={addItem}
+                  className="add-item-button"
+                >
+                  + Add Item
+                </button>
+              )}
             </div>
 
             <div className="invoice-items-table">
-              <div className="form-row">
-                <div className="form-group">
-                  <label htmlFor="category">Category</label>
-                  <input
-                    type="text"
-                    id="category"
-                    name="category"
-                    value={formData.category}
-                    onChange={handleInputChange}
-                    placeholder="Enter service category..."
-                    className="form-input"
-                    required
-                    readOnly={isViewMode}
-                  />
-                </div>
+              {formData.items.map((item, index) => (
+                <div key={index} className="item-row">
+                  <div className="form-row">
+                    <div className="form-group">
+                      <label htmlFor={`category-${index}`}>Category</label>
+                      <input
+                        type="text"
+                        id={`category-${index}`}
+                        name="category"
+                        value={item.category}
+                        onChange={(e) => handleInputChange(index, e)}
+                        placeholder="Service category"
+                        className="form-input"
+                        required
+                        readOnly={isViewMode}
+                      />
+                    </div>
 
-                <div className="form-group">
-                  <label htmlFor="date">Date</label>
-                  <input
-                    type="date"
-                    id="date"
-                    name="date"
-                    value={formData.date}
-                    onChange={handleInputChange}
-                    className="form-input"
-                    required
-                    readOnly={isViewMode}
-                  />
-                </div>
-              </div>
+                    <div className="form-group">
+                      <label htmlFor={`item_amount-${index}`}>Amount</label>
+                      <div className="amount-input-wrapper">
+                        <span className="currency-symbol">R</span>
+                        <input
+                          type="text"
+                          id={`item_amount-${index}`}
+                          name="item_amount"
+                          value={item.item_amount}
+                          onChange={(e) => handleInputChange(index, e)}
+                          placeholder="0.00"
+                          className="amount-input"
+                          required
+                          readOnly={isViewMode}
+                        />
+                      </div>
+                    </div>
+                  </div>
 
-              <div className="form-group full-width">
-                <label htmlFor="description">Description</label>
-                <textarea
-                  id="description"
-                  name="description"
-                  value={formData.description}
-                  onChange={handleInputChange}
-                  placeholder="Enter detailed description of the add-on service..."
-                  className="form-textarea"
-                  rows="4"
+                  <div className="form-group full-width">
+                    <label htmlFor={`description-${index}`}>Description</label>
+                    <textarea
+                      id={`description-${index}`}
+                      name="description"
+                      value={item.description}
+                      onChange={(e) => handleInputChange(index, e)}
+                      placeholder="Service description"
+                      className="form-textarea"
+                      rows="3"
+                      required
+                      readOnly={isViewMode}
+                    />
+                  </div>
+
+                  {!isViewMode && formData.items.length > 1 && (
+                    <button
+                      type="button"
+                      onClick={() => removeItem(index)}
+                      className="remove-item-button"
+                    >
+                      Remove
+                    </button>
+                  )}
+                </div>
+              ))}
+
+              <div className="form-group date-group">
+                <label htmlFor="date">Invoice Date</label>
+                <input
+                  type="date"
+                  id="date"
+                  name="date"
+                  value={formData.date}
+                  onChange={(e) =>
+                    setFormData((prev) => ({ ...prev, date: e.target.value }))
+                  }
+                  className="form-input"
                   required
                   readOnly={isViewMode}
                 />
               </div>
 
               <div className="invoice-summary">
-                <div className="summary-row">
-                  <span className="summary-label">Amount (excl. VAT):</span>
-                  <div className="amount-input-wrapper">
-                    <span className="currency-symbol">R</span>
-                    <input
-                      type="text"
-                      id="amount"
-                      name="amount"
-                      value={formData.amount}
-                      onChange={handleInputChange}
-                      placeholder="0.00"
-                      className="amount-input"
-                      required
-                      readOnly={isViewMode}
-                    />
-                  </div>
-                </div>
-
                 <div className="summary-row subtotal">
                   <span className="summary-label">Subtotal:</span>
                   <span className="summary-amount">
-                    {formatCurrency(formData.amount || 0)}
+                    {formatCurrency(calculateTotals().subtotal)}
                   </span>
                 </div>
 
                 <div className="summary-row vat">
                   <span className="summary-label">VAT (15%):</span>
                   <span className="summary-amount">
-                    {formatCurrency((formData.amount || 0) * 0.15)}
+                    {formatCurrency(calculateTotals().vat)}
                   </span>
                 </div>
 
                 <div className="summary-row total">
-                  <span className="summary-label">Total Amount:</span>
+                  <span className="summary-label">Total:</span>
                   <span className="summary-amount">
-                    {formatCurrency((formData.amount || 0) * 1.15)}
+                    {formatCurrency(calculateTotals().total)}
                   </span>
                 </div>
               </div>
             </div>
 
-            <div className="invoice-actions-footer">
-              {!isViewMode && (
+            {!isViewMode && (
+              <div className="invoice-actions-footer">
                 <button
                   type="submit"
                   className="create-invoice-button"
                   disabled={loading}
                 >
-                  {loading ? "Creating Invoice..." : "Create Add-On Invoice"}
+                  {loading ? "Creating..." : "Create Invoice"}
                 </button>
-              )}
-            </div>
+              </div>
+            )}
           </form>
         </div>
       </div>

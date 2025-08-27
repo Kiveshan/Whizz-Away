@@ -47,29 +47,46 @@ const getClientAddonsHandler = async (req, res) => {
 const createAddonHandler = async (req, res) => {
   try {
     console.log("Creating add-on with data:", req.body);
-    const { client_id, description, amount, category, date } = req.body;
+    const { client_id, items, date } = req.body;
 
-    if (!client_id || !description || !amount || !category || !date) {
+    if (
+      !client_id ||
+      !items ||
+      !Array.isArray(items) ||
+      items.length === 0 ||
+      !date
+    ) {
       return res.status(400).json({
         success: false,
         message:
-          "All fields are required: client_id, description, amount, category, date",
+          "All fields are required: client_id, items (non-empty array), date",
       });
     }
 
-    const numAmount = Number.parseFloat(amount);
-    if (isNaN(numAmount) || numAmount <= 0) {
-      return res.status(400).json({
-        success: false,
-        message: "Amount must be a positive number",
-      });
+    // Validate each item
+    for (const item of items) {
+      if (!item.category || !item.description || !item.item_amount) {
+        return res.status(400).json({
+          success: false,
+          message: "Each item must have category, description, and item_amount",
+        });
+      }
+      const numAmount = Number.parseFloat(item.item_amount);
+      if (isNaN(numAmount) || numAmount <= 0) {
+        return res.status(400).json({
+          success: false,
+          message: "Item amount must be a positive number",
+        });
+      }
     }
 
     const result = await createAddon({
       client_id,
-      description: description.trim(),
-      amount: numAmount,
-      category: category.trim(),
+      items: items.map((item) => ({
+        category: item.category.trim(),
+        description: item.description.trim(),
+        item_amount: Number.parseFloat(item.item_amount),
+      })),
       date,
     });
 
@@ -140,7 +157,7 @@ const updateAddonHandler = async (req, res) => {
       req.body
     );
     const { addonId } = req.params;
-    const { description, amount, category, date } = req.body;
+    const { items, date } = req.body;
 
     if (!addonId) {
       return res.status(400).json({
@@ -149,25 +166,36 @@ const updateAddonHandler = async (req, res) => {
       });
     }
 
-    if (!description || !amount || !category || !date) {
+    if (!items || !Array.isArray(items) || items.length === 0 || !date) {
       return res.status(400).json({
         success: false,
-        message: "All fields are required: description, amount, category, date",
+        message: "All fields are required: items (non-empty array), date",
       });
     }
 
-    const numAmount = Number.parseFloat(amount);
-    if (isNaN(numAmount) || numAmount <= 0) {
-      return res.status(400).json({
-        success: false,
-        message: "Amount must be a positive number",
-      });
+    // Validate each item
+    for (const item of items) {
+      if (!item.category || !item.description || !item.item_amount) {
+        return res.status(400).json({
+          success: false,
+          message: "Each item must have category, description, and item_amount",
+        });
+      }
+      const numAmount = Number.parseFloat(item.item_amount);
+      if (isNaN(numAmount) || numAmount <= 0) {
+        return res.status(400).json({
+          success: false,
+          message: "Item amount must be a positive number",
+        });
+      }
     }
 
     const result = await updateAddon(addonId, {
-      description: description.trim(),
-      amount: numAmount,
-      category: category.trim(),
+      items: items.map((item) => ({
+        category: item.category.trim(),
+        description: item.description.trim(),
+        item_amount: Number.parseFloat(item.item_amount),
+      })),
       date,
     });
 
