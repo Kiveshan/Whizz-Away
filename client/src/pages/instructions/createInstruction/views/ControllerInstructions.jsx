@@ -69,10 +69,8 @@ const ControllerInstructions = () => {
       num_six_meters: 0,
       num_twelve_meters: 0,
       num_abnormal: 0,
-      pickupTime: "",
-      pickupDate: "",
       stackDate: "",
-      deadline: "",
+      lastFreeDate: "",
       fileRef: "",
       bookingRef: "",
       vesselName: "",
@@ -100,9 +98,8 @@ const ControllerInstructions = () => {
     [location.state],
   )
 
-  const pickupDateRef = useRef(null)
   const etaDateRef = useRef(null)
-  const deadlineDateRef = useRef(null)
+  const lastFreeDateRef = useRef(null)
 
   const fieldRefs = useRef({
     clientId: null,
@@ -110,10 +107,8 @@ const ControllerInstructions = () => {
     task: null,
     pickup: null,
     dropoff: null,
-    pickupTime: null,
-    pickupDate: null,
     stackDate: null,
-    deadline: null,
+    lastFreeDate: null,
     bookingRef: null,
     fileRef: null,
     sixMeterRate: null,
@@ -284,10 +279,15 @@ const ControllerInstructions = () => {
           id: containerId++,
           containerKey: null,
           containerNum: "",
+          // Initialize file reference field for export shipments
+          fileRef: "",
           // Initialize weight field for import, export, and cross-haul shipments
           weight: (isImport || isExport || isCrossHaul) ? "" : null,
           containerType: type,
           cargoDescription: "",
+          // Initialize hazardous and addSurcharges properties for each container
+          hazardous: false,
+          addSurcharges: false,
         }
       }
 
@@ -324,43 +324,39 @@ const ControllerInstructions = () => {
   const handleContainerChange = useCallback(
     (id, field, value) => {
       if (field === "containerNum") {
-        // Container number validation
-        if (value.length > 11) return
+        // For export shipments, no validation is needed
+        if (isExport || formData.shipmentTypeId === "2") {
+          // Just ensure it doesn't exceed 20 characters
+          if (value.length > 20) return
+          
+          // Clear any existing errors
+          setContainerFieldErrors((prev) => {
+            const newErrors = { ...prev }
+            delete newErrors[`container-${id}`]
+            return newErrors
+          })
+        } else {
+          // For other shipment types, only check for uniqueness
+          // No format validation, just ensure it doesn't exceed 20 characters
+          if (value.length > 20) return
 
-        // First 4 letters, then 7 numbers
-        let newValue = ""
-        for (let i = 0; i < value.length; i++) {
-          const char = value[i]
-          if (i < 4) {
-            if (/^[a-zA-Z]$/.test(char)) newValue += char
-          } else if (/^[0-9]$/.test(char)) {
-            newValue += char
-          }
-        }
-
-        // Update field errors with format and uniqueness validation
-        let error = null
-        if (newValue.length > 0 && newValue.length < 11) {
-          error = "Does not match correct format (ABCD1234567)"
-        } else if (newValue.length === 11 && !/^[a-zA-Z]{4}[0-9]{7}$/.test(newValue)) {
-          error = "Does not match correct format (ABCD1234567)"
-        } else if (newValue.length === 11) {
           // Check for duplicates in real-time
-          const upperCaseValue = newValue.toUpperCase()
-          const duplicateExists = containers.some(
-            (container) => container.id !== id && container.containerNum.toUpperCase() === upperCaseValue,
-          )
-          if (duplicateExists) {
-            error = "Container number must be unique"
+          let error = null
+          if (value.trim() !== "") {
+            const upperCaseValue = value.toUpperCase()
+            const duplicateExists = containers.some(
+              (container) => container.id !== id && container.containerNum.toUpperCase() === upperCaseValue,
+            )
+            if (duplicateExists) {
+              error = "Container number must be unique"
+            }
           }
+
+          setContainerFieldErrors((prev) => ({
+            ...prev,
+            [`container-${id}`]: error,
+          }))
         }
-
-        setContainerFieldErrors((prev) => ({
-          ...prev,
-          [`container-${id}`]: error,
-        }))
-
-        value = newValue
       } else if (field === "weight" && value !== "") {
         // Only allow numbers and decimal point for weight
         if (!/^\d*\.?\d*$/.test(value)) return
@@ -369,6 +365,16 @@ const ControllerInstructions = () => {
         setContainerFieldErrors((prev) => {
           const newErrors = { ...prev }
           delete newErrors[`weight-${id}`]
+          return newErrors
+        })
+      } else if (field === "fileRef") {
+        // Just ensure it doesn't exceed 20 characters
+        if (value.length > 20) return
+        
+        // Clear any existing errors
+        setContainerFieldErrors((prev) => {
+          const newErrors = { ...prev }
+          delete newErrors[`file-ref-${id}`]
           return newErrors
         })
       } else if (field === "weight" && value === "") {
@@ -407,13 +413,9 @@ const ControllerInstructions = () => {
       dropoff: "",
 
       // Other form fields
-      hazardous: false,
-      surcharges: false,
       surchargesAmount: "",
-      pickupTime: "",
-      pickupDate: "",
       stackDate: "",
-      deadline: "",
+      lastFreeDate: "",
       fileRef: "",
       bookingRef: "",
       vesselName: "",
@@ -513,8 +515,6 @@ const ControllerInstructions = () => {
         "",
 
       // Other special cases
-      hazardous: Boolean(preservedFormData?.hazardous || false),
-      surcharges: Boolean(preservedFormData?.surcharges || false),
       vat: Number(preservedFormData?.vat) || 15,
       total_cost: Number(preservedFormData?.total_cost) || 0,
     }
@@ -663,16 +663,8 @@ const ControllerInstructions = () => {
               updates.rateper_breakbulk = ""
             }
 
-            // Handle surcharges - only set the amount, don't auto-check the box
-            if (rates.surcharges !== undefined) {
-              const surchargesNum = Number.parseFloat(rates.surcharges)
-              const hasSurcharges = !isNaN(surchargesNum) && surchargesNum > 0
-
-              // Only set the amount, don't change the surcharges checkbox state here
-              updates.surchargesAmount = hasSurcharges ? surchargesNum.toString() : ""
-              updates.surcharges = hasSurcharges // Auto-check if there's a value from DB
-              updates.preserveSurcharges = hasSurcharges
-            }
+            // Surcharge amounts will be calculated by backend on submit
+            // No need to fetch or store surcharge amounts in frontend
           } else {
             // Clear all rate fields when no rates are found
             updates.sixMeterRate = ""
@@ -680,7 +672,6 @@ const ControllerInstructions = () => {
             updates.abnormalRate = ""
             updates.rateper_breakbulk = ""
             updates.surchargesAmount = ""
-            updates.surcharges = false // Uncheck surcharges if no rates
             newRateLockStatus.sixMeter = false
             newRateLockStatus.twelveMeter = false
           }
@@ -690,17 +681,16 @@ const ControllerInstructions = () => {
         })
       } catch (error) {
         console.error("Error in fetchAndUpdateRates:", error)
-        // Clear rates and unlock fields on error
-        setFormData((prev) => ({
-          ...prev,
-          sixMeterRate: "",
-          twelveMeterRate: "",
-          abnormalRate: "",
-          rateper_breakbulk: "",
-          surchargesAmount: "",
-          surcharges: false,
-        }))
-        setRateLockStatus({ sixMeter: false, twelveMeter: false })
+          // Clear rates and unlock fields on error
+          setFormData((prev) => ({
+            ...prev,
+            sixMeterRate: "",
+            twelveMeterRate: "",
+            abnormalRate: "",
+            rateper_breakbulk: "",
+            surchargesAmount: "",
+          }))
+          setRateLockStatus({ sixMeter: false, twelveMeter: false })
       }
     }
 
@@ -758,7 +748,6 @@ const ControllerInstructions = () => {
         abnormalRate: "",
         rateper_breakbulk: "",
         surchargesAmount: "",
-        surcharges: false, // Uncheck surcharges when client changes
       }))
       setRateLockStatus({ sixMeter: false, twelveMeter: false })
 
@@ -966,14 +955,13 @@ const ControllerInstructions = () => {
     // Required fields
     if (!formData.clientId) errors.clientId = "Client is required"
     if (!formData.shipmentTypeId) errors.shipmentTypeId = "Shipment type is required"
-    if (!formData.task) errors.task = "Task is required"
+    if (!formData.task) errors.task = "KSM File Reference is required"
     if (!formData.pickup) errors.pickup = "Pickup location is required"
     if (!formData.dropoff) errors.dropoff = "Dropoff location is required"
-    if (!formData.pickupTime) errors.pickupTime = "Pickup time is required"
-    if (!formData.pickupDate) errors.pickupDate = "Pickup date is required"
-    if (!formData.deadline) errors.deadline = "Deadline is required"
+
+    if (!formData.lastFreeDate) errors.lastFreeDate = "Last Free Date is required"
     if (!formData.bookingRef) errors.bookingRef = "Booking reference is required"
-    if (!formData.fileRef) errors.fileRef = "File reference is required"
+    if (!formData.fileRef) errors.fileRef = "Client File Reference is required"
     if (!formData.description) errors.description = "Description is required"
 
     // Cross-haul specific validations (vessel name and stack date not required for cross-haul types)
@@ -1022,18 +1010,18 @@ const ControllerInstructions = () => {
     const containerNumbers = []
     let isValid = true
 
+    // For export shipments, skip container number validation
+    const isExportShipment = isExport || formData.shipmentTypeId === "2"
+
     // Check each container
     for (const container of containers) {
       const containerId = container.id
 
-      // Check if container number is required and present
-      if (!container.containerNum || container.containerNum.trim() === "") {
-        errors[`container-${containerId}`] = "Container number is required"
-        isValid = false
-      } else {
-        // Check format (existing validation)
-        if (container.containerNum.length !== 11 || !/^[a-zA-Z]{4}[0-9]{7}$/.test(container.containerNum)) {
-          errors[`container-${containerId}`] = "Does not match correct format (ABCD1234567)"
+      // For export shipments, File Reference is optional
+      if (!isExportShipment) {
+        // Check if container number is required and present
+        if (!container.containerNum || container.containerNum.trim() === "") {
+          errors[`container-${containerId}`] = "Container number is required"
           isValid = false
         } else {
           // Check for duplicates within current instruction
@@ -1259,21 +1247,19 @@ const ControllerInstructions = () => {
         console.log(`  Container Subtotal: R${totalCost.toFixed(2)}`)
       }
 
-      // Add surcharges
-      const surchargeAmount = formData.surcharges ? Number.parseFloat(formData.surchargesAmount || 0) : 0
-      const subtotalBeforeVAT = totalCost + surchargeAmount
+      // Note: Surcharge amounts are now calculated by the backend on submit
+      // Frontend only tracks which containers have surcharges enabled
+      const subtotalBeforeVAT = totalCost;
 
       costBreakdown.components.surcharges = {
-        applied: formData.surcharges,
-        amount: surchargeAmount,
-      }
-      costBreakdown.components.subtotalBeforeVAT = subtotalBeforeVAT
+        applied: containers.some(c => c.addSurcharges),
+        amount: 0, // Backend will calculate actual amount
+      };
+      costBreakdown.components.subtotalBeforeVAT = subtotalBeforeVAT;
 
-      console.log("SURCHARGES:")
-      console.log(`  Surcharges Applied: ${formData.surcharges ? "Yes" : "No"}`)
-      if (formData.surcharges) {
-        console.log(`  Surcharge Amount: R${surchargeAmount.toFixed(2)}`)
-      }
+      console.log("SURCHARGES:");
+      console.log(`  Containers with Surcharges: ${containers.filter(c => c.addSurcharges).length}`);
+      console.log(`  Surcharge amounts will be calculated by backend on submit`);
       console.log(`  Subtotal (before VAT): R${subtotalBeforeVAT.toFixed(2)}`)
 
       // Calculate VAT (for display purposes only - not added to total cost saved to DB)
@@ -1299,8 +1285,8 @@ const ControllerInstructions = () => {
       costBreakdown.components.finalTotalSaved = totalCost
 
       console.log("FINAL COST BREAKDOWN:")
-      console.log(`  Base Cost: R${(totalCost - surchargeAmount).toFixed(2)}`)
-      console.log(`  Surcharges: R${surchargeAmount.toFixed(2)}`)
+      console.log(`  Base Cost: R${totalCost.toFixed(2)}`)
+      console.log(`  Surcharges: Will be calculated by backend`)
       console.log(`  TOTAL COST SAVED TO DB (excluding VAT): R${totalCost.toFixed(2)}`)
       console.log(`  VAT (calculated but not saved): R${vatAmount.toFixed(2)}`)
       console.log(`  Total with VAT (for reference): R${totalWithVAT.toFixed(2)}`)
@@ -1310,8 +1296,10 @@ const ControllerInstructions = () => {
       console.log("=== END TOTAL COST CALCULATION ===")
 
       // Prepare instruction data with null values for cross-haul and weight-based
+      // Remove hazardous and surcharges fields from formData to prevent them from being sent to m1_controller table
+      const { hazardous, surcharges, ...formDataWithoutContainerFields } = formData;
       const instructionData = {
-        ...formData,
+        ...formDataWithoutContainerFields,
         total_cost: totalCost, // This is now the subtotal without VAT
         // Set vessel_name and stackdate to null for cross-haul types
         vessel_name: isCrossHaul ? null : formData.vesselName,
@@ -1365,19 +1353,24 @@ const ControllerInstructions = () => {
         rateweight: formData.rateWeight,
         status: "New",
         vat: formData.vat,
-        surchages: formData.surcharges,
-        surcharge: surchargeAmount,
+        // Note: surcharge_amount is now stored in container table, not in instruction table
       }
 
       // Prepare container data (only for container-based calculations AND if unit type is Container)
       // Also ensure container details are not saved when rateWeight is kg or ton
+      // Note: Surcharge amounts will be calculated by backend based on client rates
+      
       const containerData =
         !isWeightBased && formData.rateWeight === "Container" && formData.rateWeight !== "kg" && formData.rateWeight !== "ton"
           ? containers.map((container) => ({
               container_type: container.containerType,
               containerNum: container.containerNum,
+              file_ref: container.fileRef || "", // Include file reference field for export shipments
               weight: (isImport || isExport || isCrossHaul) ? (container.weight === "" ? null : Number.parseFloat(container.weight || 0)) : null,
               cargo_description: container.cargoDescription || "",
+              "Hazardous": container.hazardous || false,
+              "Add Surcharges": container.addSurcharges || false,
+              // Note: "Surcharge Amount" will be calculated by backend
             }))
           : []
 
@@ -1765,7 +1758,7 @@ const ControllerInstructions = () => {
                 >
                   <div className="controller-instructions-container-input">
                     <label>6m</label>
-                    <div className="controller-instructions-container-rate-group">
+                    <div className="controller-instructions-container-rate-group" style={{ display: "flex", width: "100px" }}>
                       <input
                         type="number"
                         className={fieldErrors.containers ? "controller-instructions-error-field" : ""}
@@ -1775,7 +1768,7 @@ const ControllerInstructions = () => {
                         onChange={(e) => handleContainerCountChange("num_six_meters", e.target.value)}
                         disabled={isWeightBased}
                       />
-                      <div style={{ width: "100%" }}>
+                      <div style={{ width: "100%", marginLeft: "10px" }}>
                         <input
                           type="text"
                           value={
@@ -1813,7 +1806,7 @@ const ControllerInstructions = () => {
                             }
                           }}
                           style={{
-                            width: "50%",
+                            width: "90px",
                             padding: "8px",
                             border: "1px solid #000",
                             borderRadius: "4px",
@@ -1839,7 +1832,7 @@ const ControllerInstructions = () => {
                   </div>
                   <div className="controller-instructions-container-input">
                     <label>12m</label>
-                    <div className="controller-instructions-container-rate-group">
+                    <div className="controller-instructions-container-rate-group" style={{ display: "flex", width: "100px" }}>
                       <input
                         type="number"
                         className={fieldErrors.containers ? "controller-instructions-error-field" : ""}
@@ -1849,7 +1842,7 @@ const ControllerInstructions = () => {
                         onChange={(e) => handleContainerCountChange("num_twelve_meters", e.target.value)}
                         disabled={isWeightBased}
                       />
-                      <div style={{ width: "50%" }}>
+                      <div style={{ width: "100%", marginLeft: "10px" }}>
                         <input
                           type="text"
                           value={
@@ -1884,7 +1877,7 @@ const ControllerInstructions = () => {
                             }
                           }}
                           style={{
-                            width: "50%",
+                            width: "90px",
                             padding: "8px",
                             border: "1px solid #000",
                             borderRadius: "4px",
@@ -1910,7 +1903,7 @@ const ControllerInstructions = () => {
                   </div>
                   <div className="controller-instructions-container-input">
                     <label>Abnormal</label>
-                    <div className="controller-instructions-container-rate-group">
+                    <div className="controller-instructions-container-rate-group" style={{ display: "flex", width: "100px" }}>
                       <input
                         type="number"
                         className={fieldErrors.containers ? "controller-instructions-error-field" : ""}
@@ -1920,7 +1913,7 @@ const ControllerInstructions = () => {
                         onChange={(e) => handleContainerCountChange("num_abnormal", e.target.value)}
                         disabled={isWeightBased}
                       />
-                      <div style={{ width: "50%" }}>
+                      <div style={{ width: "100%", marginLeft: "10px" }}>
                         <input
                           type="text"
                           value={
@@ -1955,7 +1948,7 @@ const ControllerInstructions = () => {
                             }
                           }}
                           style={{
-                            width: "50%",
+                            width: "90px",
                             padding: "8px",
                             border: "1px solid #000",
                             borderRadius: "4px",
@@ -1989,7 +1982,7 @@ const ControllerInstructions = () => {
                     </div>
                   )}
                 </div>
-                {/* Hazardous, Surcharges, and Rates per - Horizontally Aligned */}
+                {/* Rates per - Horizontally Aligned */}
                 <div className="controller-instructions-form-row" style={{ margin: "16px 0", padding: "0 10px" }}>
                   <div
                     style={{
@@ -2003,84 +1996,6 @@ const ControllerInstructions = () => {
                       minWidth: 0,
                     }}
                   >
-                    {/* Hazardous Checkbox */}
-                    <label className="controller-instructions-checkbox-container" style={{ margin: "5px 0" }}>
-                      <input
-                        type="checkbox"
-                        name="hazardous"
-                        checked={formData.hazardous || false}
-                        onChange={handleInputChange}
-                      />
-                      <span className="controller-instructions-checkmark"></span>
-                      Hazardous
-                    </label>
-                    {/* Surcharges Checkbox */}
-                    <div
-                      style={{
-                        display: "flex",
-                        alignItems: "center",
-                        gap: "8px",
-                        whiteSpace: "nowrap",
-                        flexShrink: 0,
-                      }}
-                    >
-                      <label className="controller-instructions-checkbox-container" style={{ margin: "5px 0" }}>
-                        <input
-                          type="checkbox"
-                          name="surcharges"
-                          checked={!!formData.surcharges}
-                          onChange={(e) => {
-                            const checked = e.target.checked
-                            setFormData((prev) => ({
-                              ...prev,
-                              surcharges: checked,
-                              // Only clear surchargesAmount when unchecking and there's no surcharge from the API
-                              ...(!checked && !prev.sixMeterRate && !prev.twelveMeterRate && { surchargesAmount: "" }),
-                            }))
-                          }}
-                        />
-                        <span className="controller-instructions-checkmark"></span>
-                        Add Surcharges
-                      </label>
-                      {/* Surcharge Input */}
-                      {formData.surcharges && (
-                        <div className="controller-instructions-input-wrapper" style={{ width: "160px" }}>
-                          <input
-                            type="number"
-                            className="controller-instructions-form-input"
-                            placeholder="Enter surcharge"
-                            value={formData.surchargesAmount || ""}
-                            onChange={(e) => {
-                              const value = e.target.value
-                              setFormData((prev) => ({
-                                ...prev,
-                                surchargesAmount: value,
-                                surcharges: value !== "" && value !== "0",
-                                preserveSurcharges: true,
-                              }))
-                            }}
-                            onFocus={() => {
-                              if (!formData.surcharges) {
-                                setFormData((prev) => ({
-                                  ...prev,
-                                  surcharges: true,
-                                }))
-                              }
-                            }}
-                            min="0"
-                            step="0.01"
-                            style={{
-                              width: "100%",
-                              padding: "8px",
-                              border: "1px solid #ccc",
-                              borderRadius: "4px",
-                              fontSize: "14px",
-                              backgroundColor: formData.surcharges ? "#f8f9fa" : "#fff",
-                            }}
-                          />
-                        </div>
-                      )}
-                    </div>
                     {/* unit per Section */}
                     <div
                       style={{
@@ -2250,12 +2165,12 @@ const ControllerInstructions = () => {
 
                   {/* File Ref */}
                   <div className="controller-instructions-form-field" style={{ flex: "1 1 120px" }}>
-                    <label>File Ref</label>
+                    <label>Client File Reference</label>
                     <div className="controller-instructions-input-wrapper" ref={fieldRefs.current.fileRef}>
                       <input
                         type="text"
                         className={`controller-instructions-form-input ${fieldErrors.fileRef ? "controller-instructions-error-field" : ""}`}
-                        placeholder="File ref"
+                        placeholder="Client File Reference"
                         name="fileRef"
                         value={formData.fileRef}
                         onChange={handleInputChange}
@@ -2267,12 +2182,12 @@ const ControllerInstructions = () => {
 
                   {/* Name of Task */}
                   <div className="controller-instructions-form-field" style={{ flex: "1 1 160px" }}>
-                    <label>Name of Task</label>
+                    <label>KSM File Reference</label>
                     <div className="controller-instructions-input-wrapper" ref={fieldRefs.current.task}>
                       <input
                         type="text"
                         className={`controller-instructions-form-input ${fieldErrors.task ? "controller-instructions-error-field" : ""}`}
-                        placeholder="Name of Task"
+                        placeholder="KSM File Reference"
                         name="task"
                         value={formData.task}
                         onChange={handleInputChange}
@@ -2283,44 +2198,8 @@ const ControllerInstructions = () => {
                   </div>
                 </div>
 
-                {/* Pick-up Time, Pick-up Date, Stack Date, and Deadline row */}
+                {/* Stack Date and Last Free Date row */}
                 <div style={{ display: "flex", gap: "12px", flexWrap: "wrap", width: "100%", marginBottom: "12px" }}>
-                  {/* Pick-up Time */}
-
-                  {/* Pick-up Time */}
-                  <div className="controller-instructions-form-field" style={{ flex: "0 0 120px" }}>
-                    <label>Pick-up Time</label>
-                    <div className="controller-instructions-input-wrapper" ref={fieldRefs.current.pickupTime}>
-                      <input
-                        type="time"
-                        className={`controller-instructions-form-input ${fieldErrors.pickupTime ? "controller-instructions-error-field" : ""}`}
-                        placeholder="Time here"
-                        name="pickupTime"
-                        value={formData.pickupTime}
-                        onChange={handleInputChange}
-                        style={{ width: "100%" }}
-                      />
-                      <ErrorTooltip message={fieldErrors.pickupTime} />
-                    </div>
-                  </div>
-
-                  {/* Pick-up Date */}
-                  <div className="controller-instructions-form-field" style={{ flex: "0 0 140px" }}>
-                    <label>Pick-up Date</label>
-                    <div className="controller-instructions-input-wrapper" ref={fieldRefs.current.pickupDate}>
-                      <input
-                        type="date"
-                        className={`controller-instructions-form-input ${fieldErrors.pickupDate ? "controller-instructions-error-field" : ""}`}
-                        ref={pickupDateRef}
-                        placeholder="Date here"
-                        name="pickupDate"
-                        value={formData.pickupDate}
-                        onChange={handleInputChange}
-                        style={{ width: "100%" }}
-                      />
-                      <ErrorTooltip message={fieldErrors.pickupDate} />
-                    </div>
-                  </div>
 
                   {/* Stack/ETA Date - Hidden for Cross-haul */}
                   {!isCrossHaul && (
@@ -2342,31 +2221,33 @@ const ControllerInstructions = () => {
                             fontSize: "13px",
                             height: "32px",
                           }}
-                          min={formData.pickupDate || today}
-                          disabled={!formData.pickupDate}
-                          onClick={() => formData.pickupDate && openCalendar(etaDateRef)}
+                          min={today}
+                          disabled={false}
+                          onClick={() => openCalendar(etaDateRef)}
+                          onKeyDown={(e) => e.preventDefault()}
                         />
                         <ErrorTooltip message={fieldErrors.stackDate} />
                       </div>
                     </div>
                   )}
 
-                  {/* Deadline */}
+                  {/* Last Free Date */}
                   <div className="controller-instructions-form-field" style={{ flex: "0 0 140px" }}>
-                    <label>Deadline</label>
-                    <div className="controller-instructions-input-wrapper" ref={fieldRefs.current.deadline}>
+                    <label>Last Free Date</label>
+                    <div className="controller-instructions-input-wrapper" ref={fieldRefs.current.lastFreeDate}>
                       <input
                         type="date"
-                        className={`controller-instructions-form-input ${fieldErrors.deadline ? "controller-instructions-error-field" : ""}`}
-                        ref={deadlineDateRef}
+                        className={`controller-instructions-form-input ${fieldErrors.lastFreeDate ? "controller-instructions-error-field" : ""}`}
+                        ref={lastFreeDateRef}
                         placeholder="Date here"
-                        name="deadline"
-                        value={formData.deadline}
+                        name="lastFreeDate"
+                        value={formData.lastFreeDate}
                         onChange={handleInputChange}
-                        min={formData.pickupDate || today}
+                        min={today}
                         style={{ width: "100%" }}
+                        onKeyDown={(e) => e.preventDefault()}
                       />
-                      <ErrorTooltip message={fieldErrors.deadline} />
+                      <ErrorTooltip message={fieldErrors.lastFreeDate} />
                     </div>
                   </div>
                 </div>
@@ -2536,9 +2417,12 @@ const ControllerInstructions = () => {
                     <tr>
                       <th style={{ width: "5%" }}>#</th>
                       <th style={{ width: "15%" }}>Container Type</th>
-                      <th style={{ width: "20%" }}>Container Number</th>
-                      {(isImport || isExport || isCrossHaul) && <th style={{ width: "15%" }}>Weight</th>}
-                      <th style={{ width: (isImport || isExport || isCrossHaul) ? "45%" : "60%" }}>Cargo Description</th>
+                      <th style={{ width: "15%" }}>Container Number</th>
+                      {(isExport || formData.shipmentTypeId === "2") && <th style={{ width: "15%" }}>File Reference</th>}
+                      {(isImport || isExport || isCrossHaul) && <th style={{ width: "10%" }}>Weight</th>}
+                      <th style={{ width: (isImport || isExport || isCrossHaul) ? "25%" : "40%" }}>Cargo Description</th>
+                      <th style={{ width: "10%" }}>Hazardous</th>
+                      <th style={{ width: "10%" }}>Add Surcharges</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -2553,8 +2437,8 @@ const ControllerInstructions = () => {
                               className={`form-control form-control-sm ${containerFieldErrors[`container-${container.id}`] ? "is-invalid" : ""}`}
                               value={container.containerNum}
                               onChange={(e) => handleContainerChange(container.id, "containerNum", e.target.value)}
-                              placeholder="ABCD1234567"
-                              maxLength={11}
+                              placeholder="Enter container number"
+                              maxLength={20}
                               style={{
                                 minWidth: "120px",
                                 backgroundColor: containerFieldErrors[`container-${container.id}`]
@@ -2607,6 +2491,69 @@ const ControllerInstructions = () => {
                             )}
                           </div>
                         </td>
+                        {(isExport || formData.shipmentTypeId === "2") && (
+                          <td>
+                            <div style={{ position: "relative" }}>
+                              <input
+                                type="text"
+                                className={`form-control form-control-sm ${containerFieldErrors[`file-ref-${container.id}`] ? "is-invalid" : ""}`}
+                                value={container.fileRef || ""}
+                                onChange={(e) => handleContainerChange(container.id, "fileRef", e.target.value)}
+                                placeholder="Enter file reference"
+                                maxLength={20}
+                                style={{
+                                  minWidth: "120px",
+                                  backgroundColor: containerFieldErrors[`file-ref-${container.id}`]
+                                    ? "#ffebee"
+                                    : "white",
+                                  borderColor: containerFieldErrors[`file-ref-${container.id}`] ? "#f44336" : "#ced4da",
+                                }}
+                              />
+                              {containerFieldErrors[`file-ref-${container.id}`] && (
+                                <div
+                                  style={{
+                                    position: "fixed",
+                                    zIndex: 9999,
+                                    backgroundColor: "#f44336",
+                                    color: "white",
+                                    padding: "6px 10px",
+                                    borderRadius: "4px",
+                                    fontSize: "12px",
+                                    whiteSpace: "nowrap",
+                                    boxShadow: "0 4px 8px rgba(0,0,0,0.3)",
+                                    transform: "translateY(4px)",
+                                    pointerEvents: "none",
+                                    maxWidth: "250px",
+                                  }}
+                                  ref={(el) => {
+                                    if (el) {
+                                      const input = el.previousElementSibling
+                                      if (input) {
+                                        const rect = input.getBoundingClientRect()
+                                        el.style.left = `${rect.left}px`
+                                        el.style.top = `${rect.bottom + 4}px`
+                                      }
+                                    }
+                                  }}
+                                >
+                                  {containerFieldErrors[`file-ref-${container.id}`]}
+                                  <div
+                                    style={{
+                                      position: "absolute",
+                                      top: "-4px",
+                                      left: "10px",
+                                      width: "0",
+                                      height: "0",
+                                      borderLeft: "4px solid transparent",
+                                      borderRight: "4px solid transparent",
+                                      borderBottom: "4px solid #f44336",
+                                    }}
+                                  />
+                                </div>
+                              )}
+                            </div>
+                          </td>
+                        )}
                         {(isImport || isExport || isCrossHaul) && (
                           <td>
                             <div style={{ position: "relative" }}>
@@ -2676,6 +2623,28 @@ const ControllerInstructions = () => {
                             placeholder="Enter cargo description"
                           />
                         </td>
+                        <td style={{ textAlign: "center" }}>
+                          <div className="form-check" style={{ display: "flex", justifyContent: "center" }}>
+                            <input
+                              type="checkbox"
+                              className="form-check-input"
+                              checked={container.hazardous || false}
+                              onChange={(e) => handleContainerChange(container.id, "hazardous", e.target.checked)}
+                              style={{ cursor: "pointer" }}
+                            />
+                          </div>
+                        </td>
+                        <td style={{ textAlign: "center" }}>
+                          <div className="form-check" style={{ display: "flex", justifyContent: "center" }}>
+                            <input
+                              type="checkbox"
+                              className="form-check-input"
+                              checked={container.addSurcharges || false}
+                              onChange={(e) => handleContainerChange(container.id, "addSurcharges", e.target.checked)}
+                              style={{ cursor: "pointer" }}
+                            />
+                          </div>
+                        </td>
                       </tr>
                     ))}
                   </tbody>
@@ -2720,3 +2689,6 @@ const ControllerInstructions = () => {
 }
 
 export default ControllerInstructions
+
+
+

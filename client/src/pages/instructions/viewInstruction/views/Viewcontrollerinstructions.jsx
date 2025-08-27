@@ -34,7 +34,7 @@ const Viewcontrollerinstructions = () => {
     email: "",
     shipmentTypeId: "",
     shipmentTypeName: "",
-    task: "",
+    ksmFileRef: "",
     pickup: "",
     dropoff: "",
     hazardous: false,
@@ -43,11 +43,9 @@ const Viewcontrollerinstructions = () => {
     num_six_meters: 0,
     num_twelve_meters: 0,
     num_abnormal: 0,
-    pickupTime: "",
-    pickupDate: "",
     stackDate: "",
-    deadline: "",
-    fileRef: "",
+    lastFreeDate: "",
+    clientFileRef: "",
     bookingRef: "",
     rateWeight: "Container",
     weight: "",
@@ -74,23 +72,20 @@ const Viewcontrollerinstructions = () => {
   }))
 
   // Refs for form fields
-  const pickupDateRef = useRef(null)
   const etaDateRef = useRef(null)
-  const deadlineDateRef = useRef(null)
+  const lastFreeDateRef = useRef(null)
   const vesselNameRef = useRef(null)
 
   const fieldRefs = {
     clientId: useRef(null),
     shipmentTypeId: useRef(null),
-    task: useRef(null),
+    ksmFileRef: useRef(null),
     pickup: useRef(null),
     dropoff: useRef(null),
-    pickupTime: useRef(null),
-    pickupDate: useRef(null),
     stackDate: useRef(null),
-    deadline: useRef(null),
+    lastFreeDate: useRef(null),
     bookingRef: useRef(null),
-    fileRef: useRef(null),
+    clientFileRef: useRef(null),
     sixMeterRate: useRef(null),
     twelveMeterRate: useRef(null),
     abnormalRate: useRef(null),
@@ -129,6 +124,9 @@ const Viewcontrollerinstructions = () => {
 
   // State to track if shipment type is Import
   const [isImport, setIsImport] = useState(false)
+
+  // State to track if shipment type is Export
+  const [isExport, setIsExport] = useState(false)
 
   // State to track if shipment type is cross-haul or shipmentID is 3
   const [isCrossHaulOrSpecial, setIsCrossHaulOrSpecial] = useState(false)
@@ -267,17 +265,15 @@ const Viewcontrollerinstructions = () => {
         email: data.email || "",
         shipmentTypeId: data.shipment_type?.toString() || "",
         shipmentTypeName: data.shipmenttype || "",
-        task: data.task || "",
+        ksmFileRef: data.ksmFileRef || "", // Updated from task to ksmFileRef
         pickup: data.pickup || "",
         dropoff: data.dropoff || "",
         hazardous: Boolean(data.hazardous),
         surchages: Boolean(data.surchages), // Note: This matches the database field name (missing 'r')
         surcharge: data.surcharge || 0,
-        pickupTime: formatTimeForInput(data.pickuptime) || "",
-        pickupDate: formatDateForInput(data.pickupdate) || "",
         stackDate: formatDateForInput(data.stackdate) || "",
-        deadline: formatDateForInput(data.deadline) || "",
-        fileRef: data.fileref || "",
+        lastFreeDate: formatDateForInput(data.lastFreeDate) || "", // Updated from deadline to lastFreeDate
+        clientFileRef: data.clientFileRef || "", // Updated from fileref to clientFileRef
         bookingRef: data.booking_ref || "",
         rateWeight: data.rateweight || "Container",
         rate: data.rate ? data.rate.toString() : "",
@@ -285,7 +281,8 @@ const Viewcontrollerinstructions = () => {
         num_six_meters: Number(data.num_six_meters) || 0,
         num_twelve_meters: Number(data.num_twelve_meters) || 0,
         num_abnormal: Number(data.num_abnormal) || 0,
-        vat: data.vat ,
+        num_breakbulk: Number(data.num_breakbulk) || 0, // Added missing field
+        vat: data.vat,
         description: data.description || "",
         status: data.status || "",
         vesselName: data.vessel_name || "",
@@ -293,6 +290,7 @@ const Viewcontrollerinstructions = () => {
         rateper_6: data.rateper_6 ? Number(data.rateper_6) : 0,
         rateper_12: data.rateper_12 ? Number(data.rateper_12) : 0,
         rateper_abnormal: data.rateper_abnormal ? Number(data.rateper_abnormal) : 0,
+        rateper_breakbulk: data.rateper_breakbulk ? Number(data.rateper_breakbulk) : 0, // Added missing field
         unitrate: data.unitrate || "",
         // Break bulk fields removed
       }
@@ -307,11 +305,15 @@ const Viewcontrollerinstructions = () => {
             console.log("Formatted data before setFormData:", formattedData)
       setFormData(formattedData)
 
-      // Set isImport based on the fetched shipment type
+      // Set isImport and isExport based on the fetched shipment type
       const shipmentTypeName = data.shipmenttype || ""
-      const isImportValue = shipmentTypeName.toLowerCase() === "import"
+      const shipmentTypeIdValue = data.shipment_type?.toString() || ""
+      const isImportValue = shipmentTypeName.toLowerCase() === "import" || shipmentTypeIdValue === "1"
+      const isExportValue = shipmentTypeName.toLowerCase() === "export" || shipmentTypeIdValue === "2"
       console.log("Setting isImport to:", isImportValue)
+      console.log("Setting isExport to:", isExportValue)
       setIsImport(isImportValue)
+      setIsExport(isExportValue)
 
       // Set isCrossHaulOrSpecial based on shipment type or ID
       const isCrossHaul =
@@ -456,6 +458,8 @@ const Viewcontrollerinstructions = () => {
         weight: "",
         containerType: "6m",
         cargoDescription: "",
+        hazardous: false,
+        addSurcharges: false
       })
     }
 
@@ -468,6 +472,8 @@ const Viewcontrollerinstructions = () => {
         weight: "",
         containerType: "12m",
         cargoDescription: "",
+        hazardous: false,
+        addSurcharges: false
       })
     }
 
@@ -480,6 +486,8 @@ const Viewcontrollerinstructions = () => {
         weight: "",
         containerType: "Abnormal",
         cargoDescription: "",
+        hazardous: false,
+        addSurcharges: false
       })
     }
 
@@ -533,14 +541,38 @@ const Viewcontrollerinstructions = () => {
 
       if (data && data.length > 0) {
         // Map container data to match the expected format
-        const containersList = data.map((container, index) => ({
-          id: index + 1,
-          containerKey: container.containerkey,
-          containerNum: container.containernum ? container.containernum.toString() : "",
-          weight: container.weight !== null ? container.weight.toString() : "",
-          containerType: container.container_type || determineContainerType(index, formData),
-          cargoDescription: container.cargo_description || "",
-        }))
+        const containersList = data.map((container, index) => {
+          // Ensure container is not null or undefined before accessing properties
+          if (!container) {
+            console.log(`Container at index ${index} is null or undefined`);
+            return {
+              id: index + 1,
+              containerKey: null,
+              containerNum: "",
+              weight: "",
+              containerType: determineContainerType(index, formData),
+              cargoDescription: "",
+              hazardous: false,
+              addSurcharges: false
+            };
+          }
+          
+          // Log the container data to debug
+          console.log(`Container ${index} data:`, container);
+          
+          return {
+            id: index + 1,
+            containerKey: container.containerkey || null,
+            containerNum: container.containernum ? String(container.containernum) : "",
+            weight: container.weight != null ? String(container.weight) : "",
+            containerType: container.container_type || determineContainerType(index, formData),
+            cargoDescription: container.cargo_description || "",
+            // The column names in PostgreSQL are case-sensitive with quotes
+            // These fields might be missing if the backend query doesn't select them
+            hazardous: container["Hazardous"] === true || false,
+            addSurcharges: container["Add Surcharges"] === true || false,
+          };
+        })
         console.log("Mapped containers list:", containersList)
         setContainers(containersList)
       } else {
@@ -810,57 +842,7 @@ const Viewcontrollerinstructions = () => {
                       </div>
                     </div>
 
-                    {/* Hazardous and Surcharges Checkboxes - Horizontally Aligned */}
-                    <div
-                      className="controller-instructions-form-row"
-                      style={{ marginTop: "16px", marginBottom: "16px", marginLeft: "10px" }}
-                    >
-                      <div
-                        className="controller-instructions-form-field"
-                        style={{ display: "flex", flexDirection: "row", gap: "30px", alignItems: "center" }}
-                      >
-                        <label className="controller-instructions-checkbox-container" style={{ margin: "5px 0" }}>
-                          <input
-                            type="checkbox"
-                            name="hazardous"
-                            checked={formData.hazardous || false}
-                            disabled={true}
-                            style={nonEditableStyle}
-                          />
-                          <span className="controller-instructions-checkmark"></span>
-                          Hazardous Materials
-                        </label>
-                        <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
-                          <label className="controller-instructions-checkbox-container" style={{ margin: "5px 0" }}>
-                            <input
-                              type="checkbox"
-                              name="surchages"
-                              checked={formData.surchages || false}
-                              disabled={true}
-                              style={nonEditableStyle}
-                            />
-                            <span className="controller-instructions-checkmark"></span>
-                            Add Surcharges
-                          </label>
-                          {formData.surchages && (
-                            <div
-                              className="controller-instructions-input-wrapper"
-                              style={{ width: "150px", marginLeft: "10px" }}
-                            >
-                              <input
-                                type="number"
-                                className="controller-instructions-form-input"
-                                name="surcharge"
-                                value={formData.surcharge || ""}
-                                readOnly
-                                style={{ ...nonEditableStyle, width: "100%", padding: "4px 8px" }}
-                                placeholder="Amount"
-                              />
-                            </div>
-                          )}
-                        </div>
-                      </div>
-                    </div>
+                    {/* Hazardous and Surcharges Checkboxes removed */}
                   </div>
 
                   {/* Booking Vertical Group */}
@@ -1028,14 +1010,14 @@ const Viewcontrollerinstructions = () => {
                         </div>
                       </div>
                       <div className="controller-instructions-form-field controller-instructions-small-field">
-                        <label>File Ref</label>
-                        <div className="controller-instructions-input-wrapper" ref={fieldRefs.fileRef}>
+                        <label>Client File Reference</label>
+                        <div className="controller-instructions-input-wrapper" ref={fieldRefs.clientFileRef}>
                           <input
                             type="text"
                             className="controller-instructions-form-input"
-                            placeholder="Enter file ref"
-                            name="fileRef"
-                            value={formData.fileRef}
+                            placeholder="Client File Reference"
+                            name="clientFileRef"
+                            value={formData.clientFileRef}
                             readOnly
                             style={nonEditableStyle}
                           />
@@ -1043,14 +1025,14 @@ const Viewcontrollerinstructions = () => {
                       </div>
                     </div>
                     <div className="controller-instructions-form-field">
-                      <label>Name of Task</label>
-                      <div className="controller-instructions-input-wrapper" ref={fieldRefs.task}>
+                      <label>KSM File Reference</label>
+                      <div className="controller-instructions-input-wrapper" ref={fieldRefs.ksmFileRef}>
                         <input
                           type="text"
                           className="controller-instructions-form-input"
-                          placeholder="Input Name of Task"
-                          name="task"
-                          value={formData.task}
+                          placeholder="KSM File Reference"
+                          name="ksmFileRef"
+                          value={formData.ksmFileRef}
                           readOnly
                           style={nonEditableStyle}
                         />
@@ -1101,32 +1083,7 @@ const Viewcontrollerinstructions = () => {
                     </div>
                   </div>
                   <div className="controller-instructions-date-time-group">
-                    <div className="controller-instructions-form-field">
-                      <label>Pickup Time</label>
-                      <input
-                        type="time"
-                        className="controller-instructions-form-input"
-                        name="pickupTime"
-                        value={formData.pickupTime}
-                        readOnly
-                        style={nonEditableStyle}
-                        ref={fieldRefs.pickupTime}
-                      />
-                    </div>
-                    <div className="controller-instructions-form-field">
-                      <label>Pickup Date</label>
-                      <div className="controller-instructions-date-wrapper" ref={fieldRefs.pickupDate}>
-                        <input
-                          type="date"
-                          className="controller-instructions-form-input"
-                          name="pickupDate"
-                          value={formData.pickupDate}
-                          readOnly
-                          style={nonEditableStyle}
-                          ref={pickupDateRef}
-                        />
-                      </div>
-                    </div>
+
                     {!isCrossHaulShipment() && (
                       <div className="controller-instructions-form-field">
                         <label>{isImport ? "ETA Date" : "Stack Date"}</label>
@@ -1144,16 +1101,16 @@ const Viewcontrollerinstructions = () => {
                       </div>
                     )}
                     <div className="controller-instructions-form-field">
-                      <label>Deadline</label>
-                      <div className="controller-instructions-date-wrapper" ref={fieldRefs.deadline}>
+                      <label>Last Free Date</label>
+                      <div className="controller-instructions-date-wrapper" ref={fieldRefs.lastFreeDate}>
                         <input
                           type="date"
                           className="controller-instructions-form-input"
-                          name="deadline"
-                          value={formData.deadline}
+                          name="lastFreeDate"
+                          value={formData.lastFreeDate}
                           readOnly
                           style={nonEditableStyle}
-                          ref={deadlineDateRef}
+                          ref={lastFreeDateRef}
                         />
                       </div>
                     </div>
@@ -1174,9 +1131,11 @@ const Viewcontrollerinstructions = () => {
                       <thead>
                         <tr>
                           <th>Container Type</th>
-                          <th>Container Number</th>
+                          <th>{isExport || formData.shipmentTypeId === "2" ? "File Reference" : "Container Number"}</th>
                           {(isImport || formData.shipmentTypeId === "2" || formData.shipmentTypeId === "3") && <th>Weight (kg)</th>}
                           <th>Cargo Description</th>
+                          <th>Hazardous</th>
+                          <th>Add Surcharges</th>
                         </tr>
                       </thead>
                       <tbody>
@@ -1217,6 +1176,24 @@ const Viewcontrollerinstructions = () => {
                                   style={nonEditableStyle}
                                 />
                               </div>
+                            </td>
+                            <td className="text-center">
+                              <input
+                                type="checkbox"
+                                checked={container.hazardous || false}
+                                readOnly
+                                disabled
+                                style={nonEditableStyle}
+                              />
+                            </td>
+                            <td className="text-center">
+                              <input
+                                type="checkbox"
+                                checked={container.addSurcharges || false}
+                                readOnly
+                                disabled
+                                style={nonEditableStyle}
+                              />
                             </td>
                           </tr>
                         ))}
