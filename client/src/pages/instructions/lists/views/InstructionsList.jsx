@@ -408,7 +408,7 @@ const Instructions = () => {
                   <th>File No</th>
                   <th>Type</th>
                   <th>Status</th>
-                  <th>Starting Date</th>
+                  <th>Creation Date</th>
                   <th>Instruction</th>
                   <th>Assignment</th>
                 </tr>
