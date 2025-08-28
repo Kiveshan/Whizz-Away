@@ -18,6 +18,7 @@ import "./utils/statementGenerator.js"; // Added to start cron job
 import fs from "fs";
 import multer from "multer";
 import "./utils/subcontractorStatementGeneration.js";
+import { generateMonthlyStatements } from "./utils/statementGenerator.js";
 
 // Get __dirname equivalent in ES modules
 const __filename = fileURLToPath(import.meta.url);
@@ -181,7 +182,6 @@ if (process.env.NODE_ENV == "deployed") {
     res.sendFile(path.join(__dirname, "public", "build", "index.html"));
   });
 }
-
 // Start server
 app.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);

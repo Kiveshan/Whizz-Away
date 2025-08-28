@@ -8,7 +8,7 @@ import {
 const createPaymentHandler = async (req, res) => {
   try {
     const { clientId } = req.params;
-    const { amount, fileupload, invoiceid, reference } = req.body;
+    const { amount, fileupload, invoiceid, addon_id, reference } = req.body;
 
     if (!amount || isNaN(amount)) {
       return res.status(400).json({
@@ -24,10 +24,17 @@ const createPaymentHandler = async (req, res) => {
       });
     }
 
-    if (!invoiceid) {
+    if (!invoiceid && !addon_id) {
       return res.status(400).json({
         success: false,
-        message: "Invoice ID is required",
+        message: "Either Invoice ID or Add-on ID is required",
+      });
+    }
+
+    if (invoiceid && addon_id) {
+      return res.status(400).json({
+        success: false,
+        message: "Payment cannot be linked to both an invoice and an add-on",
       });
     }
 
@@ -43,6 +50,7 @@ const createPaymentHandler = async (req, res) => {
       amount,
       fileupload,
       invoiceid,
+      addon_id,
       reference: reference.trim(),
     });
 
@@ -128,7 +136,7 @@ const getClientPaymentsHandler = async (req, res) => {
 const getClientInvoicesHandler = async (req, res) => {
   try {
     const { clientId } = req.params;
-    console.log(`Fetching invoices for client ${clientId}`);
+    console.log(`Fetching invoices and add-ons for client ${clientId}`);
 
     const result = await getClientInvoices(clientId);
     res.json({
@@ -137,7 +145,7 @@ const getClientInvoicesHandler = async (req, res) => {
     });
   } catch (error) {
     console.error(
-      `Error fetching invoices for client ${req.params.clientId}:`,
+      `Error fetching invoices and add-ons for client ${req.params.clientId}:`,
       error
     );
     res.status(500).json({
