@@ -89,7 +89,7 @@ const ProfitLossDetailPage = () => {
         doc.setTextColor(255, 255, 255)
         doc.setFontSize(16)
         doc.setFont("helvetica", "bold")
-        doc.text("PROFIT & LOSS STATEMENT", margin + 10, 72)
+        doc.text("INCOME & EXPENDITURE STATEMENT", margin + 10, 72)
         doc.text(`${year}`, pageWidth - margin - 10, 72, { align: "right" })
 
         doc.setDrawColor(52, 168, 83)
@@ -246,7 +246,7 @@ const ProfitLossDetailPage = () => {
                     </div>
 
                     <div className="pl-title-section">
-                        <div className="pl-title">Profit & Loss Statement</div>
+                        <div className="pl-title">Income & Expenditure Statement</div>
                         <div className="pl-period">
                             {month} - {year}
                         </div>

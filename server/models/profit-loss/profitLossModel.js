@@ -4,7 +4,7 @@ const getProfitLossData = async (month, year) => {
   const monthNum = new Date(`${month} 1, ${year}`).getMonth() + 1;
   const profitQuery = `
     SELECT 
-      'Invoice' AS source,
+      'Invoices' AS source,
       i.date,
       m1.total_cost AS amount
     FROM invoice i
@@ -12,49 +12,42 @@ const getProfitLossData = async (month, year) => {
     WHERE EXTRACT(MONTH FROM i.date) = $1 AND EXTRACT(YEAR FROM i.date) = $2
     UNION ALL
     SELECT 
-      'Payment' AS source,
+      'Payments Received' AS source,
       fileupload AS date,
       amount
     FROM payment_m3
     WHERE EXTRACT(MONTH FROM fileupload) = $1 AND EXTRACT(YEAR FROM fileupload) = $2
-    UNION ALL
-    SELECT 
-      'Add-on' AS source,
-      date,
-      amount
-    FROM add_ons
-    WHERE EXTRACT(MONTH FROM date) = $1 AND EXTRACT(YEAR FROM date) = $2
   `;
   const lossQuery = `
     SELECT 
-      'Expense' AS source,
+      'Fuel Costs' AS source,
       slipuploaddate AS date,
       expensecost AS amount
     FROM expenses_m2
     WHERE EXTRACT(MONTH FROM slipuploaddate) = $1 AND EXTRACT(YEAR FROM slipuploaddate) = $2
     UNION ALL
     SELECT 
-      'Wage' AS source,
+      'Wages' AS source,
       CURRENT_DATE AS date, -- Placeholder since no date applies
       net_pay AS amount
     FROM wages
     UNION ALL
     SELECT 
-      'Purchase Order' AS source,
+      'Purchase Orders' AS source,
       date,
       total AS amount
     FROM purchase_orders
     WHERE EXTRACT(MONTH FROM date) = $1 AND EXTRACT(YEAR FROM date) = $2
     UNION ALL
     SELECT 
-      'Leg' AS source,
+      'Leg costs' AS source,
       date,
       driverrate AS amount
     FROM legs_m2
     WHERE EXTRACT(MONTH FROM date) = $1 AND EXTRACT(YEAR FROM date) = $2
     UNION ALL
     SELECT 
-      'Credit Note' AS source,
+      'Credit Notes' AS source,
       creditnote_date AS date,
       amount[1] AS amount
     FROM credit_notes

@@ -114,22 +114,14 @@ const getTurnoverPerMonth = async (client, month, year, clientId = null) => {
       WHERE TRIM(to_char(i.date, 'Month')) = $1
       AND EXTRACT(YEAR FROM i.date)::text = $2
       GROUP BY to_char(i.date, 'Month'), EXTRACT(YEAR FROM i.date)
-    ),
-    AddOnsTurnover AS (
-      SELECT 
-        COALESCE(SUM(a.amount), 0) as addons_turnover
-      FROM add_ons a
-      WHERE TRIM(TO_CHAR(a.date, 'Month')) = $1
-      AND EXTRACT(YEAR FROM a.date)::text = $2
     )
     SELECT 
-      COALESCE(it.invoice_turnover, 0) + COALESCE(SUM(ldc.subcontractor_turnover), 0) + COALESCE(at.addons_turnover, 0) as turnover,
+      COALESCE(it.invoice_turnover, 0) + COALESCE(SUM(ldc.subcontractor_turnover), 0) as turnover,
       it.month_name,
       it.year
     FROM InvoiceTurnover it
     LEFT JOIN LegDriverContributions ldc ON 1=1
-    CROSS JOIN AddOnsTurnover at
-    GROUP BY it.invoice_turnover, it.month_name, it.year, at.addons_turnover
+    GROUP BY it.invoice_turnover, it.month_name, it.year
   `
 
   const [clientResult, totalResult] = await Promise.all([
@@ -295,22 +287,14 @@ const getTurnoverVsDieselCost = async (numericMonth, year) => {
       WHERE EXTRACT(MONTH FROM i.date) = $1
       AND EXTRACT(YEAR FROM i.date) = $2
       GROUP BY TO_CHAR(i.date, 'Month'), EXTRACT(YEAR FROM i.date)
-    ),
-    AddOnsTurnover AS (
-      SELECT 
-        COALESCE(SUM(a.amount), 0) as addons_turnover
-      FROM add_ons a
-      WHERE EXTRACT(MONTH FROM a.date) = $1
-      AND EXTRACT(YEAR FROM a.date) = $2
     )
     SELECT 
-      COALESCE(it.invoice_turnover, 0) + COALESCE(SUM(ldc.subcontractor_turnover), 0) + COALESCE(at.addons_turnover, 0) as total_turnover,
+      COALESCE(it.invoice_turnover, 0) + COALESCE(SUM(ldc.subcontractor_turnover), 0) as total_turnover,
       it.month_name,
       it.year
     FROM InvoiceTurnover it
     LEFT JOIN LegDriverContributions ldc ON 1=1
-    CROSS JOIN AddOnsTurnover at
-    GROUP BY it.invoice_turnover, it.month_name, it.year, at.addons_turnover
+    GROUP BY it.invoice_turnover, it.month_name, it.year
   `
 
   const dieselQuery = `
@@ -603,7 +587,7 @@ const getSubcontractorTurnoverPerMonth = async (client, month, year) => {
     ),
     TotalTurnover AS (
       SELECT 
-        COALESCE(SUM(m.total_cost), 0) + COALESCE((SELECT SUM(ldc.subcontractor_turnover) FROM LegDriverContributions ldc), 0) + COALESCE((SELECT SUM(a.amount) FROM add_ons a WHERE TRIM(TO_CHAR(a.date, 'Month')) = $1 AND EXTRACT(YEAR FROM a.date)::TEXT = $2), 0) AS total_turnover,
+        COALESCE(SUM(m.total_cost), 0) + COALESCE((SELECT SUM(ldc.subcontractor_turnover) FROM LegDriverContributions ldc), 0) AS total_turnover,
         TO_CHAR(i.date, 'Month') AS month_name,
         EXTRACT(YEAR FROM i.date)::TEXT AS year
       FROM invoice i
@@ -756,22 +740,14 @@ const getSubcontractorVsTurnover = async (client, month, year, subcontractorId =
       WHERE TRIM(TO_CHAR(i.date, 'Month')) = $1
       AND EXTRACT(YEAR FROM i.date)::TEXT = $2
       GROUP BY TO_CHAR(i.date, 'Month'), EXTRACT(YEAR FROM i.date)
-    ),
-    AddOnsTurnover AS (
-      SELECT 
-        COALESCE(SUM(a.amount), 0) as addons_turnover
-      FROM add_ons a
-      WHERE TRIM(TO_CHAR(a.date, 'Month')) = $1
-      AND EXTRACT(YEAR FROM a.date)::TEXT = $2
     )
     SELECT 
-      COALESCE(it.invoice_turnover, 0) + COALESCE(SUM(ldc.subcontractor_turnover), 0) + COALESCE(at.addons_turnover, 0) as total_turnover,
+      COALESCE(it.invoice_turnover, 0) + COALESCE(SUM(ldc.subcontractor_turnover), 0) as total_turnover,
       it.month_name,
       it.year
     FROM InvoiceTurnover it
     LEFT JOIN LegDriverContributions ldc ON 1=1
-    CROSS JOIN AddOnsTurnover at
-    GROUP BY it.invoice_turnover, it.month_name, it.year, at.addons_turnover
+    GROUP BY it.invoice_turnover, it.month_name, it.year
   `
 
   const [subcontractorResult, totalTurnoverResult] = await Promise.all([
@@ -986,22 +962,14 @@ const getTurnoverVsSubbieExpense = async (client, month, year, subcontractorId =
       WHERE TRIM(TO_CHAR(i.date, 'Month')) = $1
       AND EXTRACT(YEAR FROM i.date)::text = $2
       GROUP BY TO_CHAR(i.date, 'Month'), EXTRACT(YEAR FROM i.date)
-    ),
-    AddOnsTurnover AS (
-      SELECT 
-        COALESCE(SUM(a.amount), 0) as addons_turnover
-      FROM add_ons a
-      WHERE TRIM(TO_CHAR(a.date, 'Month')) = $1
-      AND EXTRACT(YEAR FROM a.date)::text = $2
     )
     SELECT 
-      COALESCE(it.invoice_turnover, 0) + COALESCE(SUM(ldc.subcontractor_turnover), 0) + COALESCE(at.addons_turnover, 0) as total_turnover,
+      COALESCE(it.invoice_turnover, 0) + COALESCE(SUM(ldc.subcontractor_turnover), 0) as total_turnover,
       it.month_name,
       it.year
     FROM InvoiceTurnover it
     LEFT JOIN LegDriverContributions ldc ON 1=1
-    CROSS JOIN AddOnsTurnover at
-    GROUP BY it.invoice_turnover, it.month_name, it.year, at.addons_turnover
+    GROUP BY it.invoice_turnover, it.month_name, it.year
   `
 
   const [subcontractorResult, totalTurnoverResult] = await Promise.all([
