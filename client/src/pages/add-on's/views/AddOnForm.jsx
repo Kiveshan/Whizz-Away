@@ -579,9 +579,6 @@ const AddOnForm = () => {
                 Invoice #: {formData.invoice_number}
               </p>
             )}
-            <p className="invoice-date">
-              Date: {new Date().toLocaleDateString()}
-            </p>
           </div>
         </div>
 
