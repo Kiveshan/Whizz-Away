@@ -407,14 +407,14 @@ const AddOnForm = () => {
 
       // Service Details Table
       const serviceData = formData.items.map((item) => [
+        formatDate(formData.date),
         item.category || "N/A",
         item.description || "N/A",
-        formatDate(formData.date),
         formatCurrency(item.item_amount || 0),
       ]);
       autoTable(doc, {
         startY: currentY,
-        head: [["Category", "Description", "Date", "Amount"]],
+        head: [["Date", "Category", "Description", "Amount"]],
         body: serviceData,
         theme: "grid",
         styles: {
@@ -423,9 +423,9 @@ const AddOnForm = () => {
           lineWidth: 0.1,
         },
         columnStyles: {
-          0: { cellWidth: 30 },
-          1: { cellWidth: "auto" },
-          2: { cellWidth: 25 },
+          0: { cellWidth: 25 },
+          1: { cellWidth: 30 },
+          2: { cellWidth: "auto" },
           3: { cellWidth: 25, halign: "right" },
         },
         headStyles: {
@@ -662,6 +662,23 @@ const AddOnForm = () => {
                     </div>
 
                     <div className="form-group">
+                      <label htmlFor={`description-${index}`}>
+                        Description
+                      </label>
+                      <textarea
+                        id={`description-${index}`}
+                        name="description"
+                        value={item.description}
+                        onChange={(e) => handleInputChange(index, e)}
+                        placeholder="Description"
+                        className="form-textarea"
+                        rows="1"
+                        required
+                        readOnly={isViewMode}
+                      />
+                    </div>
+
+                    <div className="form-group">
                       <label htmlFor={`item_amount-${index}`}>Amount</label>
                       <div className="amount-input-wrapper">
                         <span className="currency-symbol">R</span>
@@ -677,23 +694,6 @@ const AddOnForm = () => {
                           readOnly={isViewMode}
                         />
                       </div>
-                    </div>
-
-                    <div className="form-group">
-                      <label htmlFor={`description-${index}`}>
-                        Description
-                      </label>
-                      <textarea
-                        id={`description-${index}`}
-                        name="description"
-                        value={item.description}
-                        onChange={(e) => handleInputChange(index, e)}
-                        placeholder="Description"
-                        className="form-textarea"
-                        rows="1"
-                        required
-                        readOnly={isViewMode}
-                      />
                     </div>
                   </div>
 
@@ -718,7 +718,7 @@ const AddOnForm = () => {
                     disabled={isViewMode}
                   />
                   <span className="vat-toggle-slider"></span>
-                  Apply VAT (15%)
+                  Add VAT (15%)
                 </label>
               </div>
 
