@@ -437,5 +437,15 @@ body {
   height: 16px;
   margin-left: 4px;
   vertical-align: middle;
-  color: #65cdf3; /* Set the icon color to black */
+}
+
+/* White truck icon for active (green) leg */
+.bg-green-500 .driver-icon {
+  color: #ffffff;
+}
+
+/* Black truck icon for inactive legs (gray or yellow) */
+.bg-gray-200 .driver-icon,
+.bg-yellow-200 .driver-icon {
+  color: #000000;
 }

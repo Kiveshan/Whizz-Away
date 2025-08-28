@@ -143,12 +143,22 @@ const handleDownloadPDF = async () => {
   }
 
   try {
-    // Capture the form container as a canvas, excluding the download button
+    // Temporarily adjust styles to ensure all content is visible
+    const originalStyle = element.style.cssText;
+    element.style.padding = "20px";
+    element.style.boxSizing = "border-box";
+    element.style.overflow = "visible";
+    element.style.width = "794px"; // A4 width in pixels at 96 DPI
+    element.style.minHeight = "1123px"; // A4 height in pixels at 96 DPI
+
+    // Capture the form container as a canvas
     const canvas = await html2canvas(element, {
-      scale: 2, // High resolution
+      scale: 3, // Higher resolution for better quality
       useCORS: true,
       logging: false,
-      ignoreElements: (el) => el.classList.contains("download-button-container"), // 👈 skip the button
+      windowWidth: 794, // Match A4 width
+      windowHeight: 1123, // Match A4 height
+      ignoreElements: (el) => el.classList.contains("download-button-container"), // Skip the button
     });
 
     // Create PDF
@@ -158,15 +168,17 @@ const handleDownloadPDF = async () => {
       format: "a4",
     });
 
-    const imgWidth = 190;
-    const pageHeight = 297;
+    const imgWidth = 190; // A4 width minus margins (210mm - 10mm left - 10mm right)
+    const pageHeight = 297; // A4 height in mm
     const imgHeight = (canvas.height * imgWidth) / canvas.width;
     let heightLeft = imgHeight;
-    let position = 10;
+    let position = 10; // Start position with 10mm margin
 
+    // Add image to PDF
     pdf.addImage(canvas.toDataURL("image/png"), "PNG", 10, position, imgWidth, imgHeight);
 
-    heightLeft -= pageHeight - 20;
+    // Handle multi-page content
+    heightLeft -= pageHeight - 20; // Account for margins
     while (heightLeft > 0) {
       pdf.addPage();
       position = heightLeft - imgHeight + 10;
@@ -174,7 +186,11 @@ const handleDownloadPDF = async () => {
       heightLeft -= pageHeight - 20;
     }
 
+    // Save the PDF
     pdf.save(`Credit_Note_${formData.documentNo || creditNoteId}.pdf`);
+
+    // Restore original styles
+    element.style.cssText = originalStyle;
   } catch (err) {
     console.error("Error generating PDF:", err);
   }
@@ -204,11 +220,17 @@ const handleDownloadPDF = async () => {
           ) : (
             <>
               <h1>{companyDetails.companyname || ""}</h1>
-              <p>COMPANY REG NO: {companyDetails.company_reg_num || ""}</p>
-              <p>{companyDetails.address || ""}</p>
-              <p>E-mail: {companyDetails.email || ""}</p>
-              <p>Director Cell: {companyDetails.cell_num || ""}</p>
-              <p>Accounts Cell: {companyDetails.cell_num2 || ""}</p>
+<div className="company-details">
+  <div className="company-details-row">
+    <span>COMPANY REG NO: {companyDetails.company_reg_num || ""}</span>
+    <span>{companyDetails.address || ""}</span>
+  </div>
+  <div className="company-details-row">
+    <span>E-mail: {companyDetails.email || ""}</span>
+    <span>Director Cell: {companyDetails.cell_num || ""}</span>
+    <span>Accounts Cell: {companyDetails.cell_num2 || ""}</span>
+  </div>
+</div>
             </>
           )}
         </div>
