@@ -18,10 +18,9 @@ import {
 } from "../../models/instructions/instructionModel.js"
 
 // Helper function to calculate total cost based on rate weight type
-const calculateTotalCost = (instructionData) => {
+const calculateTotalCost = (instructionData, containers = []) => {
   const rateWeight = instructionData.rateweight || instructionData.rateWeight || "Container"
-  const surchargeAmount = instructionData.surchages ? Number(instructionData.surcharge || 0) : 0
-
+  
   let baseCost = 0
 
   if (rateWeight === "Container") {
@@ -46,7 +45,23 @@ const calculateTotalCost = (instructionData) => {
     baseCost = weight * unitRate
   }
 
-  const totalCost = baseCost + surchargeAmount
+  // Calculate total surcharge from containers
+  const totalSurchargeAmount = containers.reduce((total, container) => {
+    if (container["Add Surcharges"] && container["Surcharge Amount"]) {
+      return total + Number(container["Surcharge Amount"] || 0)
+    }
+    return total
+  }, 0)
+
+  // <CHANGE> Calculate total hazardous amount from containers
+  const totalHazardousAmount = containers.reduce((total, container) => {
+    if (container["Hazardous"] && container["Hazardous Amount"]) {
+      return total + Number(container["Hazardous Amount"] || 0)
+    }
+    return total
+  }, 0)
+
+  const totalCost = baseCost + totalSurchargeAmount + totalHazardousAmount
   return Number(totalCost.toFixed(2))
 }
 
@@ -104,12 +119,29 @@ export const saveInstructionHandler = async (req, res) => {
   try {
     const { controllerData, containerData } = req.body
 
-    // Calculate total cost based on rate weight type
-    const calculatedTotalCost = calculateTotalCost(controllerData)
+    console.log("CONTROLLER: Original request data:", {
+      total_cost: controllerData.total_cost,
+      type: typeof controllerData.total_cost,
+      surcharges: controllerData.surcharges,
+      surchargesAmount: controllerData.surchargesAmount
+    });
+
+    // Use the frontend's total cost if available, otherwise calculate it
+    let finalTotalCost = controllerData.total_cost;
+    if (!finalTotalCost || isNaN(Number(finalTotalCost))) {
+      finalTotalCost = calculateTotalCost(controllerData, containerData || []);
+      console.log("CONTROLLER: Had to calculate total_cost in backend:", finalTotalCost);
+    } else {
+      finalTotalCost = Number(Number(finalTotalCost).toFixed(2));
+      console.log("CONTROLLER: Using frontend total_cost:", finalTotalCost);
+    }
+    
     const updatedControllerData = {
       ...controllerData,
-      total_cost: calculatedTotalCost,
+      total_cost: finalTotalCost,
     }
+    
+    console.log("CONTROLLER: Final total_cost being sent to model:", updatedControllerData.total_cost);
 
     console.log("Received instruction data:", {
       controllerData: {
@@ -137,6 +169,20 @@ export const saveInstructionHandler = async (req, res) => {
             }
           : "No containers",
     })
+    
+    // Debug each container's file_ref field
+    if (containerData && containerData.length > 0) {
+      console.log("CONTROLLER: Container data details:")
+      containerData.forEach((container, index) => {
+        console.log(`Container ${index} details:`, {
+          containerNum: container.containerNum || container.containernum,
+          file_ref: container.file_ref,
+          fileRef: container.fileRef,
+          // Include all properties for debugging
+          ...container
+        })
+      })
+    }
     const result = await saveInstruction({ controllerData: updatedControllerData, containerData })
     res.json({ success: true, m1key: result.m1key })
   } catch (error) {
@@ -628,11 +674,17 @@ export const getClientRatesController = async (req, res) => {
 export const saveInstructionController = async (req, res) => {
   const { controllerData, containerData } = req.body
   try {
-    // Calculate total cost based on rate weight type
-    const calculatedTotalCost = calculateTotalCost(controllerData)
+    // Use the frontend's total cost if available, otherwise calculate it
+    let finalTotalCost = controllerData.total_cost;
+    if (!finalTotalCost || isNaN(Number(finalTotalCost))) {
+      finalTotalCost = calculateTotalCost(controllerData, containerData || []);
+    } else {
+      finalTotalCost = Number(Number(finalTotalCost).toFixed(2));
+    }
+    
     const updatedControllerData = {
       ...controllerData,
-      total_cost: calculatedTotalCost,
+      total_cost: finalTotalCost,
     }
 
     const result = await saveInstructionAndContainers(updatedControllerData, containerData)
@@ -664,7 +716,7 @@ export const updateFCInstructionAndContainersHandler = async (req, res) => {
     }
 
     // Calculate total cost based on rate weight type
-    const calculatedTotalCost = calculateTotalCost(instructionData)
+    const calculatedTotalCost = calculateTotalCost(instructionData, containers)
     const updatedInstructionData = {
       ...instructionData,
       total_cost: calculatedTotalCost,

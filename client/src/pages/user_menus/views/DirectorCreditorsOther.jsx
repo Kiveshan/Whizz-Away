@@ -13,6 +13,11 @@ const otherCardData = [
     image: "/images/Statements.jpg",
     path: "/Creditors/CredStatements",
   },
+    {
+    title: "Credit Note",
+    image: "/images/crednote.jpg", 
+    path: "/CredClientList",       // Path to your Credit Note page
+  },
 ];
 
 const DirectorCreditorsOther = () => {

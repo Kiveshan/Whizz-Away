@@ -399,3 +399,43 @@ body {
   width: 16px;
   height: 16px;
 }
+.bin-icon-wrapper {
+  position: absolute;
+  top: -8px; /* Move up to dangle above the button */
+  right: -8px; /* Move right to dangle outside the button */
+  width: 24px;
+  height: 24px;
+  background-color: #fef2f2; /* Light red background for notification-like effect */
+  border: 2px solid #ef4444; /* Red-500 border */
+  border-radius: 50%; /* Circular shape */
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1); /* Subtle shadow for depth */
+  transition: transform 0.2s ease, background-color 0.2s ease, border-color 0.2s ease;
+  cursor: pointer;
+}
+
+.bin-icon-wrapper:hover {
+  background-color: #fee2e2; /* Slightly darker red on hover */
+  border-color: #b91c1c; /* Red-700 border on hover */
+  transform: scale(1.1); /* Slight scale-up for interactivity */
+}
+
+.bin-icon-wrapper svg {
+  width: 14px; /* Slightly smaller icon for better fit */
+  height: 14px;
+  stroke: #ef4444; /* Red-500 for the icon */
+}
+
+.bin-icon-wrapper:hover svg {
+  stroke: #b91c1c; /* Red-700 for the icon on hover */
+}
+/* Driver icon styling */
+.driver-icon {
+  width: 16px;
+  height: 16px;
+  margin-left: 4px;
+  vertical-align: middle;
+  color: #65cdf3; /* Set the icon color to black */
+}

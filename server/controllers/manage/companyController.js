@@ -38,7 +38,6 @@ const updateCompanyHandler = async (req, res) => {
     if (!companyname || !company_reg_num) {
       return res.status(400).json({ error: "Company name and registration number are required" })
     }
-
     console.log(`Updating company for user ID ${userId}`)
     const result = await updateCompany(userId, {
       companyname,
