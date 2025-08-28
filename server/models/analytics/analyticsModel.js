@@ -390,18 +390,15 @@ const getAllExpenses = async (client, month, year) => {
     WHERE e.roleid = 6
       AND TRIM(TO_CHAR(l.date, 'Month')) = $1
       AND EXTRACT(YEAR FROM l.date)::text = $2
-    GROUP BY TO_CHAR(l.date, 'Month'), EXTRACT(YEAR FROM l.date)
+    GROUP BY e.companyname, TO_CHAR(l.date, 'Month'), EXTRACT(YEAR FROM l.date)
   `
 
   const wagesQuery = `
     SELECT 
       COALESCE(SUM(w.net_pay), 0) as total_wages,
-      to_char(w.employee_date, 'Month') as month_name,
-      EXTRACT(YEAR FROM w.employee_date) as year
+      $1 as month_name,
+      $2 as year
     FROM wages w
-    WHERE TRIM(to_char(w.employee_date, 'Month')) = $1
-      AND EXTRACT(YEAR FROM w.employee_date)::text = $2
-    GROUP BY to_char(w.employee_date, 'Month'), EXTRACT(YEAR FROM w.employee_date)
   `
 
   const incomeQuery = `
@@ -821,12 +818,9 @@ const getWagesVsExpenses = async (client, month, year) => {
   const wagesQuery = `
     SELECT 
       SUM(w.net_pay) as total_wages,
-      to_char(w.employee_date, 'Month') as month_name,
-      EXTRACT(YEAR FROM w.employee_date) as year
+      $1 as month_name,
+      $2 as year
     FROM wages w
-    WHERE TRIM(to_char(w.employee_date, 'Month')) = $1
-    AND EXTRACT(YEAR FROM w.employee_date)::text = $2
-    GROUP BY to_char(w.employee_date, 'Month'), EXTRACT(YEAR FROM w.employee_date)
   `
 
   const fuelQuery = `
