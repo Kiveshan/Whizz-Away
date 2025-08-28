@@ -22,8 +22,7 @@ import {
   CreditorsOther,
   CreditorsDashboard,
   AnalyticsReportsPage,
-  ReportsPage
-  
+  ReportsPage,
 } from "./pages/user_menus"
 import { Login, Register } from "./pages/auth"
 import {
@@ -88,9 +87,7 @@ import {
   CreditNoteView
 } from "./pages/Creditors"
 
-import {
-  WageReports
-}from "./pages/Reports"
+import { WageReports, ProfitLossReportsPage, ProfitLossDetailPage } from "./pages/Reports"
 
 // CSS Imports
 import "./css/components.css"
@@ -172,8 +169,9 @@ function DynamicHeader() {
     "/CredClientList":"Clients",
     "/credit-note-list": "Credit Notes",
     "/credit-note-form": "Credit Note Form",
-    "/view-credit-note/:clientName/:creditNoteId": "Credit Note"
-
+    "/view-credit-note/:clientName/:creditNoteId": "Credit Note",
+    "/profit-loss-reports": "Income & Expenditure Reports",
+    "/income-expenditure-reports/:month/:year": "Income & Expenditure Report",
   }
 
   const getTitle = () => {
@@ -184,6 +182,7 @@ function DynamicHeader() {
     if (location.pathname.startsWith("/DirectorExpenses/")) return "Fuel Expenses"
     if (location.pathname.startsWith("/finance-clerk-wage-slip/")) return "Wages"
     if (location.pathname.startsWith("/view-credit-note/")) return "Credit Note" 
+    if (location.pathname.startsWith("/income-expenditure-reports/")) return "Income & Expenditure Report"
     return titleMap[location.pathname] || "Unknown Page"
   }
 
@@ -286,9 +285,10 @@ function ContentWrapper() {
         <Route path="/FCcontrollerinstructions" element={<FCcontrollerinstructions />} />
         <Route path="/FCcontrollerInstructionDetails" element={<FCcontrollerInstructionDetails />} />
         <Route path="/analytics-reports" element={<AnalyticsReportsPage />} />
-        <Route path="/reports" element={<ReportsPage />} /> 
+        <Route path="/reports" element={<ReportsPage />} />
         <Route path="/wage-reports" element={<WageReports />} />
-
+        <Route path="/profit-loss-reports" element={<ProfitLossReportsPage />} />
+        <Route path="/income-expenditure-reports/:month/:year" element={<ProfitLossDetailPage />} />
       </Routes>
       {shouldShowFooter && <Footer />} {/* Conditionally render footer */}
     </div>
@@ -309,7 +309,9 @@ function App() {
     "/Viewcontrollerinstructions": "Viewcontrollerinstructions",
     "/ViewcontrollerInstructionDetails": "ViewcontrollerInstructionDetails",
     "/reports": "Reports",
-    "/wage-reports": "Wage Reports" 
+    "/wage-reports": "Wage Reports",
+    "/profit-loss-reports": "Income & Expenditure Reports",
+    "/income-expenditure-reports/:month/:year": "Income & Expenditure Report",
   }
 
   // Set page title based on current route

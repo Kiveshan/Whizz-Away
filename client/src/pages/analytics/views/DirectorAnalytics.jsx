@@ -2023,7 +2023,9 @@ export default function DirectorAnalytics() {
               <option value="turnoverVsDieselCost">
                 Turnover vs Diesel Cost
               </option>
-              <option value="turnoverPerTruck">Turnover Per Truck</option>
+              <option value="turnoverPerTruck">
+                Turnover Per Truck
+                </option>
               <option value="incomeVsExpense">
                 Income vs Expense Per Month
               </option>
