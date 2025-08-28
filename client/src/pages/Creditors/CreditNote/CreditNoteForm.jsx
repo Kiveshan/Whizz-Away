@@ -280,11 +280,17 @@ const CreditNoteForm = () => {
           ) : (
             <>
               <h1>{companyDetails.companyname || ""}</h1>
-              <p>COMPANY REG NO: {companyDetails.company_reg_num || ""}</p>
-              <p>{companyDetails.address || ""}</p>
-              <p>E-mail: {companyDetails.email || ""}</p>
-              <p>Director Cell: {companyDetails.cell_num || ""}</p>
-              <p>Accounts Cell: {companyDetails.cell_num2 || ""}</p>
+<div className="company-details">
+  <div className="company-details-row">
+    <span>COMPANY REG NO: {companyDetails.company_reg_num || ""}</span>
+    <span>{companyDetails.address || ""}</span>
+  </div>
+  <div className="company-details-row">
+    <span>E-mail: {companyDetails.email || ""}</span>
+    <span>Director Cell: {companyDetails.cell_num || ""}</span>
+    <span>Accounts Cell: {companyDetails.cell_num2 || ""}</span>
+  </div>
+</div>
             </>
           )}
         </div>
