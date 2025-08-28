@@ -33,11 +33,12 @@ const getProfitLossData = async (month, year) => {
     FROM wages
     UNION ALL
     SELECT 
-      'Purchase Orders' AS source,
-      date,
-      total AS amount
-    FROM purchase_orders
-    WHERE EXTRACT(MONTH FROM date) = $1 AND EXTRACT(YEAR FROM date) = $2
+      et.expense AS source,
+      po.date,
+      po.total AS amount
+    FROM purchase_orders po
+    JOIN expense_types et ON po.expense_type_id = et.id
+    WHERE EXTRACT(MONTH FROM po.date) = $1 AND EXTRACT(YEAR FROM po.date) = $2
     UNION ALL
     SELECT 
       'Leg costs' AS source,
