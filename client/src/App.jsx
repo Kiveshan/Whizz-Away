@@ -106,9 +106,12 @@ import {
   CreditNoteView,
 } from "./pages/Creditors";
 
-import { WageReports } from "./pages/Reports";
-
 import { ClientList, AddOnList, AddOnForm } from "./pages/add-on's";
+import {
+  WageReports,
+  ProfitLossReportsPage,
+  ProfitLossDetailPage,
+} from "./pages/Reports";
 
 // CSS Imports
 import "./css/components.css";
@@ -194,6 +197,8 @@ function DynamicHeader() {
     "/credit-note-list": "Credit Notes",
     "/credit-note-form": "Credit Note Form",
     "/view-credit-note/:clientName/:creditNoteId": "Credit Note",
+    "/profit-loss-reports": "Income & Expenditure Reports",
+    "/income-expenditure-reports/:month/:year": "Income & Expenditure Report",
   };
 
   const getTitle = () => {
@@ -210,6 +215,8 @@ function DynamicHeader() {
       return "Wages";
     if (location.pathname.startsWith("/view-credit-note/"))
       return "Credit Note";
+    if (location.pathname.startsWith("/income-expenditure-reports/"))
+      return "Income & Expenditure Report";
     return titleMap[location.pathname] || "Unknown Page";
   };
 
@@ -400,6 +407,14 @@ function ContentWrapper() {
         <Route path="/view-client-list" element={<ClientList />} />
         <Route path="/view-add-on-list" element={<AddOnList />} />
         <Route path="/add-on-form" element={<AddOnForm />} />
+        <Route
+          path="/profit-loss-reports"
+          element={<ProfitLossReportsPage />}
+        />
+        <Route
+          path="/income-expenditure-reports/:month/:year"
+          element={<ProfitLossDetailPage />}
+        />
       </Routes>
       {shouldShowFooter && <Footer />} {/* Conditionally render footer */}
     </div>
@@ -421,6 +436,8 @@ function App() {
     "/ViewcontrollerInstructionDetails": "ViewcontrollerInstructionDetails",
     "/reports": "Reports",
     "/wage-reports": "Wage Reports",
+    "/profit-loss-reports": "Income & Expenditure Reports",
+    "/income-expenditure-reports/:month/:year": "Income & Expenditure Report",
   };
 
   // Set page title based on current route

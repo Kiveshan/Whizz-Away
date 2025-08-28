@@ -1,4 +1,4 @@
-import { pool } from "../../config/database.js";
+import { pool } from "../../config/database.js"
 
 // Define monthNames for numeric-to-name conversion
 const monthNames = {
@@ -14,7 +14,7 @@ const monthNames = {
   10: "October",
   11: "November",
   12: "December",
-};
+}
 
 const getFuelExpenses = async (client, month, year) => {
   const query = `
@@ -31,39 +31,33 @@ const getFuelExpenses = async (client, month, year) => {
     AND t.status = true
     GROUP BY t.truckregnum, to_char(e.slipuploaddate, 'Month'), EXTRACT(YEAR FROM e.slipuploaddate)
     ORDER BY total_cost DESC
-  `;
-  const result = await client.query(query, [month, year]);
-  console.log("Raw query result:", result.rows);
-  console.log(`Query returned ${result.rows.length} rows`);
+  `
+  const result = await client.query(query, [month, year])
+  console.log("Raw query result:", result.rows)
+  console.log(`Query returned ${result.rows.length} rows`)
 
-  const totalFuelExpense = result.rows.reduce(
-    (sum, row) => sum + parseFloat(row.total_cost),
-    0
-  );
-  console.log(
-    `Total fuel expense for ${month} ${year} (non-subcontractors): ${totalFuelExpense}`
-  );
+  const totalFuelExpense = result.rows.reduce((sum, row) => sum + Number.parseFloat(row.total_cost), 0)
+  console.log(`Total fuel expense for ${month} ${year} (non-subcontractors): ${totalFuelExpense}`)
 
   const truckData = result.rows.map((row) => ({
     truckregnum: row.truckregnum,
-    total_cost: parseFloat(row.total_cost),
+    total_cost: Number.parseFloat(row.total_cost),
     month_name: row.month_name,
     year: row.year,
-  }));
+  }))
 
   return truckData.map((row) => {
-    const cost = parseFloat(row.total_cost);
-    const percentage =
-      totalFuelExpense > 0 ? ((cost / totalFuelExpense) * 100).toFixed(2) : 0;
+    const cost = Number.parseFloat(row.total_cost)
+    const percentage = totalFuelExpense > 0 ? ((cost / totalFuelExpense) * 100).toFixed(2) : 0
     return {
       ...row,
-      percentage: parseFloat(percentage),
-    };
-  });
-};
+      percentage: Number.parseFloat(percentage),
+    }
+  })
+}
 
 const getTurnoverPerMonth = async (client, month, year, clientId = null) => {
-  const params = [month, year];
+  const params = [month, year]
   let clientQuery = `
     SELECT 
       c.client, 
@@ -75,15 +69,15 @@ const getTurnoverPerMonth = async (client, month, year, clientId = null) => {
     JOIN m5_client c ON i.clientid = c.m5clientkey
     WHERE TRIM(to_char(i.date, 'Month')) = $1
     AND EXTRACT(YEAR FROM i.date)::text = $2
-  `;
+  `
   if (clientId) {
-    clientQuery += ` AND i.clientid = $3`;
-    params.push(clientId);
+    clientQuery += ` AND i.clientid = $3`
+    params.push(clientId)
   }
   clientQuery += `
     GROUP BY c.client, to_char(i.date, 'Month'), EXTRACT(YEAR FROM i.date)
     ORDER BY turnover DESC
-  `;
+  `
 
   const totalQuery = `
     WITH DistinctLegs AS (
@@ -128,46 +122,47 @@ const getTurnoverPerMonth = async (client, month, year, clientId = null) => {
     FROM InvoiceTurnover it
     LEFT JOIN LegDriverContributions ldc ON 1=1
     GROUP BY it.invoice_turnover, it.month_name, it.year
-  `;
+  `
 
   const [clientResult, totalResult] = await Promise.all([
     clientId ? client.query(clientQuery, params) : Promise.resolve({ rows: [] }),
-    client.query(totalQuery, [month, year])
-  ]);
+    client.query(totalQuery, [month, year]),
+  ])
 
-  console.log("Client query result:", clientResult.rows);
-  console.log("Total turnover query result:", totalResult.rows);
+  console.log("Client query result:", clientResult.rows)
+  console.log("Total turnover query result:", totalResult.rows)
 
-  const totalTurnover = parseFloat(totalResult.rows[0]?.turnover || 0);
-  console.log(`Total turnover (including subcontractors) for ${month} ${year}: ${totalTurnover}`);
+  const totalTurnover = Number.parseFloat(totalResult.rows[0]?.turnover || 0)
+  console.log(`Total turnover (including subcontractors) for ${month} ${year}: ${totalTurnover}`)
 
-  let turnoverData = [{
-    client: "Total Turnover",
-    turnover: totalTurnover,
-    month_name: month.trim(),
-    year: year.toString(),
-    percentage: 100,
-  }];
+  let turnoverData = [
+    {
+      client: "Total Turnover",
+      turnover: totalTurnover,
+      month_name: month.trim(),
+      year: year.toString(),
+      percentage: 100,
+    },
+  ]
 
   if (clientId && clientResult.rows.length > 0) {
     const clientData = clientResult.rows.map((row) => {
-      const turnover = parseFloat(row.turnover || 0);
-      const percentage =
-        totalTurnover > 0 ? ((turnover / totalTurnover) * 100).toFixed(2) : 0;
+      const turnover = Number.parseFloat(row.turnover || 0)
+      const percentage = totalTurnover > 0 ? ((turnover / totalTurnover) * 100).toFixed(2) : 0
       return {
         client: row.client,
         turnover: turnover,
         month_name: row.month_name.trim(),
         year: row.year.toString(),
-        percentage: parseFloat(percentage),
-      };
-    });
-    turnoverData = [...clientData, turnoverData[0]]; // Client data first, then total
+        percentage: Number.parseFloat(percentage),
+      }
+    })
+    turnoverData = [...clientData, turnoverData[0]] // Client data first, then total
   }
 
-  console.log("Processed turnover data:", turnoverData);
-  return turnoverData;
-};
+  console.log("Processed turnover data:", turnoverData)
+  return turnoverData
+}
 
 const getAllClients = async (client) => {
   const query = `
@@ -175,15 +170,15 @@ const getAllClients = async (client) => {
     FROM m5_client
     WHERE status = true
     ORDER BY client
-  `;
-  const result = await client.query(query);
-  console.log("Clients query result:", result.rows);
-  console.log(`Query returned ${result.rows.length} rows`);
+  `
+  const result = await client.query(query)
+  console.log("Clients query result:", result.rows)
+  console.log(`Query returned ${result.rows.length} rows`)
   return result.rows.map((row) => ({
     m5clientkey: row.m5clientkey,
     client: row.client,
-  }));
-};
+  }))
+}
 
 const getAllSubcontractors = async (client) => {
   const query = `
@@ -191,15 +186,15 @@ const getAllSubcontractors = async (client) => {
     FROM m5_employee
     WHERE roleid = 6
     ORDER BY companyname
-  `;
-  const result = await client.query(query);
-  console.log("Subcontractors query result:", result.rows);
-  console.log(`Query returned ${result.rows.length} rows`);
+  `
+  const result = await client.query(query)
+  console.log("Subcontractors query result:", result.rows)
+  console.log(`Query returned ${result.rows.length} rows`)
   return result.rows.map((row) => ({
     userid: row.userid,
     companyname: row.companyname,
-  }));
-};
+  }))
+}
 
 const getAllTrucks = async (client) => {
   const query = `
@@ -207,21 +202,21 @@ const getAllTrucks = async (client) => {
     FROM m5_trucks
     WHERE is_subcontractor = false AND status = true
     ORDER BY truckregnum
-  `;
-  const result = await client.query(query);
-  console.log("Trucks query result:", result.rows);
-  console.log(`Query returned ${result.rows.length} rows`);
+  `
+  const result = await client.query(query)
+  console.log("Trucks query result:", result.rows)
+  console.log(`Query returned ${result.rows.length} rows`)
   return result.rows.map((row) => ({
     m5truckskey: row.m5truckskey,
     truckregnum: row.truckregnum,
-  }));
-};
+  }))
+}
 
 const getAgingAnalysis = async (client, month, year, clientId = null) => {
-  const params = [month, year];
+  const params = [month, year]
   let query = `
     SELECT 
-      ${clientId ? 'c.client' : "'Total Aging' as client"}, 
+      ${clientId ? "c.client" : "'Total Aging' as client"}, 
       SUM(a.current) as current_amount,
       SUM(a."30days") as thirty_days,
       SUM(a."60days") as sixty_days,
@@ -233,28 +228,28 @@ const getAgingAnalysis = async (client, month, year, clientId = null) => {
     JOIN m5_client c ON a.clientid = c.m5clientkey
     WHERE TRIM(to_char(s.generation_date, 'Month')) = $1
     AND EXTRACT(YEAR FROM s.generation_date)::text = $2
-  `;
+  `
   if (clientId) {
-    query += ` AND a.clientid = $3`;
-    params.push(clientId);
+    query += ` AND a.clientid = $3`
+    params.push(clientId)
   }
   query += `
-    GROUP BY ${clientId ? 'c.client,' : ''} to_char(s.generation_date, 'Month'), EXTRACT(YEAR FROM s.generation_date)
-  `;
-  const result = await client.query(query, params);
-  console.log("Raw query result:", result.rows);
-  console.log(`Query returned ${result.rows.length} rows`);
+    GROUP BY ${clientId ? "c.client," : ""} to_char(s.generation_date, 'Month'), EXTRACT(YEAR FROM s.generation_date)
+  `
+  const result = await client.query(query, params)
+  console.log("Raw query result:", result.rows)
+  console.log(`Query returned ${result.rows.length} rows`)
 
   return result.rows.map((row) => ({
     client: row.client,
-    current: parseFloat(row.current_amount) || 0,
-    thirtyDays: parseFloat(row.thirty_days) || 0,
-    sixtyDays: parseFloat(row.sixty_days) || 0,
-    ninetyDays: parseFloat(row.ninety_days) || 0,
+    current: Number.parseFloat(row.current_amount) || 0,
+    thirtyDays: Number.parseFloat(row.thirty_days) || 0,
+    sixtyDays: Number.parseFloat(row.sixty_days) || 0,
+    ninetyDays: Number.parseFloat(row.ninety_days) || 0,
     month: row.month_name.trim(),
     year: row.year.toString(),
-  }));
-};
+  }))
+}
 
 const getTurnoverVsDieselCost = async (numericMonth, year) => {
   const turnoverQuery = `
@@ -300,7 +295,7 @@ const getTurnoverVsDieselCost = async (numericMonth, year) => {
     FROM InvoiceTurnover it
     LEFT JOIN LegDriverContributions ldc ON 1=1
     GROUP BY it.invoice_turnover, it.month_name, it.year
-  `;
+  `
 
   const dieselQuery = `
     SELECT COALESCE(SUM(expensecost), 0) as total_diesel_cost
@@ -308,34 +303,30 @@ const getTurnoverVsDieselCost = async (numericMonth, year) => {
     WHERE EXTRACT(MONTH FROM slipuploaddate) = $1
       AND EXTRACT(YEAR FROM slipuploaddate) = $2
       AND type = 'fuel';
-  `;
+  `
 
   const [turnoverResult, dieselResult] = await Promise.all([
     pool.query(turnoverQuery, [numericMonth, year]),
-    pool.query(dieselQuery, [numericMonth, year])
-  ]);
+    pool.query(dieselQuery, [numericMonth, year]),
+  ])
 
-  const totalTurnover = Number(turnoverResult.rows[0]?.total_turnover || 0);
-  const totalDieselCost = Number(dieselResult.rows[0]?.total_diesel_cost || 0);
+  const totalTurnover = Number(turnoverResult.rows[0]?.total_turnover || 0)
+  const totalDieselCost = Number(dieselResult.rows[0]?.total_diesel_cost || 0)
 
-  console.log(
-    `Total turnover (including subcontractors) for ${monthNames[numericMonth]} ${year}: ${totalTurnover}`
-  );
-  console.log(
-    `Total diesel cost for ${monthNames[numericMonth]} ${year}: ${totalDieselCost}`
-  );
+  console.log(`Total turnover (including subcontractors) for ${monthNames[numericMonth]} ${year}: ${totalTurnover}`)
+  console.log(`Total diesel cost for ${monthNames[numericMonth]} ${year}: ${totalDieselCost}`)
 
-  const total = totalTurnover + totalDieselCost;
-  let turnoverPercentage = 0;
-  let dieselCostPercentage = 0;
+  const total = totalTurnover + totalDieselCost
+  let turnoverPercentage = 0
+  let dieselCostPercentage = 0
 
   if (total > 0) {
-    turnoverPercentage = Number(((totalTurnover / total) * 100).toFixed(2));
-    dieselCostPercentage = Number(((totalDieselCost / total) * 100).toFixed(2));
+    turnoverPercentage = Number(((totalTurnover / total) * 100).toFixed(2))
+    dieselCostPercentage = Number(((totalDieselCost / total) * 100).toFixed(2))
   }
 
-  if (isNaN(turnoverPercentage)) turnoverPercentage = 0;
-  if (isNaN(dieselCostPercentage)) dieselCostPercentage = 0;
+  if (isNaN(turnoverPercentage)) turnoverPercentage = 0
+  if (isNaN(dieselCostPercentage)) dieselCostPercentage = 0
 
   return [
     {
@@ -346,8 +337,8 @@ const getTurnoverVsDieselCost = async (numericMonth, year) => {
       turnoverPercentage,
       dieselCostPercentage,
     },
-  ];
-};
+  ]
+}
 
 const getAllExpenses = async (client, month, year) => {
   const fuelQuery = `
@@ -360,7 +351,7 @@ const getAllExpenses = async (client, month, year) => {
       AND TRIM(to_char(e.slipuploaddate, 'Month')) = $1
       AND EXTRACT(YEAR FROM e.slipuploaddate)::text = $2
     GROUP BY to_char(e.slipuploaddate, 'Month'), EXTRACT(YEAR FROM e.slipuploaddate)
-  `;
+  `
 
   const purchaseOrderQuery = `
     SELECT 
@@ -371,7 +362,7 @@ const getAllExpenses = async (client, month, year) => {
     WHERE TRIM(to_char(p.date, 'Month')) = $1
       AND EXTRACT(YEAR FROM p.date)::text = $2
     GROUP BY to_char(p.date, 'Month'), EXTRACT(YEAR FROM p.date)
-  `;
+  `
 
   const subcontractorQuery = `
     SELECT 
@@ -383,19 +374,16 @@ const getAllExpenses = async (client, month, year) => {
     WHERE e.roleid = 6
       AND TRIM(TO_CHAR(l.date, 'Month')) = $1
       AND EXTRACT(YEAR FROM l.date)::text = $2
-    GROUP BY TO_CHAR(l.date, 'Month'), EXTRACT(YEAR FROM l.date)
-  `;
+    GROUP BY e.companyname, TO_CHAR(l.date, 'Month'), EXTRACT(YEAR FROM l.date)
+  `
 
   const wagesQuery = `
     SELECT 
       COALESCE(SUM(w.net_pay), 0) as total_wages,
-      to_char(w.employee_date, 'Month') as month_name,
-      EXTRACT(YEAR FROM w.employee_date) as year
+      $1 as month_name,
+      $2 as year
     FROM wages w
-    WHERE TRIM(to_char(w.employee_date, 'Month')) = $1
-      AND EXTRACT(YEAR FROM w.employee_date)::text = $2
-    GROUP BY to_char(w.employee_date, 'Month'), EXTRACT(YEAR FROM w.employee_date)
-  `;
+  `
 
   const incomeQuery = `
     SELECT 
@@ -407,54 +395,79 @@ const getAllExpenses = async (client, month, year) => {
     WHERE TRIM(to_char(i.date, 'Month')) = $1
     AND EXTRACT(YEAR FROM i.date)::text = $2
     GROUP BY to_char(i.date, 'Month'), EXTRACT(YEAR FROM i.date)
-  `;
+  `
 
-  const [fuelResult, purchaseOrderResult, subcontractorResult, wagesResult, incomeResult] = await Promise.all([
-    client.query(fuelQuery, [month, year]),
-    client.query(purchaseOrderQuery, [month, year]),
-    client.query(subcontractorQuery, [month, year]),
-    client.query(wagesQuery, [month, year]),
-    client.query(incomeQuery, [month, year])
-  ]);
+  const creditNotesQuery = `
+    SELECT 
+      COALESCE(SUM(amount_value), 0) as total_credit_notes,
+      month_name,
+      year
+    FROM (
+      SELECT 
+        unnest(cn.amount) as amount_value,
+        to_char(cn.creditnote_date, 'Month') as month_name,
+        EXTRACT(YEAR FROM cn.creditnote_date) as year
+      FROM credit_notes cn
+      WHERE TRIM(to_char(cn.creditnote_date, 'Month')) = $1
+      AND EXTRACT(YEAR FROM cn.creditnote_date)::text = $2
+    ) subquery
+    GROUP BY month_name, year
+  `
 
-  console.log("Fuel query result:", fuelResult.rows);
-  console.log("Purchase order query result:", purchaseOrderResult.rows);
-  console.log("Subcontractor expense query result:", subcontractorResult.rows);
-  console.log("Wages query result:", wagesResult.rows);
-  console.log("Income query result:", incomeResult.rows);
+  const [fuelResult, purchaseOrderResult, subcontractorResult, wagesResult, incomeResult, creditNotesResult] =
+    await Promise.all([
+      client.query(fuelQuery, [month, year]),
+      client.query(purchaseOrderQuery, [month, year]),
+      client.query(subcontractorQuery, [month, year]),
+      client.query(wagesQuery, [month, year]),
+      client.query(incomeQuery, [month, year]),
+      client.query(creditNotesQuery, [month, year]),
+    ])
 
-  const totalFuelCost = parseFloat(fuelResult.rows[0]?.total_fuel_cost || 0);
-  const totalPurchaseOrderCost = parseFloat(purchaseOrderResult.rows[0]?.total_po_cost || 0);
-  const totalSubcontractorExpense = parseFloat(subcontractorResult.rows[0]?.total_subcontractor_expense || 0);
-  const totalWages = parseFloat(wagesResult.rows[0]?.total_wages || 0);
-  const totalIncome = parseFloat(incomeResult.rows[0]?.total_income || 0);
+  console.log("Fuel query result:", fuelResult.rows)
+  console.log("Purchase order query result:", purchaseOrderResult.rows)
+  console.log("Subcontractor expense query result:", subcontractorResult.rows)
+  console.log("Wages query result:", wagesResult.rows)
+  console.log("Income query result:", incomeResult.rows)
+  console.log("Credit notes query result:", creditNotesResult.rows)
 
-  const totalExpenses = totalFuelCost + totalPurchaseOrderCost + totalSubcontractorExpense + totalWages;
+  const totalFuelCost = Number.parseFloat(fuelResult.rows[0]?.total_fuel_cost || 0)
+  const totalPurchaseOrderCost = Number.parseFloat(purchaseOrderResult.rows[0]?.total_po_cost || 0)
+  const totalSubcontractorExpense = Number.parseFloat(subcontractorResult.rows[0]?.total_subcontractor_expense || 0)
+  const totalWages = Number.parseFloat(wagesResult.rows[0]?.total_wages || 0)
+  const totalIncome = Number.parseFloat(incomeResult.rows[0]?.total_income || 0)
+  const totalCreditNotes = Number.parseFloat(creditNotesResult.rows[0]?.total_credit_notes || 0)
 
-  console.log(`Total fuel cost for ${month} ${year}: ${totalFuelCost}`);
-  console.log(`Total purchase order cost for ${month} ${year}: ${totalPurchaseOrderCost}`);
-  console.log(`Total subcontractor expense for ${month} ${year}: ${totalSubcontractorExpense}`);
-  console.log(`Total wages for ${month} ${year}: ${totalWages}`);
-  console.log(`Total expenses for ${month} ${year}: ${totalExpenses}`);
-  console.log(`Total income for ${month} ${year}: ${totalIncome}`);
+  const totalExpenses =
+    totalFuelCost + totalPurchaseOrderCost + totalSubcontractorExpense + totalWages + totalCreditNotes
 
-  const expensesData = [{
-    expensedesc: "All Expenses",
-    total_cost: totalExpenses,
-    month_name: month.trim(),
-    year: year.toString(),
-  }];
+  console.log(`Total fuel cost for ${month} ${year}: ${totalFuelCost}`)
+  console.log(`Total purchase order cost for ${month} ${year}: ${totalPurchaseOrderCost}`)
+  console.log(`Total subcontractor expense for ${month} ${year}: ${totalSubcontractorExpense}`)
+  console.log(`Total wages for ${month} ${year}: ${totalWages}`)
+  console.log(`Total credit notes for ${month} ${year}: ${totalCreditNotes}`)
+  console.log(`Total expenses for ${month} ${year}: ${totalExpenses}`)
+  console.log(`Total income for ${month} ${year}: ${totalIncome}`)
+
+  const expensesData = [
+    {
+      expensedesc: "All Expenses",
+      total_cost: totalExpenses,
+      month_name: month.trim(),
+      year: year.toString(),
+    },
+  ]
 
   return {
     expenses: expensesData,
     income: totalIncome,
     month: month.trim(),
     year: year.toString(),
-  };
-};
+  }
+}
 
 const getTurnoverPerTruck = async (client, month, year) => {
-  const params = [month, year];
+  const params = [month, year]
   const query = `
     WITH DistinctLegs AS (
       SELECT 
@@ -495,43 +508,40 @@ const getTurnoverPerTruck = async (client, month, year) => {
       year
     FROM TurnoverPerTruck
     ORDER BY total_turnover DESC
-  `;
+  `
 
   try {
-    const result = await client.query(query, params);
-    console.log("Turnover per Truck query result:", result.rows);
-    console.log(`Query returned ${result.rows.length} rows`);
+    const result = await client.query(query, params)
+    console.log("Turnover per Truck query result:", result.rows)
+    console.log(`Query returned ${result.rows.length} rows`)
 
     if (!result.rows || result.rows.length === 0) {
-      console.log(`No rows returned for ${month} ${year}. Check query or data.`);
-      return [];
+      console.log(`No rows returned for ${month} ${year}. Check query or data.`)
+      return []
     }
 
-    const totalTurnover = result.rows.reduce(
-      (sum, row) => sum + parseFloat(row.total_turnover || 0),
-      0
-    );
-    console.log(`Total turnover for ${month} ${year}: ${totalTurnover}`);
+    const totalTurnover = result.rows.reduce((sum, row) => sum + Number.parseFloat(row.total_turnover || 0), 0)
+    console.log(`Total turnover for ${month} ${year}: ${totalTurnover}`)
 
     const data = result.rows.map((row) => {
-      const turnover = parseFloat(row.total_turnover || 0);
-      const percentage = totalTurnover > 0 ? ((turnover / totalTurnover) * 100).toFixed(2) : 0;
+      const turnover = Number.parseFloat(row.total_turnover || 0)
+      const percentage = totalTurnover > 0 ? ((turnover / totalTurnover) * 100).toFixed(2) : 0
       return {
         truckregnumber: row.truckregnumber,
         total_turnover: turnover,
         month_name: row.month_name.trim(),
         year: row.year,
-        percentage: parseFloat(percentage),
-      };
-    });
+        percentage: Number.parseFloat(percentage),
+      }
+    })
 
-    console.log("Processed turnover per truck data:", data);
-    return data;
+    console.log("Processed turnover per truck data:", data)
+    return data
   } catch (err) {
-    console.error("Error executing turnover per truck query:", err);
-    throw new Error(`Database query failed: ${err.message}`);
+    console.error("Error executing turnover per truck query:", err)
+    throw new Error(`Database query failed: ${err.message}`)
   }
-};
+}
 
 const getSubcontractorTurnoverPerMonth = async (client, month, year) => {
   const query = `
@@ -605,35 +615,35 @@ const getSubcontractorTurnoverPerMonth = async (client, month, year) => {
     FROM TotalSubcontractorTurnover tst
     CROSS JOIN TotalTurnover tt
     ORDER BY value DESC;
-  `;
+  `
 
-  const result = await client.query(query, [month, year]);
-  console.log("Subcontractor turnover query result for month", month, year, ":", result.rows);
-  console.log(`Query returned ${result.rows ? result.rows.length : 0} rows`);
+  const result = await client.query(query, [month, year])
+  console.log("Subcontractor turnover query result for month", month, year, ":", result.rows)
+  console.log(`Query returned ${result.rows ? result.rows.length : 0} rows`)
 
   if (!result.rows || result.rows.length === 0) {
-    console.log(`No rows returned for ${month} ${year}. Check query or data.`);
-    return [];
+    console.log(`No rows returned for ${month} ${year}. Check query or data.`)
+    return []
   }
 
-  const totalTurnover = parseFloat(result.rows.find(row => row.type === 'total')?.value || 0);
-  console.log(`Total turnover (including subcontractors) for ${month} ${year}: ${totalTurnover}`);
+  const totalTurnover = Number.parseFloat(result.rows.find((row) => row.type === "total")?.value || 0)
+  console.log(`Total turnover (including subcontractors) for ${month} ${year}: ${totalTurnover}`)
 
-  const turnoverData = result.rows.map(row => ({
+  const turnoverData = result.rows.map((row) => ({
     name: row.name,
-    value: parseFloat(row.value || 0),
+    value: Number.parseFloat(row.value || 0),
     type: row.type,
-    percentage: parseFloat(row.percentage || 0),
+    percentage: Number.parseFloat(row.percentage || 0),
     month: row.month.trim(),
     year: row.year,
-  }));
+  }))
 
-  console.log("Processed turnover vs total subcontractor data:", turnoverData);
-  return turnoverData;
-};
+  console.log("Processed turnover vs total subcontractor data:", turnoverData)
+  return turnoverData
+}
 
 const getSubcontractorVsTurnover = async (client, month, year, subcontractorId = null) => {
-  const params = [month, year];
+  const params = [month, year]
   let subcontractorQuery = `
     WITH DistinctLegs AS (
       SELECT 
@@ -668,10 +678,10 @@ const getSubcontractorVsTurnover = async (client, month, year, subcontractorId =
         AND m.pickupdate IS NOT NULL
         AND TRIM(TO_CHAR(m.pickupdate, 'Month')) = $1
         AND EXTRACT(YEAR FROM m.pickupdate)::TEXT = $2
-  `;
+  `
   if (subcontractorId) {
-    subcontractorQuery += ` AND l.driverid = $3`;
-    params.push(subcontractorId);
+    subcontractorQuery += ` AND l.driverid = $3`
+    params.push(subcontractorId)
   }
   subcontractorQuery += `
       ),
@@ -693,7 +703,7 @@ const getSubcontractorVsTurnover = async (client, month, year, subcontractorId =
         year
       FROM SubcontractorTurnover
       ORDER BY value DESC;
-  `;
+  `
 
   const totalTurnoverQuery = `
     WITH DistinctLegs AS (
@@ -738,18 +748,18 @@ const getSubcontractorVsTurnover = async (client, month, year, subcontractorId =
     FROM InvoiceTurnover it
     LEFT JOIN LegDriverContributions ldc ON 1=1
     GROUP BY it.invoice_turnover, it.month_name, it.year
-  `;
+  `
 
   const [subcontractorResult, totalTurnoverResult] = await Promise.all([
     subcontractorId ? client.query(subcontractorQuery, params) : Promise.resolve({ rows: [] }),
-    client.query(totalTurnoverQuery, [month, year])
-  ]);
+    client.query(totalTurnoverQuery, [month, year]),
+  ])
 
-  console.log("Subcontractor turnover query result:", subcontractorResult.rows);
-  console.log("Total turnover query result:", totalTurnoverResult.rows);
+  console.log("Subcontractor turnover query result:", subcontractorResult.rows)
+  console.log("Total turnover query result:", totalTurnoverResult.rows)
 
-  const totalTurnover = parseFloat(totalTurnoverResult.rows[0]?.total_turnover || 0);
-  console.log(`Total turnover (including subcontractors) for ${month} ${year}: ${totalTurnover}`);
+  const totalTurnover = Number.parseFloat(totalTurnoverResult.rows[0]?.total_turnover || 0)
+  console.log(`Total turnover (including subcontractors) for ${month} ${year}: ${totalTurnover}`)
 
   const turnoverData = [
     {
@@ -759,38 +769,35 @@ const getSubcontractorVsTurnover = async (client, month, year, subcontractorId =
       percentage: 100,
       month: month.trim(),
       year: year.toString(),
-    }
-  ];
+    },
+  ]
 
   if (subcontractorId && subcontractorResult.rows.length > 0) {
-    const row = subcontractorResult.rows[0];
-    const subcontractorTurnover = parseFloat(row.value || 0);
-    const percentage = totalTurnover > 0 ? ((subcontractorTurnover / totalTurnover) * 100).toFixed(2) : 0;
+    const row = subcontractorResult.rows[0]
+    const subcontractorTurnover = Number.parseFloat(row.value || 0)
+    const percentage = totalTurnover > 0 ? ((subcontractorTurnover / totalTurnover) * 100).toFixed(2) : 0
     turnoverData.push({
       name: row.name,
       value: subcontractorTurnover,
       type: "subcontractor",
-      percentage: parseFloat(percentage),
+      percentage: Number.parseFloat(percentage),
       month: row.month.trim(),
       year: row.year,
-    });
+    })
   }
 
-  console.log("Processed subcontractor vs turnover data:", turnoverData);
-  return turnoverData;
-};
+  console.log("Processed subcontractor vs turnover data:", turnoverData)
+  return turnoverData
+}
 
 const getWagesVsExpenses = async (client, month, year) => {
   const wagesQuery = `
     SELECT 
       SUM(w.net_pay) as total_wages,
-      to_char(w.employee_date, 'Month') as month_name,
-      EXTRACT(YEAR FROM w.employee_date) as year
+      $1 as month_name,
+      $2 as year
     FROM wages w
-    WHERE TRIM(to_char(w.employee_date, 'Month')) = $1
-    AND EXTRACT(YEAR FROM w.employee_date)::text = $2
-    GROUP BY to_char(w.employee_date, 'Month'), EXTRACT(YEAR FROM w.employee_date)
-  `;
+  `
 
   const fuelQuery = `
     SELECT 
@@ -802,7 +809,7 @@ const getWagesVsExpenses = async (client, month, year) => {
       AND TRIM(to_char(e.slipuploaddate, 'Month')) = $1
       AND EXTRACT(YEAR FROM e.slipuploaddate)::text = $2
     GROUP BY to_char(e.slipuploaddate, 'Month'), EXTRACT(YEAR FROM e.slipuploaddate)
-  `;
+  `
 
   const purchaseOrderQuery = `
     SELECT 
@@ -813,7 +820,7 @@ const getWagesVsExpenses = async (client, month, year) => {
     WHERE TRIM(to_char(p.date, 'Month')) = $1
       AND EXTRACT(YEAR FROM p.date)::text = $2
     GROUP BY to_char(p.date, 'Month'), EXTRACT(YEAR FROM p.date)
-  `;
+  `
 
   const subcontractorQuery = `
     SELECT 
@@ -826,33 +833,54 @@ const getWagesVsExpenses = async (client, month, year) => {
       AND TRIM(TO_CHAR(l.date, 'Month')) = $1
       AND EXTRACT(YEAR FROM l.date)::text = $2
     GROUP BY TO_CHAR(l.date, 'Month'), EXTRACT(YEAR FROM l.date)
-  `;
+  `
 
-  const [wagesResult, fuelResult, purchaseOrderResult, subcontractorResult] = await Promise.all([
+  const creditNotesQuery = `
+    SELECT 
+      COALESCE(SUM(amount_value), 0) as total_credit_notes,
+      month_name,
+      year
+    FROM (
+      SELECT 
+        unnest(cn.amount) as amount_value,
+        to_char(cn.creditnote_date, 'Month') as month_name,
+        EXTRACT(YEAR FROM cn.creditnote_date) as year
+      FROM credit_notes cn
+      WHERE TRIM(to_char(cn.creditnote_date, 'Month')) = $1
+      AND EXTRACT(YEAR FROM cn.creditnote_date)::text = $2
+    ) subquery
+    GROUP BY month_name, year
+  `
+
+  const [wagesResult, fuelResult, purchaseOrderResult, subcontractorResult, creditNotesResult] = await Promise.all([
     client.query(wagesQuery, [month, year]),
     client.query(fuelQuery, [month, year]),
     client.query(purchaseOrderQuery, [month, year]),
-    client.query(subcontractorQuery, [month, year])
-  ]);
+    client.query(subcontractorQuery, [month, year]),
+    client.query(creditNotesQuery, [month, year]),
+  ])
 
-  console.log("Wages query result:", wagesResult.rows);
-  console.log("Fuel query result:", fuelResult.rows);
-  console.log("Purchase order query result:", purchaseOrderResult.rows);
-  console.log("Subcontractor expense query result:", subcontractorResult.rows);
+  console.log("Wages query result:", wagesResult.rows)
+  console.log("Fuel query result:", fuelResult.rows)
+  console.log("Purchase order query result:", purchaseOrderResult.rows)
+  console.log("Subcontractor expense query result:", subcontractorResult.rows)
+  console.log("Credit notes query result:", creditNotesResult.rows)
 
-  const totalWages = parseFloat(wagesResult.rows[0]?.total_wages || 0);
-  const totalFuelCost = parseFloat(fuelResult.rows[0]?.total_fuel_cost || 0);
-  const totalPurchaseOrderCost = parseFloat(purchaseOrderResult.rows[0]?.total_po_cost || 0);
-  const totalSubcontractorExpense = parseFloat(subcontractorResult.rows[0]?.total_subcontractor_expense || 0);
+  const totalWages = Number.parseFloat(wagesResult.rows[0]?.total_wages || 0)
+  const totalFuelCost = Number.parseFloat(fuelResult.rows[0]?.total_fuel_cost || 0)
+  const totalPurchaseOrderCost = Number.parseFloat(purchaseOrderResult.rows[0]?.total_po_cost || 0)
+  const totalSubcontractorExpense = Number.parseFloat(subcontractorResult.rows[0]?.total_subcontractor_expense || 0)
+  const totalCreditNotes = Number.parseFloat(creditNotesResult.rows[0]?.total_credit_notes || 0)
 
-  const totalExpenses = totalFuelCost + totalPurchaseOrderCost + totalSubcontractorExpense;
-  const total = totalWages + totalExpenses;
+  const totalExpenses = totalFuelCost + totalPurchaseOrderCost + totalSubcontractorExpense + totalCreditNotes
+  const total = totalWages + totalExpenses
 
-  console.log(`Total wages for ${month} ${year}: ${totalWages}`);
-  console.log(`Total fuel cost for ${month} ${year}: ${totalFuelCost}`);
-  console.log(`Total purchase order cost for ${month} ${year}: ${totalPurchaseOrderCost}`);
-  console.log(`Total subcontractor expense for ${month} ${year}: ${totalSubcontractorExpense}`);
-  console.log(`Total expenses for ${month} ${year}: ${totalExpenses}`);
+  console.log(`Total wages for ${month} ${year}: ${totalWages}`)
+  console.log(`Total fuel cost for ${month} ${year}: ${totalFuelCost}`)
+  console.log(`Total purchase order cost for ${month} ${year}: ${totalPurchaseOrderCost}`)
+  console.log(`Total subcontractor expense for ${month} ${year}: ${totalSubcontractorExpense}`)
+  console.log(`Total credit notes for ${month} ${year}: ${totalCreditNotes}`)
+  console.log(`Total expenses for ${month} ${year}: ${totalExpenses}`)
 
   const wagesVsExpensesData = [
     {
@@ -870,15 +898,15 @@ const getWagesVsExpenses = async (client, month, year) => {
       percentage: total > 0 ? ((totalExpenses / total) * 100).toFixed(2) : 0,
       month: month.trim(),
       year: year.toString(),
-    }
-  ];
+    },
+  ]
 
-  console.log("Processed wages vs expenses data:", wagesVsExpensesData);
-  return wagesVsExpensesData;
-};
+  console.log("Processed wages vs expenses data:", wagesVsExpensesData)
+  return wagesVsExpensesData
+}
 
 const getTurnoverVsSubbieExpense = async (client, month, year, subcontractorId = null) => {
-  const params = [month, year];
+  const params = [month, year]
   let subcontractorQuery = `
     SELECT 
       e.companyname,
@@ -890,14 +918,14 @@ const getTurnoverVsSubbieExpense = async (client, month, year, subcontractorId =
     WHERE e.roleid = 6
       AND TRIM(TO_CHAR(l.date, 'Month')) = $1
       AND EXTRACT(YEAR FROM l.date)::text = $2
-  `;
+  `
   if (subcontractorId) {
-    subcontractorQuery += ` AND e.userid = $3`;
-    params.push(subcontractorId);
+    subcontractorQuery += ` AND e.userid = $3`
+    params.push(subcontractorId)
   }
   subcontractorQuery += `
     GROUP BY e.companyname, TO_CHAR(l.date, 'Month'), EXTRACT(YEAR FROM l.date)
-  `;
+  `
 
   const totalTurnoverQuery = `
     WITH DistinctLegs AS (
@@ -942,20 +970,20 @@ const getTurnoverVsSubbieExpense = async (client, month, year, subcontractorId =
     FROM InvoiceTurnover it
     LEFT JOIN LegDriverContributions ldc ON 1=1
     GROUP BY it.invoice_turnover, it.month_name, it.year
-  `;
+  `
 
   const [subcontractorResult, totalTurnoverResult] = await Promise.all([
     subcontractorId ? client.query(subcontractorQuery, params) : Promise.resolve({ rows: [] }),
-    client.query(totalTurnoverQuery, [month, year])
-  ]);
+    client.query(totalTurnoverQuery, [month, year]),
+  ])
 
-  console.log("Subcontractor expense query result:", subcontractorResult.rows);
-  console.log("Total turnover query result:", totalTurnoverResult.rows);
+  console.log("Subcontractor expense query result:", subcontractorResult.rows)
+  console.log("Total turnover query result:", totalTurnoverResult.rows)
 
-  const totalTurnover = parseFloat(totalTurnoverResult.rows[0]?.total_turnover || 0);
-  console.log(`Total turnover (including subcontractors) for ${month} ${year}: ${totalTurnover}`);
+  const totalTurnover = Number.parseFloat(totalTurnoverResult.rows[0]?.total_turnover || 0)
+  console.log(`Total turnover (including subcontractors) for ${month} ${year}: ${totalTurnover}`)
 
-  const turnoverData = [];
+  const turnoverData = []
 
   // Add total turnover entry
   turnoverData.push({
@@ -965,30 +993,30 @@ const getTurnoverVsSubbieExpense = async (client, month, year, subcontractorId =
     percentage: 100,
     month: month.trim(),
     year: year.toString(),
-  });
+  })
 
   // Add subcontractor expense entry if subcontractorId is provided
   if (subcontractorId && subcontractorResult.rows.length > 0) {
-    const row = subcontractorResult.rows[0];
-    const subcontractorExpense = parseFloat(row.subcontractor_expense || 0);
-    const percentage = totalTurnover > 0 ? ((subcontractorExpense / totalTurnover) * 100).toFixed(2) : 0;
+    const row = subcontractorResult.rows[0]
+    const subcontractorExpense = Number.parseFloat(row.subcontractor_expense || 0)
+    const percentage = totalTurnover > 0 ? ((subcontractorExpense / totalTurnover) * 100).toFixed(2) : 0
     turnoverData.push({
       name: row.companyname,
       value: subcontractorExpense,
       type: "subcontractor",
-      percentage: parseFloat(percentage),
+      percentage: Number.parseFloat(percentage),
       month: row.month_name.trim(),
       year: row.year.toString(),
-    });
+    })
   }
 
-  console.log("Processed turnover vs subbie expense data:", turnoverData);
-  return turnoverData;
-};
+  console.log("Processed turnover vs subbie expense data:", turnoverData)
+  return turnoverData
+}
 
 const getTurnoverVsFuelPerTruck = async (client, month, year, truckId = null) => {
-  const params = [month, year];
-  let query;
+  const params = [month, year]
+  let query
 
   if (!truckId) {
     // Aggregate totals when no truckId is provided
@@ -1046,7 +1074,7 @@ const getTurnoverVsFuelPerTruck = async (client, month, year, truckId = null) =>
         COALESCE(tp.year, fp.year) AS year
       FROM TurnoverPerTruck tp
       FULL OUTER JOIN FuelPerTruck fp ON tp.month_name = fp.month_name AND tp.year = fp.year
-    `;
+    `
   } else {
     // Existing query for specific truckId
     query = `
@@ -1108,49 +1136,43 @@ const getTurnoverVsFuelPerTruck = async (client, month, year, truckId = null) =>
       FROM TurnoverPerTruck tp
       FULL OUTER JOIN FuelPerTruck fp ON tp.truckregnumber = fp.truckregnum
       ORDER BY COALESCE(tp.total_turnover, 0) DESC, COALESCE(fp.total_fuel_cost, 0) DESC
-    `;
-    params.push(truckId);
+    `
+    params.push(truckId)
   }
 
-  const result = await client.query(query, params);
-  console.log("Turnover vs Fuel per Truck query result:", result.rows);
-  console.log(`Query returned ${result.rows.length} rows`);
+  const result = await client.query(query, params)
+  console.log("Turnover vs Fuel per Truck query result:", result.rows)
+  console.log(`Query returned ${result.rows.length} rows`)
 
   if (!result.rows || result.rows.length === 0) {
-    console.log(`No rows returned for ${month} ${year}. Check query or data.`);
-    return [];
+    console.log(`No rows returned for ${month} ${year}. Check query or data.`)
+    return []
   }
 
-  const totalTurnover = result.rows.reduce(
-    (sum, row) => sum + parseFloat(row.total_turnover || 0),
-    0
-  );
-  const totalFuelCost = result.rows.reduce(
-    (sum, row) => sum + parseFloat(row.total_fuel_cost || 0),
-    0
-  );
-  console.log(`Total turnover for ${month} ${year}: ${totalTurnover}`);
-  console.log(`Total fuel cost for ${month} ${year}: ${totalFuelCost}`);
+  const totalTurnover = result.rows.reduce((sum, row) => sum + Number.parseFloat(row.total_turnover || 0), 0)
+  const totalFuelCost = result.rows.reduce((sum, row) => sum + Number.parseFloat(row.total_fuel_cost || 0), 0)
+  console.log(`Total turnover for ${month} ${year}: ${totalTurnover}`)
+  console.log(`Total fuel cost for ${month} ${year}: ${totalFuelCost}`)
 
   const data = result.rows.map((row) => {
-    const turnover = parseFloat(row.total_turnover || 0);
-    const fuelCost = parseFloat(row.total_fuel_cost || 0);
-    const turnoverPercentage = totalTurnover > 0 ? ((turnover / totalTurnover) * 100).toFixed(2) : 0;
-    const fuelCostPercentage = totalFuelCost > 0 ? ((fuelCost / totalFuelCost) * 100).toFixed(2) : 0;
+    const turnover = Number.parseFloat(row.total_turnover || 0)
+    const fuelCost = Number.parseFloat(row.total_fuel_cost || 0)
+    const turnoverPercentage = totalTurnover > 0 ? ((turnover / totalTurnover) * 100).toFixed(2) : 0
+    const fuelCostPercentage = totalFuelCost > 0 ? ((fuelCost / totalFuelCost) * 100).toFixed(2) : 0
     return {
       truckregnumber: row.truckregnumber,
       total_turnover: turnover,
       total_fuel_cost: fuelCost,
       month_name: row.month_name.trim(),
       year: row.year,
-      turnoverPercentage: parseFloat(turnoverPercentage),
-      fuelCostPercentage: parseFloat(fuelCostPercentage),
-    };
-  });
+      turnoverPercentage: Number.parseFloat(turnoverPercentage),
+      fuelCostPercentage: Number.parseFloat(fuelCostPercentage),
+    }
+  })
 
-  console.log("Processed turnover vs fuel per truck data:", data);
-  return data;
-};
+  console.log("Processed turnover vs fuel per truck data:", data)
+  return data
+}
 
 export {
   getFuelExpenses,
@@ -1167,4 +1189,4 @@ export {
   getWagesVsExpenses,
   getTurnoverVsSubbieExpense,
   getTurnoverVsFuelPerTruck,
-};
+}
