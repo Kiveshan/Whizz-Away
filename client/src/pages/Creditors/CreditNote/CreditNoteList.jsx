@@ -247,51 +247,52 @@ useEffect(() => {
           {totalRecords} credit notes
         </div>
 
-        <table className="payment-table1">
-          <thead>
-            <tr>
-              <th>Instruction No</th>
-              <th>Date</th>
-              <th>Amount</th>
-              <th>Container</th>
-              <th>View</th>
-            </tr>
-          </thead>
-<tbody>
-  {currentRecords.length > 0 ? (
-    currentRecords.map((creditNote, index) => (
-      <tr key={creditNote.creditnote_id || index}>
-        <td>{creditNote.m1key}</td> 
-        <td>{new Date(creditNote.creditnote_date).toLocaleDateString()}</td>
-        <td>R{Array.isArray(creditNote.amount) ? creditNote.amount.reduce((sum, amt) => sum + (parseFloat(amt) || 0), 0).toFixed(2) : Number(creditNote.amount).toFixed(2)}</td>
-
-        <td>{creditNote.containernum}</td>
-        <td>
-<button
-  className="view-button"
-  onClick={() =>
-    navigate(
-      `/view-credit-note/${encodeURIComponent(clientName)}/${creditNote.creditnote_id}`,
-      {
-        state: { clientId, clientName },
-      }
-    )
-  }
->
-  View
-</button>
+<table className="payment-table1">
+  <thead>
+    <tr>
+      <th>Instruction No</th>
+      <th>Doc No</th>
+      <th>Date</th>
+      <th>Amount</th>
+      <th>Container</th>
+      <th>View</th>
+    </tr>
+  </thead>
+  <tbody>
+    {currentRecords.length > 0 ? (
+      currentRecords.map((creditNote, index) => (
+        <tr key={creditNote.creditnote_id || index}>
+          <td>{creditNote.m1key}</td>
+          <td>{creditNote.doc_no || "None"}</td>
+          <td>{new Date(creditNote.creditnote_date).toLocaleDateString()}</td>
+          <td>R{Array.isArray(creditNote.amount) ? creditNote.amount.reduce((sum, amt) => sum + (parseFloat(amt) || 0), 0).toFixed(2) : Number(creditNote.amount).toFixed(2)}</td>
+          <td>{creditNote.containernum}</td>
+          <td>
+            <button
+              className="view-button"
+              onClick={() =>
+                navigate(
+                  `/view-credit-note/${encodeURIComponent(clientName)}/${creditNote.creditnote_id}`,
+                  {
+                    state: { clientId, clientName },
+                  }
+                )
+              }
+            >
+              View
+            </button>
+          </td>
+        </tr>
+      ))
+    ) : (
+      <tr>
+        <td colSpan="6" className="p-3 text-center">
+          No credit notes found
         </td>
       </tr>
-    ))
-  ) : (
-    <tr>
-      <td colSpan="5" className="p-3 text-center">
-        No credit notes found
-      </td>
-    </tr>
-  )}
-</tbody>
-        </table>
+    )}
+  </tbody>
+</table>
 
         {totalPages > 1 && (
           <div className="pagination-container">
