@@ -3,29 +3,33 @@ import { useNavigate } from "react-router-dom";
 import "../css/Debtors.css";
 import "../css/card.css";
 const Debtors = () => {
-  const navigate = useNavigate(); 
+  const navigate = useNavigate();
 
   const handleBack = () => {
     navigate("/Dashboard");
   };
-  const handlePaymentClick=()=>{
+  const handlePaymentClick = () => {
     navigate("/client-list-payments");
-  }
-  const handleStatementClick=()=>{
+  };
+  const handleStatementClick = () => {
     navigate("/FinancialDocumentsView");
-  }
+  };
+
+  const handleAddOnClick = () => {
+    navigate("/view-client-list");
+  };
 
   return (
-    <div className="debtors-container"> 
-        <div className="header-actions">
+    <div className="debtors-container">
+      <div className="header-actions">
         <button className="back-button" onClick={handleBack}>
-        Back
-      </button>
-        </div>
+          Back
+        </button>
+      </div>
 
       <div className="debtors-grid">
         <div className="card" onClick={handlePaymentClick}>
-          <div className="card-image-container" >
+          <div className="card-image-container">
             <img src="/images/Payment.jpg" alt="Payment" />
           </div>
           <div className="card-title">
@@ -38,6 +42,14 @@ const Debtors = () => {
           </div>
           <div className="card-title">
             <h3>Financial Documents</h3>
+          </div>
+        </div>
+        <div className="card" onClick={handleAddOnClick}>
+          <div className="card-image-container">
+            <img src="/images/Add-On's.jpg" alt="Add On" />
+          </div>
+          <div className="card-title">
+            <h3>Add On's</h3>
           </div>
         </div>
       </div>
