@@ -169,10 +169,7 @@ function DynamicHeader() {
     "/CredClientList":"Clients",
     "/credit-note-list": "Credit Notes",
     "/credit-note-form": "Credit Note Form",
-    "/view-credit-note/:clientName/:creditNoteId": "Credit Note"
-
-    "/reports": "Reports",
-    "/wage-reports": "Wage Reports",
+    "/view-credit-note/:clientName/:creditNoteId": "Credit Note",
     "/profit-loss-reports": "Income & Expenditure Reports",
     "/income-expenditure-reports/:month/:year": "Income & Expenditure Report",
   }
