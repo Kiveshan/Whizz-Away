@@ -420,12 +420,8 @@ const Instructions = () => {
     </tr>
   ) : (
     currentInstructions.map((item) => {
-      // Check if instruction is export (shipment_type 2) and has no containers
-      const isExportNoContainers =
-        (item.shipment_type === 2 || item.shipment_type === '2') &&
-        (!item.num_six_meters || item.num_six_meters === 0) &&
-        (!item.num_twelve_meters || item.num_twelve_meters === 0) &&
-        (!item.num_abnormal || item.num_abnormal === 0);
+      // Check if the instruction has any containers with non-empty/non-null containernum
+      const hasValidContainers = item.has_valid_containers === true;
 
       return (
         <tr key={item.m1controllerkey || item.m1key}>
@@ -447,7 +443,7 @@ const Instructions = () => {
           <td>
             {(item.startingdate || item.pickupdate)
               ? new Date(item.startingdate || item.pickupdate).toLocaleDateString()
-              : 'Not Set'}
+              : "Not Set"}
           </td>
           <td>
             <button
@@ -458,17 +454,7 @@ const Instructions = () => {
             </button>
           </td>
           <td>
-            {isExportNoContainers ? (
-              <span className="tooltip-wrapper">
-                <button
-                  className="view-btn disabled"
-                  disabled={true}
-                >
-                  View
-                </button>
-                <span className="tooltip-text">Please allocate containers to proceed to assignment</span>
-              </span>
-            ) : (
+            {hasValidContainers ? (
               <button
                 className="view-btn"
                 onClick={() => {
@@ -490,6 +476,16 @@ const Instructions = () => {
               >
                 View
               </button>
+            ) : (
+              <span className="tooltip-wrapper">
+                <button
+                  className="view-btn disabled"
+                  disabled={true}
+                >
+                  View
+                </button>
+                <span className="tooltip-text">Please allocate containers to proceed to assignment</span>
+              </span>
             )}
           </td>
         </tr>
