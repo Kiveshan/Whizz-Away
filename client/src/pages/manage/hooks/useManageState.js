@@ -243,6 +243,7 @@ const initialState = {
         "6m_rate": "",
         "12m_rate": "",
         surcharges: "",
+        hazardous: "",
       },
     ],
   },
