@@ -176,14 +176,14 @@ const CompanyForm = ({ company, loading, isEditing, onSave, onCancel, onChange }
             <div className="form-field"></div>
           </div>
         </div>
-        <div className="manage-form-actions">
-          <button type="submit" className="manage-save-button" disabled={loading}>
-            {loading ? "Saving..." : "Save"}
-          </button>
-          <button type="button" className="manage-cancel-button" onClick={onCancel}>
-            Cancel
-          </button>
-        </div>
+   <div className="company-button-container">
+        <button type="submit" className="company-save-button" disabled={loading}>
+          {loading ? "Saving..." : "Save"}
+        </button>
+        <button type="button" className="company-cancel-button" onClick={onCancel}>
+          Cancel
+        </button>
+      </div>
       </form>
     </div>
   )

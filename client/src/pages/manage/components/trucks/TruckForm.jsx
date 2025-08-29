@@ -408,13 +408,14 @@ const TruckForm = ({ truck, loading, isEditing, onSave, onCancel, onChange, onDe
           </div>
         </div>
 
-        <button type="submit" className="manage-save-button" disabled={loading}>
+     <div className="truck-button-container">
+        <button type="submit" className="truck-save-button" disabled={loading}>
           {loading ? "Saving..." : isEditing ? "Update Truck" : "Add Truck"}
         </button>
-
-        <button type="button" onClick={onCancel} className="manage-cancel-button">
+        <button type="button" onClick={onCancel} className="truck-cancel-button">
           Cancel
         </button>
+      </div>
       </form>
     </div>
   )

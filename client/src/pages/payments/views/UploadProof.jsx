@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { useNavigate, useLocation, useParams } from "react-router-dom";
+import Select from "react-select";
 import api from "../../../api";
 import "../css/ClientPayments.css";
 
@@ -13,8 +14,8 @@ const UploadProof = () => {
 
   const [amount, setAmount] = useState("");
   const [paymentDate, setPaymentDate] = useState("");
-  const [invoiceId, setInvoiceId] = useState("");
-  const [invoices, setInvoices] = useState([]);
+  const [selectedItem, setSelectedItem] = useState(null);
+  const [items, setItems] = useState([]);
   const [reference, setReference] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
@@ -33,7 +34,7 @@ const UploadProof = () => {
 
   const roleId = JSON.parse(localStorage.getItem("user"))?.roleid;
 
-  // Fetch invoices for dropdown
+  // Fetch invoices and add-ons for dropdown
   useEffect(() => {
     if (!clientId) {
       setError("No client selected");
@@ -41,7 +42,7 @@ const UploadProof = () => {
       return;
     }
 
-    const fetchInvoices = async () => {
+    const fetchItems = async () => {
       try {
         setIsLoading(true);
         const response = await api.get(`/api/payment_invoices/${clientId}`, {
@@ -50,26 +51,31 @@ const UploadProof = () => {
           },
         });
         if (response.data.success) {
-          setInvoices(response.data.data);
+          setItems(response.data.data);
           if (!isViewMode && response.data.data.length > 0) {
-            setInvoiceId(response.data.data[0].ikey.toString());
+            setSelectedItem({
+              value: response.data.data[0].id,
+              type: response.data.data[0].type,
+              label: `${response.data.data[0].type}: ${
+                response.data.data[0].invoice_num
+              } (${new Date(response.data.data[0].date).toLocaleDateString()})`,
+            });
           }
         } else {
-          throw new Error(response.data.message || "Failed to fetch invoices");
+          throw new Error(response.data.message || "Failed to fetch items");
         }
       } catch (err) {
-        console.error("Error fetching invoices:", err);
-        // Check for token expiration
+        console.error("Error fetching items:", err);
         if (handleTokenExpiration(err)) {
           return;
         }
-        setError(err.message || "An error occurred while fetching invoices");
+        setError(err.message || "An error occurred while fetching items");
       } finally {
         setIsLoading(false);
       }
     };
 
-    fetchInvoices();
+    fetchItems();
   }, [clientId, isViewMode]);
 
   // Fetch payment details for view mode
@@ -88,12 +94,28 @@ const UploadProof = () => {
           );
 
           if (response.data.success) {
-            const { amount, fileupload, invoiceid, reference } =
-              response.data.data;
+            const {
+              amount,
+              fileupload,
+              invoiceid,
+              addon_id,
+              reference,
+              invoice_num,
+            } = response.data.data;
             setAmount(amount.toString());
             setPaymentDate(fileupload.split("T")[0]);
-            setInvoiceId(invoiceid ? invoiceid.toString() : "");
             setReference(reference || "");
+            if (invoiceid || addon_id) {
+              const type = invoiceid ? "Invoice" : "Add-on";
+              const id = invoiceid || addon_id;
+              setSelectedItem({
+                value: id,
+                type,
+                label: `${type}: ${invoice_num} (${new Date(
+                  fileupload
+                ).toLocaleDateString()})`,
+              });
+            }
           } else {
             throw new Error(
               response.data.message || "Failed to fetch payment details"
@@ -101,7 +123,6 @@ const UploadProof = () => {
           }
         } catch (err) {
           console.error("Error fetching payment details:", err);
-          // Check for token expiration
           if (handleTokenExpiration(err)) {
             return;
           }
@@ -135,8 +156,8 @@ const UploadProof = () => {
       return;
     }
 
-    if (!invoiceId) {
-      setError("Please select an invoice");
+    if (!selectedItem) {
+      setError("Please select an invoice or add-on");
       return;
     }
 
@@ -150,7 +171,8 @@ const UploadProof = () => {
       const paymentData = {
         amount: Number.parseFloat(amount),
         fileupload: paymentDate,
-        invoiceid: invoiceId,
+        invoiceid: selectedItem.type === "Invoice" ? selectedItem.value : null,
+        addon_id: selectedItem.type === "Add-on" ? selectedItem.value : null,
         reference: reference.trim(),
       };
 
@@ -186,7 +208,6 @@ const UploadProof = () => {
       }
     } catch (err) {
       console.error("Error saving payment details:", err);
-      // Check for token expiration
       if (handleTokenExpiration(err)) {
         return;
       }
@@ -214,15 +235,45 @@ const UploadProof = () => {
     }
   };
 
-  const getSelectedInvoiceDetails = () => {
-    const selectedInvoice = invoices.find(
-      (inv) => inv.ikey.toString() === invoiceId
-    );
-    return selectedInvoice
-      ? `${selectedInvoice.invoice_num} (${new Date(
-          selectedInvoice.date
-        ).toLocaleDateString()})`
-      : "";
+  const getSelectedItemDetails = () => {
+    return selectedItem ? selectedItem.label : "";
+  };
+
+  // Custom styles for react-select
+  const customStyles = {
+    control: (provided) => ({
+      ...provided,
+      minHeight: "40px",
+      borderRadius: "4px",
+      border: "1px solid #ccc",
+      boxShadow: "none",
+      "&:hover": {
+        border: "1px solid #aaa",
+      },
+    }),
+    menu: (provided) => ({
+      ...provided,
+      zIndex: 9999,
+      maxHeight: "300px",
+    }),
+    menuList: (provided) => ({
+      ...provided,
+      maxHeight: "300px",
+      overflowY: "auto",
+    }),
+    option: (provided, state) => ({
+      ...provided,
+      backgroundColor: state.isSelected
+        ? "#007bff"
+        : state.isFocused
+        ? "#f8f9fa"
+        : "white",
+      color: state.isSelected ? "white" : "black",
+      "&:hover": {
+        backgroundColor: "#f8f9fa",
+        color: "black",
+      },
+    }),
   };
 
   return (
@@ -248,27 +299,28 @@ const UploadProof = () => {
 
             {!isLoading && (
               <>
-                {/* Invoice Selection - Full Width */}
+                {/* Item Selection - Full Width */}
                 <div className="form-row full-width">
                   <div className="amount-field">
-                    <label>Select Invoice *</label>
-                    <select
-                      value={invoiceId}
-                      onChange={(e) => setInvoiceId(e.target.value)}
-                      disabled={isViewMode}
-                      required
-                    >
-                      <option value="">Select an invoice</option>
-                      {invoices.map((invoice) => (
-                        <option key={invoice.ikey} value={invoice.ikey}>
-                          {invoice.invoice_num} (
-                          {new Date(invoice.date).toLocaleDateString()})
-                        </option>
-                      ))}
-                    </select>
-                    {isViewMode && invoiceId && (
+                    <label>Select Invoice or Add-on *</label>
+                    <Select
+                      options={items.map((item) => ({
+                        value: item.id,
+                        type: item.type,
+                        label: `${item.type}: ${item.invoice_num} (${new Date(
+                          item.date
+                        ).toLocaleDateString()})`,
+                      }))}
+                      value={selectedItem}
+                      onChange={setSelectedItem}
+                      isDisabled={isViewMode}
+                      placeholder="Select an invoice or add-on"
+                      isSearchable
+                      styles={customStyles}
+                    />
+                    {isViewMode && selectedItem && (
                       <div className="selected-info">
-                        Selected: {getSelectedInvoiceDetails()}
+                        Selected: {getSelectedItemDetails()}
                       </div>
                     )}
                   </div>
@@ -335,7 +387,7 @@ const UploadProof = () => {
                       disabled={
                         !amount ||
                         !paymentDate ||
-                        !invoiceId ||
+                        !selectedItem ||
                         !reference.trim() ||
                         isSubmitting
                       }

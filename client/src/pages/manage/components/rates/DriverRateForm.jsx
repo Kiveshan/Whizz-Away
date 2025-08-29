@@ -114,11 +114,11 @@ const DriverRateForm = ({ driverRate, loading, isEditing, onSave, onCancel, onCh
         </div>
       </div>
 
-      <div className="manage-form-actions">
-        <button type="submit" className="manage-save-button" disabled={loading}>
+      <div className="driver-rate-button-container">
+        <button type="submit" className="driver-rate-save-button" disabled={loading}>
           {loading ? "Saving..." : "Save"}
         </button>
-        <button type="button" className="manage-cancel-button" onClick={onCancel}>
+        <button type="button" className="driver-rate-cancel-button" onClick={onCancel}>
           Cancel
         </button>
       </div>
