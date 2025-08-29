@@ -100,8 +100,8 @@ const getTurnoverPerMonth = async (client, month, year, clientId = null) => {
       JOIN DriverCountsPerLeg dcpl ON l.m1key = dcpl.m1key AND l.legnumber = dcpl.legnumber
       JOIN m5_employee e ON l.driverid = e.userid
       WHERE e.roleid = 6
-        AND TRIM(TO_CHAR(m.pickupdate, 'Month')) = $1
-        AND EXTRACT(YEAR FROM m.pickupdate)::text = $2
+        AND TRIM(TO_CHAR(m.created_at, 'Month')) = $1
+        AND EXTRACT(YEAR FROM m.created_at)::text = $2
       GROUP BY l.m1key
     ),
     InvoiceTurnover AS (
@@ -273,8 +273,8 @@ const getTurnoverVsDieselCost = async (numericMonth, year) => {
       JOIN DriverCountsPerLeg dcpl ON l.m1key = dcpl.m1key AND l.legnumber = dcpl.legnumber
       JOIN m5_employee e ON l.driverid = e.userid
       WHERE e.roleid = 6
-        AND EXTRACT(MONTH FROM m.pickupdate) = $1
-        AND EXTRACT(YEAR FROM m.pickupdate) = $2
+        AND EXTRACT(MONTH FROM m.created_at) = $1
+        AND EXTRACT(YEAR FROM m.created_at) = $2
       GROUP BY l.m1key
     ),
     InvoiceTurnover AS (
@@ -488,18 +488,18 @@ const getTurnoverPerTruck = async (client, month, year) => {
       SELECT 
         l.truckregnumber,
         SUM(m.total_cost / dl.num_legs / tcpl.trucks_per_leg) AS total_turnover,
-        TO_CHAR(m.pickupdate, 'Month') AS month_name,
-        EXTRACT(YEAR FROM m.pickupdate)::TEXT AS year
+        TO_CHAR(m.created_at, 'Month') AS month_name,
+        EXTRACT(YEAR FROM m.created_at)::TEXT AS year
       FROM legs_m2 l
       JOIN m1_controller m ON l.m1key = m.m1key
       JOIN DistinctLegs dl ON l.m1key = dl.m1key
       JOIN TruckCountsPerLeg tcpl ON l.m1key = tcpl.m1key AND l.legnumber = tcpl.legnumber
       JOIN m5_trucks t ON l.truckregnumber = t.truckregnum
       WHERE t.is_subcontractor = false
-        AND TRIM(TO_CHAR(m.pickupdate, 'Month')) = $1
-        AND EXTRACT(YEAR FROM m.pickupdate)::TEXT = $2
+        AND TRIM(TO_CHAR(m.created_at, 'Month')) = $1
+        AND EXTRACT(YEAR FROM m.created_at)::TEXT = $2
         AND t.status = true
-      GROUP BY l.truckregnumber, TO_CHAR(m.pickupdate, 'Month'), EXTRACT(YEAR FROM m.pickupdate)
+      GROUP BY l.truckregnumber, TO_CHAR(m.created_at, 'Month'), EXTRACT(YEAR FROM m.created_at)
     )
     SELECT 
       truckregnumber,
@@ -570,20 +570,20 @@ const getSubcontractorTurnoverPerMonth = async (client, month, year) => {
       JOIN DriverCountsPerLeg dcpl ON l.m1key = dcpl.m1key AND l.legnumber = dcpl.legnumber
       JOIN m5_employee e ON l.driverid = e.userid
       WHERE e.roleid = 6
-        AND TRIM(TO_CHAR(m.pickupdate, 'Month')) = $1
-        AND EXTRACT(YEAR FROM m.pickupdate)::text = $2
+        AND TRIM(TO_CHAR(m.created_at, 'Month')) = $1
+        AND EXTRACT(YEAR FROM m.created_at)::text = $2
       GROUP BY l.m1key
     ),
     TotalSubcontractorTurnover AS (
       SELECT 
         COALESCE(SUM(ldc.subcontractor_turnover), 0) AS total_subcontractor_turnover,
-        TO_CHAR(m.pickupdate, 'Month') AS month_name,
-        EXTRACT(YEAR FROM m.pickupdate)::TEXT AS year
+        TO_CHAR(m.created_at, 'Month') AS month_name,
+        EXTRACT(YEAR FROM m.created_at)::TEXT AS year
       FROM LegDriverContributions ldc
       JOIN m1_controller m ON ldc.m1key = m.m1key
-      WHERE TRIM(TO_CHAR(m.pickupdate, 'Month')) = $1
-        AND EXTRACT(YEAR FROM m.pickupdate)::TEXT = $2
-      GROUP BY TO_CHAR(m.pickupdate, 'Month'), EXTRACT(YEAR FROM m.pickupdate)
+      WHERE TRIM(TO_CHAR(m.created_at, 'Month')) = $1
+        AND EXTRACT(YEAR FROM m.created_at)::TEXT = $2
+      GROUP BY TO_CHAR(m.created_at, 'Month'), EXTRACT(YEAR FROM m.created_at)
     ),
     TotalTurnover AS (
       SELECT 
@@ -668,16 +668,16 @@ const getSubcontractorVsTurnover = async (client, month, year, subcontractorId =
         dl.num_legs,
         dcpl.drivers_per_leg,
         (m.total_cost / dl.num_legs / dcpl.drivers_per_leg) AS turnover_contribution,
-        m.pickupdate
+        m.created_at
       FROM legs_m2 l
       JOIN m1_controller m ON l.m1key = m.m1key
       JOIN DistinctLegs dl ON l.m1key = dl.m1key
       JOIN DriverCountsPerLeg dcpl ON l.m1key = dcpl.m1key AND l.legnumber = dcpl.legnumber
       JOIN m5_employee e ON l.driverid = e.userid
       WHERE e.roleid = 6
-        AND m.pickupdate IS NOT NULL
-        AND TRIM(TO_CHAR(m.pickupdate, 'Month')) = $1
-        AND EXTRACT(YEAR FROM m.pickupdate)::TEXT = $2
+        AND m.created_at IS NOT NULL
+        AND TRIM(TO_CHAR(m.created_at, 'Month')) = $1
+        AND EXTRACT(YEAR FROM m.created_at)::TEXT = $2
   `
   if (subcontractorId) {
     subcontractorQuery += ` AND l.driverid = $3`
@@ -689,11 +689,11 @@ const getSubcontractorVsTurnover = async (client, month, year, subcontractorId =
         SELECT 
           COALESCE(e.companyname, 'Unknown') AS companyname,
           SUM(ltc.turnover_contribution) AS subcontractor_turnover,
-          TO_CHAR(ltc.pickupdate, 'Month') AS month_name,
-          EXTRACT(YEAR FROM ltc.pickupdate)::TEXT AS year
+          TO_CHAR(ltc.created_at, 'Month') AS month_name,
+          EXTRACT(YEAR FROM ltc.created_at)::TEXT AS year
         FROM LegDriverContributions ltc
         JOIN m5_employee e ON ltc.driverid = e.userid
-        GROUP BY e.companyname, TO_CHAR(ltc.pickupdate, 'Month'), EXTRACT(YEAR FROM ltc.pickupdate)
+        GROUP BY e.companyname, TO_CHAR(ltc.created_at, 'Month'), EXTRACT(YEAR FROM ltc.created_at)
       )
       SELECT 
         companyname AS name,
@@ -726,8 +726,8 @@ const getSubcontractorVsTurnover = async (client, month, year, subcontractorId =
       JOIN DriverCountsPerLeg dcpl ON l.m1key = dcpl.m1key AND l.legnumber = dcpl.legnumber
       JOIN m5_employee e ON l.driverid = e.userid
       WHERE e.roleid = 6
-        AND TRIM(TO_CHAR(m.pickupdate, 'Month')) = $1
-        AND EXTRACT(YEAR FROM m.pickupdate)::text = $2
+        AND TRIM(TO_CHAR(m.created_at, 'Month')) = $1
+        AND EXTRACT(YEAR FROM m.created_at)::text = $2
       GROUP BY l.m1key
     ),
     InvoiceTurnover AS (
@@ -948,8 +948,8 @@ const getTurnoverVsSubbieExpense = async (client, month, year, subcontractorId =
       JOIN DriverCountsPerLeg dcpl ON l.m1key = dcpl.m1key AND l.legnumber = dcpl.legnumber
       JOIN m5_employee e ON l.driverid = e.userid
       WHERE e.roleid = 6
-        AND TRIM(TO_CHAR(m.pickupdate, 'Month')) = $1
-        AND EXTRACT(YEAR FROM m.pickupdate)::text = $2
+        AND TRIM(TO_CHAR(m.created_at, 'Month')) = $1
+        AND EXTRACT(YEAR FROM m.created_at)::text = $2
       GROUP BY l.m1key
     ),
     InvoiceTurnover AS (
@@ -1039,18 +1039,18 @@ const getTurnoverVsFuelPerTruck = async (client, month, year, truckId = null) =>
       TurnoverPerTruck AS (
         SELECT 
           SUM(m.total_cost / dl.num_legs / tcpl.trucks_per_leg) AS total_turnover,
-          TO_CHAR(m.pickupdate, 'Month') AS month_name,
-          EXTRACT(YEAR FROM m.pickupdate)::TEXT AS year
+          TO_CHAR(m.created_at, 'Month') AS month_name,
+          EXTRACT(YEAR FROM m.created_at)::TEXT AS year
         FROM legs_m2 l
         JOIN m1_controller m ON l.m1key = m.m1key
         JOIN DistinctLegs dl ON l.m1key = dl.m1key
         JOIN TruckCountsPerLeg tcpl ON l.m1key = tcpl.m1key AND l.legnumber = tcpl.legnumber
         JOIN m5_trucks t ON l.truckregnumber = t.truckregnum
         WHERE t.is_subcontractor = false
-          AND TRIM(TO_CHAR(m.pickupdate, 'Month')) = $1
-          AND EXTRACT(YEAR FROM m.pickupdate)::TEXT = $2
+          AND TRIM(TO_CHAR(m.created_at, 'Month')) = $1
+          AND EXTRACT(YEAR FROM m.created_at)::TEXT = $2
           AND t.status = true
-        GROUP BY TO_CHAR(m.pickupdate, 'Month'), EXTRACT(YEAR FROM m.pickupdate)
+        GROUP BY TO_CHAR(m.created_at, 'Month'), EXTRACT(YEAR FROM m.created_at)
       ),
       FuelPerTruck AS (
         SELECT 
@@ -1097,19 +1097,19 @@ const getTurnoverVsFuelPerTruck = async (client, month, year, truckId = null) =>
         SELECT 
           l.truckregnumber,
           SUM(m.total_cost / dl.num_legs / tcpl.trucks_per_leg) AS total_turnover,
-          TO_CHAR(m.pickupdate, 'Month') AS month_name,
-          EXTRACT(YEAR FROM m.pickupdate)::TEXT AS year
+          TO_CHAR(m.created_at, 'Month') AS month_name,
+          EXTRACT(YEAR FROM m.created_at)::TEXT AS year
         FROM legs_m2 l
         JOIN m1_controller m ON l.m1key = m.m1key
         JOIN DistinctLegs dl ON l.m1key = dl.m1key
         JOIN TruckCountsPerLeg tcpl ON l.m1key = tcpl.m1key AND l.legnumber = tcpl.legnumber
         JOIN m5_trucks t ON l.truckregnumber = t.truckregnum
         WHERE t.is_subcontractor = false
-          AND TRIM(TO_CHAR(m.pickupdate, 'Month')) = $1
-          AND EXTRACT(YEAR FROM m.pickupdate)::TEXT = $2
+          AND TRIM(TO_CHAR(m.created_at, 'Month')) = $1
+          AND EXTRACT(YEAR FROM m.created_at)::TEXT = $2
           AND t.m5truckskey = $3
           AND t.status = true
-        GROUP BY l.truckregnumber, TO_CHAR(m.pickupdate, 'Month'), EXTRACT(YEAR FROM m.pickupdate)
+        GROUP BY l.truckregnumber, TO_CHAR(m.created_at, 'Month'), EXTRACT(YEAR FROM m.created_at)
       ),
       FuelPerTruck AS (
         SELECT 
