@@ -507,12 +507,14 @@ const SupplierForm = ({
           </div>
         </div>
         <br />
-        <button type="submit" className="manage-save-button" disabled={loading}>
+        <div className="supplier-button-container">
+        <button type="submit" className="supplier-save-button" disabled={loading}>
           {loading ? "Saving..." : isEditing ? "Update Supplier" : "Add Supplier"}
         </button>
-        <button type="button" onClick={handleCancel} className="manage-cancel-button">
+        <button type="button" onClick={handleCancel} className="supplier-cancel-button">
           Cancel
         </button>
+      </div>
       </form>
     </div>
   )

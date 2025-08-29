@@ -125,7 +125,7 @@ const ClientRatesForm = ({ clientData, loading, onSave, onCancel }) => {
           color: darkred;
         }
       `}</style>
-      <form className="manage-add-client-form" onSubmit={handleSubmit} noValidate>
+      <form className="manage-add-client-rate-form" onSubmit={handleSubmit} noValidate>
         <div className="rates-section">
           <div className="rates-header">
             <h3>Client Rates</h3>
