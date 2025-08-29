@@ -102,24 +102,27 @@ const getCompanyDetails = async () => {
     }
     client = await pool.connect();
 
-    const queryText = `
-      SELECT 
-        companyname,
-        company_reg_num,
-        address,
-        cluster_box,
-        email,
-        cell_num,
-        cell_num2,
-        name_of_acc,
-        bank,
-        account_num,
-        branch,
-        branch_code
-      FROM 
-        usertable
-      LIMIT 1;
-    `;
+const queryText = `
+  SELECT 
+    companyname,
+    company_reg_num,
+    address,
+    cluster_box,
+    email,
+    cell_num,
+    cell_num2,
+    name_of_acc,
+    bank,
+    account_num,
+    branch,
+    branch_code
+  FROM 
+    usertable
+  WHERE 
+    status = 'active'
+    AND roleid = 1;
+`;
+
 
     const result = await client.query(queryText);
     return { success: true, data: result.rows[0] || {} }; // Return the first row or empty object
