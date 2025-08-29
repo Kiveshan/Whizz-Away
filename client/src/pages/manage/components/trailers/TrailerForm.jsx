@@ -382,12 +382,14 @@ const TrailerForm = ({ trailer, loading, isEditing, onSave, onCancel, onChange, 
             </div>
           </div>
         </div>
-        <button type="submit" className="manage-save-button" disabled={loading}>
+       <div className="trailer-button-container">
+        <button type="submit" className="trailer-save-button" disabled={loading}>
           {loading ? "Saving..." : isEditing ? "Update Trailer" : "Add Trailer"}
         </button>
-        <button type="button" onClick={onCancel} className="manage-cancel-button">
+        <button type="button" onClick={onCancel} className="trailer-cancel-button">
           Cancel
         </button>
+      </div>
       </form>
     </div>
   )

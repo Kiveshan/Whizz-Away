@@ -20,20 +20,13 @@ const getProfitLossData = async (month, year) => {
   `;
   const lossQuery = `
     SELECT 
-      'Fuel Costs' AS source,
-      slipuploaddate AS date,
-      expensecost AS amount
-    FROM expenses_m2
-    WHERE EXTRACT(MONTH FROM slipuploaddate) = $1 AND EXTRACT(YEAR FROM slipuploaddate) = $2
-    UNION ALL
-    SELECT 
       'Wages' AS source,
       CURRENT_DATE AS date, -- Placeholder since no date applies
       net_pay AS amount
     FROM wages
     UNION ALL
     SELECT 
-      et.expense AS source,
+      et.expense || ' Purchase Order' AS source,
       po.date,
       po.total AS amount
     FROM purchase_orders po

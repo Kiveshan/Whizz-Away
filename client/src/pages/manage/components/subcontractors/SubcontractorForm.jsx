@@ -416,12 +416,11 @@ const SubcontractorForm = ({ subcontractor, loading, isEditing, onSave, onCancel
       </div>
 
       {/* Form Actions */}
-      <div className="manage-form-actions" style={{ marginTop: "30px", textAlign: "center" }}>
-        <button type="submit" className="manage-save-button" disabled={loading} style={{ marginRight: "15px" }}>
+    <div className="subcontractor-button-container">
+        <button type="submit" className="subcontractor-save-button" disabled={loading}>
           {loading ? "Saving..." : isEditing ? "Update Subcontractor" : "Add Subcontractor"}
         </button>
-
-        <button type="button" className="manage-cancel-button" onClick={onCancel}>
+        <button type="button" className="subcontractor-cancel-button" onClick={onCancel}>
           Cancel
         </button>
       </div>
