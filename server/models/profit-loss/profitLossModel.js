@@ -33,7 +33,7 @@ const getProfitLossData = async (month, year) => {
     FROM wages
     UNION ALL
     SELECT 
-      et.expense AS source,
+      et.expense || ' Purchase Order' AS source,
       po.date,
       po.total AS amount
     FROM purchase_orders po
