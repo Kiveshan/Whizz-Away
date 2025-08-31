@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
+import { FaTruckFast } from "react-icons/fa6";
 import "../css/UpdateInstruction.css";
 import api from "../../../api"; // Import the Axios instance
 
@@ -703,30 +704,34 @@ const [weightUnit, setWeightUnit] = useState('kg');
           marginLeft: "15px",
         }}
       >
-        {legs.map((leg, index) => (
-          <button
-            key={leg.id || index}
-            style={{
-              padding: "0.5rem 1rem",
-              borderRadius: "0.375rem",
-              backgroundColor:
-                currentLagIndex === index ? "#22c55e" : "#e5e7eb",
-              color: currentLagIndex === index ? "white" : "#1f2937",
-              border: "none",
-              cursor: "pointer",
-              marginBottom: "15px",
-            }}
-            onClick={() => handleSelectLeg(index)}
-          >
-            Leg {index + 1}
-            {leg.drivers && leg.drivers.length > 0 && (
-              <span style={{ marginLeft: "0.5rem", fontSize: "0.75rem" }}>
-                ({leg.drivers.length} driver
-                {leg.drivers.length !== 1 ? "s" : ""})
-              </span>
-            )}
-          </button>
-        ))}
+{legs.map((leg, index) => (
+  <button
+    key={leg.id || index}
+    style={{
+      padding: "0.5rem 1rem",
+      borderRadius: "0.375rem",
+      backgroundColor:
+        currentLagIndex === index ? "#22c55e" : "#e5e7eb",
+      color: currentLagIndex === index ? "white" : "#1f2937",
+      border: "none",
+      cursor: "pointer",
+      marginBottom: "15px",
+      display: "flex",
+      flexDirection: "column",
+      alignItems: "center",
+      gap: "0.25rem",
+    }}
+    onClick={() => handleSelectLeg(index)}
+  >
+    <span>Leg {index + 1}</span>
+    {leg.drivers && leg.drivers.length > 0 && (
+      <span style={{ fontSize: "0.75rem", display: "flex", alignItems: "center" }}>
+        ({leg.drivers.length}
+        <FaTruckFast className="driver-icon" style={{ marginLeft: "0.25rem" }} />)
+      </span>
+    )}
+  </button>
+))}
       </div>
 
       {legs.length > 0 && (

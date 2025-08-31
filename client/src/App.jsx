@@ -1,11 +1,17 @@
-"use client"
-import React from "react"
-import { BrowserRouter as Router, Routes, Route, useLocation, Navigate } from "react-router-dom"
-import { AuthProvider } from "./context/AuthContext"
-import TokenExpiryNotification from "./components/TokenExpiryNotification"
-import Header from "./components/Header"
-import Footer from "./components/Footer" // Import the Footer component
-import LogoutButton from "./components/LogoutButton"
+"use client";
+import React from "react";
+import {
+  BrowserRouter as Router,
+  Routes,
+  Route,
+  useLocation,
+  Navigate,
+} from "react-router-dom";
+import { AuthProvider } from "./context/AuthContext";
+import TokenExpiryNotification from "./components/TokenExpiryNotification";
+import Header from "./components/Header";
+import Footer from "./components/Footer"; // Import the Footer component
+import LogoutButton from "./components/LogoutButton";
 
 // Import pages
 import {
@@ -22,10 +28,9 @@ import {
   CreditorsOther,
   CreditorsDashboard,
   AnalyticsReportsPage,
-  ReportsPage
-  
-} from "./pages/user_menus"
-import { Login, Register } from "./pages/auth"
+  ReportsPage,
+} from "./pages/user_menus";
+import { Login, Register } from "./pages/auth";
 import {
   ControllerInstructions,
   ControllerInstructionDetails,
@@ -37,39 +42,52 @@ import {
   CompanyInstructions,
   CompanyInstructionView,
   InstructionsList,
-} from "./pages/instructions"
+} from "./pages/instructions";
 import {
   ViewExpense,
   ExpenseDetails,
   ExpenseSubmission,
   DirectorManagerViewFuelExpense,
   DirectorExpenses,
-} from "./pages/fuel"
-import { DirectorAnalytics, Analytics } from "./pages/analytics"
-import { Manage } from "./pages/manage"
-import { ViewClientInvoice, InvoicesList, ClientInvoice } from "./pages/invoices"
-import { ViewClientStatement, StatementsList, ClientStatement } from "./pages/statements"
+} from "./pages/fuel";
+import { DirectorAnalytics, Analytics } from "./pages/analytics";
+import { Manage } from "./pages/manage";
+import {
+  ViewClientInvoice,
+  InvoicesList,
+  ClientInvoice,
+} from "./pages/invoices";
+import {
+  ViewClientStatement,
+  StatementsList,
+  ClientStatement,
+} from "./pages/statements";
 import {
   DirectorFinancialDocumentsView,
   DirectorClientDocuments,
   ClientDocuments,
   FinancialDocumentsView,
-} from "./pages/financial_documents"
-import { FinanceClerkWage, FinanceClerkWageDetails, FClerkLegDetails, FinanceClerkWageSlip } from "./pages/wages"
+} from "./pages/financial_documents";
+import {
+  FinanceClerkWage,
+  FinanceClerkWageDetails,
+  FClerkLegDetails,
+  FinanceClerkWageSlip,
+} from "./pages/wages";
 import {
   DirectorClientListPay,
   DirectorClientPaymentList,
   ClientPayments,
   ClientListPay,
   UploadProof,
-} from "./pages/payments"
+} from "./pages/payments";
 import {
   UpdateInstruction,
   DirectorManagerViewAssignment,
   UploadInstructionDocuments,
   DirectorDocs,
-} from "./pages/assignments"
-import { AdminDashboard } from "./pages/admin"
+} from "./pages/assignments";
+import { AdminDashboard } from "./pages/admin";
 
 // Finance Clerk Pages
 import {
@@ -82,19 +100,26 @@ import {
   SubcontractorList,
   SubcontractorStatements,
   SubcontractorStatementDetails,
-} from "./pages/Creditors"
+  CredClientList,
+  CreditNoteList,
+  CreditNoteForm,
+  CreditNoteView,
+} from "./pages/Creditors";
 
+import { ClientList, AddOnList, AddOnForm } from "./pages/add-on's";
 import {
-  WageReports
-}from "./pages/Reports"
+  WageReports,
+  ProfitLossReportsPage,
+  ProfitLossDetailPage,
+} from "./pages/Reports";
 
 // CSS Imports
-import "./css/components.css"
-import "./css/layout.css"
-import "./css/MonitorInstructions.css"
+import "./css/components.css";
+import "./css/layout.css";
+import "./css/MonitorInstructions.css";
 
 function DynamicHeader() {
-  const location = useLocation()
+  const location = useLocation();
   const titleMap = {
     "/Dashboard": "Business Manager",
     "/client-payments": "Client Payments",
@@ -163,33 +188,53 @@ function DynamicHeader() {
     "/Creditors/SubcontractorStatements": "Subcontractors",
     "/Creditors/SubcontractorStatementDetails": "Subcontractor Statement",
     "/analytics-reports": "Insights",
-    "/reports" : "Reports",
-    "/wage-reports" : "Wage Reports"
-  }
+    "/reports": "Reports",
+    "/wage-reports": "Wage Reports",
+    "/view-client-list": "Add On's",
+    "/view-add-on-list": "Add On's",
+    "/add-on-form": "Add On's",
+    "/CredClientList": "Clients",
+    "/credit-note-list": "Credit Notes",
+    "/credit-note-form": "Credit Note Form",
+    "/view-credit-note/:clientName/:creditNoteId": "Credit Note",
+    "/profit-loss-reports": "Income & Expenditure Reports",
+    "/income-expenditure-reports/:month/:year": "Income & Expenditure Report",
+  };
 
   const getTitle = () => {
-    if (location.pathname.startsWith("/upload")) return "Upload Proof of Payment"
-    if (location.pathname.startsWith("/invoice/")) return "Tax Invoice"
-    if (location.pathname.startsWith("/ExpenseDetails/")) return "Fuel Expenses"
-    if (location.pathname.startsWith("/finance-clerk-wage-details/")) return "Wages"
-    if (location.pathname.startsWith("/DirectorExpenses/")) return "Fuel Expenses"
-    if (location.pathname.startsWith("/finance-clerk-wage-slip/")) return "Wages"
-    return titleMap[location.pathname] || "Unknown Page"
+    if (location.pathname.startsWith("/upload"))
+      return "Upload Proof of Payment";
+    if (location.pathname.startsWith("/invoice/")) return "Tax Invoice";
+    if (location.pathname.startsWith("/ExpenseDetails/"))
+      return "Fuel Expenses";
+    if (location.pathname.startsWith("/finance-clerk-wage-details/"))
+      return "Wages";
+    if (location.pathname.startsWith("/DirectorExpenses/"))
+      return "Fuel Expenses";
+    if (location.pathname.startsWith("/finance-clerk-wage-slip/"))
+      return "Wages";
+    if (location.pathname.startsWith("/view-credit-note/"))
+      return "Credit Note";
+    if (location.pathname.startsWith("/income-expenditure-reports/"))
+      return "Income & Expenditure Report";
+    return titleMap[location.pathname] || "Unknown Page";
+  };
+
+  if (
+    ["/login", "/register", "/", "/new-landing"].includes(location.pathname)
+  ) {
+    return null;
   }
 
-  if (["/login", "/register", "/", "/new-landing"].includes(location.pathname)) {
-    return null
-  }
-
-  return <Header title={getTitle()} />
+  return <Header title={getTitle()} />;
 }
 
 function ContentWrapper() {
-  const location = useLocation()
-  const hideFooterOn = ["/login", "/register"]
-  const hideLogoutOn = ["/login", "/register", "/landing", "/new-landing"]
-  const shouldShowFooter = !hideFooterOn.includes(location.pathname)
-  const shouldShowLogout = !hideLogoutOn.includes(location.pathname)
+  const location = useLocation();
+  const hideFooterOn = ["/login", "/register"];
+  const hideLogoutOn = ["/login", "/register", "/landing", "/new-landing"];
+  const shouldShowFooter = !hideFooterOn.includes(location.pathname);
+  const shouldShowLogout = !hideLogoutOn.includes(location.pathname);
 
   return (
     <div className="content-area">
@@ -199,13 +244,26 @@ function ContentWrapper() {
         </div>
       )}
       <Routes>
+        <Route
+          path="/view-credit-note/:clientName/:creditNoteId"
+          element={<CreditNoteView />}
+        />
+        <Route path="/credit-note-form" element={<CreditNoteForm />} />
+        <Route path="/credit-note-list" element={<CreditNoteList />} />
+        <Route path="/CredClientList" element={<CredClientList />} />
         <Route path="/" element={<Landing />} />
         <Route path="/client-payments" element={<ClientPayments />} />
         <Route path="/client-list-payments" element={<ClientListPay />} />
-        <Route path="/director-client-list-payments" element={<DirectorClientListPay />} />
+        <Route
+          path="/director-client-list-payments"
+          element={<DirectorClientListPay />}
+        />
         <Route path="/client-documents" element={<ClientDocuments />} />
         <Route path="/upload/:clientName" element={<UploadProof />} />
-        <Route path="/upload-proof/:clientName/:paymentId?" element={<UploadProof />} />
+        <Route
+          path="/upload-proof/:clientName/:paymentId?"
+          element={<UploadProof />}
+        />
         <Route path="/debtors" element={<Debtors />} />
         <Route path="/analytics" element={<Analytics />} />
         <Route path="/manage" element={<Manage />} />
@@ -214,42 +272,99 @@ function ContentWrapper() {
         <Route path="/register" element={<Register />} />
         <Route path="/ControllerDashboard" element={<ControllerDashboard />} />
         <Route path="/DirectorDashboard" element={<DirectorDashboard />} />
-        <Route path="/ControllerInstructions" element={<ControllerInstructions />} />
-        <Route path="/ControllerInstructionDetails" element={<ControllerInstructionDetails />} />
-        <Route path="/FinancialDocumentsView" element={<FinancialDocumentsView />} />
-        <Route path="/CompanyInstructionView" element={<CompanyInstructionView />} />
-        <Route path="/DirectorCreditorsOther" element={<DirectorCreditorsOther />} />
+        <Route
+          path="/ControllerInstructions"
+          element={<ControllerInstructions />}
+        />
+        <Route
+          path="/ControllerInstructionDetails"
+          element={<ControllerInstructionDetails />}
+        />
+        <Route
+          path="/FinancialDocumentsView"
+          element={<FinancialDocumentsView />}
+        />
+        <Route
+          path="/CompanyInstructionView"
+          element={<CompanyInstructionView />}
+        />
+        <Route
+          path="/DirectorCreditorsOther"
+          element={<DirectorCreditorsOther />}
+        />
         <Route path="/CompanyInstructions" element={<CompanyInstructions />} />
-        <Route path="/DirectorManagerViewAssignment" element={<DirectorManagerViewAssignment />} />
+        <Route
+          path="/DirectorManagerViewAssignment"
+          element={<DirectorManagerViewAssignment />}
+        />
         <Route path="/DirectorDocs" element={<DirectorDocs />} />
         <Route path="/DirectorAnalytics" element={<DirectorAnalytics />} />
         <Route path="/DirectorDebtors" element={<DirectorDebtors />} />
-        <Route path="/DirectorClientPaymentList" element={<DirectorClientPaymentList />} />
-        <Route path="/DirectorFinancialDocumentsView" element={<DirectorFinancialDocumentsView />} />
-        <Route path="/DirectorClientDocuments" element={<DirectorClientDocuments />} />
-        <Route path="/DirectorCreditorsDash" element={<DirectorCreditorsDash />} />
-        <Route path="/DirectorManagerViewFuelExpense" element={<DirectorManagerViewFuelExpense />} />
-        <Route path="/DirectorExpenses/:truckId" element={<DirectorExpenses />} />
-        <Route path="/Viewcontrollerinstructions" element={<Viewcontrollerinstructions />} />
-        <Route path="/ViewcontrollerInstructionDetails" element={<ViewcontrollerInstructionDetails />} />
+        <Route
+          path="/DirectorClientPaymentList"
+          element={<DirectorClientPaymentList />}
+        />
+        <Route
+          path="/DirectorFinancialDocumentsView"
+          element={<DirectorFinancialDocumentsView />}
+        />
+        <Route
+          path="/DirectorClientDocuments"
+          element={<DirectorClientDocuments />}
+        />
+        <Route
+          path="/DirectorCreditorsDash"
+          element={<DirectorCreditorsDash />}
+        />
+        <Route
+          path="/DirectorManagerViewFuelExpense"
+          element={<DirectorManagerViewFuelExpense />}
+        />
+        <Route
+          path="/DirectorExpenses/:truckId"
+          element={<DirectorExpenses />}
+        />
+        <Route
+          path="/Viewcontrollerinstructions"
+          element={<Viewcontrollerinstructions />}
+        />
+        <Route
+          path="/ViewcontrollerInstructionDetails"
+          element={<ViewcontrollerInstructionDetails />}
+        />
         <Route path="/AdminDashboard" element={<AdminDashboard />} />
         {/* Finance Clerk Routes */}
         <Route path="/instructions" element={<InstructionsList />} />
         <Route path="/update-instructions" element={<UpdateInstruction />} />
-        <Route path="/Upload-Instruction-Documents" element={<UploadInstructionDocuments />} />
+        <Route
+          path="/Upload-Instruction-Documents"
+          element={<UploadInstructionDocuments />}
+        />
         <Route path="/invoices" element={<InvoicesList />} />
-        <Route path="/view-client-statements" element={<ViewClientStatement />} />
+        <Route
+          path="/view-client-statements"
+          element={<ViewClientStatement />}
+        />
         <Route path="/statements-list" element={<StatementsList />} />
         <Route path="/client-invoice" element={<ClientInvoice />} />
         <Route path="/FDashboard" element={<FDashboard />} />
         <Route path="/finance-clerk-wage" element={<FinanceClerkWage />} />
-        <Route path="/finance-clerk-wage-details/:userid" element={<FinanceClerkWageDetails />} />
-        <Route path="/finance-clerk-wage-slip/:id" element={<FinanceClerkWageSlip />} />
+        <Route
+          path="/finance-clerk-wage-details/:userid"
+          element={<FinanceClerkWageDetails />}
+        />
+        <Route
+          path="/finance-clerk-wage-slip/:id"
+          element={<FinanceClerkWageSlip />}
+        />
         <Route path="/client-statement" element={<ClientStatement />} />
         <Route path="/ViewExpense" element={<ViewExpense />} />
         <Route path="/ExpenseDetails/:truckId" element={<ExpenseDetails />} />
         <Route path="/ExpenseSubmission" element={<ExpenseSubmission />} />
-        <Route path="/ViewClientInstruction" element={<ViewClientInstruction />} />
+        <Route
+          path="/ViewClientInstruction"
+          element={<ViewClientInstruction />}
+        />
         <Route path="/ViewClientInvoice" element={<ViewClientInvoice />} />
         <Route path="/Creditors/CreditorsOther" element={<CreditorsOther />} />
         <Route path="/Creditors/CreatePO" element={<CreatePO />} />
@@ -258,9 +373,18 @@ function ContentWrapper() {
         <Route path="/Creditors/CredStatements" element={<CredStatements />} />
         <Route path="/Creditors/PurchaseOrder/View" element={<ViewPOForm />} />
         <Route path="/Creditors/ViewStatement" element={<ViewStatement />} />
-        <Route path="/Creditors/SubcontractorList" element={<SubcontractorList />} />
-        <Route path="/Creditors/SubcontractorStatementDetails" element={<SubcontractorStatementDetails />} />
-        <Route path="/Creditors/SubcontractorStatements" element={<SubcontractorStatements />} />
+        <Route
+          path="/Creditors/SubcontractorList"
+          element={<SubcontractorList />}
+        />
+        <Route
+          path="/Creditors/SubcontractorStatementDetails"
+          element={<SubcontractorStatementDetails />}
+        />
+        <Route
+          path="/Creditors/SubcontractorStatements"
+          element={<SubcontractorStatements />}
+        />
         {/* Add the routes for invoice viewing and downloading */}
         <Route path="/invoice" element={<Navigate to="/invoices" replace />} />
         <Route path="/invoice/:id" element={<ClientInvoice />} />
@@ -269,16 +393,32 @@ function ContentWrapper() {
         <Route path="/CreditorsDashboard" element={<CreditorsDashboard />} />
         <Route path="/FuelPage" element={<ViewExpense />} />
         <Route path="/FClerkLegDetails" element={<FClerkLegDetails />} />
-        <Route path="/FCcontrollerinstructions" element={<FCcontrollerinstructions />} />
-        <Route path="/FCcontrollerInstructionDetails" element={<FCcontrollerInstructionDetails />} />
+        <Route
+          path="/FCcontrollerinstructions"
+          element={<FCcontrollerinstructions />}
+        />
+        <Route
+          path="/FCcontrollerInstructionDetails"
+          element={<FCcontrollerInstructionDetails />}
+        />
         <Route path="/analytics-reports" element={<AnalyticsReportsPage />} />
-        <Route path="/reports" element={<ReportsPage />} /> 
+        <Route path="/reports" element={<ReportsPage />} />
         <Route path="/wage-reports" element={<WageReports />} />
-
+        <Route path="/view-client-list" element={<ClientList />} />
+        <Route path="/view-add-on-list" element={<AddOnList />} />
+        <Route path="/add-on-form" element={<AddOnForm />} />
+        <Route
+          path="/profit-loss-reports"
+          element={<ProfitLossReportsPage />}
+        />
+        <Route
+          path="/income-expenditure-reports/:month/:year"
+          element={<ProfitLossDetailPage />}
+        />
       </Routes>
       {shouldShowFooter && <Footer />} {/* Conditionally render footer */}
     </div>
-  )
+  );
 }
 
 function App() {
@@ -295,15 +435,17 @@ function App() {
     "/Viewcontrollerinstructions": "Viewcontrollerinstructions",
     "/ViewcontrollerInstructionDetails": "ViewcontrollerInstructionDetails",
     "/reports": "Reports",
-    "/wage-reports": "Wage Reports" 
-  }
+    "/wage-reports": "Wage Reports",
+    "/profit-loss-reports": "Income & Expenditure Reports",
+    "/income-expenditure-reports/:month/:year": "Income & Expenditure Report",
+  };
 
   // Set page title based on current route
   React.useEffect(() => {
-    const path = window.location.pathname
-    document.title = pageTitles[path] || "Logistics App"
+    const path = window.location.pathname;
+    document.title = pageTitles[path] || "Logistics App";
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
+  }, []);
 
   return (
     <AuthProvider>
@@ -315,7 +457,7 @@ function App() {
         </div>
       </Router>
     </AuthProvider>
-  )
+  );
 }
 
-export default App
+export default App;

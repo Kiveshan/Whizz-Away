@@ -16,6 +16,11 @@ const creditorsDashboardData = [
     image: "/images/OtherExpence.jpg",
     path: "/Creditors/CreditorsOther",
   },
+    {
+    title: "Credit Note",
+    image: "/images/crednote.jpg", // add an appropriate image
+    path: "/CredClientList",  // path to your Credit Note page
+  },
 ];
 
 const CreditorsDashboard = () => {
@@ -31,7 +36,7 @@ const CreditorsDashboard = () => {
   return (
     <div className="dashboard">
       <div className="dashboard-row top-row">
-        {creditorsDashboardData.slice(0, 2).map((item) => (
+        {creditorsDashboardData.slice(0, 3).map((item) => (
           <Card
             key={item.title}
             title={item.title}
@@ -41,7 +46,7 @@ const CreditorsDashboard = () => {
         ))}
       </div>
       <div className="dashboard-row bottom-row">
-        {creditorsDashboardData.slice(2, 4).map((item) => (
+        {creditorsDashboardData.slice(3, 5).map((item) => (
           <Card
             key={item.title}
             title={item.title}

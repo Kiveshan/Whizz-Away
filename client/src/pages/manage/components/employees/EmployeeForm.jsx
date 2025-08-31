@@ -419,22 +419,22 @@ const EmployeeForm = ({ employee, loading, isEditing, onSave, onCancel, onChange
       </div>
 
       {/* Form Actions */}
-      <div
-        className="manage-button-container"
-        style={{
-          marginTop: "30px",
-          display: "flex",
-          gap: "16px",
-          justifyContent: "center",
-        }}
-      >
-        <button type="submit" className="manage-save-button" disabled={loading}>
-          {loading ? "Saving..." : "Confirm Employee Register"}
-        </button>
-        <button type="button" onClick={onCancel} className="manage-cancel-button">
-          Cancel
-        </button>
-      </div>
+  <div
+  className="employee-button-container"
+  style={{
+    marginTop: "30px",
+    display: "flex",
+    gap: "16px",
+    justifyContent: "center",
+  }}
+>
+  <button type="submit" className="employee-save-button" disabled={loading}>
+    {loading ? "Saving..." : "Save"}
+  </button>
+  <button type="button" onClick={onCancel} className="employee-cancel-button">
+    Cancel
+  </button>
+</div>
     </form>
   )
 }

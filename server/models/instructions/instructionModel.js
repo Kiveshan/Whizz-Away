@@ -998,12 +998,22 @@ export const getInstructions = async (clientId) => {
       m.m1key,
       m."clientFileRef" as fileno,
       m.shipment_type,
-      s.shipmenttype as type_text,
+      s.shipmenttype AS type_text,
       m.status,
-      m."lastFreeDate", -- Changed from pickupdate to lastFreeDate
+      m."lastFreeDate",
       m.client,
       c.client AS companyname,
-      m.created_at as startingdate -- Use created_at field for the creation date
+      m.created_at as startingdate,
+      COALESCE(m.num_six_meters, 0) AS num_six_meters,
+      COALESCE(m.num_twelve_meters, 0) AS num_twelve_meters,
+      COALESCE(m.num_abnormal, 0) AS num_abnormal,
+      (
+        SELECT COUNT(*) > 0 
+        FROM public.container cn 
+        WHERE cn.m1key = m.m1key 
+        AND cn.containernum IS NOT NULL 
+        AND cn.containernum != ''
+      ) AS has_valid_containers
     FROM 
       public.m1_controller m
     JOIN 
@@ -1016,7 +1026,7 @@ export const getInstructions = async (clientId) => {
     sql += ` WHERE m.client = $1`;
     queryParams.push(clientId);
   }
-  sql += ` ORDER BY m.created_at DESC`; // Order by creation date
+  sql += ` ORDER BY m.created_at DESC`;
 
   console.log(
     `[${new Date().toISOString()}] getInstructions: Executing SQL:`,
@@ -1044,6 +1054,10 @@ export const getInstructions = async (clientId) => {
       console.log(
         `[${new Date().toISOString()}] getInstructions: created_at/startingdate value:`,
         rows[0].startingdate
+      );
+      console.log(
+        `[${new Date().toISOString()}] getInstructions: has_valid_containers value:`,
+        rows[0].has_valid_containers
       );
     }
 

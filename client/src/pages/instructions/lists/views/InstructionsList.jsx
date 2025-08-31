@@ -413,70 +413,86 @@ const Instructions = () => {
                   <th>Assignment</th>
                 </tr>
               </thead>
-              <tbody>
-                {currentInstructions.length === 0 ? (
-                  <tr>
-                    <td colSpan="7">No instructions found</td>
-                  </tr>
-                ) : (
-                  currentInstructions.map((item) => (
-                    <tr key={item.m1controllerkey || item.m1key}>
-                      <td>Instruction {item.m1controllerkey || item.m1key}</td>
-                      <td>{item.fileno}</td>
-                      <td>
-                        {item.type_text ||
-                          (item.shipment_type === 1 || item.shipment_type === "1"
-                            ? "import"
-                            : item.shipment_type === 2 || item.shipment_type === "2"
-                              ? "export"
-                              : item.shipment_type === 3 || item.shipment_type === "3"
-                                ? "cross-haul"
-                                : item.shipment_type === 4 || item.shipment_type === "4"
-                                  ? "cross-haul (break bulk)"
-                                  : item.type)}
-                      </td>
-                      <td>{renderStatus(item.status)}</td>
-                      <td>{new Date(item.startingdate || item.pickupdate).toLocaleDateString()}</td>
-                      <td>
-                        <button
-                          className="view-btn"
-                          onClick={() => handleViewInstruction(item.m1key)} //item.m1controllerkey
-                        >
-                          View
-                        </button>
-                      </td>
-                      <td>
-                        <button
-                          className="view-btn"
-                          onClick={() => {
-                            // Create state object with all necessary parameters
-                            const stateToPass = {
-                              instructionId: item.m1key || item.m1controllerkey,
-                              clientId,
-                              clientName,
-                              selectedMonth,
-                              selectedYear,
-                              activeFilter,
-                              selectedLegIndex: 0,
-                            }
+<tbody>
+  {currentInstructions.length === 0 ? (
+    <tr>
+      <td colSpan="7">No instructions found</td>
+    </tr>
+  ) : (
+    currentInstructions.map((item) => {
+      // Check if the instruction has any containers with non-empty/non-null containernum
+      const hasValidContainers = item.has_valid_containers === true;
 
-                            // Log the state being passed to update-instructions
-                            console.log("Navigating to update-instructions with state:", stateToPass)
-
-                            // Use replace: true to ensure a clean navigation
-                            navigate("/update-instructions", {
-                              state: stateToPass,
-                              replace: true,
-                            })
-                          }}
-                        >
-                          View
-                        </button>
-                      </td>
-                    </tr>
-                  ))
-                )}
-              </tbody>
+      return (
+        <tr key={item.m1controllerkey || item.m1key}>
+          <td>Instruction {item.m1controllerkey || item.m1key}</td>
+          <td>{item.fileno}</td>
+          <td>
+            {item.type_text ||
+              (item.shipment_type === 1 || item.shipment_type === "1"
+                ? "import"
+                : item.shipment_type === 2 || item.shipment_type === "2"
+                  ? "export"
+                  : item.shipment_type === 3 || item.shipment_type === "3"
+                    ? "cross-haul"
+                    : item.shipment_type === 4 || item.shipment_type === "4"
+                      ? "cross-haul (break bulk)"
+                      : item.type)}
+          </td>
+          <td>{renderStatus(item.status)}</td>
+          <td>
+            {(item.startingdate || item.pickupdate)
+              ? new Date(item.startingdate || item.pickupdate).toLocaleDateString()
+              : "Not Set"}
+          </td>
+          <td>
+            <button
+              className="view-btn"
+              onClick={() => handleViewInstruction(item.m1key)}
+            >
+              View
+            </button>
+          </td>
+          <td>
+            {hasValidContainers ? (
+              <button
+                className="view-btn"
+                onClick={() => {
+                  const stateToPass = {
+                    instructionId: item.m1key || item.m1controllerkey,
+                    clientId,
+                    clientName,
+                    selectedMonth,
+                    selectedYear,
+                    activeFilter,
+                    selectedLegIndex: 0,
+                  };
+                  console.log("Navigating to update-instructions with state:", stateToPass);
+                  navigate("/update-instructions", {
+                    state: stateToPass,
+                    replace: true,
+                  });
+                }}
+              >
+                View
+              </button>
+            ) : (
+              <span className="tooltip-wrapper">
+                <button
+                  className="view-btn disabled"
+                  disabled={true}
+                >
+                  View
+                </button>
+                <span className="tooltip-text">Please allocate containers to proceed to assignment</span>
+              </span>
+            )}
+          </td>
+        </tr>
+      );
+    })
+  )}
+</tbody>
             </table>
           )}
         </div>

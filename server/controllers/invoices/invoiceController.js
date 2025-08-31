@@ -3,6 +3,7 @@ import {
   getInvoiceDetails,
   checkInvoiceExists,
   createInvoice,
+  updateInstructionDetails,
 } from "../../models/invoices/invoiceModel.js";
 
 const getCompletedInvoicesHandler = async (req, res) => {
@@ -79,7 +80,7 @@ const checkInvoiceExistsHandler = async (req, res) => {
   try {
     const { m1key } = req.params;
     console.log(`Checking if invoice exists for m1key: ${m1key}`);
-    
+
     if (!m1key) {
       return res.status(400).json({
         success: false,
@@ -88,7 +89,7 @@ const checkInvoiceExistsHandler = async (req, res) => {
     }
 
     const result = await checkInvoiceExists(m1key);
-    
+
     if (!result.success) {
       return res.status(500).json({
         success: false,
@@ -115,7 +116,7 @@ const createInvoiceHandler = async (req, res) => {
   try {
     const { m1key, clientId } = req.body;
     console.log(`Creating invoice for m1key: ${m1key}, clientId: ${clientId}`);
-    
+
     if (!m1key || !clientId) {
       return res.status(400).json({
         success: false,
@@ -124,7 +125,7 @@ const createInvoiceHandler = async (req, res) => {
     }
 
     const result = await createInvoice({ m1key, clientId });
-    
+
     if (!result.success) {
       return res.status(400).json({
         success: false,
@@ -146,9 +147,61 @@ const createInvoiceHandler = async (req, res) => {
   }
 };
 
-export { 
-  getCompletedInvoicesHandler, 
+// Handler to update instruction details
+const updateInstructionDetailsHandler = async (req, res) => {
+  try {
+    const { m1key, dropoff, rate } = req.body;
+    console.log(`Updating instruction details for m1key: ${m1key}`, {
+      dropoff,
+      rate,
+    });
+
+    if (!m1key) {
+      return res.status(400).json({
+        success: false,
+        message: "m1key is required",
+      });
+    }
+
+    // Validate rate if provided
+    if (rate !== undefined) {
+      const numRate = Number.parseFloat(rate);
+      if (isNaN(numRate) || numRate < 0) {
+        return res.status(400).json({
+          success: false,
+          message: "Rate must be a positive number",
+        });
+      }
+    }
+
+    const result = await updateInstructionDetails({ m1key, dropoff, rate });
+
+    if (!result.success) {
+      return res.status(400).json({
+        success: false,
+        message: result.message,
+      });
+    }
+
+    res.json({
+      success: true,
+      data: result.data,
+      message: "Instruction updated successfully",
+    });
+  } catch (error) {
+    console.error("Error updating instruction details:", error);
+    res.status(500).json({
+      success: false,
+      message: error.message,
+      stack: process.env.NODE_ENV === "production" ? null : error.stack,
+    });
+  }
+};
+
+export {
+  getCompletedInvoicesHandler,
   getInvoiceDetailsHandler,
   checkInvoiceExistsHandler,
-  createInvoiceHandler 
+  createInvoiceHandler,
+  updateInstructionDetailsHandler,
 };
