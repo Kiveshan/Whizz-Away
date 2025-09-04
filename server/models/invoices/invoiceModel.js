@@ -93,6 +93,8 @@ const getInvoiceDetails = async (id) => {
         m1.vat,
         m1.rateweight,
         m1.booking_ref,
+        m1.pickup,
+        m1.dropoff,
         m1.vessel_name,
         i.invoice_num,
         i.doc_num,
