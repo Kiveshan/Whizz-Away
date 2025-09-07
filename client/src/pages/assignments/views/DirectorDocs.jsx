@@ -182,11 +182,16 @@ const DirectorDocs = () => {
   const [shipmentType, setShipmentType] = useState(null);
   const [debugInfo, setDebugInfo] = useState({});
   const [containerCount, setContainerCount] = useState(0);
+  const [containersReachedCount, setContainersReachedCount] = useState(0);
+  const [isWeightBased, setIsWeightBased] = useState(false);
+const [weightUnit, setWeightUnit] = useState('kg');
 
   useEffect(() => {
+    
     if (instructionId) {
       fetchLegs();
       fetchDocuments();
+      checkIfWeightBased();
       fetchContainers();
 
       // Check if shipmentType was passed in location state
@@ -208,20 +213,29 @@ const DirectorDocs = () => {
       }
     }
   }, [instructionId]);
-
-  const fetchContainers = async () => {
-    try {
-      const response = await api.get(
-        `/containers/instruction/${instructionId}`
-      );
-      console.log("Containers for instruction:", response.data);
-      setContainerCount(response.data.length);
-    } catch (error) {
-      console.error("Error fetching containers:", error);
-      setContainerCount(0);
+const fetchContainers = async () => {
+  try {
+    if (!isWeightBased) {
+      // Only fetch if NOT weight-based
+      const response = await api.get(`/containers/instruction/${instructionId}`)
+      console.log("Containers for instruction:", response.data)
+      setContainerCount(response.data.length)
+      
+      // Fetch the reached count
+      const reachedCount = await countContainersReachingDestination();
+      setContainersReachedCount(reachedCount);
+      console.log("Containers reached final destination count:", reachedCount);
+    } else {
+      setContainerCount(0)
+      setContainersReachedCount(0)
+      console.log("Weight-based instruction: Skipping container count fetch.")
     }
-  };
-
+  } catch (error) {
+    console.error("Error fetching containers:", error)
+    setContainerCount(0)
+    setContainersReachedCount(0)
+  }
+}
   const fetchShipmentType = async () => {
     try {
       console.log("Fetching shipment type for instruction ID:", instructionId);
@@ -248,7 +262,62 @@ const DirectorDocs = () => {
       }));
     }
   };
+  const checkIfWeightBased = async () => {
+  if (!instructionId) return;
 
+  try {
+    const response = await api.get(`/instructions/${instructionId}/details`);
+    const rateWeightValue = response.data.rateweight;
+
+    console.log('Rate weight value:', rateWeightValue);
+    const isWeight = rateWeightValue && rateWeightValue.toLowerCase() !== 'container';
+    setIsWeightBased(isWeight);
+
+    // Determine weight unit from rateweight value
+    if (isWeight) {
+      const unit = rateWeightValue.toLowerCase().includes('ton') ? 'ton' : 'kg';
+      setWeightUnit(unit);
+      console.log(`Weight-based instruction detected. Unit: ${unit}`);
+    }
+  } catch (error) {
+    console.error('Error checking rate weight:', error);
+  }
+};
+const countContainersReachingDestination = async () => {
+  try {
+    // Get instruction details to get the dropoff location
+    const instructionResponse = await api.get(`/instructions/${instructionId}/details`);
+    const dropoff = instructionResponse.data.dropoff;
+    
+    // Normalize dropoff by converting to lowercase and removing spaces
+    const normalizedDropoff = dropoff?.toLowerCase().replace(/\s/g, '');
+    
+    // Get all legs for this instruction
+    const legsResponse = await api.get(`/legs/${instructionId}`);
+    const legsData = legsResponse.data;
+    
+    // Track which containers reach the final destination
+    const containersReachingDropoff = new Set();
+    
+    legsData.forEach((leg) => {
+      // Normalize leg destination by converting to lowercase and removing spaces
+      const normalizedLegDestination = leg.destination?.toLowerCase().replace(/\s/g, '');
+      if (normalizedLegDestination === normalizedDropoff && leg.drivers && leg.drivers.length > 0) {
+        leg.drivers.forEach((driver) => {
+          if (driver.containernumber) {
+            containersReachingDropoff.add(driver.containernumber.toString());
+          }
+        });
+      }
+    });
+    
+    console.log("Containers reaching final destination:", Array.from(containersReachingDropoff));
+    return containersReachingDropoff.size;
+  } catch (error) {
+    console.error("Error counting containers reaching destination:", error);
+    return 0;
+  }
+};
   const fetchLegs = async () => {
     try {
       const response = await api.get(`/legs/${instructionId}`);
@@ -313,13 +382,13 @@ const DirectorDocs = () => {
   };
 
   // Determine if we should show the Empty Turning Depot Document option
-  const showEmptyTurningDepotOption = () => {
-    console.log(
-      "Checking if we should show Empty Turning Depot Document option. Shipment type:",
-      shipmentType
-    );
-    return shipmentType !== 2;
-  };
+// const showAdditionalDocumentOptions = () => {
+//   console.log(
+//     "Checking if we should show additional document options. Shipment type:",
+//     shipmentType
+//   );
+//   return shipmentType !== 3;
+// };
 
   return (
     <div className="instruction-container">
@@ -387,67 +456,73 @@ const DirectorDocs = () => {
       </div>
 
       {/* Document requirements status */}
-      <div
-        style={{
-          margin: "20px 0",
-          padding: "15px",
-          backgroundColor: "#f5f5f5",
-          borderRadius: "4px",
-        }}
-      >
-        <h4 style={{ marginTop: 0 }}>Document Requirements:</h4>
-        <ul style={{ paddingLeft: "20px" }}>
-          <li
-            style={{
-              color:
-                documents.filter((doc) => doc.type === "Instruction Document")
-                  .length === 1
-                  ? "green"
-                  : "red",
-            }}
-          >
-            Instruction Document:{" "}
-            {
-              documents.filter((doc) => doc.type === "Instruction Document")
-                .length
-            }
-            /1
-          </li>
-          <li
-            style={{
-              color:
-                documents.filter((doc) => doc.type === "Delivery Note")
-                  .length === containerCount
-                  ? "green"
-                  : "red",
-            }}
-          >
-            Delivery Notes:{" "}
-            {documents.filter((doc) => doc.type === "Delivery Note").length}/
-            {containerCount}
-          </li>
-          {showEmptyTurningDepotOption() && (
-            <li
-              style={{
-                color:
-                  documents.filter(
-                    (doc) => doc.type === "Empty Turning Depot Document"
-                  ).length === 1
-                    ? "green"
-                    : "red",
-              }}
-            >
-              Empty Turning Depot Document:{" "}
-              {
-                documents.filter(
-                  (doc) => doc.type === "Empty Turning Depot Document"
-                ).length
-              }
-              /1
-            </li>
-          )}
-        </ul>
-      </div>
+<div
+  style={{
+    margin: "20px 0",
+    padding: "15px",
+    backgroundColor: "#f5f5f5",
+    borderRadius: "4px",
+  }}
+>
+  <h4 style={{ marginTop: 0 }}>Document Requirements:</h4>
+<ul style={{ paddingLeft: "20px" }}>
+  <li
+    style={{
+      color:
+        documents.filter((doc) => doc.type === "Instruction Document")
+          .length === 1
+          ? "green"
+          : "red",
+    }}
+  >
+    Instruction Document:{" "}
+    {
+      documents.filter((doc) => doc.type === "Instruction Document").length
+    }
+    /1
+  </li>
+  {shipmentType === 1 && (
+    <li
+      style={{
+        color:
+          documents.filter(
+            (doc) => doc.type === "Empty Turning Depot Document"
+          ).length === 1
+            ? "green"
+            : "red",
+      }}
+    >
+      Empty Turning Depot Document:{" "}
+      {
+        documents.filter(
+          (doc) => doc.type === "Empty Turning Depot Document"
+        ).length
+      }
+      /1
+    </li>
+  )}
+  <li
+    style={{
+      color: isWeightBased
+        ? documents.filter((doc) => doc.type === "Delivery Note").length > 0
+          ? "green"
+          : "red"
+        : documents.filter((doc) => doc.type === "Delivery Note").length ===
+          containersReachedCount
+        ? "green"
+        : "red",
+    }}
+  >
+    {isWeightBased
+      ? `Delivery Notes: ${
+          documents.filter((doc) => doc.type === "Delivery Note").length
+        }`
+      : `Delivery Notes: ${
+          documents.filter((doc) => doc.type === "Delivery Note").length
+        }/${containersReachedCount}`}
+  </li>
+</ul>
+</div>
     </div>
   );
 };

@@ -32,6 +32,7 @@ import {
   getDocuments,
   generateInvoice,
   fixInvoiceSequence,
+  updateLegNumber
 } from "../../models/assignments/assignmentModel.js";
 
 export const getDriversHandler = async (req, res) => {
@@ -631,6 +632,29 @@ export const generateInvoiceHandler = async (req, res) => {
     res.status(500).json({
       success: false,
       error: "Server error while generating invoice",
+    });
+  }
+};
+export const updateLegNumberHandler = async (req, res) => {
+  const { legId } = req.params;
+  const { legnumber } = req.body;
+  console.log(`Route PUT /legs/${legId}/update-number was accessed with legnumber=${legnumber}`);
+  if (legnumber === undefined) {
+    return res.status(400).json({ success: false, message: "Missing required field: legnumber" });
+  }
+  try {
+    const result = await updateLegNumber(legId, legnumber);
+    res.status(200).json({
+      success: true,
+      message: `Leg number updated successfully to ${legnumber}`,
+      updatedLegId: result.updatedLegId,
+    });
+  } catch (err) {
+    console.error(`Error updating leg number for ID ${legId}:`, err);
+    res.status(500).json({
+      success: false,
+      message: "Failed to update leg number",
+      error: err.message,
     });
   }
 };

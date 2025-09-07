@@ -10,9 +10,9 @@ const dashboardData = [
     path: "/CompanyInstructionView",
   },
   {
-    title: "Analytics",
+    title: "Insights",
     image: "/images/analytics.jpg",
-    path: "/DirectorAnalytics",
+    path: "/analytics-reports",
   },
   {
     title: "Debtors",
@@ -31,8 +31,9 @@ const dashboardData = [
 
 const DirectorDashboard = () => {
   const navigate = useNavigate();
+
   const handleNavigation = (path) => {
-    if (path === "/finance-clerk-wage") {
+    if (path === "/finance-clerk-wage" || path === "/analytics-reports") {
       // Store the current dashboard route before navigating
       localStorage.setItem("dashboardRoute", "/DirectorDashboard");
     }

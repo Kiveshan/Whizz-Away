@@ -1,10 +1,10 @@
 "use client";
 
 import { useState } from "react";
-import "../css/login.css";
+import styles from "../css/login.module.css"; // Updated to CSS Module
 import { useNavigate } from "react-router-dom";
 import { Eye, EyeOff } from "lucide-react";
-import api from "../../../api"; // Import the configured Axios instance
+import api from "../../../api";
 
 const Login = ({ switchToRegister }) => {
   const [email, setEmail] = useState("");
@@ -45,14 +45,14 @@ const Login = ({ switchToRegister }) => {
   };
 
   return (
-    <div className="login-container">
-      <div className="login-form">
+    <div className={styles.loginContainer}>
+      <div className={styles.loginForm}>
         <center>
-          <div className="logo-container1">
+          <div className={styles.logoContainer1}>
             <img
               src="/images/whizz-away.jpeg"
               alt="LOGITECH FLOW Logo"
-              className="logo-image5"
+              className={styles.logoImage5}
             />
           </div>
         </center>
@@ -60,55 +60,55 @@ const Login = ({ switchToRegister }) => {
           <h2>Login</h2>
         </center>
 
-        {error && <div className="error-message">{error}</div>}
+        {error && <div className={styles.errorMessage}>{error}</div>}
 
         <form onSubmit={handleLogin}>
-          <div className="form-group">
+          <div className={styles.formGroup}>
             <label htmlFor="email">Email</label>
             <input
               type="email"
               id="email"
               placeholder="Enter Email"
-              className="form-input"
+              className={styles.formInput}
               value={email}
               onChange={(e) => setEmail(e.target.value)}
             />
           </div>
 
-          <div className="form-group">
+          <div className={styles.formGroup}>
             <label htmlFor="password">Password</label>
-            <div className="password-input-container">
+            <div className={styles.passwordInputContainer}>
               <input
                 type={showPassword ? "text" : "password"}
                 id="password"
                 placeholder="Enter Password"
-                className="form-input"
+                className={styles.formInput}
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
               />
               <button
                 type="button"
-                className="password-toggle-btn"
+                className={styles.passwordToggleBtn}
                 onClick={togglePasswordVisibility}
                 tabIndex="-1"
                 aria-label={showPassword ? "Hide password" : "Show password"}
               >
                 {showPassword ? (
-                  <EyeOff className="password-eye-icon" size={18} />
+                  <EyeOff className={styles.passwordEyeIcon} size={18} />
                 ) : (
-                  <Eye className="password-eye-icon" size={18} />
+                  <Eye className={styles.passwordEyeIcon} size={18} />
                 )}
               </button>
             </div>
           </div>
 
-          <button type="submit" className="login-button">
+          <button type="submit" className={styles.loginButton}>
             Login
           </button>
         </form>
 
-        <div className="new-profile">
-          <button onClick={switchToRegister} className="link-button">
+        <div className={styles.newProfile}>
+          <button onClick={switchToRegister} className={styles.linkButton}>
             New Profile? Register Here
           </button>
         </div>

@@ -46,38 +46,38 @@ const saveWageData = async ({
 
     // Insert wage record with tax history
     const insertQuery = `
-      INSERT INTO wages (
-        employeeid, total_earnings, total_deductions, net_pay,
-        employee_date
-      ) VALUES ($1, $2, $3, $4, $5)
-      ON CONFLICT ON CONSTRAINT unique_wage_per_employee_month_year
-      DO UPDATE SET
-        total_earnings = EXCLUDED.total_earnings,
-        total_deductions = EXCLUDED.total_deductions,
-        net_pay = EXCLUDED.net_pay
-      RETURNING wageskey
-    `;
+INSERT INTO wages (
+    employeeid, total_earnings, total_deductions, net_pay,
+    employee_date
+  ) VALUES ($1, $2, $3, $4, $5)
+  ON CONFLICT ON CONSTRAINT unique_wage_per_employee_month_year
+  DO UPDATE SET
+    total_earnings = EXCLUDED.total_earnings,
+    total_deductions = EXCLUDED.total_deductions,
+    net_pay = EXCLUDED.net_pay
+  RETURNING wageskey
+`;
 
-    const params = [
-      employeeId,
-      Number(totalEarnings.toFixed(2)),
-      Number(totalDeductions.toFixed(2)),
-      Number(netPay.toFixed(2)),
-      normalizedDate,
-    ];
+const params = [
+  employeeId,
+  Number(totalEarnings.toFixed(2)), // Total earnings after loan deduction
+  Number(totalDeductions.toFixed(2)), // This can be 0 or actual deductions
+  Number(netPay.toFixed(2)), // This is now "Total Payable to Labour Consultant"
+  normalizedDate,
+];
 
-    const result = await client.query(insertQuery, params);
-    await client.query("COMMIT");
+const result = await client.query(insertQuery, params);
 
-    console.log(
-      `✅ Wage saved with latest tax amount: R${taxInfo.tax} included in total deductions`
-    );
+await client.query("COMMIT");
 
-    return {
-      success: true,
-      wagesKey: result.rows[0].wageskey,
-      taxAmount: taxInfo.tax,
-    };
+console.log(
+  `✅ Wage saved - Total Earnings: R${totalEarnings.toFixed(2)}, Total Payable: R${netPay.toFixed(2)}`
+);
+
+return {
+  success: true,
+  wagesKey: result.rows[0].wageskey,
+};
   } catch (error) {
     if (client) await client.query("ROLLBACK");
     throw error;
@@ -85,7 +85,83 @@ const saveWageData = async ({
     if (client) client.release();
   }
 };
-
+const getBaseSalaryHistory = async (employeeId, month, year) => {
+  let client;
+  try {
+    client = await pool.connect();
+    
+    // Convert month name to number if it's a string
+    let monthNumber = month;
+    if (typeof month === 'string') {
+      const monthNames = [
+        "January", "February", "March", "April", "May", "June",
+        "July", "August", "September", "October", "November", "December"
+      ];
+      monthNumber = monthNames.indexOf(month) + 1;
+      
+      if (monthNumber === 0) {
+        return { exists: false, error: 'Invalid month name' };
+      }
+    }
+    
+    // Get the last day of the requested month
+    const lastDayOfMonth = new Date(parseInt(year), monthNumber, 0);
+    const monthEndDate = lastDayOfMonth.toISOString().split('T')[0];
+    
+    console.log(`Getting base salary for employee ${employeeId} as of ${monthEndDate}`);
+    
+    // Query to get the most recent base salary on or before the month end
+    const historyQuery = `
+      SELECT base, date 
+      FROM base_salary_history 
+      WHERE userid = $1 AND date <= $2 
+      ORDER BY date DESC 
+      LIMIT 1
+    `;
+    
+    const historyResult = await client.query(historyQuery, [employeeId, monthEndDate]);
+    
+    if (historyResult.rows.length > 0) {
+      console.log(`✅ Found historical base salary: ${historyResult.rows[0].base} as of ${historyResult.rows[0].date}`);
+      return {
+        exists: true,
+        baseSalary: parseFloat(historyResult.rows[0].base),
+        effectiveDate: historyResult.rows[0].date,
+        source: 'historical'
+      };
+    } else {
+      // Fallback to current base salary from m5_employee table
+      console.log('No historical base salary found, checking current base salary');
+      const currentQuery = `
+        SELECT base_salary 
+        FROM m5_employee 
+        WHERE userid = $1
+      `;
+      
+      const currentResult = await client.query(currentQuery, [employeeId]);
+      
+      if (currentResult.rows.length > 0 && currentResult.rows[0].base_salary) {
+        console.log(`⚠️ Using current base salary: ${currentResult.rows[0].base_salary}`);
+        return {
+          exists: true,
+          baseSalary: parseFloat(currentResult.rows[0].base_salary),
+          effectiveDate: null,
+          source: 'current'
+        };
+      } else {
+        console.log('❌ No base salary found');
+        return {
+          exists: false,
+          baseSalary: 0,
+          source: 'none'
+        };
+      }
+    }
+    
+  } finally {
+    if (client) client.release();
+  }
+};
 const checkWageSlip = async (employeeId, month, year) => {
   // Normalize the date to the last day of the month
   const targetDate = new Date(Number.parseInt(year), Number.parseInt(month), 0);
@@ -131,7 +207,59 @@ const checkWageSlip = async (employeeId, month, year) => {
     return { exists: false };
   }
 };
-
+const getAllEmployees = async () => {
+  const sql = `
+    SELECT userid, name, surname, roleid
+    FROM m5_employee
+    ORDER BY name, surname
+  `;
+  const result = await query(sql);
+  return result.rows;
+};
+const getStoredWageData = async (employeeId, month, year) => {
+  let client;
+  try {
+    client = await pool.connect();
+    
+    // Convert month name to number if it's a string
+    let monthNumber = month;
+    if (typeof month === 'string') {
+      const monthNames = [
+        "January", "February", "March", "April", "May", "June",
+        "July", "August", "September", "October", "November", "December"
+      ];
+      monthNumber = monthNames.indexOf(month) + 1;
+    }
+    
+    const query = `
+      SELECT 
+        total_earnings,
+        net_pay as total_payable,
+        employee_date
+      FROM wages 
+      WHERE employeeid = $1 
+      AND EXTRACT(MONTH FROM employee_date) = $2 
+      AND EXTRACT(YEAR FROM employee_date) = $3
+    `;
+    
+    const result = await client.query(query, [employeeId, monthNumber, year]);
+    
+    if (result.rows.length > 0) {
+      console.log(`Found stored wage data for employee ${employeeId} - ${month} ${year}`);
+      return {
+        exists: true,
+        totalEarnings: parseFloat(result.rows[0].total_earnings),
+        totalPayable: parseFloat(result.rows[0].total_payable),
+        date: result.rows[0].employee_date
+      };
+    }
+    
+    return { exists: false };
+    
+  } finally {
+    if (client) client.release();
+  }
+};
 const getEmployeeDeductions = async (employeeId, month, year) => {
   let client;
   try {
@@ -563,7 +691,16 @@ const getDriverLegsByMonth = async (driverId, month, year) => {
     }
   }
 };
-
+const getAllRoles = async () => {
+  const sql = `
+    SELECT roleid, rolename
+    FROM public.roles
+    ORDER BY rolename
+  `;
+  const result = await query(sql);
+  console.log(`Found ${result.rows.length} roles`);
+  return result.rows;
+};
 export {
   saveWageData,
   checkWageSlip,
@@ -573,4 +710,8 @@ export {
   getDriverWageDetails,
   getDriverInstructions,
   getDriverLegsByMonth,
+  getStoredWageData,
+  getBaseSalaryHistory,
+   getAllEmployees,
+   getAllRoles
 };

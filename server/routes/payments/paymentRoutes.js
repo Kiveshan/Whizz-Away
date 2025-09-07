@@ -4,6 +4,7 @@ import {
   createPaymentHandler,
   getPaymentHandler,
   getClientPaymentsHandler,
+  getClientInvoicesHandler,
 } from "../../controllers/payments/paymentController.js";
 
 const router = express.Router();
@@ -19,5 +20,10 @@ router.get(
   getPaymentHandler
 );
 router.get("/api/payments/:clientId", verifyToken, getClientPaymentsHandler);
+router.get(
+  "/api/payment_invoices/:clientId",
+  verifyToken,
+  getClientInvoicesHandler
+);
 
 export default router;

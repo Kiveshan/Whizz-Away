@@ -2,12 +2,13 @@ import {
   createPayment,
   getPayment,
   getClientPayments,
+  getClientInvoices,
 } from "../../models/payments/paymentModel.js";
 
 const createPaymentHandler = async (req, res) => {
   try {
     const { clientId } = req.params;
-    const { amount, fileupload } = req.body;
+    const { amount, fileupload, invoiceid, addon_id, reference } = req.body;
 
     if (!amount || isNaN(amount)) {
       return res.status(400).json({
@@ -23,16 +24,45 @@ const createPaymentHandler = async (req, res) => {
       });
     }
 
-    console.log(`Inserting payment for client ${clientId}`);
-    const result = await createPayment(clientId, { amount, fileupload });
-    console.log(`Inserted payment for client ${clientId}:`, result.data);
+    if (!invoiceid && !addon_id) {
+      return res.status(400).json({
+        success: false,
+        message: "Either Invoice ID or Add-on ID is required",
+      });
+    }
+
+    if (invoiceid && addon_id) {
+      return res.status(400).json({
+        success: false,
+        message: "Payment cannot be linked to both an invoice and an add-on",
+      });
+    }
+
+    if (!reference || !reference.trim()) {
+      return res.status(400).json({
+        success: false,
+        message: "Payment reference is required",
+      });
+    }
+
+    // Create payment record with reference
+    const payment = await createPayment(clientId, {
+      amount,
+      fileupload,
+      invoiceid,
+      addon_id,
+      reference: reference.trim(),
+    });
 
     res.json({
       success: true,
-      data: result.data,
+      data: payment.data,
     });
   } catch (error) {
-    console.error(`Error uploading payment for client ${clientId}:`, error);
+    console.error(
+      `Error creating payment for client ${req.params.clientId}:`,
+      error
+    );
     res.status(500).json({
       success: false,
       message: error.message,
@@ -54,14 +84,9 @@ const getPaymentHandler = async (req, res) => {
       });
     }
 
-    const payment = result.data;
-    payment.fileurl = payment.filename
-      ? `${req.protocol}://${req.get("host")}/uploads/${payment.filename}`
-      : null;
-
     res.json({
       success: true,
-      data: payment,
+      data: result.data,
     });
   } catch (error) {
     console.error(
@@ -91,19 +116,15 @@ const getClientPaymentsHandler = async (req, res) => {
       `Query returned ${result.data.length} payments for client ${clientId}`
     );
 
-    const payments = result.data.map((payment) => ({
-      ...payment,
-      fileurl: payment.filename
-        ? `${req.protocol}://${req.get("host")}/uploads/${payment.filename}`
-        : null,
-    }));
-
     res.json({
       success: true,
-      data: payments,
+      data: result.data,
     });
   } catch (error) {
-    console.error(`Error fetching payments for client ${clientId}:`, error);
+    console.error(
+      `Error fetching payments for client ${req.params.clientId}:`,
+      error
+    );
     res.status(500).json({
       success: false,
       message: error.message,
@@ -112,4 +133,32 @@ const getClientPaymentsHandler = async (req, res) => {
   }
 };
 
-export { createPaymentHandler, getPaymentHandler, getClientPaymentsHandler };
+const getClientInvoicesHandler = async (req, res) => {
+  try {
+    const { clientId } = req.params;
+    console.log(`Fetching invoices and add-ons for client ${clientId}`);
+
+    const result = await getClientInvoices(clientId);
+    res.json({
+      success: true,
+      data: result.data,
+    });
+  } catch (error) {
+    console.error(
+      `Error fetching invoices and add-ons for client ${req.params.clientId}:`,
+      error
+    );
+    res.status(500).json({
+      success: false,
+      message: error.message,
+      stack: process.env.NODE_ENV === "production" ? null : error.stack,
+    });
+  }
+};
+
+export {
+  createPaymentHandler,
+  getPaymentHandler,
+  getClientPaymentsHandler,
+  getClientInvoicesHandler,
+};

@@ -69,8 +69,14 @@ const getStatementDetails = async (statementId) => {
         i.ikey,
         i.date AS invoice_date,
         m1.total_cost AS invoice_amount,
-        m1.task AS invoice_task,
+        m1."ksmFileRef" AS invoice_task,
+        m1.pickup,
+        m1.dropoff,
         i.invoice_num,
+        a2.addon_id,
+        a2.date AS addon_date,
+        a2.amount AS addon_amount,
+        a2.items AS addon_items,
         ut.companyname
       FROM 
         statements s
@@ -82,6 +88,8 @@ const getStatementDetails = async (statementId) => {
         invoice i ON i.groupid = s.groupid
       LEFT JOIN 
         m1_controller m1 ON i.m1key = m1.m1key
+      LEFT JOIN 
+        add_ons a2 ON a2.group_id = s.groupid
       INNER JOIN
         usertable ut ON ut.roleid = 1 AND ut.status = 'active'
       WHERE 
@@ -113,29 +121,83 @@ const getStatementDetails = async (statementId) => {
 
     const paymentsQuery = `
       SELECT 
-        paykey,
-        fileupload AS date,
-        amount
+        p.paykey,
+        p.fileupload AS date,
+        p.amount,
+        p.reference,
+        i.invoice_num
       FROM 
-        payment_m3
+        payment_m3 p
+      LEFT JOIN 
+        invoice i ON p.invoiceid = i.ikey
       WHERE 
-        clientid = $1
-        AND fileupload BETWEEN $2 AND $3
+        p.clientid = $1
+        AND p.fileupload BETWEEN $2 AND $3
     `;
-    const paymentsResult = await query(paymentsQuery, [
-      clientId,
-      formattedPaymentStartDate,
-      formattedPaymentEndDate,
+    const creditNotesQuery = `
+      SELECT 
+        cn.creditnote_id,
+        cn.creditnote_date AS date,
+        SUM(cn_amount.amount) AS amount,
+        cn.doc_no AS reference,
+        cn.description
+      FROM 
+        credit_notes cn
+      CROSS JOIN LATERAL unnest(cn.amount) AS cn_amount(amount)
+      WHERE 
+        cn.client_id = $1
+        AND cn.creditnote_date BETWEEN $2 AND $3
+      GROUP BY 
+        cn.creditnote_id,
+        cn.creditnote_date,
+        cn.doc_no,
+        cn.description
+    `;
+    const [paymentsResult, creditNotesResult] = await Promise.all([
+      query(paymentsQuery, [
+        clientId,
+        formattedPaymentStartDate,
+        formattedPaymentEndDate,
+      ]),
+      query(creditNotesQuery, [
+        clientId,
+        formattedPaymentStartDate,
+        formattedPaymentEndDate,
+      ]),
     ]);
+
     const payments = paymentsResult.rows.map((row) => ({
       paykey: row.paykey,
       date: row.date,
       amount: Number.parseFloat(row.amount || 0),
+      reference: row.reference || "",
+      invoice_num: row.invoice_num || "",
+    }));
+
+    const creditNotes = creditNotesResult.rows.map((row) => ({
+      creditnote_id: row.creditnote_id,
+      date: row.date,
+      amount: Number.parseFloat(row.amount || 0),
+      reference: row.doc_no || "",
+      description: row.description || "",
     }));
 
     console.log(
       `Fetched ${payments.length} payments for client ${clientId} between ${formattedPaymentStartDate} and ${formattedPaymentEndDate}`
     );
+    console.log(
+      `Fetched ${creditNotes.length} credit notes for client ${clientId} between ${formattedPaymentStartDate} and ${formattedPaymentEndDate}`
+    );
+
+    if (payments.length > 0) {
+      console.log("Sample payment data:", JSON.stringify(payments[0], null, 2));
+    }
+    if (creditNotes.length > 0) {
+      console.log(
+        "Sample credit note data:",
+        JSON.stringify(creditNotes[0], null, 2)
+      );
+    }
 
     const statementData = {
       statement_key: result.rows[0].statement_key,
@@ -165,8 +227,19 @@ const getStatementDetails = async (statementId) => {
           amount: Number.parseFloat(row.invoice_amount || 0),
           task: row.invoice_task,
           invoice_num: row.invoice_num,
+          pickup: row.pickup,
+          dropoff: row.dropoff,
+        })),
+      addons: result.rows
+        .filter((row) => row.addon_id !== null)
+        .map((row) => ({
+          addon_id: row.addon_id,
+          date: row.addon_date,
+          amount: Number.parseFloat(row.addon_amount || 0),
+          items: row.addon_items,
         })),
       payments: payments,
+      credit_notes: creditNotes,
     };
 
     return { success: true, data: statementData };

@@ -1,329 +1,338 @@
 "use client"
-import { useState, useEffect } from "react";
-import { useNavigate, useLocation } from "react-router-dom";
-import axios from "axios";
-import "../css/PO.css";
+
+import { useState, useEffect } from "react"
+import { useNavigate, useLocation } from "react-router-dom"
+import { Plus, Trash2 } from "lucide-react"
+import api from "../../../../api.js"
+import "../css/PO.css"
 import CompanyHeader from "../../../../components/CompanyHeader"
 
 const POForm = () => {
-  const navigate = useNavigate();
-  const location = useLocation();
-  const { categoryId, categoryName } = location.state || {};
+  const navigate = useNavigate()
+  const location = useLocation()
+  const { categoryId, categoryName } = location.state || {}
 
-  const [suppliers, setSuppliers] = useState([]);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState(null);
+  const [suppliers, setSuppliers] = useState([])
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState(null)
+  const [trucks, setTrucks] = useState([]) 
+  const isFuelExpense = categoryId === 5 || categoryId === "5"
 
-  const [formData, setFormData] = useState({
+  const [headerData, setHeaderData] = useState({
     supplier: "",
     date: new Date().toISOString().split("T")[0],
     attentionTo: "",
     receivedBy: "",
     regNo: "",
     subbie: "",
-    description: "",
-    quantity: "",
-    unitPrice: "",
-  });
+  })
 
-  const [amount, setAmount] = useState(0);
-  const [subtotal, setSubtotal] = useState(0);
-  const [vat, setVat] = useState(0);
-  const [total, setTotal] = useState(0);
+  const [lineItems, setLineItems] = useState([
+    {
+      id: 1,
+      expenseType: categoryName || "",
+      expenseTypeId: categoryId || "",
+      description: "",
+      trucks: "",
+    },
+  ])
+
   useEffect(() => {
     if (categoryId) {
       const fetchSuppliers = async () => {
         try {
-          setLoading(true);
-          const response = await axios.get(`http://localhost:5000/api/po-form/suppliers/${categoryId}`);
-          setSuppliers(response.data);
-          setError(null);
+          setLoading(true)
+          const response = await api.get(`/api/po-form/suppliers/${categoryId}`)
+          setSuppliers(response.data)
+          setError(null)
         } catch (err) {
-          setError("Failed to load suppliers. Please try again.");
-          console.error("Error fetching suppliers:", err);
+          setError("Failed to load suppliers. Please try again.")
+          console.error("Error fetching suppliers:", err)
         } finally {
-          setLoading(false);
+          setLoading(false)
         }
-      };
-
-      fetchSuppliers();
+      }
+      fetchSuppliers()
     }
-  }, [categoryId]);
+  }, [categoryId])
 
   useEffect(() => {
-    const calculateAmounts = async () => {
-      const qty = Number.parseFloat(formData.quantity) || 0;
-      const price = Number.parseFloat(formData.unitPrice) || 0;
-
-      if (qty > 0 && price > 0) {
+    if (isFuelExpense) {
+      const fetchTrucks = async () => {
         try {
-          const response = await axios.post("http://localhost:5000/api/po-form/calculate", {
-            quantity: qty,
-            unitPrice: price,
-          });
-
-          const { amount, subtotal, vat, total } = response.data;
-          setAmount(Number.parseFloat(amount));
-          setSubtotal(Number.parseFloat(subtotal));
-          setVat(Number.parseFloat(vat));
-          setTotal(Number.parseFloat(total));
+          const response = await api.get("/api/po-form/trucks")
+          setTrucks(response.data)
         } catch (err) {
-          console.error("Error calculating amounts:", err);
+          console.error("Error fetching trucks:", err)
+          setError("Failed to load trucks. Please try again.")
         }
-      } else {
-        setAmount(0);
-        setSubtotal(0);
-        setVat(0);
-        setTotal(0);
       }
-    };
+      fetchTrucks()
+    }
+  }, [isFuelExpense])
 
-    calculateAmounts();
-  }, [formData.quantity, formData.unitPrice]);
-
-  const handleInputChange = (e) => {
-    const { name, value } = e.target;
-    if ((name === "quantity" || name === "unitPrice") && value < 0) {
-    return;
-  }
-    setFormData({
-      ...formData,
+  const handleHeaderChange = (e) => {
+    const { name, value } = e.target
+    setHeaderData({
+      ...headerData,
       [name]: value,
-    });
-  };
+    })
+  }
+
+  const handleLineItemChange = (id, field, value) => {
+    setLineItems((prevItems) =>
+      prevItems.map((item) =>
+        item.id === id ? { ...item, [field]: value } : item
+      )
+    )
+  }
+
+  const addLineItem = () => {
+    const newId = Math.max(...lineItems.map((item) => item.id)) + 1
+    setLineItems([
+      ...lineItems,
+      {
+        id: newId,
+        expenseType: categoryName || "",
+        expenseTypeId: categoryId || "",
+        description: "",
+        trucks: "",
+      },
+    ])
+  }
+
+  const deleteLineItem = (id) => {
+    if (lineItems.length > 1) {
+      setLineItems(lineItems.filter((item) => item.id !== id))
+    }
+  }
 
   const handleBack = () => {
-    navigate("/Creditors/CreatePO");
-  };
+    navigate("/Creditors/CreatePO")
+  }
 
-  const handleSubmit = async (e) => {
-    e.preventDefault();
+const handleSubmit = async (e) => {
+  e.preventDefault()
+  if (!headerData.supplier) {
+    alert("Please select a supplier")
+    return
+  }
+  if (lineItems.some((item) => !item.description || !item.trucks)) {
+    alert("Please fill in all required fields for all line items")
+    return
+  }
 
-    if (!formData.supplier) {
-      alert("Please select a supplier");
-      return;
+  try {
+    setLoading(true)
+    const purchaseOrderData = {
+      ...headerData,
+      supplierId: Number.parseInt(headerData.supplier),
+      lineItems: lineItems.map((item) => {
+        const truckId = isFuelExpense ? Number.parseInt(item.trucks) : null
+        console.log(`Submitting line item: expenseTypeId=${item.expenseTypeId}, truckid=${truckId}, quantity=${isFuelExpense ? 0 : Number.parseInt(item.trucks)}`)
+        return {
+          expenseTypeId: item.expenseTypeId,
+          description: item.description,
+          quantity: isFuelExpense ? 0 : Number.parseInt(item.trucks),
+          truckid: isFuelExpense && item.trucks ? truckId : null,
+        }
+      }),
     }
+    console.log("Purchase Order Data:", JSON.stringify(purchaseOrderData, null, 2))
+    const response = await api.post("/api/po-form/create-multiple", purchaseOrderData)
+    navigate("/Creditors/CreditorsOther")
+  } catch (err) {
+    setError("Failed to create purchase order. Please try again.")
+    console.error("Error creating purchase order:", err)
+  } finally {
+    setLoading(false)
+  }
+}
 
-    if (!formData.quantity || !formData.unitPrice || !formData.description) {
-      alert("Please fill in all required fields");
-      return;
-    }
+  return (
+    <div className="po-form-wrapper">
+      <div className="po-form-container">
+        <CompanyHeader />
+        <button className="back-button" onClick={handleBack}>
+          Back
+        </button>
 
-    try {
-      setLoading(true);
-      const response = await axios.post("http://localhost:5000/api/po-form/create", {
-        expenseTypeId: categoryId,
-        supplierId: formData.supplier,
-        regNo: formData.regNo,
-        attentionTo: formData.attentionTo,
-        receivedBy: formData.receivedBy,
-        quantity: formData.quantity,
-        unitPrice: formData.unitPrice,
-        description: formData.description,
-        subbie: formData.subbie,
-        date: formData.date,
-        total,
-      });
-      navigate("/Creditors/CreditorsOther")
-    } catch (err) {
-      setError("Failed to create purchase order. Please try again.");
-      console.error("Error creating purchase order:", err);
-    } finally {
-      setLoading(false);
-    }
-  };
+        <form onSubmit={handleSubmit}>
+          <div className="form-section">
+            <div className="form-row">
+              <div className="form-group">
+                <label htmlFor="supplier">Supplier</label>
+                <select
+                  id="supplier"
+                  name="supplier"
+                  className="dropdown"
+                  value={headerData.supplier}
+                  onChange={handleHeaderChange}
+                  required
+                >
+                  <option value="">Select Supplier</option>
+                  {suppliers.map((supplier) => (
+                    <option key={supplier.supplier_id} value={supplier.supplier_id}>
+                      {supplier.supplier}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div className="form-group">
+                <label htmlFor="date">Date</label>
+                <input
+                  type="date"
+                  id="date"
+                  name="date"
+                  className="form-control"
+                  value={headerData.date}
+                  onChange={handleHeaderChange}
+                  min={new Date().toISOString().split("T")[0]}
+                  required
+                />
+              </div>
+              <div className="form-group">
+                <label htmlFor="attentionTo">Att</label>
+                <input
+                  type="text"
+                  id="attentionTo"
+                  name="attentionTo"
+                  className="form-control"
+                  value={headerData.attentionTo}
+                  onChange={handleHeaderChange}
+                  required
+                />
+              </div>
+              <div className="form-group">
+                <label htmlFor="receivedBy">Received by</label>
+                <input
+                  type="text"
+                  id="receivedBy"
+                  name="receivedBy"
+                  className="form-control"
+                  value={headerData.receivedBy}
+                  onChange={handleHeaderChange}
+                  required
+                />
+              </div>
+            </div>
+            <div className="form-row">
+              <div className="form-group">
+                <label htmlFor="regNo">Ref/Reg No</label>
+                <input
+                  type="text"
+                  id="regNo"
+                  name="regNo"
+                  className="form-control"
+                  value={headerData.regNo}
+                  onChange={handleHeaderChange}
+                  required
+                />
+              </div>
+              <div className="form-group">
+                <label htmlFor="subbie">Subbie</label>
+                <input
+                  type="text"
+                  id="subbie"
+                  name="subbie"
+                  className="form-control"
+                  value={headerData.subbie}
+                  onChange={handleHeaderChange}
+                />
+              </div>
+            </div>
+          </div>
 
-return (
-  <div className="po-form-wrapper">
-    <div className="po-form-container">
-      <CompanyHeader />
-
-      <button className="back-button" onClick={handleBack}>
-        Back
+<div className="line-items">
+  <div className="line-items-header">
+    <h3>Line Items</h3>
+    {!isFuelExpense && (
+      <button type="button" className="add-item-btn" onClick={addLineItem}>
+        <Plus size={16} />
+        Add Item
       </button>
+    )}
+  </div>
 
-      <form onSubmit={handleSubmit}>
-        <div className="form-section">
-          <div className="form-row">
-            <div className="form-group">
-              <label htmlFor="supplier">Supplier</label>
+  <table className="line-items-table">
+    <thead>
+      <tr>
+        <th>Expense Type</th>
+        <th>Description</th>
+        {isFuelExpense ? <th>Trucks</th> : <th>Quantity</th>}
+        {!isFuelExpense && <th>Actions</th>}
+      </tr>
+    </thead>
+    <tbody>
+      {lineItems.map((item) => (
+        <tr key={item.id}>
+          <td>
+            <input type="text" value={item.expenseType} readOnly />
+          </td>
+          <td>
+            <input
+              type="text"
+              value={item.description}
+              onChange={(e) => handleLineItemChange(item.id, "description", e.target.value)}
+              required
+            />
+          </td>
+          <td>
+            {isFuelExpense ? (
               <select
-                id="supplier"
-                name="supplier"
-                className="dropdown"
-                value={formData.supplier}
-                onChange={handleInputChange}
+                value={item.trucks}
+                onChange={(e) => handleLineItemChange(item.id, "trucks", e.target.value)}
+                className="form-control"
                 required
               >
-                <option value="">Select Supplier</option>
-                {suppliers.map((supplier) => (
-                  <option key={supplier.supplier_id} value={supplier.supplier_id}>
-                    {supplier.supplier}
+                <option value="">Select Truck</option>
+                {trucks.map((truck) => (
+                  <option key={truck.truckid} value={truck.truckid}>
+                    {truck.truckregnum}
                   </option>
                 ))}
               </select>
-            </div>
-
-            <div className="form-group">
-              <label htmlFor="date">Date</label>
+            ) : (
               <input
-                type="date"
-                id="date"
-                name="date"
+                type="number"
+                value={item.trucks}
+                onChange={(e) => handleLineItemChange(item.id, "trucks", e.target.value)}
                 className="form-control"
-                value={formData.date}
-                onChange={handleInputChange}
-                min={new Date().toISOString().split("T")[0]}  
+                min="1"
                 required
               />
-            </div>
+            )}
+          </td>
+          {!isFuelExpense && (
+            <td>
+              <button
+                type="button"
+                className="delete-item-btn"
+                onClick={() => deleteLineItem(item.id)}
+                disabled={lineItems.length === 1}
+                title="Delete item"
+              >
+                <Trash2 size={16} />
+              </button>
+            </td>
+          )}
+        </tr>
+      ))}
+    </tbody>
+  </table>
+</div>
 
-            <div className="form-group">
-              <label htmlFor="attentionTo">Att</label>
-              <input
-                type="text"
-                id="attentionTo"
-                name="attentionTo"
-                className="form-control"
-                value={formData.attentionTo}
-                onChange={handleInputChange}
-                required
-              />
-            </div>
-
-            <div className="form-group">
-              <label htmlFor="receivedBy">Received by</label>
-              <input
-                type="text"
-                id="receivedBy"
-                name="receivedBy"
-                className="form-control"
-                value={formData.receivedBy}
-                onChange={handleInputChange}
-                required
-              />
-            </div>
+          <div className="submit-section">
+            <button type="submit" className="submit-btn" disabled={loading}>
+              {loading ? "Submitting..." : "Submit Purchase Order"}
+            </button>
           </div>
 
-          <div className="form-row">
-            <div className="form-group">
-              <label htmlFor="regNo">Ref/Reg No</label>
-              <input
-                type="text"
-                id="regNo"
-                name="regNo"
-                className="form-control"
-                value={formData.regNo}
-                onChange={handleInputChange}
-                required
-              />
-            </div>
-
-            <div className="form-group">
-              <label htmlFor="subbie">Subbie</label>
-              <input
-                type="text"
-                id="subbie"
-                name="subbie"
-                className="form-control"
-                value={formData.subbie}
-                onChange={handleInputChange}
-              />
-            </div>
-          </div>
-        </div>
-
-        <div className="line-items">
-          <table className="line-items-table">
-            <thead>
-              <tr>
-                <th>Expense Type</th>
-                <th>Description</th>
-                <th>Quantity</th>
-                <th>Unit Price</th>
-                <th>Amount</th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr>
-                <td>
-                  <input
-                    type="text"
-                    value={categoryName || ''}
-                    readOnly
-                  />
-                </td>
-                <td>
-                  <input
-                    type="text"
-                    name="description"
-                    value={formData.description}
-                    onChange={handleInputChange}
-                    required
-                  />
-                </td>
-                <td>
-                  <input
-                    type="number"
-                    name="quantity"
-                    value={formData.quantity}
-                    onChange={handleInputChange}
-                    required
-                  />
-                </td>
-                <td>
-                  <input
-                    type="number"
-                    name="unitPrice"
-                    value={formData.unitPrice}
-                    onChange={handleInputChange}
-                    required
-                  />
-                </td>
-                <td>
-                  <input type="text" value={`R ${amount.toFixed(2)}`} readOnly />
-                </td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
-
-        <div className="totals-section">
-          <table className="totals-table">
-            <tbody>
-              <tr>
-                <td className="label-cell">Sub-Total</td>
-                <td className="amount-cell">
-                  <input type="text" value={`R ${subtotal.toFixed(2)}`} readOnly />
-                </td>
-              </tr>
-              <tr>
-                <td className="label-cell">VAT(15%)</td>
-                <td className="amount-cell">
-                  <input type="text" value={`R ${vat.toFixed(2)}`} readOnly />
-                </td>
-              </tr>
-              <tr>
-                <td className="label-cell">Total</td>
-                <td className="amount-cell">
-                  <input type="text" value={`R ${total.toFixed(2)}`} readOnly />
-                </td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
-
-        <div className="submit-section">
-          <button type="submit" className="submit-btn" disabled={loading}>
-            {loading ? "Submitting..." : "Submit"}
-          </button>
-        </div>
-
-        {error && <div className="error-message">{error}</div>}
-      </form>
+          {error && <div className="error-message">{error}</div>}
+        </form>
+      </div>
     </div>
-    </div>
-  );
-};
+  )
+}
 
-export default POForm;
+export default POForm

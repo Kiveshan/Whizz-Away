@@ -11,5 +11,10 @@
   },
   "devDependencies": {
     "concurrently": "^9.1.2"
+  },
+  "dependencies": {
+    "exceljs": "^4.4.0",
+    "react-select": "^5.10.2",
+    "sweetalert2": "^11.22.2"
   }
 }

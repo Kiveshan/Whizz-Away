@@ -1,10 +1,11 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import "../css/register.css";
-import { Eye, EyeOff } from "lucide-react"; // Import Eye icons
+import styles from "../css/register.module.css"; // Updated to CSS Module
+import { Eye, EyeOff } from "lucide-react";
 
 const Register = ({ switchToLogin, closePopup }) => {
+  const API_BASE_URL = process.env.REACT_APP_API_URL || "http://localhost:5000";
   const [formData, setFormData] = useState({
     name: "",
     surname: "",
@@ -15,8 +16,8 @@ const Register = ({ switchToLogin, closePopup }) => {
     cluster_box: "",
     address: "",
     suburb: "",
-    cell_num: "",
-    cell_num2: "",
+    cellnum: "",
+    cellnum2: "",
     vat_reg_num: "",
     account_num: "",
     name_of_acc: "",
@@ -27,12 +28,12 @@ const Register = ({ switchToLogin, closePopup }) => {
   });
 
   const [errorMessage, setErrorMessage] = useState("");
-  const [successMessage, setSuccessMessage] = useState(""); // Add success message state
+  const [successMessage, setSuccessMessage] = useState("");
   const [showErrorPopup, setShowErrorPopup] = useState(false);
-  const [showSuccessPopup, setShowSuccessPopup] = useState(false); // Add success popup state
+  const [showSuccessPopup, setShowSuccessPopup] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [isCheckingEmail, setIsCheckingEmail] = useState(false);
-  const [showPassword, setShowPassword] = useState(false); // State for password visibility
+  const [showPassword, setShowPassword] = useState(false);
   const [passwordStrength, setPasswordStrength] = useState({
     length: false,
     lowercase: false,
@@ -42,12 +43,10 @@ const Register = ({ switchToLogin, closePopup }) => {
     valid: false,
   });
 
-  // Toggle password visibility
   const togglePasswordVisibility = () => {
     setShowPassword(!showPassword);
   };
 
-  // Close error popup after 5 seconds
   useEffect(() => {
     let timer;
     if (showErrorPopup) {
@@ -58,7 +57,6 @@ const Register = ({ switchToLogin, closePopup }) => {
     return () => clearTimeout(timer);
   }, [showErrorPopup]);
 
-  // Handle success popup and redirect
   useEffect(() => {
     let timer;
     if (showSuccessPopup) {
@@ -66,36 +64,29 @@ const Register = ({ switchToLogin, closePopup }) => {
         setShowSuccessPopup(false);
         closePopup();
         switchToLogin();
-      }, 3000); // Redirect after 3 seconds
+      }, 3000);
     }
     return () => clearTimeout(timer);
   }, [showSuccessPopup, closePopup, switchToLogin]);
 
-  // Handle input change with validation
   const handleChange = (e) => {
     const { name, value } = e.target;
 
-    // Fields that should only accept numbers
     const numericFields = [
-      "cell_num",
-      "cell_num2",
+      "cellnum",
+      "cellnum2",
       "vat_reg_num",
       "account_num",
       "branch_code",
       "company_reg_num",
     ];
 
-    // If this is a numeric field and contains non-numeric characters, don't update
     if (numericFields.includes(name) && value !== "" && !/^\d+$/.test(value)) {
       return;
     }
 
-    // Special validation for SWIFT code
     if (name === "swift_code" && value !== "") {
-      // Convert to uppercase for SWIFT code
       const upperValue = value.toUpperCase();
-
-      // Update with uppercase value
       setFormData((prev) => ({
         ...prev,
         [name]: upperValue,
@@ -103,7 +94,6 @@ const Register = ({ switchToLogin, closePopup }) => {
       return;
     }
 
-    // Password strength validation
     if (name === "password") {
       const length = value.length >= 8;
       const lowercase = /[a-z]/.test(value);
@@ -127,19 +117,17 @@ const Register = ({ switchToLogin, closePopup }) => {
       [name]: value,
     }));
 
-    // Clear error message when user changes input
     if (errorMessage) {
       setErrorMessage("");
       setShowErrorPopup(false);
     }
   };
 
-  // Function to check if email already exists
   const checkEmailExists = async (email) => {
     try {
       setIsCheckingEmail(true);
       const response = await fetch(
-        `http://localhost:5000/check-email?email=${encodeURIComponent(email)}`
+        `${API_BASE_URL}/check-email?email=${encodeURIComponent(email)}`
       );
       const data = await response.json();
 
@@ -159,42 +147,29 @@ const Register = ({ switchToLogin, closePopup }) => {
     }
   };
 
-  // Validate SWIFT code
   const validateSwiftCode = (code) => {
-    if (!code) return true; // Optional field
-
-    // SWIFT code must be either 8 or 11 characters
+    if (!code) return true;
     if (code.length !== 8 && code.length !== 11) {
       return "SWIFT code must be either 8 or 11 characters long";
     }
-
-    // First 4 characters: Bank code (letters)
     if (!/^[A-Z]{4}/.test(code)) {
       return "First 4 characters of SWIFT code must be letters";
     }
-
-    // Next 2 characters: Country code (letters)
     if (!/^[A-Z]{4}[A-Z]{2}/.test(code)) {
       return "Characters 5-6 of SWIFT code must be letters (country code)";
     }
-
-    // Following 2 characters: Location code (letters or numbers)
     if (!/^[A-Z]{4}[A-Z]{2}[A-Z0-9]{2}/.test(code)) {
       return "Characters 7-8 of SWIFT code must be letters or numbers";
     }
-
-    // If 11 characters, last 3 must be letters or numbers (branch code)
     if (
       code.length === 11 &&
       !/^[A-Z]{4}[A-Z]{2}[A-Z0-9]{2}[A-Z0-9]{3}$/.test(code)
     ) {
       return "Last 3 characters of SWIFT code must be letters or numbers";
     }
-
     return true;
   };
 
-  // Validate password
   const validatePassword = (password) => {
     if (!password) return "Password is required";
     if (password.length < 8)
@@ -213,7 +188,6 @@ const Register = ({ switchToLogin, closePopup }) => {
   const handleRegister = async (e) => {
     e.preventDefault();
 
-    // Basic validation
     if (
       !formData.name ||
       !formData.surname ||
@@ -225,7 +199,6 @@ const Register = ({ switchToLogin, closePopup }) => {
       return;
     }
 
-    // Email format validation
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     if (!emailRegex.test(formData.email)) {
       setErrorMessage("Please enter a valid email address.");
@@ -233,7 +206,6 @@ const Register = ({ switchToLogin, closePopup }) => {
       return;
     }
 
-    // Password validation
     const passwordValidation = validatePassword(formData.password);
     if (passwordValidation !== true) {
       setErrorMessage(passwordValidation);
@@ -241,10 +213,9 @@ const Register = ({ switchToLogin, closePopup }) => {
       return;
     }
 
-    // Numeric fields validation
     const numericFields = [
-      { name: "cell_num", label: "Cell Number", required: true },
-      { name: "cell_num2", label: "Alternate Cell", required: false },
+      { name: "cellnum", label: "Cell Number", required: true },
+      { name: "cellnum2", label: "Alternate Cell", required: false },
       {
         name: "vat_reg_num",
         label: "VAT Registration Number",
@@ -265,7 +236,6 @@ const Register = ({ switchToLogin, closePopup }) => {
         setShowErrorPopup(true);
         return;
       }
-
       if (formData[field.name] && !/^\d+$/.test(formData[field.name])) {
         setErrorMessage(`${field.label} must contain only numbers.`);
         setShowErrorPopup(true);
@@ -273,20 +243,18 @@ const Register = ({ switchToLogin, closePopup }) => {
       }
     }
 
-    // Cell number length validation
-    if (formData.cell_num && formData.cell_num.length !== 10) {
+    if (formData.cellnum && formData.cellnum.length !== 10) {
       setErrorMessage("Cell Number must be exactly 10 digits.");
       setShowErrorPopup(true);
       return;
     }
 
-    if (formData.cell_num2 && formData.cell_num2.length !== 10) {
+    if (formData.cellnum2 && formData.cellnum2.length !== 10) {
       setErrorMessage("Alternate Cell Number must be exactly 10 digits.");
       setShowErrorPopup(true);
       return;
     }
 
-    // SWIFT code validation
     const swiftValidation = validateSwiftCode(formData.swift_code);
     if (swiftValidation !== true) {
       setErrorMessage(swiftValidation);
@@ -294,16 +262,15 @@ const Register = ({ switchToLogin, closePopup }) => {
       return;
     }
 
-    // Check if email already exists before submitting
     const emailExists = await checkEmailExists(formData.email);
     if (emailExists) {
-      return; // Stop form submission if email exists
+      return;
     }
 
     setIsLoading(true);
 
     try {
-      const response = await fetch("http://localhost:5000/register", {
+      const response = await fetch(`${API_BASE_URL}/register`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(formData),
@@ -312,14 +279,11 @@ const Register = ({ switchToLogin, closePopup }) => {
       const data = await response.json();
 
       if (response.ok) {
-        // Replace alert with success popup
         setSuccessMessage(
           "Registration successful! Your account is pending approval."
         );
         setShowSuccessPopup(true);
-        // The redirect will happen automatically after the timeout
       } else {
-        // Handle specific error for email already registered
         if (data.message === "Email already registered") {
           setErrorMessage(
             "This email is already registered. Please use a different email or login."
@@ -346,49 +310,46 @@ const Register = ({ switchToLogin, closePopup }) => {
   };
 
   return (
-    <div className="register-container">
-      {/* Error Popup */}
+    <div className={styles.registerContainer}>
       {showErrorPopup && errorMessage && (
-        <div className="error-popup">
-          <div className="error-popup-content">
+        <div className={styles.errorPopup}>
+          <div className={styles.errorPopupContent}>
             <span
-              className="close-popup"
+              className={styles.closePopup}
               onClick={() => setShowErrorPopup(false)}
             >
-              &times;
+              ×
             </span>
             <p>{errorMessage}</p>
           </div>
         </div>
       )}
 
-      {/* Success Popup */}
       {showSuccessPopup && successMessage && (
-        <div className="success-popup">
-          <div className="success-popup-content">
+        <div className={styles.successPopup}>
+          <div className={styles.successPopupContent}>
             <span
-              className="close-popup"
+              className={styles.closePopup}
               onClick={() => setShowSuccessPopup(false)}
             >
-              &times;
+              ×
             </span>
             <p>{successMessage}</p>
           </div>
         </div>
       )}
 
-      <div className="register-form">
+      <div className={styles.registerForm}>
         <h1
-          className="register-title"
+          className={styles.registerTitle}
           style={{ marginBottom: "10px", marginTop: "6px" }}
         >
           Register
         </h1>
 
         <form onSubmit={handleRegister}>
-          {/* Row 1: Personal Information */}
-          <div className="form-row four-fields">
-            <div className="form-group">
+          <div className={styles.formRow + " " + styles.fourFields}>
+            <div className={styles.formGroup}>
               <label>First Name</label>
               <input
                 type="text"
@@ -396,11 +357,11 @@ const Register = ({ switchToLogin, closePopup }) => {
                 value={formData.name}
                 onChange={handleChange}
                 placeholder="First Name"
-                className="form-input"
+                className={styles.formInput}
                 required
               />
             </div>
-            <div className="form-group">
+            <div className={styles.formGroup}>
               <label>Last Name</label>
               <input
                 type="text"
@@ -408,11 +369,11 @@ const Register = ({ switchToLogin, closePopup }) => {
                 value={formData.surname}
                 onChange={handleChange}
                 placeholder="Surname"
-                className="form-input"
+                className={styles.formInput}
                 required
               />
             </div>
-            <div className="form-group">
+            <div className={styles.formGroup}>
               <label>Email</label>
               <input
                 type="email"
@@ -423,45 +384,45 @@ const Register = ({ switchToLogin, closePopup }) => {
                   e.target.value && checkEmailExists(e.target.value)
                 }
                 placeholder="Email"
-                className="form-input"
+                className={styles.formInput}
                 required
               />
             </div>
-            <div className="form-group">
+            <div className={styles.formGroup}>
               <label>Password</label>
-              <div className="password-input-container">
+              <div className={styles.passwordInputContainer}>
                 <input
                   type={showPassword ? "text" : "password"}
                   name="password"
                   value={formData.password}
                   onChange={handleChange}
                   placeholder="Password"
-                  className={`form-input ${
+                  className={`${styles.formInput} ${
                     formData.password
                       ? passwordStrength.valid
-                        ? "valid-password"
-                        : "invalid-password"
+                        ? styles.validPassword
+                        : styles.invalidPassword
                       : ""
                   }`}
                   required
                 />
                 <button
                   type="button"
-                  className="password-toggle-btn"
+                  className={styles.passwordToggleBtn}
                   onClick={togglePasswordVisibility}
                   tabIndex="-1"
                   aria-label={showPassword ? "Hide password" : "Show password"}
                 >
                   {showPassword ? (
-                    <EyeOff className="password-eye-icon" size={18} />
+                    <EyeOff className={styles.passwordEyeIcon} size={18} />
                   ) : (
-                    <Eye className="password-eye-icon" size={18} />
+                    <Eye className={styles.passwordEyeIcon} size={18} />
                   )}
                 </button>
                 {formData.password && (
                   <span
-                    className={`password-indicator ${
-                      passwordStrength.valid ? "valid" : "invalid"
+                    className={`${styles.passwordIndicator} ${
+                      passwordStrength.valid ? styles.valid : styles.invalid
                     }`}
                   >
                     {passwordStrength.valid ? "✓" : "✕"}
@@ -474,9 +435,8 @@ const Register = ({ switchToLogin, closePopup }) => {
             </div>
           </div>
 
-          {/* Row 2: Company Information */}
-          <div className="form-row four-fields">
-            <div className="form-group">
+          <div className={styles.formRow + " " + styles.fourFields}>
+            <div className={styles.formGroup}>
               <label>Company Name</label>
               <input
                 type="text"
@@ -484,11 +444,11 @@ const Register = ({ switchToLogin, closePopup }) => {
                 value={formData.companyname}
                 onChange={handleChange}
                 placeholder="Company Name"
-                className="form-input"
+                className={styles.formInput}
                 required
               />
             </div>
-            <div className="form-group">
+            <div className={styles.formGroup}>
               <label>Company Reg. No.</label>
               <input
                 type="text"
@@ -496,14 +456,14 @@ const Register = ({ switchToLogin, closePopup }) => {
                 value={formData.company_reg_num}
                 onChange={handleChange}
                 placeholder="Reg. No."
-                className="form-input"
+                className={styles.formInput}
                 required
               />
               <small style={{ color: "#666", fontSize: "11px" }}>
                 Numbers only
               </small>
             </div>
-            <div className="form-group">
+            <div className={styles.formGroup}>
               <label>VAT Reg No.</label>
               <input
                 type="text"
@@ -511,22 +471,22 @@ const Register = ({ switchToLogin, closePopup }) => {
                 value={formData.vat_reg_num}
                 onChange={handleChange}
                 placeholder="VAT Number"
-                className="form-input"
+                className={styles.formInput}
                 maxLength={20}
               />
               <small style={{ color: "#666", fontSize: "11px" }}>
                 Numbers only
               </small>
             </div>
-            <div className="form-group">
+            <div className={styles.formGroup}>
               <label>Cell Number</label>
               <input
                 type="text"
-                name="cell_num"
-                value={formData.cell_num}
+                name="cellnum"
+                value={formData.cellnum}
                 onChange={handleChange}
                 placeholder="Cell Number"
-                className="form-input"
+                className={styles.formInput}
                 required
                 maxLength={10}
               />
@@ -536,24 +496,23 @@ const Register = ({ switchToLogin, closePopup }) => {
             </div>
           </div>
 
-          {/* Row 3: Contact Information */}
-          <div className="form-row four-fields">
-            <div className="form-group">
+          <div className={styles.formRow + " " + styles.fourFields}>
+            <div className={styles.formGroup}>
               <label>Alternate Cell</label>
               <input
                 type="text"
-                name="cell_num2"
-                value={formData.cell_num2}
+                name="cellnum2"
+                value={formData.cellnum2}
                 onChange={handleChange}
                 placeholder="Alternate Cell"
-                className="form-input"
+                className={styles.formInput}
                 maxLength={10}
               />
               <small style={{ color: "#666", fontSize: "11px" }}>
                 10 digits, numbers only
               </small>
             </div>
-            <div className="form-group">
+            <div className={styles.formGroup}>
               <label>Address</label>
               <input
                 type="text"
@@ -561,11 +520,11 @@ const Register = ({ switchToLogin, closePopup }) => {
                 value={formData.address}
                 onChange={handleChange}
                 placeholder="Address"
-                className="form-input"
+                className={styles.formInput}
                 required
               />
             </div>
-            <div className="form-group">
+            <div className={styles.formGroup}>
               <label>Suburb</label>
               <input
                 type="text"
@@ -573,11 +532,11 @@ const Register = ({ switchToLogin, closePopup }) => {
                 value={formData.suburb}
                 onChange={handleChange}
                 placeholder="Suburb"
-                className="form-input"
+                className={styles.formInput}
                 required
               />
             </div>
-            <div className="form-group">
+            <div className={styles.formGroup}>
               <label>Cluster Box</label>
               <input
                 type="text"
@@ -585,14 +544,13 @@ const Register = ({ switchToLogin, closePopup }) => {
                 value={formData.cluster_box}
                 onChange={handleChange}
                 placeholder="Cluster Box"
-                className="form-input"
+                className={styles.formInput}
               />
             </div>
           </div>
 
-          {/* Row 4: Banking Information */}
-          <div className="form-row three-fields">
-            <div className="form-group">
+          <div className={styles.formRow + " " + styles.threeFields}>
+            <div className={styles.formGroup}>
               <label>Account Number</label>
               <input
                 type="text"
@@ -600,14 +558,14 @@ const Register = ({ switchToLogin, closePopup }) => {
                 value={formData.account_num}
                 onChange={handleChange}
                 placeholder="Account Number"
-                className="form-input"
+                className={styles.formInput}
                 required
               />
               <small style={{ color: "#666", fontSize: "11px" }}>
                 Numbers only
               </small>
             </div>
-            <div className="form-group">
+            <div className={styles.formGroup}>
               <label>Account Name</label>
               <input
                 type="text"
@@ -615,11 +573,11 @@ const Register = ({ switchToLogin, closePopup }) => {
                 value={formData.name_of_acc}
                 onChange={handleChange}
                 placeholder="Name of Account"
-                className="form-input"
+                className={styles.formInput}
                 required
               />
             </div>
-            <div className="form-group">
+            <div className={styles.formGroup}>
               <label>Bank</label>
               <input
                 type="text"
@@ -627,15 +585,14 @@ const Register = ({ switchToLogin, closePopup }) => {
                 value={formData.bank}
                 onChange={handleChange}
                 placeholder="Bank"
-                className="form-input"
+                className={styles.formInput}
                 required
               />
             </div>
           </div>
 
-          {/* Row 5: Banking Information (continued) */}
-          <div className="form-row three-fields">
-            <div className="form-group">
+          <div className={styles.formRow + " " + styles.threeFields}>
+            <div className={styles.formGroup}>
               <label>Branch</label>
               <input
                 type="text"
@@ -643,11 +600,11 @@ const Register = ({ switchToLogin, closePopup }) => {
                 value={formData.branch}
                 onChange={handleChange}
                 placeholder="Branch"
-                className="form-input"
+                className={styles.formInput}
                 required
               />
             </div>
-            <div className="form-group">
+            <div className={styles.formGroup}>
               <label>Branch Code</label>
               <input
                 type="text"
@@ -655,14 +612,14 @@ const Register = ({ switchToLogin, closePopup }) => {
                 value={formData.branch_code}
                 onChange={handleChange}
                 placeholder="Branch Code"
-                className="form-input"
+                className={styles.formInput}
                 required
               />
               <small style={{ color: "#666", fontSize: "11px" }}>
                 Numbers only
               </small>
             </div>
-            <div className="form-group">
+            <div className={styles.formGroup}>
               <label>SWIFT Code</label>
               <input
                 type="text"
@@ -670,7 +627,7 @@ const Register = ({ switchToLogin, closePopup }) => {
                 value={formData.swift_code}
                 onChange={handleChange}
                 placeholder="SWIFT Code (8 or 11 chars)"
-                className="form-input"
+                className={styles.formInput}
                 maxLength={11}
               />
               <small style={{ color: "#666", fontSize: "11px" }}>
@@ -680,12 +637,12 @@ const Register = ({ switchToLogin, closePopup }) => {
           </div>
 
           <div
-            className="form-actions"
+            className={styles.formActions}
             style={{ marginBottom: "-30px", marginTop: "-20px" }}
           >
             <button
               type="submit"
-              className="submit-button1"
+              className={styles.submitButton1}
               disabled={isLoading || isCheckingEmail}
             >
               {isLoading
@@ -695,9 +652,9 @@ const Register = ({ switchToLogin, closePopup }) => {
                 : "Submit"}
             </button>
           </div>
-
-          <div className="login-link" style={{ marginTop: "20px" }}>
-            <button onClick={switchToLogin} className="link-button">
+          <br />
+          <div className={styles.loginLink} style={{ marginTop: "20px" }}>
+            <button onClick={switchToLogin} className={styles.linkButton}>
               Already have a profile? Login here
             </button>
           </div>

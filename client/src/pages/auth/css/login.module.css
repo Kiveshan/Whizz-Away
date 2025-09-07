@@ -1,4 +1,5 @@
-.login-container {
+/* login.module.css */
+.loginContainer {
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -7,7 +8,7 @@
   position: relative;
 }
 
-.login-form {
+.loginForm {
   background: #bae6fd;
   padding: 2rem;
   border-radius: 8px;
@@ -16,19 +17,20 @@
   max-width: 400px;
 }
 
-.logo-container1 {
+.logoContainer1 {
   display: flex;
   justify-content: center;
   margin-bottom: 2rem;
+  margin-top: -20px;
 }
 
-.logo-image5 {
+.logoImage5 {
   width: 160px;
   height: 160px;
   object-fit: cover;
 }
 
-.form-group {
+.formGroup {
   margin-bottom: 1.5rem;
 }
 
@@ -38,7 +40,7 @@ label {
   font-weight: 500;
 }
 
-.form-input {
+.formInput {
   width: 100%;
   padding: 0.75rem;
   border: 1px solid #ddd;
@@ -46,15 +48,14 @@ label {
   font-size: 1rem;
 }
 
-/* Password input container and toggle button styles */
-.password-input-container {
+.passwordInputContainer {
   position: relative;
   display: flex;
   align-items: center;
-  width: 100%; /* Ensure container takes full width */
+  width: 100%;
 }
 
-.password-toggle-btn {
+.passwordToggleBtn {
   position: absolute;
   right: 10px;
   top: 50%;
@@ -66,42 +67,41 @@ label {
   display: flex;
   align-items: center;
   justify-content: center;
-  color: #1e3a8a; /* Match the button color */
-  z-index: 1; /* Ensure button appears above input */
+  color: #1e3a8a;
+  z-index: 1;
 }
 
-.password-toggle-btn:hover {
-  color: #1e40af; /* Match the button hover color */
+.passwordToggleBtn:hover {
+  color: #1e40af;
 }
 
-.password-toggle-btn:focus {
+.passwordToggleBtn:focus {
   outline: none;
 }
 
-.password-eye-icon {
+.passwordEyeIcon {
   width: 18px;
   height: 18px;
 }
 
-/* Make sure the password input has enough padding on the right but maintains full width */
-.password-input-container .form-input {
-  padding-right: 40px; /* Enough space for the eye icon */
+.passwordInputContainer .formInput {
+  padding-right: 40px;
   width: 100%;
-  box-sizing: border-box; /* Include padding in width calculation */
+  box-sizing: border-box;
 }
 
-.forgot-password {
+.forgotPassword {
   text-align: left;
   margin-bottom: 1.5rem;
 }
 
-.forgot-password a {
+.forgotPassword a {
   color: black;
   text-decoration: none;
   font-size: 0.875rem;
 }
 
-.login-button {
+.loginButton {
   width: 100%;
   padding: 0.75rem;
   background-color: #1e3a8a;
@@ -113,21 +113,21 @@ label {
   margin-bottom: 1.5rem;
 }
 
-.login-button:hover {
+.loginButton:hover {
   background-color: #1e40af;
 }
 
-.new-profile {
+.newProfile {
   text-align: center;
 }
 
-.new-profile a {
+.newProfile a {
   color: #3b82f6;
   text-decoration: none;
   font-size: 0.875rem;
 }
 
-.link-button {
+.linkButton {
   background: none;
   border: none;
   color: #007bff;
@@ -136,11 +136,11 @@ label {
   text-decoration: underline;
 }
 
-.link-button:hover {
+.linkButton:hover {
   color: #0056b3;
 }
 
-.error-message {
+.errorMessage {
   background-color: #f8d7da;
   color: #721c24;
   padding: 10px;
@@ -149,10 +149,9 @@ label {
   text-align: center;
 }
 
-.login-form h2 {
+.loginForm h2 {
   text-align: center;
   margin-bottom: 1.5rem;
   font-size: 1.5rem;
-
-  margin-top: 35px;
+  margin-top: -30px;
 }

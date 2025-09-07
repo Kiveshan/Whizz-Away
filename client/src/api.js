@@ -1,20 +1,78 @@
-import axios from "axios";
+import axios from "axios"
 
-// Create an Axios instance with default configuration
+const API_BASE_URL = process.env.REACT_APP_API_URL || "http://localhost:5000"
+
+// Create axios instance
 const api = axios.create({
-  baseURL: "http://localhost:5000",
+  baseURL: API_BASE_URL,
   headers: {
     "Content-Type": "application/json",
   },
-});
+  withCredentials: true, // Include credentials (cookies) with requests
+  timeout: 10000, // 10 second timeout
+})
 
-// Add request interceptor to include Authorization header
-api.interceptors.request.use((config) => {
-  const token = localStorage.getItem("token");
-  if (token) {
-    config.headers.Authorization = `Bearer ${token}`;
+// Global token expiration handler
+const handleTokenExpiration = () => {
+  console.log("Token expired, triggering auto logout...")
+
+  // Clear local storage
+  localStorage.removeItem("token")
+  localStorage.removeItem("user")
+
+  // Dispatch custom events for the global system
+  window.dispatchEvent(new CustomEvent("tokenExpired"))
+  window.dispatchEvent(new CustomEvent("userLoggedOut"))
+
+  // Redirect to login if not already there
+  if (window.location.pathname !== "/") {
+    window.location.href = "/"
   }
-  return config;
-});
+}
 
-export default api;
+// Request interceptor to add auth token
+api.interceptors.request.use(
+  (config) => {
+    const token = localStorage.getItem("token")
+    if (token) {
+      config.headers.Authorization = `Bearer ${token}`
+    }
+    return config
+  },
+  (error) => {
+    return Promise.reject(error)
+  },
+)
+
+// Response interceptor to handle token expiration
+api.interceptors.response.use(
+  (response) => {
+    return response
+  },
+  (error) => {
+    console.error("API Error:", error)
+
+    if (error.response) {
+      const { status, data } = error.response
+
+      // Check for token expiration
+      if (status === 401 || (data && data.message && data.message.includes("token"))) {
+        console.log("Token expired, triggering auto logout...")
+        handleTokenExpiration()
+        return Promise.reject(new Error("Session expired. Please log in again."))
+      }
+
+      // Handle other HTTP errors
+      const errorMessage = data?.message || data?.error || `HTTP ${status}: ${error.response.statusText}`
+      return Promise.reject(new Error(errorMessage))
+    } else if (error.request) {
+      // Network error
+      return Promise.reject(new Error("Network error - please check your connection"))
+    } else {
+      // Other errors
+      return Promise.reject(new Error(error.message || "An unexpected error occurred"))
+    }
+  },
+)
+
+export default api

@@ -7,12 +7,61 @@ import {
   getDriverWageDetails,
   getDriverInstructions,
   getDriverLegsByMonth,
+  getStoredWageData,
+  getBaseSalaryHistory,
+  getAllEmployees,
+  getAllRoles
+
 } from "../../models/wages/wageModel.js";
 import {
   getTaxAmountForDate,
   getDeductionsForDate,
 } from "../../utils/wagesUtils.js";
-
+const getStoredWageDataHandler = async (req, res) => {
+  const { employeeId } = req.params;
+  const { month, year } = req.query;
+  
+  console.log(`Route /api/stored-wage-data/${employeeId} was accessed with month=${month}, year=${year}`);
+  
+  if (!month || !year) {
+    return res.status(400).json({ error: "Month and year are required query parameters" });
+  }
+  
+  try {
+    const result = await getStoredWageData(employeeId, month, year);
+    res.json(result);
+  } catch (error) {
+    console.error(`Error fetching stored wage data for employee ${employeeId}:`, error);
+    res.status(500).json({ error: "Failed to fetch stored wage data" });
+  }
+};
+const getAllEmployeesHandler = async (req, res) => {
+  try {
+    const employees = await getAllEmployees();
+    res.status(200).json(employees);
+  } catch (error) {
+    console.error("Error fetching all employees:", error);
+    res.status(500).json({ error: "Failed to fetch employees" });
+  }
+};
+const getBaseSalaryHistoryHandler = async (req, res) => {
+  const { employeeId } = req.params;
+  const { month, year } = req.query;
+  
+  console.log(`Route /api/base-salary-history/${employeeId} was accessed with month=${month}, year=${year}`);
+  
+  if (!month || !year) {
+    return res.status(400).json({ error: "Month and year are required query parameters" });
+  }
+  
+  try {
+    const result = await getBaseSalaryHistory(employeeId, month, year);
+    res.json(result);
+  } catch (error) {
+    console.error(`Error fetching base salary history for employee ${employeeId}:`, error);
+    res.status(500).json({ error: "Failed to fetch base salary history" });
+  }
+};
 const saveWageDataHandler = async (req, res) => {
   const { employeeId, month, year, totalEarnings, totalDeductions, netPay } =
     req.body;
@@ -213,7 +262,15 @@ const getDriverLegsByMonthHandler = async (req, res) => {
     res.status(500).json({ error: "Failed to fetch driver legs by month" });
   }
 };
-
+const getAllRolesHandler = async (req, res) => {
+  try {
+    const roles = await getAllRoles();
+    res.status(200).json(roles);
+  } catch (error) {
+    console.error("Error fetching roles:", error);
+    res.status(500).json({ error: "Failed to fetch roles" });
+  }
+};
 export {
   saveWageDataHandler,
   checkWageSlipHandler,
@@ -223,4 +280,8 @@ export {
   getDriverWageDetailsHandler,
   getDriverInstructionsHandler,
   getDriverLegsByMonthHandler,
+  getStoredWageDataHandler,
+  getBaseSalaryHistoryHandler,
+   getAllEmployeesHandler,
+   getAllRolesHandler
 };

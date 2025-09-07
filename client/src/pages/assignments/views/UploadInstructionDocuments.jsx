@@ -15,7 +15,8 @@ const UploadInstructionDocuments = () => {
   const [documents, setDocuments] = useState([]);
   const [selectedFile, setSelectedFile] = useState(null);
   const [docName, setDocName] = useState("");
-  const [docType, setDocType] = useState("Instruction Document");
+  // const [docType, setDocType] = useState("Instruction Document");
+  const [docType, setDocType] = useState("Delivery Note");
   const [legNumber, setLegNumber] = useState("");
   const [loading, setLoading] = useState(false);
   const [legs, setLegs] = useState([]);
@@ -27,7 +28,26 @@ const UploadInstructionDocuments = () => {
   const [shipmentType, setShipmentType] = useState(null);
   const [debugInfo, setDebugInfo] = useState({});
   const [containerCount, setContainerCount] = useState(0);
+  const [rateWeight, setRateWeight] = useState(null);
+  const [weightUnit, setWeightUnit] = useState("kg");
+  const [containersReachedCount, setContainersReachedCount] = useState(0);
   const [isDocumentPage, setIsDocumentPage] = useState(true);
+  const isWeightBasedInstruction = () => {
+    return rateWeight && rateWeight.toLowerCase() !== "container";
+  };
+  // NEW: Check if shipment type is 3
+  const isShipmentType3 = () => {
+    return shipmentType === 3;
+  };
+
+  // NEW: Get available document types based on shipment type
+  const getAvailableDocumentTypes = () => {
+    const types = ["Instruction Document", "Delivery Note"];
+    if (showEmptyTurningDepotOption()) {
+      types.push("Empty Turning Depot Document");
+    }
+    return types;
+  };
 
   // Add state for modals
   const [showFinishConfirmModal, setShowFinishConfirmModal] = useState(false);
@@ -44,6 +64,7 @@ const UploadInstructionDocuments = () => {
       fetchDocuments();
       fetchInstructionStatus();
       fetchContainers();
+      fetchInstructionRateWeightAndUnit();
 
       // Check if shipmentType was passed in location state
       if (location.state?.shipmentType !== undefined) {
@@ -65,6 +86,18 @@ const UploadInstructionDocuments = () => {
     }
   }, [instructionId]);
 
+  // const fetchContainers = async () => {
+  //   try {
+  //     const response = await api.get(
+  //       `/containers/instruction/${instructionId}`
+  //     );
+  //     console.log("Containers for instruction:", response.data);
+  //     setContainerCount(response.data.length);
+  //   } catch (error) {
+  //     console.error("Error fetching containers:", error);
+  //     setContainerCount(0);
+  //   }
+  // };
   const fetchContainers = async () => {
     try {
       const response = await api.get(
@@ -72,9 +105,13 @@ const UploadInstructionDocuments = () => {
       );
       console.log("Containers for instruction:", response.data);
       setContainerCount(response.data.length);
+
+      const reachedCount = await countContainersReachingDestination();
+      setContainersReachedCount(reachedCount);
     } catch (error) {
       console.error("Error fetching containers:", error);
       setContainerCount(0);
+      setContainersReachedCount(0);
     }
   };
 
@@ -162,18 +199,22 @@ const UploadInstructionDocuments = () => {
       return;
     }
 
-    console.log(`Navigating to leg index ${legIndex}`);
+    console.log(
+      `Navigating to leg index ${legIndex} (leg number ${legNumber})`
+    );
 
-    // Force a clean navigation by using a unique timestamp in the state
+    // Navigate with the leg index
     navigate("/update-instructions", {
       state: {
         clientId,
         instructionId,
-        selectedLegIndex: legIndex,
-        timestamp: Date.now(), // Add a timestamp to force React to see this as new state
+        selectedLegIndex: legIndex, // This should be 0 for Leg 1
+        isCompleted: isCompleted,
+        shipmentType: shipmentType,
       },
       replace: true,
     });
+
     setIsDocumentPage(false);
   };
 
@@ -192,7 +233,7 @@ const UploadInstructionDocuments = () => {
     }
 
     // Check file size (10MB limit)
-    const maxSize = 10 * 1024 * 1024; // 10MB in bytes
+    const maxSize = 100 * 1024 * 1024; // 10MB in bytes
     if (selectedFile.size > maxSize) {
       setSubmitMessage("Error: File size exceeds 10MB limit");
       return false;
@@ -219,7 +260,10 @@ const UploadInstructionDocuments = () => {
         (doc) => doc.type === "Delivery Note"
       );
 
-      if (legDeliveryNotes.length >= containerCount) {
+      if (
+        !isWeightBasedInstruction() &&
+        legDeliveryNotes.length >= containersReachedCount
+      ) {
         setSubmitMessage(`Error: Too many delivery notes`);
         return false;
       }
@@ -389,6 +433,7 @@ const UploadInstructionDocuments = () => {
       setDocName("");
       setSelectedFile(null);
       setFilePreview(null);
+      setDocType(isShipmentType3() ? "Delivery Note" : "Instruction Document");
       if (document.getElementById("fileInput")) {
         document.getElementById("fileInput").value = "";
       }
@@ -422,6 +467,7 @@ const UploadInstructionDocuments = () => {
       state: {
         clientId,
         instructionId,
+        selectedLegIndex: 0,
         timestamp: Date.now(), // Add a timestamp to force React to see this as new state
       },
       replace: true,
@@ -430,7 +476,8 @@ const UploadInstructionDocuments = () => {
 
   // Modified to show confirmation modal instead of directly completing
   const handleFinish = () => {
-    // Check if we have all required documents
+    //     // Check if we have all required documents
+    // // Check if we have all required documents
     const instructionDocs = documents.filter(
       (doc) => doc.type === "Instruction Document"
     );
@@ -438,14 +485,19 @@ const UploadInstructionDocuments = () => {
       (doc) => doc.type === "Delivery Note"
     );
 
+    // NEW: For shipment type 3, only require delivery notes
+    // For other shipment types, require instruction document
     if (instructionDocs.length !== 1) {
       setSubmitMessage("Error: Exactly 1 Instruction Document is required");
       return;
     }
 
-    if (deliveryNotes.length !== containerCount) {
+    if (
+      !isWeightBasedInstruction() &&
+      deliveryNotes.length !== containersReachedCount
+    ) {
       setSubmitMessage(
-        `Error: Exactly ${containerCount} Delivery Notes are required (one per container)`
+        `Error: Exactly ${containersReachedCount} Delivery Notes are required (one per container)`
       );
       return;
     }
@@ -501,15 +553,14 @@ const UploadInstructionDocuments = () => {
       (doc) => doc.type === "Empty Turning Depot Document"
     );
 
-    // Basic requirements for all shipment types
+    // Basic requirements for other shipment types
     const basicRequirements =
-      instructionDocs.length === 1 && deliveryNotes.length === containerCount;
-
-    // For Import shipments, also require an Empty Turning Depot Document
+      instructionDocs.length === 1 &&
+      (isWeightBasedInstruction() ||
+        deliveryNotes.length === containersReachedCount);
     if (showEmptyTurningDepotOption()) {
       return basicRequirements && emptyTurningDocs.length === 1;
     }
-
     return basicRequirements;
   };
 
@@ -519,9 +570,121 @@ const UploadInstructionDocuments = () => {
       "Checking if we should show Empty Turning Depot Document option. Shipment type:",
       shipmentType
     );
-    return shipmentType !== 2;
+    return shipmentType === 1;
   };
+  //   const countContainersReachingDestination = async () => {
+  //   try {
+  //     // Get instruction details to get the dropoff location
+  //     const instructionResponse = await api.get(`/instructions/${instructionId}/details`);
+  //     const dropoff = instructionResponse.data.dropoff;
 
+  //     // Get all legs for this instruction
+  //     const legsResponse = await api.get(`/legs/${instructionId}`);
+  //     const legsData = legsResponse.data;
+
+  //     // Get all containers for this instruction
+  //     const containersResponse = await api.get(`/containers/instruction/${instructionId}`);
+  //     const instructionContainers = containersResponse.data;
+
+  //     // Track which containers reach the final destination
+  //     const containersReachingDropoff = new Set();
+
+  //     legsData.forEach((leg) => {
+  //       if (leg.destination === dropoff && leg.drivers && leg.drivers.length > 0) {
+  //         leg.drivers.forEach((driver) => {
+  //           if (driver.containernumber) {
+  //             containersReachingDropoff.add(driver.containernumber.toString());
+  //           }
+  //         });
+  //       }
+  //     });
+
+  //     console.log("Containers reaching final destination:", Array.from(containersReachingDropoff));
+  //     console.log("Total instruction containers:", instructionContainers.length);
+  //     console.log("Containers reached count:", containersReachingDropoff.size);
+
+  //     return containersReachingDropoff.size;
+  //   } catch (error) {
+  //     console.error("Error counting containers reaching destination:", error);
+  //     return 0;
+  //   }
+  // };
+  const countContainersReachingDestination = async () => {
+    try {
+      // Get instruction details to get the dropoff location
+      const instructionResponse = await api.get(
+        `/instructions/${instructionId}/details`
+      );
+      const dropoff = instructionResponse.data.dropoff;
+
+      // Normalize dropoff by converting to lowercase and removing spaces
+      const normalizedDropoff = dropoff?.toLowerCase().replace(/\s/g, "");
+
+      // Get all legs for this instruction
+      const legsResponse = await api.get(`/legs/${instructionId}`);
+      const legsData = legsResponse.data;
+
+      // Get all containers for this instruction
+      const containersResponse = await api.get(
+        `/containers/instruction/${instructionId}`
+      );
+      const instructionContainers = containersResponse.data;
+
+      // Track which containers reach the final destination
+      const containersReachingDropoff = new Set();
+
+      legsData.forEach((leg) => {
+        // Normalize leg destination by converting to lowercase and removing spaces
+        const normalizedLegDestination = leg.destination
+          ?.toLowerCase()
+          .replace(/\s/g, "");
+        if (
+          normalizedLegDestination === normalizedDropoff &&
+          leg.drivers &&
+          leg.drivers.length > 0
+        ) {
+          leg.drivers.forEach((driver) => {
+            if (driver.containernumber) {
+              containersReachingDropoff.add(driver.containernumber.toString());
+            }
+          });
+        }
+      });
+
+      console.log(
+        "Containers reaching final destination:",
+        Array.from(containersReachingDropoff)
+      );
+      console.log(
+        "Total instruction containers:",
+        instructionContainers.length
+      );
+      console.log("Containers reached count:", containersReachingDropoff.size);
+
+      return containersReachingDropoff.size;
+    } catch (error) {
+      console.error("Error counting containers reaching destination:", error);
+      return 0;
+    }
+  };
+  const fetchInstructionRateWeightAndUnit = async () => {
+    if (!instructionId) return;
+    try {
+      const response = await api.get(`/instructions/${instructionId}/details`);
+      const rateWeightValue = response.data.rateweight;
+      setRateWeight(rateWeightValue);
+      const isWeight =
+        rateWeightValue && rateWeightValue.toLowerCase() !== "container";
+      if (isWeight) {
+        const unit = rateWeightValue.toLowerCase().includes("ton")
+          ? "ton"
+          : "kg";
+        setWeightUnit(unit);
+      }
+    } catch (error) {
+      console.error("Error fetching rate weight:", error);
+    }
+  };
   return (
     <div className="instruction-container">
       <div>
@@ -603,11 +766,11 @@ const UploadInstructionDocuments = () => {
               onChange={(e) => setDocType(e.target.value)}
               className="dropdown"
             >
-              <option>Instruction Document</option>
-              <option>Delivery Note</option>
-              {showEmptyTurningDepotOption() && (
-                <option>Empty Turning Depot Document</option>
-              )}
+              {getAvailableDocumentTypes().map((type) => (
+                <option key={type} value={type}>
+                  {type}
+                </option>
+              ))}
             </select>
 
             {submitMessage && (
@@ -703,7 +866,6 @@ const UploadInstructionDocuments = () => {
         )}
       </div>
 
-      {/* Document requirements status */}
       <div className="requirements-section">
         <h4>Document Requirements:</h4>
         <ul>
@@ -723,20 +885,27 @@ const UploadInstructionDocuments = () => {
             }
             /1
           </li>
+
           <li
             style={{
               color:
+                isWeightBasedInstruction() ||
                 documents.filter((doc) => doc.type === "Delivery Note")
-                  .length === containerCount
+                  .length === containersReachedCount
                   ? "green"
                   : "red",
             }}
           >
-            Delivery Notes:{" "}
-            {documents.filter((doc) => doc.type === "Delivery Note").length}/
-            {containerCount}
+            {/* Delivery Notes:{" "} */}
+            {isWeightBasedInstruction()
+              ? `Delivery Notes: ${
+                  documents.filter((doc) => doc.type === "Delivery Note").length
+                }`
+              : `Delivery Notes: ${
+                  documents.filter((doc) => doc.type === "Delivery Note").length
+                }/${containersReachedCount}`}
           </li>
-          {showEmptyTurningDepotOption() && (
+          {showEmptyTurningDepotOption() && !isShipmentType3() && (
             <li
               style={{
                 color:

@@ -3,6 +3,7 @@ import { useState, useEffect, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import api from "../../../api"; // Import the configured Axios instance
 import "../css/ViewClientInvoice.css";
+import Pagination from "../../../components/Pagination.jsx"; // Import the Pagination component
 
 // Debug utility
 const debug = (message, data) => {
@@ -16,6 +17,10 @@ const ViewClientInvoice = () => {
   const [clients, setClients] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+
+  // Pagination state
+  const [currentPage, setCurrentPage] = useState(1);
+  const [recordsPerPage] = useState(5); // You can make this configurable
 
   // Auth helper function to get token from localStorage
   const getAuthHeader = () => {
@@ -83,55 +88,78 @@ const ViewClientInvoice = () => {
     [navigate]
   );
 
-  return (
-    <div className="view-client-invoice-container">
-      {/* Back Button */}
-      <div className="client-payments-header">
-        <button
-          className="back-button"
-          onClick={() => navigate("/DebtorsDashboard")}
-        >
-          Back
-        </button>
-      </div>
+  // Handle pagination
+  const handlePageChange = useCallback((pageNumber) => {
+    setCurrentPage(pageNumber);
+  }, []);
 
-      {/* Table */}
-      <div className="table-container">
-        {loading ? (
-          <p>Loading clients...</p>
-        ) : error ? (
-          <p>{error}</p>
-        ) : clients.length === 0 ? (
-          <p>No clients found.</p>
-        ) : (
-          <table className="clients-table">
-            <thead>
-              <tr>
-                <th>Company</th>
-                <th>Representative</th>
-                <th>Email</th>
-                <th>Action</th>
-              </tr>
-            </thead>
-            <tbody>
-              {clients.map((client) => (
-                <tr key={client.m5clientkey}>
-                  <td>{client.companyname}</td>
-                  <td>{client.representative}</td>
-                  <td>{client.email}</td>
-                  <td>
-                    <button
-                      className="view-button"
-                      onClick={() => handleViewInvoices(client)}
-                    >
-                      View
-                    </button>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        )}
+  // Calculate pagination data
+  const totalRecords = clients.length;
+  const startIndex = (currentPage - 1) * recordsPerPage;
+  const endIndex = startIndex + recordsPerPage;
+  const currentClients = clients.slice(startIndex, endIndex);
+
+  return (
+    <div className="view-client-invoice-wrapper">
+      <div className="view-client-invoice-container">
+        {/* Back Button */}
+        <div className="client-payments-header">
+          <button
+            className="back-button"
+            onClick={() => navigate("/DebtorsDashboard")}
+          >
+            Back
+          </button>
+        </div>
+
+        {/* Table */}
+        <div className="table-container">
+          {loading ? (
+            <p className="loading-message">Loading clients...</p>
+          ) : error ? (
+            <p className="error-message">{error}</p>
+          ) : clients.length === 0 ? (
+            <p className="no-data-message">No clients found.</p>
+          ) : (
+            <>
+              <table className="clients-table">
+                <thead>
+                  <tr>
+                    <th>Company</th>
+                    <th>Representative</th>
+                    <th>Email</th>
+                    <th>Action</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {currentClients.map((client) => (
+                    <tr key={client.m5clientkey}>
+                      <td>{client.companyname}</td>
+                      <td>{client.representative}</td>
+                      <td>{client.email}</td>
+                      <td>
+                        <button
+                          className="view-button"
+                          onClick={() => handleViewInvoices(client)}
+                        >
+                          View
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+
+              {/* Pagination Component */}
+              <Pagination
+                totalRecords={totalRecords}
+                recordsPerPage={recordsPerPage}
+                currentPage={currentPage}
+                onPageChange={handlePageChange}
+              />
+            </>
+          )}
+        </div>
       </div>
     </div>
   );

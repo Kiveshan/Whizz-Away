@@ -1,27 +1,46 @@
 import express from "express";
 import {
-  getFuelExpensesHandler,
-  getTurnoverPerMonthHandler,
-  getAgingAnalysisHandler,
-  getTurnoverVsDieselCostHandler,
-  getAllExpensesHandler,
-  getTurnoverPerTruckHandler,
-  getWagesPerMonthHandler,
+  getFuelExpensesController,
+  getTurnoverPerMonthController,
+  getAllClientsController,
+  getAllSubcontractorsController,
+  getAllTrucksController,
+  getAgingAnalysisController,
+  getTurnoverVsDieselCostController,
+  getAllExpensesController,
+  getTurnoverPerTruckController,
+  getSubcontractorTurnoverPerMonthController,
+  getSubcontractorVsTurnoverController,
+  getWagesVsExpensesController,
+  getTurnoverVsSubbieExpenseController,
+  getTurnoverVsFuelPerTruckController,
 } from "../../controllers/analytics/analyticsController.js";
 import { verifyToken } from "../../middleware/auth.js";
 
 const router = express.Router();
 
-router.get("/api/fuel-expenses", verifyToken, getFuelExpensesHandler);
-router.get("/api/turnover-per-month", verifyToken, getTurnoverPerMonthHandler);
-router.get("/api/aging-analysis", verifyToken, getAgingAnalysisHandler);
+router.get("/api/fuel-expenses", verifyToken, getFuelExpensesController);
+router.get("/api/turnover-per-month", verifyToken, getTurnoverPerMonthController);
+router.get("/api/aging-analysis", verifyToken, getAgingAnalysisController);
+router.get("/api/get-clients", verifyToken, getAllClientsController);
+router.get("/api/get-subcontractors", verifyToken, getAllSubcontractorsController);
+router.get("/api/get-trucks", verifyToken, getAllTrucksController);
 router.get(
   "/api/turnover-vs-diesel-cost",
   verifyToken,
-  getTurnoverVsDieselCostHandler
+  getTurnoverVsDieselCostController
 );
-router.get("/api/all-expenses", verifyToken, getAllExpensesHandler);
-router.get("/api/turnover-per-truck", verifyToken, getTurnoverPerTruckHandler);
-router.get("/api/wages-per-month", verifyToken, getWagesPerMonthHandler);
+router.get("/api/all-expenses", verifyToken, getAllExpensesController);
+router.get("/api/turnover-per-truck", verifyToken, getTurnoverPerTruckController);
+router.get("/api/subcontractor-turnover-per-month", verifyToken, 
+  getSubcontractorTurnoverPerMonthController);
+router.get("/api/subcontractor-vs-turnover", verifyToken, 
+  getSubcontractorVsTurnoverController);
+router.get("/api/wages-vs-expenses", verifyToken, 
+  getWagesVsExpensesController);
+router.get("/api/turnover-vs-subbie-expense", verifyToken, 
+  getTurnoverVsSubbieExpenseController);
+router.get("/api/turnover-vs-fuel-per-truck", verifyToken, 
+  getTurnoverVsFuelPerTruckController);
 
 export default router;

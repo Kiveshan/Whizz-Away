@@ -1,5 +1,5 @@
 "use client"
-import "../css/modal.css"
+import "../css/modal.module.css"
 
 const Header = ({ onLoginClick, onRegisterClick }) => {
   return (
@@ -15,9 +15,9 @@ const Header = ({ onLoginClick, onRegisterClick }) => {
         <button className="header-btn login-btn" onClick={onLoginClick}>
           Login
         </button>
-        <button className="header-btn register-btn" onClick={onRegisterClick}>
+        {/* <button className="header-btn register-btn" onClick={onRegisterClick}>
           Register
-        </button>
+        </button> */}
       </div>
     </header>
   )

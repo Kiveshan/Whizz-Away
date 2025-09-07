@@ -4,20 +4,30 @@ import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import api from "../../../api";
 
+import Pagination from "../../../components/Pagination"
+
 const FinanceClerkWage = () => {
   const [drivers, setDrivers] = useState([]);
   const [userRole, setUserRole] = useState(null);
+  const [error, setError] = useState(null);
   const navigate = useNavigate();
+  const [currentPage, setCurrentPage] = useState(1);
+  const recordsPerPage = 5; // Consistent with other components
 
   useEffect(() => {
     // Fetch drivers data
     api
-      .get("/employees/drivers")
+      .get("/all-employees")
       .then((response) => {
         setDrivers(response.data);
         console.log(response.data);
+        setCurrentPage(1); // Reset to first page when data changes
+        setError(null); // Clear any previous errors
       })
-      .catch((error) => console.error("Error fetching drivers:", error));
+      .catch((error) => {
+        console.error("Error fetching drivers:", error);
+        setError("Failed to load drivers. Please try again.");
+      });
 
     // Get user role from localStorage if available
     const roleId = localStorage.getItem("userRoleId");
@@ -28,18 +38,17 @@ const FinanceClerkWage = () => {
     navigate(`/finance-clerk-wage-details/${driver.userid}`, {
       state: {
         name: `${driver.name} ${driver.surname}`,
-        // Pass the dashboard route to the details page
         returnDashboard: getDashboardRouteByRole(),
       },
     });
   };
 
   const getDashboardRouteByRole = () => {
-    // IMPORTANT: Check localStorage first
+    // Check localStorage first
     const storedDashboard = localStorage.getItem("dashboardRoute");
     if (storedDashboard) return storedDashboard;
 
-    // Only fall back to role-based routing if no stored route
+    // Fall back to role-based routing
     if (userRole === 8) {
       return "/CreditorsDashboard";
     }
@@ -51,13 +60,18 @@ const FinanceClerkWage = () => {
       case 4:
         return "/DirectorDashboard";
       default:
-        return "/CreditorsDashboard"; // Default to CreditorsDashboard instead of FDashboard
+        return "/CreditorsDashboard";
     }
   };
 
   const handleBackClick = () => {
     navigate(getDashboardRouteByRole());
   };
+
+  // Calculate paginated records
+  const startIndex = (currentPage - 1) * recordsPerPage;
+  const endIndex = startIndex + recordsPerPage;
+  const currentRecords = drivers.slice(startIndex, endIndex);
 
   return (
     <div className="wage-container">
@@ -67,33 +81,56 @@ const FinanceClerkWage = () => {
         </button>
       </div>
 
-      <div className="wage-table-container">
-        <table className="wage-table1">
-          <thead>
-            <tr>
-              <th>Driver Name</th>
-              <th>Wage</th>
-            </tr>
-          </thead>
-          <tbody>
-            {drivers.map((driver) => (
-              <tr key={driver.userid}>
-                <td>
-                  {driver.name} {driver.surname}
-                </td>
-                <td>
-                  <button
-                    onClick={() => handleViewClick(driver)}
-                    className="view-btn"
-                  >
-                    View
-                  </button>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
+      {error ? (
+        <p className="error-message">{error}</p>
+      ) : (
+        <>
+          <div className="wage-table-container">
+            <table className="wage-table1" aria-label="Driver Wages">
+              <thead>
+                <tr>
+                  <th scope="col">Driver Name</th>
+                  <th scope="col">Wage</th>
+                </tr>
+              </thead>
+              <tbody>
+                {currentRecords.length > 0 ? (
+                  currentRecords.map((driver) => (
+                    <tr key={driver.userid}>
+                      <td>
+                        {driver.name} {driver.surname}
+                      </td>
+                      <td>
+                        <button
+                          onClick={() => handleViewClick(driver)}
+                          className="view-btn"
+                        >
+                          View
+                        </button>
+                      </td>
+                    </tr>
+                  ))
+                ) : (
+                  <tr>
+                    <td colSpan="2" className="text-center">
+                      No drivers found
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+
+<div className="pagination-wrapper-fixed">
+  <Pagination
+    totalRecords={drivers.length}
+    recordsPerPage={recordsPerPage}
+    currentPage={currentPage}
+    onPageChange={setCurrentPage}
+  />
+</div>
+        </>
+      )}
     </div>
   );
 };

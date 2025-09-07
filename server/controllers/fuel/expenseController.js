@@ -6,16 +6,18 @@ import {
   insertFuelExpense,
   insertFuelExpenseWithoutS3Key,
   getExpenseDocumentById,
+  getPOExpensesByTruckId
 } from "../../models/fuel/expenseModel.js";
 
 const getExpensesByTruckHandler = async (req, res) => {
   try {
     const { truckId } = req.params;
     console.log(`Getting expenses for truck ID: ${truckId}`);
-
-    const expenses = await getExpensesByTruckId(truckId);
+    
+    // Use the new function that includes PO data
+    const expenses = await getPOExpensesByTruckId(truckId);
+    
     console.log(`Found ${expenses.length} expenses for truck ID: ${truckId}`);
-
     res.json(expenses);
   } catch (error) {
     console.error("Error fetching expenses for truck:", error);
@@ -285,32 +287,61 @@ const uploadFuelExpenseHandler = async (req, res) => {
 const getExpenseDocumentHandler = async (req, res) => {
   try {
     const { id } = req.params;
+    
+    // First try to get from expenses_m2 table
     const document = await getExpenseDocumentById(id);
-
-    if (!document.success) {
-      return res.status(404).json({
-        success: false,
-        message: document.message,
+    
+    if (document.success && document.data.s3key) {
+      const { slipname, s3key } = document.data;
+      const url = getSignedUrl(s3key, 3600);
+      
+      let fileType = "image";
+      if (slipname) {
+        const extension = slipname.split(".").pop().toLowerCase();
+        if (["pdf"].includes(extension)) {
+          fileType = "pdf";
+        }
+      }
+      
+      return res.json({
+        success: true,
+        url,
+        name: slipname,
+        fileType,
       });
     }
-
-    const { slipname, s3key } = document.data;
-    const url = getSignedUrl(s3key, 3600);
-
-    let fileType = "image";
-    if (slipname) {
-      const extension = slipname.split(".").pop().toLowerCase();
-      if (["pdf"].includes(extension)) {
-        fileType = "pdf";
+    
+    // If not found in expenses_m2, try to find PO slip
+    try {
+      const poQuery = `
+        SELECT po.slip_s3key, po.ponum 
+        FROM purchase_orders po
+        JOIN expenses_m2 e ON e.orderno = po.ponum::text
+        WHERE e.ekey = $1 AND po.slip_s3key IS NOT NULL
+      `;
+      const poResult = await pool.query(poQuery, [id]);
+      
+      if (poResult.rows.length > 0) {
+        const s3key = poResult.rows[0].slip_s3key;
+        const url = getSignedUrl(s3key, 3600);
+        
+        return res.json({
+          success: true,
+          url,
+          name: `PO-${poResult.rows[0].ponum}-slip`,
+          fileType: "pdf",
+        });
       }
+    } catch (poError) {
+      console.log("No PO slip found for this expense");
     }
-
-    res.json({
-      success: true,
-      url,
-      name: slipname,
-      fileType,
+    
+    // If neither found, return error
+    return res.status(404).json({
+      success: false,
+      message: "Document not found",
     });
+    
   } catch (error) {
     console.error("Error fetching document:", error);
     res.status(500).json({

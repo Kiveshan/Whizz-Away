@@ -8,10 +8,15 @@ import {
   getDriverWageDetailsHandler,
   getDriverInstructionsHandler,
   getDriverLegsByMonthHandler,
+  getStoredWageDataHandler,
+  getBaseSalaryHistoryHandler,
+  getAllEmployeesHandler,
+  getAllRolesHandler
 } from "../../controllers/wages/wageController.js";
 
 const router = express.Router();
-
+router.get("/api/stored-wage-data/:employeeId", getStoredWageDataHandler);
+router.get("/all-employees", getAllEmployeesHandler);
 router.post("/api/save-wage-data", saveWageDataHandler);
 router.get("/api/check-wage-slip", checkWageSlipHandler);
 router.get(
@@ -32,5 +37,7 @@ router.get(
   "/api/all-driver-legs/:driverId/by-month",
   getDriverLegsByMonthHandler
 );
+router.get("/api/base-salary-history/:employeeId", getBaseSalaryHistoryHandler);
+router.get("/api/roles", getAllRolesHandler);
 
 export default router;

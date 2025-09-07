@@ -4,193 +4,1511 @@ import { useState, useEffect, useRef } from "react";
 import "../../css/controllerinstruction.css";
 import { useNavigate, useLocation } from "react-router-dom";
 import ErrorModal from "../../../../components/ErrorModal";
-import api from "../../../../api"; // Import the axios instance
-import DatePicker from "react-datepicker";
-import "react-datepicker/dist/react-datepicker.css";
+import api from "../../../../api";
+
+// ErrorTooltip component for displaying validation errors
+const ErrorTooltip = ({ message }) => {
+  if (!message) return null;
+
+  return (
+    <div className="error-tooltip">
+      <span className="error-icon">!</span>
+      <div className="error-message">{message}</div>
+    </div>
+  );
+};
 
 const FCcontrollerinstructions = () => {
   const navigate = useNavigate();
   const location = useLocation();
 
-  // Extract all state from location
-  const instructionId = location.state?.instructionId;
   const preservedFormData = location.state?.preservedFormData;
   const containerCounts = location.state?.containerCounts;
-  const clientId = location.state?.clientId;
-  const clientName = location.state?.clientName;
-  const selectedMonth = location.state?.selectedMonth;
-  const selectedYear = location.state?.selectedYear;
-  const activeFilter = location.state?.activeFilter;
-  const preservedContainers = location.state?.preservedContainers; // Add this to receive preserved containers
+  const instructionId = location.state?.instructionId;
 
-  // Log the received state for debugging
   console.log("FCcontrollerinstructions received state:", location.state);
-  console.log("FCcontrollerinstructions - clientId:", clientId);
-  console.log("FCcontrollerinstructions - clientName:", clientName);
-  console.log("FCcontrollerinstructions - selectedMonth:", selectedMonth);
-  console.log("FCcontrollerinstructions - selectedYear:", selectedYear);
-  console.log("FCcontrollerinstructions - activeFilter:", activeFilter);
   console.log(
     "FCcontrollerinstructions - preservedFormData:",
     preservedFormData
   );
   console.log("FCcontrollerinstructions - containerCounts:", containerCounts);
-  console.log(
-    "FCcontrollerinstructions - preservedContainers:",
-    preservedContainers
-  );
+  console.log("FCcontrollerinstructions - instructionId:", instructionId);
 
-  // State for calendar modals
-  const [calendarModals, setCalendarModals] = useState({
-    pickupDate: false,
-    stackDate: false,
-    deadline: false,
-  });
+  // Extract all state from location
+  const clientId = location.state?.clientId;
+  const clientName = location.state?.clientName;
+  const selectedMonth = location.state?.selectedMonth;
+  const selectedYear = location.state?.selectedYear;
+  const activeFilter = location.state?.activeFilter;
 
-  // Get today's date in MM/DD/YYYY format for min date validation
-  const today = new Date();
-  const todayFormatted = `${String(today.getMonth() + 1).padStart(
-    2,
-    "0"
-  )}/${String(today.getDate()).padStart(2, "0")}/${today.getFullYear()}`;
+  // pickupDateRef removed
+  const etaDateRef = useRef(null);
+  const lastFreeDateRef = useRef(null);
 
-  // State for form data
-  const [formData, setFormData] = useState({
-    clientId: clientId || "", // Initialize with clientId from location state
-    representative: "",
-    contactDetails: "",
-    email: "",
-    shipmentTypeId: "",
-    shipmentTypeName: "",
-    task: "",
-    pickup: "",
-    dropoff: "",
-    hazardous: false,
-    surcharges: false,
-    pickupTime: "",
-    pickupDate: "",
-    stackDate: "",
-    deadline: "",
-    fileRef: "",
-    bookingRef: "", // Add booking reference field
-    rateWeight: "kg",
-    rate: "",
-    weight: "", // Added weight field
+  const fieldRefs = {
+    clientId: useRef(null),
+    shipmentTypeId: useRef(null),
+    ksmFileRef: useRef(null),
+    pickup: useRef(null),
+    dropoff: useRef(null),
+    // pickupTime and pickupDate refs removed
+    stackDate: useRef(null),
+    lastFreeDate: useRef(null),
+    bookingRef: useRef(null),
+    clientFileRef: useRef(null),
+    sixMeterRate: useRef(null),
+    twelveMeterRate: useRef(null),
+    abnormalRate: useRef(null),
+    weight: useRef(null),
+    description: useRef(null),
+    vesselName: useRef(null),
+    rateWeight: useRef(null),
+    unitRate: useRef(null),
+  };
+
+  const [isImport, setIsImport] = useState(location.state?.isImport || false);
+  const todayDate = new Date();
+  const today = `${todayDate.getFullYear()}-${String(todayDate.getMonth() + 1).padStart(2, '0')}-${String(todayDate.getDate()).padStart(2, '0')}`;  // Fixed timezone handling
+  const [weight, setWeight] = useState("");
+  const [rateUpdateMessage, setRateUpdateMessage] = useState("");
+
+  // Log the isImport state for debugging
+  useEffect(() => {
+    console.log("isImport state changed:", isImport);
+  }, [isImport]);
+
+  // Check if instruction is already invoiced when component mounts
+  useEffect(() => {
+    if (instructionId) {
+      checkIfInvoiced();
+    }
+  }, [instructionId]);
+
+  // NEW: Track previous container counts to detect changes from 0 to >0
+  const [prevContainerCounts, setPrevContainerCounts] = useState({
     num_six_meters: 0,
     num_twelve_meters: 0,
     num_abnormal: 0,
-    vat: 15,
-    description: "",
-    status: "",
-    total_cost: 0, // Added total_cost field
-    // Add vessel information fields
-    vesselName: "",
-    voyageNo: "",
-    imoNo: "",
-    flagReg: "",
   });
 
-  // State for calendar display
-  const [calendarState, setCalendarState] = useState({
-    currentMonth: today.getMonth(),
-    currentYear: today.getFullYear(),
-    selectedDate: null,
-    activeCalendar: null,
+  const [formData, setFormData] = useState(() => {
+    // Default empty form data
+    const defaultData = {
+      // Rates
+      rateper_6: preservedFormData?.rateper_6 || 0,
+      rateper_12: preservedFormData?.rateper_12 || 0,
+      rateper_abnormal: preservedFormData?.rateper_abnormal || 0,
+      clientId: "",
+      representative: "",
+      contactDetails: "",
+      email: "",
+      shipmentTypeId: "",
+      shipmentTypeName: "",
+      ksmFileRef: "",
+      pickup: "",
+      dropoff: "",
+      pickupTime: "",
+      pickupDate: "",
+      stackDate: "",
+      lastFreeDate: "",
+      clientFileRef: "",
+      bookingRef: "",
+      rateWeight: "Container",
+      weight: "",
+      unitRate: "",
+      quantity: "",
+      num_six_meters: 0,
+      num_twelve_meters: 0,
+      num_abnormal: 0,
+      vat: 15,
+      description: "",
+      total_cost: 0,
+      status: "",
+    };
+
+    if (preservedFormData) {
+      // If we have container counts from navigation, use them
+      if (containerCounts) {
+        console.log(
+          "Initializing form data with container counts:",
+          containerCounts
+        );
+        const initialData = {
+          ...defaultData,
+          ...preservedFormData,
+          num_six_meters: containerCounts["6m"] || 0,
+          num_twelve_meters: containerCounts["12m"] || 0,
+          num_abnormal: containerCounts["Abnormal"] || 0,
+          rateWeight: "Container",
+          weight: "",
+        };
+        // Set initial previous counts
+        setPrevContainerCounts({
+          num_six_meters: containerCounts["6m"] || 0,
+          num_twelve_meters: containerCounts["12m"] || 0,
+          num_abnormal: containerCounts["Abnormal"] || 0,
+        });
+        return initialData;
+      }
+      // If we just have preserved form data without container counts
+      const initialData = {
+        ...preservedFormData,
+        rateWeight: "Container",
+      };
+      // Set initial previous counts
+      setPrevContainerCounts({
+        num_six_meters: preservedFormData.num_six_meters || 0,
+        num_twelve_meters: preservedFormData.num_twelve_meters || 0,
+        num_abnormal: preservedFormData.num_abnormal || 0,
+      });
+      return initialData;
+    }
+    return {
+      clientId: "",
+      representative: "",
+      contactDetails: "",
+      email: "",
+      shipmentTypeId: "",
+      shipmentTypeName: "",
+      ksmFileRef: "",
+      pickup: "",
+      dropoff: "",
+      pickupTime: "",
+      pickupDate: "",
+      stackDate: "",
+      lastFreeDate: "",
+      clientFileRef: "",
+      bookingRef: "",
+      rateWeight: "Container",
+      weight: "",
+      num_six_meters: 0,
+      num_twelve_meters: 0,
+      num_abnormal: 0,
+      vat: 15,
+      description: "",
+      total_cost: 0,
+      status: "",
+    };
   });
 
-  // State to track field validation errors
-  const [fieldErrors, setFieldErrors] = useState({});
+  // Check if the instruction should be read-only based on status
+  const isReadOnly = formData.status === "In Progress" || formData.status === "Completed";
 
-  // State to track if data has been modified
-  const [isDataModified, setIsDataModified] = useState(false);
-
-  // State to track if shipment type is Import
-  const [isImport, setIsImport] = useState(false);
-
-  // State for clients and shipment types
+  const [startingPoints, setStartingPoints] = useState([]);
+  const [destinations, setDestinations] = useState([]);
   const [clients, setClients] = useState([]);
   const [shipmentTypes, setShipmentTypes] = useState([]);
   const [isLoading, setIsLoading] = useState({
     clients: true,
     shipmentTypes: true,
+    startingPoints: true,
+    destinations: true,
     instruction: instructionId ? true : false,
   });
-
-  // State for error modal
   const [errorModal, setErrorModal] = useState({
     isOpen: false,
     message: "",
   });
 
-  // State for success message
-  const [successMessage, setSuccessMessage] = useState("");
+  // State for warning modal
+  const [warningModal, setWarningModal] = useState({
+    isOpen: false,
+    message: "",
+    onConfirm: null,
+    shipmentTypeId: "",
+    shipmentTypeName: "",
+  });
+  const [fieldErrors, setFieldErrors] = useState({});
+  const [preservedContainers, setPreservedContainers] = useState(
+    location.state?.preservedContainers || []
+  );
 
-  // Refs for DatePicker
-  const pickupDateRef = useRef(null);
-  const etaDateRef = useRef(null);
-  const deadlineDateRef = useRef(null);
+  // Container state
+  const [containers, setContainers] = useState([]);
+  const [containerFieldErrors, setContainerFieldErrors] = useState({});
+  const [containerSuccessMessage, setContainerSuccessMessage] = useState("");
+  const [isContainerLoading, setIsContainerLoading] = useState(false);
+  const [isContainerDataModified, setIsContainerDataModified] = useState(false);
+  const [isInvoiced, setIsInvoiced] = useState(false);
 
-  // Refs for form fields to scroll to on error
-  const fieldRefs = {
-    clientId: useRef(null),
-    shipmentTypeId: useRef(null),
-    task: useRef(null),
-    pickup: useRef(null),
-    dropoff: useRef(null),
-    pickupTime: useRef(null),
-    pickupDate: useRef(null),
-    stackDate: useRef(null),
-    deadline: useRef(null),
-    fileRef: useRef(null),
-    bookingRef: useRef(null), // Add ref for bookingRef
-    rate: useRef(null),
-    weight: useRef(null),
-    num_six_meters: useRef(null),
-    vat: useRef(null),
-    description: useRef(null),
-    // Add refs for vessel information fields
-    vesselName: useRef(null),
-    voyageNo: useRef(null),
-    imoNo: useRef(null),
-    flagReg: useRef(null),
-  };
+  const [confirmationModal, setConfirmationModal] = useState({
+    isOpen: false,
+    message: "",
+    action: null,
+  });
 
-  // Updated handleBackClick function - ensure no database changes are made
-  const handleBackClick = () => {
-    // Create state object with all necessary parameters
-    const stateToPass = {
-      clientId,
-      clientName,
-      selectedMonth,
-      selectedYear,
-      activeFilter,
+  // Initialize containers based on container counts
+  const initializeContainers = () => {
+    console.log("Initializing containers with form data:", formData);
+    const counts = {
+      "6m": formData.num_six_meters || 0,
+      "12m": formData.num_twelve_meters || 0,
+      Abnormal: formData.num_abnormal || 0,
+      BreakBulk: formData.num_breakbulk || 0,
     };
 
-    // Log the state being passed back
-    console.log("Navigating back to instructions with state:", stateToPass);
+    // If we already have containers and counts are zero, don't clear them
+    if (
+      containers &&
+      containers.length > 0 &&
+      counts["6m"] === 0 &&
+      counts["12m"] === 0 &&
+      counts["Abnormal"] === 0 &&
+      counts["BreakBulk"] === 0
+    ) {
+      console.log("Keeping existing containers as counts are zero");
+      return;
+    }
 
-    // Navigate to instructions with state
-    navigate("/instructions", { state: stateToPass });
+    const containersList = [];
+    let containerId = 1;
+
+    // Add 6m containers
+    for (let i = 0; i < counts["6m"]; i++) {
+      containersList.push({
+        id: containerId++,
+        containerKey: null,
+        containerNum: "",
+        fileRef: "", // Added fileRef field
+        weight:
+          isImport ||
+          String(formData.shipmentTypeId) === "2" ||
+          String(formData.shipmentTypeId) === "3"
+            ? ""
+            : null, // Initialize weight for import, export, and cross-haul
+        containerType: "6m",
+        cargoDescription: "",
+        hazardous: false,
+        addSurcharges: false,
+        surchargeAmount: 0,
+        hazardousAmount: 0,
+      });
+    }
+
+    // Add 12m containers
+    for (let i = 0; i < counts["12m"]; i++) {
+      containersList.push({
+        id: containerId++,
+        containerKey: null,
+        containerNum: "",
+        fileRef: "", // Added fileRef field
+        weight:
+          isImport ||
+          String(formData.shipmentTypeId) === "2" ||
+          String(formData.shipmentTypeId) === "3"
+            ? ""
+            : null, // Initialize weight for import, export, and cross-haul
+        containerType: "12m",
+        cargoDescription: "",
+        hazardous: false,
+        addSurcharges: false,
+        surchargeAmount: 0,
+        hazardousAmount: 0,
+      });
+    }
+
+    // Add abnormal containers
+    for (let i = 0; i < counts["Abnormal"]; i++) {
+      containersList.push({
+        id: containerId++,
+        containerKey: null,
+        containerNum: "",
+        fileRef: "", // Added fileRef field
+        weight:
+          isImport ||
+          String(formData.shipmentTypeId) === "2" ||
+          String(formData.shipmentTypeId) === "3"
+            ? ""
+            : null, // Initialize weight for import, export, and cross-haul
+        containerType: "Abnormal",
+        cargoDescription: "",
+        hazardous: false,
+        addSurcharges: false,
+        surchargeAmount: 0,
+        hazardousAmount: 0,
+      });
+    }
+
+    // Add break bulk containers
+    for (let i = 0; i < counts["BreakBulk"]; i++) {
+      containersList.push({
+        id: containerId++,
+        containerKey: null,
+        containerNum: "",
+        fileRef: "", // Added fileRef field
+        weight:
+          isImport ||
+          String(formData.shipmentTypeId) === "2" ||
+          String(formData.shipmentTypeId) === "3"
+            ? ""
+            : null, // Initialize weight for import, export, and cross-haul
+        containerType: "BreakBulk",
+        cargoDescription: "",
+        hazardous: false,
+        addSurcharges: false,
+        surchargeAmount: 0,
+        hazardousAmount: 0,
+      });
+    }
+
+    setContainers(containersList);
+    setIsContainerLoading(false);
   };
 
-  // Function to open calendar
-  const openCalendar = (ref) => {
-    if (ref && ref.current) {
-      // Instead of trying to click the input directly, use the DatePicker's setOpen method
-      // or focus the input which will trigger the calendar to open
-      try {
-        // Try to focus the input element which should open the calendar
-        const inputElement = ref.current.input || ref.current;
-        if (inputElement && typeof inputElement.focus === "function") {
-          inputElement.focus();
-        }
-      } catch (error) {
-        console.error("Error opening calendar:", error);
+  // Handle container input change with real-time validation
+  const handleContainerChange = (id, field, value) => {
+    // Handle both camelCase and snake_case for file reference field
+    if (field === "file_ref") {
+      field = "fileRef"; // Convert to camelCase for consistency
+    }
+    if (field === "containerNum") {
+      // Get the current container
+      const container = containers.find((c) => c.id === id);
+      const currentValue = container ? container.containerNum : "";
+
+      // For container numbers, limit to 20 characters and allow alphanumeric only
+      if (value.length > 20) {
+        // Prevent entering more than 20 characters
+        return;
       }
+
+      // Create a new value by validating each character (alphanumeric only)
+      let newValue = "";
+      for (let i = 0; i < value.length; i++) {
+        const char = value[i];
+        // Allow only alphanumeric characters
+        if (/^[a-zA-Z0-9]$/.test(char)) {
+          newValue += char;
+        }
+      }
+
+      // Only update if the filtered value is different from the input
+      if (newValue !== value) {
+        return;
+      }
+
+      // Clear error when user starts typing
+      clearContainerFieldError(id, "container");
+    } else if (field === "fileRef") {
+      // Limit file reference to 20 characters (no special validation needed)
+      if (value.length > 20) {
+        return;
+      }
+      
+      // Update the container fileRef value
+      setContainers((prevContainers) =>
+        prevContainers.map((container) =>
+          container.id === id ? { ...container, fileRef: value } : container
+        )
+      );
+      setIsContainerDataModified(true);
+      console.log(`📄 Updated File Reference for container ${id} to: ${value}`);
+      // Don't return - allow the function to continue processing
+    }
+
+    if (field === "weight") {
+      // Clear error when user starts typing
+      clearContainerFieldError(id, "weight");
+
+      // Check if this container should have weight field based on shipment type
+      const shouldHaveWeight =
+        isImport ||
+        String(formData.shipmentTypeId) === "2" ||
+        String(formData.shipmentTypeId) === "3";
+
+      if (!shouldHaveWeight) {
+        console.log("Weight field not applicable for this shipment type");
+        return;
+      }
+
+      // Sanitize weight value - convert empty string to null, validate numeric input
+      let sanitizedValue = "";
+      if (value && value.trim() !== "") {
+        // Only allow valid numeric input (including decimals)
+        if (/^[0-9]*\.?[0-9]*$/.test(value.trim())) {
+          const numValue = Number.parseFloat(value.trim());
+          if (!isNaN(numValue) && numValue >= 0) {
+            sanitizedValue = numValue;
+            console.log(
+              `Container ${id} weight updated to:`,
+              sanitizedValue,
+              `(type: ${typeof sanitizedValue})`
+            );
+          } else {
+            // Invalid number, keep as string for user feedback but will be sanitized on save
+            sanitizedValue = value;
+            console.log(
+              `Container ${id} weight set to string value:`,
+              sanitizedValue
+            );
+          }
+        } else {
+          // Invalid format, don't update
+          console.log(`Container ${id} weight invalid format:`, value);
+          return;
+        }
+      } else {
+        console.log(`Container ${id} weight set to empty string`);
+      }
+
+      // Update with sanitized value (empty string for empty, number for valid input)
+      setContainers((prevContainers) =>
+        prevContainers.map((container) =>
+          container.id === id
+            ? { ...container, [field]: sanitizedValue }
+            : container
+        )
+      );
+      setIsContainerDataModified(true);
+      return;
+    }
+
+    const fetchHazardousAmount = async (containerId) => {
+  const container = containers.find(c => c.id === containerId)
+  if (!container) return
+
+  try {
+    console.log(`🌐 Fetching hazardous rates for client ${formData.clientId}, route: ${formData.pickup} → ${formData.dropoff}`);
+    const response = await api.get(
+      `/api/instructions/client/${formData.clientId}/rates`,
+      {
+        params: {
+          start: formData.pickup,
+          destination: formData.dropoff
+        }
+      }
+    )
+    
+    const hazardousAmount = response.data.hazardous || 0;
+    console.log(`☣️ Fetched hazardous amount: ${hazardousAmount} for container ${container.containerNum || containerId}`);
+    
+    // Update container with hazardous amount
+    setContainers(prevContainers => {
+      const updatedContainers = prevContainers.map(c =>
+        c.id === containerId
+          ? { ...c, hazardousAmount: Number(hazardousAmount) }
+          : c
+      );
+      console.log(`🔄 Updated container ${containerId} with hazardous amount: ${hazardousAmount}`);
+      return updatedContainers;
+    });
+    
+    // Force immediate recalculation to include hazardous amount
+    setTimeout(() => recalculateTotalCost(), 0);
+  } catch (error) {
+    console.error('❌ Error fetching hazardous amount:', error);
+    // Fallback to 0 if fetch fails
+    setContainers(prevContainers =>
+      prevContainers.map(c =>
+        c.id === containerId
+          ? { ...c, hazardousAmount: 0 }
+          : c
+      )
+    );
+    console.log(`⚠️ Using fallback hazardous amount: 0 for container ${container.containerNum || containerId}`);
+  }
+}
+
+    // Handle hazardous and addSurcharges checkbox fields
+    if (field === "hazardous" || field === "addSurcharges") {
+      if (field === "addSurcharges") {
+        console.log(`🔄 Surcharge checkbox ${value ? 'CHECKED' : 'UNCHECKED'} for container ${id}`);
+        if (value) {
+          // Checkbox checked - update state immediately, then fetch surcharge amount
+          setContainers((prevContainers) =>
+            prevContainers.map((container) =>
+              container.id === id 
+                ? { ...container, [field]: true }
+                : container
+            )
+          );
+          console.log(`📞 Calling fetchSurchargeAmount for container ${id}`);
+          fetchSurchargeAmount(id);
+        } else {
+          // Checkbox unchecked - reset surcharge amount to 0
+          setContainers((prevContainers) =>
+            prevContainers.map((container) =>
+              container.id === id 
+                ? { ...container, [field]: value, surchargeAmount: 0 }
+                : container
+            )
+          );
+          console.log(`🔄 Surcharge unchecked - reset amount to 0 for container ${id}`);
+          recalculateTotalCost();
+        }
+      } else if (field === "hazardous") {
+        // Handle hazardous checkbox with rate fetching
+        console.log(`☢️ Hazardous checkbox ${value ? 'CHECKED' : 'UNCHECKED'} for container ${id}`);
+        if (value) {
+          // Checkbox checked - update state immediately, then fetch hazardous amount
+          console.log(`☢️ Hazardous checkbox CHECKED for container ${id} - updating state and fetching rate`);
+          setContainers((prevContainers) =>
+            prevContainers.map((container) =>
+              container.id === id 
+                ? { ...container, [field]: true }
+                : container
+            )
+          );
+          console.log(`📞 Calling fetchHazardousAmount for container ${id}`);
+          fetchHazardousAmount(id);
+        } else {
+          // Checkbox unchecked - reset hazardous amount to 0
+          console.log(`☢️ Hazardous checkbox UNCHECKED for container ${id} - updating state and resetting amount to 0`);
+          setContainers((prevContainers) =>
+            prevContainers.map((container) =>
+              container.id === id 
+                ? { ...container, [field]: value, hazardousAmount: 0 }
+                : container
+            )
+          );
+          console.log(`🔄 Hazardous unchecked - reset amount to 0 for container ${id}`);
+          console.log(`💲 Recalculating total cost due to hazardous flag change`);
+          recalculateTotalCost();
+        }
+      }
+      setIsContainerDataModified(true);
+      return;
+    }
+
+    // Update the container value for other fields
+    setContainers((prevContainers) =>
+      prevContainers.map((container) =>
+        container.id === id ? { ...container, [field]: value } : container
+      )
+    );
+    setIsContainerDataModified(true);
+  };
+
+  // Validate container data
+  const validateContainers = () => {
+    const counts = countContainersByType();
+    const newErrors = {};
+    let isValid = true;
+
+    containers.forEach((container) => {
+      // Only validate container number if not export shipment type
+      if (String(formData.shipmentTypeId) !== "2") {
+        if (!container.containerNum) {
+          newErrors[`container-${container.id}`] = "Container number is required";
+          isValid = false;
+        }
+      }
+      // No format validation - allowing any alphanumeric characters up to 20 characters
+
+      // Validate weight for import, export, and cross-haul shipment types
+      if (
+        isImport ||
+        String(formData.shipmentTypeId) === "2" ||
+        String(formData.shipmentTypeId) === "3"
+      ) {
+        // Weight is required and must be a positive number
+        if (
+          container.weight === null ||
+          container.weight === "" ||
+          isNaN(Number(container.weight)) ||
+          Number(container.weight) <= 0
+        ) {
+          newErrors[`weight-${container.id}`] = "Valid weight is required";
+          isValid = false;
+        }
+      }
+    });
+
+    setContainerFieldErrors(newErrors);
+    return isValid;
+  };
+
+  // Validate required form fields
+  const validateRequiredFields = () => {
+    const newErrors = {};
+    let isValid = true;
+
+    // Required fields for all instruction types
+    const requiredFields = [
+      { name: "clientId", label: "Client" },
+      { name: "shipmentTypeId", label: "Shipment Type" },
+      { name: "pickup", label: "Pickup Location" },
+      { name: "dropoff", label: "Dropoff Location" },
+      { name: "pickupDate", label: "Pickup Date" },
+    ];
+
+    // Check each required field
+    requiredFields.forEach((field) => {
+      if (!formData[field.name]) {
+        newErrors[field.name] = `${field.label} is required`;
+        isValid = false;
+      }
+    });
+
+    // Set the errors
+    setFieldErrors((prev) => ({ ...prev, ...newErrors }));
+
+    // If there are errors, scroll to the first error field
+    if (!isValid) {
+      const firstErrorField = requiredFields.find(
+        (field) => !formData[field.name]
+      );
+      if (firstErrorField) {
+        scrollToField(firstErrorField.name);
+      }
+    }
+
+    return isValid;
+  };
+
+  // Count containers by type
+  const countContainersByType = () => {
+    const counts = {
+      "6m": 0,
+      "12m": 0,
+      Abnormal: 0,
+      BreakBulk: 0,
+    };
+
+    containers.forEach((container) => {
+      counts[container.containerType]++;
+    });
+
+    return counts;
+  };
+
+  // Fetch original data for comparison
+  const fetchOriginalData = async () => {
+    try {
+      const response = await api.get(
+        `/api/instructions/fc/instruction/${instructionId}`
+      );
+      return response.data;
+    } catch (error) {
+      console.error("Error fetching original data:", error);
+      return null;
     }
   };
 
-  // Function to scroll to a field with error
+  // Check if instruction is already invoiced
+  const checkIfInvoiced = async () => {
+    try {
+      if (!instructionId) return;
+
+      // Get the instruction data to get the m1key
+      const instructionData = await fetchOriginalData();
+      if (!instructionData || !instructionData.m1key) {
+        console.error("No m1key found for instruction");
+        return;
+      }
+
+      // Check if m1key exists in invoice table
+      const response = await api.get(
+        `/api/invoice/check/${instructionData.m1key}`
+      );
+      setIsInvoiced(response.data.exists);
+    } catch (error) {
+      console.error("Error checking if instruction is invoiced:", error);
+      setIsInvoiced(false);
+    }
+  };
+
+  // Validate container uniqueness
+  const validateContainerUniqueness = () => {
+    const containerNumbers = containers
+      .map((c) => c.containerNum)
+      .filter((num) => num.trim() !== "");
+    const uniqueNumbers = new Set(containerNumbers);
+
+    if (containerNumbers.length !== uniqueNumbers.size) {
+      setErrorModal({
+        isOpen: true,
+        message:
+          "Container numbers must be unique within the same instruction.",
+      });
+      return false;
+    }
+    return true;
+  };
+
+  // Enhanced validation with field highlighting
+  const validateAllFields = () => {
+    const newErrors = {};
+    let isValid = true;
+    const isCrossHaul = isCrossHaulShipment();
+
+    // Required fields validation
+    const requiredFields = [
+      { name: "clientId", label: "Client" },
+      { name: "shipmentTypeId", label: "Shipment Type" },
+      { name: "pickup", label: "Pickup Location" },
+      { name: "dropoff", label: "Dropoff Location" },
+      // pickupDate field removed
+      { name: "ksmFileRef", label: "KSM File Reference" },
+      { name: "clientFileRef", label: "Client File Reference" },
+      { name: "bookingRef", label: "Booking Reference" },
+      { name: "description", label: "Description" },
+    ];
+
+    // Add vessel name and stack date specifically for import and export shipment types
+    if (formData.shipmentTypeId === "1" || formData.shipmentTypeId === "2") {
+      requiredFields.push({ name: "vesselName", label: "Vessel Name" });
+      requiredFields.push({
+        name: "stackDate",
+        label: formData.shipmentTypeId === "1" ? "ETA Date" : "Stack Date",
+      });
+
+      console.log(
+        "Validating vessel name and stack date for shipment type:",
+        formData.shipmentTypeId
+      );
+    }
+
+    // Add weight and unitRate as required fields when rateWeight is ton or kg
+    if (formData.rateWeight === "ton" || formData.rateWeight === "kg") {
+      requiredFields.push(
+        { name: "weight", label: `Weight (${formData.rateWeight})` },
+        { name: "unitRate", label: `Rate per ${formData.rateWeight}` }
+      );
+    }
+
+    requiredFields.forEach((field) => {
+      if (!formData[field.name]) {
+        newErrors[field.name] = `${field.label} is required`;
+        isValid = false;
+      }
+    });
+
+    // Container validation
+    const containerErrors = {};
+    containers.forEach((container) => {
+      // Only validate container number if not export shipment type
+      if (String(formData.shipmentTypeId) !== "2" && !container.containerNum) {
+        containerErrors[`container-${container.id}`] =
+          "Container number is required";
+        isValid = false;
+      }
+      // No format validation - allowing any alphanumeric characters up to 20 characters
+
+      // Weight validation - only validate format if weight is provided
+      if (
+        isImport &&
+        container.weight &&
+        container.weight !== "" &&
+        !/^[0-9]*\.?[0-9]*$/.test(container.weight)
+      ) {
+        containerErrors[`weight-${container.id}`] =
+          "Weight must be a valid number";
+        isValid = false;
+      }
+    });
+
+    // Check container uniqueness
+    if (!validateContainerUniqueness()) {
+      isValid = false;
+    }
+
+    setFieldErrors(newErrors);
+    setContainerFieldErrors(containerErrors);
+
+    return isValid;
+  };
+
+  // Clear field errors when user starts typing
+  const clearFieldError = (fieldName) => {
+    setFieldErrors((prev) => ({ ...prev, [fieldName]: "" }));
+  };
+
+  const clearContainerFieldError = (containerId, fieldType) => {
+    setContainerFieldErrors((prev) => ({
+      ...prev,
+      [`${fieldType}-${containerId}`]: "",
+    }));
+  };
+
+  // Check for rate/counter mismatch and show confirmation if needed
+  const checkRateCounterMismatch = () => {
+    const mismatches = [];
+    const containerTypesWithCounts = [];
+
+    // Check each container type for rate > 0 but count = 0
+    if (
+      (formData.rateper_6 > 0 || Number(formData.rateper_6) > 0) &&
+      formData.num_six_meters === 0
+    ) {
+      mismatches.push("6m");
+    }
+    if (
+      (formData.rateper_12 > 0 || Number(formData.rateper_12) > 0) &&
+      formData.num_twelve_meters === 0
+    ) {
+      mismatches.push("12m");
+    }
+    if (
+      (formData.rateper_abnormal > 0 ||
+        Number(formData.rateper_abnormal) > 0) &&
+      formData.num_abnormal === 0
+    ) {
+      mismatches.push("Abnormal");
+    }
+
+    // If there are mismatches, collect container types with counts > 0
+    if (mismatches.length > 0) {
+      if (formData.num_six_meters > 0) {
+        containerTypesWithCounts.push(
+          `6m (${formData.num_six_meters} containers, Rate: R${formData.rateper_6})`
+        );
+      }
+      if (formData.num_twelve_meters > 0) {
+        containerTypesWithCounts.push(
+          `12m (${formData.num_twelve_meters} containers, Rate: R${formData.rateper_12})`
+        );
+      }
+      if (formData.num_abnormal > 0) {
+        containerTypesWithCounts.push(
+          `Abnormal (${formData.num_abnormal} containers, Rate: R${formData.rateper_abnormal})`
+        );
+      }
+
+      // Show confirmation modal
+      const message =
+        containerTypesWithCounts.length > 0
+          ? `You have containers with the following rates: ${containerTypesWithCounts.join(
+              ", "
+            )}. Are you sure you want to continue?`
+          : "You have set rates for container types with 0 containers. Are you sure you want to continue?";
+
+      setConfirmationModal({
+        isOpen: true,
+        message: message,
+        action: "save",
+      });
+      return false; // Don't proceed with save
+    }
+
+    return true; // No mismatches, proceed with save
+  };
+
+  // Handle save changes with enhanced logic
+  const handleSaveChanges = async () => {
+    console.log("=== SAVE CHANGES INITIATED ===");
+
+    // Special validation for vessel name and stack date for import and export shipment types
+    if (formData.shipmentTypeId === "1" || formData.shipmentTypeId === "2") {
+      const errors = {};
+      let hasSpecialValidationErrors = false;
+
+      if (!formData.vesselName || !formData.vesselName.trim()) {
+        errors.vesselName = "Vessel name is required";
+        hasSpecialValidationErrors = true;
+      }
+
+      if (!formData.stackDate || !formData.stackDate.trim()) {
+        errors.stackDate = `${
+          formData.shipmentTypeId === "1" ? "ETA" : "Stack"
+        } date is required`;
+        hasSpecialValidationErrors = true;
+      }
+
+      if (hasSpecialValidationErrors) {
+        setFieldErrors((prev) => ({ ...prev, ...errors }));
+        scrollToField(Object.keys(errors)[0]);
+        console.log(
+          "Special validation failed for vessel name or stack date:",
+          errors
+        );
+        setErrorModal({
+          isOpen: true,
+          message: `Please provide ${
+            Object.keys(errors).includes("vesselName") ? "vessel name" : ""
+          } ${
+            Object.keys(errors).includes("vesselName") &&
+            Object.keys(errors).includes("stackDate")
+              ? "and"
+              : ""
+          } ${
+            Object.keys(errors).includes("stackDate")
+              ? formData.shipmentTypeId === "1"
+                ? "ETA date"
+                : "stack date"
+              : ""
+          }`,
+        });
+        return;
+      }
+    }
+
+    // Validate all fields first
+    if (!validateAllFields()) {
+      console.log("❌ Validation failed - blocking save operation");
+      setErrorModal({
+        isOpen: true,
+        message: "Please fix all validation errors before saving.",
+      });
+      return;
+    }
+
+    // Check for rate/counter mismatch
+    if (!checkRateCounterMismatch()) {
+      console.log("⚠️ Rate/counter mismatch detected - showing confirmation");
+      return;
+    }
+
+    // Proceed with actual save logic
+    await performSave();
+  };
+
+  // Handle delete instruction
+  const handleDeleteInstruction = () => {
+    console.log("=== DELETE INSTRUCTION INITIATED ===");
+
+    // Show confirmation modal
+    setConfirmationModal({
+      isOpen: true,
+      message:
+        "Are you sure you want to delete this instruction? This action cannot be undone.",
+      action: "delete",
+    });
+  };
+
+  // Handle create invoice
+  const handleCreateInvoice = async () => {
+    console.log("=== CREATE INVOICE INITIATED ===");
+
+    try {
+      // Get the instruction data to get the m1key
+      const instructionData = await fetchOriginalData();
+      if (!instructionData || !instructionData.m1key) {
+        console.error("No m1key found for instruction");
+        setErrorModal({
+          isOpen: true,
+          message: "Could not create invoice: No instruction ID found.",
+        });
+        return;
+      }
+
+      // Show confirmation modal
+      setConfirmationModal({
+        isOpen: true,
+        message:
+          "Are you sure you want to create an invoice before dispatching containers?",
+        action: "invoice",
+      });
+    } catch (error) {
+      console.error("Error preparing invoice creation:", error);
+      setErrorModal({
+        isOpen: true,
+        message: "Error preparing invoice creation. Please try again.",
+      });
+    }
+  };
+
+  // Perform the actual delete operation
+  const performDelete = async () => {
+    try {
+      console.log(`Deleting instruction with ID: ${instructionId}`);
+      setIsContainerLoading(true);
+
+      // Call the API to delete the instruction
+      const response = await api.delete(
+        `/api/instructions/fc/instruction/${instructionId}`
+      );
+
+      console.log("Delete response:", response.data);
+
+      // Show success message
+      setContainerSuccessMessage("Instruction deleted successfully!");
+
+      // Navigate back to the instructions list after a short delay
+      setTimeout(() => {
+        navigate("/ViewClientInstruction", {
+          state: {
+            clientId,
+            clientName,
+            selectedMonth,
+            selectedYear,
+            activeFilter,
+          },
+        });
+      }, 2000);
+    } catch (error) {
+      console.error("Error deleting instruction:", error);
+
+      // Show error modal
+      setErrorModal({
+        isOpen: true,
+        message:
+          error.response?.data?.message ||
+          "Failed to delete instruction. Please try again.",
+      });
+    } finally {
+      setIsContainerLoading(false);
+    }
+  };
+
+  // Perform the actual invoice creation
+  const performInvoiceCreation = async () => {
+    try {
+      console.log(`Creating invoice for instruction with ID: ${instructionId}`);
+      setIsContainerLoading(true);
+
+      // Get the instruction data to get the m1key
+      const instructionData = await fetchOriginalData();
+      if (!instructionData || !instructionData.m1key) {
+        throw new Error("No m1key found for instruction");
+      }
+
+      // Call the API to create an invoice for the instruction
+      const response = await api.post(
+        `/generate-invoice/${instructionData.m1key}`
+      );
+
+      console.log("Invoice creation response:", response.data);
+
+      // Show success message
+      setContainerSuccessMessage("Invoice created successfully!");
+
+      // Update the isInvoiced state
+      setIsInvoiced(true);
+    } catch (error) {
+      console.error("Error creating invoice:", error);
+
+      // Show error modal
+      setErrorModal({
+        isOpen: true,
+        message:
+          error.response?.data?.message ||
+          "Failed to create invoice. Please try again.",
+      });
+    } finally {
+      setIsContainerLoading(false);
+    }
+  };
+
+  // Extract the actual save logic into a separate function
+  const performSave = async () => {
+    try {
+      setIsContainerLoading(true);
+      setContainerSuccessMessage("");
+
+      // Fetch original data for comparison
+      console.log("📊 Fetching original data for comparison...");
+      const originalData = await fetchOriginalData();
+
+      // Helper function to format dates for database (YYYY-MM-DD)
+      const formatDateForDB = (dateString) => {
+        if (!dateString) return null;
+        try {
+          // If already in YYYY-MM-DD format, return as is
+          if (/^\d{4}-\d{2}-\d{2}$/.test(dateString)) {
+            return dateString;
+          }
+          // Handle MM/DD/YYYY format
+          if (dateString.includes("/")) {
+            const [month, day, year] = dateString.split("/");
+            if (year && month && day) {
+              return `${year}-${month.padStart(2, "0")}-${day.padStart(
+                2,
+                "0"
+              )}`;
+            }
+          }
+          // Try to parse as Date object
+          const date = new Date(dateString);
+          if (!isNaN(date.getTime())) {
+            return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;  // Fixed timezone handling
+          }
+          return null;
+        } catch (e) {
+          console.error("Error formatting date:", e);
+          return null;
+        }
+      };
+
+      // Helper function to format time for database (HH:MM:SS)
+      const formatTimeForDB = (timeString) => {
+        if (!timeString) return null;
+        try {
+          const [hours, minutes] = timeString.split(":");
+          return `${hours.padStart(2, "0")}:${minutes.padStart(2, "0")}:00`;
+        } catch (e) {
+          console.error("Error formatting time:", e);
+          return null;
+        }
+      };
+
+      // Recalculate total cost based on current values
+      const numSix = formData.num_six_meters || 0;
+      const numTwelve = formData.num_twelve_meters || 0;
+      const numAbnormal = formData.num_abnormal || 0;
+
+      const ratePer6 = numSix > 0 ? Number(formData.rateper_6 || 0) : 0;
+      const ratePer12 = numTwelve > 0 ? Number(formData.rateper_12 || 0) : 0;
+      const ratePerAbnormal =
+        numAbnormal > 0 ? Number(formData.rateper_abnormal || 0) : 0;
+
+      const baseCost =
+        ratePer6 * numSix +
+        ratePer12 * numTwelve +
+        ratePerAbnormal * numAbnormal;
+      // Calculate total surcharge from containers
+      const totalSurchargeAmount = containers.reduce((total, container) => {
+        if (container.addSurcharges && container.surchargeAmount) {
+          return total + Number(container.surchargeAmount || 0);
+        }
+        return total;
+      }, 0);
+      // Calculate total hazardous amount from containers
+      const totalHazardousAmount = containers.reduce((total, container) => {
+        if (container.hazardous && container.hazardousAmount) {
+          return total + Number(container.hazardousAmount || 0);
+        }
+        return total;
+      }, 0);
+      console.log(`💲 Total cost components - Base: ${baseCost}, Surcharges: ${totalSurchargeAmount}, Hazardous: ${totalHazardousAmount}`);
+      const totalCost = Number((baseCost + totalSurchargeAmount + totalHazardousAmount).toFixed(2));
+
+      // Prepare instruction update data with proper field mapping
+      const instructionUpdateData = {
+        // Map frontend fields to backend database fields
+        client: formData.clientId,
+        ksmFileRef: formData.ksmFileRef, // Updated from task to ksmFileRef to match DB schema
+        shipment_type: formData.shipmentTypeId,
+        pickup: formData.pickup,
+        dropoff: formData.dropoff,
+        // pickuptime and pickupdate fields removed
+        stackdate: formatDateForDB(formData.stackDate),
+        lastFreeDate: formatDateForDB(formData.lastFreeDate),
+        clientFileRef: formData.clientFileRef,
+        rateweight: formData.rateWeight,
+        description: formData.description,
+        status: formData.status,
+        vat: formData.vat === 0 ? 0 : formData.vat || 15,
+        num_six_meters:
+          formData.rateWeight === "kg" || formData.rateWeight === "ton"
+            ? 0
+            : numSix,
+        num_twelve_meters:
+          formData.rateWeight === "kg" || formData.rateWeight === "ton"
+            ? 0
+            : numTwelve,
+        num_abnormal:
+          formData.rateWeight === "kg" || formData.rateWeight === "ton"
+            ? 0
+            : numAbnormal,
+        num_breakbulk: 0,
+        // For ton or kg, weight must be provided and not defaulted to 0
+        weight:
+          formData.rateWeight !== "Container"
+            ? formData.weight
+              ? Number(formData.weight)
+              : null
+            : null,
+        total_cost: totalCost,
+        booking_ref: formData.bookingRef,
+        vessel_name: formData.vesselName,
+        rateper_6:
+          formData.rateWeight === "kg" || formData.rateWeight === "ton"
+            ? 0
+            : ratePer6,
+        rateper_12:
+          formData.rateWeight === "kg" || formData.rateWeight === "ton"
+            ? 0
+            : ratePer12,
+        rateper_abnormal:
+          formData.rateWeight === "kg" || formData.rateWeight === "ton"
+            ? 0
+            : ratePerAbnormal,
+        rateper_breakbulk: 0,
+        // For ton or kg, unitRate must be provided and not defaulted to 0
+        unitrate:
+          formData.rateWeight !== "Container"
+            ? formData.unitRate
+              ? Number(formData.unitRate)
+              : null
+            : null,
+      };
+
+      // Prepare container data with containerKey for smart updates
+      // When rateWeight is kg or ton, we don't save any container details
+      const containerData =
+        formData.rateWeight === "kg" || formData.rateWeight === "ton"
+          ? []
+          : containers.map((container) => {
+              // Sanitize weight value
+              let sanitizedWeight = null;
+              if (
+                container.weight !== null &&
+                container.weight !== undefined &&
+                container.weight !== ""
+              ) {
+                if (typeof container.weight === "string") {
+                  const trimmedWeight = container.weight.trim();
+                  if (trimmedWeight !== "") {
+                    const parsedWeight = Number.parseFloat(trimmedWeight);
+                    if (!isNaN(parsedWeight) && parsedWeight >= 0) {
+                      sanitizedWeight = parsedWeight;
+                    }
+                  }
+                } else if (
+                  typeof container.weight === "number" &&
+                  container.weight >= 0
+                ) {
+                  sanitizedWeight = container.weight;
+                }
+              }
+
+              return {
+                containerKey: container.containerKey, // Important for smart updates
+                containernum: container.containerNum || "",
+                file_ref: container.fileRef || "", // Added fileRef field
+                weight: sanitizedWeight, // Will be null for empty/invalid values
+                container_type: container.containerType || "",
+                cargo_description: container.cargoDescription || "",
+                "Hazardous": Boolean(container.hazardous),
+                "Hazardous Amount": Number(container.hazardousAmount || 0),
+                "Add Surcharges": Boolean(container.addSurcharges),
+                "Surcharge Amount": Number(container.surchargeAmount || 0),
+              };
+            });
+
+      // Debug: Log the container data being sent to server
+      console.log("🚀 CONTAINER DATA BEING SENT TO SERVER:");
+      console.log("==========================================");
+      containerData.forEach((container, index) => {
+        console.log(`Container ${index}:`, {
+          containerKey: container.containerKey,
+          containernum: container.containernum,
+          file_ref: container.file_ref,
+          "Add Surcharges": container["Add Surcharges"],
+          "Surcharge Amount": container["Surcharge Amount"],
+          "Hazardous": container["Hazardous"],
+          "Hazardous Amount": container["Hazardous Amount"],
+          addSurchargesType: typeof container["Add Surcharges"],
+          surchargeAmountType: typeof container["Surcharge Amount"],
+          hazardousType: typeof container["Hazardous"],
+          hazardousAmountType: typeof container["Hazardous Amount"],
+          fileRefType: typeof container.file_ref
+        });
+      });
+
+      // Console log comparison between old and new data
+      console.log("📋 DATA COMPARISON:");
+      console.log("===================");
+
+      if (originalData) {
+        console.log("🔄 INSTRUCTION CHANGES:");
+        console.log(
+          "Old total_cost:",
+          originalData.total_cost,
+          "→ New total_cost:",
+          totalCost
+        );
+        console.log(
+          "Old num_six_meters:",
+          originalData.num_six_meters,
+          "→ New num_six_meters:",
+          numSix
+        );
+        console.log(
+          "Old num_twelve_meters:",
+          originalData.num_twelve_meters,
+          "→ New num_twelve_meters:",
+          numTwelve
+        );
+        console.log(
+          "Old num_abnormal:",
+          originalData.num_abnormal,
+          "→ New num_abnormal:",
+          numAbnormal
+        );
+        console.log(
+          "Old rateper_6:",
+          originalData.rateper_6,
+          "→ New rateper_6:",
+          ratePer6
+        );
+        console.log(
+          "Old rateper_12:",
+          originalData.rateper_12,
+          "→ New rateper_12:",
+          ratePer12
+        );
+        console.log(
+          "Old rateper_abnormal:",
+          originalData.rateper_abnormal,
+          "→ New rateper_abnormal:",
+          ratePerAbnormal
+        );
+        console.log(
+          "Old task:",
+          originalData.task,
+          "→ New task:",
+          formData.task
+        );
+        console.log(
+          "Old description:",
+          originalData.description,
+          "→ New description:",
+          formData.description
+        );
+      }
+
+      console.log("💾 Sending update request to server...");
+      console.log("Instruction data:", instructionUpdateData);
+      console.log("Container data:", containerData);
+
+      // Make the API call
+      const response = await api.put(
+        `/api/instructions/fc/update/${instructionId}`,
+        {
+          instructionData: instructionUpdateData,
+          containers: containerData,
+        }
+      );
+
+      console.log("✅ Server response:", response.data);
+
+      // Check for successful response (status 200)
+      if (response.status === 200) {
+        console.log("🎉 Save operation completed successfully!");
+
+        // Show success message
+        setContainerSuccessMessage("Changes saved successfully!");
+        setIsContainerDataModified(false);
+
+        // Navigate after 2 seconds
+        setTimeout(() => {
+          console.log("🚀 Navigating to instructions list...");
+          navigate("/ViewClientInstruction");
+        }, 2000);
+      } else {
+        console.warn("⚠️ Unexpected server response:", response);
+        setErrorModal({
+          isOpen: true,
+          message:
+            "Save completed but server response was unexpected. Please verify your changes.",
+        });
+      }
+    } catch (error) {
+      console.error("❌ Error saving changes:", error);
+      console.error("Error details:", error.response?.data || error.message);
+
+      setErrorModal({
+        isOpen: true,
+        message:
+          error.response?.data?.message ||
+          "Failed to save changes. Please try again.",
+      });
+    } finally {
+      setIsContainerLoading(false);
+    }
+  };
+
+  // Handle confirmation modal actions
+  const handleConfirmAction = () => {
+    if (confirmationModal.action === "save") {
+      performSave();
+    } else if (confirmationModal.action === "delete") {
+      performDelete();
+    } else if (confirmationModal.action === "invoice") {
+      performInvoiceCreation();
+    }
+    setConfirmationModal({ isOpen: false, message: "", action: null });
+  };
+
+  const handleCancelAction = () => {
+    setConfirmationModal({ isOpen: false, message: "", action: null });
+  };
+
+  // Initialize containers when component mounts or container counts change
+  useEffect(() => {
+    console.log("Container loading effect triggered");
+    console.log("Current instructionId:", instructionId);
+
+    const loadContainers = async () => {
+      // If we already have containers from the instruction data, don't load them again
+      if (containers && containers.length > 0) {
+        console.log("Containers already loaded from instruction data");
+        return;
+      }
+
+      if (!instructionId) {
+        console.log("No instructionId, initializing empty containers");
+        initializeContainers();
+        return;
+      }
+
+      // Only fetch containers if we don't have any yet
+      console.log(
+        "No containers loaded yet, fetching from API for instruction:",
+        instructionId
+      );
+      setIsContainerLoading(true);
+
+      try {
+        const response = await api.get(
+          `/api/instructions/fc/instruction/${instructionId}`
+        );
+        console.log("Containers API response:", response.data);
+
+        if (response.data && response.data.length > 0) {
+          const containersList = response.data.map((container, index) => ({
+            id: container.containerkey || index + 1,
+            containerKey: container.containerkey,
+            containerNum: container.containernum || "",
+            fileRef: container.file_ref || "", // Added fileRef mapping
+            weight:
+              container.weight !== null && container.weight !== undefined
+                ? container.weight
+                : null,
+            containerType: container.container_type || "6m",
+            cargoDescription: container.cargo_description || "",
+            hazardous: container.Hazardous || false,
+            addSurcharges: container["Add Surcharges"] || false,
+            surchargeAmount: container["Surcharge Amount"] || 0,
+            hazardousAmount: container["Hazardous Amount"] || 0,
+          }));
+
+          console.log("Setting containers from API:", containersList);
+          setContainers(containersList);
+          setIsContainerDataModified(false);
+        } else if (
+          formData.num_six_meters > 0 ||
+          formData.num_twelve_meters > 0 ||
+          formData.num_abnormal > 0
+        ) {
+          console.log(
+            "No containers found in API, initializing based on form counts"
+          );
+          initializeContainers();
+        }
+      } catch (error) {
+        console.error("Error loading containers:", error);
+        if (error.response) {
+          console.error("Error response data:", error.response.data);
+          console.error("Error status:", error.response.status);
+        }
+        // Even if there's an error, try to initialize containers based on form data
+        if (
+          formData.num_six_meters > 0 ||
+          formData.num_twelve_meters > 0 ||
+          formData.num_abnormal > 0
+        ) {
+          console.log(
+            "Error occurred, initializing containers based on form counts"
+          );
+          initializeContainers();
+        }
+      } finally {
+        setIsContainerLoading(false);
+      }
+    };
+
+    loadContainers();
+  }, [
+    instructionId,
+    formData.num_six_meters,
+    formData.num_twelve_meters,
+    formData.num_abnormal,
+    containers,
+  ]);
+
   const scrollToField = (fieldName) => {
     const fieldRef = fieldRefs[fieldName];
     if (fieldRef && fieldRef.current) {
@@ -198,7 +1516,6 @@ const FCcontrollerinstructions = () => {
         behavior: "smooth",
         block: "center",
       });
-      // Focus the field
       setTimeout(() => {
         if (fieldRef.current.focus) {
           fieldRef.current.focus();
@@ -207,536 +1524,500 @@ const FCcontrollerinstructions = () => {
     }
   };
 
-  // Add this function to parse MM/DD/YYYY string to Date object
-  const parseDate = (dateString) => {
-    if (!dateString) return null;
-
-    try {
-      // Parse MM/DD/YYYY format
-      const [month, day, year] = dateString.split("/").map(Number);
-      return new Date(year, month - 1, day);
-    } catch (error) {
-      console.error("Error parsing date:", error);
-      return null;
-    }
+  const openCalendar = (ref) => {
+    ref.current.click();
   };
 
-  // Add this function to handle date selection from the calendar
-  const handleDateChange = (date, fieldName) => {
-    if (!date) {
-      setFormData({
-        ...formData,
-        [fieldName]: "",
-      });
+  // First useEffect: Fetch clients and shipment types on initial load
+  useEffect(() => {
+    console.log("Initial data fetch started");
+
+    const fetchInitialData = async () => {
+      try {
+        await Promise.all([fetchClients(), fetchShipmentTypes()]);
+
+        // If we have an instructionId and no preserved data, fetch the instruction
+        if (instructionId && !preservedFormData) {
+          console.log("Calling fetchInstructionData with ID:", instructionId);
+          await fetchInstructionData(instructionId);
+        } else if (preservedFormData) {
+          // If we have preserved data, update the import state
+          if (preservedFormData.shipmentTypeName) {
+            setIsImport(
+              preservedFormData.shipmentTypeName.toLowerCase() === "import"
+            );
+          }
+          // Update form data with preserved data
+          setFormData((prev) => ({ ...prev, ...preservedFormData }));
+        }
+      } catch (error) {
+        console.error("Error in initial data fetch:", error);
+        setErrorModal({
+          open: true,
+          message: "Failed to load initial form data. Please try again.",
+        });
+      } finally {
+        setIsLoading((prev) => ({ ...prev, instruction: false }));
+      }
+    };
+
+    // Call the fetchInitialData function
+    fetchInitialData();
+  }, [instructionId, preservedFormData]);
+
+  // Update form data when preserved data changes
+  useEffect(() => {
+    if (preservedFormData) {
+      console.log("Updating form with preserved data:", preservedFormData);
+
+      // Format dates before setting form data
+      const formattedData = {
+        ...preservedFormData,
+        // pickupDate field removed
+        stackDate: formatDateForInput(preservedFormData.stackDate),
+        lastFreeDate: preservedFormData.deadline
+          ? formatDateForInput(preservedFormData.deadline)
+          : "",
+      };
+
+      // Update form data
+      if (containerCounts) {
+        console.log(
+          "Updating form data with container counts:",
+          containerCounts
+        );
+        const newFormData = {
+          ...formattedData,
+          num_six_meters: containerCounts["6m"] || 0,
+          num_twelve_meters: containerCounts["12m"] || 0,
+          num_abnormal: containerCounts["Abnormal"] || 0,
+          rateWeight: "Container",
+          weight: "",
+        };
+        setFormData(newFormData);
+        // Update previous counts
+        setPrevContainerCounts({
+          num_six_meters: containerCounts["6m"] || 0,
+          num_twelve_meters: containerCounts["12m"] || 0,
+          num_abnormal: containerCounts["Abnormal"] || 0,
+        });
+      }
+
+      // Update shipment type and isImport state
+      if (preservedFormData.shipmentTypeName) {
+        const isImportType =
+          preservedFormData.shipmentTypeName.toLowerCase() === "import";
+        setIsImport(isImportType);
+      }
+
+      // Update rate values from preserved data - check multiple possible sources
+      if (preservedFormData.sixMeterRate !== undefined) {
+        setFormData((prev) => ({
+          ...prev,
+          rateper_6: preservedFormData.sixMeterRate,
+        }));
+      } else if (preservedFormData.rateper_6 !== undefined) {
+        setFormData((prev) => ({
+          ...prev,
+          rateper_6: preservedFormData.rateper_6,
+        }));
+      }
+
+      if (preservedFormData.twelveMeterRate !== undefined) {
+        setFormData((prev) => ({
+          ...prev,
+          rateper_12: preservedFormData.twelveMeterRate,
+        }));
+      } else if (preservedFormData.rateper_12 !== undefined) {
+        setFormData((prev) => ({
+          ...prev,
+          rateper_12: preservedFormData.rateper_12,
+        }));
+      }
+
+      if (preservedFormData.abnormalRate !== undefined) {
+        setFormData((prev) => ({
+          ...prev,
+          rateper_abnormal: preservedFormData.abnormalRate,
+        }));
+      } else if (preservedFormData.rateper_abnormal !== undefined) {
+        setFormData((prev) => ({
+          ...prev,
+          rateper_abnormal: preservedFormData.rateper_abnormal,
+        }));
+      }
+    }
+  }, [preservedFormData, containerCounts]);
+
+  // Add a separate useEffect to handle isImport state when formData.shipmentTypeName changes
+  useEffect(() => {
+    if (formData.shipmentTypeName) {
+      const isImportType = formData.shipmentTypeName.toLowerCase() === "import";
+      setIsImport(isImportType);
+    }
+  }, [formData.shipmentTypeName]);
+
+  useEffect(() => {
+    if (location.state?.preservedContainers) {
+      setPreservedContainers(location.state.preservedContainers);
+    }
+  }, [location.state?.preservedContainers]);
+
+  // NEW: Effect to handle rate auto-population when count changes from 0 to >0
+  useEffect(() => {
+    // Only run if we have clients data and form data with clientId
+    if (clients.length === 0 || !formData.clientId) {
       return;
     }
 
-    // Format date to MM/DD/YYYY
-    const month = String(date.getMonth() + 1).padStart(2, "0");
-    const day = String(date.getDate()).padStart(2, "0");
-    const year = date.getFullYear();
-    const formattedDate = `${month}/${day}/${year}`;
-
-    // Create a synthetic event to reuse existing handleInputChange logic
-    const syntheticEvent = {
-      target: {
-        name: fieldName,
-        value: formattedDate,
-        type: "text",
-      },
-    };
-
-    handleInputChange(syntheticEvent);
-  };
-
-  // Function to close calendar modal
-  const closeCalendar = () => {
-    setCalendarModals({
-      pickupDate: false,
-      stackDate: false,
-      deadline: false,
-    });
-  };
-
-  // Function to handle date selection in calendar
-  const handleDateSelect = (date) => {
-    const selectedDate = new Date(
-      calendarState.currentYear,
-      calendarState.currentMonth,
-      date
+    const selectedClient = clients.find(
+      (client) => client.m5clientkey.toString() === formData.clientId.toString()
     );
+    if (!selectedClient) {
+      return;
+    }
 
-    // Format as MM/DD/YYYY
-    const formattedDate = `${String(selectedDate.getMonth() + 1).padStart(
-      2,
-      "0"
-    )}/${String(selectedDate.getDate()).padStart(
-      2,
-      "0"
-    )}/${selectedDate.getFullYear()}`;
-
-    // Update the form data with the selected date
-    const activeCalendar = calendarState.activeCalendar;
-
-    if (activeCalendar === "pickupDate") {
-      // For pickup date, update and validate other dates
-      const updatedFormData = {
-        ...formData,
-        pickupDate: formattedDate,
-      };
-
-      // Reset stack date and deadline if they're now invalid
+    // Handle 6-meter containers
+    const sixMeterChanged =
+      prevContainerCounts.num_six_meters === 0 && formData.num_six_meters > 0;
+    if (sixMeterChanged) {
+      // Only populate if current rate is empty or zero
       if (
-        formData.stackDate &&
-        compareDates(formData.stackDate, formattedDate) < 0
+        (formData.rateper_6 === "" ||
+          formData.rateper_6 === "0" ||
+          Number(formData.rateper_6) === 0) &&
+        selectedClient.driver_six_meter_rate
       ) {
-        updatedFormData.stackDate = "";
-        setFieldErrors((prev) => ({
-          ...prev,
-          stackDate: `${
-            isImport ? "ETA" : "Stack date"
-          } cannot be before pickup date`,
-        }));
-      }
-
-      if (
-        formData.deadline &&
-        compareDates(formData.deadline, formattedDate) < 0
-      ) {
-        updatedFormData.deadline = "";
-        setFieldErrors((prev) => ({
-          ...prev,
-          deadline: "Deadline cannot be before pickup date",
-        }));
-      }
-
-      setFormData(updatedFormData);
-    } else if (activeCalendar === "stackDate") {
-      // For stack date, ensure it's after pickup date
-      if (!formData.pickupDate) {
-        setErrorModal({
-          isOpen: true,
-          message: "Please select a pickup date first",
-        });
-        closeCalendar();
-        return;
-      }
-
-      if (compareDates(formattedDate, formData.pickupDate) < 0) {
-        setErrorModal({
-          isOpen: true,
-          message: `${
-            isImport ? "ETA" : "Stack date"
-          } cannot be before pickup date`,
-        });
-        closeCalendar();
-        return;
-      }
-
-      const updatedFormData = {
-        ...formData,
-        stackDate: formattedDate,
-      };
-
-      // Reset deadline if it's now invalid
-      if (
-        formData.deadline &&
-        compareDates(formData.deadline, formattedDate) < 0
-      ) {
-        updatedFormData.deadline = "";
-        setFieldErrors((prev) => ({
-          ...prev,
-          deadline: `Deadline cannot be before ${
-            isImport ? "ETA" : "stack date"
-          }`,
-        }));
-      }
-
-      setFormData(updatedFormData);
-    } else if (activeCalendar === "deadline") {
-      // For deadline, ensure it's after pickup date and stack date
-      if (!formData.pickupDate) {
-        setErrorModal({
-          isOpen: true,
-          message: "Please select a pickup date first",
-        });
-        closeCalendar();
-        return;
-      }
-
-      if (!formData.stackDate) {
-        setErrorModal({
-          isOpen: true,
-          message: `Please select ${
-            isImport ? "an ETA" : "a stack date"
-          } first`,
-        });
-        closeCalendar();
-        return;
-      }
-
-      if (compareDates(formattedDate, formData.pickupDate) < 0) {
-        setErrorModal({
-          isOpen: true,
-          message: "Deadline cannot be before pickup date",
-        });
-        closeCalendar();
-        return;
-      }
-
-      if (compareDates(formattedDate, formData.stackDate) < 0) {
-        setErrorModal({
-          isOpen: true,
-          message: `Deadline cannot be before ${
-            isImport ? "ETA" : "stack date"
-          }`,
-        });
-        closeCalendar();
-        return;
-      }
-
-      setFormData({
-        ...formData,
-        deadline: formattedDate,
-      });
-    }
-
-    // Clear any error for this field
-    setFieldErrors((prev) => ({
-      ...prev,
-      [activeCalendar]: "",
-    }));
-
-    setIsDataModified(true);
-    closeCalendar();
-  };
-
-  // Function to navigate to previous month in calendar
-  const prevMonth = () => {
-    setCalendarState((prev) => {
-      let newMonth = prev.currentMonth - 1;
-      let newYear = prev.currentYear;
-
-      if (newMonth < 0) {
-        newMonth = 11;
-        newYear--;
-      }
-
-      return {
-        ...prev,
-        currentMonth: newMonth,
-        currentYear: newYear,
-      };
-    });
-  };
-
-  // Function to navigate to next month in calendar
-  const nextMonth = () => {
-    setCalendarState((prev) => {
-      let newMonth = prev.currentMonth + 1;
-      let newYear = prev.currentYear;
-
-      if (newMonth > 11) {
-        newMonth = 0;
-        newYear++;
-      }
-
-      return {
-        ...prev,
-        currentMonth: newMonth,
-        currentYear: newYear,
-      };
-    });
-  };
-
-  // Function to add one day to a date string in MM/DD/YYYY format
-  const addOneDay = (dateString) => {
-    if (!dateString) return "";
-
-    try {
-      // Parse the MM/DD/YYYY format
-      const [month, day, year] = dateString.split("/");
-
-      // Create a new date and add one day
-      const date = new Date(Number(year), Number(month) - 1, Number(day));
-      date.setDate(date.getDate() + 1);
-
-      // Format back to MM/DD/YYYY
-      return `${String(date.getMonth() + 1).padStart(2, "0")}/${String(
-        date.getDate()
-      ).padStart(2, "0")}/${date.getFullYear()}`;
-    } catch (error) {
-      console.error("Error adding one day to date:", error);
-      return dateString;
-    }
-  };
-
-  // Format time from HH:MM:SS to HH:MM (24-hour format)
-  const formatTimeForDisplay = (time) => {
-    if (!time) return "";
-    const [hours, minutes] = time.split(":");
-    return `${hours}:${minutes}`;
-  };
-
-  // Format time from HH:MM to HH:MM:SS (24-hour format)
-  const formatTimeForSubmission = (displayTime) => {
-    if (!displayTime) return null;
-    const [hours, minutes] = displayTime.split(":");
-    return `${hours}:${minutes}:00`;
-  };
-
-  // Format weight to 2 decimal places
-  const formatWeightForDisplay = (weight) => {
-    if (weight === null || weight === undefined || weight === "") {
-      return "No Weight Amount Provided";
-    }
-    return Number.parseFloat(weight).toFixed(2);
-  };
-
-  // Function to format date from API (YYYY-MM-DD) to input element (MM/DD/YYYY)
-  const formatDateForInput = (dateString) => {
-    if (!dateString) return "";
-
-    try {
-      // Create a date object from the string
-      const date = new Date(dateString);
-
-      // Check if it's a valid date
-      if (isNaN(date.getTime())) {
-        console.error("Invalid date:", dateString);
-        return "";
-      }
-
-      // Format as MM/DD/YYYY for input display
-      const month = String(date.getMonth() + 1).padStart(2, "0");
-      const day = String(date.getDate()).padStart(2, "0");
-      const year = date.getFullYear();
-
-      const formattedDate = `${month}/${day}/${year}`;
-      console.log(`Formatted date from ${dateString} to ${formattedDate}`);
-      return formattedDate;
-    } catch (error) {
-      console.error("Error formatting date:", error);
-      return "";
-    }
-  };
-
-  // Function to convert MM/DD/YYYY format to API format (YYYY-MM-DD)
-  const formatDateForAPI = (dateString) => {
-    if (!dateString) return "";
-
-    try {
-      // Parse the MM/DD/YYYY format
-      const [month, day, year] = dateString.split("/");
-
-      // Return in YYYY-MM-DD format
-      return `${year}-${month.padStart(2, "0")}-${day.padStart(2, "0")}`;
-    } catch (error) {
-      console.error("Error formatting date for API:", error, dateString);
-      return dateString; // Return original if parsing fails
-    }
-  };
-
-  // Helper function to compare dates in MM/DD/YYYY format
-  const compareDates = (date1, date2) => {
-    if (!date1 || !date2) return 0;
-
-    const [month1, day1, year1] = date1.split("/").map(Number);
-    const [month2, day2, year2] = date2.split("/").map(Number);
-
-    const d1 = new Date(year1, month1 - 1, day1);
-    const d2 = new Date(year2, month2 - 1, day2);
-
-    return d1 - d2;
-  };
-
-  // Function to save changes to the database
-  const saveChangesToDatabase = async () => {
-    if (!instructionId) {
-      throw new Error("No instruction ID provided");
-    }
-
-    // Calculate total cost
-    const totalCost = calculateTotalCost();
-
-    // Prepare weight value based on selection
-    let weightValue = null;
-    if (formData.rateWeight === "kg" || formData.rateWeight === "m³") {
-      weightValue = Number.parseFloat(formData.weight);
-      if (isNaN(weightValue)) {
-        throw new Error(
-          `Please enter a valid weight for ${formData.rateWeight} rate`
+        const newRate = selectedClient.driver_six_meter_rate.toString();
+        setFormData((prev) => ({ ...prev, rateper_6: newRate }));
+        console.log(
+          `Auto-populated 6m rate: ${newRate} (count changed from 0 to ${formData.num_six_meters})`
         );
       }
     }
 
-    // Prepare instruction data for API
-    const instructionData = {
-      client: Number.parseInt(formData.clientId),
-      task: formData.task,
-      shipment_type: Number.parseInt(formData.shipmentTypeId),
-      pickup: formData.pickup,
-      dropoff: formData.dropoff,
-      hazardous: formData.hazardous,
-      surchages: formData.surcharges,
-      pickuptime: formatTimeForSubmission(formData.pickupTime),
-      pickupdate: formatDateForAPI(formData.pickupDate),
-      stackdate: formatDateForAPI(formData.stackDate),
-      deadline: formatDateForAPI(formData.deadline),
-      fileref: formData.fileRef,
-      bookingRef: formData.bookingRef,
-      rateweight: formData.rateWeight,
-      rate: Number.parseFloat(formData.rate),
-      description: formData.description,
-      status: formData.status || "In Progress",
-      vat: formData.vat,
+    // Handle 12-meter containers
+    const twelveMeterChanged =
+      prevContainerCounts.num_twelve_meters === 0 &&
+      formData.num_twelve_meters > 0;
+    if (twelveMeterChanged) {
+      // Only populate if current rate is empty or zero
+      if (
+        (formData.rateper_12 === "" ||
+          formData.rateper_12 === "0" ||
+          Number(formData.rateper_12) === 0) &&
+        selectedClient.driver_twelve_meter_rate
+      ) {
+        const newRate = selectedClient.driver_twelve_meter_rate.toString();
+        setFormData((prev) => ({ ...prev, rateper_12: newRate }));
+        console.log(
+          `Auto-populated 12m rate: ${newRate} (count changed from 0 to ${formData.num_twelve_meters})`
+        );
+      }
+    }
+
+    // Clear rates when count goes to 0
+    if (
+      formData.num_six_meters === 0 &&
+      prevContainerCounts.num_six_meters > 0
+    ) {
+      setFormData((prev) => ({ ...prev, rateper_6: "" }));
+      console.log("Cleared 6m rate (count went to 0)");
+    }
+
+    if (
+      formData.num_twelve_meters === 0 &&
+      prevContainerCounts.num_twelve_meters > 0
+    ) {
+      setFormData((prev) => ({ ...prev, rateper_12: "" }));
+      console.log("Cleared 12m rate (count went to 0)");
+    }
+
+    if (formData.num_abnormal === 0 && prevContainerCounts.num_abnormal > 0) {
+      setFormData((prev) => ({ ...prev, rateper_abnormal: "" }));
+      console.log("Cleared abnormal rate (count went to 0)");
+    }
+
+    // Update previous counts for next comparison
+    setPrevContainerCounts({
       num_six_meters: formData.num_six_meters,
       num_twelve_meters: formData.num_twelve_meters,
       num_abnormal: formData.num_abnormal,
-      weight: weightValue,
-      total_cost: totalCost,
-      // Add vessel information
-      booking_ref: formData.bookingRef,
-      vessel_name: formData.vesselName,
-      voyage_num: formData.voyageNo,
-      imo_num: formData.imoNo,
-      flag_reg: formData.flagReg,
-    };
-
-    console.log("Updating instruction data:", instructionData);
-
-    // Update instruction using axios
-    const instructionResponse = await api.put(
-      `/api/instruction/${instructionId}`,
-      instructionData
-    );
-
-    console.log("Instruction updated successfully");
-    setIsDataModified(false);
-
-    return instructionResponse.data;
-  };
-
-  // Fetch clients, shipment types, and instruction data on component mount
-  useEffect(() => {
-    fetchClients();
-    fetchShipmentTypes();
-
-    if (preservedFormData) {
-      // Use preserved form data if available (coming back from container details)
-      setFormData({
-        ...preservedFormData,
-        clientId: clientId || preservedFormData.clientId, // Ensure clientId is set
-      });
-      // Set isImport based on the preserved shipment type
-      const shipmentTypeName = preservedFormData.shipmentTypeName || "";
-      setIsImport(shipmentTypeName.toLowerCase() === "import");
-      setIsLoading((prev) => ({ ...prev, instruction: false }));
-    } else if (instructionId) {
-      // Otherwise fetch instruction data if ID is provided
-      fetchInstructionData(instructionId);
-    } else if (clientId) {
-      // If we have a clientId but no instruction, update the form with the clientId
-      setFormData((prev) => ({
-        ...prev,
-        clientId: clientId,
-      }));
-    }
-
-    // If we have container counts from FCcontrollerInstructionDetails, update the form
-    if (containerCounts) {
-      setFormData((prev) => ({
-        ...prev,
-        num_six_meters: containerCounts.num_six_meters || prev.num_six_meters,
-        num_twelve_meters:
-          containerCounts.num_twelve_meters || prev.num_twelve_meters,
-        num_abnormal: containerCounts.num_abnormal || prev.num_abnormal,
-      }));
-
-      // Recalculate total cost after updating container counts
-      setTimeout(() => {
-        updateTotalCost();
-      }, 0);
-    }
-  }, [instructionId, preservedFormData, clientId, containerCounts]);
+    });
+  }, [
+    formData.num_six_meters,
+    formData.num_twelve_meters,
+    formData.num_abnormal,
+    clients,
+    formData.clientId,
+  ]);
 
   // Fetch instruction data by ID
   const fetchInstructionData = async (id) => {
+    if (!id) {
+      console.error("No instruction ID provided to fetchInstructionData");
+      return;
+    }
+
+    console.log("fetchInstructionData called with id:", id);
     setIsLoading((prev) => ({ ...prev, instruction: true }));
     try {
       console.log(`Fetching instruction data for ID: ${id}`);
-
-      // Use axios instead of fetch
-      const response = await api.get(`/api/instruction/${id}`);
-
+      const response = await api.get(`/api/instructions/fc/instruction/${id}`);
       const data = response.data;
+
       console.log("Instruction data received:", data);
 
-      // Store original dates for debugging
-      console.log("Original dates from database:", {
-        pickupdate: data.pickupdate,
-        stackdate: data.stackdate,
-        deadline: data.deadline,
-      });
+      if (!data) {
+        throw new Error("No data returned from server");
+      }
 
-      // Format dates for display in MM/DD/YYYY format
-      const formattedPickupDate = formatDateForInput(data.pickupdate);
-      const formattedStackDate = formatDateForInput(data.stackdate);
-      const formattedDeadlineDate = formatDateForInput(data.deadline);
-
-      // Format dates and times for display
-      const formattedData = {
-        clientId: clientId || data.client.toString(), // Use passed clientId if available
+      // Set the main form data
+      const newFormData = {
+        clientId: data.client ? data.client.toString() : "",
         representative: data.representative || "",
         contactDetails: data.cellnum || "",
         email: data.email || "",
-        shipmentTypeId: data.shipment_type.toString(),
+        shipmentTypeId: data.shipment_type ? data.shipment_type.toString() : "",
         shipmentTypeName: data.shipmenttype || "",
-        task: data.task || "",
+        ksmFileRef: data.ksmFileRef || "", // Updated from task to ksmFileRef
         pickup: data.pickup || "",
         dropoff: data.dropoff || "",
-        hazardous: data.hazardous || false,
-        surcharges: data.surchages || false,
-        pickupTime: formatTimeForDisplay(data.pickuptime) || "",
-        // Store dates in MM/DD/YYYY format
-        pickupDate: formattedPickupDate,
-        stackDate: formattedStackDate,
-        deadline: formattedDeadlineDate,
-        fileRef: data.fileref || "",
+        // pickupTime and pickupDate fields removed
+        stackDate: formatDateForInput(data.stackdate) || "",
+        lastFreeDate: data.lastFreeDate ? formatDateForInput(data.lastFreeDate) : "", // Updated from deadline to lastFreeDate
+        clientFileRef: data.clientFileRef || "", // Updated from fileref to clientFileRef
         bookingRef: data.booking_ref || "",
-        rateWeight: data.rateweight || "kg",
-        rate: data.rate ? data.rate.toString() : "",
-        weight: data.weight ? formatWeightForDisplay(data.weight) : "", // Format weight
+        rateWeight: data.rateweight || "Container",
+        weight: data.weight || "",
         num_six_meters: data.num_six_meters || 0,
         num_twelve_meters: data.num_twelve_meters || 0,
         num_abnormal: data.num_abnormal || 0,
-        vat: data.vat || 15,
+        num_breakbulk: data.num_breakbulk || 0,
+        vat: data.vat === 0 ? 0 : data.vat || 15,
         description: data.description || "",
-        status: data.status || "",
-        total_cost: data.total_cost || 0, // Include total_cost
-        // Include vessel information
         vesselName: data.vessel_name || "",
-        voyageNo: data.voyage_num || "",
-        imoNo: data.imo_num || "",
-        flagReg: data.flag_reg || "",
+        unitRate: data.unitrate || 0,
+        total_cost: calculateTotalCostFromRates(
+          data.rateper_6 || 0,
+          data.rateper_12 || 0,
+          data.rateper_abnormal || 0,
+          data.num_six_meters || 0,
+          data.num_twelve_meters || 0,
+          data.num_abnormal || 0
+        ),
+        // Store rate data for preservation
+        rateper_6: data.rateper_6 || 0,
+        rateper_12: data.rateper_12 || 0,
+        rateper_abnormal: data.rateper_abnormal || 0,
+        rateper_breakbulk: data.rateper_breakbulk || 0,
+        status: data.status || "",
       };
 
-      console.log("Formatted data for form:", formattedData);
-      setFormData(formattedData);
+      setFormData(newFormData);
 
-      // Set isImport based on the fetched shipment type
-      const shipmentTypeName = data.shipmenttype || "";
-      setIsImport(shipmentTypeName.toLowerCase() === "import");
+      // Update isImport state based on loaded shipment type
+      const isImportType =
+        data.shipmenttype && data.shipmenttype.toLowerCase() === "import";
+      setIsImport(isImportType);
+
+      // Set initial previous counts for existing instruction
+      setPrevContainerCounts({
+        num_six_meters: data.num_six_meters || 0,
+        num_twelve_meters: data.num_twelve_meters || 0,
+        num_abnormal: data.num_abnormal || 0,
+      });
+
+      // Set individual rate state variables from the backend response
+      setFormData((prev) => ({
+        ...prev,
+        rateper_6: (data.rateper_6 || 0).toString(),
+      }));
+      setFormData((prev) => ({
+        ...prev,
+        rateper_12: (data.rateper_12 || 0).toString(),
+      }));
+      setFormData((prev) => ({
+        ...prev,
+        rateper_abnormal: (data.rateper_abnormal || 0).toString(),
+      }));
+      setWeight("");
+
+      // Process containers if they exist in the response
+      if (data.containers && data.containers.length > 0) {
+        console.log(
+          "Processing containers from instruction data:",
+          data.containers
+        );
+
+        // Determine if weight should be loaded based on shipment type
+        const shouldLoadWeight =
+          isImportType ||
+          String(data.shipment_type) === "2" ||
+          String(data.shipment_type) === "3";
+
+        console.log("Should load weight for containers:", {
+          shipmentType: data.shipment_type,
+          shipmentTypeString: String(data.shipment_type),
+          isImportType,
+          shouldLoadWeight,
+        });
+
+        // Log raw container data from database with all properties
+        console.log(
+          "Raw container data from database:",
+          data.containers.map((c) => ({
+            containerkey: c.containerkey,
+            containernum: c.containernum,
+            weight: c.weight,
+            weight_type: typeof c.weight,
+            container_type: c.container_type,
+            cargo_description: c.cargo_description,
+            // Log file_ref field from container data
+            file_ref: c.file_ref,
+            file_ref_exists: 'file_ref' in c,
+            file_ref_type: typeof c.file_ref,
+            // Log the exact property names and values for surcharge flags
+            hazardous_flag: c["Hazardous"],
+            hazardous_flag_type: typeof c["Hazardous"],
+            hazardous_flag_value: String(c["Hazardous"]),
+            hazardous_flag_boolean: Boolean(c["Hazardous"]),
+            add_surcharges_flag: c["Add Surcharges"],
+            add_surcharges_flag_type: typeof c["Add Surcharges"],
+            add_surcharges_flag_value: String(c["Add Surcharges"]),
+            add_surcharges_flag_boolean: Boolean(c["Add Surcharges"]),
+            // Log all available properties on the container
+            all_properties: Object.keys(c),
+          }))
+        );
+        
+        // Log the raw JSON string to see exact values without any conversion
+        if (data.containers.length > 0) {
+          console.log("First container raw JSON:", JSON.stringify(data.containers[0]));
+        }
+        
+        // Log the first container object in full JSON format to see exact structure
+        if (data.containers.length > 0) {
+          console.log("First container full JSON:", JSON.stringify(data.containers[0], null, 2));
+        }
+
+        const containersList = data.containers.map((container, index) => {
+          // Process each container's weight value
+          let weightValue;
+          if (shouldLoadWeight) {
+            // For export and cross-haul, ensure weight is properly handled
+            // Convert any numeric string to number, null/undefined to empty string
+            if (container.weight !== null && container.weight !== undefined) {
+              // Convert string weights to numbers
+              if (
+                typeof container.weight === "string" &&
+                container.weight.trim() !== ""
+              ) {
+                weightValue = parseFloat(container.weight);
+                if (isNaN(weightValue)) weightValue = "";
+              } else {
+                weightValue = container.weight;
+              }
+              console.log(
+                `Container ${container.containernum} weight set to:`,
+                weightValue,
+                `(type: ${typeof weightValue})`
+              );
+            } else {
+              weightValue = ""; // Empty string for editable types
+              console.log(
+                `Container ${container.containernum} has no weight, initializing as empty string`
+              );
+            }
+          } else {
+            weightValue = null; // Null for non-editable types
+            console.log(
+              `Container ${container.containernum} weight set to null (non-editable)`
+            );
+          }
+
+          // Log individual container properties before mapping
+          console.log(`Processing container ${index}:`, {
+            containerkey: container.containerkey,
+            containernum: container.containernum,
+            hazardous_flag: container["Hazardous"],
+            hazardous_flag_exists: "Hazardous" in container,
+            add_surcharges_flag: container["Add Surcharges"],
+            add_surcharges_flag_exists: "Add Surcharges" in container,
+          });
+          
+          // Try alternative property access methods with explicit boolean conversion
+          // Add more detailed logging to diagnose the issue
+          console.log(`Container ${index} property check:`, {
+            hasHazardousProperty: "Hazardous" in container,
+            hasAddSurchargesProperty: "Add Surcharges" in container,
+            rawHazardousValue: container["Hazardous"],
+            rawAddSurchargesValue: container["Add Surcharges"],
+          });
+          
+          // Handle the hazardous flag - using the original column names from the database
+          let hazardousValue = false;
+          if (container["Hazardous"] !== undefined) {
+            hazardousValue = container["Hazardous"] === true || container["Hazardous"] === 'true';
+          }
+            
+          // Handle the add surcharges flag - using the original column names from the database
+          let addSurchargesValue = false;
+          if (container["Add Surcharges"] !== undefined) {
+            addSurchargesValue = container["Add Surcharges"] === true || container["Add Surcharges"] === 'true';
+          }
+          
+          console.log(`Container ${index} resolved flags:`, {
+            hazardous: hazardousValue,
+            addSurcharges: addSurchargesValue
+          });
+          
+          return {
+            id: container.containerkey || index + 1,
+            containerKey: container.containerkey,
+            containerNum: container.containernum || "",
+            fileRef: container.file_ref || "", // Add file_ref field from database
+            weight: weightValue,
+            containerType: container.container_type || "6m",
+            cargoDescription: container.cargo_description || "",
+            // Map the database column names to component property names with fallbacks
+            hazardous: hazardousValue,
+            addSurcharges: addSurchargesValue,
+            surchargeAmount: Number(container["Surcharge Amount"] || 0),
+          };
+        });
+
+        console.log(
+          "Setting containers from instruction data:",
+          containersList
+        );
+        
+        // Log detailed information about hazardous and surcharge flags in the mapped containers
+        console.log("Container hazardous and surcharge flags:", 
+          containersList.map(c => ({
+            containerNum: c.containerNum,
+            hazardous: c.hazardous,
+            hazardous_type: typeof c.hazardous,
+            addSurcharges: c.addSurcharges,
+            addSurcharges_type: typeof c.addSurcharges
+          }))
+        );
+        setContainers(containersList);
+        setIsContainerDataModified(false);
+      } else {
+        console.log(
+          "No containers found in instruction data, initializing based on counts"
+        );
+        initializeContainers();
+      }
     } catch (error) {
       console.error("Error fetching instruction data:", error);
-
       let errorMessage = "Failed to fetch instruction data. Please try again.";
+
       if (error.response) {
-        const { status } = error.response;
-        errorMessage = `Failed to fetch instruction data: ${status} ${error.response.statusText}`;
+        errorMessage = `Server error: ${error.response.status} ${error.response.statusText}`;
       } else if (error.request) {
-        errorMessage =
-          "No response received from server. Please check your connection.";
+        errorMessage = "Network error. Please check your connection.";
       }
 
       setErrorModal({
@@ -748,47 +2029,137 @@ const FCcontrollerinstructions = () => {
     }
   };
 
-  // Fetch clients from API
+  // Second useEffect: Fetch starting points and destinations when clientId is available
+  useEffect(() => {
+    if (formData.clientId) {
+      console.log(
+        "Client ID available, fetching starting points and destinations"
+      );
+      fetchStartingPoints();
+
+      // If we have a pickup value, use it to fetch destinations
+      if (formData.pickup) {
+        fetchDestinations(formData.pickup);
+      }
+    }
+  }, [formData.clientId, formData.pickup]);
+
+  // useEffect to recalculate total cost when container surcharges or hazardous flags/amounts change
+  useEffect(() => {
+    if (containers.length > 0) {
+      recalculateTotalCost();
+    }
+  }, [
+    containers.map(c => c.addSurcharges).join(','), 
+    containers.map(c => c.surchargeAmount).join(','),
+    containers.map(c => c.hazardous).join(','),
+    containers.map(c => c.hazardousAmount).join(',')
+  ]);
+
+  // Function to fetch surcharge amount from client rates
+  const fetchSurchargeAmount = async (containerId) => {
+    try {
+      console.log(`🌐 Fetching surcharge rates for client ${formData.clientId}, route: ${formData.pickup} → ${formData.dropoff}`);
+      const response = await api.get(
+        `/api/instructions/client/${formData.clientId}/rates`,
+        {
+          params: {
+            start: formData.pickup,
+            destination: formData.dropoff
+          }
+        }
+      );
+      
+      const surchargeAmount = response.data.surcharges || 0;
+      console.log(`💰 Fetched surcharge amount: ${surchargeAmount} for container ${containerId}`);
+      
+      setContainers(prevContainers =>
+        prevContainers.map(container =>
+          container.id === containerId
+            ? { ...container, surchargeAmount }
+            : container
+        )
+      );
+      
+      recalculateTotalCost();
+    } catch (error) {
+      console.error('❌ Error fetching surcharge amount:', error);
+      // Fallback to 0 if fetch fails
+      setContainers(prevContainers =>
+        prevContainers.map(container =>
+          container.id === containerId
+            ? { ...container, surchargeAmount: 0 }
+            : container
+        )
+      );
+      console.log(`⚠️ Using fallback surcharge amount: 0 for container ${containerId}`);
+    }
+  };
+
+  // Helper function to calculate total cost from individual rates
+  const calculateTotalCostFromRates = (
+    rate6,
+    rate12,
+    rateAbnormal,
+    count6,
+    count12,
+    countAbnormal
+  ) => {
+    const baseCost = rate6 * count6 + rate12 * count12 + rateAbnormal * countAbnormal;
+    
+    // Add container surcharge amounts
+    const surchargeTotal = containers
+      .filter(container => container.addSurcharges === true)
+      .reduce((total, container) => total + (Number(container.surchargeAmount) || 0), 0);
+    
+    // Add container hazardous amounts
+    const hazardousTotal = containers
+      .filter(container => container.hazardous === true)
+      .reduce((total, container) => {
+        const hazAmount = Number(container.hazardousAmount) || 0;
+        console.log(`☢️ Container ${container.id} hazardous amount: ${hazAmount}`);
+        return total + hazAmount;
+      }, 0);
+    
+    console.log(`💲 Total cost calculation - Base: ${baseCost}, Surcharges: ${surchargeTotal}, Hazardous: ${hazardousTotal}`);
+    return baseCost + surchargeTotal + hazardousTotal;
+  };
+
+  // Function for real-time total cost recalculation
+  const recalculateTotalCost = () => {
+    const newTotalCost = calculateTotalCostFromRates(
+      formData.rateper_6 || 0,
+      formData.rateper_12 || 0,
+      formData.rateper_abnormal || 0,
+      formData.num_six_meters || 0,
+      formData.num_twelve_meters || 0,
+      formData.num_abnormal || 0
+    );
+    
+    setFormData(prev => ({ ...prev, total_cost: newTotalCost }));
+  };
+
   const fetchClients = async () => {
     setIsLoading((prev) => ({ ...prev, clients: true }));
     try {
-      console.log("Fetching clients...");
-
-      // Use axios instead of fetch
-      const response = await api.get("/api/clients");
-
-      const data = response.data;
-      console.log("Clients data received:", data.length, "records");
-      setClients(data);
-
-      // If we have a clientId, update the form with client details
-      if (clientId) {
-        const selectedClient = data.find(
-          (client) => client.m5clientkey.toString() === clientId.toString()
-        );
-        if (selectedClient) {
-          console.log("Found matching client:", selectedClient);
-          setFormData((prev) => ({
-            ...prev,
-            clientId: clientId,
-            representative: selectedClient.representative || "",
-            contactDetails: selectedClient.cellnum || "",
-            email: selectedClient.email || "",
-          }));
-        }
-      }
+      console.log("Fetching active clients...");
+      const response = await api.get("/api/instructions/active-clients");
+      console.log(
+        "Active clients data received:",
+        response.data.length,
+        "records"
+      );
+      setClients(response.data);
     } catch (error) {
-      console.error("Error fetching clients:", error);
-
-      let errorMessage = "Failed to fetch clients. Please try again.";
+      console.error("Error fetching active clients:", error);
+      let errorMessage = "Failed to fetch active clients. Please try again.";
       if (error.response) {
         const { status } = error.response;
-        errorMessage = `Failed to fetch clients: ${status} ${error.response.statusText}`;
+        errorMessage = `Failed to fetch active clients: ${status} ${error.response.statusText}`;
       } else if (error.request) {
         errorMessage =
           "No response received from server. Please check your connection.";
       }
-
       setErrorModal({
         isOpen: true,
         message: errorMessage,
@@ -799,21 +2170,19 @@ const FCcontrollerinstructions = () => {
     }
   };
 
-  // Fetch shipment types from API
   const fetchShipmentTypes = async () => {
     setIsLoading((prev) => ({ ...prev, shipmentTypes: true }));
     try {
       console.log("Fetching shipment types...");
-
-      // Use axios instead of fetch
-      const response = await api.get("/api/shipment-types");
-
-      const data = response.data;
-      console.log("Shipment types data received:", data.length, "records");
-      setShipmentTypes(data);
+      const response = await api.get("/api/instructions/shipment-types");
+      console.log(
+        "Shipment types data received:",
+        response.data.length,
+        "records"
+      );
+      setShipmentTypes(response.data);
     } catch (error) {
       console.error("Error fetching shipment types:", error);
-
       let errorMessage = "Failed to fetch shipment types. Please try again.";
       if (error.response) {
         const { status } = error.response;
@@ -822,7 +2191,6 @@ const FCcontrollerinstructions = () => {
         errorMessage =
           "No response received from server. Please check your connection.";
       }
-
       setErrorModal({
         isOpen: true,
         message: errorMessage,
@@ -833,13 +2201,134 @@ const FCcontrollerinstructions = () => {
     }
   };
 
-  // Handle client selection
+  const fetchStartingPoints = async () => {
+    if (!formData.clientId) {
+      console.log("No client ID available to fetch starting points");
+      setStartingPoints([]);
+      setIsLoading((prev) => ({ ...prev, startingPoints: false }));
+      return;
+    }
+
+    setIsLoading((prev) => ({ ...prev, startingPoints: true }));
+    try {
+      console.log(
+        `Fetching starting points for client ${formData.clientId}...`
+      );
+      const response = await api.get(
+        `/api/instructions/client/${formData.clientId}/starting-points`
+      );
+      console.log("Starting points data received:", response.data);
+
+      // Ensure we have an array of objects with the correct structure
+      const formattedStartingPoints = Array.isArray(response.data)
+        ? response.data
+            .map((point, index) => ({
+              id: point.id || `point-${index}`,
+              startingpoint:
+                point.starting_point || point.startingpoint || String(point),
+            }))
+            .filter((point) => point.startingpoint) // Filter out any null/undefined values
+        : [];
+
+      console.log("Formatted starting points:", formattedStartingPoints);
+
+      setStartingPoints(formattedStartingPoints);
+
+      // If there's only one starting point, select it by default
+      if (formattedStartingPoints.length === 1 && !formData.pickup) {
+        setFormData((prev) => ({
+          ...prev,
+          pickup: formattedStartingPoints[0].startingpoint,
+        }));
+      }
+    } catch (error) {
+      console.error("Error fetching starting points:", error);
+      let errorMessage = "Failed to fetch starting points. Please try again.";
+      if (error.response) {
+        const { status } = error.response;
+        errorMessage = `Failed to fetch starting points: ${status} ${error.response.statusText}`;
+      } else if (error.request) {
+        errorMessage =
+          "No response received from server. Please check your connection.";
+      }
+      setErrorModal({
+        isOpen: true,
+        message: errorMessage,
+      });
+      setStartingPoints([]);
+    } finally {
+      setIsLoading((prev) => ({ ...prev, startingPoints: false }));
+    }
+  };
+
+  const fetchDestinations = async (startingPoint) => {
+    if (!startingPoint) {
+      setDestinations([]);
+      return;
+    }
+    if (!formData.clientId || !startingPoint) {
+      console.log(
+        "No client ID or starting point available to fetch destinations"
+      );
+      setDestinations([]);
+      setIsLoading((prev) => ({ ...prev, destinations: false }));
+      return;
+    }
+
+    setIsLoading((prev) => ({ ...prev, destinations: true }));
+    try {
+      console.log(
+        `Fetching destinations for client ${formData.clientId} and starting point ${startingPoint}...`
+      );
+      const response = await api.get(
+        `/api/instructions/client/${
+          formData.clientId
+        }/destinations/${encodeURIComponent(startingPoint)}`
+      );
+      console.log("Destinations data received:", response.data);
+
+      // Ensure we have an array of objects with the correct structure
+      const formattedDestinations = Array.isArray(response.data)
+        ? response.data.map((dest) => ({
+            id: dest.id || dest.destination,
+            destination: dest.destination || String(dest),
+          }))
+        : [];
+
+      setDestinations(formattedDestinations);
+
+      // If there's only one destination, select it by default
+      if (formattedDestinations.length === 1 && !formData.dropoff) {
+        setFormData((prev) => ({
+          ...prev,
+          dropoff: formattedDestinations[0].destination,
+        }));
+      }
+    } catch (error) {
+      console.error("Error fetching destinations:", error);
+      let errorMessage = "Failed to fetch destinations. Please try again.";
+      if (error.response) {
+        const { status } = error.response;
+        errorMessage = `Failed to fetch destinations: ${status} ${error.response.statusText}`;
+      } else if (error.request) {
+        errorMessage =
+          "No response received from server. Please check your connection.";
+      }
+      setErrorModal({
+        isOpen: true,
+        message: errorMessage,
+      });
+      setDestinations([]);
+    } finally {
+      setIsLoading((prev) => ({ ...prev, destinations: false }));
+    }
+  };
+
   const handleClientChange = (e) => {
     const clientId = e.target.value;
     const selectedClient = clients.find(
       (client) => client.m5clientkey.toString() === clientId
     );
-
     if (selectedClient) {
       setFormData({
         ...formData,
@@ -857,270 +2346,743 @@ const FCcontrollerinstructions = () => {
         email: "",
       });
     }
-
-    setIsDataModified(true);
-    // Clear any error for this field
     setFieldErrors((prev) => ({ ...prev, clientId: "" }));
   };
 
-  // Handle shipment type selection
   const handleShipmentTypeChange = (e) => {
     const shipmentTypeId = e.target.value;
     const selectedShipmentType = shipmentTypes.find(
       (type) => type.shipkey.toString() === shipmentTypeId
     );
-
     const shipmentTypeName = selectedShipmentType
       ? selectedShipmentType.shipmenttype
       : "";
     const isImportType = shipmentTypeName.toLowerCase() === "import";
+    const isCrossHaul =
+      shipmentTypeName.toLowerCase() === "cross-haul" || shipmentTypeId === "4";
 
-    // Update isImport state
-    setIsImport(isImportType);
-
-    setFormData({
-      ...formData,
-      shipmentTypeId,
-      shipmentTypeName,
-    });
-
-    // Recalculate total cost after shipment type change
-    setTimeout(() => {
-      updateTotalCost();
-    }, 0);
-
-    setIsDataModified(true);
-    // Clear any error for this field
-    setFieldErrors((prev) => ({ ...prev, shipmentTypeId: "" }));
-  };
-
-  // Add this function to calculate total cost
-  const calculateTotalCost = () => {
-    const rate = Number.parseFloat(formData.rate);
-    if (isNaN(rate)) return 0;
-
-    if (formData.rateWeight === "Container") {
-      // For Container: rate × total_number_of_containers
+    // Check if changing to cross-haul (break bulk) (type 4) with non-zero container counts
+    if (shipmentTypeId === "4") {
       const totalContainers =
         formData.num_six_meters +
         formData.num_twelve_meters +
         formData.num_abnormal;
-      return rate * totalContainers;
+      if (totalContainers > 0) {
+        // Show warning modal
+        setWarningModal({
+          isOpen: true,
+          message:
+            "Before changing to Cross-haul (break bulk), please set all container counts to 0.",
+          shipmentTypeId: shipmentTypeId,
+          shipmentTypeName: shipmentTypeName,
+          onConfirm: () => {
+            // Set all container counts to 0 and proceed with shipment type change
+            const updatedFormData = {
+              ...formData,
+              num_six_meters: 0,
+              num_twelve_meters: 0,
+              num_abnormal: 0,
+              shipmentTypeId: String(shipmentTypeId),
+              shipmentTypeName,
+              vesselName: "",
+              stackDate: "",
+              rateWeight: "ton",
+            };
+            setFormData(updatedFormData);
+            setIsImport(isImportType);
+
+            // Re-initialize containers with zero counts
+            setTimeout(() => {
+              initializeContainers();
+            }, 0);
+          },
+        });
+        return; // Stop execution here until user responds to warning
+      }
+    }
+
+    // Determine if the new shipment type should have weight fields
+    const shouldHaveWeight =
+      isImportType ||
+      String(shipmentTypeId) === "2" ||
+      String(shipmentTypeId) === "3";
+
+    console.log(
+      "BEFORE CHANGE - Current containers:",
+      containers.map((c) => ({
+        id: c.id,
+        type: c.containerType,
+        weight: c.weight,
+        weightType: typeof c.weight,
+      }))
+    );
+    console.log("BEFORE CHANGE - isImport:", isImport);
+    console.log(
+      "BEFORE CHANGE - formData.shipmentTypeId:",
+      formData.shipmentTypeId,
+      "(type: " + typeof formData.shipmentTypeId + ")"
+    );
+    console.log(
+      "BEFORE CHANGE - Weight column should show:",
+      isImport ||
+        String(formData.shipmentTypeId) === "2" ||
+        String(formData.shipmentTypeId) === "3"
+    );
+
+    // Update isImport state based on shipment type
+    setIsImport(isImportType);
+
+    console.log(
+      `Shipment type changed to: ${shipmentTypeId} (${shipmentTypeName}), isImport set to: ${isImportType}`
+    );
+    console.log(
+      `New shipment type should have weight fields: ${shouldHaveWeight}`
+    );
+
+    // For cross-haul (break bulk) - type 4, clear vessel name and stack date and set rateWeight to 'ton'
+    if (shipmentTypeId === "4") {
+      setFormData({
+        ...formData,
+        shipmentTypeId: String(shipmentTypeId), // Ensure it's stored as string
+        shipmentTypeName,
+        vesselName: "",
+        stackDate: "",
+        // Default unit per to 'ton' for shipment type 4 (Cross-haul break bulk)
+        rateWeight: "ton",
+      });
+    }
+    // For Import, Export, or Cross-haul (types 1, 2, 3), set rateWeight to 'Container'
+    else if (
+      shipmentTypeId === "1" ||
+      shipmentTypeId === "2" ||
+      shipmentTypeId === "3"
+    ) {
+      // Check if we're switching between container-based shipment types (1, 2, 3)
+      const previousShipmentType = formData.shipmentTypeId;
+      const isContainerTypeSwitch = ["1", "2", "3"].includes(
+        previousShipmentType
+      );
+
+      // Preserve container rates and counts when switching between container-based types
+      setFormData({
+        ...formData,
+        shipmentTypeId: String(shipmentTypeId), // Ensure it's stored as string
+        shipmentTypeName,
+        // Set unit per to 'Container' for shipment types 1, 2, 3
+        rateWeight: "Container",
+        // Only initialize these to 0 if not already a container type
+        num_six_meters: isContainerTypeSwitch ? formData.num_six_meters : 0,
+        num_twelve_meters: isContainerTypeSwitch
+          ? formData.num_twelve_meters
+          : 0,
+        num_abnormal: isContainerTypeSwitch ? formData.num_abnormal : 0,
+        rateper_6: isContainerTypeSwitch ? formData.rateper_6 : 0,
+        rateper_12: isContainerTypeSwitch ? formData.rateper_12 : 0,
+        rateper_abnormal: isContainerTypeSwitch ? formData.rateper_abnormal : 0,
+      });
+
+      // Only re-initialize containers if not switching between container types
+      if (!isContainerTypeSwitch) {
+        setTimeout(() => {
+          initializeContainers();
+        }, 0);
+      }
+      return; // Skip the rest of the function
+    }
+    // For any other shipment type
+    else {
+      setFormData({
+        ...formData,
+        shipmentTypeId: String(shipmentTypeId), // Ensure it's stored as string
+        shipmentTypeName,
+      });
+    }
+
+    // Clear any field errors
+    setFieldErrors((prev) => ({ ...prev, shipmentTypeId: "" }));
+
+    // Update container weight fields based on new shipment type
+    if (containers && containers.length > 0) {
+      console.log("Updating container weight fields for new shipment type");
+
+      // Update container weight fields directly without re-initializing
+      setContainers((prevContainers) =>
+        prevContainers.map((container) => {
+          // If the new shipment type should have weight fields
+          if (shouldHaveWeight) {
+            // If container already has a weight value, keep it
+            // Otherwise initialize with empty string
+            const weightValue =
+              container.weight !== null && container.weight !== undefined
+                ? container.weight
+                : "";
+            console.log(
+              `Container ${container.id} weight updated for new shipment type:`,
+              weightValue
+            );
+            return { ...container, weight: weightValue };
+          } else {
+            // For shipment types that don't need weight, set to null
+            console.log(
+              `Container ${container.id} weight set to null for new shipment type`
+            );
+            return { ...container, weight: null };
+          }
+        })
+      );
+    }
+
+    // Check if we're switching between import (1), export (2), or cross-haul (3) types
+    const isImportExportCrossHaulSwitch =
+      // Current shipment type is one of import, export, or cross-haul
+      (formData.shipmentTypeId === "1" ||
+        formData.shipmentTypeId === "2" ||
+        formData.shipmentTypeId === "3") &&
+      // New shipment type is also one of import, export, or cross-haul
+      (shipmentTypeId === "1" ||
+        shipmentTypeId === "2" ||
+        shipmentTypeId === "3");
+
+    // Only re-initialize containers if NOT switching between import, export, and cross-haul
+    // or if we're switching to/from cross-haul break bulk (type 4)
+    if (
+      !isImportExportCrossHaulSwitch ||
+      shipmentTypeId === "4" ||
+      formData.shipmentTypeId === "4"
+    ) {
+      console.log("Re-initializing containers for new shipment type");
+      setTimeout(() => {
+        // Only re-initialize if container counts have changed
+        if (
+          formData.num_six_meters > 0 ||
+          formData.num_twelve_meters > 0 ||
+          formData.num_abnormal > 0 ||
+          formData.num_breakbulk > 0
+        ) {
+          initializeContainers();
+        }
+
+        console.log(
+          "AFTER CHANGE - Containers updated with shipment type:",
+          shipmentTypeId,
+          "(type: " + typeof shipmentTypeId + ")"
+        );
+        console.log(
+          "AFTER CHANGE - formData.shipmentTypeId:",
+          formData.shipmentTypeId,
+          "(type: " + typeof formData.shipmentTypeId + ")"
+        );
+        console.log(
+          "AFTER CHANGE - Weight column should show:",
+          isImportType ||
+            String(shipmentTypeId) === "2" ||
+            String(shipmentTypeId) === "3"
+        );
+        console.log(
+          "AFTER CHANGE - Updated containers:",
+          containers.map((c) => ({
+            id: c.id,
+            type: c.containerType,
+            weight: c.weight,
+            weightType: typeof c.weight,
+          }))
+        );
+      }, 100);
     } else {
-      // For kg or m³: rate × weight_value
-      const weight = Number.parseFloat(formData.weight);
-      if (isNaN(weight)) return 0;
-      return rate * weight;
+      console.log(
+        "Preserving container details when switching between import, export, and cross-haul types"
+      );
+      console.log(
+        "AFTER CHANGE - Containers preserved with shipment type:",
+        shipmentTypeId
+      );
     }
   };
 
-  // Function to update total cost in form data
-  const updateTotalCost = () => {
-    const totalCost = calculateTotalCost();
-    setFormData((prev) => ({
-      ...prev,
-      total_cost: totalCost,
-    }));
+  // Check if shipment type is Cross-haul
+  const isCrossHaulShipment = () => {
+    const selectedShipmentType = shipmentTypes.find(
+      (type) => type.shipkey.toString() === formData.shipmentTypeId
+    );
+    return (
+      selectedShipmentType &&
+      (selectedShipmentType.shipmenttype.toLowerCase() === "cross-haul" ||
+        String(formData.shipmentTypeId) === "4")
+    );
   };
 
-  // Handle form input changes
+  // Format date from any format to YYYY-MM-DD for input[type="date"]
+  const formatDateForInput = (dateString) => {
+    if (!dateString) return "";
+
+    // If already in YYYY-MM-DD format, return as is
+    if (/^\d{4}-\d{2}-\d{2}$/.test(dateString)) {
+      return dateString;
+    }
+
+    // Handle MM/DD/YYYY format
+    if (dateString.includes("/")) {
+      const [month, day, year] = dateString.split("/");
+      if (year && month && day) {
+        return `${year}-${month.padStart(2, "0")}-${day.padStart(2, "0")}`;
+      }
+    }
+
+    // Try to parse as Date object if not in expected format
+    try {
+      const date = new Date(dateString);
+      if (!isNaN(date.getTime())) {
+        return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;  // Fixed timezone handling
+      }
+    } catch (e) {
+      console.error("Error formatting date:", e);
+    }
+
+    return dateString; // Return original if can't parse
+  };
+
+  // Fetch rates based on pickup and dropoff locations - always update rates
+  const fetchRates = async (pickupLocation, dropoffLocation = null) => {
+    if (!formData.clientId || !pickupLocation) return;
+
+    console.log(
+      "Fetching rates for client:",
+      formData.clientId,
+      "pickup:",
+      pickupLocation,
+      "dropoff:",
+      dropoffLocation
+    );
+
+    try {
+      let destinationToUse = dropoffLocation;
+
+      // If no dropoff provided, get the default destination for this client and pickup location
+      if (!destinationToUse) {
+        const destinations = await api.get(
+          `/api/instructions/client/${
+            formData.clientId
+          }/destinations/${encodeURIComponent(pickupLocation)}`
+        );
+        destinationToUse = destinations.data?.[0]?.destination;
+
+        if (!destinationToUse) {
+          console.log(
+            "No destination found for pickup location:",
+            pickupLocation
+          );
+          return;
+        }
+      }
+
+      console.log("Using destination:", destinationToUse);
+
+      // Fetch rates with both start and destination using the correct endpoint
+      const response = await api.get(
+        `/api/instructions/client/${formData.clientId}/rates`,
+        {
+          params: {
+            start: pickupLocation,
+            destination: destinationToUse,
+          },
+        }
+      );
+
+      console.log("Rates API response:", response.data);
+
+      if (response.data) {
+        // Handle both array and object responses
+        const rateData = Array.isArray(response.data)
+          ? response.data[0]
+          : response.data;
+
+        if (rateData) {
+          // Try to get rates with different possible property names
+          const rate6m =
+            rateData.rateper_6 ||
+            rateData["6m_rate"] ||
+            rateData.sixMeterRate ||
+            0;
+          const rate12m =
+            rateData.rateper_12 ||
+            rateData["12m_rate"] ||
+            rateData.twelveMeterRate ||
+            0;
+          const abnormalRate =
+            rateData.rateper_abnormal || rateData.abnormalRate || 0;
+          const surcharge = rateData.surcharge || rateData.surchages || 0;
+
+          console.log("Updating rates (always override):", {
+            rate6m,
+            rate12m,
+            abnormalRate,
+            surcharge,
+          });
+
+          // Always update rates regardless of current values
+          setFormData((prev) => {
+            const updatedData = {
+              ...prev,
+              rateper_6: rate6m,
+              rateper_12: rate12m,
+              rateper_abnormal: abnormalRate,
+              surcharge: surcharge,
+            };
+
+            // Recalculate total cost with new rates
+            const totalCost =
+              (updatedData.num_six_meters || 0) * rate6m +
+              (updatedData.num_twelve_meters || 0) * rate12m +
+              (updatedData.num_abnormal || 0) * abnormalRate +
+              (updatedData.num_breakbulk || 0) *
+                (updatedData.rateper_breakbulk || 0);
+
+            updatedData.total_cost = totalCost;
+
+            return updatedData;
+          });
+
+          // Show user feedback that rates were updated
+          setRateUpdateMessage("Rates updated based on selected route");
+          setTimeout(() => setRateUpdateMessage(""), 3000);
+        }
+      }
+    } catch (error) {
+      console.error("Error fetching rates:", error);
+      console.error("Error details:", error.response?.data || error.message);
+
+      // Show error message to user
+      setErrorModal({
+        isOpen: true,
+        message:
+          "Failed to fetch rates for selected route. Please check your selection or try again.",
+      });
+    }
+  };
+
+  const handleDropoffChange = async (e) => {
+    const dropoffLocation = e.target.value;
+
+    // Update the dropoff location in form data
+    setFormData((prev) => ({
+      ...prev,
+      dropoff: dropoffLocation,
+    }));
+
+    // Clear field error
+    clearFieldError("dropoff");
+
+    // Fetch new rates for the current pickup and new dropoff combination
+    if (formData.pickup && dropoffLocation) {
+      await fetchRates(formData.pickup, dropoffLocation);
+    }
+  };
+
+  const handlePickupChange = async (e) => {
+    const pickupLocation = e.target.value;
+
+    // Update the pickup location in form data
+    setFormData((prev) => ({
+      ...prev,
+      pickup: pickupLocation,
+      dropoff: "", // Clear the dropoff when pickup changes
+    }));
+
+    // Clear field error
+    clearFieldError("pickup");
+
+    // Fetch new destinations and rates for the selected pickup location
+    await Promise.all([
+      fetchDestinations(pickupLocation),
+      fetchRates(pickupLocation), // This will get default destination
+    ]);
+  };
+
   const handleInputChange = (e) => {
     const { name, value, type, checked } = e.target;
+    let processedValue = type === "checkbox" ? checked : value;
 
-    if (type === "checkbox") {
-      setFormData({
-        ...formData,
-        [name]: checked,
-      });
-      setIsDataModified(true);
-    } else if (
+    // Handle date inputs
+    if (type === "date") {
+      processedValue = formatDateForInput(value);
+    }
+
+    // Handle special field types
+    if (name === "imoNo") {
+      processedValue = value.replace(/[^0-9]/g, "").slice(0, 15);
+    } else if (name === "flagReg") {
+      processedValue = value.replace(/[^a-zA-Z\s\-']/g, "");
+    }
+
+    // Update form data
+    setFormData((prev) => ({
+      ...prev,
+      [name]: processedValue,
+    }));
+
+    // Clear field error when user starts typing
+    clearFieldError(name);
+  };
+
+  const handleNumericInputChange = (e) => {
+    const { name, value } = e.target;
+
+    if (
       name === "num_six_meters" ||
       name === "num_twelve_meters" ||
-      name === "num_abnormal"
+      name === "num_abnormal" ||
+      name === "num_breakbulk"
     ) {
-      // Ensure container counts are at least 0
       const numValue = Number.parseInt(value);
-      const validValue = isNaN(numValue) || numValue < 0 ? 0 : numValue;
+      const validValue = isNaN(numValue) ? 0 : Math.max(0, numValue);
+      const prevValue = formData[name];
+      const isIncreasing = validValue > prevValue;
+      const difference = Math.abs(validValue - prevValue);
 
-      // Update form data with new container count
+      // Update the form data
       const updatedFormData = {
         ...formData,
         [name]: validValue,
       };
+      setFormData(updatedFormData);
 
-      // If rate weight is "Container", recalculate total_cost
-      if (formData.rateWeight === "Container") {
-        const rate = Number.parseFloat(formData.rate);
-        if (!isNaN(rate)) {
-          // Calculate new total containers
-          const totalContainers =
-            (name === "num_six_meters"
-              ? validValue
-              : updatedFormData.num_six_meters) +
-            (name === "num_twelve_meters"
-              ? validValue
-              : updatedFormData.num_twelve_meters) +
-            (name === "num_abnormal"
-              ? validValue
-              : updatedFormData.num_abnormal);
-          updatedFormData.total_cost = rate * totalContainers;
+      // Update the containers based on the count change
+      let containerType;
+      if (name === "num_six_meters") containerType = "6m";
+      else if (name === "num_twelve_meters") containerType = "12m";
+      else if (name === "num_abnormal") containerType = "Abnormal";
+      else if (name === "num_breakbulk") containerType = "BreakBulk";
+
+      if (containerType) {
+        // Update containers directly
+        if (isIncreasing) {
+          // Add new containers
+          const newContainers = [];
+          const nextId =
+            containers.length > 0
+              ? Math.max(...containers.map((c) => c.id)) + 1
+              : 1;
+
+          for (let i = 0; i < difference; i++) {
+            newContainers.push({
+              id: nextId + i,
+              containerKey: null,
+              containerNum: "",
+              weight:
+                isImport ||
+                formData.shipmentTypeId === "2" ||
+                formData.shipmentTypeId === "3"
+                  ? ""
+                  : null,
+              containerType: containerType,
+              cargoDescription: "",
+            });
+          }
+
+          setContainers([...containers, ...newContainers]);
+          setIsContainerDataModified(true);
+        } else {
+          // Remove containers of the specified type (most recently added first)
+          const containersOfType = containers.filter(
+            (c) => c.containerType === containerType
+          );
+          const containersToRemove = containersOfType.slice(
+            containersOfType.length - difference
+          );
+          const updatedContainers = containers.filter(
+            (c) => !containersToRemove.includes(c)
+          );
+
+          setContainers(updatedContainers);
+          setIsContainerDataModified(true);
+        }
+
+        // Also update preserved containers for consistency
+        if (preservedContainers) {
+          updatePreservedContainers(containerType, isIncreasing, difference);
         }
       }
 
-      setFormData(updatedFormData);
-      setIsDataModified(true);
-      // Clear any error for this field
-      setFieldErrors((prev) => ({ ...prev, [name]: "" }));
-    } else if (name === "vat") {
-      // Handle VAT input - ensure it's an integer
-      const vatValue = value.replace(/[^0-9]/g, ""); // Remove non-numeric characters
+      // Calculate total cost using individual rates
+      const sixRate = Number(formData.rateper_6 || 0);
+      const twelveRate = Number(formData.rateper_12 || 0);
+      const abnormalRateNum = Number(formData.rateper_abnormal || 0);
+      const breakBulkRate = Number(formData.rateper_breakbulk || 0);
 
-      if (vatValue === "" || /^\d+$/.test(vatValue)) {
-        setFormData({
-          ...formData,
-          [name]: vatValue === "" ? "" : Number.parseInt(vatValue, 10),
-        });
-        setIsDataModified(true);
-        // Clear any error for this field
-        setFieldErrors((prev) => ({ ...prev, vat: "" }));
-      }
+      const totalCost =
+        (name === "num_six_meters"
+          ? validValue
+          : updatedFormData.num_six_meters) *
+          sixRate +
+        (name === "num_twelve_meters"
+          ? validValue
+          : updatedFormData.num_twelve_meters) *
+          twelveRate +
+        (name === "num_abnormal" ? validValue : updatedFormData.num_abnormal) *
+          abnormalRateNum +
+        (name === "num_breakbulk"
+          ? validValue
+          : updatedFormData.num_breakbulk || 0) *
+          breakBulkRate;
+
+      updatedFormData.total_cost = totalCost;
+
+      console.log(`Container count updated - ${name}: ${validValue}`);
+      setFormData(updatedFormData);
+      updatePreservedContainers(name, isIncreasing, difference);
+      setFieldErrors((prev) => ({ ...prev, containers: "" }));
     } else if (name === "rateWeight") {
-      // Handle rate weight change
       const updatedFormData = {
         ...formData,
         [name]: value,
       };
-
-      // If changing to "Container", set weight to null and recalculate total_cost
-      if (value === "Container") {
-        updatedFormData.weight = null;
-
-        const rate = Number.parseFloat(formData.rate);
-        if (!isNaN(rate)) {
-          const totalContainers =
-            formData.num_six_meters +
-            formData.num_twelve_meters +
-            formData.num_abnormal;
-          updatedFormData.total_cost = rate * totalContainers;
-        }
-      }
-      // If changing from "Container" to kg or m³, reset total_cost until weight is entered
-      else {
-        updatedFormData.weight = "";
-        updatedFormData.total_cost = 0;
-      }
-
+      updatedFormData.total_cost = 0;
       setFormData(updatedFormData);
-      setIsDataModified(true);
-      // Clear any error for this field
-      setFieldErrors((prev) => ({ ...prev, [name]: "" }));
-    } else if (name === "voyageNo") {
-      // For Voyage No. - allow only up to 15 characters
-      if (value.length <= 15) {
-        setFormData({
-          ...formData,
-          [name]: value,
-        });
-        setIsDataModified(true);
-        // Clear any error for this field
-        setFieldErrors((prev) => ({ ...prev, [name]: "" }));
-      } else {
-        // If the input exceeds 15 characters, show error but don't update the field
-        setFieldErrors((prev) => ({
-          ...prev,
-          [name]: "Voyage No. cannot exceed 15 characters",
-        }));
-      }
-    } else if (name === "imoNo") {
-      // For IMO Number - allow only numbers and max 15 characters
-      const numbersOnly = value.replace(/[^0-9]/g, "");
-
-      if (value === numbersOnly && value.length <= 15) {
-        setFormData({
-          ...formData,
-          [name]: value,
-        });
-        setIsDataModified(true);
-        // Clear any error for this field
-        setFieldErrors((prev) => ({ ...prev, [name]: "" }));
-      } else if (value !== numbersOnly) {
-        // If the input contains non-numeric characters, show error but don't update the field
-        setFieldErrors((prev) => ({
-          ...prev,
-          [name]: "IMO Number must contain only numbers",
-        }));
-      } else {
-        // If the input exceeds 15 characters, show error but don't update the field
-        setFieldErrors((prev) => ({
-          ...prev,
-          [name]: "IMO Number cannot exceed 15 characters",
-        }));
-      }
-    } else if (name === "flagReg") {
-      // For Flag Registration - don't allow numbers
-      if (!/\d/.test(value)) {
-        setFormData({
-          ...formData,
-          [name]: value,
-        });
-        setIsDataModified(true);
-        // Clear any error for this field
-        setFieldErrors((prev) => ({ ...prev, [name]: "" }));
-      } else {
-        // If the input contains numbers, show error but don't update the field
-        setFieldErrors((prev) => ({
-          ...prev,
-          [name]: "Flag Registration must not contain numbers",
-        }));
-      }
+      setFieldErrors((prev) => ({ ...prev, rateWeight: "", weight: "" }));
+    } else if (name === "pickupDate") {
+      setFormData({
+        ...formData,
+        [name]: value,
+        stackDate:
+          formData.stackDate && new Date(formData.stackDate) <= new Date(value)
+            ? ""
+            : formData.stackDate,
+        lastFreeDate:
+          formData.lastFreeDate &&
+          new Date(formData.lastFreeDate) <= new Date(value) <= new Date(value)
+            ? ""
+            : formData.lastFreeDate,
+      });
+      setFieldErrors((prev) => ({ ...prev, pickupDate: "" }));
     } else {
       setFormData({
         ...formData,
         [name]: value,
       });
-      setIsDataModified(true);
-      // Clear any error for this field
       setFieldErrors((prev) => ({ ...prev, [name]: "" }));
     }
   };
 
-  // Update the handleContainerCountChange function to recalculate total_cost
-  const handleContainerCountChange = (type, value) => {
-    // Ensure value is a number and not negative
-    const numValue = Number.parseInt(value);
-    const validValue = isNaN(numValue) || numValue < 0 ? 0 : numValue;
+  const handleRateChange = (e) => {
+    const { name, value } = e.target;
+    if (value === "" || /^\d*\.?\d*$/.test(value)) {
+      // Update the rate in form data
+      const updatedFormData = {
+        ...formData,
+        [name]: value === "" ? "" : Number(value) || 0,
+      };
 
-    // Update form data with new container count
+      // Recalculate total cost
+      const sixRate = Number(updatedFormData.rateper_6 || 0);
+      const twelveRate = Number(updatedFormData.rateper_12 || 0);
+      const abnormalRateNum = Number(updatedFormData.rateper_abnormal || 0);
+
+      updatedFormData.total_cost =
+        (updatedFormData.num_six_meters || 0) * sixRate +
+        (updatedFormData.num_twelve_meters || 0) * twelveRate +
+        (updatedFormData.num_abnormal || 0) * abnormalRateNum;
+
+      setFormData(updatedFormData);
+    }
+  };
+
+  const handleWeightChange = (e) => {
+    const value = e.target.value;
+    if (value === "" || /^[0-9]*\.?[0-9]*$/.test(value)) {
+      setWeight(value);
+      setFieldErrors((prev) => ({ ...prev, weight: "" }));
+    }
+  };
+
+  const updatePreservedContainers = (
+    containerType,
+    isIncreasing,
+    difference
+  ) => {
+    const containerTypeMap = {
+      num_six_meters: "6m",
+      num_twelve_meters: "12m",
+      num_abnormal: "Abnormal",
+    };
+    const type = containerTypeMap[containerType];
+    if (!type) return;
+    if (isIncreasing) {
+      const newContainers = [];
+      const nextId =
+        preservedContainers.length > 0
+          ? Math.max(...preservedContainers.map((c) => c.id)) + 1
+          : 1;
+      for (let i = 0; i < difference; i++) {
+        newContainers.push({
+          id: nextId + i,
+          containerKey: null,
+          containerNum: "",
+          weight: isImport ? "" : null,
+          containerType: type,
+          cargoDescription: "",
+        });
+      }
+      setPreservedContainers([...preservedContainers, ...newContainers]);
+    } else {
+      const containersOfType = preservedContainers.filter(
+        (c) => c.containerType === type
+      );
+      const containersToRemove = containersOfType.slice(
+        containersOfType.length - difference
+      );
+      const updatedContainers = preservedContainers.filter(
+        (c) => !containersToRemove.includes(c)
+      );
+      setPreservedContainers(updatedContainers);
+    }
+  };
+
+  const handleContainerCountChange = (type, value) => {
+    const numValue = Number.parseInt(value);
+    const validValue = isNaN(numValue) ? 0 : Math.max(0, numValue);
+    const prevValue = formData[type];
+    const isIncreasing = validValue > prevValue;
+    const difference = Math.abs(validValue - prevValue);
+
+    // Update the form data
     const updatedFormData = {
       ...formData,
       [type]: validValue,
     };
 
-    // If rate weight is "Container", recalculate total_cost
-    if (formData.rateWeight === "Container") {
-      const rate = Number.parseFloat(formData.rate);
-      if (!isNaN(rate)) {
-        // Calculate new total containers
-        const totalContainers =
-          (type === "num_six_meters"
-            ? validValue
-            : updatedFormData.num_six_meters) +
-          (type === "num_twelve_meters"
-            ? validValue
-            : updatedFormData.num_twelve_meters) +
-          (type === "num_abnormal" ? validValue : updatedFormData.num_abnormal);
-        updatedFormData.total_cost = rate * totalContainers;
-      }
-    }
+    // Calculate total cost using individual rates
+    const sixRate = Number(formData.rateper_6 || 0);
+    const twelveRate = Number(formData.rateper_12 || 0);
+    const abnormalRateNum = Number(formData.rateper_abnormal || 0);
+    const breakBulkRate = Number(formData.rateper_breakbulk || 0);
 
+    const totalCost =
+      (type === "num_six_meters"
+        ? validValue
+        : updatedFormData.num_six_meters) *
+        sixRate +
+      (type === "num_twelve_meters"
+        ? validValue
+        : updatedFormData.num_twelve_meters) *
+        twelveRate +
+      (type === "num_abnormal" ? validValue : updatedFormData.num_abnormal) *
+        abnormalRateNum;
+
+    updatedFormData.total_cost = totalCost;
+
+    console.log(`Container count updated - ${type}: ${validValue}`);
     setFormData(updatedFormData);
-    setIsDataModified(true);
-    // Clear any error for this field
-    setFieldErrors((prev) => ({ ...prev, [type]: "" }));
+    updatePreservedContainers(type, isIncreasing, difference);
+    setFieldErrors((prev) => ({ ...prev, containers: "" }));
   };
 
-  // Validate form
   const validateForm = () => {
+    console.log("validateForm called");
+    console.log("Current formData:", formData);
+    // Check if shipment type is cross-haul or type 4
+    const isCrossHaul = isCrossHaulShipment();
+    console.log("Is cross-haul shipment:", isCrossHaul);
+
     const requiredFields = [
       "clientId",
       "shipmentTypeId",
@@ -1129,138 +3091,174 @@ const FCcontrollerinstructions = () => {
       "dropoff",
       "pickupTime",
       "pickupDate",
-      "stackDate",
-      "deadline",
-      "fileRef",
-      "bookingRef", // Add bookingRef as a required field
-      "rate",
+      "lastFreeDate",
+      "bookingRef",
+      "clientFileRef",
       "description",
-      // Add vessel information fields as required
-      "vesselName",
-      "voyageNo",
-      "imoNo",
-      "flagReg",
     ];
+
+    // Add vessel name and stack date as required for import and export shipment types (1 and 2)
+    console.log(
+      "Checking shipment type for vessel name and stack date requirement:",
+      formData.shipmentTypeId
+    );
+    if (formData.shipmentTypeId === "1" || formData.shipmentTypeId === "2") {
+      console.log("Adding vesselName and stackDate as required fields");
+      requiredFields.push("vesselName", "stackDate");
+    }
 
     let isValid = true;
     const errors = {};
-
-    // Check all required fields
+    console.log("Validating required fields...");
     for (const field of requiredFields) {
       if (!formData[field]) {
+        console.log(`Missing required field: ${field}`);
         errors[field] = `This field is required`;
+        isValid = false;
+      } else {
+        console.log(`Field ${field} is valid:`, formData[field]);
+      }
+    }
+    if (formData.shipmentTypeId) {
+      const selectedShipmentType = shipmentTypes.find(
+        (type) => type.shipkey.toString() === formData.shipmentTypeId
+      );
+      if (selectedShipmentType) {
+        const shipmentTypeName =
+          selectedShipmentType.shipmenttype.toLowerCase();
+        if (shipmentTypeName !== "import" && shipmentTypeName !== "export") {
+          errors.shipmentTypeId = "Please select either Import or Export";
+          isValid = false;
+        }
+      }
+    }
+
+    // Rate validation - only require rates when container count > 0
+    if (formData.num_six_meters > 0) {
+      if (
+        formData.rateper_6 === "" ||
+        formData.rateper_6 === "0" ||
+        Number(formData.rateper_6) === 0
+      ) {
+        errors.rateper_6 = "Rate is required when containers are present";
+        isValid = false;
+      } else if (Number(formData.rateper_6) <= 0) {
+        errors.rateper_6 = "Rate must be a positive number";
         isValid = false;
       }
     }
 
-    // Validate rate is a number
-    if (formData.rate && isNaN(Number.parseFloat(formData.rate))) {
-      errors.rate = "Rate must be a valid number";
-      isValid = false;
+    if (formData.num_twelve_meters > 0) {
+      if (
+        formData.rateper_12 === "" ||
+        formData.rateper_12 === "0" ||
+        Number(formData.rateper_12) === 0
+      ) {
+        errors.rateper_12 = "Rate is required when containers are present";
+        isValid = false;
+      } else if (Number(formData.rateper_12) <= 0) {
+        errors.rateper_12 = "Rate must be a positive number";
+        isValid = false;
+      }
     }
 
-    // Validate weight if kg or m³ is selected
+    if (formData.num_abnormal > 0) {
+      if (
+        formData.rateper_abnormal === "" ||
+        formData.rateper_abnormal === "0" ||
+        Number(formData.rateper_abnormal) === 0
+      ) {
+        errors.rateper_abnormal =
+          "Rate is required when containers are present";
+        isValid = false;
+      } else if (Number(formData.rateper_abnormal) <= 0) {
+        errors.rateper_abnormal = "Rate must be a positive number";
+        isValid = false;
+      }
+    }
+
+    // For ton or kg, both weight and unitRate are required
     if (
-      (formData.rateWeight === "kg" || formData.rateWeight === "m³") &&
-      !formData.weight
+      (formData.rateWeight === "ton" || formData.rateWeight === "kg") &&
+      (formData.weight === "" || weight === "")
     ) {
-      errors.weight = `Please enter the weight in ${formData.rateWeight}`;
+      errors.weight = "Please add weight";
       isValid = false;
     }
 
-    // Validate weight is a number
+    // For ton or kg, unitRate is required
     if (
-      (formData.rateWeight === "kg" || formData.rateWeight === "m³") &&
-      (formData.weight === "" || isNaN(Number.parseFloat(formData.weight)))
+      (formData.rateWeight === "ton" || formData.rateWeight === "kg") &&
+      (!formData.unitRate ||
+        formData.unitRate === "" ||
+        formData.unitRate === "0")
     ) {
-      errors.weight = `Weight must be a valid number`;
+      errors.unitRate = `Rate per ${formData.rateWeight} is required`;
       isValid = false;
     }
 
-    // Validate at least one container is added
+    // Validate weight if provided for import, export, or cross-haul shipments
+    if (
+      (isImport ||
+        formData.shipmentTypeId === "2" ||
+        formData.shipmentTypeId === "3") &&
+      (formData.weight !== "" || weight !== "")
+    ) {
+      const weightValue = Number.parseFloat(formData.weight || weight);
+      if (isNaN(weightValue) || weightValue <= 0) {
+        errors.weight = "Weight must be a positive number";
+        isValid = false;
+      }
+    }
+
+    // Validate unitRate format if provided
+    if (formData.unitRate && formData.unitRate !== "") {
+      const unitRateValue = Number.parseFloat(formData.unitRate);
+      if (isNaN(unitRateValue) || unitRateValue <= 0) {
+        errors.unitRate = `Rate per ${formData.rateWeight} must be a positive number`;
+        isValid = false;
+      }
+    }
     const totalContainers =
       formData.num_six_meters +
       formData.num_twelve_meters +
       formData.num_abnormal;
     if (totalContainers <= 0) {
-      errors.num_six_meters = "Please add at least one container";
+      errors.containers = "Please add at least one container";
       isValid = false;
     }
-
-    // Validate VAT is a number
-    if (formData.vat === "" || isNaN(Number.parseInt(formData.vat))) {
-      errors.vat = "VAT must be a valid integer";
-      isValid = false;
-    }
-
-    // Validate date order
     if (
       formData.stackDate &&
       formData.pickupDate &&
-      compareDates(formData.stackDate, formData.pickupDate) < 0
+      new Date(formData.stackDate) < new Date(formData.pickupDate)
     ) {
       errors.stackDate = `${
         isImport ? "ETA" : "Stack date"
       } cannot be before pickup date`;
       isValid = false;
     }
-
     if (
-      formData.deadline &&
-      formData.pickupDate &&
-      compareDates(formData.deadline, formData.pickupDate) < 0
+      formData.lastFreeDate &&
+      new Date(formData.lastFreeDate) < new Date(today)
     ) {
-      errors.deadline = "Deadline cannot be before pickup date";
+      errors.lastFreeDate = "Last Free Date cannot be in the past";
       isValid = false;
     }
-
     if (
-      formData.deadline &&
+      formData.lastFreeDate &&
       formData.stackDate &&
-      compareDates(formData.deadline, formData.stackDate) < 0
+      new Date(formData.lastFreeDate) < new Date(formData.stackDate)
     ) {
-      errors.deadline = `Deadline cannot be before ${
+      errors.lastFreeDate = `Last Free Date cannot be before ${
         isImport ? "ETA" : "stack date"
       }`;
       isValid = false;
     }
-
-    // Validate IMO Number contains only numbers and doesn't exceed 15 characters
-    if (formData.imoNo && /[^0-9]/.test(formData.imoNo)) {
-      errors.imoNo = "IMO Number must contain only numbers";
-      isValid = false;
-    } else if (formData.imoNo && formData.imoNo.length > 15) {
-      errors.imoNo = "IMO Number cannot exceed 15 characters";
-      isValid = false;
-    }
-
-    // Validate Voyage No. doesn't exceed 15 characters
-    if (formData.voyageNo && formData.voyageNo.length > 15) {
-      errors.voyageNo = "Voyage No. cannot exceed 15 characters";
-      isValid = false;
-    }
-
-    // Validate Flag Registration doesn't contain numbers
-    if (formData.flagReg && /\d/.test(formData.flagReg)) {
-      errors.flagReg = "Flag Registration must not contain numbers";
-      isValid = false;
-    }
-
-    // Set all errors
     setFieldErrors(errors);
-
-    // If not valid, scroll to the first field with an error
     if (!isValid) {
       const firstErrorField = Object.keys(errors)[0];
       scrollToField(firstErrorField);
-
-      // Show error in modal
-      setErrorModal({
-        isOpen: true,
-        message: `Please fill in all required fields before proceeding.`,
-      });
     }
-
     return isValid;
   };
 
@@ -1275,336 +3273,318 @@ const FCcontrollerinstructions = () => {
     );
   };
 
-  // Update the handleSubmit function to NOT save to database and only pass data to FCcontrollerInstructionDetails
-  const handleSubmit = async () => {
-    if (!validateForm()) {
+  const handleBackClick = () => {
+    const stateToPass = {
+      clientId,
+      clientName,
+      selectedMonth,
+      selectedYear,
+      activeFilter,
+    };
+
+    console.log("Navigating back to instructions with state:", stateToPass);
+    navigate("/instructions", { state: stateToPass });
+  };
+
+  const handleSubmit = async (e) => {
+    console.log("handleSubmit called");
+    e.preventDefault();
+
+    // Special validation for vessel name and stack date for import and export shipment types
+    let hasSpecialValidationErrors = false;
+    if (formData.shipmentTypeId === "1" || formData.shipmentTypeId === "2") {
+      const errors = {};
+
+      if (!formData.vesselName || !formData.vesselName.trim()) {
+        errors.vesselName = "Vessel name is required";
+        hasSpecialValidationErrors = true;
+      }
+
+      if (!formData.stackDate || !formData.stackDate.trim()) {
+        errors.stackDate = `${
+          formData.shipmentTypeId === "1" ? "ETA" : "Stack"
+        } date is required`;
+        hasSpecialValidationErrors = true;
+      }
+
+      if (hasSpecialValidationErrors) {
+        setFieldErrors((prev) => ({ ...prev, ...errors }));
+        scrollToField(Object.keys(errors)[0]);
+        console.log("Special validation failed:", errors);
+        return;
+      }
+    }
+
+    // Then validate the rest of the form
+    console.log("Validating form...");
+    const isValid = validateForm();
+    console.log("Form validation result:", isValid);
+
+    if (!isValid) {
+      console.log("Form validation failed");
       return;
     }
 
-    // Calculate total containers
-    const totalContainers =
-      formData.num_six_meters +
-      formData.num_twelve_meters +
-      formData.num_abnormal;
+    try {
+      console.log("Form is valid, proceeding with submission...");
+      // Calculate total cost using individual rates
+      const sixRate = Number(formData.rateper_6 || 0);
+      const twelveRate = Number(formData.rateper_12 || 0);
+      const abnormalRateNum = Number(formData.rateper_abnormal || 0);
 
-    // Calculate total cost
-    const totalCost = calculateTotalCost();
+      const totalCost =
+        formData.num_six_meters * sixRate +
+        formData.num_twelve_meters * twelveRate +
+        formData.num_abnormal * abnormalRateNum;
 
-    // Prepare weight value based on selection
-    let weightValue = null;
-    if (formData.rateWeight === "kg" || formData.rateWeight === "m³") {
-      weightValue = Number.parseFloat(formData.weight);
+      const totalContainers =
+        formData.num_six_meters +
+        formData.num_twelve_meters +
+        formData.num_abnormal;
+
+      // IMPROVED: Create comprehensive form data with all current values
+      const updatedFormData = {
+        ...formData,
+        // Rate fields for display
+        rateper_6: sixRate.toString(),
+        rateper_12: twelveRate.toString(),
+        rateper_abnormal: abnormalRateNum.toString(),
+        // Rate fields for database
+        rateper_6: sixRate,
+        rateper_12: twelveRate,
+        rateper_abnormal: abnormalRateNum,
+        total_cost: totalCost,
+        weight:
+          (isImport ||
+            formData.shipmentTypeId === "2" ||
+            formData.shipmentTypeId === "3") &&
+          formData.rateWeight !== "Container"
+            ? formData.weight || weight
+            : null,
+      };
+
+      const stateToPass = {
+        controllerData: updatedFormData,
+        isImport: isImportShipment(),
+        totalContainers: totalContainers,
+        instructionId: instructionId,
+        clientId: clientId,
+        clientName: clientName,
+        selectedMonth: selectedMonth,
+        selectedYear: selectedYear,
+        activeFilter: activeFilter,
+        preservedContainers: preservedContainers,
+      };
+
+      console.log(
+        "Navigating to FCcontrollerInstructionDetails with state:",
+        stateToPass
+      );
+
+      navigate("/FCcontrollerInstructionDetails", { state: stateToPass });
+    } catch (error) {
+      console.error("Error processing form:", error);
+      setErrorModal({
+        isOpen: true,
+        message: "Failed to process form. Please try again.",
+      });
     }
-
-    // Create updated form data with total_cost and weight
-    const updatedFormData = {
-      ...formData,
-      total_cost: totalCost,
-      weight: weightValue,
-    };
-
-    // Create state object with all necessary parameters
-    const stateToPass = {
-      controllerData: updatedFormData,
-      isImport: isImportShipment(),
-      totalContainers: totalContainers,
-      instructionId: instructionId,
-      // Pass through the original navigation state for when we return
-      clientId: clientId,
-      clientName: clientName,
-      selectedMonth: selectedMonth,
-      selectedYear: selectedYear,
-      activeFilter: activeFilter,
-      // Pass the preserved containers if available
-      preservedContainers: preservedContainers,
-    };
-
-    // Log the state being passed to FCcontrollerInstructionDetails
-    console.log(
-      "Navigating to FCcontrollerInstructionDetails with state:",
-      stateToPass
-    );
-
-    // Navigate to container details page with state
-    navigate("/FCcontrollerInstructionDetails", { state: stateToPass });
   };
 
-  // Retry fetching data
   const handleRetryFetch = () => {
-    if (isLoading.clients || isLoading.shipmentTypes) {
-      return; // Don't retry if already loading
+    if (
+      isLoading.clients ||
+      isLoading.shipmentTypes ||
+      isLoading.startingPoints ||
+      isLoading.destinations
+    ) {
+      return;
     }
-
     fetchClients();
     fetchShipmentTypes();
+    fetchStartingPoints();
+    fetchDestinations();
     if (instructionId) {
       fetchInstructionData(instructionId);
     }
-
     setErrorModal({
       isOpen: false,
       message: "",
     });
   };
 
-  // Generate calendar for current month
-  const generateCalendar = () => {
-    const year = calendarState.currentYear;
-    const month = calendarState.currentMonth;
-
-    // Get first day of month and number of days in month
-    const firstDay = new Date(year, month, 1).getDay();
-    const daysInMonth = new Date(year, month + 1, 0).getDate();
-
-    // Get today's date for highlighting
-    const currentDate = new Date();
-    const isCurrentMonth =
-      currentDate.getMonth() === month && currentDate.getFullYear() === year;
-    const today = isCurrentMonth ? currentDate.getDate() : -1;
-
-    // Get selected date if in current month/year
-    let selectedDay = -1;
-    if (calendarState.selectedDate) {
-      const selectedDate = calendarState.selectedDate;
-      if (
-        selectedDate.getMonth() === month &&
-        selectedDate.getFullYear() === year
-      ) {
-        selectedDay = selectedDate.getDate();
-      }
-    }
-
-    // Get minimum date based on active calendar
-    let minDate = null;
-    if (calendarState.activeCalendar === "stackDate" && formData.pickupDate) {
-      const [pickupMonth, pickupDay, pickupYear] = formData.pickupDate
-        .split("/")
-        .map(Number);
-      minDate = new Date(pickupYear, pickupMonth - 1, pickupDay);
-    } else if (calendarState.activeCalendar === "deadline") {
-      if (formData.stackDate) {
-        const [stackMonth, stackDay, stackYear] = formData.stackDate
-          .split("/")
-          .map(Number);
-        minDate = new Date(stackYear, stackMonth - 1, stackDay);
-      } else if (formData.pickupDate) {
-        const [pickupMonth, pickupDay, pickupYear] = formData.pickupDate
-          .split("/")
-          .map(Number);
-        minDate = new Date(pickupYear, pickupMonth - 1, pickupDay);
-      }
-    }
-
-    // Create calendar rows
-    const rows = [];
-    let cells = [];
-
-    // Add empty cells for days before first day of month
-    for (let i = 0; i < firstDay; i++) {
-      cells.push(<td key={`empty-${i}`} className="empty"></td>);
-    }
-
-    // Add cells for days of month
-    for (let day = 1; day <= daysInMonth; day++) {
-      const date = new Date(year, month, day);
-      const isDisabled = minDate && date < minDate;
-
-      cells.push(
-        <td
-          key={day}
-          className={`
-            ${day === today ? "today" : ""} 
-            ${day === selectedDay ? "selected" : ""} 
-            ${isDisabled ? "disabled" : ""}
-          `}
-          onClick={() => !isDisabled && handleDateSelect(day)}
-        >
-          {day}
-        </td>
-      );
-
-      // Start new row after Saturday (6)
-      if ((firstDay + day) % 7 === 0) {
-        rows.push(<tr key={day}>{cells}</tr>);
-        cells = [];
-      }
-    }
-
-    // Add remaining cells to last row
-    if (cells.length > 0) {
-      rows.push(<tr key="last">{cells}</tr>);
-    }
-
-    return rows;
-  };
-
-  // Style for non-editable fields
   const nonEditableStyle = {
     backgroundColor: "#f0f0f0",
     cursor: "not-allowed",
-    opacity: 0.7,
   };
 
-  // Tooltip component for field errors
-  const ErrorTooltip = ({ message }) => {
+  const readOnlyStyle = {
+    backgroundColor: "#f8f9fa",
+    cursor: "not-allowed",
+    color: "#6c757d",
+    border: "1px solid #e9ecef",
+  };
+
+  // Inner tooltip component with different styling
+  const InstructionErrorTooltip = ({ message }) => {
     if (!message) return null;
-
     return (
-      <div className="error-tooltip">
+      <div className="controller-instructions-error-tooltip">
         {message}
-        <div className="tooltip-arrow"></div>
+        <div className="controller-instructions-tooltip-arrow"></div>
       </div>
     );
   };
 
-  // Calendar modal component
-  const CalendarModal = ({ isOpen, onClose }) => {
-    if (!isOpen) return null;
+  // Loading state check that includes all required data
+  const isLoadingComplete =
+    !isLoading.clients &&
+    !isLoading.shipmentTypes &&
+    !isLoading.startingPoints &&
+    !isLoading.destinations &&
+    !isLoading.instruction &&
+    Object.keys(formData).length > 0; // Ensure formData is initialized
 
-    const monthNames = [
-      "January",
-      "February",
-      "March",
-      "April",
-      "May",
-      "June",
-      "July",
-      "August",
-      "September",
-      "October",
-      "November",
-      "December",
-    ];
+  // Debug log for loading states
+  console.log("Loading states:", {
+    clients: isLoading.clients,
+    shipmentTypes: isLoading.shipmentTypes,
+    startingPoints: isLoading.startingPoints,
+    destinations: isLoading.destinations,
+    instruction: isLoading.instruction,
+    formDataKeys: Object.keys(formData),
+    isLoadingComplete,
+  });
 
+  // Ensure we have all required data before rendering the form
+  if (!isLoadingComplete) {
     return (
-      <div className="calendar-modal-overlay" onClick={onClose}>
-        <div className="calendar-modal" onClick={(e) => e.stopPropagation()}>
-          <div className="calendar-header">
-            <button onClick={prevMonth}>&lt;</button>
-            <h3>
-              {monthNames[calendarState.currentMonth]}{" "}
-              {calendarState.currentYear}
-            </h3>
-            <button onClick={nextMonth}>&gt;</button>
-          </div>
-          <table className="calendar">
-            <thead>
-              <tr>
-                <th>Sun</th>
-                <th>Mon</th>
-                <th>Tue</th>
-                <th>Wed</th>
-                <th>Thu</th>
-                <th>Fri</th>
-                <th>Sat</th>
-              </tr>
-            </thead>
-            <tbody>{generateCalendar()}</tbody>
-          </table>
-          <div className="calendar-footer">
-            <button onClick={onClose}>Cancel</button>
-          </div>
-        </div>
+      <div style={{ textAlign: "center", padding: "20px" }}>
+        <p>Loading data...</p>
       </div>
     );
-  };
+  }
 
-  // Declare seDate function
-  const seDate = (dateString) => {
-    return dateString;
-  };
+  // Check if we have all required data
+  console.log("Data availability check:", {
+    clients: clients.length,
+    shipmentTypes: shipmentTypes.length,
+    startingPoints: startingPoints.length,
+    destinations: destinations.length,
+  });
 
-  return (
-    <div className="controller-instruction-page-wrapper">
-      {/* Error Modal */}
-      {errorModal.isOpen && (
-        <ErrorModal
-          isOpen={errorModal.isOpen}
-          onClose={() => setErrorModal({ ...errorModal, isOpen: false })}
-          message={errorModal.message}
-        />
-      )}
-
-      {/* Calendar Modals */}
-      <CalendarModal
-        isOpen={calendarModals.pickupDate}
-        onClose={closeCalendar}
-      />
-      <CalendarModal
-        isOpen={calendarModals.stackDate}
-        onClose={closeCalendar}
-      />
-      <CalendarModal isOpen={calendarModals.deadline} onClose={closeCalendar} />
-
-      {/* Back Button - Updated to match the requested structure */}
-      <div className="">
-        <button className="back-button" onClick={handleBackClick}>
-          Back
-        </button>
-      </div>
-
-      {/* Success Message */}
-      {successMessage && (
-        <div
-          className="success-message"
+  if (
+    clients.length === 0 ||
+    shipmentTypes.length === 0 ||
+    startingPoints.length === 0 ||
+    destinations.length === 0
+  ) {
+    return (
+      <div style={{ textAlign: "center", padding: "20px" }}>
+        <p>Failed to load required data. Please try again.</p>
+        <button
+          onClick={handleRetryFetch}
           style={{
-            backgroundColor: "#d4edda",
-            color: "#155724",
-            padding: "10px",
+            padding: "8px 16px",
+            backgroundColor: "#4a90e2",
+            color: "white",
+            border: "none",
             borderRadius: "4px",
-            margin: "10px 0",
-            textAlign: "center",
+            cursor: "pointer",
+            marginTop: "10px",
           }}
         >
-          {successMessage}
+          Retry
+        </button>
+      </div>
+    );
+  }
+
+  // Log form data before render
+  console.log("Rendering with formData:", formData);
+  console.log(
+    "Client options:",
+    clients.map((c) => ({ id: c.m5clientkey, name: c.companyname }))
+  );
+  console.log("Current client selection:", formData.clientId);
+
+  return (
+    <div className="controller-instructions-root">
+      <div className="controller-instructions-unique-wrapper">
+        {errorModal.isOpen &&
+          errorModal.message.includes("Failed to fetch") && (
+            <ErrorModal
+              isOpen={errorModal.isOpen}
+              message={errorModal.message}
+              onClose={() => setErrorModal({ isOpen: false, message: "" })}
+              type="error"
+            />
+          )}
+        {warningModal.isOpen && (
+          <ErrorModal
+            isOpen={warningModal.isOpen}
+            message={warningModal.message}
+            onClose={() =>
+              setWarningModal((prev) => ({ ...prev, isOpen: false }))
+            }
+            onConfirm={warningModal.onConfirm}
+            type="warning"
+            showConfirmButton={true}
+            confirmButtonText="Reset Counts & Continue"
+            cancelButtonText="Cancel"
+          />
+        )}
+        <div className="controller-instructions-header">
+          <button
+            className="controller-instructions-back-button"
+            onClick={() => handleBackClick()}
+          >
+            Back
+          </button>
         </div>
-      )}
-
-      <div className="instruction-container1" style={{ marginTop: "-20px" }}>
-        <div className="content">
-          {/* Loading indicator or retry button */}
-          {isLoading.clients ||
-          isLoading.shipmentTypes ||
-          isLoading.instruction ? (
-            <div style={{ textAlign: "center", padding: "20px" }}>
-              <p>Loading data...</p>
+        <div
+          className="controller-instructions-form-container"
+          style={{ maxWidth: "1200px" }}
+        >
+          {isReadOnly && (
+            <div
+              style={{
+                backgroundColor: "#fff3cd",
+                border: "1px solid #ffeaa7",
+                borderRadius: "4px",
+                padding: "12px",
+                marginBottom: "20px",
+                textAlign: "center",
+                color: "#856404",
+                fontWeight: "bold",
+              }}
+            >
+              ⚠️ This instruction is {formData.status} and is in read-only mode
             </div>
-          ) : clients.length === 0 || shipmentTypes.length === 0 ? (
-            <div style={{ textAlign: "center", padding: "20px" }}>
-              <p>Failed to load data from the database. Please try again.</p>
-              <button
-                onClick={handleRetryFetch}
-                style={{
-                  padding: "8px 16px",
-                  backgroundColor: "#4a90e2",
-                  color: "white",
-                  border: "none",
-                  borderRadius: "4px",
-                  cursor: "pointer",
-                  marginTop: "10px",
-                }}
-              >
-                Retry
-              </button>
-            </div>
-          ) : null}
-
-          <div className="form-section">
-            <div className="form-row1">
-              <div className="form-group">
+          )}
+          <div className="controller-instructions-form-section controller-instructions-client-info-section">
+            <div className="controller-instructions-form-row">
+              <div className="controller-instructions-form-field">
                 <label>Client</label>
-                <div className="select-wrapper" ref={fieldRefs.clientId}>
+                <div
+                  className="controller-instructions-select-wrapper"
+                  ref={fieldRefs.clientId}
+                >
                   <select
+                    style={isReadOnly ? readOnlyStyle : nonEditableStyle}
                     className={`dropdown ${
-                      fieldErrors.clientId ? "error-field" : ""
+                      fieldErrors.clientId
+                        ? "controller-instructions-error-field"
+                        : ""
                     }`}
                     name="clientId"
-                    value={formData.clientId}
+                    value={formData.clientId || ""}
                     onChange={handleClientChange}
                     disabled={true}
-                    style={nonEditableStyle}
                   >
-                    <option value="">Select Client</option>
+                    <option value="" disabled>
+                      Select Client
+                    </option>
                     {clients.map((client) => (
                       <option
                         key={client.m5clientkey}
@@ -1614,63 +3594,74 @@ const FCcontrollerinstructions = () => {
                       </option>
                     ))}
                   </select>
-                  <ErrorTooltip message={fieldErrors.clientId} />
+                  <InstructionErrorTooltip message={fieldErrors.clientId} />
                 </div>
               </div>
-              <div className="form-group">
+              <div className="controller-instructions-form-field">
                 <label>Representative</label>
                 <input
                   type="text"
-                  className="form-input"
+                  className="controller-instructions-form-input"
+                  style={isReadOnly ? readOnlyStyle : nonEditableStyle}
+                  value={formData.representative || ""}
+                  readOnly
                   placeholder="Autoload representative"
                   name="representative"
-                  value={formData.representative}
-                  readOnly
-                  style={nonEditableStyle}
+                  onChange={handleInputChange}
+                  disabled={true}
                 />
+                <InstructionErrorTooltip message={fieldErrors.representative} />
               </div>
-              <div className="form-group">
+              <div className="controller-instructions-form-field">
                 <label>Contact Details</label>
                 <input
                   type="text"
-                  className="form-input"
+                  className="controller-instructions-form-input"
                   placeholder="Autoload contact details"
                   name="contactDetails"
                   value={formData.contactDetails}
                   readOnly
-                  style={nonEditableStyle}
+                  style={isReadOnly ? readOnlyStyle : nonEditableStyle}
+                  disabled={isReadOnly}
                 />
               </div>
-              <div className="form-group">
+              <div className="controller-instructions-form-field">
                 <label>Email</label>
                 <input
                   type="email"
-                  className="form-input"
+                  className="controller-instructions-form-input"
                   placeholder="Autoload email"
                   name="email"
                   value={formData.email}
                   readOnly
-                  style={nonEditableStyle}
+                  style={isReadOnly ? readOnlyStyle : nonEditableStyle}
+                  disabled={isReadOnly}
                 />
               </div>
             </div>
           </div>
-
-          <div className="form-section">
-            <div className="form-row1">
-              <div className="form-group">
+          <div className="controller-instructions-form-section">
+            <div
+              className="controller-instructions-form-row"
+              style={{ display: "none" }}
+            >
+              <div className="controller-instructions-form-field">
                 <label>Shipment Type</label>
-                <div className="select-wrapper" ref={fieldRefs.shipmentTypeId}>
+                <div
+                  className="controller-instructions-select-wrapper"
+                  ref={fieldRefs.shipmentTypeId}
+                >
                   <select
                     className={`dropdown ${
-                      fieldErrors.shipmentTypeId ? "error-field" : ""
+                      fieldErrors.shipmentTypeId
+                        ? "controller-instructions-error-field"
+                        : ""
                     }`}
                     name="shipmentTypeId"
                     value={formData.shipmentTypeId}
                     onChange={handleShipmentTypeChange}
-                    disabled={
-                      isLoading.shipmentTypes || shipmentTypes.length === 0
-                    }
+                    disabled={isReadOnly}
+                    style={isReadOnly ? readOnlyStyle : {}}
                   >
                     <option value="" disabled>
                       Select Shipment
@@ -1681,1004 +3672,1252 @@ const FCcontrollerinstructions = () => {
                       </option>
                     ))}
                   </select>
-                  <ErrorTooltip message={fieldErrors.shipmentTypeId} />
+                  <InstructionErrorTooltip
+                    message={fieldErrors.shipmentTypeId}
+                  />
                 </div>
               </div>
-              <div className="form-group" style={{ flex: "2" }}>
-                <label>Name of Task</label>
-                <div className="input-wrapper" ref={fieldRefs.task}>
+              <div className="controller-instructions-form-field">
+                <label>KSM File Reference</label>
+                <div
+                  className="controller-instructions-input-wrapper"
+                  ref={fieldRefs.ksmFileRef}
+                >
                   <input
                     type="text"
-                    className={`form-input ${
-                      fieldErrors.task ? "error-field" : ""
+                    className={`controller-instructions-form-input ${
+                      fieldErrors.ksmFileRef
+                        ? "controller-instructions-error-field"
+                        : ""
                     }`}
-                    placeholder="Input Name of Task"
+                    placeholder="Input KSM File Reference"
                     name="task"
                     value={formData.task}
                     onChange={handleInputChange}
+                    disabled={isReadOnly}
+                    style={isReadOnly ? readOnlyStyle : {}}
                   />
-                  <ErrorTooltip message={fieldErrors.task} />
-                </div>
-              </div>
-            </div>
-
-            <div className="form-row1">
-              <div className="form-group">
-                <label>Pick-Up Location</label>
-                <div className="input-wrapper" ref={fieldRefs.pickup}>
-                  <input
-                    type="text"
-                    className={`form-input ${
-                      fieldErrors.pickup ? "error-field" : ""
-                    }`}
-                    placeholder="Input pick-up location here"
-                    name="pickup"
-                    value={formData.pickup}
-                    onChange={handleInputChange}
-                  />
-                  <ErrorTooltip message={fieldErrors.pickup} />
-                </div>
-              </div>
-              <div className="form-group">
-                <label>Drop-off</label>
-                <div className="input-wrapper" ref={fieldRefs.dropoff}>
-                  <input
-                    type="text"
-                    className={`form-input ${
-                      fieldErrors.dropoff ? "error-field" : ""
-                    }`}
-                    placeholder="Input drop-off location here"
-                    name="dropoff"
-                    value={formData.dropoff}
-                    onChange={handleInputChange}
-                  />
-                  <ErrorTooltip message={fieldErrors.dropoff} />
-                </div>
-              </div>
-              <div className="form-group checkboxes">
-                <div className="checkbox-group">
-                  <input
-                    type="checkbox"
-                    id="hazardous"
-                    name="hazardous"
-                    checked={formData.hazardous}
-                    onChange={handleInputChange}
-                  />
-                  <label htmlFor="hazardous">Hazardous Materials</label>
-                </div>
-                <div className="checkbox-group">
-                  <input
-                    type="checkbox"
-                    id="surcharges"
-                    name="surcharges"
-                    checked={formData.surcharges}
-                    onChange={handleInputChange}
-                  />
-                  <label htmlFor="surcharges">Add Surcharges</label>
-                </div>
-              </div>
-            </div>
-
-            {/* Date Inputs with functional calendar buttons */}
-            <div className="form-row1">
-              <div className="form-group">
-                <label>Pick-up Time</label>
-                <div className="time-input-group" ref={fieldRefs.pickupTime}>
-                  <input
-                    type="time"
-                    className={`form-input ${
-                      fieldErrors.pickupTime ? "error-field" : ""
-                    }`}
-                    name="pickupTime"
-                    value={formData.pickupTime}
-                    onChange={handleInputChange}
-                  />
-                  <ErrorTooltip message={fieldErrors.pickupTime} />
-                </div>
-              </div>
-
-              <div className="form-group">
-                <label>Pick-up Date</label>
-                <div className="date-input-group" ref={fieldRefs.pickupDate}>
-                  <DatePicker
-                    selected={parseDate(formData.pickupDate)}
-                    onChange={(date) => handleDateChange(date, "pickupDate")}
-                    dateFormat="MM/dd/yyyy"
-                    className={`form-input ${
-                      fieldErrors.pickupDate ? "error-field" : ""
-                    }`}
-                    placeholderText="MM/DD/YYYY"
-                    ref={pickupDateRef}
-                    onFocus={(e) => e.target.blur()} // Prevent keyboard on mobile
-                    customInput={
-                      <input
-                        type="text"
-                        className={`form-input ${
-                          fieldErrors.pickupDate ? "error-field" : ""
-                        }`}
-                        placeholder="MM/DD/YYYY"
-                        name="pickupDate"
-                        value={formData.pickupDate || ""}
-                        onChange={handleInputChange}
-                      />
-                    }
-                  />
-                  <button
-                    type="button"
-                    className="calendar-button"
-                    onClick={() => {
-                      if (pickupDateRef.current) {
-                        const datePickerInput =
-                          pickupDateRef.current.input || pickupDateRef.current;
-                        if (
-                          datePickerInput &&
-                          typeof datePickerInput.focus === "function"
-                        ) {
-                          datePickerInput.focus();
-                        }
-                      }
-                    }}
-                  ></button>
-                  <ErrorTooltip message={fieldErrors.pickupDate} />
-                </div>
-              </div>
-
-              <div className="form-group">
-                <label>{isImport ? "ETA" : "Stack Date"}</label>
-                <div className="date-input-group" ref={fieldRefs.stackDate}>
-                  <DatePicker
-                    selected={parseDate(formData.stackDate)}
-                    onChange={(date) => handleDateChange(date, "stackDate")}
-                    dateFormat="MM/dd/yyyy"
-                    className={`form-input ${
-                      fieldErrors.stackDate ? "error-field" : ""
-                    }`}
-                    placeholderText="MM/DD/YYYY"
-                    ref={etaDateRef}
-                    disabled={!formData.pickupDate}
-                    minDate={parseDate(formData.pickupDate)}
-                    onFocus={(e) => e.target.blur()} // Prevent keyboard on mobile
-                    customInput={
-                      <input
-                        type="text"
-                        className={`form-input ${
-                          fieldErrors.stackDate ? "error-field" : ""
-                        }`}
-                        placeholder="MM/DD/YYYY"
-                        name="stackDate"
-                        value={formData.stackDate || ""}
-                        onChange={handleInputChange}
-                        disabled={!formData.pickupDate}
-                      />
-                    }
-                  />
-                  <button
-                    type="button"
-                    className="calendar-button"
-                    onClick={() => {
-                      if (!formData.pickupDate) {
-                        setErrorModal({
-                          isOpen: true,
-                          message: "Please select a pickup date first",
-                        });
-                      } else if (etaDateRef.current) {
-                        const datePickerInput =
-                          etaDateRef.current.input || etaDateRef.current;
-                        if (
-                          datePickerInput &&
-                          typeof datePickerInput.focus === "function"
-                        ) {
-                          datePickerInput.focus();
-                        }
-                      }
-                    }}
-                  ></button>
-                  <ErrorTooltip message={fieldErrors.stackDate} />
-                </div>
-              </div>
-
-              <div className="form-group">
-                <label>Deadline</label>
-                <div className="date-input-group" ref={fieldRefs.deadline}>
-                  <DatePicker
-                    selected={parseDate(formData.deadline)}
-                    onChange={(date) => handleDateChange(date, "deadline")}
-                    dateFormat="MM/dd/yyyy"
-                    className={`form-input ${
-                      fieldErrors.deadline ? "error-field" : ""
-                    }`}
-                    placeholderText="MM/DD/YYYY"
-                    ref={deadlineDateRef}
-                    disabled={!formData.stackDate}
-                    minDate={
-                      parseDate(formData.stackDate) ||
-                      seDate(formData.pickupDate)
-                    }
-                    onFocus={(e) => e.target.blur()} // Prevent keyboard on mobile
-                    customInput={
-                      <input
-                        type="text"
-                        className={`form-input ${
-                          fieldErrors.deadline ? "error-field" : ""
-                        }`}
-                        placeholder="MM/DD/YYYY"
-                        name="deadline"
-                        value={formData.deadline || ""}
-                        onChange={handleInputChange}
-                        disabled={!formData.stackDate}
-                      />
-                    }
-                  />
-                  <button
-                    type="button"
-                    className="calendar-button"
-                    onClick={() => {
-                      if (!formData.pickupDate) {
-                        setErrorModal({
-                          isOpen: true,
-                          message: "Please select a pickup date first",
-                        });
-                      } else if (!formData.stackDate) {
-                        setErrorModal({
-                          isOpen: true,
-                          message: `Please select ${
-                            isImport ? "an ETA" : "a stack date"
-                          } first`,
-                        });
-                      } else if (deadlineDateRef.current) {
-                        const datePickerInput =
-                          deadlineDateRef.current.input ||
-                          deadlineDateRef.current;
-                        if (
-                          datePickerInput &&
-                          typeof datePickerInput.focus === "function"
-                        ) {
-                          datePickerInput.focus();
-                        }
-                      }
-                    }}
-                  ></button>
-                  <ErrorTooltip message={fieldErrors.deadline} />
+                  <InstructionErrorTooltip message={fieldErrors.ksmFileRef} />
                 </div>
               </div>
             </div>
           </div>
+          <div className="controller-instructions-form-section">
+            <div className="controller-instructions-form-row controller-instructions-trailer-container">
+              <div
+                className="controller-instructions-trailer-title"
+                style={{ display: "none" }}
+              >
+                <h3>Trailer Size</h3>
+              </div>
+              <hr
+                className="controller-instructions-divider"
+                style={{ display: "none" }}
+              />
 
-          {/* File Ref and Rates Section */}
-          <div className="form-section blue-bg">
-            <div className="file-rates-row">
-              <div className="file-ref-column">
-                <label>File Ref</label>
-                <div className="input-wrapper" ref={fieldRefs.fileRef}>
-                  <input
-                    type="text"
-                    className={`form-input ${
-                      fieldErrors.fileRef ? "error-field" : ""
-                    }`}
-                    placeholder="Upload file number here"
-                    name="fileRef"
-                    value={formData.fileRef}
-                    onChange={handleInputChange}
-                  />
-                  <ErrorTooltip message={fieldErrors.fileRef} />
+              <div className="controller-instructions-container-section">
+                <div className="controller-instructions-container-group">
+                  <div className="controller-instructions-container-label">
+                    <span className="controller-instructions-trailer-size-label">
+                      Trailer Size
+                    </span>
+                    <label>No. of Containers</label>
+                    {fieldErrors.containers && (
+                      <div className="controller-instructions-container-error-message">
+                        {fieldErrors.containers}
+                      </div>
+                    )}
+                  </div>
+                  <div className="controller-instructions-container-inputs">
+                    <div className="controller-instructions-container-input">
+                      <label>6m</label>
+                      <div className="controller-instructions-container-rate-group">
+                        <input
+                          type="number"
+                          className={
+                            fieldErrors.containers
+                              ? "controller-instructions-error-field"
+                              : ""
+                          }
+                          value={formData.num_six_meters}
+                          min="0"
+                          name="num_six_meters"
+                          onChange={(e) => handleNumericInputChange(e)}
+                          disabled={
+                            formData.rateWeight !== "Container" || isReadOnly
+                          }
+                          style={isReadOnly ? readOnlyStyle : {}}
+                        />
+                        <div
+                          className="controller-instructions-input-wrapper controller-instructions-rate-input"
+                          ref={fieldRefs.rateper_6}
+                        >
+                          <input
+                            type="text"
+                            className={`controller-instructions-form-input ${
+                              fieldErrors.rateper_6
+                                ? "controller-instructions-error-field"
+                                : ""
+                            }`}
+                            placeholder="Rate"
+                            value={formData.rateper_6 || ""}
+                            name="rateper_6"
+                            onChange={handleRateChange}
+                            disabled={
+                              formData.rateWeight !== "Container" || isReadOnly
+                            }
+                            style={isReadOnly ? readOnlyStyle : {}}
+                          />
+                          <InstructionErrorTooltip
+                            message={fieldErrors.rateper_6}
+                          />
+                        </div>
+                      </div>
+                    </div>
+                    <div className="controller-instructions-container-input">
+                      <label>12m</label>
+                      <div className="controller-instructions-container-rate-group">
+                        <input
+                          type="number"
+                          className={
+                            fieldErrors.containers
+                              ? "controller-instructions-error-field"
+                              : ""
+                          }
+                          value={formData.num_twelve_meters}
+                          min="0"
+                          name="num_twelve_meters"
+                          onChange={(e) => handleNumericInputChange(e)}
+                          disabled={
+                            formData.rateWeight !== "Container" || isReadOnly
+                          }
+                          style={isReadOnly ? readOnlyStyle : {}}
+                        />
+                        <div
+                          className="controller-instructions-input-wrapper controller-instructions-rate-input"
+                          ref={fieldRefs.rateper_12}
+                        >
+                          <input
+                            type="text"
+                            className={`controller-instructions-form-input ${
+                              fieldErrors.rateper_12
+                                ? "controller-instructions-error-field"
+                                : ""
+                            }`}
+                            placeholder="Rate"
+                            value={formData.rateper_12 || ""}
+                            name="rateper_12"
+                            onChange={handleRateChange}
+                            disabled={
+                              formData.rateWeight !== "Container" || isReadOnly
+                            }
+                            style={isReadOnly ? readOnlyStyle : {}}
+                          />
+                          <InstructionErrorTooltip
+                            message={fieldErrors.rateper_12}
+                          />
+                        </div>
+                      </div>
+                    </div>
+                    <div className="controller-instructions-container-input">
+                      <label>Abnormal</label>
+                      <div className="controller-instructions-container-rate-group">
+                        <input
+                          type="number"
+                          className={
+                            fieldErrors.containers
+                              ? "controller-instructions-error-field"
+                              : ""
+                          }
+                          value={formData.num_abnormal}
+                          min="0"
+                          name="num_abnormal"
+                          onChange={(e) => handleNumericInputChange(e)}
+                          disabled={
+                            formData.rateWeight !== "Container" || isReadOnly
+                          }
+                          style={isReadOnly ? readOnlyStyle : {}}
+                        />
+                        <div
+                          className="controller-instructions-input-wrapper controller-instructions-rate-input"
+                          ref={fieldRefs.rateper_abnormal}
+                        >
+                          <input
+                            type="text"
+                            className={`controller-instructions-form-input ${
+                              fieldErrors.rateper_abnormal
+                                ? "controller-instructions-error-field"
+                                : ""
+                            }`}
+                            placeholder="Rate"
+                            value={formData.rateper_abnormal || ""}
+                            name="rateper_abnormal"
+                            onChange={handleRateChange}
+                            disabled={
+                              formData.rateWeight !== "Container" || isReadOnly
+                            }
+                            style={isReadOnly ? readOnlyStyle : {}}
+                          />
+                          <ErrorTooltip
+                            message={fieldErrors.rateper_abnormal}
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Hazardous and Surcharges checkboxes have been removed from this section */}
                 </div>
-              </div>
-              <div className="booking-ref-column">
-                <label>Booking Ref.</label>
-                <div className="input-wrapper" ref={fieldRefs.bookingRef}>
-                  <input
-                    type="text"
-                    className={`form-input ${
-                      fieldErrors.bookingRef ? "error-field" : ""
-                    }`}
-                    placeholder="Enter booking reference"
-                    name="bookingRef"
-                    value={formData.bookingRef}
-                    onChange={handleInputChange}
-                  />
-                  <ErrorTooltip message={fieldErrors.bookingRef} />
-                </div>
-              </div>
-              <div className="rates-column">
-                <label>Rates per</label>
-                <div className="rates-input-group">
-                  <div className="select-wrapper small">
-                    <select
-                      className="dropdown"
-                      name="rateWeight"
-                      value={formData.rateWeight}
-                      onChange={handleInputChange}
+                {/* Main form section */}
+                <div
+                  className="controller-instructions-booking-vertical-group"
+                  style={{
+                    marginTop: "8px",
+                    display: "flex",
+                    flexDirection: "column",
+                    gap: "8px",
+                    maxWidth: "220px",
+                  }}
+                >
+                  <div className="controller-instructions-form-field">
+                    <label>Shipment Type</label>
+                    <div
+                      className="controller-instructions-select-wrapper"
+                      ref={fieldRefs.shipmentTypeId}
                     >
-                      <option value="kg">kg</option>
-                      <option value="m³">m³</option>
-                      <option value="Container">Container</option>
-                    </select>
+                      <select
+                        className={`controller-instructions-dropdown ${
+                          fieldErrors.shipmentTypeId
+                            ? "controller-instructions-error-field"
+                            : ""
+                        }`}
+                        name="shipmentTypeId"
+                        value={formData.shipmentTypeId}
+                        onChange={handleShipmentTypeChange}
+                        disabled={isReadOnly}
+                        style={isReadOnly ? readOnlyStyle : {}}
+                      >
+                        <option value="" disabled>
+                          Select Shipment
+                        </option>
+                        {shipmentTypes.map((type) => (
+                          <option key={type.shipkey} value={type.shipkey}>
+                            {type.shipmenttype}
+                          </option>
+                        ))}
+                      </select>
+                      <InstructionErrorTooltip
+                        message={fieldErrors.shipmentTypeId}
+                      />
+                    </div>
                   </div>
-                  <div className="input-wrapper" ref={fieldRefs.rate}>
-                    <input
-                      type="text"
-                      className={`form-input ${
-                        fieldErrors.rate ? "error-field" : ""
-                      }`}
-                      placeholder="R 1000000/ton"
-                      name="rate"
-                      value={formData.rate}
-                      onChange={(e) => {
-                        // Allow only numbers and decimal point
-                        const value = e.target.value;
-                        if (value === "" || /^[0-9]*\.?[0-9]*$/.test(value)) {
-                          handleInputChange(e);
-                        }
+                  <div className="controller-instructions-form-field">
+                    <label>Pickup Location</label>
+                    <div
+                      className="controller-instructions-select-wrapper"
+                      ref={fieldRefs.pickup}
+                    >
+                      <select
+                        className={`controller-instructions-dropdown ${
+                          fieldErrors.pickup
+                            ? "controller-instructions-error-field"
+                            : ""
+                        }`}
+                        name="pickup"
+                        value={formData.pickup || ""}
+                        onChange={handlePickupChange}
+                        disabled={isReadOnly}
+                        style={isReadOnly ? readOnlyStyle : {}}
+                      >
+                        <option value="" disabled>
+                          Select Pickup
+                        </option>
+                        {startingPoints.map((point) => (
+                          <option key={point.id} value={point.startingpoint}>
+                            {point.startingpoint}
+                          </option>
+                        ))}
+                      </select>
+                      <InstructionErrorTooltip message={fieldErrors.pickup} />
+                    </div>
+                  </div>
+                  <div className="controller-instructions-form-field">
+                    <label>Dropoff Location</label>
+                    <div
+                      className="controller-instructions-select-wrapper"
+                      ref={fieldRefs.dropoff}
+                    >
+                      <select
+                        className={`controller-instructions-dropdown ${
+                          fieldErrors.dropoff
+                            ? "controller-instructions-error-field"
+                            : ""
+                        }`}
+                        name="dropoff"
+                        value={formData.dropoff || ""}
+                        onChange={handleDropoffChange}
+                        disabled={isReadOnly}
+                        style={isReadOnly ? readOnlyStyle : {}}
+                      >
+                        <option value="" disabled>
+                          Select Dropoff
+                        </option>
+                        {destinations.map((dest) => (
+                          <option key={dest.id} value={dest.destination}>
+                            {dest.destination}
+                          </option>
+                        ))}
+                      </select>
+                      <InstructionErrorTooltip message={fieldErrors.dropoff} />
+                    </div>
+                  </div>
+                  {/* This surchages section has been moved to be next to the checkbox */}
+
+                  {/* Compact Rates per dropdown and input fields in one row */}
+                  <div className="controller-instructions-form-field">
+                    <label>Unit per</label>
+                    <div
+                      style={{
+                        display: "flex",
+                        alignItems: "flex-start",
+                        gap: "15px",
+                        width: "100%",
                       }}
-                    />
-                    <ErrorTooltip message={fieldErrors.rate} />
+                    >
+                      {/* Unit per dropdown */}
+                      <div
+                        className="controller-instructions-select-wrapper"
+                        style={{ minWidth: "100px", marginTop: "5px" }}
+                      >
+                        <select
+                          className="controller-instructions-dropdown"
+                          name="rateWeight"
+                          value={formData.rateWeight || "Container"}
+                          onChange={handleInputChange}
+                          style={{
+                            width: "100%",
+                            padding: "4px 8px",
+                            ...(isReadOnly ? readOnlyStyle : {}),
+                          }}
+                          ref={fieldRefs.rateWeight}
+                          disabled={isReadOnly}
+                        >
+                          {/* Show kg and ton options only for Cross-haul (break bulk) - type 4 */}
+                          {formData.shipmentTypeId === "4" && (
+                            <>
+                              <option value="kg">kg</option>
+                              <option value="ton">ton</option>
+                            </>
+                          )}
+                          {/* Show Container option only for Import, Export, and Cross-haul - types 1, 2, 3 */}
+                          {(formData.shipmentTypeId === "1" ||
+                            formData.shipmentTypeId === "2" ||
+                            formData.shipmentTypeId === "3") && (
+                            <option value="Container">Container</option>
+                          )}
+                        </select>
+                      </div>
+
+                      {/* Rate per unit and weight textboxes */}
+                      {(formData.rateWeight === "kg" ||
+                        formData.rateWeight === "m³" ||
+                        formData.rateWeight === "ton") && (
+                        <div
+                          style={{
+                            display: "flex",
+                            gap: "15px",
+                            width: "100%",
+                            marginTop: "48px",
+                            marginLeft: "-113px",
+                          }}
+                        >
+                          {/* Unit Rate Field */}
+                          <div
+                            className="controller-instructions-form-field"
+                            style={{ flex: 1, minWidth: "150px" }}
+                          >
+                            <label>{`Rate per ${formData.rateWeight}`}</label>
+                            <div
+                              className="controller-instructions-input-wrapper"
+                              ref={fieldRefs.unitRate}
+                              style={{ width: "100%" }}
+                            >
+                              <input
+                                type="text"
+                                className={`controller-instructions-form-input ${
+                                  fieldErrors.unitRate
+                                    ? "controller-instructions-error-field"
+                                    : ""
+                                }`}
+                                name="unitRate"
+                                value={formData.unitRate || ""}
+                                onChange={(e) => {
+                                  const value = e.target.value;
+                                  if (
+                                    value === "" ||
+                                    /^[0-9]*\.?[0-9]*$/.test(value)
+                                  ) {
+                                    handleInputChange(e);
+                                  }
+                                }}
+                                disabled={isReadOnly}
+                                style={isReadOnly ? readOnlyStyle : {}}
+                              />
+                              <InstructionErrorTooltip
+                                message={fieldErrors.unitRate}
+                              />
+                            </div>
+                          </div>
+
+                          {/* Weight Field */}
+                          <div
+                            className="controller-instructions-form-field"
+                            style={{ flex: 1, minWidth: "150px" }}
+                          >
+                            <label>{`Weight (${formData.rateWeight})`}</label>
+                            <div
+                              className="controller-instructions-input-wrapper"
+                              ref={fieldRefs.weight}
+                              style={{ width: "100%" }}
+                            >
+                              <input
+                                type="text"
+                                className={`controller-instructions-form-input ${
+                                  fieldErrors.weight
+                                    ? "controller-instructions-error-field"
+                                    : ""
+                                }`}
+                                name="weight"
+                                value={formData.weight || ""}
+                                onChange={(e) => {
+                                  const value = e.target.value;
+                                  if (
+                                    value === "" ||
+                                    /^[0-9]*\.?[0-9]*$/.test(value)
+                                  ) {
+                                    handleInputChange(e);
+                                  }
+                                }}
+                                disabled={isReadOnly}
+                                style={isReadOnly ? readOnlyStyle : {}}
+                              />
+                              <InstructionErrorTooltip
+                                message={fieldErrors.quantity}
+                              />
+                            </div>
+                          </div>
+                        </div>
+                      )}
+                    </div>
                   </div>
                 </div>
-                {/* Add weight field for kg or m³ */}
-                {(formData.rateWeight === "kg" ||
-                  formData.rateWeight === "m³") && (
-                  <div className="weight-input-group" ref={fieldRefs.weight}>
-                    <label>{formData.rateWeight}</label>
-                    <div className="input-wrapper">
+                {/* End of main form section */}
+
+                {/* Hazardous / Surcharge checkboxes moved below Rate Type */}
+                <div className="controller-instructions-date-time-group">
+                  <div
+                    className="controller-instructions-shipment-task-row"
+                    style={{ order: -1, marginBottom: "8px" }}
+                  >
+                    <div className="controller-instructions-form-field controller-instructions-small-field">
+                      <label>Booking Reference</label>
+                      <div
+                        className="controller-instructions-input-wrapper"
+                        ref={fieldRefs.bookingRef}
+                      >
+                        <input
+                          type="text"
+                          className={`controller-instructions-form-input ${
+                            fieldErrors.bookingRef
+                              ? "controller-instructions-error-field"
+                              : ""
+                          }`}
+                          placeholder="Enter booking ref"
+                          name="bookingRef"
+                          value={formData.bookingRef}
+                          onChange={handleInputChange}
+                          disabled={isReadOnly}
+                          style={isReadOnly ? readOnlyStyle : {}}
+                        />
+                        <InstructionErrorTooltip
+                          message={fieldErrors.bookingRef}
+                        />
+                      </div>
+                    </div>
+                    <div className="controller-instructions-form-field controller-instructions-small-field">
+                      <label>Client File Ref</label>
+                      <div
+                        className="controller-instructions-input-wrapper"
+                        ref={fieldRefs.clientFileRef}
+                      >
+                        <input
+                          type="text"
+                          className={`controller-instructions-form-input ${
+                            fieldErrors.clientFileRef
+                              ? "controller-instructions-error-field"
+                              : ""
+                          }`}
+                          placeholder="Enter client file ref"
+                          name="clientFileRef"
+                          value={formData.clientFileRef}
+                          onChange={handleInputChange}
+                          disabled={isReadOnly}
+                          style={isReadOnly ? readOnlyStyle : {}}
+                        />
+                        <InstructionErrorTooltip
+                          message={fieldErrors.clientFileRef}
+                        />
+                      </div>
+                    </div>
+                    {/* Booking / File / VAT inline with task */}
+                    <div
+                      className="controller-instructions-booking-inline-row"
+                      style={{ display: "none" }}
+                    >
+                      <div
+                        className="controller-instructions-form-field controller-instructions-small-field"
+                        style={{ flex: "0 1 160px" }}
+                      >
+                        <label>Booking Reference</label>
+                        <div className="controller-instructions-input-wrapper">
+                          <input
+                            type="text"
+                            className="controller-instructions-form-input"
+                            placeholder="Enter booking ref"
+                            name="bookingRef"
+                            value={formData.bookingRef}
+                            onChange={handleInputChange}
+                          />
+                        </div>
+                      </div>
+                      <div
+                        className="controller-instructions-form-field controller-instructions-small-field"
+                        style={{ flex: "0 1 160px" }}
+                      >
+                        <label>Client File Ref</label>
+                        <div className="controller-instructions-input-wrapper">
+                          <input
+                            type="text"
+                            className="controller-instructions-form-input"
+                            placeholder="Enter client file ref"
+                            name="clientFileRef"
+                            value={formData.clientFileRef}
+                            onChange={handleInputChange}
+                          />
+                        </div>
+                      </div>
+                      <div
+                        className="controller-instructions-form-field controller-instructions-small-field"
+                        style={{ flex: "0 1 80px" }}
+                      >
+                        <label>VAT Rate %</label>
+                        <div className="controller-instructions-input-wrapper">
+                          <input
+                            type="number"
+                            className="controller-instructions-form-input"
+                            name="vat"
+                            value={formData.vat === 0 ? 0 : formData.vat || 15}
+                            onChange={handleInputChange}
+                            required
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                  <div className="controller-instructions-form-field">
+                    <label>Ksm File Reference</label>
+                    <div
+                      className="controller-instructions-input-wrapper"
+                      ref={fieldRefs.ksmFileRef}
+                    >
                       <input
                         type="text"
-                        className={`form-input ${
-                          fieldErrors.weight ? "error-field" : ""
+                        className={`controller-instructions-form-input ${
+                          fieldErrors.ksmFileRef
+                            ? "controller-instructions-error-field"
+                            : ""
                         }`}
-                        placeholder={`Enter weight in ${formData.rateWeight}`}
-                        name="weight"
-                        value={formData.weight}
-                        onChange={(e) => {
-                          // Allow only numbers and decimal point
-                          const value = e.target.value;
-                          if (value === "" || /^[0-9]*\.?[0-9]*$/.test(value)) {
-                            handleInputChange(e);
-                          }
-                        }}
+                        placeholder="Input KSM File Reference"
+                        name="ksmFileRef"
+                        value={formData.ksmFileRef}
+                        onChange={handleInputChange}
+                        disabled={isReadOnly}
+                        style={isReadOnly ? readOnlyStyle : {}}
                       />
-                      <ErrorTooltip message={fieldErrors.weight} />
+                      <InstructionErrorTooltip message={fieldErrors.ksmFileRef} />
                     </div>
+                  </div>
+                  <div
+                    className="controller-instructions-form-field"
+                    style={{ maxWidth: "120px" }}
+                  >
+                    <label>VAT Rate %</label>
+                    <div className="controller-instructions-input-wrapper">
+                      <input
+                        type="number"
+                        className="controller-instructions-form-input"
+                        name="vat"
+                        value={formData.vat === 0 ? 0 : formData.vat || 15}
+                        onChange={handleInputChange}
+                        required
+                        disabled={isReadOnly}
+                        style={isReadOnly ? readOnlyStyle : {}}
+                      />
+                    </div>
+                  </div>
+                  {(formData.shipmentTypeId === "1" ||
+                    formData.shipmentTypeId === "2") && (
+                    <div className="controller-instructions-form-field">
+                      <label>
+                        Vessel Name <span style={{ color: "red" }}>*</span>
+                      </label>
+                      <div
+                        className="controller-instructions-input-wrapper"
+                        ref={fieldRefs.vesselName}
+                      >
+                        <input
+                          type="text"
+                          className={`controller-instructions-form-input ${
+                            fieldErrors.vesselName
+                              ? "controller-instructions-error-field"
+                              : ""
+                          }`}
+                          placeholder="Enter vessel name"
+                          name="vesselName"
+                          value={formData.vesselName || ""}
+                          onChange={handleInputChange}
+                          disabled={isReadOnly}
+                          style={isReadOnly ? readOnlyStyle : {}}
+                          required={true}
+                        />
+                        <InstructionErrorTooltip
+                          message={fieldErrors.vesselName}
+                        />
+                      </div>
+                    </div>
+                  )}
+                  <div className="controller-instructions-form-field">
+                    <label>Description</label>
+                    <div
+                      className="controller-instructions-input-wrapper"
+                      ref={fieldRefs.description}
+                    >
+                      <input
+                        type="text"
+                        className={`controller-instructions-form-input ${
+                          fieldErrors.description
+                            ? "controller-instructions-error-field"
+                            : ""
+                        }`}
+                        placeholder="Enter description"
+                        name="description"
+                        value={formData.description}
+                        onChange={handleInputChange}
+                        disabled={isReadOnly}
+                        style={isReadOnly ? readOnlyStyle : {}}
+                      />
+                      <InstructionErrorTooltip
+                        message={fieldErrors.description}
+                      />
+                    </div>
+                  </div>
+                </div>
+                <div className="controller-instructions-date-time-group">
+                 
+                  {(formData.shipmentTypeId === "1" ||
+                    formData.shipmentTypeId === "2") && (
+                    <div className="controller-instructions-form-field">
+                      <label>
+                        {formData.shipmentTypeId === "1"
+                          ? "ETA Date"
+                          : "Stack Date"}{" "}
+                        <span style={{ color: "red" }}>*</span>
+                      </label>
+                      <div
+                        className="controller-instructions-date-wrapper"
+                        ref={fieldRefs.stackDate}
+                      >
+                        <input
+                          type="date"
+                          className={`controller-instructions-form-input ${
+                            fieldErrors.stackDate
+                              ? "controller-instructions-error-field"
+                              : ""
+                          }`}
+                          name="stackDate"
+                          value={formData.stackDate || ""}
+                          onChange={handleInputChange}
+                          min={today}
+                          ref={etaDateRef}
+                          disabled={isReadOnly}
+                          style={isReadOnly ? readOnlyStyle : {}}
+                          required={true}
+                          onKeyDown={(e) => e.preventDefault()}
+                        />
+                        <InstructionErrorTooltip
+                          message={fieldErrors.stackDate}
+                        />
+                      </div>
+                    </div>
+                  )}
+                  <div className="controller-instructions-form-field">
+                    <label>Last Free Date</label>
+                    <div
+                      className="controller-instructions-date-wrapper"
+                      ref={fieldRefs.lastFreeDate}
+                    >
+                      <input
+                        type="date"
+                        className={`controller-instructions-form-input ${
+                          fieldErrors.lastFreeDate
+                            ? "controller-instructions-error-field"
+                            : ""
+                        }`}
+                        name="lastFreeDate"
+                        value={formData.lastFreeDate}
+                        onChange={handleInputChange}
+                        min={today}
+                        ref={lastFreeDateRef}
+                        disabled={isReadOnly}
+                        style={isReadOnly ? readOnlyStyle : {}}
+                        onKeyDown={(e) => e.preventDefault()} // stops typing
+                        
+                      />
+                      <InstructionErrorTooltip
+                        message={fieldErrors.lastFreeDate}
+                      />
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+          {/* Container Details Table */}
+          {console.log("Debug weight column visibility:", {
+            isImport,
+            shipmentTypeId: formData.shipmentTypeId,
+            shipmentTypeIdType: typeof formData.shipmentTypeId,
+            shipmentTypeName: formData.shipmentTypeName,
+            stringComparison: {
+              isEqual2: String(formData.shipmentTypeId) === "2",
+              isEqual3: String(formData.shipmentTypeId) === "3",
+              isEqual4: String(formData.shipmentTypeId) === "4",
+            },
+            shouldShowWeight:
+              isImport ||
+              String(formData.shipmentTypeId) === "2" ||
+              String(formData.shipmentTypeId) === "3",
+            weightColumnCondition: Boolean(
+              isImport ||
+                String(formData.shipmentTypeId) === "2" ||
+                String(formData.shipmentTypeId) === "3"
+            ),
+            containers: containers.map((c) => ({
+              id: c.id,
+              type: c.containerType,
+              weight: c.weight,
+            })),
+          })}
+          {/* Only show container details table when shipment type is NOT cross-haul (break bulk) (type 4) */}
+          {containers.length > 0 && formData.shipmentTypeId !== "4" && (
+            <div className="controller-instructions-form-section">
+              <div className="controller-instructions-container-details-section">
+                <h3>Container Details</h3>
+                {(containerSuccessMessage || rateUpdateMessage) && (
+                  <div className="controller-instructions-success-message">
+                    {containerSuccessMessage || rateUpdateMessage}
+                  </div>
+                )}
+                <div
+                  className="controller-instructions-container-table-wrapper"
+                  style={{
+                    overflowX: "auto",
+                    marginBottom: "20px",
+                  }}
+                >
+                  <table
+                    className="controller-instructions-container-table"
+                    style={{
+                      width: "100%",
+                      borderCollapse: "collapse",
+                      marginBottom: "10px",
+                    }}
+                  >
+                    <thead>
+                      <tr>
+                        <th
+                          style={{
+                            padding: "12px 8px",
+                            textAlign: "left",
+                            borderBottom: "2px solid #ddd",
+                          }}
+                        >
+                          Container Type
+                        </th>
+                        <th
+                          style={{
+                            padding: "12px 8px",
+                            textAlign: "left",
+                            borderBottom: "2px solid #ddd",
+                          }}
+                        >
+                          Container Number
+                        </th>
+                        {/* Add File Reference header for export shipments */}
+                        {String(formData.shipmentTypeId) === "2" && (
+                          <th
+                            style={{
+                              padding: "12px 8px",
+                              textAlign: "left",
+                              borderBottom: "2px solid #ddd",
+                            }}
+                          >
+                            File Reference
+                          </th>
+                        )}
+                        {/* Force string comparison for shipmentTypeId */}
+                        {(isImport ||
+                          String(formData.shipmentTypeId) === "2" ||
+                          String(formData.shipmentTypeId) === "3") && (
+                          <th
+                            style={{
+                              padding: "12px 8px",
+                              textAlign: "left",
+                              borderBottom: "2px solid #ddd",
+                            }}
+                          >
+                            Weight
+                          </th>
+                        )}
+                        <th
+                          style={{
+                            padding: "12px 8px",
+                            textAlign: "left",
+                            borderBottom: "2px solid #ddd",
+                          }}
+                        >
+                          Cargo Description
+                        </th>
+                        <th
+                          style={{
+                            padding: "12px 8px",
+                            textAlign: "center",
+                            borderBottom: "2px solid #ddd",
+                          }}
+                        >
+                          Hazardous
+                        </th>
+                        <th
+                          style={{
+                            padding: "12px 8px",
+                            textAlign: "center",
+                            borderBottom: "2px solid #ddd",
+                          }}
+                        >
+                          Add Surcharges
+                        </th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {containers.map((container) => (
+                        <tr key={container.id}>
+                          <td>{container.containerType}</td>
+                          <td>
+                            <div className="controller-instructions-input-wrapper">
+                              <input
+                                type="text"
+                                className={`controller-instructions-form-input ${
+                                  containerFieldErrors[
+                                    `container-${container.id}`
+                                  ]
+                                    ? "controller-instructions-error-field"
+                                    : ""
+                                }`}
+                                value={container.containerNum}
+                                onChange={(e) =>
+                                  handleContainerChange(
+                                    container.id,
+                                    "containerNum",
+                                    e.target.value
+                                  )
+                                }
+                                placeholder="Up to 20 alphanumeric characters"
+                                maxLength={20}
+                                disabled={isReadOnly}
+                                style={isReadOnly ? readOnlyStyle : {}}
+                              />
+                              {containerFieldErrors[
+                                `container-${container.id}`
+                              ] && (
+                                <div
+                                  className="controller-instructions-container-error-text"
+                                  style={{
+                                    color: "#e74c3c",
+                                    fontSize: "12px",
+                                    marginTop: "4px",
+                                    fontWeight: "500",
+                                    display: "block",
+                                  }}
+                                >
+                                  {
+                                    containerFieldErrors[
+                                      `container-${container.id}`
+                                    ]
+                                  }
+                                </div>
+                              )}
+                            </div>
+                          </td>
+                          {/* Add File Reference field only for export shipments */}
+                          {String(formData.shipmentTypeId) === "2" && (
+                            <td>
+                              <div className="controller-instructions-input-wrapper">
+                                <input
+                                  type="text"
+                                  className="controller-instructions-form-input"
+                                  value={container.fileRef}
+                                  onChange={(e) =>
+                                    handleContainerChange(
+                                      container.id,
+                                      "fileRef",
+                                      e.target.value
+                                    )
+                                  }
+                                  placeholder="Enter file reference"
+                                  maxLength={20}
+                                  disabled={isReadOnly}
+                                  style={isReadOnly ? readOnlyStyle : {}}
+                                />
+                              </div>
+                            </td>
+                          )}
+                          {/* Force string comparison for shipmentTypeId */}
+                          {(isImport ||
+                            String(formData.shipmentTypeId) === "2" ||
+                            String(formData.shipmentTypeId) === "3") && (
+                            <td>
+                              <div className="controller-instructions-input-wrapper">
+                                <input
+                                  type="text"
+                                  className={`controller-instructions-form-input ${
+                                    containerFieldErrors[
+                                      `weight-${container.id}`
+                                    ]
+                                      ? "controller-instructions-error-field"
+                                      : ""
+                                  }`}
+                                  value={
+                                    container.weight === null ||
+                                    container.weight === undefined
+                                      ? ""
+                                      : typeof container.weight === "number"
+                                      ? container.weight.toString()
+                                      : container.weight
+                                  }
+                                  onFocus={() => {
+                                    console.log(
+                                      `Weight input focus - container ${container.id}:`,
+                                      {
+                                        weightValue: container.weight,
+                                        weightType: typeof container.weight,
+                                        displayValue:
+                                          container.weight === null
+                                            ? ""
+                                            : container.weight.toString(),
+                                      }
+                                    );
+                                  }}
+                                  onChange={(e) =>
+                                    handleContainerChange(
+                                      container.id,
+                                      "weight",
+                                      e.target.value
+                                    )
+                                  }
+                                  placeholder="0.00"
+                                  disabled={isReadOnly}
+                                  style={isReadOnly ? readOnlyStyle : {}}
+                                />
+                                {containerFieldErrors[
+                                  `weight-${container.id}`
+                                ] && (
+                                  <div
+                                    className="controller-instructions-container-error-text"
+                                    style={{
+                                      color: "#e74c3c",
+                                      fontSize: "12px",
+                                      marginTop: "4px",
+                                      fontWeight: "500",
+                                      display: "block",
+                                    }}
+                                  >
+                                    {
+                                      containerFieldErrors[
+                                        `weight-${container.id}`
+                                      ]
+                                    }
+                                  </div>
+                                )}
+                              </div>
+                            </td>
+                          )}
+                          <td>
+                            <div className="controller-instructions-input-wrapper">
+                              <input
+                                type="text"
+                                className="controller-instructions-form-input"
+                                value={container.cargoDescription}
+                                onChange={(e) =>
+                                  handleContainerChange(
+                                    container.id,
+                                    "cargoDescription",
+                                    e.target.value
+                                  )
+                                }
+                                placeholder="Enter cargo description"
+                                disabled={isReadOnly}
+                                style={isReadOnly ? readOnlyStyle : {}}
+                              />
+                            </div>
+                          </td>
+                          <td style={{ textAlign: "center" }}>
+                            <div className="controller-instructions-checkbox-wrapper">
+                              <input
+                                type="checkbox"
+                                className="controller-instructions-form-checkbox"
+                                checked={container.hazardous === true}
+                                onChange={(e) =>
+                                  handleContainerChange(
+                                    container.id,
+                                    "hazardous",
+                                    e.target.checked
+                                  )
+                                }
+                                disabled={isReadOnly}
+                                style={{
+                                  transform: "scale(1.2)",
+                                  cursor: isReadOnly ? "default" : "pointer"
+                                }}
+                              />
+                            </div>
+                          </td>
+                          <td style={{ textAlign: "center" }}>
+                            <div className="controller-instructions-checkbox-wrapper">
+                              <input
+                                type="checkbox"
+                                className="controller-instructions-form-checkbox"
+                                checked={container.addSurcharges === true}
+                                onChange={(e) =>
+                                  handleContainerChange(
+                                    container.id,
+                                    "addSurcharges",
+                                    e.target.checked
+                                  )
+                                }
+                                disabled={isReadOnly}
+                                style={{
+                                  transform: "scale(1.2)",
+                                  cursor: isReadOnly ? "default" : "pointer"
+                                }}
+                              />
+                            </div>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+                {isContainerLoading && (
+                  <div className="controller-instructions-loading-message">
+                    Updating containers...
                   </div>
                 )}
               </div>
             </div>
-
-            <div className="trailer-section">
-              <div className="trailer-title">
-                <h3>Trailer Size</h3>
-              </div>
-              <div className="container-row">
-                <div className="no-of-containers">
-                  <label>No. of Containers</label>
-                </div>
-                <div className="container-boxes">
-                  <div className="container-box">
-                    <div className="container-label">6m</div>
-                    <input
-                      type="number"
-                      className={
-                        fieldErrors.num_six_meters ? "error-field" : ""
-                      }
-                      value={formData.num_six_meters}
-                      min="0"
-                      name="num_six_meters"
-                      onChange={(e) =>
-                        handleContainerCountChange(
-                          "num_six_meters",
-                          e.target.value
-                        )
-                      }
-                      ref={fieldRefs.num_six_meters}
-                    />
-                    <ErrorTooltip message={fieldErrors.num_six_meters} />
-                  </div>
-                  <div className="container-box">
-                    <div className="container-label">12m</div>
-                    <input
-                      type="number"
-                      value={formData.num_twelve_meters}
-                      min="0"
-                      name="num_twelve_meters"
-                      onChange={(e) =>
-                        handleContainerCountChange(
-                          "num_twelve_meters",
-                          e.target.value
-                        )
-                      }
-                    />
-                  </div>
-                  <div className="container-box">
-                    <div className="container-label">Abnormal</div>
-                    <input
-                      type="number"
-                      value={formData.num_abnormal}
-                      min="0"
-                      name="num_abnormal"
-                      onChange={(e) =>
-                        handleContainerCountChange(
-                          "num_abnormal",
-                          e.target.value
-                        )
-                      }
-                    />
-                  </div>
-                </div>
-                <div className="vat-rate">
-                  <label>VAT Rate</label>
-                  <div className="vat-input-wrapper" ref={fieldRefs.vat}>
-                    <input
-                      type="text"
-                      className={`form-input vat-input ${
-                        fieldErrors.vat ? "error-field" : ""
-                      }`}
-                      value={`${formData.vat}%`}
-                      name="vat"
-                      onChange={(e) => {
-                        // Remove the % sign and handle the input
-                        const value = e.target.value.replace(/%/g, "");
-                        const syntheticEvent = {
-                          target: {
-                            name: "vat",
-                            value: value,
-                            type: "text",
-                          },
-                        };
-                        handleInputChange(syntheticEvent);
-                      }}
-                    />
-                    <ErrorTooltip message={fieldErrors.vat} />
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          {/* Vessel Information Section */}
-          <div className="form-section blue-bg">
-            <div className="vessel-info-container">
-              <div className="vessel-info-row">
-                <div className="vessel-info-field">
-                  <label>Vessel Name</label>
-                  <div className="input-wrapper" ref={fieldRefs.vesselName}>
-                    <input
-                      type="text"
-                      className={`form-input vessel-input ${
-                        fieldErrors.vesselName ? "error-field" : ""
-                      }`}
-                      placeholder="Enter vessel name"
-                      name="vesselName"
-                      value={formData.vesselName}
-                      onChange={handleInputChange}
-                    />
-                    <ErrorTooltip message={fieldErrors.vesselName} />
-                  </div>
-                </div>
-                <div className="vessel-info-field">
-                  <label>Voyage No.</label>
-                  <div className="input-wrapper" ref={fieldRefs.voyageNo}>
-                    <input
-                      type="text"
-                      className={`form-input vessel-input ${
-                        fieldErrors.voyageNo ? "error-field" : ""
-                      }`}
-                      placeholder="Enter voyage number (max 15 chars)"
-                      name="voyageNo"
-                      value={formData.voyageNo}
-                      onChange={handleInputChange}
-                      maxLength={15}
-                    />
-                    <ErrorTooltip message={fieldErrors.voyageNo} />
-                  </div>
-                </div>
-              </div>
-              <div className="vessel-info-row">
-                <div className="vessel-info-field">
-                  <label>IMO No.</label>
-                  <div className="input-wrapper" ref={fieldRefs.imoNo}>
-                    <input
-                      type="text"
-                      className={`form-input vessel-input ${
-                        fieldErrors.imoNo ? "error-field" : ""
-                      }`}
-                      placeholder="Numbers only (max 15 chars)"
-                      name="imoNo"
-                      value={formData.imoNo}
-                      onChange={handleInputChange}
-                      maxLength={15}
-                    />
-                    <ErrorTooltip message={fieldErrors.imoNo} />
-                  </div>
-                </div>
-                <div className="vessel-info-field">
-                  <label>Flag Reg</label>
-                  <div className="input-wrapper" ref={fieldRefs.flagReg}>
-                    <input
-                      type="text"
-                      className={`form-input vessel-input ${
-                        fieldErrors.flagReg ? "error-field" : ""
-                      }`}
-                      placeholder="No numbers allowed"
-                      name="flagReg"
-                      value={formData.flagReg}
-                      onChange={handleInputChange}
-                    />
-                    <ErrorTooltip message={fieldErrors.flagReg} />
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          {/* Description Section */}
-          <div className="form-section blue-bg">
-            <div className="description-section">
-              <label>Description from client</label>
-              <div className="textarea-wrapper" ref={fieldRefs.description}>
-                <textarea
-                  className={`form-textarea ${
-                    fieldErrors.description ? "error-field" : ""
-                  }`}
-                  placeholder="Description from client, like type of goods etc"
-                  name="description"
-                  value={formData.description}
-                  onChange={handleInputChange}
-                ></textarea>
-                <ErrorTooltip message={fieldErrors.description} />
-              </div>
-            </div>
-          </div>
-
-          <div className="save-note">
-            <p>Note: To save changes, please proceed to the next page.</p>
-          </div>
-
-          <div className="button-container">
-            <button
-              className="add-container-button"
-              onClick={handleSubmit}
-              disabled={
-                isLoading.clients ||
-                isLoading.shipmentTypes ||
-                isLoading.instruction ||
-                clients.length === 0 ||
-                shipmentTypes.length === 0
-              }
+          )}
+          {!isReadOnly && (
+            <div
+              className="controller-instructions-form-actions"
+              style={{ display: "flex", justifyContent: "center", gap: "15px" }}
             >
-              Add Container Details
-            </button>
-          </div>
+              <button
+                className="controller-instructions-save-button"
+                onClick={handleSaveChanges}
+                style={{
+                  backgroundColor: "#4a90e2",
+                  color: "white",
+                  padding: "12px 24px",
+                  border: "none",
+                  borderRadius: "4px",
+                  cursor: "pointer",
+                  fontSize: "16px",
+                  fontWeight: "bold",
+                }}
+              >
+                Save Changes
+              </button>
+              {formData.status === "New" && (
+                <>
+                  <button
+                    className="controller-instructions-delete-button"
+                    onClick={handleDeleteInstruction}
+                    style={{
+                      backgroundColor: "#e74c3c",
+                      color: "white",
+                      padding: "12px 24px",
+                      border: "none",
+                      borderRadius: "4px",
+                      cursor: "pointer",
+                      fontSize: "16px",
+                      fontWeight: "bold",
+                      marginRight: "10px",
+                    }}
+                  >
+                    Delete Instruction
+                  </button>
+                  {!isInvoiced && (
+                    <button
+                      className="controller-instructions-invoice-button"
+                      onClick={handleCreateInvoice}
+                      style={{
+                        backgroundColor: "#27ae60",
+                        color: "white",
+                        padding: "12px 24px",
+                        border: "none",
+                        borderRadius: "4px",
+                        cursor: "pointer",
+                        fontSize: "16px",
+                        fontWeight: "bold",
+                      }}
+                    >
+                      Invoice
+                    </button>
+                  )}
+                </>
+              )}
+              {/* Invoice button for In Progress moved to read-only section */}
+            </div>
+          )}
+
+          {isReadOnly && (
+            <div
+              className="controller-instructions-form-actions"
+              style={{ display: "flex", justifyContent: "center", gap: "15px" }}
+            >
+              <div
+                style={{
+                  backgroundColor: "#6c757d",
+                  color: "white",
+                  padding: "12px 24px",
+                  borderRadius: "4px",
+                  fontSize: "16px",
+                  fontWeight: "bold",
+                  textAlign: "center",
+                }}
+              >
+                This instruction is {formData.status} and cannot be edited
+              </div>
+              
+              {/* Display invoice button for In Progress instructions */}
+              {formData.status === "In Progress" && !isInvoiced && (
+                <button
+                  className="controller-instructions-invoice-button"
+                  onClick={handleCreateInvoice}
+                  style={{
+                    backgroundColor: "#27ae60",
+                    color: "white",
+                    padding: "12px 24px",
+                    border: "none",
+                    borderRadius: "4px",
+                    cursor: "pointer",
+                    fontSize: "16px",
+                    fontWeight: "bold",
+                  }}
+                >
+                  Invoice
+                </button>
+              )}
+            </div>
+          )}
         </div>
+        {/* Confirmation Modal */}
+        {confirmationModal.isOpen && (
+          <div
+            className="controller-instructions-modal-overlay"
+            style={{
+              position: "fixed",
+              top: 0,
+              left: 0,
+              right: 0,
+              bottom: 0,
+              backgroundColor: "rgba(0, 0, 0, 0.5)",
+              display: "flex",
+              justifyContent: "center",
+              alignItems: "center",
+              zIndex: 1000,
+            }}
+          >
+            <div
+              className="controller-instructions-modal-content"
+              style={{
+                backgroundColor: "white",
+                padding: "24px",
+                borderRadius: "8px",
+                maxWidth: "500px",
+                width: "90%",
+                boxShadow: "0 4px 6px rgba(0, 0, 0, 0.1)",
+              }}
+            >
+              <h3 style={{ marginBottom: "16px", color: "#333" }}>
+                Confirm Save
+              </h3>
+              <p
+                style={{
+                  marginBottom: "24px",
+                  lineHeight: "1.5",
+                  color: "#666",
+                }}
+              >
+                {confirmationModal.message}
+              </p>
+              <div
+                style={{
+                  display: "flex",
+                  justifyContent: "flex-end",
+                  gap: "12px",
+                }}
+              >
+                <button
+                  onClick={handleCancelAction}
+                  style={{
+                    padding: "8px 16px",
+                    border: "1px solid #ddd",
+                    borderRadius: "4px",
+                    backgroundColor: "white",
+                    color: "#666",
+                    cursor: "pointer",
+                  }}
+                >
+                  No, Let Me Edit
+                </button>
+                <button
+                  onClick={handleConfirmAction}
+                  style={{
+                    padding: "8px 16px",
+                    border: "none",
+                    borderRadius: "4px",
+                    backgroundColor: "#4a90e2",
+                    color: "white",
+                    cursor: "pointer",
+                  }}
+                >
+                  Yes, Continue
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
-
-      {/* CSS for calendar modal and error tooltips */}
-      <style jsx>{`
-        .date-display {
-          flex: 1;
-          padding: 8px 12px;
-          border: 1px solid #ccc;
-          border-radius: 4px;
-          background-color: #fff;
-          min-height: 38px;
-          display: flex;
-          align-items: center;
-        }
-
-        .calendar-modal-overlay {
-          position: fixed;
-          top: 0;
-          left: 0;
-          right: 0;
-          bottom: 0;
-          background-color: rgba(0, 0, 0, 0.5);
-          display: flex;
-          justify-content: center;
-          align-items: center;
-          z-index: 1000;
-        }
-
-        .calendar-modal {
-          background-color: white;
-          border-radius: 8px;
-          padding: 20px;
-          box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
-          max-width: 400px;
-          width: 100%;
-        }
-
-        .calendar-header {
-          display: flex;
-          justify-content: space-between;
-          align-items: center;
-          margin-bottom: 15px;
-        }
-
-        .calendar-header button {
-          background: none;
-          border: none;
-          font-size: 18px;
-          cursor: pointer;
-          padding: 5px 10px;
-        }
-
-        .calendar {
-          width: 100%;
-          border-collapse: collapse;
-        }
-
-        .calendar th {
-          padding: 8px;
-          text-align: center;
-          font-weight: bold;
-        }
-
-        .calendar td {
-          padding: 8px;
-          text-align: center;
-          cursor: pointer;
-          border: 1px solid #eee;
-        }
-
-        .calendar td:hover:not(.empty):not(.disabled) {
-          background-color: #f0f0f0;
-        }
-
-        .calendar td.today {
-          background-color: #e6f7ff;
-          font-weight: bold;
-        }
-
-        .calendar td.selected {
-          background-color: #1890ff;
-          color: white;
-        }
-
-        .calendar td.empty {
-          background-color: #f9f9f9;
-          cursor: default;
-        }
-
-        .calendar td.disabled {
-          color: #ccc;
-          cursor: not-allowed;
-        }
-
-        .calendar-footer {
-          display: flex;
-          justify-content: flex-end;
-          margin-top: 15px;
-        }
-
-        .calendar-footer button {
-          padding: 8px 16px;
-          margin-left: 10px;
-          border: none;
-          border-radius: 4px;
-          cursor: pointer;
-        }
-
-        .calendar-footer button:first-child {
-          background-color: #f0f0f0;
-        }
-
-        .calendar-footer button:last-child {
-          background-color: #1890ff;
-          color: white;
-        }
-
-        /* Error styling */
-        .error-field {
-          border: 2px solid #ff4d4f !important;
-          background-color: #fff1f0 !important;
-        }
-
-        .input-wrapper,
-        .select-wrapper,
-        .date-input-group,
-        .textarea-wrapper,
-        .vat-input-wrapper {
-          position: relative;
-        }
-
-        .error-tooltip {
-          position: absolute;
-          top: -40px;
-          left: 0;
-          background-color: #ff4d4f;
-          color: white;
-          padding: 5px 10px;
-          border-radius: 4px;
-          font-size: 12px;
-          z-index: 100;
-          white-space: nowrap;
-          box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
-        }
-
-        .tooltip-arrow {
-          position: absolute;
-          bottom: -5px;
-          left: 10px;
-          width: 0;
-          height: 0;
-          border-left: 5px solid transparent;
-          border-right: 5px solid transparent;
-          border-top: 5px solid #ff4d4f;
-        }
-
-        /* Form layout styling */
-        .form-section {
-          margin-bottom: 20px;
-          padding-bottom: 20px;
-          border-bottom: 1px solid #0066cc;
-        }
-
-        .form-section:last-child {
-          border-bottom: none;
-          margin-bottom: 30px;
-        }
-
-        .blue-bg {
-          background-color: #e6f7ff;
-          padding: 15px;
-          border-radius: 4px;
-        }
-
-        .form-row1 {
-          display: flex;
-          flex-wrap: wrap;
-          margin: 0 -10px;
-        }
-
-        .form-group {
-          flex: 1;
-          padding: 0 10px;
-          min-width: 200px;
-          margin-bottom: 15px;
-        }
-
-        .file-rates-row {
-          display: flex;
-          justify-content: space-between;
-          margin-bottom: 20px;
-        }
-
-        .file-ref-column {
-          width: 32%;
-        }
-
-        .booking-ref-column {
-          width: 32%;
-        }
-
-        .rates-column {
-          width: 32%;
-        }
-
-        .description-section {
-          width: 100%;
-        }
-
-        .form-textarea {
-          width: 100%;
-          min-height: 80px;
-          padding: 10px;
-          border: 1px solid #d9d9d9;
-          border-radius: 4px;
-          background-color: white;
-          resize: vertical;
-        }
-
-        .checkboxes {
-          display: flex;
-          flex-direction: column;
-          justify-content: flex-end;
-          padding-bottom: 10px;
-        }
-
-        .checkbox-group {
-          display: flex;
-          align-items: center;
-          margin-bottom: 5px;
-        }
-
-        .checkbox-group input[type="checkbox"] {
-          margin-right: 8px;
-        }
-
-        /* Input styling */
-        .form-input,
-        .dropdown {
-          width: 100%;
-          padding: 8px 12px;
-          border: 1px solid #d9d9d9;
-          border-radius: 4px;
-          background-color: white;
-        }
-
-        /* Date input styling */
-        .date-input-group {
-          position: relative;
-          display: flex;
-        }
-
-        .calendar-button {
-          position: absolute;
-          right: 10px;
-          top: 50%;
-          transform: translateY(-50%);
-          background: none;
-          border: none;
-          cursor: pointer;
-          width: 20px;
-          height: 20px;
-          background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='currentColor' strokeWidth='2' strokeLinecap='round' strokeLinejoin='round'%3E%3Crect x='3' y='4' width='18' height='18' rx='2' ry='2'%3E%3C/rect%3E%3Cline x1='16' y1='2' x2='16' y2='6'%3E%3C/line%3E%3Cline x1='8' y1='2' x2='8' y2='6'%3E%3C/line%3E%3Cline x1='3' y1='10' x2='21' y2='10'%3E%3C/line%3E%3C/svg%3E");
-          background-repeat: no-repeat;
-          background-position: center;
-        }
-
-        /* Rates styling */
-        .rates-input-group {
-          display: flex;
-          align-items: center;
-          gap: 10px; /* Add gap instead of separator */
-        }
-
-        .select-wrapper.small {
-          width: 100px;
-          flex-shrink: 0;
-        }
-
-        .weight-input-group {
-          display: flex;
-          align-items: center;
-          margin-top: 10px;
-        }
-
-        .weight-input-group label {
-          margin-right: 10px;
-          width: 30px;
-        }
-
-        /* Trailer section styling */
-        .trailer-section {
-          margin-top: 20px;
-        }
-
-        .trailer-title {
-          text-align: center;
-          margin-bottom: 15px;
-        }
-
-        .trailer-title h3 {
-          margin: 0;
-          font-size: 16px;
-          font-weight: bold;
-        }
-
-        .container-row {
-          display: flex;
-          align-items: flex-start;
-        }
-
-        .no-of-containers {
-          width: 120px;
-          padding-top: 10px;
-        }
-
-        .container-boxes {
-          display: flex;
-          flex: 1;
-          gap: 10px;
-          margin-right: 20px;
-        }
-
-        .container-box {
-          background-color: white;
-          border-radius: 8px;
-          padding: 10px;
-          text-align: center;
-          box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
-          flex: 1;
-        }
-
-        .container-label {
-          font-weight: bold;
-          margin-bottom: 5px;
-        }
-
-        .container-box input {
-          width: 100%;
-          text-align: center;
-          padding: 5px;
-          border: 1px solid #ddd;
-          border-radius: 4px;
-        }
-
-        .vat-rate {
-          width: 150px;
-        }
-
-        .vat-input {
-          text-align: center;
-        }
-
-        /* Button styling */
-        .button-container {
-          text-align: center;
-          margin-top: 20px;
-        }
-
-        .add-container-button {
-          background-color: #7fbfff;
-          color: white;
-          border: none;
-          border-radius: 4px;
-          padding: 10px 20px;
-          font-size: 16px;
-          cursor: pointer;
-          transition: background-color 0.3s;
-        }
-
-        .add-container-button:hover {
-          background-color: #5aa9ff;
-        }
-
-        .time-input-group {
-          position: relative;
-          display: flex;
-        }
-
-        .time-input-group input[type="time"] {
-          width: 100%;
-          padding: 8px 12px;
-          border: 1px solid #d9d9d9;
-          border-radius: 4px;
-          background-color: white;
-        }
-
-        /* Vessel Information styling */
-        .vessel-info-container {
-          width: 100%;
-        }
-
-        .vessel-info-row {
-          display: flex;
-          justify-content: space-between;
-          margin-bottom: 20px;
-        }
-
-        .vessel-info-row:last-child {
-          margin-bottom: 0;
-        }
-
-        .vessel-info-field {
-          width: 48%;
-        }
-
-        .vessel-input {
-          width: 100%;
-          padding: 10px 15px;
-          font-size: 15px;
-          border: 1px solid #d9d9d9;
-          border-radius: 4px;
-          background-color: white;
-        }
-
-        /* Save note styling */
-        .save-note {
-          text-align: center;
-          margin: 20px 0;
-          padding: 10px;
-          background-color: #fffbe6;
-          border: 1px solid #ffe58f;
-          border-radius: 4px;
-        }
-
-        .save-note p {
-          margin: 0;
-          color: #d48806;
-          font-weight: 500;
-        }
-      `}</style>
     </div>
   );
 };

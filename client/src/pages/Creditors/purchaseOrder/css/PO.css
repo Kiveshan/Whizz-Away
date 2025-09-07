@@ -1,12 +1,12 @@
 /* Purchase Order Form Styles */
 .po-form-wrapper .po-form-container {
-  max-width: 700px;
+  max-width: 900px; /* Increased width for more columns */
   margin: 10px auto;
   background-color: #ffffff;
   border-radius: 8px;
   box-shadow: 0 3px 10px rgba(0, 0, 0, 0.1);
   padding: 12px;
-  font-family: 'Roboto', Arial, sans-serif;
+  font-family: "Roboto", Arial, sans-serif;
 }
 
 .po-form-wrapper .po-header {
@@ -75,7 +75,7 @@
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
 }
 
-.po-form-wrapper .company-address, 
+.po-form-wrapper .company-address,
 .po-form-wrapper .company-contact {
   width: 48%;
   padding: 10px;
@@ -142,13 +142,13 @@
 
 .po-form-wrapper .form-control {
   width: 100%;
-  height: 34px; 
-  padding: 8px 10px; 
+  height: 34px;
+  padding: 8px 10px;
   border: 1px solid #ddd;
   border-radius: 4px;
   font-size: 13px;
   line-height: 1.2;
-  box-sizing: border-box; 
+  box-sizing: border-box;
   transition: border-color 0.2s, box-shadow 0.2s;
 }
 
@@ -162,7 +162,7 @@
   transition: border-color 0.2s, box-shadow 0.2s;
 }
 
-.po-form-wrapper .form-control:focus, 
+.po-form-wrapper .form-control:focus,
 .po-form-wrapper .dropdown-field:focus {
   border-color: #4169e1;
   outline: none;
@@ -175,6 +175,38 @@
   padding-top: 6px;
 }
 
+.po-form-wrapper .line-items-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 10px;
+}
+
+.po-form-wrapper .line-items-header h3 {
+  margin: 0;
+  font-size: 16px;
+  color: #1a3c5e;
+}
+
+.po-form-wrapper .add-item-btn {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  background: linear-gradient(135deg, #4169e1, #3b5bdb);
+  color: white;
+  border: none;
+  padding: 8px 12px;
+  border-radius: 4px;
+  font-size: 13px;
+  cursor: pointer;
+  transition: transform 0.2s, background 0.2s;
+}
+
+.po-form-wrapper .add-item-btn:hover {
+  transform: translateY(-1px);
+  background: linear-gradient(135deg, #3b5bdb, #364fc7);
+}
+
 .po-form-wrapper .line-items-table {
   width: 100%;
   border-collapse: collapse;
@@ -182,18 +214,37 @@
 
 .po-form-wrapper .line-items-table th {
   background-color: #f5f7fa;
-  padding: 5px;
+  padding: 8px 5px;
   text-align: left;
   font-weight: 600;
   font-size: 13px;
   color: #1a3c5e;
-  width: 20%;
+  border-bottom: 2px solid #ddd;
+}
+
+.po-form-wrapper .line-items-table th:nth-child(1) {
+  width: 15%;
+}
+.po-form-wrapper .line-items-table th:nth-child(2) {
+  width: 25%;
+}
+.po-form-wrapper .line-items-table th:nth-child(3) {
+  width: 15%;
+}
+.po-form-wrapper .line-items-table th:nth-child(4) {
+  width: 15%;
+}
+.po-form-wrapper .line-items-table th:nth-child(5) {
+  width: 15%;
+}
+.po-form-wrapper .line-items-table th:nth-child(6) {
+  width: 10%;
 }
 
 .po-form-wrapper .line-items-table td {
   padding: 5px;
   border-bottom: 1px solid #eee;
-  width: 20%;
+  vertical-align: middle;
 }
 
 .po-form-wrapper .line-items-table input {
@@ -204,6 +255,47 @@
   border-radius: 4px;
   font-size: 13px;
   box-sizing: border-box;
+}
+
+.po-form-wrapper .delete-item-btn {
+  background: linear-gradient(135deg, #dc3545, #c82333);
+  color: white;
+  border: none;
+  padding: 8px;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: transform 0.2s, background 0.2s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.po-form-wrapper .delete-item-btn:hover:not(:disabled) {
+  transform: translateY(-1px);
+  background: linear-gradient(135deg, #c82333, #bd2130);
+}
+
+.po-form-wrapper .delete-item-btn:disabled {
+  background: #ccc;
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
+.po-form-wrapper .back-button {
+  background: linear-gradient(135deg, #6c757d, #5a6268);
+  color: white;
+  border: none;
+  padding: 8px 16px;
+  border-radius: 4px;
+  font-size: 14px;
+  cursor: pointer;
+  margin-bottom: 15px;
+  transition: transform 0.2s, background 0.2s;
+}
+
+.po-form-wrapper .back-button:hover {
+  transform: translateY(-1px);
+  background: linear-gradient(135deg, #5a6268, #495057);
 }
 
 .po-form-wrapper .totals-section {
@@ -257,7 +349,7 @@
   background: linear-gradient(135deg, #8dd28e, #7bc17c);
   color: white;
   border: none;
-  padding: 7px 18px;
+  padding: 10px 24px;
   border-radius: 5px;
   font-size: 14px;
   cursor: pointer;
@@ -280,67 +372,27 @@
 @media (max-width: 768px) {
   .po-form-wrapper .po-form-container {
     padding: 8px;
+    max-width: 100%;
   }
 
-  .po-form-wrapper .po-header {
-    flex-direction: column;
-    gap: 6px;
-    padding: 10px;
-  }
-
-  .po-form-wrapper .po-header-left {
-    justify-content: center;
-  }
-
-  .po-form-wrapper .company-details {
-    flex-direction: column;
-    gap: 6px;
-  }
-
-  .po-form-wrapper .company-address, 
-  .po-form-wrapper .company-contact {
-    width: 100%;
-    padding: 8px;
-  }
-
-  .po-form-wrapper .po-title {
-    font-size: 18px;
-  }
-
-  .po-form-wrapper .po-subtitle {
+  .po-form-wrapper .line-items-table {
     font-size: 12px;
   }
 
-  .po-form-wrapper .form-group label {
-    font-size: 12px;
-  }
-
-  .po-form-wrapper .form-control, 
-  .po-form-wrapper .dropdown-field {
-    padding: 6px 8px;
-    font-size: 12px;
-    height: 30px;
-  }
-
-  .po-form-wrapper .line-items-table th, 
+  .po-form-wrapper .line-items-table th,
   .po-form-wrapper .line-items-table td {
-    font-size: 12px;
+    padding: 4px 2px;
   }
 
   .po-form-wrapper .line-items-table input {
+    height: 30px;
     padding: 6px 8px;
     font-size: 12px;
-    height: 30px;
   }
 
-  .po-form-wrapper .amount-cell input {
+  .po-form-wrapper .add-item-btn,
+  .po-form-wrapper .delete-item-btn {
     padding: 6px 8px;
     font-size: 12px;
-    height: 30px;
-  }
-
-  .po-form-wrapper .submit-btn {
-    padding: 6px 16px;
-    font-size: 13px;
   }
 }

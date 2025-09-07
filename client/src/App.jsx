@@ -1,5 +1,4 @@
 "use client";
-
 import React from "react";
 import {
   BrowserRouter as Router,
@@ -8,12 +7,13 @@ import {
   useLocation,
   Navigate,
 } from "react-router-dom";
+import { AuthProvider } from "./context/AuthContext";
+import TokenExpiryNotification from "./components/TokenExpiryNotification";
 import Header from "./components/Header";
 import Footer from "./components/Footer"; // Import the Footer component
 import LogoutButton from "./components/LogoutButton";
 
 // Import pages
-
 import {
   Landing,
   ControllerDashboard,
@@ -27,6 +27,8 @@ import {
   DirectorCreditorsOther,
   CreditorsOther,
   CreditorsDashboard,
+  AnalyticsReportsPage,
+  ReportsPage,
 } from "./pages/user_menus";
 import { Login, Register } from "./pages/auth";
 import {
@@ -41,7 +43,6 @@ import {
   CompanyInstructionView,
   InstructionsList,
 } from "./pages/instructions";
-
 import {
   ViewExpense,
   ExpenseDetails,
@@ -49,37 +50,30 @@ import {
   DirectorManagerViewFuelExpense,
   DirectorExpenses,
 } from "./pages/fuel";
-
 import { DirectorAnalytics, Analytics } from "./pages/analytics";
-
 import { Manage } from "./pages/manage";
-
 import {
   ViewClientInvoice,
   InvoicesList,
   ClientInvoice,
 } from "./pages/invoices";
-
 import {
   ViewClientStatement,
   StatementsList,
   ClientStatement,
 } from "./pages/statements";
-
 import {
   DirectorFinancialDocumentsView,
   DirectorClientDocuments,
   ClientDocuments,
   FinancialDocumentsView,
 } from "./pages/financial_documents";
-
 import {
   FinanceClerkWage,
   FinanceClerkWageDetails,
   FClerkLegDetails,
   FinanceClerkWageSlip,
 } from "./pages/wages";
-
 import {
   DirectorClientListPay,
   DirectorClientPaymentList,
@@ -87,17 +81,15 @@ import {
   ClientListPay,
   UploadProof,
 } from "./pages/payments";
-
 import {
   UpdateInstruction,
   DirectorManagerViewAssignment,
   UploadInstructionDocuments,
   DirectorDocs,
 } from "./pages/assignments";
-
 import { AdminDashboard } from "./pages/admin";
-// Finance Clerk Pages
 
+// Finance Clerk Pages
 import {
   CreatePO,
   POForm,
@@ -105,10 +97,23 @@ import {
   ViewPOForm,
   CredStatements,
   ViewStatement,
+  SubcontractorList,
+  SubcontractorStatements,
+  SubcontractorStatementDetails,
+  CredClientList,
+  CreditNoteList,
+  CreditNoteForm,
+  CreditNoteView,
 } from "./pages/Creditors";
 
-// CSS Imports
+import { ClientList, AddOnList, AddOnForm } from "./pages/add-on's";
+import {
+  WageReports,
+  ProfitLossReportsPage,
+  ProfitLossDetailPage,
+} from "./pages/Reports";
 
+// CSS Imports
 import "./css/components.css";
 import "./css/layout.css";
 import "./css/MonitorInstructions.css";
@@ -117,17 +122,14 @@ function DynamicHeader() {
   const location = useLocation();
   const titleMap = {
     "/Dashboard": "Business Manager",
-
     "/client-payments": "Client Payments",
     "/client-list-payments": "Client Payments",
     "/director-client-list-payments": "Client Payments",
     "/client-documents": "Client Documents",
     "/driver-wage": "Wages",
     "/ControllerInstructions": "Instruction",
-
     "/ControllerInstructionDetails": "Container Details",
     "/FCcontrollerInstructionDetails": "Container Details",
-
     "/expenses": "Truck Expenses",
     "/analytics": "Analytics",
     "/debtors": "Debtors",
@@ -182,6 +184,21 @@ function DynamicHeader() {
     "/Creditors/PurchaseOrder/View": "Purchase Order",
     "/Creditors/CredStatements": "Purchase Orders",
     "/Creditors/ViewStatement": "Statement of Expenses",
+    "/Creditors/SubcontractorList": "Subcontractors",
+    "/Creditors/SubcontractorStatements": "Subcontractors",
+    "/Creditors/SubcontractorStatementDetails": "Subcontractor Statement",
+    "/analytics-reports": "Insights",
+    "/reports": "Reports",
+    "/wage-reports": "Wage Reports",
+    "/view-client-list": "Add On's",
+    "/view-add-on-list": "Add On's",
+    "/add-on-form": "Add On's",
+    "/CredClientList": "Clients",
+    "/credit-note-list": "Credit Notes",
+    "/credit-note-form": "Credit Note Form",
+    "/view-credit-note/:clientName/:creditNoteId": "Credit Note",
+    "/profit-loss-reports": "Income & Expenditure Reports",
+    "/income-expenditure-reports/:month/:year": "Income & Expenditure Report",
   };
 
   const getTitle = () => {
@@ -196,6 +213,10 @@ function DynamicHeader() {
       return "Fuel Expenses";
     if (location.pathname.startsWith("/finance-clerk-wage-slip/"))
       return "Wages";
+    if (location.pathname.startsWith("/view-credit-note/"))
+      return "Credit Note";
+    if (location.pathname.startsWith("/income-expenditure-reports/"))
+      return "Income & Expenditure Report";
     return titleMap[location.pathname] || "Unknown Page";
   };
 
@@ -212,7 +233,6 @@ function ContentWrapper() {
   const location = useLocation();
   const hideFooterOn = ["/login", "/register"];
   const hideLogoutOn = ["/login", "/register", "/landing", "/new-landing"];
-
   const shouldShowFooter = !hideFooterOn.includes(location.pathname);
   const shouldShowLogout = !hideLogoutOn.includes(location.pathname);
 
@@ -224,6 +244,13 @@ function ContentWrapper() {
         </div>
       )}
       <Routes>
+        <Route
+          path="/view-credit-note/:clientName/:creditNoteId"
+          element={<CreditNoteView />}
+        />
+        <Route path="/credit-note-form" element={<CreditNoteForm />} />
+        <Route path="/credit-note-list" element={<CreditNoteList />} />
+        <Route path="/CredClientList" element={<CredClientList />} />
         <Route path="/" element={<Landing />} />
         <Route path="/client-payments" element={<ClientPayments />} />
         <Route path="/client-list-payments" element={<ClientListPay />} />
@@ -297,8 +324,6 @@ function ContentWrapper() {
           path="/DirectorExpenses/:truckId"
           element={<DirectorExpenses />}
         />
-        // Add these routes in the ContentWrapper function, with the other
-        Director routes
         <Route
           path="/Viewcontrollerinstructions"
           element={<Viewcontrollerinstructions />}
@@ -348,6 +373,18 @@ function ContentWrapper() {
         <Route path="/Creditors/CredStatements" element={<CredStatements />} />
         <Route path="/Creditors/PurchaseOrder/View" element={<ViewPOForm />} />
         <Route path="/Creditors/ViewStatement" element={<ViewStatement />} />
+        <Route
+          path="/Creditors/SubcontractorList"
+          element={<SubcontractorList />}
+        />
+        <Route
+          path="/Creditors/SubcontractorStatementDetails"
+          element={<SubcontractorStatementDetails />}
+        />
+        <Route
+          path="/Creditors/SubcontractorStatements"
+          element={<SubcontractorStatements />}
+        />
         {/* Add the routes for invoice viewing and downloading */}
         <Route path="/invoice" element={<Navigate to="/invoices" replace />} />
         <Route path="/invoice/:id" element={<ClientInvoice />} />
@@ -364,6 +401,20 @@ function ContentWrapper() {
           path="/FCcontrollerInstructionDetails"
           element={<FCcontrollerInstructionDetails />}
         />
+        <Route path="/analytics-reports" element={<AnalyticsReportsPage />} />
+        <Route path="/reports" element={<ReportsPage />} />
+        <Route path="/wage-reports" element={<WageReports />} />
+        <Route path="/view-client-list" element={<ClientList />} />
+        <Route path="/view-add-on-list" element={<AddOnList />} />
+        <Route path="/add-on-form" element={<AddOnForm />} />
+        <Route
+          path="/profit-loss-reports"
+          element={<ProfitLossReportsPage />}
+        />
+        <Route
+          path="/income-expenditure-reports/:month/:year"
+          element={<ProfitLossDetailPage />}
+        />
       </Routes>
       {shouldShowFooter && <Footer />} {/* Conditionally render footer */}
     </div>
@@ -376,16 +427,17 @@ function App() {
     "/": "Controller Dashboard",
     "/ControllerInstructions": "Controller Instructions",
     "/ControllerInstructionDetails": "Container Details",
-
     "/FDashboard": "Finance Clerk Dashboard",
     "/ViewClientInstruction": "View Client Instructions",
     "/FCcontrollerinstructions": "Finance Clerk Instructions",
     "/FCcontrollerInstructionDetails": "Finance Clerk Container Details",
-
     "/InstructionsList": "Instructions List",
-    // Add these entries to the pageTitles object in the App function
     "/Viewcontrollerinstructions": "Viewcontrollerinstructions",
     "/ViewcontrollerInstructionDetails": "ViewcontrollerInstructionDetails",
+    "/reports": "Reports",
+    "/wage-reports": "Wage Reports",
+    "/profit-loss-reports": "Income & Expenditure Reports",
+    "/income-expenditure-reports/:month/:year": "Income & Expenditure Report",
   };
 
   // Set page title based on current route
@@ -396,12 +448,15 @@ function App() {
   }, []);
 
   return (
-    <Router>
-      <div className="container">
-        <DynamicHeader />
-        <ContentWrapper />
-      </div>
-    </Router>
+    <AuthProvider>
+      <Router>
+        <div className="container">
+          <TokenExpiryNotification />
+          <DynamicHeader />
+          <ContentWrapper />
+        </div>
+      </Router>
+    </AuthProvider>
   );
 }
 

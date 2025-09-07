@@ -35,6 +35,10 @@ const ClientStatement = () => {
         const response = await api.get(`/api/statement/${statementId}`);
 
         if (response.data.success) {
+          console.log("Statement data received:", response.data.data); // Debug log
+          console.log("Invoices data:", response.data.data.invoices); // Debug log for invoices
+          console.log("Addons data:", response.data.data.addons); // Debug log for addons
+          console.log("Payments data:", response.data.data.payments); // Debug log for payments
           setStatement(response.data.data);
         } else {
           throw new Error(response.data.message || "Failed to fetch statement");
@@ -81,7 +85,8 @@ const ClientStatement = () => {
       const filename = `Statement-${statement.statement_key}.pdf`;
 
       // Check if the table is small (few rows) to determine if we need page breaks
-      const isSmallTable = statement.invoices.length <= 3;
+      const isSmallTable =
+        statement.invoices.length + statement.addons.length <= 3;
 
       const opt = {
         margin: [20, 15, 20, 15],
@@ -154,47 +159,124 @@ const ClientStatement = () => {
     });
   };
 
-  if (loading) return <div>Loading statement...</div>;
-  if (error) return <div className="error-message">Error: {error}</div>;
-  if (!statement) return <div>Please select a statement from the list.</div>;
-  if (statement.invoices.length === 0 && statement.payments.length === 0)
-    return <div>No transactions for this statement period.</div>;
+  if (loading)
+    return (
+      <div className="client-statement-wrapper">
+        <div>Loading statement...</div>
+      </div>
+    );
+  if (error)
+    return (
+      <div className="client-statement-wrapper">
+        <div className="error-message">Error: {error}</div>
+      </div>
+    );
+  if (!statement)
+    return (
+      <div className="client-statement-wrapper">
+        <div>Please select a statement from the list.</div>
+      </div>
+    );
+  if (
+    statement.invoices.length === 0 &&
+    statement.addons.length === 0 &&
+    statement.payments.length === 0 &&
+    statement.credit_notes?.length === 0
+  )
+    return (
+      <div className="client-statement-wrapper">
+        <div>No transactions for this statement period.</div>
+      </div>
+    );
 
-  // Calculate totals (include payments)
-  const invoicedAmount = statement.invoices.reduce(
-    (sum, inv) => sum + inv.amount,
-    0
-  );
+  // Calculate totals (include payments and credit notes)
+  const invoicedAmount =
+    statement.invoices.reduce((sum, inv) => sum + inv.amount, 0) +
+    statement.addons.reduce((sum, addon) => sum + addon.amount, 0);
   const amountPaid = statement.payments.reduce(
     (sum, payment) => sum + payment.amount,
     0
   );
+  const creditNotesAmount =
+    statement.credit_notes?.reduce(
+      (sum, creditNote) => sum + creditNote.amount,
+      0
+    ) || 0;
+  const totalAmountPaid = amountPaid + creditNotesAmount;
   const openingBalance = statement.opening_balance; // Use the stored opening balance
-  const balanceDue = openingBalance - amountPaid + invoicedAmount;
+  const balanceDue = openingBalance - totalAmountPaid + invoicedAmount;
 
-  // Combine invoices and payments into a single transactions array
+  // Helper function to format invoice and addon details
+  const formatDetails = (item, type) => {
+    if (type === "Invoice") {
+      const pickup = item.pickup || "";
+      const dropoff = item.dropoff || "";
+      console.log("Invoice details:", { pickup, dropoff, item }); // Debug log
+      if (pickup && dropoff) {
+        return `${pickup} → ${dropoff}`;
+      } else if (pickup) {
+        return pickup;
+      } else if (dropoff) {
+        return `→ ${dropoff}`;
+      } else {
+        return item.task || item.invoice_num || `Invoice #${item.ikey}`;
+      }
+    } else if (type === "Add-on") {
+      console.log("Addon details:", { item }); // Debug log
+      return item.description || item.invoice_num || `Add-on #${item.addon_id}`;
+    } else if (type === "Credit Note") {
+      console.log("Credit Note details:", { item }); // Debug log
+      return item.description || `Credit Note #${item.credit_note_id}`;
+    }
+    return "";
+  };
+
+  // Combine invoices, addons, payments, and credit notes into a single transactions array
   const transactions = [
     ...statement.invoices.map((invoice) => ({
       type: "Invoice",
       date: new Date(invoice.date),
-      details:
-        invoice.task || invoice.invoice_num || `Invoice #${invoice.ikey}`,
+      details: formatDetails(invoice, "Invoice"),
+      reference: "", // Invoices don't have references
       amount: invoice.amount,
       payment: null,
     })),
-    ...statement.payments.map((payment) => ({
-      type: "Payment",
-      date: new Date(payment.date),
-      details: `Payment ID: ${payment.paykey}`,
-      amount: null,
-      payment: payment.amount,
+    ...statement.addons.map((addon) => ({
+      type: "Add-on",
+      date: new Date(addon.date),
+      details: formatDetails(addon, "Add-on"),
+      reference: "", // Add-ons don't have references
+      amount: addon.amount,
+      payment: null,
     })),
+    ...statement.payments.map((payment) => {
+      console.log("Processing payment:", payment); // Debug log
+      return {
+        type: "Payment",
+        date: new Date(payment.date),
+        details: payment.invoice_num || "", // Use invoice number, empty if no match
+        reference: payment.reference || "", // Payment reference from the database
+        amount: null,
+        payment: payment.amount,
+      };
+    }),
+    ...(statement.credit_notes || []).map((creditNote) => {
+      console.log("Processing credit note:", creditNote); // Debug log
+      return {
+        type: "Credit Note",
+        date: new Date(creditNote.date),
+        details: formatDetails(creditNote, "Credit Note"),
+        reference: creditNote.reference || "", // Credit note reference
+        amount: null,
+        payment: creditNote.amount, // Credit notes reduce the balance like payments
+      };
+    }),
   ].sort((a, b) => a.date - b.date); // Sort by date
 
   // Calculate running balance
   let runningBalance = openingBalance; // Start with the opening balance
   const transactionsWithBalance = transactions.map((tx) => {
-    if (tx.type === "Invoice") {
+    if (tx.type === "Invoice" || tx.type === "Add-on") {
       runningBalance += tx.amount;
     } else {
       runningBalance -= tx.payment;
@@ -205,200 +287,210 @@ const ClientStatement = () => {
   // Determine if this is a small table that should fit on one page
   const isSmallTable = transactions.length <= 3; // Update to consider total transactions
 
-  // Update the date formatting in the transactions table to ensure it fits in the column
   return (
-    <div className="statement-page">
-      <div className="statement-paper" ref={statementRef}>
-        {/* Header */}
-        <div className="statement-header1">
-          <h1>{statement.company_name}</h1>
-        </div>
-
-        {/* Statement Info and Client Info Section */}
-        <div className="statement-info-section">
-          {/* Client Info - Left Side */}
-          <div className="client-info">
-            <div className="to-label">To</div>
-            <div className="client-name">{statement.client.representative}</div>
-            <div className="client-email">{statement.client.email}</div>
-            <div className="client-phone">{statement.client.phone}</div>
-            <div
-              className="client-address"
-              style={{ maxWidth: "250px", overflowWrap: "break-word" }}
-            >
-              {statement.client.address}
-            </div>
+    <div className="client-statement-wrapper">
+      <div className="statement-page">
+        <div className="statement-paper" ref={statementRef}>
+          {/* Header */}
+          <div className="statement-header1">
+            <h1>{statement.company_name}</h1>
           </div>
 
-          {/* Statement Title and Account Summary - Right Side */}
-          <div className="statement-title">
-            <h2>Statement of Accounts</h2>
-            <div className="statement-date">
-              {new Date(statement.generation_date).toLocaleDateString("en-GB")}
+          {/* Statement Info and Client Info Section */}
+          <div className="statement-info-section">
+            {/* Client Info - Left Side */}
+            <div className="client-info">
+              <div className="to-label">To</div>
+              <div className="client-name">
+                {statement.client.representative}
+              </div>
+              <div className="client-email">{statement.client.email}</div>
+              <div className="client-phone">{statement.client.phone}</div>
+              <div
+                className="client-address"
+                style={{ maxWidth: "250px", overflowWrap: "break-word" }}
+              >
+                {statement.client.address}
+              </div>
             </div>
 
-            <h3>Account Summary</h3>
+            {/* Statement Title and Account Summary - Right Side */}
+            <div className="statement-title">
+              <h2>Statement of Accounts</h2>
+              <div className="statement-date">
+                {new Date(statement.generation_date).toLocaleDateString(
+                  "en-GB"
+                )}
+              </div>
 
-            <table className="summary-table">
-              <tbody>
-                <tr>
-                  <td className="summary-label">Opening Balance</td>
-                  <td className="summary-value">
-                    R{openingBalance.toFixed(2)}
-                  </td>
-                </tr>
-                <tr>
-                  <td className="summary-label">Invoiced Amount</td>
-                  <td className="summary-value">
-                    R{invoicedAmount.toFixed(2)}
-                  </td>
-                </tr>
-                <tr>
-                  <td className="summary-label">Amount Paid</td>
-                  <td className="summary-value">R{amountPaid.toFixed(2)}</td>
-                </tr>
-                <tr>
-                  <td className="summary-label">Balance Due:</td>
-                  <td className="summary-value">R{balanceDue.toFixed(2)}</td>
-                </tr>
-              </tbody>
-            </table>
-          </div>
-        </div>
+              <h3>Account Summary</h3>
 
-        {/* Horizontal Line */}
-        <div className="statement-divider"></div>
-
-        {/* Transactions Table - Now wrapped with TransactionsTableWrapper */}
-        <div
-          className={`transactions-section ${
-            isSmallTable ? "small-table" : ""
-          }`}
-        >
-          <TransactionsTableWrapper>
-            <table className="transactions-table">
-              <thead>
-                <tr>
-                  <th>Date</th>
-                  <th>Transactions</th>
-                  <th>Details</th>
-                  <th>Amount</th>
-                  <th>Payments</th>
-                  <th>Balance</th>
-                </tr>
-              </thead>
-              <tbody>
-                <tr>
-                  <td>
-                    {new Date(statement.generation_date).toLocaleDateString(
-                      "en-GB"
-                    )}
-                  </td>
-                  <td>Opening Balance</td>
-                  <td></td>
-                  <td>R0</td>
-                  <td></td>
-                  <td>R{openingBalance.toFixed(2)}</td>
-                </tr>
-                {transactionsWithBalance.map((tx, index) => (
-                  <tr key={index}>
-                    <td>{tx.date.toLocaleDateString("en-GB")}</td>
-                    <td>{tx.type}</td>
-                    <td>{tx.details}</td>
-                    <td>{tx.amount ? `R${tx.amount.toFixed(2)}` : ""}</td>
-                    <td>{tx.payment ? `R${tx.payment.toFixed(2)}` : ""}</td>
-                    <td>R{tx.balance.toFixed(2)}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </TransactionsTableWrapper>
-        </div>
-
-        {/* Balance Due Summary */}
-        <div className="balance-due-summary">
-          <div className="balance-due-label">Balance Due</div>
-          <div className="balance-due-amount">R{balanceDue.toFixed(2)}</div>
-        </div>
-
-        {/* Age Analysis */}
-        <div
-          className={`age-analysis-section ${
-            isSmallTable ? "small-table" : ""
-          }`}
-        >
-          <div
-            className="age-analysis-header"
-            onClick={() => setIsAgeAnalysisOpen(!isAgeAnalysisOpen)}
-          >
-            <span>Age Analysis</span>
-            <span
-              className={`dropdown-arrow ${isAgeAnalysisOpen ? "open" : ""}`}
-            >
-              ▼
-            </span>
-          </div>
-
-          {isAgeAnalysisOpen && (
-            <div className="age-analysis-content">
-              <table className="age-analysis-table">
-                <thead>
-                  <tr>
-                    <th>Current</th>
-                    <th>30 Days</th>
-                    <th>60 Days</th>
-                    <th>90 Days + </th>
-                  </tr>
-                </thead>
+              <table className="summary-table">
                 <tbody>
                   <tr>
-                    <td>R{statement.aging.current.toFixed(2)}</td>
-                    <td>R{statement.aging["30days"].toFixed(2)}</td>
-                    <td>R{statement.aging["60days"].toFixed(2)}</td>
-                    <td>R{statement.aging["90days"].toFixed(2)}</td>
+                    <td className="summary-label">Opening Balance</td>
+                    <td className="summary-value">
+                      R{openingBalance.toFixed(2)}
+                    </td>
+                  </tr>
+                  <tr>
+                    <td className="summary-label">Invoiced Amount</td>
+                    <td className="summary-value">
+                      R{invoicedAmount.toFixed(2)}
+                    </td>
+                  </tr>
+                  <tr>
+                    <td className="summary-label">Amount Paid</td>
+                    <td className="summary-value">
+                      R{totalAmountPaid.toFixed(2)}
+                    </td>
+                  </tr>
+                  <tr>
+                    <td className="summary-label">Balance Due:</td>
+                    <td className="summary-value">R{balanceDue.toFixed(2)}</td>
                   </tr>
                 </tbody>
               </table>
             </div>
-          )}
-        </div>
-      </div>
+          </div>
 
-      {/* Buttons */}
-      <div className="statementdownloadbtn1">
-        <button
-          className="back-btn"
-          onClick={() => {
-            if (roleId == 3) {
-              navigate("/statements-list", {
-                state: { clientId: statement.client.id },
-              });
-            } else if (roleId == 4) {
-              navigate("/DirectorClientDocuments", {
-                state: {
-                  clientId: statement.client.id,
-                  clientName: statement.client.name,
-                },
-              });
-            } else if (roleId == 1) {
-              navigate("/client-documents", {
-                state: {
-                  clientId: statement.client.id,
-                  clientName: statement.client.name,
-                },
-              });
-            }
-          }}
-        >
-          Back
-        </button>
-        <button
-          className={`download-btn ${isGenerating ? "generating" : ""}`}
-          onClick={generatePDF}
-          disabled={isGenerating}
-        >
-          {isGenerating ? "Generating PDF..." : "Download PDF"}
-        </button>
+          {/* Horizontal Line */}
+          <div className="statement-divider"></div>
+
+          {/* Transactions Table - Now wrapped with TransactionsTableWrapper */}
+          <div
+            className={`transactions-section ${
+              isSmallTable ? "small-table" : ""
+            }`}
+          >
+            <TransactionsTableWrapper>
+              <table className="transactions-table">
+                <thead>
+                  <tr>
+                    <th style={{ width: "12%" }}>Date</th>
+                    <th style={{ width: "15%" }}>Transactions</th>
+                    <th style={{ width: "25%" }}>Details</th>
+                    <th style={{ width: "15%" }}>Reference</th>
+                    <th style={{ width: "12%" }}>Amount</th>
+                    <th style={{ width: "12%" }}>Payments</th>
+                    <th style={{ width: "12%" }}>Balance</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr>
+                    <td>
+                      {new Date(statement.generation_date).toLocaleDateString(
+                        "en-GB"
+                      )}
+                    </td>
+                    <td>Opening Balance</td>
+                    <td></td>
+                    <td></td>
+                    <td>R0</td>
+                    <td></td>
+                    <td>R{openingBalance.toFixed(2)}</td>
+                  </tr>
+                  {transactionsWithBalance.map((tx, index) => (
+                    <tr key={index}>
+                      <td>{tx.date.toLocaleDateString("en-GB")}</td>
+                      <td>{tx.type}</td>
+                      <td>{tx.details}</td>
+                      <td>{tx.reference || ""}</td>
+                      <td>{tx.amount ? `R${tx.amount.toFixed(2)}` : ""}</td>
+                      <td>{tx.payment ? `R${tx.payment.toFixed(2)}` : ""}</td>
+                      <td>R{tx.balance.toFixed(2)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </TransactionsTableWrapper>
+          </div>
+
+          {/* Balance Due Summary */}
+          <div className="balance-due-summary">
+            <div className="balance-due-label">Balance Due</div>
+            <div className="balance-due-amount">R{balanceDue.toFixed(2)}</div>
+          </div>
+
+          {/* Age Analysis */}
+          <div
+            className={`age-analysis-section ${
+              isSmallTable ? "small-table" : ""
+            }`}
+          >
+            <div
+              className="age-analysis-header"
+              onClick={() => setIsAgeAnalysisOpen(!isAgeAnalysisOpen)}
+            >
+              <span>Age Analysis</span>
+              <span
+                className={`dropdown-arrow ${isAgeAnalysisOpen ? "open" : ""}`}
+              >
+                ▼
+              </span>
+            </div>
+
+            {isAgeAnalysisOpen && (
+              <div className="age-analysis-content">
+                <table className="age-analysis-table">
+                  <thead>
+                    <tr>
+                      <th>Current</th>
+                      <th>30 Days</th>
+                      <th>60 Days</th>
+                      <th>90 Days + </th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr>
+                      <td>R{statement.aging.current.toFixed(2)}</td>
+                      <td>R{statement.aging["30days"].toFixed(2)}</td>
+                      <td>R{statement.aging["60days"].toFixed(2)}</td>
+                      <td>R{statement.aging["90days"].toFixed(2)}</td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Buttons */}
+        <div className="statementdownloadbtn1">
+          <button
+            className="back-btn"
+            onClick={() => {
+              if (roleId == 3) {
+                navigate("/statements-list", {
+                  state: { clientId: statement.client.id },
+                });
+              } else if (roleId == 4) {
+                navigate("/DirectorClientDocuments", {
+                  state: {
+                    clientId: statement.client.id,
+                    clientName: statement.client.name,
+                  },
+                });
+              } else if (roleId == 1) {
+                navigate("/client-documents", {
+                  state: {
+                    clientId: statement.client.id,
+                    clientName: statement.client.name,
+                  },
+                });
+              }
+            }}
+          >
+            Back
+          </button>
+          <button
+            className={`download-btn ${isGenerating ? "generating" : ""}`}
+            onClick={generatePDF}
+            disabled={isGenerating}
+          >
+            {isGenerating ? "Generating PDF..." : "Download PDF"}
+          </button>
+        </div>
       </div>
     </div>
   );
