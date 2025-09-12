@@ -4,6 +4,7 @@
 import { useState, useEffect, useRef } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import "../css/UpdateInstruction.css";
+import {modalAnimation,MismatchModal,ContainerModal,UnsavedChangesModal,MissingFieldsModal,NoDriversModal,BackConfirmModal,RemoveDriverModal,RemoveLegModal,DuplicateDriverModal,ContainerReachedModal} from './Modals';
 import api from "../../../api";
 import { FaTruckFast } from "react-icons/fa6";
 const normalizeString = (str) => {
@@ -12,156 +13,6 @@ const normalizeString = (str) => {
 };
 
   const API_BASE_URL = process.env.REACT_APP_API_URL || "http://localhost:5000";
-const modalAnimation = `
-  @keyframes fadeIn {
-    from { opacity: 0; }
-    to { opacity: 1; }
-  }
-  
-  @keyframes scaleIn {
-    from { transform: scale(0.95); opacity: 0; }
-    to { transform: scale(1); opacity: 1; }
-  }
-  
-  .animate-fadeIn {
-    animation: fadeIn 0.2s ease-out forwards;
-  }
-  
-  .animate-scaleIn {
-    animation: scaleIn 0.3s ease-out forwards;
-  }
-  
-  .modal-wrapper {
-    position: fixed;
-    top: 0;
-    left: 0;
-    right: 0;
-    bottom: 0;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    z-index: 50;
-  }
-  
-  .modal-backdrop {
-    position: fixed;
-    top: 0;
-    left: 0;
-    right: 0;
-    bottom: 0;
-    background: linear-gradient(135deg, rgba(37, 99, 235, 0.9) 0%, rgba(79, 70, 229, 0.9) 100%);
-    z-index: 40;
-  }
-  
-  .modal-container {
-    background: white;
-    border-radius: 12px;
-    width: 400px;
-    max-width: 90vw;
-    box-shadow: 0 10px 25px rgba(0, 0, 0, 0.1);
-    z-index: 50;
-    overflow: hidden;
-  }
-  
-  .modal-header {
-    padding: 20px 24px 0;
-  }
-  
-  .modal-title {
-    font-size: 18px;
-    font-weight: 600;
-    color: #111827;
-    margin-bottom: 8px;
-  }
-  
-  .modal-description {
-    font-size: 14px;
-    color: #6B7280;
-    margin-bottom: 16px;
-  }
-  
-  .modal-body {
-    padding: 0 24px 16px;
-  }
-  
-  .modal-item {
-    display: flex;
-    align-items: flex-start;
-    padding: 8px 0;
-  }
-  
-  .modal-bullet {
-    min-width: 8px;
-    height: 8px;
-    border-radius: 50%;
-    background-color: #3b82f6;
-    margin-right: 12px;
-    margin-top: 6px;
-  }
-  
-  .modal-item-text {
-    font-size: 14px;
-    color: #374151;
-  }
-  
-  .modal-footer {
-    padding: 16px 24px 20px;
-    display: flex;
-    justify-content: flex-end;
-    gap: 12px;
-  }
-  
-  .modal-btn {
-    padding: 8px 16px;
-    border-radius: 6px;
-    font-weight: 500;
-    font-size: 14px;
-    transition: all 0.2s;
-  }
-  
-  .modal-btn-secondary {
-    background-color: #F3F4F6;
-    color: #374151;
-  }
-  
-  .modal-btn-secondary:hover {
-    background-color: #E5E7EB;
-  }
-  
-  .modal-btn-primary {
-    background-color: #4F46E5;
-    color: white;
-  }
-  
-  .modal-btn-primary:hover {
-    background-color: #4338CA;
-  }
-
-.toast-popup {
-  position: fixed;
-  top: 20px;
-  left: 50%;
-  transform: translateX(-50%);
-  background-color: #4F46E5;
-  color: white;
-  padding: 12px 24px;
-  border-radius: 8px;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
-  z-index: 1000;
-  animation: toastFadeIn 0.3s ease-out forwards, toastFadeOut 0.3s ease-in forwards 0.7s;
-}
-
-@keyframes toastFadeIn {
-  from { opacity: 0; transform: translate(-50%, -20px); }
-  to { opacity: 1; transform: translate(-50%, 0); }
-}
-
-@keyframes toastFadeOut {
-  from { opacity: 1; transform: translate(-50%, 0); }
-  to { opacity: 0; transform: translate(-50%, -20px); }
-}
-`;
-
 // Add this debug function at the top of the component
 const debugDriverData = (drivers) => {
   if (!drivers || drivers.length === 0) {
@@ -3277,31 +3128,11 @@ disabled={isCompleted}
                 >
                   {saving ? "Saving..." : "Save"}
                 </button>
-
-                {/* Only show remove leg button for the last leg AND only if it has been saved */}
-                {/* {currentLagIndex === legs.length - 1 &&
-                  savedLegs.has(currentLagIndex) && (
-                    <button
-                      className="bg-red-500 hover:bg-red-600 text-white px-4 py-2 rounded-md transition-colors"
-                      onClick={() => {
-                        const legId = legs[currentLagIndex]?.id;
-                        const isTemp = legId?.toString().startsWith("temp-");
-                        handleRemoveLeg(currentLagIndex, isTemp ? null : legId);
-                      }}
-                      disabled={saving || isCompleted}
-                    >
-                      Remove Leg
-                    </button>
-                  )} */}
               </div>
             )}
-
-            {/* Toast popup for success messages */}
             {savedMessage && !savedMessage.includes("Error") && (
               <div className="toast-popup">{savedMessage}</div>
             )}
-
-            {/* Keep error messages in place */}
             {savedMessage && savedMessage.includes("Error") && (
               <div className="mt-4 text-center">
                 <p className="text-red-500">{savedMessage}</p>
@@ -3311,612 +3142,266 @@ disabled={isCompleted}
         )}
       </div>
 
-      {/* Destination Mismatch Modal */}
-      {showMismatchModal && (
-        <div className="modal-wrapper">
-          <div className="modal-backdrop animate-fadeIn"></div>
-          <div className="modal-container animate-scaleIn">
-            <div className="modal-header">
-              <h3 className="modal-title">Destination Mismatch</h3>
-              <p className="modal-description">
-                The final leg destination doesn't match the instruction dropoff
-                location.
-              </p>
-            </div>
-            <div className="modal-body">
-              <div className="modal-item">
-                <div className="modal-bullet"></div>
-                <span className="modal-item-text">
-                  Last Leg Destination:{" "}
-                  <strong>{mismatchDetails.lastLegDestination}</strong>
-                </span>
-              </div>
-              <div className="modal-item">
-                {/* Add the "checked" class to the dropoff destination to indicate it's the correct one */}
-                <div className="modal-bullet"></div>
-                <span className="modal-item-text">
-                  Instruction Dropoff:{" "}
-                  <strong>{mismatchDetails.dropoff}</strong>
-                </span>
-              </div>
-              <div className="modal-item">
-                <div className="modal-bullet"></div>
-                <span className="modal-item-text">
-                  Please update the final leg destination or edit the
-                  instruction.
-                </span>
-              </div>
-            </div>
-            <div className="modal-footer">
-              <button
-                className="modal-btn modal-btn-primary"
-                onClick={() => setShowMismatchModal(false)}
-              >
-                Okay
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+<MismatchModal
+  isOpen={showMismatchModal}
+  onClose={() => setShowMismatchModal(false)}
+  lastLegDestination={mismatchDetails.lastLegDestination}
+  dropoff={mismatchDetails.dropoff}
+/>
 
-{showContainerModal && (
-  <div className="modal-wrapper">
-    <div className="modal-backdrop animate-fadeIn"></div>
-    <div className="modal-container animate-scaleIn">
-      <div className="modal-header">
-        <div className="flex items-center gap-4">
-          <svg
-            xmlns="http://www.w3.org/2000/svg"
-            width="50"
-            height="50"
-            viewBox="0 0 24 24"
-            fill="#FEE2E2"
-            stroke="#DC2626"
-            strokeWidth="2"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            className="text-red-600 drop-shadow-sm"
-          >
-            <path d="M12 2L2 19h20L12 2z" />
-            <path d="M12 8v4" />
-            <circle cx="12" cy="16" r="1" />
-          </svg>
-          <h3 className="modal-title">
-            {containerValidationDetails.isWeightBased 
-              ? (containerValidationDetails.missingWeight > 0 ? "Weight Destination Warning" : "Excess Weight Warning")
-              : "Container Destination Warning"}
-          </h3>
-        </div>
-        <p className="modal-description">
-          {containerValidationDetails.isWeightBased
-            ? (containerValidationDetails.missingWeight > 0 
-                ? "Not all weight reaches the final destination."
-                : "More weight is assigned than the instruction total.")
-            : "All containers must reach the final destination."}
-        </p>
-      </div>
-      <div className="modal-body">
-        <div className="modal-item">
-          <div className="modal-bullet"></div>
-          <span className="modal-item-text">
-            Final Destination: <strong>{containerValidationDetails.dropoff}</strong>
-          </span>
-        </div>
-        {containerValidationDetails.isWeightBased ? (
-          <div className="modal-item">
-            <div className="modal-bullet"></div>
-            <span className="modal-item-text">
-              Weight reaching destination: <strong>
-                {(containerValidationDetails.totalWeight - Math.abs(containerValidationDetails.missingWeight)).toFixed(2)}/
-                {containerValidationDetails.totalWeight.toFixed(2)} {containerValidationDetails.weightUnit}
-              </strong>
-            </span>
-          </div>
-        ) : (
-          containerValidationDetails.missingContainers?.map((container, index) => (
-            <div key={index} className="modal-item">
-              <div className="modal-bullet"></div>
-              <span className="modal-item-text">
-                Container <strong>{container}</strong> does not reach final destination
-              </span>
-            </div>
-          ))
-        )}
-      </div>
-      <div className="modal-footer">
-        <button
-          className="modal-btn modal-btn-primary"
-          onClick={() => setShowContainerModal(false)}
-        >
-          Okay
-        </button>
-      </div>
-    </div>
-  </div>
-)}
-      {/* Unsaved Changes Modal */}
-      {showUnsavedChangesModal && (
-        <div className="modal-wrapper">
-          <div className="modal-backdrop animate-fadeIn"></div>
-          <div className="modal-container animate-scaleIn">
-            <div className="modal-header">
-              <h3 className="modal-title">Unsaved Changes</h3>
-              <p className="modal-description">
-                Please save your changes in the current leg before adding a new
-                leg.
-              </p>
-            </div>
-            <div className="modal-footer">
-              <button
-                className="modal-btn modal-btn-primary"
-                onClick={() => setShowUnsavedChangesModal(false)}
-              >
-                Okay
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+<ContainerModal
+  isOpen={showContainerModal}
+  onClose={() => setShowContainerModal(false)}
+  validationDetails={containerValidationDetails}
+/>
+<UnsavedChangesModal
+  isOpen={showUnsavedChangesModal}
+  onClose={() => setShowUnsavedChangesModal(false)}
+/>
 
-      {/* Missing Fields Modal */}
-      {showMissingFieldsModal && (
-        <div className="modal-wrapper">
-          <div className="modal-backdrop animate-fadeIn"></div>
-          <div className="modal-container animate-scaleIn">
-            <div className="modal-header">
-              <h3 className="modal-title">Missing Required Fields</h3>
-              <p className="modal-description">
-                Please fill in all required fields before saving.
-              </p>
-            </div>
-            <div className="modal-body">
-              {missingFields.map((field, index) => (
-                <div key={index} className="modal-item">
-                  <div className="modal-bullet"></div>
-                  <span className="modal-item-text">{field}</span>
-                </div>
-              ))}
-            </div>
-            <div className="modal-footer">
-              <button
-                className="modal-btn modal-btn-primary"
-                onClick={() => setShowMissingFieldsModal(false)}
-              >
-                Okay
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-      {/* No Drivers Modal */}
-      {showNoDriversModal && (
-        <div className="modal-wrapper">
-          <div className="modal-backdrop animate-fadeIn"></div>
-          <div className="modal-container animate-scaleIn">
-            <div className="modal-header">
-              <h3 className="modal-title">Driver Required</h3>
-              <p className="modal-description">
-                Please make sure to add a driver before finalisation.
-              </p>
-            </div>
-            <div className="modal-footer">
-              <button
-                className="modal-btn modal-btn-primary"
-                onClick={() => setShowNoDriversModal(false)}
-              >
-                Okay
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+<MissingFieldsModal
+  isOpen={showMissingFieldsModal}
+  onClose={() => setShowMissingFieldsModal(false)}
+  missingFields={missingFields}
+/>
+<NoDriversModal
+  isOpen={showNoDriversModal}
+  onClose={() => setShowNoDriversModal(false)}
+/>
+<BackConfirmModal
+  isOpen={showBackConfirmModal}
+  onClose={() => setShowBackConfirmModal(false)}
+  onConfirm={() => {
+    setShowBackConfirmModal(false);
+    navigateBack();
+  }}
+/>
+<RemoveDriverModal
+  isOpen={showRemoveDriverModal}
+  onClose={() => setShowRemoveDriverModal(false)}
+  onConfirm={async () => {
+    if (driverToRemove.index !== null) {
+      const updatedDrivers = [...drivers];
+      updatedDrivers.splice(driverToRemove.index, 1);
+      setDrivers(updatedDrivers);
+      const updatedLegs = [...legs];
+      updatedLegs[currentLagIndex] = {
+        ...updatedLegs[currentLagIndex],
+        drivers: updatedDrivers,
+      };
+      setLegs(updatedLegs);
+      try {
+        setSaving(true);
+        const currentLeg = legs[currentLagIndex];
+        const isNewLeg =
+          currentLeg.isNew ||
+          currentLeg.id?.toString().startsWith("temp-");
+        const legData = {
+          legkey:
+            !isNewLeg &&
+            currentLeg.id &&
+            !isNaN(Number.parseInt(currentLeg.id))
+              ? currentLeg.id
+              : null,
+          legnumber: currentLeg.legnumber || currentLagIndex + 1,
+          startingpoint: formData.startingPoint,
+          destination: formData.destination,
+          driverrate: calculateLegDriverRate(
+            updatedDrivers,
+            rates
+          ),
+          m1key: instructionId,
+          drivers: updatedDrivers.map((driver) => {
+            let driverRateToSave = "0";
 
-      {/* Back Button Confirmation Modal */}
-      {showBackConfirmModal && (
-        <div className="modal-wrapper">
-          <div className="modal-backdrop animate-fadeIn"></div>
-          <div className="modal-container animate-scaleIn">
-            <div className="modal-header">
-              {/* <h3 className="modal-title">Confirm Navigation</h3> */}
-              <p className="modal-description" style={{ fontSize: "20px" }}>
-                Are you sure you wish to proceed? Unsaved changes will be lost.
-              </p>
-            </div>
-            <div className="modal-footer">
-              <button
-                className="modal-btn modal-btn-secondary"
-                onClick={() => setShowBackConfirmModal(false)}
-              >
-                No
-              </button>
-              <button
-                className="modal-btn modal-btn-primary"
-                onClick={() => {
-                  setShowBackConfirmModal(false);
-                  navigateBack();
-                }}
-              >
-                Yes
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+            if (driver.container_type === "12m") {
+              driverRateToSave = rates.twelve_meter.toString();
+            } else if (driver.container_type === "abnormal") {
+              driverRateToSave = driver.driverRate || "0";
+            } else {
+              driverRateToSave = rates.six_meter.toString();
+            }
+            console.log(
+              `Driver ${driver.driverid} with container type ${driver.container_type} has rate: ${driverRateToSave}`
+            );
 
-      {/* Driver Removal Confirmation Modal */}
-      {showRemoveDriverModal && (
-        <div className="modal-wrapper">
-          <div className="modal-backdrop animate-fadeIn"></div>
-          <div className="modal-container animate-scaleIn">
-            <div className="modal-header">
-              {/* <h3 className="modal-title">Remove Driver</h3> */}
-              <p className="modal-description" style={{ fontSize: "20px" }}>
-                Are you sure you want to remove this driver?
-              </p>
-            </div>
-            <div className="modal-body">
-              <div className="p-2 text-center">
-                <span className="text-gray-700">
-                  Removing: <strong>{driverToRemove.name}</strong>
-                </span>
-              </div>
-            </div>
-            <div className="modal-footer">
-              <button
-                className="modal-btn modal-btn-secondary"
-                onClick={() => setShowRemoveDriverModal(false)}
-              >
-                No
-              </button>
-              <button
-                className="modal-btn modal-btn-primary"
-                onClick={async () => {
-                  // Remove the driver from local state
-                  if (driverToRemove.index !== null) {
-                    const updatedDrivers = [...drivers];
-                    updatedDrivers.splice(driverToRemove.index, 1);
-                    setDrivers(updatedDrivers);
+            return {
+              id: driver.id, 
+              driverid: driver.driverid || null,
+              truckregnumber: driver.truckregnumber || null,
+              containernumber: driver.containernumber || null,
+              container_type: driver.container_type || null,
+              driverRate: driverRateToSave,
+              date: driver.date || null,
+            };
+          }),
+        };
 
-                    // Update the legs state immediately to reflect the driver removal in the UI
-                    const updatedLegs = [...legs];
-                    updatedLegs[currentLagIndex] = {
-                      ...updatedLegs[currentLagIndex],
-                      drivers: updatedDrivers,
-                    };
-                    setLegs(updatedLegs);
+        // Send the data to the server
+        const response = await fetch(
+          `${API_BASE_URL}/legs/save`,
+          {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify(legData),
+          }
+        );
 
-                    // Save to database immediately
-                    try {
-                      setSaving(true);
+        const responseText = await response.text();
+        let result;
+        try {
+          result = JSON.parse(responseText);
+        } catch (e) {
+          throw new Error(
+            `Invalid JSON response: ${responseText}`
+          );
+        }
 
-                      // Get the current leg
-                      const currentLeg = legs[currentLagIndex];
-                      const isNewLeg =
-                        currentLeg.isNew ||
-                        currentLeg.id?.toString().startsWith("temp-");
+        if (!response.ok) {
+          throw new Error(
+            result.message || "Failed to save leg data"
+          );
+        }
 
-                      // Prepare the leg data with the updated drivers array
-                      const legData = {
-                        legkey:
-                          !isNewLeg &&
-                          currentLeg.id &&
-                          !isNaN(Number.parseInt(currentLeg.id))
-                            ? currentLeg.id
-                            : null,
-                        legnumber: currentLeg.legnumber || currentLagIndex + 1,
-                        startingpoint: formData.startingPoint,
-                        destination: formData.destination,
-                        // Calculate the leg's driver rate based on container types
-                        driverrate: calculateLegDriverRate(
-                          updatedDrivers,
-                          rates
-                        ),
-                        m1key: instructionId,
-                        drivers: updatedDrivers.map((driver) => {
-                          let driverRateToSave = "0";
+        // Show success message
+        setSavedMessage("Driver removed successfully!");
+        setTimeout(() => setSavedMessage(""), 5000);
 
-                          if (driver.container_type === "12m") {
-                            driverRateToSave = rates.twelve_meter.toString();
-                          } else if (driver.container_type === "abnormal") {
-                            driverRateToSave = driver.driverRate || "0";
-                          } else {
-                            // Default to 6m rate
-                            driverRateToSave = rates.six_meter.toString();
-                          }
-                          console.log(
-                            `Driver ${driver.driverid} with container type ${driver.container_type} has rate: ${driverRateToSave}`
-                          );
+        // Refresh the legs data
+        await refreshLegData();
+      } catch (error) {
+        console.error("Error removing driver:", error);
+        setSavedMessage(
+          "Error removing driver: " + error.message
+        );
+        setTimeout(() => setSavedMessage(""), 5000);
+      } finally {
+        setSaving(false);
+      }
+    }
 
-                          return {
-                            id: driver.id, // Include the driver ID if it exists
-                            driverid: driver.driverid || null,
-                            truckregnumber: driver.truckregnumber || null,
-                            containernumber: driver.containernumber || null,
-                            container_type: driver.container_type || null,
-                            driverRate: driverRateToSave,
-                            date: driver.date || null,
-                          };
-                        }),
-                      };
-
-                      // Send the data to the server
-                      const response = await fetch(
-                        `${API_BASE_URL}/legs/save`,
-                        {
-                          method: "POST",
-                          headers: {
-                            "Content-Type": "application/json",
-                          },
-                          body: JSON.stringify(legData),
-                        }
-                      );
-
-                      const responseText = await response.text();
-                      let result;
-                      try {
-                        result = JSON.parse(responseText);
-                      } catch (e) {
-                        throw new Error(
-                          `Invalid JSON response: ${responseText}`
-                        );
-                      }
-
-                      if (!response.ok) {
-                        throw new Error(
-                          result.message || "Failed to save leg data"
-                        );
-                      }
-
-                      // Show success message
-                      setSavedMessage("Driver removed successfully!");
-                      setTimeout(() => setSavedMessage(""), 5000);
-
-                      // Refresh the legs data
-                      await refreshLegData();
-                    } catch (error) {
-                      console.error("Error removing driver:", error);
-                      setSavedMessage(
-                        "Error removing driver: " + error.message
-                      );
-                      setTimeout(() => setSavedMessage(""), 5000);
-                    } finally {
-                      setSaving(false);
-                    }
-                  }
-
-                  // Close the modal
-                  setShowRemoveDriverModal(false);
-                }}
-              >
-                Yes
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+    // Close the modal
+    setShowRemoveDriverModal(false);
+  }}
+  driverName={driverToRemove.name}
+/>
 
       {/* Leg Removal Confirmation Modal */}
-      {showRemoveLegModal && (
-        <div className="modal-wrapper">
-          <div className="modal-backdrop animate-fadeIn"></div>
-          <div className="modal-container animate-scaleIn">
-            <div className="modal-header">
-              <p className="modal-description" style={{ fontSize: "20px" }}>
-                Are you sure you want to remove this leg?
-              </p>
-            </div>
-            <div className="modal-body">
-              <div className="p-2 text-center">
-                <span className="text-gray-700">
-                  Removing: <strong>Leg {legToRemove.number}</strong>
-                </span>
-              </div>
-            </div>
-            <div className="modal-footer">
-              <button
-                className="modal-btn modal-btn-secondary"
-                onClick={() => setShowRemoveLegModal(false)}
-              >
-                No
-              </button>
-              <button
-                className="modal-btn modal-btn-primary"
-                onClick={async () => {
-                  if (legToRemove.index !== null) {
-                    try {
-                      setSaving(true);
+<RemoveLegModal
+  isOpen={showRemoveLegModal}
+  onClose={() => setShowRemoveLegModal(false)}
+  onConfirm={async () => {
+    if (legToRemove.index !== null) {
+      try {
+        setSaving(true);
 
-                      const isTemporaryLeg =
-                        !legToRemove.id ||
-                        legToRemove.id.toString().startsWith("temp-");
+        const isTemporaryLeg =
+          !legToRemove.id ||
+          legToRemove.id.toString().startsWith("temp-");
 
-                      if (!isTemporaryLeg) {
-                        await api.delete(`/legs/${legToRemove.id}`);
+        if (!isTemporaryLeg) {
+          await api.delete(`/legs/${legToRemove.id}`);
 
-                        for (
-                          let i = legToRemove.index + 1;
-                          i < legs.length;
-                          i++
-                        ) {
-                          const legToUpdate = legs[i];
-                          if (
-                            legToUpdate.id &&
-                            !legToUpdate.id.toString().startsWith("temp-")
-                          ) {
-                            await api.put(
-                              `/legs/${legToUpdate.id}/update-number`,
-                              {
-                                legnumber: i,
-                              }
-                            );
-                          }
-                        }
-                      }
+          for (
+            let i = legToRemove.index + 1;
+            i < legs.length;
+            i++
+          ) {
+            const legToUpdate = legs[i];
+            if (
+              legToUpdate.id &&
+              !legToUpdate.id.toString().startsWith("temp-")
+            ) {
+              await api.put(
+                `/legs/${legToUpdate.id}/update-number`,
+                {
+                  legnumber: i,
+                }
+              );
+            }
+          }
+        }
 
-                      const updatedLegs = [...legs];
-                      updatedLegs.splice(legToRemove.index, 1);
+        const updatedLegs = [...legs];
+        updatedLegs.splice(legToRemove.index, 1);
 
-                      for (
-                        let i = legToRemove.index;
-                        i < updatedLegs.length;
-                        i++
-                      ) {
-                        updatedLegs[i].legnumber = i + 1;
-                      }
+        for (
+          let i = legToRemove.index;
+          i < updatedLegs.length;
+          i++
+        ) {
+          updatedLegs[i].legnumber = i + 1;
+        }
 
-                      setLegs(updatedLegs);
+        setLegs(updatedLegs);
 
-                      setSavedLegs((prevSavedLegs) => {
-                        const newSavedLegs = new Set();
-                        prevSavedLegs.forEach((index) => {
-                          if (index < legToRemove.index) {
-                            newSavedLegs.add(index);
-                          } else if (index > legToRemove.index) {
-                            newSavedLegs.add(index - 1);
-                          }
-                        });
-                        return newSavedLegs;
-                      });
+        setSavedLegs((prevSavedLegs) => {
+          const newSavedLegs = new Set();
+          prevSavedLegs.forEach((index) => {
+            if (index < legToRemove.index) {
+              newSavedLegs.add(index);
+            } else if (index > legToRemove.index) {
+              newSavedLegs.add(index - 1);
+            }
+          });
+          return newSavedLegs;
+        });
 
-                      if (currentLagIndex === legToRemove.index) {
-                        const newIndex = Math.max(0, legToRemove.index - 1);
-                        setCurrentLagIndex(newIndex);
-                        const selectedLeg = updatedLegs[newIndex];
-                        setFormData({
-                          startingPoint: selectedLeg.startingPoint || "",
-                          driverRate: selectedLeg.driverRate || "",
-                          destination: selectedLeg.destination || "",
-                        });
-                        if (
-                          selectedLeg.drivers &&
-                          selectedLeg.drivers.length > 0
-                        ) {
-                          setDrivers(selectedLeg.drivers);
-                        } else {
-                          setDrivers([]);
-                        }
-                      } else if (currentLagIndex > legToRemove.index) {
-                        setCurrentLagIndex(currentLagIndex - 1);
-                      }
+        if (currentLagIndex === legToRemove.index) {
+          const newIndex = Math.max(0, legToRemove.index - 1);
+          setCurrentLagIndex(newIndex);
+          const selectedLeg = updatedLegs[newIndex];
+          setFormData({
+            startingPoint: selectedLeg.startingPoint || "",
+            driverRate: selectedLeg.driverRate || "",
+            destination: selectedLeg.destination || "",
+          });
+          if (
+            selectedLeg.drivers &&
+            selectedLeg.drivers.length > 0
+          ) {
+            setDrivers(selectedLeg.drivers);
+          } else {
+            setDrivers([]);
+          }
+        } else if (currentLagIndex > legToRemove.index) {
+          setCurrentLagIndex(currentLagIndex - 1);
+        }
 
-                      setSavedMessage("Leg removed successfully!");
-                      setTimeout(() => setSavedMessage(""), 5000);
+        setSavedMessage("Leg removed successfully!");
+        setTimeout(() => setSavedMessage(""), 5000);
 
-                      if (!isTemporaryLeg) {
-                        await refreshLegData();
-                      }
-                    } catch (error) {
-                      console.error("Error removing leg:", error);
-                      setSavedMessage("Error removing leg: " + error.message);
-                      setTimeout(() => setSavedMessage(""), 5000);
-                    } finally {
-                      setSaving(false);
-                    }
-                  }
-                  setShowRemoveLegModal(false);
-                }}
-              >
-                Yes
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
+        if (!isTemporaryLeg) {
+          await refreshLegData();
+        }
+      } catch (error) {
+        console.error("Error removing leg:", error);
+        setSavedMessage("Error removing leg: " + error.message);
+        setTimeout(() => setSavedMessage(""), 5000);
+      } finally {
+        setSaving(false);
+      }
+    }
+    setShowRemoveLegModal(false);
+  }}
+  legNumber={legToRemove.number}
+/>
       {/* Duplicate Driver Modal */}
-      {showDuplicateDriverModal && (
-        <div className="modal-wrapper">
-          <div className="modal-backdrop animate-fadeIn"></div>
-          <div className="modal-container animate-scaleIn">
-            <div className="modal-header">
-              <h3 className="modal-title">Identical Driver Information</h3>
-              <p className="modal-description">
-                A driver with identical information already exists.
-              </p>
-            </div>
-            <div className="modal-body">
-              <div className="modal-item">
-                <div className="modal-bullet"></div>
-                <span className="modal-item-text">
-                  Driver:{" "}
-                  <strong>
-                    {duplicateDriverInfo &&
-                      getDriverName(duplicateDriverInfo.driverid)}
-                  </strong>
-                </span>
-              </div>
-              <div className="modal-item">
-                <div className="modal-bullet"></div>
-                <span className="modal-item-text">
-                  Truck: <strong>{duplicateDriverInfo?.truckregnumber}</strong>
-                </span>
-              </div>
-              <div className="modal-item">
-                <div className="modal-bullet"></div>
-                <span className="modal-item-text">
-                  Container:{" "}
-                  <strong>{duplicateDriverInfo?.containernumber}</strong>
-                </span>
-              </div>
-              <div className="modal-item">
-                <div className="modal-bullet"></div>
-                <span className="modal-item-text">
-                  Date: <strong>{duplicateDriverInfo?.date}</strong>
-                </span>
-              </div>
-            </div>
-            <div className="modal-footer">
-              <button
-                className="modal-btn modal-btn-primary"
-                onClick={() => setShowDuplicateDriverModal(false)}
-              >
-                Okay
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+<DuplicateDriverModal
+  isOpen={showDuplicateDriverModal}
+  onClose={() => setShowDuplicateDriverModal(false)}
+  duplicateDriverInfo={duplicateDriverInfo}
+  getDriverName={getDriverName}
+/>
 
       {/* Container Already Reached Dropoff Modal */}
-      {showContainerReachedModal && (
-        <div className="modal-wrapper">
-          <div className="modal-backdrop animate-fadeIn"></div>
-          <div className="modal-container animate-scaleIn">
-            <div className="modal-header">
-              <h3 className="modal-title">Container Already Reached Dropoff</h3>
-              <p className="modal-description">
-                The specified container has already reached its dropoff in a
-                previous leg.
-              </p>
-            </div>
-            <div className="modal-body">
-              <div className="modal-item">
-                <div className="modal-bullet"></div>
-                <span className="modal-item-text">
-                  Container{" "}
-                  <strong>{containerReachedDetails.containerNumber}</strong> has
-                  already reached its final destination.
-                </span>
-              </div>
-              <div className="modal-item">
-                <div className="modal-bullet"></div>
-                <span className="modal-item-text">
-                  Please select a different container or update the previous
-                  legs.
-                </span>
-              </div>
-            </div>
-            <div className="modal-footer">
-              <button
-                className="modal-btn modal-btn-primary"
-                onClick={() => setShowContainerReachedModal(false)}
-              >
-                Okay
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+<ContainerReachedModal
+  isOpen={showContainerReachedModal}
+  onClose={() => setShowContainerReachedModal(false)}
+  containerNumber={containerReachedDetails.containerNumber}
+/>
     </div>
   );
 }
