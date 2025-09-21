@@ -70,15 +70,19 @@ export const getContainersByInstructionId = async (instructionId) => {
   const instructionIdStr = String(instructionId);
   const sql = `
     SELECT 
-      containerkey, 
-      containernum, 
-      weight, 
-      m1key, 
-      container_type, 
-      cargo_description, 
-      "Hazardous", 
+      containerkey,
+      containernum,
+      weight,
+      m1key,
+      container_type,
+      cargo_description,
+      "Hazardous",
       "Add Surcharges",
-      "Surcharge Amount"
+      "Surcharge Amount",
+      "Hazardous Amount",
+      "vgm",
+      "vgm amount",
+      file_ref
     FROM public.container
     WHERE m1key = $1
     ORDER BY containerkey
@@ -87,6 +91,7 @@ export const getContainersByInstructionId = async (instructionId) => {
   console.log(
     `[${new Date().toISOString()}] getContainersByInstructionId: Executing query`,
     {
+      query: sql,
       sql,
       params: [instructionIdStr],
       instructionId,
@@ -143,6 +148,11 @@ export const getContainersByInstructionId = async (instructionId) => {
           container["Add Surcharges"] === "true" ||
           false,
         "Surcharge Amount": container["Surcharge Amount"] || 0,
+        "vgm":
+          container["vgm"] === true ||
+          container["vgm"] === "true" ||
+          false,
+        "vgm amount": container["vgm amount"] || 0,
       })
     );
 
@@ -155,6 +165,8 @@ export const getContainersByInstructionId = async (instructionId) => {
           Hazardous: c["Hazardous"],
           "Add Surcharges": c["Add Surcharges"],
           "Surcharge Amount": c["Surcharge Amount"],
+          vgm: c["vgm"],
+          "vgm amount": c["vgm amount"],
         })),
       }
     );
@@ -379,31 +391,34 @@ export const saveInstruction = async ({ controllerData, containerData }) => {
     );
 
     // Define clientId, pickup, and dropoff variables before container processing
-  let clientId = controllerData.client || controllerData.clientId;
-  let pickup = controllerData.pickup || controllerData.selectedStartingPoint || 
-      (Array.isArray(controllerData.startingPoints) ? null : controllerData.startingPoints);
-  let dropoff = controllerData.dropoff || controllerData.selectedDestination || 
-      (Array.isArray(controllerData.destinations) ? null : controllerData.destinations);
+    let clientId = controllerData.client || controllerData.clientId;
+    let pickup =
+      controllerData.pickup ||
+      controllerData.selectedStartingPoint ||
+      (Array.isArray(controllerData.startingPoints)
+        ? null
+        : controllerData.startingPoints);
+    let dropoff =
+      controllerData.dropoff ||
+      controllerData.selectedDestination ||
+      (Array.isArray(controllerData.destinations)
+        ? null
+        : controllerData.destinations);
 
-  for (const container of containerData) {
+    // Track computed VGM amounts and per-container charges to include in total calc
+    const vgmAmountsArr = [];
+    const containersWithSurcharges = [];
+
+    for (const container of containerData) {
+
       // Define the container insert query with parameter placeholders
       // Debug logging for container data
       console.log(`Processing container for saveInstruction:`, {
         containerNum: container.containerNum || container.containernum,
         file_ref: container.file_ref,
-        properties: Object.keys(container),
+        container_type: container.container_type || container.containerType,
+        vgm: container.vgm || container["vgm"] || false
       });
-      
-      const containerQuery = `
-        INSERT INTO public.container (
-          containernum, weight, m1key, container_type, cargo_description, "Hazardous", "Add Surcharges", "Surcharge Amount", "Hazardous Amount", file_ref
-        ) VALUES (
-          $1, $2, $3, $4, $5, $6, $7, $8, $9, $10
-        )
-      `;
-      
-      // Debug statement moved after variable definition
-      console.log(`DEBUG: Container insert SQL columns: containernum, weight, m1key, container_type, cargo_description, "Hazardous", "Add Surcharges", "Surcharge Amount", "Hazardous Amount"`);
 
       // Sanitize weight value
       let sanitizedWeight = null;
@@ -428,122 +443,9 @@ export const saveInstruction = async ({ controllerData, containerData }) => {
         }
       }
 
-      // Using previously defined clientId, pickup, and dropoff variables
-
-      console.log(`DEBUG: controllerData keys:`, Object.keys(controllerData));
-      console.log(
-        `DEBUG: client: ${controllerData.client}, pickup: ${controllerData.pickup}, dropoff: ${controllerData.dropoff}`
-      );
-      console.log(
-        `DEBUG: startingPoints: ${controllerData.startingPoints}, destinations: ${controllerData.destinations}`
-      );
-
-      // Fetch surcharge amount if addSurcharges is true
+      // Compute surcharge & hazardous flags and fetch amounts if necessary
+      const addSurcharges = container["Add Surcharges"] || container.surcharges || false;
       let surchargeAmount = 0;
-      const addSurcharges =
-        container["Add Surcharges"] || container.addSurcharges || false;
-
-      // <CHANGE> Fetch hazardous amount if hazardous is true
-      let hazardousAmount = 0;
-      const isHazardous =
-        container["Hazardous"] || container.hazardous || false;
-
-      console.log(
-        `DEBUG: Container ${
-          container.containerNum || "unnamed"
-        } - isHazardous: ${isHazardous}`
-      );
-      
-      console.log(`DEBUG: Preparing container insert with hazardous=${isHazardous}, hazardousAmount=${hazardousAmount}`);
-
-      if (isHazardous) {
-        // First check if we already have a hazardous amount directly from container data
-        if (container["Hazardous Amount"] && !isNaN(Number(container["Hazardous Amount"])) && Number(container["Hazardous Amount"]) > 0) {
-          hazardousAmount = Number(container["Hazardous Amount"]);
-          console.log(`DEBUG: Using existing hazardous amount from container data: ${hazardousAmount}`);
-        } 
-        // If we don't have a hazardous amount or it's 0, fetch from the database
-        else if (clientId && pickup && dropoff) {
-          try {
-            const hazardousQuery = `
-        SELECT hazardous
-        FROM public.m5_client_rate
-        WHERE clientid = $1
-          AND starting_point = $2
-          AND destination = $3
-        ORDER BY client_rate_id DESC
-        LIMIT 1
-      `;
-            console.log(
-              `DEBUG: Executing hazardous query with exact params: clientId='${clientId}', pickup='${pickup}', dropoff='${dropoff}'`
-            );
-
-            const hazardousResult = await client.query(hazardousQuery, [
-              clientId,
-              pickup,
-              dropoff,
-            ]);
-
-            console.log(
-              `DEBUG: Hazardous query result rows: ${hazardousResult.rows.length}`
-            );
-            console.log(
-              `DEBUG: Raw hazardous result rows:`,
-              JSON.stringify(hazardousResult.rows)
-            );
-            if (hazardousResult.rows.length > 0) {
-              console.log(
-                `DEBUG: First row hazardous value:`,
-                hazardousResult.rows[0].hazardous
-              );
-              if (hazardousResult.rows[0].hazardous) {
-                const fetchedAmount = Number.parseFloat(
-                  hazardousResult.rows[0].hazardous
-                );
-                console.log(`DEBUG: Parsed hazardous amount: ${fetchedAmount}`);
-                if (!isNaN(fetchedAmount) && fetchedAmount > 0) {
-                  hazardousAmount = fetchedAmount;
-                  console.log(
-                    `SUCCESS: Fetched hazardous amount: ${hazardousAmount} for container ${
-                      container.containerNum || "unnamed"
-                    }`
-                  );
-                } else {
-                  console.log(
-                    `DEBUG: Hazardous amount is NaN or <= 0: ${fetchedAmount}`
-                  );
-                }
-              } else {
-                console.log(`DEBUG: No hazardous value in database row`);
-              }
-            } else {
-              console.log(
-                `DEBUG: No matching rates found in m5_client_rate table for hazardous`
-              );
-            }
-          } catch (error) {
-            console.error(
-              `Error fetching hazardous amount for container ${
-                container.containerNum || "unnamed"
-              }:`,
-              error
-            );
-            console.log(`API call failed for hazardous amount, defaulting to 0`);
-            // Continue with hazardousAmount = 0 on error
-          }
-        } else {
-          console.log(
-            `WARN: Hazardous requested but missing parameters. clientId=${clientId}, pickup=${pickup}, dropoff=${dropoff}`
-          );
-        }
-      }
-
-      console.log(
-        `DEBUG: Container ${
-          container.containerNum || "unnamed"
-        } - addSurcharges: ${addSurcharges}`
-      );
-
       if (addSurcharges && clientId && pickup && dropoff) {
         try {
           const surchargeQuery = `
@@ -555,102 +457,74 @@ export const saveInstruction = async ({ controllerData, containerData }) => {
             ORDER BY client_rate_id DESC
             LIMIT 1
           `;
-          console.log(
-            `DEBUG: Executing surcharge query with exact params: clientId='${clientId}', pickup='${pickup}', dropoff='${dropoff}'`
-          );
-          console.log(
-            `DEBUG: Verifying SQL: SELECT * FROM public.m5_client_rate WHERE clientid='${clientId}' AND starting_point='${pickup}' AND destination='${dropoff}' LIMIT 1`
-          );
-
           const surchargeResult = await client.query(surchargeQuery, [
             clientId,
             pickup,
             dropoff,
           ]);
-
-          console.log(
-            `DEBUG: Query result rows: ${surchargeResult.rows.length}`
-          );
-          console.log(
-            `DEBUG: Raw result rows:`,
-            JSON.stringify(surchargeResult.rows)
-          );
           if (surchargeResult.rows.length > 0) {
-            console.log(
-              `DEBUG: First row surcharges value:`,
-              surchargeResult.rows[0].surcharges
-            );
-            if (surchargeResult.rows[0].surcharges) {
-              const fetchedAmount = Number.parseFloat(
-                surchargeResult.rows[0].surcharges
-              );
-              console.log(`DEBUG: Parsed surcharge amount: ${fetchedAmount}`);
-              if (!isNaN(fetchedAmount) && fetchedAmount > 0) {
-                surchargeAmount = fetchedAmount;
-                console.log(
-                  `SUCCESS: Fetched surcharge amount: ${surchargeAmount} for container ${
-                    container.containerNum || "unnamed"
-                  }`
-                );
-              } else {
-                console.log(
-                  `DEBUG: Surcharge amount is NaN or <= 0: ${fetchedAmount}`
-                );
-              }
-            } else {
-              console.log(`DEBUG: No surcharges value in database row`);
-            }
-          } else {
-            console.log(
-              `DEBUG: No matching rates found in m5_client_rate table`
-            );
+            const fetched = Number.parseFloat(surchargeResult.rows[0].surcharges);
+            if (!isNaN(fetched) && fetched > 0) surchargeAmount = fetched;
           }
-        } catch (error) {
-          console.error(
-            `Error fetching surcharge amount for container ${
-              container.containerNum || "unnamed"
-            }:`,
-            error
-          );
-          // Continue with surchargeAmount = 0 on error
+        } catch (e) {
+          console.error("ERROR: Failed to fetch surcharge:", e.message);
         }
-      } else if (addSurcharges) {
-        console.log(
-          `WARN: Surcharge requested but missing parameters. clientId=${clientId}, pickup=${pickup}, dropoff=${dropoff}`
-        );
       }
 
-      console.log(
-        `DEBUG: === CONTAINER INSERT VALUES (Container: ${container.containerNum || container.containernum || "unnamed"}) ===`
-      );
-      console.log(
-        `DEBUG: containerNum: ${container.containerNum || container.containernum || ""}`
-      );
-      console.log(`DEBUG: weight: ${sanitizedWeight}`);
-      console.log(`DEBUG: m1key: ${m1key}`);
-      console.log(
-        `DEBUG: container_type: ${container.container_type || container.containerType || ""}`
-      );
-      console.log(
-        `DEBUG: cargo_description: ${container.cargo_description || container.cargoDescription || ""}`
-      );
-      console.log(`DEBUG: isHazardous: ${isHazardous}`);
-      console.log(`DEBUG: addSurcharges: ${addSurcharges}`);
-      console.log(`DEBUG: surchargeAmount: ${surchargeAmount}`);
-      console.log(`DEBUG: hazardousAmount: ${hazardousAmount}`);
-      console.log(
-        `DEBUG: Container SQL parameters: ${[
-          container.containerNum || container.containernum || "",
-          sanitizedWeight,
-          m1key,
-          container.container_type || container.containerType || "",
-          container.cargo_description || container.cargoDescription || "",
-          isHazardous,
-          addSurcharges,
-          surchargeAmount,
-          hazardousAmount,
-        ].join(", ")}`
-      );
+      const isHazardous = container["Hazardous"] || container.hazardous || false;
+      let hazardousAmount = container["Hazardous Amount"] || container.hazardousAmount || 0;
+      if (isHazardous && hazardousAmount === 0 && clientId && pickup && dropoff) {
+        try {
+          const hazardousQuery = `
+            SELECT hazardous
+            FROM public.m5_client_rate
+            WHERE clientid = $1
+              AND starting_point = $2
+              AND destination = $3
+            ORDER BY client_rate_id DESC
+            LIMIT 1
+          `;
+          const hazardousResult = await client.query(hazardousQuery, [
+            clientId,
+            pickup,
+            dropoff,
+          ]);
+          if (hazardousResult.rows.length > 0) {
+            const fetched = Number.parseFloat(hazardousResult.rows[0].hazardous);
+            if (!isNaN(fetched) && fetched > 0) hazardousAmount = fetched;
+          }
+        } catch (e) {
+          console.error("ERROR: Failed to fetch hazardous:", e.message);
+        }
+      }
+
+      // Get VGM flag and amount with fallbacks
+      const isVgm = container.vgm || container["vgm"] || false;
+      let vgmAmount = container.vgmAmount || container["vgm amount"] || 0;
+      if (isVgm && (!vgmAmount || Number(vgmAmount) === 0) && clientId && pickup && dropoff) {
+        try {
+          const vgmQuery = `
+            SELECT vgm
+            FROM public.m5_client_rate
+            WHERE clientid = $1
+              AND starting_point = $2
+              AND destination = $3
+            ORDER BY client_rate_id DESC
+            LIMIT 1
+          `;
+          const vgmResult = await client.query(vgmQuery, [
+            clientId,
+            pickup,
+            dropoff,
+          ]);
+          if (vgmResult.rows.length > 0) {
+            const fetched = Number.parseFloat(vgmResult.rows[0].vgm);
+            if (!isNaN(fetched) && fetched >= 0) vgmAmount = fetched;
+          }
+        } catch (e) {
+          console.error("ERROR: Failed to fetch VGM:", e.message);
+        }
+      }
 
       const containerValues = [
         container.containerNum || container.containernum || "",
@@ -662,9 +536,35 @@ export const saveInstruction = async ({ controllerData, containerData }) => {
         addSurcharges,
         surchargeAmount, // Backend-calculated surcharge amount
         hazardousAmount, // Backend-calculated hazardous amount
+        isVgm,
+        vgmAmount,
         container.file_ref || container.fileRef || "", // File reference field for export shipments
       ];
       
+      console.log('Container values with VGM:', { isVgm, vgmAmount });
+      // Keep track for total calc later
+      vgmAmountsArr.push(vgmAmount);
+
+      // Build a light-weight representation used for total calculation
+      containersWithSurcharges.push({
+        "Add Surcharges": addSurcharges,
+        "Surcharge Amount": surchargeAmount,
+        "Hazardous": isHazardous,
+        "Hazardous Amount": hazardousAmount,
+        vgm: isVgm,
+        "vgm amount": vgmAmount,
+      });
+
+      // Insert the container row now that values are prepared
+      const insertContainerQuery = `
+        INSERT INTO public.container (
+          containernum, weight, m1key, container_type, cargo_description,
+          "Hazardous", "Add Surcharges", "Surcharge Amount", "Hazardous Amount",
+          "vgm", "vgm amount", file_ref
+        ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)
+      `;
+      await client.query(insertContainerQuery, containerValues);
+
       // Debug log for container values
       console.log("Container values array:", {
         containerNum: containerValues[0],
@@ -676,122 +576,18 @@ export const saveInstruction = async ({ controllerData, containerData }) => {
         addSurcharges: containerValues[6],
         surchargeAmount: containerValues[7],
         hazardousAmount: containerValues[8],
-        file_ref: containerValues[9]
-      });
-
-      console.log(`DEBUG: Executing container insert query with ${containerValues.length} parameters`);
-      console.log(`DEBUG: Container insert query: ${containerQuery}`);
-      await client.query(containerQuery, containerValues);
-    }
-
-    // After all containers are processed with surcharge amounts, recalculate total cost
-    const containersWithSurcharges = [];
-    for (const container of containerData) {
-      const addSurcharges =
-        container["Add Surcharges"] || container.addSurcharges || false;
-      let surchargeAmount = 0;
-
-      if (addSurcharges) {
-        // Re-use the previously defined clientId, pickup, dropoff variables
-
-        if (clientId && pickup && dropoff) {
-          try {
-            const surchargeQuery = `
-              SELECT surcharges
-              FROM public.m5_client_rate
-              WHERE clientid = $1
-                AND starting_point = $2
-                AND destination = $3
-              ORDER BY client_rate_id DESC
-              LIMIT 1
-            `;
-            const surchargeResult = await client.query(surchargeQuery, [
-              clientId,
-              pickup,
-              dropoff,
-            ]);
-
-            if (
-              surchargeResult.rows.length > 0 &&
-              surchargeResult.rows[0].surcharges
-            ) {
-              const fetchedAmount = Number.parseFloat(
-                surchargeResult.rows[0].surcharges
-              );
-              if (!isNaN(fetchedAmount) && fetchedAmount > 0) {
-                surchargeAmount = fetchedAmount;
-              }
-            }
-          } catch (error) {
-            console.error(
-              `Error re-fetching surcharge for total calculation:`,
-              error
-            );
-          }
-        } else {
-          console.log(
-            `WARN: Recalc surcharge requested but missing parameters. clientId=${clientId}, pickup=${pickup}, dropoff=${dropoff}`
-          );
-        }
-      }
-
-      // Add hazardous information for each container
-      const isHazardous = container["Hazardous"] || container.hazardous || false;
-      let hazardousAmount = 0;
-      
-      if (isHazardous) {
-        // First check if the container already has a hazardous amount
-        if (container["Hazardous Amount"] && !isNaN(Number(container["Hazardous Amount"])) && Number(container["Hazardous Amount"]) > 0) {
-          hazardousAmount = Number(container["Hazardous Amount"]);
-          console.log(`DEBUG: Using existing hazardous amount for total cost calculation: ${hazardousAmount}`);
-        }
-        // If not, try to fetch from the database
-        else if (clientId && pickup && dropoff) {
-          try {
-            const hazardousQuery = `
-              SELECT hazardous
-              FROM public.m5_client_rate
-              WHERE clientid = $1
-                AND starting_point = $2
-                AND destination = $3
-              ORDER BY client_rate_id DESC
-              LIMIT 1
-            `;
-            
-            const hazardousResult = await client.query(hazardousQuery, [
-              clientId,
-              pickup,
-              dropoff,
-            ]);
-            
-            if (hazardousResult.rows.length > 0 && hazardousResult.rows[0].hazardous) {
-              const fetchedAmount = Number.parseFloat(hazardousResult.rows[0].hazardous);
-              if (!isNaN(fetchedAmount) && fetchedAmount > 0) {
-                hazardousAmount = fetchedAmount;
-                console.log(`DEBUG: Re-fetched hazardous amount from database for total cost calculation: ${hazardousAmount}`);
-              }
-            }
-          } catch (error) {
-            console.error(`Error re-fetching hazardous for total calculation:`, error);
-          }
-        } else {
-          console.log(`DEBUG: Hazardous is true but couldn't determine hazardous amount for total cost calculation. clientId=${clientId}, pickup=${pickup}, dropoff=${dropoff}`);
-        }
-      }
-
-      containersWithSurcharges.push({
-        "Add Surcharges": addSurcharges,
-        "Surcharge Amount": surchargeAmount,
-        "Hazardous": isHazardous,
-        "Hazardous Amount": hazardousAmount
+        vgm: containerValues[9],
+        vgmAmount: containerValues[10],
+        file_ref: containerValues[11]
       });
     }
 
-    // Calculate total cost including surcharges (local implementation)
+    // Calculate total cost including surcharges and VGM (local implementation)
     const calculateTotalCostWithSurcharges = (
       instructionData,
       containers = []
     ) => {
+
       const rateWeight =
         instructionData.rateweight || instructionData.rateWeight || "Container";
 
@@ -804,14 +600,10 @@ export const saveInstruction = async ({ controllerData, containerData }) => {
         const numAbnormal = Number(instructionData.num_abnormal || 0);
         const numBreakBulk = Number(instructionData.num_breakbulk || 0);
 
-        const ratePer6 =
-          numSix > 0 ? Number(instructionData.rateper_6 || 0) : 0;
-        const ratePer12 =
-          numTwelve > 0 ? Number(instructionData.rateper_12 || 0) : 0;
-        const ratePerAbnormal =
-          numAbnormal > 0 ? Number(instructionData.rateper_abnormal || 0) : 0;
-        const ratePerBreakBulk =
-          numBreakBulk > 0 ? Number(instructionData.rateper_breakbulk || 0) : 0;
+        const ratePer6 = numSix > 0 ? Number(instructionData.rateper_6 || 0) : 0;
+        const ratePer12 = numTwelve > 0 ? Number(instructionData.rateper_12 || 0) : 0;
+        const ratePerAbnormal = numAbnormal > 0 ? Number(instructionData.rateper_abnormal || 0) : 0;
+        const ratePerBreakBulk = numBreakBulk > 0 ? Number(instructionData.rateper_breakbulk || 0) : 0;
 
         baseCost =
           ratePer6 * numSix +
@@ -841,20 +633,40 @@ export const saveInstruction = async ({ controllerData, containerData }) => {
         return total;
       }, 0);
 
-      console.log(`DEBUG: Base cost: ${baseCost}, Surcharges: ${totalSurchargeAmount}, Hazardous: ${totalHazardousAmount}`);
-      const totalCost = baseCost + totalSurchargeAmount + totalHazardousAmount;
+      // Calculate total VGM amount from containers
+      const totalVgmAmount = containers.reduce((total, container) => {
+        if (container["vgm"] && (container["vgm amount"] || container.vgmAmount)) {
+          return total + Number(container["vgm amount"] || container.vgmAmount || 0);
+        }
+        return total;
+      }, 0);
+
+      console.log(`DEBUG: Base cost: ${baseCost}, Surcharges: ${totalSurchargeAmount}, Hazardous: ${totalHazardousAmount}, VGM: ${totalVgmAmount}`);
+      const totalCost = baseCost + totalSurchargeAmount + totalHazardousAmount + totalVgmAmount;
       return Number(totalCost.toFixed(2));
     };
 
+    // Build enriched containers including VGM for total calculation
+    const containersWithExtras = containersWithSurcharges.map((c, idx) => {
+      const original = containerData[idx] || {};
+      const isVgmFlag = original.vgm || original["vgm"] || false;
+      const vgmAmtFromOriginal = (original.vgmAmount || original["vgm amount"]) ?? 0;
+      const vgmAmt = (vgmAmountsArr[idx] !== undefined) ? vgmAmountsArr[idx] : vgmAmtFromOriginal;
+      return { ...c, vgm: isVgmFlag, "vgm amount": vgmAmt };
+    });
+
     const recalculatedTotalCost = calculateTotalCostWithSurcharges(
       controllerData,
-      containersWithSurcharges
+      containersWithExtras
     );
+
+// ... (rest of the code remains the same)
 
     console.log(`DEBUG: Original total cost: ${controllerData.total_cost}`);
     console.log(
       `DEBUG: Recalculated total cost with surcharges: ${recalculatedTotalCost}`
     );
+// ... (rest of the code remains the same)
 
     // Update the total cost in the database if it changed
     if (
@@ -1008,11 +820,9 @@ export const getInstructions = async (clientId) => {
       COALESCE(m.num_twelve_meters, 0) AS num_twelve_meters,
       COALESCE(m.num_abnormal, 0) AS num_abnormal,
       (
-        SELECT COUNT(*) > 0 
-        FROM public.container cn 
-        WHERE cn.m1key = m.m1key 
-        AND cn.containernum IS NOT NULL 
-        AND cn.containernum != ''
+        SELECT COUNT(*) > 0
+        FROM public.container cn
+        WHERE cn.m1key = m.m1key
       ) AS has_valid_containers
     FROM 
       public.m1_controller m
@@ -1282,21 +1092,29 @@ export const updateContainersByInstructionId = async (
       const cargoDescription =
         container.cargoDescription || container.cargo_description || "";
 
-      // Get hazardous and surcharge flags with fallbacks
+      // Get hazardous, surcharge, and VGM flags with fallbacks
       const hazardous =
         container.hazardous !== undefined ? container.hazardous : false;
       const addSurcharges =
         container.addSurcharges !== undefined ? container.addSurcharges : false;
+      const vgm =
+        container.vgm !== undefined ? container.vgm : false;
       const surchargeAmount =
         container.surchargeAmount || container["Surcharge Amount"] || 0;
+      const vgmAmount =
+        container.vgmAmount || container["vgm amount"] || 0;
 
       console.log(
         `Inserting container: containerNum=${containerNum}, weight=${sanitizedWeight}, m1key=${instructionId}, container_type=${containerType}, cargo_description=${cargoDescription}, hazardous=${hazardous}, addSurcharges=${addSurcharges}, surchargeAmount=${surchargeAmount}`
       );
 
       const insertQuery = `
-        INSERT INTO public.container (containernum, weight, m1key, container_type, cargo_description, "Hazardous", "Add Surcharges", "Surcharge Amount", file_ref)
-        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+        INSERT INTO public.container (
+          containernum, weight, m1key, container_type, cargo_description, 
+          "Hazardous", "Add Surcharges", "Surcharge Amount", 
+          "vgm", "vgm amount", file_ref
+        )
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
         RETURNING containerkey
       `;
       // Get file_ref value from container with proper fallback
@@ -1313,8 +1131,12 @@ export const updateContainersByInstructionId = async (
         hazardous,
         addSurcharges,
         surchargeAmount,
-        fileRef, // Add file_ref to query values
+        vgm,
+        vgmAmount,
+        fileRef,
       ];
+      
+      console.log('Container values with VGM:', { vgm, vgmAmount });
 
       const result = await client.query(insertQuery, values);
       console.log(`Inserted container with ID: ${result.rows[0].containerkey}`);
@@ -2246,23 +2068,93 @@ export const updateFCInstructionAndContainers = async (
         }
       );
 
-      const updateQuery = `
+      const updateContainerQuery = `
         UPDATE public.container 
-        SET containernum = $1, weight = $2, container_type = $3, cargo_description = $4, "Add Surcharges" = $5, "Hazardous" = $6, "Surcharge Amount" = $7, "Hazardous Amount" = $8, file_ref = $10
-        WHERE containerkey = $9
+        SET 
+          containernum = $1,
+          weight = $2,
+          container_type = $3,
+          cargo_description = $4,
+          "Hazardous" = $5,
+          "Add Surcharges" = $6,
+          "Surcharge Amount" = $7,
+          "Hazardous Amount" = $8,
+          "vgm" = $9,
+          "vgm amount" = $10,
+          file_ref = $11,
+          updated_at = CURRENT_TIMESTAMP
+        WHERE containerkey = $12
+        RETURNING *
       `;
-      const updateResult = await client.query(updateQuery, [
-        container.containernum,
-        sanitizedWeight, // Will be null for empty/invalid values
-        container.container_type,
-        container.cargo_description,
-        container["Add Surcharges"] || container.addSurcharges || false,
-        container["Hazardous"] || container.hazardous || false,
-        container["Surcharge Amount"] || container.surchargeAmount || 0,
-        hazardousAmount, // Use the hazardous amount we fetched or calculated
+
+      // Get VGM flag and amount with fallbacks
+      const isVgm = container.vgm || container["vgm"] || false;
+      let vgmAmount = container.vgmAmount || container["vgm amount"] || 0;
+
+      // If VGM is checked and no amount provided, fetch from DB like hazardous/surcharges
+      if (isVgm && (!vgmAmount || Number(vgmAmount) === 0)) {
+        if (clientId && pickup && dropoff) {
+          try {
+            const vgmRateQuery = `
+              SELECT vgm
+              FROM public.m5_client_rate
+              WHERE clientid = $1
+                AND starting_point = $2
+                AND destination = $3
+              ORDER BY client_rate_id DESC
+              LIMIT 1
+            `;
+            console.log(
+              `DEBUG: Executing VGM rate query with params: clientId='${clientId}', pickup='${pickup}', dropoff='${dropoff}'`
+            );
+            const vgmRateResult = await client.query(vgmRateQuery, [
+              clientId,
+              pickup,
+              dropoff,
+            ]);
+            console.log(
+              `DEBUG: VGM rate query rows: ${vgmRateResult.rows.length}`,
+              vgmRateResult.rows
+            );
+            if (vgmRateResult.rows.length > 0 && vgmRateResult.rows[0].vgm != null) {
+              const fetchedVgm = Number.parseFloat(vgmRateResult.rows[0].vgm);
+              if (!isNaN(fetchedVgm) && fetchedVgm >= 0) {
+                vgmAmount = fetchedVgm;
+                console.log(`SUCCESS: Fetched VGM amount: ${vgmAmount}`);
+              } else {
+                console.log(`DEBUG: VGM amount parsed as NaN or < 0: ${vgmRateResult.rows[0].vgm}`);
+              }
+            } else {
+              console.log(`DEBUG: No VGM rate found for route/client; defaulting to 0`);
+            }
+          } catch (e) {
+            console.error(`ERROR: Failed to fetch VGM rate:`, e);
+          }
+        } else {
+          console.log(
+            `WARN: VGM requested but missing parameters. clientId=${clientId}, pickup=${pickup}, dropoff=${dropoff}`
+          );
+        }
+      }
+      
+      const updateValues = [
+        container.containernum || "",
+        sanitizedWeight,
+        container.container_type || "",
+        container.cargo_description || "",
+        isHazardous,
+        container["Add Surcharges"] || false,
+        container["Surcharge Amount"] || 0,
+        hazardousAmount,
+        isVgm,
+        vgmAmount,
+        container.file_ref || "",
         container.containerkey,
-        container.file_ref || "", // Add file_ref parameter
-      ]);
+      ];
+      
+      console.log('Updating container with VGM values:', { isVgm, vgmAmount });
+
+      const updateResult = await client.query(updateContainerQuery, updateValues);
       console.log(
         `[${new Date().toISOString()}] [MODEL] Container ${
           container.containerkey
@@ -2359,9 +2251,17 @@ export const updateFCInstructionAndContainers = async (
       const cargoDescription =
         container.cargoDescription || container.cargo_description || "";
 
+      // Get VGM flag and amount with fallbacks for new container
+      const isVgm = container.vgm || container["vgm"] || false;
+      const vgmAmount = container.vgmAmount || container["vgm amount"] || 0;
+      
       const insertQuery = `
-        INSERT INTO public.container (containernum, weight, m1key, container_type, cargo_description, "Add Surcharges", "Hazardous", "Surcharge Amount", "Hazardous Amount", file_ref)
-        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+        INSERT INTO public.container (
+          containernum, weight, m1key, container_type, cargo_description, 
+          "Add Surcharges", "Hazardous", "Surcharge Amount", 
+          "Hazardous Amount", "vgm", "vgm amount", file_ref
+        )
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
         RETURNING containerkey
       `;
       const insertResult = await client.query(insertQuery, [
@@ -2374,8 +2274,12 @@ export const updateFCInstructionAndContainers = async (
         container["Hazardous"] || container.hazardous || false,
         container["Surcharge Amount"] || container.surchargeAmount || 0,
         hazardousAmount,
+        isVgm,
+        vgmAmount,
         container.file_ref || "", // Add file_ref parameter
       ]);
+      
+      console.log('Inserted new container with VGM values:', { isVgm, vgmAmount });
       console.log(
         `[${new Date().toISOString()}] [MODEL] Inserted new container ${
           insertResult.rows[0].containerkey
@@ -2572,6 +2476,10 @@ export const saveInstructionAndContainers = async (
       // <CHANGE> Fetch hazardous amount if hazardous is true
       let hazardousAmount = 0;
       const isHazardous = container["Hazardous"] || container.hazardous || false;
+      
+      // <CHANGE> Fetch VGM amount if VGM is true
+      let vgmAmount = 0;
+      const isVgm = container["vgm"] || container.vgm || false;
 
       console.log(`DEBUG: Container ${container.containerNum || 'unnamed'} - isHazardous: ${isHazardous}`);
 
@@ -2630,10 +2538,58 @@ export const saveInstructionAndContainers = async (
         isHazardous
       });
 
-      // <CHANGE> Updated container query to include Hazardous Amount and File Reference
+      // <CHANGE> Fetch VGM amount if VGM is true
+      if (isVgm && clientId && pickup && dropoff) {
+        try {
+          const vgmQuery = `
+            SELECT vgm
+            FROM public.m5_client_rate
+            WHERE clientid = $1
+              AND starting_point = $2
+              AND destination = $3
+            ORDER BY client_rate_id DESC
+            LIMIT 1
+          `;
+          console.log(`DEBUG: Executing VGM query with exact params: clientId='${clientId}', pickup='${pickup}', dropoff='${dropoff}'`);
+          
+          const vgmResult = await client.query(vgmQuery, [
+            clientId,
+            pickup,
+            dropoff
+          ]);
+          
+          console.log(`DEBUG: VGM query result rows: ${vgmResult.rows.length}`);
+          console.log(`DEBUG: Raw VGM result rows:`, JSON.stringify(vgmResult.rows));
+          if (vgmResult.rows.length > 0) {
+            console.log(`DEBUG: First row VGM value:`, vgmResult.rows[0].vgm);
+            if (vgmResult.rows[0].vgm) {
+              const fetchedAmount = Number.parseFloat(vgmResult.rows[0].vgm);
+              console.log(`DEBUG: Parsed VGM amount: ${fetchedAmount}`);
+              if (!isNaN(fetchedAmount) && fetchedAmount > 0) {
+                vgmAmount = fetchedAmount;
+                console.log(`SUCCESS: Fetched VGM amount: ${vgmAmount} for container ${container.containerNum || 'unnamed'}`);
+              } else {
+                console.log(`DEBUG: VGM amount is NaN or <= 0: ${fetchedAmount}`);
+              }
+            } else {
+              console.log(`DEBUG: No VGM value in database row`);
+            }
+          } else {
+            console.log(`DEBUG: No matching rates found in m5_client_rate table for VGM`);
+          }
+        } catch (error) {
+          console.error(`Error fetching VGM amount for container ${container.containerNum || 'unnamed'}:`, error);
+          console.log(`API call failed for VGM amount, defaulting to 0`);
+          // Continue with vgmAmount = 0 on error
+        }
+      } else if (isVgm) {
+        console.log(`WARN: VGM requested but missing parameters. clientId=${clientId}, pickup=${pickup}, dropoff=${dropoff}`);
+      }
+
+      // <CHANGE> Updated container query to include VGM, Hazardous Amount, and File Reference
       const containerQuery = `
-        INSERT INTO public.container (containernum, weight, m1key, container_type, cargo_description, "Add Surcharges", "Hazardous", "Surcharge Amount", "Hazardous Amount", file_ref)
-        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+        INSERT INTO public.container (containernum, weight, m1key, container_type, cargo_description, "Add Surcharges", "Hazardous", "Surcharge Amount", "Hazardous Amount", "vgm", "vgm amount", file_ref)
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
       `;
       const containerValues = [
         container.containerNum || container.containernum || "",
@@ -2645,6 +2601,8 @@ export const saveInstructionAndContainers = async (
         isHazardous,
         surchargeAmount, // Backend-calculated surcharge amount
         hazardousAmount, // Backend-calculated hazardous amount
+        isVgm, // VGM flag
+        vgmAmount, // Backend-calculated VGM amount
         // Extract file_ref value, ensuring proper case handling for all possible variations
         (container.file_ref !== undefined ? container.file_ref : 
          container.fileRef !== undefined ? container.fileRef : ""), // New file reference field for export shipments

@@ -53,7 +53,7 @@ const calculateTotalCost = (instructionData, containers = []) => {
     return total
   }, 0)
 
-  // <CHANGE> Calculate total hazardous amount from containers
+  // Calculate total hazardous amount from containers
   const totalHazardousAmount = containers.reduce((total, container) => {
     if (container["Hazardous"] && container["Hazardous Amount"]) {
       return total + Number(container["Hazardous Amount"] || 0)
@@ -61,7 +61,15 @@ const calculateTotalCost = (instructionData, containers = []) => {
     return total
   }, 0)
 
-  const totalCost = baseCost + totalSurchargeAmount + totalHazardousAmount
+  // Calculate total VGM amount from containers
+  const totalVgmAmount = containers.reduce((total, container) => {
+    if (container["vgm"] && container["vgm amount"]) {
+      return total + Number(container["vgm amount"] || 0)
+    }
+    return total
+  }, 0)
+
+  const totalCost = baseCost + totalSurchargeAmount + totalHazardousAmount + totalVgmAmount
   return Number(totalCost.toFixed(2))
 }
 
