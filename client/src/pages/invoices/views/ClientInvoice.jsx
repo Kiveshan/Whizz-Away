@@ -1,5 +1,5 @@
 "use client";
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, forwardRef, useImperativeHandle } from "react";
 import { useNavigate, useParams, useLocation } from "react-router-dom";
 import "../css/InvoiceTemplate.css";
 import jsPDF from "jspdf";
@@ -31,7 +31,12 @@ const debug = (message, data) => {
   }
 };
 
-const ClientInvoice = () => {
+const ClientInvoice = forwardRef(({ 
+  previewData, 
+  isPreview = false, 
+  instructionId,
+  onClosePreview 
+}, ref) => {
   const navigate = useNavigate();
   const location = useLocation();
   const params = useParams();
@@ -48,26 +53,54 @@ const ClientInvoice = () => {
   const [error, setError] = useState(null);
   const [pdfLoading, setPdfLoading] = useState(false);
 
+  // Add preview mode state
+  const [isPreviewMode, setIsPreviewMode] = useState(isPreview);
+  const componentRef = useRef(null);
+  const invoiceRef = useRef(null);
+
   const [isEditMode, setIsEditMode] = useState(false);
   const [editData, setEditData] = useState({
     amount: "",
     invoice_num: "",
-    additional_destination_info: "", // New field
+    additional_destination_info: "",
   });
   const [saveLoading, setSaveLoading] = useState(false);
   const [saveError, setSaveError] = useState(null);
   const [showConfirmDialog, setShowConfirmDialog] = useState(false);
 
-  const invoiceRef = useRef(null);
+  // Use ref forwarding
+  useImperativeHandle(ref, () => ({
+    generatePDF: () => generatePDF()
+  }));
+
+  // Update data source for preview mode
+  const finalInvoiceData = previewData || invoiceData;
+
+  // Disable editing in preview mode
+  const canEdit = !isPreviewMode && !isPreview && JSON.parse(localStorage.getItem("user")).roleid === 3;
 
   useEffect(() => {
     let isMounted = true;
 
     const fetchInvoiceData = async () => {
       try {
-        if (!id) {
+        if (!id && !previewData) {
           if (isMounted) {
             setError("No invoice ID provided");
+            setLoading(false);
+          }
+          return;
+        }
+
+        // If we have preview data, use it directly
+        if (previewData) {
+          if (isMounted) {
+            setInvoiceData(previewData);
+            setEditData({
+              amount: previewData.total_cost || "",
+              invoice_num: previewData.invoice_num || "",
+              additional_destination_info: previewData.additional_destination_info || "",
+            });
             setLoading(false);
           }
           return;
@@ -111,7 +144,7 @@ const ClientInvoice = () => {
           setEditData({
             amount: response.data.data.total_cost || "",
             invoice_num: response.data.data.invoice_num || "",
-            additional_destination_info: response.data.data.additional_destination_info || "", // New field
+            additional_destination_info: response.data.data.additional_destination_info || "",
           });
           setLoading(false);
         }
@@ -154,14 +187,30 @@ const ClientInvoice = () => {
       }
     };
 
-    fetchInvoiceData();
+    if (!isPreview) {
+      fetchInvoiceData();
+    }
 
     return () => {
       isMounted = false;
     };
-  }, [id, navigate]);
+  }, [id, navigate, previewData, isPreview]);
+
+  // NEW: Handle PDF generation event for preview
+  useEffect(() => {
+    const handleGeneratePDF = () => {
+      generatePDF();
+    };
+
+    document.addEventListener('generatePDF', handleGeneratePDF);
+    return () => document.removeEventListener('generatePDF', handleGeneratePDF);
+  }, [finalInvoiceData]);
 
   const handleEditClick = () => {
+    if (isPreviewMode) {
+      setIsPreviewMode(false);
+      return;
+    }
     setIsEditMode(true);
     setSaveError(null);
   };
@@ -169,9 +218,9 @@ const ClientInvoice = () => {
   const handleCancelEdit = () => {
     setIsEditMode(false);
     setEditData({
-      amount: invoiceData.total_cost || "",
-      invoice_num: invoiceData.invoice_num || "",
-      additional_destination_info: invoiceData.additional_destination_info || "",
+      amount: finalInvoiceData.total_cost || "",
+      invoice_num: finalInvoiceData.invoice_num || "",
+      additional_destination_info: finalInvoiceData.additional_destination_info || "",
     });
     setSaveError(null);
     setShowConfirmDialog(false);
@@ -185,19 +234,22 @@ const ClientInvoice = () => {
   };
 
   const handleSaveClick = () => {
+    if (isPreviewMode) return; // Disable save in preview mode
     setShowConfirmDialog(true);
   };
 
   const handleConfirmSave = async () => {
+    if (isPreviewMode) return; // Disable save in preview mode
+
     setSaveLoading(true);
     setSaveError(null);
 
     try {
       const updateData = {
-        m1key: invoiceData.m1key,
+        m1key: finalInvoiceData.m1key,
         rate: editData.amount ? Number.parseFloat(editData.amount) : undefined,
         invoice_num: editData.invoice_num || undefined,
-        additional_destination_info: editData.additional_destination_info || undefined, // New field
+        additional_destination_info: editData.additional_destination_info || undefined,
       };
 
       const response = await api.put(
@@ -207,12 +259,12 @@ const ClientInvoice = () => {
 
       if (response.data.success) {
         setInvoiceData({
-          ...invoiceData,
-          total_cost: response.data.data.total_cost || invoiceData.total_cost,
+          ...finalInvoiceData,
+          total_cost: response.data.data.total_cost || finalInvoiceData.total_cost,
           invoice_num:
-            response.data.data.invoice_num || invoiceData.invoice_num,
+            response.data.data.invoice_num || finalInvoiceData.invoice_num,
           additional_destination_info: 
-            response.data.data.additional_destination_info || invoiceData.additional_destination_info, // New field
+            response.data.data.additional_destination_info || finalInvoiceData.additional_destination_info,
         });
         setIsEditMode(false);
         setShowConfirmDialog(false);
@@ -230,12 +282,12 @@ const ClientInvoice = () => {
   };
 
   const calculateVAT = (amount) => {
-    if (invoiceData?.invoice?.vat_amount !== undefined) {
-      return Number(invoiceData.invoice.vat_amount);
+    if (finalInvoiceData?.invoice?.vat_amount !== undefined) {
+      return Number(finalInvoiceData.invoice.vat_amount);
     }
 
-    if (invoiceData?.vat !== undefined && invoiceData?.vat !== null && amount) {
-      const vatRate = Number(invoiceData.vat) / 100;
+    if (finalInvoiceData?.vat !== undefined && finalInvoiceData?.vat !== null && amount) {
+      const vatRate = Number(finalInvoiceData.vat) / 100;
       return amount * vatRate;
     }
 
@@ -246,7 +298,7 @@ const ClientInvoice = () => {
     setPdfLoading(true);
 
     try {
-      const containers = invoiceData.containers || [];
+      const containers = finalInvoiceData.containers || [];
       const isCompactLayout = true;
 
       // Create new PDF document
@@ -286,18 +338,18 @@ const ClientInvoice = () => {
       // Company Header
       doc.setFontSize(fonts.title);
       doc.setFont("helvetica", "bold");
-      doc.text(invoiceData.companyname || "", margins.left, currentY);
+      doc.text(finalInvoiceData.companyname || "", margins.left, currentY);
       currentY += isCompactLayout ? 6 : 8;
 
       // Company Details
       doc.setFontSize(fonts.small);
       doc.setFont("helvetica", "normal");
       const companyDetails = [
-        invoiceData.cluster_box,
-        invoiceData.address,
-        invoiceData.suburb,
-        `VAT Reg No: ${invoiceData.vat_reg_num}`,
-        `Cellphone: ${invoiceData.phonenumber}`,
+        finalInvoiceData.cluster_box,
+        finalInvoiceData.address,
+        finalInvoiceData.suburb,
+        `VAT Reg No: ${finalInvoiceData.vat_reg_num}`,
+        `Cellphone: ${finalInvoiceData.phonenumber}`,
       ].filter(Boolean);
 
       companyDetails.forEach((detail) => {
@@ -316,7 +368,7 @@ const ClientInvoice = () => {
       doc.setFontSize(fonts.normal);
       doc.setFont("helvetica", "normal");
       doc.text(
-        `Document No: ${invoiceData.doc_num}`,
+        `Document No: ${finalInvoiceData.doc_num}`,
         pageWidth - margins.right,
         currentY,
         { align: "right" }
@@ -326,13 +378,13 @@ const ClientInvoice = () => {
       // Client Details
       doc.setFontSize(fonts.small);
       const clientDetails = [
-        invoiceData.client_name,
-        invoiceData.client_address,
-        invoiceData.client_suburb,
-        `Telephone: ${invoiceData.client_telephone}`,
-        `Date: ${formatDate(invoiceData.date)}`,
-        `Email: ${invoiceData.client_email}`,
-        `VAT Reg No: ${invoiceData.client_vat}`,
+        finalInvoiceData.client_name,
+        finalInvoiceData.client_address,
+        finalInvoiceData.client_suburb,
+        `Telephone: ${finalInvoiceData.client_telephone}`,
+        `Date: ${formatDate(finalInvoiceData.date)}`,
+        `Email: ${finalInvoiceData.client_email}`,
+        `VAT Reg No: ${finalInvoiceData.client_vat}`,
       ].filter(Boolean);
 
       clientDetails.forEach((detail) => {
@@ -343,14 +395,14 @@ const ClientInvoice = () => {
       currentY += isCompactLayout ? 8 : 10;
 
       // Destination Table - Updated to include additional destination info
-      const destinationRoute = `${invoiceData.pickup || ""} to ${
-        invoiceData.dropoff || ""
+      const destinationRoute = `${finalInvoiceData.pickup || ""} to ${
+        finalInvoiceData.dropoff || ""
       }`;
       const destinationData = [["Destination", destinationRoute]];
       
       // Add additional destination info if it exists
-      if (invoiceData.additional_destination_info) {
-        destinationData.push(["Additional Info", invoiceData.additional_destination_info]);
+      if (finalInvoiceData.additional_destination_info) {
+        destinationData.push(["Additional Info", finalInvoiceData.additional_destination_info]);
       }
 
       autoTable(doc, {
@@ -374,10 +426,10 @@ const ClientInvoice = () => {
 
       // Invoice Details Table
       const invoiceDetailsData = [
-        ["Booking Ref", invoiceData.booking_ref || ""],
-        ["File Number", invoiceData.file_no || ""],
-        ["Description", invoiceData.description || ""],
-        ["Vessel/Ref", invoiceData.vessel_name || ""],
+        ["Booking Ref", finalInvoiceData.booking_ref || ""],
+        ["File Number", finalInvoiceData.file_no || ""],
+        ["Description", finalInvoiceData.description || ""],
+        ["Vessel/Ref", finalInvoiceData.vessel_name || ""],
       ];
 
       autoTable(doc, {
@@ -519,8 +571,8 @@ const ClientInvoice = () => {
       currentY = doc.lastAutoTable.finalY + (isCompactLayout ? 8 : 10);
 
       // Calculate invoice values - FIXED
-      const amount = invoiceData.total_cost || 0;
-      const vatRate = invoiceData.vat ? (Number(invoiceData.vat) / 100) : 0;
+      const amount = finalInvoiceData.total_cost || 0;
+      const vatRate = finalInvoiceData.vat ? (Number(finalInvoiceData.vat) / 100) : 0;
       const vat = amount * vatRate;
       const total = amount + vat;
 
@@ -528,7 +580,7 @@ const ClientInvoice = () => {
       const summaryHeaders = ["Description", "Amount"];
       const summaryData = [
         ["Amount (excl. VAT)", formatCurrency(amount)],
-        ...(vat > 0 ? [["VAT (" + invoiceData.vat + "%)", formatCurrency(vat)]] : []),
+        ...(vat > 0 ? [["VAT (" + finalInvoiceData.vat + "%)", formatCurrency(vat)]] : []),
         ["Total Amount", formatCurrency(total)],
       ];
 
@@ -582,12 +634,12 @@ const ClientInvoice = () => {
       doc.setFont("helvetica", "normal");
       
       const bankingDetails = [
-        `Account Name: ${invoiceData.name_of_acc || ""}`,
-        `Bank Name: ${invoiceData.bank || ""}`,
-        `Account Number: ${invoiceData.account_num || ""}`,
-        `Branch Code: ${invoiceData.branch_code || ""}`,
-        `SWIFT Code: ${invoiceData.swift_code || ""}`,
-        `Reference: ${invoiceData.invoice_num || ""}`,
+        `Account Name: ${finalInvoiceData.name_of_acc || ""}`,
+        `Bank Name: ${finalInvoiceData.bank || ""}`,
+        `Account Number: ${finalInvoiceData.account_num || ""}`,
+        `Branch Code: ${finalInvoiceData.branch_code || ""}`,
+        `SWIFT Code: ${finalInvoiceData.swift_code || ""}`,
+        `Reference: ${finalInvoiceData.invoice_num || ""}`,
       ].filter(Boolean);
 
       bankingDetails.forEach((detail) => {
@@ -609,13 +661,15 @@ const ClientInvoice = () => {
       
       doc.setFont("helvetica", "normal");
       doc.text(
-        `Thank you for choosing ${invoiceData.companyname || ""}.`,
+        `Thank you for choosing ${finalInvoiceData.companyname || ""}.`,
         margins.left,
         currentY
       );
 
       // Save the PDF
-      const fileName = `Invoice_${invoiceData.invoice_num || invoiceData.doc_num || 'NO'}_${formatDate(invoiceData.date)}.pdf`;
+      const fileName = isPreviewMode || isPreview 
+        ? `Invoice_Preview_${finalInvoiceData.invoice_num || instructionId || 'NO'}_${formatDate(finalInvoiceData.date)}.pdf`
+        : `Invoice_${finalInvoiceData.invoice_num || finalInvoiceData.doc_num || 'NO'}_${formatDate(finalInvoiceData.date)}.pdf`;
       doc.save(fileName);
 
     } catch (error) {
@@ -626,9 +680,94 @@ const ClientInvoice = () => {
     }
   };
 
-  if (loading) {
+  // UPDATED: Action buttons rendering
+  const renderActionButtons = () => {
+    if (isPreviewMode || isPreview) {
+      return (
+        <div className={`invoicedownloadbtn1 ${isPreview ? 'preview-mode' : ''}`}>
+          <div className="preview-controls">
+            <button
+              className="preview-back-btn"
+              onClick={onClosePreview || (() => setIsPreviewMode(false))}
+              disabled={pdfLoading}
+            >
+              ← Back to Documents
+            </button>
+            <button
+              className="preview-download-btn"
+              onClick={generatePDF}
+              disabled={pdfLoading}
+            >
+              {pdfLoading ? "Generating PDF..." : "📄 Download PDF"}
+            </button>
+            {!isPreview && (
+              <button
+                className="preview-edit-btn"
+                onClick={() => {
+                  setIsPreviewMode(false);
+                }}
+                disabled={pdfLoading}
+              >
+                ✏️ Edit Invoice
+              </button>
+            )}
+          </div>
+        </div>
+      );
+    }
+
+    // Existing non-preview buttons
     return (
-      <div className="client-invoice-wrapper">
+      <div className="invoicedownloadbtn1">
+        {canEdit && (
+          <button className="edit-btn" onClick={handleEditClick}>
+            Edit
+          </button>
+        )}
+        <button
+          className="back-btn"
+          onClick={() => {
+            if (roleId == 3) {
+              navigate("/invoices", {
+                state: {
+                  clientId,
+                  clientName,
+                },
+              });
+            } else if (roleId == 4) {
+              navigate("/DirectorClientDocuments", {
+                state: {
+                  clientId: finalInvoiceData.m5clientkey,
+                  clientName: finalInvoiceData.client_name,
+                },
+              });
+            } else if (roleId == 1) {
+              navigate("/client-documents", {
+                state: {
+                  clientId: finalInvoiceData.m5clientkey,
+                  clientName: finalInvoiceData.client_name,
+                },
+              });
+            }
+          }}
+          disabled={pdfLoading}
+        >
+          Back
+        </button>
+        <button
+          className="download-btn"
+          onClick={generatePDF}
+          disabled={pdfLoading}
+        >
+          {pdfLoading ? "Generating PDF..." : "Download PDF"}
+        </button>
+      </div>
+    );
+  };
+
+  if (loading && !previewData) {
+    return (
+      <div className={`client-invoice-wrapper ${isPreview ? 'preview-mode' : ''}`}>
         <div className="invoice-page">
           <div className="loading">Loading invoice...</div>
         </div>
@@ -636,9 +775,9 @@ const ClientInvoice = () => {
     );
   }
 
-  if (error) {
+  if (error && !previewData) {
     return (
-      <div className="client-invoice-wrapper">
+      <div className={`client-invoice-wrapper ${isPreview ? 'preview-mode' : ''}`}>
         <div className="invoice-page">
           <div className="loading-error">{error}</div>
           <div className="invoicedownloadbtn1">
@@ -651,9 +790,9 @@ const ClientInvoice = () => {
     );
   }
 
-  if (!invoiceData) {
+  if (!finalInvoiceData) {
     return (
-      <div className="client-invoice-wrapper">
+      <div className={`client-invoice-wrapper ${isPreview ? 'preview-mode' : ''}`}>
         <div className="invoice-page">
           <div className="loading-error">No invoice data found.</div>
           <div className="invoicedownloadbtn1">
@@ -666,34 +805,39 @@ const ClientInvoice = () => {
     );
   }
 
-  const amount = invoiceData.invoice?.amount || invoiceData.total_cost || 0;
+  const amount = finalInvoiceData.invoice?.amount || finalInvoiceData.total_cost || 0;
   const vat = calculateVAT(amount);
-  const total = invoiceData.invoice?.total_amount || amount + vat;
+  const total = finalInvoiceData.invoice?.total_amount || amount + vat;
   const roleId = JSON.parse(localStorage.getItem("user")).roleid;
 
-  const containers = invoiceData.containers || [];
+  const containers = finalInvoiceData.containers || [];
 
   return (
-    <div className="client-invoice-wrapper">
+    <div className={`client-invoice-wrapper ${isPreview ? 'preview-mode' : ''}`} ref={componentRef}>
+      {isPreview && (
+        <div className="preview-mode-indicator">
+          👁️ PREVIEW MODE
+        </div>
+      )}
       <div className="invoice-page">
         <div className="invoice-paper" ref={invoiceRef}>
           {/* Transport and Logistics section */}
           <div className="transport-section">
-            <div className="section-title">{invoiceData.companyname}</div>
+            <div className="section-title">{finalInvoiceData.companyname}</div>
           </div>
 
           {/* Middle section with company details */}
           <div className="middle-section">
             <div className="company-info">
-              {invoiceData.cluster_box}
+              {finalInvoiceData.cluster_box}
               <br />
-              {invoiceData.address}
+              {finalInvoiceData.address}
               <br />
-              {invoiceData.suburb}
+              {finalInvoiceData.suburb}
               <br />
-              VAT Reg No: {invoiceData.vat_reg_num}
+              VAT Reg No: {finalInvoiceData.vat_reg_num}
               <br />
-              Cellphone: {invoiceData.phonenumber}
+              Cellphone: {finalInvoiceData.phonenumber}
             </div>
           </div>
 
@@ -701,30 +845,30 @@ const ClientInvoice = () => {
           <div className="invoice-title-section">
             <div className="invoice-title">Tax Invoice</div>
             <div className="document-number">
-              Document No: {invoiceData.doc_num}
+              Document No: {finalInvoiceData.doc_num}
             </div>
           </div>
 
           {/* Sender Details */}
           <div className="sender-details">
-            <div>{invoiceData.client_name}</div>
-            <div>{invoiceData.client_address}</div>
-            <div>{invoiceData.client_suburb}</div>
-            <div>Telephone: {invoiceData.client_telephone}</div>
-            <div>Date: {formatDate(invoiceData.date)}</div>
-            <div>Email: {invoiceData.client_email}</div>
-            <div>VAT Reg No: {invoiceData.client_vat}</div>
+            <div>{finalInvoiceData.client_name}</div>
+            <div>{finalInvoiceData.client_address}</div>
+            <div>{finalInvoiceData.client_suburb}</div>
+            <div>Telephone: {finalInvoiceData.client_telephone}</div>
+            <div>Date: {formatDate(finalInvoiceData.date)}</div>
+            <div>Email: {finalInvoiceData.client_email}</div>
+            <div>VAT Reg No: {finalInvoiceData.client_vat}</div>
           </div>
 
           {/* Vessel/Ref and Destination - Updated */}
           <div className="vessel-destination">
-            <div className="vessel">Starting: {invoiceData.pickup}</div>
+            <div className="vessel">Starting: {finalInvoiceData.pickup}</div>
             <div className="destination" id="destination">
               <div className="dropoff-row">
                 <div className="dropoff" id="dropoff">
-                  Destination: {invoiceData.dropoff}
+                  Destination: {finalInvoiceData.dropoff}
                 </div>
-                {isEditMode && (
+                {!isPreviewMode && !isPreview && isEditMode && (
                   <div className="additional-destination-edit">
                     <span className="additional-label">Additional:</span>
                     <input
@@ -737,9 +881,9 @@ const ClientInvoice = () => {
                   </div>
                 )}
               </div>
-              {!isEditMode && invoiceData.additional_destination_info && (
+              {!isEditMode && finalInvoiceData.additional_destination_info && (
                 <div className="additional-destination-display">
-                  Additional: {invoiceData.additional_destination_info}
+                  Additional: {finalInvoiceData.additional_destination_info}
                 </div>
               )}
             </div>
@@ -751,19 +895,19 @@ const ClientInvoice = () => {
               <tbody>
                 <tr>
                   <td className="label">Booking Ref</td>
-                  <td className="value">{invoiceData.booking_ref}</td>
+                  <td className="value">{finalInvoiceData.booking_ref}</td>
                 </tr>
                 <tr>
                   <td className="label">File Number</td>
-                  <td className="value">{invoiceData.file_no}</td>
+                  <td className="value">{finalInvoiceData.file_no}</td>
                 </tr>
                 <tr>
                   <td className="label">Description</td>
-                  <td className="value">{invoiceData.description}</td>
+                  <td className="value">{finalInvoiceData.description}</td>
                 </tr>
                 <tr>
                   <td className="label">Vessel/Ref</td>
-                  <td className="value">{invoiceData.vessel_name}</td>
+                  <td className="value">{finalInvoiceData.vessel_name}</td>
                 </tr>
               </tbody>
             </table>
@@ -913,7 +1057,7 @@ const ClientInvoice = () => {
                     <tr>
                       <td className="summary-label">Amount (excl. VAT)</td>
                       <td className="summary-value">
-                        {isEditMode ? (
+                        {isEditMode && !isPreviewMode && !isPreview ? (
                           <input
                             type="text"
                             value={editData.amount}
@@ -931,7 +1075,7 @@ const ClientInvoice = () => {
                     {vat > 0 && (
                       <tr>
                         <td className="summary-label">
-                          VAT ({invoiceData.vat}%)
+                          VAT ({finalInvoiceData.vat}%)
                         </td>
                         <td className="summary-value">{formatCurrency(vat)}</td>
                       </tr>
@@ -950,14 +1094,14 @@ const ClientInvoice = () => {
 
           {/* Banking Details */}
           <div className="banking-details">
-            <div>Account Name: {invoiceData.name_of_acc}</div>
-            <div>Bank Name: {invoiceData.bank}</div>
-            <div>Account Number: {invoiceData.account_num}</div>
-            <div>Branch Code: {invoiceData.branch_code}</div>
-            <div>SWIFT Code: {invoiceData.swift_code}</div>
+            <div>Account Name: {finalInvoiceData.name_of_acc}</div>
+            <div>Bank Name: {finalInvoiceData.bank}</div>
+            <div>Account Number: {finalInvoiceData.account_num}</div>
+            <div>Branch Code: {finalInvoiceData.branch_code}</div>
+            <div>SWIFT Code: {finalInvoiceData.swift_code}</div>
             <div className="invoice-number-value">
               Reference:
-              {isEditMode ? (
+              {isEditMode && !isPreviewMode && !isPreview ? (
                 <input
                   type="text"
                   value={editData.invoice_num}
@@ -969,7 +1113,7 @@ const ClientInvoice = () => {
                 />
               ) : (
                 <div className="invoice-num" id="invoice_num">
-                  {invoiceData.invoice_num}
+                  {finalInvoiceData.invoice_num}
                 </div>
               )}
             </div>
@@ -978,12 +1122,12 @@ const ClientInvoice = () => {
               payment.
             </div>
             <div className="thank-you">
-              Thank you for choosing {invoiceData.companyname}.
+              Thank you for choosing {finalInvoiceData.companyname}.
             </div>
           </div>
         </div>
 
-        {showConfirmDialog && (
+        {showConfirmDialog && !isPreviewMode && !isPreview && (
           <div className="confirmation-dialog-overlay">
             <div className="confirmation-dialog">
               <h3>Confirm Changes</h3>
@@ -1008,74 +1152,32 @@ const ClientInvoice = () => {
           </div>
         )}
 
-        <div className="invoicedownloadbtn1">
-          {isEditMode ? (
-            <div className="edit-controls">
-              {saveError && <div className="error-message">{saveError}</div>}
-              <button
-                className="cancel-edit-btn"
-                onClick={handleCancelEdit}
-                disabled={saveLoading}
-              >
-                Cancel
-              </button>
-              <button
-                className="save-btn"
-                onClick={handleSaveClick}
-                disabled={saveLoading}
-              >
-                {saveLoading ? "Saving..." : "Save Changes"}
-              </button>
-            </div>
-          ) : (
-            <>
-              {roleId == 3 && (
-                <button className="edit-btn" onClick={handleEditClick}>
-                  Edit
-                </button>
-              )}
-              <button
-                className="back-btn"
-                onClick={() => {
-                  if (roleId == 3) {
-                    navigate("/invoices", {
-                      state: {
-                        clientId,
-                        clientName,
-                      },
-                    });
-                  } else if (roleId == 4) {
-                    navigate("/DirectorClientDocuments", {
-                      state: {
-                        clientId: invoiceData.m5clientkey,
-                        clientName: invoiceData.client_name,
-                      },
-                    });
-                  } else if (roleId == 1) {
-                    navigate("/client-documents", {
-                      state: {
-                        clientId: invoiceData.m5clientkey,
-                        clientName: invoiceData.client_name,
-                      },
-                    });
-                  }
-                }}
-              >
-                Back
-              </button>
-              <button
-                className="download-btn"
-                onClick={generatePDF}
-                disabled={pdfLoading}
-              >
-                {pdfLoading ? "Generating PDF..." : "Download PDF"}
-              </button>
-            </>
-          )}
-        </div>
+        {isEditMode && !isPreviewMode && !isPreview ? (
+          <div className="edit-controls">
+            {saveError && <div className="error-message">{saveError}</div>}
+            <button
+              className="cancel-edit-btn"
+              onClick={handleCancelEdit}
+              disabled={saveLoading}
+            >
+              Cancel
+            </button>
+            <button
+              className="save-btn"
+              onClick={handleSaveClick}
+              disabled={saveLoading}
+            >
+              {saveLoading ? "Saving..." : "Save Changes"}
+            </button>
+          </div>
+        ) : (
+          renderActionButtons()
+        )}
       </div>
     </div>
   );
-};
+});
+
+ClientInvoice.displayName = 'ClientInvoice';
 
 export default ClientInvoice;

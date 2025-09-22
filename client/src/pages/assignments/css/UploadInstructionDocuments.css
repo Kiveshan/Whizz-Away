@@ -370,6 +370,53 @@
   cursor: not-allowed;
 }
 
+/* Action buttons row for Preview + Finish */
+.action-buttons {
+  display: flex;
+  justify-content: flex-end;
+  gap: 12px;
+  margin-top: 16px;
+}
+
+.action-buttons .preview-btn,
+.action-buttons .finish-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 10px 16px;
+  font-size: 14px;
+  border-radius: 6px;
+  border: none;
+}
+
+.action-buttons .preview-btn {
+  background-color: #f3f4f6;
+  color: #374151;
+}
+
+.action-buttons .preview-btn:hover {
+  background-color: #e5e7eb;
+}
+
+/* Override finish button when inside the action row */
+.action-buttons .finish-btn {
+  background-color: #4169e1;
+  color: #ffffff;
+  width: auto;
+  margin: 0;
+}
+
+.action-buttons .finish-btn:hover {
+  background-color: #3050b5;
+}
+
+.action-buttons .finish-btn:disabled,
+.action-buttons .preview-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
 /* Modal styling */
 .modal-wrapper {
   position: fixed;

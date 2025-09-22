@@ -942,3 +942,126 @@
   background-color: #f8f9fa;
   font-style: italic;
 }
+
+/* Add these styles to your existing InvoiceTemplate.css */
+
+/* Preview mode styles */
+.client-invoice-wrapper.preview-mode {
+  background: #f8fafc;
+  padding: 10px;
+  border-radius: 8px;
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.05);
+}
+
+.client-invoice-wrapper.preview-mode .invoice-page {
+  padding: 0;
+}
+
+.client-invoice-wrapper.preview-mode .invoicedownloadbtn1.preview-mode {
+  background: #f8fafc;
+  padding: 20px;
+  border-top: 1px solid #e5e7eb;
+  border-radius: 0 0 12px 12px;
+  margin: 0;
+  justify-content: center;
+}
+
+.preview-controls {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  flex-wrap: wrap;
+  justify-content: center;
+}
+
+.preview-back-btn,
+.preview-download-btn,
+.preview-edit-btn {
+  padding: 10px 20px;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 600;
+  transition: all 0.2s ease;
+  text-decoration: none;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 44px;
+}
+
+.preview-back-btn {
+  background: #6b7280;
+  color: white;
+}
+
+.preview-back-btn:hover {
+  background: #4b5563;
+  transform: translateY(-1px);
+}
+
+.preview-download-btn {
+  background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+  color: white;
+  box-shadow: 0 2px 8px rgba(16, 185, 129, 0.2);
+}
+
+.preview-download-btn:hover:not(:disabled) {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(16, 185, 129, 0.3);
+}
+
+.preview-download-btn:disabled {
+  background: #9ca3af;
+  cursor: not-allowed;
+  opacity: 0.7;
+}
+
+.preview-edit-btn {
+  background: linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%);
+  color: white;
+  box-shadow: 0 2px 8px rgba(59, 130, 246, 0.2);
+}
+
+.preview-edit-btn:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(59, 130, 246, 0.3);
+}
+
+/* Responsive preview controls */
+@media (max-width: 768px) {
+  .preview-controls {
+    flex-direction: column;
+    gap: 10px;
+    width: 100%;
+  }
+  
+  .preview-back-btn,
+  .preview-download-btn,
+  .preview-edit-btn {
+    width: 100%;
+    max-width: 280px;
+    justify-content: center;
+  }
+}
+
+/* Preview mode indicator */
+.preview-mode-indicator {
+  position: absolute;
+  top: 20px;
+  right: 20px;
+  background: rgba(79, 70, 229, 0.9);
+  color: white;
+  padding: 6px 12px;
+  border-radius: 20px;
+  font-size: 12px;
+  font-weight: 600;
+  z-index: 10;
+  animation: pulse 2s infinite;
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.7; }
+}

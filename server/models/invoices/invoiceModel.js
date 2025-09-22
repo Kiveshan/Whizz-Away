@@ -574,6 +574,178 @@ const createInvoice = async ({ m1key, clientId }) => {
 };
 
 
+// Helper function to get instruction details for preview
+const getInstructionDetailsForPreview = async (instructionId) => {
+  try {
+    if (!pool) {
+      throw new Error("Database connection not established");
+    }
+
+    const client = await pool.connect();
+
+    try {
+      // Get m1_controller details
+      const m1Query = `
+        SELECT 
+          m1.m1key,
+          m1."ksmFileRef" as instruction_no,
+          m1."clientFileRef" as file_no,
+          m1.description,
+          m1.total_cost,
+          m1.vat,
+          m1.booking_ref,
+          m1.pickup,
+          m1.dropoff,
+          m1.vessel_name,
+          m1.rateper_6,
+          m1.rateper_12,
+          m1.rateper_abnormal,
+          c.client as client_name,
+          c.m5clientkey,
+          c.companyaddress as client_address,
+          c.cellnum as client_telephone,
+          c.email as client_email,
+          c.vatregno as client_vat,
+          c.suburb as client_suburb,
+          s.shipmenttype as shipment_type,
+          COALESCE(m1.num_six_meters, 0) + COALESCE(m1.num_twelve_meters, 0) + COALESCE(m1.num_abnormal, 0) as num_containers
+        FROM public.m1_controller m1
+        LEFT JOIN public.m5_client c ON m1.client = c.m5clientkey
+        LEFT JOIN public.shipment s ON m1.shipment_type = s.shipkey
+        WHERE m1.m1key = $1
+      `;
+      
+      const m1Result = await client.query(m1Query, [instructionId]);
+      
+      if (m1Result.rows.length === 0) {
+        return { success: false, message: "Instruction not found" };
+      }
+
+      // Get containers
+      const containerQuery = `
+        SELECT 
+          c.containernum as container_number,
+          c.weight,
+          c.container_type,
+          c.cargo_description,
+          c."Add Surcharges" as add_surcharges,
+          c."Hazardous" as hazardous,
+          c."Surcharge Amount" as surcharge_amount,
+          c."Hazardous Amount" as hazardous_amount,
+          c."vgm amount" as vgm_amount,
+          c.vgm
+        FROM public.container c
+        WHERE c.m1key = $1
+        ORDER BY c.containernum
+      `;
+      
+      const containerResult = await client.query(containerQuery, [instructionId]);
+
+      // Get company details (same as regular invoice)
+      const companyQuery = `
+        SELECT 
+          cluster_box,
+          vat_reg_num,
+          address,
+          suburb,
+          branch_code,
+          bank,
+          name_of_acc,
+          companyname,
+          swift_code,
+          account_num,
+          COALESCE(cell_num, cell_num2) AS phonenumber
+        FROM usertable 
+        WHERE roleid = 1 AND status = 'active'
+        LIMIT 1
+      `;
+      
+      const companyResult = await client.query(companyQuery);
+
+      const baseRates = {
+        rateper_6: m1Result.rows[0].rateper_6 || 0,
+        rateper_12: m1Result.rows[0].rateper_12 || 0,
+        rateper_abnormal: m1Result.rows[0].rateper_abnormal || 0,
+      };
+
+      // Process containers with rate logic (same as regular processing)
+      const containerMap = new Map();
+      containerResult.rows.forEach(row => {
+        const containerNum = row.container_number;
+        if (!containerMap.has(containerNum)) {
+          let containerType = 'abnormal';
+          if (row.container_type && row.container_type.toLowerCase().includes('20') || 
+              row.container_type.toLowerCase().includes('6')) {
+            containerType = '6';
+          } else if (row.container_type && row.container_type.toLowerCase().includes('40') || 
+                     row.container_type.toLowerCase().includes('12')) {
+            containerType = '12';
+          }
+
+          let displayRate = 0;
+          const hasSpecialRate = 
+            row.surcharge_amount > 0 || 
+            row.hazardous_amount > 0 || 
+            row.vgm_amount > 0;
+
+          if (hasSpecialRate) {
+            displayRate = Math.max(
+              row.surcharge_amount || 0,
+              row.hazardous_amount || 0,
+              row.vgm_amount || 0
+            );
+          } else {
+            displayRate = baseRates[`rateper_${containerType}`] || 0;
+          }
+
+          containerMap.set(containerNum, {
+            container_number: row.container_number,
+            weight: row.weight,
+            container_type: row.container_type || 'Standard',
+            container_type_key: containerType,
+            cargo_description: row.cargo_description,
+            add_surcharges: row.add_surcharges || false,
+            hazardous: row.hazardous || false,
+            surcharge_amount: row.surcharge_amount || 0,
+            hazardous_amount: row.hazardous_amount || 0,
+            vgm: row.vgm || false,
+            vgm_amount: row.vgm_amount || 0,
+            truckregnumber: null,
+            rate_per_container: displayRate,
+            leg_rate: 0,
+            base_rate: baseRates[`rateper_${containerType}`] || 0,
+            has_special_rate: hasSpecialRate,
+            leg_date: null
+          });
+        }
+      });
+
+      const containers = Array.from(containerMap.values());
+
+      return {
+        success: true,
+        data: {
+          ...m1Result.rows[0],
+          containers,
+          base_rates: baseRates,
+          // Add company details
+          ...companyResult.rows[0],
+          // Add preview metadata
+          is_preview: true,
+          preview_instruction_id: instructionId,
+          preview_generated_at: new Date().toISOString()
+        }
+      };
+
+    } finally {
+      client.release();
+    }
+  } catch (error) {
+    console.error("Error getting instruction details for preview:", error);
+    return { success: false, message: error.message };
+  }
+};
+
 
 export {
   getCompletedInvoices,
@@ -582,4 +754,5 @@ export {
   checkInvoiceNumExists,
   createInvoice,
   updateInstructionDetails,
+  getInstructionDetailsForPreview,
 };
