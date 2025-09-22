@@ -131,6 +131,48 @@
   border-right: 1px solid #000;
 }
 
+/* Additional destination styles */
+.dropoff-row {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.additional-destination-display {
+  font-size: 13px;
+  color: #666;
+  font-style: italic;
+  margin-top: 5px;
+  padding: 4px 8px;
+  background-color: #f8f9fa;
+  border-radius: 3px;
+  border-left: 3px solid #007bff;
+}
+
+.additional-destination-edit {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 5px;
+  padding: 5px;
+  background-color: #f8f9fa;
+  border-radius: 3px;
+  border: 1px solid #dee2e6;
+}
+
+.additional-label {
+  font-weight: bold;
+  color: #495057;
+  font-size: 12px;
+  white-space: nowrap;
+}
+
+.additional-destination-input {
+  flex: 1;
+  min-width: 200px;
+  max-width: 100%;
+}
+
 /* Invoice Details */
 .invoice-details {
   margin: 15px 0 0 0; /* Added top margin to move table down */
@@ -256,9 +298,39 @@
   min-width: 60px;
   text-align: right;
   padding-right: 4px;
+  position: relative;
 }
 
-.container-table5 .surcharge-header,
+.container-table5 .rate::after {
+  content: '';
+  position: absolute;
+  right: -4px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 0;
+  height: 0;
+  border-left: 4px solid transparent;
+  border-right: 4px solid transparent;
+  border-top: 4px solid #007bff;
+  opacity: 0;
+  transition: opacity 0.2s;
+}
+
+.container-table5 .rate:hover::after {
+  opacity: 1;
+}
+
+.container-table5 .rate[title]:hover::after {
+  border-top-color: #dc3545;
+}
+
+.container-table5 .surcharge-header {
+  width: 8%;
+  min-width: 60px;
+  text-align: center;
+  font-weight: bold;
+}
+
 .container-table5 .surcharge {
   width: 8%;
   min-width: 60px;
@@ -266,7 +338,13 @@
   padding-right: 4px;
 }
 
-.container-table5 .hazardous-header,
+.container-table5 .hazardous-header {
+  width: 8%;
+  min-width: 60px;
+  text-align: center;
+  font-weight: bold;
+}
+
 .container-table5 .hazardous {
   width: 8%;
   min-width: 60px;
@@ -274,7 +352,13 @@
   padding-right: 4px;
 }
 
-.container-table5 .vgm-header,
+.container-table5 .vgm-header {
+  width: 8%;
+  min-width: 60px;
+  text-align: center;
+  font-weight: bold;
+}
+
 .container-table5 .vgm {
   width: 8%;
   min-width: 60px;
@@ -354,6 +438,22 @@
     width: 10%;
     min-width: 45px;
     padding-right: 2px;
+    font-size: 9px;
+  }
+
+  /* Responsive adjustments for additional destination */
+  .additional-destination-edit {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 5px;
+  }
+  
+  .additional-destination-input {
+    min-width: auto;
+  }
+  
+  .additional-label {
+    text-align: center;
   }
 }
 
@@ -377,6 +477,59 @@
   text-align: center;
   margin-top: 15px;
   font-style: italic;
+}
+
+/* Invoice number specific styling */
+.invoice-number-value {
+  margin: 8px 0;
+  font-weight: bold;
+}
+
+.invoice-num {
+  font-family: monospace;
+  font-weight: bold;
+  margin-left: 10px;
+}
+
+/* Edit input styles */
+.edit-input {
+  border: 2px solid #007bff;
+  border-radius: 4px;
+  padding: 5px 8px;
+  font-size: 14px;
+  background-color: #f8f9fa;
+  transition: border-color 0.3s;
+  min-width: 100px;
+}
+
+.edit-input:focus {
+  outline: none;
+  border-color: #0056b3;
+  background-color: white;
+  box-shadow: 0 0 0 0.2rem rgba(0, 123, 255, 0.25);
+}
+
+.edit-input.additional-destination-input:focus {
+  border-color: #28a745;
+  background-color: white;
+  box-shadow: 0 0 0 0.2rem rgba(40, 167, 69, 0.25);
+}
+
+.client-invoice-wrapper .dropoff-input {
+  width: 100%;
+  margin-top: 5px;
+  max-width: 300px;
+}
+
+.client-invoice-wrapper .amount-input {
+  width: 120px;
+  text-align: right;
+}
+
+.client-invoice-wrapper .invoice-num-input {
+  width: 150px;
+  font-family: monospace;
+  font-size: 13px;
 }
 
 /* Wrapper-scoped styles for buttons and UI elements */
@@ -484,37 +637,6 @@
 
 .client-invoice-wrapper .cancel-edit-btn:hover:not(:disabled) {
   background-color: #545b62;
-}
-
-.client-invoice-wrapper .edit-input {
-  border: 2px solid #007bff;
-  border-radius: 4px;
-  padding: 5px 8px;
-  font-size: 14px;
-  background-color: #f8f9fa;
-  transition: border-color 0.3s;
-  min-width: 100px;
-}
-
-.client-invoice-wrapper .edit-input:focus {
-  outline: none;
-  border-color: #0056b3;
-  background-color: white;
-}
-
-.client-invoice-wrapper .dropoff-input {
-  width: 100%;
-  margin-top: 5px;
-  max-width: 300px;
-}
-
-.client-invoice-wrapper .amount-input {
-  width: 120px;
-  text-align: right;
-}
-
-.client-invoice-wrapper .invoice-num-input {
-  width: 150px;
 }
 
 .client-invoice-wrapper .error-message {
@@ -813,92 +935,6 @@
   font-size: 16px;
   color: #666;
   font-family: inherit;
-}
-
-/* Invoice number specific styling */
-.invoice-number-value {
-  margin: 8px 0;
-  font-weight: bold;
-}
-
-.invoice-num {
-  font-family: monospace;
-  font-weight: bold;
-  margin-left: 10px;
-}
-
-/* Edit mode styling for invoice number input */
-.edit-input.invoice-num-input {
-  min-width: 150px;
-  font-family: monospace;
-  font-size: 13px;
-}
-
-/* Add these new styles to your existing InvoiceTemplate.css */
-
-/* Additional destination styles */
-.dropoff-row {
-  display: flex;
-  flex-direction: column;
-  gap: 5px;
-}
-
-.additional-destination-display {
-  font-size: 13px;
-  color: #666;
-  font-style: italic;
-  margin-top: 5px;
-  padding: 4px 8px;
-  background-color: #f8f9fa;
-  border-radius: 3px;
-  border-left: 3px solid #007bff;
-}
-
-.additional-destination-edit {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  margin-top: 5px;
-  padding: 5px;
-  background-color: #f8f9fa;
-  border-radius: 3px;
-  border: 1px solid #dee2e6;
-}
-
-.additional-label {
-  font-weight: bold;
-  color: #495057;
-  font-size: 12px;
-  white-space: nowrap;
-}
-
-.additional-destination-input {
-  flex: 1;
-  min-width: 200px;
-  max-width: 100%;
-}
-
-.edit-input.additional-destination-input:focus {
-  border-color: #28a745;
-  background-color: white;
-  box-shadow: 0 0 0 0.2rem rgba(40, 167, 69, 0.25);
-}
-
-/* Responsive adjustments */
-@media (max-width: 768px) {
-  .additional-destination-edit {
-    flex-direction: column;
-    align-items: stretch;
-    gap: 5px;
-  }
-  
-  .additional-destination-input {
-    min-width: auto;
-  }
-  
-  .additional-label {
-    text-align: center;
-  }
 }
 
 /* PDF-specific styles for additional destination */

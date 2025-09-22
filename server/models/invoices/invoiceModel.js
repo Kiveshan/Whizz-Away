@@ -97,6 +97,10 @@ const getInvoiceDetails = async (id) => {
         m1.pickup,
         m1.dropoff,
         m1.vessel_name,
+        -- Base rates from m1_controller
+        m1.rateper_6,
+        m1.rateper_12,
+        m1.rateper_abnormal,
         i.invoice_num,
         i.doc_num,
         i.date,
@@ -132,6 +136,13 @@ const getInvoiceDetails = async (id) => {
       return { success: false, message: "Instruction not found" };
     }
 
+    // Get the base rates from the result
+    const baseRates = {
+      rateper_6: result.rows[0].rateper_6 || 0,
+      rateper_12: result.rows[0].rateper_12 || 0,
+      rateper_abnormal: result.rows[0].rateper_abnormal || 0,
+    };
+
     // Updated container query to include all new fields and truck information
     const containerQuery = `
       SELECT 
@@ -146,7 +157,7 @@ const getInvoiceDetails = async (id) => {
         c."vgm amount" as vgm_amount,
         c.vgm,
         l.truckregnumber,
-        l.driverrate as rate_per_container,
+        l.driverrate as leg_rate,
         l.date as leg_date,
         ROW_NUMBER() OVER (PARTITION BY c.containernum ORDER BY l.date DESC) as rn
       FROM 
@@ -162,15 +173,48 @@ const getInvoiceDetails = async (id) => {
     
     const containerResult = await query(containerQuery, [id]);
     
-    // Process container data to get the most recent truck for each container
+    // Process container data to get the most recent truck for each container and determine the correct rate
     const containerMap = new Map();
     containerResult.rows.forEach(row => {
       const containerNum = row.container_number;
       if (!containerMap.has(containerNum)) {
+        // Determine the container type for base rate lookup
+        let containerType = 'abnormal'; // default
+        if (row.container_type && row.container_type.toLowerCase().includes('20') || 
+            row.container_type.toLowerCase().includes('6')) {
+          containerType = '6';
+        } else if (row.container_type && row.container_type.toLowerCase().includes('40') || 
+                   row.container_type.toLowerCase().includes('12')) {
+          containerType = '12';
+        }
+
+        // Determine the rate to use - prioritize special rates, then leg rate, then base rate
+        let displayRate = 0;
+        const hasSpecialRate = 
+          row.surcharge_amount > 0 || 
+          row.hazardous_amount > 0 || 
+          row.vgm_amount > 0;
+
+        if (hasSpecialRate) {
+          // Use the highest special rate
+          displayRate = Math.max(
+            row.surcharge_amount || 0,
+            row.hazardous_amount || 0,
+            row.vgm_amount || 0
+          );
+        } else if (row.leg_rate && row.rn === 1) {
+          // Use leg rate if available and it's the most recent leg
+          displayRate = row.leg_rate;
+        } else {
+          // Use base rate based on container type
+          displayRate = baseRates[`rateper_${containerType}`] || 0;
+        }
+
         containerMap.set(containerNum, {
           container_number: row.container_number,
           weight: row.weight,
-          container_type: row.container_type,
+          container_type: row.container_type || 'Standard',
+          container_type_key: containerType, // For reference
           cargo_description: row.cargo_description,
           add_surcharges: row.add_surcharges || false,
           hazardous: row.hazardous || false,
@@ -178,18 +222,23 @@ const getInvoiceDetails = async (id) => {
           hazardous_amount: row.hazardous_amount || 0,
           vgm: row.vgm || false,
           vgm_amount: row.vgm_amount || 0,
-          truckregnumber: row.truckregnumber || null,
-          rate_per_container: row.rate_per_container || 0,
-          leg_date: row.leg_date || null
+          truckregnumber: null,
+          rate_per_container: displayRate,
+          leg_rate: row.leg_rate || 0,
+          base_rate: baseRates[`rateper_${containerType}`] || 0,
+          has_special_rate: hasSpecialRate,
+          leg_date: null
         });
       }
+      
       // Only update truck info if this is the most recent leg (rn = 1)
       if (row.rn === 1 && row.truckregnumber) {
         const existing = containerMap.get(containerNum);
         containerMap.set(containerNum, {
           ...existing,
           truckregnumber: row.truckregnumber,
-          leg_date: row.leg_date
+          leg_date: row.leg_date,
+          rate_per_container: existing.has_special_rate ? existing.rate_per_container : (row.leg_rate || existing.base_rate)
         });
       }
     });
@@ -198,11 +247,19 @@ const getInvoiceDetails = async (id) => {
     console.log(
       `Container query returned ${containers.length} unique containers for invoice ID ${id}`
     );
+    console.log("Sample container rates:", containers.slice(0, 2).map(c => ({
+      container: c.container_number,
+      rate: c.rate_per_container,
+      has_special: c.has_special_rate,
+      base_rate: c.base_rate,
+      leg_rate: c.leg_rate
+    })));
 
     return {
       success: true,
       data: {
         ...result.rows[0],
+        base_rates: baseRates, // Include base rates for reference
         containers,
       },
     };
@@ -212,7 +269,6 @@ const getInvoiceDetails = async (id) => {
     if (client) client.release();
   }
 };
-
 // Update the updateInstructionDetails function to handle the new field
 const updateInstructionDetails = async ({
   m1key,
