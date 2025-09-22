@@ -239,361 +239,390 @@ const ClientInvoice = () => {
     return 0;
   };
 
-  const generatePDF = () => {
-    setPdfLoading(true);
+const generatePDF = () => {
+  setPdfLoading(true);
 
-    try {
-      const containers = invoiceData.containers || [];
-      const containerCount = containers.length;
-      const isCompactLayout = true;
+  try {
+    const containers = invoiceData.containers || [];
+    const isCompactLayout = true;
 
-      // Create new PDF document
-      const doc = new jsPDF({
-        orientation: "portrait",
-        unit: "mm",
-        format: "a4",
-      });
+    // Create new PDF document
+    const doc = new jsPDF({
+      orientation: "portrait",
+      unit: "mm",
+      format: "a4",
+    });
 
-      // Set up fonts and sizes based on layout
-      const fonts = isCompactLayout
-        ? {
-            title: 18,
-            header: 14,
-            normal: 11,
-            small: 10,
-            tiny: 9,
-          }
-        : {
-            title: 20,
-            header: 16,
-            normal: 12,
-            small: 11,
-            tiny: 10,
-          };
+    // Set up fonts and sizes based on layout
+    const fonts = isCompactLayout
+      ? {
+          title: 18,
+          header: 14,
+          normal: 11,
+          small: 10,
+          tiny: 9,
+        }
+      : {
+          title: 20,
+          header: 16,
+          normal: 12,
+          small: 11,
+          tiny: 10,
+        };
 
-      // Reduced margins for maximum space utilization
-      const margins = {
-        left: isCompactLayout ? 10 : 15,
-        right: isCompactLayout ? 10 : 15,
-        top: isCompactLayout ? 10 : 15,
-      };
+    // Reduced margins for maximum space utilization
+    const margins = {
+      left: isCompactLayout ? 10 : 15,
+      right: isCompactLayout ? 10 : 15,
+      top: isCompactLayout ? 10 : 15,
+    };
 
-      const pageWidth = doc.internal.pageSize.getWidth();
-      let currentY = margins.top;
+    const pageWidth = doc.internal.pageSize.getWidth();
+    let currentY = margins.top;
 
-      // Company Header
-      doc.setFontSize(fonts.title);
-      doc.setFont("helvetica", "bold");
-      doc.text(invoiceData.companyname || "", margins.left, currentY);
-      currentY += isCompactLayout ? 6 : 8;
+    // Company Header
+    doc.setFontSize(fonts.title);
+    doc.setFont("helvetica", "bold");
+    doc.text(invoiceData.companyname || "", margins.left, currentY);
+    currentY += isCompactLayout ? 6 : 8;
 
-      // Company Details
-      doc.setFontSize(fonts.small);
-      doc.setFont("helvetica", "normal");
-      const companyDetails = [
-        invoiceData.cluster_box,
-        invoiceData.address,
-        invoiceData.suburb,
-        `VAT Reg No: ${invoiceData.vat_reg_num}`,
-        `Cellphone: ${invoiceData.phonenumber}`,
-      ].filter(Boolean);
+    // Company Details
+    doc.setFontSize(fonts.small);
+    doc.setFont("helvetica", "normal");
+    const companyDetails = [
+      invoiceData.cluster_box,
+      invoiceData.address,
+      invoiceData.suburb,
+      `VAT Reg No: ${invoiceData.vat_reg_num}`,
+      `Cellphone: ${invoiceData.phonenumber}`,
+    ].filter(Boolean);
 
-      companyDetails.forEach((detail) => {
-        doc.text(detail, margins.left, currentY);
-        currentY += isCompactLayout ? 5 : 6;
-      });
+    companyDetails.forEach((detail) => {
+      doc.text(detail, margins.left, currentY);
+      currentY += isCompactLayout ? 5 : 6;
+    });
 
-      currentY += isCompactLayout ? 8 : 10;
+    currentY += isCompactLayout ? 8 : 10;
 
-      // Invoice Title and Document Number (side by side)
-      doc.setFontSize(fonts.header);
-      doc.setFont("helvetica", "bold");
-      doc.text("Tax Invoice", margins.left, currentY);
+    // Invoice Title and Document Number (side by side)
+    doc.setFontSize(fonts.header);
+    doc.setFont("helvetica", "bold");
+    doc.text("Tax Invoice", margins.left, currentY);
 
-      // Document number on the right side
-      doc.setFontSize(fonts.normal);
-      doc.setFont("helvetica", "normal");
-      doc.text(
-        `Document No: ${invoiceData.doc_num}`,
-        pageWidth - margins.right,
-        currentY,
-        { align: "right" }
-      );
-      currentY += isCompactLayout ? 12 : 15;
+    // Document number on the right side
+    doc.setFontSize(fonts.normal);
+    doc.setFont("helvetica", "normal");
+    doc.text(
+      `Document No: ${invoiceData.doc_num}`,
+      pageWidth - margins.right,
+      currentY,
+      { align: "right" }
+    );
+    currentY += isCompactLayout ? 12 : 15;
 
-      // Client Details
-      doc.setFontSize(fonts.small);
-      const clientDetails = [
-        invoiceData.client_name,
-        invoiceData.client_address,
-        invoiceData.client_suburb,
-        `Telephone: ${invoiceData.client_telephone}`,
-        `Date: ${formatDate(invoiceData.date)}`,
-        `Email: ${invoiceData.client_email}`,
-        `VAT Reg No: ${invoiceData.client_vat}`,
-      ].filter(Boolean);
+    // Client Details
+    doc.setFontSize(fonts.small);
+    const clientDetails = [
+      invoiceData.client_name,
+      invoiceData.client_address,
+      invoiceData.client_suburb,
+      `Telephone: ${invoiceData.client_telephone}`,
+      `Date: ${formatDate(invoiceData.date)}`,
+      `Email: ${invoiceData.client_email}`,
+      `VAT Reg No: ${invoiceData.client_vat}`,
+    ].filter(Boolean);
 
-      clientDetails.forEach((detail) => {
-        doc.text(detail, margins.left, currentY);
-        currentY += isCompactLayout ? 5 : 6;
-      });
+    clientDetails.forEach((detail) => {
+      doc.text(detail, margins.left, currentY);
+      currentY += isCompactLayout ? 5 : 6;
+    });
 
-      currentY += isCompactLayout ? 8 : 10;
+    currentY += isCompactLayout ? 8 : 10;
 
-      // Destination Table - Updated to include additional destination info
-      const destinationRoute = `${invoiceData.pickup || ""} to ${
-        invoiceData.dropoff || ""
-      }`;
-      const destinationData = [["Destination", destinationRoute]];
-      
-      // Add additional destination info if it exists
-      if (invoiceData.additional_destination_info) {
-        destinationData.push(["Additional Info", invoiceData.additional_destination_info]);
-      }
-
-      autoTable(doc, {
-        startY: currentY,
-        head: [],
-        body: destinationData,
-        theme: "grid",
-        styles: {
-          fontSize: fonts.small,
-          cellPadding: isCompactLayout ? 1.5 : 2.5,
-          lineWidth: 0.1,
-        },
-        columnStyles: {
-          0: { fontStyle: "bold", cellWidth: 35 },
-          1: { cellWidth: "auto" },
-        },
-        margin: { left: margins.left, right: margins.right },
-      });
-
-      currentY = doc.lastAutoTable.finalY + (isCompactLayout ? 5 : 7);
-
-      // Invoice Details Table
-      const invoiceDetailsData = [
-        ["Booking Ref", invoiceData.booking_ref || ""],
-        ["File Number", invoiceData.file_no || ""],
-        ["Description", invoiceData.description || ""],
-        ["Vessel/Ref", invoiceData.vessel_name || ""],
-      ];
-
-      autoTable(doc, {
-        startY: currentY,
-        head: [],
-        body: invoiceDetailsData,
-        theme: "grid",
-        styles: {
-          fontSize: fonts.small,
-          cellPadding: isCompactLayout ? 1.5 : 2.5,
-          lineWidth: 0.1,
-        },
-        columnStyles: {
-          0: { fontStyle: "bold", cellWidth: 35 },
-          1: { cellWidth: "auto" },
-        },
-        margin: { left: margins.left, right: margins.right },
-      });
-
-      currentY = doc.lastAutoTable.finalY + (isCompactLayout ? 5 : 7);
-
-      // Enhanced Container Table with all new columns
-      const hasWeights = containers.some(
-        (container) => container.weight && container.weight !== "N/A"
-      );
-      const hasSurcharges = containers.some(
-        (container) =>
-          container.add_surcharges || container.surcharge_amount > 0
-      );
-      const hasHazardous = containers.some(
-        (container) => container.hazardous || container.hazardous_amount > 0
-      );
-      const hasVGM = containers.some(
-        (container) => container.vgm || container.vgm_amount > 0
-      );
-      const hasTrucks = containers.some(
-        (container) => container.truckregnumber
-      );
-      const hasRates = containers.some(
-        (container) => container.rate_per_container > 0
-      );
-
-      const containerHeaders = ["Container Number", "Type"];
-      if (hasWeights) containerHeaders.push("Weight");
-      if (hasTrucks) containerHeaders.push("Truck Reg");
-      if (hasRates) containerHeaders.push("Rate");
-      if (hasSurcharges) containerHeaders.push("Surcharges");
-      if (hasHazardous) containerHeaders.push("Hazardous");
-      if (hasVGM) containerHeaders.push("VGM");
-
-      const containerData =
-        containers.length > 0
-          ? containers.map((container) => {
-              const row = [
-                container.container_number || "N/A",
-                container.container_type || "Standard"
-              ];
-              
-              if (hasWeights && container.weight && container.weight !== "N/A") {
-                row.push(`${container.weight} kg`);
-              } else if (hasWeights) {
-                row.push("-");
-              }
-              
-              if (hasTrucks) {
-                row.push(container.truckregnumber || "-");
-              }
-              
-              if (hasRates) {
-                row.push(container.rate_per_container > 0 
-                  ? formatCurrency(container.rate_per_container) 
-                  : "-");
-              }
-              
-              if (hasSurcharges) {
-                const surchargeText =
-                  container.surcharge_amount > 0
-                    ? formatCurrency(container.surcharge_amount)
-                    : "-";
-                row.push(surchargeText);
-              }
-              
-              if (hasHazardous) {
-                const hazardText =
-                  container.hazardous_amount > 0
-                    ? formatCurrency(container.hazardous_amount)
-                    : "-";
-                row.push(hazardText);
-              }
-              
-              if (hasVGM) {
-                const vgmText =
-                  container.vgm_amount > 0
-                    ? formatCurrency(container.vgm_amount)
-                    : "-";
-                row.push(vgmText);
-              }
-              
-              return row;
-            })
-          : [["No container information"]];
-
-      autoTable(doc, {
-        startY: currentY,
-        head: [containerHeaders],
-        body: containerData,
-        theme: "grid",
-        styles: {
-          fontSize: isCompactLayout ? fonts.tiny : fonts.small,
-          cellPadding: isCompactLayout ? 1.5 : 2.5,
-          lineWidth: 0.1,
-        },
-        headStyles: {
-          fillColor: [70, 130, 180],
-          textColor: [255, 255, 255],
-          fontStyle: "bold",
-        },
-        columnStyles: {
-          0: { cellWidth: 25 },
-          1: { cellWidth: 20 },
-          2: { cellWidth: 20 },
-          3: { cellWidth: 20 },
-          4: { cellWidth: 20 },
-          5: { cellWidth: 20 },
-          6: { cellWidth: 20 },
-          7: { cellWidth: 20 },
-        },
-        margin: { left: margins.left, right: margins.right },
-      });
-
-      currentY = doc.lastAutoTable.finalY + (isCompactLayout ? 8 : 10);
-
-      // Calculate invoice values
-      const amount = invoiceData.invoice?.amount || invoiceData.total_cost || 0;
-      const vat = calculateVAT(amount);
-      const total = invoiceData.invoice?.total_amount || amount + vat;
-
-      // Summary Table
-      const summaryData = [
-        ["Amount (excl. VAT)", formatCurrency(amount)],
-      ];
-      
-      if (vat > 0) {
-        summaryData.push(["VAT", formatCurrency(vat)]);
-      }
-      summaryData.push(["Total Amount", formatCurrency(total)]);
-
-      autoTable(doc, {
-        startY: currentY,
-        head: [["Invoice Summary"]],
-        body: summaryData,
-        theme: "grid",
-        styles: {
-          fontSize: fonts.normal,
-          cellPadding: 3,
-          lineWidth: 0.1,
-        },
-        headStyles: {
-          fillColor: [70, 130, 180],
-          textColor: [255, 255, 255],
-          fontStyle: "bold",
-        },
-        columnStyles: {
-          0: { fontStyle: "bold", cellWidth: 60 },
-          1: { halign: "right" },
-        },
-        margin: { left: margins.left, right: margins.right },
-      });
-
-      currentY = doc.lastAutoTable.finalY + 10;
-
-      // Banking Details
-      doc.setFontSize(fonts.small);
-      doc.setFont("helvetica", "normal");
-      
-      const bankingDetails = [
-        `Account Name: ${invoiceData.name_of_acc || ""}`,
-        `Bank Name: ${invoiceData.bank || ""}`,
-        `Account Number: ${invoiceData.account_num || ""}`,
-        `Branch Code: ${invoiceData.branch_code || ""}`,
-        `SWIFT Code: ${invoiceData.swift_code || ""}`,
-        `Invoice Number: ${invoiceData.invoice_num || ""}`,
-      ].filter(Boolean);
-
-      bankingDetails.forEach((detail) => {
-        doc.text(detail, margins.left, currentY);
-        currentY += 5;
-      });
-
-      currentY += 5;
-
-      // Footer
-      doc.setFontSize(fonts.small);
-      doc.setFont("helvetica", "italic");
-      doc.text(
-        "Please ensure the invoice number is referenced when making payment.",
-        margins.left,
-        currentY
-      );
-      currentY += 8;
-      
-      doc.text(
-        `Thank you for choosing ${invoiceData.companyname || ""}.`,
-        margins.left,
-        currentY
-      );
-
-      // Save the PDF
-      const fileName = `Invoice_${invoiceData.invoice_num || invoiceData.doc_num || 'NO'}_${formatDate(invoiceData.date)}.pdf`;
-      doc.save(fileName);
-
-    } catch (error) {
-      console.error("Error generating PDF:", error);
-      alert("Error generating PDF. Please try again.");
-    } finally {
-      setPdfLoading(false);
+    // Destination Table - Updated to include additional destination info
+    const destinationRoute = `${invoiceData.pickup || ""} to ${
+      invoiceData.dropoff || ""
+    }`;
+    const destinationData = [["Destination", destinationRoute]];
+    
+    // Add additional destination info if it exists
+    if (invoiceData.additional_destination_info) {
+      destinationData.push(["Additional Info", invoiceData.additional_destination_info]);
     }
-  };
+
+    autoTable(doc, {
+      startY: currentY,
+      head: [],
+      body: destinationData,
+      theme: "grid",
+      styles: {
+        fontSize: fonts.small,
+        cellPadding: isCompactLayout ? 1.5 : 2.5,
+        lineWidth: 0.1,
+      },
+      columnStyles: {
+        0: { fontStyle: "bold", cellWidth: 35 },
+        1: { cellWidth: "auto" },
+      },
+      margin: { left: margins.left, right: margins.right },
+    });
+
+    currentY = doc.lastAutoTable.finalY + (isCompactLayout ? 5 : 7);
+
+    // Invoice Details Table
+    const invoiceDetailsData = [
+      ["Booking Ref", invoiceData.booking_ref || ""],
+      ["File Number", invoiceData.file_no || ""],
+      ["Description", invoiceData.description || ""],
+      ["Vessel/Ref", invoiceData.vessel_name || ""],
+    ];
+
+    autoTable(doc, {
+      startY: currentY,
+      head: [],
+      body: invoiceDetailsData,
+      theme: "grid",
+      styles: {
+        fontSize: fonts.small,
+        cellPadding: isCompactLayout ? 1.5 : 2.5,
+        lineWidth: 0.1,
+      },
+      columnStyles: {
+        0: { fontStyle: "bold", cellWidth: 35 },
+        1: { cellWidth: "auto" },
+      },
+      margin: { left: margins.left, right: margins.right },
+    });
+
+    currentY = doc.lastAutoTable.finalY + (isCompactLayout ? 5 : 7);
+
+    // Enhanced Container Table with all new columns
+    const hasWeights = containers.some(
+      (container) => container.weight && container.weight !== "N/A"
+    );
+    const hasSurcharges = containers.some(
+      (container) =>
+        container.add_surcharges || container.surcharge_amount > 0
+    );
+    const hasHazardous = containers.some(
+      (container) => container.hazardous || container.hazardous_amount > 0
+    );
+    const hasVGM = containers.some(
+      (container) => container.vgm || container.vgm_amount > 0
+    );
+    const hasTrucks = containers.some(
+      (container) => container.truckregnumber
+    );
+    const hasRates = containers.some(
+      (container) => container.rate_per_container > 0
+    );
+
+    const containerHeaders = ["Container Number", "Type"];
+    if (hasWeights) containerHeaders.push("Weight");
+    if (hasTrucks) containerHeaders.push("Truck Reg");
+    if (hasRates) containerHeaders.push("Rate");
+    if (hasSurcharges) containerHeaders.push("Surcharges");
+    if (hasHazardous) containerHeaders.push("Hazardous");
+    if (hasVGM) containerHeaders.push("VGM");
+
+    const containerData =
+      containers.length > 0
+        ? containers.map((container) => {
+            const row = [
+              container.container_number || "N/A",
+              container.container_type || "Standard"
+            ];
+            
+            if (hasWeights && container.weight && container.weight !== "N/A") {
+              row.push(`${container.weight} kg`);
+            } else if (hasWeights) {
+              row.push("-");
+            }
+            
+            if (hasTrucks) {
+              row.push(container.truckregnumber || "-");
+            }
+            
+            if (hasRates) {
+              row.push(container.rate_per_container > 0 
+                ? formatCurrency(container.rate_per_container) 
+                : "-");
+            }
+            
+            if (hasSurcharges) {
+              const surchargeText =
+                container.surcharge_amount > 0
+                  ? formatCurrency(container.surcharge_amount)
+                  : "-";
+              row.push(surchargeText);
+            }
+            
+            if (hasHazardous) {
+              const hazardText =
+                container.hazardous_amount > 0
+                  ? formatCurrency(container.hazardous_amount)
+                  : "-";
+              row.push(hazardText);
+            }
+            
+            if (hasVGM) {
+              const vgmText =
+                container.vgm_amount > 0
+                  ? formatCurrency(container.vgm_amount)
+                  : "-";
+              row.push(vgmText);
+            }
+            
+            return row;
+          })
+        : [["No container information", "", "", "", "", "", "", ""]];
+
+    autoTable(doc, {
+      startY: currentY,
+      head: [containerHeaders],
+      body: containerData,
+      theme: "grid",
+      styles: {
+        fontSize: isCompactLayout ? fonts.tiny : fonts.small,
+        cellPadding: isCompactLayout ? 1.5 : 2.5,
+        lineWidth: 0.1,
+      },
+      headStyles: {
+        fillColor: [70, 130, 180],
+        textColor: [255, 255, 255],
+        fontStyle: "bold",
+      },
+      columnStyles: {
+        0: { cellWidth: 25 },
+        1: { cellWidth: 20 },
+        // Add empty columns for potential headers to prevent layout issues
+        2: { cellWidth: 20 },
+        3: { cellWidth: 20 },
+        4: { cellWidth: 20 },
+        5: { cellWidth: 20 },
+        6: { cellWidth: 20 },
+        7: { cellWidth: 20 },
+      },
+      margin: { left: margins.left, right: margins.right },
+    });
+
+    currentY = doc.lastAutoTable.finalY + (isCompactLayout ? 8 : 10);
+
+    // Calculate invoice values - FIXED
+    const amount = invoiceData.total_cost || 0;
+    const vatRate = invoiceData.vat ? (Number(invoiceData.vat) / 100) : 0;
+    const vat = amount * vatRate;
+    const total = amount + vat;
+
+    // FIXED Summary Table - Proper two-column layout
+    const summaryHeaders = ["Description", "Amount"];
+    const summaryData = [
+      ["Amount (excl. VAT)", formatCurrency(amount)],
+      ...(vat > 0 ? [["VAT (" + invoiceData.vat + "%)", formatCurrency(vat)]] : []),
+      ["Total Amount", formatCurrency(total)],
+    ];
+
+    autoTable(doc, {
+      startY: currentY,
+      head: [summaryHeaders],
+      body: summaryData,
+      theme: "grid",
+      styles: {
+        fontSize: fonts.normal,
+        cellPadding: 3,
+        lineWidth: 0.1,
+        halign: "left",
+      },
+      headStyles: {
+        fillColor: [70, 130, 180],
+        textColor: [255, 255, 255],
+        fontStyle: "bold",
+      },
+      bodyStyles: {
+        valign: "middle",
+      },
+      columnStyles: {
+        0: { 
+          fontStyle: "bold", 
+          cellWidth: 60,
+          halign: "left"
+        },
+        1: { 
+          halign: "right",
+          cellWidth: 40
+        },
+      },
+      rowStyles: {
+        0: { // Total row styling
+          fillColor: [245, 245, 245],
+          fontStyle: "bold",
+        }
+      },
+      margin: { left: margins.left, right: margins.right },
+      didParseCell: function(data) {
+        // Make the total row more prominent
+        if (data.section === 'body' && data.column.index === 0 && data.row.index === summaryData.length - 1) {
+          data.cell.styles.fontStyle = 'bold';
+          data.cell.styles.fillColor = [240, 240, 240];
+        }
+        if (data.section === 'body' && data.column.index === 1 && data.row.index === summaryData.length - 1) {
+          data.cell.styles.fontStyle = 'bold';
+          data.cell.styles.fillColor = [240, 240, 240];
+          data.cell.styles.halign = 'right';
+        }
+      }
+    });
+
+    currentY = doc.lastAutoTable.finalY + 10;
+
+    // Banking Details
+    doc.setFontSize(fonts.small);
+    doc.setFont("helvetica", "normal");
+    
+    const bankingDetails = [
+      `Account Name: ${invoiceData.name_of_acc || ""}`,
+      `Bank Name: ${invoiceData.bank || ""}`,
+      `Account Number: ${invoiceData.account_num || ""}`,
+      `Branch Code: ${invoiceData.branch_code || ""}`,
+      `SWIFT Code: ${invoiceData.swift_code || ""}`,
+      `Reference: ${invoiceData.invoice_num || ""}`,
+    ].filter(Boolean);
+
+    bankingDetails.forEach((detail) => {
+      doc.text(detail, margins.left, currentY);
+      currentY += 5;
+    });
+
+    currentY += 5;
+
+    // Footer
+    doc.setFontSize(fonts.small);
+    doc.setFont("helvetica", "italic");
+    doc.text(
+      "Please ensure the invoice number is referenced when making payment.",
+      margins.left,
+      currentY
+    );
+    currentY += 8;
+    
+    doc.setFont("helvetica", "normal");
+    doc.text(
+      `Thank you for choosing ${invoiceData.companyname || ""}.`,
+      margins.left,
+      currentY
+    );
+
+    // Save the PDF
+    const fileName = `Invoice_${invoiceData.invoice_num || invoiceData.doc_num || 'NO'}_${formatDate(invoiceData.date)}.pdf`;
+    doc.save(fileName);
+
+  } catch (error) {
+    console.error("Error generating PDF:", error);
+    alert("Error generating PDF. Please try again.");
+  } finally {
+    setPdfLoading(false);
+  }
+};
 
   if (loading) {
     return (
