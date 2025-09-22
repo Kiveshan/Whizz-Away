@@ -93,6 +93,8 @@ const getInvoiceDetails = async (id) => {
         m1.vat,
         m1.rateweight,
         m1.booking_ref,
+        m1.pickup,
+        m1.dropoff,
         m1.vessel_name,
         i.invoice_num,
         i.doc_num,
@@ -195,6 +197,38 @@ const checkInvoiceExists = async (m1key) => {
   }
 };
 
+// Check if an invoice number already exists in the invoice table
+const checkInvoiceNumExists = async (invoice_num, m1key) => {
+  try {
+    if (!pool) {
+      throw new Error(
+        "Database connection not established. Please try again later."
+      );
+    }
+
+    const queryText = `
+      SELECT COUNT(*) as count
+      FROM public.invoice
+      WHERE invoice_num = $1 AND m1key != $2
+    `;
+
+    const result = await query(queryText, [invoice_num, m1key]);
+    const count = Number.parseInt(result.rows[0].count, 10);
+
+    return {
+      success: true,
+      exists: count > 0,
+    };
+  } catch (error) {
+    console.error("Error checking if invoice number exists:", error);
+    return {
+      success: false,
+      message: error.message,
+      exists: false,
+    };
+  }
+};
+
 // Create a new invoice for an instruction
 const createInvoice = async ({ m1key, clientId }) => {
   try {
@@ -260,7 +294,12 @@ const createInvoice = async ({ m1key, clientId }) => {
   }
 };
 
-const updateInstructionDetails = async ({ m1key, dropoff, rate }) => {
+const updateInstructionDetails = async ({
+  m1key,
+  dropoff,
+  rate,
+  invoice_num,
+}) => {
   try {
     if (!pool) {
       throw new Error(
@@ -283,59 +322,117 @@ const updateInstructionDetails = async ({ m1key, dropoff, rate }) => {
       };
     }
 
-    // Build dynamic query based on provided fields
-    const updateFields = [];
-    const queryParams = [];
-    let paramIndex = 1;
-
-    if (dropoff !== undefined) {
-      updateFields.push(`dropoff = $${paramIndex}`);
-      queryParams.push(dropoff);
-      paramIndex++;
-    }
-
-    if (rate !== undefined) {
-      updateFields.push(`total_cost = $${paramIndex}`);
-      queryParams.push(rate);
-      paramIndex++;
-    }
-
-    if (updateFields.length === 0) {
+    if (
+      invoice_num !== undefined &&
+      (!invoice_num || typeof invoice_num !== "string")
+    ) {
       return {
         success: false,
-        message: "No fields to update",
+        message: "Invoice number must be a non-empty string",
       };
     }
 
-    // Add m1key as the last parameter for WHERE clause
-    queryParams.push(m1key);
+    // Start a transaction
+    const client = await pool.connect();
+    try {
+      await client.query("BEGIN");
 
-    const queryText = `
-      UPDATE public.m1_controller
-      SET ${updateFields.join(", ")}
-      WHERE m1key = $${paramIndex}
-      RETURNING m1key, dropoff, total_cost
-    `;
+      let m1Result = null;
+      let invoiceResult = null;
 
-    console.log(
-      "Executing update query:",
-      queryText,
-      "with params:",
-      queryParams
-    );
-    const result = await query(queryText, queryParams);
+      // Check if invoice_num already exists
+      if (invoice_num !== undefined) {
+        const invoiceNumCheck = await checkInvoiceNumExists(invoice_num, m1key);
+        if (invoiceNumCheck.exists) {
+          throw new Error("Invoice number already exists in the database");
+        }
+      }
 
-    if (result.rows.length === 0) {
+      // Update m1_controller table if dropoff or rate is provided
+      if (dropoff !== undefined || rate !== undefined) {
+        const m1UpdateFields = [];
+        const m1QueryParams = [];
+        let paramIndex = 1;
+
+        if (dropoff !== undefined) {
+          m1UpdateFields.push(`dropoff = $${paramIndex}`);
+          m1QueryParams.push(dropoff);
+          paramIndex++;
+        }
+
+        if (rate !== undefined) {
+          m1UpdateFields.push(`total_cost = $${paramIndex}`);
+          m1QueryParams.push(rate);
+          paramIndex++;
+        }
+
+        m1QueryParams.push(m1key);
+
+        const m1QueryText = `
+          UPDATE public.m1_controller
+          SET ${m1UpdateFields.join(", ")}
+          WHERE m1key = $${paramIndex}
+          RETURNING m1key, dropoff, total_cost
+        `;
+
+        console.log(
+          "Executing m1_controller update query:",
+          m1QueryText,
+          "with params:",
+          m1QueryParams
+        );
+        m1Result = await client.query(m1QueryText, m1QueryParams);
+
+        if (m1Result.rows.length === 0) {
+          throw new Error("Instruction not found in m1_controller");
+        }
+      }
+
+      // Update invoice table if invoice_num is provided
+      if (invoice_num !== undefined) {
+        const invoiceQueryText = `
+          UPDATE public.invoice
+          SET invoice_num = $1
+          WHERE m1key = $2
+          RETURNING ikey, invoice_num
+        `;
+
+        console.log(
+          "Executing invoice update query:",
+          invoiceQueryText,
+          "with params:",
+          [invoice_num, m1key]
+        );
+        invoiceResult = await client.query(invoiceQueryText, [
+          invoice_num,
+          m1key,
+        ]);
+
+        if (invoiceResult.rows.length === 0) {
+          throw new Error("Invoice not found for the provided m1key");
+        }
+      }
+
+      await client.query("COMMIT");
+
       return {
-        success: false,
-        message: "Instruction not found",
+        success: true,
+        data: {
+          m1key: m1Result ? m1Result.rows[0].m1key : m1key,
+          dropoff: m1Result ? m1Result.rows[0].dropoff : undefined,
+          total_cost: m1Result ? m1Result.rows[0].total_cost : undefined,
+          invoice_num: invoiceResult
+            ? invoiceResult.rows[0].invoice_num
+            : undefined,
+        },
+        message: "Instruction and/or invoice updated successfully",
       };
+    } catch (error) {
+      await client.query("ROLLBACK");
+      throw error;
+    } finally {
+      client.release();
     }
-
-    return {
-      success: true,
-      data: result.rows[0],
-    };
   } catch (error) {
     console.error("Error updating instruction details:", error);
     return {
@@ -349,6 +446,7 @@ export {
   getCompletedInvoices,
   getInvoiceDetails,
   checkInvoiceExists,
+  checkInvoiceNumExists,
   createInvoice,
   updateInstructionDetails,
 };

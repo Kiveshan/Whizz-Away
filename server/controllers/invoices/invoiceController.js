@@ -150,10 +150,11 @@ const createInvoiceHandler = async (req, res) => {
 // Handler to update instruction details
 const updateInstructionDetailsHandler = async (req, res) => {
   try {
-    const { m1key, dropoff, rate } = req.body;
+    const { m1key, dropoff, rate, invoice_num } = req.body;
     console.log(`Updating instruction details for m1key: ${m1key}`, {
       dropoff,
       rate,
+      invoice_num,
     });
 
     if (!m1key) {
@@ -174,7 +175,23 @@ const updateInstructionDetailsHandler = async (req, res) => {
       }
     }
 
-    const result = await updateInstructionDetails({ m1key, dropoff, rate });
+    // Validate invoice_num if provided
+    if (
+      invoice_num !== undefined &&
+      (!invoice_num || typeof invoice_num !== "string")
+    ) {
+      return res.status(400).json({
+        success: false,
+        message: "Invoice number must be a non-empty string",
+      });
+    }
+
+    const result = await updateInstructionDetails({
+      m1key,
+      dropoff,
+      rate,
+      invoice_num,
+    });
 
     if (!result.success) {
       return res.status(400).json({
@@ -186,7 +203,7 @@ const updateInstructionDetailsHandler = async (req, res) => {
     res.json({
       success: true,
       data: result.data,
-      message: "Instruction updated successfully",
+      message: "Instruction and/or invoice updated successfully",
     });
   } catch (error) {
     console.error("Error updating instruction details:", error);

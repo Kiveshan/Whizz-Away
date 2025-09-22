@@ -171,7 +171,7 @@
 .pl-btn {
     padding: 12px 30px;
     border: none;
-    border-radius: 25px;
+    border-radius: 5px;
     font-size: 14px;
     font-weight: 600;
     cursor: pointer;
@@ -187,12 +187,12 @@
 }
 
 .pl-back-btn {
-    background: linear-gradient(135deg, #34a853 0%, #2e7d32 100%);
+    background-color: #4caf50;
     color: white;
 }
 
 .pl-back-btn:hover {
-    background: linear-gradient(135deg, #2e7d32 0%, #1b5e20 100%);
+    background-color: #45a049;
 }
 
 .pl-download-btn {
