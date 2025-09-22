@@ -1,4 +1,4 @@
-// In ClientInvoice.jsx, replace the existing component with this updated version
+// In ClientInvoice.jsx - Replace the existing component with this updated version
 "use client";
 import { useState, useEffect, useRef } from "react";
 import { useNavigate, useParams, useLocation } from "react-router-dom";
@@ -51,9 +51,9 @@ const ClientInvoice = () => {
 
   const [isEditMode, setIsEditMode] = useState(false);
   const [editData, setEditData] = useState({
-    dropoff: "",
     amount: "",
     invoice_num: "",
+    additional_destination_info: "", // New field
   });
   const [saveLoading, setSaveLoading] = useState(false);
   const [saveError, setSaveError] = useState(null);
@@ -106,9 +106,9 @@ const ClientInvoice = () => {
         if (isMounted) {
           setInvoiceData(response.data.data);
           setEditData({
-            dropoff: response.data.data.dropoff || "",
             amount: response.data.data.total_cost || "",
             invoice_num: response.data.data.invoice_num || "",
+            additional_destination_info: response.data.data.additional_destination_info || "", // New field
           });
           setLoading(false);
         }
@@ -166,9 +166,9 @@ const ClientInvoice = () => {
   const handleCancelEdit = () => {
     setIsEditMode(false);
     setEditData({
-      dropoff: invoiceData.dropoff || "",
       amount: invoiceData.total_cost || "",
       invoice_num: invoiceData.invoice_num || "",
+      additional_destination_info: invoiceData.additional_destination_info || "",
     });
     setSaveError(null);
     setShowConfirmDialog(false);
@@ -192,9 +192,9 @@ const ClientInvoice = () => {
     try {
       const updateData = {
         m1key: invoiceData.m1key,
-        dropoff: editData.dropoff || undefined,
         rate: editData.amount ? Number.parseFloat(editData.amount) : undefined,
         invoice_num: editData.invoice_num || undefined,
+        additional_destination_info: editData.additional_destination_info || undefined, // New field
       };
 
       const response = await api.put(
@@ -205,10 +205,11 @@ const ClientInvoice = () => {
       if (response.data.success) {
         setInvoiceData({
           ...invoiceData,
-          dropoff: response.data.data.dropoff || invoiceData.dropoff,
           total_cost: response.data.data.total_cost || invoiceData.total_cost,
           invoice_num:
             response.data.data.invoice_num || invoiceData.invoice_num,
+          additional_destination_info: 
+            response.data.data.additional_destination_info || invoiceData.additional_destination_info, // New field
         });
         setIsEditMode(false);
         setShowConfirmDialog(false);
@@ -339,13 +340,16 @@ const ClientInvoice = () => {
 
       currentY += isCompactLayout ? 8 : 10;
 
-      // Destination Table
+      // Destination Table - Updated to include additional destination info
       const destinationRoute = `${invoiceData.pickup || ""} to ${
-        document.getElementById("dropoff")?.innerHTML ||
-        invoiceData.dropoff ||
-        ""
+        invoiceData.dropoff || ""
       }`;
       const destinationData = [["Destination", destinationRoute]];
+      
+      // Add additional destination info if it exists
+      if (invoiceData.additional_destination_info) {
+        destinationData.push(["Additional Info", invoiceData.additional_destination_info]);
+      }
 
       autoTable(doc, {
         startY: currentY,
@@ -681,22 +685,30 @@ const ClientInvoice = () => {
             <div>VAT Reg No: {invoiceData.client_vat}</div>
           </div>
 
-          {/* Vessel/Ref and Destination */}
+          {/* Vessel/Ref and Destination - Updated */}
           <div className="vessel-destination">
             <div className="vessel">Starting: {invoiceData.pickup}</div>
             <div className="destination" id="destination">
-              Destination:
-              {isEditMode ? (
-                <input
-                  type="text"
-                  value={editData.dropoff}
-                  onChange={(e) => handleInputChange("dropoff", e.target.value)}
-                  className="edit-input dropoff-input"
-                  placeholder="Enter destination"
-                />
-              ) : (
+              <div className="dropoff-row">
                 <div className="dropoff" id="dropoff">
-                  {invoiceData.dropoff}
+                  Destination: {invoiceData.dropoff}
+                </div>
+                {isEditMode && (
+                  <div className="additional-destination-edit">
+                    <span className="additional-label">Additional:</span>
+                    <input
+                      type="text"
+                      value={editData.additional_destination_info}
+                      onChange={(e) => handleInputChange("additional_destination_info", e.target.value)}
+                      className="edit-input additional-destination-input"
+                      placeholder="Add additional destination info..."
+                    />
+                  </div>
+                )}
+              </div>
+              {!isEditMode && invoiceData.additional_destination_info && (
+                <div className="additional-destination-display">
+                  Additional: {invoiceData.additional_destination_info}
                 </div>
               )}
             </div>

@@ -148,13 +148,15 @@ const createInvoiceHandler = async (req, res) => {
 };
 
 // Handler to update instruction details
+// In invoiceController.js - Update the updateInstructionDetailsHandler function
 const updateInstructionDetailsHandler = async (req, res) => {
   try {
-    const { m1key, dropoff, rate, invoice_num } = req.body;
+    const { m1key, dropoff, rate, invoice_num, additional_destination_info } = req.body; // Add new field
     console.log(`Updating instruction details for m1key: ${m1key}`, {
       dropoff,
       rate,
       invoice_num,
+      additional_destination_info, // Log the new field
     });
 
     if (!m1key) {
@@ -186,11 +188,23 @@ const updateInstructionDetailsHandler = async (req, res) => {
       });
     }
 
+    // Validate additional_destination_info if provided
+    if (
+      additional_destination_info !== undefined &&
+      (additional_destination_info === "" || typeof additional_destination_info !== "string")
+    ) {
+      return res.status(400).json({
+        success: false,
+        message: "Additional destination info must be a valid string",
+      });
+    }
+
     const result = await updateInstructionDetails({
       m1key,
       dropoff,
       rate,
       invoice_num,
+      additional_destination_info, // Pass the new field
     });
 
     if (!result.success) {
@@ -214,7 +228,6 @@ const updateInstructionDetailsHandler = async (req, res) => {
     });
   }
 };
-
 export {
   getCompletedInvoicesHandler,
   getInvoiceDetailsHandler,

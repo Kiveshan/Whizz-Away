@@ -65,7 +65,7 @@ const getCompletedInvoices = async ({ year, month, type, clientId }) => {
   }
 };
 
-// In invoiceModel.js, replace the existing getInvoiceDetails function
+// In invoiceModel.js - Update the getInvoiceDetails function
 const getInvoiceDetails = async (id) => {
   let client;
   try {
@@ -100,6 +100,7 @@ const getInvoiceDetails = async (id) => {
         i.invoice_num,
         i.doc_num,
         i.date,
+        i.additional_destination_info,
         ut.cluster_box,
         ut.vat_reg_num,
         ut.address,
@@ -209,6 +210,181 @@ const getInvoiceDetails = async (id) => {
     throw error;
   } finally {
     if (client) client.release();
+  }
+};
+
+// Update the updateInstructionDetails function to handle the new field
+const updateInstructionDetails = async ({
+  m1key,
+  dropoff,
+  rate,
+  invoice_num,
+  additional_destination_info, // New parameter
+}) => {
+  try {
+    if (!pool) {
+      throw new Error(
+        "Database connection not established. Please try again later."
+      );
+    }
+
+    // Validate inputs
+    if (!m1key) {
+      return {
+        success: false,
+        message: "m1key is required",
+      };
+    }
+
+    if (rate !== undefined && (isNaN(rate) || rate < 0)) {
+      return {
+        success: false,
+        message: "Rate must be a positive number",
+      };
+    }
+
+    if (
+      invoice_num !== undefined &&
+      (!invoice_num || typeof invoice_num !== "string")
+    ) {
+      return {
+        success: false,
+        message: "Invoice number must be a non-empty string",
+      };
+    }
+
+    // Validate additional destination info if provided
+    if (
+      additional_destination_info !== undefined &&
+      (additional_destination_info === "" || typeof additional_destination_info !== "string")
+    ) {
+      return {
+        success: false,
+        message: "Additional destination info must be a valid string",
+      };
+    }
+
+    // Start a transaction
+    const client = await pool.connect();
+    try {
+      await client.query("BEGIN");
+
+      let m1Result = null;
+      let invoiceResult = null;
+
+      // Check if invoice_num already exists
+      if (invoice_num !== undefined) {
+        const invoiceNumCheck = await checkInvoiceNumExists(invoice_num, m1key);
+        if (invoiceNumCheck.exists) {
+          throw new Error("Invoice number already exists in the database");
+        }
+      }
+
+      // Update m1_controller table if dropoff or rate is provided
+      if (dropoff !== undefined || rate !== undefined) {
+        const m1UpdateFields = [];
+        const m1QueryParams = [];
+        let paramIndex = 1;
+
+        if (dropoff !== undefined) {
+          m1UpdateFields.push(`dropoff = $${paramIndex}`);
+          m1QueryParams.push(dropoff);
+          paramIndex++;
+        }
+
+        if (rate !== undefined) {
+          m1UpdateFields.push(`total_cost = $${paramIndex}`);
+          m1QueryParams.push(rate);
+          paramIndex++;
+        }
+
+        m1QueryParams.push(m1key);
+
+        const m1QueryText = `
+          UPDATE public.m1_controller
+          SET ${m1UpdateFields.join(", ")}
+          WHERE m1key = $${paramIndex}
+          RETURNING m1key, dropoff, total_cost
+        `;
+
+        console.log(
+          "Executing m1_controller update query:",
+          m1QueryText,
+          "with params:",
+          m1QueryParams
+        );
+        m1Result = await client.query(m1QueryText, m1QueryParams);
+
+        if (m1Result.rows.length === 0) {
+          throw new Error("Instruction not found in m1_controller");
+        }
+      }
+
+      // Update invoice table if invoice_num or additional_destination_info is provided
+      if (invoice_num !== undefined || additional_destination_info !== undefined) {
+        const invoiceUpdateFields = [];
+        const invoiceQueryParams = [];
+        let paramIndex = 1;
+
+        if (invoice_num !== undefined) {
+          invoiceUpdateFields.push(`invoice_num = $${paramIndex}`);
+          invoiceQueryParams.push(invoice_num);
+          paramIndex++;
+        }
+
+        if (additional_destination_info !== undefined) {
+          invoiceUpdateFields.push(`additional_destination_info = $${paramIndex}`);
+          invoiceQueryParams.push(additional_destination_info);
+          paramIndex++;
+        }
+
+        invoiceQueryParams.push(m1key);
+
+        const invoiceQueryText = `
+          UPDATE public.invoice
+          SET ${invoiceUpdateFields.join(", ")}
+          WHERE m1key = $${paramIndex}
+          RETURNING ikey, invoice_num, additional_destination_info
+        `;
+
+        console.log(
+          "Executing invoice update query:",
+          invoiceQueryText,
+          "with params:",
+          invoiceQueryParams
+        );
+        invoiceResult = await client.query(invoiceQueryText, invoiceQueryParams);
+
+        if (invoiceResult.rows.length === 0) {
+          throw new Error("Invoice not found for the provided m1key");
+        }
+      }
+
+      await client.query("COMMIT");
+
+      return {
+        success: true,
+        data: {
+          m1key: m1Result ? m1Result.rows[0].m1key : m1key,
+          dropoff: m1Result ? m1Result.rows[0].dropoff : undefined,
+          total_cost: m1Result ? m1Result.rows[0].total_cost : undefined,
+          invoice_num: invoiceResult ? invoiceResult.rows[0].invoice_num : undefined,
+          additional_destination_info: invoiceResult ? invoiceResult.rows[0].additional_destination_info : undefined,
+        },
+        message: "Instruction and/or invoice updated successfully",
+      };
+    } catch (error) {
+      await client.query("ROLLBACK");
+      throw error;
+    } finally {
+      client.release();
+    }
+  } catch (error) {
+    console.error("Error updating instruction details:", error);
+    return {
+      success: false,
+      message: error.message,
+    };
   }
 };
 
@@ -341,153 +517,7 @@ const createInvoice = async ({ m1key, clientId }) => {
   }
 };
 
-const updateInstructionDetails = async ({
-  m1key,
-  dropoff,
-  rate,
-  invoice_num,
-}) => {
-  try {
-    if (!pool) {
-      throw new Error(
-        "Database connection not established. Please try again later."
-      );
-    }
 
-    // Validate inputs
-    if (!m1key) {
-      return {
-        success: false,
-        message: "m1key is required",
-      };
-    }
-
-    if (rate !== undefined && (isNaN(rate) || rate < 0)) {
-      return {
-        success: false,
-        message: "Rate must be a positive number",
-      };
-    }
-
-    if (
-      invoice_num !== undefined &&
-      (!invoice_num || typeof invoice_num !== "string")
-    ) {
-      return {
-        success: false,
-        message: "Invoice number must be a non-empty string",
-      };
-    }
-
-    // Start a transaction
-    const client = await pool.connect();
-    try {
-      await client.query("BEGIN");
-
-      let m1Result = null;
-      let invoiceResult = null;
-
-      // Check if invoice_num already exists
-      if (invoice_num !== undefined) {
-        const invoiceNumCheck = await checkInvoiceNumExists(invoice_num, m1key);
-        if (invoiceNumCheck.exists) {
-          throw new Error("Invoice number already exists in the database");
-        }
-      }
-
-      // Update m1_controller table if dropoff or rate is provided
-      if (dropoff !== undefined || rate !== undefined) {
-        const m1UpdateFields = [];
-        const m1QueryParams = [];
-        let paramIndex = 1;
-
-        if (dropoff !== undefined) {
-          m1UpdateFields.push(`dropoff = $${paramIndex}`);
-          m1QueryParams.push(dropoff);
-          paramIndex++;
-        }
-
-        if (rate !== undefined) {
-          m1UpdateFields.push(`total_cost = $${paramIndex}`);
-          m1QueryParams.push(rate);
-          paramIndex++;
-        }
-
-        m1QueryParams.push(m1key);
-
-        const m1QueryText = `
-          UPDATE public.m1_controller
-          SET ${m1UpdateFields.join(", ")}
-          WHERE m1key = $${paramIndex}
-          RETURNING m1key, dropoff, total_cost
-        `;
-
-        console.log(
-          "Executing m1_controller update query:",
-          m1QueryText,
-          "with params:",
-          m1QueryParams
-        );
-        m1Result = await client.query(m1QueryText, m1QueryParams);
-
-        if (m1Result.rows.length === 0) {
-          throw new Error("Instruction not found in m1_controller");
-        }
-      }
-
-      // Update invoice table if invoice_num is provided
-      if (invoice_num !== undefined) {
-        const invoiceQueryText = `
-          UPDATE public.invoice
-          SET invoice_num = $1
-          WHERE m1key = $2
-          RETURNING ikey, invoice_num
-        `;
-
-        console.log(
-          "Executing invoice update query:",
-          invoiceQueryText,
-          "with params:",
-          [invoice_num, m1key]
-        );
-        invoiceResult = await client.query(invoiceQueryText, [
-          invoice_num,
-          m1key,
-        ]);
-
-        if (invoiceResult.rows.length === 0) {
-          throw new Error("Invoice not found for the provided m1key");
-        }
-      }
-
-      await client.query("COMMIT");
-
-      return {
-        success: true,
-        data: {
-          m1key: m1Result ? m1Result.rows[0].m1key : m1key,
-          dropoff: m1Result ? m1Result.rows[0].dropoff : undefined,
-          total_cost: m1Result ? m1Result.rows[0].total_cost : undefined,
-          invoice_num: invoiceResult
-            ? invoiceResult.rows[0].invoice_num
-            : undefined,
-        },
-        message: "Instruction and/or invoice updated successfully",
-      };
-    } catch (error) {
-      await client.query("ROLLBACK");
-      throw error;
-    } finally {
-      client.release();
-    }
-  } catch (error) {
-    console.error("Error updating instruction details:", error);
-    return {
-      success: false,
-      message: error.message,
-    };
-  }
-};
 
 export {
   getCompletedInvoices,

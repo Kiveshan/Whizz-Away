@@ -833,3 +833,76 @@
   font-family: monospace;
   font-size: 13px;
 }
+
+/* Add these new styles to your existing InvoiceTemplate.css */
+
+/* Additional destination styles */
+.dropoff-row {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.additional-destination-display {
+  font-size: 13px;
+  color: #666;
+  font-style: italic;
+  margin-top: 5px;
+  padding: 4px 8px;
+  background-color: #f8f9fa;
+  border-radius: 3px;
+  border-left: 3px solid #007bff;
+}
+
+.additional-destination-edit {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 5px;
+  padding: 5px;
+  background-color: #f8f9fa;
+  border-radius: 3px;
+  border: 1px solid #dee2e6;
+}
+
+.additional-label {
+  font-weight: bold;
+  color: #495057;
+  font-size: 12px;
+  white-space: nowrap;
+}
+
+.additional-destination-input {
+  flex: 1;
+  min-width: 200px;
+  max-width: 100%;
+}
+
+.edit-input.additional-destination-input:focus {
+  border-color: #28a745;
+  background-color: white;
+  box-shadow: 0 0 0 0.2rem rgba(40, 167, 69, 0.25);
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+  .additional-destination-edit {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 5px;
+  }
+  
+  .additional-destination-input {
+    min-width: auto;
+  }
+  
+  .additional-label {
+    text-align: center;
+  }
+}
+
+/* PDF-specific styles for additional destination */
+.destination-table .additional-destination-row {
+  background-color: #f8f9fa;
+  font-style: italic;
+}
