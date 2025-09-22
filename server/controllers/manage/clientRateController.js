@@ -81,6 +81,11 @@ const saveClientRatesHandler = async (req, res) => {
       if (rate.hazardous !== undefined && rate.hazardous !== "" && (isNaN(rate.hazardous) || Number.parseFloat(rate.hazardous) < 0)) {
         return res.status(400).json({ error: "Hazardous must be a non-negative number" })
       }
+
+      // Validate vgm if provided
+      if (rate.vgm !== undefined && rate.vgm !== "" && (isNaN(rate.vgm) || Number.parseFloat(rate.vgm) < 0)) {
+        return res.status(400).json({ error: "VGM must be a non-negative number" })
+      }
     }
 
     const result = await saveClientRates(clientId, rates)
