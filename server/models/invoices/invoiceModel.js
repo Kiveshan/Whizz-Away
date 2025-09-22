@@ -231,14 +231,22 @@ const getInvoiceDetails = async (id) => {
         });
       }
       
-      // Only update truck info if this is the most recent leg (rn = 1)
+      // Prefer truck from the most recent leg; if that's missing, fall back to next with a truck
+      const existing = containerMap.get(containerNum);
       if (row.rn === 1 && row.truckregnumber) {
-        const existing = containerMap.get(containerNum);
         containerMap.set(containerNum, {
           ...existing,
           truckregnumber: row.truckregnumber,
           leg_date: row.leg_date,
           rate_per_container: existing.has_special_rate ? existing.rate_per_container : (row.leg_rate || existing.base_rate)
+        });
+      } else if (!existing.truckregnumber && row.truckregnumber) {
+        // Set truck from a slightly older leg if latest leg has none
+        containerMap.set(containerNum, {
+          ...existing,
+          truckregnumber: row.truckregnumber,
+          // Do not override rate/date here; keep latest leg's rate preference
+          leg_date: existing.leg_date || row.leg_date,
         });
       }
     });
@@ -621,7 +629,7 @@ const getInstructionDetailsForPreview = async (instructionId) => {
         return { success: false, message: "Instruction not found" };
       }
 
-      // Get containers
+      // Get containers and join legs_m2 to fetch latest truck per container
       const containerQuery = `
         SELECT 
           c.containernum as container_number,
@@ -633,10 +641,16 @@ const getInstructionDetailsForPreview = async (instructionId) => {
           c."Surcharge Amount" as surcharge_amount,
           c."Hazardous Amount" as hazardous_amount,
           c."vgm amount" as vgm_amount,
-          c.vgm
+          c.vgm,
+          l.truckregnumber,
+          l.driverrate as leg_rate,
+          l.date as leg_date,
+          ROW_NUMBER() OVER (PARTITION BY c.containernum ORDER BY l.date DESC) as rn
         FROM public.container c
+        LEFT JOIN public.legs_m2 l 
+          ON c.containernum = l.containernumber AND c.m1key = l.m1key
         WHERE c.m1key = $1
-        ORDER BY c.containernum
+        ORDER BY c.containernum, l.date DESC
       `;
       
       const containerResult = await client.query(containerQuery, [instructionId]);
@@ -668,25 +682,25 @@ const getInstructionDetailsForPreview = async (instructionId) => {
         rateper_abnormal: m1Result.rows[0].rateper_abnormal || 0,
       };
 
-      // Process containers with rate logic (same as regular processing)
+      // Process containers with rate logic and attach latest truck info
       const containerMap = new Map();
       containerResult.rows.forEach(row => {
         const containerNum = row.container_number;
         if (!containerMap.has(containerNum)) {
           let containerType = 'abnormal';
-          if (row.container_type && row.container_type.toLowerCase().includes('20') || 
-              row.container_type.toLowerCase().includes('6')) {
+          if ((row.container_type && row.container_type.toLowerCase().includes('20')) || 
+              (row.container_type && row.container_type.toLowerCase().includes('6'))) {
             containerType = '6';
-          } else if (row.container_type && row.container_type.toLowerCase().includes('40') || 
-                     row.container_type.toLowerCase().includes('12')) {
+          } else if ((row.container_type && row.container_type.toLowerCase().includes('40')) || 
+                     (row.container_type && row.container_type.toLowerCase().includes('12'))) {
             containerType = '12';
           }
 
           let displayRate = 0;
           const hasSpecialRate = 
-            row.surcharge_amount > 0 || 
-            row.hazardous_amount > 0 || 
-            row.vgm_amount > 0;
+            (row.surcharge_amount || 0) > 0 || 
+            (row.hazardous_amount || 0) > 0 || 
+            (row.vgm_amount || 0) > 0;
 
           if (hasSpecialRate) {
             displayRate = Math.max(
@@ -694,6 +708,8 @@ const getInstructionDetailsForPreview = async (instructionId) => {
               row.hazardous_amount || 0,
               row.vgm_amount || 0
             );
+          } else if (row.leg_rate && row.rn === 1) {
+            displayRate = row.leg_rate;
           } else {
             displayRate = baseRates[`rateper_${containerType}`] || 0;
           }
@@ -712,10 +728,20 @@ const getInstructionDetailsForPreview = async (instructionId) => {
             vgm_amount: row.vgm_amount || 0,
             truckregnumber: null,
             rate_per_container: displayRate,
-            leg_rate: 0,
+            leg_rate: row.leg_rate || 0,
             base_rate: baseRates[`rateper_${containerType}`] || 0,
             has_special_rate: hasSpecialRate,
             leg_date: null
+          });
+        }
+        // Update with latest truck info if this is the most recent leg
+        if (row.rn === 1 && row.truckregnumber) {
+          const existing = containerMap.get(containerNum);
+          containerMap.set(containerNum, {
+            ...existing,
+            truckregnumber: row.truckregnumber,
+            leg_date: row.leg_date,
+            rate_per_container: existing.has_special_rate ? existing.rate_per_container : (row.leg_rate || existing.base_rate)
           });
         }
       });
