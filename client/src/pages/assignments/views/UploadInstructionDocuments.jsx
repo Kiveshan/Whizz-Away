@@ -191,12 +191,8 @@ const UploadInstructionDocuments = () => {
 
   // NEW: Handle invoice preview
   const handlePreviewInvoice = async () => {
-    // Validate that we can generate an invoice
-    if (!canFinish()) {
-      setSubmitMessage("Please complete all required documents before previewing the invoice");
-      return;
-    }
-
+    // Clear any previous messages and open preview
+    setSubmitMessage("");
     setShowInvoicePreview(true);
   };
 
@@ -778,14 +774,9 @@ const UploadInstructionDocuments = () => {
         <button
           className="preview-btn"
           onClick={handlePreviewInvoice}
-          disabled={!canFinish() || isCompleted}
-          style={{
-            opacity: canFinish() && !isCompleted ? 1 : 0.5,
-            cursor: canFinish() && !isCompleted ? "pointer" : "not-allowed",
-          }}
-          title={!canFinish() ? "Complete all required documents first" : "Preview the invoice that will be generated"}
+          title={"Preview the invoice"}
         >
-          👁️ Preview Invoice
+          Preview Invoice
         </button>
         
         <button
@@ -798,7 +789,7 @@ const UploadInstructionDocuments = () => {
           }}
           title={!canFinish() ? "Complete all required documents first" : "Complete this instruction and generate invoice"}
         >
-          ✅ Finish Instruction
+        Finish Instruction
         </button>
       </div>
 

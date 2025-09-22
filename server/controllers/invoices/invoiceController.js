@@ -242,14 +242,14 @@ const generateInvoicePreviewHandler = async (req, res) => {
       preview
     });
 
-    // First check if invoice already exists
-    const existsCheck = await checkInvoiceExists(instructionId);
-    if (existsCheck.exists) {
-      return res.status(400).json({
-        success: false,
-        message: "Invoice already exists for this instruction. Cannot preview."
-      });
-    }
+    // Previously blocked preview when an invoice already existed. We now allow preview regardless.
+    // const existsCheck = await checkInvoiceExists(instructionId);
+    // if (existsCheck.exists) {
+    //   return res.status(400).json({
+    //     success: false,
+    //     message: "Invoice already exists for this instruction. Cannot preview."
+    //   });
+    // }
 
     // Get instruction details for preview
     const instructionDetails = await getInstructionDetailsForPreview(instructionId);
