@@ -65,6 +65,7 @@ const getCompletedInvoices = async ({ year, month, type, clientId }) => {
   }
 };
 
+// In invoiceModel.js, replace the existing getInvoiceDetails function
 const getInvoiceDetails = async (id) => {
   let client;
   try {
@@ -130,32 +131,78 @@ const getInvoiceDetails = async (id) => {
       return { success: false, message: "Instruction not found" };
     }
 
-    // Updated container query to include hazard and surcharge fields
+    // Updated container query to include all new fields and truck information
     const containerQuery = `
       SELECT 
-        containernum as container_number, 
-        weight,
-        "Add Surcharges" as add_surcharges,
-        "Hazardous" as hazardous,
-        "Surcharge Amount" as surcharge_amount,
-        "Hazardous Amount" as hazardous_amount
+        c.containernum as container_number,
+        c.weight,
+        c.container_type,
+        c.cargo_description,
+        c."Add Surcharges" as add_surcharges,
+        c."Hazardous" as hazardous,
+        c."Surcharge Amount" as surcharge_amount,
+        c."Hazardous Amount" as hazardous_amount,
+        c."vgm amount" as vgm_amount,
+        c.vgm,
+        l.truckregnumber,
+        l.driverrate as rate_per_container,
+        l.date as leg_date,
+        ROW_NUMBER() OVER (PARTITION BY c.containernum ORDER BY l.date DESC) as rn
       FROM 
         public.container c
       INNER JOIN
         invoice i ON i.m1key = c.m1key
+      LEFT JOIN 
+        public.legs_m2 l ON c.containernum = l.containernumber AND c.m1key = l.m1key
       WHERE
         i.ikey = $1
+      ORDER BY c.containernum, l.date DESC
     `;
+    
     const containerResult = await query(containerQuery, [id]);
+    
+    // Process container data to get the most recent truck for each container
+    const containerMap = new Map();
+    containerResult.rows.forEach(row => {
+      const containerNum = row.container_number;
+      if (!containerMap.has(containerNum)) {
+        containerMap.set(containerNum, {
+          container_number: row.container_number,
+          weight: row.weight,
+          container_type: row.container_type,
+          cargo_description: row.cargo_description,
+          add_surcharges: row.add_surcharges || false,
+          hazardous: row.hazardous || false,
+          surcharge_amount: row.surcharge_amount || 0,
+          hazardous_amount: row.hazardous_amount || 0,
+          vgm: row.vgm || false,
+          vgm_amount: row.vgm_amount || 0,
+          truckregnumber: row.truckregnumber || null,
+          rate_per_container: row.rate_per_container || 0,
+          leg_date: row.leg_date || null
+        });
+      }
+      // Only update truck info if this is the most recent leg (rn = 1)
+      if (row.rn === 1 && row.truckregnumber) {
+        const existing = containerMap.get(containerNum);
+        containerMap.set(containerNum, {
+          ...existing,
+          truckregnumber: row.truckregnumber,
+          leg_date: row.leg_date
+        });
+      }
+    });
+
+    const containers = Array.from(containerMap.values());
     console.log(
-      `Container query returned ${containerResult.rows.length} rows for invoice ID ${id}`
+      `Container query returned ${containers.length} unique containers for invoice ID ${id}`
     );
 
     return {
       success: true,
       data: {
         ...result.rows[0],
-        containers: containerResult.rows,
+        containers,
       },
     };
   } catch (error) {

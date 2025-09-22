@@ -1,3 +1,4 @@
+// In ClientInvoice.jsx, replace the existing component with this updated version
 "use client";
 import { useState, useEffect, useRef } from "react";
 import { useNavigate, useParams, useLocation } from "react-router-dom";
@@ -87,10 +88,17 @@ const ClientInvoice = () => {
               container_number:
                 container.container_number || container.containernum || "",
               weight: container.weight || null,
+              container_type: container.container_type || "",
+              cargo_description: container.cargo_description || "",
               add_surcharges: container.add_surcharges || false,
               hazardous: container.hazardous || false,
               surcharge_amount: container.surcharge_amount || 0,
               hazardous_amount: container.hazardous_amount || 0,
+              vgm: container.vgm || false,
+              vgm_amount: container.vgm_amount || 0,
+              truckregnumber: container.truckregnumber || null,
+              rate_per_container: container.rate_per_container || 0,
+              leg_date: container.leg_date || null,
             })
           );
         }
@@ -385,7 +393,7 @@ const ClientInvoice = () => {
 
       currentY = doc.lastAutoTable.finalY + (isCompactLayout ? 5 : 7);
 
-      // Container Table
+      // Enhanced Container Table with all new columns
       const hasWeights = containers.some(
         (container) => container.weight && container.weight !== "N/A"
       );
@@ -396,23 +404,48 @@ const ClientInvoice = () => {
       const hasHazardous = containers.some(
         (container) => container.hazardous || container.hazardous_amount > 0
       );
+      const hasVGM = containers.some(
+        (container) => container.vgm || container.vgm_amount > 0
+      );
+      const hasTrucks = containers.some(
+        (container) => container.truckregnumber
+      );
+      const hasRates = containers.some(
+        (container) => container.rate_per_container > 0
+      );
 
-      const containerHeaders = ["Container Number"];
+      const containerHeaders = ["Container Number", "Type"];
       if (hasWeights) containerHeaders.push("Weight");
+      if (hasTrucks) containerHeaders.push("Truck Reg");
+      if (hasRates) containerHeaders.push("Rate");
       if (hasSurcharges) containerHeaders.push("Surcharges");
       if (hasHazardous) containerHeaders.push("Hazardous");
+      if (hasVGM) containerHeaders.push("VGM");
 
       const containerData =
         containers.length > 0
           ? containers.map((container) => {
-              const row = [container.container_number || "N/A"];
-              if (
-                hasWeights &&
-                container.weight &&
-                container.weight !== "N/A"
-              ) {
-                row.push(container.weight);
+              const row = [
+                container.container_number || "N/A",
+                container.container_type || "Standard"
+              ];
+              
+              if (hasWeights && container.weight && container.weight !== "N/A") {
+                row.push(`${container.weight} kg`);
+              } else if (hasWeights) {
+                row.push("-");
               }
+              
+              if (hasTrucks) {
+                row.push(container.truckregnumber || "-");
+              }
+              
+              if (hasRates) {
+                row.push(container.rate_per_container > 0 
+                  ? formatCurrency(container.rate_per_container) 
+                  : "-");
+              }
+              
               if (hasSurcharges) {
                 const surchargeText =
                   container.surcharge_amount > 0
@@ -420,6 +453,7 @@ const ClientInvoice = () => {
                     : "-";
                 row.push(surchargeText);
               }
+              
               if (hasHazardous) {
                 const hazardText =
                   container.hazardous_amount > 0
@@ -427,6 +461,15 @@ const ClientInvoice = () => {
                     : "-";
                 row.push(hazardText);
               }
+              
+              if (hasVGM) {
+                const vgmText =
+                  container.vgm_amount > 0
+                    ? formatCurrency(container.vgm_amount)
+                    : "-";
+                row.push(vgmText);
+              }
+              
               return row;
             })
           : [["No container information"]];
@@ -446,6 +489,16 @@ const ClientInvoice = () => {
           textColor: [255, 255, 255],
           fontStyle: "bold",
         },
+        columnStyles: {
+          0: { cellWidth: 25 },
+          1: { cellWidth: 20 },
+          2: { cellWidth: 20 },
+          3: { cellWidth: 20 },
+          4: { cellWidth: 20 },
+          5: { cellWidth: 20 },
+          6: { cellWidth: 20 },
+          7: { cellWidth: 20 },
+        },
         margin: { left: margins.left, right: margins.right },
       });
 
@@ -456,77 +509,83 @@ const ClientInvoice = () => {
       const vat = calculateVAT(amount);
       const total = invoiceData.invoice?.total_amount || amount + vat;
 
-      // Store the Y position for the side-by-side layout
-      const sectionStartY = currentY;
+      // Summary Table
+      const summaryData = [
+        ["Amount (excl. VAT)", formatCurrency(amount)],
+      ];
+      
+      if (vat > 0) {
+        summaryData.push(["VAT", formatCurrency(vat)]);
+      }
+      summaryData.push(["Total Amount", formatCurrency(total)]);
 
-      // Banking Details on the LEFT side
-      const leftColumnWidth = (pageWidth - margins.left - margins.right) * 0.55; // 55% of available width
+      autoTable(doc, {
+        startY: currentY,
+        head: [["Invoice Summary"]],
+        body: summaryData,
+        theme: "grid",
+        styles: {
+          fontSize: fonts.normal,
+          cellPadding: 3,
+          lineWidth: 0.1,
+        },
+        headStyles: {
+          fillColor: [70, 130, 180],
+          textColor: [255, 255, 255],
+          fontStyle: "bold",
+        },
+        columnStyles: {
+          0: { fontStyle: "bold", cellWidth: 60 },
+          1: { halign: "right" },
+        },
+        margin: { left: margins.left, right: margins.right },
+      });
 
-      doc.setFontSize(fonts.normal);
-      doc.setFont("helvetica", "bold");
-      doc.text("Banking Details", margins.left, currentY);
-      currentY += isCompactLayout ? 6 : 8;
+      currentY = doc.lastAutoTable.finalY + 10;
 
+      // Banking Details
       doc.setFontSize(fonts.small);
       doc.setFont("helvetica", "normal");
-
+      
       const bankingDetails = [
         `Account Name: ${invoiceData.name_of_acc || ""}`,
         `Bank Name: ${invoiceData.bank || ""}`,
         `Account Number: ${invoiceData.account_num || ""}`,
         `Branch Code: ${invoiceData.branch_code || ""}`,
         `SWIFT Code: ${invoiceData.swift_code || ""}`,
-        `Reference: ${invoiceData.invoice_num || ""}`,
-      ];
+        `Invoice Number: ${invoiceData.invoice_num || ""}`,
+      ].filter(Boolean);
 
       bankingDetails.forEach((detail) => {
         doc.text(detail, margins.left, currentY);
-        currentY += isCompactLayout ? 5 : 6;
+        currentY += 5;
       });
 
-      // Invoice Summary Table on the RIGHT side
-      const rightColumnStart = margins.left + leftColumnWidth + 5; // 5mm gap
-      const rightColumnWidth = (pageWidth - margins.left - margins.right) * 0.4; // 40% of available width
+      currentY += 5;
 
-      const summaryData = [["Amount (excl. VAT)", formatCurrency(amount)]];
-
-      if (vat > 0) {
-        summaryData.push([`VAT (${invoiceData.vat}%)`, formatCurrency(vat)]);
-      }
-
-      summaryData.push(["Total Amount", formatCurrency(total)]);
-
-      autoTable(doc, {
-        startY: sectionStartY,
-        head: [["Invoice Summary", ""]],
-        body: summaryData,
-        theme: "grid",
-        styles: {
-          fontSize: fonts.small,
-          cellPadding: isCompactLayout ? 1.5 : 2.5,
-          lineWidth: 0.1,
-        },
-        headStyles: {
-          fillColor: [34, 139, 34],
-          textColor: [255, 255, 255],
-          fontStyle: "bold",
-        },
-        bodyStyles: {
-          0: { fontStyle: "normal" },
-          1: { fontStyle: "normal" },
-        },
-        columnStyles: {
-          0: { cellWidth: rightColumnWidth * 0.6 },
-          1: { cellWidth: rightColumnWidth * 0.4, halign: "right" },
-        },
-        margin: { left: rightColumnStart, right: margins.right },
-      });
+      // Footer
+      doc.setFontSize(fonts.small);
+      doc.setFont("helvetica", "italic");
+      doc.text(
+        "Please ensure the invoice number is referenced when making payment.",
+        margins.left,
+        currentY
+      );
+      currentY += 8;
+      
+      doc.text(
+        `Thank you for choosing ${invoiceData.companyname || ""}.`,
+        margins.left,
+        currentY
+      );
 
       // Save the PDF
-      doc.save(`Invoice_${invoiceData.invoice_num}.pdf`);
+      const fileName = `Invoice_${invoiceData.invoice_num || invoiceData.doc_num || 'NO'}_${formatDate(invoiceData.date)}.pdf`;
+      doc.save(fileName);
+
     } catch (error) {
       console.error("Error generating PDF:", error);
-      setError("Failed to generate PDF");
+      alert("Error generating PDF. Please try again.");
     } finally {
       setPdfLoading(false);
     }
@@ -536,12 +595,7 @@ const ClientInvoice = () => {
     return (
       <div className="client-invoice-wrapper">
         <div className="invoice-page">
-          <div className="loading-error">Loading invoice data...</div>
-          <div className="invoicedownloadbtn1">
-            <button className="back-btn" onClick={() => navigate("/invoices")}>
-              Back
-            </button>
-          </div>
+          <div className="loading">Loading invoice...</div>
         </div>
       </div>
     );
@@ -671,7 +725,7 @@ const ClientInvoice = () => {
               </tbody>
             </table>
 
-            {/* Container Details */}
+            {/* Enhanced Container Details */}
             <div className="container-section">
               <table className="container-table5">
                 <thead>
@@ -679,10 +733,17 @@ const ClientInvoice = () => {
                     <th className="container-number-header">
                       Container Number
                     </th>
+                    <th className="type-header">Type</th>
                     {containers.some(
                       (container) =>
                         container.weight && container.weight !== "N/A"
                     ) && <th className="weight-header">Weight</th>}
+                    {containers.some(
+                      (container) => container.truckregnumber
+                    ) && <th className="truck-header">Truck Reg</th>}
+                    {containers.some(
+                      (container) => container.rate_per_container > 0
+                    ) && <th className="rate-header">Rate</th>}
                     {containers.some(
                       (container) =>
                         container.add_surcharges ||
@@ -692,6 +753,9 @@ const ClientInvoice = () => {
                       (container) =>
                         container.hazardous || container.hazardous_amount > 0
                     ) && <th className="hazardous-header">Hazardous</th>}
+                    {containers.some(
+                      (container) => container.vgm || container.vgm_amount > 0
+                    ) && <th className="vgm-header">VGM</th>}
                   </tr>
                 </thead>
                 <tbody>
@@ -699,11 +763,14 @@ const ClientInvoice = () => {
                     containers.map((container, index) => {
                       const hasWeight =
                         container.weight && container.weight !== "N/A";
+                      const hasTruck = container.truckregnumber;
+                      const hasRate = container.rate_per_container > 0;
                       const hasSurcharge =
                         container.add_surcharges ||
                         container.surcharge_amount > 0;
                       const hasHazard =
                         container.hazardous || container.hazardous_amount > 0;
+                      const hasVGM = container.vgm || container.vgm_amount > 0;
 
                       return (
                         <tr key={index}>
@@ -711,11 +778,28 @@ const ClientInvoice = () => {
                             {container.container_number ||
                               `Container ${index + 1}`}
                           </td>
+                          <td className="container-type">
+                            {container.container_type || "Standard"}
+                          </td>
                           {containers.some(
                             (c) => c.weight && c.weight !== "N/A"
                           ) && (
                             <td className="weight">
-                              {hasWeight ? container.weight : "N/A"}
+                              {hasWeight ? `${container.weight} kg` : "N/A"}
+                            </td>
+                          )}
+                          {containers.some((c) => c.truckregnumber) && (
+                            <td className="truck-reg">
+                              {hasTruck ? container.truckregnumber : "-"}
+                            </td>
+                          )}
+                          {containers.some(
+                            (c) => c.rate_per_container > 0
+                          ) && (
+                            <td className="rate">
+                              {hasRate
+                                ? formatCurrency(container.rate_per_container)
+                                : "-"}
                             </td>
                           )}
                           {containers.some(
@@ -736,12 +820,21 @@ const ClientInvoice = () => {
                                 : "-"}
                             </td>
                           )}
+                          {containers.some(
+                            (c) => c.vgm || c.vgm_amount > 0
+                          ) && (
+                            <td className="vgm">
+                              {container.vgm_amount > 0
+                                ? formatCurrency(container.vgm_amount)
+                                : "-"}
+                            </td>
+                          )}
                         </tr>
                       );
                     })
                   ) : (
                     <tr>
-                      <td className="container-number" colSpan="4">
+                      <td className="container-number" colSpan="8">
                         No container information
                       </td>
                     </tr>
