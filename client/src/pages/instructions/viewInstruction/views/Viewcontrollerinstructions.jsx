@@ -665,7 +665,7 @@ const Viewcontrollerinstructions = () => {
       <div className="controller-instructions-unique-wrapper">
         {/* Header with Back Button */}
         <div className="controller-instructions-header">
-          <button className="controller-instructions-back-button" onClick={() => navigate("/CompanyInstructions")}>
+          <button className="controller-instructions-back-button" onClick={handleBackClick}>
             Back
           </button>
         </div>

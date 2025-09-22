@@ -8,7 +8,7 @@ env:
   AWS_REGION: af-south-1
   EB_APPLICATION_NAME: Whizz-Away
   EB_ENVIRONMENT_NAME: Whizz-Away-env
-  S3_BUCKET_NAME: whizz-away-versions-main
+  S3_BUCKET_NAME: whizz-away-versions-prod
   DEPLOYMENT_PACKAGE: whizz-${{ github.sha }}.zip
 jobs:
   build-and-deploy:

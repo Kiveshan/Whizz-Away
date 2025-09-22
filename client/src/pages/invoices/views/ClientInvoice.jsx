@@ -52,6 +52,7 @@ const ClientInvoice = () => {
   const [editData, setEditData] = useState({
     dropoff: "",
     amount: "",
+    invoice_num: "",
   });
   const [saveLoading, setSaveLoading] = useState(false);
   const [saveError, setSaveError] = useState(null);
@@ -96,6 +97,11 @@ const ClientInvoice = () => {
 
         if (isMounted) {
           setInvoiceData(response.data.data);
+          setEditData({
+            dropoff: response.data.data.dropoff || "",
+            amount: response.data.data.total_cost || "",
+            invoice_num: response.data.data.invoice_num || "",
+          });
           setLoading(false);
         }
       } catch (err) {
@@ -143,6 +149,73 @@ const ClientInvoice = () => {
       isMounted = false;
     };
   }, [id, navigate]);
+
+  const handleEditClick = () => {
+    setIsEditMode(true);
+    setSaveError(null);
+  };
+
+  const handleCancelEdit = () => {
+    setIsEditMode(false);
+    setEditData({
+      dropoff: invoiceData.dropoff || "",
+      amount: invoiceData.total_cost || "",
+      invoice_num: invoiceData.invoice_num || "",
+    });
+    setSaveError(null);
+    setShowConfirmDialog(false);
+  };
+
+  const handleInputChange = (field, value) => {
+    setEditData((prev) => ({
+      ...prev,
+      [field]: value,
+    }));
+  };
+
+  const handleSaveClick = () => {
+    setShowConfirmDialog(true);
+  };
+
+  const handleConfirmSave = async () => {
+    setSaveLoading(true);
+    setSaveError(null);
+
+    try {
+      const updateData = {
+        m1key: invoiceData.m1key,
+        dropoff: editData.dropoff || undefined,
+        rate: editData.amount ? Number.parseFloat(editData.amount) : undefined,
+        invoice_num: editData.invoice_num || undefined,
+      };
+
+      const response = await api.put(
+        "/api/invoice/update-instruction",
+        updateData
+      );
+
+      if (response.data.success) {
+        setInvoiceData({
+          ...invoiceData,
+          dropoff: response.data.data.dropoff || invoiceData.dropoff,
+          total_cost: response.data.data.total_cost || invoiceData.total_cost,
+          invoice_num:
+            response.data.data.invoice_num || invoiceData.invoice_num,
+        });
+        setIsEditMode(false);
+        setShowConfirmDialog(false);
+      } else {
+        setSaveError(response.data.message || "Failed to save changes");
+      }
+    } catch (err) {
+      console.error("Error saving invoice changes:", err);
+      setSaveError(
+        err.response?.data?.message || err.message || "Failed to save changes"
+      );
+    } finally {
+      setSaveLoading(false);
+    }
+  };
 
   const calculateVAT = (amount) => {
     if (invoiceData?.invoice?.vat_amount !== undefined) {
@@ -260,7 +333,9 @@ const ClientInvoice = () => {
 
       // Destination Table
       const destinationRoute = `${invoiceData.pickup || ""} to ${
-        `${document.getElementById("dropoff").innerHTML}` || ""
+        document.getElementById("dropoff")?.innerHTML ||
+        invoiceData.dropoff ||
+        ""
       }`;
       const destinationData = [["Destination", destinationRoute]];
 
@@ -444,148 +519,16 @@ const ClientInvoice = () => {
           0: { cellWidth: rightColumnWidth * 0.6 },
           1: { cellWidth: rightColumnWidth * 0.4, halign: "right" },
         },
-        didParseCell: (data) => {
-          if (data.row.index === summaryData.length - 1) {
-            data.cell.styles.fontStyle = "bold";
-            data.cell.styles.fillColor = [220, 220, 220];
-          }
-        },
         margin: { left: rightColumnStart, right: margins.right },
       });
 
-      // Calculate the final Y position (whichever section is lower)
-      const bankingEndY = currentY;
-      const summaryEndY = doc.lastAutoTable.finalY;
-      currentY =
-        Math.max(bankingEndY, summaryEndY) + (isCompactLayout ? 8 : 10);
-
-      // Payment note and thank you message
-      doc.setFontSize(fonts.tiny);
-      doc.text(
-        "Please ensure the invoice number is referenced when making payment.",
-        margins.left,
-        currentY
-      );
-      currentY += isCompactLayout ? 4 : 5;
-
-      doc.setFontSize(fonts.small);
-      doc.text(
-        `Thank you for choosing ${invoiceData.companyname}.`,
-        margins.left,
-        currentY
-      );
-
       // Save the PDF
-      const filename = `Invoice-${invoiceData.invoice_num}.pdf`;
-      doc.save(filename);
-
-      setPdfLoading(false);
+      doc.save(`Invoice_${invoiceData.invoice_num}.pdf`);
     } catch (error) {
-      console.error("PDF generation error:", error);
-      setPdfLoading(false);
-    }
-  };
-
-  const handleEditClick = () => {
-    if (invoiceData) {
-      setEditData({
-        dropoff: invoiceData.dropoff || "",
-        amount: (
-          invoiceData.invoice?.amount ||
-          invoiceData.total_cost ||
-          0
-        ).toString(),
-      });
-      setIsEditMode(true);
-      setSaveError(null);
-    }
-  };
-
-  const handleCancelEdit = () => {
-    setIsEditMode(false);
-    setEditData({ dropoff: "", amount: "" });
-    setSaveError(null);
-  };
-
-  const handleInputChange = (field, value) => {
-    if (field === "amount") {
-      // Remove any non-numeric characters except decimal point
-      const numericValue = value.replace(/[^0-9.]/g, "");
-
-      // Ensure only one decimal point
-      const parts = numericValue.split(".");
-      if (parts.length > 2) {
-        return; // Don't update if more than one decimal point
-      }
-
-      // Prevent negative values
-      if (Number.parseFloat(numericValue) < 0) {
-        return;
-      }
-
-      setEditData((prev) => ({ ...prev, [field]: numericValue }));
-    } else {
-      setEditData((prev) => ({ ...prev, [field]: value }));
-    }
-  };
-
-  const handleSaveClick = () => {
-    // Validate amount
-    const amount = Number.parseFloat(editData.amount);
-    if (isNaN(amount) || amount < 0) {
-      setSaveError("Amount must be a valid positive number");
-      return;
-    }
-
-    setShowConfirmDialog(true);
-  };
-
-  const handleConfirmSave = async () => {
-    setSaveLoading(true);
-    setSaveError(null);
-    setShowConfirmDialog(false);
-
-    try {
-      const updateData = {
-        m1key: invoiceData.m1key,
-        dropoff: editData.dropoff.trim(),
-        rate: Number.parseFloat(editData.amount),
-      };
-
-      console.log("Sending update request:", updateData);
-
-      const response = await api.put(
-        "/api/invoice/update-instruction",
-        updateData
-      );
-
-      console.log("Update response:", response.data);
-
-      if (response.data.success) {
-        // Update local state with new data
-        setInvoiceData((prev) => ({
-          ...prev,
-          dropoff: editData.dropoff.trim(),
-          total_cost: Number.parseFloat(editData.amount),
-          invoice: {
-            ...prev.invoice,
-            amount: Number.parseFloat(editData.amount),
-          },
-        }));
-
-        setIsEditMode(false);
-        setEditData({ dropoff: "", amount: "" });
-      } else {
-        setSaveError(response.data.message || "Failed to update instruction");
-      }
-    } catch (err) {
-      console.error("Error updating instruction:", err);
-      setSaveError(
-        err.response?.data?.message ||
-          "Failed to update instruction. Please try again."
-      );
+      console.error("Error generating PDF:", error);
+      setError("Failed to generate PDF");
     } finally {
-      setSaveLoading(false);
+      setPdfLoading(false);
     }
   };
 
@@ -686,9 +629,9 @@ const ClientInvoice = () => {
 
           {/* Vessel/Ref and Destination */}
           <div className="vessel-destination">
-            <div className="vessel">Starting : {invoiceData.pickup}</div>
+            <div className="vessel">Starting: {invoiceData.pickup}</div>
             <div className="destination" id="destination">
-              Destination :
+              Destination:
               {isEditMode ? (
                 <input
                   type="text"
@@ -862,7 +805,24 @@ const ClientInvoice = () => {
             <div>Account Number: {invoiceData.account_num}</div>
             <div>Branch Code: {invoiceData.branch_code}</div>
             <div>SWIFT Code: {invoiceData.swift_code}</div>
-            <div>Reference: {invoiceData.invoice_num}</div>
+            <div className="invoice-number-value">
+              Reference:
+              {isEditMode ? (
+                <input
+                  type="text"
+                  value={editData.invoice_num}
+                  onChange={(e) =>
+                    handleInputChange("invoice_num", e.target.value)
+                  }
+                  className="edit-input invoice-num-input"
+                  placeholder="Enter invoice number"
+                />
+              ) : (
+                <div className="invoice-num" id="invoice_num">
+                  {invoiceData.invoice_num}
+                </div>
+              )}
+            </div>
             <div className="payment-note">
               Please ensure the invoice number is referenced when making
               payment.
