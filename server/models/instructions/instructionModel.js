@@ -911,7 +911,10 @@ export const getInstructionById = async (instructionId) => {
         file_ref,
         "Hazardous",
         "Add Surcharges",
-        "Surcharge Amount"
+        "Surcharge Amount",
+        "Hazardous Amount",
+        vgm,
+        "vgm amount"
       FROM 
         public.container
       WHERE 
@@ -932,7 +935,10 @@ export const getInstructionById = async (instructionId) => {
               'm1key', c.m1key,
               'Hazardous', COALESCE(c."Hazardous", false),
               'Add Surcharges', COALESCE(c."Add Surcharges", false),
-              'Surcharge Amount', COALESCE(c."Surcharge Amount", 0)
+              'Surcharge Amount', COALESCE(c."Surcharge Amount", 0),
+              'Hazardous Amount', COALESCE(c."Hazardous Amount", 0),
+              'vgm', COALESCE(c.vgm, false),
+              'vgm amount', COALESCE(c."vgm amount", 0)
             )
             ORDER BY c.containerkey
           )
@@ -1290,6 +1296,7 @@ export const getClientRates = async (clientId, start, destination) => {
       "12m_rate" as "twelveMeterRate",
       surcharges,
       hazardous,
+      vgm,
       starting_point as "startingPoint",
       destination
     FROM public.m5_client_rate
@@ -1501,6 +1508,12 @@ const compareContainers = (currentContainers, newContainers) => {
           newContainer["Surcharge Amount"] || newContainer.surchargeAmount || 0
         );
 
+        // Handle VGM flag and amount
+        const currentVgm = Boolean(currentContainer["vgm"]);
+        const newVgm = Boolean(newContainer["vgm"] || newContainer.vgm);
+        const currentVgmAmount = Number(currentContainer["vgm amount"] || 0);
+        const newVgmAmount = Number(newContainer["vgm amount"] || newContainer.vgmAmount || 0);
+
         const hasChanges =
           currentContainer.containernum !== containerNum ||
           currentContainer.weight !== weight ||
@@ -1508,7 +1521,9 @@ const compareContainers = (currentContainers, newContainers) => {
           currentContainer.cargo_description !== cargoDescription ||
           currentHazardous !== newHazardous ||
           currentAddSurcharges !== newAddSurcharges ||
-          currentSurchargeAmount !== newSurchargeAmount;
+          currentSurchargeAmount !== newSurchargeAmount ||
+          currentVgm !== newVgm ||
+          currentVgmAmount !== newVgmAmount;
 
         console.log(
           `[${new Date().toISOString()}] [MODEL] Comparing container ${key}:`,
@@ -1538,6 +1553,16 @@ const compareContainers = (currentContainers, newContainers) => {
               new: newSurchargeAmount,
               changed: currentSurchargeAmount !== newSurchargeAmount,
             },
+            vgm: {
+              current: currentVgm,
+              new: newVgm,
+              changed: currentVgm !== newVgm,
+            },
+            vgmAmount: {
+              current: currentVgmAmount,
+              new: newVgmAmount,
+              changed: currentVgmAmount !== newVgmAmount,
+            },
             hasChanges,
           }
         );
@@ -1552,6 +1577,8 @@ const compareContainers = (currentContainers, newContainers) => {
             Hazardous: newHazardous,
             "Add Surcharges": newAddSurcharges,
             "Surcharge Amount": newSurchargeAmount,
+            vgm: newVgm,
+            "vgm amount": newVgmAmount,
             file_ref: newContainer.file_ref || "", // Add file_ref field to update
           });
         }
@@ -1925,7 +1952,9 @@ export const updateFCInstructionAndContainers = async (
 
     // 5. Handle containers
     const getCurrentContainersQuery = `
-      SELECT containerkey, containernum, weight, container_type, cargo_description, "Add Surcharges", "Hazardous", "Surcharge Amount"
+      SELECT containerkey, containernum, weight, container_type, cargo_description,
+             "Add Surcharges", "Hazardous", "Surcharge Amount",
+             "vgm", "vgm amount"
       FROM public.container
       WHERE m1key = $1
       ORDER BY containerkey
@@ -1955,6 +1984,11 @@ export const updateFCInstructionAndContainers = async (
         containerChanges.toDelete.length
       } to delete`
     );
+
+    // Make current instruction fields available for rate lookups (hazardous/VGM)
+    const clientId = currentInstruction.client;
+    const pickup = currentInstruction.pickup;
+    const dropoff = currentInstruction.dropoff;
 
     // Delete containers
     for (const containerKey of containerChanges.toDelete) {
@@ -2081,8 +2115,7 @@ export const updateFCInstructionAndContainers = async (
           "Hazardous Amount" = $8,
           "vgm" = $9,
           "vgm amount" = $10,
-          file_ref = $11,
-          updated_at = CURRENT_TIMESTAMP
+          file_ref = $11
         WHERE containerkey = $12
         RETURNING *
       `;
