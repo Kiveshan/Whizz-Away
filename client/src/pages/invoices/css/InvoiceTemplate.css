@@ -131,6 +131,48 @@
   border-right: 1px solid #000;
 }
 
+/* Additional destination styles */
+.dropoff-row {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.additional-destination-display {
+  font-size: 13px;
+  color: #666;
+  font-style: italic;
+  margin-top: 5px;
+  padding: 4px 8px;
+  background-color: #f8f9fa;
+  border-radius: 3px;
+  border-left: 3px solid #007bff;
+}
+
+.additional-destination-edit {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 5px;
+  padding: 5px;
+  background-color: #f8f9fa;
+  border-radius: 3px;
+  border: 1px solid #dee2e6;
+}
+
+.additional-label {
+  font-weight: bold;
+  color: #495057;
+  font-size: 12px;
+  white-space: nowrap;
+}
+
+.additional-destination-input {
+  flex: 1;
+  min-width: 200px;
+  max-width: 100%;
+}
+
 /* Invoice Details */
 .invoice-details {
   margin: 15px 0 0 0; /* Added top margin to move table down */
@@ -190,41 +232,229 @@
   overflow: hidden;
   border: 1px solid #ddd;
   margin-left: 14px;
+  font-size: 12px; /* Slightly smaller font for more columns */
 }
 
-.container-table th {
+.container-table5 th {
   background-color: #b8d1f3;
-  padding: 8px 12px;
+  padding: 6px 8px; /* Reduced padding to fit more columns */
   text-align: left;
-  font-size: 14px;
+  font-size: 12px;
   font-weight: normal;
   border-right: 1px solid #ddd;
+  vertical-align: middle;
 }
 
-.container-table th:last-child {
+.container-table5 th:last-child {
   border-right: none;
 }
 
-.container-table td {
-  padding: 8px 12px;
-  font-size: 14px;
+.container-table5 td {
+  padding: 6px 8px; /* Reduced padding to fit more columns */
+  font-size: 12px;
   border-right: 1px solid #ddd;
   border-top: 1px solid #ddd;
+  vertical-align: top;
 }
 
-.container-table td:last-child {
+.container-table5 td:last-child {
   border-right: none;
 }
 
-.container-number {
+/* Container table header and cell styles using th wrappers */
+.container-table5 .container-number-header,
+.container-table5 .container-number {
+  width: 12%;
+  min-width: 80px;
   text-align: left;
 }
 
-.weight,
-.amount,
-.vat,
-.total {
+.container-table5 .type-header,
+.container-table5 .container-type {
+  width: 10%;
+  min-width: 70px;
   text-align: left;
+}
+
+.container-table5 .weight-header,
+.container-table5 .weight {
+  width: 10%;
+  min-width: 70px;
+  text-align: left;
+}
+
+.container-table5 .truck-header,
+.container-table5 .truck-reg {
+  width: 10%;
+  min-width: 70px;
+  text-align: center;
+  font-family: monospace;
+  font-weight: bold;
+}
+
+.container-table5 .rate-header,
+.container-table5 .rate {
+  width: 8%;
+  min-width: 60px;
+  text-align: right;
+  padding-right: 4px;
+  position: relative;
+}
+
+.container-table5 .rate::after {
+  content: '';
+  position: absolute;
+  right: -4px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 0;
+  height: 0;
+  border-left: 4px solid transparent;
+  border-right: 4px solid transparent;
+  border-top: 4px solid #007bff;
+  opacity: 0;
+  transition: opacity 0.2s;
+}
+
+.container-table5 .rate:hover::after {
+  opacity: 1;
+}
+
+.container-table5 .rate[title]:hover::after {
+  border-top-color: #dc3545;
+}
+
+.container-table5 .surcharge-header {
+  width: 8%;
+  min-width: 60px;
+  text-align: center;
+  font-weight: bold;
+}
+
+.container-table5 .surcharge {
+  width: 8%;
+  min-width: 60px;
+  text-align: right;
+  padding-right: 4px;
+}
+
+.container-table5 .hazardous-header {
+  width: 8%;
+  min-width: 60px;
+  text-align: center;
+  font-weight: bold;
+}
+
+.container-table5 .hazardous {
+  width: 8%;
+  min-width: 60px;
+  text-align: right;
+  padding-right: 4px;
+}
+
+.container-table5 .vgm-header {
+  width: 8%;
+  min-width: 60px;
+  text-align: center;
+  font-weight: bold;
+}
+
+.container-table5 .vgm {
+  width: 8%;
+  min-width: 60px;
+  text-align: right;
+  padding-right: 4px;
+}
+
+/* Summary table styles */
+.container-table5 .summary-header {
+  background-color: #4682b4 !important;
+  color: white !important;
+  font-weight: bold !important;
+  text-align: center;
+  padding: 8px 12px !important;
+  font-size: 13px !important;
+}
+
+.container-table5 .summary-label {
+  font-weight: normal;
+  padding: 8px 12px;
+}
+
+.container-table5 .summary-value {
+  font-weight: bold;
+  text-align: right;
+  padding: 8px 12px;
+}
+
+.container-table5 .summary-total-row .summary-label,
+.container-table5 .summary-total-row .summary-value {
+  font-weight: bold;
+  font-size: 13px;
+  border-top: 2px solid #000;
+}
+
+.container-table5 .summary-total-label {
+  background-color: #f0f0f0;
+}
+
+/* Responsive adjustments for smaller screens */
+@media (max-width: 768px) {
+  .container-table5 {
+    width: 100%;
+    font-size: 10px;
+    margin-left: 0;
+  }
+  
+  .container-table5 th,
+  .container-table5 td {
+    padding: 4px 3px;
+  }
+  
+  .container-table5 .container-number-header,
+  .container-table5 .container-number {
+    width: 15%;
+    min-width: 60px;
+  }
+  
+  .container-table5 .type-header,
+  .container-table5 .container-type,
+  .container-table5 .weight-header,
+  .container-table5 .weight,
+  .container-table5 .truck-header,
+  .container-table5 .truck-reg {
+    width: 12%;
+    min-width: 50px;
+  }
+  
+  .container-table5 .rate-header,
+  .container-table5 .rate,
+  .container-table5 .surcharge-header,
+  .container-table5 .surcharge,
+  .container-table5 .hazardous-header,
+  .container-table5 .hazardous,
+  .container-table5 .vgm-header,
+  .container-table5 .vgm {
+    width: 10%;
+    min-width: 45px;
+    padding-right: 2px;
+    font-size: 9px;
+  }
+
+  /* Responsive adjustments for additional destination */
+  .additional-destination-edit {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 5px;
+  }
+  
+  .additional-destination-input {
+    min-width: auto;
+  }
+  
+  .additional-label {
+    text-align: center;
+  }
 }
 
 /* Banking Details */
@@ -247,6 +477,59 @@
   text-align: center;
   margin-top: 15px;
   font-style: italic;
+}
+
+/* Invoice number specific styling */
+.invoice-number-value {
+  margin: 8px 0;
+  font-weight: bold;
+}
+
+.invoice-num {
+  font-family: monospace;
+  font-weight: bold;
+  margin-left: 10px;
+}
+
+/* Edit input styles */
+.edit-input {
+  border: 2px solid #007bff;
+  border-radius: 4px;
+  padding: 5px 8px;
+  font-size: 14px;
+  background-color: #f8f9fa;
+  transition: border-color 0.3s;
+  min-width: 100px;
+}
+
+.edit-input:focus {
+  outline: none;
+  border-color: #0056b3;
+  background-color: white;
+  box-shadow: 0 0 0 0.2rem rgba(0, 123, 255, 0.25);
+}
+
+.edit-input.additional-destination-input:focus {
+  border-color: #28a745;
+  background-color: white;
+  box-shadow: 0 0 0 0.2rem rgba(40, 167, 69, 0.25);
+}
+
+.client-invoice-wrapper .dropoff-input {
+  width: 100%;
+  margin-top: 5px;
+  max-width: 300px;
+}
+
+.client-invoice-wrapper .amount-input {
+  width: 120px;
+  text-align: right;
+}
+
+.client-invoice-wrapper .invoice-num-input {
+  width: 150px;
+  font-family: monospace;
+  font-size: 13px;
 }
 
 /* Wrapper-scoped styles for buttons and UI elements */
@@ -307,8 +590,11 @@
 .client-invoice-wrapper .edit-controls {
   display: flex;
   align-items: center;
-  gap: 10px;
+  justify-content: center; /* Center buttons horizontally */
+  gap: 12px;
   flex-wrap: wrap;
+  width: 100%;
+  margin: 16px 0; /* Add vertical spacing */
 }
 
 .client-invoice-wrapper .edit-btn {
@@ -354,31 +640,6 @@
 
 .client-invoice-wrapper .cancel-edit-btn:hover:not(:disabled) {
   background-color: #545b62;
-}
-
-.client-invoice-wrapper .edit-input {
-  border: 2px solid #007bff;
-  border-radius: 4px;
-  padding: 5px 8px;
-  font-size: 14px;
-  background-color: #f8f9fa;
-  transition: border-color 0.3s;
-}
-
-.client-invoice-wrapper .edit-input:focus {
-  outline: none;
-  border-color: #0056b3;
-  background-color: white;
-}
-
-.client-invoice-wrapper .dropoff-input {
-  width: 100%;
-  margin-top: 5px;
-}
-
-.client-invoice-wrapper .amount-input {
-  width: 120px;
-  text-align: right;
 }
 
 .client-invoice-wrapper .error-message {
@@ -512,8 +773,11 @@
 .edit-controls {
   display: flex;
   align-items: center;
-  gap: 10px;
+  justify-content: center; /* Center buttons horizontally */
+  gap: 12px;
   flex-wrap: wrap;
+  width: 100%;
+  margin: 16px 0; /* Add vertical spacing */
 }
 
 .edit-btn {
@@ -668,4 +932,142 @@
 .cancel-btn:disabled {
   opacity: 0.6;
   cursor: not-allowed;
+}
+
+/* Loading state for the entire component */
+.client-invoice-wrapper .loading {
+  text-align: center;
+  padding: 50px 20px;
+  font-size: 16px;
+  color: #666;
+  font-family: inherit;
+}
+
+/* PDF-specific styles for additional destination */
+.destination-table .additional-destination-row {
+  background-color: #f8f9fa;
+  font-style: italic;
+}
+
+/* Add these styles to your existing InvoiceTemplate.css */
+
+/* Preview mode styles */
+.client-invoice-wrapper.preview-mode {
+  background: #f8fafc;
+  padding: 10px;
+  border-radius: 8px;
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.05);
+}
+
+.client-invoice-wrapper.preview-mode .invoice-page {
+  padding: 0;
+}
+
+.client-invoice-wrapper.preview-mode .invoicedownloadbtn1.preview-mode {
+  background: #f8fafc;
+  padding: 20px;
+  border-top: 1px solid #e5e7eb;
+  border-radius: 0 0 12px 12px;
+  margin: 0;
+  justify-content: center;
+}
+
+.preview-controls {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  flex-wrap: wrap;
+  justify-content: center;
+}
+
+.preview-back-btn,
+.preview-download-btn,
+.preview-edit-btn {
+  padding: 10px 20px;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 600;
+  transition: all 0.2s ease;
+  text-decoration: none;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 44px;
+}
+
+.preview-back-btn {
+  background: #6b7280;
+  color: white;
+}
+
+.preview-back-btn:hover {
+  background: #4b5563;
+  transform: translateY(-1px);
+}
+
+.preview-download-btn {
+  background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+  color: white;
+  box-shadow: 0 2px 8px rgba(16, 185, 129, 0.2);
+}
+
+.preview-download-btn:hover:not(:disabled) {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(16, 185, 129, 0.3);
+}
+
+.preview-download-btn:disabled {
+  background: #9ca3af;
+  cursor: not-allowed;
+  opacity: 0.7;
+}
+
+.preview-edit-btn {
+  background: linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%);
+  color: white;
+  box-shadow: 0 2px 8px rgba(59, 130, 246, 0.2);
+}
+
+.preview-edit-btn:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(59, 130, 246, 0.3);
+}
+
+/* Responsive preview controls */
+@media (max-width: 768px) {
+  .preview-controls {
+    flex-direction: column;
+    gap: 10px;
+    width: 100%;
+  }
+  
+  .preview-back-btn,
+  .preview-download-btn,
+  .preview-edit-btn {
+    width: 100%;
+    max-width: 280px;
+    justify-content: center;
+  }
+}
+
+/* Preview mode indicator */
+.preview-mode-indicator {
+  position: absolute;
+  top: 20px;
+  right: 20px;
+  background: rgba(79, 70, 229, 0.9);
+  color: white;
+  padding: 6px 12px;
+  border-radius: 20px;
+  font-size: 12px;
+  font-weight: 600;
+  z-index: 10;
+  animation: pulse 2s infinite;
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.7; }
 }

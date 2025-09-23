@@ -1303,6 +1303,7 @@ export function useApi(state, actions) {
                 "12m_rate": "",
                 surcharges: "",
                 hazardous: "",
+                vgm: "",
               },
             ],
           })

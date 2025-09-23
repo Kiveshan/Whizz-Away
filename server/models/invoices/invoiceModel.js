@@ -65,6 +65,7 @@ const getCompletedInvoices = async ({ year, month, type, clientId }) => {
   }
 };
 
+// In invoiceModel.js - Update the getInvoiceDetails function
 const getInvoiceDetails = async (id) => {
   let client;
   try {
@@ -96,9 +97,14 @@ const getInvoiceDetails = async (id) => {
         m1.pickup,
         m1.dropoff,
         m1.vessel_name,
+        -- Base rates from m1_controller
+        m1.rateper_6,
+        m1.rateper_12,
+        m1.rateper_abnormal,
         i.invoice_num,
         i.doc_num,
         i.date,
+        i.additional_destination_info,
         ut.cluster_box,
         ut.vat_reg_num,
         ut.address,
@@ -130,38 +136,318 @@ const getInvoiceDetails = async (id) => {
       return { success: false, message: "Instruction not found" };
     }
 
-    // Updated container query to include hazard and surcharge fields
+    // Get the base rates from the result
+    const baseRates = {
+      rateper_6: result.rows[0].rateper_6 || 0,
+      rateper_12: result.rows[0].rateper_12 || 0,
+      rateper_abnormal: result.rows[0].rateper_abnormal || 0,
+    };
+
+    // Updated container query to include all new fields and truck information
     const containerQuery = `
       SELECT 
-        containernum as container_number, 
-        weight,
-        "Add Surcharges" as add_surcharges,
-        "Hazardous" as hazardous,
-        "Surcharge Amount" as surcharge_amount,
-        "Hazardous Amount" as hazardous_amount
+        c.containernum as container_number,
+        c.weight,
+        c.container_type,
+        c.cargo_description,
+        c."Add Surcharges" as add_surcharges,
+        c."Hazardous" as hazardous,
+        c."Surcharge Amount" as surcharge_amount,
+        c."Hazardous Amount" as hazardous_amount,
+        c."vgm amount" as vgm_amount,
+        c.vgm,
+        l.truckregnumber,
+        l.driverrate as leg_rate,
+        l.date as leg_date,
+        ROW_NUMBER() OVER (PARTITION BY c.containernum ORDER BY l.date DESC) as rn
       FROM 
         public.container c
       INNER JOIN
         invoice i ON i.m1key = c.m1key
+      LEFT JOIN 
+        public.legs_m2 l ON c.containernum = l.containernumber AND c.m1key = l.m1key
       WHERE
         i.ikey = $1
+      ORDER BY c.containernum, l.date DESC
     `;
+    
     const containerResult = await query(containerQuery, [id]);
+    
+    // Process container data to get the most recent truck for each container and determine the correct rate
+    const containerMap = new Map();
+    containerResult.rows.forEach(row => {
+      const containerNum = row.container_number;
+      if (!containerMap.has(containerNum)) {
+        // Determine the container type for base rate lookup (6m, 12m, abnormal)
+        let containerType = 'abnormal'; // default
+        const ct = (row.container_type || '').toLowerCase();
+        if (ct && (ct.includes('20') || ct.includes('6'))) {
+          containerType = '6';
+        } else if (ct && (ct.includes('40') || ct.includes('12'))) {
+          containerType = '12';
+        }
+
+        // Determine the rate to use - prioritize special rates, then leg rate, then base rate
+        let displayRate = 0;
+        const hasSpecialRate = 
+          row.surcharge_amount > 0 || 
+          row.hazardous_amount > 0 || 
+          row.vgm_amount > 0;
+
+        if (hasSpecialRate) {
+          // Use the highest special rate
+          displayRate = Math.max(
+            row.surcharge_amount || 0,
+            row.hazardous_amount || 0,
+            row.vgm_amount || 0
+          );
+        } else if (row.leg_rate && row.rn === 1) {
+          // Use leg rate if available and it's the most recent leg
+          displayRate = row.leg_rate;
+        } else {
+          // Use base rate based on container type
+          displayRate = baseRates[`rateper_${containerType}`] || 0;
+        }
+
+        containerMap.set(containerNum, {
+          container_number: row.container_number,
+          weight: row.weight,
+          container_type: row.container_type || 'Standard',
+          container_type_key: containerType, // For reference
+          cargo_description: row.cargo_description,
+          add_surcharges: row.add_surcharges || false,
+          hazardous: row.hazardous || false,
+          surcharge_amount: row.surcharge_amount || 0,
+          hazardous_amount: row.hazardous_amount || 0,
+          vgm: row.vgm || false,
+          vgm_amount: row.vgm_amount || 0,
+          truckregnumber: null,
+          rate_per_container: displayRate,
+          leg_rate: row.leg_rate || 0,
+          base_rate: baseRates[`rateper_${containerType}`] || 0,
+          has_special_rate: hasSpecialRate,
+          leg_date: null
+        });
+      }
+      
+      // Prefer truck from the most recent leg; if that's missing, fall back to next with a truck
+      const existing = containerMap.get(containerNum);
+      if (row.rn === 1 && row.truckregnumber) {
+        containerMap.set(containerNum, {
+          ...existing,
+          truckregnumber: row.truckregnumber,
+          leg_date: row.leg_date,
+          rate_per_container: existing.has_special_rate ? existing.rate_per_container : (row.leg_rate || existing.base_rate)
+        });
+      } else if (!existing.truckregnumber && row.truckregnumber) {
+        // Set truck from a slightly older leg if latest leg has none
+        containerMap.set(containerNum, {
+          ...existing,
+          truckregnumber: row.truckregnumber,
+          // Do not override rate/date here; keep latest leg's rate preference
+          leg_date: existing.leg_date || row.leg_date,
+        });
+      }
+    });
+
+    const containers = Array.from(containerMap.values());
     console.log(
-      `Container query returned ${containerResult.rows.length} rows for invoice ID ${id}`
+      `Container query returned ${containers.length} unique containers for invoice ID ${id}`
     );
+    console.log("Sample container rates:", containers.slice(0, 2).map(c => ({
+      container: c.container_number,
+      rate: c.rate_per_container,
+      has_special: c.has_special_rate,
+      base_rate: c.base_rate,
+      leg_rate: c.leg_rate
+    })));
 
     return {
       success: true,
       data: {
         ...result.rows[0],
-        containers: containerResult.rows,
+        base_rates: baseRates, // Include base rates for reference
+        containers,
       },
     };
   } catch (error) {
     throw error;
   } finally {
     if (client) client.release();
+  }
+};
+// Update the updateInstructionDetails function to handle the new field
+const updateInstructionDetails = async ({
+  m1key,
+  dropoff,
+  rate,
+  invoice_num,
+  additional_destination_info, // New parameter
+}) => {
+  try {
+    if (!pool) {
+      throw new Error(
+        "Database connection not established. Please try again later."
+      );
+    }
+
+    // Validate inputs
+    if (!m1key) {
+      return {
+        success: false,
+        message: "m1key is required",
+      };
+    }
+
+    if (rate !== undefined && (isNaN(rate) || rate < 0)) {
+      return {
+        success: false,
+        message: "Rate must be a positive number",
+      };
+    }
+
+    if (
+      invoice_num !== undefined &&
+      (!invoice_num || typeof invoice_num !== "string")
+    ) {
+      return {
+        success: false,
+        message: "Invoice number must be a non-empty string",
+      };
+    }
+
+    // Validate additional destination info if provided
+    if (
+      additional_destination_info !== undefined &&
+      (additional_destination_info === "" || typeof additional_destination_info !== "string")
+    ) {
+      return {
+        success: false,
+        message: "Additional destination info must be a valid string",
+      };
+    }
+
+    // Start a transaction
+    const client = await pool.connect();
+    try {
+      await client.query("BEGIN");
+
+      let m1Result = null;
+      let invoiceResult = null;
+
+      // Check if invoice_num already exists
+      if (invoice_num !== undefined) {
+        const invoiceNumCheck = await checkInvoiceNumExists(invoice_num, m1key);
+        if (invoiceNumCheck.exists) {
+          throw new Error("Invoice number already exists in the database");
+        }
+      }
+
+      // Update m1_controller table if dropoff or rate is provided
+      if (dropoff !== undefined || rate !== undefined) {
+        const m1UpdateFields = [];
+        const m1QueryParams = [];
+        let paramIndex = 1;
+
+        if (dropoff !== undefined) {
+          m1UpdateFields.push(`dropoff = $${paramIndex}`);
+          m1QueryParams.push(dropoff);
+          paramIndex++;
+        }
+
+        if (rate !== undefined) {
+          m1UpdateFields.push(`total_cost = $${paramIndex}`);
+          m1QueryParams.push(rate);
+          paramIndex++;
+        }
+
+        m1QueryParams.push(m1key);
+
+        const m1QueryText = `
+          UPDATE public.m1_controller
+          SET ${m1UpdateFields.join(", ")}
+          WHERE m1key = $${paramIndex}
+          RETURNING m1key, dropoff, total_cost
+        `;
+
+        console.log(
+          "Executing m1_controller update query:",
+          m1QueryText,
+          "with params:",
+          m1QueryParams
+        );
+        m1Result = await client.query(m1QueryText, m1QueryParams);
+
+        if (m1Result.rows.length === 0) {
+          throw new Error("Instruction not found in m1_controller");
+        }
+      }
+
+      // Update invoice table if invoice_num or additional_destination_info is provided
+      if (invoice_num !== undefined || additional_destination_info !== undefined) {
+        const invoiceUpdateFields = [];
+        const invoiceQueryParams = [];
+        let paramIndex = 1;
+
+        if (invoice_num !== undefined) {
+          invoiceUpdateFields.push(`invoice_num = $${paramIndex}`);
+          invoiceQueryParams.push(invoice_num);
+          paramIndex++;
+        }
+
+        if (additional_destination_info !== undefined) {
+          invoiceUpdateFields.push(`additional_destination_info = $${paramIndex}`);
+          invoiceQueryParams.push(additional_destination_info);
+          paramIndex++;
+        }
+
+        invoiceQueryParams.push(m1key);
+
+        const invoiceQueryText = `
+          UPDATE public.invoice
+          SET ${invoiceUpdateFields.join(", ")}
+          WHERE m1key = $${paramIndex}
+          RETURNING ikey, invoice_num, additional_destination_info
+        `;
+
+        console.log(
+          "Executing invoice update query:",
+          invoiceQueryText,
+          "with params:",
+          invoiceQueryParams
+        );
+        invoiceResult = await client.query(invoiceQueryText, invoiceQueryParams);
+
+        if (invoiceResult.rows.length === 0) {
+          throw new Error("Invoice not found for the provided m1key");
+        }
+      }
+
+      await client.query("COMMIT");
+
+      return {
+        success: true,
+        data: {
+          m1key: m1Result ? m1Result.rows[0].m1key : m1key,
+          dropoff: m1Result ? m1Result.rows[0].dropoff : undefined,
+          total_cost: m1Result ? m1Result.rows[0].total_cost : undefined,
+          invoice_num: invoiceResult ? invoiceResult.rows[0].invoice_num : undefined,
+          additional_destination_info: invoiceResult ? invoiceResult.rows[0].additional_destination_info : undefined,
+        },
+        message: "Instruction and/or invoice updated successfully",
+      };
+    } catch (error) {
+      await client.query("ROLLBACK");
+      throw error;
+    } finally {
+      client.release();
+    }
+  } catch (error) {
+    console.error("Error updating instruction details:", error);
+    return {
+      success: false,
+      message: error.message,
+    };
   }
 };
 
@@ -294,153 +580,205 @@ const createInvoice = async ({ m1key, clientId }) => {
   }
 };
 
-const updateInstructionDetails = async ({
-  m1key,
-  dropoff,
-  rate,
-  invoice_num,
-}) => {
+
+// Helper function to get instruction details for preview
+const getInstructionDetailsForPreview = async (instructionId) => {
   try {
     if (!pool) {
-      throw new Error(
-        "Database connection not established. Please try again later."
-      );
+      throw new Error("Database connection not established");
     }
 
-    // Validate inputs
-    if (!m1key) {
-      return {
-        success: false,
-        message: "m1key is required",
-      };
-    }
-
-    if (rate !== undefined && (isNaN(rate) || rate < 0)) {
-      return {
-        success: false,
-        message: "Rate must be a positive number",
-      };
-    }
-
-    if (
-      invoice_num !== undefined &&
-      (!invoice_num || typeof invoice_num !== "string")
-    ) {
-      return {
-        success: false,
-        message: "Invoice number must be a non-empty string",
-      };
-    }
-
-    // Start a transaction
     const client = await pool.connect();
+
     try {
-      await client.query("BEGIN");
-
-      let m1Result = null;
-      let invoiceResult = null;
-
-      // Check if invoice_num already exists
-      if (invoice_num !== undefined) {
-        const invoiceNumCheck = await checkInvoiceNumExists(invoice_num, m1key);
-        if (invoiceNumCheck.exists) {
-          throw new Error("Invoice number already exists in the database");
-        }
+      // Get m1_controller details
+      const m1Query = `
+        SELECT 
+          m1.m1key,
+          m1."ksmFileRef" as instruction_no,
+          m1."clientFileRef" as file_no,
+          m1.description,
+          m1.total_cost,
+          m1.vat,
+          m1.booking_ref,
+          m1.pickup,
+          m1.dropoff,
+          m1.vessel_name,
+          m1.rateper_6,
+          m1.rateper_12,
+          m1.rateper_abnormal,
+          c.client as client_name,
+          c.m5clientkey,
+          c.companyaddress as client_address,
+          c.cellnum as client_telephone,
+          c.email as client_email,
+          c.vatregno as client_vat,
+          c.suburb as client_suburb,
+          s.shipmenttype as shipment_type,
+          COALESCE(m1.num_six_meters, 0) + COALESCE(m1.num_twelve_meters, 0) + COALESCE(m1.num_abnormal, 0) as num_containers
+        FROM public.m1_controller m1
+        LEFT JOIN public.m5_client c ON m1.client = c.m5clientkey
+        LEFT JOIN public.shipment s ON m1.shipment_type = s.shipkey
+        WHERE m1.m1key = $1
+      `;
+      
+      const m1Result = await client.query(m1Query, [instructionId]);
+      
+      if (m1Result.rows.length === 0) {
+        return { success: false, message: "Instruction not found" };
       }
 
-      // Update m1_controller table if dropoff or rate is provided
-      if (dropoff !== undefined || rate !== undefined) {
-        const m1UpdateFields = [];
-        const m1QueryParams = [];
-        let paramIndex = 1;
+      // Get containers and join legs_m2 to fetch latest truck per container
+      const containerQuery = `
+        SELECT 
+          c.containernum as container_number,
+          c.weight,
+          c.container_type,
+          c.cargo_description,
+          c."Add Surcharges" as add_surcharges,
+          c."Hazardous" as hazardous,
+          c."Surcharge Amount" as surcharge_amount,
+          c."Hazardous Amount" as hazardous_amount,
+          c."vgm amount" as vgm_amount,
+          c.vgm,
+          l.truckregnumber,
+          l.driverrate as leg_rate,
+          l.date as leg_date,
+          ROW_NUMBER() OVER (PARTITION BY c.containernum ORDER BY l.date DESC) as rn
+        FROM public.container c
+        LEFT JOIN public.legs_m2 l 
+          ON c.containernum = l.containernumber AND c.m1key = l.m1key
+        WHERE c.m1key = $1
+        ORDER BY c.containernum, l.date DESC
+      `;
+      
+      const containerResult = await client.query(containerQuery, [instructionId]);
 
-        if (dropoff !== undefined) {
-          m1UpdateFields.push(`dropoff = $${paramIndex}`);
-          m1QueryParams.push(dropoff);
-          paramIndex++;
+      // Get company details (same as regular invoice)
+      const companyQuery = `
+        SELECT 
+          cluster_box,
+          vat_reg_num,
+          address,
+          suburb,
+          branch_code,
+          bank,
+          name_of_acc,
+          companyname,
+          swift_code,
+          account_num,
+          COALESCE(cell_num, cell_num2) AS phonenumber
+        FROM usertable 
+        WHERE roleid = 1 AND status = 'active'
+        LIMIT 1
+      `;
+      
+      const companyResult = await client.query(companyQuery);
+
+      const baseRates = {
+        rateper_6: m1Result.rows[0].rateper_6 || 0,
+        rateper_12: m1Result.rows[0].rateper_12 || 0,
+        rateper_abnormal: m1Result.rows[0].rateper_abnormal || 0,
+      };
+
+      // Process containers with rate logic and attach latest truck info
+      const containerMap = new Map();
+      containerResult.rows.forEach(row => {
+        const containerNum = row.container_number;
+        if (!containerMap.has(containerNum)) {
+          let containerType = 'abnormal';
+          if ((row.container_type && row.container_type.toLowerCase().includes('20')) || 
+              (row.container_type && row.container_type.toLowerCase().includes('6'))) {
+            containerType = '6';
+          } else if ((row.container_type && row.container_type.toLowerCase().includes('40')) || 
+                     (row.container_type && row.container_type.toLowerCase().includes('12'))) {
+            containerType = '12';
+          }
+
+          let displayRate = 0;
+          const hasSpecialRate = 
+            (row.surcharge_amount || 0) > 0 || 
+            (row.hazardous_amount || 0) > 0 || 
+            (row.vgm_amount || 0) > 0;
+
+          if (hasSpecialRate) {
+            displayRate = Math.max(
+              row.surcharge_amount || 0,
+              row.hazardous_amount || 0,
+              row.vgm_amount || 0
+            );
+          } else if (row.leg_rate && row.rn === 1) {
+            displayRate = row.leg_rate;
+          } else {
+            displayRate = baseRates[`rateper_${containerType}`] || 0;
+          }
+
+          containerMap.set(containerNum, {
+            container_number: row.container_number,
+            weight: row.weight,
+            container_type: row.container_type || 'Standard',
+            container_type_key: containerType,
+            cargo_description: row.cargo_description,
+            add_surcharges: row.add_surcharges || false,
+            hazardous: row.hazardous || false,
+            surcharge_amount: row.surcharge_amount || 0,
+            hazardous_amount: row.hazardous_amount || 0,
+            vgm: row.vgm || false,
+            vgm_amount: row.vgm_amount || 0,
+            truckregnumber: null,
+            rate_per_container: displayRate,
+            leg_rate: row.leg_rate || 0,
+            base_rate: baseRates[`rateper_${containerType}`] || 0,
+            has_special_rate: hasSpecialRate,
+            leg_date: null
+          });
         }
-
-        if (rate !== undefined) {
-          m1UpdateFields.push(`total_cost = $${paramIndex}`);
-          m1QueryParams.push(rate);
-          paramIndex++;
+        // Update with latest truck info if this is the most recent leg
+        if (row.rn === 1 && row.truckregnumber) {
+          const existing = containerMap.get(containerNum);
+          containerMap.set(containerNum, {
+            ...existing,
+            truckregnumber: row.truckregnumber,
+            leg_date: row.leg_date,
+            rate_per_container: existing.has_special_rate ? existing.rate_per_container : (row.leg_rate || existing.base_rate)
+          });
+        } else if (!containerMap.get(containerNum).truckregnumber && row.truckregnumber) {
+          // Fallback: if latest leg has no truck, use the next available leg's truck
+          const existing = containerMap.get(containerNum);
+          containerMap.set(containerNum, {
+            ...existing,
+            truckregnumber: row.truckregnumber,
+            leg_date: existing.leg_date || row.leg_date,
+          });
         }
+      });
 
-        m1QueryParams.push(m1key);
-
-        const m1QueryText = `
-          UPDATE public.m1_controller
-          SET ${m1UpdateFields.join(", ")}
-          WHERE m1key = $${paramIndex}
-          RETURNING m1key, dropoff, total_cost
-        `;
-
-        console.log(
-          "Executing m1_controller update query:",
-          m1QueryText,
-          "with params:",
-          m1QueryParams
-        );
-        m1Result = await client.query(m1QueryText, m1QueryParams);
-
-        if (m1Result.rows.length === 0) {
-          throw new Error("Instruction not found in m1_controller");
-        }
-      }
-
-      // Update invoice table if invoice_num is provided
-      if (invoice_num !== undefined) {
-        const invoiceQueryText = `
-          UPDATE public.invoice
-          SET invoice_num = $1
-          WHERE m1key = $2
-          RETURNING ikey, invoice_num
-        `;
-
-        console.log(
-          "Executing invoice update query:",
-          invoiceQueryText,
-          "with params:",
-          [invoice_num, m1key]
-        );
-        invoiceResult = await client.query(invoiceQueryText, [
-          invoice_num,
-          m1key,
-        ]);
-
-        if (invoiceResult.rows.length === 0) {
-          throw new Error("Invoice not found for the provided m1key");
-        }
-      }
-
-      await client.query("COMMIT");
+      const containers = Array.from(containerMap.values());
 
       return {
         success: true,
         data: {
-          m1key: m1Result ? m1Result.rows[0].m1key : m1key,
-          dropoff: m1Result ? m1Result.rows[0].dropoff : undefined,
-          total_cost: m1Result ? m1Result.rows[0].total_cost : undefined,
-          invoice_num: invoiceResult
-            ? invoiceResult.rows[0].invoice_num
-            : undefined,
-        },
-        message: "Instruction and/or invoice updated successfully",
+          ...m1Result.rows[0],
+          containers,
+          base_rates: baseRates,
+          // Add company details
+          ...companyResult.rows[0],
+          // Add preview metadata
+          is_preview: true,
+          preview_instruction_id: instructionId,
+          preview_generated_at: new Date().toISOString()
+        }
       };
-    } catch (error) {
-      await client.query("ROLLBACK");
-      throw error;
+
     } finally {
       client.release();
     }
   } catch (error) {
-    console.error("Error updating instruction details:", error);
-    return {
-      success: false,
-      message: error.message,
-    };
+    console.error("Error getting instruction details for preview:", error);
+    return { success: false, message: error.message };
   }
 };
+
 
 export {
   getCompletedInvoices,
@@ -449,4 +787,5 @@ export {
   checkInvoiceNumExists,
   createInvoice,
   updateInstructionDetails,
+  getInstructionDetailsForPreview,
 };

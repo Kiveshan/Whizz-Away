@@ -1,3 +1,4 @@
+// Add this to your invoice routes file (invoiceRoutes.js)
 import express from "express";
 import { verifyToken } from "../../middleware/auth.js";
 import {
@@ -6,21 +7,22 @@ import {
   checkInvoiceExistsHandler,
   createInvoiceHandler,
   updateInstructionDetailsHandler,
+  generateInvoicePreviewHandler, // New handler
 } from "../../controllers/invoices/invoiceController.js";
 
 const router = express.Router();
 
 router.get("/api/invoices/completed", verifyToken, getCompletedInvoicesHandler);
 router.get("/api/invoices/:id", verifyToken, getInvoiceDetailsHandler);
-
-// New routes for invoice check and creation
 router.get("/api/invoice/check/:m1key", checkInvoiceExistsHandler);
 router.post("/api/invoice/create", verifyToken, createInvoiceHandler);
-
 router.put(
   "/api/invoice/update-instruction",
   verifyToken,
   updateInstructionDetailsHandler
 );
+
+// NEW: Preview endpoint
+router.post("/api/invoices/preview/:instructionId", verifyToken, generateInvoicePreviewHandler);
 
 export default router;

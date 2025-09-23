@@ -1,72 +1,110 @@
-"use client"
-
-import { useRef, useState } from "react"
-import { extractFilenameFromUrl } from "../../utils/helpers"
+import { useRef, useState } from "react";
+import { extractFilenameFromUrl } from "../../utils/helpers";
 
 const EmployeeForm = ({ employee, loading, isEditing, onSave, onCancel, onChange, onDeleteDocument }) => {
-  const emailRef = useRef(null)
-  const [alert, setAlert] = useState({ show: false, message: "" })
+  const emailRef = useRef(null);
+  const [alert, setAlert] = useState({ show: false, message: "" });
+  const [isCheckingEmail, setIsCheckingEmail] = useState(false);
+
+  const API_BASE_URL = process.env.REACT_APP_API_URL || "http://localhost:5000";
 
   // Validate required fields on submit
   const validateForm = () => {
-    let isValid = true
-    const requiredFields = ['name', 'surname', 'roleid', 'cellnum']
+    let isValid = true;
+    const requiredFields = ['name', 'surname', 'roleid', 'cellnum'];
     requiredFields.forEach(field => {
       if (!employee[field]) {
-        isValid = false
+        isValid = false;
       }
-    })
-    return isValid
-  }
+    });
+    return isValid;
+  };
+
+  const checkEmailExists = async (email) => {
+    try {
+      setIsCheckingEmail(true);
+      const response = await fetch(
+        `${API_BASE_URL}/check-email?email=${encodeURIComponent(email)}`
+      );
+      const data = await response.json();
+      if (data.exists) {
+        emailRef.current?.setCustomValidity("This email is already in use.");
+        setAlert({ show: true, message: "This email is already in use." });
+        return true;
+      } else {
+        emailRef.current?.setCustomValidity("");
+        setAlert({ show: false, message: "" });
+        return false;
+      }
+    } catch (error) {
+      console.error("Error checking email:", error);
+      setAlert({ show: true, message: "Error checking email availability." });
+      return false;
+    } finally {
+      setIsCheckingEmail(false);
+    }
+  };
 
   const handleSubmit = async (e) => {
-    e.preventDefault()
+    e.preventDefault();
     if (!validateForm()) {
-      e.target.reportValidity()
-      return
+      e.target.reportValidity();
+      return;
     }
-    const success = await onSave(employee, emailRef)
+
+    // For new employees, ensure email is valid if provided
+    if (!isEditing && employee.email) {
+      const emailExists = await checkEmailExists(employee.email);
+      if (emailExists) {
+        e.target.reportValidity();
+        return;
+      }
+    }
+
+    const success = await onSave(employee, emailRef);
     if (!success) {
-      return
+      return;
     }
-  }
+  };
 
   const handleFileUpload = (e) => {
-    const file = e.target.files[0]
-    const maxSizeInBytes = 5 * 1024 * 1024 // 5MB in bytes
+    const file = e.target.files[0];
+    const maxSizeInBytes = 5 * 1024 * 1024; // 5MB in bytes
 
     if (file) {
       if (file.type !== "application/pdf") {
-        setAlert({ show: true, message: "Only PDF files are allowed." })
-        return
+        setAlert({ show: true, message: "Only PDF files are allowed." });
+        return;
       }
       if (file.size > maxSizeInBytes) {
-        setAlert({ show: true, message: "File size exceeds the 5MB limit." })
-        return
+        setAlert({ show: true, message: "File size exceeds the 5MB limit." });
+        return;
       }
       if ((employee.documents?.length || 0) >= 3) {
-        setAlert({ show: true, message: "Maximum of 3 documents allowed." })
-        return
+        setAlert({ show: true, message: "Maximum of 3 documents allowed." });
+        return;
       }
-      setAlert({ show: false, message: "" }) // Clear alert on success
-      onChange("documents", [...(employee.documents || []), file])
+      setAlert({ show: false, message: "" }); // Clear alert on success
+      onChange("documents", [...(employee.documents || []), file]);
     }
-  }
+  };
 
   const removeDocument = (index) => {
-    const updatedDocs = [...(employee.documents || [])]
-    updatedDocs.splice(index, 1)
-    onChange("documents", updatedDocs)
-  }
+    const updatedDocs = [...(employee.documents || [])];
+    updatedDocs.splice(index, 1);
+    onChange("documents", updatedDocs);
+  };
 
   const closeAlert = () => {
-    setAlert({ show: false, message: "" })
-  }
+    setAlert({ show: false, message: "" });
+  };
+
+  // Check if the role is Driver (5) or Yard Staff (9)
+  const hideEmailAndPassword = employee.roleid === 5 || employee.roleid === 9;
 
   return (
     <form className="manage-add-employee-form" onSubmit={handleSubmit} noValidate>
       <h3>{isEditing ? "Edit Employee" : "Add New Employee"}</h3>
-
 
       <div
         className="manage-form-grid"
@@ -148,31 +186,42 @@ const EmployeeForm = ({ employee, loading, isEditing, onSave, onCancel, onChange
           />
         </div>
 
-        <div className="manage-form-group">
-          <label>
-            Email
-          </label>
-          <input
-            ref={emailRef}
-            type="email"
-            value={employee.email || ""}
-            onChange={(e) => {
-              emailRef.current?.setCustomValidity("")
-              onChange("email", e.target.value)
-            }}
-          />
-        </div>
+        {!hideEmailAndPassword && (
+          <>
+            <div className="manage-form-group">
+              <label>
+                Email
+              </label>
+              <input
+                ref={emailRef}
+                type="email"
+                value={employee.email || ""}
+                onChange={(e) => {
+                  emailRef.current?.setCustomValidity("");
+                  setAlert({ show: false, message: "" });
+                  onChange("email", e.target.value);
+                }}
+                onBlur={(e) => {
+                  if (!isEditing && e.target.value) {
+                    checkEmailExists(e.target.value);
+                  }
+                }}
+                disabled={isCheckingEmail}
+              />
+            </div>
 
-        <div className="manage-form-group">
-          <label>
-            Password
-          </label>
-          <input
-            type="password"
-            value={employee.password || ""}
-            onChange={(e) => onChange("password", e.target.value)}
-          />
-        </div>
+            <div className="manage-form-group">
+              <label>
+                Password
+              </label>
+              <input
+                type="password"
+                value={employee.password || ""}
+                onChange={(e) => onChange("password", e.target.value)}
+              />
+            </div>
+          </>
+        )}
 
         <div className="manage-form-group">
           <label htmlFor="roleid">
@@ -192,10 +241,22 @@ const EmployeeForm = ({ employee, loading, isEditing, onSave, onCancel, onChange
             <option value="5">Driver</option>
             <option value="3">Debtors Clerk</option>
             <option value="8">Creditors Clerk</option>
-            <option value="0">Yard Staff</option>
+            <option value="9">Yard Staff</option>
           </select>
         </div>
-
+     {alert.show && (
+          <div className="alert-box">
+            <span>{alert.message}</span>
+            <button
+              type="button"
+              className="alert-close"
+              onClick={closeAlert}
+              aria-label="Close alert"
+            >
+              &times;
+            </button>
+          </div>
+        )}
         {/* Deductions */}
         <div style={{ gridColumn: "1 / span 3" }}>
           <h3 style={{ textAlign: "center", marginTop: "30px" }}>Employee Salary Deductions</h3>
@@ -276,20 +337,7 @@ const EmployeeForm = ({ employee, loading, isEditing, onSave, onCancel, onChange
         </div>
 
         {/* Document Upload */}
-         {/* Alert Component */}
-      {alert.show && (
-        <div className="alert-box">
-          <span>{alert.message}</span>
-          <button
-            type="button"
-            className="alert-close"
-            onClick={closeAlert}
-            aria-label="Close alert"
-          >
-            &times;
-          </button>
-        </div>
-      )}
+   
         <div className="manage-form-group" style={{ gridColumn: "1 / span 3" }}>
           <label>
             <strong>Upload Documents (PDF Only, Max 3, 5MB each)</strong>
@@ -419,24 +467,24 @@ const EmployeeForm = ({ employee, loading, isEditing, onSave, onCancel, onChange
       </div>
 
       {/* Form Actions */}
-  <div
-  className="employee-button-container"
-  style={{
-    marginTop: "30px",
-    display: "flex",
-    gap: "16px",
-    justifyContent: "center",
-  }}
->
-  <button type="submit" className="employee-save-button" disabled={loading}>
-    {loading ? "Saving..." : "Save"}
-  </button>
-  <button type="button" onClick={onCancel} className="employee-cancel-button">
-    Cancel
-  </button>
-</div>
+      <div
+        className="employee-button-container"
+        style={{
+          marginTop: "30px",
+          display: "flex",
+          gap: "16px",
+          justifyContent: "center",
+        }}
+      >
+        <button type="submit" className="employee-save-button" disabled={loading || isCheckingEmail}>
+          {loading ? "Saving..." : isCheckingEmail ? "Checking..." : "Save"}
+        </button>
+        <button type="button" onClick={onCancel} className="employee-cancel-button">
+          Cancel
+        </button>
+      </div>
     </form>
-  )
-}
+  );
+};
 
-export default EmployeeForm
+export default EmployeeForm;

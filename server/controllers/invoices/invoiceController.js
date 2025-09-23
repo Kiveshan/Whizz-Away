@@ -4,6 +4,7 @@ import {
   checkInvoiceExists,
   createInvoice,
   updateInstructionDetails,
+  getInstructionDetailsForPreview,
 } from "../../models/invoices/invoiceModel.js";
 
 const getCompletedInvoicesHandler = async (req, res) => {
@@ -148,13 +149,15 @@ const createInvoiceHandler = async (req, res) => {
 };
 
 // Handler to update instruction details
+// In invoiceController.js - Update the updateInstructionDetailsHandler function
 const updateInstructionDetailsHandler = async (req, res) => {
   try {
-    const { m1key, dropoff, rate, invoice_num } = req.body;
+    const { m1key, dropoff, rate, invoice_num, additional_destination_info } = req.body; // Add new field
     console.log(`Updating instruction details for m1key: ${m1key}`, {
       dropoff,
       rate,
       invoice_num,
+      additional_destination_info, // Log the new field
     });
 
     if (!m1key) {
@@ -186,11 +189,23 @@ const updateInstructionDetailsHandler = async (req, res) => {
       });
     }
 
+    // Validate additional_destination_info if provided
+    if (
+      additional_destination_info !== undefined &&
+      (additional_destination_info === "" || typeof additional_destination_info !== "string")
+    ) {
+      return res.status(400).json({
+        success: false,
+        message: "Additional destination info must be a valid string",
+      });
+    }
+
     const result = await updateInstructionDetails({
       m1key,
       dropoff,
       rate,
       invoice_num,
+      additional_destination_info, // Pass the new field
     });
 
     if (!result.success) {
@@ -215,10 +230,80 @@ const updateInstructionDetailsHandler = async (req, res) => {
   }
 };
 
+// Add this to your invoiceController.js
+const generateInvoicePreviewHandler = async (req, res) => {
+  try {
+    const { instructionId } = req.params;
+    const { clientId, shipmentType, preview } = req.body;
+    
+    console.log(`Generating invoice preview for instruction: ${instructionId}`, {
+      clientId,
+      shipmentType,
+      preview
+    });
+
+    // Previously blocked preview when an invoice already existed. We now allow preview regardless.
+    // const existsCheck = await checkInvoiceExists(instructionId);
+    // if (existsCheck.exists) {
+    //   return res.status(400).json({
+    //     success: false,
+    //     message: "Invoice already exists for this instruction. Cannot preview."
+    //   });
+    // }
+
+    // Get instruction details for preview
+    const instructionDetails = await getInstructionDetailsForPreview(instructionId);
+    
+    if (!instructionDetails.success) {
+      return res.status(400).json({
+        success: false,
+        message: instructionDetails.message || "Failed to load instruction details"
+      });
+    }
+
+    // Generate temporary invoice number for preview
+    const today = new Date();
+    const dateStr = today.toISOString().slice(0, 10).replace(/-/g, "");
+    const previewInvoiceNum = `PREVIEW-${dateStr}-${instructionId}`;
+
+    // Create preview invoice data
+    const previewData = {
+      ...instructionDetails.data,
+      invoice_num: previewInvoiceNum,
+      doc_num: `DOC-${Date.now()}`, // Temporary document number
+      date: today,
+      additional_destination_info: instructionDetails.data.additional_destination_info || "",
+      // Add preview flag
+      is_preview: true,
+      preview_instruction_id: instructionId,
+      // Ensure containers are processed
+      containers: instructionDetails.data.containers || []
+    };
+
+    console.log(`Invoice preview generated successfully for instruction ${instructionId}`);
+
+    res.json({
+      success: true,
+      data: previewData
+    });
+
+  } catch (error) {
+    console.error("Error generating invoice preview:", error);
+    res.status(500).json({
+      success: false,
+      message: "Failed to generate invoice preview",
+      error: process.env.NODE_ENV === "production" ? null : error.stack
+    });
+  }
+};
+
+
+
 export {
   getCompletedInvoicesHandler,
   getInvoiceDetailsHandler,
   checkInvoiceExistsHandler,
   createInvoiceHandler,
   updateInstructionDetailsHandler,
+  generateInvoicePreviewHandler, // Export the new handler
 };

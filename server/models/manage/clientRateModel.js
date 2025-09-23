@@ -80,7 +80,8 @@ const getClientRatesByClientId = async (clientId) => {
             '6m_rate', cr."6m_rate",
             '12m_rate', cr."12m_rate",
             'surcharges', cr.surcharges,
-            'hazardous', cr.hazardous
+            'hazardous', cr.hazardous,
+            'vgm', cr.vgm
           ) ORDER BY cr.client_rate_id
         ) FILTER (WHERE cr.client_rate_id IS NOT NULL) as rates
       FROM m5_client c
@@ -125,8 +126,8 @@ const saveClientRates = async (clientId, rates) => {
     // Insert new rates
     const insertPromises = rates.map((rate) => {
       return client.query(
-        `INSERT INTO m5_client_rate (clientid, starting_point, destination, "6m_rate", "12m_rate", surcharges, hazardous)
-         VALUES ($1, $2, $3, $4, $5, $6, $7)
+        `INSERT INTO m5_client_rate (clientid, starting_point, destination, "6m_rate", "12m_rate", surcharges, hazardous, vgm)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
          RETURNING *`,
         [
           clientId,
@@ -136,6 +137,7 @@ const saveClientRates = async (clientId, rates) => {
           rate["12m_rate"] === "" || rate["12m_rate"] === undefined ? null : Number.parseFloat(rate["12m_rate"]),
           rate.surcharges === "" || rate.surcharges === undefined ? null : Number.parseFloat(rate.surcharges),
           rate.hazardous === "" || rate.hazardous === undefined ? null : Number.parseFloat(rate.hazardous),
+          rate.vgm === "" || rate.vgm === undefined ? null : Number.parseFloat(rate.vgm),
         ],
       )
     })

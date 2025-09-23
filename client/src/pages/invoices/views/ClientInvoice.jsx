@@ -1,5 +1,5 @@
 "use client";
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, forwardRef, useImperativeHandle } from "react";
 import { useNavigate, useParams, useLocation } from "react-router-dom";
 import "../css/InvoiceTemplate.css";
 import jsPDF from "jspdf";
@@ -17,7 +17,7 @@ const formatDate = (dateString) => {
 
 // Utility function for formatting currency
 const formatCurrency = (amount) => {
-  if (!amount) return "R 0.00";
+  if (!amount || amount === 0) return "R 0.00";
   return `R ${Number(amount).toLocaleString("en-ZA", {
     minimumFractionDigits: 2,
     maximumFractionDigits: 2,
@@ -31,7 +31,12 @@ const debug = (message, data) => {
   }
 };
 
-const ClientInvoice = () => {
+const ClientInvoice = forwardRef(({ 
+  previewData, 
+  isPreview = false, 
+  instructionId,
+  onClosePreview 
+}, ref) => {
   const navigate = useNavigate();
   const location = useLocation();
   const params = useParams();
@@ -48,26 +53,54 @@ const ClientInvoice = () => {
   const [error, setError] = useState(null);
   const [pdfLoading, setPdfLoading] = useState(false);
 
+  // Add preview mode state
+  const [isPreviewMode, setIsPreviewMode] = useState(isPreview);
+  const componentRef = useRef(null);
+  const invoiceRef = useRef(null);
+
   const [isEditMode, setIsEditMode] = useState(false);
   const [editData, setEditData] = useState({
-    dropoff: "",
     amount: "",
     invoice_num: "",
+    additional_destination_info: "",
   });
   const [saveLoading, setSaveLoading] = useState(false);
   const [saveError, setSaveError] = useState(null);
   const [showConfirmDialog, setShowConfirmDialog] = useState(false);
 
-  const invoiceRef = useRef(null);
+  // Use ref forwarding
+  useImperativeHandle(ref, () => ({
+    generatePDF: () => generatePDF()
+  }));
+
+  // Update data source for preview mode
+  const finalInvoiceData = previewData || invoiceData;
+
+  // Disable editing in preview mode
+  const canEdit = !isPreviewMode && !isPreview && JSON.parse(localStorage.getItem("user")).roleid === 3;
 
   useEffect(() => {
     let isMounted = true;
 
     const fetchInvoiceData = async () => {
       try {
-        if (!id) {
+        if (!id && !previewData) {
           if (isMounted) {
             setError("No invoice ID provided");
+            setLoading(false);
+          }
+          return;
+        }
+
+        // If we have preview data, use it directly
+        if (previewData) {
+          if (isMounted) {
+            setInvoiceData(previewData);
+            setEditData({
+              amount: previewData.total_cost || "",
+              invoice_num: previewData.invoice_num || "",
+              additional_destination_info: previewData.additional_destination_info || "",
+            });
             setLoading(false);
           }
           return;
@@ -87,10 +120,21 @@ const ClientInvoice = () => {
               container_number:
                 container.container_number || container.containernum || "",
               weight: container.weight || null,
+              container_type: container.container_type || "",
+              container_type_key: container.container_type_key || "",
+              cargo_description: container.cargo_description || "",
               add_surcharges: container.add_surcharges || false,
               hazardous: container.hazardous || false,
               surcharge_amount: container.surcharge_amount || 0,
               hazardous_amount: container.hazardous_amount || 0,
+              vgm: container.vgm || false,
+              vgm_amount: container.vgm_amount || 0,
+              truckregnumber: container.truckregnumber || null,
+              rate_per_container: container.rate_per_container || 0,
+              leg_rate: container.leg_rate || 0,
+              base_rate: container.base_rate || 0,
+              has_special_rate: container.has_special_rate || false,
+              leg_date: container.leg_date || null,
             })
           );
         }
@@ -98,9 +142,9 @@ const ClientInvoice = () => {
         if (isMounted) {
           setInvoiceData(response.data.data);
           setEditData({
-            dropoff: response.data.data.dropoff || "",
             amount: response.data.data.total_cost || "",
             invoice_num: response.data.data.invoice_num || "",
+            additional_destination_info: response.data.data.additional_destination_info || "",
           });
           setLoading(false);
         }
@@ -143,14 +187,30 @@ const ClientInvoice = () => {
       }
     };
 
-    fetchInvoiceData();
+    if (!isPreview) {
+      fetchInvoiceData();
+    }
 
     return () => {
       isMounted = false;
     };
-  }, [id, navigate]);
+  }, [id, navigate, previewData, isPreview]);
+
+  // NEW: Handle PDF generation event for preview
+  useEffect(() => {
+    const handleGeneratePDF = () => {
+      generatePDF();
+    };
+
+    document.addEventListener('generatePDF', handleGeneratePDF);
+    return () => document.removeEventListener('generatePDF', handleGeneratePDF);
+  }, [finalInvoiceData]);
 
   const handleEditClick = () => {
+    if (isPreviewMode) {
+      setIsPreviewMode(false);
+      return;
+    }
     setIsEditMode(true);
     setSaveError(null);
   };
@@ -158,9 +218,9 @@ const ClientInvoice = () => {
   const handleCancelEdit = () => {
     setIsEditMode(false);
     setEditData({
-      dropoff: invoiceData.dropoff || "",
-      amount: invoiceData.total_cost || "",
-      invoice_num: invoiceData.invoice_num || "",
+      amount: finalInvoiceData.total_cost || "",
+      invoice_num: finalInvoiceData.invoice_num || "",
+      additional_destination_info: finalInvoiceData.additional_destination_info || "",
     });
     setSaveError(null);
     setShowConfirmDialog(false);
@@ -174,19 +234,22 @@ const ClientInvoice = () => {
   };
 
   const handleSaveClick = () => {
+    if (isPreviewMode) return; // Disable save in preview mode
     setShowConfirmDialog(true);
   };
 
   const handleConfirmSave = async () => {
+    if (isPreviewMode) return; // Disable save in preview mode
+
     setSaveLoading(true);
     setSaveError(null);
 
     try {
       const updateData = {
-        m1key: invoiceData.m1key,
-        dropoff: editData.dropoff || undefined,
+        m1key: finalInvoiceData.m1key,
         rate: editData.amount ? Number.parseFloat(editData.amount) : undefined,
         invoice_num: editData.invoice_num || undefined,
+        additional_destination_info: editData.additional_destination_info || undefined,
       };
 
       const response = await api.put(
@@ -196,11 +259,12 @@ const ClientInvoice = () => {
 
       if (response.data.success) {
         setInvoiceData({
-          ...invoiceData,
-          dropoff: response.data.data.dropoff || invoiceData.dropoff,
-          total_cost: response.data.data.total_cost || invoiceData.total_cost,
+          ...finalInvoiceData,
+          total_cost: response.data.data.total_cost || finalInvoiceData.total_cost,
           invoice_num:
-            response.data.data.invoice_num || invoiceData.invoice_num,
+            response.data.data.invoice_num || finalInvoiceData.invoice_num,
+          additional_destination_info: 
+            response.data.data.additional_destination_info || finalInvoiceData.additional_destination_info,
         });
         setIsEditMode(false);
         setShowConfirmDialog(false);
@@ -218,12 +282,12 @@ const ClientInvoice = () => {
   };
 
   const calculateVAT = (amount) => {
-    if (invoiceData?.invoice?.vat_amount !== undefined) {
-      return Number(invoiceData.invoice.vat_amount);
+    if (finalInvoiceData?.invoice?.vat_amount !== undefined) {
+      return Number(finalInvoiceData.invoice.vat_amount);
     }
 
-    if (invoiceData?.vat !== undefined && invoiceData?.vat !== null && amount) {
-      const vatRate = Number(invoiceData.vat) / 100;
+    if (finalInvoiceData?.vat !== undefined && finalInvoiceData?.vat !== null && amount) {
+      const vatRate = Number(finalInvoiceData.vat) / 100;
       return amount * vatRate;
     }
 
@@ -234,8 +298,7 @@ const ClientInvoice = () => {
     setPdfLoading(true);
 
     try {
-      const containers = invoiceData.containers || [];
-      const containerCount = containers.length;
+      const containers = finalInvoiceData.containers || [];
       const isCompactLayout = true;
 
       // Create new PDF document
@@ -275,18 +338,18 @@ const ClientInvoice = () => {
       // Company Header
       doc.setFontSize(fonts.title);
       doc.setFont("helvetica", "bold");
-      doc.text(invoiceData.companyname || "", margins.left, currentY);
+      doc.text(finalInvoiceData.companyname || "", margins.left, currentY);
       currentY += isCompactLayout ? 6 : 8;
 
       // Company Details
       doc.setFontSize(fonts.small);
       doc.setFont("helvetica", "normal");
       const companyDetails = [
-        invoiceData.cluster_box,
-        invoiceData.address,
-        invoiceData.suburb,
-        `VAT Reg No: ${invoiceData.vat_reg_num}`,
-        `Cellphone: ${invoiceData.phonenumber}`,
+        finalInvoiceData.cluster_box,
+        finalInvoiceData.address,
+        finalInvoiceData.suburb,
+        `VAT Reg No: ${finalInvoiceData.vat_reg_num}`,
+        `Cellphone: ${finalInvoiceData.phonenumber}`,
       ].filter(Boolean);
 
       companyDetails.forEach((detail) => {
@@ -305,7 +368,7 @@ const ClientInvoice = () => {
       doc.setFontSize(fonts.normal);
       doc.setFont("helvetica", "normal");
       doc.text(
-        `Document No: ${invoiceData.doc_num}`,
+        `Document No: ${finalInvoiceData.doc_num}`,
         pageWidth - margins.right,
         currentY,
         { align: "right" }
@@ -315,13 +378,13 @@ const ClientInvoice = () => {
       // Client Details
       doc.setFontSize(fonts.small);
       const clientDetails = [
-        invoiceData.client_name,
-        invoiceData.client_address,
-        invoiceData.client_suburb,
-        `Telephone: ${invoiceData.client_telephone}`,
-        `Date: ${formatDate(invoiceData.date)}`,
-        `Email: ${invoiceData.client_email}`,
-        `VAT Reg No: ${invoiceData.client_vat}`,
+        finalInvoiceData.client_name,
+        finalInvoiceData.client_address,
+        finalInvoiceData.client_suburb,
+        `Telephone: ${finalInvoiceData.client_telephone}`,
+        `Date: ${formatDate(finalInvoiceData.date)}`,
+        `Email: ${finalInvoiceData.client_email}`,
+        `VAT Reg No: ${finalInvoiceData.client_vat}`,
       ].filter(Boolean);
 
       clientDetails.forEach((detail) => {
@@ -331,13 +394,16 @@ const ClientInvoice = () => {
 
       currentY += isCompactLayout ? 8 : 10;
 
-      // Destination Table
-      const destinationRoute = `${invoiceData.pickup || ""} to ${
-        document.getElementById("dropoff")?.innerHTML ||
-        invoiceData.dropoff ||
-        ""
+      // Destination Table - Updated to include additional destination info
+      const destinationRoute = `${finalInvoiceData.pickup || ""} to ${
+        finalInvoiceData.dropoff || ""
       }`;
       const destinationData = [["Destination", destinationRoute]];
+      
+      // Add additional destination info if it exists
+      if (finalInvoiceData.additional_destination_info) {
+        destinationData.push(["Additional Info", finalInvoiceData.additional_destination_info]);
+      }
 
       autoTable(doc, {
         startY: currentY,
@@ -360,10 +426,10 @@ const ClientInvoice = () => {
 
       // Invoice Details Table
       const invoiceDetailsData = [
-        ["Booking Ref", invoiceData.booking_ref || ""],
-        ["File Number", invoiceData.file_no || ""],
-        ["Description", invoiceData.description || ""],
-        ["Vessel/Ref", invoiceData.vessel_name || ""],
+        ["Booking Ref", finalInvoiceData.booking_ref || ""],
+        ["File Number", finalInvoiceData.file_no || ""],
+        ["Description", finalInvoiceData.description || ""],
+        ["Vessel/Ref", finalInvoiceData.vessel_name || ""],
       ];
 
       autoTable(doc, {
@@ -385,7 +451,7 @@ const ClientInvoice = () => {
 
       currentY = doc.lastAutoTable.finalY + (isCompactLayout ? 5 : 7);
 
-      // Container Table
+      // Enhanced Container Table with all new columns - Updated for PDF
       const hasWeights = containers.some(
         (container) => container.weight && container.weight !== "N/A"
       );
@@ -396,23 +462,47 @@ const ClientInvoice = () => {
       const hasHazardous = containers.some(
         (container) => container.hazardous || container.hazardous_amount > 0
       );
-
-      const containerHeaders = ["Container Number"];
+      const hasVGM = containers.some(
+        (container) => container.vgm || container.vgm_amount > 0
+      );
+      const hasTrucks = containers.some(
+        (container) => container.truckregnumber
+      );
+      // Determine column visibility
+      const containerHeaders = ["Container Number", "Type"];
       if (hasWeights) containerHeaders.push("Weight");
-      if (hasSurcharges) containerHeaders.push("Surcharges");
-      if (hasHazardous) containerHeaders.push("Hazardous");
+      if (hasTrucks) containerHeaders.push("Truck Reg");
+      // Always show Base Rate column
+      containerHeaders.push("Base Rate");
+      if (hasSurcharges) containerHeaders.push("Surcharge");
+      if (hasHazardous) containerHeaders.push("Haz");
+      if (hasVGM) containerHeaders.push("VGM");
+      // Always show Total column
+      containerHeaders.push("Total");
 
       const containerData =
         containers.length > 0
           ? containers.map((container) => {
-              const row = [container.container_number || "N/A"];
-              if (
-                hasWeights &&
-                container.weight &&
-                container.weight !== "N/A"
-              ) {
-                row.push(container.weight);
+              const row = [
+                container.container_number || "N/A",
+                container.container_type || "Standard"
+              ];
+              
+              if (hasWeights && container.weight && container.weight !== "N/A") {
+                row.push(`${container.weight} kg`);
+              } else if (hasWeights) {
+                row.push("-");
               }
+              
+              if (hasTrucks) {
+                row.push(container.truckregnumber || "-");
+              }
+              
+              // Base Rate column - strictly from m1 base rates (base_rate)
+              const baseRateValue = container.base_rate || 0;
+              row.push(formatCurrency(baseRateValue || 0));
+              
+              // Individual special rate columns
               if (hasSurcharges) {
                 const surchargeText =
                   container.surcharge_amount > 0
@@ -420,6 +510,7 @@ const ClientInvoice = () => {
                     : "-";
                 row.push(surchargeText);
               }
+              
               if (hasHazardous) {
                 const hazardText =
                   container.hazardous_amount > 0
@@ -427,9 +518,24 @@ const ClientInvoice = () => {
                     : "-";
                 row.push(hazardText);
               }
+              
+              if (hasVGM) {
+                const vgmText =
+                  container.vgm_amount > 0
+                    ? formatCurrency(container.vgm_amount)
+                    : "-";
+                row.push(vgmText);
+              }
+              
+              // Total column = Base + additionals
+              const totalValue = (baseRateValue || 0)
+                + (container.surcharge_amount || 0)
+                + (container.hazardous_amount || 0)
+                + (container.vgm_amount || 0);
+              row.push(formatCurrency(totalValue));
               return row;
             })
-          : [["No container information"]];
+          : [["No container information", "", "", "", "", "", "", ""]];
 
       autoTable(doc, {
         startY: currentY,
@@ -446,110 +552,229 @@ const ClientInvoice = () => {
           textColor: [255, 255, 255],
           fontStyle: "bold",
         },
+        columnStyles: {
+          0: { cellWidth: 25 },
+          1: { cellWidth: 20 },
+          2: { cellWidth: 20 },
+          3: { cellWidth: 20 },
+          4: { cellWidth: 20 },
+          5: { cellWidth: 20 },
+          6: { cellWidth: 20 },
+          7: { cellWidth: 20 },
+        },
         margin: { left: margins.left, right: margins.right },
       });
 
       currentY = doc.lastAutoTable.finalY + (isCompactLayout ? 8 : 10);
 
-      // Calculate invoice values
-      const amount = invoiceData.invoice?.amount || invoiceData.total_cost || 0;
-      const vat = calculateVAT(amount);
-      const total = invoiceData.invoice?.total_amount || amount + vat;
+      // Calculate invoice values - FIXED
+      const amount = finalInvoiceData.total_cost || 0;
+      const vatRate = finalInvoiceData.vat ? (Number(finalInvoiceData.vat) / 100) : 0;
+      const vat = amount * vatRate;
+      const total = amount + vat;
 
-      // Store the Y position for the side-by-side layout
-      const sectionStartY = currentY;
-
-      // Banking Details on the LEFT side
-      const leftColumnWidth = (pageWidth - margins.left - margins.right) * 0.55; // 55% of available width
-
-      doc.setFontSize(fonts.normal);
-      doc.setFont("helvetica", "bold");
-      doc.text("Banking Details", margins.left, currentY);
-      currentY += isCompactLayout ? 6 : 8;
-
-      doc.setFontSize(fonts.small);
-      doc.setFont("helvetica", "normal");
-
-      const bankingDetails = [
-        `Account Name: ${invoiceData.name_of_acc || ""}`,
-        `Bank Name: ${invoiceData.bank || ""}`,
-        `Account Number: ${invoiceData.account_num || ""}`,
-        `Branch Code: ${invoiceData.branch_code || ""}`,
-        `SWIFT Code: ${invoiceData.swift_code || ""}`,
-        `Reference: ${invoiceData.invoice_num || ""}`,
+      // FIXED Summary Table - Proper two-column layout
+      const summaryHeaders = ["Description", "Amount"];
+      const summaryData = [
+        ["Amount (excl. VAT)", formatCurrency(amount)],
+        ...(vat > 0 ? [["VAT (" + finalInvoiceData.vat + "%)", formatCurrency(vat)]] : []),
+        ["Total Amount", formatCurrency(total)],
       ];
 
-      bankingDetails.forEach((detail) => {
-        doc.text(detail, margins.left, currentY);
-        currentY += isCompactLayout ? 5 : 6;
-      });
-
-      // Invoice Summary Table on the RIGHT side
-      const rightColumnStart = margins.left + leftColumnWidth + 5; // 5mm gap
-      const rightColumnWidth = (pageWidth - margins.left - margins.right) * 0.4; // 40% of available width
-
-      const summaryData = [["Amount (excl. VAT)", formatCurrency(amount)]];
-
-      if (vat > 0) {
-        summaryData.push([`VAT (${invoiceData.vat}%)`, formatCurrency(vat)]);
-      }
-
-      summaryData.push(["Total Amount", formatCurrency(total)]);
-
       autoTable(doc, {
-        startY: sectionStartY,
-        head: [["Invoice Summary", ""]],
+        startY: currentY,
+        head: [summaryHeaders],
         body: summaryData,
         theme: "grid",
         styles: {
-          fontSize: fonts.small,
-          cellPadding: isCompactLayout ? 1.5 : 2.5,
+          fontSize: fonts.normal,
+          cellPadding: 3,
           lineWidth: 0.1,
+          halign: "left",
         },
         headStyles: {
-          fillColor: [34, 139, 34],
+          fillColor: [70, 130, 180],
           textColor: [255, 255, 255],
           fontStyle: "bold",
         },
         bodyStyles: {
-          0: { fontStyle: "normal" },
-          1: { fontStyle: "normal" },
+          valign: "middle",
         },
         columnStyles: {
-          0: { cellWidth: rightColumnWidth * 0.6 },
-          1: { cellWidth: rightColumnWidth * 0.4, halign: "right" },
+          0: { 
+            fontStyle: "bold", 
+            cellWidth: 60,
+            halign: "left"
+          },
+          1: { 
+            halign: "right",
+            cellWidth: 40
+          },
         },
-        margin: { left: rightColumnStart, right: margins.right },
+        margin: { left: margins.left, right: margins.right },
+        didParseCell: function(data) {
+          // Make the total row more prominent
+          if (data.section === 'body' && data.row.index === summaryData.length - 1) {
+            data.cell.styles.fontStyle = 'bold';
+            data.cell.styles.fillColor = [240, 240, 240];
+            if (data.column.index === 1) {
+              data.cell.styles.halign = 'right';
+            }
+          }
+        }
       });
 
+      currentY = doc.lastAutoTable.finalY + 10;
+
+      // Banking Details
+      doc.setFontSize(fonts.small);
+      doc.setFont("helvetica", "normal");
+      
+      const bankingDetails = [
+        `Account Name: ${finalInvoiceData.name_of_acc || ""}`,
+        `Bank Name: ${finalInvoiceData.bank || ""}`,
+        `Account Number: ${finalInvoiceData.account_num || ""}`,
+        `Branch Code: ${finalInvoiceData.branch_code || ""}`,
+        `SWIFT Code: ${finalInvoiceData.swift_code || ""}`,
+        `Reference: ${finalInvoiceData.invoice_num || ""}`,
+      ].filter(Boolean);
+
+      bankingDetails.forEach((detail) => {
+        doc.text(detail, margins.left, currentY);
+        currentY += 5;
+      });
+
+      currentY += 5;
+
+      // Footer
+      doc.setFontSize(fonts.small);
+      doc.setFont("helvetica", "italic");
+      doc.text(
+        "Please ensure the invoice number is referenced when making payment.",
+        margins.left,
+        currentY
+      );
+      currentY += 8;
+      
+      doc.setFont("helvetica", "normal");
+      doc.text(
+        `Thank you for choosing ${finalInvoiceData.companyname || ""}.`,
+        margins.left,
+        currentY
+      );
+
       // Save the PDF
-      doc.save(`Invoice_${invoiceData.invoice_num}.pdf`);
+      const fileName = isPreviewMode || isPreview 
+        ? `Invoice_Preview_${finalInvoiceData.invoice_num || instructionId || 'NO'}_${formatDate(finalInvoiceData.date)}.pdf`
+        : `Invoice_${finalInvoiceData.invoice_num || finalInvoiceData.doc_num || 'NO'}_${formatDate(finalInvoiceData.date)}.pdf`;
+      doc.save(fileName);
+
     } catch (error) {
       console.error("Error generating PDF:", error);
-      setError("Failed to generate PDF");
+      alert("Error generating PDF. Please try again.");
     } finally {
       setPdfLoading(false);
     }
   };
 
-  if (loading) {
-    return (
-      <div className="client-invoice-wrapper">
-        <div className="invoice-page">
-          <div className="loading-error">Loading invoice data...</div>
-          <div className="invoicedownloadbtn1">
-            <button className="back-btn" onClick={() => navigate("/invoices")}>
-              Back
+  // UPDATED: Action buttons rendering
+  const renderActionButtons = () => {
+    if (isPreviewMode || isPreview) {
+      return (
+        <div className={`invoicedownloadbtn1 ${isPreview ? 'preview-mode' : ''}`}>
+          <div className="preview-controls">
+            <button
+              className="preview-back-btn"
+              onClick={onClosePreview || (() => setIsPreviewMode(false))}
+              disabled={pdfLoading}
+            >
+              ← Back to Documents
             </button>
+            <button
+              className="preview-download-btn"
+              onClick={generatePDF}
+              disabled={pdfLoading}
+            >
+              {pdfLoading ? "Generating PDF..." : "📄 Download PDF"}
+            </button>
+            {!isPreview && (
+              <button
+                className="preview-edit-btn"
+                onClick={() => {
+                  setIsPreviewMode(false);
+                }}
+                disabled={pdfLoading}
+              >
+                ✏️ Edit Invoice
+              </button>
+            )}
           </div>
+        </div>
+      );
+    }
+
+    // Existing non-preview buttons
+    return (
+      <div className="invoicedownloadbtn1">
+        {canEdit && (
+          <button className="edit-btn" onClick={handleEditClick}>
+            Edit
+          </button>
+        )}
+        <button
+          className="back-btn"
+          onClick={() => {
+            if (roleId == 3) {
+              navigate("/invoices", {
+                state: {
+                  clientId,
+                  clientName,
+                },
+              });
+            } else if (roleId == 4) {
+              navigate("/DirectorClientDocuments", {
+                state: {
+                  clientId: finalInvoiceData.m5clientkey,
+                  clientName: finalInvoiceData.client_name,
+                },
+              });
+            } else if (roleId == 1) {
+              navigate("/client-documents", {
+                state: {
+                  clientId: finalInvoiceData.m5clientkey,
+                  clientName: finalInvoiceData.client_name,
+                },
+              });
+            }
+          }}
+          disabled={pdfLoading}
+        >
+          Back
+        </button>
+        <button
+          className="download-btn"
+          onClick={generatePDF}
+          disabled={pdfLoading}
+        >
+          {pdfLoading ? "Generating PDF..." : "Download PDF"}
+        </button>
+      </div>
+    );
+  };
+
+  if (loading && !previewData) {
+    return (
+      <div className={`client-invoice-wrapper ${isPreview ? 'preview-mode' : ''}`}>
+        <div className="invoice-page">
+          <div className="loading">Loading invoice...</div>
         </div>
       </div>
     );
   }
 
-  if (error) {
+  if (error && !previewData) {
     return (
-      <div className="client-invoice-wrapper">
+      <div className={`client-invoice-wrapper ${isPreview ? 'preview-mode' : ''}`}>
         <div className="invoice-page">
           <div className="loading-error">{error}</div>
           <div className="invoicedownloadbtn1">
@@ -562,9 +787,9 @@ const ClientInvoice = () => {
     );
   }
 
-  if (!invoiceData) {
+  if (!finalInvoiceData) {
     return (
-      <div className="client-invoice-wrapper">
+      <div className={`client-invoice-wrapper ${isPreview ? 'preview-mode' : ''}`}>
         <div className="invoice-page">
           <div className="loading-error">No invoice data found.</div>
           <div className="invoicedownloadbtn1">
@@ -577,34 +802,39 @@ const ClientInvoice = () => {
     );
   }
 
-  const amount = invoiceData.invoice?.amount || invoiceData.total_cost || 0;
+  const amount = finalInvoiceData.invoice?.amount || finalInvoiceData.total_cost || 0;
   const vat = calculateVAT(amount);
-  const total = invoiceData.invoice?.total_amount || amount + vat;
+  const total = finalInvoiceData.invoice?.total_amount || amount + vat;
   const roleId = JSON.parse(localStorage.getItem("user")).roleid;
 
-  const containers = invoiceData.containers || [];
+  const containers = finalInvoiceData.containers || [];
 
   return (
-    <div className="client-invoice-wrapper">
+    <div className={`client-invoice-wrapper ${isPreview ? 'preview-mode' : ''}`} ref={componentRef}>
+      {isPreview && (
+        <div className="preview-mode-indicator">
+          👁️ PREVIEW MODE
+        </div>
+      )}
       <div className="invoice-page">
         <div className="invoice-paper" ref={invoiceRef}>
           {/* Transport and Logistics section */}
           <div className="transport-section">
-            <div className="section-title">{invoiceData.companyname}</div>
+            <div className="section-title">{finalInvoiceData.companyname}</div>
           </div>
 
           {/* Middle section with company details */}
           <div className="middle-section">
             <div className="company-info">
-              {invoiceData.cluster_box}
+              {finalInvoiceData.cluster_box}
               <br />
-              {invoiceData.address}
+              {finalInvoiceData.address}
               <br />
-              {invoiceData.suburb}
+              {finalInvoiceData.suburb}
               <br />
-              VAT Reg No: {invoiceData.vat_reg_num}
+              VAT Reg No: {finalInvoiceData.vat_reg_num}
               <br />
-              Cellphone: {invoiceData.phonenumber}
+              Cellphone: {finalInvoiceData.phonenumber}
             </div>
           </div>
 
@@ -612,37 +842,45 @@ const ClientInvoice = () => {
           <div className="invoice-title-section">
             <div className="invoice-title">Tax Invoice</div>
             <div className="document-number">
-              Document No: {invoiceData.doc_num}
+              Document No: {finalInvoiceData.doc_num}
             </div>
           </div>
 
           {/* Sender Details */}
           <div className="sender-details">
-            <div>{invoiceData.client_name}</div>
-            <div>{invoiceData.client_address}</div>
-            <div>{invoiceData.client_suburb}</div>
-            <div>Telephone: {invoiceData.client_telephone}</div>
-            <div>Date: {formatDate(invoiceData.date)}</div>
-            <div>Email: {invoiceData.client_email}</div>
-            <div>VAT Reg No: {invoiceData.client_vat}</div>
+            <div>{finalInvoiceData.client_name}</div>
+            <div>{finalInvoiceData.client_address}</div>
+            <div>{finalInvoiceData.client_suburb}</div>
+            <div>Telephone: {finalInvoiceData.client_telephone}</div>
+            <div>Date: {formatDate(finalInvoiceData.date)}</div>
+            <div>Email: {finalInvoiceData.client_email}</div>
+            <div>VAT Reg No: {finalInvoiceData.client_vat}</div>
           </div>
 
-          {/* Vessel/Ref and Destination */}
+          {/* Vessel/Ref and Destination - Updated */}
           <div className="vessel-destination">
-            <div className="vessel">Starting: {invoiceData.pickup}</div>
+            <div className="vessel">Starting: {finalInvoiceData.pickup}</div>
             <div className="destination" id="destination">
-              Destination:
-              {isEditMode ? (
-                <input
-                  type="text"
-                  value={editData.dropoff}
-                  onChange={(e) => handleInputChange("dropoff", e.target.value)}
-                  className="edit-input dropoff-input"
-                  placeholder="Enter destination"
-                />
-              ) : (
+              <div className="dropoff-row">
                 <div className="dropoff" id="dropoff">
-                  {invoiceData.dropoff}
+                  Destination: {finalInvoiceData.dropoff}
+                </div>
+                {!isPreviewMode && !isPreview && isEditMode && (
+                  <div className="additional-destination-edit">
+                    <span className="additional-label">Additional:</span>
+                    <input
+                      type="text"
+                      value={editData.additional_destination_info}
+                      onChange={(e) => handleInputChange("additional_destination_info", e.target.value)}
+                      className="edit-input additional-destination-input"
+                      placeholder="Add additional destination info..."
+                    />
+                  </div>
+                )}
+              </div>
+              {!isEditMode && finalInvoiceData.additional_destination_info && (
+                <div className="additional-destination-display">
+                  Additional: {finalInvoiceData.additional_destination_info}
                 </div>
               )}
             </div>
@@ -654,24 +892,24 @@ const ClientInvoice = () => {
               <tbody>
                 <tr>
                   <td className="label">Booking Ref</td>
-                  <td className="value">{invoiceData.booking_ref}</td>
+                  <td className="value">{finalInvoiceData.booking_ref}</td>
                 </tr>
                 <tr>
                   <td className="label">File Number</td>
-                  <td className="value">{invoiceData.file_no}</td>
+                  <td className="value">{finalInvoiceData.file_no}</td>
                 </tr>
                 <tr>
                   <td className="label">Description</td>
-                  <td className="value">{invoiceData.description}</td>
+                  <td className="value">{finalInvoiceData.description}</td>
                 </tr>
                 <tr>
                   <td className="label">Vessel/Ref</td>
-                  <td className="value">{invoiceData.vessel_name}</td>
+                  <td className="value">{finalInvoiceData.vessel_name}</td>
                 </tr>
               </tbody>
             </table>
 
-            {/* Container Details */}
+            {/* Enhanced Container Details - Updated */}
             <div className="container-section">
               <table className="container-table5">
                 <thead>
@@ -679,19 +917,28 @@ const ClientInvoice = () => {
                     <th className="container-number-header">
                       Container Number
                     </th>
+                    <th className="type-header">Type</th>
                     {containers.some(
                       (container) =>
                         container.weight && container.weight !== "N/A"
                     ) && <th className="weight-header">Weight</th>}
                     {containers.some(
-                      (container) =>
-                        container.add_surcharges ||
-                        container.surcharge_amount > 0
-                    ) && <th className="surcharge-header">Surcharges</th>}
+                      (container) => container.truckregnumber
+                    ) && <th className="truck-header">Truck Reg</th>}
+                    <th className="rate-header">Base Rate</th>
+                    {/* Individual special rate columns */}
                     {containers.some(
-                      (container) =>
+                      (container) => 
+                        container.add_surcharges || container.surcharge_amount > 0
+                    ) && <th className="surcharge-header">Surcharge</th>}
+                    {containers.some(
+                      (container) => 
                         container.hazardous || container.hazardous_amount > 0
-                    ) && <th className="hazardous-header">Hazardous</th>}
+                    ) && <th className="hazardous-header">Haz</th>}
+                    {containers.some(
+                      (container) => container.vgm || container.vgm_amount > 0
+                    ) && <th className="vgm-header">VGM</th>}
+                    <th className="total-header">Total</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -699,11 +946,17 @@ const ClientInvoice = () => {
                     containers.map((container, index) => {
                       const hasWeight =
                         container.weight && container.weight !== "N/A";
+                      const hasTruck = container.truckregnumber;
+                      const baseRateValue = container.base_rate || 0;
                       const hasSurcharge =
-                        container.add_surcharges ||
-                        container.surcharge_amount > 0;
+                        container.add_surcharges || container.surcharge_amount > 0;
                       const hasHazard =
                         container.hazardous || container.hazardous_amount > 0;
+                      const hasVGM = container.vgm || container.vgm_amount > 0;
+                      const totalValue = (baseRateValue || 0)
+                        + (container.surcharge_amount || 0)
+                        + (container.hazardous_amount || 0)
+                        + (container.vgm_amount || 0);
 
                       return (
                         <tr key={index}>
@@ -711,37 +964,65 @@ const ClientInvoice = () => {
                             {container.container_number ||
                               `Container ${index + 1}`}
                           </td>
+                          <td className="container-type">
+                            {container.container_type || "Standard"}
+                          </td>
                           {containers.some(
                             (c) => c.weight && c.weight !== "N/A"
                           ) && (
                             <td className="weight">
-                              {hasWeight ? container.weight : "N/A"}
+                              {hasWeight ? `${container.weight} kg` : "N/A"}
                             </td>
                           )}
+                          {containers.some((c) => c.truckregnumber) && (
+                            <td className="truck-reg">
+                              {hasTruck ? container.truckregnumber : "-"}
+                            </td>
+                          )}
+                          {/* Base Rate column */}
+                          <td className="rate" title={"Base rate"}>
+                            {formatCurrency(baseRateValue || 0)}
+                          </td>
+                          {/* Surcharge column */}
                           {containers.some(
                             (c) => c.add_surcharges || c.surcharge_amount > 0
                           ) && (
                             <td className="surcharge">
-                              {container.surcharge_amount > 0
+                              {hasSurcharge
                                 ? formatCurrency(container.surcharge_amount)
                                 : "-"}
                             </td>
                           )}
+                          {/* Hazardous column */}
                           {containers.some(
                             (c) => c.hazardous || c.hazardous_amount > 0
                           ) && (
                             <td className="hazardous">
-                              {container.hazardous_amount > 0
+                              {hasHazard
                                 ? formatCurrency(container.hazardous_amount)
                                 : "-"}
                             </td>
                           )}
+                          {/* VGM column */}
+                          {containers.some(
+                            (c) => c.vgm || c.vgm_amount > 0
+                          ) && (
+                            <td className="vgm">
+                              {hasVGM
+                                ? formatCurrency(container.vgm_amount)
+                                : "-"}
+                            </td>
+                          )}
+                          {/* Total column */}
+                          <td className="total" title="Base + Surcharge + Haz + VGM">
+                            {formatCurrency(totalValue)}
+                          </td>
                         </tr>
                       );
                     })
                   ) : (
                     <tr>
-                      <td className="container-number" colSpan="4">
+                      <td className="container-number" colSpan="8">
                         No container information
                       </td>
                     </tr>
@@ -763,7 +1044,7 @@ const ClientInvoice = () => {
                     <tr>
                       <td className="summary-label">Amount (excl. VAT)</td>
                       <td className="summary-value">
-                        {isEditMode ? (
+                        {isEditMode && !isPreviewMode && !isPreview ? (
                           <input
                             type="text"
                             value={editData.amount}
@@ -781,7 +1062,7 @@ const ClientInvoice = () => {
                     {vat > 0 && (
                       <tr>
                         <td className="summary-label">
-                          VAT ({invoiceData.vat}%)
+                          VAT ({finalInvoiceData.vat}%)
                         </td>
                         <td className="summary-value">{formatCurrency(vat)}</td>
                       </tr>
@@ -800,14 +1081,14 @@ const ClientInvoice = () => {
 
           {/* Banking Details */}
           <div className="banking-details">
-            <div>Account Name: {invoiceData.name_of_acc}</div>
-            <div>Bank Name: {invoiceData.bank}</div>
-            <div>Account Number: {invoiceData.account_num}</div>
-            <div>Branch Code: {invoiceData.branch_code}</div>
-            <div>SWIFT Code: {invoiceData.swift_code}</div>
+            <div>Account Name: {finalInvoiceData.name_of_acc}</div>
+            <div>Bank Name: {finalInvoiceData.bank}</div>
+            <div>Account Number: {finalInvoiceData.account_num}</div>
+            <div>Branch Code: {finalInvoiceData.branch_code}</div>
+            <div>SWIFT Code: {finalInvoiceData.swift_code}</div>
             <div className="invoice-number-value">
               Reference:
-              {isEditMode ? (
+              {isEditMode && !isPreviewMode && !isPreview ? (
                 <input
                   type="text"
                   value={editData.invoice_num}
@@ -819,7 +1100,7 @@ const ClientInvoice = () => {
                 />
               ) : (
                 <div className="invoice-num" id="invoice_num">
-                  {invoiceData.invoice_num}
+                  {finalInvoiceData.invoice_num}
                 </div>
               )}
             </div>
@@ -828,12 +1109,12 @@ const ClientInvoice = () => {
               payment.
             </div>
             <div className="thank-you">
-              Thank you for choosing {invoiceData.companyname}.
+              Thank you for choosing {finalInvoiceData.companyname}.
             </div>
           </div>
         </div>
 
-        {showConfirmDialog && (
+        {showConfirmDialog && !isPreviewMode && !isPreview && (
           <div className="confirmation-dialog-overlay">
             <div className="confirmation-dialog">
               <h3>Confirm Changes</h3>
@@ -858,74 +1139,32 @@ const ClientInvoice = () => {
           </div>
         )}
 
-        <div className="invoicedownloadbtn1">
-          {isEditMode ? (
-            <div className="edit-controls">
-              {saveError && <div className="error-message">{saveError}</div>}
-              <button
-                className="cancel-edit-btn"
-                onClick={handleCancelEdit}
-                disabled={saveLoading}
-              >
-                Cancel
-              </button>
-              <button
-                className="save-btn"
-                onClick={handleSaveClick}
-                disabled={saveLoading}
-              >
-                {saveLoading ? "Saving..." : "Save Changes"}
-              </button>
-            </div>
-          ) : (
-            <>
-              {roleId == 3 && (
-                <button className="edit-btn" onClick={handleEditClick}>
-                  Edit
-                </button>
-              )}
-              <button
-                className="back-btn"
-                onClick={() => {
-                  if (roleId == 3) {
-                    navigate("/invoices", {
-                      state: {
-                        clientId,
-                        clientName,
-                      },
-                    });
-                  } else if (roleId == 4) {
-                    navigate("/DirectorClientDocuments", {
-                      state: {
-                        clientId: invoiceData.m5clientkey,
-                        clientName: invoiceData.client_name,
-                      },
-                    });
-                  } else if (roleId == 1) {
-                    navigate("/client-documents", {
-                      state: {
-                        clientId: invoiceData.m5clientkey,
-                        clientName: invoiceData.client_name,
-                      },
-                    });
-                  }
-                }}
-              >
-                Back
-              </button>
-              <button
-                className="download-btn"
-                onClick={generatePDF}
-                disabled={pdfLoading}
-              >
-                {pdfLoading ? "Generating PDF..." : "Download PDF"}
-              </button>
-            </>
-          )}
-        </div>
+        {isEditMode && !isPreviewMode && !isPreview ? (
+          <div className="edit-controls">
+            {saveError && <div className="error-message">{saveError}</div>}
+            <button
+              className="cancel-edit-btn"
+              onClick={handleCancelEdit}
+              disabled={saveLoading}
+            >
+              Cancel
+            </button>
+            <button
+              className="save-btn"
+              onClick={handleSaveClick}
+              disabled={saveLoading}
+            >
+              {saveLoading ? "Saving..." : "Save Changes"}
+            </button>
+          </div>
+        ) : (
+          renderActionButtons()
+        )}
       </div>
     </div>
   );
-};
+});
+
+ClientInvoice.displayName = 'ClientInvoice';
 
 export default ClientInvoice;
