@@ -370,6 +370,84 @@
   cursor: not-allowed;
 }
 
+/* Action buttons row for Preview + Finish */
+.action-buttons {
+  display: grid;
+  grid-template-columns: 1fr auto auto 1fr; /* Space, button, button, space */
+  gap: 12px;
+  justify-content: end;
+  align-items: center;
+  margin-top: 16px;
+  margin-bottom: 20px;
+  width: 100%;
+  min-height: 48px; /* Ensure consistent height */
+}
+
+.action-buttons .preview-btn,
+.action-buttons .finish-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 12px 20px;
+  font-size: 16px;
+  font-weight: 500;
+  border-radius: 6px;
+  border: none;
+  width: 200px; /* Fixed width */
+  height: 48px; /* Fixed height */
+  flex-shrink: 0;
+  grid-row: 1; /* Ensure both buttons are in the same row */
+}
+
+.action-buttons .preview-btn {
+  background-color: #608fed;
+  color: #ffffff;
+  justify-self: end; /* Align to the right of its grid cell */
+}
+
+.action-buttons .preview-btn:hover {
+  background-color: #0f54df;
+}
+
+.action-buttons .preview-btn:hover,
+.action-buttons .finish-btn:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15);
+}
+
+.action-buttons .finish-btn {
+  background-color: #4169e1;
+  color: #ffffff;
+  width: 200px;
+  height: 48px;
+  margin: 0;
+  justify-self: end; /* Align to the right of its grid cell */
+}
+
+.action-buttons .finish-btn:disabled,
+.action-buttons .preview-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+  transform: none;
+  box-shadow: none;
+}
+
+/* Responsive behavior - stack on smaller screens */
+@media (max-width: 500px) {
+  .action-buttons {
+    grid-template-columns: 1fr; /* Single column on mobile */
+    gap: 12px;
+    justify-content: center;
+  }
+  
+  .action-buttons .preview-btn,
+  .action-buttons .finish-btn {
+    width: 100%;
+    max-width: 300px; /* Allow wider buttons on mobile */
+    justify-self: center; /* Center the buttons */
+  }
+}
 /* Modal styling */
 .modal-wrapper {
   position: fixed;
