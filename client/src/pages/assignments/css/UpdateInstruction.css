@@ -1,4 +1,3 @@
-
 .bg-white {
   background-color: white;
   margin-top: 15px;
@@ -275,8 +274,10 @@ button {
 
 /* Media queries for responsive grid */
 @media (min-width: 768px) {
-  .md\:grid-cols-3 {
-    grid-template-columns: repeat(3, minmax(0, 1fr));
+  .summary-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); /* Wider cards for better row fit */
+    gap: 16px;
   }
 }
 
@@ -335,6 +336,32 @@ body {
   background: #fffdf7;
   box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1);
   position: relative;
+}
+
+/* Ensure the summary modal specifically overrides the base modal width */
+.modal-container {
+  background: white;
+  border-radius: 12px;
+  width: 400px;
+  max-width: 90vw;
+  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.1);
+  z-index: 50;
+  overflow: hidden;
+}
+
+.modal-container.summary-modal-container {
+  width: 98vw !important;      /* Use almost full viewport width */
+  max-width: 1000px !important;/* Allow wider on large screens */
+}
+
+.summary-modal-container {
+  width: 98vw !important;      /* Force wide modal by class */
+  max-width: 1000px !important;
+  max-height: calc(100vh - 80px);
+  display: flex;
+  flex-direction: column;
+  border: 1px solid #e5e7eb;
+  box-shadow: 0 18px 40px rgba(2, 8, 20, 0.14);
 }
 .finalise-btn {
   display: flex;
