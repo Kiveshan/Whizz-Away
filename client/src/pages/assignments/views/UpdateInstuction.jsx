@@ -6,6 +6,7 @@ import { useNavigate, useLocation } from "react-router-dom";
 import "../css/UpdateInstruction.css";
 import api from "../../../api";
 import { FaTruckFast } from "react-icons/fa6";
+import InvoicePreviewModal from "../../invoices/views/InviewPreviewModal.jsx";
 const normalizeString = (str) => {
   if (!str) return '';
   return str.toLowerCase().replace(/\s+/g, '').trim();
@@ -322,6 +323,8 @@ const [weightUnit, setWeightUnit] = useState('kg');
 
   // Summary overlay state (moved from UploadInstructionDocuments)
   const [showSummaryModal, setShowSummaryModal] = useState(false);
+  // Invoice preview modal state
+  const [showInvoicePreview, setShowInvoicePreview] = useState(false);
 
   // Add a new state variable to track which legs have been saved
   // Add this after the other state variables (around line 200)
@@ -2522,7 +2525,16 @@ useEffect(() => {
             onClick={() => setShowSummaryModal(true)}
             type="button"
           >
-            Summary
+            Preview
+          </button>
+          <button
+            className="summary-btn"
+            type="button"
+            onClick={() => setShowInvoicePreview(true)}
+            disabled={!instructionId}
+            title={!instructionId ? "No instruction selected" : "Preview Invoice"}
+          >
+            Preview Invoice
           </button>
           <button className="finalise-btn2" onClick={handleFinaliseClick}>
             {isCompleted ? "Documents" : "Finalise"}
@@ -2659,6 +2671,15 @@ useEffect(() => {
           </div>
         </div>
       )}
+
+      {/* Invoice Preview Modal */}
+      <InvoicePreviewModal
+        instructionId={instructionId}
+        clientId={clientId}
+        isOpen={showInvoicePreview}
+        onClose={() => setShowInvoicePreview(false)}
+        shipmentType={shipmentType}
+      />
 
       <div className="px-4">
         {/* Update the UI to show when fields have been edited */}

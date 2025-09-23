@@ -4,7 +4,7 @@ import { useState, useEffect } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import "../css/UploadInstructionDocuments.css";
 import api from "../../../api"; // Import the Axios instance
-import InvoicePreviewModal from "../../invoices/views/InviewPreviewModal";
+// Removed invoice preview from this page; handled in UpdateInstruction.jsx
 
 const UploadInstructionDocuments = () => {
   const navigate = useNavigate();
@@ -926,31 +926,11 @@ const handleUpload = async (e) => {
         >
           Finish Instruction
         </button>
-        <button
-          type="button"
-          className="preview-btn"
-          onClick={() => setShowInvoicePreview(true)}
-          disabled={!instructionId}
-        >
-          Preview Invoice
-        </button>
       </div>
 
-      {/* Invoice Preview Modal */}
-      <InvoicePreviewModal
-        instructionId={instructionId}
-        clientId={clientId}
-        isOpen={showInvoicePreview}
-        onClose={() => setShowInvoicePreview(false)}
-        shipmentType={shipmentType}
-      />
-
-      {/* Summary modal moved to UpdateInstruction page */}
-
-      {/* Finish Confirmation Modal */}
+      {/* Confirmation Modal */}
       {showFinishConfirmModal && (
         <div className="modal-wrapper">
-
           <div className="modal-backdrop animate-fadeIn"></div>
           <div className="modal-container animate-scaleIn">
             <div className="modal-header">
