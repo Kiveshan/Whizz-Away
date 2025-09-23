@@ -571,6 +571,7 @@ const Viewcontrollerinstructions = () => {
             // These fields might be missing if the backend query doesn't select them
             hazardous: container["Hazardous"] === true || false,
             addSurcharges: container["Add Surcharges"] === true || false,
+            vgm: container["vgm"] === true || false,
           };
         })
         console.log("Mapped containers list:", containersList)
@@ -1136,6 +1137,7 @@ const Viewcontrollerinstructions = () => {
                           <th>Cargo Description</th>
                           <th>Hazardous</th>
                           <th>Add Surcharges</th>
+                          <th>VGM</th>
                         </tr>
                       </thead>
                       <tbody>
@@ -1190,6 +1192,15 @@ const Viewcontrollerinstructions = () => {
                               <input
                                 type="checkbox"
                                 checked={container.addSurcharges || false}
+                                readOnly
+                                disabled
+                                style={nonEditableStyle}
+                              />
+                            </td>
+                            <td className="text-center">
+                              <input
+                                type="checkbox"
+                                checked={container.vgm || false}
                                 readOnly
                                 disabled
                                 style={nonEditableStyle}

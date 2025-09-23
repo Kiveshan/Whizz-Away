@@ -66,6 +66,46 @@ const FCcontrollerinstructions = () => {
     unitRate: useRef(null),
   };
 
+  // Function to fetch VGM amount from client rates (mirrors surcharge/hazardous)
+  const fetchVgmAmount = async (containerId) => {
+    try {
+      console.log(`⚖️ Fetching VGM rate for client ${formData.clientId}, route: ${formData.pickup} → ${formData.dropoff}`);
+      const response = await api.get(
+        `/api/instructions/client/${formData.clientId}/rates`,
+        {
+          params: {
+            start: formData.pickup,
+            destination: formData.dropoff
+          }
+        }
+      );
+
+      const vgmAmount = response.data.vgm || 0;
+      console.log(`⚖️ Fetched VGM amount: ${vgmAmount} for container ${containerId}`);
+
+      setContainers(prevContainers =>
+        prevContainers.map(container =>
+          container.id === containerId
+            ? { ...container, vgmAmount: Number(vgmAmount) }
+            : container
+        )
+      );
+
+      recalculateTotalCost();
+    } catch (error) {
+      console.error('❌ Error fetching VGM amount:', error);
+      // Fallback to 0 if fetch fails
+      setContainers(prevContainers =>
+        prevContainers.map(container =>
+          container.id === containerId
+            ? { ...container, vgmAmount: 0 }
+            : container
+        )
+      );
+      console.log(`⚠️ Using fallback VGM amount: 0 for container ${containerId}`);
+    }
+  };
+
   const [isImport, setIsImport] = useState(location.state?.isImport || false);
   const todayDate = new Date();
   const today = `${todayDate.getFullYear()}-${String(todayDate.getMonth() + 1).padStart(2, '0')}-${String(todayDate.getDate()).padStart(2, '0')}`;  // Fixed timezone handling
@@ -282,6 +322,8 @@ const FCcontrollerinstructions = () => {
         addSurcharges: false,
         surchargeAmount: 0,
         hazardousAmount: 0,
+        vgm: false,
+        vgmAmount: 0,
       });
     }
 
@@ -304,6 +346,8 @@ const FCcontrollerinstructions = () => {
         addSurcharges: false,
         surchargeAmount: 0,
         hazardousAmount: 0,
+        vgm: false,
+        vgmAmount: 0,
       });
     }
 
@@ -326,6 +370,8 @@ const FCcontrollerinstructions = () => {
         addSurcharges: false,
         surchargeAmount: 0,
         hazardousAmount: 0,
+        vgm: false,
+        vgmAmount: 0,
       });
     }
 
@@ -509,8 +555,8 @@ const FCcontrollerinstructions = () => {
   }
 }
 
-    // Handle hazardous and addSurcharges checkbox fields
-    if (field === "hazardous" || field === "addSurcharges") {
+    // Handle hazardous, addSurcharges and vgm checkbox fields
+    if (field === "hazardous" || field === "addSurcharges" || field === "vgm") {
       if (field === "addSurcharges") {
         console.log(`🔄 Surcharge checkbox ${value ? 'CHECKED' : 'UNCHECKED'} for container ${id}`);
         if (value) {
@@ -563,6 +609,31 @@ const FCcontrollerinstructions = () => {
           );
           console.log(`🔄 Hazardous unchecked - reset amount to 0 for container ${id}`);
           console.log(`💲 Recalculating total cost due to hazardous flag change`);
+          recalculateTotalCost();
+        }
+      } else if (field === "vgm") {
+        console.log(`⚖️ VGM checkbox ${value ? 'CHECKED' : 'UNCHECKED'} for container ${id}`);
+        if (value) {
+          // Checkbox checked - update state immediately, then fetch VGM amount
+          setContainers((prevContainers) =>
+            prevContainers.map((container) =>
+              container.id === id 
+                ? { ...container, [field]: true }
+                : container
+            )
+          );
+          console.log(`📞 Calling fetchVgmAmount for container ${id}`);
+          fetchVgmAmount(id);
+        } else {
+          // Checkbox unchecked - reset VGM amount to 0
+          setContainers((prevContainers) =>
+            prevContainers.map((container) =>
+              container.id === id 
+                ? { ...container, [field]: value, vgmAmount: 0 }
+                : container
+            )
+          );
+          console.log(`🔄 VGM unchecked - reset amount to 0 for container ${id}`);
           recalculateTotalCost();
         }
       }
@@ -1160,8 +1231,15 @@ const FCcontrollerinstructions = () => {
         }
         return total;
       }, 0);
-      console.log(`💲 Total cost components - Base: ${baseCost}, Surcharges: ${totalSurchargeAmount}, Hazardous: ${totalHazardousAmount}`);
-      const totalCost = Number((baseCost + totalSurchargeAmount + totalHazardousAmount).toFixed(2));
+      // Calculate total VGM amount from containers
+      const totalVgmAmount = containers.reduce((total, container) => {
+        if (container.vgm && container.vgmAmount) {
+          return total + Number(container.vgmAmount || 0);
+        }
+        return total;
+      }, 0);
+      console.log(`💲 Total cost components - Base: ${baseCost}, Surcharges: ${totalSurchargeAmount}, Hazardous: ${totalHazardousAmount}, VGM: ${totalVgmAmount}`);
+      const totalCost = Number((baseCost + totalSurchargeAmount + totalHazardousAmount + totalVgmAmount).toFixed(2));
 
       // Prepare instruction update data with proper field mapping
       const instructionUpdateData = {
@@ -1264,6 +1342,8 @@ const FCcontrollerinstructions = () => {
                 "Hazardous Amount": Number(container.hazardousAmount || 0),
                 "Add Surcharges": Boolean(container.addSurcharges),
                 "Surcharge Amount": Number(container.surchargeAmount || 0),
+                vgm: Boolean(container.vgm),
+                "vgm amount": Number(container.vgmAmount || 0),
               };
             });
 
@@ -1463,6 +1543,8 @@ const FCcontrollerinstructions = () => {
             addSurcharges: container["Add Surcharges"] || false,
             surchargeAmount: container["Surcharge Amount"] || 0,
             hazardousAmount: container["Hazardous Amount"] || 0,
+            vgm: container.vgm === true || container.vgm === 'true',
+            vgmAmount: Number(container["vgm amount"] || 0),
           }));
 
           console.log("Setting containers from API:", containersList);
@@ -1944,6 +2026,8 @@ const FCcontrollerinstructions = () => {
             hazardous_flag_exists: "Hazardous" in container,
             add_surcharges_flag: container["Add Surcharges"],
             add_surcharges_flag_exists: "Add Surcharges" in container,
+            vgm_flag: container.vgm,
+            vgm_flag_exists: "vgm" in container,
           });
           
           // Try alternative property access methods with explicit boolean conversion
@@ -1966,6 +2050,12 @@ const FCcontrollerinstructions = () => {
           if (container["Add Surcharges"] !== undefined) {
             addSurchargesValue = container["Add Surcharges"] === true || container["Add Surcharges"] === 'true';
           }
+
+          // Handle the VGM flag - boolean from DB (already lower-case key)
+          let vgmValue = false;
+          if (container.vgm !== undefined) {
+            vgmValue = container.vgm === true || container.vgm === 'true';
+          }
           
           console.log(`Container ${index} resolved flags:`, {
             hazardous: hazardousValue,
@@ -1984,6 +2074,9 @@ const FCcontrollerinstructions = () => {
             hazardous: hazardousValue,
             addSurcharges: addSurchargesValue,
             surchargeAmount: Number(container["Surcharge Amount"] || 0),
+            hazardousAmount: Number(container["Hazardous Amount"] || 0),
+            vgm: vgmValue,
+            vgmAmount: Number(container["vgm amount"] || 0),
           };
         });
 
@@ -2053,7 +2146,9 @@ const FCcontrollerinstructions = () => {
     containers.map(c => c.addSurcharges).join(','), 
     containers.map(c => c.surchargeAmount).join(','),
     containers.map(c => c.hazardous).join(','),
-    containers.map(c => c.hazardousAmount).join(',')
+    containers.map(c => c.hazardousAmount).join(','),
+    containers.map(c => c.vgm).join(','),
+    containers.map(c => c.vgmAmount).join(',')
   ]);
 
   // Function to fetch surcharge amount from client rates
@@ -2120,9 +2215,14 @@ const FCcontrollerinstructions = () => {
         console.log(`☢️ Container ${container.id} hazardous amount: ${hazAmount}`);
         return total + hazAmount;
       }, 0);
+
+    // Add container VGM amounts
+    const vgmTotal = containers
+      .filter(container => container.vgm === true)
+      .reduce((total, container) => total + (Number(container.vgmAmount) || 0), 0);
     
-    console.log(`💲 Total cost calculation - Base: ${baseCost}, Surcharges: ${surchargeTotal}, Hazardous: ${hazardousTotal}`);
-    return baseCost + surchargeTotal + hazardousTotal;
+    console.log(`💲 Total cost calculation - Base: ${baseCost}, Surcharges: ${surchargeTotal}, Hazardous: ${hazardousTotal}, VGM: ${vgmTotal}`);
+    return baseCost + surchargeTotal + hazardousTotal + vgmTotal;
   };
 
   // Function for real-time total cost recalculation
@@ -4516,6 +4616,15 @@ const FCcontrollerinstructions = () => {
                         >
                           Add Surcharges
                         </th>
+                        <th
+                          style={{
+                            padding: "12px 8px",
+                            textAlign: "center",
+                            borderBottom: "2px solid #ddd",
+                          }}
+                        >
+                          VGM
+                        </th>
                       </tr>
                     </thead>
                     <tbody>
@@ -4711,6 +4820,27 @@ const FCcontrollerinstructions = () => {
                                   handleContainerChange(
                                     container.id,
                                     "addSurcharges",
+                                    e.target.checked
+                                  )
+                                }
+                                disabled={isReadOnly}
+                                style={{
+                                  transform: "scale(1.2)",
+                                  cursor: isReadOnly ? "default" : "pointer"
+                                }}
+                              />
+                            </div>
+                          </td>
+                          <td style={{ textAlign: "center" }}>
+                            <div className="controller-instructions-checkbox-wrapper">
+                              <input
+                                type="checkbox"
+                                className="controller-instructions-form-checkbox"
+                                checked={container.vgm === true}
+                                onChange={(e) =>
+                                  handleContainerChange(
+                                    container.id,
+                                    "vgm",
                                     e.target.checked
                                   )
                                 }

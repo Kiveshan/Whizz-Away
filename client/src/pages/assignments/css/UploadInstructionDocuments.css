@@ -318,6 +318,27 @@
   cursor: not-allowed;
 }
 
+/* Preview invoice button */
+.preview-btn {
+  background-color: #f59e0b; /* amber */
+  color: white;
+  border: none;
+  padding: 10px 16px;
+  border-radius: 6px;
+  font-weight: 600;
+  font-size: 14px;
+  transition: background-color 0.2s;
+}
+
+.preview-btn:hover {
+  background-color: #d97706;
+}
+
+.preview-btn:disabled {
+  background-color: #f3d09a;
+  cursor: not-allowed;
+}
+
 /* Requirements section */
 .requirements-section {
   background-color: white;

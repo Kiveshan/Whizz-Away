@@ -285,9 +285,10 @@ const ControllerInstructions = () => {
           weight: (isImport || isExport || isCrossHaul) ? "" : null,
           containerType: type,
           cargoDescription: "",
-          // Initialize hazardous and addSurcharges properties for each container
+          // Initialize hazardous, addSurcharges, and vgm properties for each container
           hazardous: false,
           addSurcharges: false,
+          vgm: false,
         }
       }
 
@@ -1370,7 +1371,8 @@ const ControllerInstructions = () => {
               cargo_description: container.cargoDescription || "",
               "Hazardous": container.hazardous || false,
               "Add Surcharges": container.addSurcharges || false,
-              // Note: "Surcharge Amount" will be calculated by backend
+              "vgm": container.vgm || false,
+              // Note: "Surcharge Amount" and "vgm amount" will be calculated by backend
             }))
           : []
 
@@ -2421,8 +2423,9 @@ const ControllerInstructions = () => {
                       {(isExport || formData.shipmentTypeId === "2") && <th style={{ width: "15%" }}>File Reference</th>}
                       {(isImport || isExport || isCrossHaul) && <th style={{ width: "10%" }}>Weight</th>}
                       <th style={{ width: (isImport || isExport || isCrossHaul) ? "25%" : "40%" }}>Cargo Description</th>
-                      <th style={{ width: "10%" }}>Hazardous</th>
-                      <th style={{ width: "10%" }}>Add Surcharges</th>
+                      <th style={{ width: "8%" }}>Hazardous</th>
+                      <th style={{ width: "8%" }}>Add Surcharges</th>
+                      <th style={{ width: "8%" }}>VGM</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -2641,6 +2644,17 @@ const ControllerInstructions = () => {
                               className="form-check-input"
                               checked={container.addSurcharges || false}
                               onChange={(e) => handleContainerChange(container.id, "addSurcharges", e.target.checked)}
+                              style={{ cursor: "pointer" }}
+                            />
+                          </div>
+                        </td>
+                        <td style={{ textAlign: "center" }}>
+                          <div className="form-check" style={{ display: "flex", justifyContent: "center" }}>
+                            <input
+                              type="checkbox"
+                              className="form-check-input"
+                              checked={container.vgm || false}
+                              onChange={(e) => handleContainerChange(container.id, "vgm", e.target.checked)}
                               style={{ cursor: "pointer" }}
                             />
                           </div>

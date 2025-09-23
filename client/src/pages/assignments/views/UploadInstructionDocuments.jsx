@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import "../css/UploadInstructionDocuments.css";
 import api from "../../../api"; // Import the Axios instance
+import InvoicePreviewModal from "../../invoices/views/InviewPreviewModal";
 
 const UploadInstructionDocuments = () => {
   const navigate = useNavigate();
@@ -32,6 +33,7 @@ const UploadInstructionDocuments = () => {
   const [weightUnit, setWeightUnit] = useState("kg");
   const [containersReachedCount, setContainersReachedCount] = useState(0);
   const [isDocumentPage, setIsDocumentPage] = useState(true);
+  const [showInvoicePreview, setShowInvoicePreview] = useState(false);
   const isWeightBasedInstruction = () => {
     return rateWeight && rateWeight.toLowerCase() !== "container";
   };
@@ -924,7 +926,24 @@ const handleUpload = async (e) => {
         >
           Finish Instruction
         </button>
+        <button
+          type="button"
+          className="preview-btn"
+          onClick={() => setShowInvoicePreview(true)}
+          disabled={!instructionId}
+        >
+          Preview Invoice
+        </button>
       </div>
+
+      {/* Invoice Preview Modal */}
+      <InvoicePreviewModal
+        instructionId={instructionId}
+        clientId={clientId}
+        isOpen={showInvoicePreview}
+        onClose={() => setShowInvoicePreview(false)}
+        shipmentType={shipmentType}
+      />
 
       {/* Summary modal moved to UpdateInstruction page */}
 
