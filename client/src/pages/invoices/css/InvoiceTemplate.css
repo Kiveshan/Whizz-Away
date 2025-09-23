@@ -590,8 +590,11 @@
 .client-invoice-wrapper .edit-controls {
   display: flex;
   align-items: center;
-  gap: 10px;
+  justify-content: center; /* Center buttons horizontally */
+  gap: 12px;
   flex-wrap: wrap;
+  width: 100%;
+  margin: 16px 0; /* Add vertical spacing */
 }
 
 .client-invoice-wrapper .edit-btn {
@@ -770,8 +773,11 @@
 .edit-controls {
   display: flex;
   align-items: center;
-  gap: 10px;
+  justify-content: center; /* Center buttons horizontally */
+  gap: 12px;
   flex-wrap: wrap;
+  width: 100%;
+  margin: 16px 0; /* Add vertical spacing */
 }
 
 .edit-btn {
