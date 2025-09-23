@@ -26,7 +26,7 @@ const EmployeeTable = ({
     <div>
       <div>
         <button className="manage-add-employee-button" onClick={onAdd}>
-          Add Employee
+          Add
         </button>
       </div>
 

@@ -37,7 +37,7 @@ const SupplierTable = ({
     <div>
       <div>
         <button className="manage-add-employee-button" onClick={onAdd}>
-          Add Supplier
+          Add
         </button>
       </div>
 
