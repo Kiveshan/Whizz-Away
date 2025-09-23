@@ -12,6 +12,7 @@ const ClientRatesForm = ({ clientData, loading, onSave, onCancel }) => {
       "12m_rate": "",
       surcharges: "",
       hazardous: "",
+      vgm: "",
     },
   ])
   const [isFormValid, setIsFormValid] = useState(false)
@@ -29,6 +30,7 @@ const ClientRatesForm = ({ clientData, loading, onSave, onCancel }) => {
             "12m_rate": rate["12m_rate"] || "",
             surcharges: rate.surcharges || "",
             hazardous: rate.hazardous || "",
+            vgm: rate.vgm || "",
           })),
         )
       } else {
@@ -40,6 +42,7 @@ const ClientRatesForm = ({ clientData, loading, onSave, onCancel }) => {
             "12m_rate": "",
             surcharges: "",
             hazardous: "",
+            vgm: "",
           },
         ])
       }
@@ -83,6 +86,7 @@ const ClientRatesForm = ({ clientData, loading, onSave, onCancel }) => {
         "12m_rate": "",
         surcharges: "",
         hazardous: "",
+        vgm: "",
       },
     ])
   }
@@ -228,6 +232,20 @@ const ClientRatesForm = ({ clientData, loading, onSave, onCancel }) => {
                         step="0.01"
                         value={rate.hazardous}
                         onChange={(e) => handleRateChange(rowIndex * 5 + index, "hazardous", e.target.value)}
+                        placeholder="0.00"
+                      />
+                    </div>
+
+                    <div className="manage-form-group">
+                      <label>
+                        <strong>VGM (R)</strong>
+                      </label>
+                      <input
+                        type="number"
+                        min="0"
+                        step="0.01"
+                        value={rate.vgm}
+                        onChange={(e) => handleRateChange(rowIndex * 5 + index, "vgm", e.target.value)}
                         placeholder="0.00"
                       />
                     </div>
