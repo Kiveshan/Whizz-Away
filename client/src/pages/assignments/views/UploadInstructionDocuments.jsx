@@ -57,6 +57,7 @@ const UploadInstructionDocuments = () => {
     index: null,
     name: "",
   });
+  // Summary overlay state moved to UpdateInstruction page
 
   useEffect(() => {
     if (instructionId) {
@@ -218,112 +219,99 @@ const UploadInstructionDocuments = () => {
     setIsDocumentPage(false);
   };
 
-  const validateDocumentUpload = () => {
-    // Check if file and document name are provided
-    if (!selectedFile || !docName) {
-      setSubmitMessage("Error: Please select a file and enter a document name");
-      return false;
-    }
+const validateDocumentUpload = (files) => {
+  // Check if files and document name are provided
+  if (!files || files.length === 0 || !docName) {
+    setSubmitMessage("Error: Please select at least one file and enter a document name");
+    return false;
+  }
 
-    // Validate file type
-    const allowedFileTypes = /\.(jpg|jpeg|png|pdf)$/i;
-    if (!allowedFileTypes.test(selectedFile.name)) {
+  // Validate file types and sizes
+  const allowedFileTypes = /\.(jpg|jpeg|png|pdf)$/i;
+  const maxSize = 100 * 1024 * 1024; // 10MB in bytes
+  for (const file of files) {
+    if (!allowedFileTypes.test(file.name)) {
       setSubmitMessage("Error: Only JPG, PNG, and PDF files are allowed");
       return false;
     }
-
-    // Check file size (10MB limit)
-    const maxSize = 100 * 1024 * 1024; // 10MB in bytes
-    if (selectedFile.size > maxSize) {
-      setSubmitMessage("Error: File size exceeds 10MB limit");
+    if (file.size > maxSize) {
+      setSubmitMessage(`Error: File ${file.name} exceeds 10MB limit`);
       return false;
     }
+  }
 
-    // For Instruction Document type
-    if (docType === "Instruction Document") {
-      // Check if we already have an instruction document
-      const instructionDocs = documents.filter(
-        (doc) => doc.type === "Instruction Document"
-      );
-      if (instructionDocs.length >= 1) {
-        setSubmitMessage("Error: Only 1 Instruction Document is allowed");
-        return false;
-      }
-      // No leg number needed for instruction document
-      return true;
+  // Count current documents
+  const instructionDocs = documents.filter((doc) => doc.type === "Instruction Document").length;
+  const deliveryNotes = documents.filter((doc) => doc.type === "Delivery Note").length;
+  const emptyTurningDocs = documents.filter((doc) => doc.type === "Empty Turning Depot Document").length;
+
+  // Calculate remaining allowed uploads for each type
+  const remainingInstructionDocs = 1 - instructionDocs;
+  const remainingDeliveryNotes = isWeightBasedInstruction() ? Infinity : containersReachedCount - deliveryNotes;
+  const remainingEmptyTurningDocs = showEmptyTurningDepotOption() ? 1 - emptyTurningDocs : 0;
+
+  // Count files of the selected document type in the batch
+  const filesForCurrentType = files.length;
+
+  // For Instruction Document type
+  if (docType === "Instruction Document") {
+    if (filesForCurrentType > remainingInstructionDocs) {
+      setSubmitMessage(`Error: Only ${remainingInstructionDocs} more Instruction Document(s) can be uploaded`);
+      return false;
     }
-
-    // For Delivery Note type
-    if (docType === "Delivery Note") {
-      // Check if we already have a delivery note for this leg
-      const legDeliveryNotes = documents.filter(
-        (doc) => doc.type === "Delivery Note"
-      );
-
-      if (
-        !isWeightBasedInstruction() &&
-        legDeliveryNotes.length >= containersReachedCount
-      ) {
-        setSubmitMessage(`Error: Too many delivery notes`);
-        return false;
-      }
-
-      return true;
-    }
-
-    // For Empty Turning Depot Document
-    if (docType === "Empty Turning Depot Document") {
-      // Check if leg number is provided
-      if (!legNumber) {
-        setSubmitMessage(
-          "Error: Please select a leg number for the Empty Turning Depot Document"
-        );
-        return false;
-      }
-
-      // Check if leg number is valid
-      if (
-        !legs.some((leg) => leg.legnumber.toString() === legNumber.toString())
-      ) {
-        setSubmitMessage(`Error: Leg ${legNumber} does not exist`);
-        return false;
-      }
-
-      // Check if we already have an Empty Turning Depot Document
-      const emptyTurningDocs = documents.filter(
-        (doc) => doc.type === "Empty Turning Depot Document"
-      );
-      if (emptyTurningDocs.length >= 1) {
-        setSubmitMessage(
-          "Error: Only 1 Empty Turning Depot Document is allowed"
-        );
-        return false;
-      }
-
-      return true;
-    }
-
+    // No leg number needed for instruction document
     return true;
-  };
+  }
 
-  const handleFileChange = (e) => {
-    if (e.target.files && e.target.files[0]) {
-      const selectedFile = e.target.files[0];
-      setSelectedFile(selectedFile);
-
-      // Generate a preview of the selected image
-      if (selectedFile.type.startsWith("image/")) {
-        const reader = new FileReader();
-        reader.onload = (event) => {
-          setFilePreview(event.target.result);
-        };
-        reader.readAsDataURL(selectedFile);
-      } else {
-        // For non-image files like PDFs
-        setFilePreview(null);
-      }
+  // For Delivery Note type
+  if (docType === "Delivery Note") {
+    if (filesForCurrentType > remainingDeliveryNotes) {
+      setSubmitMessage(`Error: Only ${remainingDeliveryNotes} more Delivery Note(s) can be uploaded`);
+      return false;
     }
-  };
+    return true;
+  }
+
+  // For Empty Turning Depot Document
+  if (docType === "Empty Turning Depot Document") {
+    if (!legNumber) {
+      setSubmitMessage("Error: Please select a leg number for the Empty Turning Depot Document");
+      return false;
+    }
+    if (!legs.some((leg) => leg.legnumber.toString() === legNumber.toString())) {
+      setSubmitMessage(`Error: Leg ${legNumber} does not exist`);
+      return false;
+    }
+    if (filesForCurrentType > remainingEmptyTurningDocs) {
+      setSubmitMessage(`Error: Only ${remainingEmptyTurningDocs} more Empty Turning Depot Document(s) can be uploaded`);
+      return false;
+    }
+    return true;
+  }
+
+  setSubmitMessage("Error: Invalid document type");
+  return false;
+};
+
+const handleFileChange = (e) => {
+  if (e.target.files && e.target.files.length > 0) {
+    const filesArray = Array.from(e.target.files);
+    setSelectedFile(filesArray);
+    const firstImageFile = filesArray.find((file) => file.type.startsWith("image/"));
+    if (firstImageFile) {
+      const reader = new FileReader();
+      reader.onload = (event) => {
+        setFilePreview(event.target.result);
+      };
+      reader.readAsDataURL(firstImageFile);
+    } else {
+      setFilePreview(null);
+    }
+  } else {
+    setSelectedFile([]);
+    setFilePreview(null);
+  }
+};
 
   const handleRemove = async (index) => {
     const docToRemove = documents[index];
@@ -350,25 +338,44 @@ const UploadInstructionDocuments = () => {
     }
   };
 
-  const handleUpload = async (e) => {
-    e.preventDefault();
+const handleUpload = async (e) => {
+  e.preventDefault();
 
-    // Reset message and set submitting state
-    setSubmitMessage("");
-    setIsSubmitting(true);
-    setUploadProgress(0);
+  // Reset message and set submitting state
+  setSubmitMessage("");
+  setIsSubmitting(true);
+  setUploadProgress(0);
 
-    // Validate the document upload
-    if (!validateDocumentUpload()) {
-      setIsSubmitting(false);
-      return;
-    }
-    let progressInterval;
-    try {
-      // Create FormData object for the server request
+  // Validate the document upload
+  if (!validateDocumentUpload(selectedFile)) {
+    setIsSubmitting(false);
+    return;
+  }
+
+  let progressInterval;
+  try {
+    // Simulate upload progress
+    const simulateProgress = () => {
+      let progress = 0;
+      const interval = setInterval(() => {
+        progress += Math.min(5, 100 / selectedFile.length);
+        if (progress >= 90) {
+          clearInterval(interval);
+        } else {
+          setUploadProgress(progress);
+        }
+      }, 200);
+      return interval;
+    };
+
+    progressInterval = simulateProgress();
+
+    const newDocuments = [];
+    for (let i = 0; i < selectedFile.length; i++) {
+      const file = selectedFile[i];
       const formData = new FormData();
-      formData.append("file", selectedFile);
-      formData.append("name", docName);
+      formData.append("file", file);
+      formData.append("name", `${docName}${selectedFile.length > 1 ? `_${i + 1}` : ""}`);
       formData.append("type", docType);
       formData.append("instructionId", instructionId);
 
@@ -376,30 +383,11 @@ const UploadInstructionDocuments = () => {
       if (docType !== "Instruction Document") {
         formData.append("legNumber", legNumber);
       } else {
-        // For instruction documents, use leg 1 by default
         formData.append("legNumber", "1");
       }
 
-      // Simulate upload progress
-      const simulateProgress = () => {
-        let progress = 0;
-        const interval = setInterval(() => {
-          progress += 5;
-          if (progress >= 90) {
-            clearInterval(interval);
-          } else {
-            setUploadProgress(progress);
-          }
-        }, 200);
-
-        // Store the interval ID to clear it when upload completes or fails
-        return interval;
-      };
-
-      progressInterval = simulateProgress();
-
       console.log("Sending document upload request with data:", {
-        name: docName,
+        name: `${docName}${selectedFile.length > 1 ? `_${i + 1}` : ""}`,
         type: docType,
         instructionId,
         legNumber: docType !== "Instruction Document" ? legNumber : "1",
@@ -412,45 +400,48 @@ const UploadInstructionDocuments = () => {
         },
       });
 
-      clearInterval(progressInterval);
-      setUploadProgress(100);
-      console.log("Upload successful:", response.data);
-
       // Create new document object
       const newDocument = {
         id: response.data.id,
-        name: docName,
+        name: `${docName}${selectedFile.length > 1 ? `_${i + 1}` : ""}`,
         type: docType,
         date: new Date().toLocaleDateString("en-GB"),
         legNumber: docType !== "Instruction Document" ? legNumber : "1",
         url: response.data.url,
       };
 
-      // Add to documents list
-      setDocuments([...documents, newDocument]);
-
-      // Reset form
-      setDocName("");
-      setSelectedFile(null);
-      setFilePreview(null);
-      setDocType(isShipmentType3() ? "Delivery Note" : "Instruction Document");
-      if (document.getElementById("fileInput")) {
-        document.getElementById("fileInput").value = "";
-      }
-
-      setSubmitMessage("Document uploaded successfully!");
-
-      // Refresh documents list
-      fetchDocuments();
-    } catch (error) {
-      console.error("Error uploading document:", error);
-      setSubmitMessage(`Error: ${error.message}`);
-      clearInterval(progressInterval);
-      setUploadProgress(0);
-    } finally {
-      setIsSubmitting(false);
+      newDocuments.push(newDocument);
     }
-  };
+
+    clearInterval(progressInterval);
+    setUploadProgress(100);
+    console.log("All uploads successful");
+
+    // Add new documents to the list
+    setDocuments([...documents, ...newDocuments]);
+
+    // Reset form
+    setDocName("");
+    setSelectedFile([]);
+    setFilePreview(null);
+    setDocType(isShipmentType3() ? "Delivery Note" : "Instruction Document");
+    if (document.getElementById("fileInput")) {
+      document.getElementById("fileInput").value = "";
+    }
+
+    setSubmitMessage("Documents uploaded successfully!");
+
+    // Refresh documents list
+    await fetchDocuments();
+  } catch (error) {
+    console.error("Error uploading documents:", error);
+    setSubmitMessage(`Error: ${error.message}`);
+    clearInterval(progressInterval);
+    setUploadProgress(0);
+  } finally {
+    setIsSubmitting(false);
+  }
+};
 
   const handleCancel = () => {
     setDocName("");
@@ -724,7 +715,11 @@ const UploadInstructionDocuments = () => {
             onClick={() => document.getElementById("fileInput").click()}
           >
             <div className="upload-content">
-              <p>{selectedFile ? selectedFile.name : "Drop files here"}</p>
+              <p>
+                {selectedFile && selectedFile.length > 0
+                  ? `${selectedFile.length} file(s) selected: ${selectedFile.map((f) => f.name).join(", ")}`
+                  : "Drop files here"}
+              </p>
               <p>
                 Supported formats: PNG, JPG, PDF OR{" "}
                 <span className="browse-link">Browse files</span>
@@ -735,6 +730,7 @@ const UploadInstructionDocuments = () => {
                 style={{ display: "none" }}
                 accept=".png,.jpg,.jpeg,.pdf"
                 onChange={handleFileChange}
+                multiple
               />
             </div>
 
@@ -746,9 +742,9 @@ const UploadInstructionDocuments = () => {
                 />
               </div>
             )}
-            {selectedFile && selectedFile.type === "application/pdf" && (
+            {selectedFile && selectedFile.length > 0 && selectedFile.some((file) => file.type === "application/pdf") && (
               <div className="file-preview">
-                <p>PDF document selected</p>
+                <p>PDF document(s) included in selection</p>
               </div>
             )}
           </div>
@@ -756,7 +752,7 @@ const UploadInstructionDocuments = () => {
           <div className="form">
             <input
               type="text"
-              placeholder="Document Name"
+              placeholder="Comment"
               value={docName}
               onChange={(e) => setDocName(e.target.value)}
             />
@@ -872,17 +868,13 @@ const UploadInstructionDocuments = () => {
           <li
             style={{
               color:
-                documents.filter((doc) => doc.type === "Instruction Document")
-                  .length === 1
+                documents.filter((doc) => doc.type === "Instruction Document").length === 1
                   ? "green"
                   : "red",
             }}
           >
             Instruction Document:{" "}
-            {
-              documents.filter((doc) => doc.type === "Instruction Document")
-                .length
-            }
+            {documents.filter((doc) => doc.type === "Instruction Document").length}
             /1
           </li>
 
@@ -890,13 +882,11 @@ const UploadInstructionDocuments = () => {
             style={{
               color:
                 isWeightBasedInstruction() ||
-                documents.filter((doc) => doc.type === "Delivery Note")
-                  .length === containersReachedCount
+                documents.filter((doc) => doc.type === "Delivery Note").length === containersReachedCount
                   ? "green"
                   : "red",
             }}
           >
-            {/* Delivery Notes:{" "} */}
             {isWeightBasedInstruction()
               ? `Delivery Notes: ${
                   documents.filter((doc) => doc.type === "Delivery Note").length
@@ -909,46 +899,44 @@ const UploadInstructionDocuments = () => {
             <li
               style={{
                 color:
-                  documents.filter(
-                    (doc) => doc.type === "Empty Turning Depot Document"
-                  ).length === 1
+                  documents.filter((doc) => doc.type === "Empty Turning Depot Document").length === 1
                     ? "green"
                     : "red",
               }}
             >
               Empty Turning Depot Document:{" "}
-              {
-                documents.filter(
-                  (doc) => doc.type === "Empty Turning Depot Document"
-                ).length
-              }
+              {documents.filter((doc) => doc.type === "Empty Turning Depot Document").length}
               /1
             </li>
           )}
         </ul>
       </div>
 
-      <button
-        className="finish-btn"
-        onClick={handleFinish}
-        disabled={!canFinish() || isCompleted}
-        style={{
-          opacity: canFinish() && !isCompleted ? 1 : 0.5,
-          cursor: canFinish() && !isCompleted ? "pointer" : "not-allowed",
-        }}
-      >
-        Finish Instruction
-      </button>
+      <div className="action-buttons">
+        <button
+          className="finish-btn"
+          onClick={handleFinish}
+          disabled={!canFinish() || isCompleted}
+          style={{
+            opacity: canFinish() && !isCompleted ? 1 : 0.5,
+            cursor: canFinish() && !isCompleted ? "pointer" : "not-allowed",
+          }}
+        >
+          Finish Instruction
+        </button>
+      </div>
+
+      {/* Summary modal moved to UpdateInstruction page */}
 
       {/* Finish Confirmation Modal */}
       {showFinishConfirmModal && (
         <div className="modal-wrapper">
+
           <div className="modal-backdrop animate-fadeIn"></div>
           <div className="modal-container animate-scaleIn">
             <div className="modal-header">
               <p className="modal-description">
-                Are you sure you wish to complete instruction? Once completed,
-                edit functionality will be unavailable.
+                Are you sure you wish to complete instruction? Once completed, edit functionality will be unavailable.
               </p>
             </div>
             <div className="modal-footer">
