@@ -60,7 +60,7 @@ const ExpenseTypeTable = ({
     <div>
       <div>
         <button className="manage-add-employee-button" onClick={handleAdd}>
-          Add Expense Type
+          Add
         </button>
       </div>
 
