@@ -178,13 +178,12 @@ const getInvoiceDetails = async (id) => {
     containerResult.rows.forEach(row => {
       const containerNum = row.container_number;
       if (!containerMap.has(containerNum)) {
-        // Determine the container type for base rate lookup
+        // Determine the container type for base rate lookup (6m, 12m, abnormal)
         let containerType = 'abnormal'; // default
-        if (row.container_type && row.container_type.toLowerCase().includes('20') || 
-            row.container_type.toLowerCase().includes('6')) {
+        const ct = (row.container_type || '').toLowerCase();
+        if (ct && (ct.includes('20') || ct.includes('6'))) {
           containerType = '6';
-        } else if (row.container_type && row.container_type.toLowerCase().includes('40') || 
-                   row.container_type.toLowerCase().includes('12')) {
+        } else if (ct && (ct.includes('40') || ct.includes('12'))) {
           containerType = '12';
         }
 
@@ -742,6 +741,14 @@ const getInstructionDetailsForPreview = async (instructionId) => {
             truckregnumber: row.truckregnumber,
             leg_date: row.leg_date,
             rate_per_container: existing.has_special_rate ? existing.rate_per_container : (row.leg_rate || existing.base_rate)
+          });
+        } else if (!containerMap.get(containerNum).truckregnumber && row.truckregnumber) {
+          // Fallback: if latest leg has no truck, use the next available leg's truck
+          const existing = containerMap.get(containerNum);
+          containerMap.set(containerNum, {
+            ...existing,
+            truckregnumber: row.truckregnumber,
+            leg_date: existing.leg_date || row.leg_date,
           });
         }
       });
