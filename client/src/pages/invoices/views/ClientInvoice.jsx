@@ -359,16 +359,16 @@ const ClientInvoice = forwardRef(({
 
       currentY += isCompactLayout ? 8 : 10;
 
-      // Invoice Title and Document Number (side by side)
+      // Invoice Title and Invoice Number (side by side)
       doc.setFontSize(fonts.header);
       doc.setFont("helvetica", "bold");
       doc.text("Tax Invoice", margins.left, currentY);
 
-      // Document number on the right side
+      // Invoice number on the right side
       doc.setFontSize(fonts.normal);
       doc.setFont("helvetica", "normal");
       doc.text(
-        `Document No: ${finalInvoiceData.doc_num}`,
+        `Invoice No: ${finalInvoiceData.invoice_num}`,
         pageWidth - margins.right,
         currentY,
         { align: "right" }
@@ -666,7 +666,7 @@ const ClientInvoice = forwardRef(({
       // Save the PDF
       const fileName = isPreviewMode || isPreview 
         ? `Invoice_Preview_${finalInvoiceData.invoice_num || instructionId || 'NO'}_${formatDate(finalInvoiceData.date)}.pdf`
-        : `Invoice_${finalInvoiceData.invoice_num || finalInvoiceData.doc_num || 'NO'}_${formatDate(finalInvoiceData.date)}.pdf`;
+        : `Invoice_${finalInvoiceData.invoice_num || 'NO'}_${formatDate(finalInvoiceData.date)}.pdf`;
       doc.save(fileName);
 
     } catch (error) {
@@ -842,7 +842,17 @@ const ClientInvoice = forwardRef(({
           <div className="invoice-title-section">
             <div className="invoice-title">Tax Invoice</div>
             <div className="document-number">
-              Document No: {finalInvoiceData.doc_num}
+              Invoice No: {isEditMode && !isPreviewMode && !isPreview ? (
+                <input
+                  type="text"
+                  value={editData.invoice_num}
+                  onChange={(e) => handleInputChange("invoice_num", e.target.value)}
+                  className="edit-input invoice-num-input"
+                  placeholder="Enter invoice number"
+                />
+              ) : (
+                finalInvoiceData.invoice_num
+              )}
             </div>
           </div>
 
@@ -1088,21 +1098,9 @@ const ClientInvoice = forwardRef(({
             <div>SWIFT Code: {finalInvoiceData.swift_code}</div>
             <div className="invoice-number-value">
               Reference:
-              {isEditMode && !isPreviewMode && !isPreview ? (
-                <input
-                  type="text"
-                  value={editData.invoice_num}
-                  onChange={(e) =>
-                    handleInputChange("invoice_num", e.target.value)
-                  }
-                  className="edit-input invoice-num-input"
-                  placeholder="Enter invoice number"
-                />
-              ) : (
-                <div className="invoice-num" id="invoice_num">
-                  {finalInvoiceData.invoice_num}
-                </div>
-              )}
+              <div className="invoice-num" id="invoice_num">
+                {finalInvoiceData.invoice_num}
+              </div>
             </div>
             <div className="payment-note">
               Please ensure the invoice number is referenced when making

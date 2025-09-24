@@ -270,7 +270,6 @@ const generateInvoicePreviewHandler = async (req, res) => {
     const previewData = {
       ...instructionDetails.data,
       invoice_num: previewInvoiceNum,
-      doc_num: `DOC-${Date.now()}`, // Temporary document number
       date: today,
       additional_destination_info: instructionDetails.data.additional_destination_info || "",
       // Add preview flag

@@ -898,25 +898,18 @@ export const generateInvoice = async (instructionId) => {
     );
     const nextInvoiceNum = sequenceResult.rows[0].next_invoice_num;
 
-    const docSequenceResult = await client.query(
-      "SELECT COALESCE(MAX(CAST(SUBSTRING(doc_num FROM 'DOC-0*(\\d+)') AS INTEGER)), 0) + 1 AS next_doc_num FROM invoice"
-    );
-    const nextDocNum = docSequenceResult.rows[0].next_doc_num;
-
     const invoiceNum = `INV-${currentYear}-${nextInvoiceNum}`;
-    const docNum = `DOC-${nextDocNum}`;
     const groupId = `${clientId}-${monthName}${currentYear}`;
 
     const insertResult = await client.query(
-      "INSERT INTO invoice (clientid, m1key, invoice_num, doc_num, groupid, date) VALUES ($1, $2, $3, $4, $5, $6) RETURNING ikey",
-      [clientId, m1key, invoiceNum, docNum, groupId, currentDate]
+      "INSERT INTO invoice (clientid, m1key, invoice_num, groupid, date) VALUES ($1, $2, $3, $4, $5) RETURNING ikey",
+      [clientId, m1key, invoiceNum, groupId, currentDate]
     );
 
     return {
       success: true,
       invoiceId: insertResult.rows[0].ikey,
       invoiceNum,
-      docNum,
       groupId,
       date: currentDate,
     };
