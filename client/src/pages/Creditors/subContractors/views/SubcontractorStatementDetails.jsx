@@ -285,7 +285,7 @@ const SubcontractorStatementDetail = () => {
       "Instructions",
     ];
     const colWidths = [25, 35, 35, 25, 60];
-    const rowHeight = 8;
+    const rowHeight = 7; // compact row height for better density
     let x = margin;
 
     // Table Header
@@ -321,7 +321,7 @@ const SubcontractorStatementDetail = () => {
 
     statement.workItems.forEach((item, index) => {
       // Check for page break
-      if (y > 250) {
+      if (y > 265) {
         doc.addPage();
         y = margin;
 
@@ -340,7 +340,7 @@ const SubcontractorStatementDetail = () => {
         x = margin;
         tableHeaders.forEach((header, idx) => {
           const textX = x + colWidths[idx] / 2;
-          doc.text(header.toUpperCase(), textX, y + 5, { align: "center" });
+          doc.text(header.toUpperCase(), textX, y + 4, { align: "center" });
           x += colWidths[idx];
         });
         y += rowHeight;
@@ -380,7 +380,7 @@ const SubcontractorStatementDetail = () => {
           year: "numeric",
         }),
         x + colWidths[0] / 2,
-        y + 5,
+        y + 4,
         { align: "center" }
       );
       x += colWidths[0];
@@ -388,13 +388,13 @@ const SubcontractorStatementDetail = () => {
       // Starting Point
       doc.setTextColor(...darkGray);
       doc.setFont("helvetica", "normal");
-      doc.text(item.startingPoint, x + colWidths[1] / 2, y + 5, {
+      doc.text(item.startingPoint, x + colWidths[1] / 2, y + 4, {
         align: "center",
       });
       x += colWidths[1];
 
       // Destination
-      doc.text(item.destination, x + colWidths[2] / 2, y + 5, {
+      doc.text(item.destination, x + colWidths[2] / 2, y + 4, {
         align: "center",
       });
       x += colWidths[2];
@@ -402,7 +402,7 @@ const SubcontractorStatementDetail = () => {
       // Rate (right-aligned and styled)
       doc.setTextColor(...primaryBlue);
       doc.setFont("helvetica", "bold");
-      doc.text(`R${item.rate.toFixed(2)}`, x + colWidths[3] - 2, y + 5, {
+      doc.text(`R${item.rate.toFixed(2)}`, x + colWidths[3] - 2, y + 4, {
         align: "right",
       });
       x += colWidths[3];
@@ -411,10 +411,10 @@ const SubcontractorStatementDetail = () => {
       doc.setTextColor(...mediumGray);
       doc.setFont("helvetica", "normal");
       const instruction =
-        item.instruction.length > 25
-          ? item.instruction.substring(0, 25) + "..."
+        item.instruction.length > 28
+          ? item.instruction.substring(0, 28) + "..."
           : item.instruction;
-      doc.text(instruction, x + colWidths[4] / 2, y + 5, { align: "center" });
+      doc.text(instruction, x + colWidths[4] / 2, y + 4, { align: "center" });
 
       y += rowHeight;
     });
@@ -499,8 +499,21 @@ const SubcontractorStatementDetail = () => {
     doc.setFontSize(8);
     doc.setFont("helvetica", "normal");
 
-    // Save PDF
-    doc.save(`Subcontractor-Statement-${statementId}.pdf`);
+    // Footer with page numbers and company name on each page
+    const pageCount = doc.internal.getNumberOfPages();
+    for (let i = 1; i <= pageCount; i++) {
+      doc.setPage(i);
+      doc.setFontSize(8);
+      doc.setTextColor(120);
+      // Company name left
+      doc.text(companyInfo.name, margin, 287);
+      // Page X of Y right
+      doc.text(`Page ${i} of ${pageCount}`, 210 - margin, 287, { align: 'right' });
+    }
+
+    // Save PDF with descriptive filename
+    const dateStr = new Date(statement.generationDate).toLocaleDateString('en-GB');
+    doc.save(`Subcontractor-Statement-${statementId}-${subcontractorName}-${dateStr}.pdf`);
     setIsGenerating(false);
   };
 
