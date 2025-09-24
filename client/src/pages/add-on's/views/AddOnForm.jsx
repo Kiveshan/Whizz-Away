@@ -334,6 +334,12 @@ const AddOnForm = () => {
         unit: "mm",
         format: "a4",
       });
+      // Brand and typography
+      const brand = {
+        primary: [45, 55, 72], // dark slate
+        accent: [70, 130, 180], // steel blue
+        gray: [110, 120, 140],
+      };
 
       const fonts = {
         title: 16,
@@ -350,60 +356,66 @@ const AddOnForm = () => {
       };
 
       const pageWidth = doc.internal.pageSize.getWidth();
+      const pageHeight = doc.internal.pageSize.getHeight();
       let currentY = margins.top;
 
-      // Company Header
+      // Header band
+      doc.setFillColor(...brand.primary);
+      doc.rect(0, 0, pageWidth, 18, 'F');
+      doc.setTextColor(255, 255, 255);
+      doc.setFont('helvetica', 'bold');
       doc.setFontSize(fonts.title);
-      doc.setFont("helvetica", "bold");
-      doc.text(companyInfo.name || "Company Name", margins.left, currentY);
+      doc.text(companyInfo.name || "Company Name", margins.left, 12);
+      doc.setFontSize(fonts.header);
+      doc.setFont('helvetica', 'normal');
+      doc.text('INVOICE', pageWidth - margins.right, 12, { align: 'right' });
+      doc.setTextColor(0, 0, 0);
+      currentY = 18 + 6;
+
+      // Two-column FROM / BILL TO
+      const colGap = 8;
+      const colWidth = (pageWidth - margins.left - margins.right - colGap) / 2;
+      doc.setFontSize(fonts.small);
+      doc.setFont('helvetica', 'bold');
+      doc.setTextColor(...brand.gray);
+      doc.text('FROM', margins.left, currentY);
+      doc.text('BILL TO', margins.left + colWidth + colGap, currentY);
+      doc.setTextColor(0, 0, 0);
+      doc.setFont('helvetica', 'normal');
       currentY += 5;
 
-      // Company Details
-      doc.setFontSize(fonts.small);
-      doc.setFont("helvetica", "normal");
-      const companyDetails = [
+      const leftDetails = [
         companyInfo.address,
         companyInfo.city,
-        `Phone: ${companyInfo.phone}`,
-        `Email: ${companyInfo.email}`,
-        `VAT Reg No: ${companyInfo.vat_reg_num}`,
+        `Phone: ${companyInfo.phone || ''}`,
+        `Email: ${companyInfo.email || ''}`,
+        `VAT Reg No: ${companyInfo.vat_reg_num || ''}`,
       ].filter(Boolean);
-      companyDetails.forEach((detail) => {
-        doc.text(detail, margins.left, currentY);
-        currentY += 4;
-      });
-      currentY += 6;
 
-      // Invoice Title and Number
-      doc.setFontSize(fonts.header);
-      doc.setFont("helvetica", "bold");
-      doc.text("Invoice", margins.left, currentY);
-      doc.setFontSize(fonts.normal);
-      doc.setFont("helvetica", "normal");
-      doc.text(
-        `Invoice No: ${formData.invoice_number || "TBA"}`,
-        pageWidth - margins.right,
-        currentY,
-        { align: "right" }
-      );
-      currentY += 6;
-
-      // Client Details
-      doc.setFontSize(fonts.small);
-      const clientDetails = [
+      const rightDetails = [
         clientInfo.name,
         clientInfo.address,
         clientInfo.city,
-        `Telephone: ${clientInfo.telephone}`,
-        `Email: ${clientInfo.email}`,
-        `VAT Reg No: ${clientInfo.vat_reg_num}`,
-        `Date: ${formatDate(formData.date)}`,
+        `Telephone: ${clientInfo.telephone || ''}`,
+        `Email: ${clientInfo.email || ''}`,
+        `VAT Reg No: ${clientInfo.vat_reg_num || ''}`,
       ].filter(Boolean);
-      clientDetails.forEach((detail) => {
-        doc.text(detail, margins.left, currentY);
-        currentY += 4;
-      });
-      currentY += 6;
+
+      const maxLines = Math.max(leftDetails.length, rightDetails.length);
+      for (let i = 0; i < maxLines; i++) {
+        if (leftDetails[i]) doc.text(String(leftDetails[i]), margins.left, currentY);
+        if (rightDetails[i]) doc.text(String(rightDetails[i]), margins.left + colWidth + colGap, currentY);
+        currentY += 5;
+      }
+      currentY += 4;
+
+      // Invoice meta row (Invoice No and Date)
+      doc.setFontSize(fonts.normal);
+      const invMetaLeft = `Invoice No: ${formData.invoice_number || 'TBA'}`;
+      const invMetaRight = `Date: ${formatDate(formData.date)}`;
+      doc.text(invMetaLeft, margins.left, currentY);
+      doc.text(invMetaRight, pageWidth - margins.right, currentY, { align: 'right' });
+      currentY += 8;
 
       // Service Details Table
       const serviceData = formData.items.map((item) => [
@@ -419,21 +431,38 @@ const AddOnForm = () => {
         theme: "grid",
         styles: {
           fontSize: fonts.small,
-          cellPadding: 1.5,
+          cellPadding: 1.2,
           lineWidth: 0.1,
+          overflow: 'ellipsize',
+          lineColor: brand.gray,
         },
         columnStyles: {
           0: { cellWidth: 25 },
           1: { cellWidth: 30 },
           2: { cellWidth: "auto" },
-          3: { cellWidth: 25, halign: "right" },
+          3: { cellWidth: 28, halign: "right" },
         },
         headStyles: {
-          fillColor: [34, 139, 34],
+          fillColor: brand.accent,
           textColor: [255, 255, 255],
           fontStyle: "bold",
         },
         margin: { left: margins.left, right: margins.right },
+        rowPageBreak: 'avoid',
+        didParseCell: (data) => {
+          if (data.section === 'head') {
+            data.cell.styles.minCellHeight = 6;
+          } else {
+            data.cell.styles.minCellHeight = 5.5;
+          }
+        },
+        didDrawPage: () => {
+          // Footer with page numbers
+          const str = `Page ${doc.internal.getNumberOfPages()}`;
+          doc.setFontSize(8);
+          doc.setTextColor(120);
+          doc.text(str, pageWidth - margins.right, pageHeight - 6, { align: 'right' });
+        },
       });
       currentY = doc.lastAutoTable.finalY + 5;
 
@@ -479,11 +508,12 @@ const AddOnForm = () => {
         theme: "grid",
         styles: {
           fontSize: fonts.small,
-          cellPadding: 1.5,
+          cellPadding: 1.2,
           lineWidth: 0.1,
+          lineColor: brand.gray,
         },
         headStyles: {
-          fillColor: [34, 139, 34],
+          fillColor: brand.accent,
           textColor: [255, 255, 255],
           fontStyle: "bold",
         },
@@ -521,7 +551,8 @@ const AddOnForm = () => {
       );
 
       // Save PDF
-      doc.save(`addon-invoice-${formData.invoice_number || "new"}.pdf`);
+      const fileName = `addon-invoice-${formData.invoice_number || "new"}-${formatDate(formData.date)}.pdf`;
+      doc.save(fileName);
       setPdfLoading(false);
     } catch (error) {
       console.error("PDF generation error:", error);
