@@ -28,7 +28,7 @@ const SubcontractorTable = ({
     <div>
       <div>
         <button className="manage-add-subcontractor-button" onClick={onAdd}>
-          Add Subcontractor
+          Add
         </button>
       </div>
 

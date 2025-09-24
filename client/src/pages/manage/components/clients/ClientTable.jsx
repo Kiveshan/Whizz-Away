@@ -27,7 +27,7 @@ const ClientTable = ({
       <div>
         
         <button className="manage-add-client-button" onClick={onAdd}>
-          Add Client
+          Add
         </button>
       </div>
 

@@ -63,7 +63,7 @@ const TrailerTable = ({
     <div>
       <div>
         <button className="manage-add-truck-button" onClick={onAdd}>
-          Add Trailer
+          Add
         </button>
       </div>
 

@@ -468,21 +468,17 @@ const ClientInvoice = forwardRef(({
       const hasTrucks = containers.some(
         (container) => container.truckregnumber
       );
-      // Only show base rate column if there are containers using base rates
-      const hasBaseRates = containers.some(
-        (container) => 
-          container.rate_per_container > 0 && 
-          !container.has_special_rate &&
-          (container.leg_rate > 0 || container.base_rate > 0)
-      );
-
+      // Determine column visibility
       const containerHeaders = ["Container Number", "Type"];
       if (hasWeights) containerHeaders.push("Weight");
       if (hasTrucks) containerHeaders.push("Truck Reg");
-      if (hasBaseRates) containerHeaders.push("Rate"); // Base rate only
+      // Always show Base Rate column
+      containerHeaders.push("Base Rate");
       if (hasSurcharges) containerHeaders.push("Surcharge");
       if (hasHazardous) containerHeaders.push("Haz");
       if (hasVGM) containerHeaders.push("VGM");
+      // Always show Total column
+      containerHeaders.push("Total");
 
       const containerData =
         containers.length > 0
@@ -502,14 +498,9 @@ const ClientInvoice = forwardRef(({
                 row.push(container.truckregnumber || "-");
               }
               
-              // Base Rate column - only for containers without special rates
-              if (hasBaseRates) {
-                const showBaseRate = 
-                  container.rate_per_container > 0 && 
-                  !container.has_special_rate &&
-                  (container.leg_rate > 0 || container.base_rate > 0);
-                row.push(showBaseRate ? formatCurrency(container.rate_per_container) : "-");
-              }
+              // Base Rate column - strictly from m1 base rates (base_rate)
+              const baseRateValue = container.base_rate || 0;
+              row.push(formatCurrency(baseRateValue || 0));
               
               // Individual special rate columns
               if (hasSurcharges) {
@@ -536,6 +527,12 @@ const ClientInvoice = forwardRef(({
                 row.push(vgmText);
               }
               
+              // Total column = Base + additionals
+              const totalValue = (baseRateValue || 0)
+                + (container.surcharge_amount || 0)
+                + (container.hazardous_amount || 0)
+                + (container.vgm_amount || 0);
+              row.push(formatCurrency(totalValue));
               return row;
             })
           : [["No container information", "", "", "", "", "", "", ""]];
@@ -928,13 +925,7 @@ const ClientInvoice = forwardRef(({
                     {containers.some(
                       (container) => container.truckregnumber
                     ) && <th className="truck-header">Truck Reg</th>}
-                    {/* Only show Rate column if there are containers using base rates */}
-                    {containers.some(
-                      (container) => 
-                        container.rate_per_container > 0 && 
-                        !container.has_special_rate &&
-                        (container.leg_rate > 0 || container.base_rate > 0)
-                    ) && <th className="rate-header">Rate</th>}
+                    <th className="rate-header">Base Rate</th>
                     {/* Individual special rate columns */}
                     {containers.some(
                       (container) => 
@@ -947,6 +938,7 @@ const ClientInvoice = forwardRef(({
                     {containers.some(
                       (container) => container.vgm || container.vgm_amount > 0
                     ) && <th className="vgm-header">VGM</th>}
+                    <th className="total-header">Total</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -955,18 +947,16 @@ const ClientInvoice = forwardRef(({
                       const hasWeight =
                         container.weight && container.weight !== "N/A";
                       const hasTruck = container.truckregnumber;
-                      const hasBaseRate = 
-                        container.rate_per_container > 0 && 
-                        !container.has_special_rate &&
-                        (container.leg_rate > 0 || container.base_rate > 0);
+                      const baseRateValue = container.base_rate || 0;
                       const hasSurcharge =
                         container.add_surcharges || container.surcharge_amount > 0;
                       const hasHazard =
                         container.hazardous || container.hazardous_amount > 0;
                       const hasVGM = container.vgm || container.vgm_amount > 0;
-
-                      // Determine if this container should show a base rate
-                      const showBaseRate = hasBaseRate;
+                      const totalValue = (baseRateValue || 0)
+                        + (container.surcharge_amount || 0)
+                        + (container.hazardous_amount || 0)
+                        + (container.vgm_amount || 0);
 
                       return (
                         <tr key={index}>
@@ -989,17 +979,10 @@ const ClientInvoice = forwardRef(({
                               {hasTruck ? container.truckregnumber : "-"}
                             </td>
                           )}
-                          {/* Base Rate column - only for containers without special rates */}
-                          {containers.some(
-                            (c) => 
-                              c.rate_per_container > 0 && 
-                              !c.has_special_rate &&
-                              (c.leg_rate > 0 || c.base_rate > 0)
-                          ) && (
-                            <td className="rate" title={container.leg_rate > 0 ? "Leg rate" : "Base rate"}>
-                              {showBaseRate ? formatCurrency(container.rate_per_container) : "-"}
-                            </td>
-                          )}
+                          {/* Base Rate column */}
+                          <td className="rate" title={"Base rate"}>
+                            {formatCurrency(baseRateValue || 0)}
+                          </td>
                           {/* Surcharge column */}
                           {containers.some(
                             (c) => c.add_surcharges || c.surcharge_amount > 0
@@ -1030,6 +1013,10 @@ const ClientInvoice = forwardRef(({
                                 : "-"}
                             </td>
                           )}
+                          {/* Total column */}
+                          <td className="total" title="Base + Surcharge + Haz + VGM">
+                            {formatCurrency(totalValue)}
+                          </td>
                         </tr>
                       );
                     })
