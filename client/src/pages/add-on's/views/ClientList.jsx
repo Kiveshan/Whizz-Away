@@ -126,11 +126,13 @@ const ClientList = () => {
           {roleId == 4 && (
             <button
               className="back-button"
-              onClick={() => navigate("/DebtorsDashboard")}
+              onClick={() => navigate("/DirectorDebtors")}
             >
               Back
             </button>
           )}
+
+          
         </div>
 
         {/* Table */}
