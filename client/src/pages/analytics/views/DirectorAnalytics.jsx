@@ -693,23 +693,17 @@ export default function DirectorAnalytics() {
       });
       console.log("API response:", response.data);
       if (response.data.success) {
-        const data = response.data.data.map((item) => {
-          const turnover = Number.parseFloat(item.total_turnover);
-          const fuelCost = Number.parseFloat(item.total_fuel_cost);
-          const status = calculateTurnoverStatus(turnover);
-          return {
-            truckId: item.truckregnumber,
-            turnover: turnover,
-            fuelCost: fuelCost,
-            month: item.month_name.trim(),
-            year: item.year,
-            status,
-            turnoverPercentage: Number.parseFloat(item.turnoverPercentage) || 0,
-            fuelCostPercentage: Number.parseFloat(item.fuelCostPercentage) || 0,
-          };
-        });
-        console.log("Processed turnover vs fuel per truck data:", data);
-        return data;
+        const processedData = response.data.data.map((item) => ({
+          truckId: item.truckregnumber || item.truckregnum || 'Totals', // Standardize to 'Totals' for aggregate
+          turnover: Number.parseFloat(item.total_turnover) || 0,
+          fuelCost: Number.parseFloat(item.total_fuel_cost) || 0,
+          month: item.month_name.trim(),
+          year: item.year,
+          turnoverPercentage: Number.parseFloat(item.turnoverPercentage) || 0,
+          fuelCostPercentage: Number.parseFloat(item.fuelCostPercentage) || 0,
+        }));
+        console.log("Processed turnover vs fuel per truck data:", processedData);
+        return processedData;
       } else {
         throw new Error(response.data.message || "Failed to fetch data");
       }
@@ -1883,11 +1877,15 @@ export default function DirectorAnalytics() {
                     <span>Turnover</span>
                   </div>
                   <div className="chart-header-item">
+                    <span
+                      className="legend-color"
+                      style={{ backgroundColor: "#FF6347" }}
+                    ></span>
                     <span>Diesel Cost</span>
                   </div>
                 </div>
                 <div className="chart-scroll-container">
-                  <ResponsiveContainer width={chartWidth} height="100%">
+                  <ResponsiveContainer width={chartWidth} height={500}>
                     <BarChart
                       data={
                         selectedTruck
@@ -1896,11 +1894,11 @@ export default function DirectorAnalytics() {
                             {
                               truckId: "Totals",
                               turnover: chartData.reduce(
-                                (sum, item) => sum + item.turnover,
+                                (sum, item) => sum + (item.turnover || 0),
                                 0
                               ),
                               fuelCost: chartData.reduce(
-                                (sum, item) => sum + item.fuelCost,
+                                (sum, item) => sum + (item.fuelCost || 0),
                                 0
                               ),
                               turnoverPercentage: 100,
@@ -1910,9 +1908,16 @@ export default function DirectorAnalytics() {
                             },
                           ]
                       }
-                      margin={{ top: 24, right: 24, left: 48, bottom: 16 }}
+                      margin={{ top: 40, right: 30, left: 60, bottom: 120 }}
                     >
-                      <XAxis dataKey="truckId" interval={0} tick={{ fontSize: 11 }} />
+                      <XAxis
+                        dataKey="truckId"
+                        angle={0}
+                        textAnchor="middle"
+                        height={150}
+                        interval={0}
+                        tick={{ fontSize: 11 }}
+                      />
                       <YAxis
                         label={{
                           value: "Amount (R)",
@@ -1923,6 +1928,7 @@ export default function DirectorAnalytics() {
                       />
                       <Tooltip content={<CustomTooltip />} />
                       <Bar
+                        dataKey="turnover"
                         name="Turnover"
                         fill="#2196F3"
                         radius={[4, 4, 0, 0]}
