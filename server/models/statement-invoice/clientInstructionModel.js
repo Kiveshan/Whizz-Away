@@ -11,11 +11,11 @@ const getClientInstructions = async (clientId, { year, month, type }) => {
     let queryText = `
       SELECT 
         m1.m1key, 
-        m1.task as instruction_no, 
+        m1."ksmFileRef" as instruction_no, 
         s.shipmenttype as shipment_type, 
-        m1.fileref as file_no, 
+        m1."clientFileRef" as file_no, 
         m1.status,
-        m1.pickupdate,
+        m1.created_at as pickupdate,
         m1.total_cost,
         i.ikey,
         i.invoice_num,
@@ -45,19 +45,19 @@ const getClientInstructions = async (clientId, { year, month, type }) => {
 
     // Handle date filtering - with separate conditions for year and month
     if (year) {
-      queryText += ` AND EXTRACT(YEAR FROM m1.pickupdate) = $${paramIndex}`;
+      queryText += ` AND EXTRACT(YEAR FROM m1.created_at) = $${paramIndex}`;
       queryParams.push(year);
       paramIndex++;
     }
 
     if (month) {
-      queryText += ` AND EXTRACT(MONTH FROM m1.pickupdate) = $${paramIndex}`;
+      queryText += ` AND EXTRACT(MONTH FROM m1.created_at) = $${paramIndex}`;
       queryParams.push(month);
       paramIndex++;
     }
 
-    // Order by pickup date descending (newest first)
-    queryText += ` ORDER BY m1.pickupdate DESC`;
+    // Order by created_at descending (newest first)
+    queryText += ` ORDER BY m1.created_at DESC`;
 
     console.log("Executing query:", queryText, "with params:", queryParams);
 
