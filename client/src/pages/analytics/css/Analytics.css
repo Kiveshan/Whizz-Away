@@ -1,8 +1,39 @@
+/* Adjustable header/footer heights. Tweak these to match your actual navbar/footer sizes */
+:root {
+  --site-header-height: 90px;
+  --site-footer-height: 40px;
+}
+
+.analytics-page-wrapper {
+  /* Fill the remaining space between the navbar and footer */
+  height: calc(100vh - var(--site-header-height) - var(--site-footer-height));
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+/* When this class is applied to <body>, it will fully disable vertical scrolling
+   while this page is active, without affecting global styles on other pages. */
+body.no-vertical-scroll,
+html.no-vertical-scroll {
+  height: 100%;
+  overflow-y: hidden !important;
+}
+
+/* Prevent accidental layout shifts due to body margins on some browsers */
+body.no-vertical-scroll {
+  margin: 0;
+}
+
 .analytics-page-wrapper .analytics-container {
   padding: 5px;
   /* Further reduced from 10px to minimize top space */
   width: 100%;
   font-family: Arial, sans-serif;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
 }
 
 .analytics-page-wrapper .header-actions {
@@ -61,6 +92,9 @@
 .analytics-page-wrapper .analytics-content {
   display: flex;
   gap: 20px;
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
 }
 
 .analytics-page-wrapper .sidebar-filters {
@@ -129,26 +163,36 @@
   padding: 20px;
   box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
   min-width: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
 }
 
 .analytics-page-wrapper .chart-title {
   margin-top: 0;
-  margin-bottom: 20px;
+  margin-bottom: 10px;
   color: #333;
   font-size: 18px;
   font-weight: bold;
+  flex-shrink: 0;
 }
 
 .analytics-page-wrapper .chart-wrapper {
   overflow: visible;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
 }
 
 .analytics-page-wrapper .chart-scroll-container {
   width: 100%;
   overflow-x: auto;
-  overflow-y: visible;
+  overflow-y: hidden;
   padding-bottom: 0;
   margin-bottom: 0;
+  flex: 1;
+  min-height: 0;
 }
 
 .analytics-page-wrapper .chart-scroll-container::-webkit-scrollbar {
@@ -259,7 +303,9 @@
   display: flex;
   justify-content: center;
   align-items: center;
-  height: 300px;
+  height: auto; /* Avoid forcing extra vertical space */
+  flex: 1; /* Fill available space without growing the page height */
+  min-height: 0; /* Allow shrinking in flex containers */
   font-size: 16px;
   color: #666;
 }
