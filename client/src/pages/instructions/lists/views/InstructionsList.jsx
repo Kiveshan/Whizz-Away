@@ -421,7 +421,7 @@ const Instructions = () => {
   ) : (
     currentInstructions.map((item) => {
       // Check if the instruction has any containers with non-empty/non-null containernum
-      const hasValidContainers = item.has_valid_containers === true;
+      const disableAssignment = (item.has_valid_containers !== true) && (item.shipment_type !== 4);
 
       return (
         <tr key={item.m1controllerkey || item.m1key}>
@@ -453,41 +453,41 @@ const Instructions = () => {
               View
             </button>
           </td>
-          <td>
-            {hasValidContainers ? (
-              <button
-                className="view-btn"
-                onClick={() => {
-                  const stateToPass = {
-                    instructionId: item.m1key || item.m1controllerkey,
-                    clientId,
-                    clientName,
-                    selectedMonth,
-                    selectedYear,
-                    activeFilter,
-                    selectedLegIndex: 0,
-                  };
-                  console.log("Navigating to update-instructions with state:", stateToPass);
-                  navigate("/update-instructions", {
-                    state: stateToPass,
-                    replace: true,
-                  });
-                }}
-              >
-                View
-              </button>
-            ) : (
-              <span className="tooltip-wrapper">
-                <button
-                  className="view-btn disabled"
-                  disabled={true}
-                >
-                  View
-                </button>
-                <span className="tooltip-text">Please allocate containers to proceed to assignment</span>
-              </span>
-            )}
-          </td>
+<td>
+  {disableAssignment ? (
+    <span className="tooltip-wrapper">
+      <button className="view-btn disabled" disabled>
+        View
+      </button>
+      <span className="tooltip-text">
+        Please allocate containers to proceed to assignment
+      </span>
+    </span>
+  ) : (
+    <button
+      className="view-btn"
+      onClick={() => {
+        const stateToPass = {
+          instructionId: item.m1key || item.m1controllerkey,
+          clientId,
+          clientName,
+          selectedMonth,
+          selectedYear,
+          activeFilter,
+          selectedLegIndex: 0,
+        };
+        console.log("Navigating to update-instructions with state:", stateToPass);
+        navigate("/update-instructions", {
+          state: stateToPass,
+          replace: true,
+        });
+      }}
+    >
+      View
+    </button>
+  )}
+</td>
+
         </tr>
       );
     })
