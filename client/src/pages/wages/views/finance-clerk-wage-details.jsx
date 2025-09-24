@@ -70,8 +70,6 @@ const FinanceClerkWageDetails = () => {
         console.error("Error fetching employee data:", error);
       }
     };
-
-    // Fetch instructions for this driver
     const fetchDriverInstructions = async () => {
       try {
         setLoading(true);
@@ -80,7 +78,6 @@ const FinanceClerkWageDetails = () => {
         let response;
         let successfulEndpoint = "";
 
-        // Try the first endpoint
         try {
           console.log("Trying endpoint: /api/driver-instructions/" + id);
           response = await api.get(`/api/driver-instructions/${id}`);
@@ -91,7 +88,6 @@ const FinanceClerkWageDetails = () => {
             );
             successfulEndpoint = "/api/driver-instructions/" + id;
           } else {
-            // Try the second endpoint
             console.log("Trying endpoint: /instructions/driver/" + id);
             response = await api.get(`/instructions/driver/${id}`);
 
@@ -101,7 +97,6 @@ const FinanceClerkWageDetails = () => {
               );
               successfulEndpoint = "/instructions/driver/" + id;
             } else {
-              // Try the third endpoint
               console.log(
                 "Trying endpoint: /legs/instruction/all/driver/" + id
               );
@@ -181,21 +176,20 @@ const FinanceClerkWageDetails = () => {
     }
   }, [id, selectedMonth, selectedYear]);
 
-  // Filter instructions based on selected month and year
-  const filteredInstructions = driverInstructions.filter((instruction) => {
-    // Try to use deadline first, fall back to pickupdate if deadline is not available
-    const dateToUse = instruction.deadline || instruction.pickupdate;
-    if (!dateToUse) return false;
+const filteredInstructions = driverInstructions.filter((instruction) => {
+  // Use lastFreeDate if available, otherwise created_at
+  const dateToUse = instruction.lastFreeDate || instruction.created_at;
+  if (!dateToUse) return false;
 
-    const instructionDate = new Date(dateToUse);
+  const instructionDate = new Date(dateToUse);
 
-    const matchesMonth =
-      monthNames[instructionDate.getMonth()] === selectedMonth;
-    const matchesYear =
-      instructionDate.getFullYear().toString() === selectedYear;
+  const matchesMonth =
+    monthNames[instructionDate.getMonth()] === selectedMonth;
+  const matchesYear =
+    instructionDate.getFullYear().toString() === selectedYear;
 
-    return matchesMonth && matchesYear;
-  });
+  return matchesMonth && matchesYear;
+});
 
   // Handle viewing all legs for the selected month and year
   const handleViewLegs = () => {
@@ -208,8 +202,6 @@ const FinanceClerkWageDetails = () => {
       },
     });
   };
-
-  // Handle viewing wage slip for the selected month and year
   const handleViewWageSlip = () => {
     navigate(`/finance-clerk-wage-slip/${id}`, {
       state: {

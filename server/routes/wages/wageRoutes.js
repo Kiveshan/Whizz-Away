@@ -11,7 +11,7 @@ import {
   getStoredWageDataHandler,
   getBaseSalaryHistoryHandler,
   getAllEmployeesHandler,
-  getAllRolesHandler
+  getAllRolesHandler,getAllRolesExcludingSixHandler
 } from "../../controllers/wages/wageController.js";
 
 const router = express.Router();
@@ -39,5 +39,6 @@ router.get(
 );
 router.get("/api/base-salary-history/:employeeId", getBaseSalaryHistoryHandler);
 router.get("/api/roles", getAllRolesHandler);
+router.get("/api/roles/exclude-six", getAllRolesExcludingSixHandler);
 
 export default router;
