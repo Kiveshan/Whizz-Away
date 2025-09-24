@@ -636,7 +636,6 @@ const ClientInvoice = forwardRef(({
         `Account Number: ${finalInvoiceData.account_num || ""}`,
         `Branch Code: ${finalInvoiceData.branch_code || ""}`,
         `SWIFT Code: ${finalInvoiceData.swift_code || ""}`,
-        `Reference: ${finalInvoiceData.invoice_num || ""}`,
       ].filter(Boolean);
 
       bankingDetails.forEach((detail) => {
@@ -1096,12 +1095,6 @@ const ClientInvoice = forwardRef(({
             <div>Account Number: {finalInvoiceData.account_num}</div>
             <div>Branch Code: {finalInvoiceData.branch_code}</div>
             <div>SWIFT Code: {finalInvoiceData.swift_code}</div>
-            <div className="invoice-number-value">
-              Reference:
-              <div className="invoice-num" id="invoice_num">
-                {finalInvoiceData.invoice_num}
-              </div>
-            </div>
             <div className="payment-note">
               Please ensure the invoice number is referenced when making
               payment.
