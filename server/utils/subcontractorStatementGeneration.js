@@ -58,6 +58,7 @@ const generateCurrentMonthStatements = async (specificSubeiRegNum = null) => {
         AND l.driverrate > 0
     `;
 
+    
     const queryParams = [formattedLegsStartDate, formattedLegsEndDate];
 
     // Add specific subcontractor filter if provided
