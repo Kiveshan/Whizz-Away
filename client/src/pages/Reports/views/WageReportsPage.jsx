@@ -100,11 +100,11 @@ const generateReport = async (monthName) => {
     const worksheet = workbook.addWorksheet('Labour Consultant Report')
 
     // Set up the headers with styling
-worksheet.columns = [
-  { header: 'Employee Name', key: 'employeeName', width: 25 },
-  { header: 'Role', key: 'roleName', width: 20 },
-  { header: 'Total Payable to Labour Consultant', key: 'totalPayable', width: 35 }
-]
+    worksheet.columns = [
+      { header: 'Employee Name', key: 'employeeName', width: 25 },
+      { header: 'Role', key: 'roleName', width: 20 },
+      { header: 'Total Payable to Labour Consultant', key: 'totalPayable', width: 35 }
+    ]
 
     // Style the header row
     worksheet.getRow(1).font = { bold: true, size: 12 }
@@ -121,8 +121,8 @@ worksheet.columns = [
     }
 
     // Add title row
-worksheet.insertRow(1, [`Labour Consultant Report - ${monthName} ${selectedYear}`])
-worksheet.mergeCells('A1:C1')
+    worksheet.insertRow(1, [`Labour Consultant Report - ${monthName} ${selectedYear}`])
+    worksheet.mergeCells('A1:C1')
     worksheet.getRow(1).font = { bold: true, size: 14 }
     worksheet.getRow(1).alignment = { horizontal: 'center' }
     worksheet.getRow(1).fill = {
@@ -130,15 +130,14 @@ worksheet.mergeCells('A1:C1')
       pattern: 'solid',
       fgColor: { argb: 'FFD4E6F1' }
     }
-
-    // Fetch all employees/drivers (same as finance-clerk-wage.jsx)
+    
     console.log('Fetching employees/drivers...')
     const employeesResponse = await api.get('/all-employees')
-    const employees = employeesResponse.data
+  const employees = employeesResponse.data.filter(employee => employee.roleid !== 6)
     console.log(`Found ${employees.length} employees`)
-    console.log('Fetching roles...')
-const rolesResponse = await api.get('/api/roles')
-const rolesMap = new Map(rolesResponse.data.map(role => [role.roleid, role.rolename]));
+    console.log('Fetching roles (excluding roleid 6)...')
+    const rolesResponse = await api.get('/api/roles/exclude-six')
+    const rolesMap = new Map(rolesResponse.data.map(role => [role.roleid, role.rolename]));
 
     if (!employees || employees.length === 0) {
       alert('No employees found in the system')
@@ -150,17 +149,17 @@ const rolesMap = new Map(rolesResponse.data.map(role => [role.roleid, role.rolen
     let processedCount = 0
     let totalSum = 0;
     
-for (const employee of employees) {
-  try {
-    console.log(`Processing employee: ${employee.name} ${employee.surname}`)
-    const cleanId = employee.userid.toString()
-    
-    // FIRST: Check if we have stored wage data for this month/year
-    const storedWageResponse = await checkStoredWageDataForReport(
-      cleanId,
-      monthName,
-      selectedYear
-    );
+    for (const employee of employees) {
+      try {
+        console.log(`Processing employee: ${employee.name} ${employee.surname}`)
+        const cleanId = employee.userid.toString()
+        
+        // FIRST: Check if we have stored wage data for this month/year
+        const storedWageResponse = await checkStoredWageDataForReport(
+          cleanId,
+          monthName,
+          selectedYear
+        );
     
     let totalPayable = 0;
     let useStoredData = storedWageResponse.useStored;

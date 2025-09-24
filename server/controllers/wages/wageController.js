@@ -10,7 +10,7 @@ import {
   getStoredWageData,
   getBaseSalaryHistory,
   getAllEmployees,
-  getAllRoles
+  getAllRoles,getAllRolesExcludingSix
 
 } from "../../models/wages/wageModel.js";
 import {
@@ -271,6 +271,15 @@ const getAllRolesHandler = async (req, res) => {
     res.status(500).json({ error: "Failed to fetch roles" });
   }
 };
+const getAllRolesExcludingSixHandler = async (req, res) => {
+  try {
+    const roles = await getAllRolesExcludingSix();
+    res.status(200).json(roles);
+  } catch (error) {
+    console.error("Error fetching roles (excluding roleid 6):", error);
+    res.status(500).json({ error: "Failed to fetch roles excluding roleid 6" });
+  }
+};
 export {
   saveWageDataHandler,
   checkWageSlipHandler,
@@ -283,5 +292,5 @@ export {
   getStoredWageDataHandler,
   getBaseSalaryHistoryHandler,
    getAllEmployeesHandler,
-   getAllRolesHandler
+   getAllRolesHandler,getAllRolesExcludingSixHandler
 };
