@@ -266,7 +266,7 @@ const DirectorClientDocuments = () => {
               <table>
                 <thead>
                   <tr>
-                    <th>Instruction No.</th>
+                    <th>Instruction</th>
                     <th>File No.</th>
                     <th>Type</th>
                     <th>Date</th>

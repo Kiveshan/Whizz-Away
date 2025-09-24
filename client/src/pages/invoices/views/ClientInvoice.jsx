@@ -308,21 +308,29 @@ const ClientInvoice = forwardRef(({
         format: "a4",
       });
 
-      // Set up fonts and sizes based on layout
+      // Brand and typography
+      const brand = {
+        primary: [45, 55, 72], // dark slate
+        accent: [70, 130, 180], // steel blue
+        light: [245, 247, 250],
+        gray: [110, 120, 140],
+      };
+
+      // Set up fonts and sizes based on layout (smaller to ensure 10+ rows per page)
       const fonts = isCompactLayout
         ? {
+            title: 16,
+            header: 12,
+            normal: 10,
+            small: 9,
+            tiny: 8,
+          }
+        : {
             title: 18,
             header: 14,
             normal: 11,
             small: 10,
             tiny: 9,
-          }
-        : {
-            title: 20,
-            header: 16,
-            normal: 12,
-            small: 11,
-            tiny: 10,
           };
 
       // Reduced margins for maximum space utilization
@@ -333,66 +341,73 @@ const ClientInvoice = forwardRef(({
       };
 
       const pageWidth = doc.internal.pageSize.getWidth();
+      const pageHeight = doc.internal.pageSize.getHeight();
       let currentY = margins.top;
 
-      // Company Header
+      // Header band
+      doc.setFillColor(...brand.primary);
+      doc.rect(0, 0, pageWidth, 18, 'F');
+      doc.setTextColor(255, 255, 255);
+      doc.setFont('helvetica', 'bold');
       doc.setFontSize(fonts.title);
-      doc.setFont("helvetica", "bold");
-      doc.text(finalInvoiceData.companyname || "", margins.left, currentY);
-      currentY += isCompactLayout ? 6 : 8;
-
-      // Company Details
+      doc.text(finalInvoiceData.companyname || "", margins.left, 12);
+      doc.setFontSize(fonts.header);
+      doc.setFont('helvetica', 'normal');
+      doc.text('TAX INVOICE', pageWidth - margins.right, 12, { align: 'right' });
+      doc.setTextColor(0, 0, 0);
+      currentY = 18 + 6;
+      // Two-column Company (From) and Client (Bill To)
+      const colGap = 8;
+      const colWidth = (pageWidth - margins.left - margins.right - colGap) / 2;
       doc.setFontSize(fonts.small);
-      doc.setFont("helvetica", "normal");
-      const companyDetails = [
+      doc.setFont('helvetica', 'bold');
+      doc.setTextColor(...brand.gray);
+      doc.text('FROM', margins.left, currentY);
+      doc.text('BILL TO', margins.left + colWidth + colGap, currentY);
+      doc.setTextColor(0, 0, 0);
+      doc.setFont('helvetica', 'normal');
+      currentY += 5;
+
+      const leftDetails = [
         finalInvoiceData.cluster_box,
         finalInvoiceData.address,
         finalInvoiceData.suburb,
-        `VAT Reg No: ${finalInvoiceData.vat_reg_num}`,
-        `Cellphone: ${finalInvoiceData.phonenumber}`,
+        `VAT Reg No: ${finalInvoiceData.vat_reg_num || ''}`,
+        `Cellphone: ${finalInvoiceData.phonenumber || ''}`,
       ].filter(Boolean);
 
-      companyDetails.forEach((detail) => {
-        doc.text(detail, margins.left, currentY);
-        currentY += isCompactLayout ? 5 : 6;
-      });
-
-      currentY += isCompactLayout ? 8 : 10;
-
-      // Invoice Title and Document Number (side by side)
-      doc.setFontSize(fonts.header);
-      doc.setFont("helvetica", "bold");
-      doc.text("Tax Invoice", margins.left, currentY);
-
-      // Document number on the right side
-      doc.setFontSize(fonts.normal);
-      doc.setFont("helvetica", "normal");
-      doc.text(
-        `Document No: ${finalInvoiceData.doc_num}`,
-        pageWidth - margins.right,
-        currentY,
-        { align: "right" }
-      );
-      currentY += isCompactLayout ? 12 : 15;
-
-      // Client Details
-      doc.setFontSize(fonts.small);
-      const clientDetails = [
+      const rightDetails = [
         finalInvoiceData.client_name,
         finalInvoiceData.client_address,
         finalInvoiceData.client_suburb,
-        `Telephone: ${finalInvoiceData.client_telephone}`,
-        `Date: ${formatDate(finalInvoiceData.date)}`,
-        `Email: ${finalInvoiceData.client_email}`,
-        `VAT Reg No: ${finalInvoiceData.client_vat}`,
+        `Telephone: ${finalInvoiceData.client_telephone || ''}`,
+        `Email: ${finalInvoiceData.client_email || ''}`,
+        `VAT Reg No: ${finalInvoiceData.client_vat || ''}`,
       ].filter(Boolean);
 
-      clientDetails.forEach((detail) => {
-        doc.text(detail, margins.left, currentY);
-        currentY += isCompactLayout ? 5 : 6;
-      });
+      const maxLines = Math.max(leftDetails.length, rightDetails.length);
+      for (let i = 0; i < maxLines; i++) {
+        if (leftDetails[i]) {
+          doc.text(String(leftDetails[i]), margins.left, currentY);
+        }
+        if (rightDetails[i]) {
+          doc.text(String(rightDetails[i]), margins.left + colWidth + colGap, currentY);
+        }
+        currentY += 5;
+      }
+      currentY += 4;
 
-      currentY += isCompactLayout ? 8 : 10;
+      // Invoice meta row (Invoice No and Date)
+      doc.setFontSize(fonts.normal);
+      doc.setFont('helvetica', 'normal');
+      const invMetaLeft = `Invoice No: ${finalInvoiceData.invoice_num || ''}`;
+      const invMetaRight = `Date: ${formatDate(finalInvoiceData.date)}`;
+      doc.text(invMetaLeft, margins.left, currentY);
+      doc.text(invMetaRight, pageWidth - margins.right, currentY, { align: 'right' });
+      currentY += 8;
+
+      // Destination table (compact)
+      doc.setFontSize(fonts.small);
 
       // Destination Table - Updated to include additional destination info
       const destinationRoute = `${finalInvoiceData.pickup || ""} to ${
@@ -412,11 +427,13 @@ const ClientInvoice = forwardRef(({
         theme: "grid",
         styles: {
           fontSize: fonts.small,
-          cellPadding: isCompactLayout ? 1.5 : 2.5,
+          cellPadding: 1.2,
           lineWidth: 0.1,
+          overflow: 'ellipsize',
+          lineColor: brand.gray,
         },
         columnStyles: {
-          0: { fontStyle: "bold", cellWidth: 35 },
+          0: { fontStyle: "bold", cellWidth: 32 },
           1: { cellWidth: "auto" },
         },
         margin: { left: margins.left, right: margins.right },
@@ -439,11 +456,13 @@ const ClientInvoice = forwardRef(({
         theme: "grid",
         styles: {
           fontSize: fonts.small,
-          cellPadding: isCompactLayout ? 1.5 : 2.5,
+          cellPadding: 1.2,
           lineWidth: 0.1,
+          overflow: 'ellipsize',
+          lineColor: brand.gray,
         },
         columnStyles: {
-          0: { fontStyle: "bold", cellWidth: 35 },
+          0: { fontStyle: "bold", cellWidth: 32 },
           1: { cellWidth: "auto" },
         },
         margin: { left: margins.left, right: margins.right },
@@ -469,12 +488,12 @@ const ClientInvoice = forwardRef(({
         (container) => container.truckregnumber
       );
       // Determine column visibility
-      const containerHeaders = ["Container Number", "Type"];
+      const containerHeaders = ["Cont. No", "Type"];
       if (hasWeights) containerHeaders.push("Weight");
-      if (hasTrucks) containerHeaders.push("Truck Reg");
+      if (hasTrucks) containerHeaders.push("Truck");
       // Always show Base Rate column
-      containerHeaders.push("Base Rate");
-      if (hasSurcharges) containerHeaders.push("Surcharge");
+      containerHeaders.push("Base");
+      if (hasSurcharges) containerHeaders.push("Surch.");
       if (hasHazardous) containerHeaders.push("Haz");
       if (hasVGM) containerHeaders.push("VGM");
       // Always show Total column
@@ -537,32 +556,61 @@ const ClientInvoice = forwardRef(({
             })
           : [["No container information", "", "", "", "", "", "", ""]];
 
+      // Calculate available height for the table and enforce compact row styling
+      const footerReserve = 16; // space for footer
+      const availableHeight = pageHeight - currentY - footerReserve - 10; // include bottom margin
+
       autoTable(doc, {
         startY: currentY,
         head: [containerHeaders],
         body: containerData,
         theme: "grid",
         styles: {
-          fontSize: isCompactLayout ? fonts.tiny : fonts.small,
-          cellPadding: isCompactLayout ? 1.5 : 2.5,
+          fontSize: fonts.tiny,
+          cellPadding: 1.0,
           lineWidth: 0.1,
+          overflow: 'ellipsize',
+          lineColor: brand.gray,
         },
         headStyles: {
-          fillColor: [70, 130, 180],
+          fillColor: brand.accent,
           textColor: [255, 255, 255],
           fontStyle: "bold",
         },
         columnStyles: {
-          0: { cellWidth: 25 },
-          1: { cellWidth: 20 },
-          2: { cellWidth: 20 },
-          3: { cellWidth: 20 },
-          4: { cellWidth: 20 },
-          5: { cellWidth: 20 },
-          6: { cellWidth: 20 },
-          7: { cellWidth: 20 },
+          0: { cellWidth: 28 }, // Cont. No
+          1: { cellWidth: 18 }, // Type
+          2: { cellWidth: hasWeights ? 16 : undefined }, // Weight
+          3: { cellWidth: hasTrucks ? 18 : undefined }, // Truck
+          // remaining numeric columns kept compact
         },
         margin: { left: margins.left, right: margins.right },
+        tableWidth: pageWidth - margins.left - margins.right,
+        bodyStyles: {
+          valign: 'middle',
+        },
+        rowPageBreak: 'avoid',
+        pageBreak: 'auto',
+        didParseCell: (data) => {
+          // Force header row height to be minimal and readable
+          if (data.section === 'head') {
+            data.cell.styles.minCellHeight = 6;
+          } else {
+            data.cell.styles.minCellHeight = 5.5;
+          }
+        },
+        didDrawPage: (data) => {
+          // Footer with page numbers
+          const str = `Page ${doc.internal.getNumberOfPages()}`;
+          doc.setFontSize(8);
+          doc.setTextColor(120);
+          doc.text(
+            str,
+            pageWidth - margins.right,
+            pageHeight - 6,
+            { align: 'right' }
+          );
+        },
       });
 
       currentY = doc.lastAutoTable.finalY + (isCompactLayout ? 8 : 10);
@@ -587,13 +635,14 @@ const ClientInvoice = forwardRef(({
         body: summaryData,
         theme: "grid",
         styles: {
-          fontSize: fonts.normal,
-          cellPadding: 3,
+          fontSize: fonts.small,
+          cellPadding: 2,
           lineWidth: 0.1,
           halign: "left",
+          lineColor: brand.gray,
         },
         headStyles: {
-          fillColor: [70, 130, 180],
+          fillColor: brand.accent,
           textColor: [255, 255, 255],
           fontStyle: "bold",
         },
@@ -601,15 +650,8 @@ const ClientInvoice = forwardRef(({
           valign: "middle",
         },
         columnStyles: {
-          0: { 
-            fontStyle: "bold", 
-            cellWidth: 60,
-            halign: "left"
-          },
-          1: { 
-            halign: "right",
-            cellWidth: 40
-          },
+          0: { fontStyle: "bold", cellWidth: 80, halign: "left" },
+          1: { halign: "right", cellWidth: 40 },
         },
         margin: { left: margins.left, right: margins.right },
         didParseCell: function(data) {
@@ -636,7 +678,6 @@ const ClientInvoice = forwardRef(({
         `Account Number: ${finalInvoiceData.account_num || ""}`,
         `Branch Code: ${finalInvoiceData.branch_code || ""}`,
         `SWIFT Code: ${finalInvoiceData.swift_code || ""}`,
-        `Reference: ${finalInvoiceData.invoice_num || ""}`,
       ].filter(Boolean);
 
       bankingDetails.forEach((detail) => {
@@ -646,7 +687,7 @@ const ClientInvoice = forwardRef(({
 
       currentY += 5;
 
-      // Footer
+      // Footer note
       doc.setFontSize(fonts.small);
       doc.setFont("helvetica", "italic");
       doc.text(
@@ -666,7 +707,7 @@ const ClientInvoice = forwardRef(({
       // Save the PDF
       const fileName = isPreviewMode || isPreview 
         ? `Invoice_Preview_${finalInvoiceData.invoice_num || instructionId || 'NO'}_${formatDate(finalInvoiceData.date)}.pdf`
-        : `Invoice_${finalInvoiceData.invoice_num || finalInvoiceData.doc_num || 'NO'}_${formatDate(finalInvoiceData.date)}.pdf`;
+        : `Invoice_${finalInvoiceData.invoice_num || 'NO'}_${formatDate(finalInvoiceData.date)}.pdf`;
       doc.save(fileName);
 
     } catch (error) {
@@ -842,7 +883,17 @@ const ClientInvoice = forwardRef(({
           <div className="invoice-title-section">
             <div className="invoice-title">Tax Invoice</div>
             <div className="document-number">
-              Document No: {finalInvoiceData.doc_num}
+              Invoice No: {isEditMode && !isPreviewMode && !isPreview ? (
+                <input
+                  type="text"
+                  value={editData.invoice_num}
+                  onChange={(e) => handleInputChange("invoice_num", e.target.value)}
+                  className="edit-input invoice-num-input"
+                  placeholder="Enter invoice number"
+                />
+              ) : (
+                finalInvoiceData.invoice_num
+              )}
             </div>
           </div>
 
@@ -1086,24 +1137,6 @@ const ClientInvoice = forwardRef(({
             <div>Account Number: {finalInvoiceData.account_num}</div>
             <div>Branch Code: {finalInvoiceData.branch_code}</div>
             <div>SWIFT Code: {finalInvoiceData.swift_code}</div>
-            <div className="invoice-number-value">
-              Reference:
-              {isEditMode && !isPreviewMode && !isPreview ? (
-                <input
-                  type="text"
-                  value={editData.invoice_num}
-                  onChange={(e) =>
-                    handleInputChange("invoice_num", e.target.value)
-                  }
-                  className="edit-input invoice-num-input"
-                  placeholder="Enter invoice number"
-                />
-              ) : (
-                <div className="invoice-num" id="invoice_num">
-                  {finalInvoiceData.invoice_num}
-                </div>
-              )}
-            </div>
             <div className="payment-note">
               Please ensure the invoice number is referenced when making
               payment.
