@@ -102,7 +102,6 @@ const getInvoiceDetails = async (id) => {
         m1.rateper_12,
         m1.rateper_abnormal,
         i.invoice_num,
-        i.doc_num,
         i.date,
         i.additional_destination_info,
         ut.cluster_box,
