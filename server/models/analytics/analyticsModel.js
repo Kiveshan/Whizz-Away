@@ -57,28 +57,6 @@ const getFuelExpenses = async (client, month, year) => {
 }
 
 const getTurnoverPerMonth = async (client, month, year, clientId = null) => {
-  const params = [month, year]
-  let clientQuery = `
-    SELECT 
-      c.client, 
-      SUM(m.total_cost) as turnover,
-      to_char(i.date, 'Month') as month_name,
-      EXTRACT(YEAR FROM i.date) as year
-    FROM invoice i
-    JOIN m1_controller m ON i.m1key = m.m1key
-    JOIN m5_client c ON i.clientid = c.m5clientkey
-    WHERE TRIM(to_char(i.date, 'Month')) = $1
-    AND EXTRACT(YEAR FROM i.date)::text = $2
-  `
-  if (clientId) {
-    clientQuery += ` AND i.clientid = $3`
-    params.push(clientId)
-  }
-  clientQuery += `
-    GROUP BY c.client, to_char(i.date, 'Month'), EXTRACT(YEAR FROM i.date)
-    ORDER BY turnover DESC
-  `
-
   const totalQuery = `
     WITH DistinctLegs AS (
       SELECT m1key, COUNT(DISTINCT legnumber) AS num_legs
@@ -124,12 +102,7 @@ const getTurnoverPerMonth = async (client, month, year, clientId = null) => {
     GROUP BY it.invoice_turnover, it.month_name, it.year
   `
 
-  const [clientResult, totalResult] = await Promise.all([
-    clientId ? client.query(clientQuery, params) : Promise.resolve({ rows: [] }),
-    client.query(totalQuery, [month, year]),
-  ])
-
-  console.log("Client query result:", clientResult.rows)
+  const totalResult = await client.query(totalQuery, [month, year])
   console.log("Total turnover query result:", totalResult.rows)
 
   const totalTurnover = Number.parseFloat(totalResult.rows[0]?.turnover || 0)
@@ -145,19 +118,57 @@ const getTurnoverPerMonth = async (client, month, year, clientId = null) => {
     },
   ]
 
-  if (clientId && clientResult.rows.length > 0) {
-    const clientData = clientResult.rows.map((row) => {
-      const turnover = Number.parseFloat(row.turnover || 0)
-      const percentage = totalTurnover > 0 ? ((turnover / totalTurnover) * 100).toFixed(2) : 0
-      return {
-        client: row.client,
-        turnover: turnover,
-        month_name: row.month_name.trim(),
-        year: row.year.toString(),
-        percentage: Number.parseFloat(percentage),
+  if (clientId) {
+    const clientQuery = `
+      SELECT 
+        c.client, 
+        SUM(m.total_cost) as turnover,
+        to_char(i.date, 'Month') as month_name,
+        EXTRACT(YEAR FROM i.date) as year
+      FROM invoice i
+      JOIN m1_controller m ON i.m1key = m.m1key
+      JOIN m5_client c ON i.clientid = c.m5clientkey
+      WHERE TRIM(to_char(i.date, 'Month')) = $1
+      AND EXTRACT(YEAR FROM i.date)::text = $2
+      AND i.clientid = $3
+      GROUP BY c.client, to_char(i.date, 'Month'), EXTRACT(YEAR FROM i.date)
+      ORDER BY turnover DESC
+    `
+    const clientResult = await client.query(clientQuery, [month, year, clientId])
+    console.log("Client query result:", clientResult.rows)
+
+    if (clientResult.rows.length > 0) {
+      const clientData = clientResult.rows.map((row) => {
+        const turnover = Number.parseFloat(row.turnover || 0)
+        const percentage = totalTurnover > 0 ? ((turnover / totalTurnover) * 100).toFixed(2) : 0
+        return {
+          client: row.client,
+          turnover: turnover,
+          month_name: row.month_name.trim(),
+          year: row.year.toString(),
+          percentage: Number.parseFloat(percentage),
+        }
+      })
+      turnoverData = [...clientData, ...turnoverData]
+    } else {
+      // Fetch client name and add zero entry if no data for selected client
+      const nameQuery = `SELECT client FROM m5_client WHERE m5clientkey = $1`
+      const nameResult = await client.query(nameQuery, [clientId])
+      const clientName = nameResult.rows[0]?.client || ''
+      if (clientName) {
+        turnoverData = [
+          {
+            client: clientName,
+            turnover: 0,
+            month_name: month.trim(),
+            year: year.toString(),
+            percentage: 0,
+          },
+          ...turnoverData,
+        ]
+        console.log(`Added zero-turnover entry for selected client: ${clientName}`)
       }
-    })
-    turnoverData = [...clientData, turnoverData[0]] // Client data first, then total
+    }
   }
 
   console.log("Processed turnover data:", turnoverData)

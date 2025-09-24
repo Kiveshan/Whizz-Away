@@ -586,10 +586,10 @@ const getDriverInstructions = async (driverId) => {
     client = await pool.connect();
 
     const queryText = `
-      SELECT 
+        SELECT 
         m1.m1key, 
-        m1.deadline,
-        m1.pickupdate,
+        m1."lastFreeDate",
+        m1.created_at,
         COUNT(l.legkey) as leg_count
       FROM 
         public.m1_controller m1
@@ -598,9 +598,9 @@ const getDriverInstructions = async (driverId) => {
       WHERE 
         l.driverid = $1
       GROUP BY 
-        m1.m1key, m1.deadline, m1.pickupdate
+        m1.m1key, m1."lastFreeDate", m1.created_at
       ORDER BY 
-        COALESCE(m1.deadline, m1.pickupdate) DESC
+        COALESCE(m1."lastFreeDate", m1.created_at) DESC
     `;
 
     const result = await client.query(queryText, [driverId]);
@@ -701,6 +701,17 @@ const getAllRoles = async () => {
   console.log(`Found ${result.rows.length} roles`);
   return result.rows;
 };
+const getAllRolesExcludingSix = async () => {
+  const sql = `
+    SELECT roleid, rolename
+    FROM public.roles
+    WHERE roleid != 6
+    ORDER BY rolename
+  `;
+  const result = await query(sql);
+  console.log(`Found ${result.rows.length} roles (excluding roleid 6)`);
+  return result.rows;
+};
 export {
   saveWageData,
   checkWageSlip,
@@ -713,5 +724,6 @@ export {
   getStoredWageData,
   getBaseSalaryHistory,
    getAllEmployees,
-   getAllRoles
+   getAllRoles,
+   getAllRolesExcludingSix
 };

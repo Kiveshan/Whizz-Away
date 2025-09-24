@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import {
   BarChart,
   Bar,
@@ -56,6 +56,7 @@ export default function DirectorAnalytics() {
   const [error, setError] = useState(null);
   const roleId = JSON.parse(localStorage.getItem("user"))?.roleid;
   const navigate = useNavigate();
+  const wrapperRef = useRef(null);
 
   const calculateTurnoverStatus = (turnover) => {
     if (turnover >= 10000) return "high";
@@ -253,8 +254,26 @@ export default function DirectorAnalytics() {
             turnover: turnover,
             month: item.month_name.trim(),
             year: item.year,
+            percentage: item.percentage,
           };
         });
+        console.log("Processed turnover data before handling zero:", turnoverData);
+
+        // If a client is selected and only the total is present, add a zero entry for the client
+        if (clientId && turnoverData.length === 1 && turnoverData[0].name === "Total Turnover") {
+          const selectedClientName = clients.find((c) => c.m5clientkey === clientId)?.client || "";
+          if (selectedClientName) {
+            turnoverData.push({
+              name: selectedClientName,
+              turnover: 0,
+              month: month.trim(),
+              year: turnoverData[0].year || year,
+              percentage: 0,
+            });
+            console.log(`Added zero-turnover entry for client: ${selectedClientName}`);
+          }
+        }
+
         console.log("Processed turnover data before sorting:", turnoverData);
 
         turnoverData = turnoverData.sort((a, b) => {
@@ -345,10 +364,8 @@ export default function DirectorAnalytics() {
       if (response.data.success) {
         const data = response.data.data.map((item) => {
           console.log(
-            `Received percentages: turnoverPercentage=${
-              item.turnoverPercentage
-            } (${typeof item.turnoverPercentage}), dieselCostPercentage=${
-              item.dieselCostPercentage
+            `Received percentages: turnoverPercentage=${item.turnoverPercentage
+            } (${typeof item.turnoverPercentage}), dieselCostPercentage=${item.dieselCostPercentage
             } (${typeof item.dieselCostPercentage})`
           );
           return {
@@ -807,6 +824,45 @@ export default function DirectorAnalytics() {
     selectedTruck,
   ]);
 
+  // Disable vertical scrolling while this page is mounted
+  useEffect(() => {
+    try {
+      document.body.classList.add("no-vertical-scroll");
+      document.documentElement.classList.add("no-vertical-scroll");
+    } catch (e) {
+      // ignore if not in browser context
+    }
+    return () => {
+      try {
+        document.body.classList.remove("no-vertical-scroll");
+        document.documentElement.classList.remove("no-vertical-scroll");
+      } catch (e) {
+        // ignore if not in browser context
+      }
+    };
+  }, []);
+
+  useEffect(() => {
+    const computeWrapperHeight = () => {
+      if (!wrapperRef.current) return;
+      const top = wrapperRef.current.getBoundingClientRect().top;
+      // Try to find your global footer element. Adjust this query if your footer has a known selector.
+      const footerEl =
+        document.querySelector("footer") ||
+        document.querySelector('[role="contentinfo"]');
+      const footerHeight = footerEl
+        ? footerEl.getBoundingClientRect().height
+        : 0;
+
+      const available = Math.max(0, window.innerHeight - top - footerHeight);
+      wrapperRef.current.style.height = `${available}px`;
+    };
+
+    computeWrapperHeight();
+    window.addEventListener("resize", computeWrapperHeight);
+    return () => window.removeEventListener("resize", computeWrapperHeight);
+  }, []);
+
   const CustomTooltip = ({ active, payload, label }) => {
     if (active && payload && payload.length) {
       return (
@@ -868,12 +924,12 @@ export default function DirectorAnalytics() {
       return entry.type === "total"
         ? "#2196F3"
         : entry.type === "subcontractor"
-        ? "#FF6347"
-        : entry.type === "income"
-        ? "#4169E1"
-        : entry.type === "expenses"
-        ? "#FF6347"
-        : "#4169E1";
+          ? "#FF6347"
+          : entry.type === "income"
+            ? "#4169E1"
+            : entry.type === "expenses"
+              ? "#FF6347"
+              : "#4169E1";
     } else if (activeFilter === "turnoverVsFuelPerTruck") {
       return "#4169E1"; // Default for turnoverVsFuelPerTruck, overridden in Bar components
     }
@@ -991,10 +1047,10 @@ export default function DirectorAnalytics() {
             ) : (
               <>
                 <div className="chart-scroll-container">
-                  <ResponsiveContainer width={chartWidth} height={500}>
+                  <ResponsiveContainer width={chartWidth} height="100%">
                     <BarChart
                       data={chartData}
-                      margin={{ top: 40, right: 30, left: 60, bottom: 120 }}
+                      margin={{ top: 24, right: 24, left: 48, bottom: 16 }}
                     >
                       <XAxis
                         dataKey="truckId"
@@ -1096,10 +1152,10 @@ export default function DirectorAnalytics() {
                   )}
                 </div>
                 <div className="chart-scroll-container">
-                  <ResponsiveContainer width={chartWidth} height={500}>
+                  <ResponsiveContainer width={chartWidth} height="100%">
                     <BarChart
                       data={chartData}
-                      margin={{ top: 40, right: 30, left: 60, bottom: 40 }}
+                      margin={{ top: 24, right: 24, left: 48, bottom: 16 }}
                     >
                       <XAxis dataKey="name" tick={{ fill: "#000" }} />
                       <YAxis
@@ -1186,7 +1242,7 @@ export default function DirectorAnalytics() {
                   </div>
                 </div>
                 <div className="chart-scroll-container">
-                  <ResponsiveContainer width={chartWidth} height={500}>
+                  <ResponsiveContainer width={chartWidth} height="100%">
                     <BarChart
                       data={chartData}
                       margin={{ top: 40, right: 30, left: 60, bottom: 100 }}
@@ -1297,10 +1353,10 @@ export default function DirectorAnalytics() {
                   </div>
                 </div>
                 <div className="chart-scroll-container">
-                  <ResponsiveContainer width={chartWidth} height={500}>
+                  <ResponsiveContainer width={chartWidth} height="100%">
                     <BarChart
                       data={chartData}
-                      margin={{ top: 40, right: 30, left: 60, bottom: 40 }}
+                      margin={{ top: 24, right: 24, left: 48, bottom: 16 }}
                     >
                       <XAxis dataKey="name" tick={{ fill: "#000" }} />
                       <YAxis
@@ -1359,20 +1415,20 @@ export default function DirectorAnalytics() {
                   {chartData.some(
                     (entry) => entry.type === "subcontractor"
                   ) && (
-                    <div className="chart-header-item">
-                      <span
-                        className="legend-color"
-                        style={{ backgroundColor: "#FF6347" }}
-                      ></span>
-                      <span>Selected Subcontractor</span>
-                    </div>
-                  )}
+                      <div className="chart-header-item">
+                        <span
+                          className="legend-color"
+                          style={{ backgroundColor: "#FF6347" }}
+                        ></span>
+                        <span>Selected Subcontractor</span>
+                      </div>
+                    )}
                 </div>
                 <div className="chart-scroll-container">
-                  <ResponsiveContainer width={chartWidth} height={500}>
+                  <ResponsiveContainer width={chartWidth} height="100%">
                     <BarChart
                       data={chartData}
-                      margin={{ top: 40, right: 30, left: 60, bottom: 40 }}
+                      margin={{ top: 24, right: 24, left: 48, bottom: 16 }}
                     >
                       <XAxis dataKey="name" tick={{ fill: "#000" }} />
                       <YAxis
@@ -1432,20 +1488,20 @@ export default function DirectorAnalytics() {
                   {chartData.some(
                     (entry) => entry.type === "subcontractor"
                   ) && (
-                    <div className="chart-header-item">
-                      <span
-                        className="legend-color"
-                        style={{ backgroundColor: "#FF6347" }}
-                      ></span>
-                      <span>Selected Subcontractor</span>
-                    </div>
-                  )}
+                      <div className="chart-header-item">
+                        <span
+                          className="legend-color"
+                          style={{ backgroundColor: "#FF6347" }}
+                        ></span>
+                        <span>Selected Subcontractor</span>
+                      </div>
+                    )}
                 </div>
                 <div className="chart-scroll-container">
-                  <ResponsiveContainer width={chartWidth} height={500}>
+                  <ResponsiveContainer width={chartWidth} height="100%">
                     <BarChart
                       data={chartData}
-                      margin={{ top: 40, right: 30, left: 60, bottom: 40 }}
+                      margin={{ top: 24, right: 24, left: 48, bottom: 16 }}
                     >
                       <XAxis dataKey="name" tick={{ fill: "#000" }} />
                       <YAxis
@@ -1511,10 +1567,10 @@ export default function DirectorAnalytics() {
                   </div>
                 </div>
                 <div className="chart-scroll-container">
-                  <ResponsiveContainer width={chartWidth} height={500}>
+                  <ResponsiveContainer width={chartWidth} height="100%">
                     <BarChart
                       data={chartData}
-                      margin={{ top: 40, right: 30, left: 60, bottom: 40 }}
+                      margin={{ top: 24, right: 24, left: 48, bottom: 16 }}
                     >
                       <XAxis dataKey="month" />
                       <YAxis
@@ -1575,10 +1631,10 @@ export default function DirectorAnalytics() {
             ) : (
               <>
                 <div className="chart-scroll-container">
-                  <ResponsiveContainer width={chartWidth} height={500}>
+                  <ResponsiveContainer width={chartWidth} height="100%">
                     <BarChart
                       data={chartData}
-                      margin={{ top: 40, right: 30, left: 60, bottom: 120 }}
+                      margin={{ top: 24, right: 24, left: 48, bottom: 16 }}
                     >
                       <XAxis
                         dataKey="truckregnumber"
@@ -1609,8 +1665,8 @@ export default function DirectorAnalytics() {
                               entry.status === "high"
                                 ? "#4CAF50"
                                 : entry.status === "medium"
-                                ? "#FFC107"
-                                : "#F44336"
+                                  ? "#FFC107"
+                                  : "#F44336"
                             }
                           />
                         ))}
@@ -1684,10 +1740,10 @@ export default function DirectorAnalytics() {
                   </div>
                 </div>
                 <div className="chart-scroll-container">
-                  <ResponsiveContainer width={chartWidth} height={500}>
+                  <ResponsiveContainer width={chartWidth} height="100%">
                     <BarChart
                       data={chartData}
-                      margin={{ top: 40, right: 30, left: 60, bottom: 40 }}
+                      margin={{ top: 24, right: 24, left: 48, bottom: 16 }}
                     >
                       <XAxis dataKey="name" tick={{ fill: "#000" }} />
                       <YAxis
@@ -1753,10 +1809,10 @@ export default function DirectorAnalytics() {
                   </div>
                 </div>
                 <div className="chart-scroll-container">
-                  <ResponsiveContainer width={chartWidth} height={500}>
+                  <ResponsiveContainer width={chartWidth} height="100%">
                     <BarChart
                       data={chartData}
-                      margin={{ top: 40, right: 30, left: 60, bottom: 120 }}
+                      margin={{ top: 24, right: 24, left: 48, bottom: 16 }}
                     >
                       <XAxis
                         dataKey="name"
@@ -1827,47 +1883,36 @@ export default function DirectorAnalytics() {
                     <span>Turnover</span>
                   </div>
                   <div className="chart-header-item">
-                    <span
-                      className="legend-color"
-                      style={{ backgroundColor: "#FF6347" }}
-                    ></span>
                     <span>Diesel Cost</span>
                   </div>
                 </div>
                 <div className="chart-scroll-container">
-                  <ResponsiveContainer width={chartWidth} height={500}>
+                  <ResponsiveContainer width={chartWidth} height="100%">
                     <BarChart
                       data={
                         selectedTruck
                           ? chartData
                           : [
-                              {
-                                truckId: "Totals",
-                                turnover: chartData.reduce(
-                                  (sum, item) => sum + item.turnover,
-                                  0
-                                ),
-                                fuelCost: chartData.reduce(
-                                  (sum, item) => sum + item.fuelCost,
-                                  0
-                                ),
-                                turnoverPercentage: 100,
-                                fuelCostPercentage: 100,
-                                month: chartData[0]?.month,
-                                year: chartData[0]?.year,
-                              },
-                            ]
+                            {
+                              truckId: "Totals",
+                              turnover: chartData.reduce(
+                                (sum, item) => sum + item.turnover,
+                                0
+                              ),
+                              fuelCost: chartData.reduce(
+                                (sum, item) => sum + item.fuelCost,
+                                0
+                              ),
+                              turnoverPercentage: 100,
+                              fuelCostPercentage: 100,
+                              month: chartData[0]?.month,
+                              year: chartData[0]?.year,
+                            },
+                          ]
                       }
-                      margin={{ top: 40, right: 30, left: 60, bottom: 120 }}
+                      margin={{ top: 24, right: 24, left: 48, bottom: 16 }}
                     >
-                      <XAxis
-                        dataKey="truckId"
-                        angle={0}
-                        textAnchor="middle"
-                        height={150}
-                        interval={0}
-                        tick={{ fontSize: 11 }}
-                      />
+                      <XAxis dataKey="truckId" interval={0} tick={{ fontSize: 11 }} />
                       <YAxis
                         label={{
                           value: "Amount (R)",
@@ -1878,7 +1923,6 @@ export default function DirectorAnalytics() {
                       />
                       <Tooltip content={<CustomTooltip />} />
                       <Bar
-                        dataKey="turnover"
                         name="Turnover"
                         fill="#2196F3"
                         radius={[4, 4, 0, 0]}
@@ -1923,7 +1967,7 @@ export default function DirectorAnalytics() {
   };
 
   return (
-    <div className="analytics-page-wrapper">
+    <div className="analytics-page-wrapper" ref={wrapperRef}>
       <div className="analytics-container">
         <div className="header-actions">
           <button onClick={handleBack} className="back-button">
@@ -1955,34 +1999,34 @@ export default function DirectorAnalytics() {
           </select>
           {(activeFilter === "turnoverPerMonth" ||
             activeFilter === "agingAnalysis") && (
-            <select
-              value={selectedClient}
-              onChange={(e) => setSelectedClient(e.target.value)}
-              className="client-select"
-            >
-              <option value="">Select Client</option>
-              {clients.map((client) => (
-                <option key={client.m5clientkey} value={client.m5clientkey}>
-                  {client.client}
-                </option>
-              ))}
-            </select>
-          )}
+              <select
+                value={selectedClient}
+                onChange={(e) => setSelectedClient(e.target.value)}
+                className="client-select"
+              >
+                <option value="">Select Client</option>
+                {clients.map((client) => (
+                  <option key={client.m5clientkey} value={client.m5clientkey}>
+                    {client.client}
+                  </option>
+                ))}
+              </select>
+            )}
           {(activeFilter === "subcontractorVsTurnover" ||
             activeFilter === "turnoverVsSubbieExpense") && (
-            <select
-              value={selectedSubcontractor}
-              onChange={(e) => setSelectedSubcontractor(e.target.value)}
-              className="subcontractor-select"
-            >
-              <option value="">Select Subcontractor</option>
-              {subcontractors.map((subcontractor) => (
-                <option key={subcontractor.userid} value={subcontractor.userid}>
-                  {subcontractor.companyname}
-                </option>
-              ))}
-            </select>
-          )}
+              <select
+                value={selectedSubcontractor}
+                onChange={(e) => setSelectedSubcontractor(e.target.value)}
+                className="subcontractor-select"
+              >
+                <option value="">Select Subcontractor</option>
+                {subcontractors.map((subcontractor) => (
+                  <option key={subcontractor.userid} value={subcontractor.userid}>
+                    {subcontractor.companyname}
+                  </option>
+                ))}
+              </select>
+            )}
           {activeFilter === "turnoverVsFuelPerTruck" && (
             <select
               value={selectedTruck}
@@ -2025,7 +2069,7 @@ export default function DirectorAnalytics() {
               </option>
               <option value="turnoverPerTruck">
                 Turnover Per Truck
-                </option>
+              </option>
               <option value="incomeVsExpense">
                 Income vs Expense Per Month
               </option>
