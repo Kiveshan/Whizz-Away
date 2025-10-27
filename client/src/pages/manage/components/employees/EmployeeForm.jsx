@@ -17,6 +17,17 @@ const EmployeeForm = ({ employee, loading, isEditing, onSave, onCancel, onChange
         isValid = false;
       }
     });
+
+    // Validate telephone number format if provided
+    if (employee.telephonenum && !/^[0-9]{10}$/.test(employee.telephonenum)) {
+      isValid = false;
+    }
+
+    // Validate cell number format (required field)
+    if (employee.cellnum && !/^[0-9]{10}$/.test(employee.cellnum)) {
+      isValid = false;
+    }
+
     return isValid;
   };
 
@@ -48,6 +59,15 @@ const EmployeeForm = ({ employee, loading, isEditing, onSave, onCancel, onChange
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (!validateForm()) {
+      // Set custom validity messages for phone number format errors
+      if (employee.telephonenum && !/^[0-9]{10}$/.test(employee.telephonenum)) {
+        const phoneInput = e.target.querySelector('input[pattern="[0-9]{10}"]');
+        if (phoneInput) phoneInput.setCustomValidity("Please enter exactly 10 digits for telephone number");
+      }
+      if (employee.cellnum && !/^[0-9]{10}$/.test(employee.cellnum)) {
+        const cellInput = e.target.querySelectorAll('input[pattern="[0-9]{10}"]')[1];
+        if (cellInput) cellInput.setCustomValidity("Please enter exactly 10 digits for cell number");
+      }
       e.target.reportValidity();
       return;
     }
@@ -144,10 +164,22 @@ const EmployeeForm = ({ employee, loading, isEditing, onSave, onCancel, onChange
             Telephone Number
           </label>
           <input
-            type="text"
+            type="number"
             value={employee.telephonenum || ""}
-            onChange={(e) => onChange("telephonenum", e.target.value)}
-            placeholder="e.g., 1234567890 or +1234567890"
+            onChange={(e) => {
+              const input = e.target;
+              if (input.validity.patternMismatch) {
+                input.setCustomValidity("Please enter exactly 10 digits");
+              } else {
+                input.setCustomValidity("");
+              }
+              onChange("telephonenum", e.target.value);
+            }}
+            placeholder="Exactly 10 digits only"
+            minLength="10"
+            maxLength="10"
+            pattern="[0-9]{10}"
+            title="Please enter exactly 10 digits"
           />
         </div>
 
@@ -156,10 +188,22 @@ const EmployeeForm = ({ employee, loading, isEditing, onSave, onCancel, onChange
             Cell Number <span style={{ color: "red" }}>*</span>
           </label>
           <input
-            type="text"
+            type="number"
             value={employee.cellnum || ""}
-            onChange={(e) => onChange("cellnum", e.target.value)}
-            placeholder="e.g., 1234567890 or +1234567890"
+            onChange={(e) => {
+              const input = e.target;
+              if (input.validity.patternMismatch) {
+                input.setCustomValidity("Please enter exactly 10 digits");
+              } else {
+                input.setCustomValidity("");
+              }
+              onChange("cellnum", e.target.value);
+            }}
+            placeholder="Exactly 10 digits only"
+            minLength="10"
+            maxLength="10"
+            pattern="[0-9]{10}"
+            title="Please enter exactly 10 digits"
             required
           />
         </div>
