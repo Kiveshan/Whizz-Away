@@ -231,7 +231,20 @@ const EmployeeForm = ({ employee, loading, isEditing, onSave, onCancel, onChange
             id="roleid"
             className="dropdown"
             value={employee.roleid || ""}
-            onChange={(e) => onChange("roleid", Number.parseInt(e.target.value))}
+            onChange={(e) => {
+              const selectedRoleId = Number.parseInt(e.target.value);
+              onChange("roleid", selectedRoleId);
+
+              // Clear email and password if Driver (5) or Yard Staff (9) is selected
+              if (selectedRoleId === 5 || selectedRoleId === 9) {
+                onChange("email", "");
+                onChange("password", "");
+                // Clear email validation error messages and states
+                setAlert({ show: false, message: "" });
+                emailRef.current?.setCustomValidity("");
+                setIsCheckingEmail(false);
+              }
+            }}
             required
           >
             <option value="" disabled>Select Role</option>
