@@ -901,9 +901,22 @@ export const generateInvoice = async (instructionId) => {
     const invoiceNum = `INV-${currentYear}-${nextInvoiceNum}`;
     const groupId = `${clientId}-${monthName}${currentYear}`;
 
+    // Determine invoice date based on earliest date for legnumber = 1
+    const legDateQuery = `
+      SELECT MIN(l.date) AS first_leg_date
+      FROM public.legs_m2 l
+      WHERE l.m1key = $1 AND l.legnumber = 1 AND l.date IS NOT NULL
+    `;
+    const legDateResult = await client.query(legDateQuery, [m1key]);
+    const firstLegDate =
+      legDateResult.rows.length > 0 && legDateResult.rows[0].first_leg_date
+        ? new Date(legDateResult.rows[0].first_leg_date)
+        : null;
+    const invoiceDate = firstLegDate || currentDate;
+
     const insertResult = await client.query(
       "INSERT INTO invoice (clientid, m1key, invoice_num, groupid, date) VALUES ($1, $2, $3, $4, $5) RETURNING ikey",
-      [clientId, m1key, invoiceNum, groupId, currentDate]
+      [clientId, m1key, invoiceNum, groupId, invoiceDate]
     );
 
     return {
@@ -911,7 +924,7 @@ export const generateInvoice = async (instructionId) => {
       invoiceId: insertResult.rows[0].ikey,
       invoiceNum,
       groupId,
-      date: currentDate,
+      date: invoiceDate,
     };
   } catch (error) {
     throw error;

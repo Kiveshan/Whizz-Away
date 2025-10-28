@@ -266,11 +266,16 @@ const generateInvoicePreviewHandler = async (req, res) => {
     const dateStr = today.toISOString().slice(0, 10).replace(/-/g, "");
     const previewInvoiceNum = `PREVIEW-${dateStr}-${instructionId}`;
 
+    // Mirror invoice date logic: use earliest leg 1 date if available
+    const previewInvoiceDate = instructionDetails.data.preview_invoice_date
+      ? new Date(instructionDetails.data.preview_invoice_date)
+      : today;
+
     // Create preview invoice data
     const previewData = {
       ...instructionDetails.data,
       invoice_num: previewInvoiceNum,
-      date: today,
+      date: previewInvoiceDate,
       additional_destination_info: instructionDetails.data.additional_destination_info || "",
       // Add preview flag
       is_preview: true,
