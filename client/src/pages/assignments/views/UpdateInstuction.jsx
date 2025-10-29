@@ -2911,7 +2911,17 @@ useEffect(() => {
                           }}
                           disabled={isCompleted}
                         >
-                          <option value="">Select driver</option>
+                          <option value="" disabled hidden>
+                            Select driver
+                          </option>
+                          {entry.driverid &&
+                            !employeeDrivers.some(
+                              (d) => d.userid.toString() === entry.driverid
+                            ) && (
+                              <option value={entry.driverid}>
+                                {entry.full_name || `Driver ID: ${entry.driverid}`} (inactive)
+                              </option>
+                            )}
                           {employeeDrivers.map((driver) => (
                             <option
                               key={driver.userid}
