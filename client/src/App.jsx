@@ -51,7 +51,7 @@ import {
   DirectorExpenses,
 } from "./pages/fuel";
 import { DirectorAnalytics, Analytics } from "./pages/analytics";
-import { Manage } from "./pages/manage";
+import Manage from "./pages/manage/views/Manage";
 import {
   ViewClientInvoice,
   InvoicesList,

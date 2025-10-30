@@ -102,6 +102,7 @@ const initialState = {
     subcontractors: {
       search: "",
       status: "all",
+      driverStatus: "all", // all, active, disabled
     },
     clientRates: {
       search: "",
@@ -230,7 +231,10 @@ const initialState = {
     email: "",
     subei_reg_num: "",
     no_of_trucks: 1,
-    trucks: [{ reg: "", driver: "" }],
+    drivers: [],
+    trucks: [],
+    driverCurrentPage: 1,
+    driversPerPage: 10,
   },
 
   newClientRate: {
