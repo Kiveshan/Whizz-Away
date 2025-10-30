@@ -109,7 +109,7 @@ const getSubcontractorById = async (id) => {
 
     // Get all driver records for this company (same subei_reg_num)
     const driversResult = await client.query(
-      `SELECT userid, name, surname 
+      `SELECT userid, name, surname, driverstatus 
        FROM m5_employee 
        WHERE subei_reg_num = $1 AND roleid = 6 
        ORDER BY userid`,
@@ -129,6 +129,7 @@ const getSubcontractorById = async (id) => {
     const drivers = driversResult.rows.map((record) => ({
       userid: record.userid,
       name: `${record.name || ""} ${record.surname || ""}`.trim(),
+      driverstatus: record.driverstatus !== false, // Default to true if null
     }))
 
     // Build the trucks array
@@ -234,8 +235,8 @@ const createSubcontractor = async (subcontractorData) => {
       const driverResult = await client.query(
         `INSERT INTO m5_employee (
           name, surname, cellnum, email, companyname, location, 
-          contact_person, subei_reg_num, roleid, status
-        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+          contact_person, subei_reg_num, roleid, status, driverstatus
+        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
         RETURNING *`,
         [
           firstName,
@@ -248,6 +249,7 @@ const createSubcontractor = async (subcontractorData) => {
           subei_reg_num,
           6, // roleid for subcontractor
           true, // status
+          true, // driverstatus - default to active
         ],
       )
 
@@ -333,25 +335,69 @@ const updateSubcontractor = async (id, subcontractorData) => {
       return { success: false, message: "Email already exists" }
     }
 
-    // Delete all existing driver records for this company
-    await client.query("DELETE FROM m5_employee WHERE subei_reg_num = $1 AND roleid = 6", [currentSubeiRegNum])
-
-    // Delete all existing truck records for this company
-    await client.query("DELETE FROM m5_trucks WHERE subei_reg_num = $1 AND is_subcontractor = true", [
-      currentSubeiRegNum,
-    ])
-
     // Validate that we have at least one driver
     if (!drivers.length || drivers.every((driver) => !driver.name)) {
       await client.query("ROLLBACK")
       return { success: false, message: "At least one driver is required" }
     }
 
+    // Get existing driver IDs for this company
+    const existingDriversResult = await client.query(
+      "SELECT userid FROM m5_employee WHERE subei_reg_num = $1 AND roleid = 6",
+      [currentSubeiRegNum]
+    )
+    const existingDriverIds = existingDriversResult.rows.map(row => row.userid)
+
+    // Separate existing drivers from new drivers
+    const driversToUpdate = drivers.filter(d => d.userid && existingDriverIds.includes(d.userid))
+    const driversToCreate = drivers.filter(d => !d.userid)
+    const driverIdsToKeep = driversToUpdate.map(d => d.userid)
+
+    // Delete drivers that are no longer in the list
+    if (existingDriverIds.length > 0) {
+      const idsToDelete = existingDriverIds.filter(id => !driverIdsToKeep.includes(id))
+      if (idsToDelete.length > 0) {
+        await client.query(
+          "DELETE FROM m5_employee WHERE userid = ANY($1) AND roleid = 6",
+          [idsToDelete]
+        )
+      }
+    }
+
+    const updatedDrivers = []
     const createdDrivers = []
-    const createdTrucks = []
+
+    // Update existing drivers (preserve their driverstatus)
+    for (const driver of driversToUpdate) {
+      // Parse driver name into first and last name
+      const driverName = (driver.name || "").trim()
+      let firstName = ""
+      let lastName = ""
+
+      if (driverName) {
+        const nameParts = driverName.split(" ")
+        firstName = nameParts[0] || ""
+        lastName = nameParts.slice(1).join(" ") || ""
+      }
+
+      await client.query(
+        `UPDATE m5_employee 
+         SET name = $1, surname = $2, cellnum = $3, email = $4, companyname = $5, location = $6, 
+             contact_person = $7, subei_reg_num = $8
+         WHERE userid = $9 AND roleid = 6
+         RETURNING *`,
+        [firstName, lastName, cellnum, email, companyname, location, contact_person, subei_reg_num, driver.userid]
+      )
+      
+      const updatedResult = await client.query(
+        "SELECT * FROM m5_employee WHERE userid = $1",
+        [driver.userid]
+      )
+      updatedDrivers.push(updatedResult.rows[0])
+    }
 
     // Create new driver records
-    for (const driver of drivers) {
+    for (const driver of driversToCreate) {
       if (!driver.name || !driver.name.trim()) continue
 
       const driverName = driver.name.trim()
@@ -367,8 +413,8 @@ const updateSubcontractor = async (id, subcontractorData) => {
       const driverResult = await client.query(
         `INSERT INTO m5_employee (
           name, surname, cellnum, email, companyname, location, 
-          contact_person, subei_reg_num, roleid, status
-        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+          contact_person, subei_reg_num, roleid, status, driverstatus
+        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
         RETURNING *`,
         [
           firstName,
@@ -381,11 +427,21 @@ const updateSubcontractor = async (id, subcontractorData) => {
           subei_reg_num,
           6, // roleid for subcontractor
           true, // status
+          true, // driverstatus - default to active for new drivers
         ],
       )
 
       createdDrivers.push(driverResult.rows[0])
     }
+
+    const allDrivers = [...updatedDrivers, ...createdDrivers]
+
+    // Delete all existing truck records for this company (trucks are always recreated)
+    await client.query("DELETE FROM m5_trucks WHERE subei_reg_num = $1 AND is_subcontractor = true", [
+      currentSubeiRegNum,
+    ])
+
+    const createdTrucks = []
 
     // Create new truck records
     for (const truck of trucks) {
@@ -416,8 +472,8 @@ const updateSubcontractor = async (id, subcontractorData) => {
     return {
       success: true,
       data: {
-        ...createdDrivers[0], // Return first driver record as main reference
-        drivers: createdDrivers,
+        ...(allDrivers[0] || {}), // Return first driver record as main reference
+        drivers: allDrivers,
         trucks: createdTrucks,
       },
     }
@@ -518,6 +574,33 @@ const toggleSubcontractorStatus = async (id, status) => {
   }
 }
 
+const toggleSubcontractorDriverStatus = async (driverId, driverstatus) => {
+  let client
+  try {
+    client = await pool.connect()
+
+    // Update driverstatus for the specific driver
+    const result = await client.query(
+      `UPDATE m5_employee
+       SET driverstatus = $1
+       WHERE userid = $2 AND roleid = 6
+       RETURNING *`,
+      [driverstatus, driverId],
+    )
+
+    if (!result.rowCount) {
+      return { success: false, message: "Driver not found" }
+    }
+
+    return { success: true, data: result.rows[0] }
+  } catch (err) {
+    console.error(`Error toggling driver ${driverId} status:`, err)
+    throw err
+  } finally {
+    if (client) client.release()
+  }
+}
+
 export {
   getAllSubcontractors,
   getSubcontractorById,
@@ -527,4 +610,5 @@ export {
   deleteSubcontractorDriver,
   deleteSubcontractorTruck,
   toggleSubcontractorStatus,
+  toggleSubcontractorDriverStatus,
 }

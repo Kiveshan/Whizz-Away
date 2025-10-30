@@ -556,11 +556,24 @@ const createInvoice = async ({ m1key, clientId }) => {
       RETURNING ikey
     `;
 
+    // Determine invoice date based on earliest date for legnumber = 1
+    const legDateQuery = `
+      SELECT MIN(l.date) AS first_leg_date
+      FROM public.legs_m2 l
+      WHERE l.m1key = $1 AND l.legnumber = 1 AND l.date IS NOT NULL
+    `;
+    const legDateResult = await query(legDateQuery, [m1key]);
+    const firstLegDate =
+      legDateResult.rows.length > 0 && legDateResult.rows[0].first_leg_date
+        ? new Date(legDateResult.rows[0].first_leg_date)
+        : null;
+    const invoiceDate = firstLegDate || today;
+
     const result = await query(insertQueryText, [
       clientId,
       m1key,
       invoiceNum,
-      today,
+      invoiceDate,
     ]);
 
     return {
@@ -754,6 +767,18 @@ const getInstructionDetailsForPreview = async (instructionId) => {
 
       const containers = Array.from(containerMap.values());
 
+      // Determine earliest date for legnumber = 1 to be used as preview invoice date
+      const legDateQuery = `
+        SELECT MIN(l.date) AS first_leg_date
+        FROM public.legs_m2 l
+        WHERE l.m1key = $1 AND l.legnumber = 1 AND l.date IS NOT NULL
+      `;
+      const legDateResult = await client.query(legDateQuery, [instructionId]);
+      const firstLegDate =
+        legDateResult.rows.length > 0 && legDateResult.rows[0].first_leg_date
+          ? new Date(legDateResult.rows[0].first_leg_date)
+          : new Date();
+
       return {
         success: true,
         data: {
@@ -765,7 +790,8 @@ const getInstructionDetailsForPreview = async (instructionId) => {
           // Add preview metadata
           is_preview: true,
           preview_instruction_id: instructionId,
-          preview_generated_at: new Date().toISOString()
+          preview_generated_at: new Date().toISOString(),
+          preview_invoice_date: firstLegDate
         }
       };
 

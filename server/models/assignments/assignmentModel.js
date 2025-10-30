@@ -43,7 +43,7 @@ export const updateInstructionStatus = async (instructionId, status) => {
 
 export const getDriversSub = async () => {
   const query =
-    "SELECT userid, name, surname, roleid FROM m5_employee WHERE roleid IN (5, 6) AND status = true ORDER BY name, surname";
+    "SELECT userid, name, surname, roleid, status, driverstatus FROM m5_employee WHERE roleid IN (5, 6) AND status = true ORDER BY name, surname";
   try {
     const result = await pool.query(query);
     return result.rows;
@@ -389,6 +389,21 @@ export const saveLeg = async ({
         }
       }
     }
+    // Recompute invoice date based on earliest date for legnumber = 1 and update invoice if exists
+    const legDateQuery = `
+      SELECT MIN(l.date) AS first_leg_date
+      FROM public.legs_m2 l
+      WHERE l.m1key = $1 AND l.legnumber = 1 AND l.date IS NOT NULL
+    `;
+    const legDateResult = await client.query(legDateQuery, [m1key]);
+    const firstLegDate =
+      legDateResult.rows.length > 0 && legDateResult.rows[0].first_leg_date
+        ? new Date(legDateResult.rows[0].first_leg_date)
+        : new Date();
+    await client.query(
+      `UPDATE public.invoice SET date = $2 WHERE m1key = $1`,
+      [m1key, firstLegDate]
+    );
 
     await client.query("COMMIT");
     return { legId, isUpdate: !isNewLeg };
@@ -602,6 +617,20 @@ export const deleteLeg = async (legId) => {
     );
     if (result.rowCount === 0)
       throw new Error(`Leg with ID ${legId} not found or could not be deleted`);
+    const legDateQuery = `
+      SELECT MIN(l.date) AS first_leg_date
+      FROM public.legs_m2 l
+      WHERE l.m1key = $1 AND l.legnumber = 1 AND l.date IS NOT NULL
+    `;
+    const legDateResult = await client.query(legDateQuery, [m1key]);
+    const firstLegDate =
+      legDateResult.rows.length > 0 && legDateResult.rows[0].first_leg_date
+        ? new Date(legDateResult.rows[0].first_leg_date)
+        : new Date();
+    await client.query(
+      `UPDATE public.invoice SET date = $2 WHERE m1key = $1`,
+      [m1key, firstLegDate]
+    );
     await client.query("COMMIT");
     return { deletedLegId: legId };
   } catch (error) {
@@ -621,6 +650,27 @@ export const updateLegNumber = async (legId, legnumber) => {
     );
     if (result.rows.length === 0) {
       throw new Error(`Leg with ID ${legId} not found`);
+    }
+    const info = await client.query(
+      `SELECT m1key FROM legs_m2 WHERE legkey = $1`,
+      [legId]
+    );
+    const m1key = info.rows.length > 0 ? info.rows[0].m1key : null;
+    if (m1key) {
+      const legDateQuery = `
+        SELECT MIN(l.date) AS first_leg_date
+        FROM public.legs_m2 l
+        WHERE l.m1key = $1 AND l.legnumber = 1 AND l.date IS NOT NULL
+      `;
+      const legDateResult = await client.query(legDateQuery, [m1key]);
+      const firstLegDate =
+        legDateResult.rows.length > 0 && legDateResult.rows[0].first_leg_date
+          ? new Date(legDateResult.rows[0].first_leg_date)
+          : new Date();
+      await client.query(
+        `UPDATE public.invoice SET date = $2 WHERE m1key = $1`,
+        [m1key, firstLegDate]
+      );
     }
     await client.query("COMMIT");
     return { updatedLegId: result.rows[0].legkey, legnumber };
@@ -901,9 +951,22 @@ export const generateInvoice = async (instructionId) => {
     const invoiceNum = `INV-${currentYear}-${nextInvoiceNum}`;
     const groupId = `${clientId}-${monthName}${currentYear}`;
 
+    // Determine invoice date based on earliest date for legnumber = 1
+    const legDateQuery = `
+      SELECT MIN(l.date) AS first_leg_date
+      FROM public.legs_m2 l
+      WHERE l.m1key = $1 AND l.legnumber = 1 AND l.date IS NOT NULL
+    `;
+    const legDateResult = await client.query(legDateQuery, [m1key]);
+    const firstLegDate =
+      legDateResult.rows.length > 0 && legDateResult.rows[0].first_leg_date
+        ? new Date(legDateResult.rows[0].first_leg_date)
+        : null;
+    const invoiceDate = firstLegDate || currentDate;
+
     const insertResult = await client.query(
       "INSERT INTO invoice (clientid, m1key, invoice_num, groupid, date) VALUES ($1, $2, $3, $4, $5) RETURNING ikey",
-      [clientId, m1key, invoiceNum, groupId, currentDate]
+      [clientId, m1key, invoiceNum, groupId, invoiceDate]
     );
 
     return {
@@ -911,7 +974,7 @@ export const generateInvoice = async (instructionId) => {
       invoiceId: insertResult.rows[0].ikey,
       invoiceNum,
       groupId,
-      date: currentDate,
+      date: invoiceDate,
     };
   } catch (error) {
     throw error;

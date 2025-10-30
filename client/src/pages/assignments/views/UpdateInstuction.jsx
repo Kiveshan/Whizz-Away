@@ -803,7 +803,16 @@ const fetchContainersForInstruction = async (instructionId) => {
       const response = await api.get("/employees/driverssub");
       const data = response.data;
       console.log("Drivers from backend:", data);
-      setEmployeeDrivers(data);
+      const filtered = Array.isArray(data)
+        ? data.filter((d) => {
+            if (d?.roleid === 6) {
+              return d?.status === true && d?.driverstatus === true;
+            }
+            return true;
+          })
+        : [];
+
+      setEmployeeDrivers(filtered);
     } catch (error) {
       console.error("Error fetching drivers:", error);
     }
@@ -2911,7 +2920,17 @@ useEffect(() => {
                           }}
                           disabled={isCompleted}
                         >
-                          <option value="">Select driver</option>
+                          <option value="" disabled hidden>
+                            Select driver
+                          </option>
+                          {entry.driverid &&
+                            !employeeDrivers.some(
+                              (d) => d.userid.toString() === entry.driverid
+                            ) && (
+                              <option value={entry.driverid}>
+                                {entry.full_name || `Driver ID: ${entry.driverid}`} (inactive)
+                              </option>
+                            )}
                           {employeeDrivers.map((driver) => (
                             <option
                               key={driver.userid}
