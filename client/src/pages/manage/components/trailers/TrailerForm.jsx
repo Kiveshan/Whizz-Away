@@ -100,9 +100,7 @@ const TrailerForm = ({ trailer, loading, isEditing, onSave, onCancel, onChange, 
   const handleVinChange = (e) => {
     const value = e.target.value.toUpperCase()
     onChange("vin_num", value || null)
-    if (value && value.length !== 17) {
-      setErrors((prev) => ({ ...prev, vin_num: "VIN must be exactly 17 characters long" }))
-    } else if (value && !/^[A-HJ-NPR-Z0-9]{17}$/.test(value)) {
+    if (value && !/^[A-HJ-NPR-Z0-9]*$/.test(value)) {
       setErrors((prev) => ({ ...prev, vin_num: "VIN must contain only A-H, J-N, P, R-Z, 0-9" }))
     } else {
       setErrors((prev) => ({ ...prev, vin_num: null }))
@@ -184,8 +182,6 @@ const TrailerForm = ({ trailer, loading, isEditing, onSave, onCancel, onChange, 
               type="text"
               value={trailer.vin_num || ""}
               onChange={handleVinChange}
-              pattern="[A-HJ-NPR-Z0-9]{17}"
-              title="VIN must be 17 characters, containing only A-H, J-N, P, R-Z, 0-9"
             />
             {errors.vin_num && <small style={{ color: "red" }}>{errors.vin_num}</small>}
           </div>
