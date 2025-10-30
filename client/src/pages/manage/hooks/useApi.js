@@ -900,6 +900,36 @@ export function useApi(state, actions) {
     [state, actions, fetchPaginatedData],
   )
 
+  const toggleSubcontractorDriverStatus = useCallback(
+    async (driverId, currentStatus) => {
+      actions.setLoading(true)
+      try {
+        const newStatus = !currentStatus
+        await api.put(`/api/subcontractors/drivers/${driverId}/toggle-status`, { driverstatus: newStatus })
+
+        // Refresh current page
+        await fetchPaginatedData(
+          "subcontractors",
+          state.pagination.subcontractors.currentPage,
+          state.pagination.subcontractors.itemsPerPage,
+          state.filters.subcontractors,
+        )
+
+        actions.showAlert(`Driver ${newStatus ? "enabled" : "disabled"}!`)
+        return true
+      } catch (err) {
+        console.error(`Error toggling driver ${driverId}:`, err)
+        actions.showAlert(
+          `Error ${currentStatus ? "disabling" : "enabling"} driver: ${err.response?.data?.error || err.message}`,
+        )
+        return false
+      } finally {
+        actions.setLoading(false)
+      }
+    },
+    [state, actions, fetchPaginatedData],
+  )
+
   const toggleSupplierStatus = useCallback(
     async (id) => {
       actions.setLoading(true)
@@ -1414,6 +1444,7 @@ export function useApi(state, actions) {
     toggleEmployeeStatus,
     toggleClientStatus,
     toggleSubcontractorStatus,
+    toggleSubcontractorDriverStatus,
     toggleSupplierStatus,
     toggleTruckStatus,
     toggleTrailerStatus,

@@ -6,6 +6,7 @@ import {
   deleteSubcontractorDriver,
   deleteSubcontractorTruck,
   toggleSubcontractorStatus,
+  toggleSubcontractorDriverStatus,
 } from "../../models/manage/subbieModel.js"
 
 const getAllSubcontractorsHandler = async (req, res) => {
@@ -228,6 +229,28 @@ const toggleSubcontractorStatusHandler = async (req, res) => {
   }
 }
 
+const toggleSubcontractorDriverStatusHandler = async (req, res) => {
+  try {
+    const { driverId } = req.params
+    const { driverstatus } = req.body
+
+    const parsedId = Number.parseInt(driverId)
+    if (isNaN(parsedId)) {
+      return res.status(400).json({ error: "Invalid driver ID" })
+    }
+
+    console.log(`Toggling driver status for driver ID ${parsedId} to ${driverstatus}`)
+    const result = await toggleSubcontractorDriverStatus(parsedId, driverstatus)
+    if (!result.success) {
+      return res.status(404).json({ message: result.message })
+    }
+    res.json(result.data)
+  } catch (err) {
+    console.error(`Error toggling driver ${req.params.driverId} status:`, err)
+    res.status(500).json({ error: "Failed to toggle driver status" })
+  }
+}
+
 export {
   getAllSubcontractorsHandler,
   getSubcontractorByIdHandler,
@@ -236,4 +259,5 @@ export {
   deleteSubcontractorDriverHandler,
   deleteSubcontractorTruckHandler,
   toggleSubcontractorStatusHandler,
+  toggleSubcontractorDriverStatusHandler,
 }

@@ -607,6 +607,7 @@ const Manage = () => {
               onSave={api.saveSubcontractor}
               onCancel={handleSubcontractorCancel}
               onChange={handleSubcontractorFormChange}
+              onToggleDriverStatus={api.toggleSubcontractorDriverStatus}
             />
           ) : (
             <SubcontractorTable
