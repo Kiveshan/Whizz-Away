@@ -77,8 +77,9 @@ const SubcontractorForm = ({ subcontractor, loading, isEditing, onSave, onCancel
 
   // Helper functions for button visibility
   const shouldShowDeleteButton = (driver) => {
-    // Show delete only for unsaved drivers when NOT in edit mode
-    return !driver.userid && !isEditing
+    // Show delete button for any unsaved driver (no userid)
+    // This allows deleting newly added drivers before saving
+    return !driver.userid
   }
 
   const shouldShowToggleButton = (driver) => {
@@ -697,6 +698,7 @@ const SubcontractorForm = ({ subcontractor, loading, isEditing, onSave, onCancel
         </button>
       </div>
 
+    
       {/* Dynamic Summary */}
       <div
         style={{
@@ -734,10 +736,7 @@ const SubcontractorForm = ({ subcontractor, loading, isEditing, onSave, onCancel
           )}
           .
         </p>
-        <p style={{ margin: "5px 0 0 0", fontSize: "14px", color: "#0c5460" }}>
-          Drivers will be stored in the employee table, trucks will be stored in the trucks table with subcontractor
-          flag.
-        </p>
+      
       </div>
     </form>
   )
