@@ -43,7 +43,7 @@ export const updateInstructionStatus = async (instructionId, status) => {
 
 export const getDriversSub = async () => {
   const query =
-    "SELECT userid, name, surname, roleid FROM m5_employee WHERE roleid IN (5, 6) AND status = true ORDER BY name, surname";
+    "SELECT userid, name, surname, roleid, status, driverstatus FROM m5_employee WHERE roleid IN (5, 6) AND status = true ORDER BY name, surname";
   try {
     const result = await pool.query(query);
     return result.rows;
