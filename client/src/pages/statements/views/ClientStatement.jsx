@@ -2,7 +2,8 @@
 import { useNavigate, useLocation } from "react-router-dom";
 import { useState, useEffect, useRef } from "react";
 import "../css/ClientStatement.css";
-import html2pdf from "html2pdf.js";
+import jsPDF from "jspdf";
+import autoTable from "jspdf-autotable";
 import TransactionsTableWrapper from "./TransactionsTableWrapper.jsx";
 import api from "../../../api"; // Import the axios instance
 
@@ -74,89 +75,169 @@ const ClientStatement = () => {
     fetchStatement();
   }, [statementId, navigate]);
 
-  // Update the generatePDF function to better handle page breaks and avoid blank pages
+  // Generate PDF using jsPDF for consistent formatting
   const generatePDF = () => {
     if (isGenerating) return;
     setIsGenerating(true);
 
-    // Use requestAnimationFrame for better browser compatibility
-    requestAnimationFrame(() => {
-      const element = statementRef.current;
-      const filename = `Statement-${statement.statement_key}.pdf`;
+    try {
+      const doc = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4" });
 
-      // Check if the table is small (few rows) to determine if we need page breaks
-      const isSmallTable =
-        statement.invoices.length + statement.addons.length <= 3;
-
-      const opt = {
-        margin: [20, 15, 20, 15],
-        filename: filename,
-        image: { type: "png", quality: 0.98 },
-        html2canvas: {
-          scale: 1.2, // Reduced scale for better fit
-          useCORS: true,
-          scrollY: 0,
-          scrollX: 0,
-          windowWidth: document.documentElement.offsetWidth,
-          windowHeight: document.documentElement.offsetHeight,
-        },
-        jsPDF: {
-          unit: "mm",
-          format: "a4",
-          orientation: "portrait",
-          compress: true,
-        },
-        pagebreak: {
-          mode: ["avoid-all", "css", "legacy"],
-          // Only add page breaks for large tables
-          after: isSmallTable ? [] : [".transactions-section"],
-        },
+      // Theme similar to ClientInvoice
+      const brand = {
+        primary: [45, 55, 72],
+        accent: [70, 130, 180],
+        gray: [110, 120, 140],
       };
+      const fonts = { title: 16, header: 12, normal: 10, small: 9, tiny: 8 };
+      const margins = { left: 10, right: 10, top: 10 };
+      const pageWidth = doc.internal.pageSize.getWidth();
+      const pageHeight = doc.internal.pageSize.getHeight();
+      let currentY = margins.top;
 
-      // Add CSS to handle page breaks properly
-      const style = document.createElement("style");
-      style.innerHTML = `
-      @media print {
-        .statement-info-section { page-break-inside: avoid; }
-        .transactions-section { page-break-inside: avoid; }
-        .age-analysis-section { page-break-inside: avoid; }
-        table { page-break-inside: avoid; }
-        tr { page-break-inside: avoid; }
-        td { page-break-inside: avoid; }
-        th { page-break-inside: avoid; }
-        .transactions-table { font-size: 11px; }
-        
-        /* Remove forced page breaks for small tables */
-        ${
-          isSmallTable
-            ? `
-        .transactions-section {
-          page-break-after: auto !important;
-        }
-        .age-analysis-section {
-          page-break-before: auto !important;
-        }
-        `
-            : ""
-        }
+      // Header band
+      doc.setFillColor(...brand.primary);
+      doc.rect(0, 0, pageWidth, 18, 'F');
+      doc.setTextColor(255, 255, 255);
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(fonts.title);
+      doc.text(statement.company_name || "", margins.left, 12);
+      doc.setFontSize(fonts.header);
+      doc.setFont('helvetica', 'normal');
+      doc.text('STATEMENT OF ACCOUNT', pageWidth - margins.right, 12, { align: 'right' });
+      doc.setTextColor(0, 0, 0);
+      currentY = 18 + 6;
+
+      // Two-column From / To
+      const colGap = 8;
+      const colWidth = (pageWidth - margins.left - margins.right - colGap) / 2;
+      doc.setFontSize(fonts.small);
+      doc.setFont('helvetica', 'bold');
+      doc.setTextColor(...brand.gray);
+      doc.text('FROM', margins.left, currentY);
+      doc.text('TO', margins.left + colWidth + colGap, currentY);
+      doc.setTextColor(0, 0, 0);
+      doc.setFont('helvetica', 'normal');
+      currentY += 5;
+
+      const leftDetails = [
+        statement.company_name,
+      ].filter(Boolean);
+
+      const rightDetails = [
+        statement.client.name,
+        statement.client.email,
+        statement.client.phone,
+        statement.client.address,
+      ].filter(Boolean);
+
+      const maxLines = Math.max(leftDetails.length, rightDetails.length);
+      for (let i = 0; i < maxLines; i++) {
+        if (leftDetails[i]) doc.text(String(leftDetails[i]), margins.left, currentY);
+        if (rightDetails[i]) doc.text(String(rightDetails[i]), margins.left + colWidth + colGap, currentY);
+        currentY += 5;
       }
-    `;
-      document.head.appendChild(style);
+      currentY += 4;
 
-      html2pdf()
-        .set(opt)
-        .from(element)
-        .save()
-        .then(() => {
-          document.head.removeChild(style); // Clean up the added style
-          setIsGenerating(false);
-        })
-        .catch((error) => {
-          document.head.removeChild(style); // Clean up the added style
-          console.error("PDF generation error:", error);
-          setIsGenerating(false);
-        });
-    });
+      // Statement meta row
+      doc.setFontSize(fonts.normal);
+      const metaLeft = `Statement #: ${statement.statement_key}`;
+      const metaRight = `Date: ${new Date(statement.generation_date).toLocaleDateString('en-GB')}`;
+      doc.text(metaLeft, margins.left, currentY);
+      doc.text(metaRight, pageWidth - margins.right, currentY, { align: 'right' });
+      currentY += 8;
+
+      // Account Summary table
+      const openingBalance = statement.opening_balance;
+      const invoicedAmount = statement.invoices.reduce((s, i) => s + i.amount, 0) + statement.addons.reduce((s, a) => s + a.amount, 0);
+      const amountPaid = statement.payments.reduce((s, p) => s + p.amount, 0);
+      const creditNotesAmount = (statement.credit_notes || []).reduce((s, c) => s + c.amount, 0);
+      const totalAmountPaid = amountPaid + creditNotesAmount;
+      const balanceDue = openingBalance - totalAmountPaid + invoicedAmount;
+
+      autoTable(doc, {
+        startY: currentY,
+        head: [["Description", "Amount"]],
+        body: [
+          ["Opening Balance", `R${openingBalance.toFixed(2)}`],
+          ["Invoiced Amount", `R${invoicedAmount.toFixed(2)}`],
+          ["Amount Paid", `R${totalAmountPaid.toFixed(2)}`],
+          ["Balance Due", `R${balanceDue.toFixed(2)}`],
+        ],
+        theme: "grid",
+        styles: { fontSize: fonts.small, cellPadding: 1.6, lineWidth: 0.1, lineColor: brand.gray },
+        headStyles: { fillColor: brand.accent, textColor: [255,255,255], fontStyle: "bold" },
+        columnStyles: { 0: { fontStyle: "bold", cellWidth: 80 }, 1: { halign: "right" } },
+        margin: { left: margins.left, right: margins.right },
+      });
+      currentY = doc.lastAutoTable.finalY + 6;
+
+      // Transactions table
+      const txRows = transactionsWithBalance.map(tx => ([
+        tx.date.toLocaleDateString('en-GB'),
+        tx.type,
+        tx.details || "",
+        tx.reference || "",
+        tx.amount ? `R${tx.amount.toFixed(2)}` : "",
+        tx.payment ? `R${tx.payment.toFixed(2)}` : "",
+        `R${tx.balance.toFixed(2)}`,
+      ]));
+
+      autoTable(doc, {
+        startY: currentY,
+        head: [["Date", "Transaction", "Details", "Reference", "Amount", "Payment", "Balance"]],
+        body: [
+          [new Date(statement.generation_date).toLocaleDateString('en-GB'), "Opening Balance", "", "", "R0", "", `R${openingBalance.toFixed(2)}`],
+          ...txRows,
+        ],
+        theme: "grid",
+        styles: { fontSize: fonts.tiny, cellPadding: 1.2, lineWidth: 0.1, lineColor: brand.gray },
+        headStyles: { fillColor: brand.accent, textColor: [255,255,255], fontStyle: "bold" },
+        columnStyles: {
+          0: { cellWidth: 22 },
+          1: { cellWidth: 22 },
+          2: { cellWidth: 52 },
+          3: { cellWidth: 28 },
+          4: { cellWidth: 22, halign: 'right' },
+          5: { cellWidth: 22, halign: 'right' },
+          6: { cellWidth: 22, halign: 'right' },
+        },
+        margin: { left: margins.left, right: margins.right },
+        rowPageBreak: 'auto',
+        didDrawPage: () => {
+          const str = `Page ${doc.internal.getNumberOfPages()}`;
+          doc.setFontSize(8);
+          doc.setTextColor(120);
+          doc.text(str, pageWidth - margins.right, pageHeight - 6, { align: 'right' });
+        },
+      });
+
+      currentY = doc.lastAutoTable.finalY + 6;
+
+      // Age Analysis table
+      autoTable(doc, {
+        startY: currentY,
+        head: [["Current", "30 Days", "60 Days", "90+ Days"]],
+        body: [[
+          `R${statement.aging.current.toFixed(2)}`,
+          `R${statement.aging["30days"].toFixed(2)}`,
+          `R${statement.aging["60days"].toFixed(2)}`,
+          `R${statement.aging["90days"].toFixed(2)}`,
+        ]],
+        theme: "grid",
+        styles: { fontSize: fonts.small, cellPadding: 1.6, lineWidth: 0.1, lineColor: brand.gray },
+        headStyles: { fillColor: brand.accent, textColor: [255,255,255], fontStyle: "bold" },
+        margin: { left: margins.left, right: margins.right },
+      });
+
+      // Save
+      const fileName = `Statement-${statement.statement_key}.pdf`;
+      doc.save(fileName);
+    } catch (err) {
+      console.error("PDF generation error:", err);
+    } finally {
+      setIsGenerating(false);
+    }
   };
 
   if (loading)
