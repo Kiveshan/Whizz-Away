@@ -20,6 +20,8 @@ const AddOnForm = () => {
     invoice_number: "",
     group_id: "",
     vat_applied: true, // New field for VAT toggle
+    booking_ref: "",
+    client_ref: "",
   });
 
   const [companyInfo, setCompanyInfo] = useState({
@@ -146,6 +148,8 @@ const AddOnForm = () => {
               group_id: addon.group_id || "",
               vat_applied:
                 addon.vat_applied !== undefined ? addon.vat_applied : true,
+              booking_ref: addon.booking_ref || "",
+              client_ref: addon.client_ref || "",
             });
           } else {
             throw new Error(
@@ -241,6 +245,18 @@ const AddOnForm = () => {
       setError("Please select a date");
       return false;
     }
+    if (!formData.booking_ref || formData.booking_ref.trim().length === 0) {
+      setError("Booking Ref is required");
+      return false;
+    }
+    if (!formData.client_ref || formData.client_ref.trim().length === 0) {
+      setError("Client Ref is required");
+      return false;
+    }
+    if (formData.booking_ref.length > 50 || formData.client_ref.length > 50) {
+      setError("Booking Ref and Client Ref must be at most 50 characters");
+      return false;
+    }
     return true;
   };
 
@@ -260,6 +276,8 @@ const AddOnForm = () => {
         })),
         date: formData.date,
         vat_applied: formData.vat_applied,
+        booking_ref: formData.booking_ref.trim(),
+        client_ref: formData.client_ref.trim(),
       };
       const response = await api.post("/api/addons", submitData, {
         headers: {
@@ -399,6 +417,8 @@ const AddOnForm = () => {
         `Telephone: ${clientInfo.telephone || ''}`,
         `Email: ${clientInfo.email || ''}`,
         `VAT Reg No: ${clientInfo.vat_reg_num || ''}`,
+        formData.booking_ref ? `Booking Ref: ${formData.booking_ref}` : '',
+        formData.client_ref ? `Client Ref: ${formData.client_ref}` : '',
       ].filter(Boolean);
 
       const maxLines = Math.max(leftDetails.length, rightDetails.length);
@@ -635,6 +655,38 @@ const AddOnForm = () => {
                   setFormData((prev) => ({ ...prev, date: e.target.value }))
                 }
                 className="form-input"
+                required
+                readOnly={isViewMode}
+              />
+            </div>
+            <div className="form-group">
+              <label htmlFor="booking_ref">Booking Ref</label>
+              <input
+                type="text"
+                id="booking_ref"
+                name="booking_ref"
+                value={formData.booking_ref}
+                onChange={(e) =>
+                  setFormData((prev) => ({ ...prev, booking_ref: e.target.value }))
+                }
+                className="form-input"
+                maxLength={50}
+                required
+                readOnly={isViewMode}
+              />
+            </div>
+            <div className="form-group">
+              <label htmlFor="client_ref">Client Ref</label>
+              <input
+                type="text"
+                id="client_ref"
+                name="client_ref"
+                value={formData.client_ref}
+                onChange={(e) =>
+                  setFormData((prev) => ({ ...prev, client_ref: e.target.value }))
+                }
+                className="form-input"
+                maxLength={50}
                 required
                 readOnly={isViewMode}
               />

@@ -18,7 +18,9 @@ const getAddonsByClient = async (clientId, filters = {}) => {
         invoice_number,
         created_at,
         group_id,
-        vat_applied
+        vat_applied,
+        booking_ref,
+        client_ref
       FROM public.add_ons 
       WHERE client_id = $1
     `;
@@ -106,9 +108,11 @@ const createAddon = async (addonData) => {
         invoice_number,
         group_id,
         created_at,
-        vat_applied
-      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
-      RETURNING addon_id, items, amount, date, invoice_number, group_id, vat_applied
+        vat_applied,
+        booking_ref,
+        client_ref
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+      RETURNING addon_id, items, amount, date, invoice_number, group_id, vat_applied, booking_ref, client_ref
     `;
 
     const result = await query(insertQueryText, [
@@ -120,6 +124,8 @@ const createAddon = async (addonData) => {
       groupId,
       today,
       addonData.vat_applied,
+      addonData.booking_ref,
+      addonData.client_ref,
     ]);
 
     return {
@@ -133,6 +139,8 @@ const createAddon = async (addonData) => {
         group_id: result.rows[0].group_id,
         client_id: addonData.client_id,
         vat_applied: result.rows[0].vat_applied,
+        booking_ref: result.rows[0].booking_ref,
+        client_ref: result.rows[0].client_ref,
       },
     };
   } catch (error) {
@@ -164,6 +172,8 @@ const getAddonById = async (addonId) => {
         a.invoice_number,
         a.created_at,
         a.vat_applied,
+        a.booking_ref,
+        a.client_ref,
         c.client as client_name
       FROM public.add_ons a
       LEFT JOIN public.m5_client c ON a.client_id = c.m5clientkey
@@ -211,9 +221,9 @@ const updateAddon = async (addonId, addonData) => {
 
     const queryText = `
       UPDATE public.add_ons 
-      SET items = $1, amount = $2, date = $3, vat_applied = $4
-      WHERE addon_id = $5
-      RETURNING addon_id, items, amount, date, invoice_number, vat_applied
+      SET items = $1, amount = $2, date = $3, vat_applied = $4, booking_ref = $5, client_ref = $6
+      WHERE addon_id = $7
+      RETURNING addon_id, items, amount, date, invoice_number, vat_applied, booking_ref, client_ref
     `;
 
     console.log("Executing update query:", queryText, "with params:", [
@@ -221,6 +231,8 @@ const updateAddon = async (addonId, addonData) => {
       totalAmount,
       addonData.date,
       addonData.vat_applied,
+      addonData.booking_ref,
+      addonData.client_ref,
       addonId,
     ]);
     const result = await query(queryText, [
@@ -228,6 +240,8 @@ const updateAddon = async (addonId, addonData) => {
       totalAmount,
       addonData.date,
       addonData.vat_applied,
+      addonData.booking_ref,
+      addonData.client_ref,
       addonId,
     ]);
 
