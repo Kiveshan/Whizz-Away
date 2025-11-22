@@ -187,7 +187,11 @@ export const getContainersByInstructionId = async (instructionId) => {
   }
 };
 
-export const saveInstruction = async ({ controllerData, containerData }) => {
+export const saveInstruction = async ({
+  controllerData,
+  containerData = [],
+  weightData = [],
+}) => {
   const client = await pool.connect();
   try {
     await client.query("BEGIN");
@@ -299,6 +303,10 @@ export const saveInstruction = async ({ controllerData, containerData }) => {
       rateper_breakbulk: controllerData.rateper_breakbulk,
     };
 
+    if (String(fields.shipmentType) === "4") {
+      fields.weight = null;
+    }
+
     console.log(
       "MODEL: Original total_cost from controller:",
       controllerData.total_cost
@@ -389,6 +397,43 @@ export const saveInstruction = async ({ controllerData, containerData }) => {
       "MODEL: Verified total_cost in database:",
       verifyResult.rows[0]?.total_cost
     );
+
+    if (String(fields.shipmentType) === "4" && Array.isArray(weightData) && weightData.length > 0) {
+      for (const row of weightData) {
+        let rowWeight = null;
+        if (row.weight !== null && row.weight !== undefined && row.weight !== "") {
+          if (typeof row.weight === "string") {
+            const trimmed = row.weight.trim();
+            if (trimmed !== "") {
+              const parsed = Number.parseFloat(trimmed);
+              if (!Number.isNaN(parsed) && parsed >= 0) {
+                rowWeight = parsed;
+              }
+            }
+          } else if (typeof row.weight === "number" && row.weight >= 0) {
+            rowWeight = row.weight;
+          }
+        }
+
+        const insertWeightQuery = `
+          INSERT INTO public.m1_controller_weight (
+            m1_key,
+            ksm_dm_no,
+            ticket_no,
+            receipt_book_no,
+            weight
+          ) VALUES ($1, $2, $3, $4, $5)
+        `;
+        const weightValues = [
+          m1key,
+          row.ksm_dm_no || row.ksmDmNo || null,
+          row.ticket_no || row.ticketNo || null,
+          row.receipt_book_no || row.receiptBookNo || null,
+          rowWeight,
+        ];
+        await client.query(insertWeightQuery, weightValues);
+      }
+    }
 
     // Define clientId, pickup, and dropoff variables before container processing
     let clientId = controllerData.client || controllerData.clientId;
@@ -609,10 +654,16 @@ export const saveInstruction = async ({ controllerData, containerData }) => {
           ratePerAbnormal * numAbnormal +
           ratePerBreakBulk * numBreakBulk;
       } else {
-        // Weight-based calculation (kg, ton, m³)
-        const weight = Number(instructionData.weight || 0);
-        const unitRate = Number(instructionData.unitrate || 0);
-        baseCost = weight * unitRate;
+        const hasTotalCost =
+          instructionData.total_cost !== undefined &&
+          !Number.isNaN(Number(instructionData.total_cost));
+        if (hasTotalCost) {
+          baseCost = Number(Number(instructionData.total_cost).toFixed(2));
+        } else {
+          const weight = Number(instructionData.weight || 0);
+          const unitRate = Number(instructionData.unitrate || 0);
+          baseCost = weight * unitRate;
+        }
       }
 
       // Calculate total surcharge from containers
@@ -915,6 +966,17 @@ export const getInstructionById = async (instructionId) => {
         public.container
       WHERE 
         m1key = $1
+    ),
+    weight_data AS (
+      SELECT
+        weight_pk,
+        m1_key,
+        ksm_dm_no,
+        ticket_no,
+        receipt_book_no,
+        weight
+      FROM public.m1_controller_weight
+      WHERE m1_key = $1
     )
     SELECT 
       i.*,
@@ -940,7 +1002,25 @@ export const getInstructionById = async (instructionId) => {
           WHERE c.m1key = i.m1key
         ),
         '[]'::json
-      ) AS containers
+      ) AS containers,
+      COALESCE(
+        (
+          SELECT json_agg(
+            json_build_object(
+              'weight_pk', w.weight_pk,
+              'm1_key', w.m1_key,
+              'ksm_dm_no', w.ksm_dm_no,
+              'ticket_no', w.ticket_no,
+              'receipt_book_no', w.receipt_book_no,
+              'weight', w.weight
+            )
+            ORDER BY w.weight_pk
+          )
+          FROM weight_data w
+          WHERE w.m1_key = i.m1key
+        ),
+        '[]'::json
+      ) AS weight_rows
     FROM 
       instruction_data i`;
   const result = await query(sql, [instructionId]);
@@ -1648,7 +1728,8 @@ const preserveExistingValue = (
 export const updateFCInstructionAndContainers = async (
   instructionId,
   instructionData,
-  containerData
+  containerData,
+  weightData = []
 ) => {
   const client = await pool.connect();
   try {
@@ -1806,6 +1887,17 @@ export const updateFCInstructionAndContainers = async (
       ),
     };
 
+    const newShipmentType = String(
+      instructionData.shipmentTypeId ||
+        instructionData.shipment_type ||
+        updateData.shipment_type ||
+        currentInstruction.shipment_type
+    );
+
+    if (newShipmentType === "4") {
+      updateData.weight = null;
+    }
+
     console.log(
       `[${new Date().toISOString()}] [MODEL] Sanitized update data:`,
       {
@@ -1941,7 +2033,59 @@ export const updateFCInstructionAndContainers = async (
       );
     }
 
-    // 5. Handle containers
+    // 5. Handle weight rows for shipment type 4 (cross-haul/break bulk)
+    if (newShipmentType === "4") {
+      const deleteWeightsQuery =
+        "DELETE FROM public.m1_controller_weight WHERE m1_key = $1";
+      await client.query(deleteWeightsQuery, [instructionId]);
+
+      if (Array.isArray(weightData) && weightData.length > 0) {
+        for (const row of weightData) {
+          let rowWeight = null;
+          if (
+            row.weight !== null &&
+            row.weight !== undefined &&
+            row.weight !== ""
+          ) {
+            if (typeof row.weight === "string") {
+              const trimmed = row.weight.trim();
+              if (trimmed !== "") {
+                const parsed = Number.parseFloat(trimmed);
+                if (!Number.isNaN(parsed) && parsed >= 0) {
+                  rowWeight = parsed;
+                }
+              }
+            } else if (typeof row.weight === "number" && row.weight >= 0) {
+              rowWeight = row.weight;
+            }
+          }
+
+          const insertWeightQuery = `
+            INSERT INTO public.m1_controller_weight (
+              m1_key,
+              ksm_dm_no,
+              ticket_no,
+              receipt_book_no,
+              weight
+            ) VALUES ($1, $2, $3, $4, $5)
+          `;
+          const weightValues = [
+            instructionId,
+            row.ksm_dm_no || row.ksmDmNo || null,
+            row.ticket_no || row.ticketNo || null,
+            row.receipt_book_no || row.receiptBookNo || null,
+            rowWeight,
+          ];
+          await client.query(insertWeightQuery, weightValues);
+        }
+      }
+    } else if (String(currentInstruction.shipment_type) === "4") {
+      const deleteWeightsQuery =
+        "DELETE FROM public.m1_controller_weight WHERE m1_key = $1";
+      await client.query(deleteWeightsQuery, [instructionId]);
+    }
+
+    // 6. Handle containers
     const getCurrentContainersQuery = `
       SELECT containerkey, containernum, weight, container_type, cargo_description,
              "Add Surcharges", "Hazardous", "Surcharge Amount"

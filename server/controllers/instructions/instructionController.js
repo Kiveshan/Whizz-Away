@@ -125,7 +125,7 @@ export const getContainersHandler = async (req, res) => {
 
 export const saveInstructionHandler = async (req, res) => {
   try {
-    const { controllerData, containerData } = req.body
+    const { controllerData, containerData, weightData } = req.body
 
     console.log("CONTROLLER: Original request data:", {
       total_cost: controllerData.total_cost,
@@ -135,13 +135,13 @@ export const saveInstructionHandler = async (req, res) => {
     });
 
     // Use the frontend's total cost if available, otherwise calculate it
-    let finalTotalCost = controllerData.total_cost;
+    let finalTotalCost = controllerData.total_cost
     if (!finalTotalCost || isNaN(Number(finalTotalCost))) {
-      finalTotalCost = calculateTotalCost(controllerData, containerData || []);
-      console.log("CONTROLLER: Had to calculate total_cost in backend:", finalTotalCost);
+      finalTotalCost = calculateTotalCost(controllerData, containerData || [])
+      console.log("CONTROLLER: Had to calculate total_cost in backend:", finalTotalCost)
     } else {
-      finalTotalCost = Number(Number(finalTotalCost).toFixed(2));
-      console.log("CONTROLLER: Using frontend total_cost:", finalTotalCost);
+      finalTotalCost = Number(Number(finalTotalCost).toFixed(2))
+      console.log("CONTROLLER: Using frontend total_cost:", finalTotalCost)
     }
     
     let updatedControllerData = {
@@ -232,7 +232,11 @@ export const saveInstructionHandler = async (req, res) => {
         ? []
         : containerData
 
-    const result = await saveInstruction({ controllerData: updatedControllerData, containerData: containersToSave })
+    const result = await saveInstruction({
+      controllerData: updatedControllerData,
+      containerData: containersToSave,
+      weightData: Array.isArray(weightData) ? weightData : [],
+    })
     res.json({ success: true, m1key: result.m1key })
   } catch (error) {
     console.error("Error in save-instruction endpoint:", error)
@@ -754,7 +758,7 @@ export const saveInstructionController = async (req, res) => {
 export const updateFCInstructionAndContainersHandler = async (req, res) => {
   try {
     const { id } = req.params
-    const { instructionData, containers } = req.body
+    const { instructionData, containers, weightData } = req.body
 
     // Validate input data
     if (!id) {
@@ -769,11 +773,25 @@ export const updateFCInstructionAndContainersHandler = async (req, res) => {
       return res.status(400).json({ success: false, error: "Containers must be an array" })
     }
 
-    // Calculate total cost based on rate weight type
-    const calculatedTotalCost = calculateTotalCost(instructionData, containers)
+    // Calculate total cost: prefer frontend-provided total_cost when valid, otherwise fall back to backend calculation
+    let finalTotalCost = instructionData.total_cost
+    if (!finalTotalCost || isNaN(Number(finalTotalCost))) {
+      finalTotalCost = calculateTotalCost(instructionData, containers)
+      console.log(
+        `[${new Date().toISOString()}] [CONTROLLER] updateFCInstructionAndContainersHandler: Calculated total_cost in backend:`,
+        finalTotalCost,
+      )
+    } else {
+      finalTotalCost = Number(Number(finalTotalCost).toFixed(2))
+      console.log(
+        `[${new Date().toISOString()}] [CONTROLLER] updateFCInstructionAndContainersHandler: Using frontend total_cost:`,
+        finalTotalCost,
+      )
+    }
+
     let updatedInstructionData = {
       ...instructionData,
-      total_cost: calculatedTotalCost,
+      total_cost: finalTotalCost,
     }
 
     // For shipment type 5 (add-on) on FC update, zero/null non-essential fields and drop containers
@@ -811,14 +829,21 @@ export const updateFCInstructionAndContainersHandler = async (req, res) => {
     console.log(
       `[${new Date().toISOString()}] [CONTROLLER] updateFCInstructionAndContainersHandler: Processing request for instruction ${id} with ${containers.length} containers`,
     )
-    console.log(`[${new Date().toISOString()}] [CONTROLLER] Calculated total cost: ${calculatedTotalCost}`)
+    console.log(
+      `[${new Date().toISOString()}] [CONTROLLER] updateFCInstructionAndContainersHandler: Final total_cost being sent to model: ${updatedInstructionData.total_cost}`,
+    )
 
     const containersToSave =
       String(updatedInstructionData.shipmentTypeId || updatedInstructionData.shipment_type) === "5"
         ? []
         : containers
 
-    const result = await updateFCInstructionAndContainers(id, updatedInstructionData, containersToSave)
+    const result = await updateFCInstructionAndContainers(
+      id,
+      updatedInstructionData,
+      containersToSave,
+      Array.isArray(weightData) ? weightData : [],
+    )
     res.status(200).json({ success: true, message: "Instruction and containers updated successfully", data: result })
   } catch (error) {
     console.error(`[${new Date().toISOString()}] [CONTROLLER] Error in updateFCInstructionAndContainersHandler:`, error)

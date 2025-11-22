@@ -160,6 +160,31 @@ const ControllerInstructions = () => {
   const [containers, setContainers] = useState([])
   const [showContainerDetails, setShowContainerDetails] = useState(false)
 
+  const [weightRows, setWeightRows] = useState([])
+
+  const addWeightRow = useCallback(() => {
+    setWeightRows((prev) => [
+      ...prev,
+      {
+        id: prev.length > 0 ? prev[prev.length - 1].id + 1 : 1,
+        ksmDmNo: "",
+        ticketNo: "",
+        receiptBookNo: "",
+        weight: "",
+      },
+    ])
+  }, [])
+
+  const updateWeightRow = useCallback((id, field, value) => {
+    setWeightRows((prev) =>
+      prev.map((row) => (row.id === id ? { ...row, [field]: value } : row)),
+    )
+  }, [])
+
+  const removeWeightRow = useCallback((id) => {
+    setWeightRows((prev) => prev.filter((row) => row.id !== id))
+  }, [])
+
   // New state for rate locking
   const [rateLockStatus, setRateLockStatus] = useState({
     sixMeter: false,
@@ -901,6 +926,24 @@ const ControllerInstructions = () => {
         rateWeight: newRateWeight,
       }))
 
+      if (isBreakBulkType) {
+        setWeightRows((prev) =>
+          prev.length > 0
+            ? prev
+            : [
+                {
+                  id: 1,
+                  ksmDmNo: "",
+                  ticketNo: "",
+                  receiptBookNo: "",
+                  weight: "",
+                },
+              ],
+        )
+      } else {
+        setWeightRows([])
+      }
+
       // Clear any existing errors
       setFieldErrors((prev) => {
         const newErrors = { ...prev }
@@ -977,8 +1020,10 @@ const ControllerInstructions = () => {
 
     // Weight-based validations
     if (isWeightBased) {
-      if (!formData.weight || formData.weight === "") {
-        errors.weight = "Weight is required for weight-based calculations"
+      if (formData.shipmentTypeId !== "4") {
+        if (!formData.weight || formData.weight === "") {
+          errors.weight = "Weight is required for weight-based calculations"
+        }
       }
       if (!formData.unitrate || formData.unitrate === "") {
         errors.unitrate = "Unit rate is required for weight-based calculations"
@@ -1186,20 +1231,32 @@ const ControllerInstructions = () => {
 
       if (isWeightBased && !isAddOn) {
         // Weight-based calculation
-        const weight = Number.parseFloat(formData.weight || 0)
+        let baseWeight = 0
+        if (formData.shipmentTypeId === "4") {
+          baseWeight = weightRows.reduce((sum, row) => {
+            if (row.weight === null || row.weight === undefined || row.weight === "") {
+              return sum
+            }
+            const parsed = Number.parseFloat(row.weight)
+            return Number.isNaN(parsed) ? sum : sum + parsed
+          }, 0)
+        } else {
+          baseWeight = Number.parseFloat(formData.weight || 0)
+        }
+
         const unitRate = Number.parseFloat(formData.unitrate || 0)
-        totalCost = weight * unitRate
+        totalCost = baseWeight * unitRate
 
         costBreakdown.components = {
-          weight: weight,
+          weight: baseWeight,
           unitRate: unitRate,
           weightBasedCost: totalCost,
         }
 
         console.log("WEIGHT-BASED CALCULATION:")
-        console.log(`  Weight: ${weight} ${formData.rateWeight}`)
+        console.log(`  Weight: ${baseWeight} ${formData.rateWeight}`)
         console.log(`  Unit Rate: R${unitRate.toFixed(2)} per ${formData.rateWeight}`)
-        console.log(`  Base Cost: ${weight} × R${unitRate.toFixed(2)} = R${totalCost.toFixed(2)}`)
+        console.log(`  Base Cost: ${baseWeight} × R${unitRate.toFixed(2)} = R${totalCost.toFixed(2)}`)
       } else {
         // Container-based calculation
         const sixMeterRate = Number.parseFloat(formData.sixMeterRate) || 0
@@ -1345,7 +1402,12 @@ const ControllerInstructions = () => {
         rateper_breakbulk: null,
         num_breakbulk: 0,
         // Set weight and unitrate appropriately
-        weight: isWeightBased ? (formData.weight === "" ? null : Number.parseFloat(formData.weight || 0)) : null,
+        weight:
+          isWeightBased && formData.shipmentTypeId !== "4"
+            ? formData.weight === ""
+              ? null
+              : Number.parseFloat(formData.weight || 0)
+            : null,
         unitrate: isWeightBased ? (formData.unitrate === "" ? null : Number.parseFloat(formData.unitrate || 0)) : null,
         // Map field names for backend
         client: formData.clientId,
@@ -1380,12 +1442,43 @@ const ControllerInstructions = () => {
             }))
           : []
 
+      let weightData = []
+      if (formData.shipmentTypeId === "4") {
+        // Normalize and filter weight rows: only send rows where at least one field is filled,
+        // and preserve numeric 0 instead of converting it to null.
+        weightData = weightRows
+          .map((row) => {
+            let numericWeight = null
+            if (row.weight !== null && row.weight !== undefined && row.weight !== "") {
+              const parsed = Number.parseFloat(row.weight)
+              numericWeight = Number.isNaN(parsed) ? null : parsed
+            }
+
+            const ksm = row.ksmDmNo || row.ksm_dm_no || ""
+            const ticket = row.ticketNo || row.ticket_no || ""
+            const receipt = row.receiptBookNo || row.receipt_book_no || ""
+
+            return {
+              ksm_dm_no: ksm,
+              ticket_no: ticket,
+              receipt_book_no: receipt,
+              weight: numericWeight,
+              _isEmptyRow:
+                !ksm && !ticket && !receipt && (numericWeight === null || Number.isNaN(numericWeight)),
+            }
+          })
+          .filter((row) => !row._isEmptyRow)
+          .map(({ _isEmptyRow, ...cleanRow }) => cleanRow)
+      }
+
       console.log("=== SUBMITTING TO DATABASE ===")
       console.log("Instruction data being saved:", {
         ...instructionData,
         description: instructionData.description ? instructionData.description.substring(0, 50) + "..." : null, // Truncate for logging
       })
       console.log("Container data being saved:", containerData)
+      console.log("Raw weightRows state (shipment type 4 only):", weightRows)
+      console.log("Weight rows being saved (shipment type 4 only):", weightData)
       console.log("Final calculated total cost (WITHOUT VAT):", totalCost)
       console.log("Rate saving logic applied:")
       console.log(`  rateper_6: ${instructionData.rateper_6} (count: ${instructionData.num_six_meters})`)
@@ -1397,6 +1490,7 @@ const ControllerInstructions = () => {
       const response = await api.post("/api/instructions/save-instruction", {
         controllerData: instructionData,
         containerData: containerData,
+        weightData: weightData,
       })
 
       if (response.data.success) {
@@ -1414,7 +1508,7 @@ const ControllerInstructions = () => {
     } finally {
       setIsSubmitting(false)
     }
-  }, [formData, isWeightBased, isCrossHaul, isImport, containers, navigate])
+  }, [formData, isWeightBased, isCrossHaul, isImport, containers, weightRows, navigate])
 
   const handleConfirmSubmit = useCallback(async () => {
     setShowConfirmationPopup(false)
@@ -2017,7 +2111,6 @@ const ControllerInstructions = () => {
                     minWidth: 0,
                   }}
                 >
-                  {/* unit per Section */}
                   <div
                     style={{
                       display: "flex",
@@ -2080,7 +2173,7 @@ const ControllerInstructions = () => {
                         )}
                       </select>
                     </div>
-                    {isWeightBased && (
+                    {isWeightBased && formData.shipmentTypeId !== "4" && (
                       <div
                         className="controller-instructions-weight-input-group"
                         ref={fieldRefs.current.weight}
@@ -2143,9 +2236,170 @@ const ControllerInstructions = () => {
                         <ErrorTooltip message={fieldErrors.unitrate} />
                       </div>
                     )}
+                    {isWeightBased && formData.shipmentTypeId === "4" && (
+                      <div
+                        className="controller-instructions-weight-input-group"
+                        ref={fieldRefs.current.weight}
+                        style={{ display: "flex", alignItems: "center", gap: "4px" }}
+                      >
+                        <div className="controller-instructions-input-wrapper" style={{ width: "100%" }}>
+                          <input
+                            type="text"
+                            className={`controller-instructions-form-input ${fieldErrors.unitrate ? "controller-instructions-error-field" : ""}`}
+                            placeholder="Rate"
+                            name="unitrate"
+                            value={formData.unitrate || ""}
+                            onChange={(e) => {
+                              const value = e.target.value
+                              if (value === "" || /^[0-9]*\.?[0-9]*$/.test(value)) {
+                                handleInputChange(e)
+                              }
+                            }}
+                            style={{
+                              width: "100%",
+                              padding: "4px 6px",
+                              border: "1px solid #ced4da",
+                              borderRadius: "4px",
+                              fontSize: "12px",
+                              height: "28px",
+                              lineHeight: "1",
+                            }}
+                          />
+                        </div>
+                        <span style={{ whiteSpace: "nowrap", fontSize: "13px", color: "#333" }}>
+                          {formData.rateWeight}
+                        </span>
+                        <ErrorTooltip message={fieldErrors.unitrate} />
+                      </div>
+                    )}
                   </div>
                 </div>
               </div>
+
+              {formData.shipmentTypeId === "4" && (
+                <div
+                  className="controller-instructions-form-row"
+                  style={{ margin: "8px 0", padding: "0 10px" }}
+                >
+                  <div style={{ width: "100%" }}>
+                    <table
+                      style={{
+                        width: "100%",
+                        borderCollapse: "collapse",
+                        fontSize: "12px",
+                      }}
+                    >
+                      <thead>
+                        <tr>
+                          <th style={{ border: "1px solid #dee2e6", padding: "4px" }}>
+                            KSM DN Number
+                          </th>
+                          <th style={{ border: "1px solid #dee2e6", padding: "4px" }}>
+                            Ticket Number
+                          </th>
+                          <th style={{ border: "1px solid #dee2e6", padding: "4px" }}>
+                            Receipt Book Number
+                          </th>
+                          <th style={{ border: "1px solid #dee2e6", padding: "4px" }}>
+                            Weight ({formData.rateWeight})
+                          </th>
+                          <th style={{ border: "1px solid #dee2e6", padding: "4px" }}></th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {weightRows.map((row) => (
+                          <tr key={row.id}>
+                            <td style={{ border: "1px solid #dee2e6", padding: "2px 4px" }}>
+                              <input
+                                type="text"
+                                className="controller-instructions-form-input"
+                                value={row.ksmDmNo || ""}
+                                onChange={(e) => updateWeightRow(row.id, "ksmDmNo", e.target.value)}
+                                style={{ width: "100%", fontSize: "12px", height: "26px" }}
+                              />
+                            </td>
+                            <td style={{ border: "1px solid #dee2e6", padding: "2px 4px" }}>
+                              <input
+                                type="text"
+                                className="controller-instructions-form-input"
+                                value={row.ticketNo || ""}
+                                onChange={(e) => updateWeightRow(row.id, "ticketNo", e.target.value)}
+                                style={{ width: "100%", fontSize: "12px", height: "26px" }}
+                              />
+                            </td>
+                            <td style={{ border: "1px solid #dee2e6", padding: "2px 4px" }}>
+                              <input
+                                type="text"
+                                className="controller-instructions-form-input"
+                                value={row.receiptBookNo || ""}
+                                onChange={(e) => updateWeightRow(row.id, "receiptBookNo", e.target.value)}
+                                style={{ width: "100%", fontSize: "12px", height: "26px" }}
+                              />
+                            </td>
+                            <td style={{ border: "1px solid #dee2e6", padding: "2px 4px" }}>
+                              <input
+                                type="text"
+                                className="controller-instructions-form-input"
+                                value={row.weight || ""}
+                                onChange={(e) => {
+                                  const value = e.target.value
+                                  if (value === "" || /^[0-9]*\.?[0-9]*$/.test(value)) {
+                                    updateWeightRow(row.id, "weight", value)
+                                  }
+                                }}
+                                style={{ width: "100%", fontSize: "12px", height: "26px" }}
+                              />
+                            </td>
+                            <td
+                              style={{
+                                border: "1px solid #dee2e6",
+                                padding: "2px 4px",
+                                textAlign: "center",
+                                whiteSpace: "nowrap",
+                              }}
+                            >
+                              <button
+                                type="button"
+                                onClick={() => removeWeightRow(row.id)}
+                                style={{
+                                  padding: "2px 6px",
+                                  fontSize: "11px",
+                                  borderRadius: "4px",
+                                  border: "1px solid #dc3545",
+                                  backgroundColor: "#fff",
+                                  color: "#dc3545",
+                                  cursor: "pointer",
+                                }}
+                              >
+                                Remove
+                              </button>
+                            </td>
+                          </tr>
+                        ))}
+                        <tr>
+                          <td colSpan={5} style={{ padding: "4px", textAlign: "left" }}>
+                            <button
+                              type="button"
+                              onClick={addWeightRow}
+                              style={{
+                                padding: "4px 8px",
+                                fontSize: "12px",
+                                borderRadius: "4px",
+                                border: "1px solid #4a90e2",
+                                backgroundColor: "#4a90e2",
+                                color: "#fff",
+                                cursor: "pointer",
+                              }}
+                            >
+                              Add Row
+                            </button>
+                          </td>
+                        </tr>
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              )}
             </div>
 
             {/* RIGHT: Booking + dates + VAT/vessel/description */}
