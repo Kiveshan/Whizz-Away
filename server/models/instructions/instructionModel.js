@@ -80,8 +80,6 @@ export const getContainersByInstructionId = async (instructionId) => {
       "Add Surcharges",
       "Surcharge Amount",
       "Hazardous Amount",
-      "vgm",
-      "vgm amount",
       file_ref
     FROM public.container
     WHERE m1key = $1
@@ -148,6 +146,8 @@ export const getContainersByInstructionId = async (instructionId) => {
           container["Add Surcharges"] === "true" ||
           false,
         "Surcharge Amount": container["Surcharge Amount"] || 0,
+        // VGM flags/amounts are kept in-memory only; the container table
+        // no longer has dedicated VGM columns.
         "vgm":
           container["vgm"] === true ||
           container["vgm"] === "true" ||
@@ -536,12 +536,10 @@ export const saveInstruction = async ({ controllerData, containerData }) => {
         addSurcharges,
         surchargeAmount, // Backend-calculated surcharge amount
         hazardousAmount, // Backend-calculated hazardous amount
-        isVgm,
-        vgmAmount,
         container.file_ref || container.fileRef || "", // File reference field for export shipments
       ];
-      
-      console.log('Container values with VGM:', { isVgm, vgmAmount });
+
+      console.log("Container values with VGM:", { isVgm, vgmAmount });
       // Keep track for total calc later
       vgmAmountsArr.push(vgmAmount);
 
@@ -555,13 +553,15 @@ export const saveInstruction = async ({ controllerData, containerData }) => {
         "vgm amount": vgmAmount,
       });
 
-      // Insert the container row now that values are prepared
+      // Insert the container row now that values are prepared. Note: the
+      // container table does not have dedicated VGM columns; VGM is only
+      // used in the in-memory cost calculation.
       const insertContainerQuery = `
         INSERT INTO public.container (
           containernum, weight, m1key, container_type, cargo_description,
           "Hazardous", "Add Surcharges", "Surcharge Amount", "Hazardous Amount",
-          "vgm", "vgm amount", file_ref
-        ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)
+          file_ref
+        ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)
       `;
       await client.query(insertContainerQuery, containerValues);
 
@@ -576,9 +576,7 @@ export const saveInstruction = async ({ controllerData, containerData }) => {
         addSurcharges: containerValues[6],
         surchargeAmount: containerValues[7],
         hazardousAmount: containerValues[8],
-        vgm: containerValues[9],
-        vgmAmount: containerValues[10],
-        file_ref: containerValues[11]
+        file_ref: containerValues[9],
       });
     }
 
@@ -912,9 +910,7 @@ export const getInstructionById = async (instructionId) => {
         "Hazardous",
         "Add Surcharges",
         "Surcharge Amount",
-        "Hazardous Amount",
-        vgm,
-        "vgm amount"
+        "Hazardous Amount"
       FROM 
         public.container
       WHERE 
@@ -936,9 +932,7 @@ export const getInstructionById = async (instructionId) => {
               'Hazardous', COALESCE(c."Hazardous", false),
               'Add Surcharges', COALESCE(c."Add Surcharges", false),
               'Surcharge Amount', COALESCE(c."Surcharge Amount", 0),
-              'Hazardous Amount', COALESCE(c."Hazardous Amount", 0),
-              'vgm', COALESCE(c.vgm, false),
-              'vgm amount', COALESCE(c."vgm amount", 0)
+              'Hazardous Amount', COALESCE(c."Hazardous Amount", 0)
             )
             ORDER BY c.containerkey
           )
@@ -1118,9 +1112,9 @@ export const updateContainersByInstructionId = async (
         INSERT INTO public.container (
           containernum, weight, m1key, container_type, cargo_description, 
           "Hazardous", "Add Surcharges", "Surcharge Amount", 
-          "vgm", "vgm amount", file_ref
+          file_ref
         )
-        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
         RETURNING containerkey
       `;
       // Get file_ref value from container with proper fallback
@@ -1137,12 +1131,10 @@ export const updateContainersByInstructionId = async (
         hazardous,
         addSurcharges,
         surchargeAmount,
-        vgm,
-        vgmAmount,
         fileRef,
       ];
-      
-      console.log('Container values with VGM:', { vgm, vgmAmount });
+
+      console.log("Container values with VGM:", { vgm, vgmAmount });
 
       const result = await client.query(insertQuery, values);
       console.log(`Inserted container with ID: ${result.rows[0].containerkey}`);
@@ -1296,7 +1288,6 @@ export const getClientRates = async (clientId, start, destination) => {
       "12m_rate" as "twelveMeterRate",
       surcharges,
       hazardous,
-      vgm,
       starting_point as "startingPoint",
       destination
     FROM public.m5_client_rate
@@ -1953,8 +1944,7 @@ export const updateFCInstructionAndContainers = async (
     // 5. Handle containers
     const getCurrentContainersQuery = `
       SELECT containerkey, containernum, weight, container_type, cargo_description,
-             "Add Surcharges", "Hazardous", "Surcharge Amount",
-             "vgm", "vgm amount"
+             "Add Surcharges", "Hazardous", "Surcharge Amount"
       FROM public.container
       WHERE m1key = $1
       ORDER BY containerkey
@@ -2113,10 +2103,8 @@ export const updateFCInstructionAndContainers = async (
           "Add Surcharges" = $6,
           "Surcharge Amount" = $7,
           "Hazardous Amount" = $8,
-          "vgm" = $9,
-          "vgm amount" = $10,
-          file_ref = $11
-        WHERE containerkey = $12
+          file_ref = $9
+        WHERE containerkey = $10
         RETURNING *
       `;
 
@@ -2179,13 +2167,11 @@ export const updateFCInstructionAndContainers = async (
         container["Add Surcharges"] || false,
         container["Surcharge Amount"] || 0,
         hazardousAmount,
-        isVgm,
-        vgmAmount,
         container.file_ref || "",
         container.containerkey,
       ];
-      
-      console.log('Updating container with VGM values:', { isVgm, vgmAmount });
+
+      console.log("Updating container with VGM values:", { isVgm, vgmAmount });
 
       const updateResult = await client.query(updateContainerQuery, updateValues);
       console.log(
@@ -2292,9 +2278,9 @@ export const updateFCInstructionAndContainers = async (
         INSERT INTO public.container (
           containernum, weight, m1key, container_type, cargo_description, 
           "Add Surcharges", "Hazardous", "Surcharge Amount", 
-          "Hazardous Amount", "vgm", "vgm amount", file_ref
+          "Hazardous Amount", file_ref
         )
-        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
         RETURNING containerkey
       `;
       const insertResult = await client.query(insertQuery, [
@@ -2307,8 +2293,6 @@ export const updateFCInstructionAndContainers = async (
         container["Hazardous"] || container.hazardous || false,
         container["Surcharge Amount"] || container.surchargeAmount || 0,
         hazardousAmount,
-        isVgm,
-        vgmAmount,
         container.file_ref || "", // Add file_ref parameter
       ]);
       
@@ -2619,10 +2603,14 @@ export const saveInstructionAndContainers = async (
         console.log(`WARN: VGM requested but missing parameters. clientId=${clientId}, pickup=${pickup}, dropoff=${dropoff}`);
       }
 
-      // <CHANGE> Updated container query to include VGM, Hazardous Amount, and File Reference
+      // <CHANGE> Updated container query: VGM values are used only in cost
+      // calculations and are not stored on the container table.
       const containerQuery = `
-        INSERT INTO public.container (containernum, weight, m1key, container_type, cargo_description, "Add Surcharges", "Hazardous", "Surcharge Amount", "Hazardous Amount", "vgm", "vgm amount", file_ref)
-        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
+        INSERT INTO public.container (
+          containernum, weight, m1key, container_type, cargo_description,
+          "Add Surcharges", "Hazardous", "Surcharge Amount", "Hazardous Amount", file_ref
+        )
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
       `;
       const containerValues = [
         container.containerNum || container.containernum || "",
@@ -2634,11 +2622,12 @@ export const saveInstructionAndContainers = async (
         isHazardous,
         surchargeAmount, // Backend-calculated surcharge amount
         hazardousAmount, // Backend-calculated hazardous amount
-        isVgm, // VGM flag
-        vgmAmount, // Backend-calculated VGM amount
         // Extract file_ref value, ensuring proper case handling for all possible variations
-        (container.file_ref !== undefined ? container.file_ref : 
-         container.fileRef !== undefined ? container.fileRef : ""), // New file reference field for export shipments
+        (container.file_ref !== undefined
+          ? container.file_ref
+          : container.fileRef !== undefined
+          ? container.fileRef
+          : ""), // New file reference field for export shipments
       ];
       await client.query(containerQuery, containerValues);
     }

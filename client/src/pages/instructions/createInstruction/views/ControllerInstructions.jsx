@@ -336,7 +336,7 @@ const ControllerInstructions = () => {
             delete newErrors[`container-${id}`]
             return newErrors
           })
-        } else {
+        } else if (!isAddOn) {
           // For other shipment types, only check for uniqueness
           // No format validation, just ensure it doesn't exceed 20 characters
           if (value.length > 20) return
@@ -523,6 +523,8 @@ const ControllerInstructions = () => {
     return formData
   })
 
+  const isAddOn = formData.shipmentTypeId === "5"
+
   // Update unit type and cross-haul states when form data changes
   useEffect(() => {
     const weightBasedUnits = ["kg", "mÂ³", "ton"]
@@ -599,8 +601,8 @@ const ControllerInstructions = () => {
 
   // Update rates when pickup or dropoff changes (only for container-based calculations)
   useEffect(() => {
-    // Skip rate fetching for weight-based calculations
-    if (isWeightBased) {
+    // Skip rate fetching for weight-based calculations and for add-on shipment type
+    if (isWeightBased || isAddOn) {
       // Also reset rate lock status when switching to weight-based
       setRateLockStatus({ sixMeter: false, twelveMeter: false })
       return
@@ -696,7 +698,7 @@ const ControllerInstructions = () => {
     }
 
     fetchAndUpdateRates()
-  }, [formData.clientId, formData.pickup, formData.dropoff, fetchRates, isWeightBased])
+  }, [formData.clientId, formData.pickup, formData.dropoff, fetchRates, isWeightBased, isAddOn])
 
   // Update rate fields enabled state when container counts change
   useEffect(() => {
@@ -956,17 +958,19 @@ const ControllerInstructions = () => {
     // Required fields
     if (!formData.clientId) errors.clientId = "Client is required"
     if (!formData.shipmentTypeId) errors.shipmentTypeId = "Shipment type is required"
-    if (!formData.task) errors.task = "KSM File Reference is required"
     if (!formData.pickup) errors.pickup = "Pickup location is required"
     if (!formData.dropoff) errors.dropoff = "Dropoff location is required"
 
-    if (!formData.lastFreeDate) errors.lastFreeDate = "Last Free Date is required"
-    if (!formData.bookingRef) errors.bookingRef = "Booking reference is required"
-    if (!formData.fileRef) errors.fileRef = "Client File Reference is required"
-    if (!formData.description) errors.description = "Description is required"
+    if (!isAddOn) {
+      if (!formData.task) errors.task = "KSM File Reference is required"
+      if (!formData.lastFreeDate) errors.lastFreeDate = "Last Free Date is required"
+      if (!formData.bookingRef) errors.bookingRef = "Booking reference is required"
+      if (!formData.fileRef) errors.fileRef = "Client File Reference is required"
+      if (!formData.description) errors.description = "Description is required"
+    }
 
     // Cross-haul specific validations (vessel name and stack date not required for cross-haul types)
-    if (!isCrossHaul) {
+    if (!isCrossHaul && !isAddOn) {
       if (!formData.vesselName) errors.vesselName = "Vessel name is required"
       if (!formData.stackDate) errors.stackDate = "Stack date is required"
     }
@@ -979,8 +983,8 @@ const ControllerInstructions = () => {
       if (!formData.unitrate || formData.unitrate === "") {
         errors.unitrate = "Unit rate is required for weight-based calculations"
       }
-    } else {
-      // Container-based validations
+    } else if (!isAddOn) {
+      // Container-based validations (skip for add-on shipments)
       const totalContainers =
         formData.num_six_meters +
         formData.num_twelve_meters +
@@ -999,11 +1003,11 @@ const ControllerInstructions = () => {
     }
 
     return errors
-  }, [formData, isCrossHaul, isWeightBased])
+  }, [formData, isCrossHaul, isWeightBased, isAddOn])
 
   // Container validation function
   const validateContainers = useCallback(() => {
-    if (isWeightBased || !showContainerDetails || containers.length === 0) {
+    if (isAddOn || isWeightBased || !showContainerDetails || containers.length === 0) {
       return true // No validation needed for weight-based or when no containers
     }
 
@@ -1051,12 +1055,12 @@ const ControllerInstructions = () => {
 
     setContainerFieldErrors(errors)
     return isValid
-  }, [isWeightBased, showContainerDetails, containers, isImport])
+  }, [isAddOn, isWeightBased, showContainerDetails, containers, isImport, isExport, formData.shipmentTypeId])
 
   // Check for rate/count mismatch and generate confirmation message
   const checkRateCountMismatch = useCallback(() => {
-    // Only check for container-based calculations
-    if (isWeightBased) {
+    // Skip mismatch check for weight-based and add-on shipments
+    if (isWeightBased || isAddOn) {
       return { needsConfirmation: false, message: "" }
     }
 
@@ -1124,7 +1128,7 @@ const ControllerInstructions = () => {
     }
 
     return { needsConfirmation: false, message: "" }
-  }, [formData, isWeightBased, isCrossHaul])
+  }, [formData, isWeightBased, isCrossHaul, isAddOn])
 
   const handleSubmit = useCallback(
     async (e) => {
@@ -1180,7 +1184,7 @@ const ControllerInstructions = () => {
         components: {},
       }
 
-      if (isWeightBased) {
+      if (isWeightBased && !isAddOn) {
         // Weight-based calculation
         const weight = Number.parseFloat(formData.weight || 0)
         const unitRate = Number.parseFloat(formData.unitrate || 0)
@@ -1715,7 +1719,7 @@ const ControllerInstructions = () => {
           </div>
         </div>
         <div className="controller-instructions-form-section">
-          <div className="controller-instructions-form-row" style={{ display: "none" }}>
+          <div className="controller-instructions-form-row">
             <div className="controller-instructions-form-field">
               <label>Shipment Type</label>
               <div className="controller-instructions-select-wrapper" ref={fieldRefs.current.shipmentTypeId}>
@@ -1742,7 +1746,10 @@ const ControllerInstructions = () => {
         </div>
         <div className="controller-instructions-form-section">
           <div className="controller-instructions-form-row controller-instructions-trailer-container">
-            <div className="controller-instructions-container-section">
+            <div
+              className="controller-instructions-container-section"
+              style={{ display: isAddOn ? "none" : undefined }}
+            >
               <div className="controller-instructions-container-group">
                 <div className="controller-instructions-container-label">
                   <span className="controller-instructions-trailer-size-label">Trailer Size</span>
@@ -1780,7 +1787,6 @@ const ControllerInstructions = () => {
                           }
                           onChange={(e) => {
                             const value = e.target.value
-                            // Allow numbers, decimal point, and empty string
                             if (value === "" || /^\d*\.?\d*$/.test(value)) {
                               setFormData((prev) => ({
                                 ...prev,
@@ -1790,7 +1796,6 @@ const ControllerInstructions = () => {
                           }}
                           onFocus={(e) => {
                             e.target.select()
-                            // Show raw value when focused for editing
                             if (formData.sixMeterRate) {
                               setFormData((prev) => ({
                                 ...prev,
@@ -1799,7 +1804,6 @@ const ControllerInstructions = () => {
                             }
                           }}
                           onBlur={() => {
-                            // Format to 2 decimal places when focus is lost
                             if (formData.sixMeterRate !== "") {
                               setFormData((prev) => ({
                                 ...prev,
@@ -2013,22 +2017,39 @@ const ControllerInstructions = () => {
                         <select
                           className="controller-instructions-dropdown"
                           name="rateWeight"
-                          value={formData.rateWeight}
+                          value={String(formData.rateWeight || "Container")}
                           onChange={handleInputChange}
-                          disabled={formData.shipmentTypeId === "1" || formData.shipmentTypeId === "2" || formData.shipmentTypeId === "3"}
+                          disabled={
+                            formData.shipmentTypeId === "1" ||
+                            formData.shipmentTypeId === "2" ||
+                            formData.shipmentTypeId === "3"
+                          }
                           style={{
                             width: "100%",
                             padding: "6px 8px",
                             border: "1px solid #ced4da",
                             borderRadius: "4px",
                             fontSize: "13px",
-                            backgroundColor: (formData.shipmentTypeId === "1" || formData.shipmentTypeId === "2" || formData.shipmentTypeId === "3" || formData.shipmentTypeId === "4") ? "#e9ecef" : "#fff",
+                            backgroundColor:
+                              formData.shipmentTypeId === "1" ||
+                              formData.shipmentTypeId === "2" ||
+                              formData.shipmentTypeId === "3" ||
+                              formData.shipmentTypeId === "4"
+                                ? "#e9ecef"
+                                : "#fff",
                             height: "32px",
                             lineHeight: "1",
-                            cursor: (formData.shipmentTypeId === "1" || formData.shipmentTypeId === "2" || formData.shipmentTypeId === "3") ? "not-allowed" : "pointer",
+                            cursor:
+                              formData.shipmentTypeId === "1" ||
+                              formData.shipmentTypeId === "2" ||
+                              formData.shipmentTypeId === "3"
+                                ? "not-allowed"
+                                : "pointer",
                           }}
                         >
-                          {formData.shipmentTypeId === "1" || formData.shipmentTypeId === "2" || formData.shipmentTypeId === "3" ? (
+                          {formData.shipmentTypeId === "1" ||
+                          formData.shipmentTypeId === "2" ||
+                          formData.shipmentTypeId === "3" ? (
                             <option value="Container">Container</option>
                           ) : formData.shipmentTypeId === "4" ? (
                             <>
@@ -2111,6 +2132,8 @@ const ControllerInstructions = () => {
                   </div>
                 </div>
               </div>
+            </div>
+            {!isAddOn ? (
               <div
                 className="controller-instructions-booking-vertical-group"
                 style={{
@@ -2123,31 +2146,6 @@ const ControllerInstructions = () => {
                 }}
               >
                 <div style={{ display: "flex", gap: "12px", flexWrap: "wrap", width: "100%", marginBottom: "12px" }}>
-                  {/* Shipment Type */}
-                  <div className="controller-instructions-form-field" style={{ flex: "1 1 160px" }}>
-                    <label>Shipment Type</label>
-                    <div className="controller-instructions-select-wrapper" ref={fieldRefs.current.shipmentTypeId}>
-                      <select
-                        className={`controller-instructions-dropdown ${fieldErrors.shipmentTypeId ? "controller-instructions-error-field" : ""}`}
-                        name="shipmentTypeId"
-                        value={formData.shipmentTypeId}
-                        onChange={handleShipmentTypeChange}
-                        disabled={isLoading.shipmentTypes || shipmentTypes.length === 0}
-                        style={{ width: "100%" }}
-                      >
-                        <option value="" disabled>
-                          Select Shipment
-                        </option>
-                        {shipmentTypes.map((type) => (
-                          <option key={type.shipkey} value={type.shipkey}>
-                            {type.shipmenttype}
-                          </option>
-                        ))}
-                      </select>
-                      <ErrorTooltip message={fieldErrors.shipmentTypeId} />
-                    </div>
-                  </div>
-
                   {/* Booking Ref */}
                   <div className="controller-instructions-form-field" style={{ flex: "1 1 180px" }}>
                     <label>Booking Ref</label>
@@ -2283,8 +2281,8 @@ const ControllerInstructions = () => {
 
                 {/* Import/Export layout: Vessel Name and Description on left; File Ref, Name of Task, dates on right */}
                 {!isCrossHaul && (
-                  // Import/Export layout: Vessel Name and Description on left; File Ref, Name of Task, dates on right
                   <>
+                    {/* Import/Export layout: Vessel Name and Description on left; File Ref, Name of Task, dates on right */}
                     <div
                       style={{
                         display: "flex",
@@ -2402,11 +2400,11 @@ const ControllerInstructions = () => {
                   </>
                 )}
               </div>
-            </div>
+            ) : null}
           </div>
         </div>
         {/* Container Details Section - Only show for container-based calculations */}
-        {!isWeightBased && showContainerDetails && (
+        {!isAddOn && !isWeightBased && showContainerDetails ? (
           <div className="container-details-section" style={{ margin: "20px 0", width: "100%" }}>
             <div
               className="controller-instructions-form-section"
@@ -2666,7 +2664,7 @@ const ControllerInstructions = () => {
               </div>
             </div>
           </div>
-        )}
+        ) : null}
         <div className="controller-instructions-button-container" style={{ margin: "20px 0" }}>
           <button
             type="submit"

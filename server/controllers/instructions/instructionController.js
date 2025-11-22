@@ -144,9 +144,45 @@ export const saveInstructionHandler = async (req, res) => {
       console.log("CONTROLLER: Using frontend total_cost:", finalTotalCost);
     }
     
-    const updatedControllerData = {
+    let updatedControllerData = {
       ...controllerData,
       total_cost: finalTotalCost,
+    }
+
+    // Special handling for shipment type 5 (add-on):
+    // only client, shipment_type, pickup and dropoff should be meaningful, everything else 0/null
+    // and no containers should be saved
+    if (String(updatedControllerData.shipmentTypeId || updatedControllerData.shipment_type) === "5") {
+      updatedControllerData = {
+        ...updatedControllerData,
+        // map essentials
+        client: updatedControllerData.client || updatedControllerData.clientId,
+        shipment_type: "5",
+        pickup: updatedControllerData.pickup || "",
+        dropoff: updatedControllerData.dropoff || "",
+        // zero / null the rest
+        ksmFileRef: null,
+        task: null,
+        stackDate: null,
+        lastFreeDate: null,
+        clientFileRef: null,
+        rateWeight: null,
+        description: null,
+        booking_ref: null,
+        vessel_name: null,
+        num_six_meters: 0,
+        num_twelve_meters: 0,
+        num_abnormal: 0,
+        num_breakbulk: 0,
+        weight: null,
+        rateper_6: null,
+        rateper_12: null,
+        rateper_abnormal: null,
+        rateper_breakbulk: null,
+        unitrate: null,
+        vat: 0,
+        total_cost: 0,
+      }
     }
     
     console.log("CONTROLLER: Final total_cost being sent to model:", updatedControllerData.total_cost);
@@ -191,7 +227,12 @@ export const saveInstructionHandler = async (req, res) => {
         })
       })
     }
-    const result = await saveInstruction({ controllerData: updatedControllerData, containerData })
+    const containersToSave =
+      String(updatedControllerData.shipmentTypeId || updatedControllerData.shipment_type) === "5"
+        ? []
+        : containerData
+
+    const result = await saveInstruction({ controllerData: updatedControllerData, containerData: containersToSave })
     res.json({ success: true, m1key: result.m1key })
   } catch (error) {
     console.error("Error in save-instruction endpoint:", error)
@@ -695,7 +736,12 @@ export const saveInstructionController = async (req, res) => {
       total_cost: finalTotalCost,
     }
 
-    const result = await saveInstructionAndContainers(updatedControllerData, containerData)
+    const containersToSave =
+      String(updatedControllerData.shipmentTypeId || updatedControllerData.shipment_type) === "5"
+        ? []
+        : containerData
+
+    const result = await saveInstructionAndContainers(updatedControllerData, containersToSave)
     res
       .status(201)
       .json({ success: true, message: "Instruction saved successfully!", instructionId: result.instructionId })
@@ -725,9 +771,41 @@ export const updateFCInstructionAndContainersHandler = async (req, res) => {
 
     // Calculate total cost based on rate weight type
     const calculatedTotalCost = calculateTotalCost(instructionData, containers)
-    const updatedInstructionData = {
+    let updatedInstructionData = {
       ...instructionData,
       total_cost: calculatedTotalCost,
+    }
+
+    // For shipment type 5 (add-on) on FC update, zero/null non-essential fields and drop containers
+    if (String(updatedInstructionData.shipmentTypeId || updatedInstructionData.shipment_type) === "5") {
+      updatedInstructionData = {
+        ...updatedInstructionData,
+        client: updatedInstructionData.client || updatedInstructionData.clientId,
+        shipment_type: "5",
+        pickup: updatedInstructionData.pickup || "",
+        dropoff: updatedInstructionData.dropoff || "",
+        task: null,
+        ksmFileRef: null,
+        stackDate: null,
+        lastFreeDate: null,
+        clientFileRef: null,
+        rateweight: null,
+        description: null,
+        booking_ref: null,
+        vessel_name: null,
+        num_six_meters: 0,
+        num_twelve_meters: 0,
+        num_abnormal: 0,
+        num_breakbulk: 0,
+        weight: null,
+        rateper_6: null,
+        rateper_12: null,
+        rateper_abnormal: null,
+        rateper_breakbulk: null,
+        unitrate: null,
+        vat: 0,
+        total_cost: 0,
+      }
     }
 
     console.log(
@@ -735,7 +813,12 @@ export const updateFCInstructionAndContainersHandler = async (req, res) => {
     )
     console.log(`[${new Date().toISOString()}] [CONTROLLER] Calculated total cost: ${calculatedTotalCost}`)
 
-    const result = await updateFCInstructionAndContainers(id, updatedInstructionData, containers)
+    const containersToSave =
+      String(updatedInstructionData.shipmentTypeId || updatedInstructionData.shipment_type) === "5"
+        ? []
+        : containers
+
+    const result = await updateFCInstructionAndContainers(id, updatedInstructionData, containersToSave)
     res.status(200).json({ success: true, message: "Instruction and containers updated successfully", data: result })
   } catch (error) {
     console.error(`[${new Date().toISOString()}] [CONTROLLER] Error in updateFCInstructionAndContainersHandler:`, error)

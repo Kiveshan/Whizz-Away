@@ -159,6 +159,20 @@ const Viewcontrollerinstructions = () => {
   // Track if initial data has been loaded
   const [initialDataLoaded, setInitialDataLoaded] = useState(false)
 
+  const isAddOn = (() => {
+    const id = (formData.shipmentTypeId || "").toString()
+    const name = (formData.shipmentTypeName || "").toLowerCase()
+    const selectedType = shipmentTypes.find((type) => (type.shipkey || type.id)?.toString() === id)
+    const typeName = (selectedType?.shipmenttype || "").toLowerCase()
+    return (
+      id === "5" ||
+      name === "add-on" ||
+      name === "add on" ||
+      typeName === "add-on" ||
+      typeName === "add on"
+    )
+  })()
+
   // Check if shipment type is Cross-haul (type 3) or Cross-haul(break bulk) (type 4)
   const isCrossHaulShipment = () => {
     console.log("Checking if cross-haul shipment:", {
@@ -765,7 +779,10 @@ const Viewcontrollerinstructions = () => {
             {/* Container and Booking Section */}
             <div className="controller-instructions-form-section">
               <div className="controller-instructions-form-row controller-instructions-trailer-container">
-                <div className="controller-instructions-container-section">
+                <div
+                  className="controller-instructions-container-section"
+                  style={{ display: isAddOn ? "none" : undefined }}
+                >
                   <div className="controller-instructions-container-group">
                     <div className="controller-instructions-container-label">
                       <span className="controller-instructions-trailer-size-label">Trailer Size</span>
@@ -911,7 +928,10 @@ const Viewcontrollerinstructions = () => {
                     </div>
 
                     {/* Compact Rates per dropdown and input fields in one row */}
-                    <div className="controller-instructions-form-field">
+                    <div
+                      className="controller-instructions-form-field"
+                      style={{ display: isAddOn ? "none" : undefined }}
+                    >
                       <label>Unit per</label>
                       <div style={{ display: "flex", alignItems: "flex-start", gap: "15px", width: "100%" }}>
                         {/* Unit per dropdown */}
@@ -991,7 +1011,10 @@ const Viewcontrollerinstructions = () => {
                   </div>
 
                   {/* Date Time Group */}
-                  <div className="controller-instructions-date-time-group">
+                  <div
+                    className="controller-instructions-date-time-group"
+                    style={{ display: isAddOn ? "none" : undefined }}
+                  >
                     <div
                       className="controller-instructions-shipment-task-row"
                       style={{ order: -1, marginBottom: "8px" }}
@@ -1083,7 +1106,10 @@ const Viewcontrollerinstructions = () => {
                       </div>
                     </div>
                   </div>
-                  <div className="controller-instructions-date-time-group">
+                  <div
+                    className="controller-instructions-date-time-group"
+                    style={{ display: isAddOn ? "none" : undefined }}
+                  >
 
                     {!isCrossHaulShipment() && (
                       <div className="controller-instructions-form-field">
@@ -1119,8 +1145,77 @@ const Viewcontrollerinstructions = () => {
                 </div>
               </div>
             </div>
+
+            {isAddOn && (
+              <div className="controller-instructions-form-section">
+                <div
+                  className="controller-instructions-form-row"
+                  style={{ display: "flex", gap: "12px", flexWrap: "wrap" }}
+                >
+                  <div
+                    className="controller-instructions-form-field"
+                    style={{ flex: "1 1 180px", maxWidth: "220px" }}
+                  >
+                    <label>Shipment Type</label>
+                    <div className="controller-instructions-select-wrapper" ref={fieldRefs.shipmentTypeId}>
+                      <select
+                        className="controller-instructions-dropdown"
+                        name="shipmentTypeId"
+                        value={formData.shipmentTypeId}
+                        disabled={true}
+                        style={nonEditableStyle}
+                      >
+                        <option value="" disabled>
+                          Select Shipment
+                        </option>
+                        {shipmentTypes.map((type) => (
+                          <option key={type.shipkey} value={type.shipkey}>
+                            {type.shipmenttype}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                  </div>
+                  <div
+                    className="controller-instructions-form-field"
+                    style={{ flex: "1 1 220px", maxWidth: "260px" }}
+                  >
+                    <label>Pickup Location</label>
+                    <div className="controller-instructions-input-wrapper" ref={fieldRefs.pickup}>
+                      <input
+                        type="text"
+                        className="controller-instructions-form-input"
+                        placeholder="Pickup location"
+                        name="pickup"
+                        value={formData.pickup || ""}
+                        readOnly
+                        style={nonEditableStyle}
+                      />
+                    </div>
+                  </div>
+                  <div
+                    className="controller-instructions-form-field"
+                    style={{ flex: "1 1 220px", maxWidth: "260px" }}
+                  >
+                    <label>Dropoff Location</label>
+                    <div className="controller-instructions-input-wrapper" ref={fieldRefs.dropoff}>
+                      <input
+                        type="text"
+                        className="controller-instructions-form-input"
+                        placeholder="Dropoff location"
+                        name="dropoff"
+                        value={formData.dropoff || ""}
+                        readOnly
+                        style={nonEditableStyle}
+                      />
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+
             {/* Container Details Section */}
-            {containers.length > 0 && (
+            {containers.length > 0 && !isAddOn && (
               <div className="controller-instructions-form-section">
                 <div className="controller-instructions-container-details-section">
                   <h3>Container Details</h3>

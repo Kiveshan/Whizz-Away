@@ -250,6 +250,22 @@ const FCcontrollerinstructions = () => {
     message: "",
   });
 
+  const isAddOn = (() => {
+    const id = (formData.shipmentTypeId || "").toString();
+    const name = (formData.shipmentTypeName || "").toLowerCase();
+    const selectedType = shipmentTypes.find(
+      (type) => (type.shipkey || type.id)?.toString() === id
+    );
+    const typeName = (selectedType?.shipmenttype || "").toLowerCase();
+    return (
+      id === "5" ||
+      name === "add-on" ||
+      name === "add on" ||
+      typeName === "add-on" ||
+      typeName === "add on"
+    );
+  })();
+
   // State for warning modal
   const [warningModal, setWarningModal] = useState({
     isOpen: false,
@@ -781,6 +797,9 @@ const FCcontrollerinstructions = () => {
 
   // Validate container uniqueness
   const validateContainerUniqueness = () => {
+    if (isAddOn) {
+      return true;
+    }
     const containerNumbers = containers
       .map((c) => c.containerNum)
       .filter((num) => num.trim() !== "");
@@ -810,14 +829,19 @@ const FCcontrollerinstructions = () => {
       { name: "pickup", label: "Pickup Location" },
       { name: "dropoff", label: "Dropoff Location" },
       // pickupDate field removed
-      { name: "ksmFileRef", label: "KSM File Reference" },
-      { name: "clientFileRef", label: "Client File Reference" },
-      { name: "bookingRef", label: "Booking Reference" },
-      { name: "description", label: "Description" },
     ];
 
+    if (!isAddOn) {
+      requiredFields.push(
+        { name: "ksmFileRef", label: "KSM File Reference" },
+        { name: "clientFileRef", label: "Client File Reference" },
+        { name: "bookingRef", label: "Booking Reference" },
+        { name: "description", label: "Description" }
+      );
+    }
+
     // Add vessel name and stack date specifically for import and export shipment types
-    if (formData.shipmentTypeId === "1" || formData.shipmentTypeId === "2") {
+    if (!isAddOn && (formData.shipmentTypeId === "1" || formData.shipmentTypeId === "2")) {
       requiredFields.push({ name: "vesselName", label: "Vessel Name" });
       requiredFields.push({
         name: "stackDate",
@@ -845,33 +869,35 @@ const FCcontrollerinstructions = () => {
       }
     });
 
-    // Container validation
+    // Container validation (skip entirely for add-on shipments)
     const containerErrors = {};
-    containers.forEach((container) => {
-      // Only validate container number if not export shipment type
-      if (String(formData.shipmentTypeId) !== "2" && !container.containerNum) {
-        containerErrors[`container-${container.id}`] =
-          "Container number is required";
+    if (!isAddOn) {
+      containers.forEach((container) => {
+        // Only validate container number if not export shipment type
+        if (String(formData.shipmentTypeId) !== "2" && !container.containerNum) {
+          containerErrors[`container-${container.id}`] =
+            "Container number is required";
+          isValid = false;
+        }
+        // No format validation - allowing any alphanumeric characters up to 20 characters
+
+        // Weight validation - only validate format if weight is provided
+        if (
+          isImport &&
+          container.weight &&
+          container.weight !== "" &&
+          !/^[0-9]*\.?[0-9]*$/.test(container.weight)
+        ) {
+          containerErrors[`weight-${container.id}`] =
+            "Weight must be a valid number";
+          isValid = false;
+        }
+      });
+
+      // Check container uniqueness
+      if (!validateContainerUniqueness()) {
         isValid = false;
       }
-      // No format validation - allowing any alphanumeric characters up to 20 characters
-
-      // Weight validation - only validate format if weight is provided
-      if (
-        isImport &&
-        container.weight &&
-        container.weight !== "" &&
-        !/^[0-9]*\.?[0-9]*$/.test(container.weight)
-      ) {
-        containerErrors[`weight-${container.id}`] =
-          "Weight must be a valid number";
-        isValid = false;
-      }
-    });
-
-    // Check container uniqueness
-    if (!validateContainerUniqueness()) {
-      isValid = false;
     }
 
     setFieldErrors(newErrors);
@@ -894,6 +920,9 @@ const FCcontrollerinstructions = () => {
 
   // Check for rate/counter mismatch and show confirmation if needed
   const checkRateCounterMismatch = () => {
+    if (isAddOn) {
+      return true;
+    }
     const mismatches = [];
     const containerTypesWithCounts = [];
 
@@ -3741,66 +3770,116 @@ const FCcontrollerinstructions = () => {
             </div>
           </div>
           <div className="controller-instructions-form-section">
-            <div
-              className="controller-instructions-form-row"
-              style={{ display: "none" }}
-            >
-              <div className="controller-instructions-form-field">
-                <label>Shipment Type</label>
+            {isAddOn && (
+              <div
+                className="controller-instructions-form-row"
+                style={{ display: "flex", gap: "12px", flexWrap: "wrap" }}
+              >
                 <div
-                  className="controller-instructions-select-wrapper"
-                  ref={fieldRefs.shipmentTypeId}
+                  className="controller-instructions-form-field"
+                  style={{ flex: "1 1 180px", maxWidth: "220px" }}
                 >
-                  <select
-                    className={`dropdown ${
-                      fieldErrors.shipmentTypeId
-                        ? "controller-instructions-error-field"
-                        : ""
-                    }`}
-                    name="shipmentTypeId"
-                    value={formData.shipmentTypeId}
-                    onChange={handleShipmentTypeChange}
-                    disabled={isReadOnly}
-                    style={isReadOnly ? readOnlyStyle : {}}
+                  <label>Shipment Type</label>
+                  <div
+                    className="controller-instructions-select-wrapper"
+                    ref={fieldRefs.shipmentTypeId}
                   >
-                    <option value="" disabled>
-                      Select Shipment
-                    </option>
-                    {shipmentTypes.map((type) => (
-                      <option key={type.shipkey} value={type.shipkey}>
-                        {type.shipmenttype}
+                    <select
+                      className={`dropdown ${
+                        fieldErrors.shipmentTypeId
+                          ? "controller-instructions-error-field"
+                          : ""
+                      }`}
+                      name="shipmentTypeId"
+                      value={formData.shipmentTypeId}
+                      onChange={handleShipmentTypeChange}
+                      disabled={isReadOnly}
+                      style={isReadOnly ? readOnlyStyle : {}}
+                    >
+                      <option value="" disabled>
+                        Select Shipment
                       </option>
-                    ))}
-                  </select>
-                  <InstructionErrorTooltip
-                    message={fieldErrors.shipmentTypeId}
-                  />
+                      {shipmentTypes.map((type) => (
+                        <option key={type.shipkey} value={type.shipkey}>
+                          {type.shipmenttype}
+                        </option>
+                      ))}
+                    </select>
+                    <InstructionErrorTooltip
+                      message={fieldErrors.shipmentTypeId}
+                    />
+                  </div>
                 </div>
-              </div>
-              <div className="controller-instructions-form-field">
-                <label>KSM File Reference</label>
+
                 <div
-                  className="controller-instructions-input-wrapper"
-                  ref={fieldRefs.ksmFileRef}
+                  className="controller-instructions-form-field"
+                  style={{ flex: "1 1 220px", maxWidth: "260px" }}
                 >
-                  <input
-                    type="text"
-                    className={`controller-instructions-form-input ${
-                      fieldErrors.ksmFileRef
-                        ? "controller-instructions-error-field"
-                        : ""
-                    }`}
-                    placeholder="Input KSM File Reference"
-                    name="task"
-                    value={formData.task}
-                    onChange={handleInputChange}
-                    disabled={isReadOnly}
-                    style={isReadOnly ? readOnlyStyle : {}}
-                  />
-                  <InstructionErrorTooltip message={fieldErrors.ksmFileRef} />
+                  <label>Pickup Location</label>
+                  <div
+                    className="controller-instructions-select-wrapper"
+                    ref={fieldRefs.pickup}
+                  >
+                    <select
+                      className={`controller-instructions-dropdown ${
+                        fieldErrors.pickup
+                          ? "controller-instructions-error-field"
+                          : ""
+                      }`}
+                      name="pickup"
+                      value={formData.pickup || ""}
+                      onChange={handlePickupChange}
+                      disabled={isReadOnly}
+                      style={isReadOnly ? readOnlyStyle : {}}
+                    >
+                      <option value="" disabled>
+                        Select Pickup
+                      </option>
+                      {startingPoints.map((point) => (
+                        <option key={point.id} value={point.startingpoint}>
+                          {point.startingpoint}
+                        </option>
+                      ))}
+                    </select>
+                    <InstructionErrorTooltip message={fieldErrors.pickup} />
+                  </div>
+                </div>
+
+                <div
+                  className="controller-instructions-form-field"
+                  style={{ flex: "1 1 220px", maxWidth: "260px" }}
+                >
+                  <label>Dropoff Location</label>
+                  <div
+                    className="controller-instructions-select-wrapper"
+                    ref={fieldRefs.dropoff}
+                  >
+                    <select
+                      className={`controller-instructions-dropdown ${
+                        fieldErrors.dropoff
+                          ? "controller-instructions-error-field"
+                          : ""
+                      }`}
+                      name="dropoff"
+                      value={formData.dropoff || ""}
+                      onChange={handleDropoffChange}
+                      disabled={isReadOnly}
+                      style={isReadOnly ? readOnlyStyle : {}}
+                    >
+                      <option value="" disabled>
+                        Select Dropoff
+                      </option>
+                      {destinations.map((dest) => (
+                        <option key={dest.id} value={dest.destination}>
+                          {dest.destination}
+                        </option>
+                      ))}
+                    </select>
+                    <InstructionErrorTooltip message={fieldErrors.dropoff} />
+                  </div>
                 </div>
               </div>
-            </div>
+            )}
           </div>
           <div className="controller-instructions-form-section">
             <div className="controller-instructions-form-row controller-instructions-trailer-container">
@@ -3814,8 +3893,10 @@ const FCcontrollerinstructions = () => {
                 className="controller-instructions-divider"
                 style={{ display: "none" }}
               />
-
-              <div className="controller-instructions-container-section">
+              <div
+                className="controller-instructions-container-section"
+                style={isAddOn ? { display: "none" } : undefined}
+              >
                 <div className="controller-instructions-container-group">
                   <div className="controller-instructions-container-label">
                     <span className="controller-instructions-trailer-size-label">
@@ -3973,7 +4054,7 @@ const FCcontrollerinstructions = () => {
                   className="controller-instructions-booking-vertical-group"
                   style={{
                     marginTop: "8px",
-                    display: "flex",
+                    display: isAddOn ? "none" : "flex",
                     flexDirection: "column",
                     gap: "8px",
                     maxWidth: "220px",
@@ -4074,7 +4155,10 @@ const FCcontrollerinstructions = () => {
                   {/* This surchages section has been moved to be next to the checkbox */}
 
                   {/* Compact Rates per dropdown and input fields in one row */}
-                  <div className="controller-instructions-form-field">
+                  <div
+                    className="controller-instructions-form-field"
+                    style={isAddOn ? { display: "none" } : undefined}
+                  >
                     <label>Unit per</label>
                     <div
                       style={{
@@ -4214,7 +4298,10 @@ const FCcontrollerinstructions = () => {
                 {/* End of main form section */}
 
                 {/* Hazardous / Surcharge checkboxes moved below Rate Type */}
-                <div className="controller-instructions-date-time-group">
+                <div
+                  className="controller-instructions-date-time-group"
+                  style={isAddOn ? { display: "none" } : undefined}
+                >
                   <div
                     className="controller-instructions-shipment-task-row"
                     style={{ order: -1, marginBottom: "8px" }}
@@ -4422,7 +4509,10 @@ const FCcontrollerinstructions = () => {
                     </div>
                   </div>
                 </div>
-                <div className="controller-instructions-date-time-group">
+                <div
+                  className="controller-instructions-date-time-group"
+                  style={isAddOn ? { display: "none" } : undefined}
+                >
                  
                   {(formData.shipmentTypeId === "1" ||
                     formData.shipmentTypeId === "2") && (
@@ -4518,8 +4608,8 @@ const FCcontrollerinstructions = () => {
               weight: c.weight,
             })),
           })}
-          {/* Only show container details table when shipment type is NOT cross-haul (break bulk) (type 4) */}
-          {containers.length > 0 && formData.shipmentTypeId !== "4" && (
+          {/* Only show container details table when shipment type is NOT cross-haul (break bulk) (type 4) and not add-on */}
+          {containers.length > 0 && formData.shipmentTypeId !== "4" && !isAddOn && (
             <div className="controller-instructions-form-section">
               <div className="controller-instructions-container-details-section">
                 <h3>Container Details</h3>
