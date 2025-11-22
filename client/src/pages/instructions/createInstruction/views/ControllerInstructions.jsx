@@ -161,29 +161,55 @@ const ControllerInstructions = () => {
   const [showContainerDetails, setShowContainerDetails] = useState(false)
 
   const [weightRows, setWeightRows] = useState([])
+  const weightRowsRef = useRef([])
 
   const addWeightRow = useCallback(() => {
-    setWeightRows((prev) => [
-      ...prev,
-      {
-        id: prev.length > 0 ? prev[prev.length - 1].id + 1 : 1,
-        ksmDmNo: "",
-        ticketNo: "",
-        receiptBookNo: "",
-        weight: "",
-      },
-    ])
+    setWeightRows((prev) => {
+      const next = [
+        ...prev,
+        {
+          id: prev.length > 0 ? prev[prev.length - 1].id + 1 : 1,
+          ksmDmNo: "",
+          ticketNo: "",
+          receiptBookNo: "",
+          weight: "",
+        },
+      ]
+      console.log("[CREATE] ADD weight row - prev:", prev, "next:", next)
+      return next
+    })
   }, [])
 
   const updateWeightRow = useCallback((id, field, value) => {
-    setWeightRows((prev) =>
-      prev.map((row) => (row.id === id ? { ...row, [field]: value } : row)),
-    )
+    setWeightRows((prev) => {
+      const next = prev.map((row) =>
+        row.id === id ? { ...row, [field]: value } : row,
+      )
+      console.log("[CREATE] UPDATE weight row", { id, field, value, prev, next })
+      return next
+    })
   }, [])
 
   const removeWeightRow = useCallback((id) => {
-    setWeightRows((prev) => prev.filter((row) => row.id !== id))
+    setWeightRows((prev) => {
+      const next = prev.filter((row) => row.id !== id)
+      console.log("[CREATE] REMOVE weight row", { id, prev, next })
+      return next
+    })
   }, [])
+
+  useEffect(() => {
+    console.log("[CREATE] weightRows changed:", weightRows)
+    try {
+      console.log(
+        "[CREATE] weightRows changed (JSON):",
+        JSON.stringify(weightRows, null, 2),
+      )
+    } catch (e) {
+      // ignore stringify errors
+    }
+    weightRowsRef.current = weightRows
+  }, [weightRows])
 
   // New state for rate locking
   const [rateLockStatus, setRateLockStatus] = useState({
@@ -549,6 +575,14 @@ const ControllerInstructions = () => {
   })
 
   const isAddOn = formData.shipmentTypeId === "5"
+
+  // VGM is only applicable for certain shipment types. For shipment types 4
+  // (cross-haul/break bulk) and 5 (add-on), VGM should behave like the other
+  // non-applicable fields (null/false). This flag controls the UI.
+  const allowVgmUI =
+    !isAddOn &&
+    formData.shipmentTypeId !== "4" &&
+    formData.shipmentTypeId !== "5"
 
   // Update unit type and cross-haul states when form data changes
   useEffect(() => {
@@ -1229,11 +1263,13 @@ const ControllerInstructions = () => {
         components: {},
       }
 
+      const currentWeightRows = weightRowsRef.current || []
+
       if (isWeightBased && !isAddOn) {
         // Weight-based calculation
         let baseWeight = 0
         if (formData.shipmentTypeId === "4") {
-          baseWeight = weightRows.reduce((sum, row) => {
+          baseWeight = currentWeightRows.reduce((sum, row) => {
             if (row.weight === null || row.weight === undefined || row.weight === "") {
               return sum
             }
@@ -1437,38 +1473,34 @@ const ControllerInstructions = () => {
               cargo_description: container.cargoDescription || "",
               "Hazardous": container.hazardous || false,
               "Add Surcharges": container.addSurcharges || false,
-              "vgm": container.vgm || false,
+              // Only allow VGM to be true for allowed shipment types; otherwise force false
+              "vgm": allowVgmUI ? (container.vgm || false) : false,
               // Note: "Surcharge Amount" and "vgm amount" will be calculated by backend
             }))
           : []
 
       let weightData = []
       if (formData.shipmentTypeId === "4") {
-        // Normalize and filter weight rows: only send rows where at least one field is filled,
-        // and preserve numeric 0 instead of converting it to null.
-        weightData = weightRows
-          .map((row) => {
-            let numericWeight = null
-            if (row.weight !== null && row.weight !== undefined && row.weight !== "") {
-              const parsed = Number.parseFloat(row.weight)
-              numericWeight = Number.isNaN(parsed) ? null : parsed
-            }
+        // For cross-haul/break bulk, always send every visible row so the
+        // backend can persist all of them exactly as entered.
+        weightData = currentWeightRows.map((row) => {
+          let numericWeight = null
+          if (row.weight !== null && row.weight !== undefined && row.weight !== "") {
+            const parsed = Number.parseFloat(row.weight)
+            numericWeight = Number.isNaN(parsed) ? null : parsed
+          }
 
-            const ksm = row.ksmDmNo || row.ksm_dm_no || ""
-            const ticket = row.ticketNo || row.ticket_no || ""
-            const receipt = row.receiptBookNo || row.receipt_book_no || ""
+          const ksm = row.ksmDmNo || row.ksm_dm_no || null
+          const ticket = row.ticketNo || row.ticket_no || null
+          const receipt = row.receiptBookNo || row.receipt_book_no || null
 
-            return {
-              ksm_dm_no: ksm,
-              ticket_no: ticket,
-              receipt_book_no: receipt,
-              weight: numericWeight,
-              _isEmptyRow:
-                !ksm && !ticket && !receipt && (numericWeight === null || Number.isNaN(numericWeight)),
-            }
-          })
-          .filter((row) => !row._isEmptyRow)
-          .map(({ _isEmptyRow, ...cleanRow }) => cleanRow)
+          return {
+            ksm_dm_no: ksm,
+            ticket_no: ticket,
+            receipt_book_no: receipt,
+            weight: numericWeight,
+          }
+        })
       }
 
       console.log("=== SUBMITTING TO DATABASE ===")
@@ -1477,8 +1509,16 @@ const ControllerInstructions = () => {
         description: instructionData.description ? instructionData.description.substring(0, 50) + "..." : null, // Truncate for logging
       })
       console.log("Container data being saved:", containerData)
-      console.log("Raw weightRows state (shipment type 4 only):", weightRows)
+      console.log("Raw weightRows state (shipment type 4 only):", currentWeightRows)
+      console.log(
+        "Raw weightRows JSON (shipment type 4 only):",
+        JSON.stringify(currentWeightRows, null, 2),
+      )
       console.log("Weight rows being saved (shipment type 4 only):", weightData)
+      console.log(
+        "Weight rows JSON being saved (shipment type 4 only):",
+        JSON.stringify(weightData, null, 2),
+      )
       console.log("Final calculated total cost (WITHOUT VAT):", totalCost)
       console.log("Rate saving logic applied:")
       console.log(`  rateper_6: ${instructionData.rateper_6} (count: ${instructionData.num_six_meters})`)
@@ -2774,9 +2814,11 @@ const ControllerInstructions = () => {
                       {(isExport || formData.shipmentTypeId === "2") && <th style={{ width: "15%" }}>File Reference</th>}
                       {(isImport || isExport || isCrossHaul) && <th style={{ width: "10%" }}>Weight</th>}
                       <th style={{ width: (isImport || isExport || isCrossHaul) ? "25%" : "40%" }}>Cargo Description</th>
-                      <th style={{ width: "8%" }}>Hazardous</th>
-                      <th style={{ width: "8%" }}>Add Surcharges</th>
-                      <th style={{ width: "8%" }}>VGM</th>
+                      <th style={{ width: "80px", textAlign: "center" }}>Hazardous</th>
+                      <th style={{ width: "100px", textAlign: "center" }}>Add Surcharges</th>
+                      {allowVgmUI && (
+                        <th style={{ width: "60px", textAlign: "center" }}>VGM</th>
+                      )}
                     </tr>
                   </thead>
                   <tbody>
@@ -2999,17 +3041,19 @@ const ControllerInstructions = () => {
                             />
                           </div>
                         </td>
-                        <td style={{ textAlign: "center" }}>
-                          <div className="form-check" style={{ display: "flex", justifyContent: "center" }}>
-                            <input
-                              type="checkbox"
-                              className="form-check-input"
-                              checked={container.vgm || false}
-                              onChange={(e) => handleContainerChange(container.id, "vgm", e.target.checked)}
-                              style={{ cursor: "pointer" }}
-                            />
-                          </div>
-                        </td>
+                        {allowVgmUI && (
+                          <td style={{ textAlign: "center" }}>
+                            <div className="form-check" style={{ display: "flex", justifyContent: "center" }}>
+                              <input
+                                type="checkbox"
+                                className="form-check-input"
+                                checked={container.vgm || false}
+                                onChange={(e) => handleContainerChange(container.id, "vgm", e.target.checked)}
+                                style={{ cursor: "pointer" }}
+                              />
+                            </div>
+                          </td>
+                        )}
                       </tr>
                     ))}
                   </tbody>

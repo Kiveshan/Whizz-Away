@@ -112,6 +112,31 @@ const FCcontrollerinstructions = () => {
   const [weight, setWeight] = useState("");
   const [rateUpdateMessage, setRateUpdateMessage] = useState("");
 
+  const [weightRows, setWeightRows] = useState([]);
+
+  const addWeightRow = () => {
+    setWeightRows((prev) => [
+      ...prev,
+      {
+        id: prev.length > 0 ? prev[prev.length - 1].id + 1 : 1,
+        ksmDmNo: "",
+        ticketNo: "",
+        receiptBookNo: "",
+        weight: "",
+      },
+    ]);
+  };
+
+  const updateWeightRow = (id, field, value) => {
+    setWeightRows((prev) =>
+      prev.map((row) => (row.id === id ? { ...row, [field]: value } : row))
+    );
+  };
+
+  const removeWeightRow = (id) => {
+    setWeightRows((prev) => prev.filter((row) => row.id !== id));
+  };
+
   // Log the isImport state for debugging
   useEffect(() => {
     console.log("isImport state changed:", isImport);
@@ -265,6 +290,14 @@ const FCcontrollerinstructions = () => {
       typeName === "add on"
     );
   })();
+
+  // VGM is only applicable for certain shipment types. For shipment types 4
+  // (cross-haul/break bulk) and 5 (add-on), VGM should behave like other
+  // non-applicable fields (null/false). This flag is used when building the
+  // container payload sent to the backend.
+  const allowVgmUI =
+    String(formData.shipmentTypeId) !== "4" &&
+    String(formData.shipmentTypeId) !== "5";
 
   // State for warning modal
   const [warningModal, setWarningModal] = useState({
@@ -856,8 +889,12 @@ const FCcontrollerinstructions = () => {
 
     // Add weight and unitRate as required fields when rateWeight is ton or kg
     if (formData.rateWeight === "ton" || formData.rateWeight === "kg") {
+      if (String(formData.shipmentTypeId) !== "4") {
+        requiredFields.push(
+          { name: "weight", label: `Weight (${formData.rateWeight})` }
+        );
+      }
       requiredFields.push(
-        { name: "weight", label: `Weight (${formData.rateWeight})` },
         { name: "unitRate", label: `Rate per ${formData.rateWeight}` }
       );
     }
@@ -1242,10 +1279,28 @@ const FCcontrollerinstructions = () => {
       const ratePerAbnormal =
         numAbnormal > 0 ? Number(formData.rateper_abnormal || 0) : 0;
 
-      const baseCost =
-        ratePer6 * numSix +
-        ratePer12 * numTwelve +
-        ratePerAbnormal * numAbnormal;
+      let baseCost = 0;
+      if (
+        (formData.rateWeight === "kg" || formData.rateWeight === "ton") &&
+        String(formData.shipmentTypeId) === "4"
+      ) {
+        // Shipment type 4: base cost = unit rate * sum(all row weights)
+        const totalWeight = weightRows.reduce((sum, row) => {
+          if (row.weight === null || row.weight === undefined || row.weight === "") {
+            return sum;
+          }
+          const parsed = Number.parseFloat(row.weight);
+          return Number.isNaN(parsed) ? sum : sum + parsed;
+        }, 0);
+        const unitRate = Number.parseFloat(formData.unitRate || 0);
+        baseCost = totalWeight * unitRate;
+      } else {
+        // Container-based or simple weight-based using main counts
+        baseCost =
+          ratePer6 * numSix +
+          ratePer12 * numTwelve +
+          ratePerAbnormal * numAbnormal;
+      }
       // Calculate total surcharge from containers
       const totalSurchargeAmount = containers.reduce((total, container) => {
         if (container.addSurcharges && container.surchargeAmount) {
@@ -1299,9 +1354,9 @@ const FCcontrollerinstructions = () => {
             ? 0
             : numAbnormal,
         num_breakbulk: 0,
-        // For ton or kg, weight must be provided and not defaulted to 0
+        // For ton or kg, main weight is only used for non-type-4 shipments
         weight:
-          formData.rateWeight !== "Container"
+          formData.rateWeight !== "Container" && String(formData.shipmentTypeId) !== "4"
             ? formData.weight
               ? Number(formData.weight)
               : null
@@ -1371,12 +1426,37 @@ const FCcontrollerinstructions = () => {
                 "Hazardous Amount": Number(container.hazardousAmount || 0),
                 "Add Surcharges": Boolean(container.addSurcharges),
                 "Surcharge Amount": Number(container.surchargeAmount || 0),
-                vgm: Boolean(container.vgm),
-                "vgm amount": Number(container.vgmAmount || 0),
+                // Only allow VGM to be true for allowed shipment types; otherwise force false/0
+                vgm: allowVgmUI ? Boolean(container.vgm) : false,
+                "vgm amount": allowVgmUI ? Number(container.vgmAmount || 0) : 0,
               };
             });
 
-      // Debug: Log the container data being sent to server
+      let weightData = [];
+      if (String(formData.shipmentTypeId) === "4") {
+        // For cross-haul/break bulk on the FC screen, always send every
+        // visible row so the backend can persist everything the user sees.
+        weightData = weightRows.map((row) => {
+          let numericWeight = null;
+          if (row.weight !== null && row.weight !== undefined && row.weight !== "") {
+            const parsed = Number.parseFloat(row.weight);
+            numericWeight = Number.isNaN(parsed) ? null : parsed;
+          }
+
+          const ksm = row.ksmDmNo || row.ksm_dm_no || null;
+          const ticket = row.ticketNo || row.ticket_no || null;
+          const receipt = row.receiptBookNo || row.receipt_book_no || null;
+
+          return {
+            ksm_dm_no: ksm,
+            ticket_no: ticket,
+            receipt_book_no: receipt,
+            weight: numericWeight,
+          };
+        });
+      }
+
+      // Debug: Log the container and weight data being sent to server
       console.log("🚀 CONTAINER DATA BEING SENT TO SERVER:");
       console.log("==========================================");
       containerData.forEach((container, index) => {
@@ -1395,6 +1475,9 @@ const FCcontrollerinstructions = () => {
           fileRefType: typeof container.file_ref
         });
       });
+
+      console.log("Weight rows state (type 4 only):", weightRows);
+      console.log("Weight data being sent (type 4 only):", weightData);
 
       // Console log comparison between old and new data
       console.log("📋 DATA COMPARISON:");
@@ -1468,6 +1551,7 @@ const FCcontrollerinstructions = () => {
         {
           instructionData: instructionUpdateData,
           containers: containerData,
+          weightData: weightData,
         }
       );
 
@@ -1926,6 +2010,30 @@ const FCcontrollerinstructions = () => {
       };
 
       setFormData(newFormData);
+
+      if (String(data.shipment_type) === "4" && Array.isArray(data.weight_rows)) {
+        const mappedRows = data.weight_rows.map((row, index) => ({
+          id: row.weight_pk || index + 1,
+          ksmDmNo: row.ksm_dm_no || "",
+          ticketNo: row.ticket_no || "",
+          receiptBookNo: row.receipt_book_no || "",
+          weight:
+            row.weight === null || row.weight === undefined
+              ? ""
+              : String(row.weight),
+        }));
+        setWeightRows(mappedRows.length > 0 ? mappedRows : [
+          {
+            id: 1,
+            ksmDmNo: "",
+            ticketNo: "",
+            receiptBookNo: "",
+            weight: "",
+          },
+        ]);
+      } else {
+        setWeightRows([]);
+      }
 
       // Update isImport state based on loaded shipment type
       const isImportType =
@@ -4206,91 +4314,241 @@ const FCcontrollerinstructions = () => {
                       {(formData.rateWeight === "kg" ||
                         formData.rateWeight === "m³" ||
                         formData.rateWeight === "ton") && (
-                        <div
-                          style={{
-                            display: "flex",
-                            gap: "15px",
-                            width: "100%",
-                            marginTop: "48px",
-                            marginLeft: "-113px",
-                          }}
-                        >
-                          {/* Unit Rate Field */}
+                        <>
                           <div
-                            className="controller-instructions-form-field"
-                            style={{ flex: 1, minWidth: "150px" }}
+                            style={{
+                              display: "flex",
+                              gap: "15px",
+                              width: "100%",
+                              marginTop: "48px",
+                              marginLeft: "-113px",
+                            }}
                           >
-                            <label>{`Rate per ${formData.rateWeight}`}</label>
+                            {/* Unit Rate Field */}
                             <div
-                              className="controller-instructions-input-wrapper"
-                              ref={fieldRefs.unitRate}
-                              style={{ width: "100%" }}
+                              className="controller-instructions-form-field"
+                              style={{ flex: 1, minWidth: "150px" }}
                             >
-                              <input
-                                type="text"
-                                className={`controller-instructions-form-input ${
-                                  fieldErrors.unitRate
-                                    ? "controller-instructions-error-field"
-                                    : ""
-                                }`}
-                                name="unitRate"
-                                value={formData.unitRate || ""}
-                                onChange={(e) => {
-                                  const value = e.target.value;
-                                  if (
-                                    value === "" ||
-                                    /^[0-9]*\.?[0-9]*$/.test(value)
-                                  ) {
-                                    handleInputChange(e);
-                                  }
-                                }}
-                                disabled={isReadOnly}
-                                style={isReadOnly ? readOnlyStyle : {}}
-                              />
-                              <InstructionErrorTooltip
-                                message={fieldErrors.unitRate}
-                              />
+                              <label>{`Rate per ${formData.rateWeight}`}</label>
+                              <div
+                                className="controller-instructions-input-wrapper"
+                                ref={fieldRefs.unitRate}
+                                style={{ width: "100%" }}
+                              >
+                                <input
+                                  type="text"
+                                  className={`controller-instructions-form-input ${
+                                    fieldErrors.unitRate
+                                      ? "controller-instructions-error-field"
+                                      : ""
+                                  }`}
+                                  name="unitRate"
+                                  value={formData.unitRate || ""}
+                                  onChange={(e) => {
+                                    const value = e.target.value;
+                                    if (
+                                      value === "" ||
+                                      /^[0-9]*\.?[0-9]*$/.test(value)
+                                    ) {
+                                      handleInputChange(e);
+                                    }
+                                  }}
+                                  disabled={isReadOnly}
+                                  style={isReadOnly ? readOnlyStyle : {}}
+                                />
+                                <InstructionErrorTooltip
+                                  message={fieldErrors.unitRate}
+                                />
+                              </div>
                             </div>
+
+                            {/* Weight Field for non-type-4 weight-based shipments */}
+                            {String(formData.shipmentTypeId) !== "4" && (
+                              <div
+                                className="controller-instructions-form-field"
+                                style={{ flex: 1, minWidth: "150px" }}
+                              >
+                                <label>{`Weight (${formData.rateWeight})`}</label>
+                                <div
+                                  className="controller-instructions-input-wrapper"
+                                  ref={fieldRefs.weight}
+                                  style={{ width: "100%" }}
+                                >
+                                  <input
+                                    type="text"
+                                    className={`controller-instructions-form-input ${
+                                      fieldErrors.weight
+                                        ? "controller-instructions-error-field"
+                                        : ""
+                                    }`}
+                                    name="weight"
+                                    value={formData.weight || ""}
+                                    onChange={(e) => {
+                                      const value = e.target.value;
+                                      if (
+                                        value === "" ||
+                                        /^[0-9]*\.?[0-9]*$/.test(value)
+                                      ) {
+                                        handleInputChange(e);
+                                      }
+                                    }}
+                                    disabled={isReadOnly}
+                                    style={isReadOnly ? readOnlyStyle : {}}
+                                  />
+                                  <InstructionErrorTooltip
+                                    message={fieldErrors.quantity}
+                                  />
+                                </div>
+                              </div>
+                            )}
                           </div>
 
-                          {/* Weight Field */}
-                          <div
-                            className="controller-instructions-form-field"
-                            style={{ flex: 1, minWidth: "150px" }}
-                          >
-                            <label>{`Weight (${formData.rateWeight})`}</label>
+                          {String(formData.shipmentTypeId) === "4" && (
                             <div
-                              className="controller-instructions-input-wrapper"
-                              ref={fieldRefs.weight}
-                              style={{ width: "100%" }}
+                              className="controller-instructions-form-field"
+                              style={{ width: "100%", marginTop: "8px" }}
                             >
-                              <input
-                                type="text"
-                                className={`controller-instructions-form-input ${
-                                  fieldErrors.weight
-                                    ? "controller-instructions-error-field"
-                                    : ""
-                                }`}
-                                name="weight"
-                                value={formData.weight || ""}
-                                onChange={(e) => {
-                                  const value = e.target.value;
-                                  if (
-                                    value === "" ||
-                                    /^[0-9]*\.?[0-9]*$/.test(value)
-                                  ) {
-                                    handleInputChange(e);
-                                  }
-                                }}
-                                disabled={isReadOnly}
-                                style={isReadOnly ? readOnlyStyle : {}}
-                              />
-                              <InstructionErrorTooltip
-                                message={fieldErrors.quantity}
-                              />
+                              <label>Weight Details</label>
+                              <div style={{ width: "100%" }}>
+                                <table
+                                  style={{
+                                    width: "100%",
+                                    borderCollapse: "collapse",
+                                    fontSize: "12px",
+                                  }}
+                                >
+                                  <thead>
+                                    <tr>
+                                      <th style={{ border: "1px solid #dee2e6", padding: "4px" }}>
+                                        KSM DN Number
+                                      </th>
+                                      <th style={{ border: "1px solid #dee2e6", padding: "4px" }}>
+                                        Ticket Number
+                                      </th>
+                                      <th style={{ border: "1px solid #dee2e6", padding: "4px" }}>
+                                        Receipt Book Number
+                                      </th>
+                                      <th style={{ border: "1px solid #dee2e6", padding: "4px" }}>
+                                        Weight ({formData.rateWeight})
+                                      </th>
+                                      <th style={{ border: "1px solid #dee2e6", padding: "4px" }}></th>
+                                    </tr>
+                                  </thead>
+                                  <tbody>
+                                    {weightRows.map((row) => (
+                                      <tr key={row.id}>
+                                        <td style={{ border: "1px solid #dee2e6", padding: "2px 4px" }}>
+                                          <input
+                                            type="text"
+                                            className="controller-instructions-form-input"
+                                            value={row.ksmDmNo || ""}
+                                            onChange={(e) =>
+                                              updateWeightRow(row.id, "ksmDmNo", e.target.value)
+                                            }
+                                            disabled={isReadOnly}
+                                            style={{ width: "100%", fontSize: "12px", height: "26px" }}
+                                          />
+                                        </td>
+                                        <td style={{ border: "1px solid #dee2e6", padding: "2px 4px" }}>
+                                          <input
+                                            type="text"
+                                            className="controller-instructions-form-input"
+                                            value={row.ticketNo || ""}
+                                            onChange={(e) =>
+                                              updateWeightRow(row.id, "ticketNo", e.target.value)
+                                            }
+                                            disabled={isReadOnly}
+                                            style={{ width: "100%", fontSize: "12px", height: "26px" }}
+                                          />
+                                        </td>
+                                        <td style={{ border: "1px solid #dee2e6", padding: "2px 4px" }}>
+                                          <input
+                                            type="text"
+                                            className="controller-instructions-form-input"
+                                            value={row.receiptBookNo || ""}
+                                            onChange={(e) =>
+                                              updateWeightRow(row.id, "receiptBookNo", e.target.value)
+                                            }
+                                            disabled={isReadOnly}
+                                            style={{ width: "100%", fontSize: "12px", height: "26px" }}
+                                          />
+                                        </td>
+                                        <td style={{ border: "1px solid #dee2e6", padding: "2px 4px" }}>
+                                          <input
+                                            type="text"
+                                            className="controller-instructions-form-input"
+                                            value={row.weight || ""}
+                                            onChange={(e) => {
+                                              const value = e.target.value;
+                                              if (
+                                                value === "" ||
+                                                /^[0-9]*\.?[0-9]*$/.test(value)
+                                              ) {
+                                                updateWeightRow(row.id, "weight", value);
+                                              }
+                                            }}
+                                            disabled={isReadOnly}
+                                            style={{ width: "100%", fontSize: "12px", height: "26px" }}
+                                          />
+                                        </td>
+                                        <td
+                                          style={{
+                                            border: "1px solid #dee2e6",
+                                            padding: "2px 4px",
+                                            textAlign: "center",
+                                            whiteSpace: "nowrap",
+                                          }}
+                                        >
+                                          {!isReadOnly && (
+                                            <button
+                                              type="button"
+                                              onClick={() => removeWeightRow(row.id)}
+                                              style={{
+                                                padding: "2px 6px",
+                                                fontSize: "11px",
+                                                borderRadius: "4px",
+                                                border: "1px solid #dc3545",
+                                                backgroundColor: "#fff",
+                                                color: "#dc3545",
+                                                cursor: "pointer",
+                                              }}
+                                            >
+                                              Remove
+                                            </button>
+                                          )}
+                                        </td>
+                                      </tr>
+                                    ))}
+                                    {!isReadOnly && (
+                                      <tr>
+                                        <td
+                                          colSpan={5}
+                                          style={{ padding: "4px", textAlign: "left" }}
+                                        >
+                                          <button
+                                            type="button"
+                                            onClick={addWeightRow}
+                                            style={{
+                                              padding: "4px 8px",
+                                              fontSize: "12px",
+                                              borderRadius: "4px",
+                                              border: "1px solid #4a90e2",
+                                              backgroundColor: "#4a90e2",
+                                              color: "#fff",
+                                              cursor: "pointer",
+                                            }}
+                                          >
+                                            Add Row
+                                          </button>
+                                        </td>
+                                      </tr>
+                                    )}
+                                  </tbody>
+                                </table>
+                              </div>
                             </div>
-                          </div>
-                        </div>
+                          )}
+                        </>
                       )}
                     </div>
                   </div>
