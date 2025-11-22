@@ -1718,436 +1718,485 @@ const ControllerInstructions = () => {
             </div>
           </div>
         </div>
-        <div className="controller-instructions-form-section">
-          <div className="controller-instructions-form-row">
-            <div className="controller-instructions-form-field">
-              <label>Shipment Type</label>
-              <div className="controller-instructions-select-wrapper" ref={fieldRefs.current.shipmentTypeId}>
-                <select
-                  className={`dropdown ${fieldErrors.shipmentTypeId ? "controller-instructions-error-field" : ""}`}
-                  name="shipmentTypeId"
-                  value={formData.shipmentTypeId}
-                  onChange={handleShipmentTypeChange}
-                  disabled={isLoading.shipmentTypes || shipmentTypes.length === 0}
+        {isAddOn && (
+          <div className="controller-instructions-form-section">
+            <div className="controller-instructions-form-row">
+              <div className="controller-instructions-form-field">
+                <label>Shipment Type</label>
+                <div
+                  className="controller-instructions-select-wrapper"
+                  ref={fieldRefs.current.shipmentTypeId}
                 >
-                  <option value="" disabled>
-                    Select Shipment
-                  </option>
-                  {shipmentTypes.map((type) => (
-                    <option key={type.shipkey} value={type.shipkey}>
-                      {type.shipmenttype}
+                  <select
+                    className={`dropdown ${
+                      fieldErrors.shipmentTypeId
+                        ? "controller-instructions-error-field"
+                        : ""
+                    }`}
+                    name="shipmentTypeId"
+                    value={formData.shipmentTypeId}
+                    onChange={handleShipmentTypeChange}
+                    disabled={isLoading.shipmentTypes || shipmentTypes.length === 0}
+                  >
+                    <option value="" disabled>
+                      Select Shipment
                     </option>
-                  ))}
-                </select>
-                <ErrorTooltip message={fieldErrors.shipmentTypeId} />
+                    {shipmentTypes.map((type) => (
+                      <option key={type.shipkey} value={type.shipkey}>
+                        {type.shipmenttype}
+                      </option>
+                    ))}
+                  </select>
+                  <ErrorTooltip message={fieldErrors.shipmentTypeId} />
+                </div>
               </div>
             </div>
           </div>
-        </div>
+        )}
+
+        {/* Main container + booking section: two columns side by side */}
         <div className="controller-instructions-form-section">
-          <div className="controller-instructions-form-row controller-instructions-trailer-container">
-            <div
-              className="controller-instructions-container-section"
-              style={{ display: isAddOn ? "none" : undefined }}
-            >
-              <div className="controller-instructions-container-group">
-                <div className="controller-instructions-container-label">
-                  <span className="controller-instructions-trailer-size-label">Trailer Size</span>
-                  <label>No. of Containers</label>
-                  {fieldErrors.containers && (
-                    <div className="controller-instructions-container-error-message">{fieldErrors.containers}</div>
-                  )}
+          <div
+            className="controller-instructions-container-section"
+            style={{ display: isAddOn ? "none" : undefined }}
+          >
+            {/* LEFT: Trailer size / containers / unit per */}
+            <div className="controller-instructions-container-group">
+              <div className="controller-instructions-container-label">
+                <span className="controller-instructions-trailer-size-label">Trailer Size</span>
+                <label>No. of Containers</label>
+                {fieldErrors.containers && (
+                  <div className="controller-instructions-container-error-message">{fieldErrors.containers}</div>
+                )}
+              </div>
+              <div
+                className="controller-instructions-container-inputs"
+                style={{
+                  opacity: isWeightBased ? 0.5 : 1,
+                  pointerEvents: isWeightBased ? "none" : "auto",
+                }}
+              >
+                <div className="controller-instructions-container-input">
+                  <label>6m</label>
+                  <div className="controller-instructions-container-rate-group" style={{ display: "flex", width: "100px" }}>
+                    <input
+                      type="number"
+                      className={fieldErrors.containers ? "controller-instructions-error-field" : ""}
+                      value={formData.num_six_meters}
+                      min="0"
+                      name="num_six_meters"
+                      onChange={(e) => handleContainerCountChange("num_six_meters", e.target.value)}
+                      disabled={isWeightBased}
+                    />
+                    <div style={{ width: "100%", marginLeft: "10px" }}>
+                      <input
+                        type="text"
+                        value={
+                          formData.sixMeterRate !== undefined && formData.sixMeterRate !== ""
+                            ? Number.parseFloat(formData.sixMeterRate).toFixed(2)
+                            : ""
+                        }
+                        onChange={(e) => {
+                          const value = e.target.value
+                          if (value === "" || /^\d*\.?\d*$/.test(value)) {
+                            setFormData((prev) => ({
+                              ...prev,
+                              sixMeterRate: value === "" ? "" : Number.parseFloat(value) || 0,
+                            }))
+                          }
+                        }}
+                        onFocus={(e) => {
+                          e.target.select()
+                          if (formData.sixMeterRate) {
+                            setFormData((prev) => ({
+                              ...prev,
+                              sixMeterRate: Number.parseFloat(prev.sixMeterRate).toString(),
+                            }))
+                          }
+                        }}
+                        onBlur={() => {
+                          if (formData.sixMeterRate !== "") {
+                            setFormData((prev) => ({
+                              ...prev,
+                              sixMeterRate: Number.parseFloat(prev.sixMeterRate),
+                            }))
+                          }
+                        }}
+                        style={{
+                          width: "90px",
+                          padding: "8px",
+                          border: "1px solid #000",
+                          borderRadius: "4px",
+                          backgroundColor:
+                            rateFieldsEnabled.sixMeter && !isWeightBased && !rateLockStatus.sixMeter
+                              ? "#fff"
+                              : "#f5f5f5",
+                          fontSize: "16px",
+                          position: "relative",
+                          zIndex: 1000,
+                          cursor:
+                            rateFieldsEnabled.sixMeter && !isWeightBased && !rateLockStatus.sixMeter
+                              ? "text"
+                              : "not-allowed",
+                        }}
+                        disabled={!rateFieldsEnabled.sixMeter || isWeightBased || rateLockStatus.sixMeter}
+                        placeholder={
+                          rateFieldsEnabled.sixMeter && !isWeightBased && !rateLockStatus.sixMeter ? "0.00" : ""
+                        }
+                      />
+                    </div>
+                  </div>
                 </div>
+
+                <div className="controller-instructions-container-input">
+                  <label>12m</label>
+                  <div className="controller-instructions-container-rate-group" style={{ display: "flex", width: "100px" }}>
+                    <input
+                      type="number"
+                      className={fieldErrors.containers ? "controller-instructions-error-field" : ""}
+                      value={formData.num_twelve_meters}
+                      min="0"
+                      name="num_twelve_meters"
+                      onChange={(e) => handleContainerCountChange("num_twelve_meters", e.target.value)}
+                      disabled={isWeightBased}
+                    />
+                    <div style={{ width: "100%", marginLeft: "10px" }}>
+                      <input
+                        type="text"
+                        value={
+                          formData.twelveMeterRate !== undefined && formData.twelveMeterRate !== ""
+                            ? Number.parseFloat(formData.twelveMeterRate).toFixed(2)
+                            : ""
+                        }
+                        onChange={(e) => {
+                          const value = e.target.value
+                          if (value === "" || /^\d*\.?\d*$/.test(value)) {
+                            setFormData((prev) => ({
+                              ...prev,
+                              twelveMeterRate: value === "" ? "" : Number.parseFloat(value) || 0,
+                            }))
+                          }
+                        }}
+                        onFocus={(e) => {
+                          e.target.select()
+                          if (formData.twelveMeterRate) {
+                            setFormData((prev) => ({
+                              ...prev,
+                              twelveMeterRate: Number.parseFloat(prev.twelveMeterRate).toString(),
+                            }))
+                          }
+                        }}
+                        onBlur={() => {
+                          if (formData.twelveMeterRate !== "") {
+                            setFormData((prev) => ({
+                              ...prev,
+                              twelveMeterRate: Number.parseFloat(prev.twelveMeterRate),
+                            }))
+                          }
+                        }}
+                        style={{
+                          width: "90px",
+                          padding: "8px",
+                          border: "1px solid #000",
+                          borderRadius: "4px",
+                          backgroundColor:
+                            rateFieldsEnabled.twelveMeter && !isWeightBased && !rateLockStatus.twelveMeter
+                              ? "#fff"
+                              : "#f5f5f5",
+                          fontSize: "16px",
+                          position: "relative",
+                          zIndex: 1000,
+                          cursor:
+                            rateFieldsEnabled.twelveMeter && !isWeightBased && !rateLockStatus.twelveMeter
+                              ? "text"
+                              : "not-allowed",
+                        }}
+                        disabled={!rateFieldsEnabled.twelveMeter || isWeightBased || rateLockStatus.twelveMeter}
+                        placeholder={
+                          rateFieldsEnabled.twelveMeter && !isWeightBased && !rateLockStatus.twelveMeter ? "0.00" : ""
+                        }
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                <div className="controller-instructions-container-input">
+                  <label>Abnormal</label>
+                  <div className="controller-instructions-container-rate-group" style={{ display: "flex", width: "100px" }}>
+                    <input
+                      type="number"
+                      className={fieldErrors.containers ? "controller-instructions-error-field" : ""}
+                      value={formData.num_abnormal}
+                      min="0"
+                      name="num_abnormal"
+                      onChange={(e) => handleContainerCountChange("num_abnormal", e.target.value)}
+                      disabled={isWeightBased}
+                    />
+                    <div style={{ width: "100%", marginLeft: "10px" }}>
+                      <input
+                        type="text"
+                        value={
+                          formData.abnormalRate !== undefined && formData.abnormalRate !== ""
+                            ? Number.parseFloat(formData.abnormalRate).toFixed(2)
+                            : ""
+                        }
+                        onChange={(e) => {
+                          const value = e.target.value
+                          if (value === "" || /^\d*\.?\d*$/.test(value)) {
+                            setFormData((prev) => ({
+                              ...prev,
+                              abnormalRate: value === "" ? "" : Number.parseFloat(value) || 0,
+                            }))
+                          }
+                        }}
+                        onFocus={(e) => {
+                          e.target.select()
+                          if (formData.abnormalRate) {
+                            setFormData((prev) => ({
+                              ...prev,
+                              abnormalRate: Number.parseFloat(prev.abnormalRate).toString(),
+                            }))
+                          }
+                        }}
+                        onBlur={() => {
+                          if (formData.abnormalRate !== "") {
+                            setFormData((prev) => ({
+                              ...prev,
+                              abnormalRate: Number.parseFloat(prev.abnormalRate),
+                            }))
+                          }
+                        }}
+                        style={{
+                          width: "90px",
+                          padding: "8px",
+                          border: "1px solid #000",
+                          borderRadius: "4px",
+                          backgroundColor: rateFieldsEnabled.abnormal && !isWeightBased ? "#fff" : "#f5f5f5",
+                          fontSize: "16px",
+                          position: "relative",
+                          zIndex: 1000,
+                          cursor: rateFieldsEnabled.abnormal && !isWeightBased ? "text" : "not-allowed",
+                        }}
+                        disabled={!rateFieldsEnabled.abnormal || isWeightBased}
+                        placeholder={rateFieldsEnabled.abnormal && !isWeightBased ? "0.00" : ""}
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                {fieldErrors.containerCount && (
+                  <div
+                    className="controller-instructions-error-message"
+                    style={{
+                      color: "#d32f2f",
+                      fontSize: "0.75rem",
+                      marginTop: "4px",
+                      gridColumn: "1 / -1",
+                      textAlign: "center",
+                      padding: "4px 8px",
+                      backgroundColor: "#ffebee",
+                      borderRadius: "4px",
+                    }}
+                  >
+                    {fieldErrors.containerCount}
+                  </div>
+                )}
+              </div>
+
+              {/* Unit per / weight rate row */}
+              <div className="controller-instructions-form-row" style={{ margin: "16px 0", padding: "0 10px" }}>
                 <div
-                  className="controller-instructions-container-inputs"
                   style={{
-                    opacity: isWeightBased ? 0.5 : 1,
-                    pointerEvents: isWeightBased ? "none" : "auto",
+                    display: "flex",
+                    alignItems: "center",
+                    gap: "8px",
+                    flexWrap: "nowrap",
+                    width: "100%",
+                    justifyContent: "flex-start",
+                    flexShrink: 1,
+                    minWidth: 0,
                   }}
                 >
-                  <div className="controller-instructions-container-input">
-                    <label>6m</label>
-                    <div className="controller-instructions-container-rate-group" style={{ display: "flex", width: "100px" }}>
-                      <input
-                        type="number"
-                        className={fieldErrors.containers ? "controller-instructions-error-field" : ""}
-                        value={formData.num_six_meters}
-                        min="0"
-                        name="num_six_meters"
-                        onChange={(e) => handleContainerCountChange("num_six_meters", e.target.value)}
-                        disabled={isWeightBased}
-                      />
-                      <div style={{ width: "100%", marginLeft: "10px" }}>
-                        <input
-                          type="text"
-                          value={
-                            formData.sixMeterRate !== undefined && formData.sixMeterRate !== ""
-                              ? Number.parseFloat(formData.sixMeterRate).toFixed(2)
-                              : ""
-                          }
-                          onChange={(e) => {
-                            const value = e.target.value
-                            if (value === "" || /^\d*\.?\d*$/.test(value)) {
-                              setFormData((prev) => ({
-                                ...prev,
-                                sixMeterRate: value === "" ? "" : Number.parseFloat(value) || 0,
-                              }))
-                            }
-                          }}
-                          onFocus={(e) => {
-                            e.target.select()
-                            if (formData.sixMeterRate) {
-                              setFormData((prev) => ({
-                                ...prev,
-                                sixMeterRate: Number.parseFloat(prev.sixMeterRate).toString(),
-                              }))
-                            }
-                          }}
-                          onBlur={() => {
-                            if (formData.sixMeterRate !== "") {
-                              setFormData((prev) => ({
-                                ...prev,
-                                sixMeterRate: Number.parseFloat(prev.sixMeterRate),
-                              }))
-                            }
-                          }}
-                          style={{
-                            width: "90px",
-                            padding: "8px",
-                            border: "1px solid #000",
-                            borderRadius: "4px",
-                            backgroundColor:
-                              rateFieldsEnabled.sixMeter && !isWeightBased && !rateLockStatus.sixMeter
-                                ? "#fff"
-                                : "#f5f5f5",
-                            fontSize: "16px",
-                            position: "relative",
-                            zIndex: 1000,
-                            cursor:
-                              rateFieldsEnabled.sixMeter && !isWeightBased && !rateLockStatus.sixMeter
-                                ? "text"
-                                : "not-allowed",
-                          }}
-                          disabled={!rateFieldsEnabled.sixMeter || isWeightBased || rateLockStatus.sixMeter}
-                          placeholder={
-                            rateFieldsEnabled.sixMeter && !isWeightBased && !rateLockStatus.sixMeter ? "0.00" : ""
-                          }
-                        />
-                      </div>
-                    </div>
-                  </div>
-                  <div className="controller-instructions-container-input">
-                    <label>12m</label>
-                    <div className="controller-instructions-container-rate-group" style={{ display: "flex", width: "100px" }}>
-                      <input
-                        type="number"
-                        className={fieldErrors.containers ? "controller-instructions-error-field" : ""}
-                        value={formData.num_twelve_meters}
-                        min="0"
-                        name="num_twelve_meters"
-                        onChange={(e) => handleContainerCountChange("num_twelve_meters", e.target.value)}
-                        disabled={isWeightBased}
-                      />
-                      <div style={{ width: "100%", marginLeft: "10px" }}>
-                        <input
-                          type="text"
-                          value={
-                            formData.twelveMeterRate !== undefined && formData.twelveMeterRate !== ""
-                              ? Number.parseFloat(formData.twelveMeterRate).toFixed(2)
-                              : ""
-                          }
-                          onChange={(e) => {
-                            const value = e.target.value
-                            if (value === "" || /^\d*\.?\d*$/.test(value)) {
-                              setFormData((prev) => ({
-                                ...prev,
-                                twelveMeterRate: value === "" ? "" : Number.parseFloat(value) || 0,
-                              }))
-                            }
-                          }}
-                          onFocus={(e) => {
-                            e.target.select()
-                            if (formData.twelveMeterRate) {
-                              setFormData((prev) => ({
-                                ...prev,
-                                twelveMeterRate: Number.parseFloat(prev.twelveMeterRate).toString(),
-                              }))
-                            }
-                          }}
-                          onBlur={() => {
-                            if (formData.twelveMeterRate !== "") {
-                              setFormData((prev) => ({
-                                ...prev,
-                                twelveMeterRate: Number.parseFloat(prev.twelveMeterRate),
-                              }))
-                            }
-                          }}
-                          style={{
-                            width: "90px",
-                            padding: "8px",
-                            border: "1px solid #000",
-                            borderRadius: "4px",
-                            backgroundColor:
-                              rateFieldsEnabled.twelveMeter && !isWeightBased && !rateLockStatus.twelveMeter
-                                ? "#fff"
-                                : "#f5f5f5",
-                            fontSize: "16px",
-                            position: "relative",
-                            zIndex: 1000,
-                            cursor:
-                              rateFieldsEnabled.twelveMeter && !isWeightBased && !rateLockStatus.twelveMeter
-                                ? "text"
-                                : "not-allowed",
-                          }}
-                          disabled={!rateFieldsEnabled.twelveMeter || isWeightBased || rateLockStatus.twelveMeter}
-                          placeholder={
-                            rateFieldsEnabled.twelveMeter && !isWeightBased && !rateLockStatus.twelveMeter ? "0.00" : ""
-                          }
-                        />
-                      </div>
-                    </div>
-                  </div>
-                  <div className="controller-instructions-container-input">
-                    <label>Abnormal</label>
-                    <div className="controller-instructions-container-rate-group" style={{ display: "flex", width: "100px" }}>
-                      <input
-                        type="number"
-                        className={fieldErrors.containers ? "controller-instructions-error-field" : ""}
-                        value={formData.num_abnormal}
-                        min="0"
-                        name="num_abnormal"
-                        onChange={(e) => handleContainerCountChange("num_abnormal", e.target.value)}
-                        disabled={isWeightBased}
-                      />
-                      <div style={{ width: "100%", marginLeft: "10px" }}>
-                        <input
-                          type="text"
-                          value={
-                            formData.abnormalRate !== undefined && formData.abnormalRate !== ""
-                              ? Number.parseFloat(formData.abnormalRate).toFixed(2)
-                              : ""
-                          }
-                          onChange={(e) => {
-                            const value = e.target.value
-                            if (value === "" || /^\d*\.?\d*$/.test(value)) {
-                              setFormData((prev) => ({
-                                ...prev,
-                                abnormalRate: value === "" ? "" : Number.parseFloat(value) || 0,
-                              }))
-                            }
-                          }}
-                          onFocus={(e) => {
-                            e.target.select()
-                            if (formData.abnormalRate) {
-                              setFormData((prev) => ({
-                                ...prev,
-                                abnormalRate: Number.parseFloat(prev.abnormalRate).toString(),
-                              }))
-                            }
-                          }}
-                          onBlur={() => {
-                            if (formData.abnormalRate !== "") {
-                              setFormData((prev) => ({
-                                ...prev,
-                                abnormalRate: Number.parseFloat(prev.abnormalRate),
-                              }))
-                            }
-                          }}
-                          style={{
-                            width: "90px",
-                            padding: "8px",
-                            border: "1px solid #000",
-                            borderRadius: "4px",
-                            backgroundColor: rateFieldsEnabled.abnormal && !isWeightBased ? "#fff" : "#f5f5f5",
-                            fontSize: "16px",
-                            position: "relative",
-                            zIndex: 1000,
-                            cursor: rateFieldsEnabled.abnormal && !isWeightBased ? "text" : "not-allowed",
-                          }}
-                          disabled={!rateFieldsEnabled.abnormal || isWeightBased}
-                          placeholder={rateFieldsEnabled.abnormal && !isWeightBased ? "0.00" : ""}
-                        />
-                      </div>
-                    </div>
-                  </div>
-                  {fieldErrors.containerCount && (
-                    <div
-                      className="controller-instructions-error-message"
-                      style={{
-                        color: "#d32f2f",
-                        fontSize: "0.75rem",
-                        marginTop: "4px",
-                        gridColumn: "1 / -1",
-                        textAlign: "center",
-                        padding: "4px 8px",
-                        backgroundColor: "#ffebee",
-                        borderRadius: "4px",
-                      }}
-                    >
-                      {fieldErrors.containerCount}
-                    </div>
-                  )}
-                </div>
-                {/* Rates per - Horizontally Aligned */}
-                <div className="controller-instructions-form-row" style={{ margin: "16px 0", padding: "0 10px" }}>
+                  {/* unit per Section */}
                   <div
                     style={{
                       display: "flex",
                       alignItems: "center",
                       gap: "8px",
-                      flexWrap: "nowrap",
-                      width: "100%",
-                      justifyContent: "flex-start",
-                      flexShrink: 1,
-                      minWidth: 0,
+                      whiteSpace: "nowrap",
+                      flexShrink: 0,
                     }}
                   >
-                    {/* unit per Section */}
-                    <div
-                      style={{
-                        display: "flex",
-                        alignItems: "center",
-                        gap: "8px",
-                        whiteSpace: "nowrap",
-                        flexShrink: 0,
-                      }}
-                    >
-                      <span style={{ whiteSpace: "nowrap", fontSize: "13px", color: "#333" }}>Unit per:</span>
-                      <div className="controller-instructions-select-wrapper" style={{ width: "100px" }}>
-                        <select
-                          className="controller-instructions-dropdown"
-                          name="rateWeight"
-                          value={String(formData.rateWeight || "Container")}
-                          onChange={handleInputChange}
-                          disabled={
+                    <span style={{ whiteSpace: "nowrap", fontSize: "13px", color: "#333" }}>Unit per:</span>
+                    <div className="controller-instructions-select-wrapper" style={{ width: "100px" }}>
+                      <select
+                        className="controller-instructions-dropdown"
+                        name="rateWeight"
+                        value={String(formData.rateWeight || "Container")}
+                        onChange={handleInputChange}
+                        disabled={
+                          formData.shipmentTypeId === "1" ||
+                          formData.shipmentTypeId === "2" ||
+                          formData.shipmentTypeId === "3"
+                        }
+                        style={{
+                          width: "100%",
+                          padding: "6px 8px",
+                          border: "1px solid #ced4da",
+                          borderRadius: "4px",
+                          fontSize: "13px",
+                          backgroundColor:
+                            formData.shipmentTypeId === "1" ||
+                            formData.shipmentTypeId === "2" ||
+                            formData.shipmentTypeId === "3" ||
+                            formData.shipmentTypeId === "4"
+                              ? "#e9ecef"
+                              : "#fff",
+                          height: "32px",
+                          lineHeight: "1",
+                          cursor:
                             formData.shipmentTypeId === "1" ||
                             formData.shipmentTypeId === "2" ||
                             formData.shipmentTypeId === "3"
-                          }
-                          style={{
-                            width: "100%",
-                            padding: "6px 8px",
-                            border: "1px solid #ced4da",
-                            borderRadius: "4px",
-                            fontSize: "13px",
-                            backgroundColor:
-                              formData.shipmentTypeId === "1" ||
-                              formData.shipmentTypeId === "2" ||
-                              formData.shipmentTypeId === "3" ||
-                              formData.shipmentTypeId === "4"
-                                ? "#e9ecef"
-                                : "#fff",
-                            height: "32px",
-                            lineHeight: "1",
-                            cursor:
-                              formData.shipmentTypeId === "1" ||
-                              formData.shipmentTypeId === "2" ||
-                              formData.shipmentTypeId === "3"
-                                ? "not-allowed"
-                                : "pointer",
-                          }}
-                        >
-                          {formData.shipmentTypeId === "1" ||
-                          formData.shipmentTypeId === "2" ||
-                          formData.shipmentTypeId === "3" ? (
+                              ? "not-allowed"
+                              : "pointer",
+                        }}
+                      >
+                        {formData.shipmentTypeId === "1" ||
+                        formData.shipmentTypeId === "2" ||
+                        formData.shipmentTypeId === "3" ? (
+                          <option value="Container">Container</option>
+                        ) : formData.shipmentTypeId === "4" ? (
+                          <>
+                            <option value="kg">kg</option>
+                            <option value="ton">ton</option>
+                          </>
+                        ) : (
+                          <>
+                            <option value="kg">kg</option>
+                            <option value="ton">ton</option>
                             <option value="Container">Container</option>
-                          ) : formData.shipmentTypeId === "4" ? (
-                            <>
-                              <option value="kg">kg</option>
-                              <option value="ton">ton</option>
-                            </>
-                          ) : (
-                            <>
-                              <option value="kg">kg</option>
-                              <option value="ton">ton</option>
-                              <option value="Container">Container</option>
-                            </>
-                          )}
-                        </select>
-                      </div>
-                      {isWeightBased && (
-                        <div
-                          className="controller-instructions-weight-input-group"
-                          ref={fieldRefs.current.weight}
-                          style={{ display: "flex", alignItems: "center", gap: "4px" }}
-                        >
-                          <div style={{ display: "flex", gap: "4px", alignItems: "center" }}>
-                            <div className="controller-instructions-input-wrapper" style={{ width: "100%" }}>
-                              <input
-                                type="text"
-                                className={`controller-instructions-form-input ${fieldErrors.weight ? "controller-instructions-error-field" : ""}`}
-                                placeholder="Wt"
-                                name="weight"
-                                value={formData.weight}
-                                onChange={(e) => {
-                                  const value = e.target.value
-                                  if (value === "" || /^[0-9]*\.?[0-9]*$/.test(value)) {
-                                    handleInputChange(e)
-                                  }
-                                }}
-                                style={{
-                                  width: "100%",
-                                  padding: "4px 6px",
-                                  border: "1px solid #ced4da",
-                                  borderRadius: "4px",
-                                  fontSize: "12px",
-                                  height: "28px",
-                                  lineHeight: "1",
-                                }}
-                              />
-                            </div>
-                            <div className="controller-instructions-input-wrapper" style={{ width: "100%" }}>
-                              <input
-                                type="text"
-                                className={`controller-instructions-form-input ${fieldErrors.unitrate ? "controller-instructions-error-field" : ""}`}
-                                placeholder="Rate"
-                                name="unitrate"
-                                value={formData.unitrate || ""}
-                                onChange={(e) => {
-                                  const value = e.target.value
-                                  if (value === "" || /^[0-9]*\.?[0-9]*$/.test(value)) {
-                                    handleInputChange(e)
-                                  }
-                                }}
-                                style={{
-                                  width: "100%",
-                                  padding: "4px 6px",
-                                  border: "1px solid #ced4da",
-                                  borderRadius: "4px",
-                                  fontSize: "12px",
-                                  height: "28px",
-                                  lineHeight: "1",
-                                }}
-                              />
-                            </div>
-                            <span style={{ whiteSpace: "nowrap", fontSize: "13px", color: "#333" }}>
-                              {formData.rateWeight}
-                            </span>
-                          </div>
-                          <ErrorTooltip message={fieldErrors.weight} />
-                          <ErrorTooltip message={fieldErrors.unitrate} />
-                        </div>
-                      )}
+                          </>
+                        )}
+                      </select>
                     </div>
+                    {isWeightBased && (
+                      <div
+                        className="controller-instructions-weight-input-group"
+                        ref={fieldRefs.current.weight}
+                        style={{ display: "flex", alignItems: "center", gap: "4px" }}
+                      >
+                        <div style={{ display: "flex", gap: "4px", alignItems: "center" }}>
+                          <div className="controller-instructions-input-wrapper" style={{ width: "100%" }}>
+                            <input
+                              type="text"
+                              className={`controller-instructions-form-input ${fieldErrors.weight ? "controller-instructions-error-field" : ""}`}
+                              placeholder="Wt"
+                              name="weight"
+                              value={formData.weight}
+                              onChange={(e) => {
+                                const value = e.target.value
+                                if (value === "" || /^[0-9]*\.?[0-9]*$/.test(value)) {
+                                  handleInputChange(e)
+                                }
+                              }}
+                              style={{
+                                width: "100%",
+                                padding: "4px 6px",
+                                border: "1px solid #ced4da",
+                                borderRadius: "4px",
+                                fontSize: "12px",
+                                height: "28px",
+                                lineHeight: "1",
+                              }}
+                            />
+                          </div>
+                          <div className="controller-instructions-input-wrapper" style={{ width: "100%" }}>
+                            <input
+                              type="text"
+                              className={`controller-instructions-form-input ${fieldErrors.unitrate ? "controller-instructions-error-field" : ""}`}
+                              placeholder="Rate"
+                              name="unitrate"
+                              value={formData.unitrate || ""}
+                              onChange={(e) => {
+                                const value = e.target.value
+                                if (value === "" || /^[0-9]*\.?[0-9]*$/.test(value)) {
+                                  handleInputChange(e)
+                                }
+                              }}
+                              style={{
+                                width: "100%",
+                                padding: "4px 6px",
+                                border: "1px solid #ced4da",
+                                borderRadius: "4px",
+                                fontSize: "12px",
+                                height: "28px",
+                                lineHeight: "1",
+                              }}
+                            />
+                          </div>
+                          <span style={{ whiteSpace: "nowrap", fontSize: "13px", color: "#333" }}>
+                            {formData.rateWeight}
+                          </span>
+                        </div>
+                        <ErrorTooltip message={fieldErrors.weight} />
+                        <ErrorTooltip message={fieldErrors.unitrate} />
+                      </div>
+                    )}
                   </div>
                 </div>
               </div>
             </div>
-            {!isAddOn ? (
-              <div
-                className="controller-instructions-booking-vertical-group"
-                style={{
-                  marginTop: "8px",
-                  display: "flex",
-                  flexDirection: "column",
-                  gap: "8px",
-                  width: "100%",
-                  boxSizing: "border-box",
-                }}
-              >
-                <div style={{ display: "flex", gap: "12px", flexWrap: "wrap", width: "100%", marginBottom: "12px" }}>
+
+            {/* RIGHT: Booking + dates + VAT/vessel/description */}
+            {!isAddOn && (
+              <div className="controller-instructions-booking-rates-group">
+                {/* Top row: shipment type + refs */}
+                <div
+                  className="controller-instructions-booking-rates-row"
+                  style={{ marginBottom: "8px", flexWrap: "wrap" }}
+                >
+                  {/* Shipment Type (normal shipments) */}
+                  <div
+                    className="controller-instructions-form-field"
+                    style={{ flex: "1 1 160px" }}
+                  >
+                    <label>Shipment Type</label>
+                    <div
+                      className="controller-instructions-select-wrapper"
+                      ref={fieldRefs.current.shipmentTypeId}
+                    >
+                      <select
+                        className={`dropdown ${
+                          fieldErrors.shipmentTypeId
+                            ? "controller-instructions-error-field"
+                            : ""
+                        }`}
+                        name="shipmentTypeId"
+                        value={formData.shipmentTypeId}
+                        onChange={handleShipmentTypeChange}
+                        disabled={
+                          isLoading.shipmentTypes || shipmentTypes.length === 0
+                        }
+                      >
+                        <option value="" disabled>
+                          Select Shipment
+                        </option>
+                        {shipmentTypes.map((type) => (
+                          <option key={type.shipkey} value={type.shipkey}>
+                            {type.shipmenttype}
+                          </option>
+                        ))}
+                      </select>
+                      <ErrorTooltip message={fieldErrors.shipmentTypeId} />
+                    </div>
+                  </div>
+
                   {/* Booking Ref */}
-                  <div className="controller-instructions-form-field" style={{ flex: "1 1 180px" }}>
+                  <div
+                    className="controller-instructions-form-field"
+                    style={{ flex: "1 1 180px" }}
+                  >
                     <label>Booking Ref</label>
                     <div className="controller-instructions-input-wrapper" ref={fieldRefs.current.bookingRef}>
                       <input
@@ -2198,209 +2247,259 @@ const ControllerInstructions = () => {
                   </div>
                 </div>
 
-                {/* Stack Date and Last Free Date row */}
-                <div style={{ display: "flex", gap: "12px", flexWrap: "wrap", width: "100%", marginBottom: "12px" }}>
-
-                  {/* Stack/ETA Date - Hidden for Cross-haul */}
-                  {!isCrossHaul && (
-                    <div className="controller-instructions-form-field" style={{ flex: "0 0 140px" }}>
-                      <label>{isImport ? "ETA" : "Stack Date"}</label>
-                      <div className="controller-instructions-input-wrapper" ref={etaDateRef}>
-                        <input
-                          type="date"
-                          className={`controller-instructions-form-input ${fieldErrors.stackDate ? "controller-instructions-error-field" : ""}`}
-                          ref={etaDateRef}
-                          name="stackDate"
-                          value={formData.stackDate}
-                          onChange={handleInputChange}
-                          style={{
-                            width: "100%",
-                            padding: "6px 8px",
-                            border: "1px solid #ced4da",
-                            borderRadius: "4px",
-                            fontSize: "13px",
-                            height: "32px",
-                          }}
-                          min={today}
-                          disabled={false}
-                          onClick={() => openCalendar(etaDateRef)}
-                          onKeyDown={(e) => e.preventDefault()}
-                        />
-                        <ErrorTooltip message={fieldErrors.stackDate} />
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Last Free Date */}
-                  <div className="controller-instructions-form-field" style={{ flex: "0 0 140px" }}>
-                    <label>Last Free Date</label>
-                    <div className="controller-instructions-input-wrapper" ref={fieldRefs.current.lastFreeDate}>
-                      <input
-                        type="date"
-                        className={`controller-instructions-form-input ${fieldErrors.lastFreeDate ? "controller-instructions-error-field" : ""}`}
-                        ref={lastFreeDateRef}
-                        placeholder="Date here"
-                        name="lastFreeDate"
-                        value={formData.lastFreeDate}
-                        onChange={handleInputChange}
-                        min={today}
-                        style={{ width: "100%" }}
-                        onKeyDown={(e) => e.preventDefault()}
-                      />
-                      <ErrorTooltip message={fieldErrors.lastFreeDate} />
-                    </div>
-                  </div>
-                </div>
-
-                {/* Description field for Cross-haul - shown below date/time fields */}
-                {isCrossHaul && (
-                  <div className="controller-instructions-form-field" style={{ width: "100%", marginTop: "12px" }}>
-                    <label>Description from Client</label>
-                    <div className="controller-instructions-input-wrapper" ref={fieldRefs.current.description}>
-                      <input
-                        type="text"
-                        className={`controller-instructions-form-input ${fieldErrors.description ? "controller-instructions-error-field" : ""}`}
-                        placeholder="Description from Client"
-                        name="description"
-                        value={formData.description}
-                        onChange={handleInputChange}
-                        style={{
-                          width: "100%",
-                          padding: "8px 12px",
-                          border: "1px solid #ced4da",
-                          borderRadius: "4px",
-                          fontSize: "14px",
-                          boxSizing: "border-box",
-                          height: "36px",
-                        }}
-                      />
-                      <ErrorTooltip message={fieldErrors.description} />
-                    </div>
-                  </div>
-                )}
-
-                {/* Import/Export layout: Vessel Name and Description on left; File Ref, Name of Task, dates on right */}
-                {!isCrossHaul && (
+                {/* Date / description rows */}
+                {isCrossHaul ? (
                   <>
-                    {/* Import/Export layout: Vessel Name and Description on left; File Ref, Name of Task, dates on right */}
+                    {/* Cross-haul: Last Free Date row */}
                     <div
-                      style={{
-                        display: "flex",
-                        gap: "12px",
-                        alignItems: "flex-start",
-                        width: "100%",
-                        flexWrap: "wrap",
-                      }}
+                      className="controller-instructions-booking-rates-row"
+                      style={{ marginBottom: "8px", flexWrap: "wrap" }}
                     >
                       <div
-                        style={{
-                          display: "grid",
-                          gridTemplateColumns: "repeat(auto-fill, minmax(160px, 1fr))",
-                          gap: "24px",
-                          width: "100%",
-                        }}
+                        className="controller-instructions-form-field"
+                        style={{ flex: "0 0 140px" }}
                       >
-                        {/* VAT Rate */}
-                        <div className="controller-instructions-form-field" style={{ width: "100%" }}>
-                          <label>VAT Rate</label>
-                          <div className="controller-instructions-input-wrapper">
-                            <input
-                              type="text"
-                              className="controller-instructions-form-input"
-                              value={`${formData.vat || 15}%`}
-                              readOnly
-                              style={{
-                                width: "100%",
-                                padding: "4px 6px",
-                                fontSize: "12px",
-                                height: "30px",
-                              }}
-                            />
-                          </div>
-                        </div>
-
-                        {/* Vessel Name - Hidden for Cross-haul */}
-                        {!isCrossHaul && (
-                          <div className="controller-instructions-form-field" style={{ width: "100%" }}>
-                            <label>Vessel Name</label>
-                            <div className="controller-instructions-input-wrapper" ref={fieldRefs.current.vesselName}>
-                              <input
-                                type="text"
-                                className={`controller-instructions-form-input vessel-name-input ${fieldErrors.vesselName ? "controller-instructions-error-field" : ""}`}
-                                placeholder="Vessel name"
-                                name="vesselName"
-                                value={formData.vesselName}
-                                onChange={handleInputChange}
-                                style={{
-                                  width: "100%",
-                                  padding: "4px 6px",
-                                  border: "1px solid #ced4da",
-                                  borderRadius: "4px",
-                                  fontSize: "12px",
-                                  height: "30px",
-                                }}
-                              />
-                              <ErrorTooltip message={fieldErrors.vesselName} />
-                            </div>
-                          </div>
-                        )}
-
-                        {/* Description from Client */}
-                        <div className="controller-instructions-form-field" style={{ width: "100%" }}>
-                          <label>Description</label>
-                          <div className="controller-instructions-input-wrapper" ref={fieldRefs.current.description}>
-                            <input
-                              type="text"
-                              className={`controller-instructions-form-input ${fieldErrors.description ? "controller-instructions-error-field" : ""}`}
-                              placeholder="Description"
-                              name="description"
-                              value={formData.description}
-                              onChange={handleInputChange}
-                              style={{
-                                width: "100%",
-                                padding: "4px 6px",
-                                border: "1px solid #ced4da",
-                                borderRadius: "4px",
-                                fontSize: "12px",
-                                height: "30px",
-                              }}
-                            />
-                            <ErrorTooltip message={fieldErrors.description} />
-                          </div>
+                        <label>Last Free Date</label>
+                        <div
+                          className="controller-instructions-input-wrapper"
+                          ref={fieldRefs.current.lastFreeDate}
+                        >
+                          <input
+                            type="date"
+                            className={`controller-instructions-form-input ${
+                              fieldErrors.lastFreeDate
+                                ? "controller-instructions-error-field"
+                                : ""
+                            }`}
+                            ref={lastFreeDateRef}
+                            placeholder="Date here"
+                            name="lastFreeDate"
+                            value={formData.lastFreeDate}
+                            onChange={handleInputChange}
+                            min={today}
+                            style={{ width: "100%" }}
+                            onKeyDown={(e) => e.preventDefault()}
+                          />
+                          <ErrorTooltip message={fieldErrors.lastFreeDate} />
                         </div>
                       </div>
                     </div>
 
-                    {/* Date and Time Section for Import/Export */}
-                    <div className="controller-instructions-date-time-group">
+                    {/* Cross-haul: Description row */}
+                    <div
+                      className="controller-instructions-booking-rates-row"
+                      style={{ flexWrap: "wrap" }}
+                    >
                       <div
-                        className="controller-instructions-shipment-task-row"
-                        style={{ order: -1, marginBottom: "8px" }}
-                      ></div>
-                      <div
-                        className="controller-instructions-date-time-row-1"
-                        style={{
-                          marginTop: "15px",
-                          display: "grid",
-                          gridTemplateColumns: "repeat(auto-fill, minmax(140px, 1fr))",
-                          gap: "12px",
-                        }}
-                      ></div>
-                      <div
-                        className="controller-instructions-date-time-row-2"
-                        style={{
-                          display: "grid",
-                          gridTemplateColumns: "repeat(auto-fill, minmax(140px, 1fr))",
-                          gap: "12px",
-                        }}
+                        className="controller-instructions-form-field"
+                        style={{ width: "100%" }}
                       >
-                        {/* This space is left intentionally blank after moving the stack date field */}
+                        <label>Description from Client</label>
+                        <div
+                          className="controller-instructions-input-wrapper"
+                          ref={fieldRefs.current.description}
+                        >
+                          <input
+                            type="text"
+                            className={`controller-instructions-form-input ${
+                              fieldErrors.description
+                                ? "controller-instructions-error-field"
+                                : ""
+                            }`}
+                            placeholder="Description from Client"
+                            name="description"
+                            value={formData.description}
+                            onChange={handleInputChange}
+                            style={{
+                              width: "100%",
+                              padding: "8px 12px",
+                              border: "1px solid #ced4da",
+                              borderRadius: "4px",
+                              fontSize: "14px",
+                              boxSizing: "border-box",
+                              height: "36px",
+                            }}
+                          />
+                          <ErrorTooltip message={fieldErrors.description} />
+                        </div>
+                      </div>
+                    </div>
+                  </>
+                ) : (
+                  <>
+                    {/* Import/Export: Stack Date + Last Free Date row */}
+                    <div
+                      className="controller-instructions-booking-rates-row"
+                      style={{ marginBottom: "8px", flexWrap: "wrap" }}
+                    >
+                      {/* Stack/ETA Date */}
+                      <div
+                        className="controller-instructions-form-field"
+                        style={{ flex: "0 0 140px" }}
+                      >
+                        <label>{isImport ? "ETA" : "Stack Date"}</label>
+                        <div
+                          className="controller-instructions-input-wrapper"
+                          ref={etaDateRef}
+                        >
+                          <input
+                            type="date"
+                            className={`controller-instructions-form-input ${
+                              fieldErrors.stackDate
+                                ? "controller-instructions-error-field"
+                                : ""
+                            }`}
+                            ref={etaDateRef}
+                            name="stackDate"
+                            value={formData.stackDate}
+                            onChange={handleInputChange}
+                            style={{
+                              width: "100%",
+                              padding: "6px 8px",
+                              border: "1px solid #ced4da",
+                              borderRadius: "4px",
+                              fontSize: "13px",
+                              height: "32px",
+                            }}
+                            min={today}
+                            disabled={false}
+                            onClick={() => openCalendar(etaDateRef)}
+                            onKeyDown={(e) => e.preventDefault()}
+                          />
+                          <ErrorTooltip message={fieldErrors.stackDate} />
+                        </div>
+                      </div>
+
+                      {/* Last Free Date */}
+                      <div
+                        className="controller-instructions-form-field"
+                        style={{ flex: "0 0 140px" }}
+                      >
+                        <label>Last Free Date</label>
+                        <div
+                          className="controller-instructions-input-wrapper"
+                          ref={fieldRefs.current.lastFreeDate}
+                        >
+                          <input
+                            type="date"
+                            className={`controller-instructions-form-input ${
+                              fieldErrors.lastFreeDate
+                                ? "controller-instructions-error-field"
+                                : ""
+                            }`}
+                            ref={lastFreeDateRef}
+                            placeholder="Date here"
+                            name="lastFreeDate"
+                            value={formData.lastFreeDate}
+                            onChange={handleInputChange}
+                            min={today}
+                            style={{ width: "100%" }}
+                            onKeyDown={(e) => e.preventDefault()}
+                          />
+                          <ErrorTooltip message={fieldErrors.lastFreeDate} />
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Import/Export: VAT + Vessel + Description row */}
+                    <div
+                      className="controller-instructions-booking-rates-row"
+                      style={{ flexWrap: "wrap" }}
+                    >
+                      {/* VAT Rate */}
+                      <div
+                        className="controller-instructions-form-field"
+                        style={{ flex: "0 0 120px", minWidth: "100px" }}
+                      >
+                        <label>VAT Rate</label>
+                        <div className="controller-instructions-input-wrapper">
+                          <input
+                            type="text"
+                            className="controller-instructions-form-input"
+                            value={`${formData.vat || 15}%`}
+                            readOnly
+                            style={{
+                              width: "100%",
+                              padding: "4px 6px",
+                              fontSize: "12px",
+                              height: "30px",
+                            }}
+                          />
+                        </div>
+                      </div>
+
+                      {/* Vessel Name */}
+                      <div
+                        className="controller-instructions-form-field"
+                        style={{ flex: "1 1 160px", minWidth: "140px" }}
+                      >
+                        <label>Vessel Name</label>
+                        <div
+                          className="controller-instructions-input-wrapper"
+                          ref={fieldRefs.current.vesselName}
+                        >
+                          <input
+                            type="text"
+                            className={`controller-instructions-form-input vessel-name-input ${
+                              fieldErrors.vesselName
+                                ? "controller-instructions-error-field"
+                                : ""
+                            }`}
+                            placeholder="Vessel name"
+                            name="vesselName"
+                            value={formData.vesselName}
+                            onChange={handleInputChange}
+                            style={{
+                              width: "100%",
+                              padding: "4px 6px",
+                              border: "1px solid #ced4da",
+                              borderRadius: "4px",
+                              fontSize: "12px",
+                              height: "30px",
+                            }}
+                          />
+                          <ErrorTooltip message={fieldErrors.vesselName} />
+                        </div>
+                      </div>
+
+                      {/* Description */}
+                      <div
+                        className="controller-instructions-form-field"
+                        style={{ flex: "2 1 200px", minWidth: "160px" }}
+                      >
+                        <label>Description</label>
+                        <div
+                          className="controller-instructions-input-wrapper"
+                          ref={fieldRefs.current.description}
+                        >
+                          <input
+                            type="text"
+                            className={`controller-instructions-form-input ${
+                              fieldErrors.description
+                                ? "controller-instructions-error-field"
+                                : ""
+                            }`}
+                            placeholder="Description"
+                            name="description"
+                            value={formData.description}
+                            onChange={handleInputChange}
+                            style={{
+                              width: "100%",
+                              padding: "4px 6px",
+                              border: "1px solid #ced4da",
+                              borderRadius: "4px",
+                              fontSize: "12px",
+                              height: "30px",
+                            }}
+                          />
+                          <ErrorTooltip message={fieldErrors.description} />
+                        </div>
                       </div>
                     </div>
                   </>
                 )}
               </div>
-            ) : null}
+            )}
           </div>
         </div>
         {/* Container Details Section - Only show for container-based calculations */}
