@@ -4271,7 +4271,7 @@ const FCcontrollerinstructions = () => {
                     <div
                       style={{
                         display: "flex",
-                        alignItems: "flex-start",
+                        alignItems: "center",
                         gap: "15px",
                         width: "100%",
                       }}
@@ -4279,7 +4279,7 @@ const FCcontrollerinstructions = () => {
                       {/* Unit per dropdown */}
                       <div
                         className="controller-instructions-select-wrapper"
-                        style={{ minWidth: "100px", marginTop: "5px" }}
+                        style={{ minWidth: "100px", marginTop: 0 }}
                       >
                         <select
                           className="controller-instructions-dropdown"
@@ -4320,16 +4320,30 @@ const FCcontrollerinstructions = () => {
                               display: "flex",
                               gap: "15px",
                               width: "100%",
-                              marginTop: "48px",
-                              marginLeft: "-113px",
+                              alignItems: "center",
                             }}
                           >
-                            {/* Unit Rate Field */}
+                            {/* Unit Rate Field - inline text + input */}
                             <div
                               className="controller-instructions-form-field"
-                              style={{ flex: 1, minWidth: "150px" }}
+                              style={{
+                                flex: 1,
+                                minWidth: "150px",
+                                display: "flex",
+                                alignItems: "center",
+                                gap: "8px",
+                                margin: 0,
+                              }}
                             >
-                              <label>{`Rate per ${formData.rateWeight}`}</label>
+                              <span
+                                style={{
+                                  whiteSpace: "nowrap",
+                                  fontSize: "13px",
+                                  color: "#333",
+                                }}
+                              >
+                                {`Rate per ${formData.rateWeight}`}
+                              </span>
                               <div
                                 className="controller-instructions-input-wrapper"
                                 ref={fieldRefs.unitRate}
@@ -4402,152 +4416,6 @@ const FCcontrollerinstructions = () => {
                               </div>
                             )}
                           </div>
-
-                          {String(formData.shipmentTypeId) === "4" && (
-                            <div
-                              className="controller-instructions-form-field"
-                              style={{ width: "100%", marginTop: "8px" }}
-                            >
-                              <label>Weight Details</label>
-                              <div style={{ width: "100%" }}>
-                                <table
-                                  style={{
-                                    width: "100%",
-                                    borderCollapse: "collapse",
-                                    fontSize: "12px",
-                                  }}
-                                >
-                                  <thead>
-                                    <tr>
-                                      <th style={{ border: "1px solid #dee2e6", padding: "4px" }}>
-                                        KSM DN Number
-                                      </th>
-                                      <th style={{ border: "1px solid #dee2e6", padding: "4px" }}>
-                                        Ticket Number
-                                      </th>
-                                      <th style={{ border: "1px solid #dee2e6", padding: "4px" }}>
-                                        Receipt Book Number
-                                      </th>
-                                      <th style={{ border: "1px solid #dee2e6", padding: "4px" }}>
-                                        Weight ({formData.rateWeight})
-                                      </th>
-                                      <th style={{ border: "1px solid #dee2e6", padding: "4px" }}></th>
-                                    </tr>
-                                  </thead>
-                                  <tbody>
-                                    {weightRows.map((row) => (
-                                      <tr key={row.id}>
-                                        <td style={{ border: "1px solid #dee2e6", padding: "2px 4px" }}>
-                                          <input
-                                            type="text"
-                                            className="controller-instructions-form-input"
-                                            value={row.ksmDmNo || ""}
-                                            onChange={(e) =>
-                                              updateWeightRow(row.id, "ksmDmNo", e.target.value)
-                                            }
-                                            disabled={isReadOnly}
-                                            style={{ width: "100%", fontSize: "12px", height: "26px" }}
-                                          />
-                                        </td>
-                                        <td style={{ border: "1px solid #dee2e6", padding: "2px 4px" }}>
-                                          <input
-                                            type="text"
-                                            className="controller-instructions-form-input"
-                                            value={row.ticketNo || ""}
-                                            onChange={(e) =>
-                                              updateWeightRow(row.id, "ticketNo", e.target.value)
-                                            }
-                                            disabled={isReadOnly}
-                                            style={{ width: "100%", fontSize: "12px", height: "26px" }}
-                                          />
-                                        </td>
-                                        <td style={{ border: "1px solid #dee2e6", padding: "2px 4px" }}>
-                                          <input
-                                            type="text"
-                                            className="controller-instructions-form-input"
-                                            value={row.receiptBookNo || ""}
-                                            onChange={(e) =>
-                                              updateWeightRow(row.id, "receiptBookNo", e.target.value)
-                                            }
-                                            disabled={isReadOnly}
-                                            style={{ width: "100%", fontSize: "12px", height: "26px" }}
-                                          />
-                                        </td>
-                                        <td style={{ border: "1px solid #dee2e6", padding: "2px 4px" }}>
-                                          <input
-                                            type="text"
-                                            className="controller-instructions-form-input"
-                                            value={row.weight || ""}
-                                            onChange={(e) => {
-                                              const value = e.target.value;
-                                              if (
-                                                value === "" ||
-                                                /^[0-9]*\.?[0-9]*$/.test(value)
-                                              ) {
-                                                updateWeightRow(row.id, "weight", value);
-                                              }
-                                            }}
-                                            disabled={isReadOnly}
-                                            style={{ width: "100%", fontSize: "12px", height: "26px" }}
-                                          />
-                                        </td>
-                                        <td
-                                          style={{
-                                            border: "1px solid #dee2e6",
-                                            padding: "2px 4px",
-                                            textAlign: "center",
-                                            whiteSpace: "nowrap",
-                                          }}
-                                        >
-                                          {!isReadOnly && (
-                                            <button
-                                              type="button"
-                                              onClick={() => removeWeightRow(row.id)}
-                                              style={{
-                                                padding: "2px 6px",
-                                                fontSize: "11px",
-                                                borderRadius: "4px",
-                                                border: "1px solid #dc3545",
-                                                backgroundColor: "#fff",
-                                                color: "#dc3545",
-                                                cursor: "pointer",
-                                              }}
-                                            >
-                                              Remove
-                                            </button>
-                                          )}
-                                        </td>
-                                      </tr>
-                                    ))}
-                                    {!isReadOnly && (
-                                      <tr>
-                                        <td
-                                          colSpan={5}
-                                          style={{ padding: "4px", textAlign: "left" }}
-                                        >
-                                          <button
-                                            type="button"
-                                            onClick={addWeightRow}
-                                            style={{
-                                              padding: "4px 8px",
-                                              fontSize: "12px",
-                                              borderRadius: "4px",
-                                              border: "1px solid #4a90e2",
-                                              backgroundColor: "#4a90e2",
-                                              color: "#fff",
-                                              cursor: "pointer",
-                                            }}
-                                          >
-                                            Add Row
-                                          </button>
-                                        </td>
-                                      </tr>
-                                    )}
-                                  </tbody>
-                                </table>
-                              </div>
-                            </div>
-                          )}
                         </>
                       )}
                     </div>
@@ -4669,29 +4537,64 @@ const FCcontrollerinstructions = () => {
                       </div>
                     </div>
                   </div>
-                  <div className="controller-instructions-form-field">
-                    <label>Ksm File Reference</label>
-                    <div
-                      className="controller-instructions-input-wrapper"
-                      ref={fieldRefs.ksmFileRef}
-                    >
-                      <input
-                        type="text"
-                        className={`controller-instructions-form-input ${
-                          fieldErrors.ksmFileRef
-                            ? "controller-instructions-error-field"
-                            : ""
-                        }`}
-                        placeholder="Input KSM File Reference"
-                        name="ksmFileRef"
-                        value={formData.ksmFileRef}
-                        onChange={handleInputChange}
-                        disabled={isReadOnly}
-                        style={isReadOnly ? readOnlyStyle : {}}
-                      />
-                      <InstructionErrorTooltip message={fieldErrors.ksmFileRef} />
+
+                  {/* KSM File Reference and Last Free Date row below Booking/Client */}
+                  <div
+                    className="controller-instructions-shipment-task-row"
+                    style={{ marginBottom: "8px" }}
+                  >
+                    <div className="controller-instructions-form-field controller-instructions-small-field">
+                      <label>Ksm File Reference</label>
+                      <div
+                        className="controller-instructions-input-wrapper"
+                        ref={fieldRefs.ksmFileRef}
+                      >
+                        <input
+                          type="text"
+                          className={`controller-instructions-form-input ${
+                            fieldErrors.ksmFileRef
+                              ? "controller-instructions-error-field"
+                              : ""
+                          }`}
+                          placeholder="Input KSM File Reference"
+                          name="ksmFileRef"
+                          value={formData.ksmFileRef}
+                          onChange={handleInputChange}
+                          disabled={isReadOnly}
+                          style={isReadOnly ? readOnlyStyle : {}}
+                        />
+                        <InstructionErrorTooltip message={fieldErrors.ksmFileRef} />
+                      </div>
+                    </div>
+                    <div className="controller-instructions-form-field controller-instructions-small-field">
+                      <label>Last Free Date</label>
+                      <div
+                        className="controller-instructions-date-wrapper"
+                        ref={fieldRefs.lastFreeDate}
+                      >
+                        <input
+                          type="date"
+                          className={`controller-instructions-form-input ${
+                            fieldErrors.lastFreeDate
+                              ? "controller-instructions-error-field"
+                              : ""
+                          }`}
+                          name="lastFreeDate"
+                          value={formData.lastFreeDate}
+                          onChange={handleInputChange}
+                          min={today}
+                          ref={lastFreeDateRef}
+                          disabled={isReadOnly}
+                          style={isReadOnly ? readOnlyStyle : {}}
+                          onKeyDown={(e) => e.preventDefault()} // stops typing
+                        />
+                        <InstructionErrorTooltip
+                          message={fieldErrors.lastFreeDate}
+                        />
+                      </div>
                     </div>
                   </div>
+
                   <div
                     className="controller-instructions-form-field"
                     style={{ maxWidth: "120px" }}
@@ -4771,7 +4674,6 @@ const FCcontrollerinstructions = () => {
                   className="controller-instructions-date-time-group"
                   style={isAddOn ? { display: "none" } : undefined}
                 >
-                 
                   {(formData.shipmentTypeId === "1" ||
                     formData.shipmentTypeId === "2") && (
                     <div className="controller-instructions-form-field">
@@ -4808,38 +4710,168 @@ const FCcontrollerinstructions = () => {
                       </div>
                     </div>
                   )}
-                  <div className="controller-instructions-form-field">
-                    <label>Last Free Date</label>
-                    <div
-                      className="controller-instructions-date-wrapper"
-                      ref={fieldRefs.lastFreeDate}
-                    >
-                      <input
-                        type="date"
-                        className={`controller-instructions-form-input ${
-                          fieldErrors.lastFreeDate
-                            ? "controller-instructions-error-field"
-                            : ""
-                        }`}
-                        name="lastFreeDate"
-                        value={formData.lastFreeDate}
-                        onChange={handleInputChange}
-                        min={today}
-                        ref={lastFreeDateRef}
-                        disabled={isReadOnly}
-                        style={isReadOnly ? readOnlyStyle : {}}
-                        onKeyDown={(e) => e.preventDefault()} // stops typing
-                        
-                      />
-                      <InstructionErrorTooltip
-                        message={fieldErrors.lastFreeDate}
-                      />
-                    </div>
-                  </div>
                 </div>
               </div>
             </div>
           </div>
+
+          {/* Weight Details Table for shipment type 4 */}
+          {String(formData.shipmentTypeId) === "4" && weightRows.length > 0 && (
+            <div
+              className="controller-instructions-form-section"
+              style={{ marginTop: "-100px", paddingTop: "0" }}
+            >
+              <div
+                className="controller-instructions-form-row"
+                style={{ marginTop: "0" }}
+              >
+                <div
+                  className="controller-instructions-form-field"
+                  style={{ width: "100%" }}
+                >
+                  <label>Weight Details</label>
+                  <div style={{ width: "100%" }}>
+                    <table
+                      style={{
+                        width: "100%",
+                        borderCollapse: "collapse",
+                        fontSize: "12px",
+                      }}
+                    >
+                      <thead>
+                        <tr>
+                          <th style={{ border: "1px solid #dee2e6", padding: "4px" }}>
+                            KSM DN Number
+                          </th>
+                          <th style={{ border: "1px solid #dee2e6", padding: "4px" }}>
+                            Ticket Number
+                          </th>
+                          <th style={{ border: "1px solid #dee2e6", padding: "4px" }}>
+                            Receipt Book Number
+                          </th>
+                          <th style={{ border: "1px solid #dee2e6", padding: "4px" }}>
+                            Weight ({formData.rateWeight})
+                          </th>
+                          <th style={{ border: "1px solid #dee2e6", padding: "4px" }}></th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {weightRows.map((row) => (
+                          <tr key={row.id}>
+                            <td style={{ border: "1px solid #dee2e6", padding: "2px 4px" }}>
+                              <input
+                                type="text"
+                                className="controller-instructions-form-input"
+                                value={row.ksmDmNo || ""}
+                                onChange={(e) =>
+                                  updateWeightRow(row.id, "ksmDmNo", e.target.value)
+                                }
+                                disabled={isReadOnly}
+                                style={{ width: "100%", fontSize: "12px", height: "26px" }}
+                              />
+                            </td>
+                            <td style={{ border: "1px solid #dee2e6", padding: "2px 4px" }}>
+                              <input
+                                type="text"
+                                className="controller-instructions-form-input"
+                                value={row.ticketNo || ""}
+                                onChange={(e) =>
+                                  updateWeightRow(row.id, "ticketNo", e.target.value)
+                                }
+                                disabled={isReadOnly}
+                                style={{ width: "100%", fontSize: "12px", height: "26px" }}
+                              />
+                            </td>
+                            <td style={{ border: "1px solid #dee2e6", padding: "2px 4px" }}>
+                              <input
+                                type="text"
+                                className="controller-instructions-form-input"
+                                value={row.receiptBookNo || ""}
+                                onChange={(e) =>
+                                  updateWeightRow(row.id, "receiptBookNo", e.target.value)
+                                }
+                                disabled={isReadOnly}
+                                style={{ width: "100%", fontSize: "12px", height: "26px" }}
+                              />
+                            </td>
+                            <td style={{ border: "1px solid #dee2e6", padding: "2px 4px" }}>
+                              <input
+                                type="text"
+                                className="controller-instructions-form-input"
+                                value={row.weight || ""}
+                                onChange={(e) => {
+                                  const value = e.target.value;
+                                  if (
+                                    value === "" ||
+                                    /^[0-9]*\.?[0-9]*$/.test(value)
+                                  ) {
+                                    updateWeightRow(row.id, "weight", value);
+                                  }
+                                }}
+                                disabled={isReadOnly}
+                                style={{ width: "100%", fontSize: "12px", height: "26px" }}
+                              />
+                            </td>
+                            <td
+                              style={{
+                                border: "1px solid #dee2e6",
+                                padding: "2px 4px",
+                                textAlign: "center",
+                                whiteSpace: "nowrap",
+                              }}
+                            >
+                              {!isReadOnly && (
+                                <button
+                                  type="button"
+                                  onClick={() => removeWeightRow(row.id)}
+                                  style={{
+                                    padding: "2px 6px",
+                                    fontSize: "11px",
+                                    borderRadius: "4px",
+                                    border: "1px solid #dc3545",
+                                    backgroundColor: "#fff",
+                                    color: "#dc3545",
+                                    cursor: "pointer",
+                                  }}
+                                >
+                                  Remove
+                                </button>
+                              )}
+                            </td>
+                          </tr>
+                        ))}
+                        {!isReadOnly && (
+                          <tr>
+                            <td
+                              colSpan={5}
+                              style={{ padding: "4px", textAlign: "left" }}
+                            >
+                              <button
+                                type="button"
+                                onClick={addWeightRow}
+                                style={{
+                                  padding: "4px 8px",
+                                  fontSize: "12px",
+                                  borderRadius: "4px",
+                                  border: "1px solid #4a90e2",
+                                  backgroundColor: "#4a90e2",
+                                  color: "#fff",
+                                  cursor: "pointer",
+                                }}
+                              >
+                                Add Row
+                              </button>
+                            </td>
+                          </tr>
+                        )}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
           {/* Container Details Table */}
           {console.log("Debug weight column visibility:", {
             isImport,

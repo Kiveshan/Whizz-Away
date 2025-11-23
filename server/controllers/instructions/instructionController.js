@@ -18,7 +18,8 @@ import {
 } from "../../models/instructions/instructionModel.js"
 
 // Helper function to calculate total cost based on rate weight type
-const calculateTotalCost = (instructionData, containers = []) => {
+// Supports FC shipment type 4 using weight rows + unit rate
+const calculateTotalCost = (instructionData, containers = [], weightData = []) => {
   const rateWeight = instructionData.rateweight || instructionData.rateWeight || "Container"
   
   let baseCost = 0
@@ -39,10 +40,27 @@ const calculateTotalCost = (instructionData, containers = []) => {
       ratePer6 * numSix + ratePer12 * numTwelve + ratePerAbnormal * numAbnormal + ratePerBreakBulk * numBreakBulk
   } else {
     // Weight-based calculation (kg, ton, m³)
-    const weight = Number(instructionData.weight || 0)
-    const unitRate = Number(instructionData.unitrate || 0)
+    const shipmentType = String(
+      instructionData.shipment_type || instructionData.shipmentTypeId || ""
+    )
 
-    baseCost = weight * unitRate
+    // For FC shipment type 4, use the summed weight rows * unit rate
+    if (shipmentType === "4" && Array.isArray(weightData) && weightData.length > 0) {
+      const totalWeight = weightData.reduce((total, row) => {
+        const raw = row.weight
+        if (raw === null || raw === undefined || raw === "") return total
+        const parsed = typeof raw === "string" ? Number.parseFloat(raw.trim()) : Number(raw)
+        return Number.isNaN(parsed) ? total : total + parsed
+      }, 0)
+
+      const unitRate = Number(instructionData.unitrate || 0)
+      baseCost = totalWeight * unitRate
+    } else {
+      // Generic weight * unitRate fallback
+      const weight = Number(instructionData.weight || 0)
+      const unitRate = Number(instructionData.unitrate || 0)
+      baseCost = weight * unitRate
+    }
   }
 
   // Calculate total surcharge from containers
@@ -776,7 +794,8 @@ export const updateFCInstructionAndContainersHandler = async (req, res) => {
     // For FC updates, always calculate the total cost on the backend using the
     // latest instruction/containers so that VGM, surcharge and hazardous
     // changes are guaranteed to be reflected in m1_controller.total_cost.
-    const finalTotalCost = calculateTotalCost(instructionData, containers)
+    // For shipment type 4, this will now use the summed weight rows + unit rate.
+    const finalTotalCost = calculateTotalCost(instructionData, containers, weightData)
     console.log(
       `[${new Date().toISOString()}] [CONTROLLER] updateFCInstructionAndContainersHandler: Backend-calculated total_cost (includes VGM/surcharges/hazardous):`,
       finalTotalCost,

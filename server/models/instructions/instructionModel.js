@@ -1930,6 +1930,11 @@ export const updateFCInstructionAndContainers = async (
         currentInstruction.rateper_breakbulk,
         "number"
       ),
+      unitrate: preserveExistingValue(
+        instructionData.unitrate,
+        currentInstruction.unitrate,
+        "number"
+      ),
     };
 
     // 3. Check if instruction needs updating
