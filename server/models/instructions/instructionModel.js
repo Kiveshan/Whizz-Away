@@ -1407,6 +1407,7 @@ export const getClientRates = async (clientId, start, destination) => {
       "12m_rate" as "twelveMeterRate",
       surcharges,
       hazardous,
+      vgm,
       starting_point as "startingPoint",
       destination
     FROM public.m5_client_rate
@@ -1443,12 +1444,14 @@ export const getClientRates = async (clientId, start, destination) => {
     }
 
     const rateData = rates[0];
-    console.log("[getClientRates] Retrieved rates:", {
+    console.log(`[getClientRates] Retrieved rates:`, {
       rawRow: rateData,
       sixMeterRate: rateData.sixMeterRate,
       twelveMeterRate: rateData.twelveMeterRate,
       surcharges: rateData.surcharges,
       hazardous: rateData.hazardous,
+      vgm: rateData.vgm,
+      vgmRate: rateData.vgmRate, // Return the VGM rate
       startingPoint: rateData.startingPoint,
       destination: rateData.destination,
     });

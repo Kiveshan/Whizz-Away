@@ -773,21 +773,14 @@ export const updateFCInstructionAndContainersHandler = async (req, res) => {
       return res.status(400).json({ success: false, error: "Containers must be an array" })
     }
 
-    // Calculate total cost: prefer frontend-provided total_cost when valid, otherwise fall back to backend calculation
-    let finalTotalCost = instructionData.total_cost
-    if (!finalTotalCost || isNaN(Number(finalTotalCost))) {
-      finalTotalCost = calculateTotalCost(instructionData, containers)
-      console.log(
-        `[${new Date().toISOString()}] [CONTROLLER] updateFCInstructionAndContainersHandler: Calculated total_cost in backend:`,
-        finalTotalCost,
-      )
-    } else {
-      finalTotalCost = Number(Number(finalTotalCost).toFixed(2))
-      console.log(
-        `[${new Date().toISOString()}] [CONTROLLER] updateFCInstructionAndContainersHandler: Using frontend total_cost:`,
-        finalTotalCost,
-      )
-    }
+    // For FC updates, always calculate the total cost on the backend using the
+    // latest instruction/containers so that VGM, surcharge and hazardous
+    // changes are guaranteed to be reflected in m1_controller.total_cost.
+    const finalTotalCost = calculateTotalCost(instructionData, containers)
+    console.log(
+      `[${new Date().toISOString()}] [CONTROLLER] updateFCInstructionAndContainersHandler: Backend-calculated total_cost (includes VGM/surcharges/hazardous):`,
+      finalTotalCost,
+    )
 
     let updatedInstructionData = {
       ...instructionData,
