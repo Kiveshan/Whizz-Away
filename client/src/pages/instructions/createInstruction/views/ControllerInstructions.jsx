@@ -2315,131 +2315,6 @@ const ControllerInstructions = () => {
                   </div>
                 </div>
               </div>
-
-              {formData.shipmentTypeId === "4" && (
-                <div
-                  className="controller-instructions-form-row"
-                  style={{ margin: "8px 0", padding: "0 10px" }}
-                >
-                  <div style={{ width: "100%" }}>
-                    <table
-                      style={{
-                        width: "100%",
-                        borderCollapse: "collapse",
-                        fontSize: "12px",
-                      }}
-                    >
-                      <thead>
-                        <tr>
-                          <th style={{ border: "1px solid #dee2e6", padding: "4px" }}>
-                            KSM DN Number
-                          </th>
-                          <th style={{ border: "1px solid #dee2e6", padding: "4px" }}>
-                            Ticket Number
-                          </th>
-                          <th style={{ border: "1px solid #dee2e6", padding: "4px" }}>
-                            Receipt Book Number
-                          </th>
-                          <th style={{ border: "1px solid #dee2e6", padding: "4px" }}>
-                            Weight ({formData.rateWeight})
-                          </th>
-                          <th style={{ border: "1px solid #dee2e6", padding: "4px" }}></th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {weightRows.map((row) => (
-                          <tr key={row.id}>
-                            <td style={{ border: "1px solid #dee2e6", padding: "2px 4px" }}>
-                              <input
-                                type="text"
-                                className="controller-instructions-form-input"
-                                value={row.ksmDmNo || ""}
-                                onChange={(e) => updateWeightRow(row.id, "ksmDmNo", e.target.value)}
-                                style={{ width: "100%", fontSize: "12px", height: "26px" }}
-                              />
-                            </td>
-                            <td style={{ border: "1px solid #dee2e6", padding: "2px 4px" }}>
-                              <input
-                                type="text"
-                                className="controller-instructions-form-input"
-                                value={row.ticketNo || ""}
-                                onChange={(e) => updateWeightRow(row.id, "ticketNo", e.target.value)}
-                                style={{ width: "100%", fontSize: "12px", height: "26px" }}
-                              />
-                            </td>
-                            <td style={{ border: "1px solid #dee2e6", padding: "2px 4px" }}>
-                              <input
-                                type="text"
-                                className="controller-instructions-form-input"
-                                value={row.receiptBookNo || ""}
-                                onChange={(e) => updateWeightRow(row.id, "receiptBookNo", e.target.value)}
-                                style={{ width: "100%", fontSize: "12px", height: "26px" }}
-                              />
-                            </td>
-                            <td style={{ border: "1px solid #dee2e6", padding: "2px 4px" }}>
-                              <input
-                                type="text"
-                                className="controller-instructions-form-input"
-                                value={row.weight || ""}
-                                onChange={(e) => {
-                                  const value = e.target.value
-                                  if (value === "" || /^[0-9]*\.?[0-9]*$/.test(value)) {
-                                    updateWeightRow(row.id, "weight", value)
-                                  }
-                                }}
-                                style={{ width: "100%", fontSize: "12px", height: "26px" }}
-                              />
-                            </td>
-                            <td
-                              style={{
-                                border: "1px solid #dee2e6",
-                                padding: "2px 4px",
-                                textAlign: "center",
-                                whiteSpace: "nowrap",
-                              }}
-                            >
-                              <button
-                                type="button"
-                                onClick={() => removeWeightRow(row.id)}
-                                style={{
-                                  padding: "2px 6px",
-                                  fontSize: "11px",
-                                  borderRadius: "4px",
-                                  border: "1px solid #dc3545",
-                                  backgroundColor: "#fff",
-                                  color: "#dc3545",
-                                  cursor: "pointer",
-                                }}
-                              >
-                                Remove
-                              </button>
-                            </td>
-                          </tr>
-                        ))}
-                        <tr>
-                          <td colSpan={5} style={{ padding: "4px", textAlign: "left" }}>
-                            <button
-                              type="button"
-                              onClick={addWeightRow}
-                              style={{
-                                padding: "4px 8px",
-                                fontSize: "12px",
-                                borderRadius: "4px",
-                                border: "1px solid #4a90e2",
-                                backgroundColor: "#4a90e2",
-                                color: "#fff",
-                                cursor: "pointer",
-                              }}
-                            >
-                              Add Row
-                            </button>
-                          </td>
-                        </tr>
-                      </tbody>
-                    </table>
-                  </div>
-                </div>
-              )}
             </div>
 
             {/* RIGHT: Booking + dates + VAT/vessel/description */}
@@ -2618,6 +2493,200 @@ const ControllerInstructions = () => {
                         </div>
                       </div>
                     </div>
+                    {formData.shipmentTypeId === "4" && (
+                      <div
+                        className="controller-instructions-form-row"
+                        style={{ margin: "24px 0 8px", padding: "0 10px" }}
+                      >
+                        <div style={{ width: "100%" }}>
+                          <table
+                            style={{
+                              width: "100%",
+                              borderCollapse: "collapse",
+                              fontSize: "13px",
+                              backgroundColor: "#ffffff",
+                            }}
+                          >
+                            <thead>
+                              <tr>
+                                <th
+                                  style={{
+                                    border: "1px solid #dee2e6",
+                                    padding: "10px 14px",
+                                    backgroundColor: "#cfe5ff",
+                                    fontWeight: 600,
+                                    textAlign: "center",
+                                    whiteSpace: "nowrap",
+                                    minWidth: "170px",
+                                  }}
+                                >
+                                  KSM DN Number
+                                </th>
+                                <th
+                                  style={{
+                                    border: "1px solid #dee2e6",
+                                    padding: "10px 14px",
+                                    backgroundColor: "#cfe5ff",
+                                    fontWeight: 600,
+                                    textAlign: "center",
+                                    whiteSpace: "nowrap",
+                                    minWidth: "150px",
+                                  }}
+                                >
+                                  Ticket Number
+                                </th>
+                                <th
+                                  style={{
+                                    border: "1px solid #dee2e6",
+                                    padding: "10px 14px",
+                                    backgroundColor: "#cfe5ff",
+                                    fontWeight: 600,
+                                    textAlign: "center",
+                                    whiteSpace: "nowrap",
+                                    minWidth: "180px",
+                                  }}
+                                >
+                                  Receipt Book Number
+                                </th>
+                                <th
+                                  style={{
+                                    border: "1px solid #dee2e6",
+                                    padding: "10px 14px",
+                                    backgroundColor: "#cfe5ff",
+                                    fontWeight: 600,
+                                    textAlign: "center",
+                                    whiteSpace: "nowrap",
+                                    minWidth: "140px",
+                                  }}
+                                >
+                                  Weight ({formData.rateWeight})
+                                </th>
+                                <th
+                                  style={{
+                                    border: "1px solid #dee2e6",
+                                    padding: "10px 14px",
+                                    backgroundColor: "#cfe5ff",
+                                    minWidth: "110px",
+                                  }}
+                                ></th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {weightRows.map((row) => (
+                                <tr key={row.id}>
+                                  <td
+                                    style={{
+                                      border: "1px solid #dee2e6",
+                                      padding: "6px 10px",
+                                      verticalAlign: "middle",
+                                    }}
+                                  >
+                                    <input
+                                      type="text"
+                                      className="controller-instructions-form-input"
+                                      value={row.ksmDmNo || ""}
+                                      onChange={(e) => updateWeightRow(row.id, "ksmDmNo", e.target.value)}
+                                      style={{ width: "100%", fontSize: "13px", height: "32px" }}
+                                    />
+                                  </td>
+                                  <td
+                                    style={{
+                                      border: "1px solid #dee2e6",
+                                      padding: "6px 10px",
+                                      verticalAlign: "middle",
+                                    }}
+                                  >
+                                    <input
+                                      type="text"
+                                      className="controller-instructions-form-input"
+                                      value={row.ticketNo || ""}
+                                      onChange={(e) => updateWeightRow(row.id, "ticketNo", e.target.value)}
+                                      style={{ width: "100%", fontSize: "13px", height: "32px" }}
+                                    />
+                                  </td>
+                                  <td
+                                    style={{
+                                      border: "1px solid #dee2e6",
+                                      padding: "6px 10px",
+                                      verticalAlign: "middle",
+                                    }}
+                                  >
+                                    <input
+                                      type="text"
+                                      className="controller-instructions-form-input"
+                                      value={row.receiptBookNo || ""}
+                                      onChange={(e) => updateWeightRow(row.id, "receiptBookNo", e.target.value)}
+                                      style={{ width: "100%", fontSize: "13px", height: "32px" }}
+                                    />
+                                  </td>
+                                  <td
+                                    style={{
+                                      border: "1px solid #dee2e6",
+                                      padding: "6px 10px",
+                                      verticalAlign: "middle",
+                                    }}
+                                  >
+                                    <input
+                                      type="text"
+                                      className="controller-instructions-form-input"
+                                      value={row.weight || ""}
+                                      onChange={(e) => updateWeightRow(row.id, "weight", e.target.value)}
+                                      style={{ width: "100%", fontSize: "13px", height: "32px" }}
+                                    />
+                                  </td>
+                                  <td
+                                    style={{
+                                      border: "1px solid #dee2e6",
+                                      padding: "6px 10px",
+                                      textAlign: "center",
+                                      whiteSpace: "nowrap",
+                                    }}
+                                  >
+                                    <button
+                                      type="button"
+                                      onClick={() => removeWeightRow(row.id)}
+                                      style={{
+                                        padding: "4px 10px",
+                                        fontSize: "12px",
+                                        borderRadius: "4px",
+                                        border: "1px solid #dc3545",
+                                        backgroundColor: "#fff",
+                                        color: "#dc3545",
+                                        cursor: "pointer",
+                                      }}
+                                    >
+                                      Remove
+                                    </button>
+                                  </td>
+                                </tr>
+                              ))}
+                              <tr>
+                                <td
+                                  colSpan={5}
+                                  style={{ padding: "10px 14px", textAlign: "left", backgroundColor: "#f4f8ff" }}
+                                >
+                                  <button
+                                    type="button"
+                                    onClick={addWeightRow}
+                                    style={{
+                                      padding: "6px 12px",
+                                      fontSize: "13px",
+                                      borderRadius: "4px",
+                                      border: "1px solid #4a90e2",
+                                      backgroundColor: "#4a90e2",
+                                      color: "#fff",
+                                      cursor: "pointer",
+                                    }}
+                                  >
+                                    Add Row
+                                  </button>
+                                </td>
+                              </tr>
+                            </tbody>
+                          </table>
+                        </div>
+                      </div>
+                    )}
                   </>
                 ) : (
                   <>
@@ -2790,6 +2859,200 @@ const ControllerInstructions = () => {
                         </div>
                       </div>
                     </div>
+                    {formData.shipmentTypeId === "4" && (
+                      <div
+                        className="controller-instructions-form-row"
+                        style={{ margin: "24px 0 8px", padding: "0 10px" }}
+                      >
+                        <div style={{ width: "100%" }}>
+                          <table
+                            style={{
+                              width: "100%",
+                              borderCollapse: "collapse",
+                              fontSize: "13px",
+                              backgroundColor: "#ffffff",
+                            }}
+                          >
+                            <thead>
+                              <tr>
+                                <th
+                                  style={{
+                                    border: "1px solid #dee2e6",
+                                    padding: "10px 14px",
+                                    backgroundColor: "#cfe5ff",
+                                    fontWeight: 600,
+                                    textAlign: "center",
+                                    whiteSpace: "nowrap",
+                                    minWidth: "170px",
+                                  }}
+                                >
+                                  KSM DN Number
+                                </th>
+                                <th
+                                  style={{
+                                    border: "1px solid #dee2e6",
+                                    padding: "10px 14px",
+                                    backgroundColor: "#cfe5ff",
+                                    fontWeight: 600,
+                                    textAlign: "center",
+                                    whiteSpace: "nowrap",
+                                    minWidth: "150px",
+                                  }}
+                                >
+                                  Ticket Number
+                                </th>
+                                <th
+                                  style={{
+                                    border: "1px solid #dee2e6",
+                                    padding: "10px 14px",
+                                    backgroundColor: "#cfe5ff",
+                                    fontWeight: 600,
+                                    textAlign: "center",
+                                    whiteSpace: "nowrap",
+                                    minWidth: "180px",
+                                  }}
+                                >
+                                  Receipt Book Number
+                                </th>
+                                <th
+                                  style={{
+                                    border: "1px solid #dee2e6",
+                                    padding: "10px 14px",
+                                    backgroundColor: "#cfe5ff",
+                                    fontWeight: 600,
+                                    textAlign: "center",
+                                    whiteSpace: "nowrap",
+                                    minWidth: "140px",
+                                  }}
+                                >
+                                  Weight ({formData.rateWeight})
+                                </th>
+                                <th
+                                  style={{
+                                    border: "1px solid #dee2e6",
+                                    padding: "10px 14px",
+                                    backgroundColor: "#cfe5ff",
+                                    minWidth: "110px",
+                                  }}
+                                ></th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {weightRows.map((row) => (
+                                <tr key={row.id}>
+                                  <td
+                                    style={{
+                                      border: "1px solid #dee2e6",
+                                      padding: "6px 10px",
+                                      verticalAlign: "middle",
+                                    }}
+                                  >
+                                    <input
+                                      type="text"
+                                      className="controller-instructions-form-input"
+                                      value={row.ksmDmNo || ""}
+                                      onChange={(e) => updateWeightRow(row.id, "ksmDmNo", e.target.value)}
+                                      style={{ width: "100%", fontSize: "13px", height: "32px" }}
+                                    />
+                                  </td>
+                                  <td
+                                    style={{
+                                      border: "1px solid #dee2e6",
+                                      padding: "6px 10px",
+                                      verticalAlign: "middle",
+                                    }}
+                                  >
+                                    <input
+                                      type="text"
+                                      className="controller-instructions-form-input"
+                                      value={row.ticketNo || ""}
+                                      onChange={(e) => updateWeightRow(row.id, "ticketNo", e.target.value)}
+                                      style={{ width: "100%", fontSize: "13px", height: "32px" }}
+                                    />
+                                  </td>
+                                  <td
+                                    style={{
+                                      border: "1px solid #dee2e6",
+                                      padding: "6px 10px",
+                                      verticalAlign: "middle",
+                                    }}
+                                  >
+                                    <input
+                                      type="text"
+                                      className="controller-instructions-form-input"
+                                      value={row.receiptBookNo || ""}
+                                      onChange={(e) => updateWeightRow(row.id, "receiptBookNo", e.target.value)}
+                                      style={{ width: "100%", fontSize: "13px", height: "32px" }}
+                                    />
+                                  </td>
+                                  <td
+                                    style={{
+                                      border: "1px solid #dee2e6",
+                                      padding: "6px 10px",
+                                      verticalAlign: "middle",
+                                    }}
+                                  >
+                                    <input
+                                      type="text"
+                                      className="controller-instructions-form-input"
+                                      value={row.weight || ""}
+                                      onChange={(e) => updateWeightRow(row.id, "weight", e.target.value)}
+                                      style={{ width: "100%", fontSize: "13px", height: "32px" }}
+                                    />
+                                  </td>
+                                  <td
+                                    style={{
+                                      border: "1px solid #dee2e6",
+                                      padding: "6px 10px",
+                                      textAlign: "center",
+                                      whiteSpace: "nowrap",
+                                    }}
+                                  >
+                                    <button
+                                      type="button"
+                                      onClick={() => removeWeightRow(row.id)}
+                                      style={{
+                                        padding: "4px 10px",
+                                        fontSize: "12px",
+                                        borderRadius: "4px",
+                                        border: "1px solid #dc3545",
+                                        backgroundColor: "#fff",
+                                        color: "#dc3545",
+                                        cursor: "pointer",
+                                      }}
+                                    >
+                                      Remove
+                                    </button>
+                                  </td>
+                                </tr>
+                              ))}
+                              <tr>
+                                <td
+                                  colSpan={5}
+                                  style={{ padding: "10px 14px", textAlign: "left", backgroundColor: "#f4f8ff" }}
+                                >
+                                  <button
+                                    type="button"
+                                    onClick={addWeightRow}
+                                    style={{
+                                      padding: "6px 12px",
+                                      fontSize: "13px",
+                                      borderRadius: "4px",
+                                      border: "1px solid #4a90e2",
+                                      backgroundColor: "#4a90e2",
+                                      color: "#fff",
+                                      cursor: "pointer",
+                                    }}
+                                  >
+                                    Add Row
+                                  </button>
+                                </td>
+                              </tr>
+                            </tbody>
+                          </table>
+                        </div>
+                      </div>
+                    )}
                   </>
                 )}
               </div>

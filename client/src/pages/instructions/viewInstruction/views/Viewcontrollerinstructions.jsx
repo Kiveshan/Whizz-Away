@@ -951,11 +951,11 @@ const Viewcontrollerinstructions = () => {
                       style={{ display: isAddOn ? "none" : undefined }}
                     >
                       <label>Unit per</label>
-                      <div style={{ display: "flex", alignItems: "flex-start", gap: "15px", width: "100%" }}>
+                      <div style={{ display: "flex", alignItems: "center", gap: "15px", width: "100%" }}>
                         {/* Unit per dropdown */}
                         <div
                           className="controller-instructions-select-wrapper"
-                          style={{ minWidth: "100px", marginTop: "5px" }}
+                          style={{ minWidth: "100px", marginTop: "0" }}
                         >
                           <select
                             className="controller-instructions-dropdown"
@@ -976,131 +976,72 @@ const Viewcontrollerinstructions = () => {
                         {(formData.rateWeight === "kg" ||
                           formData.rateWeight === "m³" ||
                           formData.rateWeight === "ton") && (
-                          <>
+                          <div
+                            style={{
+                              display: "flex",
+                              gap: "15px",
+                              width: "100%",
+                              alignItems: "center",
+                            }}
+                          >
+                            {/* Unit Rate Field - inline text + input */}
                             <div
+                              className="controller-instructions-form-field"
                               style={{
+                                flex: 1,
+                                minWidth: "150px",
                                 display: "flex",
-                                gap: "15px",
-                                width: "100%",
-                                marginTop: "48px",
-                                marginLeft: "-113px",
+                                alignItems: "center",
+                                gap: "8px",
+                                margin: 0,
                               }}
                             >
-                              {/* Unit Rate Field */}
+                              <span
+                                style={{
+                                  whiteSpace: "nowrap",
+                                  fontSize: "13px",
+                                  color: "#333",
+                                }}
+                              >
+                                {`Rate per ${formData.rateWeight}`}
+                              </span>
+                              <div
+                                className="controller-instructions-input-wrapper"
+                                ref={fieldRefs.unitRate}
+                                style={{ width: "100%" }}
+                              >
+                                <input
+                                  type="text"
+                                  className="controller-instructions-form-input"
+                                  name="unitRate"
+                                  value={formData.unitrate || ""}
+                                  readOnly
+                                  style={{ ...nonEditableStyle, width: "100%" }}
+                                />
+                              </div>
+                            </div>
+
+                            {/* Weight Field for non-type-4 shipments, or legacy type-4 instructions without weightRows */}
+                            {(formData.shipmentTypeId !== "4" || weightRows.length === 0) && (
                               <div className="controller-instructions-form-field" style={{ flex: 1, minWidth: "150px" }}>
-                                <label>{`Rate per ${formData.rateWeight}`}</label>
+                                <label>{`Weight (${formData.rateWeight})`}</label>
                                 <div
                                   className="controller-instructions-input-wrapper"
-                                  ref={fieldRefs.unitRate}
+                                  ref={fieldRefs.weight}
                                   style={{ width: "100%" }}
                                 >
                                   <input
                                     type="text"
                                     className="controller-instructions-form-input"
-                                    name="unitRate"
-                                    value={formData.unitrate || ""}
+                                    name="weight"
+                                    value={formData.weight || ""}
                                     readOnly
                                     style={{ ...nonEditableStyle, width: "100%" }}
                                   />
                                 </div>
                               </div>
-
-                              {/* Weight Field for non-type-4 shipments, or legacy type-4 instructions without weightRows */}
-                              {(formData.shipmentTypeId !== "4" || weightRows.length === 0) && (
-                                <div className="controller-instructions-form-field" style={{ flex: 1, minWidth: "150px" }}>
-                                  <label>{`Weight (${formData.rateWeight})`}</label>
-                                  <div
-                                    className="controller-instructions-input-wrapper"
-                                    ref={fieldRefs.weight}
-                                    style={{ width: "100%" }}
-                                  >
-                                    <input
-                                      type="text"
-                                      className="controller-instructions-form-input"
-                                      name="weight"
-                                      value={formData.weight || ""}
-                                      readOnly
-                                      style={{ ...nonEditableStyle, width: "100%" }}
-                                    />
-                                  </div>
-                                </div>
-                              )}
-                            </div>
-
-                            {formData.shipmentTypeId === "4" && weightRows.length > 0 && (
-                              <div className="controller-instructions-form-field" style={{ width: "100%", marginTop: "8px" }}>
-                                <label>Weight Details</label>
-                                <div style={{ width: "100%" }}>
-                                  <table
-                                    style={{
-                                      width: "100%",
-                                      borderCollapse: "collapse",
-                                      fontSize: "12px",
-                                    }}
-                                  >
-                                    <thead>
-                                      <tr>
-                                        <th style={{ border: "1px solid #dee2e6", padding: "4px" }}>
-                                          KSM DN Number
-                                        </th>
-                                        <th style={{ border: "1px solid #dee2e6", padding: "4px" }}>
-                                          Ticket Number
-                                        </th>
-                                        <th style={{ border: "1px solid #dee2e6", padding: "4px" }}>
-                                          Receipt Book Number
-                                        </th>
-                                        <th style={{ border: "1px solid #dee2e6", padding: "4px" }}>
-                                          Weight ({formData.rateWeight})
-                                        </th>
-                                      </tr>
-                                    </thead>
-                                    <tbody>
-                                      {weightRows.map((row) => (
-                                        <tr key={row.id}>
-                                          <td style={{ border: "1px solid #dee2e6", padding: "2px 4px" }}>
-                                            <input
-                                              type="text"
-                                              className="controller-instructions-form-input"
-                                              value={row.ksmDmNo || ""}
-                                              readOnly
-                                              style={{ ...nonEditableStyle, width: "100%", fontSize: "12px", height: "26px" }}
-                                            />
-                                          </td>
-                                          <td style={{ border: "1px solid #dee2e6", padding: "2px 4px" }}>
-                                            <input
-                                              type="text"
-                                              className="controller-instructions-form-input"
-                                              value={row.ticketNo || ""}
-                                              readOnly
-                                              style={{ ...nonEditableStyle, width: "100%", fontSize: "12px", height: "26px" }}
-                                            />
-                                          </td>
-                                          <td style={{ border: "1px solid #dee2e6", padding: "2px 4px" }}>
-                                            <input
-                                              type="text"
-                                              className="controller-instructions-form-input"
-                                              value={row.receiptBookNo || ""}
-                                              readOnly
-                                              style={{ ...nonEditableStyle, width: "100%", fontSize: "12px", height: "26px" }}
-                                            />
-                                          </td>
-                                          <td style={{ border: "1px solid #dee2e6", padding: "2px 4px" }}>
-                                            <input
-                                              type="text"
-                                              className="controller-instructions-form-input"
-                                              value={row.weight || ""}
-                                              readOnly
-                                              style={{ ...nonEditableStyle, width: "100%", fontSize: "12px", height: "26px" }}
-                                            />
-                                          </td>
-                                        </tr>
-                                      ))}
-                                    </tbody>
-                                  </table>
-                                </div>
-                              </div>
                             )}
-                          </>
+                          </div>
                         )}
                       </div>
                     </div>
@@ -1144,18 +1085,37 @@ const Viewcontrollerinstructions = () => {
                         </div>
                       </div>
                     </div>
-                    <div className="controller-instructions-form-field">
-                      <label>KSM File Reference</label>
-                      <div className="controller-instructions-input-wrapper" ref={fieldRefs.ksmFileRef}>
-                        <input
-                          type="text"
-                          className="controller-instructions-form-input"
-                          placeholder="KSM File Reference"
-                          name="ksmFileRef"
-                          value={formData.ksmFileRef}
-                          readOnly
-                          style={nonEditableStyle}
-                        />
+                    <div
+                      className="controller-instructions-shipment-task-row"
+                      style={{ marginBottom: "8px" }}
+                    >
+                      <div className="controller-instructions-form-field controller-instructions-small-field">
+                        <label>KSM File Reference</label>
+                        <div className="controller-instructions-input-wrapper" ref={fieldRefs.ksmFileRef}>
+                          <input
+                            type="text"
+                            className="controller-instructions-form-input"
+                            placeholder="KSM File Reference"
+                            name="ksmFileRef"
+                            value={formData.ksmFileRef}
+                            readOnly
+                            style={nonEditableStyle}
+                          />
+                        </div>
+                      </div>
+                      <div className="controller-instructions-form-field controller-instructions-small-field">
+                        <label>Last Free Date</label>
+                        <div className="controller-instructions-date-wrapper" ref={fieldRefs.lastFreeDate}>
+                          <input
+                            type="date"
+                            className="controller-instructions-form-input"
+                            name="lastFreeDate"
+                            value={formData.lastFreeDate}
+                            readOnly
+                            style={nonEditableStyle}
+                            ref={lastFreeDateRef}
+                          />
+                        </div>
                       </div>
                     </div>
                     <div className="controller-instructions-form-field" style={{ maxWidth: "120px" }}>
@@ -1223,24 +1183,114 @@ const Viewcontrollerinstructions = () => {
                         </div>
                       </div>
                     )}
-                    <div className="controller-instructions-form-field">
-                      <label>Last Free Date</label>
-                      <div className="controller-instructions-date-wrapper" ref={fieldRefs.lastFreeDate}>
-                        <input
-                          type="date"
-                          className="controller-instructions-form-input"
-                          name="lastFreeDate"
-                          value={formData.lastFreeDate}
-                          readOnly
-                          style={nonEditableStyle}
-                          ref={lastFreeDateRef}
-                        />
-                      </div>
-                    </div>
                   </div>
                 </div>
               </div>
             </div>
+
+            {formData.shipmentTypeId === "4" && weightRows.length > 0 && (
+              <div
+                className="controller-instructions-form-section"
+                style={{ marginTop: "-100px", paddingTop: "0" }}
+              >
+                <div
+                  className="controller-instructions-form-row"
+                  style={{ marginTop: "0" }}
+                >
+                  <div className="controller-instructions-form-field" style={{ width: "100%" }}>
+                    <label>Weight Details</label>
+                    <div style={{ width: "100%" }}>
+                      <table
+                        style={{
+                          width: "100%",
+                          borderCollapse: "collapse",
+                          fontSize: "12px",
+                        }}
+                      >
+                        <thead>
+                          <tr>
+                            <th style={{ border: "1px solid #dee2e6", padding: "4px" }}>
+                              KSM DN Number
+                            </th>
+                            <th style={{ border: "1px solid #dee2e6", padding: "4px" }}>
+                              Ticket Number
+                            </th>
+                            <th style={{ border: "1px solid #dee2e6", padding: "4px" }}>
+                              Receipt Book Number
+                            </th>
+                            <th style={{ border: "1px solid #dee2e6", padding: "4px" }}>
+                              Weight ({formData.rateWeight})
+                            </th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {weightRows.map((row) => (
+                            <tr key={row.id}>
+                              <td style={{ border: "1px solid #dee2e6", padding: "2px 4px" }}>
+                                <input
+                                  type="text"
+                                  className="controller-instructions-form-input"
+                                  value={row.ksmDmNo || ""}
+                                  readOnly
+                                  style={{
+                                    ...nonEditableStyle,
+                                    width: "100%",
+                                    fontSize: "12px",
+                                    height: "26px",
+                                  }}
+                                />
+                              </td>
+                              <td style={{ border: "1px solid #dee2e6", padding: "2px 4px" }}>
+                                <input
+                                  type="text"
+                                  className="controller-instructions-form-input"
+                                  value={row.ticketNo || ""}
+                                  readOnly
+                                  style={{
+                                    ...nonEditableStyle,
+                                    width: "100%",
+                                    fontSize: "12px",
+                                    height: "26px",
+                                  }}
+                                />
+                              </td>
+                              <td style={{ border: "1px solid #dee2e6", padding: "2px 4px" }}>
+                                <input
+                                  type="text"
+                                  className="controller-instructions-form-input"
+                                  value={row.receiptBookNo || ""}
+                                  readOnly
+                                  style={{
+                                    ...nonEditableStyle,
+                                    width: "100%",
+                                    fontSize: "12px",
+                                    height: "26px",
+                                  }}
+                                />
+                              </td>
+                              <td style={{ border: "1px solid #dee2e6", padding: "2px 4px" }}>
+                                <input
+                                  type="text"
+                                  className="controller-instructions-form-input"
+                                  value={row.weight || ""}
+                                  readOnly
+                                  style={{
+                                    ...nonEditableStyle,
+                                    width: "100%",
+                                    fontSize: "12px",
+                                    height: "26px",
+                                  }}
+                                />
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
 
             {isAddOn && (
               <div className="controller-instructions-form-section">
