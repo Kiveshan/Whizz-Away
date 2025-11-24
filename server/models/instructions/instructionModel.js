@@ -469,11 +469,12 @@ export const saveInstruction = async ({
     const vgmAmountsArr = [];
     const containersWithSurcharges = [];
 
-    // Determine whether VGM should be applied based on shipment type.
-    // For shipment types 4 and 5,
-    // VGM must be treated as false/0 like the other non-applicable fields.
+    // Determine per-shipment-type behaviour for VGM and add-on logic.
     const shipmentTypeStr = String(fields.shipmentType || "");
-    const allowVgm = shipmentTypeStr !== "4" && shipmentTypeStr !== "5";
+    const isAddOnType = shipmentTypeStr === "5";
+    // VGM is disabled only for shipment type 4. For type 5 (add-on) we
+    // allow the flag to be stored but will always keep the amount at 0.
+    const allowVgm = shipmentTypeStr !== "4";
 
     for (const container of containerData) {
 
@@ -509,8 +510,10 @@ export const saveInstruction = async ({
 
       // Compute surcharge & hazardous flags and fetch amounts if necessary
       const addSurcharges = container["Add Surcharges"] || container.surcharges || false;
+      // For shipment type 5 (add-on), surcharge amounts must always remain 0
+      // even if the flag is true.
       let surchargeAmount = 0;
-      if (addSurcharges && clientId && pickup && dropoff) {
+      if (!isAddOnType && addSurcharges && clientId && pickup && dropoff) {
         try {
           const surchargeQuery = `
             SELECT surcharges
@@ -536,8 +539,10 @@ export const saveInstruction = async ({
       }
 
       const isHazardous = container["Hazardous"] || container.hazardous || false;
+      // For shipment type 5 (add-on), hazardous amounts must always remain 0
+      // even if the flag is true.
       let hazardousAmount = container["Hazardous Amount"] || container.hazardousAmount || 0;
-      if (isHazardous && hazardousAmount === 0 && clientId && pickup && dropoff) {
+      if (!isAddOnType && isHazardous && hazardousAmount === 0 && clientId && pickup && dropoff) {
         try {
           const hazardousQuery = `
             SELECT hazardous
@@ -562,8 +567,9 @@ export const saveInstruction = async ({
         }
       }
 
-      // Get VGM flag and amount with fallbacks. For shipment types 4 and 5,
-      // VGM is explicitly disabled so that it behaves like other null fields.
+      // Get VGM flag and amount with fallbacks. For shipment type 4 VGM is
+      // explicitly disabled. For shipment type 5 (add-on), the VGM flag
+      // should be persisted, but the amount must stay 0.
       const rawIsVgm = container.vgm || container["vgm"] || false;
       const isVgm = allowVgm ? rawIsVgm : false;
 
@@ -571,7 +577,7 @@ export const saveInstruction = async ({
         ? (container.vgmAmount || container["vgm amount"] || 0)
         : 0;
 
-      if (allowVgm && isVgm && (!vgmAmount || Number(vgmAmount) === 0) && clientId && pickup && dropoff) {
+      if (!isAddOnType && allowVgm && isVgm && (!vgmAmount || Number(vgmAmount) === 0) && clientId && pickup && dropoff) {
         try {
           const vgmQuery = `
             SELECT vgm
@@ -596,6 +602,14 @@ export const saveInstruction = async ({
         }
       }
 
+      // For shipment type 5 (add-on), force all surcharge/hazardous/VGM
+      // amounts to 0 even if the flags are true.
+      if (isAddOnType) {
+        surchargeAmount = 0;
+        hazardousAmount = 0;
+        vgmAmount = 0;
+      }
+
       const containerValues = [
         container.containerNum || container.containernum || "",
         sanitizedWeight, // Will be null for empty/invalid values
@@ -618,11 +632,11 @@ export const saveInstruction = async ({
       // Build a light-weight representation used for total calculation
       containersWithSurcharges.push({
         "Add Surcharges": addSurcharges,
-        "Surcharge Amount": surchargeAmount,
+        "Surcharge Amount": isAddOnType ? 0 : surchargeAmount,
         "Hazardous": isHazardous,
-        "Hazardous Amount": hazardousAmount,
+        "Hazardous Amount": isAddOnType ? 0 : hazardousAmount,
         vgm: isVgm,
-        "vgm amount": vgmAmount,
+        "vgm amount": isAddOnType ? 0 : vgmAmount,
       });
 
       // Insert the container row now that values are prepared. Note: the
@@ -662,6 +676,15 @@ export const saveInstruction = async ({
 
       const rateWeight =
         instructionData.rateweight || instructionData.rateWeight || "Container";
+
+      // For shipment type 5 (add-on), total_cost must always remain 0
+      // regardless of any container flags or amounts.
+      const shipmentType = String(
+        instructionData.shipment_type || instructionData.shipmentTypeId || ""
+      );
+      if (shipmentType === "5") {
+        return 0;
+      }
 
       let baseCost = 0;
 
@@ -725,14 +748,20 @@ export const saveInstruction = async ({
     };
 
     // Build enriched containers including VGM for total calculation.
-    // For shipment types 4 and 5, VGM values are forced to false/0.
+    // For shipment type 4, VGM values are forced to false/0. For shipment
+    // type 5, the VGM flag is preserved but the amount is kept at 0.
     const containersWithExtras = containersWithSurcharges.map((c, idx) => {
       const original = containerData[idx] || {};
       const rawIsVgmFlag = original.vgm || original["vgm"] || false;
       const isVgmFlag = allowVgm ? rawIsVgmFlag : false;
       const vgmAmtFromOriginal = (original.vgmAmount || original["vgm amount"]) ?? 0;
       const rawVgmAmt = (vgmAmountsArr[idx] !== undefined) ? vgmAmountsArr[idx] : vgmAmtFromOriginal;
-      const vgmAmt = allowVgm ? rawVgmAmt : 0;
+      let vgmAmt = allowVgm ? rawVgmAmt : 0;
+
+      if (shipmentTypeStr === "5") {
+        vgmAmt = 0;
+      }
+
       return { ...c, vgm: isVgmFlag, "vgm amount": vgmAmt };
     });
 
@@ -1803,7 +1832,10 @@ export const updateFCInstructionAndContainers = async (
         instructionData.shipmentTypeId ||
         currentInstruction.shipment_type
     );
-    const allowVgm = newShipmentType !== "4" && newShipmentType !== "5";
+    const isAddOnType = newShipmentType === "5";
+    // VGM is disabled only for shipment type 4. For type 5 (add-on) we
+    // allow the VGM flag to be stored but the amount will be kept at 0.
+    const allowVgm = newShipmentType !== "4";
 
     // Calculate total cost if not provided
     const totalCost =
@@ -2162,11 +2194,13 @@ export const updateFCInstructionAndContainers = async (
     // Update containers
     for (const container of containerChanges.toUpdate) {
 
-      // Fetch hazardous amount if container is marked as hazardous
+      // Fetch hazardous amount if container is marked as hazardous. For
+      // shipment type 5 (add-on), hazardous amounts must always remain 0
+      // even if the flag is true, so we skip any rate lookup.
       let hazardousAmount = container["Hazardous Amount"] || container.hazardousAmount || 0;
       const isHazardous = container["Hazardous"] || container.hazardous || false;
       
-      if (isHazardous && hazardousAmount === 0) {
+      if (!isAddOnType && isHazardous && hazardousAmount === 0) {
         try {
           // Get current instruction data to access client ID, pickup and dropoff
           const currentInstructionResult = await client.query(
@@ -2240,7 +2274,9 @@ export const updateFCInstructionAndContainers = async (
         }
       );
 
-      // Get VGM flag and amount with fallbacks
+      // Get VGM flag and amount with fallbacks. For shipment type 4 VGM is
+      // explicitly disabled. For shipment type 5 (add-on), the VGM flag
+      // should be persisted, but the amount must stay 0.
       const rawIsVgm = container.vgm || container["vgm"] || false;
       const isVgm = allowVgm ? rawIsVgm : false;
 
@@ -2248,7 +2284,7 @@ export const updateFCInstructionAndContainers = async (
         ? (container.vgmAmount || container["vgm amount"] || 0)
         : 0;
 
-      if (allowVgm && isVgm && (!vgmAmount || Number(vgmAmount) === 0) && clientId && pickup && dropoff) {
+      if (!isAddOnType && allowVgm && isVgm && (!vgmAmount || Number(vgmAmount) === 0) && clientId && pickup && dropoff) {
         try {
           const vgmQuery = `
             SELECT vgm
@@ -2273,6 +2309,13 @@ export const updateFCInstructionAndContainers = async (
         }
       }
 
+      // For shipment type 5 (add-on), force all surcharge/hazardous/VGM
+      // amounts to 0 even if the flags are true.
+      if (isAddOnType) {
+        hazardousAmount = 0;
+        vgmAmount = 0;
+      }
+
       const updateContainerQuery = `
         UPDATE public.container 
         SET 
@@ -2291,6 +2334,10 @@ export const updateFCInstructionAndContainers = async (
         RETURNING *
       `;
 
+      const rawSurchargeAmount =
+        container["Surcharge Amount"] || container.surchargeAmount || 0;
+      const surchargeAmount = isAddOnType ? 0 : rawSurchargeAmount;
+
       const updateValues = [
         container.containernum || "",
         container.weight,
@@ -2298,11 +2345,11 @@ export const updateFCInstructionAndContainers = async (
         container.cargo_description || "",
         container["Hazardous"] || container.hazardous || false,
         container["Add Surcharges"] || container.addSurcharges || false,
-        container["Surcharge Amount"] || container.surchargeAmount || 0,
-        hazardousAmount,
+        surchargeAmount,
+        isAddOnType ? 0 : hazardousAmount,
         container.file_ref || "",
         isVgm,
-        vgmAmount,
+        isAddOnType ? 0 : vgmAmount,
         container.containerkey,
       ];
 
@@ -2405,12 +2452,17 @@ export const updateFCInstructionAndContainers = async (
       const cargoDescription =
         container.cargoDescription || container.cargo_description || "";
 
-      // Get VGM flag and amount with fallbacks for new container
+      // Get VGM flag and amount with fallbacks for new container. For
+      // shipment type 4 VGM is disabled. For type 5 (add-on), the VGM flag
+      // is persisted but amount forced to 0.
       const rawIsVgm = container.vgm || container["vgm"] || false;
       const isVgm = allowVgm ? rawIsVgm : false;
-      const vgmAmount = allowVgm
+      let vgmAmount = allowVgm
         ? (container.vgmAmount || container["vgm amount"] || 0)
         : 0;
+      if (isAddOnType) {
+        vgmAmount = 0;
+      }
       
       const insertQuery = `
         INSERT INTO public.container (
@@ -2421,6 +2473,10 @@ export const updateFCInstructionAndContainers = async (
         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
         RETURNING containerkey
       `;
+      const rawInsertSurchargeAmount =
+        container["Surcharge Amount"] || container.surchargeAmount || 0;
+      const insertSurchargeAmount = isAddOnType ? 0 : rawInsertSurchargeAmount;
+
       const insertResult = await client.query(insertQuery, [
         containerNum,
         sanitizedWeight, // Will be null for empty/invalid values
@@ -2429,11 +2485,11 @@ export const updateFCInstructionAndContainers = async (
         cargoDescription,
         container["Add Surcharges"] || container.surcharges || false,
         container["Hazardous"] || container.hazardous || false,
-        container["Surcharge Amount"] || container.surchargeAmount || 0,
-        hazardousAmount,
+        insertSurchargeAmount,
+        isAddOnType ? 0 : hazardousAmount,
         container.file_ref || "", // Add file_ref parameter
         isVgm,
-        vgmAmount,
+        isAddOnType ? 0 : vgmAmount,
       ]);
       
       console.log('Inserted new container with VGM values:', { isVgm, vgmAmount });
