@@ -80,9 +80,9 @@ export const getContainersByInstructionId = async (instructionId) => {
       "Add Surcharges",
       "Surcharge Amount",
       "Hazardous Amount",
-      "vgm",
-      "vgm amount",
-      file_ref
+      file_ref,
+      vgm,
+      "vgm amount"
     FROM public.container
     WHERE m1key = $1
     ORDER BY containerkey
@@ -148,6 +148,8 @@ export const getContainersByInstructionId = async (instructionId) => {
           container["Add Surcharges"] === "true" ||
           false,
         "Surcharge Amount": container["Surcharge Amount"] || 0,
+        // VGM flags/amounts are kept in-memory only; the container table
+        // no longer has dedicated VGM columns.
         "vgm":
           container["vgm"] === true ||
           container["vgm"] === "true" ||
@@ -187,7 +189,11 @@ export const getContainersByInstructionId = async (instructionId) => {
   }
 };
 
-export const saveInstruction = async ({ controllerData, containerData }) => {
+export const saveInstruction = async ({
+  controllerData,
+  containerData = [],
+  weightData = [],
+}) => {
   const client = await pool.connect();
   try {
     await client.query("BEGIN");
@@ -299,6 +305,10 @@ export const saveInstruction = async ({ controllerData, containerData }) => {
       rateper_breakbulk: controllerData.rateper_breakbulk,
     };
 
+    if (String(fields.shipmentType) === "4") {
+      fields.weight = null;
+    }
+
     console.log(
       "MODEL: Original total_cost from controller:",
       controllerData.total_cost
@@ -390,6 +400,56 @@ export const saveInstruction = async ({ controllerData, containerData }) => {
       verifyResult.rows[0]?.total_cost
     );
 
+    // Debug logging for weightData payload
+    if (Array.isArray(weightData) && weightData.length > 0) {
+      console.log(
+        "MODEL: weightData payload in saveInstruction:",
+        JSON.stringify(weightData, null, 2)
+      );
+
+      for (const row of weightData) {
+        let rowWeight = null;
+        if (row.weight !== null && row.weight !== undefined && row.weight !== "") {
+          if (typeof row.weight === "string") {
+            const trimmed = row.weight.trim();
+            if (trimmed !== "") {
+              const parsed = Number.parseFloat(trimmed);
+              if (!Number.isNaN(parsed) && parsed >= 0) {
+                rowWeight = parsed;
+              }
+            }
+          } else if (typeof row.weight === "number" && row.weight >= 0) {
+            rowWeight = row.weight;
+          }
+        }
+
+        const insertWeightQuery = `
+          INSERT INTO public.m1_controller_weight (
+            m1_key,
+            ksm_dm_no,
+            ticket_no,
+            receipt_book_no,
+            weight
+          ) VALUES ($1, $2, $3, $4, $5)
+        `;
+        const weightValues = [
+          m1key,
+          row.ksm_dm_no || row.ksmDmNo || null,
+          row.ticket_no || row.ticketNo || null,
+          row.receipt_book_no || row.receiptBookNo || null,
+          rowWeight,
+        ];
+
+        console.log("MODEL: Inserting weight row into m1_controller_weight:", {
+          m1key,
+          row,
+          weightValues,
+        });
+
+        await client.query(insertWeightQuery, weightValues);
+      }
+    }
+
     // Define clientId, pickup, and dropoff variables before container processing
     let clientId = controllerData.client || controllerData.clientId;
     let pickup =
@@ -409,6 +469,12 @@ export const saveInstruction = async ({ controllerData, containerData }) => {
     const vgmAmountsArr = [];
     const containersWithSurcharges = [];
 
+    // Determine whether VGM should be applied based on shipment type.
+    // For shipment types 4 and 5,
+    // VGM must be treated as false/0 like the other non-applicable fields.
+    const shipmentTypeStr = String(fields.shipmentType || "");
+    const allowVgm = shipmentTypeStr !== "4" && shipmentTypeStr !== "5";
+
     for (const container of containerData) {
 
       // Define the container insert query with parameter placeholders
@@ -417,7 +483,8 @@ export const saveInstruction = async ({ controllerData, containerData }) => {
         containerNum: container.containerNum || container.containernum,
         file_ref: container.file_ref,
         container_type: container.container_type || container.containerType,
-        vgm: container.vgm || container["vgm"] || false
+        vgm: container.vgm || container["vgm"] || false,
+        "vgm amount": container.vgmAmount || container["vgm amount"] || 0,
       });
 
       // Sanitize weight value
@@ -431,14 +498,11 @@ export const saveInstruction = async ({ controllerData, containerData }) => {
           const trimmedWeight = container.weight.trim();
           if (trimmedWeight !== "") {
             const parsedWeight = Number.parseFloat(trimmedWeight);
-            if (!isNaN(parsedWeight) && parsedWeight >= 0) {
+            if (!Number.isNaN(parsedWeight) && parsedWeight >= 0) {
               sanitizedWeight = parsedWeight;
             }
           }
-        } else if (
-          typeof container.weight === "number" &&
-          container.weight >= 0
-        ) {
+        } else if (typeof container.weight === "number" && container.weight >= 0) {
           sanitizedWeight = container.weight;
         }
       }
@@ -464,7 +528,7 @@ export const saveInstruction = async ({ controllerData, containerData }) => {
           ]);
           if (surchargeResult.rows.length > 0) {
             const fetched = Number.parseFloat(surchargeResult.rows[0].surcharges);
-            if (!isNaN(fetched) && fetched > 0) surchargeAmount = fetched;
+            if (!Number.isNaN(fetched) && fetched > 0) surchargeAmount = fetched;
           }
         } catch (e) {
           console.error("ERROR: Failed to fetch surcharge:", e.message);
@@ -491,17 +555,23 @@ export const saveInstruction = async ({ controllerData, containerData }) => {
           ]);
           if (hazardousResult.rows.length > 0) {
             const fetched = Number.parseFloat(hazardousResult.rows[0].hazardous);
-            if (!isNaN(fetched) && fetched > 0) hazardousAmount = fetched;
+            if (!Number.isNaN(fetched) && fetched > 0) hazardousAmount = fetched;
           }
         } catch (e) {
           console.error("ERROR: Failed to fetch hazardous:", e.message);
         }
       }
 
-      // Get VGM flag and amount with fallbacks
-      const isVgm = container.vgm || container["vgm"] || false;
-      let vgmAmount = container.vgmAmount || container["vgm amount"] || 0;
-      if (isVgm && (!vgmAmount || Number(vgmAmount) === 0) && clientId && pickup && dropoff) {
+      // Get VGM flag and amount with fallbacks. For shipment types 4 and 5,
+      // VGM is explicitly disabled so that it behaves like other null fields.
+      const rawIsVgm = container.vgm || container["vgm"] || false;
+      const isVgm = allowVgm ? rawIsVgm : false;
+
+      let vgmAmount = allowVgm
+        ? (container.vgmAmount || container["vgm amount"] || 0)
+        : 0;
+
+      if (allowVgm && isVgm && (!vgmAmount || Number(vgmAmount) === 0) && clientId && pickup && dropoff) {
         try {
           const vgmQuery = `
             SELECT vgm
@@ -519,7 +589,7 @@ export const saveInstruction = async ({ controllerData, containerData }) => {
           ]);
           if (vgmResult.rows.length > 0) {
             const fetched = Number.parseFloat(vgmResult.rows[0].vgm);
-            if (!isNaN(fetched) && fetched >= 0) vgmAmount = fetched;
+            if (!Number.isNaN(fetched) && fetched >= 0) vgmAmount = fetched;
           }
         } catch (e) {
           console.error("ERROR: Failed to fetch VGM:", e.message);
@@ -536,12 +606,12 @@ export const saveInstruction = async ({ controllerData, containerData }) => {
         addSurcharges,
         surchargeAmount, // Backend-calculated surcharge amount
         hazardousAmount, // Backend-calculated hazardous amount
+        container.file_ref || container.fileRef || "", // File reference field for export shipments
         isVgm,
         vgmAmount,
-        container.file_ref || container.fileRef || "", // File reference field for export shipments
       ];
-      
-      console.log('Container values with VGM:', { isVgm, vgmAmount });
+
+      console.log("Container values with VGM:", { isVgm, vgmAmount });
       // Keep track for total calc later
       vgmAmountsArr.push(vgmAmount);
 
@@ -555,12 +625,14 @@ export const saveInstruction = async ({ controllerData, containerData }) => {
         "vgm amount": vgmAmount,
       });
 
-      // Insert the container row now that values are prepared
+      // Insert the container row now that values are prepared. Note: the
+      // container table does not have dedicated VGM columns; VGM is only
+      // used in the in-memory cost calculation.
       const insertContainerQuery = `
         INSERT INTO public.container (
           containernum, weight, m1key, container_type, cargo_description,
           "Hazardous", "Add Surcharges", "Surcharge Amount", "Hazardous Amount",
-          "vgm", "vgm amount", file_ref
+          file_ref, vgm, "vgm amount"
         ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)
       `;
       await client.query(insertContainerQuery, containerValues);
@@ -576,9 +648,9 @@ export const saveInstruction = async ({ controllerData, containerData }) => {
         addSurcharges: containerValues[6],
         surchargeAmount: containerValues[7],
         hazardousAmount: containerValues[8],
-        vgm: containerValues[9],
-        vgmAmount: containerValues[10],
-        file_ref: containerValues[11]
+        file_ref: containerValues[9],
+        vgm: containerValues[10],
+        vgmAmount: containerValues[11],
       });
     }
 
@@ -611,10 +683,16 @@ export const saveInstruction = async ({ controllerData, containerData }) => {
           ratePerAbnormal * numAbnormal +
           ratePerBreakBulk * numBreakBulk;
       } else {
-        // Weight-based calculation (kg, ton, m³)
-        const weight = Number(instructionData.weight || 0);
-        const unitRate = Number(instructionData.unitrate || 0);
-        baseCost = weight * unitRate;
+        const hasTotalCost =
+          instructionData.total_cost !== undefined &&
+          !Number.isNaN(Number(instructionData.total_cost));
+        if (hasTotalCost) {
+          baseCost = Number(Number(instructionData.total_cost).toFixed(2));
+        } else {
+          const weight = Number(instructionData.weight || 0);
+          const unitRate = Number(instructionData.unitrate || 0);
+          baseCost = weight * unitRate;
+        }
       }
 
       // Calculate total surcharge from containers
@@ -646,12 +724,15 @@ export const saveInstruction = async ({ controllerData, containerData }) => {
       return Number(totalCost.toFixed(2));
     };
 
-    // Build enriched containers including VGM for total calculation
+    // Build enriched containers including VGM for total calculation.
+    // For shipment types 4 and 5, VGM values are forced to false/0.
     const containersWithExtras = containersWithSurcharges.map((c, idx) => {
       const original = containerData[idx] || {};
-      const isVgmFlag = original.vgm || original["vgm"] || false;
+      const rawIsVgmFlag = original.vgm || original["vgm"] || false;
+      const isVgmFlag = allowVgm ? rawIsVgmFlag : false;
       const vgmAmtFromOriginal = (original.vgmAmount || original["vgm amount"]) ?? 0;
-      const vgmAmt = (vgmAmountsArr[idx] !== undefined) ? vgmAmountsArr[idx] : vgmAmtFromOriginal;
+      const rawVgmAmt = (vgmAmountsArr[idx] !== undefined) ? vgmAmountsArr[idx] : vgmAmtFromOriginal;
+      const vgmAmt = allowVgm ? rawVgmAmt : 0;
       return { ...c, vgm: isVgmFlag, "vgm amount": vgmAmt };
     });
 
@@ -919,6 +1000,17 @@ export const getInstructionById = async (instructionId) => {
         public.container
       WHERE 
         m1key = $1
+    ),
+    weight_data AS (
+      SELECT
+        weight_pk,
+        m1_key,
+        ksm_dm_no,
+        ticket_no,
+        receipt_book_no,
+        weight
+      FROM public.m1_controller_weight
+      WHERE m1_key = $1
     )
     SELECT 
       i.*,
@@ -946,7 +1038,25 @@ export const getInstructionById = async (instructionId) => {
           WHERE c.m1key = i.m1key
         ),
         '[]'::json
-      ) AS containers
+      ) AS containers,
+      COALESCE(
+        (
+          SELECT json_agg(
+            json_build_object(
+              'weight_pk', w.weight_pk,
+              'm1_key', w.m1_key,
+              'ksm_dm_no', w.ksm_dm_no,
+              'ticket_no', w.ticket_no,
+              'receipt_book_no', w.receipt_book_no,
+              'weight', w.weight
+            )
+            ORDER BY w.weight_pk
+          )
+          FROM weight_data w
+          WHERE w.m1_key = i.m1key
+        ),
+        '[]'::json
+      ) AS weight_rows
     FROM 
       instruction_data i`;
   const result = await query(sql, [instructionId]);
@@ -1118,9 +1228,9 @@ export const updateContainersByInstructionId = async (
         INSERT INTO public.container (
           containernum, weight, m1key, container_type, cargo_description, 
           "Hazardous", "Add Surcharges", "Surcharge Amount", 
-          "vgm", "vgm amount", file_ref
+          "Hazardous Amount", file_ref, vgm, "vgm amount"
         )
-        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
         RETURNING containerkey
       `;
       // Get file_ref value from container with proper fallback
@@ -1137,12 +1247,13 @@ export const updateContainersByInstructionId = async (
         hazardous,
         addSurcharges,
         surchargeAmount,
+        container["Hazardous Amount"] || container.hazardousAmount || 0,
+        fileRef,
         vgm,
         vgmAmount,
-        fileRef,
       ];
-      
-      console.log('Container values with VGM:', { vgm, vgmAmount });
+
+      console.log("Container values with VGM:", { vgm, vgmAmount });
 
       const result = await client.query(insertQuery, values);
       console.log(`Inserted container with ID: ${result.rows[0].containerkey}`);
@@ -1333,12 +1444,14 @@ export const getClientRates = async (clientId, start, destination) => {
     }
 
     const rateData = rates[0];
-    console.log("[getClientRates] Retrieved rates:", {
+    console.log(`[getClientRates] Retrieved rates:`, {
       rawRow: rateData,
       sixMeterRate: rateData.sixMeterRate,
       twelveMeterRate: rateData.twelveMeterRate,
       surcharges: rateData.surcharges,
       hazardous: rateData.hazardous,
+      vgm: rateData.vgm,
+      vgmRate: rateData.vgmRate, // Return the VGM rate
       startingPoint: rateData.startingPoint,
       destination: rateData.destination,
     });
@@ -1577,9 +1690,10 @@ const compareContainers = (currentContainers, newContainers) => {
             Hazardous: newHazardous,
             "Add Surcharges": newAddSurcharges,
             "Surcharge Amount": newSurchargeAmount,
+            "Hazardous Amount": newContainer["Hazardous Amount"] || newContainer.hazardousAmount || 0,
+            file_ref: newContainer.file_ref || "", // Add file_ref field to update
             vgm: newVgm,
             "vgm amount": newVgmAmount,
-            file_ref: newContainer.file_ref || "", // Add file_ref field to update
           });
         }
       } else {
@@ -1657,7 +1771,8 @@ const preserveExistingValue = (
 export const updateFCInstructionAndContainers = async (
   instructionId,
   instructionData,
-  containerData
+  containerData,
+  weightData = []
 ) => {
   const client = await pool.connect();
   try {
@@ -1682,6 +1797,13 @@ export const updateFCInstructionAndContainers = async (
     console.log(
       `[${new Date().toISOString()}] [MODEL] Current instruction data fetched`
     );
+
+    const newShipmentType = String(
+      instructionData.shipment_type ||
+        instructionData.shipmentTypeId ||
+        currentInstruction.shipment_type
+    );
+    const allowVgm = newShipmentType !== "4" && newShipmentType !== "5";
 
     // Calculate total cost if not provided
     const totalCost =
@@ -1815,20 +1937,6 @@ export const updateFCInstructionAndContainers = async (
       ),
     };
 
-    console.log(
-      `[${new Date().toISOString()}] [MODEL] Sanitized update data:`,
-      {
-        weight: updateData.weight,
-        rateper_6: updateData.rateper_6,
-        rateper_12: updateData.rateper_12,
-        rateper_abnormal: updateData.rateper_abnormal,
-        rateper_breakbulk: updateData.rateper_breakbulk,
-        unitrate: updateData.unitrate,
-        surcharge: updateData.surcharge,
-        total_cost: updateData.total_cost,
-      }
-    );
-
     // 3. Check if instruction needs updating
     let instructionNeedsUpdate = false;
     const fieldsToCheck = [
@@ -1950,11 +2058,63 @@ export const updateFCInstructionAndContainers = async (
       );
     }
 
-    // 5. Handle containers
+    // 5. Handle weight rows for shipment type 4 (cross-haul/break bulk)
+    if (newShipmentType === "4") {
+      const deleteWeightsQuery =
+        "DELETE FROM public.m1_controller_weight WHERE m1_key = $1";
+      await client.query(deleteWeightsQuery, [instructionId]);
+
+      if (Array.isArray(weightData) && weightData.length > 0) {
+        for (const row of weightData) {
+          let rowWeight = null;
+          if (
+            row.weight !== null &&
+            row.weight !== undefined &&
+            row.weight !== ""
+          ) {
+            if (typeof row.weight === "string") {
+              const trimmed = row.weight.trim();
+              if (trimmed !== "") {
+                const parsedWeight = Number.parseFloat(trimmed);
+                if (!Number.isNaN(parsedWeight) && parsedWeight >= 0) {
+                  rowWeight = parsedWeight;
+                }
+              }
+            } else if (typeof row.weight === "number" && row.weight >= 0) {
+              rowWeight = row.weight;
+            }
+          }
+
+          const insertWeightQuery = `
+            INSERT INTO public.m1_controller_weight (
+              m1_key,
+              ksm_dm_no,
+              ticket_no,
+              receipt_book_no,
+              weight
+            ) VALUES ($1, $2, $3, $4, $5)
+          `;
+          const weightValues = [
+            instructionId,
+            row.ksm_dm_no || row.ksmDmNo || null,
+            row.ticket_no || row.ticketNo || null,
+            row.receipt_book_no || row.receiptBookNo || null,
+            rowWeight,
+          ];
+          await client.query(insertWeightQuery, weightValues);
+        }
+      }
+    } else if (String(currentInstruction.shipment_type) === "4") {
+      const deleteWeightsQuery =
+        "DELETE FROM public.m1_controller_weight WHERE m1_key = $1";
+      await client.query(deleteWeightsQuery, [instructionId]);
+    }
+
+    // 6. Handle containers
     const getCurrentContainersQuery = `
       SELECT containerkey, containernum, weight, container_type, cargo_description,
-             "Add Surcharges", "Hazardous", "Surcharge Amount",
-             "vgm", "vgm amount"
+             "Add Surcharges", "Hazardous", "Surcharge Amount", 
+             "Hazardous Amount", file_ref, vgm, "vgm amount"
       FROM public.container
       WHERE m1key = $1
       ORDER BY containerkey
@@ -2001,29 +2161,7 @@ export const updateFCInstructionAndContainers = async (
 
     // Update containers
     for (const container of containerChanges.toUpdate) {
-      // Sanitize weight value
-      let sanitizedWeight = null;
-      if (
-        container.weight !== null &&
-        container.weight !== undefined &&
-        container.weight !== ""
-      ) {
-        if (typeof container.weight === "string") {
-          const trimmedWeight = container.weight.trim();
-          if (trimmedWeight !== "") {
-            const parsedWeight = Number.parseFloat(trimmedWeight);
-            if (!isNaN(parsedWeight) && parsedWeight >= 0) {
-              sanitizedWeight = parsedWeight;
-            }
-          }
-        } else if (
-          typeof container.weight === "number" &&
-          container.weight >= 0
-        ) {
-          sanitizedWeight = container.weight;
-        }
-      }
-      
+
       // Fetch hazardous amount if container is marked as hazardous
       let hazardousAmount = container["Hazardous Amount"] || container.hazardousAmount || 0;
       const isHazardous = container["Hazardous"] || container.hazardous || false;
@@ -2087,7 +2225,7 @@ export const updateFCInstructionAndContainers = async (
         } with data:`,
         {
           containernum: container.containernum,
-          weight: sanitizedWeight,
+          weight: container.weight,
           container_type: container.container_type,
           cargo_description: container.cargo_description,
           file_ref: container.file_ref || "",
@@ -2102,6 +2240,39 @@ export const updateFCInstructionAndContainers = async (
         }
       );
 
+      // Get VGM flag and amount with fallbacks
+      const rawIsVgm = container.vgm || container["vgm"] || false;
+      const isVgm = allowVgm ? rawIsVgm : false;
+
+      let vgmAmount = allowVgm
+        ? (container.vgmAmount || container["vgm amount"] || 0)
+        : 0;
+
+      if (allowVgm && isVgm && (!vgmAmount || Number(vgmAmount) === 0) && clientId && pickup && dropoff) {
+        try {
+          const vgmQuery = `
+            SELECT vgm
+            FROM public.m5_client_rate
+            WHERE clientid = $1
+              AND starting_point = $2
+              AND destination = $3
+            ORDER BY client_rate_id DESC
+            LIMIT 1
+          `;
+          const vgmResult = await client.query(vgmQuery, [
+            clientId,
+            pickup,
+            dropoff,
+          ]);
+          if (vgmResult.rows.length > 0) {
+            const fetched = Number.parseFloat(vgmResult.rows[0].vgm);
+            if (!Number.isNaN(fetched) && fetched >= 0) vgmAmount = fetched;
+          }
+        } catch (e) {
+          console.error("ERROR: Failed to fetch VGM:", e.message);
+        }
+      }
+
       const updateContainerQuery = `
         UPDATE public.container 
         SET 
@@ -2113,79 +2284,29 @@ export const updateFCInstructionAndContainers = async (
           "Add Surcharges" = $6,
           "Surcharge Amount" = $7,
           "Hazardous Amount" = $8,
-          "vgm" = $9,
-          "vgm amount" = $10,
-          file_ref = $11
+          file_ref = $9,
+          vgm = $10,
+          "vgm amount" = $11
         WHERE containerkey = $12
         RETURNING *
       `;
 
-      // Get VGM flag and amount with fallbacks
-      const isVgm = container.vgm || container["vgm"] || false;
-      let vgmAmount = container.vgmAmount || container["vgm amount"] || 0;
-
-      // If VGM is checked and no amount provided, fetch from DB like hazardous/surcharges
-      if (isVgm && (!vgmAmount || Number(vgmAmount) === 0)) {
-        if (clientId && pickup && dropoff) {
-          try {
-            const vgmRateQuery = `
-              SELECT vgm
-              FROM public.m5_client_rate
-              WHERE clientid = $1
-                AND starting_point = $2
-                AND destination = $3
-              ORDER BY client_rate_id DESC
-              LIMIT 1
-            `;
-            console.log(
-              `DEBUG: Executing VGM rate query with params: clientId='${clientId}', pickup='${pickup}', dropoff='${dropoff}'`
-            );
-            const vgmRateResult = await client.query(vgmRateQuery, [
-              clientId,
-              pickup,
-              dropoff,
-            ]);
-            console.log(
-              `DEBUG: VGM rate query rows: ${vgmRateResult.rows.length}`,
-              vgmRateResult.rows
-            );
-            if (vgmRateResult.rows.length > 0 && vgmRateResult.rows[0].vgm != null) {
-              const fetchedVgm = Number.parseFloat(vgmRateResult.rows[0].vgm);
-              if (!isNaN(fetchedVgm) && fetchedVgm >= 0) {
-                vgmAmount = fetchedVgm;
-                console.log(`SUCCESS: Fetched VGM amount: ${vgmAmount}`);
-              } else {
-                console.log(`DEBUG: VGM amount parsed as NaN or < 0: ${vgmRateResult.rows[0].vgm}`);
-              }
-            } else {
-              console.log(`DEBUG: No VGM rate found for route/client; defaulting to 0`);
-            }
-          } catch (e) {
-            console.error(`ERROR: Failed to fetch VGM rate:`, e);
-          }
-        } else {
-          console.log(
-            `WARN: VGM requested but missing parameters. clientId=${clientId}, pickup=${pickup}, dropoff=${dropoff}`
-          );
-        }
-      }
-      
       const updateValues = [
         container.containernum || "",
-        sanitizedWeight,
+        container.weight,
         container.container_type || "",
         container.cargo_description || "",
-        isHazardous,
-        container["Add Surcharges"] || false,
-        container["Surcharge Amount"] || 0,
+        container["Hazardous"] || container.hazardous || false,
+        container["Add Surcharges"] || container.addSurcharges || false,
+        container["Surcharge Amount"] || container.surchargeAmount || 0,
         hazardousAmount,
+        container.file_ref || "",
         isVgm,
         vgmAmount,
-        container.file_ref || "",
         container.containerkey,
       ];
-      
-      console.log('Updating container with VGM values:', { isVgm, vgmAmount });
+
+      console.log("Updating container with VGM values:", { isVgm, vgmAmount });
 
       const updateResult = await client.query(updateContainerQuery, updateValues);
       console.log(
@@ -2285,14 +2406,17 @@ export const updateFCInstructionAndContainers = async (
         container.cargoDescription || container.cargo_description || "";
 
       // Get VGM flag and amount with fallbacks for new container
-      const isVgm = container.vgm || container["vgm"] || false;
-      const vgmAmount = container.vgmAmount || container["vgm amount"] || 0;
+      const rawIsVgm = container.vgm || container["vgm"] || false;
+      const isVgm = allowVgm ? rawIsVgm : false;
+      const vgmAmount = allowVgm
+        ? (container.vgmAmount || container["vgm amount"] || 0)
+        : 0;
       
       const insertQuery = `
         INSERT INTO public.container (
           containernum, weight, m1key, container_type, cargo_description, 
           "Add Surcharges", "Hazardous", "Surcharge Amount", 
-          "Hazardous Amount", "vgm", "vgm amount", file_ref
+          "Hazardous Amount", file_ref, vgm, "vgm amount"
         )
         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
         RETURNING containerkey
@@ -2307,9 +2431,9 @@ export const updateFCInstructionAndContainers = async (
         container["Hazardous"] || container.hazardous || false,
         container["Surcharge Amount"] || container.surchargeAmount || 0,
         hazardousAmount,
+        container.file_ref || "", // Add file_ref parameter
         isVgm,
         vgmAmount,
-        container.file_ref || "", // Add file_ref parameter
       ]);
       
       console.log('Inserted new container with VGM values:', { isVgm, vgmAmount });
@@ -2619,10 +2743,14 @@ export const saveInstructionAndContainers = async (
         console.log(`WARN: VGM requested but missing parameters. clientId=${clientId}, pickup=${pickup}, dropoff=${dropoff}`);
       }
 
-      // <CHANGE> Updated container query to include VGM, Hazardous Amount, and File Reference
+      // <CHANGE> Updated container query: VGM values are used only in cost
+      // calculations and are not stored on the container table.
       const containerQuery = `
-        INSERT INTO public.container (containernum, weight, m1key, container_type, cargo_description, "Add Surcharges", "Hazardous", "Surcharge Amount", "Hazardous Amount", "vgm", "vgm amount", file_ref)
-        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
+        INSERT INTO public.container (
+          containernum, weight, m1key, container_type, cargo_description,
+          "Add Surcharges", "Hazardous", "Surcharge Amount", "Hazardous Amount", file_ref
+        )
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
       `;
       const containerValues = [
         container.containerNum || container.containernum || "",
@@ -2634,11 +2762,12 @@ export const saveInstructionAndContainers = async (
         isHazardous,
         surchargeAmount, // Backend-calculated surcharge amount
         hazardousAmount, // Backend-calculated hazardous amount
-        isVgm, // VGM flag
-        vgmAmount, // Backend-calculated VGM amount
         // Extract file_ref value, ensuring proper case handling for all possible variations
-        (container.file_ref !== undefined ? container.file_ref : 
-         container.fileRef !== undefined ? container.fileRef : ""), // New file reference field for export shipments
+        (container.file_ref !== undefined
+          ? container.file_ref
+          : container.fileRef !== undefined
+          ? container.fileRef
+          : ""), // New file reference field for export shipments
       ];
       await client.query(containerQuery, containerValues);
     }
@@ -2674,6 +2803,13 @@ export const deleteInstruction = async (instructionId) => {
     if (checkResult.rows[0].status !== "New") {
       throw new Error("Only instructions with 'New' status can be deleted");
     }
+
+    // Delete any associated weight rows first
+    const deleteWeightsQuery = `
+      DELETE FROM public.m1_controller_weight
+      WHERE m1_key = $1
+    `;
+    await client.query(deleteWeightsQuery, [instructionId]);
 
     // Delete containers first (due to foreign key constraints)
     const deleteContainersQuery = `

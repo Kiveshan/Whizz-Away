@@ -139,6 +139,7 @@ Unique wrapper for ControllerInstructions component only
 .controller-instructions-unique-wrapper .controller-instructions-container-section {
   display: flex;
   flex-direction: row;
+  flex-wrap: wrap;
   gap: 90px;
   padding: 4px 0;
   margin-bottom: 4px;
@@ -739,6 +740,7 @@ Unique wrapper for ControllerInstructions component only
 .fc-controller-instructions-unique-wrapper .fc-controller-instructions-container-section {
   display: flex;
   flex-direction: row;
+  flex-wrap: wrap;
   gap: 30px;
   padding: 4px 0;
   margin-bottom: 4px;
