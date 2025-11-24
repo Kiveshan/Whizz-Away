@@ -299,6 +299,8 @@ const ClientInvoice = forwardRef(({
 
     try {
       const containers = finalInvoiceData.containers || [];
+      const weightItems = finalInvoiceData.weightItems || [];
+      const isWeightBased = Number(finalInvoiceData.shipment_type_key) === 4;
       const isCompactLayout = true;
 
       // Create new PDF document
@@ -441,120 +443,106 @@ const ClientInvoice = forwardRef(({
 
       currentY = doc.lastAutoTable.finalY + (isCompactLayout ? 5 : 7);
 
-      // Invoice Details Table
-      const invoiceDetailsData = [
-        ["Booking Ref", finalInvoiceData.booking_ref || ""],
-        ["File Number", finalInvoiceData.file_no || ""],
-        ["Description", finalInvoiceData.description || ""],
-        ["Vessel/Ref", finalInvoiceData.vessel_name || ""],
-      ];
+      // Table for items: weight items when shipment_type_key=4, otherwise containers
+      let tableHeaders = [];
+      let tableData = [];
+      if (isWeightBased) {
+        tableHeaders = [
+          "KSM/DM No",
+          "Ticket No",
+          "Receipt Book No",
+          "Weight",
+          "Unit Rate",
+          "Price",
+        ];
+        tableData = (weightItems && weightItems.length > 0)
+          ? weightItems.map((wi) => [
+              wi.ksm_dm_no || "",
+              wi.ticket_no || "",
+              wi.receipt_book_no || "",
+              (Number(wi.weight || 0)).toFixed(2),
+              formatCurrency(Number(wi.unitrate || 0).toFixed ? Number(wi.unitrate || 0) : wi.unitrate || 0),
+              formatCurrency(Number(wi.price || 0)),
+            ])
+          : [["No weight items", "", "", "", "", ""]];
+      } else {
+        // Enhanced Container Table with all new columns - Updated for PDF
+        const hasWeights = containers.some(
+          (container) => container.weight && container.weight !== "N/A"
+        );
+        const hasSurcharges = containers.some(
+          (container) =>
+            container.add_surcharges || container.surcharge_amount > 0
+        );
+        const hasHazardous = containers.some(
+          (container) => container.hazardous || container.hazardous_amount > 0
+        );
+        const hasVGM = containers.some(
+          (container) => container.vgm || container.vgm_amount > 0
+        );
+        const hasTrucks = containers.some(
+          (container) => container.truckregnumber
+        );
+        // Determine column visibility
+        const containerHeaders = ["Cont. No", "Type"];
+        if (hasWeights) containerHeaders.push("Weight");
+        if (hasTrucks) containerHeaders.push("Truck");
+        // Always show Base Rate column
+        containerHeaders.push("Base");
+        if (hasSurcharges) containerHeaders.push("Surch.");
+        if (hasHazardous) containerHeaders.push("Haz");
+        if (hasVGM) containerHeaders.push("VGM");
+        // Always show Total column
+        containerHeaders.push("Total");
 
-      autoTable(doc, {
-        startY: currentY,
-        head: [],
-        body: invoiceDetailsData,
-        theme: "grid",
-        styles: {
-          fontSize: fonts.small,
-          cellPadding: 1.2,
-          lineWidth: 0.1,
-          overflow: 'ellipsize',
-          lineColor: brand.gray,
-        },
-        columnStyles: {
-          0: { fontStyle: "bold", cellWidth: 32 },
-          1: { cellWidth: "auto" },
-        },
-        margin: { left: margins.left, right: margins.right },
-      });
-
-      currentY = doc.lastAutoTable.finalY + (isCompactLayout ? 5 : 7);
-
-      // Enhanced Container Table with all new columns - Updated for PDF
-      const hasWeights = containers.some(
-        (container) => container.weight && container.weight !== "N/A"
-      );
-      const hasSurcharges = containers.some(
-        (container) =>
-          container.add_surcharges || container.surcharge_amount > 0
-      );
-      const hasHazardous = containers.some(
-        (container) => container.hazardous || container.hazardous_amount > 0
-      );
-      const hasVGM = containers.some(
-        (container) => container.vgm || container.vgm_amount > 0
-      );
-      const hasTrucks = containers.some(
-        (container) => container.truckregnumber
-      );
-      // Determine column visibility
-      const containerHeaders = ["Cont. No", "Type"];
-      if (hasWeights) containerHeaders.push("Weight");
-      if (hasTrucks) containerHeaders.push("Truck");
-      // Always show Base Rate column
-      containerHeaders.push("Base");
-      if (hasSurcharges) containerHeaders.push("Surch.");
-      if (hasHazardous) containerHeaders.push("Haz");
-      if (hasVGM) containerHeaders.push("VGM");
-      // Always show Total column
-      containerHeaders.push("Total");
-
-      const containerData =
-        containers.length > 0
-          ? containers.map((container) => {
-              const row = [
-                container.container_number || "N/A",
-                container.container_type || "Standard"
-              ];
-              
-              if (hasWeights && container.weight && container.weight !== "N/A") {
-                row.push(`${container.weight} kg`);
-              } else if (hasWeights) {
-                row.push("-");
-              }
-              
-              if (hasTrucks) {
-                row.push(container.truckregnumber || "-");
-              }
-              
-              // Base Rate column - strictly from m1 base rates (base_rate)
-              const baseRateValue = container.base_rate || 0;
-              row.push(formatCurrency(baseRateValue || 0));
-              
-              // Individual special rate columns
-              if (hasSurcharges) {
-                const surchargeText =
-                  container.surcharge_amount > 0
-                    ? formatCurrency(container.surcharge_amount)
-                    : "-";
-                row.push(surchargeText);
-              }
-              
-              if (hasHazardous) {
-                const hazardText =
-                  container.hazardous_amount > 0
-                    ? formatCurrency(container.hazardous_amount)
-                    : "-";
-                row.push(hazardText);
-              }
-              
-              if (hasVGM) {
-                const vgmText =
-                  container.vgm_amount > 0
-                    ? formatCurrency(container.vgm_amount)
-                    : "-";
-                row.push(vgmText);
-              }
-              
-              // Total column = Base + additionals
-              const totalValue = (baseRateValue || 0)
-                + (container.surcharge_amount || 0)
-                + (container.hazardous_amount || 0)
-                + (container.vgm_amount || 0);
-              row.push(formatCurrency(totalValue));
-              return row;
-            })
-          : [["No container information", "", "", "", "", "", "", ""]];
+        tableHeaders = containerHeaders;
+        tableData =
+          containers.length > 0
+            ? containers.map((container) => {
+                const row = [
+                  container.container_number || "N/A",
+                  container.container_type || "Standard"
+                ];
+                if (hasWeights && container.weight && container.weight !== "N/A") {
+                  row.push(`${container.weight} kg`);
+                } else if (hasWeights) {
+                  row.push("-");
+                }
+                if (hasTrucks) {
+                  row.push(container.truckregnumber || "-");
+                }
+                const baseRateValue = container.base_rate || 0;
+                row.push(formatCurrency(baseRateValue || 0));
+                if (hasSurcharges) {
+                  const surchargeText =
+                    container.surcharge_amount > 0
+                      ? formatCurrency(container.surcharge_amount)
+                      : "-";
+                  row.push(surchargeText);
+                }
+                if (hasHazardous) {
+                  const hazardText =
+                    container.hazardous_amount > 0
+                      ? formatCurrency(container.hazardous_amount)
+                      : "-";
+                  row.push(hazardText);
+                }
+                if (hasVGM) {
+                  const vgmText =
+                    container.vgm_amount > 0
+                      ? formatCurrency(container.vgm_amount)
+                      : "-";
+                  row.push(vgmText);
+                }
+                const totalValue = (baseRateValue || 0)
+                  + (container.surcharge_amount || 0)
+                  + (container.hazardous_amount || 0)
+                  + (container.vgm_amount || 0);
+                row.push(formatCurrency(totalValue));
+                return row;
+              })
+            : [["No container information", "", "", "", "", "", "", ""]];
+      }
 
       // Calculate available height for the table and enforce compact row styling
       const footerReserve = 16; // space for footer
@@ -562,8 +550,8 @@ const ClientInvoice = forwardRef(({
 
       autoTable(doc, {
         startY: currentY,
-        head: [containerHeaders],
-        body: containerData,
+        head: [tableHeaders],
+        body: tableData,
         theme: "grid",
         styles: {
           fontSize: fonts.tiny,
@@ -578,10 +566,12 @@ const ClientInvoice = forwardRef(({
           fontStyle: "bold",
         },
         columnStyles: {
-          0: { cellWidth: 28 }, // Cont. No
-          1: { cellWidth: 18 }, // Type
-          2: { cellWidth: hasWeights ? 16 : undefined }, // Weight
-          3: { cellWidth: hasTrucks ? 18 : undefined }, // Truck
+          0: { cellWidth: isWeightBased ? 28 : 28 },
+          1: { cellWidth: isWeightBased ? 22 : 18 },
+          2: { cellWidth: isWeightBased ? 32 : undefined },
+          3: { cellWidth: isWeightBased ? 16 : undefined },
+          4: { cellWidth: isWeightBased ? 22 : undefined },
+          5: { cellWidth: isWeightBased ? 22 : undefined },
           // remaining numeric columns kept compact
         },
         margin: { left: margins.left, right: margins.right },
@@ -616,7 +606,9 @@ const ClientInvoice = forwardRef(({
       currentY = doc.lastAutoTable.finalY + (isCompactLayout ? 8 : 10);
 
       // Calculate invoice values - FIXED
-      const amount = finalInvoiceData.total_cost || 0;
+      const amount = isWeightBased
+        ? (weightItems || []).reduce((sum, wi) => sum + Number(wi.price || 0), 0)
+        : (finalInvoiceData.total_cost || 0);
       const vatRate = finalInvoiceData.vat ? (Number(finalInvoiceData.vat) / 100) : 0;
       const vat = amount * vatRate;
       const total = amount + vat;
@@ -843,9 +835,14 @@ const ClientInvoice = forwardRef(({
     );
   }
 
-  const amount = finalInvoiceData.invoice?.amount || finalInvoiceData.total_cost || 0;
+  const isWeightBasedView = Number(finalInvoiceData.shipment_type_key) === 4;
+  const weightItemsView = finalInvoiceData.weightItems || [];
+  const amount = isWeightBasedView
+    ? weightItemsView.reduce((sum, wi) => sum + Number(wi.price || 0), 0)
+    : (finalInvoiceData.invoice?.amount || finalInvoiceData.total_cost || 0);
   const vat = calculateVAT(amount);
   const total = finalInvoiceData.invoice?.total_amount || amount + vat;
+
   const roleId = JSON.parse(localStorage.getItem("user")).roleid;
 
   const containers = finalInvoiceData.containers || [];
@@ -960,126 +957,153 @@ const ClientInvoice = forwardRef(({
               </tbody>
             </table>
 
-            {/* Enhanced Container Details - Updated */}
+            {/* Items section: weight items for shipment_type 4, else containers */}
             <div className="container-section">
-              <table className="container-table5">
-                <thead>
-                  <tr>
-                    <th className="container-number-header">
-                      Container Number
-                    </th>
-                    <th className="type-header">Type</th>
-                    {containers.some(
-                      (container) =>
-                        container.weight && container.weight !== "N/A"
-                    ) && <th className="weight-header">Weight</th>}
-                    {containers.some(
-                      (container) => container.truckregnumber
-                    ) && <th className="truck-header">Truck Reg</th>}
-                    <th className="rate-header">Base Rate</th>
-                    {/* Individual special rate columns */}
-                    {containers.some(
-                      (container) => 
-                        container.add_surcharges || container.surcharge_amount > 0
-                    ) && <th className="surcharge-header">Surcharge</th>}
-                    {containers.some(
-                      (container) => 
-                        container.hazardous || container.hazardous_amount > 0
-                    ) && <th className="hazardous-header">Haz</th>}
-                    {containers.some(
-                      (container) => container.vgm || container.vgm_amount > 0
-                    ) && <th className="vgm-header">VGM</th>}
-                    <th className="total-header">Total</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {containers.length > 0 ? (
-                    containers.map((container, index) => {
-                      const hasWeight =
-                        container.weight && container.weight !== "N/A";
-                      const hasTruck = container.truckregnumber;
-                      const baseRateValue = container.base_rate || 0;
-                      const hasSurcharge =
-                        container.add_surcharges || container.surcharge_amount > 0;
-                      const hasHazard =
-                        container.hazardous || container.hazardous_amount > 0;
-                      const hasVGM = container.vgm || container.vgm_amount > 0;
-                      const totalValue = (baseRateValue || 0)
-                        + (container.surcharge_amount || 0)
-                        + (container.hazardous_amount || 0)
-                        + (container.vgm_amount || 0);
-
-                      return (
-                        <tr key={index}>
-                          <td className="container-number">
-                            {container.container_number ||
-                              `Container ${index + 1}`}
-                          </td>
-                          <td className="container-type">
-                            {container.container_type || "Standard"}
-                          </td>
-                          {containers.some(
-                            (c) => c.weight && c.weight !== "N/A"
-                          ) && (
-                            <td className="weight">
-                              {hasWeight ? `${container.weight} kg` : "N/A"}
-                            </td>
-                          )}
-                          {containers.some((c) => c.truckregnumber) && (
-                            <td className="truck-reg">
-                              {hasTruck ? container.truckregnumber : "-"}
-                            </td>
-                          )}
-                          {/* Base Rate column */}
-                          <td className="rate" title={"Base rate"}>
-                            {formatCurrency(baseRateValue || 0)}
-                          </td>
-                          {/* Surcharge column */}
-                          {containers.some(
-                            (c) => c.add_surcharges || c.surcharge_amount > 0
-                          ) && (
-                            <td className="surcharge">
-                              {hasSurcharge
-                                ? formatCurrency(container.surcharge_amount)
-                                : "-"}
-                            </td>
-                          )}
-                          {/* Hazardous column */}
-                          {containers.some(
-                            (c) => c.hazardous || c.hazardous_amount > 0
-                          ) && (
-                            <td className="hazardous">
-                              {hasHazard
-                                ? formatCurrency(container.hazardous_amount)
-                                : "-"}
-                            </td>
-                          )}
-                          {/* VGM column */}
-                          {containers.some(
-                            (c) => c.vgm || c.vgm_amount > 0
-                          ) && (
-                            <td className="vgm">
-                              {hasVGM
-                                ? formatCurrency(container.vgm_amount)
-                                : "-"}
-                            </td>
-                          )}
-                          {/* Total column */}
-                          <td className="total" title="Base + Surcharge + Haz + VGM">
-                            {formatCurrency(totalValue)}
-                          </td>
-                        </tr>
-                      );
-                    })
-                  ) : (
+              {isWeightBasedView ? (
+                <table className="container-table5">
+                  <thead>
                     <tr>
-                      <td className="container-number" colSpan="8">
-                        No container information
-                      </td>
+                      <th>KSM/DM No</th>
+                      <th>Ticket No</th>
+                      <th>Receipt Book No</th>
+                      <th>Weight</th>
+                      <th>Unit Rate</th>
+                      <th>Price</th>
                     </tr>
-                  )}
-                </tbody>
-              </table>
+                  </thead>
+                  <tbody>
+                    {weightItemsView.length > 0 ? (
+                      weightItemsView.map((wi, idx) => (
+                        <tr key={idx}>
+                          <td>{wi.ksm_dm_no || ''}</td>
+                          <td>{wi.ticket_no || ''}</td>
+                          <td>{wi.receipt_book_no || ''}</td>
+                          <td>{Number(wi.weight || 0).toFixed(2)}</td>
+                          <td>{formatCurrency(Number(wi.unitrate || 0))}</td>
+                          <td>{formatCurrency(Number(wi.price || 0))}</td>
+                        </tr>
+                      ))
+                    ) : (
+                      <tr>
+                        <td colSpan="6">No weight items</td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
+              ) : (
+                <table className="container-table5">
+                  <thead>
+                    <tr>
+                      <th className="container-number-header">
+                        Container Number
+                      </th>
+                      <th className="type-header">Type</th>
+                      {containers.some(
+                        (container) =>
+                          container.weight && container.weight !== "N/A"
+                      ) && <th className="weight-header">Weight</th>}
+                      {containers.some(
+                        (container) => container.truckregnumber
+                      ) && <th className="truck-header">Truck Reg</th>}
+                      <th className="rate-header">Base Rate</th>
+                      {containers.some(
+                        (container) => 
+                          container.add_surcharges || container.surcharge_amount > 0
+                      ) && <th className="surcharge-header">Surcharge</th>}
+                      {containers.some(
+                        (container) => 
+                          container.hazardous || container.hazardous_amount > 0
+                      ) && <th className="hazardous-header">Haz</th>}
+                      {containers.some(
+                        (container) => container.vgm || container.vgm_amount > 0
+                      ) && <th className="vgm-header">VGM</th>}
+                      <th className="total-header">Total</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {containers.length > 0 ? (
+                      containers.map((container, index) => {
+                        const hasWeight =
+                          container.weight && container.weight !== "N/A";
+                        const hasTruck = container.truckregnumber;
+                        const baseRateValue = container.base_rate || 0;
+                        const hasSurcharge =
+                          container.add_surcharges || container.surcharge_amount > 0;
+                        const hasHazard =
+                          container.hazardous || container.hazardous_amount > 0;
+                        const hasVGM = container.vgm || container.vgm_amount > 0;
+                        const totalValue = (baseRateValue || 0)
+                          + (container.surcharge_amount || 0)
+                          + (container.hazardous_amount || 0)
+                          + (container.vgm_amount || 0);
+
+                        return (
+                          <tr key={index}>
+                            <td className="container-number">
+                              {container.container_number ||
+                                `Container ${index + 1}`}
+                            </td>
+                            <td className="container-type">
+                              {container.container_type || "Standard"}
+                            </td>
+                            {containers.some(
+                              (c) => c.weight && c.weight !== "N/A"
+                            ) && (
+                              <td className="weight">
+                                {hasWeight ? `${container.weight} kg` : "N/A"}
+                              </td>
+                            )}
+                            {containers.some((c) => c.truckregnumber) && (
+                              <td className="truck-reg">
+                                {hasTruck ? container.truckregnumber : "-"}
+                              </td>
+                            )}
+                            <td className="rate" title={"Base rate"}>
+                              {formatCurrency(baseRateValue || 0)}
+                            </td>
+                            {containers.some(
+                              (c) => c.add_surcharges || c.surcharge_amount > 0
+                            ) && (
+                              <td className="surcharge">
+                                {hasSurcharge
+                                  ? formatCurrency(container.surcharge_amount)
+                                  : "-"}
+                              </td>
+                            )}
+                            {containers.some(
+                              (c) => c.hazardous || c.hazardous_amount > 0
+                            ) && (
+                              <td className="hazardous">
+                                {hasHazard
+                                  ? formatCurrency(container.hazardous_amount)
+                                  : "-"}
+                              </td>
+                            )}
+                            {containers.some(
+                              (c) => c.vgm || c.vgm_amount > 0
+                            ) && (
+                              <td className="vgm">
+                                {hasVGM
+                                  ? formatCurrency(container.vgm_amount)
+                                  : "-"}
+                              </td>
+                            )}
+                            <td className="total" title="Base + Surcharge + Haz + VGM">
+                              {formatCurrency(totalValue)}
+                            </td>
+                          </tr>
+                        );
+                      })
+                    ) : (
+                      <tr>
+                        <td className="container-number" colSpan="8">
+                          No container information
+                        </td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
+              )}
 
               {/* Summary Table */}
               <div className="summary-section">
