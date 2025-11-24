@@ -580,9 +580,7 @@ const ControllerInstructions = () => {
   // (cross-haul/break bulk) and 5 (add-on), VGM should behave like the other
   // non-applicable fields (null/false). This flag controls the UI.
   const allowVgmUI =
-    !isAddOn &&
-    formData.shipmentTypeId !== "4" &&
-    formData.shipmentTypeId !== "5"
+    formData.shipmentTypeId !== "4"
 
   // Update unit type and cross-haul states when form data changes
   useEffect(() => {
@@ -605,6 +603,16 @@ const ControllerInstructions = () => {
       setIsExport(newIsExport)
     }
   }, [formData.rateWeight, formData.shipmentTypeId, isWeightBased, isCrossHaul, isImport, isExport])
+
+  // Ensure add-on shipment type (5) always uses Container as unit per
+  useEffect(() => {
+    if (formData.shipmentTypeId === "5" && formData.rateWeight !== "Container") {
+      setFormData((prev) => ({
+        ...prev,
+        rateWeight: "Container",
+      }))
+    }
+  }, [formData.shipmentTypeId, formData.rateWeight])
 
   // Load initial data
   useEffect(() => {
@@ -1345,6 +1353,12 @@ const ControllerInstructions = () => {
         console.log(`  Container Subtotal: R${totalCost.toFixed(2)}`)
       }
 
+      // For add-on shipment type (5), force all financial values to zero
+      if (formData.shipmentTypeId === "5") {
+        console.log("[ADD-ON] Forcing totalCost to 0 for shipment type 5")
+        totalCost = 0
+      }
+
       // Note: Surcharge amounts are now calculated by the backend on submit
       // Frontend only tracks which containers have surcharges enabled
       const subtotalBeforeVAT = totalCost;
@@ -1396,55 +1410,68 @@ const ControllerInstructions = () => {
       // Prepare instruction data with null values for cross-haul and weight-based
       // Remove hazardous and surcharges fields from formData to prevent them from being sent to m1_controller table
       const { hazardous, surcharges, ...formDataWithoutContainerFields } = formData;
+      const isAddOnType = formData.shipmentTypeId === "5"
+
       const instructionData = {
         ...formDataWithoutContainerFields,
-        total_cost: totalCost, // This is now the subtotal without VAT
+        total_cost: isAddOnType ? 0 : totalCost, // For add-on, always save 0
         // Set vessel_name and stackdate to null for cross-haul types
         vessel_name: isCrossHaul ? null : formData.vesselName,
         stackdate: isCrossHaul ? null : formData.stackDate,
-        // UPDATED RATE SAVING LOGIC: Set container rates to 0 if count is 0, null for weight-based, or 0 when unit is kg or ton
-        rateper_6: formData.rateWeight === "kg" || formData.rateWeight === "ton"
+        // UPDATED RATE SAVING LOGIC: For add-on (type 5), force all rates to 0.
+        // Otherwise, set container rates to 0 if count is 0, null for weight-based, or 0 when unit is kg or ton
+        rateper_6: isAddOnType
           ? 0
-          : isWeightBased
-            ? null
-            : formData.num_six_meters === 0
-              ? 0
-              : formData.sixMeterRate === ""
-                ? null
-                : Number.parseFloat(formData.sixMeterRate || 0),
-        rateper_12: formData.rateWeight === "kg" || formData.rateWeight === "ton"
+          : formData.rateWeight === "kg" || formData.rateWeight === "ton"
+            ? 0
+            : isWeightBased
+              ? null
+              : formData.num_six_meters === 0
+                ? 0
+                : formData.sixMeterRate === ""
+                  ? null
+                  : Number.parseFloat(formData.sixMeterRate || 0),
+        rateper_12: isAddOnType
           ? 0
-          : isWeightBased
-            ? null
-            : formData.num_twelve_meters === 0
-              ? 0
-              : formData.twelveMeterRate === ""
-                ? null
-                : Number.parseFloat(formData.twelveMeterRate || 0),
-        rateper_abnormal: formData.rateWeight === "kg" || formData.rateWeight === "ton"
+          : formData.rateWeight === "kg" || formData.rateWeight === "ton"
+            ? 0
+            : isWeightBased
+              ? null
+              : formData.num_twelve_meters === 0
+                ? 0
+                : formData.twelveMeterRate === ""
+                  ? null
+                  : Number.parseFloat(formData.twelveMeterRate || 0),
+        rateper_abnormal: isAddOnType
           ? 0
-          : isWeightBased
-            ? null
-            : formData.num_abnormal === 0
-              ? 0
-              : formData.abnormalRate === ""
-                ? null
-                : Number.parseFloat(formData.abnormalRate || 0),
+          : formData.rateWeight === "kg" || formData.rateWeight === "ton"
+            ? 0
+            : isWeightBased
+              ? null
+              : formData.num_abnormal === 0
+                ? 0
+                : formData.abnormalRate === ""
+                  ? null
+                  : Number.parseFloat(formData.abnormalRate || 0),
         // Set container counts to 0 for weight-based or when unit is kg or ton
         num_six_meters: formData.rateWeight === "kg" || formData.rateWeight === "ton" ? 0 : formData.num_six_meters || 0,
         num_twelve_meters: formData.rateWeight === "kg" || formData.rateWeight === "ton" ? 0 : formData.num_twelve_meters || 0,
         num_abnormal: formData.rateWeight === "kg" || formData.rateWeight === "ton" ? 0 : formData.num_abnormal || 0,
-        // Set break bulk fields to null/0 as they've been removed from the UI
-        rateper_breakbulk: null,
+        // Set break bulk fields. For add-on, force 0; otherwise null as it's removed from UI
+        rateper_breakbulk: isAddOnType ? 0 : null,
         num_breakbulk: 0,
-        // Set weight and unitrate appropriately
+        // Set weight and unitrate appropriately. For add-on, force unitrate to 0.
         weight:
           isWeightBased && formData.shipmentTypeId !== "4"
             ? formData.weight === ""
               ? null
               : Number.parseFloat(formData.weight || 0)
             : null,
-        unitrate: isWeightBased ? (formData.unitrate === "" ? null : Number.parseFloat(formData.unitrate || 0)) : null,
+        unitrate: isAddOnType
+          ? 0
+          : isWeightBased
+            ? formData.unitrate === "" ? null : Number.parseFloat(formData.unitrate || 0)
+            : null,
         // Map field names for backend
         client: formData.clientId,
         shipment_type: formData.shipmentTypeId,
@@ -1852,7 +1879,7 @@ const ControllerInstructions = () => {
             </div>
           </div>
         </div>
-        {isAddOn && (
+        {false && (
           <div className="controller-instructions-form-section">
             <div className="controller-instructions-form-row">
               <div className="controller-instructions-form-field">
@@ -1890,10 +1917,7 @@ const ControllerInstructions = () => {
 
         {/* Main container + booking section: two columns side by side */}
         <div className="controller-instructions-form-section">
-          <div
-            className="controller-instructions-container-section"
-            style={{ display: isAddOn ? "none" : undefined }}
-          >
+          <div className="controller-instructions-container-section">
             {/* LEFT: Trailer size / containers / unit per */}
             <div className="controller-instructions-container-group">
               <div className="controller-instructions-container-label">
@@ -2170,7 +2194,8 @@ const ControllerInstructions = () => {
                         disabled={
                           formData.shipmentTypeId === "1" ||
                           formData.shipmentTypeId === "2" ||
-                          formData.shipmentTypeId === "3"
+                          formData.shipmentTypeId === "3" ||
+                          formData.shipmentTypeId === "5"
                         }
                         style={{
                           width: "100%",
@@ -2182,7 +2207,8 @@ const ControllerInstructions = () => {
                             formData.shipmentTypeId === "1" ||
                             formData.shipmentTypeId === "2" ||
                             formData.shipmentTypeId === "3" ||
-                            formData.shipmentTypeId === "4"
+                            formData.shipmentTypeId === "4" ||
+                            formData.shipmentTypeId === "5"
                               ? "#e9ecef"
                               : "#fff",
                           height: "32px",
@@ -2190,14 +2216,16 @@ const ControllerInstructions = () => {
                           cursor:
                             formData.shipmentTypeId === "1" ||
                             formData.shipmentTypeId === "2" ||
-                            formData.shipmentTypeId === "3"
+                            formData.shipmentTypeId === "3" ||
+                            formData.shipmentTypeId === "5"
                               ? "not-allowed"
                               : "pointer",
                         }}
                       >
                         {formData.shipmentTypeId === "1" ||
                         formData.shipmentTypeId === "2" ||
-                        formData.shipmentTypeId === "3" ? (
+                        formData.shipmentTypeId === "3" ||
+                        formData.shipmentTypeId === "5" ? (
                           <option value="Container">Container</option>
                         ) : formData.shipmentTypeId === "4" ? (
                           <>
@@ -2318,7 +2346,7 @@ const ControllerInstructions = () => {
             </div>
 
             {/* RIGHT: Booking + dates + VAT/vessel/description */}
-            {!isAddOn && (
+            {true && (
               <div className="controller-instructions-booking-rates-group">
                 {/* Top row: shipment type + refs */}
                 <div
@@ -3060,7 +3088,7 @@ const ControllerInstructions = () => {
           </div>
         </div>
         {/* Container Details Section - Only show for container-based calculations */}
-        {!isAddOn && !isWeightBased && showContainerDetails ? (
+        {!isWeightBased && showContainerDetails ? (
           <div className="container-details-section" style={{ margin: "20px 0", width: "100%" }}>
             <div
               className="controller-instructions-form-section"

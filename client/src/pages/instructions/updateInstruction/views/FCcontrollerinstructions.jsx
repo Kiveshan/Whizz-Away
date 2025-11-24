@@ -296,8 +296,17 @@ const FCcontrollerinstructions = () => {
   // non-applicable fields (null/false). This flag is used when building the
   // container payload sent to the backend.
   const allowVgmUI =
-    String(formData.shipmentTypeId) !== "4" &&
-    String(formData.shipmentTypeId) !== "5";
+    String(formData.shipmentTypeId) !== "4";
+
+  // Ensure add-on shipment type (5) always uses Container as unit per
+  useEffect(() => {
+    if (String(formData.shipmentTypeId) === "5" && formData.rateWeight !== "Container") {
+      setFormData((prev) => ({
+        ...prev,
+        rateWeight: "Container",
+      }));
+    }
+  }, [formData.shipmentTypeId, formData.rateWeight]);
 
   // State for warning modal
   const [warningModal, setWarningModal] = useState({
@@ -1326,6 +1335,8 @@ const FCcontrollerinstructions = () => {
       const totalCost = Number((baseCost + totalSurchargeAmount + totalHazardousAmount + totalVgmAmount).toFixed(2));
 
       // Prepare instruction update data with proper field mapping
+      const isAddOnType = isAddOn;
+
       const instructionUpdateData = {
         // Map frontend fields to backend database fields
         client: formData.clientId,
@@ -1361,29 +1372,37 @@ const FCcontrollerinstructions = () => {
               ? Number(formData.weight)
               : null
             : null,
-        total_cost: totalCost,
+        total_cost: isAddOnType ? 0 : totalCost,
         booking_ref: formData.bookingRef,
         vessel_name: formData.vesselName,
         rateper_6:
-          formData.rateWeight === "kg" || formData.rateWeight === "ton"
+          isAddOnType
             ? 0
-            : ratePer6,
+            : formData.rateWeight === "kg" || formData.rateWeight === "ton"
+              ? 0
+              : ratePer6,
         rateper_12:
-          formData.rateWeight === "kg" || formData.rateWeight === "ton"
+          isAddOnType
             ? 0
-            : ratePer12,
+            : formData.rateWeight === "kg" || formData.rateWeight === "ton"
+              ? 0
+              : ratePer12,
         rateper_abnormal:
-          formData.rateWeight === "kg" || formData.rateWeight === "ton"
+          isAddOnType
             ? 0
-            : ratePerAbnormal,
-        rateper_breakbulk: 0,
+            : formData.rateWeight === "kg" || formData.rateWeight === "ton"
+              ? 0
+              : ratePerAbnormal,
+        rateper_breakbulk: isAddOnType ? 0 : 0,
         // For ton or kg, unitRate must be provided and not defaulted to 0
         unitrate:
-          formData.rateWeight !== "Container"
-            ? formData.unitRate
-              ? Number(formData.unitRate)
-              : null
-            : null,
+          isAddOnType
+            ? 0
+            : formData.rateWeight !== "Container"
+              ? formData.unitRate
+                ? Number(formData.unitRate)
+                : null
+              : null,
       };
 
       // Prepare container data with containerKey for smart updates
@@ -2364,6 +2383,20 @@ const FCcontrollerinstructions = () => {
 
   // Function for real-time total cost recalculation
   const recalculateTotalCost = () => {
+    // For add-on shipment type (5), always force zero cost and zero rates
+    if (isAddOn) {
+      setFormData(prev => ({
+        ...prev,
+        total_cost: 0,
+        rateper_6: 0,
+        rateper_12: 0,
+        rateper_abnormal: 0,
+        rateper_breakbulk: 0,
+        unitRate: 0,
+      }));
+      return;
+    }
+
     const newTotalCost = calculateTotalCostFromRates(
       formData.rateper_6 || 0,
       formData.rateper_12 || 0,
@@ -2372,7 +2405,7 @@ const FCcontrollerinstructions = () => {
       formData.num_twelve_meters || 0,
       formData.num_abnormal || 0
     );
-    
+
     setFormData(prev => ({ ...prev, total_cost: newTotalCost }));
   };
 
@@ -3878,7 +3911,7 @@ const FCcontrollerinstructions = () => {
             </div>
           </div>
           <div className="controller-instructions-form-section">
-            {isAddOn && (
+            {false && (
               <div
                 className="controller-instructions-form-row"
                 style={{ display: "flex", gap: "12px", flexWrap: "wrap" }}
@@ -4003,7 +4036,6 @@ const FCcontrollerinstructions = () => {
               />
               <div
                 className="controller-instructions-container-section"
-                style={isAddOn ? { display: "none" } : undefined}
               >
                 <div className="controller-instructions-container-group">
                   <div className="controller-instructions-container-label">
@@ -4162,7 +4194,7 @@ const FCcontrollerinstructions = () => {
                   className="controller-instructions-booking-vertical-group"
                   style={{
                     marginTop: "8px",
-                    display: isAddOn ? "none" : "flex",
+                    display: "flex",
                     flexDirection: "column",
                     gap: "8px",
                     maxWidth: "220px",
@@ -4265,7 +4297,6 @@ const FCcontrollerinstructions = () => {
                   {/* Compact Rates per dropdown and input fields in one row */}
                   <div
                     className="controller-instructions-form-field"
-                    style={isAddOn ? { display: "none" } : undefined}
                   >
                     <label>Unit per</label>
                     <div
@@ -4292,7 +4323,7 @@ const FCcontrollerinstructions = () => {
                             ...(isReadOnly ? readOnlyStyle : {}),
                           }}
                           ref={fieldRefs.rateWeight}
-                          disabled={isReadOnly}
+                          disabled={isReadOnly || isAddOn}
                         >
                           {/* Show kg and ton options only for Cross-haul (break bulk) - type 4 */}
                           {formData.shipmentTypeId === "4" && (
@@ -4304,7 +4335,8 @@ const FCcontrollerinstructions = () => {
                           {/* Show Container option only for Import, Export, and Cross-haul - types 1, 2, 3 */}
                           {(formData.shipmentTypeId === "1" ||
                             formData.shipmentTypeId === "2" ||
-                            formData.shipmentTypeId === "3") && (
+                            formData.shipmentTypeId === "3" ||
+                            String(formData.shipmentTypeId) === "5") && (
                             <option value="Container">Container</option>
                           )}
                         </select>
@@ -4426,7 +4458,6 @@ const FCcontrollerinstructions = () => {
                 {/* Hazardous / Surcharge checkboxes moved below Rate Type */}
                 <div
                   className="controller-instructions-date-time-group"
-                  style={isAddOn ? { display: "none" } : undefined}
                 >
                   <div
                     className="controller-instructions-shipment-task-row"
@@ -4519,22 +4550,6 @@ const FCcontrollerinstructions = () => {
                           />
                         </div>
                       </div>
-                      <div
-                        className="controller-instructions-form-field controller-instructions-small-field"
-                        style={{ flex: "0 1 80px" }}
-                      >
-                        <label>VAT Rate %</label>
-                        <div className="controller-instructions-input-wrapper">
-                          <input
-                            type="number"
-                            className="controller-instructions-form-input"
-                            name="vat"
-                            value={formData.vat === 0 ? 0 : formData.vat || 15}
-                            onChange={handleInputChange}
-                            required
-                          />
-                        </div>
-                      </div>
                     </div>
                   </div>
 
@@ -4596,54 +4611,106 @@ const FCcontrollerinstructions = () => {
                   </div>
 
                   <div
-                    className="controller-instructions-form-field"
-                    style={{ maxWidth: "120px" }}
+                    className="controller-instructions-shipment-task-row"
+                    style={{ marginBottom: "8px" }}
                   >
-                    <label>VAT Rate %</label>
-                    <div className="controller-instructions-input-wrapper">
-                      <input
-                        type="number"
-                        className="controller-instructions-form-input"
-                        name="vat"
-                        value={formData.vat === 0 ? 0 : formData.vat || 15}
-                        onChange={handleInputChange}
-                        required
-                        disabled={isReadOnly}
-                        style={isReadOnly ? readOnlyStyle : {}}
-                      />
-                    </div>
-                  </div>
-                  {(formData.shipmentTypeId === "1" ||
-                    formData.shipmentTypeId === "2") && (
-                    <div className="controller-instructions-form-field">
-                      <label>
-                        Vessel Name <span style={{ color: "red" }}>*</span>
-                      </label>
-                      <div
-                        className="controller-instructions-input-wrapper"
-                        ref={fieldRefs.vesselName}
-                      >
+                    <div
+                      className="controller-instructions-form-field controller-instructions-small-field"
+                      style={{ maxWidth: "120px" }}
+                    >
+                      <label>VAT Rate %</label>
+                      <div className="controller-instructions-input-wrapper">
                         <input
-                          type="text"
-                          className={`controller-instructions-form-input ${
-                            fieldErrors.vesselName
-                              ? "controller-instructions-error-field"
-                              : ""
-                          }`}
-                          placeholder="Enter vessel name"
-                          name="vesselName"
-                          value={formData.vesselName || ""}
+                          type="number"
+                          className="controller-instructions-form-input"
+                          name="vat"
+                          value={formData.vat === 0 ? 0 : formData.vat || 15}
                           onChange={handleInputChange}
+                          required
                           disabled={isReadOnly}
                           style={isReadOnly ? readOnlyStyle : {}}
-                          required={true}
-                        />
-                        <InstructionErrorTooltip
-                          message={fieldErrors.vesselName}
                         />
                       </div>
                     </div>
-                  )}
+                    {(isAddOn ||
+                      String(formData.shipmentTypeId) === "1" ||
+                      String(formData.shipmentTypeId) === "2") && (
+                      <div className="controller-instructions-form-field controller-instructions-small-field">
+                        <label>
+                          {String(formData.shipmentTypeId) === "1"
+                            ? "ETA Date"
+                            : "Stack Date"}{" "}
+                          {(String(formData.shipmentTypeId) === "1" ||
+                            String(formData.shipmentTypeId) === "2") && (
+                            <span style={{ color: "red" }}>*</span>
+                          )}
+                        </label>
+                        <div
+                          className="controller-instructions-date-wrapper"
+                          ref={fieldRefs.stackDate}
+                        >
+                          <input
+                            type="date"
+                            className={`controller-instructions-form-input ${
+                              fieldErrors.stackDate
+                                ? "controller-instructions-error-field"
+                                : ""
+                            }`}
+                            name="stackDate"
+                            value={formData.stackDate || ""}
+                            onChange={handleInputChange}
+                            min={today}
+                            ref={etaDateRef}
+                            disabled={isReadOnly}
+                            style={isReadOnly ? readOnlyStyle : {}}
+                            required={
+                              String(formData.shipmentTypeId) === "1" ||
+                              String(formData.shipmentTypeId) === "2"
+                            }
+                            onKeyDown={(e) => e.preventDefault()}
+                          />
+                          <InstructionErrorTooltip
+                            message={fieldErrors.stackDate}
+                          />
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                  <div className="controller-instructions-form-field">
+                    <label>
+                      Vessel Name{" "}
+                      {(formData.shipmentTypeId === "1" ||
+                        formData.shipmentTypeId === "2") && (
+                        <span style={{ color: "red" }}>*</span>
+                      )}
+                    </label>
+                    <div
+                      className="controller-instructions-input-wrapper"
+                      ref={fieldRefs.vesselName}
+                    >
+                      <input
+                        type="text"
+                        className={`controller-instructions-form-input ${
+                          fieldErrors.vesselName
+                            ? "controller-instructions-error-field"
+                            : ""
+                        }`}
+                        placeholder="Enter vessel name"
+                        name="vesselName"
+                        value={formData.vesselName || ""}
+                        onChange={handleInputChange}
+                        disabled={isReadOnly}
+                        style={isReadOnly ? readOnlyStyle : {}}
+                        required={
+                          formData.shipmentTypeId === "1" ||
+                          formData.shipmentTypeId === "2"
+                        }
+                      />
+                      <InstructionErrorTooltip
+                        message={fieldErrors.vesselName}
+                      />
+                    </div>
+                  </div>
                   <div className="controller-instructions-form-field">
                     <label>Description</label>
                     <div
@@ -4669,47 +4736,6 @@ const FCcontrollerinstructions = () => {
                       />
                     </div>
                   </div>
-                </div>
-                <div
-                  className="controller-instructions-date-time-group"
-                  style={isAddOn ? { display: "none" } : undefined}
-                >
-                  {(formData.shipmentTypeId === "1" ||
-                    formData.shipmentTypeId === "2") && (
-                    <div className="controller-instructions-form-field">
-                      <label>
-                        {formData.shipmentTypeId === "1"
-                          ? "ETA Date"
-                          : "Stack Date"}{" "}
-                        <span style={{ color: "red" }}>*</span>
-                      </label>
-                      <div
-                        className="controller-instructions-date-wrapper"
-                        ref={fieldRefs.stackDate}
-                      >
-                        <input
-                          type="date"
-                          className={`controller-instructions-form-input ${
-                            fieldErrors.stackDate
-                              ? "controller-instructions-error-field"
-                              : ""
-                          }`}
-                          name="stackDate"
-                          value={formData.stackDate || ""}
-                          onChange={handleInputChange}
-                          min={today}
-                          ref={etaDateRef}
-                          disabled={isReadOnly}
-                          style={isReadOnly ? readOnlyStyle : {}}
-                          required={true}
-                          onKeyDown={(e) => e.preventDefault()}
-                        />
-                        <InstructionErrorTooltip
-                          message={fieldErrors.stackDate}
-                        />
-                      </div>
-                    </div>
-                  )}
                 </div>
               </div>
             </div>
@@ -4898,9 +4924,16 @@ const FCcontrollerinstructions = () => {
               weight: c.weight,
             })),
           })}
-          {/* Only show container details table when shipment type is NOT cross-haul (break bulk) (type 4) and not add-on */}
-          {containers.length > 0 && formData.shipmentTypeId !== "4" && !isAddOn && (
-            <div className="controller-instructions-form-section">
+          {/* Only show container details table when shipment type is NOT cross-haul (break bulk) (type 4) */}
+          {containers.length > 0 && formData.shipmentTypeId !== "4" && (
+            <div
+              className="controller-instructions-form-section"
+              style={
+                String(formData.shipmentTypeId) === "2"
+                  ? { marginTop: "-40px", paddingTop: "0" }
+                  : undefined
+              }
+            >
               <div className="controller-instructions-container-details-section">
                 <h3>Container Details</h3>
                 {(containerSuccessMessage || rateUpdateMessage) && (
