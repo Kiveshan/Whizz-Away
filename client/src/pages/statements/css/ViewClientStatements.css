@@ -56,8 +56,8 @@
   width: 1000px;
   border-collapse: collapse;
   margin-top: -35px;
-  margin-left: 60px;
   align-items: center;
+  margin : auto
 }
 
 .view-client-statements-wrapper thead {

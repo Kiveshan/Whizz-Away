@@ -6,7 +6,7 @@ import { useNavigate } from "react-router-dom";
 import { Eye, EyeOff } from "lucide-react";
 import api from "../../../api";
 
-const Login = ({ switchToRegister }) => {
+const Login = ({ switchToRegister, closePopup }) => {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
@@ -15,6 +15,14 @@ const Login = ({ switchToRegister }) => {
 
   const togglePasswordVisibility = () => {
     setShowPassword(!showPassword);
+  };
+
+  const handleClose = () => {
+    if (closePopup) {
+      closePopup();
+    } else {
+      navigate("/");
+    }
   };
 
   const handleLogin = async (e) => {
@@ -47,6 +55,13 @@ const Login = ({ switchToRegister }) => {
   return (
     <div className={styles.loginContainer}>
       <div className={styles.loginForm}>
+        <button
+          type="button"
+          className={styles.closePopup}
+          onClick={handleClose}
+        >
+          X
+        </button>
         <center>
           <div className={styles.logoContainer1}>
             <img

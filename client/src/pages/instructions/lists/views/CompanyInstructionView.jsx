@@ -203,10 +203,10 @@ const CompanyInstructionView = () => {
   // Table style to override any existing CSS
   const tableStyle = {
     width: "100%",
-    maxWidth: "1000px",
+    maxWidth: "1200px",
     marginLeft: "auto",
     marginRight: "auto",
-    marginTop: "-80px",
+    marginTop: "-110px",
     borderCollapse: "collapse",
   }
 
@@ -305,12 +305,14 @@ const CompanyInstructionView = () => {
 
       {/* Pagination */}
       {!loading && !error && clients.length > 0 && (
-        <Pagination
-          totalRecords={clients.length}
-          recordsPerPage={recordsPerPage}
-          currentPage={currentPage}
-          onPageChange={handlePageChange}
-        />
+        <div className="company-instruction-view-pagination-container">
+          <Pagination
+            totalRecords={clients.length}
+            recordsPerPage={recordsPerPage}
+            currentPage={currentPage}
+            onPageChange={handlePageChange}
+          />
+        </div>
       )}
     </div>
   )
