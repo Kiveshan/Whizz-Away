@@ -33,5 +33,7 @@ html {
   margin-top: -4px;
   margin-right: -5px;
   position: relative;
-  z-index: 1000;
+  z-index: 0 ;
+  width : 25%;
+  margin-left: 75%;
 }
