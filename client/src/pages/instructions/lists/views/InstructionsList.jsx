@@ -222,6 +222,16 @@ const Instructions = () => {
             item.shipment_type === 4 ||
             item.shipment_type === "4"
         )
+      } else if (activeFilter === "add-on") {
+        filtered = filtered.filter((item) => {
+          const typeText = (item.type_text || item.type || "").toLowerCase()
+          return (
+            typeText === "add-on" ||
+            typeText === "add on" ||
+            item.shipment_type === 5 ||
+            item.shipment_type === "5"
+          )
+        })
       }
     }
 
@@ -393,6 +403,12 @@ const Instructions = () => {
             >
               New
             </button>
+            <button
+              className={`btn btn-blue ${activeFilter === "add-on" ? "active" : ""}`}
+              onClick={() => handleFilterClick("add-on")}
+            >
+              Add-on
+            </button>
           </div>
         </div>
         <div className="tables-container">
@@ -437,7 +453,9 @@ const Instructions = () => {
                     ? "cross-haul"
                     : item.shipment_type === 4 || item.shipment_type === "4"
                       ? "cross-haul (break bulk)"
-                      : item.type)}
+                      : item.shipment_type === 5 || item.shipment_type === "5"
+                        ? "add-on"
+                        : item.type)}
           </td>
           <td>{renderStatus(item.status)}</td>
           <td>
