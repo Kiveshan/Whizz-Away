@@ -66,6 +66,14 @@ const LandingPage = () => {
   };
 
   useEffect(() => {
+    // Disable page scroll only while on landing page
+    document.body.classList.add("landing-no-scroll");
+    return () => {
+      document.body.classList.remove("landing-no-scroll");
+    };
+  }, []);
+
+  useEffect(() => {
     const id = setInterval(() => setFlipped((f) => !f), 4000);
     return () => clearInterval(id);
   }, []);
