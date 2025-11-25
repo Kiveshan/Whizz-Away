@@ -11,6 +11,7 @@
   top: 55px;
   left: 20px;
   margin-top: 90px;
+  z-index: 1001;
 }
 .back-button:hover {
   background-color: #218838;

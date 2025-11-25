@@ -4,13 +4,7 @@ import "../css/modal.module.css"
 const Header = ({ onLoginClick, onRegisterClick }) => {
   return (
     <header className="header2">
-      <div className="logo-container">
-        <img src="/images/whizz-away.jpeg" className="logo-img" alt="Business Logo" />
-      </div>
-      <h1 style={{ fontSize: "2.5rem", fontWeight: "bold", textAlign: "center", color: "black" }}>
-  Whizz-Away
-</h1>
-
+      <div className="header-spacer" />
       <div className="header-buttons1">
         <button className="header-btn login-btn" onClick={onLoginClick}>
           Login

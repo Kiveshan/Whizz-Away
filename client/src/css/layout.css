@@ -32,4 +32,6 @@ html {
   gap: 10px;
   margin-top: -4px;
   margin-right: -5px;
+  position: relative;
+  z-index: 1000;
 }
