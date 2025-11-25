@@ -50,6 +50,7 @@ const getAddonsByClient = async (clientId, filters = {}) => {
   }
 };
 
+
 const createAddon = async (addonData) => {
   try {
     if (!pool) {

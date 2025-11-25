@@ -44,6 +44,7 @@ const getClientAddonsHandler = async (req, res) => {
   }
 };
 
+
 const createAddonHandler = async (req, res) => {
   try {
     console.log("Creating add-on with data:", req.body);

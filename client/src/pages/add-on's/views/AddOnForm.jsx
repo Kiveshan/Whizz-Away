@@ -53,6 +53,10 @@ const AddOnForm = () => {
   const [success, setSuccess] = useState(false);
   const [fetchingData, setFetchingData] = useState(isViewMode);
   const [fetchingInfo, setFetchingInfo] = useState(true);
+  const [isEditingInvoiceNum, setIsEditingInvoiceNum] = useState(false);
+  const [invoiceNumInput, setInvoiceNumInput] = useState("");
+  const [savingInvoiceNum, setSavingInvoiceNum] = useState(false);
+  const [saveInvoiceError, setSaveInvoiceError] = useState(null);
 
   useEffect(() => {
     const fetchCompanyAndClientInfo = async () => {
@@ -151,6 +155,7 @@ const AddOnForm = () => {
               booking_ref: addon.booking_ref || "",
               client_ref: addon.client_ref || "",
             });
+            setInvoiceNumInput(addon.invoice_number || "");
           } else {
             throw new Error(
               response.data.message || "Failed to fetch add-on details"
@@ -176,6 +181,30 @@ const AddOnForm = () => {
       fetchAddonData();
     }
   }, [isViewMode, addonId, clientId, clientName, navigate]);
+
+  const handleStartEditInvoiceNum = () => {
+    setSaveInvoiceError(null);
+    setInvoiceNumInput(formData.invoice_number || "");
+    setIsEditingInvoiceNum(true);
+  };
+
+  const handleCancelEditInvoiceNum = () => {
+    setIsEditingInvoiceNum(false);
+    setInvoiceNumInput(formData.invoice_number || "");
+    setSaveInvoiceError(null);
+  };
+
+  const handleSaveInvoiceNum = async () => {
+    if (!isViewMode || !addonId) return;
+    if (!invoiceNumInput || invoiceNumInput.trim().length === 0) {
+      setSaveInvoiceError("Invoice number is required");
+      return;
+    }
+    // Frontend-only: update local state so the PDF reflects the typed number
+    setSaveInvoiceError(null);
+    setFormData((prev) => ({ ...prev, invoice_number: invoiceNumInput.trim() }));
+    setIsEditingInvoiceNum(false);
+  };
 
   const handleInputChange = (index, e) => {
     if (isViewMode) return;
@@ -625,10 +654,52 @@ const AddOnForm = () => {
             <p>VAT Reg No: {companyInfo.vat_reg_num}</p>
           </div>
           <div className="invoice-details">
-            {isViewMode && formData.invoice_number && (
-              <p className="invoice-number">
-                Invoice #: {formData.invoice_number}
-              </p>
+            {isViewMode && (
+              <div className="invoice-number" style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                {!isEditingInvoiceNum ? (
+                  <>
+                    <span>Invoice #:</span>
+                    <strong>{formData.invoice_number || "—"}</strong>
+                    <button
+                      type="button"
+                      className="print-button"
+                      onClick={handleStartEditInvoiceNum}
+                    >
+                      Edit
+                    </button>
+                  </>
+                ) : (
+                  <>
+                    <input
+                      type="text"
+                      value={invoiceNumInput}
+                      onChange={(e) => setInvoiceNumInput(e.target.value)}
+                      className="form-input"
+                      placeholder="Enter invoice number"
+                      style={{ width: "200px" }}
+                    />
+                    <button
+                      type="button"
+                      className="print-button"
+                      onClick={handleSaveInvoiceNum}
+                      disabled={savingInvoiceNum}
+                    >
+                      {savingInvoiceNum ? "Saving..." : "Save"}
+                    </button>
+                    <button
+                      type="button"
+                      className="back-button"
+                      onClick={handleCancelEditInvoiceNum}
+                      disabled={savingInvoiceNum}
+                    >
+                      Cancel
+                    </button>
+                  </>
+                )}
+              </div>
+            )}
+            {saveInvoiceError && (
+              <div className="error-message" style={{ marginTop: "6px" }}>{saveInvoiceError}</div>
             )}
           </div>
         </div>
