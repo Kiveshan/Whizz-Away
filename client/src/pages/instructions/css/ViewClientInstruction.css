@@ -40,12 +40,13 @@
   flex-direction: column;
   align-items: center;
   padding: 0 20px;
+  margin-top: -70px;
 }
 
 .view-client-instruction-table-wrapper {
-  background-color: white;
-  border-radius: 8px;
-  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+  background-color: transparent;
+  border-radius: 0;
+  box-shadow: none;
   overflow: hidden;
   width: 100%;
   max-width: 1200px;
@@ -56,6 +57,7 @@
   width: 100%;
   border-collapse: collapse;
   font-size: 14px;
+  background-color: transparent !important;
 }
 
 .view-client-instruction-table thead {
@@ -63,7 +65,7 @@
 }
 
 .view-client-instruction-table th {
-  padding: 12px;
+  padding: 8px;
   text-align: left;
   font-weight: bold;
   color: #1f2937;
@@ -71,9 +73,10 @@
 }
 
 .view-client-instruction-table td {
-  padding: 12px;
+  padding: 8px;
   border-bottom: 1px solid #e5e7eb;
   color: #374151;
+  background-color: transparent !important;
 }
 
 .view-client-instruction-table tbody tr:hover {
@@ -152,8 +155,22 @@
 .view-client-instruction-pagination-container {
   display: flex;
   justify-content: center;
-  margin-top: 20px;
-  padding: 20px;
+  margin-top: 0;
+  padding: 0;
+}
+
+/* Tighten shared Pagination spacing on this page so controls sit higher */
+.view-client-instruction-pagination-container .client-payment-dashboard-wrapper .pagination-container {
+  margin-top: 0;
+  gap: 8px;
+}
+
+.view-client-instruction-pagination-container .client-payment-dashboard-wrapper .pagination-info {
+  display: none;
+}
+
+.view-client-instruction-pagination-container .client-payment-dashboard-wrapper .pagination-summary {
+  display: none;
 }
 
 .view-client-instruction-pagination {

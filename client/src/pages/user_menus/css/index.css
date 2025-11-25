@@ -1,6 +1,6 @@
   html, body {
     height: 100%;
-    overflow: hidden; /* prevent scrollbars */
+ 
   }
 body {
     margin: 0;
@@ -63,32 +63,37 @@ body {
     left: 0;
     width: 100%;
     display: flex;
+    justify-content: flex-end;
     align-items: center;
-    padding: 15px 20px;
-    background: #bae6fd;
-    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+    padding: 16px 40px;
+    background: transparent;
+    box-shadow: none;
     z-index: 1000; /* Ensures it stays above other elements */
 }
 
-.logo-container {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  margin-right: 15px;
-  padding: 5px;
+.header-spacer {
+  flex: 1;
 }
 
-.logo-img {
-  height: 120px;
-  width: 120px;
-  object-fit: contain;
-  transition: transform 0.3s ease-in-out;
-  margin-top: 20px;
-}
+  .logo-container {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin-right: 15px;
+    padding: 5px;
+  }
 
-.logo-img:hover {
-  transform: scale(1.05);
-}
+  .logo-img {
+    height: 120px;
+    width: 120px;
+    object-fit: contain;
+    transition: transform 0.3s ease-in-out;
+    margin-top: 20px;
+  }
+
+  .logo-img:hover {
+    transform: scale(1.05);
+  }
 
   .header2 h1 {
     margin: 0;
@@ -98,7 +103,7 @@ body {
   
   /* Header buttons */
   .header-buttons1 {
-    margin-right: 70px;
+    margin-right: 0;
     display: flex;
     gap: 10px;
   }
@@ -134,30 +139,31 @@ body {
   /* Landing content layout */
   .landing-content {
     display: flex;
-    flex-direction: row;
+    flex-direction: column;
     align-items: flex-start;
     gap: 24px;
     padding: 20px;
     position: absolute;
-    left: 40px;
-    right: 40px;
-    bottom: 220px;
+    top: 45%;
+    right: 20%;
+    left: auto;
+    transform: translateY(-50%);
     z-index: 2;
   }
-
-  /* Left stats panel */
+  
+  /* Stats panel: two smaller cards under the intro card, aligned to the right */
   .stats-panel {
     display: flex;
     flex-direction: row;
     gap: 16px;
     align-items: center;
-    flex-wrap: wrap;
-    margin-left: -80px; /* shift cards 80px further left */
-    margin-top: 50px;
+    justify-content: flex-start;
+    margin-top: 0;
   }
-
+  
   .intro-panel {
-    max-width: 720px;
+    width: 500px;
+    max-width: 500px;
     color: #0b1220;
     background: rgba(255,255,255,0.28);
     border: 1px solid rgba(255,255,255,0.4);
@@ -165,19 +171,40 @@ body {
     padding: 16px 18px;
     box-shadow: 0 8px 24px rgba(0,0,0,0.12);
     backdrop-filter: blur(8px);
-    margin-left: auto; /* push intro to the right */
-    transform: translateY(-185px); /* move up 185px */
+    margin-left: 0;
+  }
+  
+  .intro-brand {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 14px;
+    margin-bottom: 10px;
   }
 
+  .intro-logo {
+    width: 80px;
+    height: 80px;
+    border-radius: 8px;
+    object-fit: cover;
+  }
+  
+  .intro-name {
+    font-size: 28px;
+    font-weight: 800;
+    color: #ffffff;
+    text-shadow: 0 2px 4px rgba(0, 0, 0, 0.6);
+  }
+  
   .intro-title {
     margin: 0 0 6px 0;
-    font-size: 28px;
+    font-size: 24px;
     font-weight: 800;
     letter-spacing: 0.2px;
     color: #0f172a; /* slate-900 */
     text-shadow: 0 1px 2px rgba(255,255,255,0.4);
   }
-
+  
   .intro-desc {
     margin: 0;
     font-size: 15px;
@@ -185,8 +212,9 @@ body {
     color: #111827; /* gray-900 */
     opacity: 0.98;
     font-weight: 700; /* bolder */
+    text-align: center;
   }
-
+  
   .landing-bg,
   .landing-bg-base,
   .landing-bg-overlay {
@@ -198,13 +226,13 @@ body {
     z-index: 0;
     filter: brightness(0.9);
   }
-
+  
   /* Base layer stays visible */
   .landing-bg-base {
     opacity: 1;
     transition: none;
   }
-
+  
   /* Overlay layer crossfades in */
   .landing-bg-overlay {
     opacity: 0;
@@ -215,11 +243,11 @@ body {
   .landing-bg-overlay.visible {
     opacity: 1;
   }
-
+  
   /* Flip card */
   .flip-card {
-    width: 220px;
-    height: 110px;
+    width: 240px;
+    height: 120px;
     perspective: 1000px;
     backdrop-filter: blur(8px);
     background: rgba(255,255,255,0.28);
@@ -227,7 +255,7 @@ body {
     border-radius: 12px;
     box-shadow: 0 8px 24px rgba(0,0,0,0.12);
   }
-
+  
   .flip-card-inner {
     position: relative;
     width: 100%;
@@ -235,11 +263,11 @@ body {
     transition: transform 0.6s ease;
     transform-style: preserve-3d;
   }
-
+  
   .flip-card.flipped .flip-card-inner {
     transform: rotateY(180deg);
   }
-
+  
   .flip-card-front,
   .flip-card-back {
     position: absolute;
@@ -249,43 +277,43 @@ body {
     align-items: center;
     padding: 12px 14px;
   }
-
+  
   .flip-card-back {
     transform: rotateY(180deg);
   }
-
+  
   .stat-card-face {
     display: flex;
     align-items: center;
     gap: 12px;
     width: 100%;
   }
-
+  
   .stat-icon {
     font-size: 24px;
     color: #0ea5e9; /* sky-600 */
   }
   .stat-icon.success { color: #16a34a; } /* green-600 */
   .stat-icon.warning { color: #f59e0b; } /* amber-500 */
-
+  
   .stat-texts {
     display: flex;
     flex-direction: column;
     line-height: 1.2;
   }
-
+  
   .stat-title {
     font-weight: 600;
     color: #111827; /* gray-900 */
     font-size: 14px;
   }
-
+  
   .stat-number {
     font-weight: 800;
     font-size: 22px;
     color: #111827;
   }
-
+  
   @media (max-width: 768px) {
     .flip-card {
       width: 200px;
@@ -294,8 +322,11 @@ body {
     .landing-content {
       left: 12px;
       right: 16px;
+      top: auto;
       bottom: 140px;
+      transform: none;
       flex-direction: column;
+      align-items: flex-start;
       gap: 16px;
     }
     .stats-panel {
@@ -305,4 +336,16 @@ body {
       margin-left: 0;
       max-width: 100%;
     }
+  }
+
+  /* Footer on landing: light text fixed at bottom center of the page */
+  .landing .footer {
+    background: transparent;
+    color: #f9fafb;
+    position: fixed;
+    bottom: 12px;
+    left: 50%;
+    transform: translateX(-50%);
+    padding: 0;
+    width: auto;
   }

@@ -157,6 +157,20 @@ const LandingPage = () => {
         onRegisterClick={handleRegisterClick}
       />
       <div className="landing-content">
+        <div className="intro-panel">
+          <div className="intro-brand">
+            <img
+              src="/images/whizz-away.jpeg"
+              alt="Whizz-Away logo"
+              className="intro-logo"
+            />
+            <span className="intro-name">Whizz-Away</span>
+          </div>
+          <h1 className="intro-title">Operate Smarter. Move Faster.</h1>
+          <p className="intro-desc">
+            Whizz-Away: one platform for logistics, payments, and analytics to keep every delivery on time.
+          </p>
+        </div>
         <div className="stats-panel">
           <div className={`flip-card ${flipped ? "flipped" : ""}`}>
             <div className="flip-card-inner">
@@ -179,14 +193,6 @@ const LandingPage = () => {
               </div>
             </div>
           </div>
-        </div>
-        <div className="intro-panel">
-          <h1 className="intro-title">Operate Smarter. Move Faster.</h1>
-          <p className="intro-desc">
-            Whizz-Away is a unified logistics platform that streamlines instructions, assignments,
-            debtors/ creditors workflows, wages, and analytics—giving your team the clarity and control
-            needed to deliver on time, every time.
-          </p>
         </div>
       </div>
 

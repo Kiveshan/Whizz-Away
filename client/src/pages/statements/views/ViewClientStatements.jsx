@@ -94,7 +94,7 @@ const ViewClientStatement = () => {
       {/* Table */}
       {!loading && !error && (
         <div className="clientstatementtable">
-          <table className="t1" style={{ width: "70%", marginLeft: "350px" }}>
+          <table className="t1" style={{ width: "70%" }}>
             <thead className="bg-blue-300">
               <tr>
                 <th className="p-3">Company</th>
