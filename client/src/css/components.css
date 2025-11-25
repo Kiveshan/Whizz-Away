@@ -13,6 +13,7 @@
   margin-top: 90px;
   z-index: 1001;
 }
+
 .back-button:hover {
   background-color: #218838;
 }
@@ -54,6 +55,13 @@
   transition: transform 0.3s ease-in-out;
   margin-top: 2px;
 }
+
+.header > div > .logo-img {
+  width: 120px;
+  height: 120px;
+  border-radius: 10px;
+}
+
 
 .user-info {
   display: flex;
@@ -105,6 +113,7 @@ h1 {
     max-width: 300px;
   }
 }
+
 .client-payments-container {
   font-family: Arial, sans-serif;
   max-width: 1200px;
@@ -296,15 +305,18 @@ h1 {
   cursor: pointer;
   font-weight: bold;
 }
+
 /* Centers filter buttons */
 .filter-section {
   display: flex;
-  justify-content: center; /* Centers buttons */
+  justify-content: center;
+  /* Centers buttons */
   flex-wrap: wrap;
   gap: 20px;
   width: 100%;
   margin-bottom: 20px;
 }
+
 .filter-group {
   display: flex;
 }
@@ -351,20 +363,23 @@ h1 {
   background: #bae6fd;
   color: #333;
   text-align: center;
-  padding: 15px 0; /* Remove horizontal padding to allow full width */
+  padding: 15px 0;
+  /* Remove horizontal padding to allow full width */
   display: flex;
-  justify-content: center; /* Center text */
+  justify-content: center;
+  /* Center text */
   align-items: center;
   font-size: 14px;
   position: relative;
   bottom: 0;
   width: 100%;
-  left: 0; /* Ensure it touches both sides */
+  left: 0;
+  /* Ensure it touches both sides */
   position: fixed;
 }
 
-  /* tokennotfication */
-  /* Backdrop styles */
+/* tokennotfication */
+/* Backdrop styles */
 .popup-backdrop {
   position: fixed;
   top: 0;
@@ -404,6 +419,7 @@ h1 {
     opacity: 0;
     transform: scale(0.9);
   }
+
   to {
     opacity: 1;
     transform: scale(1);
@@ -458,15 +474,22 @@ h1 {
 }
 
 @keyframes pulse {
-  0%, 100% { opacity: 1; }
-  50% { opacity: 0.5; }
+
+  0%,
+  100% {
+    opacity: 1;
+  }
+
+  50% {
+    opacity: 0.5;
+  }
 }
 
 .popup-header h3 {
   font-size: 1.25rem;
   font-weight: 700;
   margin: 0;
-  
+
 
 }
 
@@ -475,7 +498,7 @@ h1 {
   color: #fef3c7;
   margin: 0;
   text-align: center;
- margin-right: 80px;
+  margin-right: 80px;
 }
 
 /* Content styles */
@@ -556,7 +579,8 @@ h1 {
   gap: 0.75rem;
 }
 
-.dismiss-button, .logout-button {
+.dismiss-button,
+.logout-button {
   flex: 1;
   padding: 0.625rem 1rem;
   border: none;
