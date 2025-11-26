@@ -220,7 +220,7 @@ const getStatementDetails = async (statementId) => {
         "90days": Number.parseFloat(result.rows[0]["90days"] || 0),
       },
       invoices: result.rows
-        .filter((row) => row.ikey !== null)
+        .filter((row) => row.ikey !== null && Number.parseFloat(row.invoice_amount || 0) > 0)
         .map((row) => ({
           ikey: row.ikey,
           date: row.invoice_date,
