@@ -440,8 +440,8 @@ const CompanyInstructions = () => {
               All
             </button>
             <button
-              className={`btn btn-blue ${activeFilter === "In Progress" ? "active" : ""}`}
-              onClick={() => handleFilterClick("In Progress")}
+              className={`btn btn-blue ${activeFilter === "In progress" ? "active" : ""}`}
+              onClick={() => handleFilterClick("In progress")}
             >
               In-Progress
             </button>
