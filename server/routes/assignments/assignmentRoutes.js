@@ -53,7 +53,7 @@ router.get(
   "/instructions/:instructionId/shipment-type",
   getShipmentTypeByInstructionIdHandler
 );
-router.get("/instructions", getInstructionsHandler);
+// router.get("/instructions", getInstructionsHandler);
 router.get("/trucks/regnums", getTruckRegNumsHandler);
 router.get("/trucks", getTrucksHandler);
 router.get("/client-instructions", getClientInstructionsHandler);
