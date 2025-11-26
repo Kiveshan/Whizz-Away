@@ -6,6 +6,7 @@ import Modal from "../../../components/modal";
 import Footer from "../../../components/Footer";
 import "../css/index.css";
 import { FiFileText, FiBookOpen, FiCheckCircle, FiActivity } from "react-icons/fi";
+import api from "../../../api";
 
 const dashboardData = [];
 
@@ -13,6 +14,9 @@ const LandingPage = () => {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [modalForm, setModalForm] = useState("login");
   const [flipped, setFlipped] = useState(false);
+  const [stats, setStats] = useState({ total: 0, completed: 0, new: 0, in_progress: 0 });
+  const [loadingStats, setLoadingStats] = useState(false);
+
   const images = [
     "/images/landingpage/photo-1516216628859-9bccecab13ca.jpg",
     "/images/landingpage/blue-truck-rainy-highway-power-energy-motion.jpg",
@@ -107,12 +111,33 @@ const LandingPage = () => {
     };
   }, []);
 
+  useEffect(() => {
+    const fetchStats = async () => {
+      try {
+        setLoadingStats(true);
+        const res = await api.get("/api/landing/stats");
+        const data = res.data || {};
+        setStats({
+          total: Number(data.total) || 0,
+          completed: Number(data.completed) || 0,
+          new: Number(data.new) || 0,
+          in_progress: Number(data.in_progress) || 0,
+        });
+      } catch (e) {
+        setStats({ total: 0, completed: 0, new: 0, in_progress: 0 });
+      } finally {
+        setLoadingStats(false);
+      }
+    };
+    fetchStats();
+  }, []);
+
   const CardFront1 = () => (
     <div className="stat-card-face">
       <div className="stat-icon"><FiFileText /></div>
       <div className="stat-texts">
-        <span className="stat-title">New Assignments</span>
-        <span className="stat-number">5</span>
+        <span className="stat-title">Total Instructions</span>
+        <span className="stat-number">{loadingStats ? "-" : stats.total}</span>
       </div>
     </div>
   );
@@ -121,8 +146,8 @@ const LandingPage = () => {
     <div className="stat-card-face">
       <div className="stat-icon success"><FiCheckCircle /></div>
       <div className="stat-texts">
-        <span className="stat-title">Completed Assignments</span>
-        <span className="stat-number">40</span>
+        <span className="stat-title">Completed Instructions</span>
+        <span className="stat-number">{loadingStats ? "-" : stats.completed}</span>
       </div>
     </div>
   );
@@ -132,7 +157,7 @@ const LandingPage = () => {
       <div className="stat-icon"><FiBookOpen /></div>
       <div className="stat-texts">
         <span className="stat-title">New Instructions</span>
-        <span className="stat-number">10</span>
+        <span className="stat-number">{loadingStats ? "-" : stats.new}</span>
       </div>
     </div>
   );
@@ -142,7 +167,7 @@ const LandingPage = () => {
       <div className="stat-icon warning"><FiActivity /></div>
       <div className="stat-texts">
         <span className="stat-title">In Progress Instructions</span>
-        <span className="stat-number">50</span>
+        <span className="stat-number">{loadingStats ? "-" : stats.in_progress}</span>
       </div>
     </div>
   );
