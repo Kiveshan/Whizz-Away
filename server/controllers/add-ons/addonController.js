@@ -44,10 +44,11 @@ const getClientAddonsHandler = async (req, res) => {
   }
 };
 
+
 const createAddonHandler = async (req, res) => {
   try {
     console.log("Creating add-on with data:", req.body);
-    const { client_id, items, date, vat_applied } = req.body;
+    const { client_id, items, date, vat_applied, booking_ref, client_ref } = req.body;
 
     if (
       !client_id ||
@@ -55,12 +56,14 @@ const createAddonHandler = async (req, res) => {
       !Array.isArray(items) ||
       items.length === 0 ||
       !date ||
-      typeof vat_applied !== "boolean"
+      typeof vat_applied !== "boolean" ||
+      !booking_ref ||
+      !client_ref
     ) {
       return res.status(400).json({
         success: false,
         message:
-          "All fields are required: client_id, items (non-empty array), date, vat_applied (boolean)",
+          "All fields are required: client_id, items (non-empty array), date, vat_applied (boolean), booking_ref, client_ref",
       });
     }
 
@@ -81,6 +84,14 @@ const createAddonHandler = async (req, res) => {
       }
     }
 
+    // Validate lengths
+    if (String(booking_ref).trim().length > 50 || String(client_ref).trim().length > 50) {
+      return res.status(400).json({
+        success: false,
+        message: "booking_ref and client_ref must be at most 50 characters",
+      });
+    }
+
     const result = await createAddon({
       client_id,
       items: items.map((item) => ({
@@ -90,6 +101,8 @@ const createAddonHandler = async (req, res) => {
       })),
       date,
       vat_applied,
+      booking_ref: String(booking_ref).trim(),
+      client_ref: String(client_ref).trim(),
     });
 
     if (!result.success) {
@@ -159,7 +172,7 @@ const updateAddonHandler = async (req, res) => {
       req.body
     );
     const { addonId } = req.params;
-    const { items, date, vat_applied } = req.body;
+    const { items, date, vat_applied, booking_ref, client_ref } = req.body;
 
     if (
       !addonId ||
@@ -167,12 +180,14 @@ const updateAddonHandler = async (req, res) => {
       !Array.isArray(items) ||
       items.length === 0 ||
       !date ||
-      typeof vat_applied !== "boolean"
+      typeof vat_applied !== "boolean" ||
+      !booking_ref ||
+      !client_ref
     ) {
       return res.status(400).json({
         success: false,
         message:
-          "All fields are required: addonId, items (non-empty array), date, vat_applied (boolean)",
+          "All fields are required: addonId, items (non-empty array), date, vat_applied (boolean), booking_ref, client_ref",
       });
     }
 
@@ -193,6 +208,13 @@ const updateAddonHandler = async (req, res) => {
       }
     }
 
+    if (String(booking_ref).trim().length > 50 || String(client_ref).trim().length > 50) {
+      return res.status(400).json({
+        success: false,
+        message: "booking_ref and client_ref must be at most 50 characters",
+      });
+    }
+
     const result = await updateAddon(addonId, {
       items: items.map((item) => ({
         category: item.category.trim(),
@@ -201,6 +223,8 @@ const updateAddonHandler = async (req, res) => {
       })),
       date,
       vat_applied,
+      booking_ref: String(booking_ref).trim(),
+      client_ref: String(client_ref).trim(),
     });
 
     if (!result.success) {

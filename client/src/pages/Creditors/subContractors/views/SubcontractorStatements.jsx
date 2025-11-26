@@ -105,9 +105,15 @@ const SubcontractorStatements = () => {
       });
 
       if (response.data.success) {
-        setGenerationMessage(
-          response.data.message || "Statement generated successfully!"
-        );
+        const created = Number(response.data?.stats?.created || 0);
+        const updated = Number(response.data?.stats?.updated || 0);
+        let msg = response.data.message;
+        if (!msg) {
+          if (created > 0) msg = "Statement created for this subcontractor.";
+          else if (updated > 0) msg = "Statement updated for this subcontractor.";
+          else msg = "No statement was created or updated for this subcontractor.";
+        }
+        setGenerationMessage(msg);
         // Refresh the statements list
         await fetchStatements();
       } else {

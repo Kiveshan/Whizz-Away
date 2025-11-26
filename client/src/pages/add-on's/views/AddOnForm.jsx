@@ -20,6 +20,8 @@ const AddOnForm = () => {
     invoice_number: "",
     group_id: "",
     vat_applied: true, // New field for VAT toggle
+    booking_ref: "",
+    client_ref: "",
   });
 
   const [companyInfo, setCompanyInfo] = useState({
@@ -51,6 +53,10 @@ const AddOnForm = () => {
   const [success, setSuccess] = useState(false);
   const [fetchingData, setFetchingData] = useState(isViewMode);
   const [fetchingInfo, setFetchingInfo] = useState(true);
+  const [isEditingInvoiceNum, setIsEditingInvoiceNum] = useState(false);
+  const [invoiceNumInput, setInvoiceNumInput] = useState("");
+  const [savingInvoiceNum, setSavingInvoiceNum] = useState(false);
+  const [saveInvoiceError, setSaveInvoiceError] = useState(null);
 
   useEffect(() => {
     const fetchCompanyAndClientInfo = async () => {
@@ -146,7 +152,10 @@ const AddOnForm = () => {
               group_id: addon.group_id || "",
               vat_applied:
                 addon.vat_applied !== undefined ? addon.vat_applied : true,
+              booking_ref: addon.booking_ref || "",
+              client_ref: addon.client_ref || "",
             });
+            setInvoiceNumInput(addon.invoice_number || "");
           } else {
             throw new Error(
               response.data.message || "Failed to fetch add-on details"
@@ -172,6 +181,30 @@ const AddOnForm = () => {
       fetchAddonData();
     }
   }, [isViewMode, addonId, clientId, clientName, navigate]);
+
+  const handleStartEditInvoiceNum = () => {
+    setSaveInvoiceError(null);
+    setInvoiceNumInput(formData.invoice_number || "");
+    setIsEditingInvoiceNum(true);
+  };
+
+  const handleCancelEditInvoiceNum = () => {
+    setIsEditingInvoiceNum(false);
+    setInvoiceNumInput(formData.invoice_number || "");
+    setSaveInvoiceError(null);
+  };
+
+  const handleSaveInvoiceNum = async () => {
+    if (!isViewMode || !addonId) return;
+    if (!invoiceNumInput || invoiceNumInput.trim().length === 0) {
+      setSaveInvoiceError("Invoice number is required");
+      return;
+    }
+    // Frontend-only: update local state so the PDF reflects the typed number
+    setSaveInvoiceError(null);
+    setFormData((prev) => ({ ...prev, invoice_number: invoiceNumInput.trim() }));
+    setIsEditingInvoiceNum(false);
+  };
 
   const handleInputChange = (index, e) => {
     if (isViewMode) return;
@@ -241,6 +274,18 @@ const AddOnForm = () => {
       setError("Please select a date");
       return false;
     }
+    if (!formData.booking_ref || formData.booking_ref.trim().length === 0) {
+      setError("Booking Ref is required");
+      return false;
+    }
+    if (!formData.client_ref || formData.client_ref.trim().length === 0) {
+      setError("Client Ref is required");
+      return false;
+    }
+    if (formData.booking_ref.length > 50 || formData.client_ref.length > 50) {
+      setError("Booking Ref and Client Ref must be at most 50 characters");
+      return false;
+    }
     return true;
   };
 
@@ -260,6 +305,8 @@ const AddOnForm = () => {
         })),
         date: formData.date,
         vat_applied: formData.vat_applied,
+        booking_ref: formData.booking_ref.trim(),
+        client_ref: formData.client_ref.trim(),
       };
       const response = await api.post("/api/addons", submitData, {
         headers: {
@@ -399,6 +446,8 @@ const AddOnForm = () => {
         `Telephone: ${clientInfo.telephone || ''}`,
         `Email: ${clientInfo.email || ''}`,
         `VAT Reg No: ${clientInfo.vat_reg_num || ''}`,
+        formData.booking_ref ? `Booking Ref: ${formData.booking_ref}` : '',
+        formData.client_ref ? `Client Ref: ${formData.client_ref}` : '',
       ].filter(Boolean);
 
       const maxLines = Math.max(leftDetails.length, rightDetails.length);
@@ -605,10 +654,52 @@ const AddOnForm = () => {
             <p>VAT Reg No: {companyInfo.vat_reg_num}</p>
           </div>
           <div className="invoice-details">
-            {isViewMode && formData.invoice_number && (
-              <p className="invoice-number">
-                Invoice #: {formData.invoice_number}
-              </p>
+            {isViewMode && (
+              <div className="invoice-number" style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                {!isEditingInvoiceNum ? (
+                  <>
+                    <span>Invoice #:</span>
+                    <strong>{formData.invoice_number || "—"}</strong>
+                    <button
+                      type="button"
+                      className="print-button"
+                      onClick={handleStartEditInvoiceNum}
+                    >
+                      Edit
+                    </button>
+                  </>
+                ) : (
+                  <>
+                    <input
+                      type="text"
+                      value={invoiceNumInput}
+                      onChange={(e) => setInvoiceNumInput(e.target.value)}
+                      className="form-input"
+                      placeholder="Enter invoice number"
+                      style={{ width: "200px" }}
+                    />
+                    <button
+                      type="button"
+                      className="print-button"
+                      onClick={handleSaveInvoiceNum}
+                      disabled={savingInvoiceNum}
+                    >
+                      {savingInvoiceNum ? "Saving..." : "Save"}
+                    </button>
+                    <button
+                      type="button"
+                      className="back-button"
+                      onClick={handleCancelEditInvoiceNum}
+                      disabled={savingInvoiceNum}
+                    >
+                      Cancel
+                    </button>
+                  </>
+                )}
+              </div>
+            )}
+            {saveInvoiceError && (
+              <div className="error-message" style={{ marginTop: "6px" }}>{saveInvoiceError}</div>
             )}
           </div>
         </div>
@@ -635,6 +726,38 @@ const AddOnForm = () => {
                   setFormData((prev) => ({ ...prev, date: e.target.value }))
                 }
                 className="form-input"
+                required
+                readOnly={isViewMode}
+              />
+            </div>
+            <div className="form-group">
+              <label htmlFor="booking_ref">Booking Ref</label>
+              <input
+                type="text"
+                id="booking_ref"
+                name="booking_ref"
+                value={formData.booking_ref}
+                onChange={(e) =>
+                  setFormData((prev) => ({ ...prev, booking_ref: e.target.value }))
+                }
+                className="form-input"
+                maxLength={50}
+                required
+                readOnly={isViewMode}
+              />
+            </div>
+            <div className="form-group">
+              <label htmlFor="client_ref">Client Ref</label>
+              <input
+                type="text"
+                id="client_ref"
+                name="client_ref"
+                value={formData.client_ref}
+                onChange={(e) =>
+                  setFormData((prev) => ({ ...prev, client_ref: e.target.value }))
+                }
+                className="form-input"
+                maxLength={50}
                 required
                 readOnly={isViewMode}
               />

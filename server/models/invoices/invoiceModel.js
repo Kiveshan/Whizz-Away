@@ -81,6 +81,7 @@ const getInvoiceDetails = async (id) => {
         m1.m1key,
         m1."ksmFileRef" as instruction_no,
         s.shipmenttype as shipment_type,
+        m1.shipment_type as shipment_type_key,
         m1."clientFileRef" as file_no,
         c.client as client_name,
         c.m5clientkey,
@@ -93,6 +94,7 @@ const getInvoiceDetails = async (id) => {
         m1.total_cost,  
         m1.vat,
         m1.rateweight,
+        m1.unitrate,
         m1.booking_ref,
         m1.pickup,
         m1.dropoff,
@@ -261,12 +263,46 @@ const getInvoiceDetails = async (id) => {
       leg_rate: c.leg_rate
     })));
 
+    // If shipment type is 4 (weight-based), fetch weight items
+    const shipmentTypeKey = result.rows[0].shipment_type_key;
+    let weightItems = [];
+    const unitrate = Number(result.rows[0].unitrate || 0);
+    if (shipmentTypeKey === 4) {
+      const weightQuery = `
+        SELECT 
+          w.ksm_dm_no,
+          w.ticket_no,
+          w.receipt_book_no,
+          w.weight
+        FROM public.m1_controller_weight w
+        JOIN public.invoice i2 ON i2.m1key = w.m1_key
+        WHERE i2.ikey = $1
+        ORDER BY w.weight_pk ASC
+      `;
+      const weightRes = await query(weightQuery, [id]);
+      weightItems = weightRes.rows.map((r) => {
+        const w = Number(r.weight || 0);
+        const price = Number((w * unitrate).toFixed(2));
+        return {
+          ksm_dm_no: r.ksm_dm_no || "",
+          ticket_no: r.ticket_no || "",
+          receipt_book_no: r.receipt_book_no || "",
+          weight: w,
+          unitrate: unitrate,
+          price: price,
+        };
+      });
+      console.log(`Fetched ${weightItems.length} weight items for invoice ID ${id}`);
+    }
+
     return {
       success: true,
       data: {
         ...result.rows[0],
         base_rates: baseRates, // Include base rates for reference
         containers,
+        weightItems,
+        unitrate,
       },
     };
   } catch (error) {
@@ -619,6 +655,8 @@ const getInstructionDetailsForPreview = async (instructionId) => {
           m1.rateper_6,
           m1.rateper_12,
           m1.rateper_abnormal,
+          m1.shipment_type as shipment_type_key,
+          m1.unitrate,
           c.client as client_name,
           c.m5clientkey,
           c.companyaddress as client_address,
@@ -767,6 +805,35 @@ const getInstructionDetailsForPreview = async (instructionId) => {
 
       const containers = Array.from(containerMap.values());
 
+      // Weight-based items for preview when shipment_type_key = 4
+      let weightItems = [];
+      const unitratePrev = Number(m1Result.rows[0].unitrate || 0);
+      if (m1Result.rows[0].shipment_type_key === 4) {
+        const weightQuery = `
+          SELECT 
+            w.ksm_dm_no,
+            w.ticket_no,
+            w.receipt_book_no,
+            w.weight
+          FROM public.m1_controller_weight w
+          WHERE w.m1_key = $1
+          ORDER BY w.weight_pk ASC
+        `;
+        const weightRes = await client.query(weightQuery, [instructionId]);
+        weightItems = weightRes.rows.map((r) => {
+          const w = Number(r.weight || 0);
+          const price = Number((w * unitratePrev).toFixed(2));
+          return {
+            ksm_dm_no: r.ksm_dm_no || "",
+            ticket_no: r.ticket_no || "",
+            receipt_book_no: r.receipt_book_no || "",
+            weight: w,
+            unitrate: unitratePrev,
+            price: price,
+          };
+        });
+      }
+
       // Determine earliest date for legnumber = 1 to be used as preview invoice date
       const legDateQuery = `
         SELECT MIN(l.date) AS first_leg_date
@@ -784,6 +851,8 @@ const getInstructionDetailsForPreview = async (instructionId) => {
         data: {
           ...m1Result.rows[0],
           containers,
+          weightItems,
+          unitrate: unitratePrev,
           base_rates: baseRates,
           // Add company details
           ...companyResult.rows[0],
