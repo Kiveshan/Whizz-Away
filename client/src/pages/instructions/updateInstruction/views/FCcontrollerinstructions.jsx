@@ -4745,7 +4745,7 @@ const FCcontrollerinstructions = () => {
           {String(formData.shipmentTypeId) === "4" && weightRows.length > 0 && (
             <div
               className="controller-instructions-form-section"
-              style={{ marginTop: "-100px", paddingTop: "0" }}
+              style={{ marginTop: "0", paddingTop: "0" }}
             >
               <div
                 className="controller-instructions-form-row"
