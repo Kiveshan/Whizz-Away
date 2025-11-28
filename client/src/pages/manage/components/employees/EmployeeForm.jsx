@@ -164,16 +164,18 @@ const EmployeeForm = ({ employee, loading, isEditing, onSave, onCancel, onChange
             Telephone Number
           </label>
           <input
-            type="number"
+            type="text"
             value={employee.telephonenum || ""}
             onChange={(e) => {
+              const digitsOnly = e.target.value.replace(/\D/g, "");
+              e.target.value = digitsOnly;
               const input = e.target;
               if (input.validity.patternMismatch) {
                 input.setCustomValidity("Please enter exactly 10 digits");
               } else {
                 input.setCustomValidity("");
               }
-              onChange("telephonenum", e.target.value);
+              onChange("telephonenum", digitsOnly);
             }}
             placeholder="Exactly 10 digits only"
             minLength="10"
@@ -188,16 +190,18 @@ const EmployeeForm = ({ employee, loading, isEditing, onSave, onCancel, onChange
             Cell Number <span style={{ color: "red" }}>*</span>
           </label>
           <input
-            type="number"
+            type="text"
             value={employee.cellnum || ""}
             onChange={(e) => {
+              const digitsOnly = e.target.value.replace(/\D/g, "");
+              e.target.value = digitsOnly;
               const input = e.target;
               if (input.validity.patternMismatch) {
                 input.setCustomValidity("Please enter exactly 10 digits");
               } else {
                 input.setCustomValidity("");
               }
-              onChange("cellnum", e.target.value);
+              onChange("cellnum", digitsOnly);
             }}
             placeholder="Exactly 10 digits only"
             minLength="10"
@@ -224,7 +228,7 @@ const EmployeeForm = ({ employee, loading, isEditing, onSave, onCancel, onChange
             Base Salary
           </label>
           <input
-            type="number"
+            type="text"
             value={employee.base_salary || ""}
             onChange={(e) => onChange("base_salary", e.target.value)}
           />
