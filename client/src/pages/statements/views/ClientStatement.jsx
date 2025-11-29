@@ -133,9 +133,20 @@ const ClientStatement = () => {
 
       const maxLines = Math.max(leftDetails.length, rightDetails.length);
       for (let i = 0; i < maxLines; i++) {
-        if (leftDetails[i]) doc.text(String(leftDetails[i]), margins.left, currentY);
-        if (rightDetails[i]) doc.text(String(rightDetails[i]), margins.left + colWidth + colGap, currentY);
-        currentY += 5;
+        const leftText = leftDetails[i] ? String(leftDetails[i]) : null;
+        const rightText = rightDetails[i] ? String(rightDetails[i]) : null;
+        let rowHeight = 0;
+        if (leftText) {
+          const wrapped = doc.splitTextToSize(leftText, colWidth);
+          doc.text(wrapped, margins.left, currentY);
+          rowHeight = Math.max(rowHeight, wrapped.length * 5);
+        }
+        if (rightText) {
+          const wrappedR = doc.splitTextToSize(rightText, colWidth);
+          doc.text(wrappedR, margins.left + colWidth + colGap, currentY);
+          rowHeight = Math.max(rowHeight, wrappedR.length * 5);
+        }
+        currentY += Math.max(5, rowHeight || 5);
       }
       currentY += 4;
 
@@ -173,15 +184,30 @@ const ClientStatement = () => {
       currentY = doc.lastAutoTable.finalY + 6;
 
       // Transactions table
-      const txRows = transactionsWithBalance.map(tx => ([
-        tx.date.toLocaleDateString('en-GB'),
-        tx.type,
-        tx.details || "",
-        tx.reference || "",
-        tx.amount ? `R${tx.amount.toFixed(2)}` : "",
-        tx.payment ? `R${tx.payment.toFixed(2)}` : "",
-        `R${tx.balance.toFixed(2)}`,
-      ]));
+const txRows = transactionsWithBalance.map(tx => {
+  let detailsForPdf = tx.details || "";
+
+  // Only for PDF: Replace the arrow with " - " and clean up spacing
+  if (detailsForPdf.includes('→')) {
+    detailsForPdf = detailsForPdf
+      .replace(/→/g, '-')
+      .replace(/\s*-\s*/g, ' - ')  // Ensure consistent spacing around dash
+      .trim();
+  }
+
+  // Optional: Force wrap long lines better by limiting consecutive spaces
+  detailsForPdf = detailsForPdf.replace(/\s+/g, ' ');
+
+  return [
+    tx.date.toLocaleDateString('en-GB'),
+    tx.type,
+    detailsForPdf,
+    tx.reference || "",
+    tx.amount ? `R${tx.amount.toFixed(2)}` : "",
+    tx.payment ? `R${tx.payment.toFixed(2)}` : "",
+    `R${tx.balance.toFixed(2)}`,
+  ];
+});
 
       autoTable(doc, {
         startY: currentY,
@@ -191,19 +217,37 @@ const ClientStatement = () => {
           ...txRows,
         ],
         theme: "grid",
-        styles: { fontSize: fonts.tiny, cellPadding: 1.2, lineWidth: 0.1, lineColor: brand.gray },
+        styles: {
+          font: 'helvetica',
+          fontStyle: 'normal',
+          fontSize: fonts.tiny,
+          cellPadding: 1.4,
+          lineWidth: 0.1,
+          lineColor: brand.gray,
+          overflow: 'linebreak',
+          valign: 'top',
+          lineHeight: 1.2,
+        },
         headStyles: { fillColor: brand.accent, textColor: [255,255,255], fontStyle: "bold" },
         columnStyles: {
-          0: { cellWidth: 22 },
-          1: { cellWidth: 22 },
-          2: { cellWidth: 52 },
-          3: { cellWidth: 28 },
-          4: { cellWidth: 22, halign: 'right' },
-          5: { cellWidth: 22, halign: 'right' },
-          6: { cellWidth: 22, halign: 'right' },
+          0: { cellWidth: 20 }, // Date
+          1: { cellWidth: 20 }, // Transaction
+          2: { cellWidth: 72, overflow: 'linebreak' }, // Details (wider)
+          3: { cellWidth: 18 }, // Reference (narrower)
+          4: { cellWidth: 20, halign: 'right' }, // Amount
+          5: { cellWidth: 20, halign: 'right' }, // Payment
+          6: { cellWidth: 20, halign: 'right' }, // Balance
         },
+        tableWidth: pageWidth - margins.left - margins.right,
         margin: { left: margins.left, right: margins.right },
         rowPageBreak: 'auto',
+        didParseCell: (data) => {
+          if (data.section === 'body' && data.column.index === 2) {
+            // Ensure multi-line wrapping behaves predictably for Details
+            data.cell.styles.overflow = 'linebreak';
+            data.cell.styles.valign = 'top';
+          }
+        },
         didDrawPage: () => {
           const str = `Page ${doc.internal.getNumberOfPages()}`;
           doc.setFontSize(8);
@@ -287,27 +331,54 @@ const ClientStatement = () => {
   const openingBalance = statement.opening_balance; // Use the stored opening balance
   const balanceDue = openingBalance - totalAmountPaid + invoicedAmount;
 
+  // Helper: fix strings that arrive with spaces between every character
+  const fixTokenSpacing = (s) => {
+    if (!s) return s;
+    const tokens = String(s).trim().split(/\s+/);
+    const singleCount = tokens.filter((t) => t.length === 1).length;
+    if (tokens.length === 0) return '';
+    // Only rebuild if most tokens are single letters (likely corrupted spacing)
+    if (singleCount < tokens.length * 0.6) {
+      return tokens.join(' ');
+    }
+    const rebuilt = [];
+    let buffer = '';
+    for (const tok of tokens) {
+      if (tok.length === 1) {
+        buffer += tok;
+      } else {
+        if (buffer) {
+          rebuilt.push(buffer);
+          buffer = '';
+        }
+        rebuilt.push(tok);
+      }
+    }
+    if (buffer) rebuilt.push(buffer);
+    return rebuilt.join(' ');
+  };
+
   // Helper function to format invoice and addon details
   const formatDetails = (item, type) => {
     if (type === "Invoice") {
-      const pickup = item.pickup || "";
-      const dropoff = item.dropoff || "";
+      const pickup = fixTokenSpacing(item.pickup || "");
+      const dropoff = fixTokenSpacing(item.dropoff || "");
       console.log("Invoice details:", { pickup, dropoff, item }); // Debug log
       if (pickup && dropoff) {
-        return `${pickup} → ${dropoff}`;
+        return `${pickup} → ${dropoff}`.replace(/\s+/g, ' ').trim();
       } else if (pickup) {
-        return pickup;
+        return pickup.replace(/\s+/g, ' ').trim();
       } else if (dropoff) {
-        return `→ ${dropoff}`;
+        return `→ ${dropoff}`.replace(/\s+/g, ' ').trim();
       } else {
-        return item.task || item.invoice_num || `Invoice #${item.ikey}`;
+        return fixTokenSpacing(item.task || item.invoice_num || `Invoice #${item.ikey}`).replace(/\s+/g, ' ').trim();
       }
     } else if (type === "Add-on") {
       console.log("Addon details:", { item }); // Debug log
-      return item.description || item.invoice_num || `Add-on #${item.addon_id}`;
+      return fixTokenSpacing(item.description || item.invoice_num || `Add-on #${item.addon_id}`).replace(/\s+/g, ' ').trim();
     } else if (type === "Credit Note") {
       console.log("Credit Note details:", { item }); // Debug log
-      return item.description || `Credit Note #${item.credit_note_id}`;
+      return fixTokenSpacing(item.description || `Credit Note #${item.credit_note_id}`).replace(/\s+/g, ' ').trim();
     }
     return "";
   };
