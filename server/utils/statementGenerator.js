@@ -667,13 +667,18 @@ async function generateMonthlyStatements(specificClientId = null) {
 
     await dbClient.query("COMMIT");
 
-    const message = specificClientId
-      ? `Statement processed for client ${specificClientId}. ${
-          createdCount > 0
-            ? "Created new statement."
-            : "Updated existing statement."
-        }`
-      : `Monthly statement generation completed. Processed: ${processedCount}, Created: ${createdCount}, Updated: ${updatedCount}`;
+    let message;
+    if (specificClientId) {
+      if (createdCount > 0) {
+        message = `Statement processed for client ${specificClientId}. Created new statement.`;
+      } else if (updatedCount > 0) {
+        message = `Statement processed for client ${specificClientId}. Updated existing statement.`;
+      } else {
+        message = `Statement processed for client ${specificClientId}. No statement created or updated.`;
+      }
+    } else {
+      message = `Monthly statement generation completed. Processed: ${processedCount}, Created: ${createdCount}, Updated: ${updatedCount}`;
+    }
 
     console.log(message);
     return {

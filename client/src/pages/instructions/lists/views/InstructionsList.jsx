@@ -154,12 +154,13 @@ const Instructions = () => {
 
   // Helper function to determine status priority for sorting
   const getStatusPriority = (status) => {
-    switch (status) {
-      case "New":
+    const normalized = (status || "").toLowerCase()
+    switch (normalized) {
+      case "new":
         return 1 // Highest priority
-      case "In progress":
+      case "in progress":
         return 3
-      case "Completed":
+      case "completed":
         return 4
       default:
         return 5 // Lowest priority
@@ -200,8 +201,11 @@ const Instructions = () => {
 
     // Filter by status or type
     if (activeFilter !== "All") {
-      if (["New", "In progress", "Completed"].includes(activeFilter)) {
-        filtered = filtered.filter((item) => item.status === activeFilter)
+      const normalizedActiveFilter = (activeFilter || "").toLowerCase()
+      if (["new", "in progress", "completed"].includes(normalizedActiveFilter)) {
+        filtered = filtered.filter(
+          (item) => (item.status || "").toLowerCase() === normalizedActiveFilter,
+        )
       } else if (activeFilter === "import") {
         filtered = filtered.filter((item) => item.type_text === "import" || item.type === "import")
       } else if (activeFilter === "export") {
@@ -222,6 +226,16 @@ const Instructions = () => {
             item.shipment_type === 4 ||
             item.shipment_type === "4"
         )
+      } else if (activeFilter === "add-on") {
+        filtered = filtered.filter((item) => {
+          const typeText = (item.type_text || item.type || "").toLowerCase()
+          return (
+            typeText === "add-on" ||
+            typeText === "add on" ||
+            item.shipment_type === 5 ||
+            item.shipment_type === "5"
+          )
+        })
       }
     }
 
@@ -376,8 +390,10 @@ const Instructions = () => {
               All
             </button>
             <button
-              className={`btn btn-blue ${activeFilter === "In progress" ? "active" : ""}`}
-              onClick={() => handleFilterClick("In progress")}
+              className={`btn btn-blue ${
+                (activeFilter || "").toLowerCase() === "in progress" ? "active" : ""
+              }`}
+              onClick={() => handleFilterClick("In Progress")}
             >
               In-Progress
             </button>
@@ -392,6 +408,12 @@ const Instructions = () => {
               onClick={() => handleFilterClick("New")}
             >
               New
+            </button>
+            <button
+              className={`btn btn-blue ${activeFilter === "add-on" ? "active" : ""}`}
+              onClick={() => handleFilterClick("add-on")}
+            >
+              Add-on
             </button>
           </div>
         </div>
@@ -437,7 +459,9 @@ const Instructions = () => {
                     ? "cross-haul"
                     : item.shipment_type === 4 || item.shipment_type === "4"
                       ? "cross-haul (break bulk)"
-                      : item.type)}
+                      : item.shipment_type === 5 || item.shipment_type === "5"
+                        ? "add-on"
+                        : item.type)}
           </td>
           <td>{renderStatus(item.status)}</td>
           <td>

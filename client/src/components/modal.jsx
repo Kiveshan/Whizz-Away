@@ -28,15 +28,12 @@ const Modal = ({ isOpen, onClose, initialForm }) => {
       onClick={handleBackgroundClick}
     >
       <div className={styles.modalContent} onClick={(e) => e.stopPropagation()}>
-      
-
-        {/* Close Button */}
-        <button
-          className={isLogin ? styles.closeBtnLogin : styles.closeBtn}
-          onClick={onClose}
-        >
-          X
-        </button>
+        {/* Close Button: only for Register; Login has its own close inside the card */}
+        {!isLogin && (
+          <button className={styles.closeBtn} onClick={onClose}>
+            X
+          </button>
+        )}
 
         {isLogin ? (
           <Login

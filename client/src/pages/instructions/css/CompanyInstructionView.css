@@ -158,8 +158,22 @@
 .company-instruction-view-pagination-container {
   display: flex;
   justify-content: center;
-  margin-top: 20px;
-  padding: 20px;
+  margin-top: 0;
+  padding: 0;
+}
+
+/* Tighten shared Pagination spacing on this page so controls sit higher */
+.company-instruction-view-pagination-container .client-payment-dashboard-wrapper .pagination-container {
+  margin-top: 0;
+  gap: 8px;
+}
+
+.company-instruction-view-pagination-container .client-payment-dashboard-wrapper .pagination-info {
+  display: none;
+}
+
+.company-instruction-view-pagination-container .client-payment-dashboard-wrapper .pagination-summary {
+  display: none;
 }
 
 .company-instruction-view-pagination {

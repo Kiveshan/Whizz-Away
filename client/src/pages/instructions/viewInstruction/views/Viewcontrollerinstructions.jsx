@@ -113,6 +113,8 @@ const Viewcontrollerinstructions = () => {
   const [containers, setContainers] = useState([])
   const [isLoadingContainers, setIsLoadingContainers] = useState(false)
 
+  const [weightRows, setWeightRows] = useState([])
+
   // State for error modal
   const [errorModal, setErrorModal] = useState({
     isOpen: false,
@@ -158,6 +160,20 @@ const Viewcontrollerinstructions = () => {
 
   // Track if initial data has been loaded
   const [initialDataLoaded, setInitialDataLoaded] = useState(false)
+
+  const isAddOn = (() => {
+    const id = (formData.shipmentTypeId || "").toString()
+    const name = (formData.shipmentTypeName || "").toLowerCase()
+    const selectedType = shipmentTypes.find((type) => (type.shipkey || type.id)?.toString() === id)
+    const typeName = (selectedType?.shipmenttype || "").toLowerCase()
+    return (
+      id === "5" ||
+      name === "add-on" ||
+      name === "add on" ||
+      typeName === "add-on" ||
+      typeName === "add on"
+    )
+  })()
 
   // Check if shipment type is Cross-haul (type 3) or Cross-haul(break bulk) (type 4)
   const isCrossHaulShipment = () => {
@@ -304,6 +320,22 @@ const Viewcontrollerinstructions = () => {
       })
             console.log("Formatted data before setFormData:", formattedData)
       setFormData(formattedData)
+
+      if (String(data.shipment_type) === "4" && Array.isArray(data.weight_rows)) {
+        const mappedRows = data.weight_rows.map((row, index) => ({
+          id: row.weight_pk || index + 1,
+          ksmDmNo: row.ksm_dm_no || "",
+          ticketNo: row.ticket_no || "",
+          receiptBookNo: row.receipt_book_no || "",
+          weight:
+            row.weight === null || row.weight === undefined
+              ? ""
+              : String(row.weight),
+        }))
+        setWeightRows(mappedRows)
+      } else {
+        setWeightRows([])
+      }
 
       // Set isImport and isExport based on the fetched shipment type
       const shipmentTypeName = data.shipmenttype || ""
@@ -765,7 +797,9 @@ const Viewcontrollerinstructions = () => {
             {/* Container and Booking Section */}
             <div className="controller-instructions-form-section">
               <div className="controller-instructions-form-row controller-instructions-trailer-container">
-                <div className="controller-instructions-container-section">
+                <div
+                  className="controller-instructions-container-section"
+                >
                   <div className="controller-instructions-container-group">
                     <div className="controller-instructions-container-label">
                       <span className="controller-instructions-trailer-size-label">Trailer Size</span>
@@ -911,13 +945,15 @@ const Viewcontrollerinstructions = () => {
                     </div>
 
                     {/* Compact Rates per dropdown and input fields in one row */}
-                    <div className="controller-instructions-form-field">
+                    <div
+                      className="controller-instructions-form-field"
+                    >
                       <label>Unit per</label>
-                      <div style={{ display: "flex", alignItems: "flex-start", gap: "15px", width: "100%" }}>
+                      <div style={{ display: "flex", alignItems: "center", gap: "15px", width: "100%" }}>
                         {/* Unit per dropdown */}
                         <div
                           className="controller-instructions-select-wrapper"
-                          style={{ minWidth: "100px", marginTop: "5px" }}
+                          style={{ minWidth: "100px", marginTop: "0" }}
                         >
                           <select
                             className="controller-instructions-dropdown"
@@ -943,13 +979,30 @@ const Viewcontrollerinstructions = () => {
                               display: "flex",
                               gap: "15px",
                               width: "100%",
-                              marginTop: "48px",
-                              marginLeft: "-113px",
+                              alignItems: "center",
                             }}
                           >
-                            {/* Unit Rate Field */}
-                            <div className="controller-instructions-form-field" style={{ flex: 1, minWidth: "150px" }}>
-                              <label>{`Rate per ${formData.rateWeight}`}</label>
+                            {/* Unit Rate Field - inline text + input */}
+                            <div
+                              className="controller-instructions-form-field"
+                              style={{
+                                flex: 1,
+                                minWidth: "150px",
+                                display: "flex",
+                                alignItems: "center",
+                                gap: "8px",
+                                margin: 0,
+                              }}
+                            >
+                              <span
+                                style={{
+                                  whiteSpace: "nowrap",
+                                  fontSize: "13px",
+                                  color: "#333",
+                                }}
+                              >
+                                {`Rate per ${formData.rateWeight}`}
+                              </span>
                               <div
                                 className="controller-instructions-input-wrapper"
                                 ref={fieldRefs.unitRate}
@@ -966,24 +1019,26 @@ const Viewcontrollerinstructions = () => {
                               </div>
                             </div>
 
-                            {/* Weight Field */}
-                            <div className="controller-instructions-form-field" style={{ flex: 1, minWidth: "150px" }}>
-                              <label>{`Weight (${formData.rateWeight})`}</label>
-                              <div
-                                className="controller-instructions-input-wrapper"
-                                ref={fieldRefs.weight}
-                                style={{ width: "100%" }}
-                              >
-                                <input
-                                  type="text"
-                                  className="controller-instructions-form-input"
-                                  name="weight"
-                                  value={formData.weight || ""}
-                                  readOnly
-                                  style={{ ...nonEditableStyle, width: "100%" }}
-                                />
+                            {/* Weight Field for non-type-4 shipments, or legacy type-4 instructions without weightRows */}
+                            {(formData.shipmentTypeId !== "4" || weightRows.length === 0) && (
+                              <div className="controller-instructions-form-field" style={{ flex: 1, minWidth: "150px" }}>
+                                <label>{`Weight (${formData.rateWeight})`}</label>
+                                <div
+                                  className="controller-instructions-input-wrapper"
+                                  ref={fieldRefs.weight}
+                                  style={{ width: "100%" }}
+                                >
+                                  <input
+                                    type="text"
+                                    className="controller-instructions-form-input"
+                                    name="weight"
+                                    value={formData.weight || ""}
+                                    readOnly
+                                    style={{ ...nonEditableStyle, width: "100%" }}
+                                  />
+                                </div>
                               </div>
-                            </div>
+                            )}
                           </div>
                         )}
                       </div>
@@ -991,7 +1046,9 @@ const Viewcontrollerinstructions = () => {
                   </div>
 
                   {/* Date Time Group */}
-                  <div className="controller-instructions-date-time-group">
+                  <div
+                    className="controller-instructions-date-time-group"
+                  >
                     <div
                       className="controller-instructions-shipment-task-row"
                       style={{ order: -1, marginBottom: "8px" }}
@@ -1025,49 +1082,92 @@ const Viewcontrollerinstructions = () => {
                         </div>
                       </div>
                     </div>
-                    <div className="controller-instructions-form-field">
-                      <label>KSM File Reference</label>
-                      <div className="controller-instructions-input-wrapper" ref={fieldRefs.ksmFileRef}>
-                        <input
-                          type="text"
-                          className="controller-instructions-form-input"
-                          placeholder="KSM File Reference"
-                          name="ksmFileRef"
-                          value={formData.ksmFileRef}
-                          readOnly
-                          style={nonEditableStyle}
-                        />
-                      </div>
-                    </div>
-                    <div className="controller-instructions-form-field" style={{ maxWidth: "120px" }}>
-                      <label>VAT Rate %</label>
-                      <div className="controller-instructions-input-wrapper">
-                        <input
-                          type="number"
-                          className="controller-instructions-form-input"
-                          name="vat"
-                          value={formData.vat }
-                          readOnly
-                          style={nonEditableStyle}
-                        />
-                      </div>
-                    </div>
-                    {!isCrossHaulShipment() && (
-                      <div className="controller-instructions-form-field">
-                        <label>Vessel Name</label>
-                        <div className="controller-instructions-input-wrapper" ref={fieldRefs.vesselName}>
+                    <div
+                      className="controller-instructions-shipment-task-row"
+                      style={{ marginBottom: "8px" }}
+                    >
+                      <div className="controller-instructions-form-field controller-instructions-small-field">
+                        <label>KSM File Reference</label>
+                        <div className="controller-instructions-input-wrapper" ref={fieldRefs.ksmFileRef}>
                           <input
                             type="text"
                             className="controller-instructions-form-input"
-                            placeholder="Enter vessel name"
-                            name="vesselName"
-                            value={formData.vesselName}
+                            placeholder="KSM File Reference"
+                            name="ksmFileRef"
+                            value={formData.ksmFileRef}
                             readOnly
                             style={nonEditableStyle}
                           />
                         </div>
                       </div>
-                    )}
+                      <div className="controller-instructions-form-field controller-instructions-small-field">
+                        <label>Last Free Date</label>
+                        <div className="controller-instructions-date-wrapper" ref={fieldRefs.lastFreeDate}>
+                          <input
+                            type="date"
+                            className="controller-instructions-form-input"
+                            name="lastFreeDate"
+                            value={formData.lastFreeDate}
+                            readOnly
+                            style={nonEditableStyle}
+                            ref={lastFreeDateRef}
+                          />
+                        </div>
+                      </div>
+                    </div>
+                    <div
+                      className="controller-instructions-shipment-task-row"
+                      style={{ marginBottom: "8px" }}
+                    >
+                      <div
+                        className="controller-instructions-form-field controller-instructions-small-field"
+                        style={{ maxWidth: "120px" }}
+                      >
+                        <label>VAT Rate %</label>
+                        <div className="controller-instructions-input-wrapper">
+                          <input
+                            type="number"
+                            className="controller-instructions-form-input"
+                            name="vat"
+                            value={formData.vat }
+                            readOnly
+                            style={nonEditableStyle}
+                          />
+                        </div>
+                      </div>
+                      {((isAddOn && !isCrossHaulShipment()) ||
+                        String(formData.shipmentTypeId) === "1" ||
+                        String(formData.shipmentTypeId) === "2") && (
+                        <div className="controller-instructions-form-field controller-instructions-small-field">
+                          <label>{isImport ? "ETA Date" : "Stack Date"}</label>
+                          <div className="controller-instructions-date-wrapper" ref={fieldRefs.stackDate}>
+                            <input
+                              type="date"
+                              className="controller-instructions-form-input"
+                              name="stackDate"
+                              value={formData.stackDate}
+                              readOnly
+                              style={nonEditableStyle}
+                              ref={etaDateRef}
+                            />
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                    <div className="controller-instructions-form-field">
+                      <label>Vessel Name</label>
+                      <div className="controller-instructions-input-wrapper" ref={fieldRefs.vesselName}>
+                        <input
+                          type="text"
+                          className="controller-instructions-form-input"
+                          placeholder="Enter vessel name"
+                          name="vesselName"
+                          value={formData.vesselName}
+                          readOnly
+                          style={nonEditableStyle}
+                        />
+                      </div>
+                    </div>
                     <div className="controller-instructions-form-field">
                       <label>Description</label>
                       <div className="controller-instructions-input-wrapper" ref={fieldRefs.description}>
@@ -1083,45 +1183,144 @@ const Viewcontrollerinstructions = () => {
                       </div>
                     </div>
                   </div>
-                  <div className="controller-instructions-date-time-group">
+                  <div
+                    className="controller-instructions-date-time-group"
+                  >
 
-                    {!isCrossHaulShipment() && (
-                      <div className="controller-instructions-form-field">
-                        <label>{isImport ? "ETA Date" : "Stack Date"}</label>
-                        <div className="controller-instructions-date-wrapper" ref={fieldRefs.stackDate}>
-                          <input
-                            type="date"
-                            className="controller-instructions-form-input"
-                            name="stackDate"
-                            value={formData.stackDate}
-                            readOnly
-                            style={nonEditableStyle}
-                            ref={etaDateRef}
-                          />
+                    {!isCrossHaulShipment() &&
+                      !isAddOn &&
+                      String(formData.shipmentTypeId) !== "1" &&
+                      String(formData.shipmentTypeId) !== "2" && (
+                        <div className="controller-instructions-form-field">
+                          <label>{isImport ? "ETA Date" : "Stack Date"}</label>
+                          <div className="controller-instructions-date-wrapper" ref={fieldRefs.stackDate}>
+                            <input
+                              type="date"
+                              className="controller-instructions-form-input"
+                              name="stackDate"
+                              value={formData.stackDate}
+                              readOnly
+                              style={nonEditableStyle}
+                              ref={etaDateRef}
+                            />
+                          </div>
                         </div>
-                      </div>
-                    )}
-                    <div className="controller-instructions-form-field">
-                      <label>Last Free Date</label>
-                      <div className="controller-instructions-date-wrapper" ref={fieldRefs.lastFreeDate}>
-                        <input
-                          type="date"
-                          className="controller-instructions-form-input"
-                          name="lastFreeDate"
-                          value={formData.lastFreeDate}
-                          readOnly
-                          style={nonEditableStyle}
-                          ref={lastFreeDateRef}
-                        />
-                      </div>
-                    </div>
+                      )}
                   </div>
                 </div>
               </div>
             </div>
+
+            {formData.shipmentTypeId === "4" && weightRows.length > 0 && (
+              <div
+                className="controller-instructions-form-section"
+                style={{ marginTop: "-100px", paddingTop: "0" }}
+              >
+                <div
+                  className="controller-instructions-form-row"
+                  style={{ marginTop: "0" }}
+                >
+                  <div className="controller-instructions-form-field" style={{ width: "100%" }}>
+                    <label>Weight Details</label>
+                    <div style={{ width: "100%" }}>
+                      <table
+                        style={{
+                          width: "100%",
+                          borderCollapse: "collapse",
+                          fontSize: "12px",
+                        }}
+                      >
+                        <thead>
+                          <tr>
+                            <th style={{ border: "1px solid #dee2e6", padding: "4px" }}>
+                              KSM DN Number
+                            </th>
+                            <th style={{ border: "1px solid #dee2e6", padding: "4px" }}>
+                              Ticket Number
+                            </th>
+                            <th style={{ border: "1px solid #dee2e6", padding: "4px" }}>
+                              Receipt Book Number
+                            </th>
+                            <th style={{ border: "1px solid #dee2e6", padding: "4px" }}>
+                              Weight ({formData.rateWeight})
+                            </th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {weightRows.map((row) => (
+                            <tr key={row.id}>
+                              <td style={{ border: "1px solid #dee2e6", padding: "2px 4px" }}>
+                                <input
+                                  type="text"
+                                  className="controller-instructions-form-input"
+                                  value={row.ksmDmNo || ""}
+                                  readOnly
+                                  style={{
+                                    ...nonEditableStyle,
+                                    width: "100%",
+                                    fontSize: "12px",
+                                    height: "26px",
+                                  }}
+                                />
+                              </td>
+                              <td style={{ border: "1px solid #dee2e6", padding: "2px 4px" }}>
+                                <input
+                                  type="text"
+                                  className="controller-instructions-form-input"
+                                  value={row.ticketNo || ""}
+                                  readOnly
+                                  style={{
+                                    ...nonEditableStyle,
+                                    width: "100%",
+                                    fontSize: "12px",
+                                    height: "26px",
+                                  }}
+                                />
+                              </td>
+                              <td style={{ border: "1px solid #dee2e6", padding: "2px 4px" }}>
+                                <input
+                                  type="text"
+                                  className="controller-instructions-form-input"
+                                  value={row.receiptBookNo || ""}
+                                  readOnly
+                                  style={{
+                                    ...nonEditableStyle,
+                                    width: "100%",
+                                    fontSize: "12px",
+                                    height: "26px",
+                                  }}
+                                />
+                              </td>
+                              <td style={{ border: "1px solid #dee2e6", padding: "2px 4px" }}>
+                                <input
+                                  type="text"
+                                  className="controller-instructions-form-input"
+                                  value={row.weight || ""}
+                                  readOnly
+                                  style={{
+                                    ...nonEditableStyle,
+                                    width: "100%",
+                                    fontSize: "12px",
+                                    height: "26px",
+                                  }}
+                                />
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+
             {/* Container Details Section */}
             {containers.length > 0 && (
-              <div className="controller-instructions-form-section">
+              <div
+                className="controller-instructions-form-section"
+                style={isAddOn ? { marginTop: "-40px" } : undefined}
+              >
                 <div className="controller-instructions-container-details-section">
                   <h3>Container Details</h3>
                   {isLoadingContainers && (

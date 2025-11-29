@@ -12,6 +12,7 @@ import TokenExpiryNotification from "./components/TokenExpiryNotification";
 import Header from "./components/Header";
 import Footer from "./components/Footer"; // Import the Footer component
 import LogoutButton from "./components/LogoutButton";
+import LandingPage from "./pages/user_menus/views/LandingPage";
 
 // Import pages
 import {
@@ -231,8 +232,8 @@ function DynamicHeader() {
 
 function ContentWrapper() {
   const location = useLocation();
-  const hideFooterOn = ["/login", "/register"];
-  const hideLogoutOn = ["/login", "/register", "/landing", "/new-landing"];
+  const hideFooterOn = ["/login", "/register", "/"]; // hide global footer on landing
+  const hideLogoutOn = ["/login", "/register", "/landing", "/new-landing", "/"]; // hide logout on landing
   const shouldShowFooter = !hideFooterOn.includes(location.pathname);
   const shouldShowLogout = !hideLogoutOn.includes(location.pathname);
 
@@ -251,7 +252,7 @@ function ContentWrapper() {
         <Route path="/credit-note-form" element={<CreditNoteForm />} />
         <Route path="/credit-note-list" element={<CreditNoteList />} />
         <Route path="/CredClientList" element={<CredClientList />} />
-        <Route path="/" element={<Landing />} />
+        <Route path="/" element={<LandingPage />} />
         <Route path="/client-payments" element={<ClientPayments />} />
         <Route path="/client-list-payments" element={<ClientListPay />} />
         <Route
