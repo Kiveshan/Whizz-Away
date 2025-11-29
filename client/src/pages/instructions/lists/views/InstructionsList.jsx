@@ -154,12 +154,13 @@ const Instructions = () => {
 
   // Helper function to determine status priority for sorting
   const getStatusPriority = (status) => {
-    switch (status) {
-      case "New":
+    const normalized = (status || "").toLowerCase()
+    switch (normalized) {
+      case "new":
         return 1 // Highest priority
-      case "In progress":
+      case "in progress":
         return 3
-      case "Completed":
+      case "completed":
         return 4
       default:
         return 5 // Lowest priority
@@ -200,8 +201,11 @@ const Instructions = () => {
 
     // Filter by status or type
     if (activeFilter !== "All") {
-      if (["New", "In progress", "Completed"].includes(activeFilter)) {
-        filtered = filtered.filter((item) => item.status === activeFilter)
+      const normalizedActiveFilter = (activeFilter || "").toLowerCase()
+      if (["new", "in progress", "completed"].includes(normalizedActiveFilter)) {
+        filtered = filtered.filter(
+          (item) => (item.status || "").toLowerCase() === normalizedActiveFilter,
+        )
       } else if (activeFilter === "import") {
         filtered = filtered.filter((item) => item.type_text === "import" || item.type === "import")
       } else if (activeFilter === "export") {
@@ -386,8 +390,10 @@ const Instructions = () => {
               All
             </button>
             <button
-              className={`btn btn-blue ${activeFilter === "In progress" ? "active" : ""}`}
-              onClick={() => handleFilterClick("In progress")}
+              className={`btn btn-blue ${
+                (activeFilter || "").toLowerCase() === "in progress" ? "active" : ""
+              }`}
+              onClick={() => handleFilterClick("In Progress")}
             >
               In-Progress
             </button>
