@@ -446,8 +446,6 @@ const AddOnForm = () => {
         `Telephone: ${clientInfo.telephone || ''}`,
         `Email: ${clientInfo.email || ''}`,
         `VAT Reg No: ${clientInfo.vat_reg_num || ''}`,
-        formData.booking_ref ? `Booking Ref: ${formData.booking_ref}` : '',
-        formData.client_ref ? `Client Ref: ${formData.client_ref}` : '',
       ].filter(Boolean);
 
       const maxLines = Math.max(leftDetails.length, rightDetails.length);
@@ -465,6 +463,24 @@ const AddOnForm = () => {
       doc.text(invMetaLeft, margins.left, currentY);
       doc.text(invMetaRight, pageWidth - margins.right, currentY, { align: 'right' });
       currentY += 8;
+
+      // References section (Booking Ref / Client Ref)
+      if (formData.booking_ref || formData.client_ref) {
+        autoTable(doc, {
+          startY: currentY,
+          head: [["References", ""]],
+          body: [
+            ["Booking Ref", formData.booking_ref || "—"],
+            ["Client Ref", formData.client_ref || "—"],
+          ],
+          theme: "grid",
+          styles: { fontSize: fonts.small, cellPadding: 1.2, lineWidth: 0.1, lineColor: brand.gray },
+          headStyles: { fillColor: brand.accent, textColor: [255, 255, 255], fontStyle: 'bold' },
+          columnStyles: { 0: { cellWidth: 40 }, 1: { cellWidth: (pageWidth - margins.left - margins.right - 40), halign: 'left' } },
+          margin: { left: margins.left, right: margins.right },
+        });
+        currentY = doc.lastAutoTable.finalY + 6;
+      }
 
       // Service Details Table
       const serviceData = formData.items.map((item) => [
