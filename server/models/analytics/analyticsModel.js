@@ -351,122 +351,6 @@ const getTurnoverVsDieselCost = async (numericMonth, year) => {
   ]
 }
 
-const getAllExpenses = async (client, month, year) => {
-  const fuelQuery = `
-    SELECT 
-      COALESCE(SUM(e.expensecost), 0) as total_fuel_cost,
-      to_char(e.slipuploaddate, 'Month') as month_name,
-      EXTRACT(YEAR FROM e.slipuploaddate) as year
-    FROM expenses_m2 e
-    WHERE e.type = 'fuel'
-      AND TRIM(to_char(e.slipuploaddate, 'Month')) = $1
-      AND EXTRACT(YEAR FROM e.slipuploaddate)::text = $2
-    GROUP BY to_char(e.slipuploaddate, 'Month'), EXTRACT(YEAR FROM e.slipuploaddate)
-  `
-
-  const purchaseOrderQuery = `
-    SELECT 
-      COALESCE(SUM(p.total), 0) as total_po_cost,
-      to_char(p.date, 'Month') as month_name,
-      EXTRACT(YEAR FROM p.date) as year
-    FROM purchase_orders p
-    WHERE TRIM(to_char(p.date, 'Month')) = $1
-      AND EXTRACT(YEAR FROM p.date)::text = $2
-    GROUP BY to_char(p.date, 'Month'), EXTRACT(YEAR FROM p.date)
-  `
-
-  const subcontractorQuery = `
-    SELECT 
-      COALESCE(SUM(l.driverrate), 0) as total_subcontractor_expense,
-      TO_CHAR(l.date, 'Month') as month_name,
-      EXTRACT(YEAR FROM l.date) as year
-    FROM legs_m2 l
-    JOIN m5_employee e ON l.driverid = e.userid
-    WHERE e.roleid = 6
-      AND TRIM(TO_CHAR(l.date, 'Month')) = $1
-      AND EXTRACT(YEAR FROM l.date)::text = $2
-    GROUP BY e.companyname, TO_CHAR(l.date, 'Month'), EXTRACT(YEAR FROM l.date)
-  `
-
-  const incomeQuery = `
-    SELECT 
-      COALESCE(SUM(m.total_cost), 0) as total_income,
-      to_char(i.date, 'Month') as month_name,
-      EXTRACT(YEAR FROM i.date) as year
-    FROM invoice i
-    JOIN m1_controller m ON i.m1key = m.m1key
-    WHERE TRIM(to_char(i.date, 'Month')) = $1
-    AND EXTRACT(YEAR FROM i.date)::text = $2
-    GROUP BY to_char(i.date, 'Month'), EXTRACT(YEAR FROM i.date)
-  `
-
-  const creditNotesQuery = `
-    SELECT 
-      COALESCE(SUM(amount_value), 0) as total_credit_notes,
-      month_name,
-      year
-    FROM (
-      SELECT 
-        unnest(cn.amount) as amount_value,
-        to_char(cn.creditnote_date, 'Month') as month_name,
-        EXTRACT(YEAR FROM cn.creditnote_date) as year
-      FROM credit_notes cn
-      WHERE TRIM(to_char(cn.creditnote_date, 'Month')) = $1
-      AND EXTRACT(YEAR FROM cn.creditnote_date)::text = $2
-    ) subquery
-    GROUP BY month_name, year
-  `
-
-  const [fuelResult, purchaseOrderResult, subcontractorResult, incomeResult, creditNotesResult] =
-    await Promise.all([
-      client.query(fuelQuery, [month, year]),
-      client.query(purchaseOrderQuery, [month, year]),
-      client.query(subcontractorQuery, [month, year]),
-      client.query(incomeQuery, [month, year]),
-      client.query(creditNotesQuery, [month, year]),
-    ])
-
-  console.log("Fuel query result:", fuelResult.rows)
-  console.log("Purchase order query result:", purchaseOrderResult.rows)
-  console.log("Subcontractor expense query result:", subcontractorResult.rows)
-  console.log("Income query result:", incomeResult.rows)
-  console.log("Credit notes query result:", creditNotesResult.rows)
-
-  const totalFuelCost = Number.parseFloat(fuelResult.rows[0]?.total_fuel_cost || 0)
-  const totalPurchaseOrderCost = Number.parseFloat(purchaseOrderResult.rows[0]?.total_po_cost || 0)
-  const totalSubcontractorExpense = Number.parseFloat(subcontractorResult.rows[0]?.total_subcontractor_expense || 0)
-  const totalWages = await getTotalWagesForMonth(client, month, year)
-  const totalIncome = Number.parseFloat(incomeResult.rows[0]?.total_income || 0)
-  const totalCreditNotes = Number.parseFloat(creditNotesResult.rows[0]?.total_credit_notes || 0)
-
-  const totalExpenses =
-    totalFuelCost + totalPurchaseOrderCost + totalSubcontractorExpense + totalWages + totalCreditNotes
-
-  console.log(`Total fuel cost for ${month} ${year}: ${totalFuelCost}`)
-  console.log(`Total purchase order cost for ${month} ${year}: ${totalPurchaseOrderCost}`)
-  console.log(`Total subcontractor expense for ${month} ${year}: ${totalSubcontractorExpense}`)
-  console.log(`Total wages for ${month} ${year}: ${totalWages}`)
-  console.log(`Total credit notes for ${month} ${year}: ${totalCreditNotes}`)
-  console.log(`Total expenses for ${month} ${year}: ${totalExpenses}`)
-  console.log(`Total income for ${month} ${year}: ${totalIncome}`)
-
-  const expensesData = [
-    {
-      expensedesc: "All Expenses",
-      total_cost: totalExpenses,
-      month_name: month.trim(),
-      year: year.toString(),
-    },
-  ]
-
-  return {
-    expenses: expensesData,
-    income: totalIncome,
-    month: month.trim(),
-    year: year.toString(),
-  }
-}
-
 const getTurnoverPerTruck = async (client, month, year) => {
   const params = [month, year]
   const query = `
@@ -791,111 +675,6 @@ const getSubcontractorVsTurnover = async (client, month, year, subcontractorId =
   return turnoverData
 }
 
-const getWagesVsExpenses = async (client, month, year) => {
-  const fuelQuery = `
-    SELECT 
-      SUM(e.expensecost) as total_fuel_cost,
-      to_char(e.slipuploaddate, 'Month') as month_name,
-      EXTRACT(YEAR FROM e.slipuploaddate) as year
-    FROM expenses_m2 e
-    WHERE e.type = 'fuel'
-      AND TRIM(to_char(e.slipuploaddate, 'Month')) = $1
-      AND EXTRACT(YEAR FROM e.slipuploaddate)::text = $2
-    GROUP BY to_char(e.slipuploaddate, 'Month'), EXTRACT(YEAR FROM e.slipuploaddate)
-  `
-
-  const purchaseOrderQuery = `
-    SELECT 
-      SUM(p.total) as total_po_cost,
-      to_char(p.date, 'Month') as month_name,
-      EXTRACT(YEAR FROM p.date) as year
-    FROM purchase_orders p
-    WHERE TRIM(to_char(p.date, 'Month')) = $1
-      AND EXTRACT(YEAR FROM p.date)::text = $2
-    GROUP BY to_char(p.date, 'Month'), EXTRACT(YEAR FROM p.date)
-  `
-
-  const subcontractorQuery = `
-    SELECT 
-      SUM(l.driverrate) as total_subcontractor_expense,
-      TO_CHAR(l.date, 'Month') as month_name,
-      EXTRACT(YEAR FROM l.date) as year
-    FROM legs_m2 l
-    JOIN m5_employee e ON l.driverid = e.userid
-    WHERE e.roleid = 6
-      AND TRIM(TO_CHAR(l.date, 'Month')) = $1
-      AND EXTRACT(YEAR FROM l.date)::text = $2
-    GROUP BY TO_CHAR(l.date, 'Month'), EXTRACT(YEAR FROM l.date)
-  `
-
-  const creditNotesQuery = `
-    SELECT 
-      COALESCE(SUM(amount_value), 0) as total_credit_notes,
-      month_name,
-      year
-    FROM (
-      SELECT 
-        unnest(cn.amount) as amount_value,
-        to_char(cn.creditnote_date, 'Month') as month_name,
-        EXTRACT(YEAR FROM cn.creditnote_date) as year
-      FROM credit_notes cn
-      WHERE TRIM(to_char(cn.creditnote_date, 'Month')) = $1
-      AND EXTRACT(YEAR FROM cn.creditnote_date)::text = $2
-    ) subquery
-    GROUP BY month_name, year
-  `
-
-  const [fuelResult, purchaseOrderResult, subcontractorResult, creditNotesResult] = await Promise.all([
-    client.query(fuelQuery, [month, year]),
-    client.query(purchaseOrderQuery, [month, year]),
-    client.query(subcontractorQuery, [month, year]),
-    client.query(creditNotesQuery, [month, year]),
-  ])
-
-  console.log("Fuel query result:", fuelResult.rows)
-  console.log("Purchase order query result:", purchaseOrderResult.rows)
-  console.log("Subcontractor expense query result:", subcontractorResult.rows)
-  console.log("Credit notes query result:", creditNotesResult.rows)
-
-  const totalWages = await getTotalWagesForMonth(client, month, year)
-  const totalFuelCost = Number.parseFloat(fuelResult.rows[0]?.total_fuel_cost || 0)
-  const totalPurchaseOrderCost = Number.parseFloat(purchaseOrderResult.rows[0]?.total_po_cost || 0)
-  const totalSubcontractorExpense = Number.parseFloat(subcontractorResult.rows[0]?.total_subcontractor_expense || 0)
-  const totalCreditNotes = Number.parseFloat(creditNotesResult.rows[0]?.total_credit_notes || 0)
-
-  const totalExpenses = totalFuelCost + totalPurchaseOrderCost + totalSubcontractorExpense + totalCreditNotes
-  const total = totalWages + totalExpenses
-
-  console.log(`Total wages for ${month} ${year}: ${totalWages}`)
-  console.log(`Total fuel cost for ${month} ${year}: ${totalFuelCost}`)
-  console.log(`Total purchase order cost for ${month} ${year}: ${totalPurchaseOrderCost}`)
-  console.log(`Total subcontractor expense for ${month} ${year}: ${totalSubcontractorExpense}`)
-  console.log(`Total credit notes for ${month} ${year}: ${totalCreditNotes}`)
-  console.log(`Total expenses for ${month} ${year}: ${totalExpenses}`)
-
-  const wagesVsExpensesData = [
-    {
-      name: "Wages",
-      value: totalWages,
-      type: "wages",
-      percentage: total > 0 ? ((totalWages / total) * 100).toFixed(2) : 0,
-      month: month.trim(),
-      year: year.toString(),
-    },
-    {
-      name: "Expenses",
-      value: totalExpenses,
-      type: "expenses",
-      percentage: total > 0 ? ((totalExpenses / total) * 100).toFixed(2) : 0,
-      month: month.trim(),
-      year: year.toString(),
-    },
-  ]
-
-  console.log("Processed wages vs expenses data:", wagesVsExpensesData)
-  return wagesVsExpensesData
-}
-
 const getTurnoverVsSubbieExpense = async (client, month, year, subcontractorId = null) => {
   const params = [month, year]
   let subcontractorQuery = `
@@ -1165,6 +944,227 @@ const getTurnoverVsFuelPerTruck = async (client, month, year, truckId = null) =>
   return data
 }
 
+const getAllExpenses = async (client, month, year) => {
+  const fuelQuery = `
+    SELECT 
+      COALESCE(SUM(e.expensecost), 0) as total_fuel_cost,
+      to_char(e.slipuploaddate, 'Month') as month_name,
+      EXTRACT(YEAR FROM e.slipuploaddate) as year
+    FROM expenses_m2 e
+    WHERE e.type = 'fuel'
+      AND TRIM(to_char(e.slipuploaddate, 'Month')) = $1
+      AND EXTRACT(YEAR FROM e.slipuploaddate)::text = $2
+    GROUP BY to_char(e.slipuploaddate, 'Month'), EXTRACT(YEAR FROM e.slipuploaddate)
+  `
+
+  const purchaseOrderQuery = `
+    SELECT 
+      COALESCE(SUM(p.total), 0) as total_po_cost,
+      to_char(p.date, 'Month') as month_name,
+      EXTRACT(YEAR FROM p.date) as year
+    FROM purchase_orders p
+    WHERE TRIM(to_char(p.date, 'Month')) = $1
+      AND EXTRACT(YEAR FROM p.date)::text = $2
+    GROUP BY to_char(p.date, 'Month'), EXTRACT(YEAR FROM p.date)
+  `
+
+  const subcontractorQuery = `
+    SELECT 
+      COALESCE(SUM(l.driverrate), 0) as total_subcontractor_expense,
+      TO_CHAR(l.date, 'Month') as month_name,
+      EXTRACT(YEAR FROM l.date) as year
+    FROM legs_m2 l
+    JOIN m5_employee e ON l.driverid = e.userid
+    WHERE e.roleid = 6
+      AND TRIM(TO_CHAR(l.date, 'Month')) = $1
+      AND EXTRACT(YEAR FROM l.date)::text = $2
+    GROUP BY TO_CHAR(l.date, 'Month'), EXTRACT(YEAR FROM l.date)
+  `
+
+  const incomeQuery = `
+    SELECT 
+      COALESCE(SUM(m.total_cost), 0) as total_income,
+      to_char(i.date, 'Month') as month_name,
+      EXTRACT(YEAR FROM i.date) as year
+    FROM invoice i
+    JOIN m1_controller m ON i.m1key = m.m1key
+    WHERE TRIM(to_char(i.date, 'Month')) = $1
+    AND EXTRACT(YEAR FROM i.date)::text = $2
+    GROUP BY to_char(i.date, 'Month'), EXTRACT(YEAR FROM i.date)
+  `
+
+  const creditNotesQuery = `
+    SELECT 
+      COALESCE(SUM(amount_value), 0) as total_credit_notes,
+      month_name,
+      year
+    FROM (
+      SELECT 
+        unnest(cn.amount) as amount_value,
+        to_char(cn.creditnote_date, 'Month') as month_name,
+        EXTRACT(YEAR FROM cn.creditnote_date) as year
+      FROM credit_notes cn
+      WHERE TRIM(to_char(cn.creditnote_date, 'Month')) = $1
+      AND EXTRACT(YEAR FROM cn.creditnote_date)::text = $2
+    ) subquery
+    GROUP BY month_name, year
+  `
+
+  const [fuelResult, purchaseOrderResult, subcontractorResult, incomeResult, creditNotesResult] =
+    await Promise.all([
+      client.query(fuelQuery, [month, year]),
+      client.query(purchaseOrderQuery, [month, year]),
+      client.query(subcontractorQuery, [month, year]),
+      client.query(incomeQuery, [month, year]),
+      client.query(creditNotesQuery, [month, year]),
+    ])
+
+  console.log("Fuel query result:", fuelResult.rows)
+  console.log("Purchase order query result:", purchaseOrderResult.rows)
+  console.log("Subcontractor expense query result:", subcontractorResult.rows)
+  console.log("Income query result:", incomeResult.rows)
+  console.log("Credit notes query result:", creditNotesResult.rows)
+
+  const totalFuelCost = Number.parseFloat(fuelResult.rows[0]?.total_fuel_cost || 0)
+  const totalPurchaseOrderCost = Number.parseFloat(purchaseOrderResult.rows[0]?.total_po_cost || 0)
+  const totalSubcontractorExpense = Number.parseFloat(subcontractorResult.rows[0]?.total_subcontractor_expense || 0)
+  const totalWages = await getTotalWagesForMonth(client, month, year)
+  const totalIncome = Number.parseFloat(incomeResult.rows[0]?.total_income || 0)
+  const totalCreditNotes = Number.parseFloat(creditNotesResult.rows[0]?.total_credit_notes || 0)
+
+  const totalExpenses =
+    totalFuelCost + totalPurchaseOrderCost + totalSubcontractorExpense + totalWages + totalCreditNotes
+
+  console.log(`Total fuel cost for ${month} ${year}: ${totalFuelCost}`)
+  console.log(`Total purchase order cost for ${month} ${year}: ${totalPurchaseOrderCost}`)
+  console.log(`Total subcontractor expense for ${month} ${year}: ${totalSubcontractorExpense}`)
+  console.log(`Total wages for ${month} ${year}: ${totalWages}`)
+  console.log(`Total credit notes for ${month} ${year}: ${totalCreditNotes}`)
+  console.log(`Total expenses for ${month} ${year}: ${totalExpenses}`)
+  console.log(`Total income for ${month} ${year}: ${totalIncome}`)
+
+  const expensesData = [
+    {
+      expensedesc: "All Expenses",
+      total_cost: totalExpenses,
+      month_name: month.trim(),
+      year: year.toString(),
+    },
+  ]
+
+  return {
+    expenses: expensesData,
+    income: totalIncome,
+    month: month.trim(),
+    year: year.toString(),
+  }
+}
+
+const getWagesVsExpenses = async (client, month, year) => {
+  const fuelQuery = `
+    SELECT 
+      COALESCE(SUM(e.expensecost), 0) as total_fuel_cost,
+      to_char(e.slipuploaddate, 'Month') as month_name,
+      EXTRACT(YEAR FROM e.slipuploaddate) as year
+    FROM expenses_m2 e
+    WHERE e.type = 'fuel'
+      AND TRIM(to_char(e.slipuploaddate, 'Month')) = $1
+      AND EXTRACT(YEAR FROM e.slipuploaddate)::text = $2
+    GROUP BY to_char(e.slipuploaddate, 'Month'), EXTRACT(YEAR FROM e.slipuploaddate)
+  `
+
+  const purchaseOrderQuery = `
+    SELECT 
+      COALESCE(SUM(p.total), 0) as total_po_cost,
+      to_char(p.date, 'Month') as month_name,
+      EXTRACT(YEAR FROM p.date) as year
+    FROM purchase_orders p
+    WHERE TRIM(to_char(p.date, 'Month')) = $1
+      AND EXTRACT(YEAR FROM p.date)::text = $2
+    GROUP BY to_char(p.date, 'Month'), EXTRACT(YEAR FROM p.date)
+  `
+
+  const subcontractorQuery = `
+    SELECT 
+      COALESCE(SUM(l.driverrate), 0) as total_subcontractor_expense,
+      TO_CHAR(l.date, 'Month') as month_name,
+      EXTRACT(YEAR FROM l.date) as year
+    FROM legs_m2 l
+    JOIN m5_employee e ON l.driverid = e.userid
+    WHERE e.roleid = 6
+      AND TRIM(TO_CHAR(l.date, 'Month')) = $1
+      AND EXTRACT(YEAR FROM l.date)::text = $2
+    GROUP BY TO_CHAR(l.date, 'Month'), EXTRACT(YEAR FROM l.date)
+  `
+
+  const creditNotesQuery = `
+    SELECT 
+      COALESCE(SUM(amount_value), 0) as total_credit_notes,
+      month_name,
+      year
+    FROM (
+      SELECT 
+        unnest(cn.amount) as amount_value,
+        to_char(cn.creditnote_date, 'Month') as month_name,
+        EXTRACT(YEAR FROM cn.creditnote_date) as year
+      FROM credit_notes cn
+      WHERE TRIM(to_char(cn.creditnote_date, 'Month')) = $1
+      AND EXTRACT(YEAR FROM cn.creditnote_date)::text = $2
+    ) subquery
+    GROUP BY month_name, year
+  `
+
+  const [fuelResult, purchaseOrderResult, subcontractorResult, creditNotesResult] = await Promise.all([
+    client.query(fuelQuery, [month, year]),
+    client.query(purchaseOrderQuery, [month, year]),
+    client.query(subcontractorQuery, [month, year]),
+    client.query(creditNotesQuery, [month, year]),
+  ])
+
+  console.log("Fuel query result:", fuelResult.rows)
+  console.log("Purchase order query result:", purchaseOrderResult.rows)
+  console.log("Subcontractor expense query result:", subcontractorResult.rows)
+  console.log("Credit notes query result:", creditNotesResult.rows)
+
+  const totalWages = await getTotalWagesForMonth(client, month, year)
+  const totalFuelCost = Number.parseFloat(fuelResult.rows[0]?.total_fuel_cost || 0)
+  const totalPurchaseOrderCost = Number.parseFloat(purchaseOrderResult.rows[0]?.total_po_cost || 0)
+  const totalSubcontractorExpense = Number.parseFloat(subcontractorResult.rows[0]?.total_subcontractor_expense || 0)
+  const totalCreditNotes = Number.parseFloat(creditNotesResult.rows[0]?.total_credit_notes || 0)
+
+  const totalExpenses = totalFuelCost + totalPurchaseOrderCost + totalSubcontractorExpense + totalCreditNotes
+  const total = totalWages + totalExpenses
+
+  console.log(`Total wages for ${month} ${year}: ${totalWages}`)
+  console.log(`Total fuel cost for ${month} ${year}: ${totalFuelCost}`)
+  console.log(`Total purchase order cost for ${month} ${year}: ${totalPurchaseOrderCost}`)
+  console.log(`Total subcontractor expense for ${month} ${year}: ${totalSubcontractorExpense}`)
+  console.log(`Total credit notes for ${month} ${year}: ${totalCreditNotes}`)
+  console.log(`Total expenses for ${month} ${year}: ${totalExpenses}`)
+
+  const wagesVsExpensesData = [
+    {
+      name: "Wages",
+      value: totalWages,
+      type: "wages",
+      percentage: total > 0 ? ((totalWages / total) * 100).toFixed(2) : 0,
+      month: month.trim(),
+      year: year.toString(),
+    },
+    {
+      name: "Expenses",
+      value: totalExpenses,
+      type: "expenses",
+      percentage: total > 0 ? ((totalExpenses / total) * 100).toFixed(2) : 0,
+      month: month.trim(),
+      year: year.toString(),
+    },
+  ]
+
+  console.log("Processed wages vs expenses data:", wagesVsExpensesData)
+  return wagesVsExpensesData
+}
+
 async function calculateTotalPayable(client, employeeId, month, year) {
   const monthNames = [
     "January", "February", "March", "April", "May", "June",
@@ -1271,8 +1271,8 @@ async function getTotalWagesForMonth(client, month, year) {
   const currentYear = currentDate.getFullYear();
   const reportMonth = monthNumber;
   const reportYear = parseInt(year);
-  const isPastMonth = (reportYear < currentYear) ||
-    (reportYear === currentYear && reportMonth < currentMonth);
+  const isPastMonth = (reportYear < currentYear) || 
+                      (reportYear === currentYear && reportMonth < currentMonth);
 
   for (const emp of employees) {
     const employeeId = emp.userid;
