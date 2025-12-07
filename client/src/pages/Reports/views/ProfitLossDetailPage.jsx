@@ -45,11 +45,13 @@ const ProfitLossDetailPage = () => {
     }
 
     const aggregateData = (details) => {
-        const aggregated = details.reduce((acc, item) => {
-            if (!acc[item.source]) {
-                acc[item.source] = 0
+        const aggregated = (details || []).reduce((acc, item) => {
+            const key = item?.source ?? "Unknown";
+            const amt = Number(item?.amount ?? 0);
+            if (!Object.prototype.hasOwnProperty.call(acc, key)) {
+                acc[key] = 0
             }
-            acc[item.source] += item.amount
+            acc[key] += amt
             return acc
         }, {})
         return aggregated
@@ -146,9 +148,11 @@ const ProfitLossDetailPage = () => {
             yPos = addTableRow(source, `R ${amount.toLocaleString("en-ZA", { minimumFractionDigits: 2 })}`, yPos)
         })
 
+        const profitAggSum = Object.values(profitAgg).reduce((s, v) => s + Number(v || 0), 0)
+        const totalProfitVal = (reportData.totalProfit ?? reportData.totalIncome ?? profitAggSum)
         yPos = addTableRow(
             "Total Income",
-            `R ${reportData.totalProfit.toLocaleString("en-ZA", { minimumFractionDigits: 2 })}`,
+            `R ${totalProfitVal.toLocaleString("en-ZA", { minimumFractionDigits: 2 })}`,
             yPos,
             true,
             true,
@@ -162,16 +166,18 @@ const ProfitLossDetailPage = () => {
             yPos = addTableRow(source, `R ${amount.toLocaleString("en-ZA", { minimumFractionDigits: 2 })}`, yPos)
         })
 
+        const lossAggSum = Object.values(lossAgg).reduce((s, v) => s + Number(v || 0), 0)
+        const totalLossVal = (reportData.totalLoss ?? reportData.totalExpenses ?? lossAggSum)
         yPos = addTableRow(
             "Total Expenditure",
-            `R ${Math.abs(reportData.totalLoss).toLocaleString("en-ZA", { minimumFractionDigits: 2 })}`,
+            `R ${Math.abs(totalLossVal).toLocaleString("en-ZA", { minimumFractionDigits: 2 })}`,
             yPos,
             true,
             true,
         )
 
         yPos += 15
-        const net = reportData.net;
+        const net = (reportData.net ?? reportData.netProfit ?? (totalProfitVal - totalLossVal));
         const isProfit = net >= 0;
         doc.setFillColor(isProfit ? (232, 245, 233) : (255, 235, 238));
         doc.rect(margin, yPos - 5, contentWidth, 20, "F");
@@ -235,6 +241,11 @@ const ProfitLossDetailPage = () => {
 
     const profitAgg = aggregateData(reportData.profitDetails)
     const lossAgg = aggregateData(reportData.lossDetails)
+    const profitAggSum = Object.values(profitAgg).reduce((s, v) => s + Number(v || 0), 0)
+    const lossAggSum = Object.values(lossAgg).reduce((s, v) => s + Number(v || 0), 0)
+    const uiTotalProfitVal = (reportData.totalProfit ?? reportData.totalIncome ?? profitAggSum)
+    const uiTotalLossVal = (reportData.totalLoss ?? reportData.totalExpenses ?? lossAggSum)
+    const uiNet = (reportData.net ?? reportData.netProfit ?? (uiTotalProfitVal - uiTotalLossVal))
 
     return (
         <div className="pl-enhanced-wrapper">
@@ -269,7 +280,7 @@ const ProfitLossDetailPage = () => {
                                 ))}
                                 <tr className="pl-total-row">
                                     <td>Total Income</td>
-                                    <td>R {reportData.totalProfit.toFixed(2)}</td>
+                                    <td>R {Number(uiTotalProfitVal).toFixed(2)}</td>
                                 </tr>
                             </tbody>
                         </table>
@@ -292,7 +303,7 @@ const ProfitLossDetailPage = () => {
                                 ))}
                                 <tr className="pl-total-row">
                                     <td>Total Expenditure</td>
-                                    <td>R {Math.abs(reportData.totalLoss).toFixed(2)}</td>
+                                    <td>R {Math.abs(Number(uiTotalLossVal)).toFixed(2)}</td>
                                 </tr>
                             </tbody>
                         </table>
@@ -309,10 +320,10 @@ const ProfitLossDetailPage = () => {
                             <tbody className="pl-section-body">
                                 <tr>
                                     <td>Net Profit (Loss)</td>
-                                    <td className={`pl-net-amount ${reportData.net >= 0 ? "pl-profit" : "pl-loss"}`}>
-                                        {reportData.net >= 0
-                                            ? `R ${reportData.net.toFixed(2)}`
-                                            : `R (${Math.abs(reportData.net).toFixed(2)})`}
+                                    <td className={`pl-net-amount ${uiNet >= 0 ? "pl-profit" : "pl-loss"}`}>
+                                        {uiNet >= 0
+                                            ? `R ${Number(uiNet).toFixed(2)}`
+                                            : `R (${Math.abs(Number(uiNet)).toFixed(2)})`}
                                     </td>
                                 </tr>
                             </tbody>
