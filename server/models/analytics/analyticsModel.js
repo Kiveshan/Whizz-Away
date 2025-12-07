@@ -106,12 +106,26 @@ const getTurnoverPerMonth = async (client, month, year, clientId = null) => {
   console.log("Total turnover query result:", totalResult.rows)
 
   const totalTurnover = Number.parseFloat(totalResult.rows[0]?.turnover || 0)
+
+  // Add Payments Received to income for analytics
+  const paymentsQuery = `
+    SELECT COALESCE(SUM(amount), 0) AS payments_received
+    FROM payment_m3
+    WHERE TRIM(TO_CHAR(fileupload, 'Month')) = $1
+      AND EXTRACT(YEAR FROM fileupload)::TEXT = $2
+  `
+  const paymentsRes = await client.query(paymentsQuery, [month, year])
+  const paymentsReceived = Number.parseFloat(paymentsRes.rows[0]?.payments_received || 0)
+
+  const totalIncome = totalTurnover + paymentsReceived
   console.log(`Total turnover (including subcontractors) for ${month} ${year}: ${totalTurnover}`)
+  console.log(`Payments received for ${month} ${year}: ${paymentsReceived}`)
+  console.log(`Total income (turnover + payments) for ${month} ${year}: ${totalIncome}`)
 
   let turnoverData = [
     {
       client: "Total Turnover",
-      turnover: totalTurnover,
+      turnover: totalIncome,
       month_name: month.trim(),
       year: year.toString(),
       percentage: 100,
