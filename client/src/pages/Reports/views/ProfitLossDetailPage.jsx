@@ -225,7 +225,7 @@ const ProfitLossDetailPage = () => {
                     </div>
                     <div className="pl-enhanced-buttons">
                         <button className="pl-btn pl-back-btn" onClick={handleBack}>
-                            Back to Reports
+                            Back
                         </button>
                     </div>
                 </div>
