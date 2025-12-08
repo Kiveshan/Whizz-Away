@@ -205,7 +205,7 @@ const getProfitLossData = async (month, year) => {
     const netProfit = totalIncome - totalExpenses;
 
     const profitDetails = [
-      { source: "Invoice Turnover (incl. Subcontractor Share)", amount: invoiceTurnover },
+      { source: "Instructions", amount: invoiceTurnover },
       { source: "Payments Received", amount: paymentsReceived },
     ];
 
@@ -213,7 +213,7 @@ const getProfitLossData = async (month, year) => {
       { source: "Wages (Labour Consultant Payable)", amount: wages },
       { source: "Fuel", amount: fuel },
       { source: "Purchase Orders", amount: purchaseOrders },
-      { source: "Subcontractors (roleid 6)", amount: subcontractors },
+      { source: "Subcontractors", amount: subcontractors },
       { source: "Credit Notes", amount: creditNotes },
     ];
 
