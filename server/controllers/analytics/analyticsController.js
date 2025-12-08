@@ -14,6 +14,8 @@ import {
   getWagesVsExpenses,
   getTurnoverVsSubbieExpense,
   getTurnoverVsFuelPerTruck,
+  getPaymentsReceivedPerMonth,
+  getPaymentClients,
 } from "../../models/analytics/analyticsModel.js";
 
 const getFuelExpensesController = async (req, res) => {
@@ -245,6 +247,42 @@ const getTurnoverVsFuelPerTruckController = async (req, res) => {
   }
 };
 
+const getPaymentsReceivedPerMonthController = async (req, res) => {
+  const { month, year, clientId } = req.query;
+  console.log(`Received request for payments received per month: month=${month}, year=${year}, clientId=${clientId}`);
+  try {
+    const client = await pool.connect();
+    try {
+      const data = await getPaymentsReceivedPerMonth(client, month, year, clientId);
+      console.log("Payments received data:", data);
+      res.status(200).json({ success: true, data });
+    } finally {
+      client.release();
+    }
+  } catch (error) {
+    console.error("Error in getPaymentsReceivedPerMonthController:", error);
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+const getPaymentClientsController = async (req, res) => {
+  const { month, year } = req.query;
+  console.log(`Received request for payment clients: month=${month}, year=${year}`);
+  try {
+    const client = await pool.connect();
+    try {
+      const data = await getPaymentClients(client, month, year);
+      console.log("Payment clients data:", data);
+      res.status(200).json({ success: true, data });
+    } finally {
+      client.release();
+    }
+  } catch (error) {
+    console.error("Error in getPaymentClientsController:", error);
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
 export {
   getFuelExpensesController,
   getTurnoverPerMonthController,
@@ -260,4 +298,6 @@ export {
   getWagesVsExpensesController,
   getTurnoverVsSubbieExpenseController,
   getTurnoverVsFuelPerTruckController,
+  getPaymentsReceivedPerMonthController,
+  getPaymentClientsController,
 };
