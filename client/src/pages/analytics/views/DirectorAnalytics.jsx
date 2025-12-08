@@ -735,9 +735,7 @@ export default function DirectorAnalytics() {
 
   const fetchPaymentsReceivedPerMonth = async (month, year, clientId = "") => {
     setIsLoading(true);
-    setError(null);
     try {
-      console.log(`Fetching payments received for month: ${month}, year: ${year}, clientId: ${clientId}`);
       const response = await api.get("/api/payments-received-per-month", {
         params: {
           month,
@@ -746,36 +744,37 @@ export default function DirectorAnalytics() {
           _t: new Date().getTime(),
         },
       });
-      console.log("API response:", response.data);
+
       if (response.data.success) {
         let paymentsData = response.data.data.map((item) => {
-          const payments = Number.parseFloat(item.payments);
-          console.log(`Client ${item.client}: Payments=${payments}, Percentage=${item.percentage}%`);
+          const amount = Number(item.amount) || 0;
+
           return {
-            name: item.client || "Total Payments",
-            payments: payments,
-            month: item.month_name?.trim() || month.trim(),
+            name: item.name === "Total Payments"
+              ? "Total Payments"
+              : (item.client || item.name || "Unknown Client"),
+            payments: amount,
+            month: item.month?.trim() || month.trim(),
             year: item.year.toString(),
-            percentage: item.percentage,
+            percentage: Number(item.percentage) || 0,
           };
         });
-        console.log("Processed payments data before sorting:", paymentsData);
 
-        // Sort to put "Total Payments" first
+        // CRITICAL: Always show "Total Payments" first, then the selected client
         paymentsData = paymentsData.sort((a, b) => {
           if (a.name === "Total Payments") return -1;
           if (b.name === "Total Payments") return 1;
-          return a.name.localeCompare(b.name);
+          return 0; // keep relative order (total first, client second)
         });
 
-        console.log("Processed payments data after sorting:", paymentsData);
+        console.log("Final sorted payments data:", paymentsData);
         return paymentsData;
       } else {
         throw new Error(response.data.message || "Failed to fetch data");
       }
     } catch (err) {
-      console.error("Error fetching payments received data:", err);
-      setError(err.message);
+      console.error("Error fetching payments received:", err);
+      setError(err.message || "Failed to load payments data");
       return [];
     } finally {
       setIsLoading(false);
@@ -1007,7 +1006,6 @@ export default function DirectorAnalytics() {
   };
 
   const CustomBarLabelForTurnover = ({ x, y, width, value, payload = {} }) => {
-    const percentage = payload.turnoverPercentage ?? payload.percentage ?? 0;
     console.log("CustomBarLabelForTurnover - payload:", payload);
     return (
       <text
@@ -1093,6 +1091,35 @@ export default function DirectorAnalytics() {
         fontSize={12}
       >
         {labelText}
+      </text>
+    );
+  };
+
+  const CustomBarLabelForPayments = (props) => {
+    const { x, y, width, height, value } = props;
+
+    if (value === undefined || value === null || isNaN(value)) {
+      return null;
+    }
+
+    const formatted = Number(value).toLocaleString("en-ZA", {
+      style: "currency",
+      currency: "ZAR",
+      minimumFractionDigits: 0,
+    });
+
+    const labelY = y - 10;
+
+    return (
+      <text
+        x={x + width / 2}
+        y={labelY}
+        fill="#333"
+        fontSize={12}
+        fontWeight="bold"
+        textAnchor="middle"
+      >
+        {formatted}
       </text>
     );
   };
@@ -2100,7 +2127,7 @@ export default function DirectorAnalytics() {
                         ))}
                         <LabelList
                           dataKey="payments"
-                          content={CustomBarLabelForTurnover}  // Reuse existing label formatter
+                          content={CustomBarLabelForPayments}
                           position="top"
                         />
                       </Bar>
