@@ -107,25 +107,13 @@ const getTurnoverPerMonth = async (client, month, year, clientId = null) => {
 
   const totalTurnover = Number.parseFloat(totalResult.rows[0]?.turnover || 0)
 
-  // Add Payments Received to income for analytics
-  const paymentsQuery = `
-    SELECT COALESCE(SUM(amount), 0) AS payments_received
-    FROM payment_m3
-    WHERE TRIM(TO_CHAR(fileupload, 'Month')) = $1
-      AND EXTRACT(YEAR FROM fileupload)::TEXT = $2
-  `
-  const paymentsRes = await client.query(paymentsQuery, [month, year])
-  const paymentsReceived = Number.parseFloat(paymentsRes.rows[0]?.payments_received || 0)
-
-  const totalIncome = totalTurnover + paymentsReceived
+  // Do not include payments received in turnover analytics
   console.log(`Total turnover (including subcontractors) for ${month} ${year}: ${totalTurnover}`)
-  console.log(`Payments received for ${month} ${year}: ${paymentsReceived}`)
-  console.log(`Total income (turnover + payments) for ${month} ${year}: ${totalIncome}`)
 
   let turnoverData = [
     {
       client: "Total Turnover",
-      turnover: totalIncome,
+      turnover: totalTurnover,
       month_name: month.trim(),
       year: year.toString(),
       percentage: 100,
@@ -187,6 +175,88 @@ const getTurnoverPerMonth = async (client, month, year, clientId = null) => {
 
   console.log("Processed turnover data:", turnoverData)
   return turnoverData
+}
+
+// Payments Received per Month (analytics)
+const getPaymentsReceivedPerMonth = async (client, month, year, clientId = null) => {
+  // Total payments for the month
+  const totalQuery = `
+    SELECT COALESCE(SUM(p.amount), 0) AS total_payments
+    FROM payment_m3 p
+    WHERE TRIM(TO_CHAR(p.fileupload, 'Month')) = $1
+      AND EXTRACT(YEAR FROM p.fileupload)::TEXT = $2
+  `
+
+  const totalRes = await client.query(totalQuery, [month, year])
+  const totalPayments = Number.parseFloat(totalRes.rows[0]?.total_payments || 0)
+
+  const data = [
+    {
+      name: "Total Payments",
+      amount: totalPayments,
+      month: month.trim(),
+      year: year.toString(),
+      type: "total",
+      percentage: 100,
+    },
+  ]
+
+  if (clientId) {
+    const perClientQuery = `
+      SELECT COALESCE(SUM(p.amount), 0) AS client_payments, c.client
+      FROM payment_m3 p
+      JOIN m5_client c ON p.clientid = c.m5clientkey
+      WHERE TRIM(TO_CHAR(p.fileupload, 'Month')) = $1
+        AND EXTRACT(YEAR FROM p.fileupload)::TEXT = $2
+        AND p.clientid = $3
+      GROUP BY c.client
+    `
+    const perClientRes = await client.query(perClientQuery, [month, year, clientId])
+    const clientPayments = Number.parseFloat(perClientRes.rows[0]?.client_payments || 0)
+    const clientName = perClientRes.rows[0]?.client
+    if (clientName) {
+      const percentage = totalPayments > 0 ? Number(((clientPayments / totalPayments) * 100).toFixed(2)) : 0
+      data.push({
+        name: clientName,
+        amount: clientPayments,
+        month: month.trim(),
+        year: year.toString(),
+        type: "client",
+        percentage,
+      })
+    } else {
+      // If no payments for selected client, still include zero entry with client name
+      const nameQuery = `SELECT client FROM m5_client WHERE m5clientkey = $1`
+      const nameRes = await client.query(nameQuery, [clientId])
+      const fallbackName = nameRes.rows[0]?.client
+      if (fallbackName) {
+        data.push({
+          name: fallbackName,
+          amount: 0,
+          month: month.trim(),
+          year: year.toString(),
+          type: "client",
+          percentage: 0,
+        })
+      }
+    }
+  }
+
+  return data
+}
+
+// List distinct clients that have payments for the given month/year
+const getPaymentClients = async (client, month, year) => {
+  const query = `
+    SELECT DISTINCT c.m5clientkey, c.client
+    FROM payment_m3 p
+    JOIN m5_client c ON p.clientid = c.m5clientkey
+    WHERE TRIM(TO_CHAR(p.fileupload, 'Month')) = $1
+      AND EXTRACT(YEAR FROM p.fileupload)::TEXT = $2
+    ORDER BY c.client
+  `
+  const res = await client.query(query, [month, year])
+  return res.rows.map((row) => ({ m5clientkey: row.m5clientkey, client: row.client }))
 }
 
 const getAllClients = async (client) => {
@@ -1337,4 +1407,6 @@ export {
   getWagesVsExpenses,
   getTurnoverVsSubbieExpense,
   getTurnoverVsFuelPerTruck,
+  getPaymentsReceivedPerMonth,
+  getPaymentClients,
 }

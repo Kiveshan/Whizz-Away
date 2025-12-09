@@ -14,6 +14,8 @@ import {
   getWagesVsExpensesController,
   getTurnoverVsSubbieExpenseController,
   getTurnoverVsFuelPerTruckController,
+  getPaymentsReceivedPerMonthController,
+  getPaymentClientsController,
 } from "../../controllers/analytics/analyticsController.js";
 import { verifyToken } from "../../middleware/auth.js";
 
@@ -32,15 +34,17 @@ router.get(
 );
 router.get("/api/all-expenses", verifyToken, getAllExpensesController);
 router.get("/api/turnover-per-truck", verifyToken, getTurnoverPerTruckController);
-router.get("/api/subcontractor-turnover-per-month", verifyToken, 
+router.get("/api/subcontractor-turnover-per-month", verifyToken,
   getSubcontractorTurnoverPerMonthController);
-router.get("/api/subcontractor-vs-turnover", verifyToken, 
+router.get("/api/subcontractor-vs-turnover", verifyToken,
   getSubcontractorVsTurnoverController);
-router.get("/api/wages-vs-expenses", verifyToken, 
+router.get("/api/wages-vs-expenses", verifyToken,
   getWagesVsExpensesController);
-router.get("/api/turnover-vs-subbie-expense", verifyToken, 
+router.get("/api/turnover-vs-subbie-expense", verifyToken,
   getTurnoverVsSubbieExpenseController);
-router.get("/api/turnover-vs-fuel-per-truck", verifyToken, 
+router.get("/api/turnover-vs-fuel-per-truck", verifyToken,
   getTurnoverVsFuelPerTruckController);
+router.get("/api/payments-received-per-month", verifyToken, getPaymentsReceivedPerMonthController);
+router.get("/api/payment-clients", verifyToken, getPaymentClientsController);
 
 export default router;

@@ -112,7 +112,7 @@ const getProfitLossData = async (month, year) => {
   try {
     client = await pool.connect();
 
-    // === INCOME: Invoice Turnover (including subcontractor share) + Payments ===
+    // === INCOME: Invoice Turnover (including subcontractor share) ===
     const turnoverQuery = `
       WITH DistinctLegs AS (
         SELECT m1key, COUNT(DISTINCT legnumber) AS num_legs
@@ -149,16 +149,7 @@ const getProfitLossData = async (month, year) => {
     const turnoverResult = await client.query(turnoverQuery, [month, year]);
     const invoiceTurnover = Number(turnoverResult.rows[0]?.invoice_turnover || 0);
 
-    const paymentsResult = await client.query(
-      `SELECT COALESCE(SUM(amount), 0) AS total
-       FROM payment_m3
-       WHERE TRIM(TO_CHAR(fileupload, 'Month')) = $1
-         AND EXTRACT(YEAR FROM fileupload)::text = $2`,
-      [month, year]
-    );
-    const paymentsReceived = Number(paymentsResult.rows[0]?.total || 0);
-
-    const totalIncome = invoiceTurnover + paymentsReceived;
+    const totalIncome = invoiceTurnover;
 
     // === EXPENSES ===
     const fuel = Number((await client.query(
@@ -205,8 +196,7 @@ const getProfitLossData = async (month, year) => {
     const netProfit = totalIncome - totalExpenses;
 
     const profitDetails = [
-      { source: "Instructions", amount: invoiceTurnover },
-      { source: "Payments Received", amount: paymentsReceived },
+      { source: "Instructions", amount: invoiceTurnover }
     ];
 
     const lossDetails = [

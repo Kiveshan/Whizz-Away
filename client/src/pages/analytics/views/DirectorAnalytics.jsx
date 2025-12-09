@@ -49,6 +49,7 @@ export default function DirectorAnalytics() {
   const [clients, setClients] = useState([]);
   const [subcontractors, setSubcontractors] = useState([]);
   const [trucks, setTrucks] = useState([]);
+  const [paymentClients, setPaymentClients] = useState([]);
   const [selectedClient, setSelectedClient] = useState("");
   const [selectedSubcontractor, setSelectedSubcontractor] = useState("");
   const [selectedTruck, setSelectedTruck] = useState("");
@@ -79,7 +80,8 @@ export default function DirectorAnalytics() {
       activeFilter === "wagesVsExpenses" ||
       activeFilter === "incomeVsExpense" ||
       activeFilter === "turnoverVsSubbieExpense" ||
-      activeFilter === "turnoverVsFuelPerTruck"
+      activeFilter === "turnoverVsFuelPerTruck" ||
+      activeFilter === "paymentsReceivedPerMonth"  // Added
     ) {
       return 1000;
     }
@@ -716,11 +718,80 @@ export default function DirectorAnalytics() {
     }
   };
 
+  const fetchPaymentClients = async (month, year) => {
+    try {
+      const response = await api.get("/api/payment-clients", {
+        params: { month, year },
+      });
+      if (response.data.success) {
+        setPaymentClients(response.data.data);
+      } else {
+        setError("Failed to fetch payment clients");
+      }
+    } catch (err) {
+      setError(`Failed to fetch payment clients: ${err.message}`);
+    }
+  };
+
+  const fetchPaymentsReceivedPerMonth = async (month, year, clientId = "") => {
+    setIsLoading(true);
+    try {
+      const response = await api.get("/api/payments-received-per-month", {
+        params: {
+          month,
+          year,
+          clientId: clientId || undefined,
+          _t: new Date().getTime(),
+        },
+      });
+
+      if (response.data.success) {
+        let paymentsData = response.data.data.map((item) => {
+          const amount = Number(item.amount) || 0;
+
+          return {
+            name: item.name === "Total Payments"
+              ? "Total Payments"
+              : (item.client || item.name || "Unknown Client"),
+            payments: amount,
+            month: item.month?.trim() || month.trim(),
+            year: item.year.toString(),
+            percentage: Number(item.percentage) || 0,
+          };
+        });
+
+        // CRITICAL: Always show "Total Payments" first, then the selected client
+        paymentsData = paymentsData.sort((a, b) => {
+          if (a.name === "Total Payments") return -1;
+          if (b.name === "Total Payments") return 1;
+          return 0; // keep relative order (total first, client second)
+        });
+
+        console.log("Final sorted payments data:", paymentsData);
+        return paymentsData;
+      } else {
+        throw new Error(response.data.message || "Failed to fetch data");
+      }
+    } catch (err) {
+      console.error("Error fetching payments received:", err);
+      setError(err.message || "Failed to load payments data");
+      return [];
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   useEffect(() => {
     fetchClients();
     fetchSubcontractors();
     fetchTrucks();
   }, []);
+
+  useEffect(() => {
+    if (activeFilter === "paymentsReceivedPerMonth") {
+      fetchPaymentClients(activeMonth, activeYear);
+    }
+  }, [activeMonth, activeYear, activeFilter]);
 
   useEffect(() => {
     let isMounted = true;
@@ -787,6 +858,9 @@ export default function DirectorAnalytics() {
               activeYear,
               selectedTruck
             );
+            break;
+          case "paymentsReceivedPerMonth":
+            data = await fetchPaymentsReceivedPerMonth(activeMonth, activeYear, selectedClient);
             break;
           default:
             data = [];
@@ -932,7 +1006,6 @@ export default function DirectorAnalytics() {
   };
 
   const CustomBarLabelForTurnover = ({ x, y, width, value, payload = {} }) => {
-    const percentage = payload.turnoverPercentage ?? payload.percentage ?? 0;
     console.log("CustomBarLabelForTurnover - payload:", payload);
     return (
       <text
@@ -1018,6 +1091,35 @@ export default function DirectorAnalytics() {
         fontSize={12}
       >
         {labelText}
+      </text>
+    );
+  };
+
+  const CustomBarLabelForPayments = (props) => {
+    const { x, y, width, height, value } = props;
+
+    if (value === undefined || value === null || isNaN(value)) {
+      return null;
+    }
+
+    const formatted = Number(value).toLocaleString("en-ZA", {
+      style: "currency",
+      currency: "ZAR",
+      minimumFractionDigits: 0,
+    });
+
+    const labelY = y - 10;
+
+    return (
+      <text
+        x={x + width / 2}
+        y={labelY}
+        fill="#333"
+        fontSize={12}
+        fontWeight="bold"
+        textAnchor="middle"
+      >
+        {formatted}
       </text>
     );
   };
@@ -1959,6 +2061,84 @@ export default function DirectorAnalytics() {
           </div>
         );
 
+      case "paymentsReceivedPerMonth":
+        return (
+          <div className="chart-wrapper">
+            {isLoading ? (
+              <div className="loading-indicator">
+                Loading payments received data...
+              </div>
+            ) : error ? (
+              <div className="error-message">{error}</div>
+            ) : !Array.isArray(chartData) || chartData.length === 0 ? (
+              <div className="no-data-message">
+                No payments received data available for {activeMonth} {activeYear}
+              </div>
+            ) : (
+              <>
+                <div className="chart-header">
+                  <div className="chart-header-item">
+                    <span
+                      className="legend-color"
+                      style={{ backgroundColor: "#4169E1" }}
+                    ></span>
+                    <span>Total Payments</span>
+                  </div>
+                  {selectedClient && (
+                    <div className="chart-header-item">
+                      <span
+                        className="legend-color"
+                        style={{ backgroundColor: "#2196F3" }}
+                      ></span>
+                      <span>Selected Client</span>
+                    </div>
+                  )}
+                </div>
+                <div className="chart-scroll-container">
+                  <ResponsiveContainer width={chartWidth} height="100%">
+                    <BarChart
+                      data={chartData}
+                      margin={{ top: 24, right: 24, left: 48, bottom: 16 }}
+                    >
+                      <XAxis
+                        dataKey="name"
+                        interval={0}
+                        tick={<CustomAxisTick />}
+                        height={150}
+                        tickMargin={10}
+                      />
+                      <YAxis
+                        label={{
+                          value: "Amount (R)",
+                          angle: 0,
+                          position: "top",
+                          dy: -20,
+                        }}
+                      />
+                      <Tooltip content={<CustomTooltip />} />
+                      <Bar dataKey="payments" name="Payments" radius={[4, 4, 0, 0]}>
+                        {chartData.map((entry, index) => (
+                          <Cell
+                            key={`cell-${index}`}
+                            fill={
+                              entry.name === "Total Payments" ? "#4169E1" : "#2196F3"
+                            }
+                          />
+                        ))}
+                        <LabelList
+                          dataKey="payments"
+                          content={CustomBarLabelForPayments}
+                          position="top"
+                        />
+                      </Bar>
+                    </BarChart>
+                  </ResponsiveContainer>
+                </div>
+              </>
+            )}
+          </div>
+        );
+
       default:
         return null;
     }
@@ -2004,14 +2184,16 @@ export default function DirectorAnalytics() {
             ))}
           </select>
           {(activeFilter === "turnoverPerMonth" ||
-            activeFilter === "agingAnalysis") && (
+            activeFilter === "agingAnalysis" ||
+            activeFilter === "paymentsReceivedPerMonth"  // Added
+          ) && (
               <select
                 value={selectedClient}
                 onChange={(e) => setSelectedClient(e.target.value)}
                 className="client-select"
               >
                 <option value="">Select Client</option>
-                {clients.map((client) => (
+                {(activeFilter === "paymentsReceivedPerMonth" ? paymentClients : clients).map((client) => (
                   <option key={client.m5clientkey} value={client.m5clientkey}>
                     {client.client}
                   </option>
@@ -2085,6 +2267,9 @@ export default function DirectorAnalytics() {
               <option value="turnoverVsFuelPerTruck">
                 Turnover Per Truck VS Diesel
               </option>
+              <option value="paymentsReceivedPerMonth">
+                Payments Received per Month
+              </option>
             </select>
           </div>
 
@@ -2109,6 +2294,8 @@ export default function DirectorAnalytics() {
                 "Turnover VS Subbie Expense"}
               {activeFilter === "turnoverVsFuelPerTruck" &&
                 "Turnover Per Truck VS Diesel"}
+              {activeFilter === "paymentsReceivedPerMonth" &&
+                "Payments Received per Month"}
             </h2>
             {renderChart()}
           </div>
