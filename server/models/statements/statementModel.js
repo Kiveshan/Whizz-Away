@@ -50,14 +50,18 @@ const getStatementDetails = async (statementId) => {
     }
     client = await pool.connect();
 
-const queryText = `
+    const queryText = `
     SELECT 
       s.statement_key,
       s.generation_date,
       s.clientid,
       s.opening_balance,
       c.client AS client_name,
-      -- ... other fields ...
+      c.companyaddress AS client_address,
+      c.cellnum AS client_phone,
+      c.email AS client_email,
+      c.suburb AS client_suburb,
+      c.representative AS client_representative,
       a.current,
       a."30days",
       a."60days",
@@ -66,16 +70,27 @@ const queryText = `
       i.date AS invoice_date,
       m1.total_cost AS invoice_amount,
       m1."ksmFileRef" AS invoice_task,
+      m1.pickup,
+      m1.dropoff,
       i.invoice_num,
       a2.addon_id,
       a2.date AS addon_date,
       a2.amount AS addon_amount,
       a2.items AS addon_items,
-      ut.companyname
+      ut.companyname,
+      ut.cluster_box,
+      ut.vat_reg_num,
+      ut.address,
+      ut.suburb,
+      ut.branch_code,
+      ut.bank,
+      ut.name_of_acc,
+      ut.swift_code,
+      ut.account_num,
+      COALESCE(ut.cell_num, ut.cell_num2) AS phonenumber
     FROM statements s
     JOIN m5_client c ON s.clientid = c.m5clientkey
     JOIN aging_analysis a ON s.agingid = a.aging_key
-    -- NEW: Use date range instead of groupid
     LEFT JOIN invoice i 
       ON i.clientid = s.clientid
       AND i.date >= DATE_TRUNC('month', s.generation_date - INTERVAL '1 month')
@@ -198,6 +213,16 @@ const queryText = `
       generation_date: result.rows[0].generation_date,
       opening_balance: Number.parseFloat(result.rows[0].opening_balance || 0),
       company_name: result.rows[0].companyname,
+      cluster_box: result.rows[0].cluster_box,
+      vat_reg_num: result.rows[0].vat_reg_num,
+      address: result.rows[0].address,
+      suburb: result.rows[0].suburb,
+      branch_code: result.rows[0].branch_code,
+      bank: result.rows[0].bank,
+      name_of_acc: result.rows[0].name_of_acc,
+      swift_code: result.rows[0].swift_code,
+      account_num: result.rows[0].account_num,
+      phonenumber: result.rows[0].phonenumber,
       client: {
         id: result.rows[0].clientid,
         name: result.rows[0].client_name,
@@ -205,6 +230,7 @@ const queryText = `
         email: result.rows[0].client_email,
         phone: result.rows[0].client_phone,
         address: result.rows[0].client_address,
+        suburb: result.rows[0].client_suburb,
       },
       aging: {
         current: Number.parseFloat(result.rows[0].current || 0),
