@@ -187,6 +187,13 @@ Troubleshooting tips:
     }
   }, [clientId, navigate]);
 
+  const minYear = 2025;
+  const maxYear = currentDate.getFullYear() + 2;
+  const yearOptions = [];
+  for (let y = maxYear; y >= minYear; y--) {
+    yearOptions.push(y);
+  }
+
   // Calculate pagination data
   const totalRecords = instructions.length;
   const startIndex = (currentPage - 1) * recordsPerPage;
@@ -218,10 +225,11 @@ Troubleshooting tips:
                   onChange={handleFilterChange}
                 >
                   <option value="">Year</option>
-                  <option value="2025">2025</option>
-                  <option value="2024">2024</option>
-                  <option value="2023">2023</option>
-                  <option value="2022">2022</option>
+                  {yearOptions.map((y) => (
+                    <option key={y} value={y.toString()}>
+                      {y}
+                    </option>
+                  ))}
                 </select>
                 <select
                   className="dropdown"

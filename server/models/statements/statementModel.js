@@ -21,12 +21,15 @@ const getClientStatements = async (clientId, { year, month }) => {
     let paramIndex = 2;
 
     if (year) {
-      queryText += ` AND EXTRACT(YEAR FROM generation_date) = $${paramIndex}`;
+      // Filter by the year of generation_date - 1 day so statements generated
+      // on the 1st of a month are grouped under the previous month/year.
+      queryText += ` AND EXTRACT(YEAR FROM (generation_date - INTERVAL '1 day')) = $${paramIndex}`;
       queryParams.push(year);
       paramIndex++;
     }
     if (month) {
-      queryText += ` AND EXTRACT(MONTH FROM generation_date) = $${paramIndex}`;
+      // Filter by the month of generation_date - 1 day
+      queryText += ` AND EXTRACT(MONTH FROM (generation_date - INTERVAL '1 day')) = $${paramIndex}`;
       queryParams.push(month);
       paramIndex++;
     }

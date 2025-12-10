@@ -17,11 +17,17 @@ const StatementList = () => {
   const [generating, setGenerating] = useState(false);
   const [generationMessage, setGenerationMessage] = useState("");
 
-  // Set default filters to current year and month
+  // Set default filters so the month is one month before the current one.
+  // If today is in January, default to December of the previous year.
   const currentDate = new Date();
+  const currentYear = currentDate.getFullYear();
+  const currentMonth = currentDate.getMonth() + 1; // 1-12
+  const defaultMonth = currentMonth === 1 ? 12 : currentMonth - 1;
+  const defaultYear = currentMonth === 1 ? currentYear - 1 : currentYear;
+
   const [filters, setFilters] = useState({
-    year: currentDate.getFullYear().toString(),
-    month: (currentDate.getMonth() + 1).toString(),
+    year: defaultYear.toString(),
+    month: defaultMonth.toString(),
   });
 
   // Pagination state
@@ -163,11 +169,25 @@ const StatementList = () => {
     "December",
   ];
 
+  const minYear = 2025;
+  const maxYear = currentYear + 2;
+  const yearOptions = [];
+  for (let y = maxYear; y >= minYear; y--) {
+    yearOptions.push(y);
+  }
+
   // Calculate pagination data
   const totalRecords = statements.length;
   const startIndex = (currentPage - 1) * recordsPerPage;
   const endIndex = startIndex + recordsPerPage;
   const currentStatements = statements.slice(startIndex, endIndex);
+
+  const getDisplayDate = (dateString) => {
+    if (!dateString) return "";
+    const d = new Date(dateString);
+    d.setDate(d.getDate() - 1);
+    return d.toLocaleDateString();
+  };
 
   if (loading)
     return (
@@ -207,10 +227,11 @@ const StatementList = () => {
               onChange={handleFilterChange}
             >
               <option>Year</option>
-              <option>2025</option>
-              <option>2024</option>
-              <option>2023</option>
-              <option>2022</option>
+              {yearOptions.map((y) => (
+                <option key={y} value={y.toString()}>
+                  {y}
+                </option>
+              ))}
             </select>
             <select
               name="month"
@@ -296,7 +317,7 @@ const StatementList = () => {
               <tr key={statement.statement_key}>
                 <td>{statement.statement_key}</td>
                 <td>
-                  {new Date(statement.generation_date).toLocaleDateString()}
+                  {getDisplayDate(statement.generation_date)}
                 </td>
                 <td>
                   <button

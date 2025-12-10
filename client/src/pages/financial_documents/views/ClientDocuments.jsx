@@ -45,6 +45,13 @@ const ClientDocuments = () => {
     monthNames[currentDate.getMonth()]
   );
 
+  const minYear = 2025;
+  const maxYear = currentDate.getFullYear() + 2;
+  const yearOptions = [];
+  for (let y = maxYear; y >= minYear; y--) {
+    yearOptions.push(y);
+  }
+
   // Auth helper function to get token from localStorage
   const getAuthHeader = () => {
     const token = localStorage.getItem("token");
@@ -200,10 +207,11 @@ const ClientDocuments = () => {
                 value={yearFilter || "Year"}
               >
                 <option>Year</option>
-                <option>2025</option>
-                <option>2024</option>
-                <option>2023</option>
-                <option>2022</option>
+                {yearOptions.map((y) => (
+                  <option key={y} value={y.toString()}>
+                    {y}
+                  </option>
+                ))}
               </select>
               <select
                 className="dropdown"

@@ -18,11 +18,16 @@ const SubcontractorStatements = () => {
   const [generating, setGenerating] = useState(false);
   const [generationMessage, setGenerationMessage] = useState("");
 
-  // Set default filters to current year and month
+  // Set default filters to previous month (with year wrap, same as client statements)
   const currentDate = new Date();
+  const currentYear = currentDate.getFullYear();
+  const currentMonth = currentDate.getMonth() + 1; // 1-12
+  const defaultMonth = currentMonth === 1 ? 12 : currentMonth - 1;
+  const defaultYear = currentMonth === 1 ? currentYear - 1 : currentYear;
+
   const [filters, setFilters] = useState({
-    year: currentDate.getFullYear().toString(),
-    month: (currentDate.getMonth() + 1).toString(),
+    year: defaultYear.toString(),
+    month: defaultMonth.toString(),
   });
 
   // Pagination state
@@ -52,20 +57,26 @@ const SubcontractorStatements = () => {
 
       if (!response.data) throw new Error("Failed to fetch statements");
 
-      const transformedStatements = response.data.map((item) => ({
-        statementId: item.sub_state_id,
-        month: new Date(item.date).toLocaleString("default", {
-          month: "long",
-        }),
-        year: new Date(item.date).getFullYear(),
-        generationDate: new Date(item.date),
-        totalAmount: item.amount,
-        status: "Pending", // Assuming status needs to be derived; adjust as needed
-        legids:
-          typeof item.legids === "object"
-            ? JSON.stringify(item.legids)
-            : item.legids,
-      }));
+      const transformedStatements = response.data.map((item) => {
+        const originalDate = new Date(item.date);
+        const adjustedDate = new Date(originalDate);
+        adjustedDate.setDate(adjustedDate.getDate() - 1);
+
+        return {
+          statementId: item.sub_state_id,
+          month: adjustedDate.toLocaleString("default", {
+            month: "long",
+          }),
+          year: adjustedDate.getFullYear(),
+          generationDate: adjustedDate.toISOString(),
+          totalAmount: item.amount,
+          status: "Pending", // Assuming status needs to be derived; adjust as needed
+          legids:
+            typeof item.legids === "object"
+              ? JSON.stringify(item.legids)
+              : item.legids,
+        };
+      });
 
       setStatements(transformedStatements);
     } catch (err) {
@@ -157,6 +168,13 @@ const SubcontractorStatements = () => {
     "December",
   ];
 
+  const minYear = 2025;
+  const maxYear = currentDate.getFullYear() + 2;
+  const yearOptions = [];
+  for (let y = maxYear; y >= minYear; y--) {
+    yearOptions.push(y);
+  }
+
   const totalRecords = statements.length;
   const startIndex = (currentPage - 1) * recordsPerPage;
   const endIndex = startIndex + recordsPerPage;
@@ -187,7 +205,7 @@ const SubcontractorStatements = () => {
         onClick={() => navigate("/Creditors/SubcontractorList")}
         className="back-button"
       >
-        Back to Subcontractors
+        Back
       </button>
       <div className="page-title">
         <h2>Monthly Statements - {subcontractorName}</h2>
@@ -202,10 +220,11 @@ const SubcontractorStatements = () => {
               onChange={handleFilterChange}
             >
               <option>Year</option>
-              <option>2025</option>
-              <option>2024</option>
-              <option>2023</option>
-              <option>2022</option>
+              {yearOptions.map((y) => (
+                <option key={y} value={y.toString()}>
+                  {y}
+                </option>
+              ))}
             </select>
             <select
               name="month"
