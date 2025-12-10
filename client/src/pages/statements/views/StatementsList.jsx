@@ -227,20 +227,19 @@ const StatementList = () => {
             </select>
           </div>
           <button
-            onClick={handleManualGeneration}
-            disabled={generating}
+            disabled
             className="generate-statement-btn"
             style={{
               marginLeft: "10px",
               padding: "8px 16px",
-              backgroundColor: generating ? "#ccc" : "#007bff",
-              color: "white",
+              backgroundColor: "#ccc",
+              color: "#666",
               border: "none",
               borderRadius: "4px",
-              cursor: generating ? "not-allowed" : "pointer",
+              cursor: "not-allowed",
             }}
           >
-            {generating ? "Generating..." : "Generate Statement"}
+            Generate Statement
           </button>
         </div>
       </div>
