@@ -169,7 +169,7 @@ const getInvoiceDetails = async (id) => {
         public.legs_m2 l ON c.containernum = l.containernumber AND c.m1key = l.m1key
       WHERE
         i.ikey = $1
-      ORDER BY c.containernum, l.date DESC
+      ORDER BY c.containerkey, l.date DESC
     `;
     
     const containerResult = await query(containerQuery, [id]);
@@ -699,7 +699,7 @@ const getInstructionDetailsForPreview = async (instructionId) => {
         LEFT JOIN public.legs_m2 l 
           ON c.containernum = l.containernumber AND c.m1key = l.m1key
         WHERE c.m1key = $1
-        ORDER BY c.containernum, l.date DESC
+        ORDER BY c.containerkey, l.date DESC
       `;
       
       const containerResult = await client.query(containerQuery, [instructionId]);
