@@ -50,8 +50,8 @@ const getSubContractorStatements = async (subei_reg_num, year, month) => {
         subcontractor_statements
       WHERE 
         subbie_reg_num = $1
-        AND ($2::text IS NULL OR EXTRACT(YEAR FROM date) = $2::integer)
-        AND ($3::text IS NULL OR EXTRACT(MONTH FROM date) = $3::integer)
+        AND ($2::text IS NULL OR EXTRACT(YEAR FROM (date - INTERVAL '1 day')) = $2::integer)
+        AND ($3::text IS NULL OR EXTRACT(MONTH FROM (date - INTERVAL '1 day')) = $3::integer)
       ORDER BY 
         date DESC
     `;

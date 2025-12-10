@@ -105,6 +105,7 @@ const SubcontractorStatementDetail = () => {
           statementId,
           subcontractorName,
           subcontractorId,
+          // generationDate is expected to already be adjusted (DB date minus 1 day)
           generationDate: date,
           workItems,
           summary: {
@@ -284,8 +285,9 @@ const SubcontractorStatementDetail = () => {
       "Rate",
       "Instructions",
     ];
-    const colWidths = [25, 35, 35, 25, 60];
-    const rowHeight = 7; // compact row height for better density
+    // Make the Starting Point column wider to accommodate longer text
+    const colWidths = [25, 50, 30, 25, 55];
+    const rowHeight = 11; // taller rows to comfortably fit up to 2 lines of text
     let x = margin;
 
     // Table Header
@@ -385,17 +387,24 @@ const SubcontractorStatementDetail = () => {
       );
       x += colWidths[0];
 
-      // Starting Point
+      // Starting Point (wrapped to max 2 lines within a wider column)
       doc.setTextColor(...darkGray);
       doc.setFont("helvetica", "normal");
-      doc.text(item.startingPoint, x + colWidths[1] / 2, y + 4, {
-        align: "center",
+      const startingLines = doc.splitTextToSize(
+        item.startingPoint,
+        colWidths[1] - 4
+      );
+      const startingToRender = startingLines.slice(0, 2); // cap at 2 lines
+      startingToRender.forEach((line, idx) => {
+        doc.text(line, x + 2, y + 4 + idx * 4, {
+          align: "left",
+        });
       });
       x += colWidths[1];
 
-      // Destination
-      doc.text(item.destination, x + colWidths[2] / 2, y + 4, {
-        align: "center",
+      // Destination (left-aligned for consistency)
+      doc.text(item.destination, x + 2, y + 4, {
+        align: "left",
       });
       x += colWidths[2];
 

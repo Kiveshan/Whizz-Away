@@ -51,6 +51,13 @@ const ClientPaymentList = () => {
     "December",
   ];
 
+  const minYear = 2025;
+  const maxYear = currentDate.getFullYear() + 2;
+  const yearOptions = [];
+  for (let y = maxYear; y >= minYear; y--) {
+    yearOptions.push(y);
+  }
+
   useEffect(() => {
     if (!clientId) {
       setError("No client selected");
@@ -210,10 +217,11 @@ const ClientPaymentList = () => {
                 onChange={handleFilterChange}
               >
                 <option>Year</option>
-                <option>2025</option>
-                <option>2024</option>
-                <option>2023</option>
-                <option>2022</option>
+                {yearOptions.map((y) => (
+                  <option key={y} value={y.toString()}>
+                    {y}
+                  </option>
+                ))}
               </select>
               <select
                 name="month"
