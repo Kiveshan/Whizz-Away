@@ -17,6 +17,8 @@ const ClientStatement = () => {
   const [error, setError] = useState(null);
   const [isAgeAnalysisOpen, setIsAgeAnalysisOpen] = useState(true);
   const [isGenerating, setIsGenerating] = useState(false);
+  const [transactionsState, setTransactionsState] = useState([]); // editable details
+  const [isEditMode, setIsEditMode] = useState(false);
 
   // Add ref for PDF generation
   const statementRef = useRef(null);
@@ -75,6 +77,85 @@ const ClientStatement = () => {
     fetchStatement();
   }, [statementId, navigate]);
 
+  // When statement or its transactions change, seed editable transaction state
+  useEffect(() => {
+    if (!statement) return;
+
+    // Rebuild transactionsWithBalance-like structure for initial state
+    const invoicedAmount =
+      statement.invoices.reduce((sum, inv) => sum + inv.amount, 0) +
+      statement.addons.reduce((sum, addon) => sum + addon.amount, 0);
+    const amountPaid = statement.payments.reduce(
+      (sum, payment) => sum + payment.amount,
+      0
+    );
+    const creditNotesAmount =
+      statement.credit_notes?.reduce(
+        (sum, creditNote) => sum + creditNote.amount,
+        0
+      ) || 0;
+    const openingBalance = statement.opening_balance;
+    const totalAmountPaid = amountPaid + creditNotesAmount;
+    const _balanceDue = openingBalance - totalAmountPaid + invoicedAmount;
+
+    // Rebuild transactions like below
+    const baseTransactions = [
+      ...statement.invoices.map((invoice) => ({
+        type: "Invoice",
+        date: new Date(invoice.date),
+        details: (invoice.formatted_details || ""),
+        reference: "",
+        amount: invoice.amount,
+        payment: null,
+      })),
+      ...statement.addons.map((addon) => ({
+        type: "Add-on",
+        date: new Date(addon.date),
+        details: (addon.formatted_details || ""),
+        reference: "",
+        amount: addon.amount,
+        payment: null,
+      })),
+      ...statement.payments.map((payment) => ({
+        type: "Payment",
+        date: new Date(payment.date),
+        details: payment.invoice_num || "",
+        reference: payment.reference || "",
+        amount: null,
+        payment: payment.amount,
+      })),
+      ...(statement.credit_notes || []).map((creditNote) => ({
+        type: "Credit Note",
+        date: new Date(creditNote.date),
+        details: creditNote.description || "",
+        reference: creditNote.reference || "",
+        amount: null,
+        payment: creditNote.amount,
+      })),
+    ].sort((a, b) => a.date - b.date);
+
+    let running = openingBalance;
+    const withBalance = baseTransactions.map((tx) => {
+      if (tx.type === "Invoice" || tx.type === "Add-on") {
+        running += tx.amount;
+      } else {
+        running -= tx.payment;
+      }
+      return { ...tx, balance: running };
+    });
+
+    setTransactionsState(withBalance);
+  }, [statement]);
+
+  // Helper to get display date as previous day
+  const getDisplayDate = (dateString) => {
+    if (!dateString) return "";
+    const d = new Date(dateString);
+    // subtract one day
+    d.setDate(d.getDate() - 1);
+    return d.toLocaleDateString("en-GB");
+  };
+
   // Generate PDF using jsPDF for consistent formatting
   const generatePDF = () => {
     if (isGenerating) return;
@@ -121,14 +202,20 @@ const ClientStatement = () => {
       currentY += 5;
 
       const leftDetails = [
-        statement.company_name,
+        statement.cluster_box,
+        statement.address,
+        statement.suburb,
+        statement.vat_reg_num ? `VAT Reg No: ${statement.vat_reg_num}` : null,
+        statement.phonenumber ? `Cellphone: ${statement.phonenumber}` : null,
       ].filter(Boolean);
 
+      const safeClient = statement.client || {};
       const rightDetails = [
-        statement.client.name,
-        statement.client.email,
-        statement.client.phone,
-        statement.client.address,
+        safeClient.name,
+        safeClient.address,
+        safeClient.suburb,
+        safeClient.phone ? `Telephone: ${safeClient.phone}` : null,
+        safeClient.email ? `Email: ${safeClient.email}` : null,
       ].filter(Boolean);
 
       const maxLines = Math.max(leftDetails.length, rightDetails.length);
@@ -152,9 +239,7 @@ const ClientStatement = () => {
 
       // Statement meta row
       doc.setFontSize(fonts.normal);
-      const metaLeft = `Statement #: ${statement.statement_key}`;
-      const metaRight = `Date: ${new Date(statement.generation_date).toLocaleDateString('en-GB')}`;
-      doc.text(metaLeft, margins.left, currentY);
+      const metaRight = `Date: ${getDisplayDate(statement.generation_date)}`;
       doc.text(metaRight, pageWidth - margins.right, currentY, { align: 'right' });
       currentY += 8;
 
@@ -184,36 +269,41 @@ const ClientStatement = () => {
       currentY = doc.lastAutoTable.finalY + 6;
 
       // Transactions table
-const txRows = transactionsWithBalance.map(tx => {
-  let detailsForPdf = tx.details || "";
+      const sourceTransactions =
+        transactionsState && transactionsState.length > 0
+          ? transactionsState
+          : transactionsWithBalance;
 
-  // Only for PDF: Replace the arrow with " - " and clean up spacing
-  if (detailsForPdf.includes('→')) {
-    detailsForPdf = detailsForPdf
-      .replace(/→/g, '-')
-      .replace(/\s*-\s*/g, ' - ')  // Ensure consistent spacing around dash
-      .trim();
-  }
+      const txRows = sourceTransactions.map((tx) => {
+        let detailsForPdf = tx.details || "";
 
-  // Optional: Force wrap long lines better by limiting consecutive spaces
-  detailsForPdf = detailsForPdf.replace(/\s+/g, ' ');
+        // Only for PDF: Replace the arrow with " - " and clean up spacing
+        if (detailsForPdf.includes("→")) {
+          detailsForPdf = detailsForPdf
+            .replace(/→/g, "-")
+            .replace(/\s*-\s*/g, " - ")
+            .trim();
+        }
 
-  return [
-    tx.date.toLocaleDateString('en-GB'),
-    tx.type,
-    detailsForPdf,
-    tx.reference || "",
-    tx.amount ? `R${tx.amount.toFixed(2)}` : "",
-    tx.payment ? `R${tx.payment.toFixed(2)}` : "",
-    `R${tx.balance.toFixed(2)}`,
-  ];
-});
+        // Optional: Force wrap long lines better by limiting consecutive spaces
+        detailsForPdf = detailsForPdf.replace(/\s+/g, " ");
+
+        return [
+          tx.date.toLocaleDateString("en-GB"),
+          tx.type,
+          detailsForPdf,
+          tx.reference || "",
+          tx.amount ? `R${tx.amount.toFixed(2)}` : "",
+          tx.payment ? `R${tx.payment.toFixed(2)}` : "",
+          `R${tx.balance.toFixed(2)}`,
+        ];
+      });
 
       autoTable(doc, {
         startY: currentY,
         head: [["Date", "Transaction", "Details", "Reference", "Amount", "Payment", "Balance"]],
         body: [
-          [new Date(statement.generation_date).toLocaleDateString('en-GB'), "Opening Balance", "", "", "R0", "", `R${openingBalance.toFixed(2)}`],
+          [getDisplayDate(statement.generation_date), "Opening Balance", "", "", "R0", "", `R${openingBalance.toFixed(2)}`],
           ...txRows,
         ],
         theme: "grid",
@@ -258,15 +348,15 @@ const txRows = transactionsWithBalance.map(tx => {
 
       currentY = doc.lastAutoTable.finalY + 6;
 
-      // Age Analysis table
+      // Age Analysis table - reordered: 90, 60, 30, Current
       autoTable(doc, {
         startY: currentY,
-        head: [["Current", "30 Days", "60 Days", "90+ Days"]],
+        head: [["90+ Days", "60 Days", "30 Days", "Current"]],
         body: [[
-          `R${statement.aging.current.toFixed(2)}`,
-          `R${statement.aging["30days"].toFixed(2)}`,
-          `R${statement.aging["60days"].toFixed(2)}`,
           `R${statement.aging["90days"].toFixed(2)}`,
+          `R${statement.aging["60days"].toFixed(2)}`,
+          `R${statement.aging["30days"].toFixed(2)}`,
+          `R${statement.aging.current.toFixed(2)}`,
         ]],
         theme: "grid",
         styles: { fontSize: fonts.small, cellPadding: 1.6, lineWidth: 0.1, lineColor: brand.gray },
@@ -439,6 +529,21 @@ const txRows = transactionsWithBalance.map(tx => {
   // Determine if this is a small table that should fit on one page
   const isSmallTable = transactions.length <= 3; // Update to consider total transactions
 
+  // Use editable state for UI transactions when available
+  const uiTransactions =
+    transactionsState && transactionsState.length > 0
+      ? transactionsState
+      : transactionsWithBalance;
+
+  const handleDetailChange = (index, value) => {
+    setTransactionsState((prev) => {
+      const next = prev && prev.length > 0 ? [...prev] : [...transactionsWithBalance];
+      if (!next[index]) return next;
+      next[index] = { ...next[index], details: value };
+      return next;
+    });
+  };
+
   return (
     <div className="client-statement-wrapper">
       <div className="statement-page">
@@ -453,26 +558,42 @@ const txRows = transactionsWithBalance.map(tx => {
             {/* Client Info - Left Side */}
             <div className="client-info">
               <div className="to-label">To</div>
-              <div className="client-name">
-                {statement.client.representative}
-              </div>
-              <div className="client-email">{statement.client.email}</div>
-              <div className="client-phone">{statement.client.phone}</div>
-              <div
-                className="client-address"
-                style={{ maxWidth: "250px", overflowWrap: "break-word" }}
-              >
-                {statement.client.address}
-              </div>
+              {statement.client && (
+                <>
+                  {statement.client.representative && (
+                    <div className="client-name">
+                      {statement.client.representative}
+                    </div>
+                  )}
+                  {statement.client.name && (
+                    <div className="client-name">{statement.client.name}</div>
+                  )}
+                  {statement.client.email && (
+                    <div className="client-email">{statement.client.email}</div>
+                  )}
+                  {statement.client.phone && (
+                    <div className="client-phone">{statement.client.phone}</div>
+                  )}
+                  {(statement.client.address || statement.client.suburb) && (
+                    <div
+                      className="client-address"
+                      style={{ maxWidth: "250px", overflowWrap: "break-word" }}
+                    >
+                      {statement.client.address}
+                      {statement.client.suburb
+                        ? `, ${statement.client.suburb}`
+                        : ""}
+                    </div>
+                  )}
+                </>
+              )}
             </div>
 
             {/* Statement Title and Account Summary - Right Side */}
             <div className="statement-title">
               <h2>Statement of Accounts</h2>
               <div className="statement-date">
-                {new Date(statement.generation_date).toLocaleDateString(
-                  "en-GB"
-                )}
+                {getDisplayDate(statement.generation_date)}
               </div>
 
               <h3>Account Summary</h3>
@@ -515,6 +636,15 @@ const txRows = transactionsWithBalance.map(tx => {
               isSmallTable ? "small-table" : ""
             }`}
           >
+            <div className="statement-transactions-actions">
+              <button
+                type="button"
+                className="edit-details-btn"
+                onClick={() => setIsEditMode(!isEditMode)}
+              >
+                {isEditMode ? "Done Editing Details" : "Edit Details"}
+              </button>
+            </div>
             <TransactionsTableWrapper>
               <table className="transactions-table">
                 <thead>
@@ -531,9 +661,7 @@ const txRows = transactionsWithBalance.map(tx => {
                 <tbody>
                   <tr>
                     <td>
-                      {new Date(statement.generation_date).toLocaleDateString(
-                        "en-GB"
-                      )}
+                      {getDisplayDate(statement.generation_date)}
                     </td>
                     <td>Opening Balance</td>
                     <td></td>
@@ -542,11 +670,24 @@ const txRows = transactionsWithBalance.map(tx => {
                     <td></td>
                     <td>R{openingBalance.toFixed(2)}</td>
                   </tr>
-                  {transactionsWithBalance.map((tx, index) => (
+                  {uiTransactions.map((tx, index) => (
                     <tr key={index}>
                       <td>{tx.date.toLocaleDateString("en-GB")}</td>
                       <td>{tx.type}</td>
-                      <td>{tx.details}</td>
+                      <td>
+                        {isEditMode ? (
+                          <input
+                            type="text"
+                            value={tx.details || ""}
+                            onChange={(e) =>
+                              handleDetailChange(index, e.target.value)
+                            }
+                            style={{ width: "100%" }}
+                          />
+                        ) : (
+                          tx.details
+                        )}
+                      </td>
                       <td>{tx.reference || ""}</td>
                       <td>{tx.amount ? `R${tx.amount.toFixed(2)}` : ""}</td>
                       <td>{tx.payment ? `R${tx.payment.toFixed(2)}` : ""}</td>
@@ -587,18 +728,18 @@ const txRows = transactionsWithBalance.map(tx => {
                 <table className="age-analysis-table">
                   <thead>
                     <tr>
-                      <th>Current</th>
-                      <th>30 Days</th>
+                      <th>90 Days +</th>
                       <th>60 Days</th>
-                      <th>90 Days + </th>
+                      <th>30 Days</th>
+                      <th>Current</th>
                     </tr>
                   </thead>
                   <tbody>
                     <tr>
-                      <td>R{statement.aging.current.toFixed(2)}</td>
-                      <td>R{statement.aging["30days"].toFixed(2)}</td>
-                      <td>R{statement.aging["60days"].toFixed(2)}</td>
                       <td>R{statement.aging["90days"].toFixed(2)}</td>
+                      <td>R{statement.aging["60days"].toFixed(2)}</td>
+                      <td>R{statement.aging["30days"].toFixed(2)}</td>
+                      <td>R{statement.aging.current.toFixed(2)}</td>
                     </tr>
                   </tbody>
                 </table>
