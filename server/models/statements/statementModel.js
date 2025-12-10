@@ -50,51 +50,44 @@ const getStatementDetails = async (statementId) => {
     }
     client = await pool.connect();
 
-    const queryText = `
-      SELECT 
-        s.statement_key,
-        s.groupid,
-        s.generation_date,
-        s.clientid,
-        s.opening_balance,
-        c.client AS client_name,
-        c.representative AS client_representative,
-        c.email AS client_email,
-        c.cellnum AS client_phone,
-        c.companyaddress AS client_address,
-        a.current,
-        a."30days",
-        a."60days",
-        a."90days",
-        i.ikey,
-        i.date AS invoice_date,
-        m1.total_cost AS invoice_amount,
-        m1."ksmFileRef" AS invoice_task,
-        m1.pickup,
-        m1.dropoff,
-        i.invoice_num,
-        a2.addon_id,
-        a2.date AS addon_date,
-        a2.amount AS addon_amount,
-        a2.items AS addon_items,
-        ut.companyname
-      FROM 
-        statements s
-      JOIN 
-        m5_client c ON s.clientid = c.m5clientkey
-      JOIN 
-        aging_analysis a ON s.agingid = a.aging_key
-      LEFT JOIN 
-        invoice i ON i.groupid = s.groupid
-      LEFT JOIN 
-        m1_controller m1 ON i.m1key = m1.m1key
-      LEFT JOIN 
-        add_ons a2 ON a2.group_id = s.groupid
-      INNER JOIN
-        usertable ut ON ut.roleid = 1 AND ut.status = 'active'
-      WHERE 
-        s.statement_key = $1
-    `;
+const queryText = `
+    SELECT 
+      s.statement_key,
+      s.generation_date,
+      s.clientid,
+      s.opening_balance,
+      c.client AS client_name,
+      -- ... other fields ...
+      a.current,
+      a."30days",
+      a."60days",
+      a."90days",
+      i.ikey,
+      i.date AS invoice_date,
+      m1.total_cost AS invoice_amount,
+      m1."ksmFileRef" AS invoice_task,
+      i.invoice_num,
+      a2.addon_id,
+      a2.date AS addon_date,
+      a2.amount AS addon_amount,
+      a2.items AS addon_items,
+      ut.companyname
+    FROM statements s
+    JOIN m5_client c ON s.clientid = c.m5clientkey
+    JOIN aging_analysis a ON s.agingid = a.aging_key
+    -- NEW: Use date range instead of groupid
+    LEFT JOIN invoice i 
+      ON i.clientid = s.clientid
+      AND i.date >= DATE_TRUNC('month', s.generation_date - INTERVAL '1 month')
+      AND i.date < s.generation_date
+    LEFT JOIN m1_controller m1 ON i.m1key = m1.m1key
+    LEFT JOIN add_ons a2 
+      ON a2.client_id = s.clientid
+      AND a2.date >= DATE_TRUNC('month', s.generation_date - INTERVAL '1 month')
+      AND a2.date < s.generation_date
+    INNER JOIN usertable ut ON ut.roleid = 1 AND ut.status = 'active'
+    WHERE s.statement_key = $1
+  `;
     const result = await query(queryText, [statementId]);
 
     if (result.rows.length === 0) {
