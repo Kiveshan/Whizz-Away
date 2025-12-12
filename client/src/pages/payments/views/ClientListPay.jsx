@@ -76,7 +76,7 @@ const ClientListPay = () => {
                 <th className="p-3">Company</th>
                 <th className="p-3">Representative</th>
                 <th className="p-3">Email</th>
-                <th className="p-3">Instructions</th>
+                <th className="p-3">Payments</th>
               </tr>
             </thead>
             <tbody>
