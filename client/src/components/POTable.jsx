@@ -120,6 +120,7 @@ const POTable = ({ showFilterButtons = true }) => {
 
   const handleFilterClick = (filter) => {
     setActiveFilter(filter)
+    setCurrentPage(1)
     setIsDropdownOpen(false)
   }
 
@@ -253,6 +254,14 @@ const POTable = ({ showFilterButtons = true }) => {
   }
 
   const filteredExpenses = getFilteredExpenses()
+  const totalPages = Math.max(1, Math.ceil(filteredExpenses.length / recordsPerPage))
+
+  useEffect(() => {
+    if (currentPage > totalPages) {
+      setCurrentPage(totalPages)
+    }
+  }, [currentPage, totalPages])
+
   const startIndex = (currentPage - 1) * recordsPerPage
   const endIndex = startIndex + recordsPerPage
   const paginatedExpenses = filteredExpenses.slice(startIndex, endIndex)
@@ -267,7 +276,10 @@ const POTable = ({ showFilterButtons = true }) => {
       <div className="dropdown-container74">
         <select
           value={selectedYear}
-          onChange={(e) => setSelectedYear(e.target.value)}
+          onChange={(e) => {
+            setSelectedYear(e.target.value)
+            setCurrentPage(1)
+          }}
           className="dropdown"
         >
           <option value="All">All Years</option>
@@ -280,7 +292,10 @@ const POTable = ({ showFilterButtons = true }) => {
 
         <select
           value={selectedMonth}
-          onChange={(e) => setSelectedMonth(e.target.value)}
+          onChange={(e) => {
+            setSelectedMonth(e.target.value)
+            setCurrentPage(1)
+          }}
           className="dropdown"
         >
           <option value="All">All Months</option>
