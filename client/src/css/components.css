@@ -181,6 +181,34 @@ h1 {
   cursor: pointer;
 }
 
+.po-delete-popup .confirm-button {
+  background-color: #2ecc71;
+  color: white;
+  padding: 8px 16px;
+  border: none;
+  border-radius: 5px;
+  cursor: pointer;
+  transition: background-color 0.2s ease;
+}
+
+.po-delete-popup .confirm-button:hover {
+  background-color: #27ae60;
+}
+
+.po-delete-popup .cancel-button {
+  background-color: #e74c3c;
+  color: white;
+  padding: 8px 16px;
+  border: none;
+  border-radius: 5px;
+  cursor: pointer;
+  transition: background-color 0.2s ease;
+}
+
+.po-delete-popup .cancel-button:hover {
+  background-color: #c0392b;
+}
+
 /* Upload page styles */
 .upload-container {
   padding: 20px;

@@ -10,7 +10,8 @@ import {
   createMultiplePurchaseOrdersHandler, // New handler
   getPurchaseOrderListHandler,
   getCompanyOwnedTrucksHandler,
-  getPurchaseOrderByPonumHandler
+  getPurchaseOrderByPonumHandler,
+  deletePurchaseOrderByPonumHandler
 } from "../../controllers/purchaseOrder/purchaseOrderController.js"
 import { uploadPurchaseOrderSlipHandler,checkSlipStatusHandler,viewSlipHandler } from "../../controllers/purchaseOrder/purchaseOrderController.js"
 import { uploadPurchaseOrder } from '../../utils/s3-config.js'
@@ -18,6 +19,7 @@ import { uploadPurchaseOrder } from '../../utils/s3-config.js'
 const router = express.Router()
 
 router.get("/api/purchase-orders", getPurchaseOrdersHandler)
+router.delete("/api/purchase-orders/:ponum", deletePurchaseOrderByPonumHandler)
 router.get("/api/po-form/details/:ponum", getPurchaseOrderByPonumHandler)
 router.get("/api/po/expense-types", getExpenseTypesHandler)
 router.get("/api/statements", getStatementsHandler)
