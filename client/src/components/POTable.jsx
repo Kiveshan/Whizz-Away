@@ -19,57 +19,60 @@ const POTable = ({ showFilterButtons = true }) => {
   const [error, setError] = useState(null)
   const [expenseTypes, setExpenseTypes] = useState([])
   const [currentPage, setCurrentPage] = useState(1)
+  const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false)
+  const [deleteTarget, setDeleteTarget] = useState(null)
+  const [deleting, setDeleting] = useState(false)
   const recordsPerPage = 2
 
-  useEffect(() => {
-    const fetchPurchaseOrders = async () => {
-      try {
-        setLoading(true)
-        const endpoint = showFilterButtons ? "/api/purchase-orders" : "/api/supplier-summary"
+  const fetchPurchaseOrders = async () => {
+    try {
+      setLoading(true)
+      const endpoint = showFilterButtons ? "/api/purchase-orders" : "/api/supplier-summary"
 
-        const response = await api.get(endpoint, {
-          params: !showFilterButtons ? { year: selectedYear, month: selectedMonth } : {},
-        })
-        console.log("Response received:", response.data)
-        const formattedData = showFilterButtons
-          ? response.data.map((po) => ({
-              type: po.expense_type,
-              suppliedBy: po.supplier_name,
-              date: formatDate(po.date),
-              amount: formatAmount(po.total),
-              details: po.ponum,
-              id: po.ponum,
-              status: po.status,
-              lineItems: po.line_items,
-            }))
-          : response.data.map((row) => ({
-              supplier: row.supplier,
-              supplierId: row.supplier_id,
-              monthYear: `${row.month_name.trim()} ${row.year}`,
-              total: formatAmount(row.total_amount),
-              rawMonth: row.month_name.trim(),
-              rawYear: row.year.toString(),
-              poNumber: row.ponum,
-            }))
+      const response = await api.get(endpoint, {
+        params: !showFilterButtons ? { year: selectedYear, month: selectedMonth } : {},
+      })
+      console.log("Response received:", response.data)
+      const formattedData = showFilterButtons
+        ? response.data.map((po) => ({
+            type: po.expense_type,
+            suppliedBy: po.supplier_name,
+            date: formatDate(po.date),
+            amount: formatAmount(po.total),
+            details: po.ponum,
+            id: po.ponum,
+            status: po.status,
+            lineItems: po.line_items,
+          }))
+        : response.data.map((row) => ({
+            supplier: row.supplier,
+            supplierId: row.supplier_id,
+            monthYear: `${row.month_name.trim()} ${row.year}`,
+            total: formatAmount(row.total_amount),
+            rawMonth: row.month_name.trim(),
+            rawYear: row.year.toString(),
+            poNumber: row.ponum,
+          }))
 
-        setExpenses(formattedData)
-        const uniqueTypes = [...new Set(response.data.map((po) => po.expense_type))]
-        setExpenseTypes(uniqueTypes)
-        setError(null)
-      } catch (err) {
-        console.error("Error fetching purchase orders:", err)
-        console.error("Error details:", {
-          message: err.message,
-          status: err.response?.status,
-          statusText: err.response?.statusText,
-          data: err.response?.data,
-        })
-        setError(`Failed to load purchase orders. Status: ${err.response?.status || "Unknown"}`)
-      } finally {
-        setLoading(false)
-      }
+      setExpenses(formattedData)
+      const uniqueTypes = [...new Set(response.data.map((po) => po.expense_type))]
+      setExpenseTypes(uniqueTypes)
+      setError(null)
+    } catch (err) {
+      console.error("Error fetching purchase orders:", err)
+      console.error("Error details:", {
+        message: err.message,
+        status: err.response?.status,
+        statusText: err.response?.statusText,
+        data: err.response?.data,
+      })
+      setError(`Failed to load purchase orders. Status: ${err.response?.status || "Unknown"}`)
+    } finally {
+      setLoading(false)
     }
+  }
 
+  useEffect(() => {
     fetchPurchaseOrders()
   }, [selectedYear, selectedMonth, showFilterButtons])
 
@@ -79,14 +82,45 @@ const POTable = ({ showFilterButtons = true }) => {
     return `${(date.getMonth() + 1).toString().padStart(2, "0")}/${date.getDate().toString().padStart(2, "0")}/${date.getFullYear()}`
   }
 
-// Updated formatAmount function to handle 0 values
-const formatAmount = (amount) => {
-  // Check for null, undefined, or 0
-  if (amount === null || amount === undefined || amount === 0) return "N/A"
-  return `R ${Number.parseFloat(amount).toFixed(2)}`
-}
+  const formatAmount = (amount) => {
+    if (amount === null || amount === undefined || amount === 0) return "N/A"
+    return `R ${Number.parseFloat(amount).toFixed(2)}`
+  }
+
+  const openDeleteConfirm = (expense) => {
+    setDeleteTarget(expense)
+    setDeleteConfirmOpen(true)
+  }
+
+  const closeDeleteConfirm = () => {
+    if (deleting) return
+    setDeleteConfirmOpen(false)
+    setDeleteTarget(null)
+  }
+
+  const handleDeleteConfirmed = async () => {
+    if (!deleteTarget?.id) {
+      closeDeleteConfirm()
+      return
+    }
+
+    try {
+      setDeleting(true)
+      setError(null)
+      await api.delete(`/api/purchase-orders/${encodeURIComponent(deleteTarget.id)}`)
+      closeDeleteConfirm()
+      await fetchPurchaseOrders()
+    } catch (err) {
+      console.error("Error deleting purchase order:", err)
+      setError(err.message || "Failed to delete purchase order.")
+    } finally {
+      setDeleting(false)
+    }
+  }
+
   const handleFilterClick = (filter) => {
     setActiveFilter(filter)
+    setCurrentPage(1)
     setIsDropdownOpen(false)
   }
 
@@ -147,9 +181,8 @@ const formatAmount = (amount) => {
     }
 
     try {
-      // EDIT: Query by ponum instead of po_id to get all line items
       const response = await api.get(`/api/po-form/list`, {
-        params: { ponum: expense.id }, // Use ponum instead of po_id
+        params: { ponum: expense.id },
       })
 
       if (response.data && response.data.length > 0) {
@@ -221,6 +254,14 @@ const formatAmount = (amount) => {
   }
 
   const filteredExpenses = getFilteredExpenses()
+  const totalPages = Math.max(1, Math.ceil(filteredExpenses.length / recordsPerPage))
+
+  useEffect(() => {
+    if (currentPage > totalPages) {
+      setCurrentPage(totalPages)
+    }
+  }, [currentPage, totalPages])
+
   const startIndex = (currentPage - 1) * recordsPerPage
   const endIndex = startIndex + recordsPerPage
   const paginatedExpenses = filteredExpenses.slice(startIndex, endIndex)
@@ -235,7 +276,10 @@ const formatAmount = (amount) => {
       <div className="dropdown-container74">
         <select
           value={selectedYear}
-          onChange={(e) => setSelectedYear(e.target.value)}
+          onChange={(e) => {
+            setSelectedYear(e.target.value)
+            setCurrentPage(1)
+          }}
           className="dropdown"
         >
           <option value="All">All Years</option>
@@ -248,7 +292,10 @@ const formatAmount = (amount) => {
 
         <select
           value={selectedMonth}
-          onChange={(e) => setSelectedMonth(e.target.value)}
+          onChange={(e) => {
+            setSelectedMonth(e.target.value)
+            setCurrentPage(1)
+          }}
           className="dropdown"
         >
           <option value="All">All Months</option>
@@ -352,8 +399,19 @@ const formatAmount = (amount) => {
                             <td>{expense.status}</td>
                             <td>{expense.amount}</td>
                             <td>
-                              <button className="view-button" onClick={() => handleViewClick(expense)}>
+                              <button
+                                className="view-button"
+                                onClick={() => handleViewClick(expense)}
+                                style={{ padding: "6px 12px" }}
+                              >
                                 View
+                              </button>
+                              <button
+                                className="delete-button"
+                                onClick={() => openDeleteConfirm(expense)}
+                                style={{ marginLeft: "10px", padding: "6px 12px" }}
+                              >
+                                Delete
                               </button>
                             </td>
                           </>
@@ -363,7 +421,11 @@ const formatAmount = (amount) => {
                             <td>{expense.monthYear}</td>
                             <td>{expense.total}</td>
                             <td>
-                              <button className="view-button" onClick={() => handleViewClick(expense)}>
+                              <button
+                                className="view-button"
+                                onClick={() => handleViewClick(expense)}
+                                style={{ padding: "6px 12px" }}
+                              >
                                 View
                               </button>
                             </td>
@@ -384,6 +446,24 @@ const formatAmount = (amount) => {
           )}
         </div>
       </div>
+
+      {deleteConfirmOpen && (
+        <div className="popup-backdrop po-delete-popup" onClick={closeDeleteConfirm}>
+          <div className="popup" onClick={(e) => e.stopPropagation()}>
+            <p>
+              Are you sure you want to delete this purchase order{deleteTarget?.id ? ` (${deleteTarget.id})` : ""}?
+            </p>
+            <div className="popup-buttons">
+              <button className="cancel-button" onClick={closeDeleteConfirm} disabled={deleting}>
+                No
+              </button>
+              <button className="confirm-button" onClick={handleDeleteConfirmed} disabled={deleting}>
+                {deleting ? "Deleting..." : "Yes"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

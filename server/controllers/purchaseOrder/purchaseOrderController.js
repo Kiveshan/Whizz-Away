@@ -17,6 +17,51 @@ import { v4 as uuidv4 } from "uuid"
 import { pool } from "../../config/database.js"
 import { getSignedUrl } from "../../utils/s3-config.js"
 
+const safeDeleteS3Key = async (key) => {
+  if (!key) return
+  try {
+    await s3
+      .deleteObject({
+        Bucket: bucketName,
+        Key: key,
+      })
+      .promise()
+  } catch (err) {
+    console.error(`Failed to delete S3 object ${key}:`, err)
+  }
+}
+
+const deleteS3Prefix = async (prefix) => {
+  if (!prefix) return
+
+  let continuationToken = undefined
+  try {
+    do {
+      const listResp = await s3
+        .listObjectsV2({
+          Bucket: bucketName,
+          Prefix: prefix,
+          ContinuationToken: continuationToken,
+        })
+        .promise()
+
+      const keys = (listResp.Contents || []).map((o) => ({ Key: o.Key }))
+      if (keys.length > 0) {
+        await s3
+          .deleteObjects({
+            Bucket: bucketName,
+            Delete: { Objects: keys, Quiet: true },
+          })
+          .promise()
+      }
+
+      continuationToken = listResp.IsTruncated ? listResp.NextContinuationToken : undefined
+    } while (continuationToken)
+  } catch (err) {
+    console.error(`Failed to delete S3 prefix ${prefix}:`, err)
+  }
+}
+
 export const getPurchaseOrdersHandler = async (req, res) => {
   try {
     const purchaseOrders = await getPurchaseOrders()
@@ -26,6 +71,59 @@ export const getPurchaseOrdersHandler = async (req, res) => {
     res.status(500).json({ error: "Internal server error" })
   }
 }
+
+export const deletePurchaseOrderByPonumHandler = async (req, res) => {
+  const { ponum } = req.params
+  if (!ponum) {
+    return res.status(400).json({ error: "Missing purchase order number" })
+  }
+
+  const client = await pool.connect()
+  try {
+    await client.query("BEGIN")
+
+    const poRows = await client.query(
+      `SELECT slip_s3key FROM purchase_orders WHERE ponum = $1`,
+      [ponum],
+    )
+
+    if (poRows.rows.length === 0) {
+      await client.query("ROLLBACK")
+      return res.status(404).json({ error: "Purchase order not found" })
+    }
+
+    const slipKeys = [...new Set(poRows.rows.map((r) => r.slip_s3key).filter(Boolean))]
+
+    const expenseRows = await client.query(
+      `SELECT s3key FROM expenses_m2 WHERE orderno::text = $1`,
+      [ponum],
+    )
+    const expenseSlipKeys = [...new Set(expenseRows.rows.map((r) => r.s3key).filter(Boolean))]
+
+    await client.query(`DELETE FROM expenses_m2 WHERE orderno::text = $1`, [ponum])
+    await client.query(`DELETE FROM purchase_orders WHERE ponum = $1`, [ponum])
+
+    await client.query("COMMIT")
+
+    await Promise.all(slipKeys.map((k) => safeDeleteS3Key(k)))
+    await Promise.all(expenseSlipKeys.map((k) => safeDeleteS3Key(k)))
+    await deleteS3Prefix(`purchaseOrders/${ponum}/`)
+
+    res.json({ success: true, message: "Purchase order deleted" })
+  } catch (error) {
+    try {
+      await client.query("ROLLBACK")
+    } catch (rollbackErr) {
+      console.error("Rollback failed:", rollbackErr)
+    }
+
+    console.error("Error deleting purchase order:", error)
+    res.status(500).json({ error: "Failed to delete purchase order" })
+  } finally {
+    client.release()
+  }
+}
+
 export const getPurchaseOrderByPonumHandler = async (req, res) => {
   try {
     const { ponum } = req.params;
