@@ -365,24 +365,40 @@ if (useStoredData) {
 
 // Always show the breakdown for display purposes (regardless of stored vs fresh)
 if (baseSalary > 0) {
-  earnings.push({
-    description: "Base Salary",
-    amount: `R ${baseSalary.toFixed(2)}`,
-  });
-}
 
-// Add each leg as a separate earning, grouped by instruction
-Object.keys(legsByInstruction).forEach((instructionId) => {
-  legsByInstruction[instructionId].forEach((leg, index) => {
-    const legAmount = parseAmount(leg.driverrate);
-    earnings.push({
-      description: `INS${instructionId}-Leg${
-        leg.legnumber || index + 1
-      } `,
-      amount: `R ${legAmount.toFixed(2)}`,
-    });
-  });
-});
+            // Add legs earnings
+            Object.keys(legsByInstruction).forEach((instructionId) => {
+              legsByInstruction[instructionId].forEach((leg, index) => {
+                const legAmount = parseAmount(leg.driverrate);
+                totalEarningsAmount += legAmount;
+              });
+            });
+          }
+
+          // Always show the breakdown for display purposes (regardless of stored vs fresh)
+          if (baseSalary > 0) {
+            earnings.push({
+              description: "Base Salary",
+              amount: `R ${baseSalary.toFixed(2)}`,
+            });
+          }
+
+          // Add each leg as a separate earning, grouped by instruction
+          Object.keys(legsByInstruction).forEach((instructionId) => {
+            legsByInstruction[instructionId].forEach((leg, index) => {
+              const legAmount = parseAmount(leg.driverrate);
+              const containerInfo = leg.containernumber
+                ? ` [${leg.containernumber}]`
+                : "";
+              earnings.push({
+                description: `INS${instructionId}-Leg${
+                  leg.legnumber || index + 1
+                }${containerInfo} `,
+                amount: `R ${legAmount.toFixed(2)}`,
+              });
+            });
+          });
+
           // If no earnings data is available, add dummy data for testing
           if (allLegsArray.length === 0 && !response.data.base_salary) {
             earnings.push({
