@@ -114,17 +114,31 @@ const getStatementDetails = async (statementId) => {
 
     const clientId = result.rows[0].clientid;
     const generationDate = new Date(result.rows[0].generation_date);
+    // Invoices/add-ons are for the month immediately BEFORE generation_date
     const statementMonth =
       generationDate.getMonth() === 0 ? 11 : generationDate.getMonth() - 1;
     const statementYear =
       generationDate.getMonth() === 0
         ? generationDate.getFullYear() - 1
         : generationDate.getFullYear();
-    const paymentMonth = statementMonth === 0 ? 11 : statementMonth - 1;
-    const paymentYear =
-      statementMonth === 0 ? statementYear - 1 : statementYear;
-    const paymentStartDate = new Date(paymentYear, paymentMonth, 1, 12, 0, 0);
-    const paymentEndDate = new Date(paymentYear, paymentMonth + 1, 0, 12, 0, 0);
+
+    // Payments and credit notes should use the SAME month as invoices/add-ons
+    const paymentStartDate = new Date(
+      statementYear,
+      statementMonth,
+      1,
+      12,
+      0,
+      0
+    );
+    const paymentEndDate = new Date(
+      statementYear,
+      statementMonth + 1,
+      0,
+      12,
+      0,
+      0
+    );
     const formattedPaymentStartDate = paymentStartDate
       .toISOString()
       .split("T")[0];

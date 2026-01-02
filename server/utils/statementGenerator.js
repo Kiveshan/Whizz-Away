@@ -17,10 +17,9 @@ function calculateStatementDates() {
     .split("T")[0];
   const formattedInvoiceEndDate = invoiceEndDate.toISOString().split("T")[0];
 
-  const paymentMonth = previousMonth === 0 ? 11 : previousMonth - 1;
-  const paymentYear = previousMonth === 0 ? previousYear - 1 : previousYear;
-  const paymentStartDate = new Date(paymentYear, paymentMonth, 1, 12, 0, 0);
-  const paymentEndDate = new Date(paymentYear, paymentMonth + 1, 0, 12, 0, 0);
+  // Payments and credit notes should now use the SAME month as invoices and add-ons
+  const paymentStartDate = new Date(previousYear, previousMonth, 1, 12, 0, 0);
+  const paymentEndDate = new Date(previousYear, previousMonth + 1, 0, 12, 0, 0);
   const formattedPaymentStartDate = paymentStartDate
     .toISOString()
     .split("T")[0];
