@@ -392,17 +392,6 @@ const ClientStatement = () => {
         <div>Please select a statement from the list.</div>
       </div>
     );
-  if (
-    statement.invoices.length === 0 &&
-    statement.addons.length === 0 &&
-    statement.payments.length === 0 &&
-    statement.credit_notes?.length === 0
-  )
-    return (
-      <div className="client-statement-wrapper">
-        <div>No transactions for this statement period.</div>
-      </div>
-    );
 
   // Calculate totals (include payments and credit notes)
   const invoicedAmount =

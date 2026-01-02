@@ -9,13 +9,14 @@ import Pagination from "..//../../components/Pagination"; // Import the Paginati
 const StatementList = () => {
   const navigate = useNavigate();
   const location = useLocation();
-  const { clientId } = location.state || {};
+  const { clientId, clientName } = location.state || {};
 
   const [statements, setStatements] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [generating, setGenerating] = useState(false);
   const [generationMessage, setGenerationMessage] = useState("");
+  const [hasDefaultMonthStatement, setHasDefaultMonthStatement] = useState(false);
 
   // Set default filters so the month is one month before the current one.
   // If today is in January, default to December of the previous year.
@@ -57,7 +58,20 @@ const StatementList = () => {
       const response = await api.get(requestUrl);
 
       if (response.data.success) {
-        setStatements(response.data.data);
+        const fetchedStatements = response.data.data;
+        setStatements(fetchedStatements);
+
+        // Determine if there is a statement for the default month/year for this client
+        const hasForDefaultMonth = fetchedStatements.some((statement) => {
+          if (!statement.generation_date) return false;
+          const d = new Date(statement.generation_date);
+          d.setDate(d.getDate() - 1);
+          const year = d.getFullYear();
+          const month = d.getMonth() + 1; // 1-12
+          return year === defaultYear && month === defaultMonth;
+        });
+
+        setHasDefaultMonthStatement(hasForDefaultMonth);
       } else {
         throw new Error(response.data.message || "Failed to fetch statements");
       }
@@ -101,6 +115,10 @@ const StatementList = () => {
     setCurrentPage(1); // Reset to first page when filter changes
   };
 
+  const isDefaultFilter =
+    filters.year === defaultYear.toString() &&
+    filters.month === defaultMonth.toString();
+
   const handleManualGeneration = async () => {
     if (!clientId) {
       setGenerationMessage("No client selected");
@@ -119,11 +137,15 @@ const StatementList = () => {
       if (response.data.success) {
         const created = Number(response.data?.stats?.created || 0);
         const updated = Number(response.data?.stats?.updated || 0);
-        let msg = response.data.message;
-        if (!msg) {
-          if (created > 0) msg = "Statement created for this client.";
-          else if (updated > 0) msg = "Statement updated for this client.";
-          else msg = "No statement was created or updated for this client.";
+        let msg = "";
+        const nameForDisplay = clientName || "this client";
+
+        if (created > 0) {
+          msg = `Statement processed for ${nameForDisplay}. Created new statement.`;
+        } else if (updated > 0) {
+          msg = `Statement processed for ${nameForDisplay}. Updated existing statement.`;
+        } else {
+          msg = `Statement processed for ${nameForDisplay}. No statement created or updated.`;
         }
         setGenerationMessage(msg);
         // Refresh the statements list
@@ -247,21 +269,19 @@ const StatementList = () => {
               ))}
             </select>
           </div>
-          <button
-            disabled
-            className="generate-statement-btn"
-            style={{
-              marginLeft: "10px",
-              padding: "8px 16px",
-              backgroundColor: "#ccc",
-              color: "#666",
-              border: "none",
-              borderRadius: "4px",
-              cursor: "not-allowed",
-            }}
-          >
-            Generate Statement
-          </button>
+          {isDefaultFilter && (
+            <button
+              onClick={handleManualGeneration}
+              disabled={generating}
+              className="generate-statement-btn"
+            >
+              {generating
+                ? "Generating..."
+                : hasDefaultMonthStatement
+                ? "Update Statement"
+                : "Generate Statement"}
+            </button>
+          )}
         </div>
       </div>
 

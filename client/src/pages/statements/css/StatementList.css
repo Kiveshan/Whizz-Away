@@ -61,6 +61,35 @@
   font-family: inherit;
 }
 
+.statement-list-wrapper .generate-statement-btn {
+  padding: 8px 18px;
+  margin-left: 10px;
+  background: linear-gradient(135deg, #0077cc, #00a3ff);
+  color: #ffffff;
+  border: none;
+  border-radius: 6px;
+  font-weight: 600;
+  cursor: pointer;
+  font-family: inherit;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.12);
+  transition: background 0.15s ease-in-out, box-shadow 0.15s ease-in-out,
+    transform 0.1s ease-in-out;
+}
+
+.statement-list-wrapper .generate-statement-btn:hover:not(:disabled) {
+  background: linear-gradient(135deg, #0061a8, #008fe0);
+  box-shadow: 0 3px 6px rgba(0, 0, 0, 0.16);
+  transform: translateY(-1px);
+}
+
+.statement-list-wrapper .generate-statement-btn:disabled {
+  background: #c5d4e6;
+  color: #6b7a90;
+  cursor: not-allowed;
+  box-shadow: none;
+  transform: none;
+}
+
 /* Table */
 .statement-list-wrapper .instruction-table1 {
   width: 1000px;

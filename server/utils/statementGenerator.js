@@ -17,10 +17,9 @@ function calculateStatementDates() {
     .split("T")[0];
   const formattedInvoiceEndDate = invoiceEndDate.toISOString().split("T")[0];
 
-  const paymentMonth = previousMonth === 0 ? 11 : previousMonth - 1;
-  const paymentYear = previousMonth === 0 ? previousYear - 1 : previousYear;
-  const paymentStartDate = new Date(paymentYear, paymentMonth, 1, 12, 0, 0);
-  const paymentEndDate = new Date(paymentYear, paymentMonth + 1, 0, 12, 0, 0);
+  // Payments and credit notes should now use the SAME month as invoices and add-ons
+  const paymentStartDate = new Date(previousYear, previousMonth, 1, 12, 0, 0);
+  const paymentEndDate = new Date(previousYear, previousMonth + 1, 0, 12, 0, 0);
   const formattedPaymentStartDate = paymentStartDate
     .toISOString()
     .split("T")[0];
@@ -283,53 +282,50 @@ function calculateAgingBuckets(
   isUpdate = false
 ) {
   if (!previousAging) {
-    const newCurrent = totalInvoices;
-    const remaining30days = 0 - totalReductions;
+    const newCurrent = totalInvoices - totalReductions;
 
     return {
       newCurrent,
-      new30days: remaining30days < 0 ? remaining30days : remaining30days,
+      new30days: 0,
       new60days: 0,
       new90days: 0,
     };
   }
 
-  const newCurrent = totalInvoices;
-  const raw30days = Number.parseFloat(previousAging.current) || 0;
-  const remaining30days = raw30days - totalReductions;
-  let new30days, new60days, new90days;
+  const prevCurrent = Number.parseFloat(previousAging.current) || 0;
+  const prev30days = Number.parseFloat(previousAging["30days"]) || 0;
+  const prev60days = Number.parseFloat(previousAging["60days"]) || 0;
+  const prev90days = Number.parseFloat(previousAging["90days"]) || 0;
 
-  if (remaining30days < 0) {
-    const raw60days = Number.parseFloat(previousAging["30days"]) || 0;
-    const remaining60days = raw60days + remaining30days;
+  // Roll the buckets forward one month
+  let newCurrent = totalInvoices;
+  let new30days = prevCurrent;
+  let new60days = prev30days;
+  let new90days = prev60days + prev90days;
 
-    if (raw60days === 0) {
-      new30days = remaining30days;
-      new60days = 0;
-      new90days =
-        (Number.parseFloat(previousAging["60days"]) || 0) +
-        (Number.parseFloat(previousAging["90days"]) || 0);
-    } else if (remaining60days < 0) {
-      new30days = 0;
-      new60days = 0;
-      const excessReduction = -remaining60days;
-      const raw90days =
-        (Number.parseFloat(previousAging["60days"]) || 0) +
-        (Number.parseFloat(previousAging["90days"]) || 0);
-      new90days = raw90days - excessReduction;
-    } else {
-      new30days = 0;
-      new60days = remaining60days;
-      new90days =
-        (Number.parseFloat(previousAging["60days"]) || 0) +
-        (Number.parseFloat(previousAging["90days"]) || 0);
-    }
-  } else {
-    new30days = remaining30days;
-    new60days = Number.parseFloat(previousAging["30days"]) || 0;
-    new90days =
-      (Number.parseFloat(previousAging["60days"]) || 0) +
-      (Number.parseFloat(previousAging["90days"]) || 0);
+  // Apply reductions starting from the oldest bucket: 90 -> 60 -> 30 -> current
+  let remainingReductions = totalReductions;
+
+  const applyReduction = (amount) => {
+    if (remainingReductions <= 0) return amount;
+    const reduction = Math.min(amount, remainingReductions);
+    remainingReductions -= reduction;
+    return amount - reduction;
+  };
+
+  // 90-days bucket first
+  new90days = applyReduction(new90days);
+
+  // Then 60-days bucket
+  new60days = applyReduction(new60days);
+
+  // Then 30-days bucket
+  new30days = applyReduction(new30days);
+
+  // Finally, apply any remaining reductions to current (can go negative)
+  if (remainingReductions > 0) {
+    newCurrent = newCurrent - remainingReductions;
+    remainingReductions = 0;
   }
 
   return { newCurrent, new30days, new60days, new90days };
@@ -456,7 +452,9 @@ async function processClient(
   let updateRequired = false;
 
   if (isUpdate) {
-    // Check if there are any invoices, add-ons, payments, or credit notes that would change the statement
+    // Previously we skipped updating when there was no activity.
+    // Now we always generate a statement for the month, even with no activity.
+    // We still fetch these values for logging/diagnostics.
     const invoices = await fetchClientInvoices(
       dbClient,
       clientId,
@@ -466,20 +464,8 @@ async function processClient(
     const totalPayments = paymentsMap.get(clientId) || 0;
     const totalCreditNotes = creditNotesMap.get(clientId) || 0;
 
-    // If no invoices, add-ons, payments, or credit notes for this period, skip update
-    if (
-      invoices.length === 0 &&
-      totalPayments === 0 &&
-      totalCreditNotes === 0
-    ) {
-      console.log(
-        `Client ${clientId}: No invoices, add-ons, payments, or credit notes found for period, skipping update`
-      );
-      return { processed: true, created: false, updated: false };
-    }
-
     console.log(
-      `Client ${clientId}: Update required - found invoices, add-ons, payments, or credit notes for period`
+      `Client ${clientId}: Invoices: ${invoices.length}, payments: R${totalPayments}, credit notes: R${totalCreditNotes} for period (statement will still be generated even if zero)`
     );
     updateRequired = true;
   }
@@ -502,14 +488,6 @@ async function processClient(
     console.log(
       `Client ${clientId}: Total reductions (payments + credit notes) from ${formattedPaymentStartDate} to ${formattedPaymentEndDate}: R${totalReductions}`
     );
-
-    if (invoices.length === 0 && totalReductions === 0) {
-      console.log(
-        `Client ${clientId}: No invoices, add-ons, payments, or credit notes found, skipping`
-      );
-      return { processed: false, created: false, updated: false };
-    }
-
     let invoice_group_id = null;
     if (invoices.length > 0) {
       invoice_group_id = invoices[0].invoice_group_id;
