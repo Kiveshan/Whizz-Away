@@ -114,7 +114,7 @@ const ViewClientStatement = () => {
                       className="view-butn"
                       onClick={() =>
                         navigate("/statements-list", {
-                          state: { clientId: client.id },
+                          state: { clientId: client.id, clientName: client.company },
                         })
                       }
                     >

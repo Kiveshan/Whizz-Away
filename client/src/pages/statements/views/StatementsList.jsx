@@ -9,7 +9,7 @@ import Pagination from "..//../../components/Pagination"; // Import the Paginati
 const StatementList = () => {
   const navigate = useNavigate();
   const location = useLocation();
-  const { clientId } = location.state || {};
+  const { clientId, clientName } = location.state || {};
 
   const [statements, setStatements] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -137,11 +137,15 @@ const StatementList = () => {
       if (response.data.success) {
         const created = Number(response.data?.stats?.created || 0);
         const updated = Number(response.data?.stats?.updated || 0);
-        let msg = response.data.message;
-        if (!msg) {
-          if (created > 0) msg = "Statement created for this client.";
-          else if (updated > 0) msg = "Statement updated for this client.";
-          else msg = "No statement was created or updated for this client.";
+        let msg = "";
+        const nameForDisplay = clientName || "this client";
+
+        if (created > 0) {
+          msg = `Statement processed for ${nameForDisplay}. Created new statement.`;
+        } else if (updated > 0) {
+          msg = `Statement processed for ${nameForDisplay}. Updated existing statement.`;
+        } else {
+          msg = `Statement processed for ${nameForDisplay}. No statement created or updated.`;
         }
         setGenerationMessage(msg);
         // Refresh the statements list
