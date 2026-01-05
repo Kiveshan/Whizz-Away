@@ -443,6 +443,37 @@ const ClientInvoice = forwardRef(({
 
       currentY = doc.lastAutoTable.finalY + (isCompactLayout ? 5 : 7);
 
+      // Invoice details table (Booking Ref, File Number, Description, Vessel/Ref)
+      const detailsRows = [
+        ["Booking Ref", finalInvoiceData.booking_ref || ""],
+        ["File Number", finalInvoiceData.file_no || ""],
+        ["Description", finalInvoiceData.description || ""],
+        ["Vessel/Ref", finalInvoiceData.vessel_name || ""],
+      ].filter(([, value]) => value !== undefined && value !== null && String(value).trim() !== "");
+
+      if (detailsRows.length > 0) {
+        autoTable(doc, {
+          startY: currentY,
+          head: [],
+          body: detailsRows,
+          theme: "grid",
+          styles: {
+            fontSize: fonts.small,
+            cellPadding: 1.2,
+            lineWidth: 0.1,
+            overflow: 'ellipsize',
+            lineColor: brand.gray,
+          },
+          columnStyles: {
+            0: { fontStyle: "bold", cellWidth: 32 },
+            1: { cellWidth: "auto" },
+          },
+          margin: { left: margins.left, right: margins.right },
+        });
+
+        currentY = doc.lastAutoTable.finalY + (isCompactLayout ? 5 : 7);
+      }
+
       // Table for items: weight items when shipment_type_key=4, otherwise containers
       let tableHeaders = [];
       let tableData = [];
