@@ -46,6 +46,11 @@
   position: absolute;
   bottom: 20px;
   left: 0;
+  max-width: 45%;
+  padding-right: 20px;
+  overflow-wrap: break-word;
+  word-wrap: break-word;
+  word-break: break-word;
   font-family: inherit;
 }
 
@@ -57,6 +62,10 @@
 .client-statement-wrapper .client-name {
   font-weight: bold;
   font-size: 16px;
+  max-width: 100%;
+  overflow-wrap: break-word;
+  word-wrap: break-word;
+  word-break: break-word;
 }
 
 /* Statement Title and Account Summary - Right Side */
