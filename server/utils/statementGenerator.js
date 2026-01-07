@@ -193,7 +193,15 @@ async function fetchClientInvoices(
 ) {
   const invoicesQuery = `
     SELECT 
-      COALESCE(SUM(m1.total_cost), 0) + COALESCE(SUM(a.amount), 0) as total_amount,
+      -- Apply VAT only to m1_controller (invoice) totals, not add-ons
+      COALESCE(
+        SUM(
+          -- Use m1.vat exactly as stored; 0 means no VAT
+          m1.total_cost * (1 + m1.vat / 100.0)
+        ),
+        0
+      )
+      + COALESCE(SUM(a.amount), 0) as total_amount,
       COALESCE(i.groupid, a.group_id) as invoice_group_id
     FROM invoice i
     FULL OUTER JOIN m1_controller m1 ON i.m1key = m1.m1key
