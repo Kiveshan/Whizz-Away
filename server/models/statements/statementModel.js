@@ -72,6 +72,7 @@ const getStatementDetails = async (statementId) => {
       i.ikey,
       i.date AS invoice_date,
       m1.total_cost AS invoice_amount,
+      m1.vat AS invoice_vat,
       m1."ksmFileRef" AS invoice_task,
       m1.pickup,
       m1.dropoff,
@@ -257,15 +258,24 @@ const getStatementDetails = async (statementId) => {
       },
       invoices: result.rows
         .filter((row) => row.ikey !== null && Number.parseFloat(row.invoice_amount || 0) > 0)
-        .map((row) => ({
-          ikey: row.ikey,
-          date: row.invoice_date,
-          amount: Number.parseFloat(row.invoice_amount || 0),
-          task: row.invoice_task,
-          invoice_num: row.invoice_num,
-          pickup: row.pickup,
-          dropoff: row.dropoff,
-        })),
+        .map((row) => {
+          const netAmount = Number.parseFloat(row.invoice_amount || 0);
+          // Use VAT exactly as stored on m1_controller; 0 means no VAT
+          const rawVat = Number(row.invoice_vat);
+          const vatRate = Number.isNaN(rawVat) ? 0 : rawVat;
+          const vatMultiplier = 1 + vatRate / 100;
+          const grossAmount = Number((netAmount * vatMultiplier).toFixed(2));
+
+          return {
+            ikey: row.ikey,
+            date: row.invoice_date,
+            amount: grossAmount,
+            task: row.invoice_task,
+            invoice_num: row.invoice_num,
+            pickup: row.pickup,
+            dropoff: row.dropoff,
+          };
+        }),
       addons: result.rows
         .filter((row) => row.addon_id !== null)
         .map((row) => ({
