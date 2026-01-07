@@ -21,6 +21,23 @@
   padding-bottom: 70px;
 }
 
+/* Top back button in header area */
+.client-statement-wrapper .back-button {
+  background-color: #28a745;
+  color: white;
+  border: none;
+  padding: 8px 20px;
+  border-radius: 5px;
+  font-size: 16px;
+  cursor: pointer;
+  margin-bottom: 20px;
+  font-family: inherit;
+}
+
+.client-statement-wrapper .back-button:hover {
+  background-color: #218838;
+}
+
 .client-statement-wrapper .statement-paper {
   max-width: 800px;
   margin: 0 auto;
@@ -386,6 +403,9 @@
   gap: 20px;
   margin-top: 20px;
   margin-bottom: 30px;
+  max-width: 800px;
+  margin-left: auto;
+  margin-right: auto;
 }
 
 .client-statement-wrapper .statementdownloadbtn1 .back-btn {

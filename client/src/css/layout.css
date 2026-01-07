@@ -26,6 +26,28 @@ html {
   padding: 20px;
 }
 
+/* Shared top bar for Back + Logout on selected detail pages */
+.top-actions-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between; /* Back left, Logout right */
+  padding: 10px 20px;
+}
+
+.back-button-inline {
+  background-color: #28a745;
+  color: white;
+  border: none;
+  padding: 8px 20px;
+  border-radius: 5px;
+  font-size: 16px;
+  cursor: pointer;
+}
+
+.back-button-inline:hover {
+  background-color: #218838;
+}
+
 .logout-container {
   display: flex;
   align-items: center;
@@ -36,4 +58,13 @@ html {
   z-index: 0 ;
   width : 25%;
   margin-left: 75%;
+}
+
+/* When logout is inside the top-actions-bar, reset special positioning */
+.top-actions-bar .logout-container {
+  margin-left: 0;
+  margin-right: 0;
+  margin-top: 0;
+  width: auto;
+  position: static;
 }
