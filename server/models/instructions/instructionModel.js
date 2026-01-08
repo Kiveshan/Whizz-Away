@@ -803,6 +803,50 @@ export const saveInstruction = async ({
   }
 };
 
+// Update only rate-related fields and total_cost for an instruction
+export const updateInstructionRatesOnly = async (instructionId, rateData) => {
+  const client = await pool.connect();
+  try {
+    await client.query("BEGIN");
+
+    const queryText = `
+      UPDATE public.m1_controller
+      SET
+        rateper_6 = $1,
+        rateper_12 = $2,
+        rateper_abnormal = $3,
+        rateper_breakbulk = $4,
+        rateweight = $5,
+        unitrate = $6,
+        weight = $7,
+        total_cost = $8
+      WHERE m1key = $9
+      RETURNING *
+    `;
+
+    const values = [
+      rateData.rateper_6 || 0,
+      rateData.rateper_12 || 0,
+      rateData.rateper_abnormal || 0,
+      rateData.rateper_breakbulk || 0,
+      rateData.rateweight || null,
+      rateData.unitrate || 0,
+      rateData.weight ?? null,
+      rateData.total_cost || 0,
+      instructionId,
+    ];
+
+    const result = await client.query(queryText, values);
+    await client.query("COMMIT");
+    return result.rows.length > 0 ? result.rows[0] : null;
+  } catch (error) {
+    await client.query("ROLLBACK");
+    throw error;
+  } finally {
+    client.release();
+  }
+};
+
 export const getClientInstructionStats = async () => {
   const statusCheckQuery = `
     SELECT DISTINCT status FROM public.m1_controller

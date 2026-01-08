@@ -7,6 +7,7 @@ import {
   getInstructions,
   getInstructionById,
   updateInstruction,
+  updateInstructionRatesOnly,
   updateContainersByInstructionId,
   getActiveClients,
   getClientStartingPoints,
@@ -377,6 +378,83 @@ export const updateInstructionHandler = async (req, res) => {
     res.json({ success: true, data: result })
   } catch (error) {
     console.error("Error updating instruction:", error)
+    res.status(500).json({ error: error.message })
+  }
+}
+
+// New: update only rate-related fields for an instruction in In Progress status
+export const updateInstructionRates = async (req, res) => {
+  try {
+    const instructionId = req.params.id
+
+    // Load the existing instruction to check status and current values
+    const existing = await getInstructionById(instructionId)
+    if (!existing) {
+      return res.status(404).json({ error: "Instruction not found" })
+    }
+
+    // Allow rate edits only when instruction is In Progress (case-insensitive)
+    const currentStatus = (existing.status || "").toString().toLowerCase()
+    if (currentStatus !== "in progress") {
+      return res.status(400).json({
+        error: "Rates can only be updated while the instruction is In Progress",
+      })
+    }
+
+    const {
+      rateper_6,
+      rateper_12,
+      rateper_abnormal,
+      rateper_breakbulk,
+      rateweight,
+      rateWeight,
+      unitrate,
+      unitRate,
+      weight,
+    } = req.body || {}
+
+    // Build a minimal update object, merging new rate fields onto existing data
+    const merged = {
+      ...existing,
+      // Container-based rates
+      rateper_6: rateper_6 ?? existing.rateper_6,
+      rateper_12: rateper_12 ?? existing.rateper_12,
+      rateper_abnormal: rateper_abnormal ?? existing.rateper_abnormal,
+      rateper_breakbulk: rateper_breakbulk ?? existing.rateper_breakbulk,
+      // Weight-based config (controller-level weight plus unit rate / unit type)
+      rateweight: rateweight ?? rateWeight ?? existing.rateweight,
+      unitrate: unitrate ?? unitRate ?? existing.unitrate,
+      weight: weight ?? existing.weight,
+    }
+
+    // Use existing containers and weight rows when recalculating total cost so
+    // weight-based shipment types (e.g. type 4 with kg/ton) are handled
+    // correctly. getInstructionById already returns JSON arrays for these.
+    const containers = existing.containers || []
+    const weightRows = existing.weight_rows || existing.weightRows || []
+
+    const calculatedTotalCost = calculateTotalCost(merged, containers, weightRows)
+    const updatePayload = {
+      rateper_6: merged.rateper_6,
+      rateper_12: merged.rateper_12,
+      rateper_abnormal: merged.rateper_abnormal,
+      rateper_breakbulk: merged.rateper_breakbulk,
+      rateweight: merged.rateweight,
+      unitrate: merged.unitrate,
+      weight: merged.weight,
+      total_cost: calculatedTotalCost,
+    }
+
+    console.log(`Updating rates for instruction ${instructionId}`, updatePayload)
+
+    const result = await updateInstructionRatesOnly(instructionId, updatePayload)
+    if (!result) {
+      return res.status(404).json({ error: "Instruction not found" })
+    }
+
+    res.json({ success: true, data: result })
+  } catch (error) {
+    console.error("Error updating instruction rates:", error)
     res.status(500).json({ error: error.message })
   }
 }

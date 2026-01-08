@@ -256,8 +256,11 @@ const FCcontrollerinstructions = () => {
     };
   });
 
-  // Check if the instruction should be read-only based on status
-  const isReadOnly = formData.status === "In Progress" || formData.status === "Completed";
+  // Check instruction status for edit behaviour
+  const isStatusInProgress = formData.status === "In Progress";
+  const isStatusCompleted = formData.status === "Completed";
+  // For most fields, treat both In Progress and Completed as read-only
+  const isReadOnly = isStatusInProgress || isStatusCompleted;
 
   const [startingPoints, setStartingPoints] = useState([]);
   const [destinations, setDestinations] = useState([]);
@@ -1030,9 +1033,83 @@ const FCcontrollerinstructions = () => {
     return true; // No mismatches, proceed with save
   };
 
+  // Save only rate-related fields for In Progress instructions
+  const performRateOnlySave = async () => {
+    if (!instructionId) {
+      setErrorModal({
+        isOpen: true,
+        message: "Cannot update rates: missing instruction ID.",
+      });
+      return;
+    }
+
+    try {
+      const payload = {
+        rateper_6: Number(formData.rateper_6 || 0),
+        rateper_12: Number(formData.rateper_12 || 0),
+        rateper_abnormal: Number(formData.rateper_abnormal || 0),
+      };
+
+      // Include weight-based configuration when applicable
+      if (formData.rateWeight && formData.rateWeight !== "Container") {
+        payload.rateweight = formData.rateWeight;
+        payload.unitrate = formData.unitRate
+          ? Number(formData.unitRate)
+          : 0;
+        payload.weight = formData.weight
+          ? Number(formData.weight)
+          : null;
+      }
+
+      console.log("PATCHing instruction rates with payload:", payload);
+
+      const response = await api.patch(
+        `/api/instructions/instruction/${instructionId}/rates`,
+        payload
+      );
+
+      const updated = response.data?.data || {};
+
+      setFormData((prev) => ({
+        ...prev,
+        rateper_6: updated.rateper_6 ?? prev.rateper_6,
+        rateper_12: updated.rateper_12 ?? prev.rateper_12,
+        rateper_abnormal:
+          updated.rateper_abnormal ?? prev.rateper_abnormal,
+        total_cost: updated.total_cost ?? prev.total_cost,
+        rateWeight: updated.rateweight || prev.rateWeight,
+        unitRate: updated.unitrate ?? prev.unitRate,
+        weight:
+          updated.weight !== undefined && updated.weight !== null
+            ? updated.weight
+            : prev.weight,
+      }));
+
+      setRateUpdateMessage("Rates updated successfully for this instruction.");
+      setTimeout(() => setRateUpdateMessage(""), 3000);
+    } catch (error) {
+      console.error("Error updating instruction rates:", error);
+      const message =
+        error.response?.data?.error ||
+        "Failed to update rates. Please try again.";
+      setErrorModal({
+        isOpen: true,
+        message,
+      });
+    }
+  };
+
   // Handle save changes with enhanced logic
   const handleSaveChanges = async () => {
     console.log("=== SAVE CHANGES INITIATED ===");
+
+    // For In Progress instructions, only allow saving rate-related fields
+    if (isStatusInProgress) {
+      await performRateOnlySave();
+      return;
+    }
+
+    // Below logic applies to New instructions (full edit flow)
 
     // Special validation for vessel name and stack date for import and export shipment types
     if (formData.shipmentTypeId === "1" || formData.shipmentTypeId === "2") {
@@ -3685,7 +3762,7 @@ const FCcontrollerinstructions = () => {
 
   const nonEditableStyle = {
     backgroundColor: "#f0f0f0",
-    cursor: "not-allowed",
+    cursor: "default",
   };
 
   const readOnlyStyle = {
@@ -4065,9 +4142,10 @@ const FCcontrollerinstructions = () => {
                           name="num_six_meters"
                           onChange={(e) => handleNumericInputChange(e)}
                           disabled={
-                            formData.rateWeight !== "Container" || isReadOnly
+                            formData.rateWeight !== "Container" ||
+                            isReadOnly
                           }
-                          style={isReadOnly ? readOnlyStyle : {}}
+                          style={isReadOnly ? readOnlyStyle : nonEditableStyle}
                         />
                         <div
                           className="controller-instructions-input-wrapper controller-instructions-rate-input"
@@ -4085,9 +4163,12 @@ const FCcontrollerinstructions = () => {
                             name="rateper_6"
                             onChange={handleRateChange}
                             disabled={
-                              formData.rateWeight !== "Container" || isReadOnly
+                              formData.rateWeight !== "Container" ||
+                              isStatusCompleted
                             }
-                            style={isReadOnly ? readOnlyStyle : {}}
+                            style={
+                              isStatusCompleted ? readOnlyStyle : nonEditableStyle
+                            }
                           />
                           <InstructionErrorTooltip
                             message={fieldErrors.rateper_6}
@@ -4110,9 +4191,10 @@ const FCcontrollerinstructions = () => {
                           name="num_twelve_meters"
                           onChange={(e) => handleNumericInputChange(e)}
                           disabled={
-                            formData.rateWeight !== "Container" || isReadOnly
+                            formData.rateWeight !== "Container" ||
+                            isReadOnly
                           }
-                          style={isReadOnly ? readOnlyStyle : {}}
+                          style={isReadOnly ? readOnlyStyle : nonEditableStyle}
                         />
                         <div
                           className="controller-instructions-input-wrapper controller-instructions-rate-input"
@@ -4130,9 +4212,12 @@ const FCcontrollerinstructions = () => {
                             name="rateper_12"
                             onChange={handleRateChange}
                             disabled={
-                              formData.rateWeight !== "Container" || isReadOnly
+                              formData.rateWeight !== "Container" ||
+                              isStatusCompleted
                             }
-                            style={isReadOnly ? readOnlyStyle : {}}
+                            style={
+                              isStatusCompleted ? readOnlyStyle : nonEditableStyle
+                            }
                           />
                           <InstructionErrorTooltip
                             message={fieldErrors.rateper_12}
@@ -4155,9 +4240,10 @@ const FCcontrollerinstructions = () => {
                           name="num_abnormal"
                           onChange={(e) => handleNumericInputChange(e)}
                           disabled={
-                            formData.rateWeight !== "Container" || isReadOnly
+                            formData.rateWeight !== "Container" ||
+                            isReadOnly
                           }
-                          style={isReadOnly ? readOnlyStyle : {}}
+                          style={isReadOnly ? readOnlyStyle : nonEditableStyle}
                         />
                         <div
                           className="controller-instructions-input-wrapper controller-instructions-rate-input"
@@ -4175,9 +4261,12 @@ const FCcontrollerinstructions = () => {
                             name="rateper_abnormal"
                             onChange={handleRateChange}
                             disabled={
-                              formData.rateWeight !== "Container" || isReadOnly
+                              formData.rateWeight !== "Container" ||
+                              isStatusCompleted
                             }
-                            style={isReadOnly ? readOnlyStyle : {}}
+                            style={
+                              isStatusCompleted ? readOnlyStyle : nonEditableStyle
+                            }
                           />
                           <ErrorTooltip
                             message={fieldErrors.rateper_abnormal}
@@ -4320,10 +4409,10 @@ const FCcontrollerinstructions = () => {
                           style={{
                             width: "100%",
                             padding: "4px 8px",
-                            ...(isReadOnly ? readOnlyStyle : {}),
+                            ...(isStatusCompleted ? readOnlyStyle : {}),
                           }}
                           ref={fieldRefs.rateWeight}
-                          disabled={isReadOnly || isAddOn}
+                          disabled={isStatusCompleted || isAddOn}
                         >
                           {/* Show kg and ton options only for Cross-haul (break bulk) - type 4 */}
                           {formData.shipmentTypeId === "4" && (
@@ -4399,8 +4488,10 @@ const FCcontrollerinstructions = () => {
                                       handleInputChange(e);
                                     }
                                   }}
-                                  disabled={isReadOnly}
-                                  style={isReadOnly ? readOnlyStyle : {}}
+                                  disabled={isStatusCompleted}
+                                  style={
+                                    isStatusCompleted ? readOnlyStyle : {}
+                                  }
                                 />
                                 <InstructionErrorTooltip
                                   message={fieldErrors.unitRate}
@@ -4438,8 +4529,10 @@ const FCcontrollerinstructions = () => {
                                         handleInputChange(e);
                                       }
                                     }}
-                                    disabled={isReadOnly}
-                                    style={isReadOnly ? readOnlyStyle : {}}
+                                    disabled={isStatusCompleted}
+                                    style={
+                                      isStatusCompleted ? readOnlyStyle : {}
+                                    }
                                   />
                                   <InstructionErrorTooltip
                                     message={fieldErrors.quantity}
@@ -5278,10 +5371,10 @@ const FCcontrollerinstructions = () => {
               </div>
             </div>
           )}
-          {!isReadOnly && (
+          {(formData.status === "New" || isStatusInProgress) && (
             <div
               className="controller-instructions-form-actions"
-              style={{ display: "flex", justifyContent: "center", gap: "15px" }}
+              style={{ display: "flex", justifyContent: "center", gap: "15px", alignItems: "center" }}
             >
               <button
                 className="controller-instructions-save-button"
@@ -5299,6 +5392,21 @@ const FCcontrollerinstructions = () => {
               >
                 Save Changes
               </button>
+              {rateUpdateMessage && (
+                <div
+                  className="controller-instructions-success-message"
+                  style={{
+                    backgroundColor: "#d4edda",
+                    color: "#155724",
+                    padding: "8px 16px",
+                    borderRadius: "4px",
+                    fontSize: "14px",
+                    fontWeight: "500",
+                  }}
+                >
+                  {rateUpdateMessage}
+                </div>
+              )}
               {formData.status === "New" && (
                 <>
                   <button
@@ -5342,7 +5450,7 @@ const FCcontrollerinstructions = () => {
             </div>
           )}
 
-          {isReadOnly && (
+          {isStatusCompleted && (
             <div
               className="controller-instructions-form-actions"
               style={{ display: "flex", justifyContent: "center", gap: "15px" }}
@@ -5361,8 +5469,8 @@ const FCcontrollerinstructions = () => {
                 This instruction is {formData.status} and cannot be edited
               </div>
               
-              {/* Display invoice button for In Progress instructions */}
-              {formData.status === "In Progress" && !isInvoiced && (
+              {/* Display invoice button for In Progress instructions (Completed should stay locked) */}
+              {isStatusInProgress && !isInvoiced && (
                 <button
                   className="controller-instructions-invoice-button"
                   onClick={handleCreateInvoice}
