@@ -8,14 +8,7 @@ import {
 const createPaymentHandler = async (req, res) => {
   try {
     const { clientId } = req.params;
-    const { amount, fileupload, invoiceid, addon_id, reference } = req.body;
-
-    if (!amount || isNaN(amount)) {
-      return res.status(400).json({
-        success: false,
-        message: "Amount is required and must be a number",
-      });
-    }
+    const { fileupload, reference, line_items } = req.body;
 
     if (!fileupload) {
       return res.status(400).json({
@@ -24,34 +17,18 @@ const createPaymentHandler = async (req, res) => {
       });
     }
 
-    if (!invoiceid && !addon_id) {
+    if (!Array.isArray(line_items) || line_items.length === 0) {
       return res.status(400).json({
         success: false,
-        message: "Either Invoice ID or Add-on ID is required",
+        message: "At least one payment line item is required",
       });
     }
-
-    if (invoiceid && addon_id) {
-      return res.status(400).json({
-        success: false,
-        message: "Payment cannot be linked to both an invoice and an add-on",
-      });
-    }
-
-    if (!reference || !reference.trim()) {
-      return res.status(400).json({
-        success: false,
-        message: "Payment reference is required",
-      });
-    }
-
-    // Create payment record with reference
+    
+    // Create payment record with optional reference and line allocations
     const payment = await createPayment(clientId, {
-      amount,
       fileupload,
-      invoiceid,
-      addon_id,
-      reference: reference.trim(),
+      reference: reference ? reference.trim() : null,
+      line_items,
     });
 
     res.json({
