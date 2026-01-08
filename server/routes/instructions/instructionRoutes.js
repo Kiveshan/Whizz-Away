@@ -7,7 +7,6 @@ import {
   getInstructionsHandler,
   getInstructionByIdHandler,
   updateInstructionHandler,
-  updateInstructionRates,
   updateContainersHandler,
   getActiveClientsHandler,
   getClientStartingPointsHandler,
@@ -43,7 +42,6 @@ router.get("/client-instruction-stats", getClientInstructionStatsHandler)
 router.get("/instructions", getInstructionsHandler)
 router.get("/instruction/:id", getInstructionByIdHandler)
 router.put("/instruction/:id", updateInstructionHandler)
-router.patch("/instruction/:id/rates", updateInstructionRates)
 router.post("/containers/:instructionId", updateContainersHandler)
 
 // ========== FC Controller Instructions Endpoints ==========
