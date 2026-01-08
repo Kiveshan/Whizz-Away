@@ -168,6 +168,11 @@ const createPayment = async (
           total,
           paid_amount: paidAmount,
           amount_due: remainingDue,
+          // Additional keys that mirror UI labels for clarity
+          paid_to_date: paidAmount,
+          balance_after_payment: remainingDue,
+          this_payment: item.amount_to_pay,
+          payment_ref: item.line_reference || "",
         };
       }
 
@@ -181,6 +186,11 @@ const createPayment = async (
         total,
         paid_amount: paidAmount,
         amount_due: remainingDue,
+        // Additional keys that mirror UI labels for clarity
+        paid_to_date: paidAmount,
+        balance_after_payment: remainingDue,
+        this_payment: item.amount_to_pay,
+        payment_ref: item.line_reference || "",
       };
     });
 
