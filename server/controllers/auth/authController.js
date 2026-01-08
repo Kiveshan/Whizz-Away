@@ -88,7 +88,7 @@ const login = async (req, res, next) => {
         company_reg_num: user.company_reg_num,
       },
       secretKey,
-      { expiresIn: "1h" }
+      { expiresIn: "5h" }
     );
 
     req.session.user = {
