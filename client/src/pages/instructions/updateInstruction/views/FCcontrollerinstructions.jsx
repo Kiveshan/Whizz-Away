@@ -257,7 +257,8 @@ const FCcontrollerinstructions = () => {
   });
 
   // Check if the instruction should be read-only based on status
-  const isReadOnly = formData.status === "In Progress" || formData.status === "Completed";
+  // Allow editing while In Progress; only Completed is locked.
+  const isReadOnly = formData.status === "Completed";
 
   const [startingPoints, setStartingPoints] = useState([]);
   const [destinations, setDestinations] = useState([]);
