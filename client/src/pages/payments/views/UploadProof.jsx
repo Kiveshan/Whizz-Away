@@ -32,6 +32,17 @@ const UploadProof = () => {
     return false;
   };
 
+  const handleLineDateChange = (index, value) => {
+    setLineItems((prev) => {
+      const updated = [...prev];
+      updated[index] = {
+        ...updated[index],
+        line_date: value,
+      };
+      return updated;
+    });
+  };
+
   const roleId = JSON.parse(localStorage.getItem("user"))?.roleid;
 
   // Fetch invoices and add-ons for dropdown
@@ -143,24 +154,29 @@ const UploadProof = () => {
       return;
     }
 
-    if (!paymentDate) {
-      setError("Please select a payment date");
+    if (lineItems.length === 0) {
+      setError("Please add at least one invoice or add-on to this payment");
       return;
     }
 
-    if (lineItems.length === 0) {
-      setError("Please add at least one invoice or add-on to this payment");
+    // Ensure each line has a date
+    const hasMissingDates = lineItems.some(
+      (item) => !item.line_date || item.line_date === ""
+    );
+    if (hasMissingDates) {
+      setError("Please select a payment date for each line");
       return;
     }
 
     try {
       setIsSubmitting(true);
       const paymentData = {
-        fileupload: paymentDate,
+        // fileupload is treated as a generation date on the backend; we omit it here
         line_items: lineItems.map((item) => ({
           type: item.type,
           id: item.id,
           amount_to_pay: Number(item.amount_to_pay),
+          line_date: item.line_date,
           line_reference: item.line_reference || "",
         })),
       };
@@ -247,6 +263,8 @@ const UploadProof = () => {
     const total = source?.total ?? null;
     const paidAmount = source?.paid_amount ?? null;
 
+    const today = new Date().toISOString().split("T")[0];
+
     setLineItems((prev) => [
       ...prev,
       {
@@ -257,6 +275,7 @@ const UploadProof = () => {
         amount_to_pay: amountDue,
         total,
         paid_amount: paidAmount,
+        line_date: today,
         line_reference: "",
       },
     ]);
@@ -388,7 +407,7 @@ const UploadProof = () => {
                     </div>
                   </div>
                 )}
-                {/* Amount and Date - Side by Side */}
+                {/* Total Amount - Single column; per-line dates are captured in the allocation table */}
                 <div className="form-row two-columns">
                   <div className="amount-field">
                     <label>Total Amount Paid</label>
@@ -399,17 +418,6 @@ const UploadProof = () => {
                       readOnly
                       disabled
                       placeholder="0.00"
-                    />
-                  </div>
-                  <div className="amount-field">
-                    <label>Payment Date *</label>
-                    <input
-                      type="date"
-                      value={paymentDate}
-                      onChange={(e) => setPaymentDate(e.target.value)}
-                      readOnly={isViewMode}
-                      disabled={isViewMode}
-                      required
                     />
                   </div>
                 </div>
@@ -429,6 +437,7 @@ const UploadProof = () => {
                             <th>Total</th>
                             <th>Paid To Date</th>
                             <th>Balance After Payment</th>
+                            <th>Payment Date</th>
                             <th>This Payment</th>
                             <th>Payment Ref</th>
                             <th></th>
@@ -450,6 +459,23 @@ const UploadProof = () => {
                                   : "-"}
                               </td>
                               <td>{Number(item.amount_due || 0).toFixed(2)}</td>
+                              <td>
+                                {isViewMode ? (
+                                  <span>
+                                    {item.line_date
+                                      ? new Date(item.line_date).toISOString().split("T")[0]
+                                      : paymentDate || "-"}
+                                  </span>
+                                ) : (
+                                  <input
+                                    type="date"
+                                    value={item.line_date || ""}
+                                    onChange={(e) =>
+                                      handleLineDateChange(index, e.target.value)
+                                    }
+                                  />
+                                )}
+                              </td>
                               <td>
                                 {isViewMode ? (
                                   <span>
@@ -520,7 +546,6 @@ const UploadProof = () => {
                       onClick={handleSubmit}
                       disabled={
                         !amount ||
-                        !paymentDate ||
                         lineItems.length === 0 ||
                         isSubmitting
                       }

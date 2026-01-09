@@ -30,7 +30,7 @@ const createPayment = async (
     // Resolve and validate each line item (invoice/add-on), computing amount due
     const processedItems = [];
     for (const item of line_items) {
-      const { type, id, amount_to_pay } = item;
+      const { type, id, amount_to_pay, line_date } = item;
       if (!type || !id) {
         throw new Error("Each line item must include a type and id");
       }
@@ -39,6 +39,15 @@ const createPayment = async (
         throw new Error(
           "Each line item must have a positive numeric amount_to_pay"
         );
+      }
+
+      // Require a valid date per line item
+      if (!line_date) {
+        throw new Error("Each line item must include a payment date");
+      }
+      const parsedLineDate = new Date(line_date);
+      if (Number.isNaN(parsedLineDate.getTime())) {
+        throw new Error("Each line item must have a valid payment date");
       }
 
       if (type === "Invoice") {
@@ -87,6 +96,7 @@ const createPayment = async (
           current_paid: currentPaid,
           total_with_vat: totalWithVat,
           amount_due: amountDue,
+          line_date: parsedLineDate.toISOString(),
         });
       } else if (type === "Add-on") {
         // Load add-on to compute amount due
@@ -126,6 +136,7 @@ const createPayment = async (
           current_paid: currentPaid,
           total: total,
           amount_due: amountDue,
+          line_date: parsedLineDate.toISOString(),
         });
       } else {
         throw new Error(
@@ -140,7 +151,7 @@ const createPayment = async (
       0
     );
 
-    // Build enriched line items JSON that includes invoice/add-on numbers and totals
+    // Build enriched line items JSON that includes invoice/add-on numbers, totals, and per-line dates
     const enrichedLineItems = line_items.map((item) => {
       const { type, id } = item;
       const processed = processedItems.find((p) => {
@@ -168,6 +179,7 @@ const createPayment = async (
           total,
           paid_amount: paidAmount,
           amount_due: remainingDue,
+          line_date: processed.line_date,
           // Additional keys that mirror UI labels for clarity
           paid_to_date: paidAmount,
           balance_after_payment: remainingDue,
@@ -186,6 +198,7 @@ const createPayment = async (
         total,
         paid_amount: paidAmount,
         amount_due: remainingDue,
+        line_date: processed.line_date,
         // Additional keys that mirror UI labels for clarity
         paid_to_date: paidAmount,
         balance_after_payment: remainingDue,
@@ -205,6 +218,10 @@ const createPayment = async (
       }
     }
 
+    // Determine a generation date for the payment header (fileupload).
+    // If fileupload was not supplied, default to now. If supplied, use it as-is.
+    const headerDate = fileupload ? new Date(fileupload) : new Date();
+
     const insertQuery = `
       INSERT INTO payment_m3 (clientid, amount, reference, fileupload, invoiceid, addon_id, line_items)
       VALUES ($1, $2, $3, $4, $5, $6, $7::jsonb)
@@ -214,7 +231,7 @@ const createPayment = async (
       clientId,
       totalAmount,
       reference,
-      fileupload,
+      headerDate,
       primaryInvoiceId,
       primaryAddonId,
       JSON.stringify(enrichedLineItems),

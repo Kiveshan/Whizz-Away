@@ -10,13 +10,6 @@ const createPaymentHandler = async (req, res) => {
     const { clientId } = req.params;
     const { fileupload, reference, line_items } = req.body;
 
-    if (!fileupload) {
-      return res.status(400).json({
-        success: false,
-        message: "Payment date (fileupload) is required",
-      });
-    }
-
     if (!Array.isArray(line_items) || line_items.length === 0) {
       return res.status(400).json({
         success: false,
@@ -26,6 +19,7 @@ const createPaymentHandler = async (req, res) => {
     
     // Create payment record with optional reference and line allocations
     const payment = await createPayment(clientId, {
+      // fileupload is now optional; the model will treat it as a generation date
       fileupload,
       reference: reference ? reference.trim() : null,
       line_items,
