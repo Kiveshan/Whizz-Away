@@ -71,14 +71,20 @@ function validateClients(clients, specificClientId) {
 
 // ==================== PAYMENT AND CREDIT NOTE UTILITIES (FOR DISPLAY ONLY) ====================
 async function fetchPaymentsMap(dbClient, start, end) {
+  // Aggregate actual applied payments per client by exploding JSONB line_items
   const result = await dbClient.query(
-    `SELECT clientid, SUM(amount) as total_payments
-     FROM payment_m3
-     WHERE fileupload BETWEEN $1 AND $2
-     GROUP BY clientid`,
+    `SELECT
+       p.clientid,
+       SUM( (item->>'this_payment')::numeric ) AS total_payments
+     FROM payment_m3 p
+     CROSS JOIN LATERAL jsonb_array_elements(p.line_items) AS item
+     WHERE (item->>'line_date')::date BETWEEN $1 AND $2
+     GROUP BY p.clientid`,
     [start, end]
   );
-  return new Map(result.rows.map(r => [r.clientid, Number.parseFloat(r.total_payments) || 0]));
+  return new Map(
+    result.rows.map((r) => [r.clientid, Number.parseFloat(r.total_payments) || 0])
+  );
 }
 
 async function fetchCreditNotesMap(dbClient, start, end) {

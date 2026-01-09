@@ -148,17 +148,16 @@ const getStatementDetails = async (statementId) => {
     const paymentsQuery = `
       SELECT 
         p.paykey,
-        p.fileupload AS date,
-        p.amount,
-        p.reference,
-        i.invoice_num
+        (item->>'line_date')::date AS date,
+        (item->>'this_payment')::numeric AS amount,
+        item->>'line_reference' AS reference,
+        item->>'invoice_num' AS invoice_num
       FROM 
         payment_m3 p
-      LEFT JOIN 
-        invoice i ON p.invoiceid = i.ikey
+      CROSS JOIN LATERAL jsonb_array_elements(p.line_items) AS item
       WHERE 
         p.clientid = $1
-        AND p.fileupload BETWEEN $2 AND $3
+        AND (item->>'line_date')::date BETWEEN $2 AND $3
     `;
     const creditNotesQuery = `
       SELECT 
