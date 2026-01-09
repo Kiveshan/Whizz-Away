@@ -189,6 +189,49 @@ export const getContainersByInstructionId = async (instructionId) => {
   }
 };
 
+// Check if a specific container for an instruction has any associated legs
+// in the legs_m2 table. We key by m1key (instructionId) and containernumber
+// to stay consistent with existing joins.
+export const checkContainerHasLegs = async (instructionId, containerNum) => {
+  const sql = `
+    SELECT COUNT(*) AS leg_count
+    FROM public.legs_m2
+    WHERE m1key = $1 AND containernumber = $2
+  `;
+  const result = await query(sql, [instructionId, containerNum]);
+  const count = Number(result.rows[0]?.leg_count || 0);
+  return count > 0;
+};
+
+// Delete a container and any associated legs for a given instruction.
+// This is used by the FC screen when the user confirms they want to
+// remove a container that may already be assigned.
+export const deleteContainerAndLegs = async (instructionId, containerNum) => {
+  const client = await pool.connect();
+  try {
+    await client.query("BEGIN");
+
+    await client.query(
+      `DELETE FROM public.legs_m2 WHERE m1key = $1 AND containernumber = $2`,
+      [instructionId, containerNum]
+    );
+
+    const deleteContainerResult = await client.query(
+      `DELETE FROM public.container WHERE m1key = $1 AND containernum = $2`,
+      [instructionId, containerNum]
+    );
+
+    await client.query("COMMIT");
+
+    return { deletedContainers: deleteContainerResult.rowCount };
+  } catch (error) {
+    await client.query("ROLLBACK");
+    throw error;
+  } finally {
+    client.release();
+  }
+};
+
 export const saveInstruction = async ({
   controllerData,
   containerData = [],
@@ -1193,7 +1236,36 @@ export const updateContainersByInstructionId = async (
   try {
     await client.query("BEGIN");
 
-    // Delete existing containers
+    // Before replacing containers, fetch existing ones so we can
+    // identify which container numbers are being removed and clean up
+    // any related legs in legs_m2.
+    const existingRes = await client.query(
+      `SELECT containernum FROM public.container WHERE m1key = $1`,
+      [instructionId]
+    );
+    const existingNums = existingRes.rows
+      .map((row) => row.containernum)
+      .filter((num) => num !== null && num !== undefined && num !== "");
+
+    const newNumsSet = new Set(
+      (containerData || [])
+        .map((c) => c.containernum || c.containerNum || null)
+        .filter((num) => num !== null && num !== undefined && num !== "")
+    );
+
+    // Any existing container number that is not present in the new
+    // payload represents a deleted container. Remove associated legs
+    // for those containers.
+    for (const existingNum of existingNums) {
+      if (!newNumsSet.has(existingNum)) {
+        await client.query(
+          `DELETE FROM public.legs_m2 WHERE m1key = $1 AND containernumber = $2`,
+          [instructionId, existingNum]
+        );
+      }
+    }
+
+    // Delete existing containers so we can insert the new set
     const deleteQuery = `
       DELETE FROM public.container
       WHERE m1key = $1

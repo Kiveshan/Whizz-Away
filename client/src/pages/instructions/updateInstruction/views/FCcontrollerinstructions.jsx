@@ -341,6 +341,10 @@ const FCcontrollerinstructions = () => {
     action: null,
   });
 
+  // Track pending delete targets for containers and weight rows
+  const [containerToDelete, setContainerToDelete] = useState(null);
+  const [weightRowToDelete, setWeightRowToDelete] = useState(null);
+
   // Initialize containers based on container counts
   const initializeContainers = () => {
     console.log("Initializing containers with form data:", formData);
@@ -1631,6 +1635,46 @@ const FCcontrollerinstructions = () => {
         pickup: "",
         dropoff: "",
       }));
+    } else if (confirmationModal.action === "delete-container") {
+      if (containerToDelete) {
+        setContainers((prev) => {
+          const updated = prev.filter((c) => c.id !== containerToDelete.id);
+
+          // Recalculate container counts based on remaining containers so
+          // the "No. of Containers" fields stay in sync. The actual
+          // database deletion will occur when the user saves, via the
+          // existing update endpoint.
+          const numSix = updated.filter((c) => c.containerType === "6m").length;
+          const numTwelve = updated.filter(
+            (c) => c.containerType === "12m"
+          ).length;
+          const numAbnormal = updated.filter(
+            (c) => c.containerType === "Abnormal"
+          ).length;
+          const numBreakBulk = updated.filter(
+            (c) => c.containerType === "BreakBulk"
+          ).length;
+
+          setFormData((prevForm) => ({
+            ...prevForm,
+            num_six_meters: numSix,
+            num_twelve_meters: numTwelve,
+            num_abnormal: numAbnormal,
+            num_breakbulk: numBreakBulk,
+          }));
+
+          return updated;
+        });
+        setIsContainerDataModified(true);
+      }
+      setContainerToDelete(null);
+    } else if (confirmationModal.action === "delete-weight") {
+      if (weightRowToDelete) {
+        setWeightRows((prev) =>
+          prev.filter((row) => row.id !== weightRowToDelete.id)
+        );
+      }
+      setWeightRowToDelete(null);
     } else if (confirmationModal.action === "save") {
       performSave();
     } else if (confirmationModal.action === "delete") {
@@ -1643,6 +1687,60 @@ const FCcontrollerinstructions = () => {
 
   const handleCancelAction = () => {
     setConfirmationModal({ isOpen: false, message: "", action: null });
+    setContainerToDelete(null);
+    setWeightRowToDelete(null);
+  };
+
+  // Ask for confirmation before deleting a container; if the
+  // container has been assigned to legs, we adjust the message
+  // based on a backend check.
+  const handleRequestDeleteContainer = async (container) => {
+    if (isReadOnly) return;
+
+    try {
+      let hasLegs = false;
+
+      // Only check legs if we have both an instructionId and a
+      // container number that could exist in the DB.
+      if (instructionId && container.containerNum) {
+        const response = await api.get(
+          `/api/instructions/fc/container/${instructionId}/${encodeURIComponent(
+            container.containerNum
+          )}/legs-exists`,
+        );
+        hasLegs = Boolean(response.data?.hasLegs);
+      }
+
+      const message = hasLegs
+        ? "This container currently has legs assigned. Deleting this container will also remove all associated assignments. Are you sure you want to continue?"
+        : "Are you sure you want to delete this container?";
+
+      setContainerToDelete(container);
+      setConfirmationModal({
+        isOpen: true,
+        message,
+        action: "delete-container",
+      });
+    } catch (error) {
+      console.error("Error checking container legs before delete:", error);
+      setErrorModal({
+        isOpen: true,
+        message:
+          "Failed to verify container assignments before delete. Please try again.",
+      });
+    }
+  };
+
+  // Ask for confirmation before deleting a weight row
+  const handleRequestDeleteWeightRow = (row) => {
+    if (isReadOnly) return;
+
+    setWeightRowToDelete(row);
+    setConfirmationModal({
+      isOpen: true,
+      message: "Are you sure you want to delete this weight row?",
+      action: "delete-weight",
+    });
   };
 
   // Initialize containers when component mounts or container counts change
@@ -4920,7 +5018,9 @@ const FCcontrollerinstructions = () => {
                           <th style={{ border: "1px solid #dee2e6", padding: "4px" }}>
                             Weight ({formData.rateWeight})
                           </th>
-                          <th style={{ border: "1px solid #dee2e6", padding: "4px" }}></th>
+                          <th style={{ border: "1px solid #dee2e6", padding: "4px" }}>
+                            Actions
+                          </th>
                         </tr>
                       </thead>
                       <tbody>
@@ -4991,7 +5091,7 @@ const FCcontrollerinstructions = () => {
                               {!isReadOnly && (
                                 <button
                                   type="button"
-                                  onClick={() => removeWeightRow(row.id)}
+                                  onClick={() => handleRequestDeleteWeightRow(row)}
                                   style={{
                                     padding: "2px 6px",
                                     fontSize: "11px",
@@ -5002,7 +5102,7 @@ const FCcontrollerinstructions = () => {
                                     cursor: "pointer",
                                   }}
                                 >
-                                  Remove
+                                  Delete
                                 </button>
                               )}
                             </td>
@@ -5144,6 +5244,15 @@ const FCcontrollerinstructions = () => {
                             Weight
                           </th>
                         )}
+                        <th
+                          style={{
+                            padding: "12px 8px",
+                            textAlign: "center",
+                            borderBottom: "2px solid #ddd",
+                          }}
+                        >
+                          Actions
+                        </th>
                         <th
                           style={{
                             padding: "12px 8px",
@@ -5325,6 +5434,32 @@ const FCcontrollerinstructions = () => {
                               </div>
                             </td>
                           )}
+                          <td
+                            style={{
+                              padding: "8px",
+                              borderBottom: "1px solid #eee",
+                              textAlign: "center",
+                              whiteSpace: "nowrap",
+                            }}
+                          >
+                            {!isReadOnly && (
+                              <button
+                                type="button"
+                                onClick={() => handleRequestDeleteContainer(container)}
+                                style={{
+                                  padding: "2px 8px",
+                                  fontSize: "11px",
+                                  borderRadius: "4px",
+                                  border: "1px solid #dc3545",
+                                  backgroundColor: "#fff",
+                                  color: "#dc3545",
+                                  cursor: "pointer",
+                                }}
+                              >
+                                Delete
+                              </button>
+                            )}
+                          </td>
                           <td>
                             <div className="controller-instructions-input-wrapper">
                               <input

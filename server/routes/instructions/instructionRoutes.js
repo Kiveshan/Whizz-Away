@@ -20,6 +20,8 @@ import {
   updateFCInstructionHandler,
   updateFCContainersHandler,
   updateFCInstructionAndContainersHandler,
+  checkFCContainerLegsHandler,
+  deleteFCContainerAndLegsHandler,
   deleteInstructionHandler,
 } from "../../controllers/instructions/instructionController.js"
 import { verifyToken } from "../../middleware/auth.js"
@@ -54,6 +56,15 @@ router.put("/fc/containers/:instructionId", updateFCContainersHandler)
 router.put("/fc/update/:id", updateFCInstructionAndContainersHandler)
 // Delete instruction and its containers
 router.delete("/fc/instruction/:id", deleteInstructionHandler)
+// Check and delete specific containers (and their legs) for FC
+router.get(
+  "/fc/container/:instructionId/:containerNum/legs-exists",
+  checkFCContainerLegsHandler,
+)
+router.delete(
+  "/fc/container/:instructionId/:containerNum",
+  deleteFCContainerAndLegsHandler,
+)
 
 // Shared routes
 router.get("/active-clients", getActiveClientsHandler)
