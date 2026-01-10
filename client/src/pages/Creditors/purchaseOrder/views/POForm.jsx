@@ -187,7 +187,6 @@ const handleSubmit = async (e) => {
                   className="form-control"
                   value={headerData.date}
                   onChange={handleHeaderChange}
-                  min={new Date().toISOString().split("T")[0]}
                   required
                 />
               </div>

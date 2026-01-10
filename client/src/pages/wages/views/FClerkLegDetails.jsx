@@ -149,6 +149,7 @@ const FClerkLegDetails = () => {
               <th>Instruction ID</th>
               <th>Leg Number</th>
               <th>Truck Reg</th>
+              <th>Container Number</th>
               <th>Starting Point</th>
               <th>Ending Point</th>
               <th>Date</th>
@@ -179,6 +180,7 @@ const FClerkLegDetails = () => {
                   <td>{leg.displayInstructionId}</td>
                   <td>{leg.legnumber || "N/A"}</td>
                   <td>{leg.truckregnumber || "N/A"}</td>
+                  <td>{leg.containernumber || "N/A"}</td>
                   <td>{leg.startingpoint || "N/A"}</td>
                   <td>{leg.destination || "N/A"}</td>
                   <td>{formatDate(leg.date)}</td>
