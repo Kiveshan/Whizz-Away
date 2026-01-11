@@ -262,6 +262,7 @@ const UploadProof = () => {
     const amountDue = source?.amount_due ?? 0;
     const total = source?.total ?? null;
     const paidAmount = source?.paid_amount ?? null;
+    const sourceDate = source?.date ?? null;
 
     const today = new Date().toISOString().split("T")[0];
 
@@ -275,6 +276,7 @@ const UploadProof = () => {
         amount_to_pay: amountDue,
         total,
         paid_amount: paidAmount,
+        date: sourceDate,
         line_date: today,
         line_reference: "",
       },
@@ -302,7 +304,53 @@ const UploadProof = () => {
   };
 
   const handleRemoveLineItem = (index) => {
-    setLineItems((prev) => prev.filter((_, i) => i !== index));
+    setLineItems((prev) => {
+      const removed = prev[index];
+      const updated = prev.filter((_, i) => i !== index);
+
+      // In create mode, when a line is removed, put it back into the dropdown list
+      if (!isViewMode && removed) {
+        setItems((prevItems) => {
+          // Avoid duplicates if it was somehow already present
+          const exists = prevItems.some(
+            (item) => item.id === removed.id && item.type === removed.type
+          );
+          if (exists) return prevItems;
+
+          // Try to recover invoice/add-on number for label; fall back sensibly
+          let invoiceNum = removed.invoice_num;
+          if (!invoiceNum && removed.label) {
+            // Label format is usually "Type: INVNO (date)", so extract middle token
+            const parts = removed.label.split(":");
+            if (parts.length > 1) {
+              const afterColon = parts[1].trim();
+              invoiceNum = afterColon.split(" ")[0];
+            }
+          }
+
+          return [
+            ...prevItems,
+            {
+              id: removed.id,
+              type: removed.type,
+              invoice_num: invoiceNum || removed.id,
+              // Date is only used for display; if we don't have it, omit and
+              // the select label will still be constructed from invoice_num.
+              date: removed.date,
+              total: removed.total ?? null,
+              paid_amount: removed.paid_amount ?? null,
+              amount_due:
+                removed.amount_due ??
+                (typeof removed.amount_to_pay === "number"
+                  ? removed.amount_to_pay
+                  : 0),
+            },
+          ];
+        });
+      }
+
+      return updated;
+    });
   };
 
   const handleLineReferenceChange = (index, value) => {
@@ -391,13 +439,20 @@ const UploadProof = () => {
                     <div className="amount-field" style={{ width: "100%" }}>
                       <label>Select Invoice or Add-on *</label>
                       <Select
-                        options={items.map((item) => ({
-                          value: item.id,
-                          type: item.type,
-                          label: `${item.type}: ${item.invoice_num} (${new Date(
-                            item.date
-                          ).toLocaleDateString()})`,
-                        }))}
+                        options={items.map((item) => {
+                          let dateLabel = "";
+                          if (item.date) {
+                            const d = new Date(item.date);
+                            if (!Number.isNaN(d.getTime())) {
+                              dateLabel = ` (${d.toLocaleDateString()})`;
+                            }
+                          }
+                          return {
+                            value: item.id,
+                            type: item.type,
+                            label: `${item.type}: ${item.invoice_num}${dateLabel}`,
+                          };
+                        })}
                         value={selectedItem}
                         onChange={handleAddLineItem}
                         placeholder="Select an invoice or add-on"
