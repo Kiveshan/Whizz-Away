@@ -303,6 +303,8 @@
 .wage-container {
   width: 100%;
   font-family: Arial, sans-serif;
+  /* Ensure content is clear of the global footer */
+  padding-bottom: 80px;
 }
 
 /* Header styling */
@@ -480,7 +482,6 @@
   margin-top: 20px;
   padding: 0 20px;
   text-align: center;
-  position: sticky; /* Keeps pagination in view */
-  bottom: 60px; /* Space for footer */
-  z-index: 10; /* Ensure it’s above other content */
+  /* Let pagination sit naturally below the table instead of overlaying it */
+  margin-bottom: 40px;
 }

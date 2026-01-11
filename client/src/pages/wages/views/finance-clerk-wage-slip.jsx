@@ -345,45 +345,27 @@ try {
   }
 }
 
-// If using stored data, use stored values, otherwise calculate fresh
-if (useStoredData) {
-  totalEarningsAmount = storedTotalEarnings;
-} else {
-  // Add base salary to total earnings
-  if (baseSalary > 0) {
-    totalEarningsAmount += baseSalary;
-  }
-  
-  // Add legs earnings
-  Object.keys(legsByInstruction).forEach((instructionId) => {
-    legsByInstruction[instructionId].forEach((leg, index) => {
-      const legAmount = parseAmount(leg.driverrate);
-      totalEarningsAmount += legAmount;
-    });
-  });
+// Compute total earnings once: base salary + all legs
+if (baseSalary > 0) {
+  totalEarningsAmount += baseSalary;
 }
+
+Object.keys(legsByInstruction).forEach((instructionId) => {
+  legsByInstruction[instructionId].forEach((leg) => {
+    const legAmount = parseAmount(leg.driverrate);
+    totalEarningsAmount += legAmount;
+  });
+});
 
 // Always show the breakdown for display purposes (regardless of stored vs fresh)
 if (baseSalary > 0) {
+  earnings.push({
+    description: "Base Salary",
+    amount: `R ${baseSalary.toFixed(2)}`,
+  });
+}
 
-            // Add legs earnings
-            Object.keys(legsByInstruction).forEach((instructionId) => {
-              legsByInstruction[instructionId].forEach((leg, index) => {
-                const legAmount = parseAmount(leg.driverrate);
-                totalEarningsAmount += legAmount;
-              });
-            });
-          }
-
-          // Always show the breakdown for display purposes (regardless of stored vs fresh)
-          if (baseSalary > 0) {
-            earnings.push({
-              description: "Base Salary",
-              amount: `R ${baseSalary.toFixed(2)}`,
-            });
-          }
-
-          // Add each leg as a separate earning, grouped by instruction
+// Add each leg as a separate earning, grouped by instruction
           Object.keys(legsByInstruction).forEach((instructionId) => {
             legsByInstruction[instructionId].forEach((leg, index) => {
               const legAmount = parseAmount(leg.driverrate);
