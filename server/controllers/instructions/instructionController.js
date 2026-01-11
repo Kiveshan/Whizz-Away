@@ -15,6 +15,8 @@ import {
   saveInstructionAndContainers,
   updateFCInstructionAndContainers,
   deleteInstruction,
+  checkContainerHasLegs,
+  deleteContainerAndLegs,
 } from "../../models/instructions/instructionModel.js"
 
 // Helper function to calculate total cost based on rate weight type
@@ -102,6 +104,30 @@ export const getShipmentTypesHandler = async (req, res) => {
     res.status(500).json({ error: error.message })
   }
 }
+
+// Check if a specific container for an instruction has any legs in legs_m2
+export const checkFCContainerLegsHandler = async (req, res) => {
+  try {
+    const { instructionId, containerNum } = req.params;
+    const hasLegs = await checkContainerHasLegs(instructionId, containerNum);
+    res.json({ hasLegs });
+  } catch (error) {
+    console.error("[FC] Error in checkFCContainerLegsHandler:", error);
+    res.status(500).json({ error: "Failed to check container assignments" });
+  }
+};
+
+// Delete a container and any associated legs for the given instruction
+export const deleteFCContainerAndLegsHandler = async (req, res) => {
+  try {
+    const { instructionId, containerNum } = req.params;
+    const result = await deleteContainerAndLegs(instructionId, containerNum);
+    res.json({ success: true, ...result });
+  } catch (error) {
+    console.error("[FC] Error in deleteFCContainerAndLegsHandler:", error);
+    res.status(500).json({ error: "Failed to delete container and assignments" });
+  }
+};
 
 export const getContainersHandler = async (req, res) => {
   try {

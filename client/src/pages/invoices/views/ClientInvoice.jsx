@@ -786,36 +786,6 @@ const ClientInvoice = forwardRef(({
           </button>
         )}
         <button
-          className="back-btn"
-          onClick={() => {
-            if (roleId == 3) {
-              navigate("/invoices", {
-                state: {
-                  clientId,
-                  clientName,
-                },
-              });
-            } else if (roleId == 4) {
-              navigate("/DirectorClientDocuments", {
-                state: {
-                  clientId: finalInvoiceData.m5clientkey,
-                  clientName: finalInvoiceData.client_name,
-                },
-              });
-            } else if (roleId == 1) {
-              navigate("/client-documents", {
-                state: {
-                  clientId: finalInvoiceData.m5clientkey,
-                  clientName: finalInvoiceData.client_name,
-                },
-              });
-            }
-          }}
-          disabled={pdfLoading}
-        >
-          Back
-        </button>
-        <button
           className="download-btn"
           onClick={generatePDF}
           disabled={pdfLoading}

@@ -16,7 +16,7 @@ const UploadProof = () => {
   const [paymentDate, setPaymentDate] = useState("");
   const [selectedItem, setSelectedItem] = useState(null);
   const [items, setItems] = useState([]);
-  const [reference, setReference] = useState("");
+  const [lineItems, setLineItems] = useState([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState(null);
@@ -30,6 +30,17 @@ const UploadProof = () => {
       return true;
     }
     return false;
+  };
+
+  const handleLineDateChange = (index, value) => {
+    setLineItems((prev) => {
+      const updated = [...prev];
+      updated[index] = {
+        ...updated[index],
+        line_date: value,
+      };
+      return updated;
+    });
   };
 
   const roleId = JSON.parse(localStorage.getItem("user"))?.roleid;
@@ -52,15 +63,6 @@ const UploadProof = () => {
         });
         if (response.data.success) {
           setItems(response.data.data);
-          if (!isViewMode && response.data.data.length > 0) {
-            setSelectedItem({
-              value: response.data.data[0].id,
-              type: response.data.data[0].type,
-              label: `${response.data.data[0].type}: ${
-                response.data.data[0].invoice_num
-              } (${new Date(response.data.data[0].date).toLocaleDateString()})`,
-            });
-          }
         } else {
           throw new Error(response.data.message || "Failed to fetch items");
         }
@@ -99,12 +101,18 @@ const UploadProof = () => {
               fileupload,
               invoiceid,
               addon_id,
-              reference,
               invoice_num,
+              line_items,
             } = response.data.data;
-            setAmount(amount.toString());
+            setAmount(Number(amount ?? 0).toFixed(2));
             setPaymentDate(fileupload.split("T")[0]);
-            setReference(reference || "");
+            if (Array.isArray(line_items) && line_items.length > 0) {
+              setLineItems(
+                line_items.map((item) => ({
+                  ...item,
+                }))
+              );
+            }
             if (invoiceid || addon_id) {
               const type = invoiceid ? "Invoice" : "Add-on";
               const id = invoiceid || addon_id;
@@ -146,34 +154,31 @@ const UploadProof = () => {
       return;
     }
 
-    if (!amount || isNaN(amount)) {
-      setError("Please enter a valid amount");
+    if (lineItems.length === 0) {
+      setError("Please add at least one invoice or add-on to this payment");
       return;
     }
 
-    if (!paymentDate) {
-      setError("Please select a payment date");
-      return;
-    }
-
-    if (!selectedItem) {
-      setError("Please select an invoice or add-on");
-      return;
-    }
-
-    if (!reference.trim()) {
-      setError("Please enter a payment reference");
+    // Ensure each line has a date
+    const hasMissingDates = lineItems.some(
+      (item) => !item.line_date || item.line_date === ""
+    );
+    if (hasMissingDates) {
+      setError("Please select a payment date for each line");
       return;
     }
 
     try {
       setIsSubmitting(true);
       const paymentData = {
-        amount: Number.parseFloat(amount),
-        fileupload: paymentDate,
-        invoiceid: selectedItem.type === "Invoice" ? selectedItem.value : null,
-        addon_id: selectedItem.type === "Add-on" ? selectedItem.value : null,
-        reference: reference.trim(),
+        // fileupload is treated as a generation date on the backend; we omit it here
+        line_items: lineItems.map((item) => ({
+          type: item.type,
+          id: item.id,
+          amount_to_pay: Number(item.amount_to_pay),
+          line_date: item.line_date,
+          line_reference: item.line_reference || "",
+        })),
       };
 
       const response = await api.post(
@@ -239,6 +244,135 @@ const UploadProof = () => {
     return selectedItem ? selectedItem.label : "";
   };
 
+  // Add selected invoice/add-on as a line item with default amount_to_pay = amount_due
+  const handleAddLineItem = (option) => {
+    if (!option) return;
+    setSelectedItem(option);
+
+    const existing = lineItems.find(
+      (item) => item.id === option.value && item.type === option.type
+    );
+    if (existing) {
+      return;
+    }
+
+    const source = items.find(
+      (item) => item.id === option.value && item.type === option.type
+    );
+    const amountDue = source?.amount_due ?? 0;
+    const total = source?.total ?? null;
+    const paidAmount = source?.paid_amount ?? null;
+    const sourceDate = source?.date ?? null;
+
+    const today = new Date().toISOString().split("T")[0];
+
+    setLineItems((prev) => [
+      ...prev,
+      {
+        id: option.value,
+        type: option.type,
+        label: option.label,
+        amount_due: amountDue,
+        amount_to_pay: amountDue,
+        total,
+        paid_amount: paidAmount,
+        date: sourceDate,
+        line_date: today,
+        line_reference: "",
+      },
+    ]);
+
+    // Remove the selected item from the dropdown list and clear the selection
+    setItems((prev) =>
+      prev.filter(
+        (item) => !(item.id === option.value && item.type === option.type)
+      )
+    );
+    setSelectedItem(null);
+  };
+
+  const handleLineAmountChange = (index, value) => {
+    setLineItems((prev) => {
+      const updated = [...prev];
+      const numeric = Number(value);
+      updated[index] = {
+        ...updated[index],
+        amount_to_pay: Number.isNaN(numeric) ? "" : numeric,
+      };
+      return updated;
+    });
+  };
+
+  const handleRemoveLineItem = (index) => {
+    setLineItems((prev) => {
+      const removed = prev[index];
+      const updated = prev.filter((_, i) => i !== index);
+
+      // In create mode, when a line is removed, put it back into the dropdown list
+      if (!isViewMode && removed) {
+        setItems((prevItems) => {
+          // Avoid duplicates if it was somehow already present
+          const exists = prevItems.some(
+            (item) => item.id === removed.id && item.type === removed.type
+          );
+          if (exists) return prevItems;
+
+          // Try to recover invoice/add-on number for label; fall back sensibly
+          let invoiceNum = removed.invoice_num;
+          if (!invoiceNum && removed.label) {
+            // Label format is usually "Type: INVNO (date)", so extract middle token
+            const parts = removed.label.split(":");
+            if (parts.length > 1) {
+              const afterColon = parts[1].trim();
+              invoiceNum = afterColon.split(" ")[0];
+            }
+          }
+
+          return [
+            ...prevItems,
+            {
+              id: removed.id,
+              type: removed.type,
+              invoice_num: invoiceNum || removed.id,
+              // Date is only used for display; if we don't have it, omit and
+              // the select label will still be constructed from invoice_num.
+              date: removed.date,
+              total: removed.total ?? null,
+              paid_amount: removed.paid_amount ?? null,
+              amount_due:
+                removed.amount_due ??
+                (typeof removed.amount_to_pay === "number"
+                  ? removed.amount_to_pay
+                  : 0),
+            },
+          ];
+        });
+      }
+
+      return updated;
+    });
+  };
+
+  const handleLineReferenceChange = (index, value) => {
+    setLineItems((prev) => {
+      const updated = [...prev];
+      updated[index] = {
+        ...updated[index],
+        line_reference: value,
+      };
+      return updated;
+    });
+  };
+
+  // Auto-calculate total amount from line items
+  useEffect(() => {
+    const totalAmount = lineItems.reduce((sum, item) => {
+      const numeric = Number(item.amount_to_pay || 0);
+      return sum + (Number.isNaN(numeric) ? 0 : numeric);
+    }, 0);
+    setAmount(totalAmount ? totalAmount.toFixed(2) : "");
+  }, [lineItems]);
+
   // Custom styles for react-select
   const customStyles = {
     control: (provided) => ({
@@ -299,84 +433,165 @@ const UploadProof = () => {
 
             {!isLoading && (
               <>
-                {/* Item Selection - Full Width */}
-                <div className="form-row full-width">
-                  <div className="amount-field">
-                    <label>Select Invoice or Add-on *</label>
-                    <Select
-                      options={items.map((item) => ({
-                        value: item.id,
-                        type: item.type,
-                        label: `${item.type}: ${item.invoice_num} (${new Date(
-                          item.date
-                        ).toLocaleDateString()})`,
-                      }))}
-                      value={selectedItem}
-                      onChange={setSelectedItem}
-                      isDisabled={isViewMode}
-                      placeholder="Select an invoice or add-on"
-                      isSearchable
-                      styles={customStyles}
-                    />
-                    {isViewMode && selectedItem && (
-                      <div className="selected-info">
-                        Selected: {getSelectedItemDetails()}
-                      </div>
-                    )}
+                {/* Item Selection - Full Width (create mode only) */}
+                {!isViewMode && (
+                  <div className="form-row full-width">
+                    <div className="amount-field" style={{ width: "100%" }}>
+                      <label>Select Invoice or Add-on *</label>
+                      <Select
+                        options={items.map((item) => {
+                          let dateLabel = "";
+                          if (item.date) {
+                            const d = new Date(item.date);
+                            if (!Number.isNaN(d.getTime())) {
+                              dateLabel = ` (${d.toLocaleDateString()})`;
+                            }
+                          }
+                          return {
+                            value: item.id,
+                            type: item.type,
+                            label: `${item.type}: ${item.invoice_num}${dateLabel}`,
+                          };
+                        })}
+                        value={selectedItem}
+                        onChange={handleAddLineItem}
+                        placeholder="Select an invoice or add-on"
+                        isSearchable
+                        styles={customStyles}
+                      />
+                    </div>
                   </div>
-                </div>
-
-                {/* Amount and Date - Side by Side */}
+                )}
+                {/* Total Amount - Single column; per-line dates are captured in the allocation table */}
                 <div className="form-row two-columns">
                   <div className="amount-field">
-                    <label>Amount Paid *</label>
+                    <label>Total Amount Paid</label>
                     <input
                       type="number"
                       step="0.01"
                       value={amount}
-                      onChange={(e) => setAmount(e.target.value)}
+                      readOnly
+                      disabled
                       placeholder="0.00"
-                      readOnly={isViewMode}
-                      disabled={isViewMode}
-                      required
-                    />
-                  </div>
-                  <div className="amount-field">
-                    <label>Payment Date *</label>
-                    <input
-                      type="date"
-                      value={paymentDate}
-                      onChange={(e) => setPaymentDate(e.target.value)}
-                      readOnly={isViewMode}
-                      disabled={isViewMode}
-                      required
                     />
                   </div>
                 </div>
 
-                {/* Reference Field - Full Width */}
-                <div className="form-row full-width">
-                  <div className="amount-field">
-                    <label>Payment Reference *</label>
-                    <input
-                      type="text"
-                      value={reference}
-                      onChange={(e) => setReference(e.target.value)}
-                      placeholder="Enter payment reference (e.g., transaction ID, check number, etc.)"
-                      readOnly={isViewMode}
-                      disabled={isViewMode}
-                      required
-                      maxLength={255}
-                    />
-                    {!isViewMode && (
-                      <div className="field-help">
-                        Enter a reference for this payment such as date of
-                        payment, bank statement no., or any other identifying
-                        information.
-                      </div>
-                    )}
+                {/* Line items table */}
+                {lineItems.length > 0 && (
+                  <div className="form-row full-width">
+                    <div className="amount-field" style={{ width: "100%" }}>
+                      <label>
+                        Payment Allocation
+                      </label>
+                      <table className="client-payments-line-items-table">
+                        <thead>
+                          <tr>
+                            <th>Item Type</th>
+                            <th>Invoice/Add-on No.</th>
+                            <th>Total</th>
+                            <th>Paid To Date</th>
+                            <th>Balance After Payment</th>
+                            <th>Payment Date</th>
+                            <th>This Payment</th>
+                            <th>Payment Ref</th>
+                            <th></th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {lineItems.map((item, index) => (
+                            <tr key={`${item.type}-${item.id || index}`}>
+                              <td>{item.type}</td>
+                              <td>{item.label || item.invoice_num || item.id}</td>
+                              <td>
+                                {item.total != null
+                                  ? Number(item.total).toFixed(2)
+                                  : "-"}
+                              </td>
+                              <td>
+                                {item.paid_amount != null
+                                  ? Number(item.paid_amount).toFixed(2)
+                                  : "-"}
+                              </td>
+                              <td>{Number(item.amount_due || 0).toFixed(2)}</td>
+                              <td>
+                                {isViewMode ? (
+                                  <span>
+                                    {item.line_date
+                                      ? new Date(item.line_date).toISOString().split("T")[0]
+                                      : paymentDate || "-"}
+                                  </span>
+                                ) : (
+                                  <input
+                                    type="date"
+                                    value={item.line_date || ""}
+                                    onChange={(e) =>
+                                      handleLineDateChange(index, e.target.value)
+                                    }
+                                  />
+                                )}
+                              </td>
+                              <td>
+                                {isViewMode ? (
+                                  <span>
+                                    {Number(item.amount_to_pay).toFixed(2)}
+                                  </span>
+                                ) : (
+                                  <input
+                                    type="number"
+                                    step="0.01"
+                                    value={item.amount_to_pay}
+                                    onChange={(e) =>
+                                      handleLineAmountChange(index, e.target.value)
+                                    }
+                                    min={0}
+                                    max={item.amount_due}
+                                  />
+                                )}
+                              </td>
+                              <td>
+                                {isViewMode ? (
+                                  <span>{item.line_reference}</span>
+                                ) : (
+                                  <input
+                                    type="text"
+                                    value={item.line_reference || ""}
+                                    onChange={(e) =>
+                                      handleLineReferenceChange(index, e.target.value)
+                                    }
+                                    placeholder="Ref for this line"
+                                  />
+                                )}
+                              </td>
+                              <td>
+                                {isViewMode ? (
+                                  <span />
+                                ) : (
+                                  <button
+                                    type="button"
+                                    className="remove-line-item-button"
+                                    onClick={() => handleRemoveLineItem(index)}
+                                    style={{
+                                      backgroundColor: "#e74c3c",
+                                      color: "#fff",
+                                      border: "none",
+                                      borderRadius: "4px",
+                                      padding: "4px 10px",
+                                      cursor: "pointer",
+                                      fontSize: "12px",
+                                    }}
+                                  >
+                                    Remove
+                                  </button>
+                                )}
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
                   </div>
-                </div>
+                )}
 
                 {/* Submit Button - Full Width (Upload Mode Only) */}
                 {!isViewMode && (
@@ -386,9 +601,7 @@ const UploadProof = () => {
                       onClick={handleSubmit}
                       disabled={
                         !amount ||
-                        !paymentDate ||
-                        !selectedItem ||
-                        !reference.trim() ||
+                        lineItems.length === 0 ||
                         isSubmitting
                       }
                     >
