@@ -2254,8 +2254,24 @@ export const updateFCInstructionAndContainers = async (
     const pickup = currentInstruction.pickup;
     const dropoff = currentInstruction.dropoff;
 
-    // Delete containers
+    // Delete containers (and any associated legs for those containers)
     for (const containerKey of containerChanges.toDelete) {
+      // Find the full container record so we can get its container number
+      const containerRecord = currentContainers.find(
+        (c) => c.containerkey === containerKey
+      );
+
+      if (containerRecord && containerRecord.containernum) {
+        // Remove any legs that reference this container for this instruction
+        await client.query(
+          `DELETE FROM public.legs_m2 WHERE m1key = $1 AND containernumber = $2`,
+          [instructionId, containerRecord.containernum]
+        );
+        console.log(
+          `[${new Date().toISOString()}] [MODEL] Deleted legs for container ${containerRecord.containernum} on instruction ${instructionId}`
+        );
+      }
+
       const deleteQuery = `DELETE FROM public.container WHERE containerkey = $1`;
       await client.query(deleteQuery, [containerKey]);
       console.log(
