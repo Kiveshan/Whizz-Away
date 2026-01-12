@@ -2933,7 +2933,7 @@ export const deleteInstruction = async (instructionId) => {
   try {
     await client.query("BEGIN");
 
-    // First check if the instruction exists and has status "New"
+    // First check if the instruction exists and has an allowed status
     const checkQuery = `
       SELECT status FROM public.m1_controller 
       WHERE m1key = $1
@@ -2944,8 +2944,12 @@ export const deleteInstruction = async (instructionId) => {
       throw new Error("Instruction not found");
     }
 
-    if (checkResult.rows[0].status !== "New") {
-      throw new Error("Only instructions with 'New' status can be deleted");
+    const status = checkResult.rows[0].status;
+    // Allow deletion for 'New' and 'In Progress' instructions; block others
+    if (status !== "New" && status !== "In Progress") {
+      throw new Error(
+        "Only instructions with 'New' or 'In Progress' status can be deleted"
+      );
     }
 
     // Delete any associated weight rows first
@@ -2955,12 +2959,26 @@ export const deleteInstruction = async (instructionId) => {
     `;
     await client.query(deleteWeightsQuery, [instructionId]);
 
-    // Delete containers first (due to foreign key constraints)
+    // Delete any associated legs for this instruction
+    const deleteLegsQuery = `
+      DELETE FROM public.legs_m2
+      WHERE m1key = $1
+    `;
+    await client.query(deleteLegsQuery, [instructionId]);
+
+    // Delete containers for this instruction (due to foreign key constraints)
     const deleteContainersQuery = `
       DELETE FROM public.container 
       WHERE m1key = $1
     `;
     await client.query(deleteContainersQuery, [instructionId]);
+
+    // Delete any associated invoice rows for this instruction
+    const deleteInvoiceQuery = `
+      DELETE FROM public.invoice
+      WHERE m1key = $1
+    `;
+    await client.query(deleteInvoiceQuery, [instructionId]);
 
     // Then delete the instruction
     const deleteInstructionQuery = `
