@@ -84,6 +84,8 @@ const modalAnimation = `
   
   .modal-body {
     padding: 0 24px 16px;
+    max-height: 60vh;
+    overflow-y: auto;
   }
   
   .modal-item {
@@ -2472,11 +2474,24 @@ useEffect(() => {
   return (
     <div className="min-h-screen bg-white" style={{ paddingBottom: 200 }}>
       <style>{modalAnimation}</style>
-      <div className="">
-        <button className="back-button" onClick={handleBackClick}>
-          Back
-        </button>
-      </div>
+      {!(
+        showMismatchModal ||
+        showContainerModal ||
+        showUnsavedChangesModal ||
+        showMissingFieldsModal ||
+        showNoDriversModal ||
+        showBackConfirmModal ||
+        showPickupMismatchModal ||
+        showContainerReachedModal ||
+        showSummaryModal ||
+        showInvoicePreview
+      ) && (
+        <div className="">
+          <button className="back-button" onClick={handleBackClick}>
+            Back
+          </button>
+        </div>
+      )}
 
       <br />
       {/* Lag Buttons & Plus */}
