@@ -343,10 +343,10 @@ const ClientStatement = () => {
 
       currentY = doc.lastAutoTable.finalY + 6;
 
-      // Age Analysis table - reordered: 90, 60, 30, Current
+      // Age Analysis table - reordered: 91+, 61-90, 31-60, Current
       autoTable(doc, {
         startY: currentY,
-        head: [["90+ Days", "60 Days", "30 Days", "Current"]],
+        head: [["91 Days +", "61-90 Days", "31-60 Days", "Current"]],
         body: [[
           `R${statement.aging["90days"].toFixed(2)}`,
           `R${statement.aging["60days"].toFixed(2)}`,
@@ -701,9 +701,9 @@ const ClientStatement = () => {
                 <table className="age-analysis-table">
                   <thead>
                     <tr>
-                      <th>90 Days +</th>
-                      <th>60 Days</th>
-                      <th>30 Days</th>
+                      <th>91 Days +</th>
+                      <th>61-90 Days</th>
+                      <th>31-60 Days</th>
                       <th>Current</th>
                     </tr>
                   </thead>
