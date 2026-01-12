@@ -388,6 +388,19 @@ export const saveLeg = async ({
           }
         }
       }
+    } else if (!isNewLeg && (!drivers || drivers.length === 0)) {
+      // Existing leg saved with no drivers: clear any persisted driver assignment data
+      await client.query(
+        `UPDATE legs_m2 SET 
+          driverid = NULL,
+          truckregnumber = NULL,
+          containernumber = NULL,
+          vgm = NULL,
+          date = NULL,
+          driverrate = $1
+        WHERE legkey = $2`,
+        [driverrate, legkey]
+      );
     }
     // Recompute invoice date based on earliest date for legnumber = 1 and update invoice if exists
     const legDateQuery = `
