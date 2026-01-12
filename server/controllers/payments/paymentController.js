@@ -8,50 +8,21 @@ import {
 const createPaymentHandler = async (req, res) => {
   try {
     const { clientId } = req.params;
-    const { amount, fileupload, invoiceid, addon_id, reference } = req.body;
+    const { fileupload, reference, line_items } = req.body;
 
-    if (!amount || isNaN(amount)) {
+    if (!Array.isArray(line_items) || line_items.length === 0) {
       return res.status(400).json({
         success: false,
-        message: "Amount is required and must be a number",
+        message: "At least one payment line item is required",
       });
     }
-
-    if (!fileupload) {
-      return res.status(400).json({
-        success: false,
-        message: "Payment date (fileupload) is required",
-      });
-    }
-
-    if (!invoiceid && !addon_id) {
-      return res.status(400).json({
-        success: false,
-        message: "Either Invoice ID or Add-on ID is required",
-      });
-    }
-
-    if (invoiceid && addon_id) {
-      return res.status(400).json({
-        success: false,
-        message: "Payment cannot be linked to both an invoice and an add-on",
-      });
-    }
-
-    if (!reference || !reference.trim()) {
-      return res.status(400).json({
-        success: false,
-        message: "Payment reference is required",
-      });
-    }
-
-    // Create payment record with reference
+    
+    // Create payment record with optional reference and line allocations
     const payment = await createPayment(clientId, {
-      amount,
+      // fileupload is now optional; the model will treat it as a generation date
       fileupload,
-      invoiceid,
-      addon_id,
-      reference: reference.trim(),
+      reference: reference ? reference.trim() : null,
+      line_items,
     });
 
     res.json({

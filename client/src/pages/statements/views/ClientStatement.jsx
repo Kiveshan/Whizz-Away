@@ -77,11 +77,13 @@ const ClientStatement = () => {
     fetchStatement();
   }, [statementId, navigate]);
 
-  // When statement or its transactions change, seed editable transaction state
+  // When statement changes, seed editable transaction state
   useEffect(() => {
     if (!statement) return;
 
-    // Rebuild transactionsWithBalance-like structure for initial state
+    const openingBalance = statement.opening_balance;
+
+    // Totals for the statement month (server already filtered by month)
     const invoicedAmount =
       statement.invoices.reduce((sum, inv) => sum + inv.amount, 0) +
       statement.addons.reduce((sum, addon) => sum + addon.amount, 0);
@@ -94,16 +96,14 @@ const ClientStatement = () => {
         (sum, creditNote) => sum + creditNote.amount,
         0
       ) || 0;
-    const openingBalance = statement.opening_balance;
-    const totalAmountPaid = amountPaid + creditNotesAmount;
-    const _balanceDue = openingBalance - totalAmountPaid + invoicedAmount;
+    const totalMonthPayments = amountPaid + creditNotesAmount;
 
-    // Rebuild transactions like below
-    const baseTransactions = [
+    // Build a single aggregated Payments row, then list all invoices/add-ons for the statement month
+    const charges = [
       ...statement.invoices.map((invoice) => ({
         type: "Invoice",
         date: new Date(invoice.date),
-        details: (invoice.formatted_details || ""),
+        details: invoice.formatted_details || "",
         reference: "",
         amount: invoice.amount,
         payment: null,
@@ -111,34 +111,29 @@ const ClientStatement = () => {
       ...statement.addons.map((addon) => ({
         type: "Add-on",
         date: new Date(addon.date),
-        details: (addon.formatted_details || ""),
+        details: addon.formatted_details || "",
         reference: "",
         amount: addon.amount,
         payment: null,
       })),
-      ...statement.payments.map((payment) => ({
-        type: "Payment",
-        date: new Date(payment.date),
-        details: payment.invoice_num || "",
-        reference: payment.reference || "",
-        amount: null,
-        payment: payment.amount,
-      })),
-      ...(statement.credit_notes || []).map((creditNote) => ({
-        type: "Credit Note",
-        date: new Date(creditNote.date),
-        details: creditNote.description || "",
-        reference: creditNote.reference || "",
-        amount: null,
-        payment: creditNote.amount,
-      })),
     ].sort((a, b) => a.date - b.date);
+
+    const paymentsRow = {
+      type: "Payments",
+      date: new Date(statement.generation_date),
+      details: "",
+      reference: "",
+      amount: null,
+      payment: totalMonthPayments,
+    };
+
+    const baseTransactions = [paymentsRow, ...charges];
 
     let running = openingBalance;
     const withBalance = baseTransactions.map((tx) => {
       if (tx.type === "Invoice" || tx.type === "Add-on") {
         running += tx.amount;
-      } else {
+      } else if (tx.payment) {
         running -= tx.payment;
       }
       return { ...tx, balance: running };
@@ -462,8 +457,8 @@ const ClientStatement = () => {
     return "";
   };
 
-  // Combine invoices, addons, payments, and credit notes into a single transactions array
-  const transactions = [
+  // Build transactions array for UI/PDF: single Payments row, then all invoices/add-ons for the statement month
+  const charges = [
     ...statement.invoices.map((invoice) => ({
       type: "Invoice",
       date: new Date(invoice.date),
@@ -480,36 +475,25 @@ const ClientStatement = () => {
       amount: addon.amount,
       payment: null,
     })),
-    ...statement.payments.map((payment) => {
-      console.log("Processing payment:", payment); // Debug log
-      return {
-        type: "Payment",
-        date: new Date(payment.date),
-        details: payment.invoice_num || "", // Use invoice number, empty if no match
-        reference: payment.reference || "", // Payment reference from the database
-        amount: null,
-        payment: payment.amount,
-      };
-    }),
-    ...(statement.credit_notes || []).map((creditNote) => {
-      console.log("Processing credit note:", creditNote); // Debug log
-      return {
-        type: "Credit Note",
-        date: new Date(creditNote.date),
-        details: formatDetails(creditNote, "Credit Note"),
-        reference: creditNote.reference || "", // Credit note reference
-        amount: null,
-        payment: creditNote.amount, // Credit notes reduce the balance like payments
-      };
-    }),
-  ].sort((a, b) => a.date - b.date); // Sort by date
+  ].sort((a, b) => a.date - b.date);
+
+  const paymentsRow = {
+    type: "Payments",
+    date: new Date(statement.generation_date),
+    details: "",
+    reference: "",
+    amount: null,
+    payment: totalAmountPaid,
+  };
+
+  const transactions = [paymentsRow, ...charges];
 
   // Calculate running balance
   let runningBalance = openingBalance; // Start with the opening balance
   const transactionsWithBalance = transactions.map((tx) => {
     if (tx.type === "Invoice" || tx.type === "Add-on") {
       runningBalance += tx.amount;
-    } else {
+    } else if (tx.payment) {
       runningBalance -= tx.payment;
     }
     return { ...tx, balance: runningBalance };
@@ -739,32 +723,6 @@ const ClientStatement = () => {
 
         {/* Buttons */}
         <div className="statementdownloadbtn1">
-          <button
-            className="back-btn"
-            onClick={() => {
-              if (roleId == 3) {
-                navigate("/statements-list", {
-                  state: { clientId: statement.client.id },
-                });
-              } else if (roleId == 4) {
-                navigate("/DirectorClientDocuments", {
-                  state: {
-                    clientId: statement.client.id,
-                    clientName: statement.client.name,
-                  },
-                });
-              } else if (roleId == 1) {
-                navigate("/client-documents", {
-                  state: {
-                    clientId: statement.client.id,
-                    clientName: statement.client.name,
-                  },
-                });
-              }
-            }}
-          >
-            Back
-          </button>
           <button
             className={`download-btn ${isGenerating ? "generating" : ""}`}
             onClick={generatePDF}

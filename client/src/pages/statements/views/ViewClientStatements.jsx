@@ -14,7 +14,7 @@ const ViewClientStatement = () => {
 
   // Pagination state
   const [currentPage, setCurrentPage] = useState(1);
-  const [recordsPerPage] = useState(5); // You can make this configurable
+  const [recordsPerPage] = useState(10); // You can make this configurable
 
   // Handle pagination
   const handlePageChange = useCallback((pageNumber) => {
