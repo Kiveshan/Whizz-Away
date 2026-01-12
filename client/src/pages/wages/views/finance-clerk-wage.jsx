@@ -12,15 +12,18 @@ const FinanceClerkWage = () => {
   const [error, setError] = useState(null);
   const navigate = useNavigate();
   const [currentPage, setCurrentPage] = useState(1);
-  const recordsPerPage = 5; // Consistent with other components
+  const recordsPerPage = 10; // Show 10 records per page
 
   useEffect(() => {
     // Fetch drivers data
     api
       .get("/all-employees")
       .then((response) => {
-        setDrivers(response.data);
-        console.log(response.data);
+        const filtered = (response.data || []).filter((emp) => emp.roleid !== 6);
+        setDrivers(filtered);
+        console.log("All employees:", response.data);
+        console.log("Filtered (excluding roleid 6):", filtered);
+
         setCurrentPage(1); // Reset to first page when data changes
         setError(null); // Clear any previous errors
       })

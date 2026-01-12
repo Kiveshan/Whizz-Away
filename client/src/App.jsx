@@ -237,12 +237,50 @@ function ContentWrapper() {
   const shouldShowFooter = !hideFooterOn.includes(location.pathname);
   const shouldShowLogout = !hideLogoutOn.includes(location.pathname);
 
+  // Only show inline Back button for specific detail routes
+  const isInvoiceDetail =
+    location.pathname.startsWith("/invoice/") ||
+    location.pathname === "/client-invoice";
+  const isStatementDetail = location.pathname === "/client-statement";
+
+  const showBackInTopBar = isInvoiceDetail || isStatementDetail;
+
+  const getBackTarget = () => {
+    if (isInvoiceDetail) return "/invoices";
+    if (isStatementDetail) return "/statements-list";
+    return null;
+  };
+
+  const backTarget = getBackTarget();
+
   return (
     <div className="content-area">
       {shouldShowLogout && (
-        <div className="logout-container">
-          <LogoutButton />
-        </div>
+        showBackInTopBar ? (
+          <div className="top-actions-bar">
+            {backTarget && (
+              <button
+                className="back-button-inline"
+                onClick={() => {
+                  if (window.history.length > 1) {
+                    window.history.back();
+                  } else if (backTarget) {
+                    window.location.href = backTarget;
+                  }
+                }}
+              >
+                Back
+              </button>
+            )}
+            <div className="logout-container">
+              <LogoutButton />
+            </div>
+          </div>
+        ) : (
+          <div className="logout-container">
+            <LogoutButton />
+          </div>
+        )
       )}
       <Routes>
         <Route

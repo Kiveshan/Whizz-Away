@@ -223,13 +223,16 @@ const createCreditNote = async (creditNoteData) => {
     }
     client = await pool.connect();
 
-    const queryText = `
+    // Wrap credit note creation and m1_controller updates in a transaction
+    await client.query("BEGIN");
+
+    const insertQuery = `
       INSERT INTO credit_notes (client_id, creditnote_date, amount, containerids, doc_no, m1key, description, account_no)
       VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
       RETURNING creditnote_id
     `;
 
-    const queryParams = [
+    const insertParams = [
       creditNoteData.client_id,
       creditNoteData.creditnote_date || new Date().toISOString().split('T')[0], // Fallback to current date if not provided
       creditNoteData.amount,
@@ -240,9 +243,67 @@ const createCreditNote = async (creditNoteData) => {
       creditNoteData.account_no,
     ];
 
-    const result = await client.query(queryText, queryParams);
-    return { success: true, data: result.rows[0] };
+    const insertResult = await client.query(insertQuery, insertParams);
+
+    // Compute the credit note subtotal from the provided amount(s)
+    let subTotal = 0;
+    if (Array.isArray(creditNoteData.amount)) {
+      subTotal = creditNoteData.amount.reduce(
+        (sum, v) => sum + (Number(v) || 0),
+        0
+      );
+    } else {
+      subTotal = Number(creditNoteData.amount || 0);
+    }
+
+    // Fetch VAT and current paid_amount for the related instruction (m1_controller)
+    const m1key = creditNoteData.m1key;
+    if (!m1key) {
+      throw new Error("m1key (instruction number) is required for credit notes");
+    }
+
+    const m1Query = `
+      SELECT total_cost, COALESCE(vat, 0) AS vat, COALESCE(paid_amount, 0) AS paid_amount
+      FROM m1_controller
+      WHERE m1key = $1
+    `;
+    const m1Result = await client.query(m1Query, [m1key]);
+    if (m1Result.rows.length === 0) {
+      throw new Error("Instruction (m1_controller) not found for provided m1key");
+    }
+
+    const m1Row = m1Result.rows[0];
+    const baseTotal = Number(m1Row.total_cost) || 0;
+    const vatRate = Number(m1Row.vat) || 0;
+    const totalWithVat = baseTotal + baseTotal * (vatRate / 100);
+
+    // Credit note should be VAT inclusive just like payments
+    const creditVat = subTotal * (vatRate / 100);
+    const creditTotalWithVat = subTotal + creditVat;
+
+    const currentPaid = Number(m1Row.paid_amount) || 0;
+    const newPaid = currentPaid + creditTotalWithVat;
+
+    const isPaid = newPaid >= totalWithVat - 0.01;
+    const status = isPaid ? "paid" : newPaid > 0 ? "partial" : null;
+
+    const updateM1Query = `
+      UPDATE m1_controller
+      SET paid_amount = $1,
+          payment_status = $2
+      WHERE m1key = $3
+    `;
+    await client.query(updateM1Query, [newPaid, status, m1key]);
+
+    await client.query("COMMIT");
+
+    return { success: true, data: insertResult.rows[0] };
   } catch (error) {
+    if (client) {
+      try {
+        await client.query("ROLLBACK");
+      } catch (_) {}
+    }
     throw error;
   } finally {
     if (client) client.release();
@@ -257,7 +318,7 @@ const getCreditNoteById = async (creditNoteId) => {
     }
     client = await pool.connect();
 
-const queryText = `
+    const queryText = `
   SELECT 
     cn.creditnote_id,
     cn.client_id,

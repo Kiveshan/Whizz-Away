@@ -152,12 +152,13 @@ const createInvoiceHandler = async (req, res) => {
 // In invoiceController.js - Update the updateInstructionDetailsHandler function
 const updateInstructionDetailsHandler = async (req, res) => {
   try {
-    const { m1key, dropoff, rate, invoice_num, additional_destination_info } = req.body; // Add new field
+    const { m1key, dropoff, rate, invoice_num, additional_destination_info, date } = req.body; // Add new field
     console.log(`Updating instruction details for m1key: ${m1key}`, {
       dropoff,
       rate,
       invoice_num,
       additional_destination_info, // Log the new field
+      date,
     });
 
     if (!m1key) {
@@ -200,12 +201,24 @@ const updateInstructionDetailsHandler = async (req, res) => {
       });
     }
 
+    // Validate date if provided
+    if (date !== undefined) {
+      const parsedDate = new Date(date);
+      if (Number.isNaN(parsedDate.getTime())) {
+        return res.status(400).json({
+          success: false,
+          message: "Date must be a valid date string",
+        });
+      }
+    }
+
     const result = await updateInstructionDetails({
       m1key,
       dropoff,
       rate,
       invoice_num,
       additional_destination_info, // Pass the new field
+      date,
     });
 
     if (!result.success) {

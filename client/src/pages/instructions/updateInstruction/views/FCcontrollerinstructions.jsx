@@ -257,7 +257,8 @@ const FCcontrollerinstructions = () => {
   });
 
   // Check if the instruction should be read-only based on status
-  const isReadOnly = formData.status === "In Progress" || formData.status === "Completed";
+  // Allow editing while In Progress; only Completed is locked.
+  const isReadOnly = formData.status === "Completed";
 
   const [startingPoints, setStartingPoints] = useState([]);
   const [destinations, setDestinations] = useState([]);
@@ -274,6 +275,11 @@ const FCcontrollerinstructions = () => {
     isOpen: false,
     message: "",
   });
+
+  // Track when the current pickup/dropoff no longer matches any client rate
+  const [hasRouteMismatch, setHasRouteMismatch] = useState(false);
+  // "locked" = show legacy route as read-only, "editable" = normal dropdown behaviour
+  const [routeEditMode, setRouteEditMode] = useState("editable");
 
   const isAddOn = (() => {
     const id = (formData.shipmentTypeId || "").toString();
@@ -334,6 +340,10 @@ const FCcontrollerinstructions = () => {
     message: "",
     action: null,
   });
+
+  // Track pending delete targets for containers and weight rows
+  const [containerToDelete, setContainerToDelete] = useState(null);
+  const [weightRowToDelete, setWeightRowToDelete] = useState(null);
 
   // Initialize containers based on container counts
   const initializeContainers = () => {
@@ -1614,7 +1624,58 @@ const FCcontrollerinstructions = () => {
 
   // Handle confirmation modal actions
   const handleConfirmAction = () => {
-    if (confirmationModal.action === "save") {
+    if (confirmationModal.action === "unlock-route") {
+      // User confirmed they want to edit a legacy route: clear both
+      // pickup and dropoff so they must choose from the current
+      // starting points and destinations lists.
+      setRouteEditMode("editable");
+      setHasRouteMismatch(false);
+      setFormData((prev) => ({
+        ...prev,
+        pickup: "",
+        dropoff: "",
+      }));
+    } else if (confirmationModal.action === "delete-container") {
+      if (containerToDelete) {
+        setContainers((prev) => {
+          const updated = prev.filter((c) => c.id !== containerToDelete.id);
+
+          // Recalculate container counts based on remaining containers so
+          // the "No. of Containers" fields stay in sync. The actual
+          // database deletion will occur when the user saves, via the
+          // existing update endpoint.
+          const numSix = updated.filter((c) => c.containerType === "6m").length;
+          const numTwelve = updated.filter(
+            (c) => c.containerType === "12m"
+          ).length;
+          const numAbnormal = updated.filter(
+            (c) => c.containerType === "Abnormal"
+          ).length;
+          const numBreakBulk = updated.filter(
+            (c) => c.containerType === "BreakBulk"
+          ).length;
+
+          setFormData((prevForm) => ({
+            ...prevForm,
+            num_six_meters: numSix,
+            num_twelve_meters: numTwelve,
+            num_abnormal: numAbnormal,
+            num_breakbulk: numBreakBulk,
+          }));
+
+          return updated;
+        });
+        setIsContainerDataModified(true);
+      }
+      setContainerToDelete(null);
+    } else if (confirmationModal.action === "delete-weight") {
+      if (weightRowToDelete) {
+        setWeightRows((prev) =>
+          prev.filter((row) => row.id !== weightRowToDelete.id)
+        );
+      }
+      setWeightRowToDelete(null);
+    } else if (confirmationModal.action === "save") {
       performSave();
     } else if (confirmationModal.action === "delete") {
       performDelete();
@@ -1626,6 +1687,60 @@ const FCcontrollerinstructions = () => {
 
   const handleCancelAction = () => {
     setConfirmationModal({ isOpen: false, message: "", action: null });
+    setContainerToDelete(null);
+    setWeightRowToDelete(null);
+  };
+
+  // Ask for confirmation before deleting a container; if the
+  // container has been assigned to legs, we adjust the message
+  // based on a backend check.
+  const handleRequestDeleteContainer = async (container) => {
+    if (isReadOnly) return;
+
+    try {
+      let hasLegs = false;
+
+      // Only check legs if we have both an instructionId and a
+      // container number that could exist in the DB.
+      if (instructionId && container.containerNum) {
+        const response = await api.get(
+          `/api/instructions/fc/container/${instructionId}/${encodeURIComponent(
+            container.containerNum
+          )}/legs-exists`,
+        );
+        hasLegs = Boolean(response.data?.hasLegs);
+      }
+
+      const message = hasLegs
+        ? "This container currently has legs assigned. Deleting this container will also remove all associated assignments. Are you sure you want to continue?"
+        : "Are you sure you want to delete this container?";
+
+      setContainerToDelete(container);
+      setConfirmationModal({
+        isOpen: true,
+        message,
+        action: "delete-container",
+      });
+    } catch (error) {
+      console.error("Error checking container legs before delete:", error);
+      setErrorModal({
+        isOpen: true,
+        message:
+          "Failed to verify container assignments before delete. Please try again.",
+      });
+    }
+  };
+
+  // Ask for confirmation before deleting a weight row
+  const handleRequestDeleteWeightRow = (row) => {
+    if (isReadOnly) return;
+
+    setWeightRowToDelete(row);
+    setConfirmationModal({
+      isOpen: true,
+      message: "Are you sure you want to delete this weight row?",
+      action: "delete-weight",
+    });
   };
 
   // Initialize containers when component mounts or container counts change
@@ -2292,6 +2407,39 @@ const FCcontrollerinstructions = () => {
       }
     }
   }, [formData.clientId, formData.pickup]);
+
+  // After data load, detect when there is no matching destination route for the
+  // current client + pickup/dropoff combination. This allows us to keep
+  // rendering the instruction while treating the route as a legacy, read-only
+  // value until the user explicitly opts to edit it.
+  useEffect(() => {
+    // When destinations finish loading and we still have no entries for the
+    // current client/pickup, treat the existing pickup/dropoff from the
+    // instruction as a legacy route.
+    if (
+      !isLoading.destinations &&
+      formData.clientId &&
+      formData.pickup &&
+      destinations.length === 0
+    ) {
+      console.log("[FC] Route mismatch detected for instruction:", {
+        clientId: formData.clientId,
+        pickup: formData.pickup,
+        dropoff: formData.dropoff,
+      });
+      setHasRouteMismatch(true);
+      setRouteEditMode("locked");
+    } else if (!isLoading.destinations && destinations.length > 0) {
+      // If we do have destinations for this pickup, clear any previous mismatch
+      setHasRouteMismatch(false);
+      setRouteEditMode("editable");
+    }
+  }, [
+    isLoading.destinations,
+    destinations.length,
+    formData.clientId,
+    formData.pickup,
+  ]);
 
   // useEffect to recalculate total cost when container surcharges or hazardous flags/amounts change
   useEffect(() => {
@@ -3746,8 +3894,7 @@ const FCcontrollerinstructions = () => {
   if (
     clients.length === 0 ||
     shipmentTypes.length === 0 ||
-    startingPoints.length === 0 ||
-    destinations.length === 0
+    startingPoints.length === 0
   ) {
     return (
       <div style={{ textAlign: "center", padding: "20px" }}>
@@ -3957,33 +4104,52 @@ const FCcontrollerinstructions = () => {
                   style={{ flex: "1 1 220px", maxWidth: "260px" }}
                 >
                   <label>Pickup Location</label>
-                  <div
-                    className="controller-instructions-select-wrapper"
-                    ref={fieldRefs.pickup}
-                  >
-                    <select
-                      className={`controller-instructions-dropdown ${
-                        fieldErrors.pickup
-                          ? "controller-instructions-error-field"
-                          : ""
-                      }`}
-                      name="pickup"
+                  {routeEditMode === "locked" && hasRouteMismatch ? (
+                    <input
+                      type="text"
+                      className="controller-instructions-form-input"
+                      ref={fieldRefs.pickup}
                       value={formData.pickup || ""}
-                      onChange={handlePickupChange}
-                      disabled={isReadOnly}
-                      style={isReadOnly ? readOnlyStyle : {}}
+                      readOnly
+                      style={readOnlyStyle}
+                      onClick={() =>
+                        setConfirmationModal({
+                          isOpen: true,
+                          message:
+                            "The current route no longer matches any client rates. To edit it, you will need to select a new valid starting point and dropoff from the current lists. Do you want to continue?",
+                          action: "unlock-route",
+                        })
+                      }
+                    />
+                  ) : (
+                    <div
+                      className="controller-instructions-select-wrapper"
+                      ref={fieldRefs.pickup}
                     >
-                      <option value="" disabled>
-                        Select Pickup
-                      </option>
-                      {startingPoints.map((point) => (
-                        <option key={point.id} value={point.startingpoint}>
-                          {point.startingpoint}
+                      <select
+                        className={`controller-instructions-dropdown ${
+                          fieldErrors.pickup
+                            ? "controller-instructions-error-field"
+                            : ""
+                        }`}
+                        name="pickup"
+                        value={formData.pickup || ""}
+                        onChange={handlePickupChange}
+                        disabled={isReadOnly}
+                        style={isReadOnly ? readOnlyStyle : {}}
+                      >
+                        <option value="" disabled>
+                          Select Pickup
                         </option>
-                      ))}
-                    </select>
-                    <InstructionErrorTooltip message={fieldErrors.pickup} />
-                  </div>
+                        {startingPoints.map((point) => (
+                          <option key={point.id} value={point.startingpoint}>
+                            {point.startingpoint}
+                          </option>
+                        ))}
+                      </select>
+                      <InstructionErrorTooltip message={fieldErrors.pickup} />
+                    </div>
+                  )}
                 </div>
 
                 <div
@@ -3991,33 +4157,52 @@ const FCcontrollerinstructions = () => {
                   style={{ flex: "1 1 220px", maxWidth: "260px" }}
                 >
                   <label>Dropoff Location</label>
-                  <div
-                    className="controller-instructions-select-wrapper"
-                    ref={fieldRefs.dropoff}
-                  >
-                    <select
-                      className={`controller-instructions-dropdown ${
-                        fieldErrors.dropoff
-                          ? "controller-instructions-error-field"
-                          : ""
-                      }`}
-                      name="dropoff"
+                  {routeEditMode === "locked" && hasRouteMismatch ? (
+                    <input
+                      type="text"
+                      className="controller-instructions-form-input"
+                      ref={fieldRefs.dropoff}
                       value={formData.dropoff || ""}
-                      onChange={handleDropoffChange}
-                      disabled={isReadOnly}
-                      style={isReadOnly ? readOnlyStyle : {}}
+                      readOnly
+                      style={readOnlyStyle}
+                      onClick={() =>
+                        setConfirmationModal({
+                          isOpen: true,
+                          message:
+                            "The current route no longer matches any client rates. To edit it, you will need to select a new valid starting point and dropoff from the current lists. Do you want to continue?",
+                          action: "unlock-route",
+                        })
+                      }
+                    />
+                  ) : (
+                    <div
+                      className="controller-instructions-select-wrapper"
+                      ref={fieldRefs.dropoff}
                     >
-                      <option value="" disabled>
-                        Select Dropoff
-                      </option>
-                      {destinations.map((dest) => (
-                        <option key={dest.id} value={dest.destination}>
-                          {dest.destination}
+                      <select
+                        className={`controller-instructions-dropdown ${
+                          fieldErrors.dropoff
+                            ? "controller-instructions-error-field"
+                            : ""
+                        }`}
+                        name="dropoff"
+                        value={formData.dropoff || ""}
+                        onChange={handleDropoffChange}
+                        disabled={isReadOnly}
+                        style={isReadOnly ? readOnlyStyle : {}}
+                      >
+                        <option value="" disabled>
+                          Select Dropoff
                         </option>
-                      ))}
-                    </select>
-                    <InstructionErrorTooltip message={fieldErrors.dropoff} />
-                  </div>
+                        {destinations.map((dest) => (
+                          <option key={dest.id} value={dest.destination}>
+                            {dest.destination}
+                          </option>
+                        ))}
+                      </select>
+                      <InstructionErrorTooltip message={fieldErrors.dropoff} />
+                    </div>
+                  )}
                 </div>
               </div>
             )}
@@ -4232,66 +4417,121 @@ const FCcontrollerinstructions = () => {
                       />
                     </div>
                   </div>
-                  <div className="controller-instructions-form-field">
-                    <label>Pickup Location</label>
-                    <div
-                      className="controller-instructions-select-wrapper"
-                      ref={fieldRefs.pickup}
-                    >
-                      <select
-                        className={`controller-instructions-dropdown ${
-                          fieldErrors.pickup
-                            ? "controller-instructions-error-field"
-                            : ""
-                        }`}
-                        name="pickup"
-                        value={formData.pickup || ""}
-                        onChange={handlePickupChange}
-                        disabled={isReadOnly}
-                        style={isReadOnly ? readOnlyStyle : {}}
-                      >
-                        <option value="" disabled>
-                          Select Pickup
-                        </option>
-                        {startingPoints.map((point) => (
-                          <option key={point.id} value={point.startingpoint}>
-                            {point.startingpoint}
-                          </option>
-                        ))}
-                      </select>
-                      <InstructionErrorTooltip message={fieldErrors.pickup} />
-                    </div>
-                  </div>
-                  <div className="controller-instructions-form-field">
-                    <label>Dropoff Location</label>
-                    <div
-                      className="controller-instructions-select-wrapper"
-                      ref={fieldRefs.dropoff}
-                    >
-                      <select
-                        className={`controller-instructions-dropdown ${
-                          fieldErrors.dropoff
-                            ? "controller-instructions-error-field"
-                            : ""
-                        }`}
-                        name="dropoff"
-                        value={formData.dropoff || ""}
-                        onChange={handleDropoffChange}
-                        disabled={isReadOnly}
-                        style={isReadOnly ? readOnlyStyle : {}}
-                      >
-                        <option value="" disabled>
-                          Select Dropoff
-                        </option>
-                        {destinations.map((dest) => (
-                          <option key={dest.id} value={dest.destination}>
-                            {dest.destination}
-                          </option>
-                        ))}
-                      </select>
-                      <InstructionErrorTooltip message={fieldErrors.dropoff} />
-                    </div>
-                  </div>
+                  {routeEditMode === "locked" && hasRouteMismatch ? (
+                    <>
+                      <div className="controller-instructions-form-field">
+                        <label>Pickup Location</label>
+                        <div
+                          className="controller-instructions-select-wrapper"
+                          ref={fieldRefs.pickup}
+                        >
+                          <input
+                            type="text"
+                            className="controller-instructions-dropdown"
+                            value={formData.pickup || ""}
+                            readOnly
+                            style={readOnlyStyle}
+                            onClick={() =>
+                              setConfirmationModal({
+                                isOpen: true,
+                                message:
+                                  "The current route no longer matches any client rates. To edit it, you will need to select a new valid starting point and dropoff from the current lists. Do you want to continue?",
+                                action: "unlock-route",
+                              })
+                            }
+                          />
+                          <InstructionErrorTooltip message={fieldErrors.pickup} />
+                        </div>
+                      </div>
+                      <div className="controller-instructions-form-field">
+                        <label>Dropoff Location</label>
+                        <div
+                          className="controller-instructions-select-wrapper"
+                          ref={fieldRefs.dropoff}
+                        >
+                          <input
+                            type="text"
+                            className="controller-instructions-dropdown"
+                            value={formData.dropoff || ""}
+                            readOnly
+                            style={readOnlyStyle}
+                            onClick={() =>
+                              setConfirmationModal({
+                                isOpen: true,
+                                message:
+                                  "The current route no longer matches any client rates. To edit it, you will need to select a new valid starting point and dropoff from the current lists. Do you want to continue?",
+                                action: "unlock-route",
+                              })
+                            }
+                          />
+                          <InstructionErrorTooltip message={fieldErrors.dropoff} />
+                        </div>
+                      </div>
+                    </>
+                  ) : (
+                    <>
+                      <div className="controller-instructions-form-field">
+                        <label>Pickup Location</label>
+                        <div
+                          className="controller-instructions-select-wrapper"
+                          ref={fieldRefs.pickup}
+                        >
+                          <select
+                            className={`controller-instructions-dropdown ${
+                              fieldErrors.pickup
+                                ? "controller-instructions-error-field"
+                                : ""
+                            }`}
+                            name="pickup"
+                            value={formData.pickup || ""}
+                            onChange={handlePickupChange}
+                            disabled={isReadOnly}
+                            style={isReadOnly ? readOnlyStyle : {}}
+                          >
+                            <option value="" disabled>
+                              Select Pickup
+                            </option>
+                            {startingPoints.map((point) => (
+                              <option key={point.id} value={point.startingpoint}>
+                                {point.startingpoint}
+                              </option>
+                            ))}
+                          </select>
+                          <InstructionErrorTooltip message={fieldErrors.pickup} />
+                        </div>
+                      </div>
+                      <div className="controller-instructions-form-field">
+                        <label>Dropoff Location</label>
+                        <div
+                          className="controller-instructions-select-wrapper"
+                          ref={fieldRefs.dropoff}
+                        >
+                          <select
+                            className={`controller-instructions-dropdown ${
+                              fieldErrors.dropoff
+                                ? "controller-instructions-error-field"
+                                : ""
+                            }`}
+                            name="dropoff"
+                            value={formData.dropoff || ""}
+                            onChange={handleDropoffChange}
+                            disabled={isReadOnly}
+                            style={isReadOnly ? readOnlyStyle : {}}
+                          >
+                            <option value="" disabled>
+                              Select Dropoff
+                            </option>
+                            {destinations.map((dest) => (
+                              <option key={dest.id} value={dest.destination}>
+                                {dest.destination}
+                              </option>
+                            ))}
+                          </select>
+                          <InstructionErrorTooltip message={fieldErrors.dropoff} />
+                        </div>
+                      </div>
+                    </>
+                  )}
                   {/* This surchages section has been moved to be next to the checkbox */}
 
                   {/* Compact Rates per dropdown and input fields in one row */}
@@ -4778,7 +5018,9 @@ const FCcontrollerinstructions = () => {
                           <th style={{ border: "1px solid #dee2e6", padding: "4px" }}>
                             Weight ({formData.rateWeight})
                           </th>
-                          <th style={{ border: "1px solid #dee2e6", padding: "4px" }}></th>
+                          <th style={{ border: "1px solid #dee2e6", padding: "4px" }}>
+                            Actions
+                          </th>
                         </tr>
                       </thead>
                       <tbody>
@@ -4849,7 +5091,7 @@ const FCcontrollerinstructions = () => {
                               {!isReadOnly && (
                                 <button
                                   type="button"
-                                  onClick={() => removeWeightRow(row.id)}
+                                  onClick={() => handleRequestDeleteWeightRow(row)}
                                   style={{
                                     padding: "2px 6px",
                                     fontSize: "11px",
@@ -4860,7 +5102,7 @@ const FCcontrollerinstructions = () => {
                                     cursor: "pointer",
                                   }}
                                 >
-                                  Remove
+                                  Delete
                                 </button>
                               )}
                             </td>
@@ -5002,6 +5244,15 @@ const FCcontrollerinstructions = () => {
                             Weight
                           </th>
                         )}
+                        <th
+                          style={{
+                            padding: "12px 8px",
+                            textAlign: "center",
+                            borderBottom: "2px solid #ddd",
+                          }}
+                        >
+                          Actions
+                        </th>
                         <th
                           style={{
                             padding: "12px 8px",
@@ -5183,6 +5434,32 @@ const FCcontrollerinstructions = () => {
                               </div>
                             </td>
                           )}
+                          <td
+                            style={{
+                              padding: "8px",
+                              borderBottom: "1px solid #eee",
+                              textAlign: "center",
+                              whiteSpace: "nowrap",
+                            }}
+                          >
+                            {!isReadOnly && (
+                              <button
+                                type="button"
+                                onClick={() => handleRequestDeleteContainer(container)}
+                                style={{
+                                  padding: "2px 8px",
+                                  fontSize: "11px",
+                                  borderRadius: "4px",
+                                  border: "1px solid #dc3545",
+                                  backgroundColor: "#fff",
+                                  color: "#dc3545",
+                                  cursor: "pointer",
+                                }}
+                              >
+                                Delete
+                              </button>
+                            )}
+                          </td>
                           <td>
                             <div className="controller-instructions-input-wrapper">
                               <input
@@ -5299,7 +5576,7 @@ const FCcontrollerinstructions = () => {
               >
                 Save Changes
               </button>
-              {formData.status === "New" && (
+              {(formData.status === "New" || formData.status === "In Progress") && (
                 <>
                   <button
                     className="controller-instructions-delete-button"
@@ -5338,7 +5615,6 @@ const FCcontrollerinstructions = () => {
                   )}
                 </>
               )}
-              {/* Invoice button for In Progress moved to read-only section */}
             </div>
           )}
 
@@ -5360,26 +5636,6 @@ const FCcontrollerinstructions = () => {
               >
                 This instruction is {formData.status} and cannot be edited
               </div>
-              
-              {/* Display invoice button for In Progress instructions */}
-              {formData.status === "In Progress" && !isInvoiced && (
-                <button
-                  className="controller-instructions-invoice-button"
-                  onClick={handleCreateInvoice}
-                  style={{
-                    backgroundColor: "#27ae60",
-                    color: "white",
-                    padding: "12px 24px",
-                    border: "none",
-                    borderRadius: "4px",
-                    cursor: "pointer",
-                    fontSize: "16px",
-                    fontWeight: "bold",
-                  }}
-                >
-                  Invoice
-                </button>
-              )}
             </div>
           )}
         </div>

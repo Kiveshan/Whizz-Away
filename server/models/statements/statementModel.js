@@ -148,17 +148,16 @@ const getStatementDetails = async (statementId) => {
     const paymentsQuery = `
       SELECT 
         p.paykey,
-        p.fileupload AS date,
-        p.amount,
-        p.reference,
-        i.invoice_num
+        (item->>'line_date')::date AS date,
+        (item->>'this_payment')::numeric AS amount,
+        item->>'line_reference' AS reference,
+        item->>'invoice_num' AS invoice_num
       FROM 
         payment_m3 p
-      LEFT JOIN 
-        invoice i ON p.invoiceid = i.ikey
+      CROSS JOIN LATERAL jsonb_array_elements(p.line_items) AS item
       WHERE 
         p.clientid = $1
-        AND p.fileupload BETWEEN $2 AND $3
+        AND (item->>'line_date')::date BETWEEN $2 AND $3
     `;
     const creditNotesQuery = `
       SELECT 
@@ -225,6 +224,44 @@ const getStatementDetails = async (statementId) => {
       );
     }
 
+    // Deduplicate invoices and add-ons because the combined LEFT JOINs can
+    // produce duplicate invoice/add_on rows (cartesian effect between tables).
+    const invoiceMap = new Map();
+    const addonMap = new Map();
+
+    for (const row of result.rows) {
+      if (row.ikey !== null && Number.parseFloat(row.invoice_amount || 0) > 0) {
+        if (!invoiceMap.has(row.ikey)) {
+          const netAmount = Number.parseFloat(row.invoice_amount || 0);
+          const rawVat = Number(row.invoice_vat);
+          const vatRate = Number.isNaN(rawVat) ? 0 : rawVat;
+          const vatMultiplier = 1 + vatRate / 100;
+          const grossAmount = Number((netAmount * vatMultiplier).toFixed(2));
+
+          invoiceMap.set(row.ikey, {
+            ikey: row.ikey,
+            date: row.invoice_date,
+            amount: grossAmount,
+            task: row.invoice_task,
+            invoice_num: row.invoice_num,
+            pickup: row.pickup,
+            dropoff: row.dropoff,
+          });
+        }
+      }
+
+      if (row.addon_id !== null) {
+        if (!addonMap.has(row.addon_id)) {
+          addonMap.set(row.addon_id, {
+            addon_id: row.addon_id,
+            date: row.addon_date,
+            amount: Number.parseFloat(row.addon_amount || 0),
+            items: row.addon_items,
+          });
+        }
+      }
+    }
+
     const statementData = {
       statement_key: result.rows[0].statement_key,
       groupid: result.rows[0].groupid,
@@ -256,34 +293,8 @@ const getStatementDetails = async (statementId) => {
         "60days": Number.parseFloat(result.rows[0]["60days"] || 0),
         "90days": Number.parseFloat(result.rows[0]["90days"] || 0),
       },
-      invoices: result.rows
-        .filter((row) => row.ikey !== null && Number.parseFloat(row.invoice_amount || 0) > 0)
-        .map((row) => {
-          const netAmount = Number.parseFloat(row.invoice_amount || 0);
-          // Use VAT exactly as stored on m1_controller; 0 means no VAT
-          const rawVat = Number(row.invoice_vat);
-          const vatRate = Number.isNaN(rawVat) ? 0 : rawVat;
-          const vatMultiplier = 1 + vatRate / 100;
-          const grossAmount = Number((netAmount * vatMultiplier).toFixed(2));
-
-          return {
-            ikey: row.ikey,
-            date: row.invoice_date,
-            amount: grossAmount,
-            task: row.invoice_task,
-            invoice_num: row.invoice_num,
-            pickup: row.pickup,
-            dropoff: row.dropoff,
-          };
-        }),
-      addons: result.rows
-        .filter((row) => row.addon_id !== null)
-        .map((row) => ({
-          addon_id: row.addon_id,
-          date: row.addon_date,
-          amount: Number.parseFloat(row.addon_amount || 0),
-          items: row.addon_items,
-        })),
+      invoices: Array.from(invoiceMap.values()),
+      addons: Array.from(addonMap.values()),
       payments: payments,
       credit_notes: creditNotes,
     };

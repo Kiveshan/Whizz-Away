@@ -7,6 +7,7 @@ import "../css/UpdateInstruction.css";
 import api from "../../../api";
 import { FaTruckFast } from "react-icons/fa6";
 import InvoicePreviewModal from "../../invoices/views/InviewPreviewModal.jsx";
+import Select from "react-select";
 const normalizeString = (str) => {
   if (!str) return '';
   return str.toLowerCase().replace(/\s+/g, '').trim();
@@ -83,6 +84,8 @@ const modalAnimation = `
   
   .modal-body {
     padding: 0 24px 16px;
+    max-height: 60vh;
+    overflow-y: auto;
   }
   
   .modal-item {
@@ -1141,9 +1144,21 @@ const handleAddLeg = () => {
   if (isCompleted) return;
 
   // Check if there are unsaved changes in the current leg (if any)
-  if (currentLagIndex !== null && hasUnsavedChanges()) {
-    setShowUnsavedChangesModal(true);
-    return;
+  if (currentLagIndex !== null) {
+    const currentLeg = legs[currentLagIndex];
+
+    // Allow adding a new leg when the current leg only has route info
+    // (startingPoint + destination) and no drivers yet.
+    const isRouteOnlyLeg =
+      currentLeg &&
+      (!drivers || drivers.length === 0) &&
+      formData.startingPoint &&
+      formData.destination;
+
+    if (hasUnsavedChanges() && !isRouteOnlyLeg) {
+      setShowUnsavedChangesModal(true);
+      return;
+    }
   }
 
   // Save current leg data to local state if any
@@ -2459,11 +2474,24 @@ useEffect(() => {
   return (
     <div className="min-h-screen bg-white" style={{ paddingBottom: 200 }}>
       <style>{modalAnimation}</style>
-      <div className="">
-        <button className="back-button" onClick={handleBackClick}>
-          Back
-        </button>
-      </div>
+      {!(
+        showMismatchModal ||
+        showContainerModal ||
+        showUnsavedChangesModal ||
+        showMissingFieldsModal ||
+        showNoDriversModal ||
+        showBackConfirmModal ||
+        showPickupMismatchModal ||
+        showContainerReachedModal ||
+        showSummaryModal ||
+        showInvoicePreview
+      ) && (
+        <div className="">
+          <button className="back-button" onClick={handleBackClick}>
+            Back
+          </button>
+        </div>
+      )}
 
       <br />
       {/* Lag Buttons & Plus */}
@@ -2767,7 +2795,7 @@ useEffect(() => {
               </div>
             </div>
 
-            <div style={{ marginTop: "10px" }}>
+            <div style={{ marginTop: "10px", display: "flex", gap: "12px", alignItems: "center" }}>
               <button
                 ref={addDriverButtonRef}
                 onClick={addDriver}
@@ -2780,6 +2808,22 @@ useEffect(() => {
               >
                 Add Driver
               </button>
+
+              {/* When there are no drivers yet, show Save inline next to Add Driver */}
+              {drivers.length === 0 && !isCompleted && (
+                <button
+                  className="bg-blue-500 hover:bg-blue-600 text-white px-6 py-2 rounded-md transition-colors"
+                  onClick={handleSave}
+                  disabled={
+                    saving ||
+                    isCompleted ||
+                    !formData.startingPoint ||
+                    !formData.destination
+                  }
+                >
+                  {saving ? "Saving..." : "Save"}
+                </button>
+              )}
             </div>
           </div>
         </div>
@@ -3002,238 +3046,253 @@ useEffect(() => {
                           ))}
                         </select>
                       </div>
+                      <div
+                        style={{
+                          width: "16.666%",
+                          padding: "0 0.5rem",
+                          marginBottom: "0.75rem",
+                        }}
+                      >
+                        <label
+                          style={{
+                            display: "block",
+                            color: "#374151",
+                            fontWeight: "500",
+                            marginBottom: "0.25rem",
+                          }}
+                        >
+                          {isWeightBased ? `Weight (${weightUnit})` : "Container Number"}
+                        </label>
+                        {isWeightBased ? (
+                          <input
+                            type="number"
+                            step="0.01"
+                            min="0"
+                            style={{
+                              width: "100%",
+                              padding: "0.5rem",
+                              border: "1px solid #d1d5db",
+                              borderRadius: "0.375rem",
+                              backgroundColor: isCompleted ? "#f3f4f6" : "white",
+                            }}
+                            value={entry.containernumber || ""}
+                            onChange={(e) => {
+                              if (isCompleted) return;
+                              const weightValue = e.target.value;
 
-<div
-  style={{
-    width: "16.666%",
-    padding: "0 0.5rem",
-    marginBottom: "0.75rem",
-  }}
->
-  <label
-    style={{
-      display: "block",
-      color: "#374151",
-      fontWeight: "500",
-      marginBottom: "0.25rem",
-    }}
-  >
-    {isWeightBased ? `Weight (${weightUnit})` : "Container Number"}
-  </label>
-  {isWeightBased ? (
-    <input
-      type="number"
-      step="0.01"
-      min="0"
-      style={{
-        width: "100%",
-        padding: "0.5rem",
-        border: "1px solid #d1d5db",
-        borderRadius: "0.375rem",
-        backgroundColor: isCompleted ? "#f3f4f6" : "white",
-      }}
-      value={entry.containernumber || ""}
-      onChange={(e) => {
-        if (isCompleted) return;
-        const weightValue = e.target.value;
+                              const updatedDrivers = [...drivers];
+                              updatedDrivers[index].containernumber = weightValue;
 
-        const updatedDrivers = [...drivers];
-        updatedDrivers[index].containernumber = weightValue;
+                              // For weight-based, we don't auto-fill container type
+                              updatedDrivers[index].container_type = "";
+                              updatedDrivers[index].driverRate = formData.driverRate || "0";
 
-        // For weight-based, we don't auto-fill container type
-        updatedDrivers[index].container_type = "";
-        updatedDrivers[index].driverRate = formData.driverRate || "0";
+                              // Mark this driver field as edited
+                              setEditedFields((prev) => ({
+                                ...prev,
+                                drivers: {
+                                  ...prev.drivers,
+                                  [updatedDrivers[index].id]: true,
+                                },
+                              }));
 
-        // Mark this driver field as edited
-        setEditedFields((prev) => ({
-          ...prev,
-          drivers: {
-            ...prev.drivers,
-            [updatedDrivers[index].id]: true,
-          },
-        }));
-
-        setDrivers(updatedDrivers);
-        console.log(`Updated weight for driver at index ${index}:`, weightValue);
-      }}
-      disabled={isCompleted}
-      placeholder={`Enter weight in ${weightUnit}`}
-    />
-  ) : (
-    <select
-      style={{
-        width: "100%",
-        padding: "0.5rem",
-        border: "1px solid #d1d5db",
-        borderRadius: "0.375rem",
-        backgroundColor: isCompleted ? "#f3f4f6" : "white",
-      }}
-      className="dropdown"
-      value={entry.containernumber || ""}
-      onChange={(e) => {
-        if (isCompleted) return;
-        const containerValue = e.target.value;
-
-                            // Store current rates for debugging
-                            console.log("Current rates:", rates);
-                            console.log(
-                              "Current driver data before update:",
-                              drivers[index]
-                            );
-
-                            // Check if this container has already reached its dropoff in a previous leg
-                            if (containerValue) {
-                              const containerDropoff =
-                                instructionContainers.find(
-                                  (c) => c.containernum === containerValue
-                                )?.dropoff;
-
-                              // If we have a dropoff for this container, check if it already reached it
-                              if (containerDropoff) {
-                                const containerReachedDropoff = legs.some(
-                                  (leg, legIndex) => {
-                                    if (legIndex >= currentLagIndex)
-                                      return false;
-                                    if (leg.destination === containerDropoff) {
-                                      return (
-                                        leg.drivers &&
-                                        leg.drivers.some(
-                                          (driver) =>
-                                            driver.containernumber ===
-                                            containerValue
-                                        )
-                                      );
-                                    }
-                                    return false;
+                              setDrivers(updatedDrivers);
+                              console.log(
+                                `Updated weight for driver at index ${index}:`,
+                                weightValue
+                              );
+                            }}
+                            disabled={isCompleted}
+                            placeholder={`Enter weight in ${weightUnit}`}
+                          />
+                        ) : (
+                          <Select
+                            classNamePrefix="select"
+                            isClearable
+                            isDisabled={isCompleted}
+                            placeholder="Select container"
+                            styles={{
+                              control: (base) => ({
+                                ...base,
+                                minHeight: "38px",
+                                backgroundColor: isCompleted ? "#f3f4f6" : "white",
+                                borderColor: "#d1d5db",
+                              }),
+                              menu: (base) => ({
+                                ...base,
+                                zIndex: 20,
+                              }),
+                            }}
+                            value={
+                              entry.containernumber
+                                ? {
+                                    value: entry.containernumber,
+                                    label: entry.containernumber,
                                   }
-                                );
+                                : null
+                            }
+                            options={
+                              (instructionContainers.length
+                                ? instructionContainers.map((c) =>
+                                    c.containernum.toString()
+                                  )
+                                : containerOptions || []
+                              )
+                                .filter((container) => {
+                                  const usedByAnotherDriver = drivers.some(
+                                    (d, i) =>
+                                      i !== index &&
+                                      d.containernumber &&
+                                      d.containernumber.toString() === container
+                                  );
+                                  if (usedByAnotherDriver) return false;
 
-                                if (containerReachedDropoff) {
-                                  // Show the modal
-                                  setContainerReachedDetails({
-                                    containerNumber: containerValue,
-                                  });
-                                  setShowContainerReachedModal(true);
-                                  return; // Don't update the state
+                                  if (currentLagIndex === 0) return true;
+                                  return !hasContainerReachedDropoff(container);
+                                })
+                                .map((container) => ({
+                                  value: container,
+                                  label: container,
+                                }))
+                            }
+                            onChange={(option) => {
+                              if (isCompleted) return;
+                              const containerValue = option ? option.value : "";
+
+                              console.log("Current rates:", rates);
+                              console.log(
+                                "Current driver data before update:",
+                                drivers[index]
+                              );
+
+                              // Check if this container has already reached its dropoff in a previous leg
+                              if (containerValue) {
+                                const containerDropoff =
+                                  instructionContainers.find(
+                                    (c) =>
+                                      c.containernum.toString() === containerValue
+                                  )?.dropoff;
+
+                                if (containerDropoff) {
+                                  const containerReachedDropoff = legs.some(
+                                    (leg, legIndex) => {
+                                      if (legIndex >= currentLagIndex) return false;
+                                      if (leg.destination === containerDropoff) {
+                                        return (
+                                          leg.drivers &&
+                                          leg.drivers.some(
+                                            (driver) =>
+                                              driver.containernumber ===
+                                              containerValue
+                                          )
+                                        );
+                                      }
+                                      return false;
+                                    }
+                                  );
+
+                                  if (containerReachedDropoff) {
+                                    setContainerReachedDetails({
+                                      containerNumber: containerValue,
+                                    });
+                                    setShowContainerReachedModal(true);
+                                    return; // Don't update the state
+                                  }
                                 }
                               }
-                            }
 
-                            const updatedDrivers = [...drivers];
-                            updatedDrivers[index].containernumber =
-                              containerValue;
+                              const updatedDrivers = [...drivers];
+                              updatedDrivers[index].containernumber = containerValue;
 
-                            // Auto-fill container type from the container details map
-                            if (
-                              containerValue &&
-                              containerDetailsMap[containerValue]
-                            ) {
-                              // Normalize container type by trimming spaces and converting to lowercase for comparison
-                              const containerType = (
-                                containerDetailsMap[containerValue].type || ""
-                              ).trim();
-                              updatedDrivers[index].container_type =
-                                containerType;
+                              // Auto-fill container type from the container details map
+                              if (
+                                containerValue &&
+                                containerDetailsMap[containerValue]
+                              ) {
+                                const containerType = (
+                                  containerDetailsMap[containerValue].type || ""
+                                ).trim();
+                                updatedDrivers[index].container_type = containerType;
 
-                              // Check if driver is a subcontractor (roleid = 6)
-                              const isSubcontractor =
-                                employeeDrivers.find(
-                                  (d) =>
-                                    d.userid.toString() ===
-                                    updatedDrivers[index].driverid
-                                )?.roleid === 6;
-                              console.log(
-                                `Driver ${updatedDrivers[index].driverid} is subcontractor: ${isSubcontractor}`
-                              );
-
-                              // Make sure rates are valid before using them
-                              const sixMeterRate = isSubcontractor
-                                ? rates && rates.subbie_six_meter
-                                  ? rates.subbie_six_meter.toString()
-                                  : "0"
-                                : rates && rates.six_meter
-                                ? rates.six_meter.toString()
-                                : "0";
-
-                              const twelveMeterRate = isSubcontractor
-                                ? rates && rates.subbie_twelve_meter
-                                  ? rates.subbie_twelve_meter.toString()
-                                  : "0"
-                                : rates && rates.twelve_meter
-                                ? rates.twelve_meter.toString()
-                                : "0";
-
-                              console.log(
-                                "Using rates - 6m:",
-                                sixMeterRate,
-                                "12m:",
-                                twelveMeterRate
-                              );
-                              if (containerType.toLowerCase() === "abnormal") {
-                                // For abnormal container types, keep existing rate if available
-                                updatedDrivers[index].driverRate =
-                                  updatedDrivers[index].driverRate ||
-                                  twelveMeterRate;
-                                updatedDrivers[index].isAbnormal = true;
+                                const isSubcontractor =
+                                  employeeDrivers.find(
+                                    (d) =>
+                                      d.userid.toString() ===
+                                      updatedDrivers[index].driverid
+                                  )?.roleid === 6;
                                 console.log(
-                                  "Setting abnormal rate (editable):",
-                                  updatedDrivers[index].driverRate
+                                  `Driver ${updatedDrivers[index].driverid} is subcontractor: ${isSubcontractor}`
                                 );
-                              } else if (containerType === "12m") {
-                                updatedDrivers[index].driverRate =
-                                  twelveMeterRate;
-                                updatedDrivers[index].isAbnormal = false;
+
+                                const sixMeterRate = isSubcontractor
+                                  ? rates && rates.subbie_six_meter
+                                    ? rates.subbie_six_meter.toString()
+                                    : "0"
+                                  : rates && rates.six_meter
+                                  ? rates.six_meter.toString()
+                                  : "0";
+
+                                const twelveMeterRate = isSubcontractor
+                                  ? rates && rates.subbie_twelve_meter
+                                    ? rates.subbie_twelve_meter.toString()
+                                    : "0"
+                                  : rates && rates.twelve_meter
+                                  ? rates.twelve_meter.toString()
+                                  : "0";
+
                                 console.log(
-                                  "Setting 12m rate:",
+                                  "Using rates - 6m:",
+                                  sixMeterRate,
+                                  "12m:",
                                   twelveMeterRate
                                 );
+
+                                if (containerType.toLowerCase() === "abnormal") {
+                                  updatedDrivers[index].driverRate =
+                                    updatedDrivers[index].driverRate ||
+                                    twelveMeterRate;
+                                  updatedDrivers[index].isAbnormal = true;
+                                  console.log(
+                                    "Setting abnormal rate (editable):",
+                                    updatedDrivers[index].driverRate
+                                  );
+                                } else if (containerType === "12m") {
+                                  updatedDrivers[index].driverRate = twelveMeterRate;
+                                  updatedDrivers[index].isAbnormal = false;
+                                  console.log("Setting 12m rate:", twelveMeterRate);
+                                } else {
+                                  updatedDrivers[index].driverRate = sixMeterRate;
+                                  updatedDrivers[index].isAbnormal = false;
+                                  console.log("Setting 6m rate:", sixMeterRate);
+                                }
                               } else {
-                                // Default to 6m rate
-                                updatedDrivers[index].driverRate = sixMeterRate;
+                                updatedDrivers[index].container_type = "";
+                                updatedDrivers[index].driverRate = "";
                                 updatedDrivers[index].isAbnormal = false;
-                                console.log("Setting 6m rate:", sixMeterRate);
                               }
-                            } else {
-                              updatedDrivers[index].container_type = "";
-                              updatedDrivers[index].driverRate = "";
-                              updatedDrivers[index].isAbnormal = false;
-                            }
 
-                            // Mark this driver field as edited
-                            setEditedFields((prev) => ({
-                              ...prev,
-                              drivers: {
-                                ...prev.drivers,
-                                [updatedDrivers[index].id]: true,
-                              },
-                            }));
+                              // Mark this driver field as edited
+                              setEditedFields((prev) => ({
+                                ...prev,
+                                drivers: {
+                                  ...prev.drivers,
+                                  [updatedDrivers[index].id]: true,
+                                },
+                              }));
 
-                            setDrivers(updatedDrivers);
-                            console.log(
-                              `Updated container for driver at index ${index}:`,
-                              containerValue
-                            );
-                            console.log(
-                              "Updated driver data:",
-                              updatedDrivers[index]
-                            );
-                          }}
-disabled={isCompleted}
-    >
-      <option value="">Select Container</option>
-      {containerOptions
-        .filter((container) => {
-          if (currentLagIndex === 0) return true;
-          return !hasContainerReachedDropoff(container);
-        })
-        .map((container) => (
-          <option key={container} value={container}>
-            {container}
-          </option>
-        ))}
-    </select>
-  )}
-</div>
+                              setDrivers(updatedDrivers);
+                              console.log(
+                                `Updated container for driver at index ${index}:`,
+                                containerValue
+                              );
+                              console.log(
+                                "Updated driver data:",
+                                updatedDrivers[index]
+                              );
+                            }}
+                          />
+                        )}
+                      </div>
 
                       <div
                         style={{
@@ -3455,7 +3514,12 @@ disabled={isCompleted}
                 <button
                   className="bg-blue-500 hover:bg-blue-600 text-white px-8 py-2 rounded-md transition-colors"
                   onClick={handleSave}
-                  disabled={saving || isCompleted}
+                  disabled={
+                    saving ||
+                    isCompleted ||
+                    !formData.startingPoint ||
+                    !formData.destination
+                  }
                 >
                   {saving ? "Saving..." : "Save"}
                 </button>

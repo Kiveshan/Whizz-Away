@@ -318,6 +318,7 @@ const updateInstructionDetails = async ({
   rate,
   invoice_num,
   additional_destination_info, // New parameter
+  date,
 }) => {
   try {
     if (!pool) {
@@ -360,6 +361,17 @@ const updateInstructionDetails = async ({
         success: false,
         message: "Additional destination info must be a valid string",
       };
+    }
+
+    // Validate date if provided
+    if (date !== undefined) {
+      const parsedDate = new Date(date);
+      if (Number.isNaN(parsedDate.getTime())) {
+        return {
+          success: false,
+          message: "Date must be a valid date string",
+        };
+      }
     }
 
     // Start a transaction
@@ -418,8 +430,8 @@ const updateInstructionDetails = async ({
         }
       }
 
-      // Update invoice table if invoice_num or additional_destination_info is provided
-      if (invoice_num !== undefined || additional_destination_info !== undefined) {
+      // Update invoice table if invoice_num or additional_destination_info or date is provided
+      if (invoice_num !== undefined || additional_destination_info !== undefined || date !== undefined) {
         const invoiceUpdateFields = [];
         const invoiceQueryParams = [];
         let paramIndex = 1;
@@ -436,13 +448,19 @@ const updateInstructionDetails = async ({
           paramIndex++;
         }
 
+        if (date !== undefined) {
+          invoiceUpdateFields.push(`date = $${paramIndex}`);
+          invoiceQueryParams.push(date);
+          paramIndex++;
+        }
+
         invoiceQueryParams.push(m1key);
 
         const invoiceQueryText = `
           UPDATE public.invoice
           SET ${invoiceUpdateFields.join(", ")}
           WHERE m1key = $${paramIndex}
-          RETURNING ikey, invoice_num, additional_destination_info
+          RETURNING ikey, invoice_num, additional_destination_info, date
         `;
 
         console.log(
@@ -468,6 +486,7 @@ const updateInstructionDetails = async ({
           total_cost: m1Result ? m1Result.rows[0].total_cost : undefined,
           invoice_num: invoiceResult ? invoiceResult.rows[0].invoice_num : undefined,
           additional_destination_info: invoiceResult ? invoiceResult.rows[0].additional_destination_info : undefined,
+          date: invoiceResult ? invoiceResult.rows[0].date : undefined,
         },
         message: "Instruction and/or invoice updated successfully",
       };
