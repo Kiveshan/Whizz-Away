@@ -63,6 +63,7 @@ const ClientInvoice = forwardRef(({
     amount: "",
     invoice_num: "",
     additional_destination_info: "",
+    date: "",
   });
   const [saveLoading, setSaveLoading] = useState(false);
   const [saveError, setSaveError] = useState(null);
@@ -100,6 +101,7 @@ const ClientInvoice = forwardRef(({
               amount: previewData.total_cost || "",
               invoice_num: previewData.invoice_num || "",
               additional_destination_info: previewData.additional_destination_info || "",
+              date: previewData.date || "",
             });
             setLoading(false);
           }
@@ -145,6 +147,7 @@ const ClientInvoice = forwardRef(({
             amount: response.data.data.total_cost || "",
             invoice_num: response.data.data.invoice_num || "",
             additional_destination_info: response.data.data.additional_destination_info || "",
+            date: response.data.data.date || "",
           });
           setLoading(false);
         }
@@ -221,6 +224,7 @@ const ClientInvoice = forwardRef(({
       amount: finalInvoiceData.total_cost || "",
       invoice_num: finalInvoiceData.invoice_num || "",
       additional_destination_info: finalInvoiceData.additional_destination_info || "",
+      date: finalInvoiceData.date || "",
     });
     setSaveError(null);
     setShowConfirmDialog(false);
@@ -250,6 +254,7 @@ const ClientInvoice = forwardRef(({
         rate: editData.amount ? Number.parseFloat(editData.amount) : undefined,
         invoice_num: editData.invoice_num || undefined,
         additional_destination_info: editData.additional_destination_info || undefined,
+        date: editData.date || undefined,
       };
 
       const response = await api.put(
@@ -265,6 +270,7 @@ const ClientInvoice = forwardRef(({
             response.data.data.invoice_num || finalInvoiceData.invoice_num,
           additional_destination_info: 
             response.data.data.additional_destination_info || finalInvoiceData.additional_destination_info,
+          date: response.data.data.date || finalInvoiceData.date,
         });
         setIsEditMode(false);
         setShowConfirmDialog(false);
@@ -403,7 +409,8 @@ const ClientInvoice = forwardRef(({
       doc.setFontSize(fonts.normal);
       doc.setFont('helvetica', 'normal');
       const invMetaLeft = `Invoice No: ${finalInvoiceData.invoice_num || ''}`;
-      const invMetaRight = `Date: ${formatDate(finalInvoiceData.date)}`;
+      const invoiceDateForPdf = editData.date || finalInvoiceData.date;
+      const invMetaRight = `Date: ${formatDate(invoiceDateForPdf)}`;
       doc.text(invMetaLeft, margins.left, currentY);
       doc.text(invMetaRight, pageWidth - margins.right, currentY, { align: 'right' });
       currentY += 8;
@@ -728,9 +735,10 @@ const ClientInvoice = forwardRef(({
       );
 
       // Save the PDF
+      const invoiceDateForFile = editData.date || finalInvoiceData.date;
       const fileName = isPreviewMode || isPreview 
-        ? `Invoice_Preview_${finalInvoiceData.invoice_num || instructionId || 'NO'}_${formatDate(finalInvoiceData.date)}.pdf`
-        : `Invoice_${finalInvoiceData.invoice_num || 'NO'}_${formatDate(finalInvoiceData.date)}.pdf`;
+        ? `Invoice_Preview_${finalInvoiceData.invoice_num || instructionId || 'NO'}_${formatDate(invoiceDateForFile)}.pdf`
+        : `Invoice_${finalInvoiceData.invoice_num || 'NO'}_${formatDate(invoiceDateForFile)}.pdf`;
       doc.save(fileName);
 
     } catch (error) {
@@ -901,7 +909,18 @@ const ClientInvoice = forwardRef(({
             <div>{finalInvoiceData.client_address}</div>
             <div>{finalInvoiceData.client_suburb}</div>
             <div>Telephone: {finalInvoiceData.client_telephone}</div>
-            <div>Date: {formatDate(finalInvoiceData.date)}</div>
+            <div>
+              Date: {isEditMode && !isPreviewMode && !isPreview ? (
+                <input
+                  type="date"
+                  value={editData.date ? editData.date.substring(0, 10) : ""}
+                  onChange={(e) => handleInputChange("date", e.target.value)}
+                  className="edit-input date-input"
+                />
+              ) : (
+                formatDate(editData.date || finalInvoiceData.date)
+              )}
+            </div>
             <div>Email: {finalInvoiceData.client_email}</div>
             <div>VAT Reg No: {finalInvoiceData.client_vat}</div>
           </div>
