@@ -122,6 +122,7 @@ const getStatementDetails = async (statementId, legKeys, subei_reg_num) => {
         l.legkey,
         l.date,
         l.startingpoint,
+        l.containernumber,
         l.destination,
         m1.description AS m1_description
       FROM 
@@ -145,6 +146,7 @@ const getStatementDetails = async (statementId, legKeys, subei_reg_num) => {
         legkey: leg.legkey,
         date: leg.date,
         startingpoint: leg.startingpoint,
+        containernumber: leg.containernumber,
         destination: leg.destination,
         // Use the VAT-inclusive rate from the stored statement
         driverrate: storedLeg ? storedLeg.driverrate : 0, // This already includes VAT

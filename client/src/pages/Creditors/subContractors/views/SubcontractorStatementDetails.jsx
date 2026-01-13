@@ -67,7 +67,7 @@ const SubcontractorStatementDetail = () => {
         const workItems = response.data.map((leg) => ({
           id: leg.legkey,
           date: leg.date,
-          startingPoint: leg.startingpoint,
+          containerNumber: leg.containernumber || "N/A",
           destination: leg.destination,
           rate: leg.driverrate || 0,
           instruction: leg.m1_description || "N/A",
@@ -280,13 +280,13 @@ const SubcontractorStatementDetail = () => {
     // Table Setup
     const tableHeaders = [
       "Date",
-      "Starting Point",
+      "Container No",
       "Destination",
       "Rate",
       "Instructions",
     ];
-    // Make the Starting Point column wider to accommodate longer text
-    const colWidths = [25, 50, 30, 25, 55];
+    // Adjust widths to suit new column
+    const colWidths = [25, 35, 30, 25, 65];
     const rowHeight = 11; // taller rows to comfortably fit up to 2 lines of text
     let x = margin;
 
@@ -387,18 +387,11 @@ const SubcontractorStatementDetail = () => {
       );
       x += colWidths[0];
 
-      // Starting Point (wrapped to max 2 lines within a wider column)
+      // Container Number
       doc.setTextColor(...darkGray);
       doc.setFont("helvetica", "normal");
-      const startingLines = doc.splitTextToSize(
-        item.startingPoint,
-        colWidths[1] - 4
-      );
-      const startingToRender = startingLines.slice(0, 2); // cap at 2 lines
-      startingToRender.forEach((line, idx) => {
-        doc.text(line, x + 2, y + 4 + idx * 4, {
-          align: "left",
-        });
+      doc.text(String(item.containerNumber || "N/A"), x + 2, y + 4, {
+        align: "left",
       });
       x += colWidths[1];
 
@@ -609,7 +602,7 @@ const SubcontractorStatementDetail = () => {
                 <thead>
                   <tr>
                     <th className="col-date">Date</th>
-                    <th className="col-starting">Starting Point</th>
+                    <th className="col-starting">Container Number</th>
                     <th className="col-destination">Destination</th>
                     <th className="col-rate">Rate</th>
                     <th className="col-instruction">Instructions</th>
@@ -628,7 +621,7 @@ const SubcontractorStatementDetail = () => {
                           year: "numeric",
                         })}
                       </td>
-                      <td className="col-starting">{item.startingPoint}</td>
+                      <td className="col-starting">{item.containerNumber}</td>
                       <td className="col-destination">{item.destination}</td>
                       <td className="col-rate">
                         R
