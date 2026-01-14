@@ -26,11 +26,11 @@ const ClientRatesForm = ({ clientData, loading, onSave, onCancel }) => {
             client_rate_id: rate.client_rate_id,
             starting_point: rate.starting_point || "",
             destination: rate.destination || "",
-            "6m_rate": rate["6m_rate"] || "",
-            "12m_rate": rate["12m_rate"] || "",
-            surcharges: rate.surcharges || "",
-            hazardous: rate.hazardous || "",
-            vgm: rate.vgm || "",
+            "6m_rate": rate["6m_rate"] !== null && rate["6m_rate"] !== undefined ? rate["6m_rate"] : "",
+            "12m_rate": rate["12m_rate"] !== null && rate["12m_rate"] !== undefined ? rate["12m_rate"] : "",
+            surcharges: rate.surcharges !== null && rate.surcharges !== undefined ? rate.surcharges : "",
+            hazardous: rate.hazardous !== null && rate.hazardous !== undefined ? rate.hazardous : "",
+            vgm: rate.vgm !== null && rate.vgm !== undefined ? rate.vgm : "",
           })),
         )
       } else {
@@ -54,7 +54,7 @@ const ClientRatesForm = ({ clientData, loading, onSave, onCancel }) => {
       (rate) =>
         rate.starting_point.trim() &&
         rate.destination.trim() &&
-        (rate["6m_rate"].toString().trim() || rate["12m_rate"].toString().trim()),
+        (rate["6m_rate"] !== "" && rate["6m_rate"] !== undefined || rate["12m_rate"] !== "" && rate["12m_rate"] !== undefined),
     )
     setIsFormValid(isValid)
   }, [rates])
@@ -93,7 +93,9 @@ const ClientRatesForm = ({ clientData, loading, onSave, onCancel }) => {
 
   const removeRate = (index) => {
     if (rates.length > 1) {
-      const updatedRates = rates.filter((_, i) => i !== index)
+      const updatedRates = rates.filter((rate, i) => i !== index)
+      console.log("Current rates before removing:", rates)
+      console.log("Updated rates after removing:", updatedRates)
       setRates(updatedRates)
     }
   }
@@ -114,6 +116,9 @@ const ClientRatesForm = ({ clientData, loading, onSave, onCancel }) => {
   for (let i = 0; i < rates.length; i += 5) {
     rateRows.push(rates.slice(i, i + 5))
   }
+
+  console.log("Current rates state:", rates)
+  console.log("Rate rows for rendering:", rateRows)
 
   return (
     <>
@@ -263,7 +268,7 @@ const ClientRatesForm = ({ clientData, loading, onSave, onCancel }) => {
                   (rate) =>
                     rate.starting_point.trim() &&
                     rate.destination.trim() &&
-                    (rate["6m_rate"].toString().trim() || rate["12m_rate"].toString().trim()),
+                    (rate["6m_rate"] !== "" && rate["6m_rate"] !== undefined || rate["12m_rate"] !== "" && rate["12m_rate"] !== undefined),
                 ).length
               }
             </p>

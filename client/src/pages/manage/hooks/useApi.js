@@ -613,8 +613,10 @@ export function useApi(state, actions) {
         }
 
         // Validate each rate
+        const hasValue = (v) => v !== "" && v !== null && v !== undefined
+
         const validRates = ratesData.filter((rate) => {
-          return rate.starting_point && rate.destination && (rate["6m_rate"] || rate["12m_rate"])
+          return rate.starting_point && rate.destination && (hasValue(rate["6m_rate"]) || hasValue(rate["12m_rate"]))
         })
 
         if (validRates.length === 0) {

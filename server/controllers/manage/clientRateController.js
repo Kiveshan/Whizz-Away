@@ -73,7 +73,7 @@ const saveClientRatesHandler = async (req, res) => {
         return res.status(400).json({ error: "Starting point and destination are required for each rate" })
       }
 
-      if (!rate["6m_rate"] && !rate["12m_rate"]) {
+      if ((rate["6m_rate"] === "" || rate["6m_rate"] === undefined) && (rate["12m_rate"] === "" || rate["12m_rate"] === undefined)) {
         return res.status(400).json({ error: "At least one rate (6m or 12m) is required for each entry" })
       }
 

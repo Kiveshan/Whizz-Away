@@ -133,11 +133,11 @@ const saveClientRates = async (clientId, rates) => {
           clientId,
           rate.starting_point || null,
           rate.destination || null,
-          rate["6m_rate"] === "" || rate["6m_rate"] === undefined ? null : Number.parseFloat(rate["6m_rate"]),
-          rate["12m_rate"] === "" || rate["12m_rate"] === undefined ? null : Number.parseFloat(rate["12m_rate"]),
-          rate.surcharges === "" || rate.surcharges === undefined ? null : Number.parseFloat(rate.surcharges),
-          rate.hazardous === "" || rate.hazardous === undefined ? null : Number.parseFloat(rate.hazardous),
-          rate.vgm === "" || rate.vgm === undefined ? null : Number.parseFloat(rate.vgm),
+          rate["6m_rate"] === "" || rate["6m_rate"] === undefined ? null : Number(rate["6m_rate"]),
+          rate["12m_rate"] === "" || rate["12m_rate"] === undefined ? null : Number(rate["12m_rate"]),
+          rate.surcharges === "" || rate.surcharges === undefined ? null : Number(rate.surcharges),
+          rate.hazardous === "" || rate.hazardous === undefined ? null : Number(rate.hazardous),
+          rate.vgm === "" || rate.vgm === undefined ? null : Number(rate.vgm),
         ],
       )
     })
