@@ -581,7 +581,7 @@ const ClientInvoice = forwardRef(({
                 row.push(formatCurrency(totalValue));
                 return row;
               })
-            : [["No container information", "", "", "", "", "", "", ""]];
+            : [["No container information", "", "", "", "", "", "", "", ""]];
       }
 
       // Calculate available height for the table and enforce compact row styling
