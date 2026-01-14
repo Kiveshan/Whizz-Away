@@ -181,10 +181,11 @@ const getTurnoverPerMonth = async (client, month, year, clientId = null) => {
 const getPaymentsReceivedPerMonth = async (client, month, year, clientId = null) => {
   // Total payments for the month
   const totalQuery = `
-    SELECT COALESCE(SUM(p.amount), 0) AS total_payments
+    SELECT COALESCE(SUM((li.item->>'this_payment')::numeric), 0) AS total_payments
     FROM payment_m3 p
-    WHERE TRIM(TO_CHAR(p.fileupload, 'Month')) = $1
-      AND EXTRACT(YEAR FROM p.fileupload)::TEXT = $2
+    CROSS JOIN LATERAL jsonb_array_elements(p.line_items) AS li(item)
+    WHERE TRIM(TO_CHAR((li.item->>'line_date')::date, 'Month')) = $1
+      AND EXTRACT(YEAR FROM (li.item->>'line_date')::date)::TEXT = $2
   `
 
   const totalRes = await client.query(totalQuery, [month, year])
@@ -203,11 +204,12 @@ const getPaymentsReceivedPerMonth = async (client, month, year, clientId = null)
 
   if (clientId) {
     const perClientQuery = `
-      SELECT COALESCE(SUM(p.amount), 0) AS client_payments, c.client
+      SELECT COALESCE(SUM((li.item->>'this_payment')::numeric), 0) AS client_payments, c.client
       FROM payment_m3 p
       JOIN m5_client c ON p.clientid = c.m5clientkey
-      WHERE TRIM(TO_CHAR(p.fileupload, 'Month')) = $1
-        AND EXTRACT(YEAR FROM p.fileupload)::TEXT = $2
+      CROSS JOIN LATERAL jsonb_array_elements(p.line_items) AS li(item)
+      WHERE TRIM(TO_CHAR((li.item->>'line_date')::date, 'Month')) = $1
+        AND EXTRACT(YEAR FROM (li.item->>'line_date')::date)::TEXT = $2
         AND p.clientid = $3
       GROUP BY c.client
     `
@@ -251,8 +253,9 @@ const getPaymentClients = async (client, month, year) => {
     SELECT DISTINCT c.m5clientkey, c.client
     FROM payment_m3 p
     JOIN m5_client c ON p.clientid = c.m5clientkey
-    WHERE TRIM(TO_CHAR(p.fileupload, 'Month')) = $1
-      AND EXTRACT(YEAR FROM p.fileupload)::TEXT = $2
+    CROSS JOIN LATERAL jsonb_array_elements(p.line_items) AS li(item)
+    WHERE TRIM(TO_CHAR((li.item->>'line_date')::date, 'Month')) = $1
+      AND EXTRACT(YEAR FROM (li.item->>'line_date')::date)::TEXT = $2
     ORDER BY c.client
   `
   const res = await client.query(query, [month, year])
