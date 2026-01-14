@@ -51,7 +51,7 @@ import {
   DirectorManagerViewFuelExpense,
   DirectorExpenses,
 } from "./pages/fuel";
-import { DirectorAnalytics, Analytics } from "./pages/analytics";
+import { DirectorAnalytics } from "./pages/analytics";
 import Manage from "./pages/manage/views/Manage";
 import {
   ViewClientInvoice,
@@ -132,7 +132,6 @@ function DynamicHeader() {
     "/ControllerInstructionDetails": "Container Details",
     "/FCcontrollerInstructionDetails": "Container Details",
     "/expenses": "Truck Expenses",
-    "/analytics": "Analytics",
     "/debtors": "Debtors",
     "/FDashboard": "Debtors Clerk",
     "/instructions": "Instruction",
@@ -304,7 +303,6 @@ function ContentWrapper() {
           element={<UploadProof />}
         />
         <Route path="/debtors" element={<Debtors />} />
-        <Route path="/analytics" element={<Analytics />} />
         <Route path="/manage" element={<Manage />} />
         <Route path="/login" element={<Login />} />
         <Route path="/Dashboard" element={<Dashboard />} />
