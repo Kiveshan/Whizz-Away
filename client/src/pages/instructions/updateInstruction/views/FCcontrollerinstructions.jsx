@@ -4860,16 +4860,17 @@ const FCcontrollerinstructions = () => {
                     >
                       <label>VAT Rate %</label>
                       <div className="controller-instructions-input-wrapper">
-                        <input
-                          type="number"
+                        <select
                           className="controller-instructions-form-input"
                           name="vat"
                           value={formData.vat === 0 ? 0 : formData.vat || 15}
                           onChange={handleInputChange}
                           required
                           disabled={isReadOnly}
-                          style={isReadOnly ? readOnlyStyle : {}}
-                        />
+                        >
+                          <option value={15}>15</option>
+                          <option value={0}>0</option>
+                        </select>
                       </div>
                     </div>
                     {(isAddOn ||

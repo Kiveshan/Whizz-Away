@@ -2802,20 +2802,23 @@ const ControllerInstructions = () => {
                         className="controller-instructions-form-field"
                         style={{ flex: "0 0 120px", minWidth: "100px" }}
                       >
-                        <label>VAT Rate</label>
+                        <label>VAT Rate %</label>
                         <div className="controller-instructions-input-wrapper">
-                          <input
-                            type="text"
+                          <select
                             className="controller-instructions-form-input"
-                            value={`${formData.vat || 15}%`}
-                            readOnly
+                            name="vat"
+                            value={formData.vat === 0 ? 0 : formData.vat || 15}
+                            onChange={handleInputChange}
                             style={{
                               width: "100%",
                               padding: "4px 6px",
                               fontSize: "12px",
                               height: "30px",
                             }}
-                          />
+                          >
+                            <option value={15}>15</option>
+                            <option value={0}>0</option>
+                          </select>
                         </div>
                       </div>
 
