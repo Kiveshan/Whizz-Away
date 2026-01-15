@@ -2177,7 +2177,10 @@ export default function DirectorAnalytics() {
             value={activeYear}
             onChange={(e) => setActiveYear(e.target.value)}
           >
-            {["2022", "2023", "2024", "2025"].map((year) => (
+            {Array.from(
+              { length: currentDate.getFullYear() - 2024 + 1 },
+              (_, idx) => (2024 + idx).toString()
+            ).map((year) => (
               <option key={year} value={year}>
                 {year}
               </option>

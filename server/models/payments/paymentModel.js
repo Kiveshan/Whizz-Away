@@ -453,4 +453,169 @@ const getClientInvoices = async (clientId) => {
   }
 };
 
-export { createPayment, getPayment, getClientPayments, getClientInvoices };
+const deletePayment = async (clientId, paymentId) => {
+  let client;
+  try {
+    if (!pool) {
+      throw new Error(
+        "Database connection not established. Please try again later."
+      );
+    }
+    client = await pool.connect();
+
+    await client.query("BEGIN");
+
+    // Load the payment and its line_items
+    const paymentQuery = `
+      SELECT paykey, line_items
+      FROM payment_m3
+      WHERE clientid = $1 AND paykey = $2
+      FOR UPDATE
+    `;
+    const paymentResult = await client.query(paymentQuery, [clientId, paymentId]);
+    if (paymentResult.rows.length === 0) {
+      throw new Error("Payment not found");
+    }
+
+    const paymentRow = paymentResult.rows[0];
+    let lineItems = [];
+    if (paymentRow.line_items) {
+      if (Array.isArray(paymentRow.line_items)) {
+        lineItems = paymentRow.line_items;
+      } else {
+        // line_items is stored as jsonb; in some drivers it's already parsed, but guard just in case
+        try {
+          lineItems = JSON.parse(paymentRow.line_items);
+        } catch (_) {
+          lineItems = [];
+        }
+      }
+    }
+
+    // Reverse allocations for each line item
+    for (const item of lineItems) {
+      const { type, id, amount_to_pay } = item;
+      const numericAmount = Number(amount_to_pay) || 0;
+      if (!type || !id || !numericAmount) continue;
+
+      if (type === "Invoice") {
+        // Load invoice + controller to recompute totals and current paid
+        const invoiceQuery = `
+          SELECT 
+            i.ikey AS invoice_id,
+            m.m1key,
+            m.total_cost,
+            COALESCE(m.vat, 0) AS vat,
+            COALESCE(m.paid_amount, 0) AS paid_amount
+          FROM invoice i
+          JOIN m1_controller m ON i.m1key = m.m1key
+          WHERE i.ikey = $1 AND i.clientid = $2
+        `;
+        const invoiceResult = await client.query(invoiceQuery, [id, clientId]);
+        if (invoiceResult.rows.length === 0) {
+          // If the invoice is gone, skip reversing for this line
+          continue;
+        }
+
+        const row = invoiceResult.rows[0];
+        const baseTotal = Number(row.total_cost) || 0;
+        const vatRate = Number(row.vat) || 0;
+        const vatAmount = baseTotal * (vatRate / 100);
+        const totalWithVat = baseTotal + vatAmount;
+        const currentPaid = Number(row.paid_amount) || 0;
+
+        // Reverse this payment's contribution
+        const newPaidRaw = currentPaid - numericAmount;
+        const newPaid = newPaidRaw < 0 ? 0 : newPaidRaw;
+
+        let status = null;
+        if (newPaid <= 0 + 0.01) {
+          status = "unpaid";
+        } else if (newPaid >= totalWithVat - 0.01) {
+          status = "paid";
+        } else {
+          status = "partial";
+        }
+
+        const updateInvoiceQuery = `
+          UPDATE m1_controller
+          SET paid_amount = $1, payment_status = $2
+          FROM invoice i
+          WHERE i.m1key = m1_controller.m1key
+            AND i.ikey = $3
+            AND i.clientid = $4
+        `;
+        await client.query(updateInvoiceQuery, [
+          newPaid,
+          status,
+          row.invoice_id,
+          clientId,
+        ]);
+      } else if (type === "Add-on") {
+        // Load add-on to recompute totals and current paid
+        const addonQuery = `
+          SELECT 
+            addon_id,
+            amount,
+            COALESCE(paid_amount, 0) AS paid_amount
+          FROM add_ons
+          WHERE addon_id = $1 AND client_id = $2
+        `;
+        const addonResult = await client.query(addonQuery, [id, clientId]);
+        if (addonResult.rows.length === 0) {
+          continue;
+        }
+
+        const row = addonResult.rows[0];
+        const total = Number(row.amount) || 0;
+        const currentPaid = Number(row.paid_amount) || 0;
+
+        const newPaidRaw = currentPaid - numericAmount;
+        const newPaid = newPaidRaw < 0 ? 0 : newPaidRaw;
+
+        let status = null;
+        if (newPaid <= 0 + 0.01) {
+          status = "unpaid";
+        } else if (newPaid >= total - 0.01) {
+          status = "paid";
+        } else {
+          status = "partial";
+        }
+
+        const updateAddonQuery = `
+          UPDATE add_ons
+          SET paid_amount = $1, status = $2
+          WHERE addon_id = $3 AND client_id = $4
+        `;
+        await client.query(updateAddonQuery, [
+          newPaid,
+          status,
+          row.addon_id,
+          clientId,
+        ]);
+      }
+    }
+
+    // Hard delete the payment row
+    const deleteQuery = `
+      DELETE FROM payment_m3
+      WHERE clientid = $1 AND paykey = $2
+    `;
+    await client.query(deleteQuery, [clientId, paymentId]);
+
+    await client.query("COMMIT");
+
+    return { success: true };
+  } catch (error) {
+    if (client) {
+      try {
+        await client.query("ROLLBACK");
+      } catch (_) {}
+    }
+    throw error;
+  } finally {
+    if (client) client.release();
+  }
+};
+
+export { createPayment, getPayment, getClientPayments, getClientInvoices, deletePayment };
