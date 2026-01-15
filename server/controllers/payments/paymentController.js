@@ -3,6 +3,7 @@ import {
   getPayment,
   getClientPayments,
   getClientInvoices,
+  deletePayment,
 } from "../../models/payments/paymentModel.js";
 
 const createPaymentHandler = async (req, res) => {
@@ -127,9 +128,33 @@ const getClientInvoicesHandler = async (req, res) => {
   }
 };
 
+const deletePaymentHandler = async (req, res) => {
+  try {
+    const { clientId, paymentId } = req.params;
+    console.log(`Deleting payment ${paymentId} for client ${clientId}`);
+
+    await deletePayment(clientId, paymentId);
+
+    res.json({
+      success: true,
+    });
+  } catch (error) {
+    console.error(
+      `Error deleting payment ${req.params.paymentId} for client ${req.params.clientId}:`,
+      error
+    );
+    res.status(500).json({
+      success: false,
+      message: error.message,
+      stack: process.env.NODE_ENV === "production" ? null : error.stack,
+    });
+  }
+};
+
 export {
   createPaymentHandler,
   getPaymentHandler,
   getClientPaymentsHandler,
   getClientInvoicesHandler,
+  deletePaymentHandler,
 };

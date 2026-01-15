@@ -18,6 +18,11 @@ const ClientPaymentList = () => {
     year: currentDate.getFullYear().toString(),
     month: (currentDate.getMonth() + 1).toString(),
   });
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
+  const [paymentToDelete, setPaymentToDelete] = useState(null);
+
+  const roleId = JSON.parse(localStorage.getItem("user"))?.roleid;
 
   // Pagination state
   const [currentPage, setCurrentPage] = useState(1);
@@ -117,6 +122,53 @@ const ClientPaymentList = () => {
 
   const handleBack = () => {
     navigate("/client-list-payments");
+  };
+
+  const handleDeleteClick = (payment) => {
+    setPaymentToDelete(payment);
+    setShowDeleteModal(true);
+  };
+
+  const handleDeleteCancel = () => {
+    if (isDeleting) return;
+    setShowDeleteModal(false);
+    setPaymentToDelete(null);
+  };
+
+  const handleDeleteConfirm = async () => {
+    if (!paymentToDelete) return;
+
+    try {
+      setIsDeleting(true);
+      const response = await api.delete(
+        `/api/payments/${clientId}/${paymentToDelete.paykey}`,
+        {
+          headers: {
+            Authorization: `Bearer ${localStorage.getItem("token")}`,
+          },
+        }
+      );
+
+      if (response.data?.success) {
+        setClientPayments((prev) =>
+          prev.filter((p) => p.paykey !== paymentToDelete.paykey)
+        );
+      } else {
+        throw new Error(
+          response.data?.message || "Failed to delete payment"
+        );
+      }
+    } catch (err) {
+      console.error("Error deleting payment:", err);
+      if (handleTokenExpiration(err)) {
+        return;
+      }
+      setError(err.message || "An error occurred while deleting the payment");
+    } finally {
+      setIsDeleting(false);
+      setShowDeleteModal(false);
+      setPaymentToDelete(null);
+    }
   };
 
   // Pagination calculations
@@ -254,6 +306,7 @@ const ClientPaymentList = () => {
               <th>Invoice</th>
               <th>Reference</th>
               <th>View</th>
+              {roleId == 1 && <th>Delete</th>}
             </tr>
           </thead>
           <tbody>
@@ -281,6 +334,17 @@ const ClientPaymentList = () => {
                       View Details
                     </button>
                   </td>
+                  {roleId == 1 && (
+                    <td>
+                      <button
+                        type="button"
+                        className="delete-payment-button"
+                        onClick={() => handleDeleteClick(payment)}
+                      >
+                        Delete
+                      </button>
+                    </td>
+                  )}
                 </tr>
               ))
             ) : (
@@ -348,6 +412,39 @@ const ClientPaymentList = () => {
           </button>
         </div>
       </div>
+      {showDeleteModal && paymentToDelete && (
+        <div className="delete-modal-overlay">
+          <div className="delete-modal">
+            <h3>Delete Payment</h3>
+            <p>
+              Are you sure you want to delete this payment dated
+              {" "}
+              {new Date(paymentToDelete.fileupload).toLocaleDateString()} for
+              {" "}
+              R{paymentToDelete.amount.toLocaleString()}? This will reverse
+              all allocations on the linked invoices and add-ons.
+            </p>
+            <div className="delete-modal-actions">
+              <button
+                type="button"
+                className="delete-modal-cancel"
+                onClick={handleDeleteCancel}
+                disabled={isDeleting}
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                className="delete-modal-confirm"
+                onClick={handleDeleteConfirm}
+                disabled={isDeleting}
+              >
+                {isDeleting ? "Deleting..." : "Delete"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

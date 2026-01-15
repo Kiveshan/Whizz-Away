@@ -2797,25 +2797,61 @@ const ControllerInstructions = () => {
                       className="controller-instructions-booking-rates-row"
                       style={{ flexWrap: "wrap" }}
                     >
-                      {/* VAT Rate */}
+                      {/* VAT toggle */}
                       <div
                         className="controller-instructions-form-field"
                         style={{ flex: "0 0 120px", minWidth: "100px" }}
                       >
-                        <label>VAT Rate</label>
+                        <label>VAT</label>
                         <div className="controller-instructions-input-wrapper">
-                          <input
-                            type="text"
-                            className="controller-instructions-form-input"
-                            value={`${formData.vat || 15}%`}
-                            readOnly
+                          <label
                             style={{
-                              width: "100%",
-                              padding: "4px 6px",
-                              fontSize: "12px",
-                              height: "30px",
+                              display: "inline-flex",
+                              alignItems: "center",
+                              gap: "8px",
+                              cursor: "pointer",
                             }}
-                          />
+                          >
+                            <span style={{ fontSize: "12px" }}>0%</span>
+                            <input
+                              type="checkbox"
+                              checked={formData.vat !== 0}
+                              onChange={(e) =>
+                                setFormData((prev) => ({
+                                  ...prev,
+                                  vat: e.target.checked ? 15 : 0,
+                                }))
+                              }
+                              style={{ display: "none" }}
+                            />
+                            <span
+                              className="vat-toggle-slider"
+                              style={{
+                                position: "relative",
+                                width: "40px",
+                                height: "20px",
+                                borderRadius: "10px",
+                                backgroundColor: formData.vat !== 0 ? "#4a90e2" : "#ccc",
+                                transition: "background-color 0.2s ease",
+                                display: "inline-block",
+                              }}
+                            >
+                              <span
+                                style={{
+                                  position: "absolute",
+                                  top: "2px",
+                                  left: formData.vat !== 0 ? "22px" : "2px",
+                                  width: "16px",
+                                  height: "16px",
+                                  borderRadius: "50%",
+                                  backgroundColor: "#fff",
+                                  boxShadow: "0 1px 3px rgba(0,0,0,0.3)",
+                                  transition: "left 0.2s ease",
+                                }}
+                              />
+                            </span>
+                            <span style={{ fontSize: "12px" }}>15%</span>
+                          </label>
                         </div>
                       </div>
 
