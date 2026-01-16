@@ -258,6 +258,10 @@ function UpdateInstruction() {
   // Add a ref to the Add Driver button for positioning the modal
   const addDriverButtonRef = useRef(null);
 
+  // Guard ref to prevent concurrent saves and track last-saved payload
+  const isSavingRef = useRef(false);
+  const lastSavedLegRef = useRef(null);
+
   const [drivers, setDrivers] = useState([]);
   const [legs, setLegs] = useState([]);
   const [currentLagIndex, setCurrentLagIndex] = useState(null);
@@ -2064,7 +2068,8 @@ const navigateToDocuments = () => {
   };
 
   const handleSave = async () => {
-    if (isCompleted || saving) return;
+    // Prevent saves on completed instructions or while a save is already in progress
+    if (isCompleted || saving || isSavingRef.current) return;
 
     if (currentLagIndex === null) {
       setSavedMessage("Please select a leg first");
@@ -2125,6 +2130,7 @@ const navigateToDocuments = () => {
 
     try {
       setSaving(true);
+      isSavingRef.current = true;
       const updatedLegs = [...legs];
       const cleanDrivers = dedupeDrivers(drivers);
 
@@ -2288,6 +2294,7 @@ if (result.legId && isNewLeg) {
       setTimeout(() => setSavedMessage(""), 5000);
     } finally {
       setSaving(false);
+      isSavingRef.current = false;
     }
   };
 
@@ -3930,6 +3937,17 @@ useEffect(() => {
                           };
                         }),
                       };
+
+                      // Idempotency guard: if this payload matches the last successful save,
+                      // skip hitting the server again.
+                      const currentPayload = JSON.stringify(legData);
+                      if (lastSavedLegRef.current === currentPayload) {
+                        console.log("Skipping save: leg payload unchanged from last save");
+                        setSavedMessage("No changes to save");
+                        setTimeout(() => setSavedMessage(""), 3000);
+                        return;
+                      }
+                      lastSavedLegRef.current = currentPayload;
 
                       // Send the data to the server
                       const response = await fetch(
