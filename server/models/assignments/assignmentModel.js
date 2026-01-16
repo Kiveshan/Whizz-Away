@@ -280,68 +280,6 @@ export const saveLeg = async ({
     await client.query("BEGIN");
     const isNewLeg = !legkey || legkey === null;
 
-    // Backend safeguard: prevent saving more container assignments on a leg
-    // than there are containers on the instruction, and avoid duplicate
-    // containers for the same leg. This mirrors the frontend validation but
-    // guarantees correctness even if the client misbehaves or Save is spammed.
-
-    let effectiveDrivers = drivers;
-    if (Array.isArray(effectiveDrivers) && effectiveDrivers.length > 0) {
-      // Count how many containers are associated with this instruction.
-      const containersResult = await client.query(
-        `SELECT containernum FROM container WHERE m1key = $1`,
-        [m1key]
-      );
-
-      const instructionContainers = containersResult.rows
-        .map((row) => (row.containernum != null ? row.containernum.toString() : null))
-        .filter((c) => c !== null);
-
-      const maxContainersForInstruction = instructionContainers.length;
-
-      // Only enforce the cap when this is a container-based instruction
-      // (i.e. there are container rows for this m1key). For weight-based
-      // instructions there may be no container rows and vgm is used instead.
-      if (maxContainersForInstruction > 0) {
-        const seenContainers = new Set();
-        const filtered = [];
-
-        for (const d of effectiveDrivers) {
-          // For container-based legs we use containernumber; vgm is used for
-          // weight-based instructions and should not be capped by container
-          // count.
-          const hasVgm = d.vgm !== null && d.vgm !== undefined;
-          const containerNum =
-            !hasVgm && d.containernumber
-              ? d.containernumber.toString()
-              : null;
-
-          // If this driver row is purely weight-based (vgm) or has no
-          // container number, keep it as-is.
-          if (!containerNum) {
-            filtered.push(d);
-            continue;
-          }
-
-          // Enforce per-instruction container cap and uniqueness within the leg.
-          if (seenContainers.size >= maxContainersForInstruction) {
-            // Skip any extra containers beyond the instruction's container count.
-            continue;
-          }
-
-          if (seenContainers.has(containerNum)) {
-            // Skip duplicate container assignments for this leg.
-            continue;
-          }
-
-          seenContainers.add(containerNum);
-          filtered.push(d);
-        }
-
-        effectiveDrivers = filtered;
-      }
-    }
-
     if (!isNewLeg) {
       await client.query(
         `DELETE FROM legs_m2 WHERE m1key = $1 AND legnumber = $2 AND legkey != $3`,
@@ -359,8 +297,8 @@ export const saveLeg = async ({
     }
 
     let legId = legkey;
-    if (isNewLeg || (effectiveDrivers && effectiveDrivers.length > 0)) {
-      if (isNewLeg && (!effectiveDrivers || effectiveDrivers.length === 0)) {
+    if (isNewLeg || (drivers && drivers.length > 0)) {
+      if (isNewLeg && (!drivers || drivers.length === 0)) {
         const insertResult = await client.query(
           `INSERT INTO legs_m2 (legnumber, startingpoint, destination, driverrate, m1key) VALUES ($1, $2, $3, $4, $5) RETURNING legkey`,
           [legnumber, startingpoint, destination, driverrate, m1key]
@@ -368,8 +306,8 @@ export const saveLeg = async ({
         legId = insertResult.rows[0].legkey;
       }
 
-      if (effectiveDrivers && effectiveDrivers.length > 0) {
-        for (const [index, driver] of effectiveDrivers.entries()) {
+      if (drivers && drivers.length > 0) {
+        for (const [index, driver] of drivers.entries()) {
           if (
             !driver.driverid &&
             !driver.truckregnumber &&
@@ -450,7 +388,7 @@ export const saveLeg = async ({
           }
         }
       }
-    } else if (!isNewLeg && (!effectiveDrivers || effectiveDrivers.length === 0)) {
+    } else if (!isNewLeg && (!drivers || drivers.length === 0)) {
       // Existing leg saved with no drivers: clear any persisted driver assignment data
       await client.query(
         `UPDATE legs_m2 SET 
