@@ -5,6 +5,7 @@ import {
   getPaymentHandler,
   getClientPaymentsHandler,
   getClientInvoicesHandler,
+  deletePaymentHandler,
 } from "../../controllers/payments/paymentController.js";
 
 const router = express.Router();
@@ -18,6 +19,11 @@ router.get(
   "/api/payments/:clientId/:paymentId",
   verifyToken,
   getPaymentHandler
+);
+router.delete(
+  "/api/payments/:clientId/:paymentId",
+  verifyToken,
+  deletePaymentHandler
 );
 router.get("/api/payments/:clientId", verifyToken, getClientPaymentsHandler);
 router.get(

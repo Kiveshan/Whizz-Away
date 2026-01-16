@@ -21,6 +21,8 @@ const UploadProof = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState(null);
   const [isViewMode, setIsViewMode] = useState(!!paymentId);
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
 
   // Helper function to handle token expiration
   const handleTokenExpiration = (error) => {
@@ -224,6 +226,47 @@ const UploadProof = () => {
     }
   };
 
+  const handleDeleteCancel = () => {
+    if (isDeleting) return;
+    setShowDeleteModal(false);
+  };
+
+  const handleDeleteConfirm = async () => {
+    if (!clientId || !paymentId) {
+      setError("Missing client or payment identifier");
+      return;
+    }
+
+    try {
+      setIsDeleting(true);
+      const response = await api.delete(
+        `/api/payments/${clientId}/${paymentId}`,
+        {
+          headers: {
+            Authorization: `Bearer ${localStorage.getItem("token")}`,
+          },
+        }
+      );
+
+      if (response.data?.success) {
+        handleBack();
+      } else {
+        throw new Error(
+          response.data?.message || "Failed to delete payment"
+        );
+      }
+    } catch (err) {
+      console.error("Error deleting payment:", err);
+      if (handleTokenExpiration(err)) {
+        return;
+      }
+      setError(err.message || "An error occurred while deleting the payment");
+    } finally {
+      setIsDeleting(false);
+      setShowDeleteModal(false);
+    }
+  };
+
   const handleBack = () => {
     if (roleId == 1) {
       navigate("/client-payments", {
@@ -421,11 +464,29 @@ const UploadProof = () => {
 
         <div className="upload-content">
           <div className="upload-form">
-            <h2>
-              {isViewMode
-                ? `View Payment for ${decodeURIComponent(clientName)}`
-                : `Add Payment for ${decodeURIComponent(clientName)}`}
-            </h2>
+            <div
+              style={{
+                display: "flex",
+                justifyContent: "space-between",
+                alignItems: "center",
+                marginBottom: "10px",
+              }}
+            >
+              <h2 style={{ marginBottom: 0 }}>
+                {isViewMode
+                  ? `View Payment for ${decodeURIComponent(clientName)}`
+                  : `Add Payment for ${decodeURIComponent(clientName)}`}
+              </h2>
+              {isViewMode && roleId == 1 && (
+                <button
+                  type="button"
+                  className="delete-payment-button"
+                  onClick={() => setShowDeleteModal(true)}
+                >
+                  Delete Payment
+                </button>
+              )}
+            </div>
 
             {error && <div className="error-message">{error}</div>}
 
@@ -607,6 +668,36 @@ const UploadProof = () => {
                     >
                       {isSubmitting ? "Saving..." : "Save Payment"}
                     </button>
+                  </div>
+                )}
+                {isViewMode && showDeleteModal && (
+                  <div className="delete-modal-overlay">
+                    <div className="delete-modal">
+                      <h3>Delete Payment</h3>
+                      <p>
+                        Are you sure you want to delete this payment? This will
+                        reverse all allocations on the linked invoices and
+                        add-ons.
+                      </p>
+                      <div className="delete-modal-actions">
+                        <button
+                          type="button"
+                          className="delete-modal-cancel"
+                          onClick={handleDeleteCancel}
+                          disabled={isDeleting}
+                        >
+                          Cancel
+                        </button>
+                        <button
+                          type="button"
+                          className="delete-modal-confirm"
+                          onClick={handleDeleteConfirm}
+                          disabled={isDeleting}
+                        >
+                          {isDeleting ? "Deleting..." : "Delete"}
+                        </button>
+                      </div>
+                    </div>
                   </div>
                 )}
               </>

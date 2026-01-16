@@ -522,7 +522,7 @@ const ClientInvoice = forwardRef(({
           (container) => container.truckregnumber
         );
         // Determine column visibility
-        const containerHeaders = ["Cont. No", "Type"];
+        const containerHeaders = ["#", "Cont. No", "Type"];
         if (hasWeights) containerHeaders.push("Weight");
         if (hasTrucks) containerHeaders.push("Truck");
         // Always show Base Rate column
@@ -536,11 +536,13 @@ const ClientInvoice = forwardRef(({
         tableHeaders = containerHeaders;
         tableData =
           containers.length > 0
-            ? containers.map((container) => {
+            ? containers.map((container, index) => {
                 const row = [
+                  index + 1,
                   container.container_number || "N/A",
                   container.container_type || "Standard"
                 ];
+
                 if (hasWeights && container.weight && container.weight !== "N/A") {
                   row.push(`${container.weight} kg`);
                 } else if (hasWeights) {
@@ -579,7 +581,7 @@ const ClientInvoice = forwardRef(({
                 row.push(formatCurrency(totalValue));
                 return row;
               })
-            : [["No container information", "", "", "", "", "", "", ""]];
+            : [["No container information", "", "", "", "", "", "", "", ""]];
       }
 
       // Calculate available height for the table and enforce compact row styling
@@ -604,8 +606,8 @@ const ClientInvoice = forwardRef(({
           fontStyle: "bold",
         },
         columnStyles: {
-          0: { cellWidth: isWeightBased ? 28 : 28 },
-          1: { cellWidth: isWeightBased ? 22 : 18 },
+          0: { cellWidth: isWeightBased ? 28 : 10 }, // thin index column in container view
+          1: { cellWidth: isWeightBased ? 22 : 28 },
           2: { cellWidth: isWeightBased ? 32 : undefined },
           3: { cellWidth: isWeightBased ? 16 : undefined },
           4: { cellWidth: isWeightBased ? 22 : undefined },
@@ -1014,6 +1016,7 @@ const ClientInvoice = forwardRef(({
                 <table className="container-table5">
                   <thead>
                     <tr>
+                      <th className="row-index-header">#</th>
                       <th className="container-number-header">
                         Container Number
                       </th>
@@ -1027,11 +1030,11 @@ const ClientInvoice = forwardRef(({
                       ) && <th className="truck-header">Truck Reg</th>}
                       <th className="rate-header">Base Rate</th>
                       {containers.some(
-                        (container) => 
+                        (container) =>
                           container.add_surcharges || container.surcharge_amount > 0
                       ) && <th className="surcharge-header">Surcharge</th>}
                       {containers.some(
-                        (container) => 
+                        (container) =>
                           container.hazardous || container.hazardous_amount > 0
                       ) && <th className="hazardous-header">Haz</th>}
                       {containers.some(
@@ -1059,6 +1062,7 @@ const ClientInvoice = forwardRef(({
 
                         return (
                           <tr key={index}>
+                            <td className="row-index">{index + 1}</td>
                             <td className="container-number">
                               {container.container_number ||
                                 `Container ${index + 1}`}
@@ -1116,7 +1120,7 @@ const ClientInvoice = forwardRef(({
                       })
                     ) : (
                       <tr>
-                        <td className="container-number" colSpan="8">
+                        <td className="container-number" colSpan="9">
                           No container information
                         </td>
                       </tr>
