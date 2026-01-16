@@ -13,6 +13,31 @@ const normalizeString = (str) => {
   return str.toLowerCase().replace(/\s+/g, '').trim();
 };
 
+// Helper to avoid sending duplicate driver/container assignments when saving
+// Uniqueness is based on driver, truck, container and date
+const dedupeDrivers = (drivers) => {
+  if (!Array.isArray(drivers) || drivers.length === 0) return drivers || [];
+
+  const seen = new Set();
+  const result = [];
+
+  for (const d of drivers) {
+    const key = [
+      d.driverid || "",
+      d.truckregnumber || "",
+      d.containernumber || "",
+      d.date || "",
+    ].join("|");
+
+    if (!seen.has(key)) {
+      seen.add(key);
+      result.push(d);
+    }
+  }
+
+  return result;
+};
+
   const API_BASE_URL = process.env.REACT_APP_API_URL || "http://localhost:5000";
 const modalAnimation = `
   @keyframes fadeIn {
@@ -2039,7 +2064,7 @@ const navigateToDocuments = () => {
   };
 
   const handleSave = async () => {
-    if (isCompleted) return;
+    if (isCompleted || saving) return;
 
     if (currentLagIndex === null) {
       setSavedMessage("Please select a leg first");
@@ -2101,10 +2126,31 @@ const navigateToDocuments = () => {
     try {
       setSaving(true);
       const updatedLegs = [...legs];
+      const cleanDrivers = dedupeDrivers(drivers);
+
+      // Enforce that a single leg cannot have more unique containers
+      // than the total number of containers on the instruction
+      if (!isWeightBased && instructionContainers && instructionContainers.length > 0) {
+        const uniqueContainersInLeg = new Set(
+          cleanDrivers
+            .filter((d) => d.containernumber)
+            .map((d) => d.containernumber.toString())
+        );
+
+        if (uniqueContainersInLeg.size > instructionContainers.length) {
+          setSavedMessage(
+            `Leg has ${uniqueContainersInLeg.size} container assignments but the instruction only has ${instructionContainers.length} containers.`
+          );
+          setTimeout(() => setSavedMessage(""), 6000);
+          setSaving(false);
+          return;
+        }
+      }
+
       updatedLegs[currentLagIndex] = {
         ...updatedLegs[currentLagIndex],
         ...formData,
-        drivers: [...drivers],
+        drivers: [...cleanDrivers],
       };
       setLegs(updatedLegs);
 
@@ -2121,14 +2167,14 @@ const navigateToDocuments = () => {
         legnumber: currentLeg.legnumber || currentLagIndex + 1,
         startingpoint: currentLeg.startingPoint || formData.startingPoint,
         destination: currentLeg.destination || formData.destination,
-        driverrate: calculateLegDriverRate(drivers, rates),
+        driverrate: calculateLegDriverRate(cleanDrivers, rates),
         m1key: instructionId,
-drivers: drivers.map((driver) => {
-  let driverRateToSave = driver.driverRate || "0";
-  if (!driver.driverRate || driver.driverRate === "") {
-    const isSubcontractor =
-      employeeDrivers.find((d) => d.userid.toString() === driver.driverid)
-        ?.roleid === 6;
+        drivers: cleanDrivers.map((driver) => {
+          let driverRateToSave = driver.driverRate || "0";
+          if (!driver.driverRate || driver.driverRate === "") {
+            const isSubcontractor =
+              employeeDrivers.find((d) => d.userid.toString() === driver.driverid)
+                ?.roleid === 6;
 
     if (driver.container_type === "12m") {
       driverRateToSave = isSubcontractor
