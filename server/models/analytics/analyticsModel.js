@@ -280,9 +280,13 @@ const getAllClients = async (client) => {
 
 const getAllSubcontractors = async (client) => {
   const query = `
-    SELECT userid, companyname
+    SELECT 
+      MIN(userid) AS userid,
+      companyname,
+      subei_reg_num
     FROM m5_employee
     WHERE roleid = 6
+    GROUP BY companyname, subei_reg_num
     ORDER BY companyname
   `
   const result = await client.query(query)
@@ -291,6 +295,7 @@ const getAllSubcontractors = async (client) => {
   return result.rows.map((row) => ({
     userid: row.userid,
     companyname: row.companyname,
+    subei_reg_num: row.subei_reg_num,
   }))
 }
 
@@ -652,7 +657,7 @@ const getSubcontractorVsTurnover = async (client, month, year, subcontractorId =
         AND EXTRACT(YEAR FROM m.created_at)::TEXT = $2
   `
   if (subcontractorId) {
-    subcontractorQuery += ` AND l.driverid = $3`
+    subcontractorQuery += ` AND e.subei_reg_num = $3`
     params.push(subcontractorId)
   }
   subcontractorQuery += `
@@ -660,12 +665,13 @@ const getSubcontractorVsTurnover = async (client, month, year, subcontractorId =
       SubcontractorTurnover AS (
         SELECT 
           COALESCE(e.companyname, 'Unknown') AS companyname,
+          e.subei_reg_num,
           SUM(ltc.turnover_contribution) AS subcontractor_turnover,
           TO_CHAR(ltc.created_at, 'Month') AS month_name,
           EXTRACT(YEAR FROM ltc.created_at)::TEXT AS year
         FROM LegDriverContributions ltc
         JOIN m5_employee e ON ltc.driverid = e.userid
-        GROUP BY e.companyname, TO_CHAR(ltc.created_at, 'Month'), EXTRACT(YEAR FROM ltc.created_at)
+        GROUP BY e.companyname, e.subei_reg_num, TO_CHAR(ltc.created_at, 'Month'), EXTRACT(YEAR FROM ltc.created_at)
       )
       SELECT 
         companyname AS name,
@@ -777,7 +783,7 @@ const getTurnoverVsSubbieExpense = async (client, month, year, subcontractorId =
       AND EXTRACT(YEAR FROM l.date)::text = $2
   `
   if (subcontractorId) {
-    subcontractorQuery += ` AND e.userid = $3`
+    subcontractorQuery += ` AND e.subei_reg_num = $3`
     params.push(subcontractorId)
   }
   subcontractorQuery += `
