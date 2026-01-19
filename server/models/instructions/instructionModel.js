@@ -330,7 +330,11 @@ export const saveInstruction = async ({
       vesselName: controllerData.vessel_name, // Already null if cross-haul from frontend
       weight: controllerData.weight, // Already null if container-based from frontend
       unitrate: controllerData.unitrate, // Already null if container-based from frontend
-      vat: controllerData.vat || 15,
+      // Preserve 0 as a valid VAT value; only default to 15 when VAT is missing
+      vat:
+        controllerData.vat !== undefined && controllerData.vat !== null
+          ? controllerData.vat
+          : 15,
       total_cost: controllerData.total_cost
         ? Number(Number(controllerData.total_cost).toFixed(2))
         : calculateTotalCost(controllerData), // Directly use frontend total_cost if available
