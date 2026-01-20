@@ -2212,7 +2212,10 @@ export default function DirectorAnalytics() {
               >
                 <option value="">Select Subcontractor</option>
                 {subcontractors.map((subcontractor) => (
-                  <option key={subcontractor.userid} value={subcontractor.userid}>
+                  <option
+                    key={subcontractor.subei_reg_num || subcontractor.userid}
+                    value={subcontractor.subei_reg_num || subcontractor.userid}
+                  >
                     {subcontractor.companyname}
                   </option>
                 ))}

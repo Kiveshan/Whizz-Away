@@ -567,7 +567,11 @@ const ControllerInstructions = () => {
         "",
 
       // Other special cases
-      vat: Number(preservedFormData?.vat) || 15,
+      // IMPORTANT: preserve 0 as a valid VAT value instead of falling back to 15
+      vat:
+        preservedFormData && preservedFormData.vat !== undefined
+          ? Number(preservedFormData.vat)
+          : 15,
       total_cost: Number(preservedFormData?.total_cost) || 0,
     }
 
