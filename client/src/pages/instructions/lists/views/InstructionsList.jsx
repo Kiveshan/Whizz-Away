@@ -428,6 +428,9 @@ const Instructions = () => {
                 <tr>
                   <th>Instruction No</th>
                   <th>File No</th>
+                  <th>Booking Ref</th>
+                  <th>Client Ref</th>
+                  <th>KSM File Ref</th>
                   <th>Type</th>
                   <th>Status</th>
                   <th>Creation Date</th>
@@ -438,7 +441,7 @@ const Instructions = () => {
 <tbody>
   {currentInstructions.length === 0 ? (
     <tr>
-      <td colSpan="7">No instructions found</td>
+      <td colSpan="10">No instructions found</td>
     </tr>
   ) : (
     currentInstructions.map((item) => {
@@ -449,6 +452,9 @@ const Instructions = () => {
         <tr key={item.m1controllerkey || item.m1key}>
           <td>Instruction {item.m1controllerkey || item.m1key}</td>
           <td>{item.fileno}</td>
+          <td>{item.booking_ref || "N/A"}</td>
+          <td>{item.client_ref || "N/A"}</td>
+          <td>{item.ksm_file_ref || "N/A"}</td>
           <td>
             {item.type_text ||
               (item.shipment_type === 1 || item.shipment_type === "1"
