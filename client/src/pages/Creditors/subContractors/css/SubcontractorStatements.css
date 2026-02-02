@@ -68,41 +68,11 @@
 }
 
 /* Table */
-.subcontractor-statements-wrapper .statement-groups {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(520px, 1fr));
-  gap: 24px;
-  margin: 20px auto;
-  max-width: 1200px;
-}
-
-.subcontractor-statements-wrapper .statement-group {
-  background: #ffffff;
-  border-radius: 12px;
-  box-shadow: 0 20px 60px rgba(12, 26, 75, 0.08);
-  padding: 20px;
-  display: flex;
-  flex-direction: column;
-}
-
-.subcontractor-statements-wrapper .statement-group__header {
-  display: flex;
-  align-items: center;
-  justify-content: flex-start;
-  gap: 12px;
-  margin-bottom: 16px;
-}
-
-.subcontractor-statements-wrapper .statement-group__header h3 {
-  font-size: 18px;
-  color: #1a365d;
-  margin: 0;
-}
-
 .subcontractor-statements-wrapper .statements-table {
-  width: 100%;
+  width: 1200px;
+  margin: 20px auto;
   border-collapse: collapse;
-  box-shadow: none;
+  box-shadow: 0 0 5px rgba(0, 0, 0, 0.05);
   font-family: inherit;
 }
 

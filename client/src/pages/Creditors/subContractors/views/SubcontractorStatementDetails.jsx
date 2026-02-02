@@ -17,7 +17,6 @@ const SubcontractorStatementDetail = () => {
     subei_reg_num,
     legids,
     date,
-    isVat = false,
   } = location.state || {};
 
   const [statement, setStatement] = useState(null);
@@ -71,37 +70,12 @@ const SubcontractorStatementDetail = () => {
           containerNumber: leg.containernumber || "N/A",
           destination: leg.destination,
           rate: leg.driverrate || 0,
-          originalRate: leg.original_rate ?? leg.driverrate ?? 0,
-          vatPercentage: leg.vat_percentage ?? 0,
-          vatAmount: leg.vat_amount ?? 0,
-          isVat: Boolean(leg.is_vat),
           instruction: leg.m1_description || "N/A",
         }));
 
-        const totals = workItems.reduce(
-          (acc, item) => {
-            const rate = item.rate || 0;
-            const original = item.originalRate || 0;
-            const vatAmount = item.vatAmount || 0;
-            const isVatLeg = Boolean(item.isVat);
-            const bucket = isVatLeg ? acc.vat : acc.nonVat;
-
-            bucket.count += 1;
-            bucket.amount += rate;
-            bucket.original += original;
-            bucket.vat += vatAmount;
-
-            acc.total.amount += rate;
-            acc.total.vat += vatAmount;
-            acc.total.original += original;
-
-            return acc;
-          },
-          {
-            vat: { count: 0, amount: 0, original: 0, vat: 0 },
-            nonVat: { count: 0, amount: 0, original: 0, vat: 0 },
-            total: { amount: 0, original: 0, vat: 0 },
-          }
+        const totalAmount = workItems.reduce(
+          (sum, item) => sum + (item.rate || 0),
+          0
         );
 
         const companyResponse = await api.get("/subcontractor/company-info", {
@@ -135,13 +109,9 @@ const SubcontractorStatementDetail = () => {
           generationDate: date,
           workItems,
           summary: {
-            vatLegs: totals.vat,
-            nonVatLegs: totals.nonVat,
-            total: totals.total,
-            totalAmount: totals.total.amount,
-            finalAmount: totals.total.amount,
+            totalAmount,
+            finalAmount: totalAmount,
           },
-          isVatStatement: isVat,
         });
       } catch (err) {
         console.error("Error fetching statement detail:", err);
@@ -312,14 +282,11 @@ const SubcontractorStatementDetail = () => {
       "Date",
       "Container No",
       "Destination",
-      "Original",
-      "VAT",
-      "Final",
-      "Type",
+      "Rate",
       "Instructions",
     ];
-    // Adjust widths to suit expanded columns
-    const colWidths = [22, 28, 32, 20, 18, 20, 18, 42];
+    // Adjust widths to suit new column
+    const colWidths = [25, 35, 30, 25, 65];
     const rowHeight = 11; // taller rows to comfortably fit up to 2 lines of text
     let x = margin;
 
@@ -434,46 +401,22 @@ const SubcontractorStatementDetail = () => {
       });
       x += colWidths[2];
 
-      // Original rate
-      doc.setTextColor(...mediumGray);
-      doc.setFont("helvetica", "normal");
-      doc.text(`R${(item.originalRate || 0).toFixed(2)}`, x + colWidths[3] - 2, y + 4, {
+      // Rate (right-aligned and styled)
+      doc.setTextColor(...primaryBlue);
+      doc.setFont("helvetica", "bold");
+      doc.text(`R${item.rate.toFixed(2)}`, x + colWidths[3] - 2, y + 4, {
         align: "right",
       });
       x += colWidths[3];
 
-      // VAT amount
-      doc.setTextColor(...primaryBlue);
-      doc.setFont("helvetica", "bold");
-      doc.text(`R${(item.vatAmount || 0).toFixed(2)}`, x + colWidths[4] - 2, y + 4, {
-        align: "right",
-      });
-      x += colWidths[4];
-
-      // Final rate
-      doc.setFont("helvetica", "bold");
-      doc.text(`R${(item.rate || 0).toFixed(2)}`, x + colWidths[5] - 2, y + 4, {
-        align: "right",
-      });
-      x += colWidths[5];
-
-      // VAT indicator
-      doc.setFont("helvetica", "bold");
-      doc.setTextColor(item.isVat ? [44, 160, 90] : [221, 107, 32]);
-      doc.text(item.isVat ? "VAT" : "Non-VAT", x + colWidths[6] / 2, y + 4, {
-        align: "center",
-      });
-      x += colWidths[6];
-
-      // Instructions (in column layout)
-      doc.setTextColor(...darkGray);
+      // Instructions
+      doc.setTextColor(...mediumGray);
       doc.setFont("helvetica", "normal");
-      const instructionText = doc.splitTextToSize(
-        item.instruction,
-        colWidths[7] - 4
-      );
-      doc.text(instructionText, x + 2, y + 4);
-      x += colWidths[7];
+      const instruction =
+        item.instruction.length > 28
+          ? item.instruction.substring(0, 28) + "..."
+          : item.instruction;
+      doc.text(instruction, x + colWidths[4] / 2, y + 4, { align: "center" });
 
       y += rowHeight;
     });
@@ -481,15 +424,15 @@ const SubcontractorStatementDetail = () => {
     y += 10;
 
     // Payment Summary Box
-    const summaryBoxWidth = 90;
+    const summaryBoxWidth = 80;
     const summaryBoxX = margin + pageWidth - summaryBoxWidth;
 
     // Summary box background and border
     doc.setFillColor(255, 255, 255);
-    doc.roundedRect(summaryBoxX, y, summaryBoxWidth, 34, 3, 3, "F");
+    doc.roundedRect(summaryBoxX, y, summaryBoxWidth, 25, 3, 3, "F");
     doc.setDrawColor(...primaryBlue);
     doc.setLineWidth(0.8);
-    doc.roundedRect(summaryBoxX, y, summaryBoxWidth, 50, 3, 3, "S");
+    doc.roundedRect(summaryBoxX, y, summaryBoxWidth, 25, 3, 3, "S");
 
     // Summary header
     doc.setFillColor(...primaryBlue);
@@ -505,11 +448,11 @@ const SubcontractorStatementDetail = () => {
     doc.setFontSize(10);
     doc.setFont("helvetica", "normal");
     doc.setTextColor(...mediumGray);
-    doc.text("Subtotal (Original):", summaryBoxX + 3, y + 13);
+    doc.text("Subtotal:", summaryBoxX + 3, y + 13);
     doc.setTextColor(...darkGray);
     doc.setFont("helvetica", "bold");
     doc.text(
-      `R${(statement.summary.total.original || 0).toFixed(2)}`,
+      `R${statement.summary.totalAmount.toFixed(2)}`,
       summaryBoxX + summaryBoxWidth - 3,
       y + 13,
       {
@@ -527,15 +470,15 @@ const SubcontractorStatementDetail = () => {
       y + 16
     );
 
-    // VAT Total
-    doc.setFontSize(10);
-    doc.setFont("helvetica", "normal");
-    doc.setTextColor(...mediumGray);
-    doc.text("VAT Total:", summaryBoxX + 3, y + 21);
-    doc.setTextColor(...darkGray);
+    // Total Amount Due
+    doc.setFontSize(12);
     doc.setFont("helvetica", "bold");
+    doc.setTextColor(...darkGray);
+    doc.text("Total Amount Due:", summaryBoxX + 3, y + 21);
+    doc.setTextColor(...primaryBlue);
+    doc.setFontSize(14);
     doc.text(
-      `R${(statement.summary.total.vat || 0).toFixed(2)}`,
+      `R${statement.summary.finalAmount.toFixed(2)}`,
       summaryBoxX + summaryBoxWidth - 3,
       y + 21,
       {
@@ -543,33 +486,7 @@ const SubcontractorStatementDetail = () => {
       }
     );
 
-    // Divider line
-    doc.setDrawColor(...primaryBlue);
-    doc.setLineWidth(0.5);
-    doc.line(
-      summaryBoxX + 3,
-      y + 24,
-      summaryBoxX + summaryBoxWidth - 3,
-      y + 24
-    );
-
-    // Total Amount Due
-    doc.setFontSize(12);
-    doc.setFont("helvetica", "bold");
-    doc.setTextColor(...darkGray);
-    doc.text("Total Amount Due:", summaryBoxX + 3, y + 30);
-    doc.setTextColor(...primaryBlue);
-    doc.setFontSize(14);
-    doc.text(
-      `R${statement.summary.finalAmount.toFixed(2)}`,
-      summaryBoxX + summaryBoxWidth - 3,
-      y + 30,
-      {
-        align: "right",
-      }
-    );
-
-    y += 44;
+    y += 35;
 
     // Footer
     doc.setDrawColor(226, 232, 240);
@@ -679,27 +596,15 @@ const SubcontractorStatementDetail = () => {
 
           {/* Work Items Table */}
           <div className="work-items-section">
-            <div className="section-header">
-              <h3 className="section-title">Work Completed</h3>
-              <span
-                className={`vat-pill ${
-                  statement.isVatStatement ? "vat" : "non-vat"
-                }`}
-              >
-                {statement.isVatStatement ? "VAT Statement" : "Non-VAT Statement"}
-              </span>
-            </div>
+            <h3 className="section-title">Work Completed</h3>
             <div className="table-container">
               <table className="work-items-table">
                 <thead>
                   <tr>
                     <th className="col-date">Date</th>
-                    <th className="col-starting">Container No</th>
+                    <th className="col-starting">Container Number</th>
                     <th className="col-destination">Destination</th>
-                    <th className="col-original">Original</th>
-                    <th className="col-vat">VAT</th>
-                    <th className="col-final">Total</th>
-                    <th className="col-type">Type</th>
+                    <th className="col-rate">Rate</th>
                     <th className="col-instruction">Instructions</th>
                   </tr>
                 </thead>
@@ -718,32 +623,12 @@ const SubcontractorStatementDetail = () => {
                       </td>
                       <td className="col-starting">{item.containerNumber}</td>
                       <td className="col-destination">{item.destination}</td>
-                      <td className="col-original">
+                      <td className="col-rate">
                         R
-                        {(item.originalRate || 0).toLocaleString("en-US", {
+                        {item.rate.toLocaleString("en-US", {
                           minimumFractionDigits: 2,
                           maximumFractionDigits: 2,
                         })}
-                      </td>
-                      <td className="col-vat">
-                        R
-                        {(item.vatAmount || 0).toLocaleString("en-US", {
-                          minimumFractionDigits: 2,
-                          maximumFractionDigits: 2,
-                        })}
-                        {item.vatPercentage
-                          ? ` (${item.vatPercentage.toFixed(2)}%)`
-                          : ""}
-                      </td>
-                      <td className="col-final">
-                        R
-                        {(item.rate || 0).toLocaleString("en-US", {
-                          minimumFractionDigits: 2,
-                          maximumFractionDigits: 2,
-                        })}
-                      </td>
-                      <td className={`col-type ${item.isVat ? "vat" : "non-vat"}`}>
-                        {item.isVat ? "VAT" : "Non-VAT"}
                       </td>
                       <td className="col-instruction">{item.instruction}</td>
                     </tr>
@@ -758,42 +643,11 @@ const SubcontractorStatementDetail = () => {
             <div className="summary-container">
               <div className="summary-header">Payment Summary</div>
               <div className="summary-content">
-                <div className="summary-row">
-                  <span className="summary-label">VAT Legs:</span>
-                  <span className="summary-value">
-                    {statement.summary.vatLegs.count} legs · R
-                    {statement.summary.vatLegs.amount.toLocaleString("en-US", {
-                      minimumFractionDigits: 2,
-                      maximumFractionDigits: 2,
-                    })}
-                  </span>
-                </div>
-                <div className="summary-row">
-                  <span className="summary-label">Non-VAT Legs:</span>
-                  <span className="summary-value">
-                    {statement.summary.nonVatLegs.count} legs · R
-                    {statement.summary.nonVatLegs.amount.toLocaleString("en-US", {
-                      minimumFractionDigits: 2,
-                      maximumFractionDigits: 2,
-                    })}
-                  </span>
-                </div>
-                <div className="summary-divider"></div>
                 <div className="summary-row subtotal-row">
-                  <span className="summary-label">Subtotal (Original):</span>
+                  <span className="summary-label">Subtotal:</span>
                   <span className="summary-value">
                     R
-                    {statement.summary.total.original.toLocaleString("en-US", {
-                      minimumFractionDigits: 2,
-                      maximumFractionDigits: 2,
-                    })}
-                  </span>
-                </div>
-                <div className="summary-row">
-                  <span className="summary-label">VAT Total:</span>
-                  <span className="summary-value">
-                    R
-                    {statement.summary.total.vat.toLocaleString("en-US", {
+                    {statement.summary.totalAmount.toLocaleString("en-US", {
                       minimumFractionDigits: 2,
                       maximumFractionDigits: 2,
                     })}

@@ -104,6 +104,10 @@ const generateCurrentMonthStatements = async (specificSubeiRegNum = null) => {
       );
     }
 
+    let processedCount = 0;
+    let createdCount = 0;
+    let updatedCount = 0;
+
     for (const subcontractor of subcontractorResult.rows) {
       const result = await upsertSubcontractorStatement(
         client,
@@ -111,18 +115,34 @@ const generateCurrentMonthStatements = async (specificSubeiRegNum = null) => {
         generationDate,
         formattedGenDate
       );
+      if (result.created) {
+        createdCount++;
+      } else if (result.updated) {
+        updatedCount++;
+      }
+      processedCount++;
     }
 
     await client.query("COMMIT");
 
     const message = specificSubeiRegNum
-      ? `Statements processed for subcontractor ${specificSubeiRegNum}.`
-      : `Generated subcontractor statements for ${formattedGenDate}.`;
+      ? `Statement processed for subcontractor ${specificSubeiRegNum}. ${
+          createdCount > 0
+            ? "Created new statement."
+            : "Updated existing statement."
+        }`
+      : `Generated ${processedCount} subcontractor statements for ${formattedGenDate}. Created: ${createdCount}, Updated: ${updatedCount}`;
 
     console.log("Subcontractor statement generation completed successfully");
     return {
       success: true,
       message,
+      count: processedCount,
+      stats: {
+        processed: processedCount,
+        created: createdCount,
+        updated: updatedCount,
+      },
     };
   } catch (error) {
     if (client) await client.query("ROLLBACK");
@@ -223,6 +243,10 @@ const generateStatementsForMonth = async (
       };
     }
 
+    let processedCount = 0;
+    let createdCount = 0;
+    let updatedCount = 0;
+
     for (const subcontractor of subcontractorResult.rows) {
       const result = await upsertSubcontractorStatement(
         client,
@@ -230,19 +254,38 @@ const generateStatementsForMonth = async (
         generationDate,
         formattedGenDate
       );
+      if (result.created) {
+        createdCount++;
+      } else if (result.updated) {
+        updatedCount++;
+      }
+      processedCount++;
     }
 
     await client.query("COMMIT");
 
     const message = specificSubeiRegNum
-      ? `Statements processed for subcontractor ${specificSubeiRegNum}.`
-      : `Generated subcontractor statement records for ${year}-${month
+      ? `Statement processed for subcontractor ${specificSubeiRegNum}. ${
+          createdCount > 0
+            ? "Created new statement."
+            : "Updated existing statement."
+        }`
+      : `Generated ${processedCount} subcontractor statements for ${year}-${month
           .toString()
-          .padStart(2, "0")}.`;
+          .padStart(
+            2,
+            "0"
+          )}. Created: ${createdCount}, Updated: ${updatedCount}`;
 
     return {
       success: true,
       message,
+      count: processedCount,
+      stats: {
+        processed: processedCount,
+        created: createdCount,
+        updated: updatedCount,
+      },
     };
   } catch (error) {
     if (client) await client.query("ROLLBACK");
@@ -311,11 +354,6 @@ const getLegsWithVAT = async (client, legIds, subeiRegNum) => {
     let totalAmount = 0;
 
     for (const leg of legDetailsResult.rows) {
-      const originalRate = Number.parseFloat(leg.original_rate) || 0;
-      const vatPercentage = Number.parseFloat(leg.vat_percentage) || 0;
-      const vatAmount = (originalRate * vatPercentage) / 100;
-      const isVat = vatPercentage > 0;
-
       let finalRate;
 
       if (useExistingRates && existingLegRates.has(leg.legkey)) {
@@ -324,6 +362,9 @@ const getLegsWithVAT = async (client, legIds, subeiRegNum) => {
         console.log(`Leg ${leg.legkey}: Using existing rate R${finalRate}`);
       } else {
         // Calculate new rate with VAT
+        const originalRate = Number.parseFloat(leg.original_rate) || 0;
+        const vatPercentage = Number.parseFloat(leg.vat_percentage) || 0;
+        const vatAmount = (originalRate * vatPercentage) / 100;
         finalRate = originalRate + vatAmount;
 
         console.log(
@@ -338,10 +379,6 @@ const getLegsWithVAT = async (client, legIds, subeiRegNum) => {
       legDetails.push({
         legkey: leg.legkey,
         driverrate: finalRate,
-        originalRate,
-        vatPercentage,
-        vatAmount,
-        isVat,
       });
 
       totalAmount += finalRate;
@@ -389,6 +426,7 @@ const upsertSubcontractorStatement = async (
       return { created: false, updated: false };
     }
 
+    // Get leg details with VAT calculation
     const { legDetails, totalAmount } = await getLegsWithVAT(
       client,
       subcontractor.leg_ids,
@@ -400,120 +438,74 @@ const upsertSubcontractorStatement = async (
       return { created: false, updated: false };
     }
 
-    const vatLegs = legDetails.filter((leg) => leg.isVat);
-    const nonVatLegs = legDetails.filter((leg) => !leg.isVat);
+    // Check if statement already exists for this generation date
+    const existingStatementQuery = `
+      SELECT sub_state_id 
+      FROM subcontractor_statements 
+      WHERE subbie_reg_num = $1 
+      AND date = $2
+    `;
 
-    const handleCategory = async (legs, isVat) => {
-      const categoryLabel = isVat ? "VAT" : "Non-VAT";
-      if (!legs.length) {
-        const existingQuery = `
-          SELECT sub_state_id 
-          FROM subcontractor_statements 
-          WHERE subbie_reg_num = $1 
-          AND date = $2
-          AND is_vat = $3
-        `;
+    const existingResult = await client.query(existingStatementQuery, [
+      subcontractor.subei_reg_num,
+      formattedGenDate,
+    ]);
 
-        const existing = await client.query(existingQuery, [
-          subcontractor.subei_reg_num,
-          formattedGenDate,
-          isVat,
-        ]);
-
-        if (existing.rows.length > 0) {
-          await client.query(
-            "DELETE FROM subcontractor_statements WHERE sub_state_id = $1",
-            [existing.rows[0].sub_state_id]
-          );
-          console.log(
-            `🗑️ Removed ${categoryLabel} statement for ${subcontractor.companyname} - no applicable legs`
-          );
-        }
-        return;
-      }
-
-      const categoryTotal = legs.reduce(
-        (sum, leg) => sum + (Number.parseFloat(leg.driverrate) || 0),
-        0
-      );
-
-      if (categoryTotal <= 0) {
-        console.log(
-          `Skipping ${categoryLabel} statement for ${subcontractor.companyname} - total amount is 0 or invalid`
-        );
-        return;
-      }
-
-      const existingStatementQuery = `
-        SELECT sub_state_id 
-        FROM subcontractor_statements 
-        WHERE subbie_reg_num = $1 
-        AND date = $2
-        AND is_vat = $3
+    if (existingResult.rows.length > 0) {
+      // Update existing statement
+      const existingStatementId = existingResult.rows[0].sub_state_id;
+      const updateQuery = `
+        UPDATE subcontractor_statements 
+        SET amount = $2, legids = $3
+        WHERE sub_state_id = $1
       `;
 
-      const existingResult = await client.query(existingStatementQuery, [
+      const updateParams = [
+        existingStatementId,
+        totalAmount,
+        JSON.stringify(legDetails),
+      ];
+
+      await client.query(updateQuery, updateParams);
+
+      console.log(
+        `✅ Updated statement ${existingStatementId} for ${
+          subcontractor.companyname
+        } - Amount: R${totalAmount.toFixed(2)} (${
+          subcontractor.total_legs
+        } legs)`
+      );
+      return { created: false, updated: true };
+    } else {
+      // Insert new statement
+      const insertQuery = `
+        INSERT INTO subcontractor_statements (
+          subbie_reg_num, 
+          date, 
+          amount, 
+          legids
+        ) VALUES ($1, $2, $3, $4)
+        RETURNING sub_state_id
+      `;
+
+      const insertParams = [
         subcontractor.subei_reg_num,
         formattedGenDate,
-        isVat,
-      ]);
+        totalAmount,
+        JSON.stringify(legDetails),
+      ];
 
-      if (existingResult.rows.length > 0) {
-        const existingStatementId = existingResult.rows[0].sub_state_id;
-        const updateQuery = `
-          UPDATE subcontractor_statements 
-          SET amount = $2, legids = $3
-          WHERE sub_state_id = $1
-        `;
+      const insertResult = await client.query(insertQuery, insertParams);
 
-        const updateParams = [
-          existingStatementId,
-          categoryTotal,
-          JSON.stringify(legs),
-        ];
-
-        await client.query(updateQuery, updateParams);
-
-        console.log(
-          `✅ Updated ${categoryLabel} statement ${existingStatementId} for ${
-            subcontractor.companyname
-          } - Amount: R${categoryTotal.toFixed(2)} (${legs.length} legs)`
-        );
-      } else {
-        const insertQuery = `
-          INSERT INTO subcontractor_statements (
-            subbie_reg_num, 
-            date, 
-            amount, 
-            legids,
-            is_vat
-          ) VALUES ($1, $2, $3, $4, $5)
-          RETURNING sub_state_id
-        `;
-
-        const insertParams = [
-          subcontractor.subei_reg_num,
-          formattedGenDate,
-          categoryTotal,
-          JSON.stringify(legs),
-          isVat,
-        ];
-
-        const insertResult = await client.query(insertQuery, insertParams);
-
-        console.log(
-          `✅ Created ${categoryLabel} statement ${insertResult.rows[0].sub_state_id} for ${
-            subcontractor.companyname
-          } - Amount: R${categoryTotal.toFixed(2)} (${legs.length} legs)`
-        );
-        return { created: true };
-      }
-    };
-
-    const result1 = await handleCategory(vatLegs, true);
-    const result2 = await handleCategory(nonVatLegs, false);
-
-    return { created: result1?.created || result2?.created, updated: result1?.updated || result2?.updated };
+      console.log(
+        `✅ Created statement ${insertResult.rows[0].sub_state_id} for ${
+          subcontractor.companyname
+        } - Amount: R${totalAmount.toFixed(2)} (${
+          subcontractor.total_legs
+        } legs)`
+      );
+      return { created: true, updated: false };
+    }
   } catch (error) {
     console.error(
       `❌ Error upserting statement for ${

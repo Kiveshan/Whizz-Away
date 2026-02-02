@@ -31,11 +31,11 @@ const SubcontractorStatements = () => {
   });
 
   // Pagination state
+  const [currentPage, setCurrentPage] = useState(1);
   const [recordsPerPage] = useState(10);
-  const [groupPage, setGroupPage] = useState({ vat: 1, nonVat: 1 });
 
-  const handleGroupPageChange = useCallback((groupKey, pageNumber) => {
-    setGroupPage((prev) => ({ ...prev, [groupKey]: pageNumber }));
+  const handlePageChange = useCallback((pageNumber) => {
+    setCurrentPage(pageNumber);
   }, []);
 
   const fetchStatements = useCallback(async () => {
@@ -75,12 +75,10 @@ const SubcontractorStatements = () => {
             typeof item.legids === "object"
               ? JSON.stringify(item.legids)
               : item.legids,
-          isVat: Boolean(item.is_vat),
         };
       });
 
       setStatements(transformedStatements);
-      setGroupPage({ vat: 1, nonVat: 1 });
     } catch (err) {
       console.error("Error fetching statements:", err);
       setError("Failed to fetch statements");
@@ -99,7 +97,7 @@ const SubcontractorStatements = () => {
       ...prev,
       [name]: value === "Year" || value === "Month" ? "" : value,
     }));
-    setGroupPage({ vat: 1, nonVat: 1 });
+    setCurrentPage(1);
   };
 
   const handleManualGeneration = async () => {
@@ -177,15 +175,10 @@ const SubcontractorStatements = () => {
     yearOptions.push(y);
   }
 
-  const vatStatements = statements.filter((statement) => statement.isVat);
-  const nonVatStatements = statements.filter((statement) => !statement.isVat);
-
-  const paginatedData = (data, groupKey) => {
-    const currentPage = groupPage[groupKey] || 1;
-    const startIndex = (currentPage - 1) * recordsPerPage;
-    const endIndex = startIndex + recordsPerPage;
-    return data.slice(startIndex, endIndex);
-  };
+  const totalRecords = statements.length;
+  const startIndex = (currentPage - 1) * recordsPerPage;
+  const endIndex = startIndex + recordsPerPage;
+  const currentStatements = statements.slice(startIndex, endIndex);
 
   if (loading)
     return (
@@ -302,94 +295,60 @@ const SubcontractorStatements = () => {
         </div>
       )}
 
-      <div className="statement-groups">
-        {[
-          {
-            title: "VAT Statements",
-            data: vatStatements,
-            key: "vat",
-          },
-          {
-            title: "Non-VAT Statements",
-            data: nonVatStatements,
-            key: "nonVat",
-          },
-        ].map(({ title, data, key }) => {
-          const currentStatements = paginatedData(data, key);
-          const totalRecords = data.length;
-          const currentPage = groupPage[key] || 1;
-
-          return (
-            <section className="statement-group" key={title}>
-              <header className="statement-group__header">
-                <h3>{title}</h3>
-              </header>
-              <table className="statements-table">
-                <thead>
-                  <tr>
-                    <th>Statement ID</th>
-                    <th>Month/Year</th>
-                    <th>Total Amount</th>
-                    <th>Actions</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {currentStatements.length === 0 ? (
-                    <tr>
-                      <td colSpan="4">
-                        {totalRecords === 0
-                          ? "No statements found for the selected period."
-                          : "No statements on this page."}
-                      </td>
-                    </tr>
-                  ) : (
-                    currentStatements.map((statement) => (
-                      <tr key={statement.statementId}>
-                        <td>{statement.statementId}</td>
-                        <td>
-                          {statement.month} {statement.year}
-                        </td>
-                        <td>R{statement.totalAmount.toLocaleString()}</td>
-                        <td>
-                          <button
-                            className="view-btn"
-                            onClick={() =>
-                              navigate(
-                                "/Creditors/SubcontractorStatementDetails",
-                                {
-                                  state: {
-                                    statementId: statement.statementId,
-                                    subcontractorName,
-                                    subcontractorId,
-                                    subei_reg_num,
-                                    legids: statement.legids,
-                                    date: statement.generationDate, // Pass as-is, now ensured to be a string
-                                    isVat: statement.isVat,
-                                  },
-                                }
-                              )
-                            }
-                          >
-                            View Details
-                          </button>
-                        </td>
-                      </tr>
-                    ))
-                  )}
-                </tbody>
-              </table>
-              {totalRecords > recordsPerPage && (
-                <Pagination
-                  totalRecords={totalRecords}
-                  recordsPerPage={recordsPerPage}
-                  currentPage={currentPage}
-                  onPageChange={(page) => handleGroupPageChange(key, page)}
-                />
-              )}
-            </section>
-          );
-        })}
-      </div>
+      <table className="statements-table">
+        <thead>
+          <tr>
+            <th>Statement ID</th>
+            <th>Month/Year</th>
+            <th>Total Amount</th>
+            <th>Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          {currentStatements.length === 0 ? (
+            <tr>
+              <td colSpan="4">No statements found for the selected period.</td>
+            </tr>
+          ) : (
+            currentStatements.map((statement) => (
+              <tr key={statement.statementId}>
+                <td>{statement.statementId}</td>
+                <td>
+                  {statement.month} {statement.year}
+                </td>
+                <td>R{statement.totalAmount.toLocaleString()}</td>
+                <td>
+                  <button
+                    className="view-btn"
+                    onClick={() =>
+                      navigate("/Creditors/SubcontractorStatementDetails", {
+                        state: {
+                          statementId: statement.statementId,
+                          subcontractorName,
+                          subcontractorId,
+                          subei_reg_num,
+                          legids: statement.legids,
+                          date: statement.generationDate, // Pass as-is, now ensured to be a string
+                        },
+                      })
+                    }
+                  >
+                    View Details
+                  </button>
+                </td>
+              </tr>
+            ))
+          )}
+        </tbody>
+      </table>
+      {totalRecords > 0 && (
+        <Pagination
+          totalRecords={totalRecords}
+          recordsPerPage={recordsPerPage}
+          currentPage={currentPage}
+          onPageChange={handlePageChange}
+        />
+      )}
     </div>
   );
 };
