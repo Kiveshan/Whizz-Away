@@ -45,7 +45,8 @@ const getSubContractorStatements = async (subei_reg_num, year, month) => {
         subbie_reg_num,
         date,
         amount,
-        legids
+        legids,
+        is_vat
       FROM 
         subcontractor_statements
       WHERE 
@@ -91,7 +92,7 @@ const getStatementDetails = async (statementId, legKeys, subei_reg_num) => {
 
     // First, get the stored legids from the statement (which now contain VAT-inclusive rates)
     const statementQuery = `
-      SELECT legids 
+      SELECT legids, is_vat 
       FROM subcontractor_statements 
       WHERE sub_state_id = $1 AND subbie_reg_num = $2
     `;
@@ -107,6 +108,7 @@ const getStatementDetails = async (statementId, legKeys, subei_reg_num) => {
     }
 
     const storedLegids = statementResult.rows[0].legids;
+    const statementIsVat = Boolean(statementResult.rows[0].is_vat);
     console.log("Stored legids from statement:", storedLegids);
 
     if (!storedLegids || !Array.isArray(storedLegids)) {
@@ -142,6 +144,12 @@ const getStatementDetails = async (statementId, legKeys, subei_reg_num) => {
         (stored) => stored.legkey === leg.legkey
       );
 
+      const driverrate = storedLeg ? storedLeg.driverrate : 0;
+      const originalRate = storedLeg?.originalRate ?? null;
+      const vatPercentage = storedLeg?.vatPercentage ?? 0;
+      const vatAmount = storedLeg?.vatAmount ?? 0;
+      const isVatLeg = storedLeg?.isVat ?? statementIsVat;
+
       return {
         legkey: leg.legkey,
         date: leg.date,
@@ -149,7 +157,11 @@ const getStatementDetails = async (statementId, legKeys, subei_reg_num) => {
         containernumber: leg.containernumber,
         destination: leg.destination,
         // Use the VAT-inclusive rate from the stored statement
-        driverrate: storedLeg ? storedLeg.driverrate : 0, // This already includes VAT
+        driverrate,
+        original_rate: originalRate,
+        vat_percentage: vatPercentage,
+        vat_amount: vatAmount,
+        is_vat: isVatLeg,
         m1_description: leg.m1_description,
       };
     });
