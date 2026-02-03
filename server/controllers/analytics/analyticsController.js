@@ -16,6 +16,7 @@ import {
   getTurnoverVsFuelPerTruck,
   getPaymentsReceivedPerMonth,
   getPaymentClients,
+  getClientSubbieCommissionReport,
 } from "../../models/analytics/analyticsModel.js";
 
 const getFuelExpensesController = async (req, res) => {
@@ -283,6 +284,30 @@ const getPaymentClientsController = async (req, res) => {
   }
 };
 
+const getClientSubbieCommissionReportController = async (req, res) => {
+  const { month, year, clientId } = req.query;
+  console.log(
+    `Received request for client subbie commission report: month=${month}, year=${year}, clientId=${clientId}`
+  );
+
+  if (!clientId) {
+    return res.status(400).json({ success: false, message: "clientId is required" });
+  }
+
+  try {
+    const dbClient = await pool.connect();
+    try {
+      const data = await getClientSubbieCommissionReport(dbClient, month, year, clientId);
+      res.status(200).json({ success: true, data });
+    } finally {
+      dbClient.release();
+    }
+  } catch (error) {
+    console.error("Error in getClientSubbieCommissionReportController:", error);
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
 export {
   getFuelExpensesController,
   getTurnoverPerMonthController,
@@ -300,4 +325,5 @@ export {
   getTurnoverVsFuelPerTruckController,
   getPaymentsReceivedPerMonthController,
   getPaymentClientsController,
+  getClientSubbieCommissionReportController,
 };

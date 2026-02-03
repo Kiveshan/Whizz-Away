@@ -1258,6 +1258,140 @@ const getWagesVsExpenses = async (client, month, year) => {
   return wagesVsExpensesData
 }
 
+const getClientSubbieCommissionReport = async (client, month, year, clientId) => {
+  if (!clientId) {
+    throw new Error("clientId is required")
+  }
+
+  const trimmedMonth = month?.trim()
+  const yearText = year?.toString()
+
+  if (!trimmedMonth || !yearText) {
+    throw new Error("Both month and year are required")
+  }
+
+  const clientInfoQuery = `
+    SELECT m5clientkey, client
+    FROM m5_client
+    WHERE m5clientkey = $1
+  `
+
+  const clientInfoResult = await client.query(clientInfoQuery, [clientId])
+  const clientInfo = clientInfoResult.rows[0] || null
+
+  const invoicesQuery = `
+    WITH filtered_invoices AS (
+      SELECT 
+        i.ikey,
+        i.invoice_num,
+        i.doc_num,
+        i.date,
+        i.m1key,
+        m.total_cost,
+        m.description
+      FROM invoice i
+      JOIN m1_controller m ON i.m1key = m.m1key
+      WHERE i.clientid = $1
+        AND TRIM(TO_CHAR(i.date, 'Month')) = $2
+        AND EXTRACT(YEAR FROM i.date)::text = $3
+    )
+    SELECT 
+      fi.ikey,
+      fi.invoice_num,
+      fi.doc_num,
+      fi.date,
+      fi.m1key,
+      fi.total_cost,
+      fi.description
+    FROM filtered_invoices fi
+    ORDER BY fi.date ASC
+  `
+
+  const subcontractorQuery = `
+    WITH filtered_invoices AS (
+      SELECT 
+        i.m1key
+      FROM invoice i
+      WHERE i.clientid = $1
+        AND TRIM(TO_CHAR(i.date, 'Month')) = $2
+        AND EXTRACT(YEAR FROM i.date)::text = $3
+    )
+    SELECT 
+      MIN(e.userid) AS subcontractor_id,
+      COALESCE(e.companyname, 'Unknown') AS companyname,
+      e.subei_reg_num,
+      COUNT(DISTINCT l.legkey) AS leg_count,
+      COALESCE(SUM(l.driverrate), 0) AS total_earned
+    FROM legs_m2 l
+    JOIN m5_employee e ON l.driverid = e.userid
+    JOIN filtered_invoices fi ON l.m1key = fi.m1key
+    WHERE e.roleid = 6
+    GROUP BY e.companyname, e.subei_reg_num
+    ORDER BY total_earned DESC
+  `
+
+  const params = [clientId, trimmedMonth, yearText]
+  const [invoiceResults, subcontractorResults] = await Promise.all([
+    client.query(invoicesQuery, params),
+    client.query(subcontractorQuery, params),
+  ])
+
+  const invoiceDetails = invoiceResults.rows.map((row) => ({
+    invoiceId: row.ikey,
+    invoiceNumber: row.invoice_num,
+    documentNumber: row.doc_num,
+    invoiceDate: row.date instanceof Date ? row.date.toISOString() : row.date,
+    instructionId: row.m1key,
+    description: row.description,
+    amount: Number.parseFloat(row.total_cost || 0),
+  }))
+
+  const totalInvoiceAmount = invoiceDetails.reduce(
+    (sum, detail) => sum + (Number.isFinite(detail.amount) ? detail.amount : 0),
+    0
+  )
+
+  const totalSubbieAmount = subcontractorResults.rows.reduce(
+    (sum, row) => sum + Number.parseFloat(row.total_earned || 0),
+    0
+  )
+
+  const subcontractorBreakdown = subcontractorResults.rows.map((row) => {
+    const totalEarned = Number.parseFloat(row.total_earned || 0)
+    const percentage = totalSubbieAmount > 0 ? totalEarned / totalSubbieAmount : 0
+    return {
+      subcontractorId: row.subcontractor_id,
+      companyName: row.companyname,
+      registrationNumber: row.subei_reg_num,
+      legCount: Number.parseInt(row.leg_count, 10) || 0,
+      totalEarned,
+      percentage,
+    }
+  })
+
+  const commission = Math.max(totalInvoiceAmount - totalSubbieAmount, 0)
+
+  return {
+    client: clientInfo
+      ? {
+          id: clientInfo.m5clientkey,
+          name: clientInfo.client,
+        }
+      : null,
+    period: {
+      month: trimmedMonth,
+      year: yearText,
+    },
+    totals: {
+      invoiceAmount: Number(totalInvoiceAmount.toFixed(2)),
+      subcontractorAmount: Number(totalSubbieAmount.toFixed(2)),
+      commission: Number(commission.toFixed(2)),
+    },
+    invoices: invoiceDetails,
+    subcontractors: subcontractorBreakdown,
+  }
+}
+
 async function calculateTotalPayable(client, employeeId, month, year) {
   const monthNames = [
     "January", "February", "March", "April", "May", "June",
@@ -1418,4 +1552,5 @@ export {
   getTurnoverVsFuelPerTruck,
   getPaymentsReceivedPerMonth,
   getPaymentClients,
+  getClientSubbieCommissionReport,
 }
