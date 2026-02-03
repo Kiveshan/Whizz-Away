@@ -55,6 +55,12 @@ const ClientForm = ({ client, loading, isEditing, onSave, onCancel, onChange }) 
   const validateForm = () => {
     let isValid = true
     
+    const isEmptyValue = (value) => {
+      if (value === undefined || value === null) return true
+      if (typeof value === "string") return value.trim() === ""
+      return false
+    }
+    
     // Validate cell number
     const cellError = validateCellNumber(client.cellnum || '')
     setCellnumError(cellError)
@@ -69,9 +75,9 @@ const ClientForm = ({ client, loading, isEditing, onSave, onCancel, onChange }) 
     }
 
     // Validate required fields
-    const requiredFields = ['client', 'email', 'cellnum']
+    const requiredFields = ['client', 'email', 'cellnum', 'insurance']
     requiredFields.forEach(field => {
-      if (!client[field]) {
+      if (isEmptyValue(client[field])) {
         isValid = false
       }
     })
@@ -121,6 +127,22 @@ const ClientForm = ({ client, loading, isEditing, onSave, onCancel, onChange }) 
             type="text"
             value={client.representative || ""}
             onChange={(e) => onChange("representative", e.target.value)}
+          />
+        </div>
+
+        <div className="client-form-group">
+          <label>
+            <strong>Insurance (R)</strong>
+          </label>
+          <input
+            type="number"
+            inputMode="decimal"
+            min="0"
+            step="0.01"
+            value={client.insurance ?? ""}
+            onChange={(e) => onChange("insurance", e.target.value)}
+            placeholder="e.g., 1500.00"
+            required
           />
         </div>
 

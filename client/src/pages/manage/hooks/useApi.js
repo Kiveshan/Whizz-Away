@@ -323,6 +323,10 @@ export function useApi(state, actions) {
           city: clientData.city || "",
           streetaddress: clientData.streetaddress || "",
           payment_type: clientData.payment_type || "",
+          insurance:
+            clientData.insurance === "" || clientData.insurance === undefined
+              ? null
+              : Number.parseFloat(clientData.insurance),
           starting_point: clientData.starting_point || null,
           destination: clientData.destination || null,
           driver_six_meter_rate:

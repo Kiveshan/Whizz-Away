@@ -111,6 +111,7 @@ const createClient = async (clientData) => {
       city,
       streetaddress,
       payment_type,
+      insurance,
     } = clientData
 
     // Only validate that client name is provided
@@ -122,8 +123,8 @@ const createClient = async (clientData) => {
       `INSERT INTO m5_client (
          client, representative, companyaddress, suburb, postalcode,
          email, client_reg_num, cellnum, vatregno, city, streetaddress, 
-         payment_type, status
-       ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
+         payment_type, insurance, status
+       ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
        RETURNING *`,
       [
         clientName.trim(),
@@ -138,6 +139,7 @@ const createClient = async (clientData) => {
         city || null,
         streetaddress || null,
         payment_type || null,
+        insurance ?? null,
         true, // status
       ],
     )
@@ -169,6 +171,7 @@ const updateClient = async (id, clientData) => {
       city,
       streetaddress,
       payment_type,
+      insurance,
     } = clientData
 
     // Only validate that client name is provided
@@ -180,8 +183,9 @@ const updateClient = async (id, clientData) => {
       `UPDATE m5_client
        SET client = $1, representative = $2, companyaddress = $3, suburb = $4,
            postalcode = $5, email = $6, client_reg_num = $7, cellnum = $8,
-           vatregno = $9, city = $10, streetaddress = $11, payment_type = $12
-       WHERE m5clientkey = $13
+           vatregno = $9, city = $10, streetaddress = $11, payment_type = $12,
+           insurance = $13
+       WHERE m5clientkey = $14
        RETURNING *`,
       [
         clientName.trim(),
@@ -196,6 +200,7 @@ const updateClient = async (id, clientData) => {
         city || null,
         streetaddress || null,
         payment_type || null,
+        insurance ?? null,
         id,
       ],
     )
