@@ -325,7 +325,7 @@ export function useApi(state, actions) {
           payment_type: clientData.payment_type || "",
           insurance:
             clientData.insurance === "" || clientData.insurance === undefined
-              ? null
+              ? 0
               : Number.parseFloat(clientData.insurance),
           starting_point: clientData.starting_point || null,
           destination: clientData.destination || null,

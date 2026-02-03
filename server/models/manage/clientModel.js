@@ -114,6 +114,8 @@ const createClient = async (clientData) => {
       insurance,
     } = clientData
 
+    const insuranceValue = insurance === undefined || insurance === null || insurance === "" ? 0 : insurance
+
     // Only validate that client name is provided
     if (!clientName || clientName.trim() === "") {
       throw new Error("Client name is required")
@@ -139,7 +141,7 @@ const createClient = async (clientData) => {
         city || null,
         streetaddress || null,
         payment_type || null,
-        insurance ?? null,
+        insuranceValue,
         true, // status
       ],
     )
@@ -174,6 +176,8 @@ const updateClient = async (id, clientData) => {
       insurance,
     } = clientData
 
+    const insuranceValue = insurance === undefined || insurance === null || insurance === "" ? 0 : insurance
+
     // Only validate that client name is provided
     if (!clientName || clientName.trim() === "") {
       throw new Error("Client name is required")
@@ -200,7 +204,7 @@ const updateClient = async (id, clientData) => {
         city || null,
         streetaddress || null,
         payment_type || null,
-        insurance ?? null,
+        insuranceValue,
         id,
       ],
     )

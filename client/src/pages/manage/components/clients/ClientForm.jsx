@@ -55,12 +55,6 @@ const ClientForm = ({ client, loading, isEditing, onSave, onCancel, onChange }) 
   const validateForm = () => {
     let isValid = true
     
-    const isEmptyValue = (value) => {
-      if (value === undefined || value === null) return true
-      if (typeof value === "string") return value.trim() === ""
-      return false
-    }
-    
     // Validate cell number
     const cellError = validateCellNumber(client.cellnum || '')
     setCellnumError(cellError)
@@ -75,9 +69,9 @@ const ClientForm = ({ client, loading, isEditing, onSave, onCancel, onChange }) 
     }
 
     // Validate required fields
-    const requiredFields = ['client', 'email', 'cellnum', 'insurance']
+    const requiredFields = ['client', 'email', 'cellnum']
     requiredFields.forEach(field => {
-      if (isEmptyValue(client[field])) {
+      if (!client[field]) {
         isValid = false
       }
     })
@@ -142,7 +136,6 @@ const ClientForm = ({ client, loading, isEditing, onSave, onCancel, onChange }) 
             value={client.insurance ?? ""}
             onChange={(e) => onChange("insurance", e.target.value)}
             placeholder="e.g., 1500.00"
-            required
           />
         </div>
 
