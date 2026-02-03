@@ -45,7 +45,8 @@ const getSubContractorStatements = async (subei_reg_num, year, month) => {
         subbie_reg_num,
         date,
         amount,
-        legids
+        legids,
+        COALESCE(vat_status, 'VAT') AS vat_status
       FROM 
         subcontractor_statements
       WHERE 
@@ -53,7 +54,8 @@ const getSubContractorStatements = async (subei_reg_num, year, month) => {
         AND ($2::text IS NULL OR EXTRACT(YEAR FROM (date - INTERVAL '1 day')) = $2::integer)
         AND ($3::text IS NULL OR EXTRACT(MONTH FROM (date - INTERVAL '1 day')) = $3::integer)
       ORDER BY 
-        date DESC
+        date DESC,
+        vat_status ASC
     `;
     const values = [subei_reg_num, year || null, month || null];
     const result = await client.query(query, values);
