@@ -126,11 +126,15 @@ const getStatementDetails = async (statementId, legKeys, subei_reg_num) => {
         l.startingpoint,
         l.containernumber,
         l.destination,
-        m1.description AS m1_description
+        l.m1key AS instruction_number,
+        m1.description AS m1_description,
+        c.client AS client_name
       FROM 
         legs_m2 l
       LEFT JOIN 
         m1_controller m1 ON l.m1key = m1.m1key
+      LEFT JOIN
+        m5_client c ON m1.client = c.m5clientkey
       WHERE l.legkey = ANY($1)
       ORDER BY l.date, l.legkey
     `;
@@ -150,6 +154,8 @@ const getStatementDetails = async (statementId, legKeys, subei_reg_num) => {
         startingpoint: leg.startingpoint,
         containernumber: leg.containernumber,
         destination: leg.destination,
+        instruction_number: leg.instruction_number,
+        client_name: leg.client_name,
         // Use the VAT-inclusive rate from the stored statement
         driverrate: storedLeg ? storedLeg.driverrate : 0, // This already includes VAT
         m1_description: leg.m1_description,

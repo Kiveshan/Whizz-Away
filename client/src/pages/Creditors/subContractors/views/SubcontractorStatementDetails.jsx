@@ -69,6 +69,8 @@ const SubcontractorStatementDetail = () => {
           date: leg.date,
           containerNumber: leg.containernumber || "N/A",
           destination: leg.destination,
+          instructionNumber: leg.instruction_number || "N/A",
+          clientName: leg.client_name || "N/A",
           rate: leg.driverrate || 0,
           instruction: leg.m1_description || "N/A",
         }));
@@ -281,18 +283,26 @@ const SubcontractorStatementDetail = () => {
     const tableHeaders = [
       "Date",
       "Container No",
+      "Client",
       "Destination",
+      "Instruction No",
       "Rate",
       "Instructions",
     ];
-    // Adjust widths to suit new column
-    const colWidths = [25, 35, 30, 25, 65];
-    const rowHeight = 11; // taller rows to comfortably fit up to 2 lines of text
+    // Adjust widths to suit new columns (must total pageWidth)
+    const colWidths = [22, 30, 32, 28, 22, 18, 28];
+    const columnPaddingX = 2;
+    const columnPaddingY = 3;
+    const baseRowHeight = 11;
+    const lineHeight = 4;
+    const headerRowHeight = 16;
+    const headerLineHeight = 5;
+    const headerPaddingY = 3;
     let x = margin;
 
     // Table Header
     doc.setFillColor(...primaryBlue);
-    doc.rect(margin, y, pageWidth, rowHeight, "F");
+    doc.rect(margin, y, pageWidth, headerRowHeight, "F");
 
     // Header borders
     doc.setDrawColor(255, 255, 255);
@@ -300,7 +310,7 @@ const SubcontractorStatementDetail = () => {
     x = margin;
     for (let i = 0; i < colWidths.length - 1; i++) {
       x += colWidths[i];
-      doc.line(x, y, x, y + rowHeight);
+      doc.line(x, y, x, y + headerRowHeight);
     }
 
     // Header text
@@ -310,10 +320,20 @@ const SubcontractorStatementDetail = () => {
     x = margin;
     tableHeaders.forEach((header, index) => {
       const textX = x + colWidths[index] / 2;
-      doc.text(header.toUpperCase(), textX, y + 5, { align: "center" });
+      const isInstructionHeader = header === "Instruction No";
+      const headerLines = isInstructionHeader
+        ? ["INSTRUCTION", "NO"]
+        : [header.toUpperCase()];
+      const totalHeaderHeight = headerLines.length * headerLineHeight;
+      let textY =
+        y + headerPaddingY + Math.max(headerLineHeight - 1, (headerRowHeight - totalHeaderHeight) / 2 + headerLineHeight / 2);
+      headerLines.forEach((line) => {
+        doc.text(line, textX, textY, { align: "center" });
+        textY += headerLineHeight;
+      });
       x += colWidths[index];
     });
-    y += rowHeight;
+    y += headerRowHeight;
 
     // Table Rows
     doc.setFont("helvetica", "normal");
@@ -321,20 +341,100 @@ const SubcontractorStatementDetail = () => {
     doc.setDrawColor(226, 232, 240);
     doc.setLineWidth(0.2);
 
+    const columnSpecs = [
+      {
+        width: colWidths[0],
+        align: "center",
+        fontStyle: "bold",
+        textColor: primaryBlue,
+        formatter: (item) =>
+          new Date(item.date).toLocaleDateString("en-US", {
+            month: "short",
+            day: "numeric",
+            year: "numeric",
+          }),
+      },
+      {
+        width: colWidths[1],
+        align: "left",
+        fontStyle: "normal",
+        textColor: darkGray,
+        formatter: (item) => item.containerNumber || "N/A",
+      },
+      {
+        width: colWidths[2],
+        align: "left",
+        fontStyle: "normal",
+        textColor: darkGray,
+        formatter: (item) => item.clientName || "N/A",
+      },
+      {
+        width: colWidths[3],
+        align: "left",
+        fontStyle: "normal",
+        textColor: darkGray,
+        formatter: (item) => item.destination || "N/A",
+      },
+      {
+        width: colWidths[4],
+        align: "center",
+        fontStyle: "normal",
+        textColor: darkGray,
+        formatter: (item) => item.instructionNumber || "N/A",
+      },
+      {
+        width: colWidths[5],
+        align: "right",
+        fontStyle: "bold",
+        textColor: primaryBlue,
+        formatter: (item) => `R${item.rate.toFixed(2)}`,
+      },
+      {
+        width: colWidths[6],
+        align: "left",
+        fontStyle: "normal",
+        textColor: mediumGray,
+        fontSize: 7,
+        formatter: (item) => item.instruction || "N/A",
+      },
+    ];
+
     statement.workItems.forEach((item, index) => {
-      // Check for page break
-      if (y > 265) {
+      const processedCells = columnSpecs.map((spec) => {
+        const rawValue = spec.formatter(item);
+        const stringValue = Array.isArray(rawValue)
+          ? rawValue.map((val) => String(val ?? ""))
+          : String(rawValue ?? "");
+        const lines = Array.isArray(stringValue)
+          ? stringValue
+          : doc.splitTextToSize(stringValue, spec.width - columnPaddingX * 2);
+        return {
+          ...spec,
+          lines: Array.isArray(lines) ? lines : [lines],
+        };
+      });
+
+      const maxLineCount = Math.max(
+        ...processedCells.map((cell) => cell.lines.length)
+      );
+      const dynamicRowHeight = Math.max(
+        baseRowHeight,
+        columnPaddingY * 2 + maxLineCount * lineHeight
+      );
+
+      // Check for page break before drawing row
+      if (y + dynamicRowHeight > 265) {
         doc.addPage();
         y = margin;
 
         // Redraw header on new page
         doc.setFillColor(...primaryBlue);
-        doc.rect(margin, y, pageWidth, rowHeight, "F");
+        doc.rect(margin, y, pageWidth, headerRowHeight, "F");
         doc.setDrawColor(255, 255, 255);
         x = margin;
         for (let i = 0; i < colWidths.length - 1; i++) {
           x += colWidths[i];
-          doc.line(x, y, x, y + rowHeight);
+          doc.line(x, y, x, y + headerRowHeight);
         }
         doc.setFontSize(9);
         doc.setFont("helvetica", "bold");
@@ -342,83 +442,68 @@ const SubcontractorStatementDetail = () => {
         x = margin;
         tableHeaders.forEach((header, idx) => {
           const textX = x + colWidths[idx] / 2;
-          doc.text(header.toUpperCase(), textX, y + 4, { align: "center" });
+          const isInstructionHeader = header === "Instruction No";
+          const headerLines = isInstructionHeader
+            ? ["INSTRUCTION", "NO"]
+            : [header.toUpperCase()];
+          const totalHeaderHeight = headerLines.length * headerLineHeight;
+          let textY =
+            y + headerPaddingY + Math.max(headerLineHeight - 1, (headerRowHeight - totalHeaderHeight) / 2 + headerLineHeight / 2);
+          headerLines.forEach((line) => {
+            doc.text(line, textX, textY, { align: "center" });
+            textY += headerLineHeight;
+          });
           x += colWidths[idx];
         });
-        y += rowHeight;
-        doc.setFont("helvetica", "normal");
-        doc.setTextColor(0, 0, 0);
+        y += headerRowHeight;
       }
 
       // Alternating row colors
-      const isEven = index % 2 === 0;
-      if (isEven) {
+      if (index % 2 === 0) {
         doc.setFillColor(...lightGray);
-        doc.rect(margin, y, pageWidth, rowHeight, "F");
+        doc.rect(margin, y, pageWidth, dynamicRowHeight, "F");
       }
 
       // Row borders
       doc.setDrawColor(226, 232, 240);
-      doc.rect(margin, y, pageWidth, rowHeight, "S");
+      doc.rect(margin, y, pageWidth, dynamicRowHeight, "S");
 
       // Column separators
       x = margin;
       for (let i = 0; i < colWidths.length - 1; i++) {
         x += colWidths[i];
-        doc.line(x, y, x, y + rowHeight);
+        doc.line(x, y, x, y + dynamicRowHeight);
       }
 
-      // Row data
+      // Render cell text
       x = margin;
+      processedCells.forEach((cell) => {
+        doc.setFontSize(cell.fontSize || 8);
+        doc.setFont("helvetica", cell.fontStyle);
+        doc.setTextColor(...cell.textColor);
+
+        let textX = x + columnPaddingX;
+        if (cell.align === "center") {
+          textX = x + cell.width / 2;
+        } else if (cell.align === "right") {
+          textX = x + cell.width - columnPaddingX;
+        }
+
+        let textY = y + columnPaddingY + lineHeight - 1; // slight adjustment to center vertically
+        cell.lines.forEach((line) => {
+          doc.text(line, textX, textY, { align: cell.align });
+          textY += lineHeight;
+        });
+
+        x += cell.width;
+      });
+
+      // Restore default font settings for next iteration
+      doc.setFont("helvetica", "normal");
       doc.setFontSize(8);
+      doc.setTextColor(0, 0, 0);
 
-      // Date
-      doc.setTextColor(...primaryBlue);
-      doc.setFont("helvetica", "bold");
-      doc.text(
-        new Date(item.date).toLocaleDateString("en-US", {
-          month: "short",
-          day: "numeric",
-          year: "numeric",
-        }),
-        x + colWidths[0] / 2,
-        y + 4,
-        { align: "center" }
-      );
-      x += colWidths[0];
-
-      // Container Number
-      doc.setTextColor(...darkGray);
-      doc.setFont("helvetica", "normal");
-      doc.text(String(item.containerNumber || "N/A"), x + 2, y + 4, {
-        align: "left",
-      });
-      x += colWidths[1];
-
-      // Destination (left-aligned for consistency)
-      doc.text(item.destination, x + 2, y + 4, {
-        align: "left",
-      });
-      x += colWidths[2];
-
-      // Rate (right-aligned and styled)
-      doc.setTextColor(...primaryBlue);
-      doc.setFont("helvetica", "bold");
-      doc.text(`R${item.rate.toFixed(2)}`, x + colWidths[3] - 2, y + 4, {
-        align: "right",
-      });
-      x += colWidths[3];
-
-      // Instructions
-      doc.setTextColor(...mediumGray);
-      doc.setFont("helvetica", "normal");
-      const instruction =
-        item.instruction.length > 28
-          ? item.instruction.substring(0, 28) + "..."
-          : item.instruction;
-      doc.text(instruction, x + colWidths[4] / 2, y + 4, { align: "center" });
-
-      y += rowHeight;
+      y += dynamicRowHeight;
     });
 
     y += 10;
@@ -603,7 +688,9 @@ const SubcontractorStatementDetail = () => {
                   <tr>
                     <th className="col-date">Date</th>
                     <th className="col-starting">Container Number</th>
+                    <th className="col-client">Client</th>
                     <th className="col-destination">Destination</th>
+                    <th className="col-instruction-number">Instruction No</th>
                     <th className="col-rate">Rate</th>
                     <th className="col-instruction">Instructions</th>
                   </tr>
@@ -622,7 +709,11 @@ const SubcontractorStatementDetail = () => {
                         })}
                       </td>
                       <td className="col-starting">{item.containerNumber}</td>
+                      <td className="col-client">{item.clientName}</td>
                       <td className="col-destination">{item.destination}</td>
+                      <td className="col-instruction-number">
+                        {item.instructionNumber}
+                      </td>
                       <td className="col-rate">
                         R
                         {item.rate.toLocaleString("en-US", {
