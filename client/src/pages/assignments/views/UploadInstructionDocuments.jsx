@@ -11,6 +11,7 @@ const UploadInstructionDocuments = () => {
   const location = useLocation();
   const clientId = location.state?.clientId;
   const instructionId = location.state?.instructionId;
+  const allowFinish = location.state?.allowFinish ?? true;
   const [isCompleted, setIsCompleted] = useState(false);
 
   const [documents, setDocuments] = useState([]);
@@ -914,22 +915,24 @@ const handleUpload = async (e) => {
         </ul>
       </div>
 
-      <div className="action-buttons">
-        <button
-          className="finish-btn"
-          onClick={handleFinish}
-          disabled={!canFinish() || isCompleted}
-          style={{
-            opacity: canFinish() && !isCompleted ? 1 : 0.5,
-            cursor: canFinish() && !isCompleted ? "pointer" : "not-allowed",
-          }}
-        >
-          Finish Instruction
-        </button>
-      </div>
+      {allowFinish && (
+        <div className="action-buttons">
+          <button
+            className="finish-btn"
+            onClick={handleFinish}
+            disabled={!canFinish() || isCompleted}
+            style={{
+              opacity: canFinish() && !isCompleted ? 1 : 0.5,
+              cursor: canFinish() && !isCompleted ? "pointer" : "not-allowed",
+            }}
+          >
+            Finish Instruction
+          </button>
+        </div>
+      )}
 
-      {/* Confirmation Modal */}
-      {showFinishConfirmModal && (
+      {/* Confirmation Modal - only when finishing is allowed */}
+      {allowFinish && showFinishConfirmModal && (
         <div className="modal-wrapper">
           <div className="modal-backdrop animate-fadeIn"></div>
           <div className="modal-container animate-scaleIn">
