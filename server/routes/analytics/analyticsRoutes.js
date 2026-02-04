@@ -16,6 +16,7 @@ import {
   getTurnoverVsFuelPerTruckController,
   getPaymentsReceivedPerMonthController,
   getPaymentClientsController,
+  getClientSubbieCommissionReportController,
 } from "../../controllers/analytics/analyticsController.js";
 import { verifyToken } from "../../middleware/auth.js";
 
@@ -46,5 +47,10 @@ router.get("/api/turnover-vs-fuel-per-truck", verifyToken,
   getTurnoverVsFuelPerTruckController);
 router.get("/api/payments-received-per-month", verifyToken, getPaymentsReceivedPerMonthController);
 router.get("/api/payment-clients", verifyToken, getPaymentClientsController);
+router.get(
+  "/api/client-subbie-commission",
+  verifyToken,
+  getClientSubbieCommissionReportController
+);
 
 export default router;

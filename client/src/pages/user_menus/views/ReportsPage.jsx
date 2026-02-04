@@ -15,6 +15,11 @@ const reportsData = [
     image: "/images/reports.jpg",
     path: "/profit-loss-reports",
   },
+  {
+    title: "Client Subbie Commission",
+    image: "/images/reports.jpg",
+    path: "/client-subbie-commission",
+  },
 ]
 
 const ReportsPage = () => {

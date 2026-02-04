@@ -262,13 +262,24 @@
 }
 
 .statement-detail-wrapper .col-starting {
-  width: 22%;
+  width: 18%;
+  color: #2d3748;
+}
+
+.statement-detail-wrapper .col-client {
+  width: 18%;
   color: #2d3748;
 }
 
 .statement-detail-wrapper .col-destination {
-  width: 22%;
+  width: 20%;
   color: #2d3748;
+}
+
+.statement-detail-wrapper .col-instruction-number {
+  width: 14%;
+  color: #2d3748;
+  text-align: center;
 }
 
 .statement-detail-wrapper .col-rate {
@@ -279,7 +290,7 @@
 }
 
 .statement-detail-wrapper .col-instruction {
-  width: 32%;
+  width: 18%;
   color: #4a5568;
   line-height: 1.4;
 }
