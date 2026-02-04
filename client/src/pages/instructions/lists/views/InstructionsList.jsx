@@ -43,7 +43,7 @@ const addShakeAnimation = () => {
       75% { transform: rotate(-5deg); }
       100% { transform: rotate(0deg); }
     }
-    
+
     .bell-icon-status {
       display: inline-block;
     }
@@ -94,6 +94,8 @@ const Instructions = () => {
   const [error, setError] = useState(null)
   const [currentPage, setCurrentPage] = useState(1)
   const [recordsPerPage] = useState(10)
+  const [containerSearch, setContainerSearch] = useState("")
+  const [containersByInstruction, setContainersByInstruction] = useState({})
 
   // Add the shake animation when component mounts - exactly like in CompanyInstructions.jsx
   useEffect(() => {
@@ -239,6 +241,23 @@ const Instructions = () => {
       }
     }
 
+    // Filter by container number search
+    if (containerSearch.trim()) {
+      const searchTerm = containerSearch.trim().toLowerCase()
+
+      filtered = filtered.filter((item) => {
+        const containers = containersByInstruction[item.m1key] || []
+        if (!Array.isArray(containers) || containers.length === 0) {
+          return false
+        }
+
+        return containers.some((container) => {
+          const num = (container.containernum || "").toString().toLowerCase()
+          return num.includes(searchTerm)
+        })
+      })
+    }
+
     // Sort by status priority first, then by instruction number (descending)
     filtered.sort((a, b) => {
       // Primary sort: Status priority
@@ -257,6 +276,40 @@ const Instructions = () => {
 
     return filtered
   }
+
+  // When a container search term is entered, fetch containers for all instructions
+  useEffect(() => {
+    if (!containerSearch.trim()) return
+    if (!instructions || instructions.length === 0) return
+
+    const loadContainers = async () => {
+      try {
+        const uniqueIds = Array.from(new Set(instructions.map((item) => item.m1key))).filter(Boolean)
+
+        const results = await Promise.all(
+          uniqueIds.map(async (id) => {
+            try {
+              const response = await api.get(`/containers/instruction/${id}`)
+              return { id, data: response.data || [] }
+            } catch (err) {
+              console.error("Error fetching containers for instruction", id, err)
+              return { id, data: [] }
+            }
+          }),
+        )
+
+        const containersMap = {}
+        results.forEach(({ id, data }) => {
+          containersMap[id] = data
+        })
+        setContainersByInstruction(containersMap)
+      } catch (err) {
+        console.error("Error loading containers for instructions", err)
+      }
+    }
+
+    loadContainers()
+  }, [containerSearch, instructions])
 
   // Pagination logic
   const filteredInstructions = getFilteredInstructions()
@@ -416,6 +469,20 @@ const Instructions = () => {
               Add-on
             </button>
           </div>
+        </div>
+        <div style={{ margin: "10px 0", textAlign: "center" }}>
+          <input
+            type="text"
+            placeholder="Search by container number"
+            value={containerSearch}
+            onChange={(e) => setContainerSearch(e.target.value)}
+            style={{
+              padding: "6px 10px",
+              borderRadius: "4px",
+              border: "1px solid #ccc",
+              minWidth: "220px",
+            }}
+          />
         </div>
         <div className="tables-container">
           {loading ? (
