@@ -97,6 +97,9 @@ const ClientStatement = () => {
         0
       ) || 0;
     const totalMonthPayments = amountPaid + creditNotesAmount;
+    const insuranceCredit = Number.parseFloat(
+      statement.insurance_amount || 0
+    );
 
     // Build a single aggregated Payments row, then list all invoices/add-ons for the statement month
     const charges = [
@@ -118,16 +121,32 @@ const ClientStatement = () => {
       })),
     ].sort((a, b) => a.date - b.date);
 
+    const insuranceRow =
+      insuranceCredit > 0
+        ? {
+            type: "Insurance",
+            date: new Date(statement.generation_date),
+            details: "Monthly insurance credit",
+            reference: "",
+            amount: null,
+            payment: insuranceCredit,
+          }
+        : null;
+
     const paymentsRow = {
       type: "Payments",
       date: new Date(statement.generation_date),
-      details: "",
+      details: totalMonthPayments > 0 ? "Payments & credit notes" : "",
       reference: "",
       amount: null,
       payment: totalMonthPayments,
     };
 
-    const baseTransactions = [paymentsRow, ...charges];
+    const baseTransactions = [
+      ...(insuranceRow ? [insuranceRow] : []),
+      paymentsRow,
+      ...charges,
+    ];
 
     let running = openingBalance;
     const withBalance = baseTransactions.map((tx) => {
@@ -242,19 +261,33 @@ const ClientStatement = () => {
       const openingBalance = statement.opening_balance;
       const invoicedAmount = statement.invoices.reduce((s, i) => s + i.amount, 0) + statement.addons.reduce((s, a) => s + a.amount, 0);
       const amountPaid = statement.payments.reduce((s, p) => s + p.amount, 0);
-      const creditNotesAmount = (statement.credit_notes || []).reduce((s, c) => s + c.amount, 0);
+      const creditNotesAmount = (statement.credit_notes || []).reduce(
+        (s, c) => s + c.amount,
+        0
+      );
+      const insuranceCredit = Number.parseFloat(
+        statement.insurance_amount || 0
+      );
       const totalAmountPaid = amountPaid + creditNotesAmount;
-      const balanceDue = openingBalance - totalAmountPaid + invoicedAmount;
+      const totalCredits = totalAmountPaid + insuranceCredit;
+      const balanceDue = openingBalance - totalCredits + invoicedAmount;
+
+      const summaryRows = [
+        ["Opening Balance", `R${openingBalance.toFixed(2)}`],
+        ["Invoiced Amount", `R${invoicedAmount.toFixed(2)}`],
+        ["Payments & Credit Notes", `R${totalAmountPaid.toFixed(2)}`],
+      ];
+
+      if (insuranceCredit > 0) {
+        summaryRows.push(["Insurance Credit", `R${insuranceCredit.toFixed(2)}`]);
+      }
+
+      summaryRows.push(["Balance Due", `R${balanceDue.toFixed(2)}`]);
 
       autoTable(doc, {
         startY: currentY,
         head: [["Description", "Amount"]],
-        body: [
-          ["Opening Balance", `R${openingBalance.toFixed(2)}`],
-          ["Invoiced Amount", `R${invoicedAmount.toFixed(2)}`],
-          ["Amount Paid", `R${totalAmountPaid.toFixed(2)}`],
-          ["Balance Due", `R${balanceDue.toFixed(2)}`],
-        ],
+        body: summaryRows,
         theme: "grid",
         styles: { fontSize: fonts.small, cellPadding: 1.6, lineWidth: 0.1, lineColor: brand.gray },
         headStyles: { fillColor: brand.accent, textColor: [255,255,255], fontStyle: "bold" },
@@ -402,8 +435,10 @@ const ClientStatement = () => {
       0
     ) || 0;
   const totalAmountPaid = amountPaid + creditNotesAmount;
+  const insuranceCredit = Number.parseFloat(statement.insurance_amount || 0);
+  const totalCredits = totalAmountPaid + insuranceCredit;
   const openingBalance = statement.opening_balance; // Use the stored opening balance
-  const balanceDue = openingBalance - totalAmountPaid + invoicedAmount;
+  const balanceDue = openingBalance - totalCredits + invoicedAmount;
 
   // Helper: fix strings that arrive with spaces between every character
   const fixTokenSpacing = (s) => {
@@ -477,16 +512,32 @@ const ClientStatement = () => {
     })),
   ].sort((a, b) => a.date - b.date);
 
+  const insuranceRow =
+    insuranceCredit > 0
+      ? {
+          type: "Insurance",
+          date: new Date(statement.generation_date),
+          details: "Monthly insurance credit",
+          reference: "",
+          amount: null,
+          payment: insuranceCredit,
+        }
+      : null;
+
   const paymentsRow = {
     type: "Payments",
     date: new Date(statement.generation_date),
-    details: "",
+    details: totalAmountPaid > 0 ? "Payments & credit notes" : "",
     reference: "",
     amount: null,
     payment: totalAmountPaid,
   };
 
-  const transactions = [paymentsRow, ...charges];
+  const transactions = [
+    ...(insuranceRow ? [insuranceRow] : []),
+    paymentsRow,
+    ...charges,
+  ];
 
   // Calculate running balance
   let runningBalance = openingBalance; // Start with the opening balance
@@ -586,11 +637,19 @@ const ClientStatement = () => {
                     </td>
                   </tr>
                   <tr>
-                    <td className="summary-label">Amount Paid</td>
+                    <td className="summary-label">Payments &amp; Credit Notes</td>
                     <td className="summary-value">
                       R{totalAmountPaid.toFixed(2)}
                     </td>
                   </tr>
+                  {insuranceCredit > 0 && (
+                    <tr>
+                      <td className="summary-label">Insurance Credit</td>
+                      <td className="summary-value">
+                        R{insuranceCredit.toFixed(2)}
+                      </td>
+                    </tr>
+                  )}
                   <tr>
                     <td className="summary-label">Balance Due:</td>
                     <td className="summary-value">R{balanceDue.toFixed(2)}</td>
