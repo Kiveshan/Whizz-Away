@@ -1288,6 +1288,7 @@ const getClientSubbieCommissionReport = async (client, month, year, clientId) =>
         i.date,
         i.m1key,
         m.total_cost,
+        m.vat,
         m.description
       FROM invoice i
       JOIN m1_controller m ON i.m1key = m.m1key
@@ -1336,15 +1337,25 @@ const getClientSubbieCommissionReport = async (client, month, year, clientId) =>
     client.query(subcontractorQuery, params),
   ])
 
-  const invoiceDetails = invoiceResults.rows.map((row) => ({
-    invoiceId: row.ikey,
-    invoiceNumber: row.invoice_num,
-    documentNumber: row.doc_num,
-    invoiceDate: row.date instanceof Date ? row.date.toISOString() : row.date,
-    instructionId: row.m1key,
-    description: row.description,
-    amount: Number.parseFloat(row.total_cost || 0),
-  }))
+  const invoiceDetails = invoiceResults.rows.map((row) => {
+    const baseAmount = Number.parseFloat(row.total_cost || 0)
+    const vatRate = Number.parseFloat(row.vat ?? 0) || 0
+    const vatAmount = Number.isFinite(vatRate) ? (baseAmount * vatRate) / 100 : 0
+    const grossAmount = baseAmount + vatAmount
+
+    return {
+      invoiceId: row.ikey,
+      invoiceNumber: row.invoice_num,
+      documentNumber: row.doc_num,
+      invoiceDate: row.date instanceof Date ? row.date.toISOString() : row.date,
+      instructionId: row.m1key,
+      description: row.description,
+      amount: Number(grossAmount.toFixed(2)),
+      amountExVat: Number(baseAmount.toFixed(2)),
+      vatRate: Number(vatRate.toFixed(2)),
+      vatAmount: Number(vatAmount.toFixed(2)),
+    }
+  })
 
   const totalInvoiceAmount = invoiceDetails.reduce(
     (sum, detail) => sum + (Number.isFinite(detail.amount) ? detail.amount : 0),

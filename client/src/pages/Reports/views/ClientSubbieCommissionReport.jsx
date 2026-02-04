@@ -1,6 +1,5 @@
 "use client"
 import { useEffect, useMemo, useState } from "react"
-import { useNavigate } from "react-router-dom"
 import ExcelJS from "exceljs"
 import api from "../../../api"
 import "../css/clientSubbieReport.css"
@@ -60,7 +59,6 @@ const LoadingIndicator = () => (
 )
 
 const ClientSubbieCommissionReport = () => {
-  const navigate = useNavigate()
   const currentDate = useMemo(() => new Date(), [])
   const [clients, setClients] = useState([])
   const [selectedClientId, setSelectedClientId] = useState("")
@@ -212,12 +210,7 @@ const ClientSubbieCommissionReport = () => {
 
   return (
     <div className="client-subbie-report-page">
-      <div className="header-actions">
-        <button className="back-button" onClick={() => navigate("/reports")}>⟵ Back</button>
-      </div>
-
       <div>
-        <h1 className="client-subbie-report-title">Client Subbie Commission Report</h1>
         <p className="client-subbie-report-subtitle">
           Select a client and month to see subcontractor earnings alongside KSM commission for that period.
         </p>

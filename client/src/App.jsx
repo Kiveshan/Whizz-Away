@@ -243,12 +243,15 @@ function ContentWrapper() {
     location.pathname.startsWith("/invoice/") ||
     location.pathname === "/client-invoice";
   const isStatementDetail = location.pathname === "/client-statement";
+  const isClientSubbieReport = location.pathname === "/client-subbie-commission";
 
-  const showBackInTopBar = isInvoiceDetail || isStatementDetail;
+  const showBackInTopBar =
+    isInvoiceDetail || isStatementDetail || isClientSubbieReport;
 
   const getBackTarget = () => {
     if (isInvoiceDetail) return "/invoices";
     if (isStatementDetail) return "/statements-list";
+    if (isClientSubbieReport) return "/reports";
     return null;
   };
 
