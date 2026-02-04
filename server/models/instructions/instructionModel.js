@@ -966,6 +966,9 @@ export const getInstructions = async (clientId) => {
     SELECT 
       m.m1key,
       m."clientFileRef" as fileno,
+      m."clientFileRef" as client_ref,
+      m.booking_ref,
+      m."ksmFileRef" as ksm_file_ref,
       m.shipment_type,
       s.shipmenttype AS type_text,
       m.status,

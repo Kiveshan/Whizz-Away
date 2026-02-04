@@ -70,6 +70,7 @@ const SubcontractorStatements = () => {
           year: adjustedDate.getFullYear(),
           generationDate: adjustedDate.toISOString(),
           totalAmount: item.amount,
+          vatStatus: item.vat_status || "VAT",
           status: "Pending", // Assuming status needs to be derived; adjust as needed
           legids:
             typeof item.legids === "object"
@@ -300,6 +301,7 @@ const SubcontractorStatements = () => {
           <tr>
             <th>Statement ID</th>
             <th>Month/Year</th>
+            <th>Type</th>
             <th>Total Amount</th>
             <th>Actions</th>
           </tr>
@@ -316,6 +318,9 @@ const SubcontractorStatements = () => {
                 <td>
                   {statement.month} {statement.year}
                 </td>
+                <td>
+                  {statement.vatStatus === "NON_VAT" ? "No VAT" : "VAT"}
+                </td>
                 <td>R{statement.totalAmount.toLocaleString()}</td>
                 <td>
                   <button
@@ -329,6 +334,7 @@ const SubcontractorStatements = () => {
                           subei_reg_num,
                           legids: statement.legids,
                           date: statement.generationDate, // Pass as-is, now ensured to be a string
+                          vatStatus: statement.vatStatus,
                         },
                       })
                     }

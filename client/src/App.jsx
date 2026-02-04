@@ -112,6 +112,7 @@ import {
   WageReports,
   ProfitLossReportsPage,
   ProfitLossDetailPage,
+  ClientSubbieCommissionReport,
 } from "./pages/Reports";
 
 // CSS Imports
@@ -199,6 +200,7 @@ function DynamicHeader() {
     "/view-credit-note/:clientName/:creditNoteId": "Credit Note",
     "/profit-loss-reports": "Income & Expenditure Reports",
     "/income-expenditure-reports/:month/:year": "Income & Expenditure Report",
+    "/client-subbie-commission": "Client Subbie Commission Report",
   };
 
   const getTitle = () => {
@@ -241,12 +243,15 @@ function ContentWrapper() {
     location.pathname.startsWith("/invoice/") ||
     location.pathname === "/client-invoice";
   const isStatementDetail = location.pathname === "/client-statement";
+  const isClientSubbieReport = location.pathname === "/client-subbie-commission";
 
-  const showBackInTopBar = isInvoiceDetail || isStatementDetail;
+  const showBackInTopBar =
+    isInvoiceDetail || isStatementDetail || isClientSubbieReport;
 
   const getBackTarget = () => {
     if (isInvoiceDetail) return "/invoices";
     if (isStatementDetail) return "/statements-list";
+    if (isClientSubbieReport) return "/reports";
     return null;
   };
 
@@ -441,6 +446,10 @@ function ContentWrapper() {
         <Route path="/analytics-reports" element={<AnalyticsReportsPage />} />
         <Route path="/reports" element={<ReportsPage />} />
         <Route path="/wage-reports" element={<WageReports />} />
+        <Route
+          path="/client-subbie-commission"
+          element={<ClientSubbieCommissionReport />}
+        />
         <Route path="/view-client-list" element={<ClientList />} />
         <Route path="/view-add-on-list" element={<AddOnList />} />
         <Route path="/add-on-form" element={<AddOnForm />} />

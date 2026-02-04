@@ -91,6 +91,7 @@ const createClientHandler = async (req, res) => {
       city,
       streetaddress,
       payment_type,
+      insurance,
     } = req.body
 
     console.log("Creating client with data:", req.body)
@@ -113,6 +114,7 @@ const createClientHandler = async (req, res) => {
       city,
       streetaddress,
       payment_type,
+      insurance,
     })
 
     res.status(201).json(newClient)
@@ -139,6 +141,7 @@ const updateClientHandler = async (req, res) => {
       city,
       streetaddress,
       payment_type,
+      insurance,
     } = req.body
 
     console.log(`Updating client ID ${id} with data:`, req.body)
@@ -161,6 +164,7 @@ const updateClientHandler = async (req, res) => {
       city,
       streetaddress,
       payment_type,
+      insurance,
     })
 
     if (!result.success) {

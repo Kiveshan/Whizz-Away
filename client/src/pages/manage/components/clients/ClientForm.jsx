@@ -126,6 +126,21 @@ const ClientForm = ({ client, loading, isEditing, onSave, onCancel, onChange }) 
 
         <div className="client-form-group">
           <label>
+            <strong>Insurance (R)</strong>
+          </label>
+          <input
+            type="number"
+            inputMode="decimal"
+            min="0"
+            step="0.01"
+            value={client.insurance ?? ""}
+            onChange={(e) => onChange("insurance", e.target.value)}
+            placeholder="e.g., 1500.00"
+          />
+        </div>
+
+        <div className="client-form-group">
+          <label>
             <strong>Cell Number</strong>
           </label>
           <input
