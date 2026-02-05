@@ -185,6 +185,7 @@ const LandingPage = () => {
         aria-hidden="true"
         style={{ backgroundImage: `url(${overlayImage})` }}
       />
+      <div className="landing-bg-tint" aria-hidden="true" />
       <Header
         onLoginClick={handleLoginClick}
         onRegisterClick={handleRegisterClick}

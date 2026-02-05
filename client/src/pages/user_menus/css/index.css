@@ -230,7 +230,21 @@
     background-position: center;
     background-repeat: no-repeat;
     z-index: 0;
-    filter: brightness(0.9);
+    filter: brightness(0.75);
+  }
+
+  .landing-bg-tint {
+    position: fixed;
+    inset: 0;
+    background: linear-gradient(
+        120deg,
+        rgba(9, 14, 36, 0.55) 0%,
+        rgba(15, 23, 42, 0.4) 48%,
+        rgba(15, 118, 110, 0.35) 100%
+      );
+    opacity: 0.65;
+    pointer-events: none;
+    z-index: 1;
   }
   
   /* Base layer stays visible */
