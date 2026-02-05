@@ -705,11 +705,63 @@ export const getContainersByInstructionId = async (instructionId) => {
 };
 
 export const completeInstruction = async (instructionId, status) => {
-  const query = `UPDATE m1_controller SET status = $1 WHERE m1key = $2`;
+  const client = await pool.connect();
   try {
-    await pool.query(query, [status, instructionId]);
+    await client.query("BEGIN");
+
+    // Only perform rate sync when moving an instruction out of In Progress
+    // and into a terminal state like Completed. This ensures we don't
+    // unexpectedly touch legs for other status updates.
+    if (status && status.toLowerCase() === "completed") {
+      // Refresh driverrate on legs for this instruction so they match the
+      // current values in m5_driver_rate at the time of completion.
+      //
+      // We restrict this to instructions that are currently In Progress
+      // to avoid retroactively changing historical data.
+      const refreshQuery = `
+        WITH target_instruction AS (
+          SELECT m1key
+          FROM m1_controller
+          WHERE m1key = $1 AND LOWER(COALESCE(status, '')) = 'in progress'
+        )
+        UPDATE public.legs_m2 l
+        SET driverrate = CASE
+          -- Driver 6m: employee roleid != 6 AND container is 6m
+          WHEN e.roleid != 6 AND LOWER(COALESCE(c.container_type, '')) = '6m' THEN dr.driver_six_meter_rate
+          -- Driver 12m: employee roleid != 6 AND container is 12m
+          WHEN e.roleid != 6 AND LOWER(COALESCE(c.container_type, '')) = '12m' THEN dr.driver_twelve_meter_rate
+          -- Subbie 6m: employee roleid = 6 AND container is 6m
+          WHEN e.roleid = 6 AND LOWER(COALESCE(c.container_type, '')) = '6m' THEN dr.subie_six_meter_rate
+          -- Subbie 12m: employee roleid = 6 AND container is 12m
+          WHEN e.roleid = 6 AND LOWER(COALESCE(c.container_type, '')) = '12m' THEN dr.subie_twelve_meter_rate
+          ELSE l.driverrate
+        END
+        FROM target_instruction ti
+        JOIN public.m1_controller m ON m.m1key = ti.m1key
+        JOIN public.container c ON c.m1key = m.m1key
+        JOIN public.m5_employee e ON TRUE
+        JOIN public.m5_driver_rate dr ON TRUE
+        WHERE l.m1key = ti.m1key
+          AND c.containernum = l.containernumber
+          AND e.userid = l.driverid
+          AND LOWER(TRIM(COALESCE(dr.startingpoint, ''))) = LOWER(TRIM(COALESCE(l.startingpoint, '')))
+          AND LOWER(TRIM(COALESCE(dr.destination, ''))) = LOWER(TRIM(COALESCE(l.destination, '')));
+      `;
+
+      await client.query(refreshQuery, [instructionId]);
+    }
+
+    await client.query(
+      `UPDATE m1_controller SET status = $1 WHERE m1key = $2`,
+      [status, instructionId]
+    );
+
+    await client.query("COMMIT");
   } catch (error) {
+    await client.query("ROLLBACK");
     throw error;
+  } finally {
+    client.release();
   }
 };
 
