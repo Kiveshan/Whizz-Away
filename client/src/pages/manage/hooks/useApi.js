@@ -564,6 +564,17 @@ export function useApi(state, actions) {
         const response = await api[method](url, cleanedDriverRate)
         console.log("API response:", response.data)
 
+        // After updating an existing rate, refresh legs for any in-progress
+        // instructions that are using this rate. This relies on the backend
+        // to no-op safely when there are no matching instructions.
+        if (state.editingRateId) {
+          try {
+            await api.post(`/api/driver-rates/${state.editingRateId}/refresh-legs`)
+          } catch (refreshErr) {
+            console.error("Error refreshing legs after driver rate update:", refreshErr)
+          }
+        }
+
         // Refresh current page
         await fetchPaginatedData(
           "driverRates",
