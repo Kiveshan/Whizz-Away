@@ -27,26 +27,6 @@
   gap: 12px;
 }
 
-.client-subbie-report-page .back-button {
-  background: transparent;
-  border: 1px solid var(--client-report-primary);
-  color: var(--client-report-primary);
-  padding: 10px 18px;
-  border-radius: 999px;
-  font-size: 14px;
-  letter-spacing: 0.02em;
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  transition: background 0.2s ease, border 0.2s ease, transform 0.2s ease;
-}
-
-.client-subbie-report-page .back-button:hover {
-  background: var(--client-report-primary);
-  color: #ffffff;
-  transform: translateY(-1px);
-}
-
 .client-subbie-report-title {
   font-size: clamp(24px, 3vw, 36px);
   font-weight: 600;

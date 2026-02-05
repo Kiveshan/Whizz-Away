@@ -1055,7 +1055,8 @@ const fetchContainersForInstruction = async (instructionId) => {
               ? data.driver_rate.toString()
               : "0",
         }));
-        if (drivers.length > 0) {
+        // Only update driver rates with meter rates if instruction is not completed
+        if (drivers.length > 0 && !isCompleted) {
           const updatedDrivers = drivers.map((driver) => {
             const newDriver = { ...driver };
 
@@ -2393,8 +2394,9 @@ const missingItems = await checkContainersReachDropoff(dropoff);
 }, [instructionId, legs, instructionContainers, isWeightBased]);
 
   useEffect(() => {
-    // Only update if we have drivers and rates
+    // Only update if we have drivers and rates, and instruction is not completed
     if (
+      !isCompleted &&
       drivers.length > 0 &&
       (rates.six_meter !== undefined || rates.twelve_meter !== undefined)
     ) {
@@ -2433,7 +2435,7 @@ const missingItems = await checkContainersReachDropoff(dropoff);
         setDrivers(updatedDrivers);
       }
     }
-  }, [rates]);
+  }, [rates, isCompleted]);
 
   // Add this useEffect to ensure driver rates are properly updated when rates change
   // Replace the existing useEffect for rates with this one
@@ -2449,8 +2451,8 @@ const missingItems = await checkContainersReachDropoff(dropoff);
 
 // Replace the problematic rate update useEffect with this version
 useEffect(() => {
-  // Don't update rates if we're currently switching legs
-  if (isLegSwitching || drivers.length === 0) {
+  // Don't update rates if we're currently switching legs or if instruction is completed
+  if (isLegSwitching || drivers.length === 0 || isCompleted) {
     return;
   }
 
@@ -2522,6 +2524,7 @@ useEffect(() => {
   formData.destination,
   noRatesRoutes,
   isLegSwitching, // Add this dependency
+  isCompleted, // Add this dependency
 ]);
 
   return (
@@ -2627,6 +2630,27 @@ useEffect(() => {
             title={!instructionId ? "No instruction selected" : "Preview Invoice"}
           >
             Preview Invoice
+          </button>
+          <button
+            className="summary-btn"
+            type="button"
+            onClick={() => {
+              navigate("/Upload-Instruction-Documents", {
+                state: {
+                  clientId,
+                  instructionId,
+                  isCompleted,
+                  shipmentType,
+                  allowFinish: false,
+                  timestamp: Date.now(),
+                },
+                replace: true,
+              })
+            }}
+            disabled={!instructionId}
+            title={!instructionId ? "No instruction selected" : "Upload Documents"}
+          >
+            Upload
           </button>
           <button className="finalise-btn2" onClick={handleFinaliseClick}>
             {isCompleted ? "Documents" : "Finalise"}
@@ -2849,18 +2873,21 @@ useEffect(() => {
             </div>
 
             <div style={{ marginTop: "10px", display: "flex", gap: "12px", alignItems: "center" }}>
-              <button
-                ref={addDriverButtonRef}
-                onClick={addDriver}
-                className={`px-8 py-2 rounded-md transition-colors ${
-                  currentLagIndex !== null && !isCompleted
-                    ? "bg-blue-500 text-white hover:bg-blue-600"
-                    : "bg-gray-400 text-gray-200 cursor-not-allowed"
-                }`}
-                disabled={currentLagIndex === null || isCompleted}
-              >
-                Add Driver
-              </button>
+              {/* Show Add Driver here when there are 5 or fewer drivers */}
+              {drivers.length <= 5 && (
+                <button
+                  ref={addDriverButtonRef}
+                  onClick={addDriver}
+                  className={`px-8 py-2 rounded-md transition-colors ${
+                    currentLagIndex !== null && !isCompleted
+                      ? "bg-blue-500 text-white hover:bg-blue-600"
+                      : "bg-gray-400 text-gray-200 cursor-not-allowed"
+                  }`}
+                  disabled={currentLagIndex === null || isCompleted}
+                >
+                  Add Driver
+                </button>
+              )}
 
               {/* When there are no drivers yet, show Save inline next to Add Driver */}
               {drivers.length === 0 && !isCompleted && (
@@ -3576,6 +3603,22 @@ useEffect(() => {
                 >
                   {saving ? "Saving..." : "Save"}
                 </button>
+
+                {/* When there are more than 5 drivers, show Add Driver down here next to Save */}
+                {drivers.length > 5 && (
+                  <button
+                    ref={addDriverButtonRef}
+                    onClick={addDriver}
+                    className={`px-8 py-2 rounded-md transition-colors ${
+                      currentLagIndex !== null && !isCompleted
+                        ? "bg-blue-500 text-white hover:bg-blue-600"
+                        : "bg-gray-400 text-gray-200 cursor-not-allowed"
+                    }`}
+                    disabled={currentLagIndex === null || isCompleted}
+                  >
+                    Add Driver
+                  </button>
+                )}
 
                 {/* Only show remove leg button for the last leg AND only if it has been saved */}
                 {/* {currentLagIndex === legs.length - 1 &&

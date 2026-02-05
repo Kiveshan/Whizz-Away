@@ -46,7 +46,7 @@ function logDateInfo(dates) {
 
 // ==================== CLIENT UTILITIES ====================
 async function fetchClients(specificClientId = null) {
-  let clientsQuery = "SELECT m5clientkey FROM m5_client";
+  let clientsQuery = "SELECT m5clientkey, COALESCE(insurance, 0) AS insurance FROM m5_client";
   let clientsParams = [];
 
   if (specificClientId) {
@@ -236,27 +236,27 @@ async function updateAgingAnalysis(dbClient, agingId, current, _30days, _60days,
 }
 
 // groupid can be null — we keep it for compatibility
-async function createStatement(dbClient, groupid, genDate, clientId, agingId, openingBalance) {
+async function createStatement(dbClient, groupid, genDate, clientId, agingId, openingBalance, insuranceAmount) {
   const result = await dbClient.query(
-    `INSERT INTO statements (groupid, generation_date, clientid, agingid, opening_balance)
-     VALUES ($1, $2, $3, $4, $5)
+    `INSERT INTO statements (groupid, generation_date, clientid, agingid, opening_balance, insurance_amount)
+     VALUES ($1, $2, $3, $4, $5, $6)
      RETURNING statement_key`,
-    [groupid, genDate, clientId, agingId, openingBalance]
+    [groupid, genDate, clientId, agingId, openingBalance, insuranceAmount]
   );
   return result.rows[0].statement_key;
 }
 
-async function updateStatement(dbClient, statementKey, groupid, openingBalance, genDate) {
+async function updateStatement(dbClient, statementKey, groupid, openingBalance, genDate, insuranceAmount) {
   await dbClient.query(
     `UPDATE statements
-     SET groupid = $2, opening_balance = $3, generation_date = $4
+     SET groupid = $2, opening_balance = $3, generation_date = $4, insurance_amount = $5
      WHERE statement_key = $1`,
-    [statementKey, groupid, openingBalance, genDate]
+    [statementKey, groupid, openingBalance, genDate, insuranceAmount]
   );
 }
 
 // ==================== CLIENT PROCESSING ====================
-async function processClient(dbClient, clientId, dates, paymentsMap, creditNotesMap) {
+async function processClient(dbClient, clientId, clientInsurance, dates, paymentsMap, creditNotesMap) {
   const {
     generationDate,
     formattedGenDate,
@@ -266,6 +266,8 @@ async function processClient(dbClient, clientId, dates, paymentsMap, creditNotes
 
   const existingStatement = await checkExistingStatement(dbClient, clientId, formattedGenDate);
   const isUpdate = existingStatement !== null;
+
+  const insuranceAmount = Number.parseFloat(clientInsurance) || 0;
 
   // Always process — even with zero activity
   console.log(`Client ${clientId}: Generating${isUpdate ? ' (updating)' : ''} statement for ${formattedGenDate}`);
@@ -286,12 +288,12 @@ async function processClient(dbClient, clientId, dates, paymentsMap, creditNotes
 
   if (isUpdate) {
     await updateAgingAnalysis(dbClient, existingStatement.agingid, newCurrent, new30days, new60days, new90days);
-    await updateStatement(dbClient, existingStatement.statement_key, groupid, openingBalance, formattedGenDate);
+    await updateStatement(dbClient, existingStatement.statement_key, groupid, openingBalance, formattedGenDate, insuranceAmount);
     console.log(`Client ${clientId}: Updated existing statement #${existingStatement.statement_key}`);
     return { processed: true, created: false, updated: true };
   } else {
     const agingId = await createAgingAnalysis(dbClient, clientId, newCurrent, new30days, new60days, new90days);
-    const statementKey = await createStatement(dbClient, groupid, formattedGenDate, clientId, agingId, openingBalance);
+    const statementKey = await createStatement(dbClient, groupid, formattedGenDate, clientId, agingId, openingBalance, insuranceAmount);
     console.log(`Client ${clientId}: Created new statement #${statementKey}`);
     return { processed: true, created: true, updated: false };
   }
@@ -307,9 +309,14 @@ async function generateMonthlyStatements(specificClientId = null) {
   let dbClient;
   try {
     dbClient = await pool.connect();
+    await dbClient.query(
+      `ALTER TABLE statements
+       ADD COLUMN IF NOT EXISTS insurance_amount NUMERIC(12, 2) DEFAULT 0`
+    );
     await dbClient.query("BEGIN");
 
     const clients = await fetchClients(specificClientId);
+
     const validation = validateClients(clients, specificClientId);
     if (!validation.success) return validation;
 
@@ -323,7 +330,14 @@ async function generateMonthlyStatements(specificClientId = null) {
 
     for (const client of clients) {
       const clientId = client.m5clientkey;
-      const result = await processClient(dbClient, clientId, dates, paymentsMap, creditNotesMap);
+      const result = await processClient(
+        dbClient,
+        clientId,
+        client.insurance,
+        dates,
+        paymentsMap,
+        creditNotesMap
+      );
 
       if (result.processed) processedCount++;
       if (result.created) createdCount++;
