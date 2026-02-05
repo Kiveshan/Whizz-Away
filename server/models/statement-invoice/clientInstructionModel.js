@@ -39,6 +39,7 @@ const getClientInstructions = async (clientId, { year, month, type }) => {
       ) st ON TRUE
       WHERE 
         m1.client = $1
+        AND m1.status = 'Completed'
     `;
 
     const queryParams = [clientId];

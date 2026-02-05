@@ -1303,9 +1303,24 @@ const getClientSubbieCommissionReport = async (client, month, year, clientId) =>
       fi.date,
       fi.m1key,
       fi.total_cost,
+      fi.vat,
       fi.description
     FROM filtered_invoices fi
     ORDER BY fi.date ASC
+  `
+
+  const addOnsQuery = `
+    SELECT 
+      ao.addon_id,
+      ao.invoice_number,
+      ao.date,
+      ao.amount,
+      ao.booking_ref,
+      ao.client_ref
+    FROM add_ons ao
+    WHERE ao.client_id = $1
+      AND TRIM(TO_CHAR(ao.date, 'Month')) = $2
+      AND EXTRACT(YEAR FROM ao.date)::text = $3
   `
 
   const subcontractorQuery = `
@@ -1332,12 +1347,13 @@ const getClientSubbieCommissionReport = async (client, month, year, clientId) =>
   `
 
   const params = [clientId, trimmedMonth, yearText]
-  const [invoiceResults, subcontractorResults] = await Promise.all([
+  const [invoiceResults, subcontractorResults, addOnResults] = await Promise.all([
     client.query(invoicesQuery, params),
     client.query(subcontractorQuery, params),
+    client.query(addOnsQuery, params),
   ])
 
-  const invoiceDetails = invoiceResults.rows.map((row) => {
+  const instructionInvoiceDetails = invoiceResults.rows.map((row) => {
     const baseAmount = Number.parseFloat(row.total_cost || 0)
     const vatRate = Number.parseFloat(row.vat ?? 0) || 0
     const vatAmount = Number.isFinite(vatRate) ? (baseAmount * vatRate) / 100 : 0
@@ -1354,10 +1370,40 @@ const getClientSubbieCommissionReport = async (client, month, year, clientId) =>
       amountExVat: Number(baseAmount.toFixed(2)),
       vatRate: Number(vatRate.toFixed(2)),
       vatAmount: Number(vatAmount.toFixed(2)),
+      source: "instruction",
     }
   })
 
+  const addOnDetails = addOnResults.rows.map((row) => {
+    const amount = Number.parseFloat(row.amount || 0)
+
+    return {
+      invoiceId: `addon-${row.addon_id}`,
+      invoiceNumber: row.invoice_number || "Add-On Invoice",
+      documentNumber: row.booking_ref || null,
+      invoiceDate: row.date instanceof Date ? row.date.toISOString() : row.date,
+      instructionId: row.client_ref || null,
+      description: "Add-On invoice",
+      amount: Number(amount.toFixed(2)),
+      amountExVat: Number(amount.toFixed(2)),
+      vatRate: null,
+      vatAmount: null,
+      source: "addOn",
+    }
+  })
+
+  const invoiceDetails = [...instructionInvoiceDetails, ...addOnDetails].sort((a, b) => {
+    const dateA = a.invoiceDate ? new Date(a.invoiceDate).getTime() : 0
+    const dateB = b.invoiceDate ? new Date(b.invoiceDate).getTime() : 0
+    return dateA - dateB
+  })
+
   const totalInvoiceAmount = invoiceDetails.reduce(
+    (sum, detail) => sum + (Number.isFinite(detail.amount) ? detail.amount : 0),
+    0
+  )
+
+  const totalAddOnAmount = addOnDetails.reduce(
     (sum, detail) => sum + (Number.isFinite(detail.amount) ? detail.amount : 0),
     0
   )
@@ -1397,9 +1443,11 @@ const getClientSubbieCommissionReport = async (client, month, year, clientId) =>
       invoiceAmount: Number(totalInvoiceAmount.toFixed(2)),
       subcontractorAmount: Number(totalSubbieAmount.toFixed(2)),
       commission: Number(commission.toFixed(2)),
+      addOnAmount: Number(totalAddOnAmount.toFixed(2)),
     },
     invoices: invoiceDetails,
     subcontractors: subcontractorBreakdown,
+    addOns: addOnDetails,
   }
 }
 

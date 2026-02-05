@@ -136,6 +136,8 @@ const ClientSubbieCommissionReport = () => {
       summarySheet.addRow({ metric: "Client", amount: reportData.client?.name || selectedClientName || "Unknown" })
       summarySheet.addRow({ metric: "Period", amount: `${selectedMonth} ${selectedYear}` })
       summarySheet.addRow({})
+      summarySheet.addRow({ metric: "Instruction Invoices", amount: (reportData.totals?.invoiceAmount || 0) - (reportData.totals?.addOnAmount || 0) })
+      summarySheet.addRow({ metric: "Add-On Invoices", amount: reportData.totals?.addOnAmount || 0 })
       summarySheet.addRow({ metric: "Total Invoiced", amount: reportData.totals?.invoiceAmount || 0 })
       summarySheet.addRow({ metric: "Total Subbie Earnings", amount: reportData.totals?.subcontractorAmount || 0 })
       summarySheet.addRow({ metric: "KSM Commission", amount: reportData.totals?.commission || 0 })
@@ -163,6 +165,7 @@ const ClientSubbieCommissionReport = () => {
 
       const invoicesSheet = workbook.addWorksheet("Invoices")
       invoicesSheet.columns = [
+        { header: "Type", key: "source", width: 14 },
         { header: "Invoice #", key: "invoiceNumber", width: 18 },
         { header: "Doc #", key: "documentNumber", width: 16 },
         { header: "Instruction", key: "instructionId", width: 16 },
@@ -172,6 +175,7 @@ const ClientSubbieCommissionReport = () => {
       ]
       ;(reportData.invoices || []).forEach((invoice) => {
         invoicesSheet.addRow({
+          source: invoice.source === "addOn" ? "Add-On" : "Instruction",
           invoiceNumber: invoice.invoiceNumber || "—",
           documentNumber: invoice.documentNumber || "—",
           instructionId: invoice.instructionId || "—",
@@ -205,7 +209,8 @@ const ClientSubbieCommissionReport = () => {
     }
   }
 
-  const totals = reportData?.totals || { invoiceAmount: 0, subcontractorAmount: 0, commission: 0 }
+  const totals = reportData?.totals || { invoiceAmount: 0, subcontractorAmount: 0, commission: 0, addOnAmount: 0 }
+  const instructionInvoiceAmount = Math.max((totals.invoiceAmount || 0) - (totals.addOnAmount || 0), 0)
   const hasReportContent = Boolean(reportData && (reportData.invoices?.length || reportData.subcontractors?.length))
 
   return (
@@ -309,10 +314,24 @@ const ClientSubbieCommissionReport = () => {
             </header>
             <div className="client-subbie-summary">
               <div className="client-subbie-summary-card">
+                <span className="client-subbie-summary-label">Instruction Invoices</span>
+                <span className="client-subbie-summary-value">{formatCurrency(instructionInvoiceAmount)}</span>
+                <span className="client-subbie-summary-footnote">
+                  Value of transport instructions billed directly for {selectedClientName || "the client"}.
+                </span>
+              </div>
+              <div className="client-subbie-summary-card">
+                <span className="client-subbie-summary-label">Add-On Invoices</span>
+                <span className="client-subbie-summary-value">{formatCurrency(totals.addOnAmount || 0)}</span>
+                <span className="client-subbie-summary-footnote">
+                  Ancillary services raised outside the instruction invoices (VAT already applied).
+                </span>
+              </div>
+              <div className="client-subbie-summary-card">
                 <span className="client-subbie-summary-label">Total Invoiced Amount</span>
                 <span className="client-subbie-summary-value">{formatCurrency(totals.invoiceAmount)}</span>
                 <span className="client-subbie-summary-footnote">
-                  Sum of invoices linked to {selectedClientName || "the client"} for the selected month.
+                  Combined instruction and add-on invoices for the selected month.
                 </span>
               </div>
               <div className="client-subbie-summary-card">
@@ -387,6 +406,7 @@ const ClientSubbieCommissionReport = () => {
                     <table className="client-subbie-table">
                       <thead>
                         <tr>
+                          <th>Type</th>
                           <th>Invoice</th>
                           <th>Doc #</th>
                           <th>Instruction</th>
@@ -397,6 +417,7 @@ const ClientSubbieCommissionReport = () => {
                       <tbody>
                         {reportData.invoices.map((invoice) => (
                           <tr key={invoice.invoiceId}>
+                            <td>{invoice.source === "addOn" ? "Add-On" : "Instruction"}</td>
                             <td>{invoice.invoiceNumber || "—"}</td>
                             <td>{invoice.documentNumber || "—"}</td>
                             <td>{invoice.instructionId || "—"}</td>
