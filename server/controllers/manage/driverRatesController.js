@@ -4,6 +4,7 @@ import {
   createDriverRate,
   updateDriverRate,
   deleteDriverRate,
+  getDriverRateUsage,
 } from "../../models/manage/driverRatesModel.js"
 
 const getAllDriverRatesHandler = async (req, res) => {
@@ -177,10 +178,33 @@ const deleteDriverRateHandler = async (req, res) => {
   }
 }
 
+const getDriverRateUsageHandler = async (req, res) => {
+  try {
+    const { id } = req.params
+
+    if (!/^\d+$/.test(id)) {
+      return res.status(400).json({ error: "Invalid ID format" })
+    }
+
+    console.log(`Checking usage for driver rate ID ${id}`)
+    const result = await getDriverRateUsage(id)
+
+    if (!result.success) {
+      return res.status(404).json({ message: result.message })
+    }
+
+    res.json(result.data)
+  } catch (err) {
+    console.error(`Error checking usage for driver rate ${req.params.id}:`, err)
+    res.status(500).json({ error: "Failed to check driver rate usage" })
+  }
+}
+
 export {
   getAllDriverRatesHandler,
   getDriverRateByIdHandler,
   createDriverRateHandler,
   updateDriverRateHandler,
   deleteDriverRateHandler,
+  getDriverRateUsageHandler,
 }
