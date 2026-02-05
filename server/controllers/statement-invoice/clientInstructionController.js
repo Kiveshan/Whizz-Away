@@ -27,6 +27,8 @@ const getClientInstructionsHandler = async (req, res) => {
       has_invoice: !!row.ikey,
       has_statement: !!row.statement_id,
       total_cost: Number.parseFloat(row.total_cost || 0).toFixed(2),
+      base_total_cost: Number.parseFloat(row.base_total_cost || 0).toFixed(2),
+      vat_percentage: Number.parseFloat(row.vat_percentage || 0).toFixed(2),
     }));
 
     res.json({
