@@ -210,72 +210,89 @@ const ClientSubbieCommissionReport = () => {
 
   return (
     <div className="client-subbie-report-page">
-      <div>
+      <section className="client-subbie-intro">
         <p className="client-subbie-report-subtitle">
           Select a client and month to see subcontractor earnings alongside KSM commission for that period.
         </p>
-      </div>
-
-      <div className="client-subbie-filter-bar">
-        <div className="client-subbie-filter-card">
-          <label htmlFor="client-select">Client</label>
-          <select
-            id="client-select"
-            value={selectedClientId}
-            onChange={(event) => setSelectedClientId(event.target.value)}
+        <div className="client-subbie-chips" aria-label="Current selection">
+          <span
+            className={`client-subbie-chip ${selectedClientName ? "" : "is-muted"}`}
+            data-testid="client-chip"
           >
-            <option value="">Select a client…</option>
-            {clients.map((client) => (
-              <option key={client.m5clientkey} value={client.m5clientkey}>
-                {client.client}
-              </option>
-            ))}
-          </select>
+            <span className="client-subbie-chip-label">Client</span>
+            <span className="client-subbie-chip-value">
+              {selectedClientName || "None selected"}
+            </span>
+          </span>
+          <span className="client-subbie-chip" data-testid="period-chip">
+            <span className="client-subbie-chip-label">Period</span>
+            <span className="client-subbie-chip-value">{`${selectedMonth} ${selectedYear}`}</span>
+          </span>
+        </div>
+      </section>
+
+      <section className="client-subbie-toolbar">
+        <div className="client-subbie-filters">
+          <div className="client-subbie-filter-card">
+            <label htmlFor="client-select">Client</label>
+            <select
+              id="client-select"
+              value={selectedClientId}
+              onChange={(event) => setSelectedClientId(event.target.value)}
+            >
+              <option value="">Select a client…</option>
+              {clients.map((client) => (
+                <option key={client.m5clientkey} value={client.m5clientkey}>
+                  {client.client}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <div className="client-subbie-filter-card">
+            <label htmlFor="month-select">Month</label>
+            <select
+              id="month-select"
+              value={selectedMonth}
+              onChange={(event) => setSelectedMonth(event.target.value)}
+            >
+              {monthNames.map((month) => (
+                <option key={month} value={month}>
+                  {month}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <div className="client-subbie-filter-card">
+            <label htmlFor="year-select">Year</label>
+            <select
+              id="year-select"
+              value={selectedYear}
+              onChange={(event) => setSelectedYear(event.target.value)}
+            >
+              {getYearOptions().map((year) => (
+                <option key={year} value={year}>
+                  {year}
+                </option>
+              ))}
+            </select>
+          </div>
         </div>
 
-        <div className="client-subbie-filter-card">
-          <label htmlFor="month-select">Month</label>
-          <select
-            id="month-select"
-            value={selectedMonth}
-            onChange={(event) => setSelectedMonth(event.target.value)}
+        <div className="client-subbie-actions">
+          <button className="primary" onClick={handleGenerateReport} disabled={loading}>
+            {loading ? "Generating…" : "Generate Report"}
+          </button>
+          <button
+            className="secondary"
+            onClick={handleExportToExcel}
+            disabled={!reportData || !hasReportContent || exporting}
           >
-            {monthNames.map((month) => (
-              <option key={month} value={month}>
-                {month}
-              </option>
-            ))}
-          </select>
+            {exporting ? "Preparing Excel…" : "Export to Excel"}
+          </button>
         </div>
-
-        <div className="client-subbie-filter-card">
-          <label htmlFor="year-select">Year</label>
-          <select
-            id="year-select"
-            value={selectedYear}
-            onChange={(event) => setSelectedYear(event.target.value)}
-          >
-            {getYearOptions().map((year) => (
-              <option key={year} value={year}>
-                {year}
-              </option>
-            ))}
-          </select>
-        </div>
-      </div>
-
-      <div className="client-subbie-actions">
-        <button className="primary" onClick={handleGenerateReport} disabled={loading}>
-          {loading ? "Generating…" : "Generate Report"}
-        </button>
-        <button
-          className="secondary"
-          onClick={handleExportToExcel}
-          disabled={!reportData || !hasReportContent || exporting}
-        >
-          {exporting ? "Preparing Excel…" : "Export to Excel"}
-        </button>
-      </div>
+      </section>
 
       {error && <div className="client-subbie-download-note">{error}</div>}
 
@@ -283,102 +300,120 @@ const ClientSubbieCommissionReport = () => {
 
       {!loading && reportData && (
         <>
-          <div className="client-subbie-summary">
-            <div className="client-subbie-summary-card">
-              <span className="client-subbie-summary-label">Total Invoiced Amount</span>
-              <span className="client-subbie-summary-value">{formatCurrency(totals.invoiceAmount)}</span>
-              <span className="client-subbie-summary-footnote">
-                Sum of invoices linked to {selectedClientName || "the client"} for the selected month.
-              </span>
+          <section className="client-subbie-section">
+            <header>
+              <h2>Revenue Summary</h2>
+              <p>
+                Totals include VAT from invoice instructions and reflect the earnings split for the selected period.
+              </p>
+            </header>
+            <div className="client-subbie-summary">
+              <div className="client-subbie-summary-card">
+                <span className="client-subbie-summary-label">Total Invoiced Amount</span>
+                <span className="client-subbie-summary-value">{formatCurrency(totals.invoiceAmount)}</span>
+                <span className="client-subbie-summary-footnote">
+                  Sum of invoices linked to {selectedClientName || "the client"} for the selected month.
+                </span>
+              </div>
+              <div className="client-subbie-summary-card">
+                <span className="client-subbie-summary-label">Total Subbie Earnings</span>
+                <span className="client-subbie-summary-value">{formatCurrency(totals.subcontractorAmount)}</span>
+                <span className="client-subbie-summary-footnote">
+                  Combined driver rates for subcontractors engaged on those instructions.
+                </span>
+              </div>
+              <div className="client-subbie-summary-card">
+                <span className="client-subbie-summary-label">KSM Commission</span>
+                <span className="client-subbie-summary-value">{formatCurrency(totals.commission)}</span>
+                <span className="client-subbie-summary-footnote">
+                  Displayed as an absolute value (Total invoiced minus subbie earnings).
+                </span>
+              </div>
             </div>
-            <div className="client-subbie-summary-card">
-              <span className="client-subbie-summary-label">Total Subbie Earnings</span>
-              <span className="client-subbie-summary-value">{formatCurrency(totals.subcontractorAmount)}</span>
-              <span className="client-subbie-summary-footnote">
-                Combined driver rates for subcontractors engaged on those instructions.
-              </span>
-            </div>
-            <div className="client-subbie-summary-card">
-              <span className="client-subbie-summary-label">KSM Commission</span>
-              <span className="client-subbie-summary-value">{formatCurrency(totals.commission)}</span>
-              <span className="client-subbie-summary-footnote">
-                Displayed as an absolute value (Total invoiced minus subbie earnings).
-              </span>
-            </div>
-          </div>
+          </section>
 
-          <div className="client-subbie-report-grid">
-            <div className="client-subbie-card">
-              <h3>Subcontractor Breakdown</h3>
-              {reportData.subcontractors?.length ? (
-                <div className="client-subbie-table-wrapper">
-                  <table className="client-subbie-table">
-                    <thead>
-                      <tr>
-                        <th>Subcontractor</th>
-                        <th>Reg Number</th>
-                        <th>Legs</th>
-                        <th>Total Earned</th>
-                        <th>Share of Subbie Total</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {reportData.subcontractors.map((subbie) => (
-                        <tr key={`${subbie.subcontractorId}-${subbie.registrationNumber || "na"}`}>
-                          <td>{subbie.companyName}</td>
-                          <td>{subbie.registrationNumber || "—"}</td>
-                          <td>{subbie.legCount}</td>
-                          <td>{formatCurrency(subbie.totalEarned)}</td>
-                          <td>
-                            {subbie.percentage
-                              ? percentFormatter.format(subbie.percentage)
-                              : "0.00%"}
-                          </td>
+          <div className="client-subbie-section-grid">
+            <section className="client-subbie-section">
+              <header>
+                <h2>Subcontractor Breakdown</h2>
+                <p>Understand how subcontractor earnings contribute to the selected client period.</p>
+              </header>
+              <div className="client-subbie-card">
+                {reportData.subcontractors?.length ? (
+                  <div className="client-subbie-table-wrapper">
+                    <table className="client-subbie-table">
+                      <thead>
+                        <tr>
+                          <th>Subcontractor</th>
+                          <th>Reg Number</th>
+                          <th>Legs</th>
+                          <th>Total Earned</th>
+                          <th>Share of Subbie Total</th>
                         </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              ) : (
-                <div className="client-subbie-empty-state">
-                  No subcontractor legs were billed for this client during {selectedMonth} {selectedYear}.
-                </div>
-              )}
-            </div>
+                      </thead>
+                      <tbody>
+                        {reportData.subcontractors.map((subbie) => (
+                          <tr key={`${subbie.subcontractorId}-${subbie.registrationNumber || "na"}`}>
+                            <td>{subbie.companyName}</td>
+                            <td>{subbie.registrationNumber || "—"}</td>
+                            <td>{subbie.legCount}</td>
+                            <td>{formatCurrency(subbie.totalEarned)}</td>
+                            <td>
+                              {subbie.percentage
+                                ? percentFormatter.format(subbie.percentage)
+                                : "0.00%"}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                ) : (
+                  <div className="client-subbie-empty-state">
+                    No subcontractor legs were billed for this client during {selectedMonth} {selectedYear}.
+                  </div>
+                )}
+              </div>
+            </section>
 
-            <div className="client-subbie-card">
-              <h3>Invoices & Instructions</h3>
-              {reportData.invoices?.length ? (
-                <div className="client-subbie-table-wrapper">
-                  <table className="client-subbie-table">
-                    <thead>
-                      <tr>
-                        <th>Invoice</th>
-                        <th>Doc #</th>
-                        <th>Instruction</th>
-                        <th>Date</th>
-                        <th>Amount</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {reportData.invoices.map((invoice) => (
-                        <tr key={invoice.invoiceId}>
-                          <td>{invoice.invoiceNumber || "—"}</td>
-                          <td>{invoice.documentNumber || "—"}</td>
-                          <td>{invoice.instructionId || "—"}</td>
-                          <td>{formatDate(invoice.invoiceDate)}</td>
-                          <td>{formatCurrency(invoice.amount)}</td>
+            <section className="client-subbie-section">
+              <header>
+                <h2>Invoices & Instructions</h2>
+                <p>Trace gross invoice totals with their linked documentation for auditing.</p>
+              </header>
+              <div className="client-subbie-card">
+                {reportData.invoices?.length ? (
+                  <div className="client-subbie-table-wrapper">
+                    <table className="client-subbie-table">
+                      <thead>
+                        <tr>
+                          <th>Invoice</th>
+                          <th>Doc #</th>
+                          <th>Instruction</th>
+                          <th>Date</th>
+                          <th>Amount</th>
                         </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              ) : (
-                <div className="client-subbie-empty-state">
-                  No invoices were raised for this client during {selectedMonth} {selectedYear}.
-                </div>
-              )}
-            </div>
+                      </thead>
+                      <tbody>
+                        {reportData.invoices.map((invoice) => (
+                          <tr key={invoice.invoiceId}>
+                            <td>{invoice.invoiceNumber || "—"}</td>
+                            <td>{invoice.documentNumber || "—"}</td>
+                            <td>{invoice.instructionId || "—"}</td>
+                            <td>{formatDate(invoice.invoiceDate)}</td>
+                            <td>{formatCurrency(invoice.amount)}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                ) : (
+                  <div className="client-subbie-empty-state">
+                    No invoices were raised for this client during {selectedMonth} {selectedYear}.
+                  </div>
+                )}
+              </div>
+            </section>
           </div>
         </>
       )}
