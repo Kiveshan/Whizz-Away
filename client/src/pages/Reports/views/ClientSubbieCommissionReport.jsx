@@ -68,6 +68,7 @@ const ClientSubbieCommissionReport = () => {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState("")
   const [exporting, setExporting] = useState(false)
+  const [activeTab, setActiveTab] = useState("summary")
 
   useEffect(() => {
     const fetchClients = async () => {
@@ -167,7 +168,6 @@ const ClientSubbieCommissionReport = () => {
       invoicesSheet.columns = [
         { header: "Type", key: "source", width: 14 },
         { header: "Invoice #", key: "invoiceNumber", width: 18 },
-        { header: "Doc #", key: "documentNumber", width: 16 },
         { header: "Instruction", key: "instructionId", width: 16 },
         { header: "Date", key: "invoiceDate", width: 16 },
         { header: "Description", key: "description", width: 30 },
@@ -177,7 +177,6 @@ const ClientSubbieCommissionReport = () => {
         invoicesSheet.addRow({
           source: invoice.source === "addOn" ? "Add-On" : "Instruction",
           invoiceNumber: invoice.invoiceNumber || "—",
-          documentNumber: invoice.documentNumber || "—",
           instructionId: invoice.instructionId || "—",
           invoiceDate: formatDate(invoice.invoiceDate),
           description: invoice.description || "—",
@@ -219,21 +218,6 @@ const ClientSubbieCommissionReport = () => {
         <p className="client-subbie-report-subtitle">
           Select a client and month to see subcontractor earnings alongside KSM commission for that period.
         </p>
-        <div className="client-subbie-chips" aria-label="Current selection">
-          <span
-            className={`client-subbie-chip ${selectedClientName ? "" : "is-muted"}`}
-            data-testid="client-chip"
-          >
-            <span className="client-subbie-chip-label">Client</span>
-            <span className="client-subbie-chip-value">
-              {selectedClientName || "None selected"}
-            </span>
-          </span>
-          <span className="client-subbie-chip" data-testid="period-chip">
-            <span className="client-subbie-chip-label">Period</span>
-            <span className="client-subbie-chip-value">{`${selectedMonth} ${selectedYear}`}</span>
-          </span>
-        </div>
       </section>
 
       <section className="client-subbie-toolbar">
@@ -302,57 +286,90 @@ const ClientSubbieCommissionReport = () => {
       {error && <div className="client-subbie-download-note">{error}</div>}
 
       {loading && <LoadingIndicator />}
+      {hasReportContent && !loading && (
+        <div className="client-subbie-tabs" role="tablist" aria-label="Report sections">
+          <button
+            type="button"
+            className={`client-subbie-tab ${activeTab === "summary" ? "is-active" : ""}`}
+            onClick={() => setActiveTab("summary")}
+            role="tab"
+            aria-selected={activeTab === "summary"}
+          >
+            Summary
+          </button>
+          <button
+            type="button"
+            className={`client-subbie-tab ${activeTab === "subbies" ? "is-active" : ""}`}
+            onClick={() => setActiveTab("subbies")}
+            role="tab"
+            aria-selected={activeTab === "subbies"}
+          >
+            Subcontractors
+          </button>
+          <button
+            type="button"
+            className={`client-subbie-tab ${activeTab === "invoices" ? "is-active" : ""}`}
+            onClick={() => setActiveTab("invoices")}
+            role="tab"
+            aria-selected={activeTab === "invoices"}
+          >
+            Invoices
+          </button>
+        </div>
+      )}
 
       {!loading && reportData && (
         <>
-          <section className="client-subbie-section">
-            <header>
-              <h2>Revenue Summary</h2>
-              <p>
-                Totals include VAT from invoice instructions and reflect the earnings split for the selected period.
-              </p>
-            </header>
-            <div className="client-subbie-summary">
-              <div className="client-subbie-summary-card">
-                <span className="client-subbie-summary-label">Instruction Invoices</span>
-                <span className="client-subbie-summary-value">{formatCurrency(instructionInvoiceAmount)}</span>
-                <span className="client-subbie-summary-footnote">
-                  Value of transport instructions billed directly for {selectedClientName || "the client"}.
-                </span>
+          {activeTab === "summary" && (
+            <section className="client-subbie-section" aria-label="Revenue summary">
+              <header>
+                <h2>Revenue Summary</h2>
+                <p>
+                  Totals include VAT from invoice instructions and reflect the earnings split for the selected period.
+                </p>
+              </header>
+              <div className="client-subbie-summary">
+                <div className="client-subbie-summary-card">
+                  <span className="client-subbie-summary-label">Instruction Invoices</span>
+                  <span className="client-subbie-summary-value">{formatCurrency(instructionInvoiceAmount)}</span>
+                  <span className="client-subbie-summary-footnote">
+                    Value of transport instructions billed directly for {selectedClientName || "the client"}.
+                  </span>
+                </div>
+                <div className="client-subbie-summary-card">
+                  <span className="client-subbie-summary-label">Add-On Invoices</span>
+                  <span className="client-subbie-summary-value">{formatCurrency(totals.addOnAmount || 0)}</span>
+                  <span className="client-subbie-summary-footnote">
+                    Ancillary services raised outside the instruction invoices (VAT already applied).
+                  </span>
+                </div>
+                <div className="client-subbie-summary-card">
+                  <span className="client-subbie-summary-label">Total Invoiced Amount</span>
+                  <span className="client-subbie-summary-value">{formatCurrency(totals.invoiceAmount)}</span>
+                  <span className="client-subbie-summary-footnote">
+                    Combined instruction and add-on invoices for the selected month.
+                  </span>
+                </div>
+                <div className="client-subbie-summary-card">
+                  <span className="client-subbie-summary-label">Total Subbie Earnings</span>
+                  <span className="client-subbie-summary-value">{formatCurrency(totals.subcontractorAmount)}</span>
+                  <span className="client-subbie-summary-footnote">
+                    Combined driver rates for subcontractors engaged on those instructions.
+                  </span>
+                </div>
+                <div className="client-subbie-summary-card">
+                  <span className="client-subbie-summary-label">KSM Commission</span>
+                  <span className="client-subbie-summary-value">{formatCurrency(totals.commission)}</span>
+                  <span className="client-subbie-summary-footnote">
+                    Displayed as an absolute value (Total invoiced minus subbie earnings).
+                  </span>
+                </div>
               </div>
-              <div className="client-subbie-summary-card">
-                <span className="client-subbie-summary-label">Add-On Invoices</span>
-                <span className="client-subbie-summary-value">{formatCurrency(totals.addOnAmount || 0)}</span>
-                <span className="client-subbie-summary-footnote">
-                  Ancillary services raised outside the instruction invoices (VAT already applied).
-                </span>
-              </div>
-              <div className="client-subbie-summary-card">
-                <span className="client-subbie-summary-label">Total Invoiced Amount</span>
-                <span className="client-subbie-summary-value">{formatCurrency(totals.invoiceAmount)}</span>
-                <span className="client-subbie-summary-footnote">
-                  Combined instruction and add-on invoices for the selected month.
-                </span>
-              </div>
-              <div className="client-subbie-summary-card">
-                <span className="client-subbie-summary-label">Total Subbie Earnings</span>
-                <span className="client-subbie-summary-value">{formatCurrency(totals.subcontractorAmount)}</span>
-                <span className="client-subbie-summary-footnote">
-                  Combined driver rates for subcontractors engaged on those instructions.
-                </span>
-              </div>
-              <div className="client-subbie-summary-card">
-                <span className="client-subbie-summary-label">KSM Commission</span>
-                <span className="client-subbie-summary-value">{formatCurrency(totals.commission)}</span>
-                <span className="client-subbie-summary-footnote">
-                  Displayed as an absolute value (Total invoiced minus subbie earnings).
-                </span>
-              </div>
-            </div>
-          </section>
+            </section>
+          )}
 
-          <div className="client-subbie-section-grid">
-            <section className="client-subbie-section">
+          {activeTab === "subbies" && (
+            <section className="client-subbie-section" aria-label="Subcontractor breakdown">
               <header>
                 <h2>Subcontractor Breakdown</h2>
                 <p>Understand how subcontractor earnings contribute to the selected client period.</p>
@@ -394,8 +411,10 @@ const ClientSubbieCommissionReport = () => {
                 )}
               </div>
             </section>
+          )}
 
-            <section className="client-subbie-section">
+          {activeTab === "invoices" && (
+            <section className="client-subbie-section" aria-label="Invoices and instructions">
               <header>
                 <h2>Invoices & Instructions</h2>
                 <p>Trace gross invoice totals with their linked documentation for auditing.</p>
@@ -408,7 +427,6 @@ const ClientSubbieCommissionReport = () => {
                         <tr>
                           <th>Type</th>
                           <th>Invoice</th>
-                          <th>Doc #</th>
                           <th>Instruction</th>
                           <th>Date</th>
                           <th>Amount</th>
@@ -419,7 +437,6 @@ const ClientSubbieCommissionReport = () => {
                           <tr key={invoice.invoiceId}>
                             <td>{invoice.source === "addOn" ? "Add-On" : "Instruction"}</td>
                             <td>{invoice.invoiceNumber || "—"}</td>
-                            <td>{invoice.documentNumber || "—"}</td>
                             <td>{invoice.instructionId || "—"}</td>
                             <td>{formatDate(invoice.invoiceDate)}</td>
                             <td>{formatCurrency(invoice.amount)}</td>
@@ -435,7 +452,7 @@ const ClientSubbieCommissionReport = () => {
                 )}
               </div>
             </section>
-          </div>
+          )}
         </>
       )}
 

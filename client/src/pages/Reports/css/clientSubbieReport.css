@@ -80,6 +80,42 @@
   box-shadow: 0 12px 36px rgba(15, 23, 42, 0.08);
 }
 
+/* Tabs for main report sections */
+.client-subbie-tabs {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.client-subbie-tab {
+  border-radius: 999px;
+  padding: 8px 16px;
+  font-size: 13px;
+  font-weight: 500;
+  border: 1px solid rgba(37, 99, 235, 0.25);
+  background: rgba(255, 255, 255, 0.8);
+  color: var(--client-report-muted);
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  transition: background 0.18s ease, color 0.18s ease, box-shadow 0.18s ease, transform 0.12s ease;
+}
+
+.client-subbie-tab:hover {
+  background: #ffffff;
+  transform: translateY(-1px);
+  box-shadow: 0 3px 8px rgba(15, 23, 42, 0.12);
+}
+
+.client-subbie-tab.is-active {
+  background: linear-gradient(90deg, #2563eb 0%, #1d4ed8 100%);
+  color: #ffffff;
+  border-color: transparent;
+  box-shadow: 0 6px 16px rgba(37, 99, 235, 0.4);
+}
+
 .client-subbie-filters {
   flex: 1 1 540px;
   display: grid;
@@ -265,13 +301,16 @@
 
 .client-subbie-table-wrapper {
   border-radius: 16px;
-  overflow: hidden;
+  /* allow horizontal scrolling instead of clipping long values */
+  overflow-x: auto;
+  overflow-y: hidden;
   border: 1px solid var(--client-report-card-border);
   background: #ffffff;
 }
 
 .client-subbie-table {
   width: 100%;
+  min-width: 640px; /* ensure columns have enough space before wrapping */
   border-collapse: collapse;
 }
 
@@ -284,6 +323,10 @@
   padding: 14px 16px;
   text-align: left;
   border-bottom: 1px solid var(--client-report-divider);
+  /* keep values within their cells and avoid visual cutoff */
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .client-subbie-table th {
