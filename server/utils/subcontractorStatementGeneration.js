@@ -115,11 +115,8 @@ const generateCurrentMonthStatements = async (specificSubeiRegNum = null) => {
         generationDate,
         formattedGenDate
       );
-      if (result.created) {
-        createdCount++;
-      } else if (result.updated) {
-        updatedCount++;
-      }
+      createdCount += Number(result.created || 0);
+      updatedCount += Number(result.updated || 0);
       processedCount++;
     }
 
@@ -299,6 +296,11 @@ const generateStatementsForMonth = async (
 /**
  * Get leg details with VAT calculation for a subcontractor
  */
+const VAT_STATUS = {
+  VAT: "VAT",
+  NON_VAT: "NON_VAT",
+};
+
 const getLegsWithVAT = async (client, legIds, subeiRegNum) => {
   try {
     console.log(`Getting leg details with VAT for ${legIds.length} legs`);
@@ -379,6 +381,7 @@ const getLegsWithVAT = async (client, legIds, subeiRegNum) => {
       legDetails.push({
         legkey: leg.legkey,
         driverrate: finalRate,
+        vatPercentage: Number.parseFloat(leg.vat_percentage) || 0,
       });
 
       totalAmount += finalRate;
@@ -433,88 +436,146 @@ const upsertSubcontractorStatement = async (
       subcontractor.subei_reg_num
     );
 
-    if (totalAmount <= 0) {
+    if (!legDetails.length || totalAmount <= 0) {
       console.log("Skipping subcontractor - total amount is 0 or invalid");
-      return { created: false, updated: false };
+      return { created: 0, updated: 0 };
     }
 
-    // Check if statement already exists for this generation date
-    const existingStatementQuery = `
-      SELECT sub_state_id 
-      FROM subcontractor_statements 
-      WHERE subbie_reg_num = $1 
-      AND date = $2
-    `;
+    const groupedLegs = {
+      [VAT_STATUS.VAT]: [],
+      [VAT_STATUS.NON_VAT]: [],
+    };
 
-    const existingResult = await client.query(existingStatementQuery, [
-      subcontractor.subei_reg_num,
-      formattedGenDate,
-    ]);
+    for (const leg of legDetails) {
+      if ((leg.vatPercentage || 0) > 0) {
+        groupedLegs[VAT_STATUS.VAT].push(leg);
+      } else {
+        groupedLegs[VAT_STATUS.NON_VAT].push(leg);
+      }
+    }
 
-    if (existingResult.rows.length > 0) {
-      // Update existing statement
-      const existingStatementId = existingResult.rows[0].sub_state_id;
-      const updateQuery = `
-        UPDATE subcontractor_statements 
-        SET amount = $2, legids = $3
-        WHERE sub_state_id = $1
-      `;
+    let createdCount = 0;
+    let updatedCount = 0;
 
-      const updateParams = [
-        existingStatementId,
-        totalAmount,
-        JSON.stringify(legDetails),
-      ];
+    for (const [vatStatus, legs] of Object.entries(groupedLegs)) {
+      if (!legs.length) continue;
 
-      await client.query(updateQuery, updateParams);
-
-      console.log(
-        `✅ Updated statement ${existingStatementId} for ${
-          subcontractor.companyname
-        } - Amount: R${totalAmount.toFixed(2)} (${
-          subcontractor.total_legs
-        } legs)`
+      const bucketTotal = legs.reduce(
+        (sum, leg) => sum + (Number.parseFloat(leg.driverrate) || 0),
+        0
       );
-      return { created: false, updated: true };
-    } else {
-      // Insert new statement
-      const insertQuery = `
-        INSERT INTO subcontractor_statements (
-          subbie_reg_num, 
-          date, 
-          amount, 
-          legids
-        ) VALUES ($1, $2, $3, $4)
-        RETURNING sub_state_id
-      `;
 
-      const insertParams = [
-        subcontractor.subei_reg_num,
+      if (bucketTotal <= 0) continue;
+
+      const result = await upsertStatementForBucket(
+        client,
+        {
+          ...subcontractor,
+          leg_details: legs,
+          bucketTotal,
+        },
         formattedGenDate,
-        totalAmount,
-        JSON.stringify(legDetails),
-      ];
-
-      const insertResult = await client.query(insertQuery, insertParams);
-
-      console.log(
-        `✅ Created statement ${insertResult.rows[0].sub_state_id} for ${
-          subcontractor.companyname
-        } - Amount: R${totalAmount.toFixed(2)} (${
-          subcontractor.total_legs
-        } legs)`
+        vatStatus
       );
-      return { created: true, updated: false };
+
+      if (result === "created") createdCount += 1;
+      else if (result === "updated") updatedCount += 1;
     }
+
+    return { created: createdCount, updated: updatedCount };
   } catch (error) {
     console.error(
       `❌ Error upserting statement for ${
         subcontractor.companyname || "Unknown"
-      }:`,
-      error
+      }: ${error}`
     );
     throw error;
   }
+};
+
+const upsertStatementForBucket = async (
+  client,
+  subcontractor,
+  formattedGenDate,
+  vatStatus
+) => {
+  const existingStatementQuery = `
+    SELECT sub_state_id 
+    FROM subcontractor_statements 
+    WHERE subbie_reg_num = $1 
+      AND date = $2
+      AND vat_status = $3
+  `;
+
+  const existingResult = await client.query(existingStatementQuery, [
+    subcontractor.subei_reg_num,
+    formattedGenDate,
+    vatStatus,
+  ]);
+
+  const legPayload = JSON.stringify(
+    subcontractor.leg_details.map(({ vatPercentage, ...rest }) => ({
+      ...rest,
+      vatPercentage,
+    }))
+  );
+
+  if (existingResult.rows.length > 0) {
+    const existingStatementId = existingResult.rows[0].sub_state_id;
+    const updateQuery = `
+      UPDATE subcontractor_statements 
+      SET amount = $2, legids = $3, vat_status = $4
+      WHERE sub_state_id = $1
+    `;
+
+    const updateParams = [
+      existingStatementId,
+      subcontractor.bucketTotal,
+      legPayload,
+      vatStatus,
+    ];
+
+    await client.query(updateQuery, updateParams);
+
+    console.log(
+      `✅ Updated ${vatStatus} statement ${existingStatementId} for ${
+        subcontractor.companyname
+      } - Amount: R${subcontractor.bucketTotal.toFixed(2)} (${
+        subcontractor.leg_details.length
+      } legs)`
+    );
+    return "updated";
+  }
+
+  const insertQuery = `
+    INSERT INTO subcontractor_statements (
+      subbie_reg_num, 
+      date, 
+      amount, 
+      legids,
+      vat_status
+    ) VALUES ($1, $2, $3, $4, $5)
+    RETURNING sub_state_id
+  `;
+
+  const insertParams = [
+    subcontractor.subei_reg_num,
+    formattedGenDate,
+    subcontractor.bucketTotal,
+    legPayload,
+    vatStatus,
+  ];
+
+  const insertResult = await client.query(insertQuery, insertParams);
+
+  console.log(
+    `✅ Created ${vatStatus} statement ${insertResult.rows[0].sub_state_id} for ${
+      subcontractor.companyname
+    } - Amount: R${subcontractor.bucketTotal.toFixed(2)} (${
+      subcontractor.leg_details.length
+    } legs)`
+  );
+  return "created";
 };
 
 export { generateStatementsForMonth, generateCurrentMonthStatements };

@@ -1258,6 +1258,199 @@ const getWagesVsExpenses = async (client, month, year) => {
   return wagesVsExpensesData
 }
 
+const getClientSubbieCommissionReport = async (client, month, year, clientId) => {
+  if (!clientId) {
+    throw new Error("clientId is required")
+  }
+
+  const trimmedMonth = month?.trim()
+  const yearText = year?.toString()
+
+  if (!trimmedMonth || !yearText) {
+    throw new Error("Both month and year are required")
+  }
+
+  const clientInfoQuery = `
+    SELECT m5clientkey, client
+    FROM m5_client
+    WHERE m5clientkey = $1
+  `
+
+  const clientInfoResult = await client.query(clientInfoQuery, [clientId])
+  const clientInfo = clientInfoResult.rows[0] || null
+
+  const invoicesQuery = `
+    WITH filtered_invoices AS (
+      SELECT 
+        i.ikey,
+        i.invoice_num,
+        i.doc_num,
+        i.date,
+        i.m1key,
+        m.total_cost,
+        m.vat,
+        m.description
+      FROM invoice i
+      JOIN m1_controller m ON i.m1key = m.m1key
+      WHERE i.clientid = $1
+        AND TRIM(TO_CHAR(i.date, 'Month')) = $2
+        AND EXTRACT(YEAR FROM i.date)::text = $3
+    )
+    SELECT 
+      fi.ikey,
+      fi.invoice_num,
+      fi.doc_num,
+      fi.date,
+      fi.m1key,
+      fi.total_cost,
+      fi.vat,
+      fi.description
+    FROM filtered_invoices fi
+    ORDER BY fi.date ASC
+  `
+
+  const addOnsQuery = `
+    SELECT 
+      ao.addon_id,
+      ao.invoice_number,
+      ao.date,
+      ao.amount,
+      ao.booking_ref,
+      ao.client_ref
+    FROM add_ons ao
+    WHERE ao.client_id = $1
+      AND TRIM(TO_CHAR(ao.date, 'Month')) = $2
+      AND EXTRACT(YEAR FROM ao.date)::text = $3
+  `
+
+  const subcontractorQuery = `
+    WITH filtered_invoices AS (
+      SELECT 
+        i.m1key
+      FROM invoice i
+      WHERE i.clientid = $1
+        AND TRIM(TO_CHAR(i.date, 'Month')) = $2
+        AND EXTRACT(YEAR FROM i.date)::text = $3
+    )
+    SELECT 
+      MIN(e.userid) AS subcontractor_id,
+      COALESCE(e.companyname, 'Unknown') AS companyname,
+      e.subei_reg_num,
+      COUNT(DISTINCT l.legkey) AS leg_count,
+      COALESCE(SUM(l.driverrate), 0) AS total_earned
+    FROM legs_m2 l
+    JOIN m5_employee e ON l.driverid = e.userid
+    JOIN filtered_invoices fi ON l.m1key = fi.m1key
+    WHERE e.roleid = 6
+    GROUP BY e.companyname, e.subei_reg_num
+    ORDER BY total_earned DESC
+  `
+
+  const params = [clientId, trimmedMonth, yearText]
+  const [invoiceResults, subcontractorResults, addOnResults] = await Promise.all([
+    client.query(invoicesQuery, params),
+    client.query(subcontractorQuery, params),
+    client.query(addOnsQuery, params),
+  ])
+
+  const instructionInvoiceDetails = invoiceResults.rows.map((row) => {
+    const baseAmount = Number.parseFloat(row.total_cost || 0)
+    const vatRate = Number.parseFloat(row.vat ?? 0) || 0
+    const vatAmount = Number.isFinite(vatRate) ? (baseAmount * vatRate) / 100 : 0
+    const grossAmount = baseAmount + vatAmount
+
+    return {
+      invoiceId: row.ikey,
+      invoiceNumber: row.invoice_num,
+      documentNumber: row.doc_num,
+      invoiceDate: row.date instanceof Date ? row.date.toISOString() : row.date,
+      instructionId: row.m1key,
+      description: row.description,
+      amount: Number(grossAmount.toFixed(2)),
+      amountExVat: Number(baseAmount.toFixed(2)),
+      vatRate: Number(vatRate.toFixed(2)),
+      vatAmount: Number(vatAmount.toFixed(2)),
+      source: "instruction",
+    }
+  })
+
+  const addOnDetails = addOnResults.rows.map((row) => {
+    const amount = Number.parseFloat(row.amount || 0)
+
+    return {
+      invoiceId: `addon-${row.addon_id}`,
+      invoiceNumber: row.invoice_number || "Add-On Invoice",
+      documentNumber: row.booking_ref || null,
+      invoiceDate: row.date instanceof Date ? row.date.toISOString() : row.date,
+      instructionId: row.client_ref || null,
+      description: "Add-On invoice",
+      amount: Number(amount.toFixed(2)),
+      amountExVat: Number(amount.toFixed(2)),
+      vatRate: null,
+      vatAmount: null,
+      source: "addOn",
+    }
+  })
+
+  const invoiceDetails = [...instructionInvoiceDetails, ...addOnDetails].sort((a, b) => {
+    const dateA = a.invoiceDate ? new Date(a.invoiceDate).getTime() : 0
+    const dateB = b.invoiceDate ? new Date(b.invoiceDate).getTime() : 0
+    return dateA - dateB
+  })
+
+  const totalInvoiceAmount = invoiceDetails.reduce(
+    (sum, detail) => sum + (Number.isFinite(detail.amount) ? detail.amount : 0),
+    0
+  )
+
+  const totalAddOnAmount = addOnDetails.reduce(
+    (sum, detail) => sum + (Number.isFinite(detail.amount) ? detail.amount : 0),
+    0
+  )
+
+  const totalSubbieAmount = subcontractorResults.rows.reduce(
+    (sum, row) => sum + Number.parseFloat(row.total_earned || 0),
+    0
+  )
+
+  const subcontractorBreakdown = subcontractorResults.rows.map((row) => {
+    const totalEarned = Number.parseFloat(row.total_earned || 0)
+    const percentage = totalSubbieAmount > 0 ? totalEarned / totalSubbieAmount : 0
+    return {
+      subcontractorId: row.subcontractor_id,
+      companyName: row.companyname,
+      registrationNumber: row.subei_reg_num,
+      legCount: Number.parseInt(row.leg_count, 10) || 0,
+      totalEarned,
+      percentage,
+    }
+  })
+
+  const commission = Math.max(totalInvoiceAmount - totalSubbieAmount, 0)
+
+  return {
+    client: clientInfo
+      ? {
+          id: clientInfo.m5clientkey,
+          name: clientInfo.client,
+        }
+      : null,
+    period: {
+      month: trimmedMonth,
+      year: yearText,
+    },
+    totals: {
+      invoiceAmount: Number(totalInvoiceAmount.toFixed(2)),
+      subcontractorAmount: Number(totalSubbieAmount.toFixed(2)),
+      commission: Number(commission.toFixed(2)),
+      addOnAmount: Number(totalAddOnAmount.toFixed(2)),
+    },
+    invoices: invoiceDetails,
+    subcontractors: subcontractorBreakdown,
+    addOns: addOnDetails,
+  }
+}
+
 async function calculateTotalPayable(client, employeeId, month, year) {
   const monthNames = [
     "January", "February", "March", "April", "May", "June",
@@ -1418,4 +1611,5 @@ export {
   getTurnoverVsFuelPerTruck,
   getPaymentsReceivedPerMonth,
   getPaymentClients,
+  getClientSubbieCommissionReport,
 }

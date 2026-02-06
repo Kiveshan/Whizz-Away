@@ -252,6 +252,20 @@ const ClientDocuments = () => {
               Export
             </button>
             <button
+              className={`filter-button ${filter === "cross-haul" ? "active" : ""}`}
+              onClick={() => handleFilterChange("cross-haul")}
+            >
+              Cross-Haul
+            </button>
+            <button
+              className={`filter-button ${
+                filter === "cross-haul(break bulk)" ? "active" : ""
+              }`}
+              onClick={() => handleFilterChange("cross-haul(break bulk)")}
+            >
+              Breakbulk
+            </button>
+            <button
               className={`filter-button ${filter === "All" ? "active" : ""}`}
               onClick={() => handleFilterChange("All")}
             >

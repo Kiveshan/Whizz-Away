@@ -16,18 +16,27 @@ const getClientInstructions = async (clientId, { year, month, type }) => {
         m1."clientFileRef" as file_no, 
         m1.status,
         m1.created_at as pickupdate,
-        m1.total_cost,
+        m1.total_cost AS base_total_cost,
+        COALESCE(m1.vat, 0) AS vat_percentage,
+        (COALESCE(m1.total_cost, 0) * (1 + COALESCE(m1.vat, 0)::numeric / 100)) AS total_cost,
         i.ikey,
         i.invoice_num,
         i.date as invoice_date,
         i.groupid as invoice_group_id,
-        (SELECT statement_key FROM statements WHERE groupid = i.groupid LIMIT 1) as statement_id
+        st.statement_key as statement_id
       FROM 
         public.m1_controller m1
       LEFT JOIN 
         public.shipment s ON m1.shipment_type = s.shipkey
-      LEFT JOIN
+      INNER JOIN
         public.invoice i ON m1.m1key = i.m1key
+      LEFT JOIN LATERAL (
+        SELECT statement_key
+        FROM public.statements st
+        WHERE st.clientid = m1.client
+        ORDER BY st.generation_date DESC
+        LIMIT 1
+      ) st ON TRUE
       WHERE 
         m1.client = $1
         AND m1.status = 'Completed'

@@ -7,6 +7,7 @@ export const showConfirmDialog = async (title, text, confirmButtonText = "Yes, d
     text,
     icon: 'warning',
     showCancelButton: true,
+    reverseButtons: true,
     confirmButtonColor: '#d33',
     cancelButtonColor: '#3085d6',
     confirmButtonText,

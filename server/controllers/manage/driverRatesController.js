@@ -4,7 +4,9 @@ import {
   createDriverRate,
   updateDriverRate,
   deleteDriverRate,
+  getDriverRateUsage,
 } from "../../models/manage/driverRatesModel.js"
+import { refreshInstructionLegRates } from "../../models/assignments/assignmentModel.js"
 
 const getAllDriverRatesHandler = async (req, res) => {
   try {
@@ -32,6 +34,46 @@ const getAllDriverRatesHandler = async (req, res) => {
   } catch (err) {
     console.error("Error fetching driver rates:", err)
     res.status(500).json({ error: "Failed to fetch driver rates" })
+  }
+}
+
+// Trigger a refresh of legs_m2.driverrate for all In Progress instructions
+// that are currently using this driver rate. This is intended to be called
+// from the Manage UI "Continue" button after a rate edit is confirmed.
+const refreshDriverRateLegsHandler = async (req, res) => {
+  try {
+    const { id } = req.params
+
+    if (!/^[0-9]+$/.test(id)) {
+      return res.status(400).json({ error: "Invalid ID format" })
+    }
+
+    const usageResult = await getDriverRateUsage(id)
+    if (!usageResult.success) {
+      return res.status(404).json({ message: usageResult.message })
+    }
+
+    const { instructions = [] } = usageResult.data || {}
+
+    // Refresh legs for each affected instruction. Each helper call is
+    // internally transactional and only applies to In Progress instructions.
+    for (const instructionId of instructions) {
+      await refreshInstructionLegRates(instructionId)
+    }
+
+    return res.status(200).json({
+      success: true,
+      instructions,
+      message: "Driver rates successfully refreshed for affected instructions",
+    })
+  } catch (err) {
+    console.error(
+      `Error refreshing legs for driver rate ${req.params.id}:`,
+      err,
+    )
+    return res.status(500).json({
+      error: "Failed to refresh driver rate usage on legs",
+    })
   }
 }
 
@@ -177,10 +219,34 @@ const deleteDriverRateHandler = async (req, res) => {
   }
 }
 
+const getDriverRateUsageHandler = async (req, res) => {
+  try {
+    const { id } = req.params
+
+    if (!/^\d+$/.test(id)) {
+      return res.status(400).json({ error: "Invalid ID format" })
+    }
+
+    console.log(`Checking usage for driver rate ID ${id}`)
+    const result = await getDriverRateUsage(id)
+
+    if (!result.success) {
+      return res.status(404).json({ message: result.message })
+    }
+
+    res.json(result.data)
+  } catch (err) {
+    console.error(`Error checking usage for driver rate ${req.params.id}:`, err)
+    res.status(500).json({ error: "Failed to check driver rate usage" })
+  }
+}
+
 export {
   getAllDriverRatesHandler,
   getDriverRateByIdHandler,
   createDriverRateHandler,
   updateDriverRateHandler,
   deleteDriverRateHandler,
+  getDriverRateUsageHandler,
+  refreshDriverRateLegsHandler,
 }

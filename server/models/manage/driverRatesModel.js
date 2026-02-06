@@ -264,4 +264,107 @@ const deleteDriverRate = async (id) => {
   }
 }
 
-export { getAllDriverRates, getDriverRateById, createDriverRate, updateDriverRate, deleteDriverRate }
+const getDriverRateUsage = async (id) => {
+  let client
+  try {
+    client = await pool.connect()
+
+    const rateResult = await client.query("SELECT * FROM m5_driver_rate WHERE m5ratekey = $1", [id])
+    if (!rateResult.rows.length) {
+      return { success: false, message: "Driver rate not found" }
+    }
+
+    const rate = rateResult.rows[0]
+    const statusValue = "In Progress"
+
+    const possibleRates = [
+      rate.driver_six_meter_rate,
+      rate.driver_twelve_meter_rate,
+      rate.subie_six_meter_rate,
+      rate.subie_twelve_meter_rate,
+    ]
+
+    const rateValues = possibleRates
+      .filter((v) => v !== null && v !== undefined && v !== "")
+      .map((v) => Number(v))
+      .filter((v) => !Number.isNaN(v))
+
+    const legsResult = await client.query(
+      `
+        SELECT DISTINCT l.m1key, l.driverrate
+        FROM legs_m2 l
+        INNER JOIN m1_controller c ON c.m1key = l.m1key
+        WHERE LOWER(COALESCE(c.status, '')) = LOWER($2)
+          AND LOWER(TRIM(COALESCE(l.startingpoint, ''))) = LOWER(TRIM(COALESCE($3, '')))
+          AND LOWER(TRIM(COALESCE(l.destination, ''))) = LOWER(TRIM(COALESCE($4, '')))
+          AND (
+            l.m5ratekey = $1
+            OR (
+              COALESCE(array_length($5::double precision[], 1), 0) > 0
+              AND l.driverrate = ANY($5::double precision[])
+            )
+          )
+      `,
+      [id, statusValue, rate.startingpoint, rate.destination, rateValues],
+    )
+
+    const usageRows = legsResult.rows || []
+    const instructions = [...new Set(usageRows.map((r) => r.m1key).filter((v) => v !== null && v !== undefined))]
+
+    const fieldMap = [
+      { field: "driver_six_meter_rate", label: "Driver Rate (6m)" },
+      { field: "driver_twelve_meter_rate", label: "Driver Rate (12m)" },
+      { field: "subie_six_meter_rate", label: "Subbie Rate (6m)" },
+      { field: "subie_twelve_meter_rate", label: "Subbie Rate (12m)" },
+    ]
+
+    const usedRateFieldsMap = new Map()
+    const unmatchedLegRates = new Set()
+
+    const isMatchingNumber = (a, b) => {
+      if (a === null || a === undefined || b === null || b === undefined) return false
+      const numA = Number(a)
+      const numB = Number(b)
+      if (Number.isNaN(numA) || Number.isNaN(numB)) return false
+      return Math.abs(numA - numB) < 0.005
+    }
+
+    for (const row of usageRows) {
+      const legRate = row.driverrate
+      let matched = false
+
+      for (const fm of fieldMap) {
+        if (isMatchingNumber(legRate, rate[fm.field])) {
+          matched = true
+          if (!usedRateFieldsMap.has(fm.field)) {
+            usedRateFieldsMap.set(fm.field, { field: fm.field, label: fm.label, value: rate[fm.field] })
+          }
+        }
+      }
+
+      if (!matched && legRate !== null && legRate !== undefined && legRate !== "") {
+        unmatchedLegRates.add(legRate)
+      }
+    }
+
+    return {
+      success: true,
+      data: {
+        inUse: instructions.length > 0,
+        rateId: rate.m5ratekey,
+        startingpoint: rate.startingpoint,
+        destination: rate.destination,
+        instructions,
+        usedRateFields: Array.from(usedRateFieldsMap.values()),
+        unmatchedLegRates: Array.from(unmatchedLegRates.values()),
+      },
+    }
+  } catch (err) {
+    console.error(`Error checking usage for driver rate ${id}:`, err)
+    throw err
+  } finally {
+    if (client) client.release()
+  }
+}
+
+export { getAllDriverRates, getDriverRateById, createDriverRate, updateDriverRate, deleteDriverRate, getDriverRateUsage }

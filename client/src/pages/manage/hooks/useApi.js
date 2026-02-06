@@ -323,6 +323,10 @@ export function useApi(state, actions) {
           city: clientData.city || "",
           streetaddress: clientData.streetaddress || "",
           payment_type: clientData.payment_type || "",
+          insurance:
+            clientData.insurance === "" || clientData.insurance === undefined
+              ? 0
+              : Number.parseFloat(clientData.insurance),
           starting_point: clientData.starting_point || null,
           destination: clientData.destination || null,
           driver_six_meter_rate:
@@ -473,6 +477,75 @@ export function useApi(state, actions) {
     async (rateData) => {
       actions.setLoading(true)
       try {
+        if (state.editingRateId) {
+          try {
+            const usageResponse = await api.get(`/api/driver-rates/${state.editingRateId}/usage`)
+            const usageData = usageResponse.data
+
+            if (usageData?.inUse) {
+              const instructions = Array.isArray(usageData.instructions) ? usageData.instructions : []
+              const usedRateFields = Array.isArray(usageData.usedRateFields) ? usageData.usedRateFields : []
+
+              const isMatchingNumber = (a, b) => {
+                if (a === null || a === undefined || a === "" || b === null || b === undefined || b === "") return false
+                const numA = Number(a)
+                const numB = Number(b)
+                if (Number.isNaN(numA) || Number.isNaN(numB)) return false
+                return Math.abs(numA - numB) < 0.005
+              }
+
+              const affectedUsedRateFields = usedRateFields.filter((rf) => {
+                const newValue = rateData?.[rf.field]
+                const oldValue = rf.value
+
+                if ((newValue === "" || newValue === null || newValue === undefined) && (oldValue === null || oldValue === undefined)) {
+                  return false
+                }
+
+                if (newValue === "" || newValue === null || newValue === undefined) {
+                  return oldValue !== null && oldValue !== undefined
+                }
+
+                if (oldValue === null || oldValue === undefined) {
+                  return newValue !== "" && newValue !== null && newValue !== undefined
+                }
+
+                return !isMatchingNumber(newValue, oldValue)
+              })
+
+              if (affectedUsedRateFields.length === 0) {
+                // Rate is in use, but the specific used rate value(s) are not being changed.
+                // Continue with save.
+              } else {
+                const rateParts = affectedUsedRateFields.length
+                  ? affectedUsedRateFields
+                      .map((r) => `${r.label}: ${r.value ?? ""}`)
+                      .join("\n")
+                  : ""
+
+                const instructionParts = instructions.length ? instructions.join(", ") : ""
+
+                const alertText =
+                  `This rate: ${rateParts}${rateParts ? "\n\n" : ""}` +
+                  `is currently being used in Instruction no: ${instructionParts}\n` +
+                  `changing this rate will affect all the instructions that are using this rate.`
+
+                const confirmed = await showConfirmDialog(
+                  "Warning",
+                  alertText,
+                  "Continue"
+                )
+
+                if (!confirmed) {
+                  return false
+                }
+              }
+            }
+          } catch (usageErr) {
+            console.error("Error checking driver rate usage:", usageErr)
+          }
+        }
+
         const cleanedDriverRate = {
           startingpoint: rateData.startingpoint,
           destination: rateData.destination,
@@ -490,6 +563,17 @@ export function useApi(state, actions) {
 
         const response = await api[method](url, cleanedDriverRate)
         console.log("API response:", response.data)
+
+        // After updating an existing rate, refresh legs for any in-progress
+        // instructions that are using this rate. This relies on the backend
+        // to no-op safely when there are no matching instructions.
+        if (state.editingRateId) {
+          try {
+            await api.post(`/api/driver-rates/${state.editingRateId}/refresh-legs`)
+          } catch (refreshErr) {
+            console.error("Error refreshing legs after driver rate update:", refreshErr)
+          }
+        }
 
         // Refresh current page
         await fetchPaginatedData(
