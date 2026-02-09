@@ -277,18 +277,6 @@ const getDriverRateUsage = async (id) => {
     const rate = rateResult.rows[0]
     const statusValue = "In Progress"
 
-    const possibleRates = [
-      rate.driver_six_meter_rate,
-      rate.driver_twelve_meter_rate,
-      rate.subie_six_meter_rate,
-      rate.subie_twelve_meter_rate,
-    ]
-
-    const rateValues = possibleRates
-      .filter((v) => v !== null && v !== undefined && v !== "")
-      .map((v) => Number(v))
-      .filter((v) => !Number.isNaN(v))
-
     const legsResult = await client.query(
       `
         SELECT DISTINCT l.m1key, l.driverrate
@@ -299,13 +287,10 @@ const getDriverRateUsage = async (id) => {
           AND LOWER(TRIM(COALESCE(l.destination, ''))) = LOWER(TRIM(COALESCE($4, '')))
           AND (
             l.m5ratekey = $1
-            OR (
-              COALESCE(array_length($5::double precision[], 1), 0) > 0
-              AND l.driverrate = ANY($5::double precision[])
-            )
+            OR l.m5ratekey IS NULL
           )
       `,
-      [id, statusValue, rate.startingpoint, rate.destination, rateValues],
+      [id, statusValue, rate.startingpoint, rate.destination],
     )
 
     const usageRows = legsResult.rows || []
