@@ -1,10 +1,10 @@
 import Swal from 'sweetalert2';
 
 // Custom Confirm Dialog
-export const showConfirmDialog = async (title, text, confirmButtonText = "Yes, delete it!") => {
+export const showConfirmDialog = async (title, text, confirmButtonText = "Yes, delete it!", options = {}) => {
   const result = await Swal.fire({
     title,
-    text,
+    ...(options?.html ? { html: text } : { text }),
     icon: 'warning',
     showCancelButton: true,
     reverseButtons: true,
