@@ -517,49 +517,23 @@ export function useApi(state, actions) {
                 // Rate is in use, but the specific used rate value(s) are not being changed.
                 // Continue with save.
               } else {
-                const escapeHtml = (value) => {
-                  if (value === null || value === undefined) return ""
-                  return String(value)
-                    .replaceAll("&", "&amp;")
-                    .replaceAll("<", "&lt;")
-                    .replaceAll(">", "&gt;")
-                    .replaceAll('"', "&quot;")
-                    .replaceAll("'", "&#039;")
-                }
+                const rateParts = affectedUsedRateFields.length
+                  ? affectedUsedRateFields
+                      .map((r) => `${r.label}: ${r.value ?? ""}`)
+                      .join("\n")
+                  : ""
 
-                const formatRateValue = (value) => {
-                  if (value === null || value === undefined || value === "") return "(empty)"
-                  const num = Number(value)
-                  return Number.isNaN(num) ? escapeHtml(value) : escapeHtml(num)
-                }
+                const instructionParts = instructions.length ? instructions.join(", ") : ""
 
-                const htmlLines = affectedUsedRateFields
-                  .map((rf) => {
-                    const newValue = rateData?.[rf.field]
-                    const instrList = Array.isArray(rf.instructions) ? rf.instructions : []
-                    const instrText = instrList.length ? instrList.join(", ") : ""
-
-                    return (
-                      `<div style="margin-bottom:10px;">` +
-                      `<div><strong>${escapeHtml(rf.label)}</strong>: ${formatRateValue(rf.value)} &rarr; ${formatRateValue(newValue)}</div>` +
-                      `<div style="margin-top:4px;"><strong>Instruction no:</strong> ${escapeHtml(instrText)}</div>` +
-                      `</div>`
-                    )
-                  })
-                  .join("")
-
-                const alertHtml =
-                  `<div style="text-align:left;">` +
-                  `<div style="margin-bottom:10px;"><strong>Changing this rate will affect the following instructions:</strong></div>` +
-                  `${htmlLines}` +
-                  `</div>`
+                const alertText =
+                  `This rate: ${rateParts}${rateParts ? "\n\n" : ""}` +
+                  `is currently being used in Instruction no: ${instructionParts}\n` +
+                  `changing this rate will affect all the instructions that are using this rate.`
 
                 const confirmed = await showConfirmDialog(
                   "Warning",
-                  alertHtml,
+                  alertText,
                   "Continue"
-                  ,
-                  { html: true }
                 )
 
                 if (!confirmed) {
