@@ -331,13 +331,22 @@ const getDriverRateUsage = async (id) => {
 
     for (const row of usageRows) {
       const legRate = row.driverrate
+      const instructionNo = row.m1key
       let matched = false
 
       for (const fm of fieldMap) {
         if (isMatchingNumber(legRate, rate[fm.field])) {
           matched = true
           if (!usedRateFieldsMap.has(fm.field)) {
-            usedRateFieldsMap.set(fm.field, { field: fm.field, label: fm.label, value: rate[fm.field] })
+            usedRateFieldsMap.set(fm.field, {
+              field: fm.field,
+              label: fm.label,
+              value: rate[fm.field],
+              instructions: new Set(),
+            })
+          }
+          if (instructionNo !== null && instructionNo !== undefined) {
+            usedRateFieldsMap.get(fm.field).instructions.add(instructionNo)
           }
         }
       }
@@ -355,7 +364,12 @@ const getDriverRateUsage = async (id) => {
         startingpoint: rate.startingpoint,
         destination: rate.destination,
         instructions,
-        usedRateFields: Array.from(usedRateFieldsMap.values()),
+        usedRateFields: Array.from(usedRateFieldsMap.values()).map((r) => ({
+          field: r.field,
+          label: r.label,
+          value: r.value,
+          instructions: Array.from(r.instructions.values()),
+        })),
         unmatchedLegRates: Array.from(unmatchedLegRates.values()),
       },
     }
