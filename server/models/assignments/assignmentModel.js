@@ -744,7 +744,7 @@ export const refreshInstructionLegRates = async (instructionId) => {
       JOIN public.m5_employee e ON TRUE
       JOIN public.m5_driver_rate dr ON TRUE
       WHERE l.m1key = ti.m1key
-        AND c.containernum = l.containernumber
+        AND LOWER(TRIM(COALESCE(c.containernum, ''))) = LOWER(TRIM(COALESCE(l.containernumber, '')))
         AND e.userid = l.driverid
         AND LOWER(TRIM(COALESCE(dr.startingpoint, ''))) = LOWER(TRIM(COALESCE(l.startingpoint, '')))
         AND LOWER(TRIM(COALESCE(dr.destination, ''))) = LOWER(TRIM(COALESCE(l.destination, '')));
