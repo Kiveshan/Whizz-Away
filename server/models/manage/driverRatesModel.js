@@ -279,13 +279,9 @@ const getDriverRateUsage = async (id) => {
 
     const legsResult = await client.query(
       `
-        SELECT DISTINCT l.m1key, l.driverrate, ct.container_type, e.roleid
+        SELECT DISTINCT l.m1key, l.driverrate
         FROM legs_m2 l
         INNER JOIN m1_controller c ON c.m1key = l.m1key
-        LEFT JOIN container ct
-          ON ct.m1key = l.m1key
-         AND LOWER(TRIM(COALESCE(ct.containernum, ''))) = LOWER(TRIM(COALESCE(l.containernumber, '')))
-        LEFT JOIN m5_employee e ON e.userid = l.driverid
         WHERE LOWER(COALESCE(c.status, '')) = LOWER($2)
           AND LOWER(TRIM(COALESCE(l.startingpoint, ''))) = LOWER(TRIM(COALESCE($3, '')))
           AND LOWER(TRIM(COALESCE(l.destination, ''))) = LOWER(TRIM(COALESCE($4, '')))
@@ -340,58 +336,24 @@ const getDriverRateUsage = async (id) => {
       return Math.abs(numA - numB) < 0.005
     }
 
-    const resolveFieldFromLeg = (containerType, roleId) => {
-      const ct = (containerType || "").toString().trim().toLowerCase()
-      const role = roleId !== null && roleId !== undefined ? Number(roleId) : null
-
-      let sizeSuffix = null
-      if (ct === "6m") sizeSuffix = "six_meter_rate"
-      if (ct === "12m") sizeSuffix = "twelve_meter_rate"
-      if (!sizeSuffix) return null
-
-      if (role === 6) return `subie_${sizeSuffix}`
-      return `driver_${sizeSuffix}`
-    }
-
     for (const row of usageRows) {
       const legRate = row.driverrate
       const instructionNo = row.m1key
       let matched = false
 
-      const resolvedField = resolveFieldFromLeg(row.container_type, row.roleid)
-      if (resolvedField && isMatchingNumber(legRate, rate[resolvedField])) {
-        matched = true
-        const fm = fieldMap.find((f) => f.field === resolvedField)
-        const label = fm ? fm.label : resolvedField
-
-        if (!usedRateFieldsMap.has(resolvedField)) {
-          usedRateFieldsMap.set(resolvedField, {
-            field: resolvedField,
-            label,
-            value: rate[resolvedField],
-            instructions: new Set(),
-          })
-        }
-        if (instructionNo !== null && instructionNo !== undefined) {
-          usedRateFieldsMap.get(resolvedField).instructions.add(instructionNo)
-        }
-      }
-
-      if (!matched) {
-        for (const fm of fieldMap) {
-          if (isMatchingNumber(legRate, rate[fm.field])) {
-            matched = true
-            if (!usedRateFieldsMap.has(fm.field)) {
-              usedRateFieldsMap.set(fm.field, {
-                field: fm.field,
-                label: fm.label,
-                value: rate[fm.field],
-                instructions: new Set(),
-              })
-            }
-            if (instructionNo !== null && instructionNo !== undefined) {
-              usedRateFieldsMap.get(fm.field).instructions.add(instructionNo)
-            }
+      for (const fm of fieldMap) {
+        if (isMatchingNumber(legRate, rate[fm.field])) {
+          matched = true
+          if (!usedRateFieldsMap.has(fm.field)) {
+            usedRateFieldsMap.set(fm.field, {
+              field: fm.field,
+              label: fm.label,
+              value: rate[fm.field],
+              instructions: new Set(),
+            })
+          }
+          if (instructionNo !== null && instructionNo !== undefined) {
+            usedRateFieldsMap.get(fm.field).instructions.add(instructionNo)
           }
         }
       }
