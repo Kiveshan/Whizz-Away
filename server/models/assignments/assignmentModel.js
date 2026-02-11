@@ -721,13 +721,11 @@ export const refreshInstructionLegRates = async (instructionId) => {
       UPDATE public.legs_m2 l
       SET driverrate = CASE
         -- Driver 6m: any non-subbie employee (roleid != 6) and 6m container
-        WHEN e.roleid IS NOT NULL
-         AND e.roleid <> 6
+        WHEN COALESCE(e.roleid, 5) <> 6
          AND LOWER(COALESCE(c.container_type, '')) = '6m'
           THEN dr.driver_six_meter_rate
         -- Driver 12m: any non-subbie employee (roleid != 6) and 12m container
-        WHEN e.roleid IS NOT NULL
-         AND e.roleid <> 6
+        WHEN COALESCE(e.roleid, 5) <> 6
          AND LOWER(COALESCE(c.container_type, '')) = '12m'
           THEN dr.driver_twelve_meter_rate
         -- Subbie 6m: subcontractor (roleid = 6) and 6m container
@@ -744,7 +742,7 @@ export const refreshInstructionLegRates = async (instructionId) => {
       JOIN public.m5_employee e ON TRUE
       JOIN public.m5_driver_rate dr ON TRUE
       WHERE l.m1key = ti.m1key
-        AND LOWER(TRIM(COALESCE(c.containernum, ''))) = LOWER(TRIM(COALESCE(l.containernumber, '')))
+        AND c.containernum = l.containernumber
         AND e.userid = l.driverid
         AND LOWER(TRIM(COALESCE(dr.startingpoint, ''))) = LOWER(TRIM(COALESCE(l.startingpoint, '')))
         AND LOWER(TRIM(COALESCE(dr.destination, ''))) = LOWER(TRIM(COALESCE(l.destination, '')));
