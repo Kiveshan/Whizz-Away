@@ -721,13 +721,11 @@ export const refreshInstructionLegRates = async (instructionId) => {
       UPDATE public.legs_m2 l
       SET driverrate = CASE
         -- Driver 6m: any non-subbie employee (roleid != 6) and 6m container
-        WHEN e.roleid IS NOT NULL
-         AND e.roleid <> 6
+        WHEN COALESCE(e.roleid, 5) <> 6
          AND LOWER(COALESCE(c.container_type, '')) = '6m'
           THEN dr.driver_six_meter_rate
         -- Driver 12m: any non-subbie employee (roleid != 6) and 12m container
-        WHEN e.roleid IS NOT NULL
-         AND e.roleid <> 6
+        WHEN COALESCE(e.roleid, 5) <> 6
          AND LOWER(COALESCE(c.container_type, '')) = '12m'
           THEN dr.driver_twelve_meter_rate
         -- Subbie 6m: subcontractor (roleid = 6) and 6m container
