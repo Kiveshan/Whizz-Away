@@ -5,8 +5,8 @@ import {
   updateDriverRate,
   deleteDriverRate,
   getDriverRateUsage,
+  refreshDriverRateLegsForInstructions,
 } from "../../models/manage/driverRatesModel.js"
-import { refreshInstructionLegRates } from "../../models/assignments/assignmentModel.js"
 
 const getAllDriverRatesHandler = async (req, res) => {
   try {
@@ -48,22 +48,29 @@ const refreshDriverRateLegsHandler = async (req, res) => {
       return res.status(400).json({ error: "Invalid ID format" })
     }
 
-    const usageResult = await getDriverRateUsage(id)
-    if (!usageResult.success) {
-      return res.status(404).json({ message: usageResult.message })
+    let instructions = []
+
+    if (Array.isArray(req.body?.instructions) && req.body.instructions.length > 0) {
+      instructions = [...new Set(req.body.instructions)]
+        .map((v) => Number(v))
+        .filter((v) => Number.isInteger(v) && v > 0)
+    } else {
+      const usageResult = await getDriverRateUsage(id)
+      if (!usageResult.success) {
+        return res.status(404).json({ message: usageResult.message })
+      }
+
+      instructions = Array.isArray(usageResult.data?.instructions) ? usageResult.data.instructions : []
     }
 
-    const { instructions = [] } = usageResult.data || {}
-
-    // Refresh legs for each affected instruction. Each helper call is
-    // internally transactional and only applies to In Progress instructions.
-    for (const instructionId of instructions) {
-      await refreshInstructionLegRates(instructionId)
-    }
+    // Refresh legs for all affected instructions using the specific driver rate id.
+    // This avoids relying on assignmentModel and is deterministic.
+    const refreshResult = await refreshDriverRateLegsForInstructions(Number(id), instructions)
 
     return res.status(200).json({
       success: true,
       instructions,
+      updated: refreshResult?.updated ?? 0,
       message: "Driver rates successfully refreshed for affected instructions",
     })
   } catch (err) {

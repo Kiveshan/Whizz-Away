@@ -277,18 +277,6 @@ const getDriverRateUsage = async (id) => {
     const rate = rateResult.rows[0]
     const statusValue = "In Progress"
 
-    const possibleRates = [
-      rate.driver_six_meter_rate,
-      rate.driver_twelve_meter_rate,
-      rate.subie_six_meter_rate,
-      rate.subie_twelve_meter_rate,
-    ]
-
-    const rateValues = possibleRates
-      .filter((v) => v !== null && v !== undefined && v !== "")
-      .map((v) => Number(v))
-      .filter((v) => !Number.isNaN(v))
-
     const legsResult = await client.query(
       `
         SELECT DISTINCT l.m1key, l.driverrate
@@ -301,11 +289,30 @@ const getDriverRateUsage = async (id) => {
             l.m5ratekey = $1
             OR (
               COALESCE(array_length($5::double precision[], 1), 0) > 0
-              AND l.driverrate = ANY($5::double precision[])
+              AND l.driverrate IS NOT NULL
+              AND EXISTS (
+                SELECT 1
+                FROM unnest($5::double precision[]) AS rv(rate)
+                WHERE abs(l.driverrate - rv.rate) < 0.005
+              )
             )
           )
       `,
-      [id, statusValue, rate.startingpoint, rate.destination, rateValues],
+      [
+        id,
+        statusValue,
+        rate.startingpoint,
+        rate.destination,
+        [
+          rate.driver_six_meter_rate,
+          rate.driver_twelve_meter_rate,
+          rate.subie_six_meter_rate,
+          rate.subie_twelve_meter_rate,
+        ]
+          .filter((v) => v !== null && v !== undefined && v !== "")
+          .map((v) => Number(v))
+          .filter((v) => !Number.isNaN(v)),
+      ],
     )
 
     const usageRows = legsResult.rows || []
@@ -331,13 +338,22 @@ const getDriverRateUsage = async (id) => {
 
     for (const row of usageRows) {
       const legRate = row.driverrate
+      const instructionNo = row.m1key
       let matched = false
 
       for (const fm of fieldMap) {
         if (isMatchingNumber(legRate, rate[fm.field])) {
           matched = true
           if (!usedRateFieldsMap.has(fm.field)) {
-            usedRateFieldsMap.set(fm.field, { field: fm.field, label: fm.label, value: rate[fm.field] })
+            usedRateFieldsMap.set(fm.field, {
+              field: fm.field,
+              label: fm.label,
+              value: rate[fm.field],
+              instructions: new Set(),
+            })
+          }
+          if (instructionNo !== null && instructionNo !== undefined) {
+            usedRateFieldsMap.get(fm.field).instructions.add(instructionNo)
           }
         }
       }
@@ -355,7 +371,12 @@ const getDriverRateUsage = async (id) => {
         startingpoint: rate.startingpoint,
         destination: rate.destination,
         instructions,
-        usedRateFields: Array.from(usedRateFieldsMap.values()),
+        usedRateFields: Array.from(usedRateFieldsMap.values()).map((r) => ({
+          field: r.field,
+          label: r.label,
+          value: r.value,
+          instructions: Array.from(r.instructions.values()),
+        })),
         unmatchedLegRates: Array.from(unmatchedLegRates.values()),
       },
     }
@@ -368,3 +389,56 @@ const getDriverRateUsage = async (id) => {
 }
 
 export { getAllDriverRates, getDriverRateById, createDriverRate, updateDriverRate, deleteDriverRate, getDriverRateUsage }
+
+// Refresh legs_m2.driverrate for a set of instructions using a specific driver rate ID
+// The update respects container_type (6m/12m) and driver role (subbie vs normal)
+// and only applies to instructions that are In Progress.
+export const refreshDriverRateLegsForInstructions = async (rateId, instructionIds) => {
+  if (!Array.isArray(instructionIds) || instructionIds.length === 0) {
+    return { success: true, updated: 0 }
+  }
+  let client
+  try {
+    client = await pool.connect()
+    await client.query('BEGIN')
+
+    const query = `
+      WITH target_instructions AS (
+        SELECT m1key
+        FROM m1_controller
+        WHERE m1key = ANY($2::int[])
+          AND LOWER(COALESCE(status, '')) = 'in progress'
+      )
+      UPDATE public.legs_m2 l
+      SET driverrate = CASE
+        WHEN COALESCE(e.roleid, 5) <> 6 AND LOWER(TRIM(COALESCE(c.container_type, ''))) = '6m'
+          THEN dr.driver_six_meter_rate
+        WHEN COALESCE(e.roleid, 5) <> 6 AND LOWER(TRIM(COALESCE(c.container_type, ''))) = '12m'
+          THEN dr.driver_twelve_meter_rate
+        WHEN e.roleid = 6 AND LOWER(TRIM(COALESCE(c.container_type, ''))) = '6m'
+          THEN dr.subie_six_meter_rate
+        WHEN e.roleid = 6 AND LOWER(TRIM(COALESCE(c.container_type, ''))) = '12m'
+          THEN dr.subie_twelve_meter_rate
+        ELSE l.driverrate
+      END
+      FROM target_instructions ti
+      JOIN public.container c ON c.m1key = ti.m1key
+      LEFT JOIN public.m5_employee e ON TRUE
+      JOIN public.m5_driver_rate dr ON dr.m5ratekey = $1
+      WHERE l.m1key = ti.m1key
+        AND LOWER(TRIM(COALESCE(c.containernum, ''))) = LOWER(TRIM(COALESCE(l.containernumber, '')))
+        AND e.userid = l.driverid
+        AND LOWER(TRIM(COALESCE(dr.startingpoint, ''))) = LOWER(TRIM(COALESCE(l.startingpoint, '')))
+        AND LOWER(TRIM(COALESCE(dr.destination, ''))) = LOWER(TRIM(COALESCE(l.destination, '')))
+    `
+
+    const result = await client.query(query, [Number(rateId), instructionIds.map((v) => Number(v))])
+    await client.query('COMMIT')
+    return { success: true, updated: result.rowCount }
+  } catch (err) {
+    if (client) await client.query('ROLLBACK')
+    throw err
+  } finally {
+    if (client) client.release()
+  }
+}

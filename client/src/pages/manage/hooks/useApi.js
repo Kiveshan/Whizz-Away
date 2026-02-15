@@ -477,13 +477,15 @@ export function useApi(state, actions) {
     async (rateData) => {
       actions.setLoading(true)
       try {
+        let instructionsToRefresh = []
+        let shouldRefreshLegs = false
+
         if (state.editingRateId) {
           try {
             const usageResponse = await api.get(`/api/driver-rates/${state.editingRateId}/usage`)
             const usageData = usageResponse.data
 
             if (usageData?.inUse) {
-              const instructions = Array.isArray(usageData.instructions) ? usageData.instructions : []
               const usedRateFields = Array.isArray(usageData.usedRateFields) ? usageData.usedRateFields : []
 
               const isMatchingNumber = (a, b) => {
@@ -513,28 +515,54 @@ export function useApi(state, actions) {
                 return !isMatchingNumber(newValue, oldValue)
               })
 
-              if (affectedUsedRateFields.length === 0) {
-                // Rate is in use, but the specific used rate value(s) are not being changed.
-                // Continue with save.
-              } else {
-                const rateParts = affectedUsedRateFields.length
-                  ? affectedUsedRateFields
-                      .map((r) => `${r.label}: ${r.value ?? ""}`)
-                      .join("\n")
-                  : ""
+              if (affectedUsedRateFields.length > 0) {
+                shouldRefreshLegs = true
+                instructionsToRefresh = [
+                  ...new Set(
+                    affectedUsedRateFields
+                      .flatMap((rf) => (Array.isArray(rf.instructions) ? rf.instructions : []))
+                      .filter((v) => v !== null && v !== undefined),
+                  ),
+                ]
 
-                const instructionParts = instructions.length ? instructions.join(", ") : ""
+                const escapeHtml = (value) => {
+                  if (value === null || value === undefined) return ""
+                  return String(value)
+                    .replaceAll("&", "&amp;")
+                    .replaceAll("<", "&lt;")
+                    .replaceAll(">", "&gt;")
+                    .replaceAll('"', "&quot;")
+                    .replaceAll("'", "&#039;")
+                }
 
-                const alertText =
-                  `This rate: ${rateParts}${rateParts ? "\n\n" : ""}` +
-                  `is currently being used in Instruction no: ${instructionParts}\n` +
-                  `changing this rate will affect all the instructions that are using this rate.`
+                const formatRateValue = (value) => {
+                  if (value === null || value === undefined || value === "") return "(empty)"
+                  const num = Number(value)
+                  return Number.isNaN(num) ? escapeHtml(value) : escapeHtml(num)
+                }
 
-                const confirmed = await showConfirmDialog(
-                  "Warning",
-                  alertText,
-                  "Continue"
-                )
+                const htmlLines = affectedUsedRateFields
+                  .map((rf) => {
+                    const newValue = rateData?.[rf.field]
+                    const instrList = Array.isArray(rf.instructions) ? rf.instructions : []
+                    const instrText = instrList.length ? instrList.join(", ") : ""
+
+                    return (
+                      `<div style="margin-bottom:10px;">` +
+                      `<div><strong>${escapeHtml(rf.label)}</strong>: ${formatRateValue(rf.value)} &rarr; ${formatRateValue(newValue)}</div>` +
+                      `<div style="margin-top:4px;"><strong>Instruction no:</strong> ${escapeHtml(instrText)}</div>` +
+                      `</div>`
+                    )
+                  })
+                  .join("")
+
+                const alertHtml =
+                  `<div style="text-align:left;">` +
+                  `<div style="margin-bottom:10px;"><strong>Changing this rate will affect the following instructions:</strong></div>` +
+                  `${htmlLines}` +
+                  `</div>`
+
+                const confirmed = await showConfirmDialog("Warning", alertHtml, "Continue", { html: true })
 
                 if (!confirmed) {
                   return false
@@ -550,11 +578,9 @@ export function useApi(state, actions) {
           startingpoint: rateData.startingpoint,
           destination: rateData.destination,
           driver_six_meter_rate: rateData.driver_six_meter_rate === "" ? null : Number(rateData.driver_six_meter_rate),
-          driver_twelve_meter_rate:
-            rateData.driver_twelve_meter_rate === "" ? null : Number(rateData.driver_twelve_meter_rate),
+          driver_twelve_meter_rate: rateData.driver_twelve_meter_rate === "" ? null : Number(rateData.driver_twelve_meter_rate),
           subie_six_meter_rate: rateData.subie_six_meter_rate === "" ? null : Number(rateData.subie_six_meter_rate),
-          subie_twelve_meter_rate:
-            rateData.subie_twelve_meter_rate === "" ? null : Number(rateData.subie_twelve_meter_rate),
+          subie_twelve_meter_rate: rateData.subie_twelve_meter_rate === "" ? null : Number(rateData.subie_twelve_meter_rate),
         }
 
         const url = state.editingRateId ? `/api/driver-rates/${state.editingRateId}` : "/api/driver-rates"
@@ -564,18 +590,16 @@ export function useApi(state, actions) {
         const response = await api[method](url, cleanedDriverRate)
         console.log("API response:", response.data)
 
-        // After updating an existing rate, refresh legs for any in-progress
-        // instructions that are using this rate. This relies on the backend
-        // to no-op safely when there are no matching instructions.
-        if (state.editingRateId) {
+        if (state.editingRateId && shouldRefreshLegs) {
           try {
-            await api.post(`/api/driver-rates/${state.editingRateId}/refresh-legs`)
+            await api.post(`/api/driver-rates/${state.editingRateId}/refresh-legs`, {
+              instructions: instructionsToRefresh,
+            })
           } catch (refreshErr) {
             console.error("Error refreshing legs after driver rate update:", refreshErr)
           }
         }
 
-        // Refresh current page
         await fetchPaginatedData(
           "driverRates",
           state.pagination.driverRates.currentPage,
