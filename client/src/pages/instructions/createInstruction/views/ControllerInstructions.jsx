@@ -123,6 +123,7 @@ const ControllerInstructions = () => {
   const [isExport, setIsExport] = useState(false)
   const [isWeightBased, setIsWeightBased] = useState(false)
   const [isCrossHaul, setIsCrossHaul] = useState(false)
+  const [isSetRateMode, setIsSetRateMode] = useState(false)
   const today = useMemo(() => new Date().toISOString().split("T")[0], [])
 
   // Form validation state
@@ -480,6 +481,7 @@ const ControllerInstructions = () => {
       abnormalRate: "",
       rateper_breakbulk: "",
       unitrate: "",
+      setRateAmount: "",
       num_six_meters: 0,
       num_twelve_meters: 0,
       num_abnormal: 0,
@@ -590,12 +592,16 @@ const ControllerInstructions = () => {
   useEffect(() => {
     const weightBasedUnits = ["kg", "mÂ³", "ton"]
     const newIsWeightBased = weightBasedUnits.includes(formData.rateWeight)
+    const newIsSetRateMode = formData.rateWeight === "SetRate"
     const newIsCrossHaul = formData.shipmentTypeId === "3" || formData.shipmentTypeId === "4"
     const newIsImport = formData.shipmentTypeId === "1"
     const newIsExport = formData.shipmentTypeId === "2"
 
     if (newIsWeightBased !== isWeightBased) {
       setIsWeightBased(newIsWeightBased)
+    }
+    if (newIsSetRateMode !== isSetRateMode) {
+      setIsSetRateMode(newIsSetRateMode)
     }
     if (newIsCrossHaul !== isCrossHaul) {
       setIsCrossHaul(newIsCrossHaul)
@@ -606,7 +612,7 @@ const ControllerInstructions = () => {
     if (newIsExport !== isExport) {
       setIsExport(newIsExport)
     }
-  }, [formData.rateWeight, formData.shipmentTypeId, isWeightBased, isCrossHaul, isImport, isExport])
+  }, [formData.rateWeight, formData.shipmentTypeId, isWeightBased, isCrossHaul, isImport, isExport, isSetRateMode])
 
   // Ensure add-on shipment type (5) always uses Container as unit per
   useEffect(() => {
@@ -1074,6 +1080,10 @@ const ControllerInstructions = () => {
       if (!formData.unitrate || formData.unitrate === "") {
         errors.unitrate = "Unit rate is required for weight-based calculations"
       }
+    } else if (isSetRateMode) {
+      if (!formData.setRateAmount || formData.setRateAmount === "") {
+        errors.setRateAmount = "Set rate amount is required when unit type is Set Rate"
+      }
     } else if (!isAddOn) {
       // Container-based validations (skip for add-on shipments)
       const totalContainers =
@@ -1098,8 +1108,8 @@ const ControllerInstructions = () => {
 
   // Container validation function
   const validateContainers = useCallback(() => {
-    if (isAddOn || isWeightBased || !showContainerDetails || containers.length === 0) {
-      return true // No validation needed for weight-based or when no containers
+    if (isAddOn || isWeightBased || isSetRateMode || !showContainerDetails || containers.length === 0) {
+      return true // No validation needed for weight-based, set-rate, or when no containers
     }
 
     const errors = {}
@@ -1150,8 +1160,8 @@ const ControllerInstructions = () => {
 
   // Check for rate/count mismatch and generate confirmation message
   const checkRateCountMismatch = useCallback(() => {
-    // Skip mismatch check for weight-based and add-on shipments
-    if (isWeightBased || isAddOn) {
+    // Skip mismatch check for weight-based, set-rate, and add-on shipments
+    if (isWeightBased || isSetRateMode || isAddOn) {
       return { needsConfirmation: false, message: "" }
     }
 
@@ -1233,7 +1243,7 @@ const ControllerInstructions = () => {
       }
 
       // Validate containers if container details are shown
-      if (!isWeightBased && showContainerDetails) {
+      if (!isWeightBased && !isSetRateMode && showContainerDetails) {
         const containerValidationPassed = validateContainers()
         if (!containerValidationPassed) {
           // Scroll to container details section
@@ -1268,7 +1278,7 @@ const ControllerInstructions = () => {
 
       let totalCost = 0
       const costBreakdown = {
-        calculationType: isWeightBased ? "weight-based" : "container-based",
+        calculationType: isWeightBased ? "weight-based" : isSetRateMode ? "set-rate" : "container-based",
         isWeightBased,
         isCrossHaul,
         unitType: formData.rateWeight,
@@ -1277,7 +1287,18 @@ const ControllerInstructions = () => {
 
       const currentWeightRows = weightRowsRef.current || []
 
-      if (isWeightBased && !isAddOn) {
+      if (isSetRateMode && !isAddOn) {
+        const setRateValue = Number.parseFloat(formData.setRateAmount || 0)
+        totalCost = Number.isNaN(setRateValue) ? 0 : setRateValue
+
+        costBreakdown.components = {
+          setRateAmount: setRateValue,
+          setRateCost: totalCost,
+        }
+
+        console.log("SET-RATE CALCULATION:")
+        console.log(`  Set Rate Amount: R${setRateValue.toFixed(2)}`)
+      } else if (isWeightBased && !isAddOn) {
         // Weight-based calculation
         let baseWeight = 0
         if (formData.shipmentTypeId === "4") {
@@ -1934,8 +1955,8 @@ const ControllerInstructions = () => {
               <div
                 className="controller-instructions-container-inputs"
                 style={{
-                  opacity: isWeightBased ? 0.5 : 1,
-                  pointerEvents: isWeightBased ? "none" : "auto",
+                  opacity: isWeightBased || isSetRateMode ? 0.5 : 1,
+                  pointerEvents: isWeightBased || isSetRateMode ? "none" : "auto",
                 }}
               >
                 <div className="controller-instructions-container-input">
@@ -1948,7 +1969,7 @@ const ControllerInstructions = () => {
                       min="0"
                       name="num_six_meters"
                       onChange={(e) => handleContainerCountChange("num_six_meters", e.target.value)}
-                      disabled={isWeightBased}
+                      disabled={isWeightBased || isSetRateMode}
                     />
                     <div style={{ width: "100%", marginLeft: "10px" }}>
                       <input
@@ -2020,7 +2041,7 @@ const ControllerInstructions = () => {
                       min="0"
                       name="num_twelve_meters"
                       onChange={(e) => handleContainerCountChange("num_twelve_meters", e.target.value)}
-                      disabled={isWeightBased}
+                      disabled={isWeightBased || isSetRateMode}
                     />
                     <div style={{ width: "100%", marginLeft: "10px" }}>
                       <input
@@ -2092,7 +2113,7 @@ const ControllerInstructions = () => {
                       min="0"
                       name="num_abnormal"
                       onChange={(e) => handleContainerCountChange("num_abnormal", e.target.value)}
-                      disabled={isWeightBased}
+                      disabled={isWeightBased || isSetRateMode}
                     />
                     <div style={{ width: "100%", marginLeft: "10px" }}>
                       <input
@@ -2235,6 +2256,7 @@ const ControllerInstructions = () => {
                           <>
                             <option value="kg">kg</option>
                             <option value="ton">ton</option>
+                            <option value="SetRate">Set Rate</option>
                           </>
                         ) : (
                           <>
@@ -2245,6 +2267,39 @@ const ControllerInstructions = () => {
                         )}
                       </select>
                     </div>
+                    {isSetRateMode && formData.shipmentTypeId === "4" && (
+                      <div
+                        className="controller-instructions-weight-input-group"
+                        ref={fieldRefs.current.weight}
+                        style={{ display: "flex", alignItems: "center", gap: "4px" }}
+                      >
+                        <div className="controller-instructions-input-wrapper" style={{ width: "100%" }}>
+                          <input
+                            type="text"
+                            className={`controller-instructions-form-input ${fieldErrors.setRateAmount ? "controller-instructions-error-field" : ""}`}
+                            placeholder="Set Rate Amount"
+                            name="setRateAmount"
+                            value={formData.setRateAmount || ""}
+                            onChange={(e) => {
+                              const value = e.target.value
+                              if (value === "" || /^[0-9]*\.?[0-9]*$/.test(value)) {
+                                handleInputChange(e)
+                              }
+                            }}
+                            style={{
+                              width: "100%",
+                              padding: "4px 6px",
+                              border: "1px solid #ced4da",
+                              borderRadius: "4px",
+                              fontSize: "12px",
+                              height: "28px",
+                              lineHeight: "1",
+                            }}
+                          />
+                        </div>
+                        <ErrorTooltip message={fieldErrors.setRateAmount} />
+                      </div>
+                    )}
                     {isWeightBased && formData.shipmentTypeId !== "4" && (
                       <div
                         className="controller-instructions-weight-input-group"

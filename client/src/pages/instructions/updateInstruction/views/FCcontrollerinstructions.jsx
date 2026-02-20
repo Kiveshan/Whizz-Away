@@ -111,6 +111,7 @@ const FCcontrollerinstructions = () => {
   const today = `${todayDate.getFullYear()}-${String(todayDate.getMonth() + 1).padStart(2, '0')}-${String(todayDate.getDate()).padStart(2, '0')}`;  // Fixed timezone handling
   const [weight, setWeight] = useState("");
   const [rateUpdateMessage, setRateUpdateMessage] = useState("");
+  const [isSetRateMode, setIsSetRateMode] = useState(false);
 
   const [weightRows, setWeightRows] = useState([]);
 
@@ -313,6 +314,14 @@ const FCcontrollerinstructions = () => {
       }));
     }
   }, [formData.shipmentTypeId, formData.rateWeight]);
+
+  // Update isSetRateMode when rateWeight changes
+  useEffect(() => {
+    const newIsSetRateMode = formData.rateWeight === "SetRate";
+    if (newIsSetRateMode !== isSetRateMode) {
+      setIsSetRateMode(newIsSetRateMode);
+    }
+  }, [formData.rateWeight, isSetRateMode]);
 
   // State for warning modal
   const [warningModal, setWarningModal] = useState({
@@ -1299,7 +1308,14 @@ const FCcontrollerinstructions = () => {
         numAbnormal > 0 ? Number(formData.rateper_abnormal || 0) : 0;
 
       let baseCost = 0;
-      if (
+      console.log("DEBUG UPDATE isSetRateMode:", isSetRateMode, "formData.rateWeight:", formData.rateWeight, "formData.setRateAmount:", formData.setRateAmount);
+      if (isSetRateMode && !isAddOn) {
+        // Set Rate mode: use setRateAmount as total cost
+        const setRateValue = Number.parseFloat(formData.setRateAmount || 0);
+        baseCost = Number.isNaN(setRateValue) ? 0 : setRateValue;
+        console.log("SET-RATE CALCULATION (UPDATE):");
+        console.log(`  Set Rate Amount: R${setRateValue.toFixed(2)} -> baseCost: ${baseCost}`);
+      } else if (
         (formData.rateWeight === "kg" || formData.rateWeight === "ton") &&
         String(formData.shipmentTypeId) === "4"
       ) {
@@ -1342,7 +1358,11 @@ const FCcontrollerinstructions = () => {
         return total;
       }, 0);
       console.log(`💲 Total cost components - Base: ${baseCost}, Surcharges: ${totalSurchargeAmount}, Hazardous: ${totalHazardousAmount}, VGM: ${totalVgmAmount}`);
-      const totalCost = Number((baseCost + totalSurchargeAmount + totalHazardousAmount + totalVgmAmount).toFixed(2));
+      // In Set Rate mode, total cost is exactly the set rate amount (no surcharges/hazardous/VGM)
+      const totalCost = isSetRateMode
+        ? baseCost
+        : Number((baseCost + totalSurchargeAmount + totalHazardousAmount + totalVgmAmount).toFixed(2));
+      console.log("DEBUG FINAL totalCost before payload:", totalCost, "isSetRateMode:", isSetRateMode);
 
       // Prepare instruction update data with proper field mapping
       const isAddOnType = isAddOn;
@@ -1363,15 +1383,15 @@ const FCcontrollerinstructions = () => {
         status: formData.status,
         vat: formData.vat === 0 ? 0 : formData.vat || 15,
         num_six_meters:
-          formData.rateWeight === "kg" || formData.rateWeight === "ton"
+          formData.rateWeight === "kg" || formData.rateWeight === "ton" || isSetRateMode
             ? 0
             : numSix,
         num_twelve_meters:
-          formData.rateWeight === "kg" || formData.rateWeight === "ton"
+          formData.rateWeight === "kg" || formData.rateWeight === "ton" || isSetRateMode
             ? 0
             : numTwelve,
         num_abnormal:
-          formData.rateWeight === "kg" || formData.rateWeight === "ton"
+          formData.rateWeight === "kg" || formData.rateWeight === "ton" || isSetRateMode
             ? 0
             : numAbnormal,
         num_breakbulk: 0,
@@ -1573,6 +1593,7 @@ const FCcontrollerinstructions = () => {
       console.log("💾 Sending update request to server...");
       console.log("Instruction data:", instructionUpdateData);
       console.log("Container data:", containerData);
+      console.log("DEBUG PAYLOAD total_cost:", instructionUpdateData.total_cost, "isSetRateMode:", isSetRateMode);
 
       // Make the API call
       const response = await api.put(
@@ -2119,6 +2140,7 @@ const FCcontrollerinstructions = () => {
         bookingRef: data.booking_ref || "",
         rateWeight: data.rateweight || "Container",
         weight: data.weight || "",
+        setRateAmount: data.rateweight === "SetRate" ? (data.total_cost != null ? data.total_cost.toString() : "") : "",
         num_six_meters: data.num_six_meters || 0,
         num_twelve_meters: data.num_twelve_meters || 0,
         num_abnormal: data.num_abnormal || 0,
@@ -3604,6 +3626,12 @@ const FCcontrollerinstructions = () => {
       isValid = false;
     }
 
+    // For Set Rate mode, setRateAmount is required
+    if (isSetRateMode && (!formData.setRateAmount || formData.setRateAmount === "")) {
+      errors.setRateAmount = "Set rate amount is required when unit type is Set Rate";
+      isValid = false;
+    }
+
     // For ton or kg, unitRate is required
     if (
       (formData.rateWeight === "ton" || formData.rateWeight === "kg") &&
@@ -4250,7 +4278,7 @@ const FCcontrollerinstructions = () => {
                           name="num_six_meters"
                           onChange={(e) => handleNumericInputChange(e)}
                           disabled={
-                            formData.rateWeight !== "Container" || isReadOnly
+                            formData.rateWeight !== "Container" || isReadOnly || isSetRateMode
                           }
                           style={isReadOnly ? readOnlyStyle : {}}
                         />
@@ -4295,7 +4323,7 @@ const FCcontrollerinstructions = () => {
                           name="num_twelve_meters"
                           onChange={(e) => handleNumericInputChange(e)}
                           disabled={
-                            formData.rateWeight !== "Container" || isReadOnly
+                            formData.rateWeight !== "Container" || isReadOnly || isSetRateMode
                           }
                           style={isReadOnly ? readOnlyStyle : {}}
                         />
@@ -4340,7 +4368,7 @@ const FCcontrollerinstructions = () => {
                           name="num_abnormal"
                           onChange={(e) => handleNumericInputChange(e)}
                           disabled={
-                            formData.rateWeight !== "Container" || isReadOnly
+                            formData.rateWeight !== "Container" || isReadOnly || isSetRateMode
                           }
                           style={isReadOnly ? readOnlyStyle : {}}
                         />
@@ -4570,6 +4598,7 @@ const FCcontrollerinstructions = () => {
                             <>
                               <option value="kg">kg</option>
                               <option value="ton">ton</option>
+                              <option value="SetRate">Set Rate</option>
                             </>
                           )}
                           {/* Show Container option only for Import, Export, and Cross-haul - types 1, 2, 3 */}
@@ -4583,6 +4612,57 @@ const FCcontrollerinstructions = () => {
                       </div>
 
                       {/* Rate per unit and weight textboxes */}
+                      {isSetRateMode && formData.shipmentTypeId === "4" && (
+                        <div
+                          style={{
+                            display: "flex",
+                            gap: "15px",
+                            width: "100%",
+                            alignItems: "center",
+                            flexWrap: "wrap",
+                          }}
+                        >
+                          <div
+                            className="controller-instructions-form-field"
+                            style={{
+                              flex: 1,
+                              minWidth: "150px",
+                              display: "flex",
+                              alignItems: "center",
+                              gap: "8px",
+                              margin: 0,
+                            }}
+                          >
+                            <span
+                              style={{
+                                whiteSpace: "nowrap",
+                                fontSize: "13px",
+                                color: "#333",
+                              }}
+                            >
+                              Amount
+                            </span>
+                            <div
+                              className="controller-instructions-input-wrapper"
+                              ref={fieldRefs.unitRate}
+                              style={{ width: "100px" }}
+                            >
+                              <input
+                                type="text"
+                                className="controller-instructions-form-input"
+                                name="setRateAmount"
+                                value={formData.setRateAmount || ""}
+                                onChange={handleInputChange}
+                                style={{
+                                  ...nonEditableStyle,
+                                  width: "100%",
+                                }}
+                                disabled={isReadOnly}
+                              />
+                            </div>
+                          </div>
+                        </div>
+                      )}
                       {(formData.rateWeight === "kg" ||
                         formData.rateWeight === "m³" ||
                         formData.rateWeight === "ton") && (

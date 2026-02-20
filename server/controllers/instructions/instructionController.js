@@ -26,6 +26,12 @@ const calculateTotalCost = (instructionData, containers = [], weightData = []) =
   
   let baseCost = 0
 
+  // Set Rate mode: use the provided total_cost directly (no surcharges/hazardous/VGM)
+  if (rateWeight === "SetRate") {
+    const setRateValue = Number(instructionData.total_cost || 0)
+    return Number.isNaN(setRateValue) ? 0 : setRateValue
+  }
+
   if (rateWeight === "Container") {
     // Container-based calculation
     const numSix = Number(instructionData.num_six_meters || 0)
