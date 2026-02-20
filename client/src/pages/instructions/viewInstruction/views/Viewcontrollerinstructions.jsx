@@ -967,10 +967,62 @@ const Viewcontrollerinstructions = () => {
                             <option value="m³">m³</option>
                             <option value="ton">ton</option>
                             <option value="Container">Container</option>
+                            <option value="SetRate">Set Rate</option>
                           </select>
                         </div>
 
                         {/* Rate per unit and weight textboxes */}
+                        {formData.rateWeight === "SetRate" && (
+                          <div
+                            style={{
+                              display: "flex",
+                              gap: "15px",
+                              width: "100%",
+                              alignItems: "center",
+                              flexWrap: "wrap",
+                            }}
+                          >
+                            <div
+                              className="controller-instructions-form-field"
+                              style={{
+                                flex: 1,
+                                minWidth: "150px",
+                                display: "flex",
+                                alignItems: "center",
+                                gap: "8px",
+                                margin: 0,
+                              }}
+                            >
+                              <span
+                                style={{
+                                  whiteSpace: "nowrap",
+                                  fontSize: "13px",
+                                  color: "#333",
+                                }}
+                              >
+                                Amount
+                              </span>
+                              <div
+                                className="controller-instructions-input-wrapper"
+                                ref={fieldRefs.unitRate}
+                                style={{ width: "100px" }}
+                              >
+                                <input
+                                  type="text"
+                                  className="controller-instructions-form-input"
+                                  name="setRateAmount"
+                                  value={
+                                    formData.total_cost != null
+                                      ? Number(formData.total_cost).toFixed(2)
+                                      : ""
+                                  }
+                                  readOnly
+                                  style={{ ...nonEditableStyle, width: "100%" }}
+                                />
+                              </div>
+                            </div>
+                          </div>
+                        )}
                         {(formData.rateWeight === "kg" ||
                           formData.rateWeight === "m³" ||
                           formData.rateWeight === "ton") && (

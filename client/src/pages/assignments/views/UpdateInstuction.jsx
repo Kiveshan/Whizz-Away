@@ -363,6 +363,7 @@ const [weightUnit, setWeightUnit] = useState('kg');
   const [savedLegs, setSavedLegs] = useState(new Set());
   // Guard for leg switching to avoid stale updates
   const legSwitchIdRef = useRef(0);
+  const currentLegIndexRef = useRef(null);
 
   // Add these state variables after the other state declarations
   const [rates, setRates] = useState({
@@ -371,6 +372,7 @@ const [weightUnit, setWeightUnit] = useState('kg');
     subbie_six_meter: 0,
     subbie_twelve_meter: 0,
   });
+  const ratesRouteKeyRef = useRef(null);
   const checkIfWeightBased = async () => {
   if (!instructionId) return;
   
@@ -400,6 +402,7 @@ const [weightUnit, setWeightUnit] = useState('kg');
   const refreshLegData = async () => {
     if (instructionId) {
       try {
+        const requestId = legSwitchIdRef.current;
         console.log("Refreshing leg data for instruction:", instructionId);
 
         const response = await api.get(`/legs/${instructionId}`, {
@@ -452,26 +455,27 @@ const [weightUnit, setWeightUnit] = useState('kg');
           setSavedLegs(savedLegIndexes);
           console.log("Updated savedLegs:", Array.from(savedLegIndexes));
 
-          if (
-            currentLagIndex !== null &&
-            currentLagIndex < fetchedLegs.length
-          ) {
-            const currentLeg = fetchedLegs[currentLagIndex];
-            setFormData({
-              startingPoint: currentLeg.startingPoint || "",
-              driverRate: currentLeg.driverRate || "",
-              destination: currentLeg.destination || "",
-            });
+          const activeIndex = currentLegIndexRef.current;
+          if (activeIndex !== null && activeIndex !== undefined && activeIndex < fetchedLegs.length) {
+            const currentLeg = fetchedLegs[activeIndex];
 
-            if (currentLeg.drivers && currentLeg.drivers.length > 0) {
-              console.log(
-                "Setting drivers for refreshed leg:",
-                currentLeg.drivers
-              );
-              setDrivers(currentLeg.drivers);
-              debugDriverData(currentLeg.drivers);
-            } else {
-              setDrivers([]);
+            if (legSwitchIdRef.current === requestId && currentLegIndexRef.current === activeIndex) {
+              setFormData({
+                startingPoint: currentLeg.startingPoint || "",
+                driverRate: currentLeg.driverRate || "",
+                destination: currentLeg.destination || "",
+              });
+
+              if (currentLeg.drivers && currentLeg.drivers.length > 0) {
+                console.log(
+                  "Setting drivers for refreshed leg:",
+                  currentLeg.drivers
+                );
+                setDrivers(currentLeg.drivers);
+                debugDriverData(currentLeg.drivers);
+              } else {
+                setDrivers([]);
+              }
             }
           }
 
@@ -606,6 +610,7 @@ useEffect(() => {
           const rateData = rateResponse.data;
           console.log("Fetched rates:", rateData);
 
+          ratesRouteKeyRef.current = `${data[0].startingpoint}-${data[0].destination}`;
           setRates({
             six_meter: rateData.driver_six_meter_rate || 0,
             twelve_meter: rateData.driver_twelve_meter_rate || 0,
@@ -937,38 +942,31 @@ const fetchContainersForInstruction = async (instructionId) => {
     try {
       setRateError("");
 
-      setRates({
-        six_meter: 0,
-        twelve_meter: 0,
-        subbie_six_meter: 0,
-        subbie_twelve_meter: 0,
-      });
-
       if (noRatesRoutes.has(routeKey)) {
         console.log(
           `Route ${routeKey} is known to have no rates, skipping fetch`
         );
         // Only apply if still on same leg and request
-        if (legSwitchIdRef.current === requestId && currentLagIndex === targetLegIndex) {
+        if (legSwitchIdRef.current === requestId && currentLegIndexRef.current === targetLegIndex) {
           setFormData((prev) => ({
             ...prev,
             driverRate: "0",
           }));
-          if (drivers.length > 0) {
-            const updatedDrivers = drivers.map((driver) => ({
+          setDrivers((prevDrivers) => {
+            if (!Array.isArray(prevDrivers) || prevDrivers.length === 0) return prevDrivers;
+            return prevDrivers.map((driver) => ({
               ...driver,
               driverRate: "0",
               isAbnormal:
                 driver.container_type === "abnormal" || driver.isAbnormal,
             }));
-            setDrivers(updatedDrivers);
-          }
+          });
         }
         // Update legs state for current leg
-        if (currentLagIndex !== null && legSwitchIdRef.current === requestId && currentLagIndex === targetLegIndex) {
+        if (targetLegIndex !== null && targetLegIndex !== undefined && legSwitchIdRef.current === requestId && currentLegIndexRef.current === targetLegIndex) {
           const updatedLegs = [...legs];
-          updatedLegs[currentLagIndex] = {
-            ...updatedLegs[currentLagIndex],
+          updatedLegs[targetLegIndex] = {
+            ...updatedLegs[targetLegIndex],
             driverRate: "0",
           };
           setLegs(updatedLegs);
@@ -1000,26 +998,26 @@ const fetchContainersForInstruction = async (instructionId) => {
         });
         console.log(`Added route ${routeKey} to noRatesRoutes set`);
         // Only apply if still on same leg and request
-        if (legSwitchIdRef.current === requestId && currentLagIndex === targetLegIndex) {
+        if (legSwitchIdRef.current === requestId && currentLegIndexRef.current === targetLegIndex) {
           setFormData((prev) => ({
             ...prev,
             driverRate: "0",
           }));
-          if (drivers.length > 0) {
-            const updatedDrivers = drivers.map((driver) => ({
+          setDrivers((prevDrivers) => {
+            if (!Array.isArray(prevDrivers) || prevDrivers.length === 0) return prevDrivers;
+            return prevDrivers.map((driver) => ({
               ...driver,
               driverRate: "0",
               isAbnormal:
                 driver.container_type === "abnormal" || driver.isAbnormal,
             }));
-            setDrivers(updatedDrivers);
-          }
+          });
         }
         // Update legs state for current leg
-        if (currentLagIndex !== null && legSwitchIdRef.current === requestId && currentLagIndex === targetLegIndex) {
+        if (targetLegIndex !== null && targetLegIndex !== undefined && legSwitchIdRef.current === requestId && currentLegIndexRef.current === targetLegIndex) {
           const updatedLegs = [...legs];
-          updatedLegs[currentLagIndex] = {
-            ...updatedLegs[currentLagIndex],
+          updatedLegs[targetLegIndex] = {
+            ...updatedLegs[targetLegIndex],
             driverRate: "0",
           };
           setLegs(updatedLegs);
@@ -1044,10 +1042,11 @@ const fetchContainersForInstruction = async (instructionId) => {
       };
 
       console.log("Setting new rates:", newRates);
+      ratesRouteKeyRef.current = routeKey;
       setRates(newRates);
 
       // Only apply if still on same leg and request
-      if (legSwitchIdRef.current === requestId && currentLagIndex === targetLegIndex) {
+      if (legSwitchIdRef.current === requestId && currentLegIndexRef.current === targetLegIndex && ratesRouteKeyRef.current === routeKey) {
         setFormData((prev) => ({
           ...prev,
           driverRate:
@@ -1056,51 +1055,53 @@ const fetchContainersForInstruction = async (instructionId) => {
               : "0",
         }));
         // Only update driver rates with meter rates if instruction is not completed
-        if (drivers.length > 0 && !isCompleted) {
-          const updatedDrivers = drivers.map((driver) => {
-            const newDriver = { ...driver };
+        if (!isCompleted) {
+          setDrivers((prevDrivers) => {
+            if (!Array.isArray(prevDrivers) || prevDrivers.length === 0) return prevDrivers;
 
-            // Check if driver is a subcontractor (roleid = 6)
-            const isSubcontractor =
-              employeeDrivers.find((d) => d.userid.toString() === driver.driverid)
-                ?.roleid === 6;
+            return prevDrivers.map((driver) => {
+              const newDriver = { ...driver };
 
-            if (newDriver.container_type === "12m") {
-              newDriver.driverRate = isSubcontractor
-                ? data.subie_twelve_meter_rate
-                  ? data.subie_twelve_meter_rate.toString()
-                  : "0"
-                : data.driver_twelve_meter_rate
-                ? data.driver_twelve_meter_rate.toString()
-                : "0";
-            } else if (newDriver.container_type === "abnormal") {
-              // For abnormal container types, keep existing rate or set to 0
-              if (!newDriver.driverRate) {
-                newDriver.driverRate = "0";
+              // Check if driver is a subcontractor (roleid = 6)
+              const isSubcontractor =
+                employeeDrivers.find((d) => d.userid.toString() === driver.driverid)
+                  ?.roleid === 6;
+
+              if (newDriver.container_type === "12m") {
+                newDriver.driverRate = isSubcontractor
+                  ? data.subie_twelve_meter_rate
+                    ? data.subie_twelve_meter_rate.toString()
+                    : "0"
+                  : data.driver_twelve_meter_rate
+                  ? data.driver_twelve_meter_rate.toString()
+                  : "0";
+              } else if (newDriver.container_type === "abnormal") {
+                // For abnormal container types, keep existing rate or set to 0
+                if (!newDriver.driverRate) {
+                  newDriver.driverRate = "0";
+                }
+                newDriver.isAbnormal = true; // Mark as abnormal to allow editing
+              } else {
+                newDriver.driverRate = isSubcontractor
+                  ? data.subie_six_meter_rate
+                    ? data.subie_six_meter_rate.toString()
+                    : "0"
+                  : data.driver_six_meter_rate
+                  ? data.driver_six_meter_rate.toString()
+                  : "0";
               }
-              newDriver.isAbnormal = true; // Mark as abnormal to allow editing
-            } else {
-              newDriver.driverRate = isSubcontractor
-                ? data.subie_six_meter_rate
-                  ? data.subie_six_meter_rate.toString()
-                  : "0"
-                : data.driver_six_meter_rate
-                ? data.driver_six_meter_rate.toString()
-                : "0";
-            }
 
-            return newDriver;
+              return newDriver;
+            });
           });
-
-          setDrivers(updatedDrivers);
         }
       }
 
       // Update legs state for current leg
-      if (currentLagIndex !== null && legSwitchIdRef.current === requestId && currentLagIndex === targetLegIndex) {
+      if (targetLegIndex !== null && targetLegIndex !== undefined && legSwitchIdRef.current === requestId && currentLegIndexRef.current === targetLegIndex) {
         const updatedLegs = [...legs];
-        updatedLegs[currentLagIndex] = {
-          ...updatedLegs[currentLagIndex],
+        updatedLegs[targetLegIndex] = {
+          ...updatedLegs[targetLegIndex],
           driverRate: data.driver_rate ? data.driver_rate.toString() : "0",
         };
         setLegs(updatedLegs);
@@ -1122,27 +1123,28 @@ const fetchContainersForInstruction = async (instructionId) => {
       });
 
       // Only apply if still on same leg and request
-      if (legSwitchIdRef.current === requestId && currentLagIndex === targetLegIndex) {
+      if (legSwitchIdRef.current === requestId && currentLegIndexRef.current === targetLegIndex) {
+        ratesRouteKeyRef.current = routeKey;
         setFormData((prev) => ({
           ...prev,
           driverRate: "0",
         }));
-        if (drivers.length > 0) {
-          const updatedDrivers = drivers.map((driver) => ({
+        setDrivers((prevDrivers) => {
+          if (!Array.isArray(prevDrivers) || prevDrivers.length === 0) return prevDrivers;
+          return prevDrivers.map((driver) => ({
             ...driver,
             driverRate: "0",
             isAbnormal:
               driver.container_type === "abnormal" || driver.isAbnormal,
           }));
-          setDrivers(updatedDrivers);
-        }
+        });
       }
 
       // Update legs state for current leg
-      if (currentLagIndex !== null && legSwitchIdRef.current === requestId && currentLagIndex === targetLegIndex) {
+      if (targetLegIndex !== null && targetLegIndex !== undefined && legSwitchIdRef.current === requestId && currentLegIndexRef.current === targetLegIndex) {
         const updatedLegs = [...legs];
-        updatedLegs[currentLagIndex] = {
-          ...updatedLegs[currentLagIndex],
+        updatedLegs[targetLegIndex] = {
+          ...updatedLegs[targetLegIndex],
           driverRate: "0",
         };
         setLegs(updatedLegs);
@@ -1291,6 +1293,7 @@ const handleSelectLeg = (index) => {
   // Increment switch token and set the current leg index
   legSwitchIdRef.current += 1;
   const requestId = legSwitchIdRef.current;
+  currentLegIndexRef.current = index;
   setCurrentLagIndex(index);
 
   // Get the selected leg data
@@ -1302,6 +1305,9 @@ const handleSelectLeg = (index) => {
     driverRate: selectedLeg.driverRate || "",
     destination: selectedLeg.destination || "",
   });
+
+  // Prevent the rates->drivers effect from applying stale rates from the previously-selected leg
+  ratesRouteKeyRef.current = null;
 
   // Clear then immediately set drivers from selected leg using deep clone
   setDrivers([]);
@@ -2394,52 +2400,6 @@ const missingItems = await checkContainersReachDropoff(dropoff);
 }, [instructionId, legs, instructionContainers, isWeightBased]);
 
   useEffect(() => {
-    // Only update if we have drivers and rates, and instruction is not completed
-    if (
-      !isCompleted &&
-      drivers.length > 0 &&
-      (rates.six_meter !== undefined || rates.twelve_meter !== undefined)
-    ) {
-      console.log("Rates changed, updating driver rates:", rates);
-
-      const updatedDrivers = [...drivers];
-      let ratesUpdated = false;
-
-      updatedDrivers.forEach((driver) => {
-        if (driver.container_type === "12m") {
-          const newRate = rates.twelve_meter
-            ? rates.twelve_meter.toString()
-            : "0";
-          if (driver.driverRate !== newRate) {
-            driver.driverRate = newRate;
-            ratesUpdated = true;
-          }
-        } else if (driver.container_type === "abnormal") {
-          // For abnormal container types, keep existing rate or set to 0
-          if (!driver.driverRate) {
-            driver.driverRate = "0";
-            ratesUpdated = true;
-          }
-          driver.isAbnormal = true; // Mark as abnormal to allow editing
-        } else {
-          const newRate = rates.six_meter ? rates.six_meter.toString() : "0";
-          if (driver.driverRate !== newRate) {
-            driver.driverRate = newRate;
-            ratesUpdated = true;
-          }
-        }
-      });
-
-      if (ratesUpdated) {
-        console.log("Updated driver rates based on new rates:", updatedDrivers);
-        setDrivers(updatedDrivers);
-      }
-    }
-  }, [rates, isCompleted]);
-
-  // Add this useEffect to ensure driver rates are properly updated when rates change
-  // Replace the existing useEffect for rates with this one
-  useEffect(() => {
   // Set switching flag when leg changes
   setIsLegSwitching(true);
   const timer = setTimeout(() => {
@@ -2453,6 +2413,14 @@ const missingItems = await checkContainersReachDropoff(dropoff);
 useEffect(() => {
   // Don't update rates if we're currently switching legs or if instruction is completed
   if (isLegSwitching || drivers.length === 0 || isCompleted) {
+    return;
+  }
+
+  // Avoid applying stale rates from a different leg/route (prevents flicker on leg switches)
+  const currentRouteKey = formData.startingPoint && formData.destination
+    ? `${formData.startingPoint}-${formData.destination}`
+    : null;
+  if (!currentRouteKey || ratesRouteKeyRef.current !== currentRouteKey) {
     return;
   }
 
