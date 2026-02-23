@@ -17,6 +17,7 @@ import {
   deleteInstruction,
   checkContainerHasLegs,
   deleteContainerAndLegs,
+  getClientSetRate,
 } from "../../models/instructions/instructionModel.js"
 
 // Helper function to calculate total cost based on rate weight type
@@ -27,7 +28,7 @@ const calculateTotalCost = (instructionData, containers = [], weightData = []) =
   let baseCost = 0
 
   // Set Rate mode: use the provided total_cost directly (no surcharges/hazardous/VGM)
-  if (rateWeight === "SetRate") {
+  if (instructionData.is_set_rate) {
     const setRateValue = Number(instructionData.total_cost || 0)
     return Number.isNaN(setRateValue) ? 0 : setRateValue
   }
@@ -97,6 +98,22 @@ const calculateTotalCost = (instructionData, containers = [], weightData = []) =
 
   const totalCost = baseCost + totalSurchargeAmount + totalHazardousAmount + totalVgmAmount
   return Number(totalCost.toFixed(2))
+}
+
+// Handler functions
+export const getClientSetRateHandler = async (req, res) => {
+  try {
+    const { clientId, shipmentTypeId } = req.params
+
+    console.log(`[${new Date().toISOString()}] getClientSetRateHandler: Request for client ${clientId}, shipment type ${shipmentTypeId}`)
+
+    const result = await getClientSetRate(clientId, shipmentTypeId)
+
+    res.status(200).json(result)
+  } catch (error) {
+    console.error(`[${new Date().toISOString()}] getClientSetRateHandler: Error:`, error)
+    res.status(500).json({ error: "Failed to fetch client set rate" })
+  }
 }
 
 export const getShipmentTypesHandler = async (req, res) => {
