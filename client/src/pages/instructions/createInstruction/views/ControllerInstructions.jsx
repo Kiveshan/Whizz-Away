@@ -2237,110 +2237,66 @@ const ControllerInstructions = () => {
                       flexShrink: 0,
                     }}
                   >
-                    <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
-                      <span style={{ whiteSpace: "nowrap", fontSize: "13px", color: "#333" }}>Unit per:</span>
-                      {formData.shipmentTypeId === "4" && (
-                        <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
-                          <label style={{ display: "inline-flex", alignItems: "center", gap: "6px", fontSize: "13px" }}>
-                            <input
-                              type="checkbox"
-                              checked={isSetRate}
-                              onChange={(e) => {
-                                const nextChecked = e.target.checked
-                                setIsSetRate(nextChecked)
-                                if (nextChecked) {
-                                  setFormData((prev) => ({ ...prev, unitrate: "" }))
-                                  setFieldErrors((prev) => {
-                                    if (!prev.unitrate) return prev
-                                    const next = { ...prev }
-                                    delete next.unitrate
-                                    return next
-                                  })
-                                }
-                              }}
-                            />
-                            Set Rate
-                          </label>
-                          {isSetRate && (
-                            <div className="controller-instructions-input-wrapper" style={{ width: "140px" }}>
-                              <input
-                                type="text"
-                                className="controller-instructions-form-input"
-                                value={Number.isFinite(Number(setRateValue)) ? String(setRateValue) : ""}
-                                readOnly
-                                disabled
-                                style={{
-                                  width: "100%",
-                                  padding: "4px 6px",
-                                  border: "1px solid #ced4da",
-                                  borderRadius: "4px",
-                                  fontSize: "12px",
-                                  height: "28px",
-                                  lineHeight: "1",
-                                  backgroundColor: "#e9ecef",
-                                  cursor: "not-allowed",
-                                }}
-                              />
-                            </div>
-                          )}
+                    <div style={{ display: "flex", flexDirection: "column" }}>
+                      <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                        <span style={{ whiteSpace: "nowrap", fontSize: "13px", color: "#333" }}>Unit per:</span>
+                        <div className="controller-instructions-select-wrapper" style={{ width: "100px" }}>
+                          <select
+                            className="controller-instructions-dropdown"
+                            name="rateWeight"
+                            value={String(formData.rateWeight || "Container")}
+                            onChange={handleInputChange}
+                            disabled={
+                              formData.shipmentTypeId === "1" ||
+                              formData.shipmentTypeId === "2" ||
+                              formData.shipmentTypeId === "3" ||
+                              formData.shipmentTypeId === "5"
+                            }
+                            style={{
+                              width: "100%",
+                              padding: "6px 8px",
+                              border: "1px solid #ced4da",
+                              borderRadius: "4px",
+                              fontSize: "13px",
+                              backgroundColor:
+                                formData.shipmentTypeId === "1" ||
+                                formData.shipmentTypeId === "2" ||
+                                formData.shipmentTypeId === "3" ||
+                                formData.shipmentTypeId === "4" ||
+                                formData.shipmentTypeId === "5"
+                                  ? "#e9ecef"
+                                  : "#fff",
+                              height: "32px",
+                              lineHeight: "1",
+                              cursor:
+                                formData.shipmentTypeId === "1" ||
+                                formData.shipmentTypeId === "2" ||
+                                formData.shipmentTypeId === "3" ||
+                                formData.shipmentTypeId === "5"
+                                  ? "not-allowed"
+                                  : "pointer",
+                            }}
+                          >
+                            {formData.shipmentTypeId === "1" ||
+                            formData.shipmentTypeId === "2" ||
+                            formData.shipmentTypeId === "3" ||
+                            formData.shipmentTypeId === "5" ? (
+                              <option value="Container">Container</option>
+                            ) : formData.shipmentTypeId === "4" ? (
+                              <>
+                                <option value="kg">kg</option>
+                                <option value="ton">ton</option>
+                              </>
+                            ) : (
+                              <>
+                                <option value="kg">kg</option>
+                                <option value="ton">ton</option>
+                                <option value="Container">Container</option>
+                              </>
+                            )}
+                          </select>
                         </div>
-                      )}
-                    </div>
-                    <div className="controller-instructions-select-wrapper" style={{ width: "100px" }}>
-                      <select
-                        className="controller-instructions-dropdown"
-                        name="rateWeight"
-                        value={String(formData.rateWeight || "Container")}
-                        onChange={handleInputChange}
-                        disabled={
-                          formData.shipmentTypeId === "1" ||
-                          formData.shipmentTypeId === "2" ||
-                          formData.shipmentTypeId === "3" ||
-                          formData.shipmentTypeId === "5"
-                        }
-                        style={{
-                          width: "100%",
-                          padding: "6px 8px",
-                          border: "1px solid #ced4da",
-                          borderRadius: "4px",
-                          fontSize: "13px",
-                          backgroundColor:
-                            formData.shipmentTypeId === "1" ||
-                            formData.shipmentTypeId === "2" ||
-                            formData.shipmentTypeId === "3" ||
-                            formData.shipmentTypeId === "4" ||
-                            formData.shipmentTypeId === "5"
-                              ? "#e9ecef"
-                              : "#fff",
-                          height: "32px",
-                          lineHeight: "1",
-                          cursor:
-                            formData.shipmentTypeId === "1" ||
-                            formData.shipmentTypeId === "2" ||
-                            formData.shipmentTypeId === "3" ||
-                            formData.shipmentTypeId === "5"
-                              ? "not-allowed"
-                              : "pointer",
-                        }}
-                      >
-                        {formData.shipmentTypeId === "1" ||
-                        formData.shipmentTypeId === "2" ||
-                        formData.shipmentTypeId === "3" ||
-                        formData.shipmentTypeId === "5" ? (
-                          <option value="Container">Container</option>
-                        ) : formData.shipmentTypeId === "4" ? (
-                          <>
-                            <option value="kg">kg</option>
-                            <option value="ton">ton</option>
-                          </>
-                        ) : (
-                          <>
-                            <option value="kg">kg</option>
-                            <option value="ton">ton</option>
-                            <option value="Container">Container</option>
-                          </>
-                        )}
-                      </select>
+                      </div>
                     </div>
                     {isWeightBased && formData.shipmentTypeId !== "4" && (
                       <div
@@ -2449,6 +2405,55 @@ const ControllerInstructions = () => {
                   </div>
                 </div>
               </div>
+              {/* Set Rate checkbox - positioned below Unit per with spacing */}
+              {formData.shipmentTypeId === "4" && (
+                <div className="controller-instructions-form-row" style={{ margin: "32px 0 0", padding: "0 10px" }}>
+                  <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
+                    <label style={{ display: "inline-flex", alignItems: "center", gap: "6px", fontSize: "13px" }}>
+                      <input
+                        type="checkbox"
+                        checked={isSetRate}
+                        onChange={(e) => {
+                          const nextChecked = e.target.checked
+                          setIsSetRate(nextChecked)
+                          if (nextChecked) {
+                            setFormData((prev) => ({ ...prev, unitrate: "" }))
+                            setFieldErrors((prev) => {
+                              if (!prev.unitrate) return prev
+                              const next = { ...prev }
+                              delete next.unitrate
+                              return next
+                            })
+                          }
+                        }}
+                      />
+                      Set Rate
+                    </label>
+                    {isSetRate && (
+                      <div className="controller-instructions-input-wrapper" style={{ width: "140px" }}>
+                        <input
+                          type="text"
+                          className="controller-instructions-form-input"
+                          value={Number.isFinite(Number(setRateValue)) ? String(setRateValue) : ""}
+                          readOnly
+                          disabled
+                          style={{
+                            width: "100%",
+                            padding: "4px 6px",
+                            border: "1px solid #ced4da",
+                            borderRadius: "4px",
+                            fontSize: "12px",
+                            height: "28px",
+                            lineHeight: "1",
+                            backgroundColor: "#e9ecef",
+                            cursor: "not-allowed",
+                          }}
+                        />
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
             </div>
 
             {/* RIGHT: Booking + dates + VAT/vessel/description */}

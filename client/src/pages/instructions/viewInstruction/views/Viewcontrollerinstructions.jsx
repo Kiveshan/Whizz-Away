@@ -972,26 +972,6 @@ const Viewcontrollerinstructions = () => {
                       className="controller-instructions-form-field"
                     >
                       <label>Unit per</label>
-                      {formData.shipmentTypeId === "4" && (
-                        <div style={{ display: "flex", flexDirection: "column", gap: "6px", marginBottom: "8px" }}>
-                          <label style={{ display: "inline-flex", alignItems: "center", gap: "6px", fontSize: "13px" }}>
-                            <input type="checkbox" checked={isSetRate} disabled={true} />
-                            Set Rate
-                          </label>
-                          {isSetRate && (
-                            <div className="controller-instructions-input-wrapper" style={{ width: "140px" }}>
-                              <input
-                                type="text"
-                                className="controller-instructions-form-input"
-                                value={Number.isFinite(Number(setRateValue)) ? String(setRateValue) : ""}
-                                readOnly
-                                disabled={true}
-                                style={{ ...nonEditableStyle, width: "100%" }}
-                              />
-                            </div>
-                          )}
-                        </div>
-                      )}
                       <div style={{ display: "flex", alignItems: "center", gap: "15px", width: "100%" }}>
                         {/* Unit per dropdown */}
                         <div
@@ -1086,6 +1066,29 @@ const Viewcontrollerinstructions = () => {
                         )}
                       </div>
                     </div>
+                    {/* Set Rate checkbox - positioned below Unit per */}
+                    {formData.shipmentTypeId === "4" && (
+                      <div className="controller-instructions-form-field" style={{ marginTop: "8px" }}>
+                        <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
+                          <label style={{ display: "inline-flex", alignItems: "center", gap: "6px", fontSize: "13px" }}>
+                            <input type="checkbox" checked={isSetRate} disabled={true} />
+                            Set Rate
+                          </label>
+                          {isSetRate && (
+                            <div className="controller-instructions-input-wrapper" style={{ width: "140px" }}>
+                              <input
+                                type="text"
+                                className="controller-instructions-form-input"
+                                value={Number.isFinite(Number(setRateValue)) ? String(setRateValue) : ""}
+                                readOnly
+                                disabled={true}
+                                style={{ ...nonEditableStyle, width: "100%" }}
+                              />
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    )}
                   </div>
 
                   {/* Date Time Group */}
