@@ -1735,6 +1735,13 @@ const compareContainers = (currentContainers, newContainers) => {
           newContainer["Surcharge Amount"] || newContainer.surchargeAmount || 0
         );
 
+        const currentHazardousAmount = Number(
+          currentContainer["Hazardous Amount"] || 0
+        );
+        const newHazardousAmount = Number(
+          newContainer["Hazardous Amount"] || newContainer.hazardousAmount || 0
+        );
+
         // Handle VGM flag and amount
         const currentVgm = Boolean(currentContainer["vgm"]);
         const newVgm = Boolean(newContainer["vgm"] || newContainer.vgm);
@@ -1749,8 +1756,13 @@ const compareContainers = (currentContainers, newContainers) => {
           currentHazardous !== newHazardous ||
           currentAddSurcharges !== newAddSurcharges ||
           currentSurchargeAmount !== newSurchargeAmount ||
+          currentHazardousAmount !== newHazardousAmount ||
           currentVgm !== newVgm ||
-          currentVgmAmount !== newVgmAmount;
+          currentVgmAmount !== newVgmAmount ||
+          // Always update if flags are true to refresh amounts from current rates
+          newHazardous ||
+          newAddSurcharges ||
+          newVgm;
 
         console.log(
           `[${new Date().toISOString()}] [MODEL] Comparing container ${key}:`,
@@ -1779,6 +1791,11 @@ const compareContainers = (currentContainers, newContainers) => {
               current: currentSurchargeAmount,
               new: newSurchargeAmount,
               changed: currentSurchargeAmount !== newSurchargeAmount,
+            },
+            hazardousAmount: {
+              current: currentHazardousAmount,
+              new: newHazardousAmount,
+              changed: currentHazardousAmount !== newHazardousAmount,
             },
             vgm: {
               current: currentVgm,

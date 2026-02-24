@@ -506,7 +506,7 @@ const FCcontrollerinstructions = () => {
   };
 
   // Handle container input change with real-time validation
-  const handleContainerChange = (id, field, value) => {
+  const handleContainerChange = async (id, field, value) => {
     // Handle both camelCase and snake_case for file reference field
     if (field === "file_ref") {
       field = "fileRef"; // Convert to camelCase for consistency
@@ -690,17 +690,44 @@ const FCcontrollerinstructions = () => {
         // Handle hazardous checkbox with rate fetching
         console.log(`☢️ Hazardous checkbox ${value ? 'CHECKED' : 'UNCHECKED'} for container ${id}`);
         if (value) {
-          // Checkbox checked - update state immediately, then fetch hazardous amount
-          console.log(`☢️ Hazardous checkbox CHECKED for container ${id} - updating state and fetching rate`);
-          setContainers((prevContainers) =>
-            prevContainers.map((container) =>
-              container.id === id 
-                ? { ...container, [field]: true }
-                : container
-            )
-          );
-          console.log(`📞 Calling fetchHazardousAmount for container ${id}`);
-          fetchHazardousAmount(id);
+          // Checkbox checked - fetch amount first, then update state
+          console.log(`☢️ Hazardous checkbox CHECKED for container ${id} - fetching rate first`);
+          try {
+            const response = await api.get(
+              `/api/instructions/client/${formData.clientId}/rates`,
+              {
+                params: {
+                  start: formData.pickup,
+                  destination: formData.dropoff
+                }
+              }
+            );
+            const hazardousAmount = response.data.hazardous || 0;
+            console.log(`☣️ Fetched hazardous amount: ${hazardousAmount} for container ${id}`);
+            
+            // Update container with both flag and amount atomically
+            setContainers((prevContainers) =>
+              prevContainers.map((container) =>
+                container.id === id 
+                  ? { ...container, hazardous: true, hazardousAmount: Number(hazardousAmount) }
+                  : container
+              )
+            );
+            console.log(`🔄 Updated container ${id} with hazardous=true and amount=${hazardousAmount}`);
+            
+            // Force immediate recalculation
+            setTimeout(() => recalculateTotalCost(), 0);
+          } catch (error) {
+            console.error('❌ Error fetching hazardous amount:', error);
+            // Fallback: set flag true but amount 0
+            setContainers((prevContainers) =>
+              prevContainers.map((container) =>
+                container.id === id 
+                  ? { ...container, hazardous: true, hazardousAmount: 0 }
+                  : container
+              )
+            );
+          }
         } else {
           // Checkbox unchecked - reset hazardous amount to 0
           console.log(`☢️ Hazardous checkbox UNCHECKED for container ${id} - updating state and resetting amount to 0`);
