@@ -103,11 +103,11 @@ const calculateTotalCost = (instructionData, containers = [], weightData = []) =
 // Handler functions
 export const getClientSetRateHandler = async (req, res) => {
   try {
-    const { clientId, shipmentTypeId } = req.params
+    const { clientId, starting_point, destination } = req.params
 
-    console.log(`[${new Date().toISOString()}] getClientSetRateHandler: Request for client ${clientId}, shipment type ${shipmentTypeId}`)
+    console.log(`[${new Date().toISOString()}] getClientSetRateHandler: Request for client ${clientId}, starting_point ${starting_point}, destination ${destination}`)
 
-    const result = await getClientSetRate(clientId, shipmentTypeId)
+    const result = await getClientSetRate(clientId, starting_point, destination)
 
     res.status(200).json(result)
   } catch (error) {

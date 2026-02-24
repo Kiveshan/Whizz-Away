@@ -112,6 +112,8 @@ const FCcontrollerinstructions = () => {
   const [weight, setWeight] = useState("");
   const [rateUpdateMessage, setRateUpdateMessage] = useState("");
   const [isSetRateMode, setIsSetRateMode] = useState(false);
+  const [isSetRate, setIsSetRate] = useState(false);
+  const [setRateValue, setSetRateValue] = useState(0);
 
   const [weightRows, setWeightRows] = useState([]);
 
@@ -315,13 +317,36 @@ const FCcontrollerinstructions = () => {
     }
   }, [formData.shipmentTypeId, formData.rateWeight]);
 
-  // Update isSetRateMode when rateWeight changes
+  // Fetch set rate value when isSetRate is enabled
   useEffect(() => {
-    const newIsSetRateMode = formData.rateWeight === "SetRate";
-    if (newIsSetRateMode !== isSetRateMode) {
-      setIsSetRateMode(newIsSetRateMode);
+    const fetchSetRate = async () => {
+      if (isSetRate && formData.clientId && formData.shipmentTypeId) {
+        try {
+          const response = await api.get(`/api/instructions/client-set-rate/${formData.clientId}/${formData.shipmentTypeId}`)
+          if (response.data && response.data.set_rate !== undefined) {
+            const numericSetRate = Number(response.data.set_rate)
+            setSetRateValue(numericSetRate)
+            // Keep formData.setRateAmount in sync so save logic can use it
+            setFormData((prev) => ({
+              ...prev,
+              setRateAmount: Number.isNaN(numericSetRate)
+                ? ""
+                : String(numericSetRate),
+            }))
+          }
+        } catch (error) {
+          console.error("Error fetching set_rate:", error)
+          setSetRateValue(0)
+        }
+      }
     }
-  }, [formData.rateWeight, isSetRateMode]);
+    fetchSetRate()
+  }, [isSetRate, formData.clientId, formData.shipmentTypeId])
+
+  // Keep internal "mode" flag in sync with the checkbox
+  useEffect(() => {
+    setIsSetRateMode(isSetRate)
+  }, [isSetRate])
 
   // State for warning modal
   const [warningModal, setWarningModal] = useState({
@@ -1433,6 +1458,7 @@ const FCcontrollerinstructions = () => {
                 ? Number(formData.unitRate)
                 : null
               : null,
+        is_set_rate: isSetRate, // Set rate flag for database
       };
 
       // Prepare container data with containerKey for smart updates
@@ -2140,7 +2166,7 @@ const FCcontrollerinstructions = () => {
         bookingRef: data.booking_ref || "",
         rateWeight: data.rateweight || "Container",
         weight: data.weight || "",
-        setRateAmount: data.rateweight === "SetRate" ? (data.total_cost != null ? data.total_cost.toString() : "") : "",
+        setRateAmount: (data.is_set_rate === true || data.is_set_rate === "true" || data.is_set_rate === 1) ? (data.total_cost != null ? data.total_cost.toString() : "") : "",
         num_six_meters: data.num_six_meters || 0,
         num_twelve_meters: data.num_twelve_meters || 0,
         num_abnormal: data.num_abnormal || 0,
@@ -2166,6 +2192,13 @@ const FCcontrollerinstructions = () => {
       };
 
       setFormData(newFormData);
+
+      // Load is_set_rate from database and set checkbox state
+      if (data.is_set_rate === true || data.is_set_rate === "true" || data.is_set_rate === 1) {
+        setIsSetRate(true);
+      } else {
+        setIsSetRate(false);
+      }
 
       if (String(data.shipment_type) === "4" && Array.isArray(data.weight_rows)) {
         const mappedRows = data.weight_rows.map((row, index) => ({
@@ -4598,7 +4631,6 @@ const FCcontrollerinstructions = () => {
                             <>
                               <option value="kg">kg</option>
                               <option value="ton">ton</option>
-                              <option value="SetRate">Set Rate</option>
                             </>
                           )}
                           {/* Show Container option only for Import, Export, and Cross-haul - types 1, 2, 3 */}
@@ -4612,57 +4644,6 @@ const FCcontrollerinstructions = () => {
                       </div>
 
                       {/* Rate per unit and weight textboxes */}
-                      {isSetRateMode && formData.shipmentTypeId === "4" && (
-                        <div
-                          style={{
-                            display: "flex",
-                            gap: "15px",
-                            width: "100%",
-                            alignItems: "center",
-                            flexWrap: "wrap",
-                          }}
-                        >
-                          <div
-                            className="controller-instructions-form-field"
-                            style={{
-                              flex: 1,
-                              minWidth: "150px",
-                              display: "flex",
-                              alignItems: "center",
-                              gap: "8px",
-                              margin: 0,
-                            }}
-                          >
-                            <span
-                              style={{
-                                whiteSpace: "nowrap",
-                                fontSize: "13px",
-                                color: "#333",
-                              }}
-                            >
-                              Amount
-                            </span>
-                            <div
-                              className="controller-instructions-input-wrapper"
-                              ref={fieldRefs.unitRate}
-                              style={{ width: "100px" }}
-                            >
-                              <input
-                                type="text"
-                                className="controller-instructions-form-input"
-                                name="setRateAmount"
-                                value={formData.setRateAmount || ""}
-                                onChange={handleInputChange}
-                                style={{
-                                  ...nonEditableStyle,
-                                  width: "100%",
-                                }}
-                                disabled={isReadOnly}
-                              />
-                            </div>
-                          </div>
-                        </div>
-                      )}
                       {(formData.rateWeight === "kg" ||
                         formData.rateWeight === "m³" ||
                         formData.rateWeight === "ton") && (
@@ -4771,6 +4752,38 @@ const FCcontrollerinstructions = () => {
                         </>
                       )}
                     </div>
+                    {/* Set Rate checkbox and value - positioned below Unit per for shipment type 4 */}
+                    {formData.shipmentTypeId === "4" && (
+                      <div style={{ display: "flex", flexDirection: "column", gap: "6px", marginTop: "8px" }}>
+                        <label style={{ display: "inline-flex", alignItems: "center", gap: "6px", fontSize: "13px" }}>
+                          <input
+                            type="checkbox"
+                            checked={isSetRate}
+                            onChange={(e) => {
+                              const nextChecked = e.target.checked
+                              setIsSetRate(nextChecked)
+                            }}
+                            disabled={isReadOnly}
+                          />
+                          Set Rate
+                        </label>
+                        {isSetRate && (
+                          <div className="controller-instructions-input-wrapper" style={{ width: "140px" }}>
+                            <input
+                              type="text"
+                              className="controller-instructions-form-input"
+                              value={Number.isFinite(Number(setRateValue)) ? String(setRateValue) : ""}
+                              readOnly
+                              disabled
+                              style={{
+                                ...readOnlyStyle,
+                                width: "100%",
+                              }}
+                            />
+                          </div>
+                        )}
+                      </div>
+                    )}
                   </div>
                 </div>
                 {/* End of main form section */}

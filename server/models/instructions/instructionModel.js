@@ -1518,6 +1518,7 @@ export const getClientRates = async (clientId, start, destination) => {
     SELECT 
       "6m_rate" as "sixMeterRate",
       "12m_rate" as "twelveMeterRate",
+      set_rate as "setRate",
       surcharges,
       hazardous,
       vgm,
@@ -3013,20 +3014,20 @@ export const deleteInstruction = async (instructionId) => {
   }
 };
 
-export const getClientSetRate = async (clientId, shipmentTypeId) => {
+export const getClientSetRate = async (clientId, starting_point, destination) => {
   const sql = `
     SELECT set_rate
     FROM public.m5_client_rate
-    WHERE m5clientkey = $1 AND shipkey = $2
+    WHERE clientid = $1 AND starting_point = $2 AND destination = $3
     ORDER BY client_rate_id DESC
     LIMIT 1
   `;
 
   console.log(`[${new Date().toISOString()}] getClientSetRate: Executing SQL:`, sql);
-  console.log(`[${new Date().toISOString()}] getClientSetRate: With params:`, [clientId, shipmentTypeId]);
+  console.log(`[${new Date().toISOString()}] getClientSetRate: With params:`, [clientId, starting_point, destination]);
 
   try {
-    const result = await query(sql, [clientId, shipmentTypeId]);
+    const result = await query(sql, [clientId, starting_point, destination]);
     const rows = result.recordset || result.rows || [];
 
     console.log(`[${new Date().toISOString()}] getClientSetRate: Query completed, found ${rows.length} rates`);
@@ -3036,7 +3037,7 @@ export const getClientSetRate = async (clientId, shipmentTypeId) => {
       console.log(`[${new Date().toISOString()}] getClientSetRate: Found set_rate: ${setRate}`);
       return { set_rate: setRate };
     } else {
-      console.log(`[${new Date().toISOString()}] getClientSetRate: No set_rate found for client ${clientId}, shipment type ${shipmentTypeId}`);
+      console.log(`[${new Date().toISOString()}] getClientSetRate: No set_rate found for client ${clientId}, starting_point ${starting_point}, destination ${destination}`);
       return { set_rate: null };
     }
   } catch (error) {

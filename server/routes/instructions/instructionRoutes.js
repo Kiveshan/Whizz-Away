@@ -73,6 +73,6 @@ router.get("/client/:clientId/starting-points", getClientStartingPointsHandler)
 router.get("/client/:clientId/destinations/:startingPoint", getClientDestinationsHandler)
 router.get("/client/:clientId/check-rates", checkClientRatesHandler)
 router.get("/client/:clientId/rates", getClientRatesHandler)
-router.get("/client/:clientId/set-rate/:shipmentTypeId", getClientSetRateHandler)
+router.get("/client/:clientId/set-rate/:starting_point/:destination", getClientSetRateHandler)
 
 export default router

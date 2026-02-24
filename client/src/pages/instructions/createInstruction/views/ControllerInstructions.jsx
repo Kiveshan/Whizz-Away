@@ -591,24 +591,6 @@ const ControllerInstructions = () => {
   const allowVgmUI =
     formData.shipmentTypeId !== "4"
 
-  // Fetch set_rate when isSetRate is true
-  useEffect(() => {
-    const fetchSetRate = async () => {
-      if (isSetRate && formData.clientId && formData.shipmentTypeId) {
-        try {
-          const response = await api.get(`/api/instructions/client-set-rate/${formData.clientId}/${formData.shipmentTypeId}`)
-          if (response.data && response.data.set_rate !== undefined) {
-            setSetRateValue(Number(response.data.set_rate))
-          }
-        } catch (error) {
-          console.error("Error fetching set_rate:", error)
-          setSetRateValue(0)
-        }
-      }
-    }
-    fetchSetRate()
-  }, [isSetRate, formData.clientId, formData.shipmentTypeId])
-
   // Update unit type and cross-haul states when form data changes
   useEffect(() => {
     const weightBasedUnits = ["kg", "mÂ³", "ton"]
@@ -696,6 +678,37 @@ const ControllerInstructions = () => {
       return null
     }
   }, [])
+
+  // Fetch set_rate for the current client + route when Set Rate is enabled
+  useEffect(() => {
+    const fetchSetRate = async () => {
+      const { clientId, pickup, dropoff } = formData
+
+      // Only fetch when the checkbox is on and we have a fully selected route
+      if (!isSetRate || !clientId || !pickup || !dropoff) {
+        return
+      }
+
+      try {
+        // Reuse the same client-rate endpoint used for normal rates so that
+        // we respect the selected starting point and destination.
+        const rates = await fetchRates(clientId, pickup, dropoff)
+
+        if (rates && rates.setRate != null) {
+          const numericSetRate = Number(rates.setRate)
+          setSetRateValue(Number.isNaN(numericSetRate) ? 0 : numericSetRate)
+        } else {
+          // No set_rate defined for this route – treat as 0 for now
+          setSetRateValue(0)
+        }
+      } catch (error) {
+        console.error("Error fetching set_rate:", error)
+        setSetRateValue(0)
+      }
+    }
+
+    fetchSetRate()
+  }, [isSetRate, formData.clientId, formData.pickup, formData.dropoff, fetchRates])
 
   // Update rates when pickup or dropoff changes (only for container-based calculations)
   useEffect(() => {
@@ -2405,9 +2418,9 @@ const ControllerInstructions = () => {
                   </div>
                 </div>
               </div>
-              {/* Set Rate checkbox - positioned below Unit per with spacing */}
+              {/* Set Rate checkbox - positioned below Unit per with spacing, completely outside flex row */}
               {formData.shipmentTypeId === "4" && (
-                <div className="controller-instructions-form-row" style={{ margin: "32px 0 0", padding: "0 10px" }}>
+                <div style={{ margin: "24px 10px 0", padding: "0" }}>
                   <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
                     <label style={{ display: "inline-flex", alignItems: "center", gap: "6px", fontSize: "13px" }}>
                       <input
