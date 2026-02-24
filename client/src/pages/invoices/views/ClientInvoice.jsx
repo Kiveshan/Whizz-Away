@@ -484,7 +484,7 @@ const ClientInvoice = forwardRef(({
       // Table for items: weight items when shipment_type_key=4, otherwise containers
       let tableHeaders = [];
       let tableData = [];
-      const isSetRate = finalInvoiceData.rateweight === "SetRate";
+      const isSetRate = finalInvoiceData.is_set_rate === true || finalInvoiceData.rateweight === "SetRate";
       if (isSetRate) {
         // Use weight table structure but without Unit Rate and Price columns
         tableHeaders = [
@@ -866,10 +866,10 @@ const ClientInvoice = forwardRef(({
   }
 
   const isWeightBasedView = Number(finalInvoiceData.shipment_type_key) === 4;
-  const isSetRateView = finalInvoiceData.rateweight === "SetRate";
+  const isSetRateView = finalInvoiceData.is_set_rate === true || finalInvoiceData.rateweight === "SetRate";
   const weightItemsView = finalInvoiceData.weightItems || [];
   const amount = isSetRateView
-    ? (finalInvoiceData.invoice?.amount || finalInvoiceData.total_cost || 0)
+    ? (finalInvoiceData.total_cost || 0)
     : isWeightBasedView
     ? weightItemsView.reduce((sum, wi) => sum + Number(wi.price || 0), 0)
     : (finalInvoiceData.invoice?.amount || finalInvoiceData.total_cost || 0);

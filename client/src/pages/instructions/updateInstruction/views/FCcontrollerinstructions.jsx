@@ -970,15 +970,18 @@ const FCcontrollerinstructions = () => {
     }
 
     // Add weight and unitRate as required fields when rateWeight is ton or kg
+    // Skip unitRate requirement if Set Rate is checked
     if (formData.rateWeight === "ton" || formData.rateWeight === "kg") {
       if (String(formData.shipmentTypeId) !== "4") {
         requiredFields.push(
           { name: "weight", label: `Weight (${formData.rateWeight})` }
         );
       }
-      requiredFields.push(
-        { name: "unitRate", label: `Rate per ${formData.rateWeight}` }
-      );
+      if (!isSetRate) {
+        requiredFields.push(
+          { name: "unitRate", label: `Rate per ${formData.rateWeight}` }
+        );
+      }
     }
 
     requiredFields.forEach((field) => {
@@ -3694,9 +3697,10 @@ const FCcontrollerinstructions = () => {
       isValid = false;
     }
 
-    // For ton or kg, unitRate is required
+    // For ton or kg, unitRate is required (unless Set Rate is checked)
     if (
       (formData.rateWeight === "ton" || formData.rateWeight === "kg") &&
+      !isSetRate &&
       (!formData.unitRate ||
         formData.unitRate === "" ||
         formData.unitRate === "0")
@@ -3799,6 +3803,7 @@ const FCcontrollerinstructions = () => {
     e.preventDefault();
 
     // Special validation for vessel name and stack date for import and export shipment types
+    // Skip vessel name for shipment type 4 (cross-haul break bulk)
     let hasSpecialValidationErrors = false;
     if (formData.shipmentTypeId === "1" || formData.shipmentTypeId === "2") {
       const errors = {};
@@ -3815,6 +3820,19 @@ const FCcontrollerinstructions = () => {
         hasSpecialValidationErrors = true;
       }
 
+      if (hasSpecialValidationErrors) {
+        setFieldErrors((prev) => ({ ...prev, ...errors }));
+        scrollToField(Object.keys(errors)[0]);
+        console.log("Special validation failed:", errors);
+        return;
+      }
+    } else if (formData.shipmentTypeId === "4") {
+      // For shipment type 4 (cross-haul break bulk), only validate stack date
+      const errors = {};
+      if (!formData.stackDate || !formData.stackDate.trim()) {
+        errors.stackDate = "Stack date is required";
+        hasSpecialValidationErrors = true;
+      }
       if (hasSpecialValidationErrors) {
         setFieldErrors((prev) => ({ ...prev, ...errors }));
         scrollToField(Object.keys(errors)[0]);
@@ -5077,41 +5095,43 @@ const FCcontrollerinstructions = () => {
                       </div>
                     )}
                   </div>
-                  <div className="controller-instructions-form-field">
-                    <label>
-                      Vessel Name{" "}
-                      {(formData.shipmentTypeId === "1" ||
-                        formData.shipmentTypeId === "2") && (
-                        <span style={{ color: "red" }}>*</span>
-                      )}
-                    </label>
-                    <div
-                      className="controller-instructions-input-wrapper"
-                      ref={fieldRefs.vesselName}
-                    >
-                      <input
-                        type="text"
-                        className={`controller-instructions-form-input ${
-                          fieldErrors.vesselName
-                            ? "controller-instructions-error-field"
-                            : ""
-                        }`}
-                        placeholder="Enter vessel name"
-                        name="vesselName"
-                        value={formData.vesselName || ""}
-                        onChange={handleInputChange}
-                        disabled={isReadOnly}
-                        style={isReadOnly ? readOnlyStyle : {}}
-                        required={
-                          formData.shipmentTypeId === "1" ||
-                          formData.shipmentTypeId === "2"
-                        }
-                      />
-                      <InstructionErrorTooltip
-                        message={fieldErrors.vesselName}
-                      />
+                  {String(formData.shipmentTypeId) !== "4" && (
+                    <div className="controller-instructions-form-field">
+                      <label>
+                        Vessel Name{" "}
+                        {(formData.shipmentTypeId === "1" ||
+                          formData.shipmentTypeId === "2") && (
+                          <span style={{ color: "red" }}>*</span>
+                        )}
+                      </label>
+                      <div
+                        className="controller-instructions-input-wrapper"
+                        ref={fieldRefs.vesselName}
+                      >
+                        <input
+                          type="text"
+                          className={`controller-instructions-form-input ${
+                            fieldErrors.vesselName
+                              ? "controller-instructions-error-field"
+                              : ""
+                          }`}
+                          placeholder="Enter vessel name"
+                          name="vesselName"
+                          value={formData.vesselName || ""}
+                          onChange={handleInputChange}
+                          disabled={isReadOnly}
+                          style={isReadOnly ? readOnlyStyle : {}}
+                          required={
+                            formData.shipmentTypeId === "1" ||
+                            formData.shipmentTypeId === "2"
+                          }
+                        />
+                        <InstructionErrorTooltip
+                          message={fieldErrors.vesselName}
+                        />
+                      </div>
                     </div>
-                  </div>
+                  )}
                   <div className="controller-instructions-form-field">
                     <label>Description</label>
                     <div
