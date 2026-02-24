@@ -13,6 +13,7 @@ const ClientRatesForm = ({ clientData, loading, onSave, onCancel }) => {
       surcharges: "",
       hazardous: "",
       vgm: "",
+      set_rate: "",
     },
   ])
   const [isFormValid, setIsFormValid] = useState(false)
@@ -31,6 +32,7 @@ const ClientRatesForm = ({ clientData, loading, onSave, onCancel }) => {
             surcharges: rate.surcharges !== null && rate.surcharges !== undefined ? rate.surcharges : "",
             hazardous: rate.hazardous !== null && rate.hazardous !== undefined ? rate.hazardous : "",
             vgm: rate.vgm !== null && rate.vgm !== undefined ? rate.vgm : "",
+            set_rate: rate.set_rate !== null && rate.set_rate !== undefined ? rate.set_rate : "",
           })),
         )
       } else {
@@ -43,6 +45,7 @@ const ClientRatesForm = ({ clientData, loading, onSave, onCancel }) => {
             surcharges: "",
             hazardous: "",
             vgm: "",
+            set_rate: "",
           },
         ])
       }
@@ -87,6 +90,7 @@ const ClientRatesForm = ({ clientData, loading, onSave, onCancel }) => {
         surcharges: "",
         hazardous: "",
         vgm: "",
+        set_rate: "",
       },
     ])
   }
@@ -251,6 +255,20 @@ const ClientRatesForm = ({ clientData, loading, onSave, onCancel }) => {
                         step="0.01"
                         value={rate.vgm}
                         onChange={(e) => handleRateChange(rowIndex * 5 + index, "vgm", e.target.value)}
+                        placeholder="0.00"
+                      />
+                    </div>
+
+                    <div className="manage-form-group">
+                      <label>
+                        <strong>Set Rate (R)</strong>
+                      </label>
+                      <input
+                        type="number"
+                        min="0"
+                        step="0.01"
+                        value={rate.set_rate}
+                        onChange={(e) => handleRateChange(rowIndex * 5 + index, "set_rate", e.target.value)}
                         placeholder="0.00"
                       />
                     </div>
