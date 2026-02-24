@@ -249,6 +249,7 @@ const initialState = {
         surcharges: "",
         hazardous: "",
         vgm: "",
+        set_rate: "",
       },
     ],
   },
