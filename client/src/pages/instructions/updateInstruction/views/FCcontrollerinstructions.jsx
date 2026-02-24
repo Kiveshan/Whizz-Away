@@ -320,9 +320,11 @@ const FCcontrollerinstructions = () => {
   // Fetch set rate value when isSetRate is enabled
   useEffect(() => {
     const fetchSetRate = async () => {
-      if (isSetRate && formData.clientId && formData.shipmentTypeId) {
+      if (isSetRate && formData.clientId && formData.pickup && formData.dropoff) {
         try {
-          const response = await api.get(`/api/instructions/client-set-rate/${formData.clientId}/${formData.shipmentTypeId}`)
+          const encodedPickup = encodeURIComponent(formData.pickup)
+          const encodedDropoff = encodeURIComponent(formData.dropoff)
+          const response = await api.get(`/api/instructions/client/${formData.clientId}/set-rate/${encodedPickup}/${encodedDropoff}`)
           if (response.data && response.data.set_rate !== undefined) {
             const numericSetRate = Number(response.data.set_rate)
             setSetRateValue(numericSetRate)
@@ -341,7 +343,7 @@ const FCcontrollerinstructions = () => {
       }
     }
     fetchSetRate()
-  }, [isSetRate, formData.clientId, formData.shipmentTypeId])
+  }, [isSetRate, formData.clientId, formData.pickup, formData.dropoff])
 
   // Keep internal "mode" flag in sync with the checkbox
   useEffect(() => {
