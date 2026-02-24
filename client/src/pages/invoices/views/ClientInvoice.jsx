@@ -869,7 +869,7 @@ const ClientInvoice = forwardRef(({
   const isSetRateView = finalInvoiceData.is_set_rate === true || finalInvoiceData.rateweight === "SetRate";
   const weightItemsView = finalInvoiceData.weightItems || [];
   const amount = isSetRateView
-    ? (finalInvoiceData.total_cost || 0)
+    ? (finalInvoiceData.invoice?.amount || finalInvoiceData.total_cost || 0)
     : isWeightBasedView
     ? weightItemsView.reduce((sum, wi) => sum + Number(wi.price || 0), 0)
     : (finalInvoiceData.invoice?.amount || finalInvoiceData.total_cost || 0);
