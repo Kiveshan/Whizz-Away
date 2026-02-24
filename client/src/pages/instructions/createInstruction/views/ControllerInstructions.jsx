@@ -1320,11 +1320,24 @@ const ControllerInstructions = () => {
         components: {},
       }
 
+      // Calculate set rate value upfront (used in multiple places)
+      // Use the state variable setRateValue (fetched from API) rather than formData.setRateAmount
+      const calculatedSetRateValue = Number.isFinite(Number(setRateValue)) ? Number(setRateValue) : 0
+
+      console.log("DEBUG VALUES:", {
+        isSetRateMode,
+        isSetRate,
+        isAddOn,
+        shipmentTypeId: formData.shipmentTypeId,
+        rateWeight: formData.rateWeight,
+        setRateValue,
+        calculatedSetRateValue
+      })
+
       const currentWeightRows = weightRowsRef.current || []
 
-      if (isSetRateMode && !isAddOn) {
-        const setRateValue = Number.parseFloat(formData.setRateAmount || 0)
-        totalCost = Number.isNaN(setRateValue) ? 0 : setRateValue
+      if ((isSetRateMode || isSetRate) && !isAddOn) {
+        totalCost = calculatedSetRateValue
 
         costBreakdown.components = {
           setRateAmount: setRateValue,
@@ -1452,8 +1465,9 @@ const ControllerInstructions = () => {
       console.log(`  Total with VAT: R${totalWithVAT.toFixed(2)}`)
 
       // Set the total cost to save (WITHOUT VAT)
-      if (isSetRate) {
-        totalCost = setRateValue
+      // Use set rate value if either isSetRateMode (SetRate unit type) or isSetRate (checkbox) is true
+      if ((isSetRateMode || isSetRate) && !isAddOn) {
+        totalCost = calculatedSetRateValue
         costBreakdown.components.finalTotalSaved = totalCost
         console.log("FINAL COST BREAKDOWN (SET RATE):")
         console.log(`  Set Rate Cost: R${totalCost.toFixed(2)}`)
@@ -1597,6 +1611,15 @@ const ControllerInstructions = () => {
       }
 
       console.log("=== SUBMITTING TO DATABASE ===")
+      console.log("DEBUG FINAL VALUES:", {
+        totalCost,
+        isSetRateMode,
+        isSetRate,
+        isAddOn,
+        isAddOnType,
+        calculatedSetRateValue,
+        setRateValue
+      })
       console.log("Instruction data being saved:", {
         ...instructionData,
         description: instructionData.description ? instructionData.description.substring(0, 50) + "..." : null, // Truncate for logging
@@ -1641,7 +1664,7 @@ const ControllerInstructions = () => {
     } finally {
       setIsSubmitting(false)
     }
-  }, [formData, isWeightBased, isCrossHaul, isImport, containers, weightRows, navigate])
+  }, [formData, isWeightBased, isCrossHaul, isImport, isSetRate, isSetRateMode, isAddOn, setRateValue, containers, weightRows, navigate])
 
   const handleConfirmSubmit = useCallback(async () => {
     setShowConfirmationPopup(false)
