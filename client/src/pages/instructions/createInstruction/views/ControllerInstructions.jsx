@@ -1311,6 +1311,25 @@ const ControllerInstructions = () => {
     try {
       console.log("=== STARTING TOTAL COST CALCULATION ===")
 
+      // Fetch set rate on-the-fly if Set Rate checkbox is checked (prevents race condition)
+      let currentSetRateValue = setRateValue
+      if (isSetRate && formData.clientId && formData.pickup && formData.dropoff) {
+        console.log("[SET RATE] Fetching set rate on-the-fly to avoid race condition...")
+        try {
+          const rates = await fetchRates(formData.clientId, formData.pickup, formData.dropoff)
+          if (rates && rates.setRate != null) {
+            currentSetRateValue = Number(rates.setRate)
+            console.log(`[SET RATE] Fetched fresh value: ${currentSetRateValue}`)
+          } else {
+            currentSetRateValue = 0
+            console.log("[SET RATE] No set rate found for this route")
+          }
+        } catch (err) {
+          console.error("[SET RATE] Error fetching:", err)
+          currentSetRateValue = 0
+        }
+      }
+
       let totalCost = 0
       const costBreakdown = {
         calculationType: isWeightBased ? "weight-based" : isSetRateMode ? "set-rate" : "container-based",
@@ -1320,9 +1339,8 @@ const ControllerInstructions = () => {
         components: {},
       }
 
-      // Calculate set rate value upfront (used in multiple places)
-      // Use the state variable setRateValue (fetched from API) rather than formData.setRateAmount
-      const calculatedSetRateValue = Number.isFinite(Number(setRateValue)) ? Number(setRateValue) : 0
+      // Calculate set rate value using the freshly fetched value
+      const calculatedSetRateValue = Number.isFinite(Number(currentSetRateValue)) ? Number(currentSetRateValue) : 0
 
       console.log("DEBUG VALUES:", {
         isSetRateMode,
@@ -1331,6 +1349,7 @@ const ControllerInstructions = () => {
         shipmentTypeId: formData.shipmentTypeId,
         rateWeight: formData.rateWeight,
         setRateValue,
+        currentSetRateValue,
         calculatedSetRateValue
       })
 
@@ -1618,7 +1637,8 @@ const ControllerInstructions = () => {
         isAddOn,
         isAddOnType,
         calculatedSetRateValue,
-        setRateValue
+        setRateValue,
+        currentSetRateValue
       })
       console.log("Instruction data being saved:", {
         ...instructionData,
@@ -1664,7 +1684,7 @@ const ControllerInstructions = () => {
     } finally {
       setIsSubmitting(false)
     }
-  }, [formData, isWeightBased, isCrossHaul, isImport, isSetRate, isSetRateMode, isAddOn, setRateValue, containers, weightRows, navigate])
+  }, [formData, isWeightBased, isCrossHaul, isImport, isSetRate, isSetRateMode, isAddOn, setRateValue, fetchRates, containers, weightRows, navigate])
 
   const handleConfirmSubmit = useCallback(async () => {
     setShowConfirmationPopup(false)
