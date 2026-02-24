@@ -138,9 +138,11 @@ const Viewcontrollerinstructions = () => {
 
   useEffect(() => {
     const fetchSetRate = async () => {
-      if (isSetRate && formData.clientId && formData.shipmentTypeId) {
+      if (isSetRate && formData.clientId && formData.pickup && formData.dropoff) {
         try {
-          const response = await api.get(`/api/instructions/client-set-rate/${formData.clientId}/${formData.shipmentTypeId}`)
+          const encodedPickup = encodeURIComponent(formData.pickup)
+          const encodedDropoff = encodeURIComponent(formData.dropoff)
+          const response = await api.get(`/api/instructions/client/${formData.clientId}/set-rate/${encodedPickup}/${encodedDropoff}`)
           if (response.data && response.data.set_rate !== undefined) {
             setSetRateValue(Number(response.data.set_rate))
           }
@@ -151,7 +153,7 @@ const Viewcontrollerinstructions = () => {
       }
     }
     fetchSetRate()
-  }, [isSetRate, formData.clientId, formData.shipmentTypeId])
+  }, [isSetRate, formData.clientId, formData.pickup, formData.dropoff])
 
   // Style for non-editable fields - applied to ALL fields
   const nonEditableStyle = {
