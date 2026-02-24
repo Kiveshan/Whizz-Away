@@ -2955,6 +2955,17 @@ const FCcontrollerinstructions = () => {
         // Default unit per to 'ton' for shipment type 4 (Cross-haul break bulk)
         rateWeight: "ton",
       });
+      
+      // Initialize weightRows with a single blank entry for break bulk
+      setWeightRows([
+        {
+          id: 1,
+          ksmDmNo: "",
+          ticketNo: "",
+          receiptBookNo: "",
+          weight: "",
+        },
+      ]);
     }
     // For Import, Export, or Cross-haul (types 1, 2, 3), set rateWeight to 'Container'
     else if (
@@ -2981,9 +2992,11 @@ const FCcontrollerinstructions = () => {
           ? formData.num_twelve_meters
           : 0,
         num_abnormal: isContainerTypeSwitch ? formData.num_abnormal : 0,
+        num_breakbulk: 0, // Always clear break bulk count when switching to container types
         rateper_6: isContainerTypeSwitch ? formData.rateper_6 : 0,
         rateper_12: isContainerTypeSwitch ? formData.rateper_12 : 0,
         rateper_abnormal: isContainerTypeSwitch ? formData.rateper_abnormal : 0,
+        rateper_breakbulk: 0, // Always clear break bulk rate when switching to container types
       });
 
       // Only re-initialize containers if not switching between container types
@@ -2992,7 +3005,11 @@ const FCcontrollerinstructions = () => {
           initializeContainers();
         }, 0);
       }
-      return; // Skip the rest of the function
+      
+      // Reset set rate mode when switching away from break bulk
+      setIsSetRate(false);
+      
+      // Continue processing - don't return early so the state update completes properly
     }
     // For any other shipment type
     else {
