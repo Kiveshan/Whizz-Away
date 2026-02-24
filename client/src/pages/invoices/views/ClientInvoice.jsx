@@ -304,7 +304,7 @@ const ClientInvoice = forwardRef(({
     setPdfLoading(true);
 
     try {
-      const containers = finalInvoiceData.containers || [];
+      const pdfContainers = finalInvoiceData.containers || [];
       const weightItems = finalInvoiceData.weightItems || [];
       const isWeightBased = Number(finalInvoiceData.shipment_type_key) === 4;
       const isCompactLayout = true;
@@ -484,7 +484,24 @@ const ClientInvoice = forwardRef(({
       // Table for items: weight items when shipment_type_key=4, otherwise containers
       let tableHeaders = [];
       let tableData = [];
-      if (isWeightBased) {
+      const isSetRate = finalInvoiceData.rateweight === "SetRate";
+      if (isSetRate) {
+        // Use weight table structure but without Unit Rate and Price columns
+        tableHeaders = [
+          "KSM/DM No",
+          "Ticket No",
+          "Receipt Book No",
+          "Weight",
+        ];
+        tableData = (weightItems && weightItems.length > 0)
+          ? weightItems.map((wi) => [
+              wi.ksm_dm_no || "",
+              wi.ticket_no || "",
+              wi.receipt_book_no || "",
+              (Number(wi.weight || 0)).toFixed(2),
+            ])
+          : [["No weight items", "", "", ""]];
+      } else if (isWeightBased) {
         tableHeaders = [
           "KSM/DM No",
           "Ticket No",
@@ -505,20 +522,20 @@ const ClientInvoice = forwardRef(({
           : [["No weight items", "", "", "", "", ""]];
       } else {
         // Enhanced Container Table with all new columns - Updated for PDF
-        const hasWeights = containers.some(
+        const hasWeights = pdfContainers.some(
           (container) => container.weight && container.weight !== "N/A"
         );
-        const hasSurcharges = containers.some(
+        const hasSurcharges = pdfContainers.some(
           (container) =>
             container.add_surcharges || container.surcharge_amount > 0
         );
-        const hasHazardous = containers.some(
+        const hasHazardous = pdfContainers.some(
           (container) => container.hazardous || container.hazardous_amount > 0
         );
-        const hasVGM = containers.some(
+        const hasVGM = pdfContainers.some(
           (container) => container.vgm || container.vgm_amount > 0
         );
-        const hasTrucks = containers.some(
+        const hasTrucks = pdfContainers.some(
           (container) => container.truckregnumber
         );
         // Determine column visibility
@@ -535,8 +552,8 @@ const ClientInvoice = forwardRef(({
 
         tableHeaders = containerHeaders;
         tableData =
-          containers.length > 0
-            ? containers.map((container, index) => {
+          pdfContainers.length > 0
+            ? pdfContainers.map((container, index) => {
                 const row = [
                   index + 1,
                   container.container_number || "N/A",
@@ -646,7 +663,9 @@ const ClientInvoice = forwardRef(({
       currentY = doc.lastAutoTable.finalY + (isCompactLayout ? 8 : 10);
 
       // Calculate invoice values - FIXED
-      const amount = isWeightBased
+      const amount = isSetRate
+        ? (finalInvoiceData.total_cost || 0)
+        : isWeightBased
         ? (weightItems || []).reduce((sum, wi) => sum + Number(wi.price || 0), 0)
         : (finalInvoiceData.total_cost || 0);
       const vatRate = finalInvoiceData.vat ? (Number(finalInvoiceData.vat) / 100) : 0;
@@ -847,8 +866,11 @@ const ClientInvoice = forwardRef(({
   }
 
   const isWeightBasedView = Number(finalInvoiceData.shipment_type_key) === 4;
+  const isSetRateView = finalInvoiceData.rateweight === "SetRate";
   const weightItemsView = finalInvoiceData.weightItems || [];
-  const amount = isWeightBasedView
+  const amount = isSetRateView
+    ? (finalInvoiceData.invoice?.amount || finalInvoiceData.total_cost || 0)
+    : isWeightBasedView
     ? weightItemsView.reduce((sum, wi) => sum + Number(wi.price || 0), 0)
     : (finalInvoiceData.invoice?.amount || finalInvoiceData.total_cost || 0);
   const vat = calculateVAT(amount);
@@ -981,7 +1003,34 @@ const ClientInvoice = forwardRef(({
 
             {/* Items section: weight items for shipment_type 4, else containers */}
             <div className="container-section">
-              {isWeightBasedView ? (
+              {isSetRateView ? (
+                <table className="container-table5">
+                  <thead>
+                    <tr>
+                      <th>KSM/DM No</th>
+                      <th>Ticket No</th>
+                      <th>Receipt Book No</th>
+                      <th>Weight</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {weightItemsView.length > 0 ? (
+                      weightItemsView.map((wi, idx) => (
+                        <tr key={idx}>
+                          <td>{wi.ksm_dm_no || ''}</td>
+                          <td>{wi.ticket_no || ''}</td>
+                          <td>{wi.receipt_book_no || ''}</td>
+                          <td>{Number(wi.weight || 0).toFixed(2)}</td>
+                        </tr>
+                      ))
+                    ) : (
+                      <tr>
+                        <td colSpan="4">No weight items</td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
+              ) : isWeightBasedView ? (
                 <table className="container-table5">
                   <thead>
                     <tr>

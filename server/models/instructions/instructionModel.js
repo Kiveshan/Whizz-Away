@@ -253,11 +253,11 @@ export const saveInstruction = async ({
         num_six_meters, num_twelve_meters, num_abnormal, num_breakbulk,
         weight, total_cost, booking_ref, vessel_name,
         rateper_6, rateper_12, rateper_abnormal, rateper_breakbulk, unitrate,
-        created_at
+        is_set_rate, created_at
       ) VALUES (
         $1, $2, $3, $4, $5, 
         $6, $7, $8, $9, $10, $11, $12, $13, $14, $15,
-        $16, $17, $18, $19, $20, $21, $22, $23, $24, $25, $26
+        $16, $17, $18, $19, $20, $21, $22, $23, $24, $25, $26, $27
       ) RETURNING m1key
     `;
 
@@ -341,6 +341,9 @@ export const saveInstruction = async ({
       // Debug log for total cost
       _debug_frontend_total_cost: controllerData.total_cost,
 
+      // Set rate flag
+      is_set_rate: Boolean(controllerData.is_set_rate) || false,
+
       // Container counts and rates (already handled for null/0 by frontend)
       num_six_meters: controllerData.num_six_meters || 0,
       num_twelve_meters: controllerData.num_twelve_meters || 0,
@@ -394,6 +397,7 @@ export const saveInstruction = async ({
       rateper_abnormal: fields.rateper_abnormal,
       rateper_breakbulk: fields.rateper_breakbulk,
       unitrate: fields.unitrate,
+      is_set_rate: fields.is_set_rate,
       created_at: formatDate(new Date()),
     });
 
@@ -428,6 +432,7 @@ export const saveInstruction = async ({
       fields.rateper_abnormal, // Will be null if weight-based
       fields.rateper_breakbulk, // Will be null if weight-based or not cross-haul/container
       fields.unitrate, // Will be null if container-based
+      fields.is_set_rate, // Set rate flag
       formatDate(new Date()), // Current date for created_at
     ];
 
@@ -1513,6 +1518,7 @@ export const getClientRates = async (clientId, start, destination) => {
     SELECT 
       "6m_rate" as "sixMeterRate",
       "12m_rate" as "twelveMeterRate",
+      set_rate as "setRate",
       surcharges,
       hazardous,
       vgm,
@@ -2046,6 +2052,11 @@ export const updateFCInstructionAndContainers = async (
         currentInstruction.unitrate,
         "number"
       ),
+      is_set_rate: preserveExistingValue(
+        instructionData.is_set_rate,
+        currentInstruction.is_set_rate,
+        "boolean"
+      ),
     };
 
     // 3. Check if instruction needs updating
@@ -2079,6 +2090,7 @@ export const updateFCInstructionAndContainers = async (
       { field: "rateper_abnormal", type: "number" },
       { field: "rateper_breakbulk", type: "number" },
       { field: "unitrate", type: "number" },
+      { field: "is_set_rate", type: "boolean" },
     ];
 
     for (const { field, type } of fieldsToCheck) {
@@ -2106,8 +2118,8 @@ export const updateFCInstructionAndContainers = async (
           stackdate = $6, "lastFreeDate" = $7, "clientFileRef" = $8, rateweight = $9, description = $10,
           status = $11, vat = $12, num_six_meters = $13, num_twelve_meters = $14, num_abnormal = $15,
           num_breakbulk = $16, weight = $17, total_cost = $18, booking_ref = $19, vessel_name = $20,
-          rateper_6 = $21, rateper_12 = $22, rateper_abnormal = $23, rateper_breakbulk = $24, unitrate = $25
-        WHERE m1key = $26
+          rateper_6 = $21, rateper_12 = $22, rateper_abnormal = $23, rateper_breakbulk = $24, unitrate = $25, is_set_rate = $26
+        WHERE m1key = $27
         RETURNING *
       `;
 
@@ -2138,6 +2150,7 @@ export const updateFCInstructionAndContainers = async (
         updateData.rateper_abnormal,
         updateData.rateper_breakbulk,
         updateData.unitrate,
+        updateData.is_set_rate,
         instructionId,
       ];
 
@@ -3005,5 +3018,37 @@ export const deleteInstruction = async (instructionId) => {
     throw error;
   } finally {
     client.release();
+  }
+};
+
+export const getClientSetRate = async (clientId, starting_point, destination) => {
+  const sql = `
+    SELECT set_rate
+    FROM public.m5_client_rate
+    WHERE clientid = $1 AND starting_point = $2 AND destination = $3
+    ORDER BY client_rate_id DESC
+    LIMIT 1
+  `;
+
+  console.log(`[${new Date().toISOString()}] getClientSetRate: Executing SQL:`, sql);
+  console.log(`[${new Date().toISOString()}] getClientSetRate: With params:`, [clientId, starting_point, destination]);
+
+  try {
+    const result = await query(sql, [clientId, starting_point, destination]);
+    const rows = result.recordset || result.rows || [];
+
+    console.log(`[${new Date().toISOString()}] getClientSetRate: Query completed, found ${rows.length} rates`);
+
+    if (rows.length > 0) {
+      const setRate = rows[0].set_rate;
+      console.log(`[${new Date().toISOString()}] getClientSetRate: Found set_rate: ${setRate}`);
+      return { set_rate: setRate };
+    } else {
+      console.log(`[${new Date().toISOString()}] getClientSetRate: No set_rate found for client ${clientId}, starting_point ${starting_point}, destination ${destination}`);
+      return { set_rate: null };
+    }
+  } catch (error) {
+    console.error(`[${new Date().toISOString()}] getClientSetRate: Error executing query:`, error);
+    throw error;
   }
 };

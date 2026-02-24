@@ -111,6 +111,9 @@ const FCcontrollerinstructions = () => {
   const today = `${todayDate.getFullYear()}-${String(todayDate.getMonth() + 1).padStart(2, '0')}-${String(todayDate.getDate()).padStart(2, '0')}`;  // Fixed timezone handling
   const [weight, setWeight] = useState("");
   const [rateUpdateMessage, setRateUpdateMessage] = useState("");
+  const [isSetRateMode, setIsSetRateMode] = useState(false);
+  const [isSetRate, setIsSetRate] = useState(false);
+  const [setRateValue, setSetRateValue] = useState(0);
 
   const [weightRows, setWeightRows] = useState([]);
 
@@ -313,6 +316,39 @@ const FCcontrollerinstructions = () => {
       }));
     }
   }, [formData.shipmentTypeId, formData.rateWeight]);
+
+  // Fetch set rate value when isSetRate is enabled
+  useEffect(() => {
+    const fetchSetRate = async () => {
+      if (isSetRate && formData.clientId && formData.pickup && formData.dropoff) {
+        try {
+          const encodedPickup = encodeURIComponent(formData.pickup)
+          const encodedDropoff = encodeURIComponent(formData.dropoff)
+          const response = await api.get(`/api/instructions/client/${formData.clientId}/set-rate/${encodedPickup}/${encodedDropoff}`)
+          if (response.data && response.data.set_rate !== undefined) {
+            const numericSetRate = Number(response.data.set_rate)
+            setSetRateValue(numericSetRate)
+            // Keep formData.setRateAmount in sync so save logic can use it
+            setFormData((prev) => ({
+              ...prev,
+              setRateAmount: Number.isNaN(numericSetRate)
+                ? ""
+                : String(numericSetRate),
+            }))
+          }
+        } catch (error) {
+          console.error("Error fetching set_rate:", error)
+          setSetRateValue(0)
+        }
+      }
+    }
+    fetchSetRate()
+  }, [isSetRate, formData.clientId, formData.pickup, formData.dropoff])
+
+  // Keep internal "mode" flag in sync with the checkbox
+  useEffect(() => {
+    setIsSetRateMode(isSetRate)
+  }, [isSetRate])
 
   // State for warning modal
   const [warningModal, setWarningModal] = useState({
@@ -1299,7 +1335,14 @@ const FCcontrollerinstructions = () => {
         numAbnormal > 0 ? Number(formData.rateper_abnormal || 0) : 0;
 
       let baseCost = 0;
-      if (
+      console.log("DEBUG UPDATE isSetRateMode:", isSetRateMode, "formData.rateWeight:", formData.rateWeight, "formData.setRateAmount:", formData.setRateAmount);
+      if (isSetRateMode && !isAddOn) {
+        // Set Rate mode: use setRateAmount as total cost
+        const setRateValue = Number.parseFloat(formData.setRateAmount || 0);
+        baseCost = Number.isNaN(setRateValue) ? 0 : setRateValue;
+        console.log("SET-RATE CALCULATION (UPDATE):");
+        console.log(`  Set Rate Amount: R${setRateValue.toFixed(2)} -> baseCost: ${baseCost}`);
+      } else if (
         (formData.rateWeight === "kg" || formData.rateWeight === "ton") &&
         String(formData.shipmentTypeId) === "4"
       ) {
@@ -1342,7 +1385,11 @@ const FCcontrollerinstructions = () => {
         return total;
       }, 0);
       console.log(`💲 Total cost components - Base: ${baseCost}, Surcharges: ${totalSurchargeAmount}, Hazardous: ${totalHazardousAmount}, VGM: ${totalVgmAmount}`);
-      const totalCost = Number((baseCost + totalSurchargeAmount + totalHazardousAmount + totalVgmAmount).toFixed(2));
+      // In Set Rate mode, total cost is exactly the set rate amount (no surcharges/hazardous/VGM)
+      const totalCost = isSetRateMode
+        ? baseCost
+        : Number((baseCost + totalSurchargeAmount + totalHazardousAmount + totalVgmAmount).toFixed(2));
+      console.log("DEBUG FINAL totalCost before payload:", totalCost, "isSetRateMode:", isSetRateMode);
 
       // Prepare instruction update data with proper field mapping
       const isAddOnType = isAddOn;
@@ -1363,15 +1410,15 @@ const FCcontrollerinstructions = () => {
         status: formData.status,
         vat: formData.vat === 0 ? 0 : formData.vat || 15,
         num_six_meters:
-          formData.rateWeight === "kg" || formData.rateWeight === "ton"
+          formData.rateWeight === "kg" || formData.rateWeight === "ton" || isSetRateMode
             ? 0
             : numSix,
         num_twelve_meters:
-          formData.rateWeight === "kg" || formData.rateWeight === "ton"
+          formData.rateWeight === "kg" || formData.rateWeight === "ton" || isSetRateMode
             ? 0
             : numTwelve,
         num_abnormal:
-          formData.rateWeight === "kg" || formData.rateWeight === "ton"
+          formData.rateWeight === "kg" || formData.rateWeight === "ton" || isSetRateMode
             ? 0
             : numAbnormal,
         num_breakbulk: 0,
@@ -1413,6 +1460,7 @@ const FCcontrollerinstructions = () => {
                 ? Number(formData.unitRate)
                 : null
               : null,
+        is_set_rate: isSetRate, // Set rate flag for database
       };
 
       // Prepare container data with containerKey for smart updates
@@ -1573,6 +1621,7 @@ const FCcontrollerinstructions = () => {
       console.log("💾 Sending update request to server...");
       console.log("Instruction data:", instructionUpdateData);
       console.log("Container data:", containerData);
+      console.log("DEBUG PAYLOAD total_cost:", instructionUpdateData.total_cost, "isSetRateMode:", isSetRateMode);
 
       // Make the API call
       const response = await api.put(
@@ -2119,6 +2168,7 @@ const FCcontrollerinstructions = () => {
         bookingRef: data.booking_ref || "",
         rateWeight: data.rateweight || "Container",
         weight: data.weight || "",
+        setRateAmount: (data.is_set_rate === true || data.is_set_rate === "true" || data.is_set_rate === 1) ? (data.total_cost != null ? data.total_cost.toString() : "") : "",
         num_six_meters: data.num_six_meters || 0,
         num_twelve_meters: data.num_twelve_meters || 0,
         num_abnormal: data.num_abnormal || 0,
@@ -2144,6 +2194,13 @@ const FCcontrollerinstructions = () => {
       };
 
       setFormData(newFormData);
+
+      // Load is_set_rate from database and set checkbox state
+      if (data.is_set_rate === true || data.is_set_rate === "true" || data.is_set_rate === 1) {
+        setIsSetRate(true);
+      } else {
+        setIsSetRate(false);
+      }
 
       if (String(data.shipment_type) === "4" && Array.isArray(data.weight_rows)) {
         const mappedRows = data.weight_rows.map((row, index) => ({
@@ -3604,6 +3661,12 @@ const FCcontrollerinstructions = () => {
       isValid = false;
     }
 
+    // For Set Rate mode, setRateAmount is required
+    if (isSetRateMode && (!formData.setRateAmount || formData.setRateAmount === "")) {
+      errors.setRateAmount = "Set rate amount is required when unit type is Set Rate";
+      isValid = false;
+    }
+
     // For ton or kg, unitRate is required
     if (
       (formData.rateWeight === "ton" || formData.rateWeight === "kg") &&
@@ -4250,7 +4313,7 @@ const FCcontrollerinstructions = () => {
                           name="num_six_meters"
                           onChange={(e) => handleNumericInputChange(e)}
                           disabled={
-                            formData.rateWeight !== "Container" || isReadOnly
+                            formData.rateWeight !== "Container" || isReadOnly || isSetRateMode
                           }
                           style={isReadOnly ? readOnlyStyle : {}}
                         />
@@ -4295,7 +4358,7 @@ const FCcontrollerinstructions = () => {
                           name="num_twelve_meters"
                           onChange={(e) => handleNumericInputChange(e)}
                           disabled={
-                            formData.rateWeight !== "Container" || isReadOnly
+                            formData.rateWeight !== "Container" || isReadOnly || isSetRateMode
                           }
                           style={isReadOnly ? readOnlyStyle : {}}
                         />
@@ -4340,7 +4403,7 @@ const FCcontrollerinstructions = () => {
                           name="num_abnormal"
                           onChange={(e) => handleNumericInputChange(e)}
                           disabled={
-                            formData.rateWeight !== "Container" || isReadOnly
+                            formData.rateWeight !== "Container" || isReadOnly || isSetRateMode
                           }
                           style={isReadOnly ? readOnlyStyle : {}}
                         />
@@ -4691,6 +4754,38 @@ const FCcontrollerinstructions = () => {
                         </>
                       )}
                     </div>
+                    {/* Set Rate checkbox and value - positioned below Unit per for shipment type 4 */}
+                    {formData.shipmentTypeId === "4" && (
+                      <div style={{ display: "flex", flexDirection: "column", gap: "6px", marginTop: "8px" }}>
+                        <label style={{ display: "inline-flex", alignItems: "center", gap: "6px", fontSize: "13px" }}>
+                          <input
+                            type="checkbox"
+                            checked={isSetRate}
+                            onChange={(e) => {
+                              const nextChecked = e.target.checked
+                              setIsSetRate(nextChecked)
+                            }}
+                            disabled={isReadOnly}
+                          />
+                          Set Rate
+                        </label>
+                        {isSetRate && (
+                          <div className="controller-instructions-input-wrapper" style={{ width: "140px" }}>
+                            <input
+                              type="text"
+                              className="controller-instructions-form-input"
+                              value={Number.isFinite(Number(setRateValue)) ? String(setRateValue) : ""}
+                              readOnly
+                              disabled
+                              style={{
+                                ...readOnlyStyle,
+                                width: "100%",
+                              }}
+                            />
+                          </div>
+                        )}
+                      </div>
+                    )}
                   </div>
                 </div>
                 {/* End of main form section */}
