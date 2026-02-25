@@ -136,6 +136,9 @@ const Viewcontrollerinstructions = () => {
   const [isSetRate, setIsSetRate] = useState(false)
   const [setRateValue, setSetRateValue] = useState(0)
 
+  // REMOVED: Dynamic fetching of set_rate - now using historical_set_rate from database
+  // The historical value is loaded in fetchInstructionData and stored in setSetRateValue
+  /*
   useEffect(() => {
     const fetchSetRate = async () => {
       if (isSetRate && formData.clientId && formData.pickup && formData.dropoff) {
@@ -154,6 +157,7 @@ const Viewcontrollerinstructions = () => {
     }
     fetchSetRate()
   }, [isSetRate, formData.clientId, formData.pickup, formData.dropoff])
+  */
 
   // Style for non-editable fields - applied to ALL fields
   const nonEditableStyle = {
@@ -331,6 +335,7 @@ const Viewcontrollerinstructions = () => {
         rateper_breakbulk: data.rateper_breakbulk ? Number(data.rateper_breakbulk) : 0, // Added missing field
         unitrate: data.unitrate || "",
         is_set_rate: Boolean(data.is_set_rate) || false,
+        historical_set_rate: data.historical_set_rate || null,
         // Break bulk fields removed
       }
 
@@ -345,6 +350,11 @@ const Viewcontrollerinstructions = () => {
       setFormData(formattedData)
 
       setIsSetRate(Boolean(data.is_set_rate) || false)
+      
+      // Use historical set rate value from database instead of fetching dynamically
+      if (data.is_set_rate && data.historical_set_rate) {
+        setSetRateValue(Number(data.historical_set_rate))
+      }
 
       if (String(data.shipment_type) === "4" && Array.isArray(data.weight_rows)) {
         const mappedRows = data.weight_rows.map((row, index) => ({

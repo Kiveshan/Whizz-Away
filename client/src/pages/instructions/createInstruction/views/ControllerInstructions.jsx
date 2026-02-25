@@ -1514,6 +1514,7 @@ const ControllerInstructions = () => {
         ...formDataWithoutContainerFields,
         total_cost: isAddOnType ? 0 : totalCost, // For add-on, always save 0
         is_set_rate: isSetRate, // Add is_set_rate boolean
+        historical_set_rate: isSetRate ? setRateValue : null, // Capture historical set rate value
         // Set vessel_name and stackdate to null for cross-haul types
         vessel_name: isCrossHaul ? null : formData.vesselName,
         stackdate: isCrossHaul ? null : formData.stackDate,
