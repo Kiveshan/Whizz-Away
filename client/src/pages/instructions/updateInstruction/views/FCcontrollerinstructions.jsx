@@ -1393,28 +1393,60 @@ const FCcontrollerinstructions = () => {
           ratePer12 * numTwelve +
           ratePerAbnormal * numAbnormal;
       }
-      // Calculate total surcharge from containers
-      const totalSurchargeAmount = containers.reduce((total, container) => {
+      // Fetch fresh amounts on-the-fly to prevent race condition
+      // If user clicks Save before async fetches complete, we need current values
+      const fetchFreshAmounts = async () => {
+        const freshContainers = await Promise.all(
+          containers.map(async (container) => {
+            // If flags are true but amounts might be stale, fetch fresh values
+            if ((container.addSurcharges || container.hazardous || container.vgm) && 
+                formData.clientId && formData.pickup && formData.dropoff) {
+              try {
+                const response = await api.get(
+                  `/api/instructions/client/${formData.clientId}/rates`,
+                  { params: { pickup: formData.pickup, dropoff: formData.dropoff } }
+                );
+                return {
+                  ...container,
+                  surchargeAmount: container.addSurcharges ? Number(response.data.surcharges || 0) : container.surchargeAmount,
+                  hazardousAmount: container.hazardous ? Number(response.data.hazardous || 0) : container.hazardousAmount,
+                  vgmAmount: container.vgm ? Number(response.data.vgm || 0) : container.vgmAmount,
+                };
+              } catch (err) {
+                console.error("Error fetching fresh amounts:", err);
+                return container;
+              }
+            }
+            return container;
+          })
+        );
+        return freshContainers;
+      };
+
+      const freshContainers = await fetchFreshAmounts();
+
+      // Calculate total surcharge from containers (using fresh amounts)
+      const totalSurchargeAmount = freshContainers.reduce((total, container) => {
         if (container.addSurcharges && container.surchargeAmount) {
           return total + Number(container.surchargeAmount || 0);
         }
         return total;
       }, 0);
-      // Calculate total hazardous amount from containers
-      const totalHazardousAmount = containers.reduce((total, container) => {
+      // Calculate total hazardous amount from containers (using fresh amounts)
+      const totalHazardousAmount = freshContainers.reduce((total, container) => {
         if (container.hazardous && container.hazardousAmount) {
           return total + Number(container.hazardousAmount || 0);
         }
         return total;
       }, 0);
-      // Calculate total VGM amount from containers
-      const totalVgmAmount = containers.reduce((total, container) => {
+      // Calculate total VGM amount from containers (using fresh amounts)
+      const totalVgmAmount = freshContainers.reduce((total, container) => {
         if (container.vgm && container.vgmAmount) {
           return total + Number(container.vgmAmount || 0);
         }
         return total;
       }, 0);
-      console.log(`💲 Total cost components - Base: ${baseCost}, Surcharges: ${totalSurchargeAmount}, Hazardous: ${totalHazardousAmount}, VGM: ${totalVgmAmount}`);
+      console.log(`💲 Total cost components (fresh) - Base: ${baseCost}, Surcharges: ${totalSurchargeAmount}, Hazardous: ${totalHazardousAmount}, VGM: ${totalVgmAmount}`);
       // In Set Rate mode, total cost is exactly the set rate amount (no surcharges/hazardous/VGM)
       const totalCost = isSetRateMode
         ? baseCost

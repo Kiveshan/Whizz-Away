@@ -2663,6 +2663,92 @@ export const updateFCInstructionAndContainers = async (
       `[${new Date().toISOString()}] [MODEL] Transaction committed successfully for instruction ${instructionId}`
     );
 
+    // 7. Recalculate total_cost with fresh container amounts from database
+    // This ensures total_cost is always correct regardless of what frontend sent
+    const finalContainersForCostQuery = `
+      SELECT 
+        "Add Surcharges", 
+        "Surcharge Amount", 
+        "Hazardous", 
+        "Hazardous Amount",
+        vgm,
+        "vgm amount"
+      FROM public.container
+      WHERE m1key = $1
+    `;
+    const finalContainersForCost = await client.query(finalContainersForCostQuery, [instructionId]);
+    
+    // Sum up all surcharges, hazardous, and VGM amounts from containers
+    let totalSurcharge = 0;
+    let totalHazardous = 0;
+    let totalVgm = 0;
+    
+    for (const container of finalContainersForCost.rows) {
+      if (container["Add Surcharges"] && container["Surcharge Amount"]) {
+        totalSurcharge += Number(container["Surcharge Amount"] || 0);
+      }
+      if (container["Hazardous"] && container["Hazardous Amount"]) {
+        totalHazardous += Number(container["Hazardous Amount"] || 0);
+      }
+      if (container.vgm && container["vgm amount"]) {
+        totalVgm += Number(container["vgm amount"] || 0);
+      }
+    }
+    
+    // Get the instruction data for recalculation
+    const currentInstructionQuery = `
+      SELECT 
+        num_six_meters, num_twelve_meters, num_abnormal,
+        rateper_6, rateper_12, rateper_abnormal,
+        total_cost, is_set_rate, rateweight, shipment_type,
+        weight, unitrate
+      FROM public.m1_controller
+      WHERE m1key = $1
+    `;
+    const currentInstructionResult = await client.query(currentInstructionQuery, [instructionId]);
+    const d = currentInstructionResult.rows[0]; // shorthand for instruction data
+    
+    // Calculate base cost (matching frontend logic exactly)
+    let baseCost = 0;
+    let recalculatedTotalCost = 0;
+    
+    if (isAddOnType) {
+      // Add-on: total cost is always 0
+      recalculatedTotalCost = 0;
+    } else if (d.is_set_rate) {
+      // Set Rate mode: use the total_cost as-is (already set correctly during instruction update)
+      // In Set Rate mode, there are no surcharges/hazardous/VGM added
+      recalculatedTotalCost = Number(d.total_cost || 0);
+    } else if ((d.rateweight === 'kg' || d.rateweight === 'ton') && String(d.shipment_type) === '4') {
+      // Shipment type 4: base cost = unit rate * weight
+      const weightValue = Number(d.weight || 0);
+      const unitRate = Number(d.unitrate || 0);
+      baseCost = weightValue * unitRate;
+      recalculatedTotalCost = Number((baseCost + totalSurcharge + totalHazardous + totalVgm).toFixed(2));
+    } else {
+      // Container-based calculation
+      baseCost = 
+        (Number(d.num_six_meters || 0) * Number(d.rateper_6 || 0)) +
+        (Number(d.num_twelve_meters || 0) * Number(d.rateper_12 || 0)) +
+        (Number(d.num_abnormal || 0) * Number(d.rateper_abnormal || 0));
+      recalculatedTotalCost = Number((baseCost + totalSurcharge + totalHazardous + totalVgm).toFixed(2));
+    }
+    
+    console.log(
+      `[${new Date().toISOString()}] [MODEL] Recalculated total_cost: ${recalculatedTotalCost} (is_set_rate: ${d.is_set_rate}, isAddOn: ${isAddOnType}, base: ${baseCost}, surcharge: ${totalSurcharge}, hazardous: ${totalHazardous}, vgm: ${totalVgm})`
+    );
+    
+    // Update the instruction with the recalculated total_cost
+    const updateTotalCostQuery = `
+      UPDATE public.m1_controller
+      SET total_cost = $1
+      WHERE m1key = $2
+    `;
+    await client.query(updateTotalCostQuery, [recalculatedTotalCost, instructionId]);
+    console.log(
+      `[${new Date().toISOString()}] [MODEL] Updated instruction ${instructionId} with recalculated total_cost: ${recalculatedTotalCost}`
+    );
+
     // Return updated data
     const finalInstructionQuery = `
       SELECT * FROM public.m1_controller WHERE m1key = $1
