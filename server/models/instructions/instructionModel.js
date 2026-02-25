@@ -2655,7 +2655,7 @@ export const updateFCInstructionAndContainers = async (
           insertResult.rows[0].containerkey
         } with hazardous=${isHazardous}, hazardousAmount=${hazardousAmount}, file_ref=${container.file_ref || ""}`
       );
-    }
+    } 
 
     // Commit transaction
     await client.query("COMMIT");
