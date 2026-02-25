@@ -114,6 +114,8 @@ const FCcontrollerinstructions = () => {
   const [isSetRateMode, setIsSetRateMode] = useState(false);
   const [isSetRate, setIsSetRate] = useState(false);
   const [setRateValue, setSetRateValue] = useState(0);
+  const [historicalSetRate, setHistoricalSetRate] = useState(null);
+  const [showSetRateWarning, setShowSetRateWarning] = useState(false);
 
   const [weightRows, setWeightRows] = useState([]);
 
@@ -349,6 +351,25 @@ const FCcontrollerinstructions = () => {
   useEffect(() => {
     setIsSetRateMode(isSetRate)
   }, [isSetRate])
+
+  // Check for set rate mismatch warning when historicalSetRate, setRateValue, status, or isSetRate changes
+  useEffect(() => {
+    // Only show warning when:
+    // 1. Set rate is enabled
+    // 2. Status is "New" or "In Progress"
+    // 3. Both historical and current values are available and non-zero
+    // 4. They don't match
+    if (isSetRate && 
+        (formData.status === "New" || formData.status === "In Progress") &&
+        historicalSetRate !== null && 
+        historicalSetRate !== 0 &&
+        setRateValue !== 0 &&
+        historicalSetRate !== setRateValue) {
+      setShowSetRateWarning(true);
+    } else {
+      setShowSetRateWarning(false);
+    }
+  }, [isSetRate, formData.status, historicalSetRate, setRateValue]);
 
   // State for warning modal
   const [warningModal, setWarningModal] = useState({
@@ -1523,6 +1544,8 @@ const FCcontrollerinstructions = () => {
                 : null
               : null,
         is_set_rate: isSetRate, // Set rate flag for database
+        // When set rate is checked, overwrite historical_set_rate with current setRateValue
+        historical_set_rate: isSetRate ? setRateValue : null,
       };
 
       // Prepare container data with containerKey for smart updates
@@ -2262,6 +2285,13 @@ const FCcontrollerinstructions = () => {
         setIsSetRate(true);
       } else {
         setIsSetRate(false);
+      }
+
+      // Use historical set rate value when status is Completed
+      if (data.is_set_rate && data.historical_set_rate) {
+        setHistoricalSetRate(Number(data.historical_set_rate));
+      } else {
+        setHistoricalSetRate(null);
       }
 
       if (String(data.shipment_type) === "4" && Array.isArray(data.weight_rows)) {
@@ -4136,6 +4166,22 @@ const FCcontrollerinstructions = () => {
               ⚠️ This instruction is {formData.status} and is in read-only mode
             </div>
           )}
+          {showSetRateWarning && !isReadOnly && (
+            <div
+              style={{
+                backgroundColor: "#f8d7da",
+                border: "1px solid #f5c6cb",
+                borderRadius: "4px",
+                padding: "12px",
+                marginBottom: "20px",
+                textAlign: "center",
+                color: "#721c24",
+                fontWeight: "bold",
+              }}
+            >
+              ⚠️ Set Rate Warning: The historical rate (R{historicalSetRate?.toFixed(2)}) differs from the current client rate (R{setRateValue?.toFixed(2)}). Saving will update the historical rate to the current rate.
+            </div>
+          )}
           <div className="controller-instructions-form-section controller-instructions-client-info-section">
             <div className="controller-instructions-form-row">
               <div className="controller-instructions-form-field">
@@ -4868,7 +4914,14 @@ const FCcontrollerinstructions = () => {
                             <input
                               type="text"
                               className="controller-instructions-form-input"
-                              value={Number.isFinite(Number(setRateValue)) ? String(setRateValue) : ""}
+                              value={
+                                // Show historical value when status is Completed
+                                isReadOnly && historicalSetRate !== null 
+                                  ? String(historicalSetRate)
+                                  : Number.isFinite(Number(setRateValue)) 
+                                    ? String(setRateValue) 
+                                    : ""
+                              }
                               readOnly
                               disabled
                               style={{
