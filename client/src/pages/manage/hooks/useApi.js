@@ -1435,17 +1435,19 @@ export function useApi(state, actions) {
           actions.updateFormData(formType, {
             ...data,
             clientId: id,
-            rates: data.rates || [
-              {
-                starting_point: "",
-                destination: "",
-                "6m_rate": "",
-                "12m_rate": "",
-                surcharges: "",
-                hazardous: "",
-                vgm: "",
-              },
-            ],
+            rates:
+              data.rates || [
+                {
+                  starting_point: "",
+                  destination: "",
+                  "6m_rate": "",
+                  "12m_rate": "",
+                  surcharges: "",
+                  hazardous: "",
+                  vgm: "",
+                  set_rate: "",
+                },
+              ],
           })
         } else if (type === "supplier") {
           // Handle supplier data - ensure we have the supplier data

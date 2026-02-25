@@ -133,6 +133,28 @@ const Viewcontrollerinstructions = () => {
   // State to track if shipment type is cross-haul or shipmentID is 3
   const [isCrossHaulOrSpecial, setIsCrossHaulOrSpecial] = useState(false)
 
+  const [isSetRate, setIsSetRate] = useState(false)
+  const [setRateValue, setSetRateValue] = useState(0)
+
+  useEffect(() => {
+    const fetchSetRate = async () => {
+      if (isSetRate && formData.clientId && formData.pickup && formData.dropoff) {
+        try {
+          const encodedPickup = encodeURIComponent(formData.pickup)
+          const encodedDropoff = encodeURIComponent(formData.dropoff)
+          const response = await api.get(`/api/instructions/client/${formData.clientId}/set-rate/${encodedPickup}/${encodedDropoff}`)
+          if (response.data && response.data.set_rate !== undefined) {
+            setSetRateValue(Number(response.data.set_rate))
+          }
+        } catch (error) {
+          console.error("Error fetching set_rate:", error)
+          setSetRateValue(0)
+        }
+      }
+    }
+    fetchSetRate()
+  }, [isSetRate, formData.clientId, formData.pickup, formData.dropoff])
+
   // Style for non-editable fields - applied to ALL fields
   const nonEditableStyle = {
     backgroundColor: "#f0f0f0",
@@ -308,6 +330,7 @@ const Viewcontrollerinstructions = () => {
         rateper_abnormal: data.rateper_abnormal ? Number(data.rateper_abnormal) : 0,
         rateper_breakbulk: data.rateper_breakbulk ? Number(data.rateper_breakbulk) : 0, // Added missing field
         unitrate: data.unitrate || "",
+        is_set_rate: Boolean(data.is_set_rate) || false,
         // Break bulk fields removed
       }
 
@@ -320,6 +343,8 @@ const Viewcontrollerinstructions = () => {
       })
             console.log("Formatted data before setFormData:", formattedData)
       setFormData(formattedData)
+
+      setIsSetRate(Boolean(data.is_set_rate) || false)
 
       if (String(data.shipment_type) === "4" && Array.isArray(data.weight_rows)) {
         const mappedRows = data.weight_rows.map((row, index) => ({
@@ -967,62 +992,10 @@ const Viewcontrollerinstructions = () => {
                             <option value="m³">m³</option>
                             <option value="ton">ton</option>
                             <option value="Container">Container</option>
-                            <option value="SetRate">Set Rate</option>
                           </select>
                         </div>
 
                         {/* Rate per unit and weight textboxes */}
-                        {formData.rateWeight === "SetRate" && (
-                          <div
-                            style={{
-                              display: "flex",
-                              gap: "15px",
-                              width: "100%",
-                              alignItems: "center",
-                              flexWrap: "wrap",
-                            }}
-                          >
-                            <div
-                              className="controller-instructions-form-field"
-                              style={{
-                                flex: 1,
-                                minWidth: "150px",
-                                display: "flex",
-                                alignItems: "center",
-                                gap: "8px",
-                                margin: 0,
-                              }}
-                            >
-                              <span
-                                style={{
-                                  whiteSpace: "nowrap",
-                                  fontSize: "13px",
-                                  color: "#333",
-                                }}
-                              >
-                                Amount
-                              </span>
-                              <div
-                                className="controller-instructions-input-wrapper"
-                                ref={fieldRefs.unitRate}
-                                style={{ width: "100px" }}
-                              >
-                                <input
-                                  type="text"
-                                  className="controller-instructions-form-input"
-                                  name="setRateAmount"
-                                  value={
-                                    formData.total_cost != null
-                                      ? Number(formData.total_cost).toFixed(2)
-                                      : ""
-                                  }
-                                  readOnly
-                                  style={{ ...nonEditableStyle, width: "100%" }}
-                                />
-                              </div>
-                            </div>
-                          </div>
-                        )}
                         {(formData.rateWeight === "kg" ||
                           formData.rateWeight === "m³" ||
                           formData.rateWeight === "ton") && (
@@ -1095,6 +1068,29 @@ const Viewcontrollerinstructions = () => {
                         )}
                       </div>
                     </div>
+                    {/* Set Rate checkbox - positioned below Unit per */}
+                    {formData.shipmentTypeId === "4" && (
+                      <div className="controller-instructions-form-field" style={{ marginTop: "8px" }}>
+                        <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
+                          <label style={{ display: "inline-flex", alignItems: "center", gap: "6px", fontSize: "13px" }}>
+                            <input type="checkbox" checked={isSetRate} disabled={true} />
+                            Set Rate
+                          </label>
+                          {isSetRate && (
+                            <div className="controller-instructions-input-wrapper" style={{ width: "140px" }}>
+                              <input
+                                type="text"
+                                className="controller-instructions-form-input"
+                                value={Number.isFinite(Number(setRateValue)) ? String(setRateValue) : ""}
+                                readOnly
+                                disabled={true}
+                                style={{ ...nonEditableStyle, width: "100%" }}
+                              />
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    )}
                   </div>
 
                   {/* Date Time Group */}

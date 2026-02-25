@@ -253,11 +253,11 @@ export const saveInstruction = async ({
         num_six_meters, num_twelve_meters, num_abnormal, num_breakbulk,
         weight, total_cost, booking_ref, vessel_name,
         rateper_6, rateper_12, rateper_abnormal, rateper_breakbulk, unitrate,
-        created_at
+        is_set_rate, created_at
       ) VALUES (
         $1, $2, $3, $4, $5, 
         $6, $7, $8, $9, $10, $11, $12, $13, $14, $15,
-        $16, $17, $18, $19, $20, $21, $22, $23, $24, $25, $26
+        $16, $17, $18, $19, $20, $21, $22, $23, $24, $25, $26, $27
       ) RETURNING m1key
     `;
 
@@ -341,6 +341,9 @@ export const saveInstruction = async ({
       // Debug log for total cost
       _debug_frontend_total_cost: controllerData.total_cost,
 
+      // Set rate flag
+      is_set_rate: Boolean(controllerData.is_set_rate) || false,
+
       // Container counts and rates (already handled for null/0 by frontend)
       num_six_meters: controllerData.num_six_meters || 0,
       num_twelve_meters: controllerData.num_twelve_meters || 0,
@@ -394,6 +397,7 @@ export const saveInstruction = async ({
       rateper_abnormal: fields.rateper_abnormal,
       rateper_breakbulk: fields.rateper_breakbulk,
       unitrate: fields.unitrate,
+      is_set_rate: fields.is_set_rate,
       created_at: formatDate(new Date()),
     });
 
@@ -428,6 +432,7 @@ export const saveInstruction = async ({
       fields.rateper_abnormal, // Will be null if weight-based
       fields.rateper_breakbulk, // Will be null if weight-based or not cross-haul/container
       fields.unitrate, // Will be null if container-based
+      fields.is_set_rate, // Set rate flag
       formatDate(new Date()), // Current date for created_at
     ];
 
@@ -616,15 +621,15 @@ export const saveInstruction = async ({
 
       // Get VGM flag and amount with fallbacks. For shipment type 4 VGM is
       // explicitly disabled. For shipment type 5 (add-on), the VGM flag
-      // should be persisted, but the amount must stay 0.
+      // should be persisted, but the amount must stay 0. When VGM is
+      // enabled, always refresh the amount from current client rates so it
+      // stays in sync with m5_client_rate.
       const rawIsVgm = container.vgm || container["vgm"] || false;
       const isVgm = allowVgm ? rawIsVgm : false;
 
-      let vgmAmount = allowVgm
-        ? (container.vgmAmount || container["vgm amount"] || 0)
-        : 0;
+      let vgmAmount = 0;
 
-      if (!isAddOnType && allowVgm && isVgm && (!vgmAmount || Number(vgmAmount) === 0) && clientId && pickup && dropoff) {
+      if (!isAddOnType && allowVgm && isVgm && clientId && pickup && dropoff) {
         try {
           const vgmQuery = `
             SELECT vgm
@@ -1513,6 +1518,7 @@ export const getClientRates = async (clientId, start, destination) => {
     SELECT 
       "6m_rate" as "sixMeterRate",
       "12m_rate" as "twelveMeterRate",
+      set_rate as "setRate",
       surcharges,
       hazardous,
       vgm,
@@ -1729,6 +1735,13 @@ const compareContainers = (currentContainers, newContainers) => {
           newContainer["Surcharge Amount"] || newContainer.surchargeAmount || 0
         );
 
+        const currentHazardousAmount = Number(
+          currentContainer["Hazardous Amount"] || 0
+        );
+        const newHazardousAmount = Number(
+          newContainer["Hazardous Amount"] || newContainer.hazardousAmount || 0
+        );
+
         // Handle VGM flag and amount
         const currentVgm = Boolean(currentContainer["vgm"]);
         const newVgm = Boolean(newContainer["vgm"] || newContainer.vgm);
@@ -1743,8 +1756,13 @@ const compareContainers = (currentContainers, newContainers) => {
           currentHazardous !== newHazardous ||
           currentAddSurcharges !== newAddSurcharges ||
           currentSurchargeAmount !== newSurchargeAmount ||
+          currentHazardousAmount !== newHazardousAmount ||
           currentVgm !== newVgm ||
-          currentVgmAmount !== newVgmAmount;
+          currentVgmAmount !== newVgmAmount ||
+          // Always update if flags are true to refresh amounts from current rates
+          newHazardous ||
+          newAddSurcharges ||
+          newVgm;
 
         console.log(
           `[${new Date().toISOString()}] [MODEL] Comparing container ${key}:`,
@@ -1773,6 +1791,11 @@ const compareContainers = (currentContainers, newContainers) => {
               current: currentSurchargeAmount,
               new: newSurchargeAmount,
               changed: currentSurchargeAmount !== newSurchargeAmount,
+            },
+            hazardousAmount: {
+              current: currentHazardousAmount,
+              new: newHazardousAmount,
+              changed: currentHazardousAmount !== newHazardousAmount,
             },
             vgm: {
               current: currentVgm,
@@ -2046,6 +2069,11 @@ export const updateFCInstructionAndContainers = async (
         currentInstruction.unitrate,
         "number"
       ),
+      is_set_rate: preserveExistingValue(
+        instructionData.is_set_rate,
+        currentInstruction.is_set_rate,
+        "boolean"
+      ),
     };
 
     // 3. Check if instruction needs updating
@@ -2079,6 +2107,7 @@ export const updateFCInstructionAndContainers = async (
       { field: "rateper_abnormal", type: "number" },
       { field: "rateper_breakbulk", type: "number" },
       { field: "unitrate", type: "number" },
+      { field: "is_set_rate", type: "boolean" },
     ];
 
     for (const { field, type } of fieldsToCheck) {
@@ -2106,8 +2135,8 @@ export const updateFCInstructionAndContainers = async (
           stackdate = $6, "lastFreeDate" = $7, "clientFileRef" = $8, rateweight = $9, description = $10,
           status = $11, vat = $12, num_six_meters = $13, num_twelve_meters = $14, num_abnormal = $15,
           num_breakbulk = $16, weight = $17, total_cost = $18, booking_ref = $19, vessel_name = $20,
-          rateper_6 = $21, rateper_12 = $22, rateper_abnormal = $23, rateper_breakbulk = $24, unitrate = $25
-        WHERE m1key = $26
+          rateper_6 = $21, rateper_12 = $22, rateper_abnormal = $23, rateper_breakbulk = $24, unitrate = $25, is_set_rate = $26
+        WHERE m1key = $27
         RETURNING *
       `;
 
@@ -2138,6 +2167,7 @@ export const updateFCInstructionAndContainers = async (
         updateData.rateper_abnormal,
         updateData.rateper_breakbulk,
         updateData.unitrate,
+        updateData.is_set_rate,
         instructionId,
       ];
 
@@ -2289,61 +2319,53 @@ export const updateFCInstructionAndContainers = async (
     // Update containers
     for (const container of containerChanges.toUpdate) {
 
-      // Fetch hazardous amount if container is marked as hazardous. For
-      // shipment type 5 (add-on), hazardous amounts must always remain 0
-      // even if the flag is true, so we skip any rate lookup.
-      let hazardousAmount = container["Hazardous Amount"] || container.hazardousAmount || 0;
+      // Always recompute hazardous amount from current client rates when the
+      // hazardous flag is true (except for add-on shipments where amounts
+      // must remain 0). This ensures we refresh from m5_client_rate even if
+      // the frontend sends a non-zero "Hazardous Amount" from a previous rate.
+      let hazardousAmount = 0;
       const isHazardous = container["Hazardous"] || container.hazardous || false;
       
-      if (!isAddOnType && isHazardous && hazardousAmount === 0) {
+      if (!isAddOnType && isHazardous && clientId && pickup && dropoff) {
         try {
-          // Get current instruction data to access client ID, pickup and dropoff
-          const currentInstructionResult = await client.query(
-            "SELECT client, pickup, dropoff FROM public.m1_controller WHERE m1key = $1",
-            [instructionId]
+          console.log(
+            `[${new Date().toISOString()}] [MODEL] Container ${container.containerkey} is hazardous, refreshing hazardous amount for client ${clientId}, pickup ${pickup}, dropoff ${dropoff}`
           );
-          
-          if (currentInstructionResult.rows.length > 0) {
-            const { client: clientId, pickup, dropoff } = currentInstructionResult.rows[0];
-            
+
+          const hazardousRateQuery = `
+            SELECT hazardous
+            FROM public.m5_client_rate
+            WHERE clientid = $1
+              AND starting_point = $2
+              AND destination = $3
+            ORDER BY client_rate_id DESC
+            LIMIT 1
+          `;
+
+          const hazardousRateResult = await client.query(hazardousRateQuery, [
+            clientId,
+            pickup,
+            dropoff
+          ]);
+
+          if (hazardousRateResult.rows.length > 0) {
+            const fetchedHaz = hazardousRateResult.rows[0].hazardous;
+            const numericHaz = Number.parseFloat(fetchedHaz);
+            hazardousAmount = Number.isNaN(numericHaz) ? 0 : numericHaz;
             console.log(
-              `[${new Date().toISOString()}] [MODEL] Container ${container.containerkey} is hazardous, fetching hazardous amount for client ${clientId}, pickup ${pickup}, dropoff ${dropoff}`
+              `[${new Date().toISOString()}] [MODEL] Refreshed hazardous amount ${hazardousAmount} for container ${container.containerkey}`
             );
-            
-            // Query to fetch hazardous amount from m5_client_rate table
-            const hazardousRateQuery = `
-              SELECT hazardous
-              FROM public.m5_client_rate
-              WHERE clientid = $1
-                AND starting_point = $2
-                AND destination = $3
-              ORDER BY client_rate_id DESC
-              LIMIT 1
-            `;
-            
-            const hazardousRateResult = await client.query(hazardousRateQuery, [
-              clientId,
-              pickup,
-              dropoff
-            ]);
-            
-            if (hazardousRateResult.rows.length > 0) {
-              hazardousAmount = hazardousRateResult.rows[0].hazardous || 0;
-              console.log(
-                `[${new Date().toISOString()}] [MODEL] Found hazardous amount ${hazardousAmount} for container ${container.containerkey}`
-              );
-            } else {
-              console.log(
-                `[${new Date().toISOString()}] [MODEL] No hazardous rate found for client ${clientId}, pickup ${pickup}, dropoff ${dropoff}`
-              );
-            }
+          } else {
+            console.log(
+              `[${new Date().toISOString()}] [MODEL] No hazardous rate found for client ${clientId}, pickup ${pickup}, dropoff ${dropoff}`
+            );
           }
         } catch (error) {
           console.error(
             `[${new Date().toISOString()}] [MODEL] Error fetching hazardous amount:`,
             error.message
           );
-          // Continue with hazardous amount as 0 if there's an error
+          // Continue with hazardousAmount = 0 if there's an error
         }
       }
 
@@ -2371,15 +2393,15 @@ export const updateFCInstructionAndContainers = async (
 
       // Get VGM flag and amount with fallbacks. For shipment type 4 VGM is
       // explicitly disabled. For shipment type 5 (add-on), the VGM flag
-      // should be persisted, but the amount must stay 0.
+      // should be persisted, but the amount must stay 0. When VGM is
+      // enabled, always refresh the amount from current client rates so it
+      // stays in sync with m5_client_rate.
       const rawIsVgm = container.vgm || container["vgm"] || false;
       const isVgm = allowVgm ? rawIsVgm : false;
 
-      let vgmAmount = allowVgm
-        ? (container.vgmAmount || container["vgm amount"] || 0)
-        : 0;
+      let vgmAmount = 0;
 
-      if (!isAddOnType && allowVgm && isVgm && (!vgmAmount || Number(vgmAmount) === 0) && clientId && pickup && dropoff) {
+      if (!isAddOnType && allowVgm && isVgm && clientId && pickup && dropoff) {
         try {
           const vgmQuery = `
             SELECT vgm
@@ -2429,9 +2451,49 @@ export const updateFCInstructionAndContainers = async (
         RETURNING *
       `;
 
-      const rawSurchargeAmount =
+      // Always recompute surcharge amount from current client rates when the
+      // "Add Surcharges" flag is true (except for add-on shipments where
+      // amounts must remain 0). This keeps container surcharges aligned with
+      // m5_client_rate even if the frontend sends an older amount.
+      let rawSurchargeAmount =
         container["Surcharge Amount"] || container.surchargeAmount || 0;
-      const surchargeAmount = isAddOnType ? 0 : rawSurchargeAmount;
+      let surchargeAmount = isAddOnType ? 0 : rawSurchargeAmount;
+
+      const hasAddSurcharges =
+        container["Add Surcharges"] || container.addSurcharges || false;
+
+      if (!isAddOnType && hasAddSurcharges && clientId && pickup && dropoff) {
+        try {
+          const surchargeQuery = `
+            SELECT surcharges
+            FROM public.m5_client_rate
+            WHERE clientid = $1
+              AND starting_point = $2
+              AND destination = $3
+            ORDER BY client_rate_id DESC
+            LIMIT 1
+          `;
+          const surchargeResult = await client.query(surchargeQuery, [
+            clientId,
+            pickup,
+            dropoff,
+          ]);
+
+          if (surchargeResult.rows.length > 0) {
+            const fetched = Number.parseFloat(surchargeResult.rows[0].surcharges);
+            if (!Number.isNaN(fetched) && fetched > 0) {
+              surchargeAmount = fetched;
+            } else {
+              surchargeAmount = 0;
+            }
+          } else {
+            surchargeAmount = 0;
+          }
+        } catch (e) {
+          console.error("ERROR: Failed to fetch surcharge:", e.message);
+          // Keep surchargeAmount as 0 on error
+        }
+      }
 
       const updateValues = [
         container.containernum || "",
@@ -2439,7 +2501,7 @@ export const updateFCInstructionAndContainers = async (
         container.container_type || "",
         container.cargo_description || "",
         container["Hazardous"] || container.hazardous || false,
-        container["Add Surcharges"] || container.addSurcharges || false,
+        hasAddSurcharges,
         surchargeAmount,
         isAddOnType ? 0 : hazardousAmount,
         container.file_ref || "",
@@ -2593,12 +2655,98 @@ export const updateFCInstructionAndContainers = async (
           insertResult.rows[0].containerkey
         } with hazardous=${isHazardous}, hazardousAmount=${hazardousAmount}, file_ref=${container.file_ref || ""}`
       );
-    }
+    } 
 
     // Commit transaction
     await client.query("COMMIT");
     console.log(
       `[${new Date().toISOString()}] [MODEL] Transaction committed successfully for instruction ${instructionId}`
+    );
+
+    // 7. Recalculate total_cost with fresh container amounts from database
+    // This ensures total_cost is always correct regardless of what frontend sent
+    const finalContainersForCostQuery = `
+      SELECT 
+        "Add Surcharges", 
+        "Surcharge Amount", 
+        "Hazardous", 
+        "Hazardous Amount",
+        vgm,
+        "vgm amount"
+      FROM public.container
+      WHERE m1key = $1
+    `;
+    const finalContainersForCost = await client.query(finalContainersForCostQuery, [instructionId]);
+    
+    // Sum up all surcharges, hazardous, and VGM amounts from containers
+    let totalSurcharge = 0;
+    let totalHazardous = 0;
+    let totalVgm = 0;
+    
+    for (const container of finalContainersForCost.rows) {
+      if (container["Add Surcharges"] && container["Surcharge Amount"]) {
+        totalSurcharge += Number(container["Surcharge Amount"] || 0);
+      }
+      if (container["Hazardous"] && container["Hazardous Amount"]) {
+        totalHazardous += Number(container["Hazardous Amount"] || 0);
+      }
+      if (container.vgm && container["vgm amount"]) {
+        totalVgm += Number(container["vgm amount"] || 0);
+      }
+    }
+    
+    // Get the instruction data for recalculation
+    const currentInstructionQuery = `
+      SELECT 
+        num_six_meters, num_twelve_meters, num_abnormal,
+        rateper_6, rateper_12, rateper_abnormal,
+        total_cost, is_set_rate, rateweight, shipment_type,
+        weight, unitrate
+      FROM public.m1_controller
+      WHERE m1key = $1
+    `;
+    const currentInstructionResult = await client.query(currentInstructionQuery, [instructionId]);
+    const d = currentInstructionResult.rows[0]; // shorthand for instruction data
+    
+    // Calculate base cost (matching frontend logic exactly)
+    let baseCost = 0;
+    let recalculatedTotalCost = 0;
+    
+    if (isAddOnType) {
+      // Add-on: total cost is always 0
+      recalculatedTotalCost = 0;
+    } else if (d.is_set_rate) {
+      // Set Rate mode: use the total_cost as-is (already set correctly during instruction update)
+      // In Set Rate mode, there are no surcharges/hazardous/VGM added
+      recalculatedTotalCost = Number(d.total_cost || 0);
+    } else if ((d.rateweight === 'kg' || d.rateweight === 'ton') && String(d.shipment_type) === '4') {
+      // Shipment type 4: base cost = unit rate * weight
+      const weightValue = Number(d.weight || 0);
+      const unitRate = Number(d.unitrate || 0);
+      baseCost = weightValue * unitRate;
+      recalculatedTotalCost = Number((baseCost + totalSurcharge + totalHazardous + totalVgm).toFixed(2));
+    } else {
+      // Container-based calculation
+      baseCost = 
+        (Number(d.num_six_meters || 0) * Number(d.rateper_6 || 0)) +
+        (Number(d.num_twelve_meters || 0) * Number(d.rateper_12 || 0)) +
+        (Number(d.num_abnormal || 0) * Number(d.rateper_abnormal || 0));
+      recalculatedTotalCost = Number((baseCost + totalSurcharge + totalHazardous + totalVgm).toFixed(2));
+    }
+    
+    console.log(
+      `[${new Date().toISOString()}] [MODEL] Recalculated total_cost: ${recalculatedTotalCost} (is_set_rate: ${d.is_set_rate}, isAddOn: ${isAddOnType}, base: ${baseCost}, surcharge: ${totalSurcharge}, hazardous: ${totalHazardous}, vgm: ${totalVgm})`
+    );
+    
+    // Update the instruction with the recalculated total_cost
+    const updateTotalCostQuery = `
+      UPDATE public.m1_controller
+      SET total_cost = $1
+      WHERE m1key = $2
+    `;
+    await client.query(updateTotalCostQuery, [recalculatedTotalCost, instructionId]);
+    console.log(
+      `[${new Date().toISOString()}] [MODEL] Updated instruction ${instructionId} with recalculated total_cost: ${recalculatedTotalCost}`
     );
 
     // Return updated data
@@ -3005,5 +3153,37 @@ export const deleteInstruction = async (instructionId) => {
     throw error;
   } finally {
     client.release();
+  }
+};
+
+export const getClientSetRate = async (clientId, starting_point, destination) => {
+  const sql = `
+    SELECT set_rate
+    FROM public.m5_client_rate
+    WHERE clientid = $1 AND starting_point = $2 AND destination = $3
+    ORDER BY client_rate_id DESC
+    LIMIT 1
+  `;
+
+  console.log(`[${new Date().toISOString()}] getClientSetRate: Executing SQL:`, sql);
+  console.log(`[${new Date().toISOString()}] getClientSetRate: With params:`, [clientId, starting_point, destination]);
+
+  try {
+    const result = await query(sql, [clientId, starting_point, destination]);
+    const rows = result.recordset || result.rows || [];
+
+    console.log(`[${new Date().toISOString()}] getClientSetRate: Query completed, found ${rows.length} rates`);
+
+    if (rows.length > 0) {
+      const setRate = rows[0].set_rate;
+      console.log(`[${new Date().toISOString()}] getClientSetRate: Found set_rate: ${setRate}`);
+      return { set_rate: setRate };
+    } else {
+      console.log(`[${new Date().toISOString()}] getClientSetRate: No set_rate found for client ${clientId}, starting_point ${starting_point}, destination ${destination}`);
+      return { set_rate: null };
+    }
+  } catch (error) {
+    console.error(`[${new Date().toISOString()}] getClientSetRate: Error executing query:`, error);
+    throw error;
   }
 };
