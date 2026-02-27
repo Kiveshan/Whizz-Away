@@ -2259,8 +2259,15 @@ if (result.legId && isNewLeg) {
   };
   setLegs(updatedLegs);
   console.log(`New leg saved to database with ID: ${result.legId}`);
-  setHasUnsavedNewLeg(false); // NEW: Mark that the new leg is now saved
 }
+
+// CRITICAL FIX: Check if there's still any unsaved new leg in the legs array
+// This handles the case where user adds a new leg, switches to a previous leg, and saves it
+const hasRemainingUnsavedLeg = updatedLegs.some(
+  (leg) => leg.isNew || leg.id?.toString().startsWith("temp-")
+);
+setHasUnsavedNewLeg(hasRemainingUnsavedLeg);
+console.log(`Has unsaved new leg after save: ${hasRemainingUnsavedLeg}`);
 
       // Ensure the current leg is marked as saved
       setSavedLegs((prev) => {
@@ -2384,14 +2391,6 @@ const checkContainersDestination = async () => {
           return;
         }
 
-        // CRITICAL FIX: Only hide the add leg button if we're currently viewing the last leg
-        // If user is on a previous leg and saves, we shouldn't disable adding more legs
-        const isOnLastLeg = currentLagIndex === legs.length - 1;
-        if (!isOnLastLeg) {
-          setShouldHideAddLegButton(false);
-          return;
-        }
-
 const missingItems = await checkContainersReachDropoff(dropoff);
 
       console.log("Destination check result (missing items):", missingItems);
@@ -2405,7 +2404,7 @@ const missingItems = await checkContainersReachDropoff(dropoff);
   };
 
   checkContainersDestination();
-}, [instructionId, legs, instructionContainers, isWeightBased, currentLagIndex]);
+}, [instructionId, legs, instructionContainers, isWeightBased]);
 
   useEffect(() => {
   // Set switching flag when leg changes
