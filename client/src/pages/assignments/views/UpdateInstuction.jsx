@@ -4110,6 +4110,7 @@ useEffect(() => {
                       if (currentLagIndex === legToRemove.index) {
                         const newIndex = Math.max(0, legToRemove.index - 1);
                         setCurrentLagIndex(newIndex);
+                        currentLegIndexRef.current = newIndex; // Keep ref in sync
                         const selectedLeg = updatedLegs[newIndex];
                         setFormData({
                           startingPoint: selectedLeg.startingPoint || "",
@@ -4125,7 +4126,9 @@ useEffect(() => {
                           setDrivers([]);
                         }
                       } else if (currentLagIndex > legToRemove.index) {
-                        setCurrentLagIndex(currentLagIndex - 1);
+                        const newIndex = currentLagIndex - 1;
+                        setCurrentLagIndex(newIndex);
+                        currentLegIndexRef.current = newIndex; // Keep ref in sync
                       }
 
                       setSavedMessage("Leg removed successfully!");
