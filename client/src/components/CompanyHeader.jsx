@@ -1,13 +1,42 @@
 import "../pages/Creditors/purchaseOrder/css/PO.css";
 
+import { useEffect, useState } from "react";
+import api from "../api";
+
 const CompanyHeader = ({ subtitle }) => {
+  const [company, setCompany] = useState(null);
+
+  useEffect(() => {
+    const fetchCompany = async () => {
+      try {
+        const response = await api.get("/api/companies");
+        setCompany(response.data);
+      } catch (error) {
+        console.error("Error fetching company details:", error);
+        setCompany(null);
+      }
+    };
+
+    fetchCompany();
+  }, []);
+
+  const companyName = company?.companyname || "";
+  const clusterBox = company?.cluster_box || "";
+  const suburb = company?.suburb || "";
+  const address = company?.address || "";
+  const cell = company?.cell_num || company?.cell_num2 || "";
+  const tel = company?.cell_num2 || "";
+  const email = company?.email || "";
+  const vatRegNum = company?.vat_reg_num || "";
+  const regNum = company?.company_reg_num || "";
+
   return (
     <>
     <div className="po-form-wrapper">
       <div className="po-header">
         <div className="po-header-left">
           <div className="po-title-container">
-            <h1 className="po-title">KSM Carriers</h1>
+            <h1 className="po-title">{companyName}</h1>
             {subtitle && <h2 className="po-subtitle">{subtitle}</h2>}
           </div>
         </div>
@@ -15,27 +44,27 @@ const CompanyHeader = ({ subtitle }) => {
 
       <div className="company-details">
         <div className="company-address">
-          Cluster Box 24230
+          {clusterBox}
           <br />
-          Broadlands
+          {suburb}
           <br />
-          Mount Edgecombe
+          {address}
           <br />
-          4156
+          {""}
         </div>
         <div className="company-contact">
-          Tel: 031 459 0406
+          Tel: {tel}
           <br />
-          Cell: 076 834 2900
+          Cell: {cell}
           <br />
-          E-mail: operations@ksmcarriers.co.za
+          {/* E-mail: {email} */}
         </div>
       </div>
 
       <div className="company-registration">
-        VAT Reg No: 4130274923
+        VAT Reg No: {vatRegNum}
         <br />
-        Reg: 2019/302835/07
+        Reg: {regNum}
       </div>
       </div>
     </>
