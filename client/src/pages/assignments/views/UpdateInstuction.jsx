@@ -2384,6 +2384,14 @@ const checkContainersDestination = async () => {
           return;
         }
 
+        // CRITICAL FIX: Only hide the add leg button if we're currently viewing the last leg
+        // If user is on a previous leg and saves, we shouldn't disable adding more legs
+        const isOnLastLeg = currentLagIndex === legs.length - 1;
+        if (!isOnLastLeg) {
+          setShouldHideAddLegButton(false);
+          return;
+        }
+
 const missingItems = await checkContainersReachDropoff(dropoff);
 
       console.log("Destination check result (missing items):", missingItems);
@@ -2397,7 +2405,7 @@ const missingItems = await checkContainersReachDropoff(dropoff);
   };
 
   checkContainersDestination();
-}, [instructionId, legs, instructionContainers, isWeightBased]);
+}, [instructionId, legs, instructionContainers, isWeightBased, currentLagIndex]);
 
   useEffect(() => {
   // Set switching flag when leg changes
