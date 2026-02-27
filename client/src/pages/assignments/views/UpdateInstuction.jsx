@@ -1253,6 +1253,7 @@ setLegs(prevLegs => {
   // Set currentLagIndex in the same render cycle using a callback
   setTimeout(() => {
     setCurrentLagIndex(newLegIndex);
+    currentLegIndexRef.current = newLegIndex;
   }, 0);
   
   return updatedLegs;
@@ -2096,10 +2097,23 @@ const navigateToDocuments = () => {
   };
 
   const handleSave = async () => {
+    // Prevent concurrent saves
+    if (isSavingRef.current) return;
+
+    const legIndexToSave =
+      currentLegIndexRef.current !== null &&
+      currentLegIndexRef.current !== undefined
+        ? currentLegIndexRef.current
+        : currentLagIndex;
+
+    if (legIndexToSave === null || legIndexToSave === undefined) {
+      return;
+    }
+
     // Prevent saves on completed instructions or while a save is already in progress
     if (isCompleted || saving || isSavingRef.current) return;
 
-    if (currentLagIndex === null) {
+    if (legIndexToSave === null || legIndexToSave === undefined) {
       setSavedMessage("Please select a leg first");
       setTimeout(() => setSavedMessage(""), 3000);
       return;
@@ -2181,14 +2195,14 @@ const navigateToDocuments = () => {
         }
       }
 
-      updatedLegs[currentLagIndex] = {
-        ...updatedLegs[currentLagIndex],
+      updatedLegs[legIndexToSave] = {
+        ...updatedLegs[legIndexToSave],
         ...formData,
         drivers: [...cleanDrivers],
       };
       setLegs(updatedLegs);
 
-      const currentLeg = updatedLegs[currentLagIndex];
+      const currentLeg = updatedLegs[legIndexToSave];
       const isNewLeg =
         currentLeg.isNew || currentLeg.id?.toString().startsWith("temp-");
 
@@ -2198,7 +2212,7 @@ const navigateToDocuments = () => {
           !isNewLeg && currentLeg.id && !isNaN(Number.parseInt(currentLeg.id))
             ? currentLeg.id
             : null,
-        legnumber: currentLeg.legnumber || currentLagIndex + 1,
+        legnumber: currentLeg.legnumber || legIndexToSave + 1,
         startingpoint: currentLeg.startingPoint || formData.startingPoint,
         destination: currentLeg.destination || formData.destination,
         driverrate: calculateLegDriverRate(cleanDrivers, rates),
@@ -2273,8 +2287,8 @@ const navigateToDocuments = () => {
 
       // Update the leg ID with the one from the database if this was a new leg
 if (result.legId && isNewLeg) {
-  updatedLegs[currentLagIndex] = {
-    ...updatedLegs[currentLagIndex],
+  updatedLegs[legIndexToSave] = {
+    ...updatedLegs[legIndexToSave],
     id: result.legId,
     isNew: false, // Clear the isNew flag
   };
@@ -2293,7 +2307,7 @@ console.log(`Has unsaved new leg after save: ${hasRemainingUnsavedLeg}`);
       // Ensure the current leg is marked as saved
       setSavedLegs((prev) => {
         const newSet = new Set(prev);
-        newSet.add(currentLagIndex);
+        newSet.add(legIndexToSave);
         return newSet;
       });
 
@@ -4135,6 +4149,7 @@ useEffect(() => {
                       if (currentLagIndex === legToRemove.index) {
                         const newIndex = Math.max(0, legToRemove.index - 1);
                         setCurrentLagIndex(newIndex);
+                        currentLegIndexRef.current = newIndex;
                         const selectedLeg = updatedLegs[newIndex];
                         setFormData({
                           startingPoint: selectedLeg.startingPoint || "",
@@ -4151,6 +4166,7 @@ useEffect(() => {
                         }
                       } else if (currentLagIndex > legToRemove.index) {
                         setCurrentLagIndex(currentLagIndex - 1);
+                        currentLegIndexRef.current = currentLagIndex - 1;
                       }
 
                       setSavedMessage("Leg removed successfully!");
