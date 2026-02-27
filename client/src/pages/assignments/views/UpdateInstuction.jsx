@@ -2352,7 +2352,7 @@ const shouldDisableAddLeg = async () => {
 };
 
 // Simplified sync - only when absolutely necessary
-  // Add this useEffect to check if we should hide the + button whenever legs or containers change
+  // Add this useEffect to check if we should hide the + button whenever legs or containers  n      change
   useEffect(() => {
 const checkContainersDestination = async () => {
   if (
