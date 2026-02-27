@@ -399,7 +399,7 @@ const [weightUnit, setWeightUnit] = useState('kg');
 };
   // Improve the refreshLegData function to ensure data is properly refreshed
   // Update refreshLegData function to use Axios
-  const refreshLegData = async () => {
+  const refreshLegData = async (skipCurrentLegUpdate = false) => {
     if (instructionId) {
       try {
         const requestId = legSwitchIdRef.current;
@@ -456,7 +456,9 @@ const [weightUnit, setWeightUnit] = useState('kg');
           console.log("Updated savedLegs:", Array.from(savedLegIndexes));
 
           const activeIndex = currentLegIndexRef.current;
-          if (activeIndex !== null && activeIndex !== undefined && activeIndex < fetchedLegs.length) {
+          // Skip updating current leg display if we just deleted a leg
+          // (local state is already correct, and server might have stale data briefly)
+          if (!skipCurrentLegUpdate && activeIndex !== null && activeIndex !== undefined && activeIndex < fetchedLegs.length) {
             const currentLeg = fetchedLegs[activeIndex];
 
             if (legSwitchIdRef.current === requestId && currentLegIndexRef.current === activeIndex) {
@@ -4127,7 +4129,7 @@ useEffect(() => {
                       setTimeout(() => setSavedMessage(""), 5000);
 
                       if (!isTemporaryLeg) {
-                        await refreshLegData();
+                        await refreshLegData(true); // Skip current leg update since local state is correct
                       }
                     } catch (error) {
                       console.error("Error removing leg:", error);
