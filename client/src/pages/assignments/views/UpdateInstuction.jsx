@@ -4076,10 +4076,7 @@ useEffect(() => {
                         }
                       }
 
-                      const updatedLegs = legs.map(leg => ({
-                        ...leg,
-                        drivers: leg.drivers ? leg.drivers.map(d => ({...d})) : []
-                      }));
+                      const updatedLegs = [...legs];
                       updatedLegs.splice(legToRemove.index, 1);
 
                       for (
@@ -4087,10 +4084,7 @@ useEffect(() => {
                         i < updatedLegs.length;
                         i++
                       ) {
-                        updatedLegs[i] = {
-                          ...updatedLegs[i],
-                          legnumber: i + 1
-                        };
+                        updatedLegs[i].legnumber = i + 1;
                       }
 
                       setLegs(updatedLegs);
@@ -4121,7 +4115,7 @@ useEffect(() => {
                           selectedLeg.drivers &&
                           selectedLeg.drivers.length > 0
                         ) {
-                          setDrivers(JSON.parse(JSON.stringify(selectedLeg.drivers)));
+                          setDrivers(selectedLeg.drivers);
                         } else {
                           setDrivers([]);
                         }
@@ -4134,8 +4128,9 @@ useEffect(() => {
                       setSavedMessage("Leg removed successfully!");
                       setTimeout(() => setSavedMessage(""), 5000);
 
-                      // Don't refresh from server - local state is already correct
-                      // and server might have stale data due to replication lag on AWS
+                      if (!isTemporaryLeg) {
+                        await refreshLegData(true); // Skip current leg update since local state is correct
+                      }
                     } catch (error) {
                       console.error("Error removing leg:", error);
                       setSavedMessage("Error removing leg: " + error.message);
