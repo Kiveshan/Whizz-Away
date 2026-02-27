@@ -436,14 +436,35 @@ const [weightUnit, setWeightUnit] = useState('kg');
             };
           });
 
-          console.log(
-            "Transformed refreshed legs data:",
-            JSON.stringify(fetchedLegs, null, 2)
+          // CRITICAL FIX: Preserve any unsaved new legs that don't exist on server
+          // Get current unsaved legs from state before we overwrite it
+          const currentUnsavedLegs = legs.filter(
+            (leg) => leg.isNew || leg.id?.toString().startsWith("temp-")
           );
-          setLegs(fetchedLegs);
+          
+          // Merge: server legs first, then append unsaved legs that aren't on server
+          const mergedLegs = [...fetchedLegs];
+          currentUnsavedLegs.forEach((unsavedLeg) => {
+            // Only add if this unsaved leg number doesn't exist in fetched data
+            const existsOnServer = fetchedLegs.some(
+              (fetched) => fetched.legnumber === unsavedLeg.legnumber
+            );
+            if (!existsOnServer) {
+              mergedLegs.push(unsavedLeg);
+            }
+          });
+          
+          // Sort by legnumber to maintain order
+          mergedLegs.sort((a, b) => a.legnumber - b.legnumber);
+
+          console.log(
+            "Transformed refreshed legs data (with preserved unsaved):",
+            JSON.stringify(mergedLegs, null, 2)
+          );
+          setLegs(mergedLegs);
 
           const savedLegIndexes = new Set();
-          fetchedLegs.forEach((leg, index) => {
+          mergedLegs.forEach((leg, index) => {
             if (
               leg.id &&
               !leg.id.toString().startsWith("temp-") &&
@@ -456,8 +477,8 @@ const [weightUnit, setWeightUnit] = useState('kg');
           console.log("Updated savedLegs:", Array.from(savedLegIndexes));
 
           const activeIndex = currentLegIndexRef.current;
-          if (activeIndex !== null && activeIndex !== undefined && activeIndex < fetchedLegs.length) {
-            const currentLeg = fetchedLegs[activeIndex];
+          if (activeIndex !== null && activeIndex !== undefined && activeIndex < mergedLegs.length) {
+            const currentLeg = mergedLegs[activeIndex];
 
             if (legSwitchIdRef.current === requestId && currentLegIndexRef.current === activeIndex) {
               setFormData({
@@ -4091,6 +4112,11 @@ useEffect(() => {
                       ) {
                         updatedLegs[i].legnumber = i + 1;
                       }
+
+                      const hasRemainingUnsavedLeg = updatedLegs.some(
+                        (leg) => leg.isNew || leg.id?.toString().startsWith("temp-")
+                      );
+                      setHasUnsavedNewLeg(hasRemainingUnsavedLeg);
 
                       setLegs(updatedLegs);
 
