@@ -150,7 +150,7 @@ function DynamicHeader() {
     "/ViewExpense": "Fuel Expenses",
     "/ExpenseDetails": "Fuel Expenses",
     "/ExpenseSubmission": "Fuel Expense",
-    "/manage": "Manage",
+    "/manage":                            "Manage",
     "/ViewClientInstruction": "Clients",
     "/ViewClientInvoice": "Invoice",
     "/DebtorsDashboard": "Debtors",

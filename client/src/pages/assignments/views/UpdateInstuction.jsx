@@ -399,7 +399,7 @@ const [weightUnit, setWeightUnit] = useState('kg');
 };
   // Improve the refreshLegData function to ensure data is properly refreshed
   // Update refreshLegData function to use Axios
-  const refreshLegData = async () => {
+  const refreshLegData = async (skipCurrentLegUpdate = false) => {
     if (instructionId) {
       try {
         const requestId = legSwitchIdRef.current;
@@ -456,7 +456,9 @@ const [weightUnit, setWeightUnit] = useState('kg');
           console.log("Updated savedLegs:", Array.from(savedLegIndexes));
 
           const activeIndex = currentLegIndexRef.current;
-          if (activeIndex !== null && activeIndex !== undefined && activeIndex < fetchedLegs.length) {
+          // Skip updating current leg display if we just deleted a leg
+          // (local state is already correct, and server might have stale data briefly)
+          if (!skipCurrentLegUpdate && activeIndex !== null && activeIndex !== undefined && activeIndex < fetchedLegs.length) {
             const currentLeg = fetchedLegs[activeIndex];
 
             if (legSwitchIdRef.current === requestId && currentLegIndexRef.current === activeIndex) {
@@ -4074,7 +4076,10 @@ useEffect(() => {
                         }
                       }
 
-                      const updatedLegs = [...legs];
+                      const updatedLegs = legs.map(leg => ({
+                        ...leg,
+                        drivers: leg.drivers ? leg.drivers.map(d => ({...d})) : []
+                      }));
                       updatedLegs.splice(legToRemove.index, 1);
 
                       for (
@@ -4082,7 +4087,10 @@ useEffect(() => {
                         i < updatedLegs.length;
                         i++
                       ) {
-                        updatedLegs[i].legnumber = i + 1;
+                        updatedLegs[i] = {
+                          ...updatedLegs[i],
+                          legnumber: i + 1
+                        };
                       }
 
                       setLegs(updatedLegs);
@@ -4102,6 +4110,7 @@ useEffect(() => {
                       if (currentLagIndex === legToRemove.index) {
                         const newIndex = Math.max(0, legToRemove.index - 1);
                         setCurrentLagIndex(newIndex);
+                        currentLegIndexRef.current = newIndex; // Keep ref in sync
                         const selectedLeg = updatedLegs[newIndex];
                         setFormData({
                           startingPoint: selectedLeg.startingPoint || "",
@@ -4112,20 +4121,21 @@ useEffect(() => {
                           selectedLeg.drivers &&
                           selectedLeg.drivers.length > 0
                         ) {
-                          setDrivers(selectedLeg.drivers);
+                          setDrivers(JSON.parse(JSON.stringify(selectedLeg.drivers)));
                         } else {
                           setDrivers([]);
                         }
                       } else if (currentLagIndex > legToRemove.index) {
-                        setCurrentLagIndex(currentLagIndex - 1);
+                        const newIndex = currentLagIndex - 1;
+                        setCurrentLagIndex(newIndex);
+                        currentLegIndexRef.current = newIndex; // Keep ref in sync
                       }
 
                       setSavedMessage("Leg removed successfully!");
                       setTimeout(() => setSavedMessage(""), 5000);
 
-                      if (!isTemporaryLeg) {
-                        await refreshLegData();
-                      }
+                      // Don't refresh from server - local state is already correct
+                      // and server might have stale data due to replication lag on AWS
                     } catch (error) {
                       console.error("Error removing leg:", error);
                       setSavedMessage("Error removing leg: " + error.message);
