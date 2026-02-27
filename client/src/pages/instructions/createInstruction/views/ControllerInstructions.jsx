@@ -1356,15 +1356,19 @@ const ControllerInstructions = () => {
       const currentWeightRows = weightRowsRef.current || []
 
       if ((isSetRateMode || isSetRate) && !isAddOn) {
-        totalCost = calculatedSetRateValue
+        const weightRowCount = currentWeightRows.length || 1
+        totalCost = calculatedSetRateValue * weightRowCount
 
         costBreakdown.components = {
           setRateAmount: setRateValue,
+          weightRowCount: weightRowCount,
           setRateCost: totalCost,
         }
 
         console.log("SET-RATE CALCULATION:")
         console.log(`  Set Rate Amount: R${setRateValue.toFixed(2)}`)
+        console.log(`  Weight Row Count: ${weightRowCount}`)
+        console.log(`  Total Cost: R${setRateValue.toFixed(2)} × ${weightRowCount} = R${totalCost.toFixed(2)}`)
       } else if (isWeightBased && !isAddOn) {
         // Weight-based calculation
         let baseWeight = 0
@@ -1486,9 +1490,12 @@ const ControllerInstructions = () => {
       // Set the total cost to save (WITHOUT VAT)
       // Use set rate value if either isSetRateMode (SetRate unit type) or isSetRate (checkbox) is true
       if ((isSetRateMode || isSetRate) && !isAddOn) {
-        totalCost = calculatedSetRateValue
+        const weightRowCount = currentWeightRows.length || 1
+        totalCost = calculatedSetRateValue * weightRowCount
         costBreakdown.components.finalTotalSaved = totalCost
         console.log("FINAL COST BREAKDOWN (SET RATE):")
+        console.log(`  Set Rate Amount: R${setRateValue.toFixed(2)}`)
+        console.log(`  Weight Row Count: ${weightRowCount}`)
         console.log(`  Set Rate Cost: R${totalCost.toFixed(2)}`)
       } else {
         totalCost = subtotalBeforeVAT

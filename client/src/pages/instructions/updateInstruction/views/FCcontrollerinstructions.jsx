@@ -1388,11 +1388,14 @@ const FCcontrollerinstructions = () => {
       let baseCost = 0;
       console.log("DEBUG UPDATE isSetRateMode:", isSetRateMode, "formData.rateWeight:", formData.rateWeight, "formData.setRateAmount:", formData.setRateAmount);
       if (isSetRateMode && !isAddOn) {
-        // Set Rate mode: use setRateAmount as total cost
+        // Set Rate mode: use setRateAmount multiplied by weight row count
         const setRateValue = Number.parseFloat(formData.setRateAmount || 0);
-        baseCost = Number.isNaN(setRateValue) ? 0 : setRateValue;
+        const weightRowCount = weightRows.length || 1;
+        baseCost = Number.isNaN(setRateValue) ? 0 : setRateValue * weightRowCount;
         console.log("SET-RATE CALCULATION (UPDATE):");
-        console.log(`  Set Rate Amount: R${setRateValue.toFixed(2)} -> baseCost: ${baseCost}`);
+        console.log(`  Set Rate Amount: R${setRateValue.toFixed(2)}`);
+        console.log(`  Weight Row Count: ${weightRowCount}`);
+        console.log(`  Total Cost: R${setRateValue.toFixed(2)} × ${weightRowCount} = R${baseCost.toFixed(2)}`);
       } else if (
         (formData.rateWeight === "kg" || formData.rateWeight === "ton") &&
         String(formData.shipmentTypeId) === "4"

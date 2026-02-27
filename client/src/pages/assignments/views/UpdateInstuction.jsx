@@ -399,7 +399,7 @@ const [weightUnit, setWeightUnit] = useState('kg');
 };
   // Improve the refreshLegData function to ensure data is properly refreshed
   // Update refreshLegData function to use Axios
-  const refreshLegData = async (skipCurrentLegUpdate = false) => {
+  const refreshLegData = async () => {
     if (instructionId) {
       try {
         const requestId = legSwitchIdRef.current;
@@ -436,14 +436,35 @@ const [weightUnit, setWeightUnit] = useState('kg');
             };
           });
 
-          console.log(
-            "Transformed refreshed legs data:",
-            JSON.stringify(fetchedLegs, null, 2)
+          // CRITICAL FIX: Preserve any unsaved new legs that don't exist on server
+          // Get current unsaved legs from state before we overwrite it
+          const currentUnsavedLegs = legs.filter(
+            (leg) => leg.isNew || leg.id?.toString().startsWith("temp-")
           );
-          setLegs(fetchedLegs);
+          
+          // Merge: server legs first, then append unsaved legs that aren't on server
+          const mergedLegs = [...fetchedLegs];
+          currentUnsavedLegs.forEach((unsavedLeg) => {
+            // Only add if this unsaved leg number doesn't exist in fetched data
+            const existsOnServer = fetchedLegs.some(
+              (fetched) => fetched.legnumber === unsavedLeg.legnumber
+            );
+            if (!existsOnServer) {
+              mergedLegs.push(unsavedLeg);
+            }
+          });
+          
+          // Sort by legnumber to maintain order
+          mergedLegs.sort((a, b) => a.legnumber - b.legnumber);
+
+          console.log(
+            "Transformed refreshed legs data (with preserved unsaved):",
+            JSON.stringify(mergedLegs, null, 2)
+          );
+          setLegs(mergedLegs);
 
           const savedLegIndexes = new Set();
-          fetchedLegs.forEach((leg, index) => {
+          mergedLegs.forEach((leg, index) => {
             if (
               leg.id &&
               !leg.id.toString().startsWith("temp-") &&
@@ -456,10 +477,8 @@ const [weightUnit, setWeightUnit] = useState('kg');
           console.log("Updated savedLegs:", Array.from(savedLegIndexes));
 
           const activeIndex = currentLegIndexRef.current;
-          // Skip updating current leg display if we just deleted a leg
-          // (local state is already correct, and server might have stale data briefly)
-          if (!skipCurrentLegUpdate && activeIndex !== null && activeIndex !== undefined && activeIndex < fetchedLegs.length) {
-            const currentLeg = fetchedLegs[activeIndex];
+          if (activeIndex !== null && activeIndex !== undefined && activeIndex < mergedLegs.length) {
+            const currentLeg = mergedLegs[activeIndex];
 
             if (legSwitchIdRef.current === requestId && currentLegIndexRef.current === activeIndex) {
               setFormData({
@@ -1234,6 +1253,7 @@ setLegs(prevLegs => {
   // Set currentLagIndex in the same render cycle using a callback
   setTimeout(() => {
     setCurrentLagIndex(newLegIndex);
+    currentLegIndexRef.current = newLegIndex;
   }, 0);
   
   return updatedLegs;
@@ -2077,10 +2097,23 @@ const navigateToDocuments = () => {
   };
 
   const handleSave = async () => {
+    // Prevent concurrent saves
+    if (isSavingRef.current) return;
+
+    const legIndexToSave =
+      currentLegIndexRef.current !== null &&
+      currentLegIndexRef.current !== undefined
+        ? currentLegIndexRef.current
+        : currentLagIndex;
+
+    if (legIndexToSave === null || legIndexToSave === undefined) {
+      return;
+    }
+
     // Prevent saves on completed instructions or while a save is already in progress
     if (isCompleted || saving || isSavingRef.current) return;
 
-    if (currentLagIndex === null) {
+    if (legIndexToSave === null || legIndexToSave === undefined) {
       setSavedMessage("Please select a leg first");
       setTimeout(() => setSavedMessage(""), 3000);
       return;
@@ -2162,14 +2195,14 @@ const navigateToDocuments = () => {
         }
       }
 
-      updatedLegs[currentLagIndex] = {
-        ...updatedLegs[currentLagIndex],
+      updatedLegs[legIndexToSave] = {
+        ...updatedLegs[legIndexToSave],
         ...formData,
         drivers: [...cleanDrivers],
       };
       setLegs(updatedLegs);
 
-      const currentLeg = updatedLegs[currentLagIndex];
+      const currentLeg = updatedLegs[legIndexToSave];
       const isNewLeg =
         currentLeg.isNew || currentLeg.id?.toString().startsWith("temp-");
 
@@ -2179,7 +2212,7 @@ const navigateToDocuments = () => {
           !isNewLeg && currentLeg.id && !isNaN(Number.parseInt(currentLeg.id))
             ? currentLeg.id
             : null,
-        legnumber: currentLeg.legnumber || currentLagIndex + 1,
+        legnumber: currentLeg.legnumber || legIndexToSave + 1,
         startingpoint: currentLeg.startingPoint || formData.startingPoint,
         destination: currentLeg.destination || formData.destination,
         driverrate: calculateLegDriverRate(cleanDrivers, rates),
@@ -2254,20 +2287,27 @@ const navigateToDocuments = () => {
 
       // Update the leg ID with the one from the database if this was a new leg
 if (result.legId && isNewLeg) {
-  updatedLegs[currentLagIndex] = {
-    ...updatedLegs[currentLagIndex],
+  updatedLegs[legIndexToSave] = {
+    ...updatedLegs[legIndexToSave],
     id: result.legId,
     isNew: false, // Clear the isNew flag
   };
   setLegs(updatedLegs);
   console.log(`New leg saved to database with ID: ${result.legId}`);
-  setHasUnsavedNewLeg(false); // NEW: Mark that the new leg is now saved
 }
+
+// CRITICAL FIX: Check if there's still any unsaved new leg in the legs array
+// This handles the case where user adds a new leg, switches to a previous leg, and saves it
+const hasRemainingUnsavedLeg = updatedLegs.some(
+  (leg) => leg.isNew || leg.id?.toString().startsWith("temp-")
+);
+setHasUnsavedNewLeg(hasRemainingUnsavedLeg);
+console.log(`Has unsaved new leg after save: ${hasRemainingUnsavedLeg}`);
 
       // Ensure the current leg is marked as saved
       setSavedLegs((prev) => {
         const newSet = new Set(prev);
-        newSet.add(currentLagIndex);
+        newSet.add(legIndexToSave);
         return newSet;
       });
 
@@ -2347,7 +2387,7 @@ const shouldDisableAddLeg = async () => {
 };
 
 // Simplified sync - only when absolutely necessary
-  // Add this useEffect to check if we should hide the + button whenever legs or containers change
+  // Add this useEffect to check if we should hide the + button whenever legs or containers  n      change
   useEffect(() => {
 const checkContainersDestination = async () => {
   if (
@@ -4076,10 +4116,7 @@ useEffect(() => {
                         }
                       }
 
-                      const updatedLegs = legs.map(leg => ({
-                        ...leg,
-                        drivers: leg.drivers ? leg.drivers.map(d => ({...d})) : []
-                      }));
+                      const updatedLegs = [...legs];
                       updatedLegs.splice(legToRemove.index, 1);
 
                       for (
@@ -4087,11 +4124,13 @@ useEffect(() => {
                         i < updatedLegs.length;
                         i++
                       ) {
-                        updatedLegs[i] = {
-                          ...updatedLegs[i],
-                          legnumber: i + 1
-                        };
+                        updatedLegs[i].legnumber = i + 1;
                       }
+
+                      const hasRemainingUnsavedLeg = updatedLegs.some(
+                        (leg) => leg.isNew || leg.id?.toString().startsWith("temp-")
+                      );
+                      setHasUnsavedNewLeg(hasRemainingUnsavedLeg);
 
                       setLegs(updatedLegs);
 
@@ -4110,7 +4149,7 @@ useEffect(() => {
                       if (currentLagIndex === legToRemove.index) {
                         const newIndex = Math.max(0, legToRemove.index - 1);
                         setCurrentLagIndex(newIndex);
-                        currentLegIndexRef.current = newIndex; // Keep ref in sync
+                        currentLegIndexRef.current = newIndex;
                         const selectedLeg = updatedLegs[newIndex];
                         setFormData({
                           startingPoint: selectedLeg.startingPoint || "",
@@ -4121,21 +4160,21 @@ useEffect(() => {
                           selectedLeg.drivers &&
                           selectedLeg.drivers.length > 0
                         ) {
-                          setDrivers(JSON.parse(JSON.stringify(selectedLeg.drivers)));
+                          setDrivers(selectedLeg.drivers);
                         } else {
                           setDrivers([]);
                         }
                       } else if (currentLagIndex > legToRemove.index) {
-                        const newIndex = currentLagIndex - 1;
-                        setCurrentLagIndex(newIndex);
-                        currentLegIndexRef.current = newIndex; // Keep ref in sync
+                        setCurrentLagIndex(currentLagIndex - 1);
+                        currentLegIndexRef.current = currentLagIndex - 1;
                       }
 
                       setSavedMessage("Leg removed successfully!");
                       setTimeout(() => setSavedMessage(""), 5000);
 
-                      // Don't refresh from server - local state is already correct
-                      // and server might have stale data due to replication lag on AWS
+                      if (!isTemporaryLeg) {
+                        await refreshLegData();
+                      }
                     } catch (error) {
                       console.error("Error removing leg:", error);
                       setSavedMessage("Error removing leg: " + error.message);
