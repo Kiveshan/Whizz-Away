@@ -624,12 +624,15 @@ export const deleteLeg = async (legId) => {
     console.log(
       `Deleting leg ${legId} (leg number ${legnumber}) from instruction ${m1key}`
     );
+    // CRITICAL FIX: Delete ALL rows with this legnumber and m1key, not just one row
+    // A leg can have multiple drivers, each stored as separate rows with the same legnumber
     const result = await client.query(
-      `DELETE FROM legs_m2 WHERE legkey = $1 RETURNING legkey`,
-      [legId]
+      `DELETE FROM legs_m2 WHERE legnumber = $1 AND m1key = $2`,
+      [legnumber, m1key]
     );
-    if (result.rowCount === 0)
-      throw new Error(`Leg with ID ${legId} not found or could not be deleted`);
+    console.log(
+      `Deleted ${result.rowCount} rows for leg number ${legnumber} from instruction ${m1key}`
+    );
     const legDateQuery = `
       SELECT MIN(l.date) AS first_leg_date
       FROM public.legs_m2 l
@@ -645,7 +648,7 @@ export const deleteLeg = async (legId) => {
       [m1key, firstLegDate]
     );
     await client.query("COMMIT");
-    return { deletedLegId: legId };
+    return { deletedLegId: legId, deletedRows: result.rowCount };
   } catch (error) {
     await client.query("ROLLBACK");
     throw error;
