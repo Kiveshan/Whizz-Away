@@ -1311,6 +1311,25 @@ const ControllerInstructions = () => {
     try {
       console.log("=== STARTING TOTAL COST CALCULATION ===")
 
+      // Fetch set rate on-the-fly if Set Rate checkbox is checked (prevents race condition)
+      let currentSetRateValue = setRateValue
+      if (isSetRate && formData.clientId && formData.pickup && formData.dropoff) {
+        console.log("[SET RATE] Fetching set rate on-the-fly to avoid race condition...")
+        try {
+          const rates = await fetchRates(formData.clientId, formData.pickup, formData.dropoff)
+          if (rates && rates.setRate != null) {
+            currentSetRateValue = Number(rates.setRate)
+            console.log(`[SET RATE] Fetched fresh value: ${currentSetRateValue}`)
+          } else {
+            currentSetRateValue = 0
+            console.log("[SET RATE] No set rate found for this route")
+          }
+        } catch (err) {
+          console.error("[SET RATE] Error fetching:", err)
+          currentSetRateValue = 0
+        }
+      }
+
       let totalCost = 0
       const costBreakdown = {
         calculationType: isWeightBased ? "weight-based" : isSetRateMode ? "set-rate" : "container-based",
@@ -1320,19 +1339,36 @@ const ControllerInstructions = () => {
         components: {},
       }
 
+      // Calculate set rate value using the freshly fetched value
+      const calculatedSetRateValue = Number.isFinite(Number(currentSetRateValue)) ? Number(currentSetRateValue) : 0
+
+      console.log("DEBUG VALUES:", {
+        isSetRateMode,
+        isSetRate,
+        isAddOn,
+        shipmentTypeId: formData.shipmentTypeId,
+        rateWeight: formData.rateWeight,
+        setRateValue,
+        currentSetRateValue,
+        calculatedSetRateValue
+      })
+
       const currentWeightRows = weightRowsRef.current || []
 
-      if (isSetRateMode && !isAddOn) {
-        const setRateValue = Number.parseFloat(formData.setRateAmount || 0)
-        totalCost = Number.isNaN(setRateValue) ? 0 : setRateValue
+      if ((isSetRateMode || isSetRate) && !isAddOn) {
+        const weightRowCount = currentWeightRows.length || 1
+        totalCost = calculatedSetRateValue * weightRowCount
 
         costBreakdown.components = {
           setRateAmount: setRateValue,
+          weightRowCount: weightRowCount,
           setRateCost: totalCost,
         }
 
         console.log("SET-RATE CALCULATION:")
         console.log(`  Set Rate Amount: R${setRateValue.toFixed(2)}`)
+        console.log(`  Weight Row Count: ${weightRowCount}`)
+        console.log(`  Total Cost: R${setRateValue.toFixed(2)} × ${weightRowCount} = R${totalCost.toFixed(2)}`)
       } else if (isWeightBased && !isAddOn) {
         // Weight-based calculation
         let baseWeight = 0
@@ -1452,10 +1488,14 @@ const ControllerInstructions = () => {
       console.log(`  Total with VAT: R${totalWithVAT.toFixed(2)}`)
 
       // Set the total cost to save (WITHOUT VAT)
-      if (isSetRate) {
-        totalCost = setRateValue
+      // Use set rate value if either isSetRateMode (SetRate unit type) or isSetRate (checkbox) is true
+      if ((isSetRateMode || isSetRate) && !isAddOn) {
+        const weightRowCount = currentWeightRows.length || 1
+        totalCost = calculatedSetRateValue * weightRowCount
         costBreakdown.components.finalTotalSaved = totalCost
         console.log("FINAL COST BREAKDOWN (SET RATE):")
+        console.log(`  Set Rate Amount: R${setRateValue.toFixed(2)}`)
+        console.log(`  Weight Row Count: ${weightRowCount}`)
         console.log(`  Set Rate Cost: R${totalCost.toFixed(2)}`)
       } else {
         totalCost = subtotalBeforeVAT
@@ -1481,6 +1521,7 @@ const ControllerInstructions = () => {
         ...formDataWithoutContainerFields,
         total_cost: isAddOnType ? 0 : totalCost, // For add-on, always save 0
         is_set_rate: isSetRate, // Add is_set_rate boolean
+        historical_set_rate: isSetRate ? currentSetRateValue : null, // Use freshly fetched value to avoid race condition
         // Set vessel_name and stackdate to null for cross-haul types
         vessel_name: isCrossHaul ? null : formData.vesselName,
         stackdate: isCrossHaul ? null : formData.stackDate,
@@ -1597,6 +1638,16 @@ const ControllerInstructions = () => {
       }
 
       console.log("=== SUBMITTING TO DATABASE ===")
+      console.log("DEBUG FINAL VALUES:", {
+        totalCost,
+        isSetRateMode,
+        isSetRate,
+        isAddOn,
+        isAddOnType,
+        calculatedSetRateValue,
+        setRateValue,
+        currentSetRateValue
+      })
       console.log("Instruction data being saved:", {
         ...instructionData,
         description: instructionData.description ? instructionData.description.substring(0, 50) + "..." : null, // Truncate for logging
@@ -1641,7 +1692,7 @@ const ControllerInstructions = () => {
     } finally {
       setIsSubmitting(false)
     }
-  }, [formData, isWeightBased, isCrossHaul, isImport, containers, weightRows, navigate])
+  }, [formData, isWeightBased, isCrossHaul, isImport, isSetRate, isSetRateMode, isAddOn, setRateValue, fetchRates, containers, weightRows, navigate])
 
   const handleConfirmSubmit = useCallback(async () => {
     setShowConfirmationPopup(false)

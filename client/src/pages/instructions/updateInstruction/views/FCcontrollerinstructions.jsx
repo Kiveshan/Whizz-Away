@@ -114,6 +114,8 @@ const FCcontrollerinstructions = () => {
   const [isSetRateMode, setIsSetRateMode] = useState(false);
   const [isSetRate, setIsSetRate] = useState(false);
   const [setRateValue, setSetRateValue] = useState(0);
+  const [historicalSetRate, setHistoricalSetRate] = useState(null);
+  const [showSetRateWarning, setShowSetRateWarning] = useState(false);
 
   const [weightRows, setWeightRows] = useState([]);
 
@@ -350,6 +352,25 @@ const FCcontrollerinstructions = () => {
     setIsSetRateMode(isSetRate)
   }, [isSetRate])
 
+  // Check for set rate mismatch warning when historicalSetRate, setRateValue, status, or isSetRate changes
+  useEffect(() => {
+    // Only show warning when:
+    // 1. Set rate is enabled
+    // 2. Status is "New" or "In Progress"
+    // 3. Both historical and current values are available and non-zero
+    // 4. They don't match
+    if (isSetRate && 
+        (formData.status === "New" || formData.status === "In Progress") &&
+        historicalSetRate !== null && 
+        historicalSetRate !== 0 &&
+        setRateValue !== 0 &&
+        historicalSetRate !== setRateValue) {
+      setShowSetRateWarning(true);
+    } else {
+      setShowSetRateWarning(false);
+    }
+  }, [isSetRate, formData.status, historicalSetRate, setRateValue]);
+
   // State for warning modal
   const [warningModal, setWarningModal] = useState({
     isOpen: false,
@@ -506,7 +527,7 @@ const FCcontrollerinstructions = () => {
   };
 
   // Handle container input change with real-time validation
-  const handleContainerChange = (id, field, value) => {
+  const handleContainerChange = async (id, field, value) => {
     // Handle both camelCase and snake_case for file reference field
     if (field === "file_ref") {
       field = "fileRef"; // Convert to camelCase for consistency
@@ -690,17 +711,44 @@ const FCcontrollerinstructions = () => {
         // Handle hazardous checkbox with rate fetching
         console.log(`☢️ Hazardous checkbox ${value ? 'CHECKED' : 'UNCHECKED'} for container ${id}`);
         if (value) {
-          // Checkbox checked - update state immediately, then fetch hazardous amount
-          console.log(`☢️ Hazardous checkbox CHECKED for container ${id} - updating state and fetching rate`);
-          setContainers((prevContainers) =>
-            prevContainers.map((container) =>
-              container.id === id 
-                ? { ...container, [field]: true }
-                : container
-            )
-          );
-          console.log(`📞 Calling fetchHazardousAmount for container ${id}`);
-          fetchHazardousAmount(id);
+          // Checkbox checked - fetch amount first, then update state
+          console.log(`☢️ Hazardous checkbox CHECKED for container ${id} - fetching rate first`);
+          try {
+            const response = await api.get(
+              `/api/instructions/client/${formData.clientId}/rates`,
+              {
+                params: {
+                  start: formData.pickup,
+                  destination: formData.dropoff
+                }
+              }
+            );
+            const hazardousAmount = response.data.hazardous || 0;
+            console.log(`☣️ Fetched hazardous amount: ${hazardousAmount} for container ${id}`);
+            
+            // Update container with both flag and amount atomically
+            setContainers((prevContainers) =>
+              prevContainers.map((container) =>
+                container.id === id 
+                  ? { ...container, hazardous: true, hazardousAmount: Number(hazardousAmount) }
+                  : container
+              )
+            );
+            console.log(`🔄 Updated container ${id} with hazardous=true and amount=${hazardousAmount}`);
+            
+            // Force immediate recalculation
+            setTimeout(() => recalculateTotalCost(), 0);
+          } catch (error) {
+            console.error('❌ Error fetching hazardous amount:', error);
+            // Fallback: set flag true but amount 0
+            setContainers((prevContainers) =>
+              prevContainers.map((container) =>
+                container.id === id 
+                  ? { ...container, hazardous: true, hazardousAmount: 0 }
+                  : container
+              )
+            );
+          }
         } else {
           // Checkbox unchecked - reset hazardous amount to 0
           console.log(`☢️ Hazardous checkbox UNCHECKED for container ${id} - updating state and resetting amount to 0`);
@@ -943,15 +991,18 @@ const FCcontrollerinstructions = () => {
     }
 
     // Add weight and unitRate as required fields when rateWeight is ton or kg
+    // Skip unitRate requirement if Set Rate is checked
     if (formData.rateWeight === "ton" || formData.rateWeight === "kg") {
       if (String(formData.shipmentTypeId) !== "4") {
         requiredFields.push(
           { name: "weight", label: `Weight (${formData.rateWeight})` }
         );
       }
-      requiredFields.push(
-        { name: "unitRate", label: `Rate per ${formData.rateWeight}` }
-      );
+      if (!isSetRate) {
+        requiredFields.push(
+          { name: "unitRate", label: `Rate per ${formData.rateWeight}` }
+        );
+      }
     }
 
     requiredFields.forEach((field) => {
@@ -1337,11 +1388,14 @@ const FCcontrollerinstructions = () => {
       let baseCost = 0;
       console.log("DEBUG UPDATE isSetRateMode:", isSetRateMode, "formData.rateWeight:", formData.rateWeight, "formData.setRateAmount:", formData.setRateAmount);
       if (isSetRateMode && !isAddOn) {
-        // Set Rate mode: use setRateAmount as total cost
+        // Set Rate mode: use setRateAmount multiplied by weight row count
         const setRateValue = Number.parseFloat(formData.setRateAmount || 0);
-        baseCost = Number.isNaN(setRateValue) ? 0 : setRateValue;
+        const weightRowCount = weightRows.length || 1;
+        baseCost = Number.isNaN(setRateValue) ? 0 : setRateValue * weightRowCount;
         console.log("SET-RATE CALCULATION (UPDATE):");
-        console.log(`  Set Rate Amount: R${setRateValue.toFixed(2)} -> baseCost: ${baseCost}`);
+        console.log(`  Set Rate Amount: R${setRateValue.toFixed(2)}`);
+        console.log(`  Weight Row Count: ${weightRowCount}`);
+        console.log(`  Total Cost: R${setRateValue.toFixed(2)} × ${weightRowCount} = R${baseCost.toFixed(2)}`);
       } else if (
         (formData.rateWeight === "kg" || formData.rateWeight === "ton") &&
         String(formData.shipmentTypeId) === "4"
@@ -1363,28 +1417,60 @@ const FCcontrollerinstructions = () => {
           ratePer12 * numTwelve +
           ratePerAbnormal * numAbnormal;
       }
-      // Calculate total surcharge from containers
-      const totalSurchargeAmount = containers.reduce((total, container) => {
+      // Fetch fresh amounts on-the-fly to prevent race condition
+      // If user clicks Save before async fetches complete, we need current values
+      const fetchFreshAmounts = async () => {
+        const freshContainers = await Promise.all(
+          containers.map(async (container) => {
+            // If flags are true but amounts might be stale, fetch fresh values
+            if ((container.addSurcharges || container.hazardous || container.vgm) && 
+                formData.clientId && formData.pickup && formData.dropoff) {
+              try {
+                const response = await api.get(
+                  `/api/instructions/client/${formData.clientId}/rates`,
+                  { params: { pickup: formData.pickup, dropoff: formData.dropoff } }
+                );
+                return {
+                  ...container,
+                  surchargeAmount: container.addSurcharges ? Number(response.data.surcharges || 0) : container.surchargeAmount,
+                  hazardousAmount: container.hazardous ? Number(response.data.hazardous || 0) : container.hazardousAmount,
+                  vgmAmount: container.vgm ? Number(response.data.vgm || 0) : container.vgmAmount,
+                };
+              } catch (err) {
+                console.error("Error fetching fresh amounts:", err);
+                return container;
+              }
+            }
+            return container;
+          })
+        );
+        return freshContainers;
+      };
+
+      const freshContainers = await fetchFreshAmounts();
+
+      // Calculate total surcharge from containers (using fresh amounts)
+      const totalSurchargeAmount = freshContainers.reduce((total, container) => {
         if (container.addSurcharges && container.surchargeAmount) {
           return total + Number(container.surchargeAmount || 0);
         }
         return total;
       }, 0);
-      // Calculate total hazardous amount from containers
-      const totalHazardousAmount = containers.reduce((total, container) => {
+      // Calculate total hazardous amount from containers (using fresh amounts)
+      const totalHazardousAmount = freshContainers.reduce((total, container) => {
         if (container.hazardous && container.hazardousAmount) {
           return total + Number(container.hazardousAmount || 0);
         }
         return total;
       }, 0);
-      // Calculate total VGM amount from containers
-      const totalVgmAmount = containers.reduce((total, container) => {
+      // Calculate total VGM amount from containers (using fresh amounts)
+      const totalVgmAmount = freshContainers.reduce((total, container) => {
         if (container.vgm && container.vgmAmount) {
           return total + Number(container.vgmAmount || 0);
         }
         return total;
       }, 0);
-      console.log(`💲 Total cost components - Base: ${baseCost}, Surcharges: ${totalSurchargeAmount}, Hazardous: ${totalHazardousAmount}, VGM: ${totalVgmAmount}`);
+      console.log(`💲 Total cost components (fresh) - Base: ${baseCost}, Surcharges: ${totalSurchargeAmount}, Hazardous: ${totalHazardousAmount}, VGM: ${totalVgmAmount}`);
       // In Set Rate mode, total cost is exactly the set rate amount (no surcharges/hazardous/VGM)
       const totalCost = isSetRateMode
         ? baseCost
@@ -1461,6 +1547,8 @@ const FCcontrollerinstructions = () => {
                 : null
               : null,
         is_set_rate: isSetRate, // Set rate flag for database
+        // When set rate is checked, overwrite historical_set_rate with current setRateValue
+        historical_set_rate: isSetRate ? setRateValue : null,
       };
 
       // Prepare container data with containerKey for smart updates
@@ -2202,6 +2290,13 @@ const FCcontrollerinstructions = () => {
         setIsSetRate(false);
       }
 
+      // Use historical set rate value when status is Completed
+      if (data.is_set_rate && data.historical_set_rate) {
+        setHistoricalSetRate(Number(data.historical_set_rate));
+      } else {
+        setHistoricalSetRate(null);
+      }
+
       if (String(data.shipment_type) === "4" && Array.isArray(data.weight_rows)) {
         const mappedRows = data.weight_rows.map((row, index) => ({
           id: row.weight_pk || index + 1,
@@ -2925,6 +3020,17 @@ const FCcontrollerinstructions = () => {
         // Default unit per to 'ton' for shipment type 4 (Cross-haul break bulk)
         rateWeight: "ton",
       });
+      
+      // Initialize weightRows with a single blank entry for break bulk
+      setWeightRows([
+        {
+          id: 1,
+          ksmDmNo: "",
+          ticketNo: "",
+          receiptBookNo: "",
+          weight: "",
+        },
+      ]);
     }
     // For Import, Export, or Cross-haul (types 1, 2, 3), set rateWeight to 'Container'
     else if (
@@ -2951,9 +3057,11 @@ const FCcontrollerinstructions = () => {
           ? formData.num_twelve_meters
           : 0,
         num_abnormal: isContainerTypeSwitch ? formData.num_abnormal : 0,
+        num_breakbulk: 0, // Always clear break bulk count when switching to container types
         rateper_6: isContainerTypeSwitch ? formData.rateper_6 : 0,
         rateper_12: isContainerTypeSwitch ? formData.rateper_12 : 0,
         rateper_abnormal: isContainerTypeSwitch ? formData.rateper_abnormal : 0,
+        rateper_breakbulk: 0, // Always clear break bulk rate when switching to container types
       });
 
       // Only re-initialize containers if not switching between container types
@@ -2962,7 +3070,11 @@ const FCcontrollerinstructions = () => {
           initializeContainers();
         }, 0);
       }
-      return; // Skip the rest of the function
+      
+      // Reset set rate mode when switching away from break bulk
+      setIsSetRate(false);
+      
+      // Continue processing - don't return early so the state update completes properly
     }
     // For any other shipment type
     else {
@@ -3667,9 +3779,10 @@ const FCcontrollerinstructions = () => {
       isValid = false;
     }
 
-    // For ton or kg, unitRate is required
+    // For ton or kg, unitRate is required (unless Set Rate is checked)
     if (
       (formData.rateWeight === "ton" || formData.rateWeight === "kg") &&
+      !isSetRate &&
       (!formData.unitRate ||
         formData.unitRate === "" ||
         formData.unitRate === "0")
@@ -3772,6 +3885,7 @@ const FCcontrollerinstructions = () => {
     e.preventDefault();
 
     // Special validation for vessel name and stack date for import and export shipment types
+    // Skip vessel name for shipment type 4 (cross-haul break bulk)
     let hasSpecialValidationErrors = false;
     if (formData.shipmentTypeId === "1" || formData.shipmentTypeId === "2") {
       const errors = {};
@@ -3788,6 +3902,19 @@ const FCcontrollerinstructions = () => {
         hasSpecialValidationErrors = true;
       }
 
+      if (hasSpecialValidationErrors) {
+        setFieldErrors((prev) => ({ ...prev, ...errors }));
+        scrollToField(Object.keys(errors)[0]);
+        console.log("Special validation failed:", errors);
+        return;
+      }
+    } else if (formData.shipmentTypeId === "4") {
+      // For shipment type 4 (cross-haul break bulk), only validate stack date
+      const errors = {};
+      if (!formData.stackDate || !formData.stackDate.trim()) {
+        errors.stackDate = "Stack date is required";
+        hasSpecialValidationErrors = true;
+      }
       if (hasSpecialValidationErrors) {
         setFieldErrors((prev) => ({ ...prev, ...errors }));
         scrollToField(Object.keys(errors)[0]);
@@ -4040,6 +4167,22 @@ const FCcontrollerinstructions = () => {
               }}
             >
               ⚠️ This instruction is {formData.status} and is in read-only mode
+            </div>
+          )}
+          {showSetRateWarning && !isReadOnly && (
+            <div
+              style={{
+                backgroundColor: "#f8d7da",
+                border: "1px solid #f5c6cb",
+                borderRadius: "4px",
+                padding: "12px",
+                marginBottom: "20px",
+                textAlign: "center",
+                color: "#721c24",
+                fontWeight: "bold",
+              }}
+            >
+              ⚠️ Set Rate Warning: The historical rate (R{historicalSetRate?.toFixed(2)}) differs from the current client rate (R{setRateValue?.toFixed(2)}). Saving will update the historical rate to the current rate.
             </div>
           )}
           <div className="controller-instructions-form-section controller-instructions-client-info-section">
@@ -4774,7 +4917,14 @@ const FCcontrollerinstructions = () => {
                             <input
                               type="text"
                               className="controller-instructions-form-input"
-                              value={Number.isFinite(Number(setRateValue)) ? String(setRateValue) : ""}
+                              value={
+                                // Show historical value when status is Completed
+                                isReadOnly && historicalSetRate !== null 
+                                  ? String(historicalSetRate)
+                                  : Number.isFinite(Number(setRateValue)) 
+                                    ? String(setRateValue) 
+                                    : ""
+                              }
                               readOnly
                               disabled
                               style={{
@@ -5050,41 +5200,43 @@ const FCcontrollerinstructions = () => {
                       </div>
                     )}
                   </div>
-                  <div className="controller-instructions-form-field">
-                    <label>
-                      Vessel Name{" "}
-                      {(formData.shipmentTypeId === "1" ||
-                        formData.shipmentTypeId === "2") && (
-                        <span style={{ color: "red" }}>*</span>
-                      )}
-                    </label>
-                    <div
-                      className="controller-instructions-input-wrapper"
-                      ref={fieldRefs.vesselName}
-                    >
-                      <input
-                        type="text"
-                        className={`controller-instructions-form-input ${
-                          fieldErrors.vesselName
-                            ? "controller-instructions-error-field"
-                            : ""
-                        }`}
-                        placeholder="Enter vessel name"
-                        name="vesselName"
-                        value={formData.vesselName || ""}
-                        onChange={handleInputChange}
-                        disabled={isReadOnly}
-                        style={isReadOnly ? readOnlyStyle : {}}
-                        required={
-                          formData.shipmentTypeId === "1" ||
-                          formData.shipmentTypeId === "2"
-                        }
-                      />
-                      <InstructionErrorTooltip
-                        message={fieldErrors.vesselName}
-                      />
+                  {String(formData.shipmentTypeId) !== "4" && (
+                    <div className="controller-instructions-form-field">
+                      <label>
+                        Vessel Name{" "}
+                        {(formData.shipmentTypeId === "1" ||
+                          formData.shipmentTypeId === "2") && (
+                          <span style={{ color: "red" }}>*</span>
+                        )}
+                      </label>
+                      <div
+                        className="controller-instructions-input-wrapper"
+                        ref={fieldRefs.vesselName}
+                      >
+                        <input
+                          type="text"
+                          className={`controller-instructions-form-input ${
+                            fieldErrors.vesselName
+                              ? "controller-instructions-error-field"
+                              : ""
+                          }`}
+                          placeholder="Enter vessel name"
+                          name="vesselName"
+                          value={formData.vesselName || ""}
+                          onChange={handleInputChange}
+                          disabled={isReadOnly}
+                          style={isReadOnly ? readOnlyStyle : {}}
+                          required={
+                            formData.shipmentTypeId === "1" ||
+                            formData.shipmentTypeId === "2"
+                          }
+                        />
+                        <InstructionErrorTooltip
+                          message={fieldErrors.vesselName}
+                        />
+                      </div>
                     </div>
-                  </div>
+                  )}
                   <div className="controller-instructions-form-field">
                     <label>Description</label>
                     <div
