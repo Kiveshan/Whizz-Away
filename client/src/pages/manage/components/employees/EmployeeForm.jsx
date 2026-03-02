@@ -1,10 +1,22 @@
 import { useRef, useState } from "react";
 import { extractFilenameFromUrl } from "../../utils/helpers";
+import { validatePassword, getPasswordStrength } from "../../../../utils/passwordValidator.js";
+import { Eye, EyeOff } from "lucide-react";
 
 const EmployeeForm = ({ employee, loading, isEditing, onSave, onCancel, onChange, onDeleteDocument }) => {
   const emailRef = useRef(null);
   const [alert, setAlert] = useState({ show: false, message: "" });
   const [isCheckingEmail, setIsCheckingEmail] = useState(false);
+  const [passwordStrength, setPasswordStrength] = useState({
+    length: false,
+    lowercase: false,
+    uppercase: false,
+    number: false,
+    special: false,
+    valid: false,
+  });
+  const [passwordError, setPasswordError] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
 
   const API_BASE_URL = process.env.REACT_APP_API_URL || "http://localhost:5000";
 
@@ -26,6 +38,17 @@ const EmployeeForm = ({ employee, loading, isEditing, onSave, onCancel, onChange
     // Validate cell number format (required field)
     if (employee.cellnum && !/^[0-9]{10}$/.test(employee.cellnum)) {
       isValid = false;
+    }
+
+    // Validate password if provided (new employee or password change)
+    if (employee.password && employee.password.trim() !== "") {
+      const passwordValidation = validatePassword(employee.password);
+      if (passwordValidation !== true) {
+        setPasswordError(passwordValidation);
+        isValid = false;
+      } else {
+        setPasswordError("");
+      }
     }
 
     return isValid;
@@ -117,6 +140,17 @@ const EmployeeForm = ({ employee, loading, isEditing, onSave, onCancel, onChange
 
   const closeAlert = () => {
     setAlert({ show: false, message: "" });
+  };
+
+  const handlePasswordChange = (password) => {
+    onChange("password", password);
+    setPasswordStrength(getPasswordStrength(password));
+    if (password && password.trim() !== "") {
+      const validation = validatePassword(password);
+      setPasswordError(validation === true ? "" : validation);
+    } else {
+      setPasswordError("");
+    }
   };
 
   // Check if the role is Driver (5) or Yard Staff (9)
@@ -261,12 +295,63 @@ const EmployeeForm = ({ employee, loading, isEditing, onSave, onCancel, onChange
             <div className="manage-form-group">
               <label>
                 Password
+                {!isEditing && <span style={{ color: "red" }}>*</span>}
               </label>
-              <input
-                type="password"
-                value={employee.password || ""}
-                onChange={(e) => onChange("password", e.target.value)}
-              />
+              <div style={{ position: "relative" }}>
+                <input
+                  type={showPassword ? "text" : "password"}
+                  value={employee.password || ""}
+                  onChange={(e) => handlePasswordChange(e.target.value)}
+                  className={passwordError ? "password-error" : ""}
+                  style={{ paddingRight: "40px" }}
+                  placeholder={isEditing ? "Enter new password (optional)" : "Enter password"}
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(!showPassword)}
+                  style={{
+                    position: "absolute",
+                    right: "8px",
+                    top: "50%",
+                    transform: "translateY(-50%)",
+                    background: "none",
+                    border: "none",
+                    cursor: "pointer",
+                    color: "#666"
+                  }}
+                >
+                  {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+                </button>
+              </div>
+              {isEditing && (
+                <div style={{ fontSize: "0.8rem", color: "#666", marginTop: "4px" }}>
+                  Leave blank to keep existing password unchanged
+                </div>
+              )}
+              {passwordError && (
+                <div style={{ color: "red", fontSize: "0.85rem", marginTop: "4px" }}>
+                  {passwordError}
+                </div>
+              )}
+              {employee.password && employee.password.trim() !== "" && (
+                <div style={{ fontSize: "0.75rem", marginTop: "4px", color: "#666" }}>
+                  <div style={{ color: passwordStrength.length ? "green" : "red" }}>
+                    ✓ At least 8 characters
+                  </div>
+                  <div style={{ color: passwordStrength.lowercase ? "green" : "red" }}>
+                    ✓ One lowercase letter
+                  </div>
+                  <div style={{ color: passwordStrength.uppercase ? "green" : "red" }}>
+                    ✓ One uppercase letter
+                  </div>
+                  <div style={{ color: passwordStrength.number ? "green" : "red" }}>
+                    ✓ One number
+                  </div>
+                  <div style={{ color: passwordStrength.special ? "green" : "red" }}>
+                    ✓ One special character (!@#$%^&*)
+                  </div>
+                </div>
+              )}
             </div>
           </>
         )}
