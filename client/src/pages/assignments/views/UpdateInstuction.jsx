@@ -956,6 +956,14 @@ const fetchContainersForInstruction = async (instructionId) => {
     console.log(
       `fetchRate called with: startingPoint=${startingPoint}, destination=${destination}`
     );
+
+    // For shipment type 4 (cross-haul break bulk), driver rates are manually
+    // maintained in legs_m2 and must not be overridden by automatic route rates.
+    if (shipmentType === 4) {
+      console.log("Shipment type 4 detected - skipping automatic rate fetch");
+      return Promise.resolve();
+    }
+
     if (!startingPoint || !destination) return Promise.resolve();
 
     const routeKey = `${startingPoint}-${destination}`;
@@ -1411,7 +1419,8 @@ const handleSelectLeg = (index) => {
     }));
 
     // If both starting point and destination are selected, fetch the rate
-    if (startingPoint && formData.destination) {
+    // Skip automatic rate logic for shipment type 4 (cross-haul break bulk)
+    if (shipmentType !== 4 && startingPoint && formData.destination) {
       // Force a fresh rate fetch when route changes
       console.log("Route changed, fetching new rates...");
 
@@ -1550,7 +1559,8 @@ const handleSelectLeg = (index) => {
     }));
 
     // If both starting point and destination are selected, fetch the rate
-    if (formData.startingPoint && destination) {
+    // Skip automatic rate logic for shipment type 4 (cross-haul break bulk)
+    if (shipmentType !== 4 && formData.startingPoint && destination) {
       // Force a fresh rate fetch when route changes
       console.log("Route changed, fetching new rates...");
 
@@ -2074,7 +2084,18 @@ const navigateToDocuments = () => {
       }
     });
 
-    // Use the rate of the most common container type
+    // For shipment type 4 (cross-haul break bulk), leg rate should come from
+    // the manually entered driver rates, not from the automatic meter rates.
+    if (shipmentType === 4) {
+      const firstDriverWithRate = drivers.find(
+        (d) => d.driverRate !== undefined && d.driverRate !== null && d.driverRate !== ""
+      );
+      return firstDriverWithRate
+        ? Number.parseFloat(firstDriverWithRate.driverRate) || 0
+        : 0;
+    }
+
+    // Use the rate of the most common container type for other shipment types
     if (
       twelveMeterCount >= sixMeterCount &&
       twelveMeterCount >= abnormalCount
@@ -2219,23 +2240,27 @@ const navigateToDocuments = () => {
         m1key: instructionId,
         drivers: cleanDrivers.map((driver) => {
           let driverRateToSave = driver.driverRate || "0";
-          if (!driver.driverRate || driver.driverRate === "") {
+
+          // For shipment type 4 (cross-haul break bulk), keep the manually
+          // entered driver rate and do not override it with automatic meter
+          // rates from the route. If it's empty, it will remain 0.
+          if (shipmentType !== 4 && (!driver.driverRate || driver.driverRate === "")) {
             const isSubcontractor =
               employeeDrivers.find((d) => d.userid.toString() === driver.driverid)
                 ?.roleid === 6;
 
-    if (driver.container_type === "12m") {
-      driverRateToSave = isSubcontractor
-        ? rates.subbie_twelve_meter.toString()
-        : rates.twelve_meter.toString();
-    } else if (driver.container_type === "abnormal") {
-      driverRateToSave = driver.driverRate || "0";
-    } else {
-      driverRateToSave = isSubcontractor
-        ? rates.subbie_six_meter.toString()
-        : rates.six_meter.toString();
-    }
-  }
+            if (driver.container_type === "12m") {
+              driverRateToSave = isSubcontractor
+                ? rates.subbie_twelve_meter.toString()
+                : rates.twelve_meter.toString();
+            } else if (driver.container_type === "abnormal") {
+              driverRateToSave = driver.driverRate || "0";
+            } else {
+              driverRateToSave = isSubcontractor
+                ? rates.subbie_six_meter.toString()
+                : rates.six_meter.toString();
+            }
+          }
 
   console.log(
     `Driver ${driver.driverid} with container type ${driver.container_type} has rate: ${driverRateToSave}`
@@ -2458,6 +2483,12 @@ useEffect(() => {
     return;
   }
 
+  // For shipment type 4 (cross-haul break bulk), driver rates are managed
+  // manually and should not be auto-updated from meter rates.
+  if (shipmentType === 4) {
+    return;
+  }
+
   // Avoid applying stale rates from a different leg/route (prevents flicker on leg switches)
   const currentRouteKey = formData.startingPoint && formData.destination
     ? `${formData.startingPoint}-${formData.destination}`
@@ -2535,6 +2566,7 @@ useEffect(() => {
   noRatesRoutes,
   isLegSwitching, // Add this dependency
   isCompleted, // Add this dependency
+  shipmentType,
 ]);
 
   return (
