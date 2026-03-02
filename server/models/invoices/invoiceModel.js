@@ -96,6 +96,7 @@ const getInvoiceDetails = async (id) => {
         m1.rateweight,
         m1.unitrate,
         m1.is_set_rate,
+        m1.historical_set_rate,
         m1.booking_ref,
         m1.pickup,
         m1.dropoff,
@@ -266,6 +267,8 @@ const getInvoiceDetails = async (id) => {
 
     // If shipment type is 4 (weight-based), fetch weight items
     const shipmentTypeKey = result.rows[0].shipment_type_key;
+    const isSetRate = result.rows[0].is_set_rate === true || result.rows[0].rateweight === "SetRate";
+    const historicalSetRate = Number(result.rows[0].historical_set_rate || 0);
     let weightItems = [];
     const unitrate = Number(result.rows[0].unitrate || 0);
     if (shipmentTypeKey === 4) {
@@ -283,13 +286,16 @@ const getInvoiceDetails = async (id) => {
       const weightRes = await query(weightQuery, [id]);
       weightItems = weightRes.rows.map((r) => {
         const w = Number(r.weight || 0);
-        const price = Number((w * unitrate).toFixed(2));
+        // For set rate: unitrate = historical_set_rate, price = set_rate × weight
+        // For normal weight-based: unitrate = unitrate, price = unitrate × weight
+        const rowUnitRate = isSetRate ? historicalSetRate : unitrate;
+        const price = Number((w * rowUnitRate).toFixed(2));
         return {
           ksm_dm_no: r.ksm_dm_no || "",
           ticket_no: r.ticket_no || "",
           receipt_book_no: r.receipt_book_no || "",
           weight: w,
-          unitrate: unitrate,
+          unitrate: rowUnitRate,
           price: price,
         };
       });
@@ -678,6 +684,7 @@ const getInstructionDetailsForPreview = async (instructionId) => {
           m1.shipment_type as shipment_type_key,
           m1.unitrate,
           m1.is_set_rate,
+          m1.historical_set_rate,
           c.client as client_name,
           c.m5clientkey,
           c.companyaddress as client_address,
@@ -829,6 +836,8 @@ const getInstructionDetailsForPreview = async (instructionId) => {
       // Weight-based items for preview when shipment_type_key = 4
       let weightItems = [];
       const unitratePrev = Number(m1Result.rows[0].unitrate || 0);
+      const isSetRatePrev = m1Result.rows[0].is_set_rate === true;
+      const historicalSetRatePrev = Number(m1Result.rows[0].historical_set_rate || 0);
       if (m1Result.rows[0].shipment_type_key === 4) {
         const weightQuery = `
           SELECT 
@@ -843,13 +852,16 @@ const getInstructionDetailsForPreview = async (instructionId) => {
         const weightRes = await client.query(weightQuery, [instructionId]);
         weightItems = weightRes.rows.map((r) => {
           const w = Number(r.weight || 0);
-          const price = Number((w * unitratePrev).toFixed(2));
+          // For set rate: unitrate = historical_set_rate, price = set_rate × weight
+          // For normal weight-based: unitrate = unitrate, price = unitrate × weight
+          const rowUnitRate = isSetRatePrev ? historicalSetRatePrev : unitratePrev;
+          const price = Number((w * rowUnitRate).toFixed(2));
           return {
             ksm_dm_no: r.ksm_dm_no || "",
             ticket_no: r.ticket_no || "",
             receipt_book_no: r.receipt_book_no || "",
             weight: w,
-            unitrate: unitratePrev,
+            unitrate: rowUnitRate,
             price: price,
           };
         });
