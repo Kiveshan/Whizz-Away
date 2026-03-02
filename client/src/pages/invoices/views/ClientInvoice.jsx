@@ -486,12 +486,13 @@ const ClientInvoice = forwardRef(({
       let tableData = [];
       const isSetRate = finalInvoiceData.is_set_rate === true || finalInvoiceData.rateweight === "SetRate";
       if (isSetRate) {
-        // Use weight table structure but without Unit Rate and Price columns
+        // Use weight table structure with Unit Rate column only (no Price for set rate)
         tableHeaders = [
           "KSM/DM No",
           "Ticket No",
           "Receipt Book No",
           "Weight",
+          "Unit Rate",
         ];
         tableData = (weightItems && weightItems.length > 0)
           ? weightItems.map((wi) => [
@@ -499,8 +500,9 @@ const ClientInvoice = forwardRef(({
               wi.ticket_no || "",
               wi.receipt_book_no || "",
               (Number(wi.weight || 0)).toFixed(2),
+              formatCurrency(Number(wi.unitrate || 0)),
             ])
-          : [["No weight items", "", "", ""]];
+          : [["No weight items", "", "", "", ""]];
       } else if (isWeightBased) {
         tableHeaders = [
           "KSM/DM No",
@@ -1011,6 +1013,7 @@ const ClientInvoice = forwardRef(({
                       <th>Ticket No</th>
                       <th>Receipt Book No</th>
                       <th>Weight</th>
+                      <th>Unit Rate</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -1021,11 +1024,12 @@ const ClientInvoice = forwardRef(({
                           <td>{wi.ticket_no || ''}</td>
                           <td>{wi.receipt_book_no || ''}</td>
                           <td>{Number(wi.weight || 0).toFixed(2)}</td>
+                          <td>{formatCurrency(Number(wi.unitrate || 0))}</td>
                         </tr>
                       ))
                     ) : (
                       <tr>
-                        <td colSpan="4">No weight items</td>
+                        <td colSpan="5">No weight items</td>
                       </tr>
                     )}
                   </tbody>

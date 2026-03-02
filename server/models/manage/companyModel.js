@@ -1,5 +1,47 @@
 import { pool } from "../../config/database.js"
 
+const getCompanyByCompanyRegNum = async (companyRegNum) => {
+  let client;
+  try {
+    client = await pool.connect();
+    const companyResult = await client.query(
+      `
+      SELECT 
+        userid,
+        companyname,
+        company_reg_num,
+        email,
+        cell_num,
+        cell_num2,
+        vat_reg_num,
+        account_num,
+        name_of_acc,
+        bank,
+        branch,
+        branch_code,
+        address,
+        suburb,
+        swift_code,
+        cluster_box
+      FROM usertable
+      WHERE company_reg_num = $1
+      `,
+      [companyRegNum]
+    );
+
+    if (!companyResult.rows.length) {
+      return { success: false, message: "Company not found for this registration number" };
+    }
+
+    return { success: true, data: companyResult.rows[0] };
+  } catch (err) {
+    console.error(`Error fetching company for company_reg_num ${companyRegNum}:`, err);
+    throw err;
+  } finally {
+    if (client) client.release();
+  }
+};
+
 const getCompanyByUserId = async (userId) => {
   let client;
   try {
@@ -220,4 +262,4 @@ const updateCompany = async (userId, companyData) => {
 
 
 
-export { getCompanyByUserId, updateCompany };
+export { getCompanyByCompanyRegNum, getCompanyByUserId, updateCompany };
