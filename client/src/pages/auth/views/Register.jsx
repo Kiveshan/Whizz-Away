@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import styles from "../css/register.module.css"; // Updated to CSS Module
 import { Eye, EyeOff } from "lucide-react";
+import { validatePassword, getPasswordStrength } from "../../../utils/passwordValidator.js";
 
 const Register = ({ switchToLogin, closePopup }) => {
   const API_BASE_URL = process.env.REACT_APP_API_URL || "http://localhost:5000";
@@ -95,21 +96,7 @@ const Register = ({ switchToLogin, closePopup }) => {
     }
 
     if (name === "password") {
-      const length = value.length >= 8;
-      const lowercase = /[a-z]/.test(value);
-      const uppercase = /[A-Z]/.test(value);
-      const number = /[0-9]/.test(value);
-      const special = /[!@#$%^&*]/.test(value);
-      const valid = length && lowercase && uppercase && number && special;
-
-      setPasswordStrength({
-        length,
-        lowercase,
-        uppercase,
-        number,
-        special,
-        valid,
-      });
+      setPasswordStrength(getPasswordStrength(value));
     }
 
     setFormData((prev) => ({
@@ -170,21 +157,7 @@ const Register = ({ switchToLogin, closePopup }) => {
     return true;
   };
 
-  const validatePassword = (password) => {
-    if (!password) return "Password is required";
-    if (password.length < 8)
-      return "Password must be at least 8 characters long";
-    if (!/[a-z]/.test(password))
-      return "Password must include at least one lowercase letter";
-    if (!/[A-Z]/.test(password))
-      return "Password must include at least one uppercase letter";
-    if (!/[0-9]/.test(password))
-      return "Password must include at least one number";
-    if (!/[!@#$%^&*]/.test(password))
-      return "Password must include at least one special character (!@#$%^&*)";
-    return true;
-  };
-
+  
   const handleRegister = async (e) => {
     e.preventDefault();
 
