@@ -496,13 +496,6 @@ export function useApi(state, actions) {
                 return Math.abs(numA - numB) < 0.005
               }
 
-              const isWarnableRateValue = (value) => {
-                if (value === null || value === undefined || value === "") return false
-                const num = Number(value)
-                if (Number.isNaN(num)) return true
-                return Math.abs(num) >= 1
-              }
-
               const affectedUsedRateFields = usedRateFields.filter((rf) => {
                 const newValue = rateData?.[rf.field]
                 const oldValue = rf.value
@@ -531,51 +524,48 @@ export function useApi(state, actions) {
                       .filter((v) => v !== null && v !== undefined),
                   ),
                 ]
-                const warnableAffectedRateFields = affectedUsedRateFields.filter((rf) => isWarnableRateValue(rf.value))
 
-                if (warnableAffectedRateFields.length > 0) {
-                  const escapeHtml = (value) => {
-                    if (value === null || value === undefined) return ""
-                    return String(value)
-                      .replaceAll("&", "&amp;")
-                      .replaceAll("<", "&lt;")
-                      .replaceAll(">", "&gt;")
-                      .replaceAll('"', "&quot;")
-                      .replaceAll("'", "&#039;")
-                  }
+                const escapeHtml = (value) => {
+                  if (value === null || value === undefined) return ""
+                  return String(value)
+                    .replaceAll("&", "&amp;")
+                    .replaceAll("<", "&lt;")
+                    .replaceAll(">", "&gt;")
+                    .replaceAll('"', "&quot;")
+                    .replaceAll("'", "&#039;")
+                }
 
-                  const formatRateValue = (value) => {
-                    if (value === null || value === undefined || value === "") return "(empty)"
-                    const num = Number(value)
-                    return Number.isNaN(num) ? escapeHtml(value) : escapeHtml(num)
-                  }
+                const formatRateValue = (value) => {
+                  if (value === null || value === undefined || value === "") return "(empty)"
+                  const num = Number(value)
+                  return Number.isNaN(num) ? escapeHtml(value) : escapeHtml(num)
+                }
 
-                  const htmlLines = warnableAffectedRateFields
-                    .map((rf) => {
-                      const newValue = rateData?.[rf.field]
-                      const instrList = Array.isArray(rf.instructions) ? rf.instructions : []
-                      const instrText = instrList.length ? instrList.join(", ") : ""
+                const htmlLines = affectedUsedRateFields
+                  .map((rf) => {
+                    const newValue = rateData?.[rf.field]
+                    const instrList = Array.isArray(rf.instructions) ? rf.instructions : []
+                    const instrText = instrList.length ? instrList.join(", ") : ""
 
-                      return (
-                        `<div style="margin-bottom:10px;">` +
-                        `<div><strong>${escapeHtml(rf.label)}</strong>: ${formatRateValue(rf.value)} &rarr; ${formatRateValue(newValue)}</div>` +
-                        `<div style="margin-top:4px;"><strong>Instruction no:</strong> ${escapeHtml(instrText)}</div>` +
-                        `</div>`
-                      )
-                    })
-                    .join("")
+                    return (
+                      `<div style="margin-bottom:10px;">` +
+                      `<div><strong>${escapeHtml(rf.label)}</strong>: ${formatRateValue(rf.value)} &rarr; ${formatRateValue(newValue)}</div>` +
+                      `<div style="margin-top:4px;"><strong>Instruction no:</strong> ${escapeHtml(instrText)}</div>` +
+                      `</div>`
+                    )
+                  })
+                  .join("")
 
-                  const alertHtml =
-                    `<div style="text-align:left;">` +
-                    `<div style="margin-bottom:10px;"><strong>Changing this rate will affect the following instructions:</strong></div>` +
-                    `${htmlLines}` +
-                    `</div>`
+                const alertHtml =
+                  `<div style="text-align:left;">` +
+                  `<div style="margin-bottom:10px;"><strong>Changing this rate will affect the following instructions:</strong></div>` +
+                  `${htmlLines}` +
+                  `</div>`
 
-                  const confirmed = await showConfirmDialog("Warning", alertHtml, "Continue", { html: true })
+                const confirmed = await showConfirmDialog("Warning", alertHtml, "Continue", { html: true })
 
-                  if (!confirmed) {
-                    return false
-                  }
+                if (!confirmed) {
+                  return false
                 }
               }
             }

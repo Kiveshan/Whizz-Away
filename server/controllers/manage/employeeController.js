@@ -115,9 +115,6 @@ const createEmployeeHandler = async (req, res) => {
     while (urls.length < 3) urls.push(null)
 
     console.log("Creating employee with data:", req.body)
-    const adminId = req.user?.userid || null // Extract admin ID from authenticated user
-    const ipAddress = req.ip || req.connection.remoteAddress || req.headers['x-forwarded-for'] || null
-    const userAgent = req.headers['user-agent'] || null
     const newEmployee = await createEmployee(
       {
         name,
@@ -139,9 +136,6 @@ const createEmployeeHandler = async (req, res) => {
         deduction_damage,
       },
       urls,
-      adminId,
-      ipAddress,
-      userAgent
     )
     res.status(201).json(newEmployee)
   } catch (err) {
@@ -188,9 +182,6 @@ const updateEmployeeHandler = async (req, res) => {
     const newFileUrls = (req.files || []).map((f) => f.location)
 
     console.log(`Updating employee ID ${id}`)
-    const adminId = req.user?.userid || null // Extract admin ID from authenticated user
-    const ipAddress = req.ip || req.connection.remoteAddress || req.headers['x-forwarded-for'] || null
-    const userAgent = req.headers['user-agent'] || null
     const updatedEmployee = await updateEmployee(
       Number.parseInt(id),
       {
@@ -212,9 +203,6 @@ const updateEmployeeHandler = async (req, res) => {
         deduction_damage,
       },
       newFileUrls,
-      adminId,
-      ipAddress,
-      userAgent
     )
     res.json(updatedEmployee)
   } catch (err) {

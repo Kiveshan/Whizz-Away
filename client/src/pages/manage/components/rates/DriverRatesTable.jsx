@@ -1,10 +1,31 @@
 "use client"
 
+import { useState } from "react"
 import { formatDate } from "../../utils/helpers"
 import Pagination from "../common/Pagination"
 import SearchFilter from "../common/SearchFilter"
-import { showConfirmDialog } from "../../utils/alertUtils"
-import api from "../../../../api.js"
+
+
+// Confirmation Popup Component
+const ConfirmationPopup = ({ isOpen, message, onConfirm, onCancel }) => {
+  if (!isOpen) return null
+
+  return (
+    <div className="popup-backdrop" onClick={onCancel}>
+      <div className="popup" onClick={(e) => e.stopPropagation()}>
+        <p>{message}</p>
+        <div className="popup-buttons">
+          <button className="confirm-button" onClick={onConfirm}>
+            Yes, delete
+          </button>
+          <button className="cancel-button" onClick={onCancel}>
+            Cancel
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
 
 const DriverRatesTable = ({
   driverRates,
@@ -20,93 +41,25 @@ const DriverRatesTable = ({
   onSearchChange,
   onApplyFilters,
 }) => {
-  const buildUsageHtml = (usedRateFields = []) => {
-    const isWarnableRateValue = (value) => {
-      if (value === null || value === undefined || value === "") return false
-      const num = Number(value)
-      if (Number.isNaN(num)) return true
-      return Math.abs(num) >= 1
-    }
+  const [showConfirmPopup, setShowConfirmPopup] = useState(false)
+  const [rateToDelete, setRateToDelete] = useState(null)
 
-    const escapeHtml = (value) => {
-      if (value === null || value === undefined) return ""
-      return String(value)
-        .replaceAll("&", "&amp;")
-        .replaceAll("<", "&lt;")
-        .replaceAll(">", "&gt;")
-        .replaceAll('"', "&quot;")
-        .replaceAll("'", "&#039;")
-    }
-
-    const formatRateValue = (value) => {
-      if (value === null || value === undefined || value === "") return "(empty)"
-      const num = Number(value)
-      return Number.isNaN(num) ? escapeHtml(value) : escapeHtml(num.toFixed(2))
-    }
-
-    const warnableFields = usedRateFields.filter((rf) => isWarnableRateValue(rf.value))
-
-    return warnableFields
-      .map((rf) => {
-        const instrList = Array.isArray(rf.instructions) ? rf.instructions : []
-        const instrText = instrList.length ? instrList.join(", ") : ""
-
-        return (
-          `<div style="margin-bottom:10px;">` +
-          `<div><strong>${escapeHtml(rf.label)}</strong>: ${formatRateValue(rf.value)}</div>` +
-          `<div style="margin-top:4px;"><strong>Instruction no:</strong> ${escapeHtml(instrText)}</div>` +
-          `</div>`
-        )
-      })
-      .join("")
+  const handleDeleteClick = (rate) => {
+    setRateToDelete(rate)
+    setShowConfirmPopup(true)
   }
 
-  const handleDeleteClick = async (rate) => {
-    if (!rate?.m5ratekey) return
-
-    const fallbackConfirm = async () =>
-      showConfirmDialog(
-        "Delete Driver Rate",
-        `Are you sure you want to delete the rate from ${rate.startingpoint} to ${rate.destination}?`,
-        "Delete",
-      )
-
-    try {
-      const usageResponse = await api.get(`/api/driver-rates/${rate.m5ratekey}/usage`)
-      const usageData = usageResponse.data
-      const usedRateFields = Array.isArray(usageData?.usedRateFields) ? usageData.usedRateFields : []
-
-      let confirmed = false
-
-      if (usageData?.inUse && usedRateFields.length > 0) {
-        const usageHtml = buildUsageHtml(usedRateFields)
-        if (usageHtml) {
-          const html =
-            `<div style="text-align:left;">` +
-            `<div style="margin-bottom:10px;"><strong>Deleting this rate will affect the following instructions:</strong></div>` +
-            usageHtml +
-            `</div>`
-
-          confirmed = await showConfirmDialog("Warning", html, "Delete", { html: true })
-        } else {
-          confirmed = await fallbackConfirm()
-        }
-      } else {
-        confirmed = await fallbackConfirm()
-      }
-
-      if (!confirmed) {
-        return
-      }
-
-      await onDelete(rate.m5ratekey)
-    } catch (err) {
-      console.error(`Error preparing delete confirmation for rate ${rate.m5ratekey}:`, err)
-      const confirmed = await fallbackConfirm()
-      if (confirmed) {
-        await onDelete(rate.m5ratekey)
-      }
+  const handleConfirmDelete = () => {
+    if (rateToDelete) {
+      onDelete(rateToDelete.m5ratekey)
     }
+    setShowConfirmPopup(false)
+    setRateToDelete(null)
+  }
+
+  const handleCancelDelete = () => {
+    setShowConfirmPopup(false)
+    setRateToDelete(null)
   }
 
   if (error) {
@@ -208,6 +161,15 @@ const DriverRatesTable = ({
             onItemsPerPageChange={onItemsPerPageChange}
           />
         </>
+      )}
+
+      {showConfirmPopup && rateToDelete && (
+        <ConfirmationPopup
+          isOpen={showConfirmPopup}
+          message={`Are you sure you want to delete the rate from ${rateToDelete.startingpoint} to ${rateToDelete.destination}?`}
+          onConfirm={handleConfirmDelete}
+          onCancel={handleCancelDelete}
+        />
       )}
     </div>
   )

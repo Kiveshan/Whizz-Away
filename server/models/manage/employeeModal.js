@@ -1,7 +1,5 @@
 import { pool } from "../../config/database.js"
 import bcrypt from "bcrypt"
-import { validatePassword } from "../../utils/passwordValidator.js"
-import { logPasswordChange, logEmployeeCreation } from "../../utils/auditLogger.js"
 
 const getEmployeeBasic = async (id) => {
   let client
@@ -149,7 +147,7 @@ const checkEmployeeEmailExists = async (email) => {
   }
 }
 
-const createEmployee = async (employeeData, documentUrls, adminId = null, ipAddress = null, userAgent = null) => {
+const createEmployee = async (employeeData, documentUrls) => {
   let client
   try {
     client = await pool.connect()
@@ -177,14 +175,6 @@ const createEmployee = async (employeeData, documentUrls, adminId = null, ipAddr
 
     if (!name || !surname) {
       throw new Error("Name and surname are required")
-    }
-
-    // Validate password if provided
-    if (password && password.trim() !== "") {
-      const passwordValidation = validatePassword(password)
-      if (passwordValidation !== true) {
-        throw new Error(passwordValidation)
-      }
     }
 
     const hashedPassword = password ? await bcrypt.hash(password, 10) : null
@@ -252,15 +242,6 @@ const createEmployee = async (employeeData, documentUrls, adminId = null, ipAddr
     await client.query(insertHistoryQuery, historyValues)
 
     await client.query("COMMIT")
-    
-    // Log employee creation with admin ID and request metadata
-    try {
-      await logEmployeeCreation(client, adminId, newEmployee.userid, `${name} ${surname}`, ipAddress, userAgent);
-    } catch (logError) {
-      // Don't fail the operation if logging fails
-      console.warn('Audit logging failed for employee creation:', logError.message);
-    }
-    
     return newEmployee
   } catch (err) {
     await client.query("ROLLBACK")
@@ -271,7 +252,7 @@ const createEmployee = async (employeeData, documentUrls, adminId = null, ipAddr
   }
 }
 
-const updateEmployee = async (id, employeeData, documentUrls, adminId = null, ipAddress = null, userAgent = null) => {
+const updateEmployee = async (id, employeeData, documentUrls) => {
   let client
   try {
     client = await pool.connect()
@@ -327,15 +308,8 @@ const updateEmployee = async (id, employeeData, documentUrls, adminId = null, ip
     ;[document_url1, document_url2, document_url3] = currentDocs
 
     let hashedPassword = currentPassword
-    let passwordChanged = false
     if (password && password.trim() !== "") {
-      // Validate password before hashing
-      const passwordValidation = validatePassword(password)
-      if (passwordValidation !== true) {
-        throw new Error(passwordValidation)
-      }
       hashedPassword = await bcrypt.hash(password, 10)
-      passwordChanged = true
     }
 
     const updateEmpQuery = `
@@ -453,17 +427,6 @@ const updateEmployee = async (id, employeeData, documentUrls, adminId = null, ip
     }
 
     await client.query("COMMIT")
-    
-    // Log password change if password was changed
-    if (passwordChanged) {
-      try {
-        await logPasswordChange(client, adminId, id, `${name} ${surname}`, ipAddress, userAgent);
-      } catch (logError) {
-        // Don't fail the operation if logging fails
-        console.warn('Audit logging failed for password change:', logError.message);
-      }
-    }
-    
     return updatedEmployee
   } catch (err) {
     await client.query("ROLLBACK")
