@@ -119,12 +119,12 @@ let query = `
   }
 
   if (fromDate) {
-    query += ` AND po.date >= $${paramIndex++}`
+    query += ` AND po.date::date >= $${paramIndex++}::date`
     values.push(fromDate)
   }
 
   if (toDate) {
-    query += ` AND po.date <= $${paramIndex++}`
+    query += ` AND po.date::date <= $${paramIndex++}::date`
     values.push(toDate)
   }
 
