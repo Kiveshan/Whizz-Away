@@ -132,23 +132,31 @@ const formatAmount = (amount) => {
                   <th>Date</th>
                   <th>Type</th>
                   <th>PO Number</th>
+                  <th>Received By</th>
+                  <th>Invoice #</th>
+                  <th>Truck Reg</th>
+                  <th>Description</th>
                   <th>Amount</th>
                 </tr>
               </thead>
               <tbody>
                 {purchaseOrders.length === 0 ? (
                   <tr>
-                    <td colSpan="4">
+                    <td colSpan="7">
                       No purchase orders found for this supplier in {month}{" "}
                       {year}.
                     </td>
                   </tr>
                 ) : (
                   purchaseOrders.map((po) => (
-                    <tr key={po.po_id}>
+                    <tr key={po.ponum}>
                       <td>{formatDate(po.date)}</td>
                       <td>{po.expense_type || "N/A"}</td>
                       <td>{po.ponum || "N/A"}</td>
+                      <td>{po.received_by || "N/A"}</td>
+                      <td>{po.invoice_number || "N/A"}</td>
+                      <td>{po.truckregnum || "N/A"}</td>
+                      <td>{po.description || "N/A"}</td>
                       <td>{formatAmount(po.total)}</td>
                     </tr>
                   ))
