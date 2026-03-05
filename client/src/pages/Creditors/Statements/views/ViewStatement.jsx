@@ -18,6 +18,14 @@ const ViewStatement = () => {
     state?.selectedMonth ||
     currentDate.toLocaleString("default", { month: "long" });
 
+  const toLocalDateOnlyString = (date) => {
+    if (!(date instanceof Date)) return "";
+    const y = date.getFullYear();
+    const m = (date.getMonth() + 1).toString().padStart(2, "0");
+    const d = date.getDate().toString().padStart(2, "0");
+    return `${y}-${m}-${d}`;
+  };
+
   useEffect(() => {
     const fetchPOs = async () => {
       try {
@@ -38,8 +46,8 @@ const ViewStatement = () => {
         ].indexOf(month);
         const firstDay = new Date(year, monthIndex, 1);
         const lastDay = new Date(year, monthIndex + 1, 0);
-        const fromDate = firstDay.toISOString().split("T")[0];
-        const toDate = lastDay.toISOString().split("T")[0];
+        const fromDate = toLocalDateOnlyString(firstDay);
+        const toDate = toLocalDateOnlyString(lastDay);
 
         const res = await api.get(`/api/statements`, {
           params: { supplierId, fromDate, toDate },
