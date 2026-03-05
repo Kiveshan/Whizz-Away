@@ -149,7 +149,7 @@ function DynamicHeader() {
     "/finance-clerk-wage-slip": "Wages",
     "/ViewExpense": "Fuel Expenses",
     "/ExpenseDetails": "Fuel Expenses",
-    "/ExpenseSubmission": "Fuel Expense",
+    "/ExpenseSubmission": "Expense",
     "/manage":                            "Manage",
     "/ViewClientInstruction": "Clients",
     "/ViewClientInvoice": "Invoice",

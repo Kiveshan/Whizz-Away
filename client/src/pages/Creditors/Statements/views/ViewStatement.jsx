@@ -18,6 +18,14 @@ const ViewStatement = () => {
     state?.selectedMonth ||
     currentDate.toLocaleString("default", { month: "long" });
 
+  const toLocalDateOnlyString = (date) => {
+    if (!(date instanceof Date)) return "";
+    const y = date.getFullYear();
+    const m = (date.getMonth() + 1).toString().padStart(2, "0");
+    const d = date.getDate().toString().padStart(2, "0");
+    return `${y}-${m}-${d}`;
+  };
+
   useEffect(() => {
     const fetchPOs = async () => {
       try {
@@ -38,8 +46,8 @@ const ViewStatement = () => {
         ].indexOf(month);
         const firstDay = new Date(year, monthIndex, 1);
         const lastDay = new Date(year, monthIndex + 1, 0);
-        const fromDate = firstDay.toISOString().split("T")[0];
-        const toDate = lastDay.toISOString().split("T")[0];
+        const fromDate = toLocalDateOnlyString(firstDay);
+        const toDate = toLocalDateOnlyString(lastDay);
 
         const res = await api.get(`/api/statements`, {
           params: { supplierId, fromDate, toDate },
@@ -124,23 +132,31 @@ const formatAmount = (amount) => {
                   <th>Date</th>
                   <th>Type</th>
                   <th>PO Number</th>
+                  <th>Received By</th>
+                  <th>Invoice #</th>
+                  <th>Truck Reg</th>
+                  <th>Description</th>
                   <th>Amount</th>
                 </tr>
               </thead>
               <tbody>
                 {purchaseOrders.length === 0 ? (
                   <tr>
-                    <td colSpan="4">
+                    <td colSpan="7">
                       No purchase orders found for this supplier in {month}{" "}
                       {year}.
                     </td>
                   </tr>
                 ) : (
                   purchaseOrders.map((po) => (
-                    <tr key={po.po_id}>
+                    <tr key={po.ponum}>
                       <td>{formatDate(po.date)}</td>
                       <td>{po.expense_type || "N/A"}</td>
                       <td>{po.ponum || "N/A"}</td>
+                      <td>{po.received_by || "N/A"}</td>
+                      <td>{po.invoice_number || "N/A"}</td>
+                      <td>{po.truckregnum || "N/A"}</td>
+                      <td>{po.description || "N/A"}</td>
                       <td>{formatAmount(po.total)}</td>
                     </tr>
                   ))

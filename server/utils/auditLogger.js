@@ -2,7 +2,7 @@
  * Audit logging utility for tracking important actions
  */
 
-export const logPasswordChange = async (client, adminId, employeeId, employeeName, ipAddress = null, userAgent = null) => {
+export const logPasswordChange = async (client, adminId, employeeId, employeeName, userAgent = null) => {
   try {
     const logQuery = `
       INSERT INTO audit_log (
@@ -12,9 +12,8 @@ export const logPasswordChange = async (client, adminId, employeeId, employeeNam
         target_employee_name, 
         timestamp, 
         details,
-        ip_address,
         user_agent
-      ) VALUES ($1, $2, $3, $4, NOW(), $5, $6, $7)
+      ) VALUES ($1, $2, $3, $4, NOW(), $5, $6)
     `;
     
     const logValues = [
@@ -23,7 +22,6 @@ export const logPasswordChange = async (client, adminId, employeeId, employeeNam
       employeeId,
       employeeName,
       `Admin ${adminId} changed password for employee ${employeeName} (ID: ${employeeId})`,
-      ipAddress,
       userAgent
     ];
     
@@ -35,7 +33,7 @@ export const logPasswordChange = async (client, adminId, employeeId, employeeNam
   }
 };
 
-export const logEmployeeCreation = async (client, adminId, employeeId, employeeName, ipAddress = null, userAgent = null) => {
+export const logEmployeeCreation = async (client, adminId, employeeId, employeeName, userAgent = null) => {
   try {
     const logQuery = `
       INSERT INTO audit_log (
@@ -45,9 +43,8 @@ export const logEmployeeCreation = async (client, adminId, employeeId, employeeN
         target_employee_name, 
         timestamp, 
         details,
-        ip_address,
         user_agent
-      ) VALUES ($1, $2, $3, $4, NOW(), $5, $6, $7)
+      ) VALUES ($1, $2, $3, $4, NOW(), $5, $6)
     `;
     
     const logValues = [
@@ -56,7 +53,6 @@ export const logEmployeeCreation = async (client, adminId, employeeId, employeeN
       employeeId,
       employeeName,
       `Admin ${adminId} created new employee ${employeeName} (ID: ${employeeId})`,
-      ipAddress,
       userAgent
     ];
     

@@ -2593,6 +2593,126 @@ const FCcontrollerinstructions = () => {
     formData.pickup,
   ]);
 
+  // Sync pickup/dropoff values when client rate names are updated
+  // This handles the case where pickup/dropoff names in m5_client_rate table
+  // have been renamed - the formData needs to be updated to match the current API values
+  // IMPORTANT: Only skip sync when user has explicitly locked the route edit mode
+  useEffect(() => {
+    console.log(`[FC SYNC DEBUG] Pickup sync effect running:`, {
+      isLoadingStartingPoints: isLoading.startingPoints,
+      startingPointsCount: startingPoints.length,
+      formDataPickup: formData.pickup,
+      routeEditMode,
+      shouldSkipSync: routeEditMode === "locked"
+    });
+
+    // Only skip auto-sync if user explicitly locked the route (for deleted clients)
+    if (routeEditMode === "locked") {
+      console.log(
+        `[FC SYNC DEBUG] Skipping pickup sync - user locked route edit mode`
+      );
+      return;
+    }
+
+    if (
+      !isLoading.startingPoints &&
+      startingPoints.length > 0 &&
+      formData.pickup
+    ) {
+      // Check if the current pickup value exists in the startingPoints array
+      const matchingPoint = startingPoints.find(
+        (point) => point.startingpoint === formData.pickup
+      );
+
+      console.log(`[FC SYNC DEBUG] Looking for pickup "${formData.pickup}" in startingPoints:`, {
+        foundExactMatch: !!matchingPoint,
+        startingPoints: startingPoints.map(p => p.startingpoint)
+      });
+
+      if (!matchingPoint) {
+        // The current pickup value is not in the API results
+        // This means the name was likely renamed in the database
+        // Try to find a match by checking if any starting point name contains or is similar
+        const possibleMatch = startingPoints.find((point) =>
+          point.startingpoint
+            .toLowerCase()
+            .includes(formData.pickup.toLowerCase()) ||
+          formData.pickup
+            .toLowerCase()
+            .includes(point.startingpoint.toLowerCase())
+        );
+
+        console.log(`[FC SYNC DEBUG] No exact match. Possible fuzzy match:`, possibleMatch);
+
+        if (possibleMatch) {
+          console.log(
+            `[FC SYNC DEBUG] Updating pickup from "${formData.pickup}" to "${possibleMatch.startingpoint}"`
+          );
+          setFormData((prev) => ({
+            ...prev,
+            pickup: possibleMatch.startingpoint,
+          }));
+          // Also update destinations for the new pickup
+          fetchDestinations(possibleMatch.startingpoint);
+        } else {
+          console.log(`[FC SYNC DEBUG] No fuzzy match found - pickup may be a completely new route`);
+        }
+      } else {
+        console.log(`[FC SYNC DEBUG] Pickup "${formData.pickup}" matches API data - no update needed`);
+      }
+    } else {
+      console.log(`[FC SYNC DEBUG] Conditions not met for pickup sync`, {
+        loadingDone: !isLoading.startingPoints,
+        hasStartingPoints: startingPoints.length > 0,
+        hasPickup: !!formData.pickup
+      });
+    }
+  }, [isLoading.startingPoints, startingPoints, formData.pickup, routeEditMode]);
+
+  useEffect(() => {
+    // Only skip auto-sync if user explicitly locked the route (for deleted clients)
+    if (routeEditMode === "locked") {
+      console.log(
+        `[FC SYNC DEBUG] Skipping dropoff sync - user locked route edit mode`
+      );
+      return;
+    }
+
+    if (
+      !isLoading.destinations &&
+      destinations.length > 0 &&
+      formData.dropoff
+    ) {
+      // Check if the current dropoff value exists in the destinations array
+      const matchingDest = destinations.find(
+        (dest) => dest.destination === formData.dropoff
+      );
+
+      if (!matchingDest) {
+        // The current dropoff value is not in the API results
+        // Try to find a match by checking if any destination name contains or is similar
+        const possibleMatch = destinations.find((dest) =>
+          dest.destination
+            .toLowerCase()
+            .includes(formData.dropoff.toLowerCase()) ||
+          formData.dropoff
+            .toLowerCase()
+            .includes(dest.destination.toLowerCase())
+        );
+
+        if (possibleMatch) {
+          console.log(
+            `[FC SYNC DEBUG] Updating dropoff from "${formData.dropoff}" to "${possibleMatch.destination}"`
+          );
+          setFormData((prev) => ({
+            ...prev,
+            dropoff: possibleMatch.destination,
+          }));
+        }
+      }
+    }
+  }, [isLoading.destinations, destinations, formData.dropoff, routeEditMode]);
+
   // useEffect to recalculate total cost when container surcharges or hazardous flags/amounts change
   useEffect(() => {
     if (containers.length > 0) {
@@ -4182,7 +4302,7 @@ const FCcontrollerinstructions = () => {
                 fontWeight: "bold",
               }}
             >
-              ⚠️ Set Rate Warning: The historical rate (R{historicalSetRate?.toFixed(2)}) differs from the current client rate (R{setRateValue?.toFixed(2)}). Saving will update the historical rate to the current rate.
+              ⚠️ Break Bulk Set Rate Warning: The historical rate (R{historicalSetRate?.toFixed(2)}) differs from the current client rate (R{setRateValue?.toFixed(2)}). Saving will update the historical rate to the current rate.
             </div>
           )}
           <div className="controller-instructions-form-section controller-instructions-client-info-section">
@@ -4910,7 +5030,7 @@ const FCcontrollerinstructions = () => {
                             }}
                             disabled={isReadOnly}
                           />
-                          Set Rate
+                          Break Bulk Set Rate
                         </label>
                         {isSetRate && (
                           <div className="controller-instructions-input-wrapper" style={{ width: "140px" }}>

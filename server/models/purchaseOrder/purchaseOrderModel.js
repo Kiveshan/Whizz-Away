@@ -103,10 +103,15 @@ let query = `
     s.supplier,
     s.supplier_id,
     STRING_AGG(DISTINCT e.expense, ', ') AS expense_type,
-    SUM(po.total) AS total
+    SUM(po.total) AS total,
+    MIN(po.received_by) AS received_by,
+    MIN(po.invoice_number) AS invoice_number,
+    STRING_AGG(DISTINCT po.description, ', ') AS description,
+    STRING_AGG(DISTINCT t.truckregnum, ', ') AS truckregnum
   FROM purchase_orders po
   JOIN suppliers s ON po.supplier_id = s.supplier_id
   LEFT JOIN expense_types e ON po.expense_type_id = e.id
+  LEFT JOIN m5_trucks t ON po.truckid = t.m5truckskey
   WHERE 1=1
 `
 
@@ -119,12 +124,12 @@ let query = `
   }
 
   if (fromDate) {
-    query += ` AND po.date >= $${paramIndex++}`
+    query += ` AND po.date::date >= $${paramIndex++}::date`
     values.push(fromDate)
   }
 
   if (toDate) {
-    query += ` AND po.date <= $${paramIndex++}`
+    query += ` AND po.date::date <= $${paramIndex++}::date`
     values.push(toDate)
   }
 
