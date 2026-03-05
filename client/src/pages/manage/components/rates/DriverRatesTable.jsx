@@ -4,6 +4,7 @@ import { formatDate } from "../../utils/helpers"
 import Pagination from "../common/Pagination"
 import SearchFilter from "../common/SearchFilter"
 import { showConfirmDialog } from "../../utils/alertUtils"
+import Swal from 'sweetalert2'
 import api from "../../../../api.js"
 
 const DriverRatesTable = ({
@@ -85,9 +86,24 @@ const DriverRatesTable = ({
             `<div style="text-align:left;">` +
             `<div style="margin-bottom:10px;"><strong>Deleting this rate will affect the following instructions:</strong></div>` +
             usageHtml +
+            `<div style="margin-top:15px; color: #d33;"><strong>This rate cannot be deleted while it is being used in instructions.</strong></div>` +
             `</div>`
 
-          confirmed = await showConfirmDialog("Warning", html, "Delete", { html: true })
+          await Swal.fire({
+            title: "Warning",
+            html: html,
+            icon: 'warning',
+            showCancelButton: false,
+            confirmButtonText: 'Cancel',
+            confirmButtonColor: '#3085d6',
+            customClass: {
+              popup: 'custom-swal-popup',
+              title: 'custom-swal-title',
+              content: 'custom-swal-content',
+              confirmButton: 'custom-swal-confirm',
+            },
+          })
+          return
         } else {
           confirmed = await fallbackConfirm()
         }
