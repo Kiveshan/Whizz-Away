@@ -244,7 +244,7 @@ setTimeout(() => {
       </div>
 
       <h2 className="expense-title">
-        {truckRegNum && `Add Fuel Expense for ${truckRegNum}`}
+        {truckRegNum && `Add Expense for ${truckRegNum}`}
       </h2>
 
       <form onSubmit={handleSubmit} className="expense-form">
