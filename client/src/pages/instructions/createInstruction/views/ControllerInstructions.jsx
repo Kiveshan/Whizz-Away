@@ -2491,7 +2491,7 @@ const ControllerInstructions = () => {
                           }
                         }}
                       />
-                      Set Rate
+                      Break Bulk Set Rate
                     </label>
                     {isSetRate && (
                       <div className="controller-instructions-input-wrapper" style={{ width: "140px" }}>

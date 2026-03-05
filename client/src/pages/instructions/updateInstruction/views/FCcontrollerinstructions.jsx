@@ -4302,7 +4302,7 @@ const FCcontrollerinstructions = () => {
                 fontWeight: "bold",
               }}
             >
-              ⚠️ Set Rate Warning: The historical rate (R{historicalSetRate?.toFixed(2)}) differs from the current client rate (R{setRateValue?.toFixed(2)}). Saving will update the historical rate to the current rate.
+              ⚠️ Break Bulk Set Rate Warning: The historical rate (R{historicalSetRate?.toFixed(2)}) differs from the current client rate (R{setRateValue?.toFixed(2)}). Saving will update the historical rate to the current rate.
             </div>
           )}
           <div className="controller-instructions-form-section controller-instructions-client-info-section">
@@ -5030,7 +5030,7 @@ const FCcontrollerinstructions = () => {
                             }}
                             disabled={isReadOnly}
                           />
-                          Set Rate
+                          Break Bulk Set Rate
                         </label>
                         {isSetRate && (
                           <div className="controller-instructions-input-wrapper" style={{ width: "140px" }}>
