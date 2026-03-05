@@ -1,10 +1,13 @@
-import { getCompanyByUserId, updateCompany } from "../../models/manage/companyModel.js"
+import { getCompanyByCompanyRegNum, getCompanyByUserId, updateCompany } from "../../models/manage/companyModel.js"
 
 const getCompanyHandler = async (req, res) => {
   try {
     const userId = req.user.userid // Assuming user ID is available from auth middleware
+    const companyRegNum = req.user.company_reg_num
     console.log(`Fetching company details for user ID ${userId}`)
-    const result = await getCompanyByUserId(userId)
+    const result = companyRegNum
+      ? await getCompanyByCompanyRegNum(companyRegNum)
+      : await getCompanyByUserId(userId)
     if (!result.success) {
       return res.status(404).json({ message: result.message })
     }
