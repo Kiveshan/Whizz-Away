@@ -2596,7 +2596,24 @@ const FCcontrollerinstructions = () => {
   // Sync pickup/dropoff values when client rate names are updated
   // This handles the case where pickup/dropoff names in m5_client_rate table
   // have been renamed - the formData needs to be updated to match the current API values
+  // IMPORTANT: Only skip sync when user has explicitly locked the route edit mode
   useEffect(() => {
+    console.log(`[FC SYNC DEBUG] Pickup sync effect running:`, {
+      isLoadingStartingPoints: isLoading.startingPoints,
+      startingPointsCount: startingPoints.length,
+      formDataPickup: formData.pickup,
+      routeEditMode,
+      shouldSkipSync: routeEditMode === "locked"
+    });
+
+    // Only skip auto-sync if user explicitly locked the route (for deleted clients)
+    if (routeEditMode === "locked") {
+      console.log(
+        `[FC SYNC DEBUG] Skipping pickup sync - user locked route edit mode`
+      );
+      return;
+    }
+
     if (
       !isLoading.startingPoints &&
       startingPoints.length > 0 &&
@@ -2607,10 +2624,15 @@ const FCcontrollerinstructions = () => {
         (point) => point.startingpoint === formData.pickup
       );
 
+      console.log(`[FC SYNC DEBUG] Looking for pickup "${formData.pickup}" in startingPoints:`, {
+        foundExactMatch: !!matchingPoint,
+        startingPoints: startingPoints.map(p => p.startingpoint)
+      });
+
       if (!matchingPoint) {
         // The current pickup value is not in the API results
+        // This means the name was likely renamed in the database
         // Try to find a match by checking if any starting point name contains or is similar
-        // This handles cases where the name was slightly modified
         const possibleMatch = startingPoints.find((point) =>
           point.startingpoint
             .toLowerCase()
@@ -2620,9 +2642,11 @@ const FCcontrollerinstructions = () => {
             .includes(point.startingpoint.toLowerCase())
         );
 
+        console.log(`[FC SYNC DEBUG] No exact match. Possible fuzzy match:`, possibleMatch);
+
         if (possibleMatch) {
           console.log(
-            `[FC] Pickup name updated from "${formData.pickup}" to "${possibleMatch.startingpoint}" based on API data`
+            `[FC SYNC DEBUG] Updating pickup from "${formData.pickup}" to "${possibleMatch.startingpoint}"`
           );
           setFormData((prev) => ({
             ...prev,
@@ -2630,12 +2654,30 @@ const FCcontrollerinstructions = () => {
           }));
           // Also update destinations for the new pickup
           fetchDestinations(possibleMatch.startingpoint);
+        } else {
+          console.log(`[FC SYNC DEBUG] No fuzzy match found - pickup may be a completely new route`);
         }
+      } else {
+        console.log(`[FC SYNC DEBUG] Pickup "${formData.pickup}" matches API data - no update needed`);
       }
+    } else {
+      console.log(`[FC SYNC DEBUG] Conditions not met for pickup sync`, {
+        loadingDone: !isLoading.startingPoints,
+        hasStartingPoints: startingPoints.length > 0,
+        hasPickup: !!formData.pickup
+      });
     }
-  }, [isLoading.startingPoints, startingPoints, formData.pickup]);
+  }, [isLoading.startingPoints, startingPoints, formData.pickup, routeEditMode]);
 
   useEffect(() => {
+    // Only skip auto-sync if user explicitly locked the route (for deleted clients)
+    if (routeEditMode === "locked") {
+      console.log(
+        `[FC SYNC DEBUG] Skipping dropoff sync - user locked route edit mode`
+      );
+      return;
+    }
+
     if (
       !isLoading.destinations &&
       destinations.length > 0 &&
@@ -2660,7 +2702,7 @@ const FCcontrollerinstructions = () => {
 
         if (possibleMatch) {
           console.log(
-            `[FC] Dropoff name updated from "${formData.dropoff}" to "${possibleMatch.destination}" based on API data`
+            `[FC SYNC DEBUG] Updating dropoff from "${formData.dropoff}" to "${possibleMatch.destination}"`
           );
           setFormData((prev) => ({
             ...prev,
@@ -2669,7 +2711,7 @@ const FCcontrollerinstructions = () => {
         }
       }
     }
-  }, [isLoading.destinations, destinations, formData.dropoff]);
+  }, [isLoading.destinations, destinations, formData.dropoff, routeEditMode]);
 
   // useEffect to recalculate total cost when container surcharges or hazardous flags/amounts change
   useEffect(() => {
