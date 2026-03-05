@@ -261,7 +261,7 @@ const ClientRatesForm = ({ clientData, loading, onSave, onCancel }) => {
 
                     <div className="manage-form-group">
                       <label>
-                        <strong>Set Rate (R)</strong>
+                        <strong>Break Bulk (R)</strong>
                       </label>
                       <input
                         type="number"
