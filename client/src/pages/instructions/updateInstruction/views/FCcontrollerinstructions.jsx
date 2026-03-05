@@ -2593,6 +2593,84 @@ const FCcontrollerinstructions = () => {
     formData.pickup,
   ]);
 
+  // Sync pickup/dropoff values when client rate names are updated
+  // This handles the case where pickup/dropoff names in m5_client_rate table
+  // have been renamed - the formData needs to be updated to match the current API values
+  useEffect(() => {
+    if (
+      !isLoading.startingPoints &&
+      startingPoints.length > 0 &&
+      formData.pickup
+    ) {
+      // Check if the current pickup value exists in the startingPoints array
+      const matchingPoint = startingPoints.find(
+        (point) => point.startingpoint === formData.pickup
+      );
+
+      if (!matchingPoint) {
+        // The current pickup value is not in the API results
+        // Try to find a match by checking if any starting point name contains or is similar
+        // This handles cases where the name was slightly modified
+        const possibleMatch = startingPoints.find((point) =>
+          point.startingpoint
+            .toLowerCase()
+            .includes(formData.pickup.toLowerCase()) ||
+          formData.pickup
+            .toLowerCase()
+            .includes(point.startingpoint.toLowerCase())
+        );
+
+        if (possibleMatch) {
+          console.log(
+            `[FC] Pickup name updated from "${formData.pickup}" to "${possibleMatch.startingpoint}" based on API data`
+          );
+          setFormData((prev) => ({
+            ...prev,
+            pickup: possibleMatch.startingpoint,
+          }));
+          // Also update destinations for the new pickup
+          fetchDestinations(possibleMatch.startingpoint);
+        }
+      }
+    }
+  }, [isLoading.startingPoints, startingPoints, formData.pickup]);
+
+  useEffect(() => {
+    if (
+      !isLoading.destinations &&
+      destinations.length > 0 &&
+      formData.dropoff
+    ) {
+      // Check if the current dropoff value exists in the destinations array
+      const matchingDest = destinations.find(
+        (dest) => dest.destination === formData.dropoff
+      );
+
+      if (!matchingDest) {
+        // The current dropoff value is not in the API results
+        // Try to find a match by checking if any destination name contains or is similar
+        const possibleMatch = destinations.find((dest) =>
+          dest.destination
+            .toLowerCase()
+            .includes(formData.dropoff.toLowerCase()) ||
+          formData.dropoff
+            .toLowerCase()
+            .includes(dest.destination.toLowerCase())
+        );
+
+        if (possibleMatch) {
+          console.log(
+            `[FC] Dropoff name updated from "${formData.dropoff}" to "${possibleMatch.destination}" based on API data`
+          );
+          setFormData((prev) => ({
+            ...prev,
+            dropoff: possibleMatch.destination,
+          }));
+        }
+      }
+    }
+  }, [isLoading.destinations, destinations, formData.dropoff]);
+
   // useEffect to recalculate total cost when container surcharges or hazardous flags/amounts change
   useEffect(() => {
     if (containers.length > 0) {
