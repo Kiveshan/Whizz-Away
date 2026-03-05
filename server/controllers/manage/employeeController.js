@@ -116,7 +116,6 @@ const createEmployeeHandler = async (req, res) => {
 
     console.log("Creating employee with data:", req.body)
     const adminId = req.user?.userid || null // Extract admin ID from authenticated user
-    const ipAddress = req.ip || req.connection.remoteAddress || req.headers['x-forwarded-for'] || null
     const userAgent = req.headers['user-agent'] || null
     const newEmployee = await createEmployee(
       {
@@ -140,7 +139,6 @@ const createEmployeeHandler = async (req, res) => {
       },
       urls,
       adminId,
-      ipAddress,
       userAgent
     )
     res.status(201).json(newEmployee)
@@ -189,7 +187,6 @@ const updateEmployeeHandler = async (req, res) => {
 
     console.log(`Updating employee ID ${id}`)
     const adminId = req.user?.userid || null // Extract admin ID from authenticated user
-    const ipAddress = req.ip || req.connection.remoteAddress || req.headers['x-forwarded-for'] || null
     const userAgent = req.headers['user-agent'] || null
     const updatedEmployee = await updateEmployee(
       Number.parseInt(id),
@@ -213,7 +210,6 @@ const updateEmployeeHandler = async (req, res) => {
       },
       newFileUrls,
       adminId,
-      ipAddress,
       userAgent
     )
     res.json(updatedEmployee)

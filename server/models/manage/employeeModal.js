@@ -149,7 +149,7 @@ const checkEmployeeEmailExists = async (email) => {
   }
 }
 
-const createEmployee = async (employeeData, documentUrls, adminId = null, ipAddress = null, userAgent = null) => {
+const createEmployee = async (employeeData, documentUrls, adminId = null, userAgent = null) => {
   let client
   try {
     client = await pool.connect()
@@ -253,9 +253,9 @@ const createEmployee = async (employeeData, documentUrls, adminId = null, ipAddr
 
     await client.query("COMMIT")
     
-    // Log employee creation with admin ID and request metadata
+    // Log employee creation with admin ID and user agent
     try {
-      await logEmployeeCreation(client, adminId, newEmployee.userid, `${name} ${surname}`, ipAddress, userAgent);
+      await logEmployeeCreation(client, adminId, newEmployee.userid, `${name} ${surname}`, userAgent);
     } catch (logError) {
       // Don't fail the operation if logging fails
       console.warn('Audit logging failed for employee creation:', logError.message);
@@ -271,7 +271,7 @@ const createEmployee = async (employeeData, documentUrls, adminId = null, ipAddr
   }
 }
 
-const updateEmployee = async (id, employeeData, documentUrls, adminId = null, ipAddress = null, userAgent = null) => {
+const updateEmployee = async (id, employeeData, documentUrls, adminId = null, userAgent = null) => {
   let client
   try {
     client = await pool.connect()
@@ -457,7 +457,7 @@ const updateEmployee = async (id, employeeData, documentUrls, adminId = null, ip
     // Log password change if password was changed
     if (passwordChanged) {
       try {
-        await logPasswordChange(client, adminId, id, `${name} ${surname}`, ipAddress, userAgent);
+        await logPasswordChange(client, adminId, id, `${name} ${surname}`, userAgent);
       } catch (logError) {
         // Don't fail the operation if logging fails
         console.warn('Audit logging failed for password change:', logError.message);
