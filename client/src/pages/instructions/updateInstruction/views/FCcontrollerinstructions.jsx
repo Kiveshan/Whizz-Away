@@ -64,6 +64,7 @@ const FCcontrollerinstructions = () => {
     vesselName: useRef(null),
     rateWeight: useRef(null),
     unitRate: useRef(null),
+    createdAt: useRef(null),
   };
 
   // Function to fetch VGM amount from client rates (mirrors surcharge/hazardous)
@@ -1549,6 +1550,7 @@ const FCcontrollerinstructions = () => {
         is_set_rate: isSetRate, // Set rate flag for database
         // When set rate is checked, overwrite historical_set_rate with current setRateValue
         historical_set_rate: isSetRate ? setRateValue : null,
+        created_at: formData.createdAt || null, // Add creation date
       };
 
       // Prepare container data with containerKey for smart updates
@@ -2279,6 +2281,7 @@ const FCcontrollerinstructions = () => {
         rateper_abnormal: data.rateper_abnormal || 0,
         rateper_breakbulk: data.rateper_breakbulk || 0,
         status: data.status || "",
+        createdAt: formatDateForInput(data.created_at) || "", // Add creation date
       };
 
       setFormData(newFormData);
@@ -4379,6 +4382,19 @@ const FCcontrollerinstructions = () => {
                   readOnly
                   style={isReadOnly ? readOnlyStyle : nonEditableStyle}
                   disabled={isReadOnly}
+                />
+              </div>
+              <div className="controller-instructions-form-field">
+                <label>Creation Date</label>
+                <input
+                  type="date"
+                  className="controller-instructions-form-input"
+                  name="createdAt"
+                  value={formData.createdAt || ""}
+                  onChange={handleInputChange}
+                  disabled={isReadOnly}
+                  style={isReadOnly ? readOnlyStyle : {}}
+                  ref={fieldRefs.createdAt}
                 />
               </div>
             </div>
