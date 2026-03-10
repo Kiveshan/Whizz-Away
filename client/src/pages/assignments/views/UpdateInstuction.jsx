@@ -1266,13 +1266,13 @@ const handleAddLeg = () => {
 
   // CRITICAL FIX: Determine next leg number based on max existing legnumber,
   // not array length (hosted can have stale/gapped data which causes collisions).
+  const newLegIndex = (legsRef.current || legs).length;
   setLegs((prevLegs) => {
     const maxLegNumber = prevLegs.reduce((max, leg) => {
       const n = Number(leg?.legnumber);
       return Number.isFinite(n) ? Math.max(max, n) : max;
     }, 0);
 
-    const newLegIndex = prevLegs.length;
     const newLeg = {
       id: `temp-${Date.now()}`,
       legnumber: maxLegNumber + 1,
