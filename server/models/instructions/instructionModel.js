@@ -2084,6 +2084,11 @@ export const updateFCInstructionAndContainers = async (
         currentInstruction.historical_set_rate,
         "number"
       ),
+      created_at: preserveExistingValue(
+        instructionData.created_at,
+        currentInstruction.created_at,
+        "string"
+      ),
     };
 
     // 3. Check if instruction needs updating
@@ -2119,6 +2124,7 @@ export const updateFCInstructionAndContainers = async (
       { field: "unitrate", type: "number" },
       { field: "is_set_rate", type: "boolean" },
       { field: "historical_set_rate", type: "number" },
+      { field: "created_at", type: "date" },
     ];
 
     for (const { field, type } of fieldsToCheck) {
@@ -2146,8 +2152,8 @@ export const updateFCInstructionAndContainers = async (
           stackdate = $6, "lastFreeDate" = $7, "clientFileRef" = $8, rateweight = $9, description = $10,
           status = $11, vat = $12, num_six_meters = $13, num_twelve_meters = $14, num_abnormal = $15,
           num_breakbulk = $16, weight = $17, total_cost = $18, booking_ref = $19, vessel_name = $20,
-          rateper_6 = $21, rateper_12 = $22, rateper_abnormal = $23, rateper_breakbulk = $24, unitrate = $25, is_set_rate = $26, historical_set_rate = $27
-        WHERE m1key = $28
+          rateper_6 = $21, rateper_12 = $22, rateper_abnormal = $23, rateper_breakbulk = $24, unitrate = $25, is_set_rate = $26, historical_set_rate = $27, created_at = $28
+        WHERE m1key = $29
         RETURNING *
       `;
 
@@ -2180,6 +2186,7 @@ export const updateFCInstructionAndContainers = async (
         updateData.unitrate,
         updateData.is_set_rate,
         updateData.historical_set_rate,
+        updateData.created_at,
         instructionId,
       ];
 
