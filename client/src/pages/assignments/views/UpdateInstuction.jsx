@@ -264,6 +264,7 @@ function UpdateInstruction() {
 
   const [drivers, setDrivers] = useState([]);
   const [legs, setLegs] = useState([]);
+  const legsRef = useRef([]);
   const [currentLagIndex, setCurrentLagIndex] = useState(null);
   const [formData, setFormData] = useState({
     startingPoint: "",
@@ -373,6 +374,10 @@ const [weightUnit, setWeightUnit] = useState('kg');
     subbie_twelve_meter: 0,
   });
   const ratesRouteKeyRef = useRef(null);
+
+  useEffect(() => {
+    legsRef.current = legs;
+  }, [legs]);
   const checkIfWeightBased = async () => {
   if (!instructionId) return;
   
@@ -438,7 +443,7 @@ const [weightUnit, setWeightUnit] = useState('kg');
 
           // CRITICAL FIX: Preserve any unsaved new legs that don't exist on server
           // Get current unsaved legs from state before we overwrite it
-          const currentUnsavedLegs = legs.filter(
+          const currentUnsavedLegs = (legsRef.current || []).filter(
             (leg) => leg.isNew || leg.id?.toString().startsWith("temp-")
           );
           
@@ -456,6 +461,23 @@ const [weightUnit, setWeightUnit] = useState('kg');
           
           // Sort by legnumber to maintain order
           mergedLegs.sort((a, b) => a.legnumber - b.legnumber);
+
+          const legNumberCounts = mergedLegs.reduce((acc, leg) => {
+            const n = Number(leg?.legnumber);
+            if (!Number.isFinite(n)) return acc;
+            acc[n] = (acc[n] || 0) + 1;
+            return acc;
+          }, {});
+          const duplicateLegNumbers = Object.entries(legNumberCounts)
+            .filter(([, count]) => count > 1)
+            .map(([n]) => n);
+          if (duplicateLegNumbers.length > 0) {
+            console.warn(
+              "Duplicate legnumber(s) detected after refresh:",
+              duplicateLegNumbers,
+              mergedLegs
+            );
+          }
 
           console.log(
             "Transformed refreshed legs data (with preserved unsaved):",
@@ -1242,30 +1264,37 @@ const handleAddLeg = () => {
     localStorage.removeItem(`instruction_${instructionId}_state`);
   }
 
-  const newLeg = {
-    id: `temp-${Date.now()}`,
-    legnumber: legs.length + 1,
-    startingPoint: "",
-    driverRate: "",
-    destination: "",
-    drivers: [], // Always start with empty drivers array
-    isNew: true,
-  };
+  // CRITICAL FIX: Determine next leg number based on max existing legnumber,
+  // not array length (hosted can have stale/gapped data which causes collisions).
+  const newLegIndex = (legsRef.current || legs).length;
+  setLegs((prevLegs) => {
+    const maxLegNumber = prevLegs.reduce((max, leg) => {
+      const n = Number(leg?.legnumber);
+      return Number.isFinite(n) ? Math.max(max, n) : max;
+    }, 0);
 
-const newLegIndex = legs.length;
+    const newLeg = {
+      id: `temp-${Date.now()}`,
+      legnumber: maxLegNumber + 1,
+      startingPoint: "",
+      driverRate: "",
+      destination: "",
+      drivers: [], // Always start with empty drivers array
+      isNew: true,
+    };
 
-// CRITICAL FIX: Use functional updates to ensure proper state synchronization
-setLegs(prevLegs => {
-  const updatedLegs = [...prevLegs, newLeg];
-  
-  // Set currentLagIndex in the same render cycle using a callback
-  setTimeout(() => {
-    setCurrentLagIndex(newLegIndex);
-    currentLegIndexRef.current = newLegIndex;
-  }, 0);
-  
-  return updatedLegs;
-});
+    // Set currentLagIndex in the same render cycle using a callback
+    setTimeout(() => {
+      setCurrentLagIndex(newLegIndex);
+      currentLegIndexRef.current = newLegIndex;
+    }, 0);
+
+    console.log(
+      `Adding new leg. prevLegs.length=${prevLegs.length}, maxLegNumber=${maxLegNumber}, newLegNumber=${maxLegNumber + 1}`
+    );
+
+    return [...prevLegs, newLeg];
+  });
 
 // Clear form state
 setFormData({
@@ -2228,12 +2257,39 @@ const navigateToDocuments = () => {
         currentLeg.isNew || currentLeg.id?.toString().startsWith("temp-");
 
       // Prepare the leg data for saving
+      const computedLegNumber = (() => {
+        if (!isNewLeg) {
+          return currentLeg.legnumber || legIndexToSave + 1;
+        }
+
+        const existingMax = updatedLegs
+          .filter((_, idx) => idx !== legIndexToSave)
+          .reduce((max, leg) => {
+            const n = Number(leg?.legnumber);
+            return Number.isFinite(n) ? Math.max(max, n) : max;
+          }, 0);
+
+        const desired = Number(currentLeg?.legnumber);
+        if (Number.isFinite(desired) && desired > existingMax) {
+          return desired;
+        }
+
+        return existingMax + 1;
+      })();
+
+      // Ensure local state matches what we're about to persist
+      updatedLegs[legIndexToSave] = {
+        ...updatedLegs[legIndexToSave],
+        legnumber: computedLegNumber,
+      };
+      setLegs(updatedLegs);
+
       const legData = {
         legkey:
           !isNewLeg && currentLeg.id && !isNaN(Number.parseInt(currentLeg.id))
             ? currentLeg.id
             : null,
-        legnumber: currentLeg.legnumber || legIndexToSave + 1,
+        legnumber: computedLegNumber,
         startingpoint: currentLeg.startingPoint || formData.startingPoint,
         destination: currentLeg.destination || formData.destination,
         driverrate: calculateLegDriverRate(cleanDrivers, rates),
