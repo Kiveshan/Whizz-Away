@@ -37,9 +37,6 @@ export const handleFinaliseClick = async ({
   weightUnit,
   setContainerValidationDetails,
   setShowContainerModal,
-  normalizeString,
-  setMismatchDetails,
-  setShowMismatchModal,
 }) => {
   if (legs.length === 0) {
     navigateToDocuments();
@@ -88,18 +85,6 @@ export const handleFinaliseClick = async ({
         });
       }
       setShowContainerModal(true);
-      return;
-    }
-
-    const lastLeg = legs[legs.length - 1];
-    const lastLegDestination = lastLeg.destination;
-
-    if (normalizeString(lastLegDestination) !== normalizeString(dropoff)) {
-      setMismatchDetails({
-        lastLegDestination,
-        dropoff,
-      });
-      setShowMismatchModal(true);
       return;
     }
 

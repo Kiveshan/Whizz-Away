@@ -53,7 +53,6 @@ import {
   handleSelectLeg as handleSelectLegHandler,
 } from "./UpdateInstruction/handlers/legsHandlers";
 import {
-  DestinationMismatchModal,
   ContainerWarningModal,
   MissingFieldsModal,
   NoDriversModal,
@@ -116,11 +115,6 @@ function UpdateInstruction() {
   const [initialDataLoaded, setInitialDataLoaded] = useState(false);
   const [isCompleted, setIsCompleted] = useState(false);
   const [shipmentType, setShipmentType] = useState(null);
-  const [showMismatchModal, setShowMismatchModal] = useState(false);
-  const [mismatchDetails, setMismatchDetails] = useState({
-    lastLegDestination: "",
-    dropoff: "",
-  });
   // New state for container validation
   const [showContainerModal, setShowContainerModal] = useState(false);
   const [containerValidationDetails, setContainerValidationDetails] = useState({
@@ -196,6 +190,79 @@ const [weightUnit, setWeightUnit] = useState('kg');
     subbie_twelve_meter: 0,
   });
   const ratesRouteKeyRef = useRef(null);
+
+  const handleMoveLeg = async (fromIndex, toIndex) => {
+    if (isCompleted) return;
+    if (fromIndex === toIndex) return;
+    if (fromIndex < 0 || toIndex < 0) return;
+    if (fromIndex >= legsRef.current.length || toIndex >= legsRef.current.length) return;
+
+    if (currentLagIndex !== null && currentLagIndex >= 0 && currentLagIndex < legsRef.current.length) {
+      const updatedLegsSnapshot = [...legsRef.current];
+      updatedLegsSnapshot[currentLagIndex] = {
+        ...updatedLegsSnapshot[currentLagIndex],
+        startingPoint: formData.startingPoint,
+        destination: formData.destination,
+        driverRate: formData.driverRate,
+        drivers: JSON.parse(JSON.stringify(drivers)),
+      };
+      setLegs(updatedLegsSnapshot);
+      legsRef.current = updatedLegsSnapshot;
+    }
+
+    const prevLegs = [...legsRef.current];
+    const movedLeg = prevLegs[fromIndex];
+    const nextLegs = [...prevLegs];
+    nextLegs.splice(fromIndex, 1);
+    nextLegs.splice(toIndex, 0, movedLeg);
+
+    const renumberedLegs = nextLegs.map((leg, idx) => ({
+      ...leg,
+      legnumber: idx + 1,
+    }));
+
+    const nextCurrentIndex = (() => {
+      if (currentLagIndex === null || currentLagIndex === undefined) return currentLagIndex;
+      if (currentLagIndex === fromIndex) return toIndex;
+      if (fromIndex < toIndex && currentLagIndex > fromIndex && currentLagIndex <= toIndex) {
+        return currentLagIndex - 1;
+      }
+      if (fromIndex > toIndex && currentLagIndex >= toIndex && currentLagIndex < fromIndex) {
+        return currentLagIndex + 1;
+      }
+      return currentLagIndex;
+    })();
+
+    setLegs(renumberedLegs);
+    legsRef.current = renumberedLegs;
+    setCurrentLagIndex(nextCurrentIndex);
+    currentLegIndexRef.current = nextCurrentIndex;
+
+    setSavedLegs((prev) => {
+      const newSet = new Set();
+      prev.forEach((idx) => {
+        let newIdx = idx;
+        if (idx === fromIndex) newIdx = toIndex;
+        else if (fromIndex < toIndex && idx > fromIndex && idx <= toIndex) newIdx = idx - 1;
+        else if (fromIndex > toIndex && idx >= toIndex && idx < fromIndex) newIdx = idx + 1;
+        newSet.add(newIdx);
+      });
+      return newSet;
+    });
+
+    if (instructionId) {
+      try {
+        await Promise.all(
+          renumberedLegs.map((leg, idx) => {
+            if (!leg?.id || leg.id.toString().startsWith("temp-")) return Promise.resolve();
+            return api.put(`/legs/${leg.id}/update-number`, { legnumber: idx + 1 });
+          })
+        );
+      } catch (error) {
+        console.error("Error updating leg numbers after reordering:", error);
+      }
+    }
+  };
 
   useEffect(() => {
     legsRef.current = legs;
@@ -873,9 +940,6 @@ const navigateBack = () => {
       weightUnit,
       setContainerValidationDetails,
       setShowContainerModal,
-      normalizeString,
-      setMismatchDetails,
-      setShowMismatchModal,
     });
   };
   const fetchShipmentType = async () => {
@@ -971,10 +1035,6 @@ const shouldDisableAddLeg = async () => {
     const dropoff = instructionDetails.dropoff;
 
     if (!dropoff) return false;
-
-    const normalizedDropoff = normalizeString(dropoff);
-    const lastLeg = legs[legs.length - 1];
-    if (normalizeString(lastLeg.destination) !== normalizedDropoff) return false;
     const missingItems = await checkContainersReachDropoff(dropoff);
     return missingItems.length === 0;
   } catch (error) {
@@ -1006,17 +1066,10 @@ const checkContainersDestination = async () => {
 
     const instructionDetails = await response.json();
     const dropoff = instructionDetails.dropoff;
-    const normalizedDropoff = normalizeString(dropoff); // ← Move this AFTER dropoff is defined
         if (!dropoff) {
           setShouldHideAddLegButton(false);
           return;
         }
-        const lastLeg = legs[legs.length - 1];
-        if (normalizeString(lastLeg.destination) !== normalizeString(dropoff)) {
-          setShouldHideAddLegButton(false);
-          return;
-        }
-
 const missingItems = await checkContainersReachDropoff(dropoff);
 
       console.log("Destination check result (missing items):", missingItems);
@@ -1128,7 +1181,6 @@ useEffect(() => {
     <div className="min-h-screen bg-white" style={{ paddingBottom: 200 }}>
       <style>{modalAnimation}</style>
       {!(
-        showMismatchModal ||
         showContainerModal ||
         showUnsavedChangesModal ||
         showMissingFieldsModal ||
@@ -1153,6 +1205,7 @@ useEffect(() => {
         isCompleted={isCompleted}
         handleSelectLeg={handleSelectLeg}
         handleRemoveLeg={handleRemoveLeg}
+        onMoveLeg={handleMoveLeg}
         shouldHideAddLegButton={shouldHideAddLegButton}
         handleAddLeg={handleAddLeg}
         hasUnsavedNewLeg={hasUnsavedNewLeg}
@@ -1227,12 +1280,6 @@ useEffect(() => {
           savedLegs={savedLegs}
         />
       </div>
-      <DestinationMismatchModal
-        show={showMismatchModal}
-        mismatchDetails={mismatchDetails}
-        onClose={() => setShowMismatchModal(false)}
-      />
-
       <ContainerWarningModal
         show={showContainerModal}
         containerValidationDetails={containerValidationDetails}

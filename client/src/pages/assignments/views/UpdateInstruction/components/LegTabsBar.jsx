@@ -8,6 +8,7 @@ export default function LegTabsBar({
   isCompleted,
   handleSelectLeg,
   handleRemoveLeg,
+  onMoveLeg,
   shouldHideAddLegButton,
   handleAddLeg,
   hasUnsavedNewLeg,
@@ -34,7 +35,31 @@ export default function LegTabsBar({
           }
 
           return (
-            <div key={leg.id || index} className="relative">
+            <div
+              key={leg.id || index}
+              className="relative"
+              draggable={!isCompleted}
+              onDragStart={(e) => {
+                if (isCompleted) return;
+                e.dataTransfer.effectAllowed = "move";
+                e.dataTransfer.setData("text/plain", String(index));
+              }}
+              onDragOver={(e) => {
+                if (isCompleted) return;
+                e.preventDefault();
+                e.dataTransfer.dropEffect = "move";
+              }}
+              onDrop={(e) => {
+                if (isCompleted) return;
+                e.preventDefault();
+                const fromRaw = e.dataTransfer.getData("text/plain");
+                const fromIndex = Number.parseInt(fromRaw, 10);
+                if (!Number.isFinite(fromIndex)) return;
+                if (typeof onMoveLeg === "function") {
+                  onMoveLeg(fromIndex, index);
+                }
+              }}
+            >
               <button
                 className={buttonClass}
                 onClick={() => handleSelectLeg(index)}
