@@ -25,6 +25,11 @@ const AddOnList = () => {
   const [currentPage, setCurrentPage] = useState(1);
   const recordsPerPage = 5;
 
+  // Delete state
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [addonToDelete, setAddonToDelete] = useState(null);
+  const [deleting, setDeleting] = useState(false);
+
   // Helper function to handle token expiration
   const handleTokenExpiration = (error) => {
     const status = error.response?.status;
@@ -126,6 +131,40 @@ const AddOnList = () => {
     });
   };
 
+  const handleDeleteAddon = async () => {
+    if (!addonToDelete) return;
+    setDeleting(true);
+    setError(null);
+    try {
+      const response = await api.delete(`/api/addons/${addonToDelete}`, {
+        headers: {
+          Authorization: `Bearer ${localStorage.getItem("token")}`,
+        },
+      });
+      if (response.data.success) {
+        setAddOns(addOns.filter((addon) => addon.addon_id !== addonToDelete));
+        setShowDeleteConfirm(false);
+        setAddonToDelete(null);
+      } else {
+        throw new Error(response.data.message || "Failed to delete add-on");
+      }
+    } catch (err) {
+      console.error("Error deleting add-on:", err);
+      if (handleTokenExpiration(err)) {
+        return;
+      }
+      setError(
+        err.response?.data?.message ||
+          err.message ||
+          "An error occurred while deleting the add-on"
+      );
+      setShowDeleteConfirm(false);
+      setAddonToDelete(null);
+    } finally {
+      setDeleting(false);
+    }
+  };
+
   if (loading)
     return (
       <div className="add-on-list-wrapper">
@@ -191,6 +230,7 @@ const AddOnList = () => {
               <th>Date</th>
               <th>Amount</th>
               <th>Invoice Number</th>
+              <th>Booking Ref</th>
               <th>Actions</th>
             </tr>
           </thead>
@@ -205,6 +245,7 @@ const AddOnList = () => {
                   <td>{new Date(addon.date).toLocaleDateString()}</td>
                   <td>R{addon.amount.toLocaleString()}</td>
                   <td>{addon.invoice_number}</td>
+                  <td>{addon.booking_ref}</td>
                   <td>
                     <button
                       className="view-button"
@@ -212,12 +253,22 @@ const AddOnList = () => {
                     >
                       View
                     </button>
+                    <button
+                      className="view-button"
+                      onClick={() => {
+                        setAddonToDelete(addon.addon_id);
+                        setShowDeleteConfirm(true);
+                      }}
+                      style={{ backgroundColor: "#dc3545", marginLeft: "5px" }}
+                    >
+                      Delete
+                    </button>
                   </td>
                 </tr>
               ))}
             {addOns.length === 0 && (
               <tr>
-                <td colSpan="4" className="p-3 text-center">
+                <td colSpan="5" className="p-3 text-center">
                   No add-ons found
                 </td>
               </tr>
@@ -240,6 +291,70 @@ const AddOnList = () => {
           currentPage={currentPage}
           onPageChange={setCurrentPage}
         />
+
+        {showDeleteConfirm && (
+          <div style={{
+            position: "fixed",
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            backgroundColor: "rgba(0, 0, 0, 0.5)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            zIndex: 1000,
+          }}>
+            <div style={{
+              backgroundColor: "white",
+              padding: "30px",
+              borderRadius: "8px",
+              boxShadow: "0 4px 6px rgba(0, 0, 0, 0.1)",
+              maxWidth: "400px",
+              textAlign: "center",
+            }}>
+              <h2 style={{ marginTop: 0, color: "#333" }}>Delete Add-On?</h2>
+              <p style={{ color: "#666", marginBottom: "30px" }}>
+                Are you sure you want to delete this add-on? This action cannot be undone.
+              </p>
+              <div style={{ display: "flex", gap: "10px", justifyContent: "center" }}>
+                <button
+                  onClick={() => {
+                    setShowDeleteConfirm(false);
+                    setAddonToDelete(null);
+                  }}
+                  disabled={deleting}
+                  style={{
+                    padding: "10px 20px",
+                    backgroundColor: "#6c757d",
+                    color: "white",
+                    border: "none",
+                    borderRadius: "4px",
+                    cursor: "pointer",
+                    fontSize: "14px",
+                  }}
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleDeleteAddon}
+                  disabled={deleting}
+                  style={{
+                    padding: "10px 20px",
+                    backgroundColor: "#dc3545",
+                    color: "white",
+                    border: "none",
+                    borderRadius: "4px",
+                    cursor: "pointer",
+                    fontSize: "14px",
+                  }}
+                >
+                  {deleting ? "Deleting..." : "Delete"}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );

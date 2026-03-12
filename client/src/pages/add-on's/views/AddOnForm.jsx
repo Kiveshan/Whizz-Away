@@ -22,6 +22,7 @@ const AddOnForm = () => {
     vat_applied: true, // New field for VAT toggle
     booking_ref: "",
     client_ref: "",
+    vessel_number: "",
   });
 
   const [companyInfo, setCompanyInfo] = useState({
@@ -53,10 +54,8 @@ const AddOnForm = () => {
   const [success, setSuccess] = useState(false);
   const [fetchingData, setFetchingData] = useState(isViewMode);
   const [fetchingInfo, setFetchingInfo] = useState(true);
+  const [isEditMode, setIsEditMode] = useState(false);
   const [isEditingInvoiceNum, setIsEditingInvoiceNum] = useState(false);
-  const [invoiceNumInput, setInvoiceNumInput] = useState("");
-  const [savingInvoiceNum, setSavingInvoiceNum] = useState(false);
-  const [saveInvoiceError, setSaveInvoiceError] = useState(null);
 
   useEffect(() => {
     const fetchCompanyAndClientInfo = async () => {
@@ -154,8 +153,8 @@ const AddOnForm = () => {
                 addon.vat_applied !== undefined ? addon.vat_applied : true,
               booking_ref: addon.booking_ref || "",
               client_ref: addon.client_ref || "",
+              vessel_number: addon.vessel_number || "",
             });
-            setInvoiceNumInput(addon.invoice_number || "");
           } else {
             throw new Error(
               response.data.message || "Failed to fetch add-on details"
@@ -182,32 +181,8 @@ const AddOnForm = () => {
     }
   }, [isViewMode, addonId, clientId, clientName, navigate]);
 
-  const handleStartEditInvoiceNum = () => {
-    setSaveInvoiceError(null);
-    setInvoiceNumInput(formData.invoice_number || "");
-    setIsEditingInvoiceNum(true);
-  };
-
-  const handleCancelEditInvoiceNum = () => {
-    setIsEditingInvoiceNum(false);
-    setInvoiceNumInput(formData.invoice_number || "");
-    setSaveInvoiceError(null);
-  };
-
-  const handleSaveInvoiceNum = async () => {
-    if (!isViewMode || !addonId) return;
-    if (!invoiceNumInput || invoiceNumInput.trim().length === 0) {
-      setSaveInvoiceError("Invoice number is required");
-      return;
-    }
-    // Frontend-only: update local state so the PDF reflects the typed number
-    setSaveInvoiceError(null);
-    setFormData((prev) => ({ ...prev, invoice_number: invoiceNumInput.trim() }));
-    setIsEditingInvoiceNum(false);
-  };
-
   const handleInputChange = (index, e) => {
-    if (isViewMode) return;
+    if (isViewMode && !isEditMode) return;
     const { name, value } = e.target;
     const newItems = [...formData.items];
     if (name === "item_amount") {
@@ -226,13 +201,13 @@ const AddOnForm = () => {
   };
 
   const handleVatToggle = () => {
-    if (isViewMode) return;
+    if (isViewMode && !isEditMode) return;
     setFormData((prev) => ({ ...prev, vat_applied: !prev.vat_applied }));
     if (error) setError(null);
   };
 
   const addItem = () => {
-    if (isViewMode) return;
+    if (isViewMode && !isEditMode) return;
     setFormData((prev) => ({
       ...prev,
       items: [
@@ -243,7 +218,7 @@ const AddOnForm = () => {
   };
 
   const removeItem = (index) => {
-    if (isViewMode || formData.items.length === 1) return;
+    if ((isViewMode && !isEditMode) || formData.items.length === 1) return;
     const newItems = formData.items.filter((_, i) => i !== index);
     setFormData((prev) => ({ ...prev, items: newItems }));
   };
@@ -291,7 +266,7 @@ const AddOnForm = () => {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (isViewMode) return;
+    if (isViewMode && !isEditMode) return;
     if (!validateForm()) return;
     setLoading(true);
     setError(null);
@@ -307,30 +282,53 @@ const AddOnForm = () => {
         vat_applied: formData.vat_applied,
         booking_ref: formData.booking_ref.trim(),
         client_ref: formData.client_ref.trim(),
+        vessel_number: formData.vessel_number.trim(),
+        invoice_number: formData.invoice_number.trim(),
       };
-      const response = await api.post("/api/addons", submitData, {
-        headers: {
-          Authorization: `Bearer ${localStorage.getItem("token")}`,
-          "Content-Type": "application/json",
-        },
-      });
-      if (response.data.success) {
-        setFormData((prev) => ({
-          ...prev,
-          invoice_number: response.data.data.invoice_number,
-          group_id: response.data.data.group_id,
-        }));
-        setSuccess(true);
-        setTimeout(() => {
-          navigate(`/view-add-on-list`, {
-            state: { clientId, clientName },
-          });
-        }, 2000);
+
+      if (isEditMode && addonId) {
+        const response = await api.put(`/api/addons/${addonId}`, submitData, {
+          headers: {
+            Authorization: `Bearer ${localStorage.getItem("token")}`,
+            "Content-Type": "application/json",
+          },
+        });
+        if (response.data.success) {
+          setSuccess(true);
+          setIsEditMode(false);
+          setTimeout(() => {
+            navigate(`/view-add-on-list`, {
+              state: { clientId, clientName },
+            });
+          }, 2000);
+        } else {
+          throw new Error(response.data.message || "Failed to update add-on");
+        }
       } else {
-        throw new Error(response.data.message || "Failed to create add-on");
+        const response = await api.post("/api/addons", submitData, {
+          headers: {
+            Authorization: `Bearer ${localStorage.getItem("token")}`,
+            "Content-Type": "application/json",
+          },
+        });
+        if (response.data.success) {
+          setFormData((prev) => ({
+            ...prev,
+            invoice_number: response.data.data.invoice_number,
+            group_id: response.data.data.group_id,
+          }));
+          setSuccess(true);
+          setTimeout(() => {
+            navigate(`/view-add-on-list`, {
+              state: { clientId, clientName },
+            });
+          }, 2000);
+        } else {
+          throw new Error(response.data.message || "Failed to create add-on");
+        }
       }
     } catch (err) {
-      console.error("Error creating add-on:", err);
+      console.error("Error saving add-on:", err);
       if (err.response?.status === 401 || err.response?.status === 403) {
         localStorage.removeItem("token");
         localStorage.removeItem("user");
@@ -340,7 +338,7 @@ const AddOnForm = () => {
       setError(
         err.response?.data?.message ||
           err.message ||
-          "An error occurred while creating the add-on"
+          "An error occurred while saving the add-on"
       );
     } finally {
       setLoading(false);
@@ -464,15 +462,19 @@ const AddOnForm = () => {
       doc.text(invMetaRight, pageWidth - margins.right, currentY, { align: 'right' });
       currentY += 8;
 
-      // References section (Booking Ref / Client Ref)
-      if (formData.booking_ref || formData.client_ref) {
+      // References section (Booking Ref / Client Ref / Vessel Number)
+      if (formData.booking_ref || formData.client_ref || formData.vessel_number) {
+        const refBody = [
+          ["Booking Ref", formData.booking_ref || "—"],
+          ["Client Ref", formData.client_ref || "—"],
+        ];
+        if (formData.vessel_number) {
+          refBody.push(["Vessel Number", formData.vessel_number || "—"]);
+        }
         autoTable(doc, {
           startY: currentY,
           head: [["References", ""]],
-          body: [
-            ["Booking Ref", formData.booking_ref || "—"],
-            ["Client Ref", formData.client_ref || "—"],
-          ],
+          body: refBody,
           theme: "grid",
           styles: { fontSize: fonts.small, cellPadding: 1.2, lineWidth: 0.1, lineColor: brand.gray },
           headStyles: { fillColor: brand.accent, textColor: [255, 255, 255], fontStyle: 'bold' },
@@ -650,7 +652,7 @@ const AddOnForm = () => {
       <div className="addon-form-wrapper">
         <div className="addon-form-container">
           <div className="success-message">
-            <h2>Add-On Created Successfully!</h2>
+            <h2>{isEditMode ? "Add-On Updated Successfully!" : "Add-On Created Successfully!"}</h2>
             <p>Redirecting to add-on list...</p>
           </div>
         </div>
@@ -672,50 +674,21 @@ const AddOnForm = () => {
           <div className="invoice-details">
             {isViewMode && (
               <div className="invoice-number" style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-                {!isEditingInvoiceNum ? (
-                  <>
-                    <span>Invoice #:</span>
-                    <strong>{formData.invoice_number || "—"}</strong>
-                    <button
-                      type="button"
-                      className="print-button"
-                      onClick={handleStartEditInvoiceNum}
-                    >
-                      Edit
-                    </button>
-                  </>
+                <span>Invoice #:</span>
+                {!isEditMode ? (
+                  <strong>{formData.invoice_number || "—"}</strong>
                 ) : (
-                  <>
-                    <input
-                      type="text"
-                      value={invoiceNumInput}
-                      onChange={(e) => setInvoiceNumInput(e.target.value)}
-                      className="form-input"
-                      placeholder="Enter invoice number"
-                      style={{ width: "200px" }}
-                    />
-                    <button
-                      type="button"
-                      className="print-button"
-                      onClick={handleSaveInvoiceNum}
-                      disabled={savingInvoiceNum}
-                    >
-                      {savingInvoiceNum ? "Saving..." : "Save"}
-                    </button>
-                    <button
-                      type="button"
-                      className="back-button"
-                      onClick={handleCancelEditInvoiceNum}
-                      disabled={savingInvoiceNum}
-                    >
-                      Cancel
-                    </button>
-                  </>
+                  <input
+                    type="text"
+                    value={formData.invoice_number}
+                    onChange={(e) =>
+                      setFormData((prev) => ({ ...prev, invoice_number: e.target.value }))
+                    }
+                    className="form-input"
+                    style={{ width: "150px", padding: "4px 8px" }}
+                  />
                 )}
               </div>
-            )}
-            {saveInvoiceError && (
-              <div className="error-message" style={{ marginTop: "6px" }}>{saveInvoiceError}</div>
             )}
           </div>
         </div>
@@ -743,7 +716,7 @@ const AddOnForm = () => {
                 }
                 className="form-input"
                 required
-                readOnly={isViewMode}
+                readOnly={isViewMode && !isEditMode}
               />
             </div>
             <div className="form-group">
@@ -759,7 +732,7 @@ const AddOnForm = () => {
                 className="form-input"
                 maxLength={50}
                 required
-                readOnly={isViewMode}
+                readOnly={isViewMode && !isEditMode}
               />
             </div>
             <div className="form-group">
@@ -775,20 +748,53 @@ const AddOnForm = () => {
                 className="form-input"
                 maxLength={50}
                 required
-                readOnly={isViewMode}
+                readOnly={isViewMode && !isEditMode}
+              />
+            </div>
+            <div className="form-group">
+              <label htmlFor="vessel_number">Vessel Number</label>
+              <input
+                type="text"
+                id="vessel_number"
+                name="vessel_number"
+                value={formData.vessel_number}
+                onChange={(e) =>
+                  setFormData((prev) => ({ ...prev, vessel_number: e.target.value }))
+                }
+                className="form-input"
+                maxLength={50}
+                readOnly={isViewMode && !isEditMode}
               />
             </div>
             <div className="invoice-actions">
               <button onClick={handleBack} className="back-button">
                 ← Back
               </button>
-              {isViewMode && (
+              {isViewMode && !isEditMode && (
+                <>
+                  <button
+                    onClick={handlePrint}
+                    className="print-button"
+                    disabled={pdfLoading}
+                  >
+                    {pdfLoading ? "Generating PDF..." : "🖨️ Print"}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setIsEditMode(true)}
+                    className="print-button"
+                  >
+                    ✏️ Edit
+                  </button>
+                </>
+              )}
+              {isEditMode && (
                 <button
-                  onClick={handlePrint}
-                  className="print-button"
-                  disabled={pdfLoading}
+                  type="button"
+                  onClick={() => setIsEditMode(false)}
+                  className="back-button"
                 >
-                  {pdfLoading ? "Generating PDF..." : "🖨️ Print"}
+                  Cancel
                 </button>
               )}
             </div>
@@ -801,7 +807,7 @@ const AddOnForm = () => {
 
             <div className="invoice-items-header">
               <h3>Invoice Details</h3>
-              {!isViewMode && (
+              {(!isViewMode || isEditMode) && (
                 <button
                   type="button"
                   onClick={addItem}
@@ -827,7 +833,7 @@ const AddOnForm = () => {
                         placeholder="Category"
                         className="form-input"
                         required
-                        readOnly={isViewMode}
+                        readOnly={isViewMode && !isEditMode}
                       />
                     </div>
 
@@ -844,7 +850,7 @@ const AddOnForm = () => {
                         className="form-textarea"
                         rows="1"
                         required
-                        readOnly={isViewMode}
+                        readOnly={isViewMode && !isEditMode}
                       />
                     </div>
 
@@ -861,13 +867,13 @@ const AddOnForm = () => {
                           placeholder="0.00"
                           className="amount-input"
                           required
-                          readOnly={isViewMode}
+                          readOnly={isViewMode && !isEditMode}
                         />
                       </div>
                     </div>
                   </div>
 
-                  {!isViewMode && formData.items.length > 1 && (
+                  {(!isViewMode || isEditMode) && formData.items.length > 1 && (
                     <button
                       type="button"
                       onClick={() => removeItem(index)}
@@ -885,7 +891,7 @@ const AddOnForm = () => {
                     type="checkbox"
                     checked={formData.vat_applied}
                     onChange={handleVatToggle}
-                    disabled={isViewMode}
+                    disabled={isViewMode && !isEditMode}
                   />
                   <span className="vat-toggle-slider"></span>
                   Add VAT (15%)
@@ -918,19 +924,20 @@ const AddOnForm = () => {
               </div>
             </div>
 
-            {!isViewMode && (
+            {(!isViewMode || isEditMode) && (
               <div className="invoice-actions-footer">
                 <button
                   type="submit"
                   className="create-invoice-button"
                   disabled={loading}
                 >
-                  {loading ? "Creating..." : "Create Invoice"}
+                  {loading ? (isEditMode ? "Updating..." : "Creating...") : (isEditMode ? "Update Invoice" : "Create Invoice")}
                 </button>
               </div>
             )}
           </form>
         </div>
+
       </div>
     </div>
   );
