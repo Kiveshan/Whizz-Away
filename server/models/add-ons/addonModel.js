@@ -20,7 +20,8 @@ const getAddonsByClient = async (clientId, filters = {}) => {
         group_id,
         vat_applied,
         booking_ref,
-        client_ref
+        client_ref,
+        vessel_number
       FROM public.add_ons 
       WHERE client_id = $1
     `;
@@ -111,9 +112,10 @@ const createAddon = async (addonData) => {
         created_at,
         vat_applied,
         booking_ref,
-        client_ref
-      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
-      RETURNING addon_id, items, amount, date, invoice_number, group_id, vat_applied, booking_ref, client_ref
+        client_ref,
+        vessel_number
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+      RETURNING addon_id, items, amount, date, invoice_number, group_id, vat_applied, booking_ref, client_ref, vessel_number
     `;
 
     const result = await query(insertQueryText, [
@@ -127,6 +129,7 @@ const createAddon = async (addonData) => {
       addonData.vat_applied,
       addonData.booking_ref,
       addonData.client_ref,
+      addonData.vessel_number || null,
     ]);
 
     return {
@@ -142,6 +145,7 @@ const createAddon = async (addonData) => {
         vat_applied: result.rows[0].vat_applied,
         booking_ref: result.rows[0].booking_ref,
         client_ref: result.rows[0].client_ref,
+        vessel_number: result.rows[0].vessel_number,
       },
     };
   } catch (error) {
@@ -175,6 +179,7 @@ const getAddonById = async (addonId) => {
         a.vat_applied,
         a.booking_ref,
         a.client_ref,
+        a.vessel_number,
         c.client as client_name
       FROM public.add_ons a
       LEFT JOIN public.m5_client c ON a.client_id = c.m5clientkey
@@ -213,38 +218,69 @@ const updateAddon = async (addonId, addonData) => {
       };
     }
 
-    // Calculate total amount from items
-    const subtotal = addonData.items.reduce(
-      (sum, item) => sum + Number(item.item_amount),
-      0
-    );
-    const totalAmount = addonData.vat_applied ? subtotal * 1.15 : subtotal;
+    // Check if this is a partial update (only invoice_number and/or vessel_number)
+    const isPartialUpdate = !addonData.items && (addonData.invoice_number !== undefined || addonData.vessel_number !== undefined);
 
-    const queryText = `
-      UPDATE public.add_ons 
-      SET items = $1, amount = $2, date = $3, vat_applied = $4, booking_ref = $5, client_ref = $6
-      WHERE addon_id = $7
-      RETURNING addon_id, items, amount, date, invoice_number, vat_applied, booking_ref, client_ref
-    `;
+    let queryText;
+    let params;
 
-    console.log("Executing update query:", queryText, "with params:", [
-      JSON.stringify(addonData.items),
-      totalAmount,
-      addonData.date,
-      addonData.vat_applied,
-      addonData.booking_ref,
-      addonData.client_ref,
-      addonId,
-    ]);
-    const result = await query(queryText, [
-      JSON.stringify(addonData.items),
-      totalAmount,
-      addonData.date,
-      addonData.vat_applied,
-      addonData.booking_ref,
-      addonData.client_ref,
-      addonId,
-    ]);
+    if (isPartialUpdate) {
+      // Partial update - only update invoice_number and/or vessel_number
+      const updates = [];
+      const values = [];
+      let paramIndex = 1;
+
+      if (addonData.invoice_number !== undefined) {
+        updates.push(`invoice_number = $${paramIndex}`);
+        values.push(addonData.invoice_number);
+        paramIndex++;
+      }
+
+      if (addonData.vessel_number !== undefined) {
+        updates.push(`vessel_number = $${paramIndex}`);
+        values.push(addonData.vessel_number);
+        paramIndex++;
+      }
+
+      values.push(addonId);
+
+      queryText = `
+        UPDATE public.add_ons 
+        SET ${updates.join(', ')}
+        WHERE addon_id = $${paramIndex}
+        RETURNING addon_id, items, amount, date, invoice_number, vat_applied, booking_ref, client_ref, vessel_number
+      `;
+      params = values;
+    } else {
+      // Full update
+      const subtotal = addonData.items.reduce(
+        (sum, item) => sum + Number(item.item_amount),
+        0
+      );
+      const totalAmount = addonData.vat_applied ? subtotal * 1.15 : subtotal;
+
+      queryText = `
+        UPDATE public.add_ons 
+        SET items = $1, amount = $2, date = $3, vat_applied = $4, booking_ref = $5, client_ref = $6, invoice_number = $7, vessel_number = $8
+        WHERE addon_id = $9
+        RETURNING addon_id, items, amount, date, invoice_number, vat_applied, booking_ref, client_ref, vessel_number
+      `;
+
+      params = [
+        JSON.stringify(addonData.items),
+        totalAmount,
+        addonData.date,
+        addonData.vat_applied,
+        addonData.booking_ref,
+        addonData.client_ref,
+        addonData.invoice_number,
+        addonData.vessel_number,
+        addonId,
+      ];
+    }
+
+    console.log("Executing update query:", queryText, "with params:", params);
+    const result = await query(queryText, params);
 
     if (result.rows.length === 0) {
       return {
