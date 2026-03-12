@@ -48,7 +48,7 @@ const getClientAddonsHandler = async (req, res) => {
 const createAddonHandler = async (req, res) => {
   try {
     console.log("Creating add-on with data:", req.body);
-    const { client_id, items, date, vat_applied, booking_ref, client_ref } = req.body;
+    const { client_id, items, date, vat_applied, booking_ref, client_ref, vessel_number } = req.body;
 
     if (
       !client_id ||
@@ -103,6 +103,7 @@ const createAddonHandler = async (req, res) => {
       vat_applied,
       booking_ref: String(booking_ref).trim(),
       client_ref: String(client_ref).trim(),
+      vessel_number: vessel_number ? String(vessel_number).trim() : null,
     });
 
     if (!result.success) {
@@ -172,60 +173,72 @@ const updateAddonHandler = async (req, res) => {
       req.body
     );
     const { addonId } = req.params;
-    const { items, date, vat_applied, booking_ref, client_ref } = req.body;
+    const { items, date, vat_applied, booking_ref, client_ref, invoice_number, vessel_number } = req.body;
 
-    if (
-      !addonId ||
-      !items ||
-      !Array.isArray(items) ||
-      items.length === 0 ||
-      !date ||
-      typeof vat_applied !== "boolean" ||
-      !booking_ref ||
-      !client_ref
-    ) {
-      return res.status(400).json({
-        success: false,
-        message:
-          "All fields are required: addonId, items (non-empty array), date, vat_applied (boolean), booking_ref, client_ref",
-      });
-    }
-
-    // Validate each item
-    for (const item of items) {
-      if (!item.category || !item.description || !item.item_amount) {
+    // Support partial updates (e.g., just invoice_number)
+    const isPartialUpdate = !items && (invoice_number !== undefined || vessel_number !== undefined);
+    
+    if (!isPartialUpdate) {
+      // Full update validation
+      if (
+        !addonId ||
+        !items ||
+        !Array.isArray(items) ||
+        items.length === 0 ||
+        !date ||
+        typeof vat_applied !== "boolean" ||
+        !booking_ref ||
+        !client_ref
+      ) {
         return res.status(400).json({
           success: false,
-          message: "Each item must have category, description, and item_amount",
+          message:
+            "All fields are required: addonId, items (non-empty array), date, vat_applied (boolean), booking_ref, client_ref",
         });
       }
-      const numAmount = Number.parseFloat(item.item_amount);
-      if (isNaN(numAmount) || numAmount <= 0) {
+
+      // Validate each item
+      for (const item of items) {
+        if (!item.category || !item.description || !item.item_amount) {
+          return res.status(400).json({
+            success: false,
+            message: "Each item must have category, description, and item_amount",
+          });
+        }
+        const numAmount = Number.parseFloat(item.item_amount);
+        if (isNaN(numAmount) || numAmount <= 0) {
+          return res.status(400).json({
+            success: false,
+            message: "Item amount must be a positive number",
+          });
+        }
+      }
+
+      if (String(booking_ref).trim().length > 50 || String(client_ref).trim().length > 50) {
         return res.status(400).json({
           success: false,
-          message: "Item amount must be a positive number",
+          message: "booking_ref and client_ref must be at most 50 characters",
         });
       }
     }
 
-    if (String(booking_ref).trim().length > 50 || String(client_ref).trim().length > 50) {
-      return res.status(400).json({
-        success: false,
-        message: "booking_ref and client_ref must be at most 50 characters",
-      });
-    }
+    const updateData = isPartialUpdate 
+      ? { invoice_number, vessel_number }
+      : {
+          items: items.map((item) => ({
+            category: item.category.trim(),
+            description: item.description.trim(),
+            item_amount: Number.parseFloat(item.item_amount),
+          })),
+          date,
+          vat_applied,
+          booking_ref: String(booking_ref).trim(),
+          client_ref: String(client_ref).trim(),
+          invoice_number,
+          vessel_number,
+        };
 
-    const result = await updateAddon(addonId, {
-      items: items.map((item) => ({
-        category: item.category.trim(),
-        description: item.description.trim(),
-        item_amount: Number.parseFloat(item.item_amount),
-      })),
-      date,
-      vat_applied,
-      booking_ref: String(booking_ref).trim(),
-      client_ref: String(client_ref).trim(),
-    });
+    const result = await updateAddon(addonId, updateData);
 
     if (!result.success) {
       return res.status(400).json({
