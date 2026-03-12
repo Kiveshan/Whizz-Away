@@ -1,0 +1,234 @@
+export const handleAddLeg = ({
+  isCompleted,
+  currentLagIndex,
+  legs,
+  drivers,
+  formData,
+  hasUnsavedChanges,
+  setShowUnsavedChangesModal,
+  setLegs,
+  instructionId,
+  legsRef,
+  setCurrentLagIndex,
+  currentLegIndexRef,
+  setFormData,
+  setDrivers,
+  setEditedFields,
+  setSavedLegs,
+  setHasUnsavedNewLeg,
+  setSavedMessage,
+}) => {
+  if (isCompleted) return;
+
+  if (currentLagIndex !== null) {
+    const currentLeg = legs[currentLagIndex];
+
+    const isRouteOnlyLeg =
+      currentLeg &&
+      (!drivers || drivers.length === 0) &&
+      formData.startingPoint &&
+      formData.destination;
+
+    if (hasUnsavedChanges() && !isRouteOnlyLeg) {
+      setShowUnsavedChangesModal(true);
+      return;
+    }
+  }
+
+  if (currentLagIndex !== null && currentLagIndex < legs.length) {
+    console.log("Saving current leg data before adding new leg");
+    const updatedLegs = [...legs];
+    updatedLegs[currentLagIndex] = {
+      ...updatedLegs[currentLagIndex],
+      startingPoint: formData.startingPoint,
+      destination: formData.destination,
+      driverRate: formData.driverRate,
+      drivers: JSON.parse(JSON.stringify(drivers)),
+    };
+    setLegs(updatedLegs);
+  }
+
+  if (instructionId) {
+    console.log(`Clearing localStorage for instruction_${instructionId}_state`);
+    localStorage.removeItem(`instruction_${instructionId}_state`);
+  }
+
+  const newLegIndex = (legsRef.current || legs).length;
+  setLegs((prevLegs) => {
+    const maxLegNumber = prevLegs.reduce((max, leg) => {
+      const n = Number(leg?.legnumber);
+      return Number.isFinite(n) ? Math.max(max, n) : max;
+    }, 0);
+
+    const newLeg = {
+      id: `temp-${Date.now()}`,
+      legnumber: maxLegNumber + 1,
+      startingPoint: "",
+      driverRate: "",
+      destination: "",
+      drivers: [],
+      isNew: true,
+    };
+
+    setTimeout(() => {
+      setCurrentLagIndex(newLegIndex);
+      currentLegIndexRef.current = newLegIndex;
+    }, 0);
+
+    console.log(
+      `Adding new leg. prevLegs.length=${prevLegs.length}, maxLegNumber=${maxLegNumber}, newLegNumber=${maxLegNumber + 1}`
+    );
+
+    return [...prevLegs, newLeg];
+  });
+
+  setFormData({
+    startingPoint: "",
+    driverRate: "",
+    destination: "",
+  });
+
+  setDrivers([]);
+
+  setEditedFields({
+    startingPoint: false,
+    destination: false,
+    driverRate: false,
+    drivers: {},
+  });
+  console.log(`Navigating to new leg at index: ${newLegIndex}`);
+
+  setSavedLegs((prevSavedLegs) => {
+    const newSavedLegs = new Set(prevSavedLegs);
+    newSavedLegs.delete(newLegIndex);
+    return newSavedLegs;
+  });
+
+  setHasUnsavedNewLeg(true);
+  setSavedMessage(
+    "New leg added. Remember to click Save after entering details."
+  );
+  setTimeout(() => setSavedMessage(""), 6000);
+};
+
+export const handleSelectLeg = ({
+  index,
+  currentLagIndex,
+  isCompleted,
+  legs,
+  formData,
+  drivers,
+  setLegs,
+  legSwitchIdRef,
+  currentLegIndexRef,
+  setCurrentLagIndex,
+  setFormData,
+  ratesRouteKeyRef,
+  setDrivers,
+  setEditedFields,
+  noRatesRoutes,
+  setRates,
+  fetchRate,
+  debugDriverData,
+}) => {
+  console.log(`Selecting leg at index ${index}`);
+  if (currentLagIndex === index) {
+    console.log("Already on this leg, skipping switch");
+    return;
+  }
+
+  if (currentLagIndex !== null && !isCompleted) {
+    const updatedLegs = [...legs];
+    updatedLegs[currentLagIndex] = {
+      ...updatedLegs[currentLagIndex],
+      startingPoint: formData.startingPoint,
+      destination: formData.destination,
+      driverRate: formData.driverRate,
+      drivers: JSON.parse(JSON.stringify(drivers)),
+    };
+    console.log(
+      `Saving leg ${currentLagIndex} data before switching:`,
+      updatedLegs[currentLagIndex]
+    );
+    setLegs(updatedLegs);
+  }
+
+  legSwitchIdRef.current += 1;
+  const requestId = legSwitchIdRef.current;
+  currentLegIndexRef.current = index;
+  setCurrentLagIndex(index);
+
+  const selectedLeg = legs[index];
+
+  setFormData({
+    startingPoint: selectedLeg.startingPoint || "",
+    driverRate: selectedLeg.driverRate || "",
+    destination: selectedLeg.destination || "",
+  });
+
+  ratesRouteKeyRef.current = null;
+
+  setDrivers([]);
+  if (selectedLeg.drivers && selectedLeg.drivers.length > 0) {
+    const normalizedDrivers = JSON.parse(JSON.stringify(selectedLeg.drivers)).map(
+      (driver) => ({
+        id: driver.id || Date.now() + Math.random(),
+        driverid: driver.driverid ? driver.driverid.toString() : "",
+        truckregnumber: driver.truckregnumber || "",
+        containernumber:
+          driver.containernumber !== null
+            ? driver.containernumber.toString()
+            : "",
+        container_type: driver.container_type || "",
+        driverRate: driver.driverRate || driver.driverate || "",
+        date: driver.date || "",
+        driver_name: driver.driver_name || "",
+        driver_surname: driver.driver_surname || "",
+        isAbnormal: driver.container_type === "abnormal" || driver.isAbnormal,
+        full_name:
+          driver.full_name ||
+          (driver.driver_name && driver.driver_surname
+            ? `${driver.driver_name} ${driver.driver_surname}`
+            : driver.driverid
+            ? `Driver ID: ${driver.driverid}`
+            : "Unknown Driver"),
+      })
+    );
+    if (legSwitchIdRef.current === requestId) {
+      setDrivers(normalizedDrivers);
+      debugDriverData(normalizedDrivers);
+    }
+  } else {
+    setDrivers([]);
+  }
+
+  setEditedFields({
+    startingPoint: false,
+    destination: false,
+    driverRate: false,
+    drivers: {},
+  });
+
+  if (selectedLeg.startingPoint && selectedLeg.destination) {
+    const routeKey = `${selectedLeg.startingPoint}-${selectedLeg.destination}`;
+    if (noRatesRoutes.has(routeKey)) {
+      console.log(
+        `Route ${routeKey} is known to have no rates, setting rates to 0`
+      );
+      setRates({
+        six_meter: 0,
+        twelve_meter: 0,
+        subbie_six_meter: 0,
+        subbie_twelve_meter: 0,
+      });
+      return;
+    }
+
+    console.log(
+      "Fetching rates after selecting leg:",
+      selectedLeg.startingPoint,
+      selectedLeg.destination
+    );
+    fetchRate(selectedLeg.startingPoint, selectedLeg.destination, index, requestId);
+  }
+};

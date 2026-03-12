@@ -6,7 +6,6 @@ import { FaTruckFast } from "react-icons/fa6";
 import "../css/UpdateInstruction.css";
 import api from "../../../api"; // Import the Axios instance
 
-// Update the modal animation for a smoother appearance
 const modalAnimation = `
  @keyframes fadeIn {
    from { opacity: 0; }
