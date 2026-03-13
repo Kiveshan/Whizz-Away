@@ -211,10 +211,10 @@ const [weightUnit, setWeightUnit] = useState('kg');
     }
 
     const prevLegs = [...legsRef.current];
-    const movedLeg = prevLegs[fromIndex];
     const nextLegs = [...prevLegs];
-    nextLegs.splice(fromIndex, 1);
-    nextLegs.splice(toIndex, 0, movedLeg);
+    const tmp = nextLegs[fromIndex];
+    nextLegs[fromIndex] = nextLegs[toIndex];
+    nextLegs[toIndex] = tmp;
 
     const renumberedLegs = nextLegs.map((leg, idx) => ({
       ...leg,
@@ -224,12 +224,7 @@ const [weightUnit, setWeightUnit] = useState('kg');
     const nextCurrentIndex = (() => {
       if (currentLagIndex === null || currentLagIndex === undefined) return currentLagIndex;
       if (currentLagIndex === fromIndex) return toIndex;
-      if (fromIndex < toIndex && currentLagIndex > fromIndex && currentLagIndex <= toIndex) {
-        return currentLagIndex - 1;
-      }
-      if (fromIndex > toIndex && currentLagIndex >= toIndex && currentLagIndex < fromIndex) {
-        return currentLagIndex + 1;
-      }
+      if (currentLagIndex === toIndex) return fromIndex;
       return currentLagIndex;
     })();
 
@@ -241,23 +236,34 @@ const [weightUnit, setWeightUnit] = useState('kg');
     setSavedLegs((prev) => {
       const newSet = new Set();
       prev.forEach((idx) => {
-        let newIdx = idx;
-        if (idx === fromIndex) newIdx = toIndex;
-        else if (fromIndex < toIndex && idx > fromIndex && idx <= toIndex) newIdx = idx - 1;
-        else if (fromIndex > toIndex && idx >= toIndex && idx < fromIndex) newIdx = idx + 1;
-        newSet.add(newIdx);
+        if (idx === fromIndex) newSet.add(toIndex);
+        else if (idx === toIndex) newSet.add(fromIndex);
+        else newSet.add(idx);
       });
       return newSet;
     });
 
     if (instructionId) {
       try {
-        await Promise.all(
-          renumberedLegs.map((leg, idx) => {
-            if (!leg?.id || leg.id.toString().startsWith("temp-")) return Promise.resolve();
-            return api.put(`/legs/${leg.id}/update-number`, { legnumber: idx + 1 });
-          })
+        const savedLegsOnly = renumberedLegs.filter(
+          (leg) => leg?.id && !leg.id.toString().startsWith("temp-")
         );
+
+        // Phase 1: move to a temporary range to avoid unique/collision issues during swaps
+        await Promise.all(
+          savedLegsOnly.map((leg, idx) =>
+            api.put(`/legs/${leg.id}/update-number`, { legnumber: 1000 + idx + 1 })
+          )
+        );
+
+        // Phase 2: apply final 1..n numbering
+        await Promise.all(
+          savedLegsOnly.map((leg, idx) =>
+            api.put(`/legs/${leg.id}/update-number`, { legnumber: idx + 1 })
+          )
+        );
+
+        await refreshLegData();
       } catch (error) {
         console.error("Error updating leg numbers after reordering:", error);
       }

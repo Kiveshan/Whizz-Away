@@ -660,18 +660,31 @@ export const updateLegNumber = async (legId, legnumber) => {
   const client = await pool.connect();
   try {
     await client.query("BEGIN");
-    const result = await client.query(
-      `UPDATE legs_m2 SET legnumber = $1 WHERE legkey = $2 RETURNING legkey`,
-      [legnumber, legId]
-    );
-    if (result.rows.length === 0) {
-      throw new Error(`Leg with ID ${legId} not found`);
-    }
     const info = await client.query(
-      `SELECT m1key FROM legs_m2 WHERE legkey = $1`,
+      `SELECT m1key, legnumber FROM legs_m2 WHERE legkey = $1`,
       [legId]
     );
-    const m1key = info.rows.length > 0 ? info.rows[0].m1key : null;
+    if (info.rows.length === 0) {
+      throw new Error(`Leg with ID ${legId} not found`);
+    }
+
+    const m1key = info.rows[0].m1key;
+    const previousLegNumber = info.rows[0].legnumber;
+
+    // A leg can have multiple rows (one per driver). Persisting a renumber must update
+    // all rows for this instruction + previous legnumber.
+    const result = await client.query(
+      `UPDATE legs_m2
+       SET legnumber = $1
+       WHERE m1key = $2 AND legnumber = $3
+       RETURNING legkey`,
+      [legnumber, m1key, previousLegNumber]
+    );
+    if (result.rows.length === 0) {
+      throw new Error(
+        `Leg renumber failed for legId=${legId} (m1key=${m1key}, prevLegNumber=${previousLegNumber})`
+      );
+    }
     if (m1key) {
       const legDateQuery = `
         SELECT MIN(l.date) AS first_leg_date

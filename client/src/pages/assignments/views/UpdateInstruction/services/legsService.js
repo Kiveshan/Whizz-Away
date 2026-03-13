@@ -46,6 +46,8 @@ export const refreshLegData = async ({
           };
         });
 
+        fetchedLegs.sort((a, b) => Number(a.legnumber) - Number(b.legnumber));
+
         const currentUnsavedLegs = (legsRef.current || []).filter(
           (leg) => leg.isNew || leg.id?.toString().startsWith("temp-")
         );
@@ -60,7 +62,7 @@ export const refreshLegData = async ({
           }
         });
 
-        mergedLegs.sort((a, b) => a.legnumber - b.legnumber);
+        mergedLegs.sort((a, b) => Number(a.legnumber) - Number(b.legnumber));
 
         const legNumberCounts = mergedLegs.reduce((acc, leg) => {
           const n = Number(leg?.legnumber);
@@ -309,6 +311,8 @@ export const fetchLegsForInstruction = async ({
           drivers: normalizedDrivers,
         };
       });
+
+      fetchedLegs.sort((a, b) => Number(a.legnumber) - Number(b.legnumber));
 
       console.log("Transformed legs data:", JSON.stringify(fetchedLegs, null, 2));
       setLegs(fetchedLegs);
