@@ -494,7 +494,7 @@ const Instructions = () => {
               <thead>
                 <tr>
                   <th>Instruction No</th>
-                  <th>File No</th>
+                  <th>Invoice No</th>
                   <th>Booking Ref</th>
                   <th>Client Ref</th>
                   <th>KSM File Ref</th>
@@ -518,7 +518,11 @@ const Instructions = () => {
       return (
         <tr key={item.m1controllerkey || item.m1key}>
           <td>Instruction {item.m1controllerkey || item.m1key}</td>
-          <td>{item.fileno}</td>
+          <td>
+            {item.shipment_type === 5 || item.shipment_type === "5" || (item.type_text || "").toLowerCase() === "add-on" || (item.type_text || "").toLowerCase() === "add on"
+              ? ""
+              : (item.invoice_num || "N/A")}
+          </td>
           <td>{item.booking_ref || "N/A"}</td>
           <td>{item.client_ref || "N/A"}</td>
           <td>{item.ksm_file_ref || "N/A"}</td>

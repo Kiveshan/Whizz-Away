@@ -993,13 +993,16 @@ export const getInstructions = async (clientId) => {
         SELECT COUNT(*) > 0
         FROM public.container cn
         WHERE cn.m1key = m.m1key
-      ) AS has_valid_containers
+      ) AS has_valid_containers,
+      i.invoice_num
     FROM 
       public.m1_controller m
     JOIN 
       public.m5_client c ON m.client = c.m5clientkey
     LEFT JOIN
       public.shipment s ON m.shipment_type = s.shipkey
+    LEFT JOIN
+      public.invoice i ON m.m1key = i.m1key
   `;
   const queryParams = [];
   if (clientId) {
