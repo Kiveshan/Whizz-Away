@@ -83,6 +83,7 @@ const getStatementDetails = async (statementId) => {
       a2.date AS addon_date,
       a2.amount AS addon_amount,
       a2.items AS addon_items,
+      a2.invoice_number AS addon_num,
       ut.companyname,
       ut.cluster_box,
       ut.vat_reg_num,
@@ -259,6 +260,7 @@ const getStatementDetails = async (statementId) => {
             date: row.addon_date,
             amount: Number.parseFloat(row.addon_amount || 0),
             items: row.addon_items,
+            addon_num: row.addon_num,
           });
         }
       }
