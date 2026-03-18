@@ -4,6 +4,7 @@ import { useNavigate, useLocation } from "react-router-dom";
 import { useState, useEffect, useRef } from "react";
 import api from "../../../../api";
 import jsPDF from "jspdf";
+import { Workbook } from "exceljs";
 import "../css/SubcontractorStatementDetail.css";
 
 const SubcontractorStatementDetail = () => {
@@ -604,6 +605,117 @@ const SubcontractorStatementDetail = () => {
     setIsGenerating(false);
   };
 
+  const generateExcel = async () => {
+    if (isGenerating || !statement || !companyInfo || !subcontractorInfo)
+      return;
+    setIsGenerating(true);
+
+    try {
+      const workbook = new Workbook();
+      const worksheet = workbook.addWorksheet("Statement");
+
+      // Set column widths
+      worksheet.columns = [
+        { width: 15 },
+        { width: 18 },
+        { width: 20 },
+        { width: 18 },
+        { width: 15 },
+        { width: 15 },
+        { width: 25 },
+      ];
+
+      let currentRow = 1;
+
+      // Header Info
+      worksheet.getCell(`A${currentRow}`).value = "Statement #";
+      worksheet.getCell(`B${currentRow}`).value = statementId;
+      worksheet.getCell(`D${currentRow}`).value = "Statement Date:";
+      worksheet.getCell(`E${currentRow}`).value = new Date(statement.generationDate).toLocaleDateString("en-US", {
+        year: "numeric",
+        month: "long",
+        day: "numeric",
+      });
+      currentRow += 2;
+
+      // Subcontractor Info
+      worksheet.getCell(`A${currentRow}`).value = "Subcontractor:";
+      worksheet.getCell(`B${currentRow}`).value = subcontractorInfo.name;
+      currentRow++;
+      worksheet.getCell(`A${currentRow}`).value = "Location:";
+      worksheet.getCell(`B${currentRow}`).value = subcontractorInfo.location;
+      currentRow++;
+      worksheet.getCell(`A${currentRow}`).value = "Contact:";
+      worksheet.getCell(`B${currentRow}`).value = subcontractorInfo.contact_person;
+      currentRow += 2;
+
+      // Work Items Header
+      const headerRow = worksheet.getRow(currentRow);
+      headerRow.values = [
+        "Date",
+        "Container Number",
+        "Client",
+        "Destination",
+        "Instruction No",
+        "Rate",
+        "Instructions",
+      ];
+      headerRow.font = { bold: true };
+      headerRow.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFD3D3D3" } };
+      currentRow++;
+
+      // Work Items
+      statement.workItems.forEach((item) => {
+        const row = worksheet.getRow(currentRow);
+        row.values = [
+          new Date(item.date).toLocaleDateString("en-US", {
+            month: "short",
+            day: "numeric",
+            year: "numeric",
+          }),
+          item.containerNumber || "N/A",
+          item.clientName || "N/A",
+          item.destination || "N/A",
+          item.instructionNumber || "N/A",
+          item.rate || 0,
+          item.instruction || "N/A",
+        ];
+
+        row.getCell(6).numFmt = '"R"#,##0.00';
+        currentRow++;
+      });
+
+      currentRow += 1;
+
+      // Summary
+      worksheet.getCell(`A${currentRow}`).value = "Total Amount Due:";
+      worksheet.getCell(`A${currentRow}`).font = { bold: true };
+      worksheet.getCell(`B${currentRow}`).value = statement.summary.finalAmount;
+      worksheet.getCell(`B${currentRow}`).numFmt = '"R"#,##0.00';
+      worksheet.getCell(`B${currentRow}`).font = { bold: true };
+
+      // Generate file
+      const dateBG = new Date(statement.generationDate).toLocaleDateString("en-GB");
+      const buffer = await workbook.xlsx.writeBuffer();
+      const blob = new Blob([buffer], {
+        type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+      });
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = `Subcontractor-Statement-${statementId}-${subcontractorName}-${dateBG}.xlsx`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      window.URL.revokeObjectURL(url);
+    } catch (err) {
+      console.error("Error generating Excel:", err);
+      alert("Failed to generate Excel file. Please try again.");
+    } finally {
+      setIsGenerating(false);
+    }
+  };
+
   if (loading)
     return (
       <div className="statement-detail-wrapper">
@@ -782,6 +894,13 @@ const SubcontractorStatementDetail = () => {
             disabled={isGenerating}
           >
             {isGenerating ? "Generating PDF..." : "Download PDF"}
+          </button>
+          <button
+            className={`download-btn ${isGenerating ? "generating" : ""}`}
+            onClick={generateExcel}
+            disabled={isGenerating}
+          >
+            {isGenerating ? "Generating Excel..." : "Download Excel"}
           </button>
         </div>
       </div>
