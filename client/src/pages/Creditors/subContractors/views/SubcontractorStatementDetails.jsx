@@ -18,6 +18,7 @@ const SubcontractorStatementDetail = () => {
     subei_reg_num,
     legids,
     date,
+    vatStatus,
   } = location.state || {};
 
   const [statement, setStatement] = useState(null);
@@ -636,6 +637,8 @@ const SubcontractorStatementDetail = () => {
         month: "long",
         day: "numeric",
       });
+      worksheet.getCell(`F${currentRow}`).value = "VAT Status:";
+      worksheet.getCell(`G${currentRow}`).value = vatStatus === "NON_VAT" ? "Non VAT" : "VAT";
       currentRow += 2;
 
       // Subcontractor Info
