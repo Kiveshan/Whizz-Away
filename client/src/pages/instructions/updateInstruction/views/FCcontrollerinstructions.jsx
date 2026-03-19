@@ -387,6 +387,14 @@ const FCcontrollerinstructions = () => {
 
   // Container state
   const [containers, setContainers] = useState([]);
+  const containersRef = useRef([]);
+  
+  // Sync containersRef with containers state
+  useEffect(() => {
+    console.log("[UPDATE] containers state changed:", containers);
+    containersRef.current = containers;
+  }, [containers]);
+  
   const [containerFieldErrors, setContainerFieldErrors] = useState({});
   const [containerSuccessMessage, setContainerSuccessMessage] = useState("");
   const [isContainerLoading, setIsContainerLoading] = useState(false);
@@ -1555,10 +1563,20 @@ const FCcontrollerinstructions = () => {
 
       // Prepare container data with containerKey for smart updates
       // When rateWeight is kg or ton, we don't save any container details
+      // CRITICAL FIX: Use containersRef.current to capture latest container data
+      const currentContainers = containersRef.current || [];
+      
+      console.log("[UPDATE SAVE DEBUG] Preparing container data:", {
+        containersState: containers,
+        containersRef: containersRef.current,
+        containerCount: currentContainers.length,
+        shipmentTypeId: formData.shipmentTypeId
+      });
+      
       const containerData =
         formData.rateWeight === "kg" || formData.rateWeight === "ton"
           ? []
-          : containers.map((container) => {
+          : currentContainers.map((container) => {
               // Sanitize weight value
               let sanitizedWeight = null;
               if (
@@ -1584,7 +1602,7 @@ const FCcontrollerinstructions = () => {
 
               return {
                 containerKey: container.containerKey, // Important for smart updates
-                containernum: container.containerNum || "",
+                containernum: container.containerNum || "",  // Ensure containerNum is never undefined
                 file_ref: container.fileRef || "", // Added fileRef field
                 weight: sanitizedWeight, // Will be null for empty/invalid values
                 container_type: container.containerType || "",
@@ -1598,6 +1616,12 @@ const FCcontrollerinstructions = () => {
                 "vgm amount": allowVgmUI ? Number(container.vgmAmount || 0) : 0,
               };
             });
+      
+      // Validate that containers with counts have container numbers
+      const containerValidation = containerData.filter(c => !c.containernum || c.containernum === "");
+      if (containerValidation.length > 0 && !isAddOn) {
+        console.warn("[UPDATE SAVE WARNING] Containers missing numbers:", containerValidation);
+      }
 
       let weightData = [];
       if (String(formData.shipmentTypeId) === "4") {
