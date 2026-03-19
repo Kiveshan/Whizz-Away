@@ -161,6 +161,7 @@ const ControllerInstructions = () => {
 
   // Container states
   const [containers, setContainers] = useState([])
+  const containersRef = useRef([])
   const [showContainerDetails, setShowContainerDetails] = useState(false)
 
   const [weightRows, setWeightRows] = useState([])
@@ -200,6 +201,11 @@ const ControllerInstructions = () => {
       return next
     })
   }, [])
+
+  useEffect(() => {
+    console.log("[CREATE] containers state changed:", containers)
+    containersRef.current = containers
+  }, [containers])
 
   useEffect(() => {
     console.log("[CREATE] weightRows changed:", weightRows)
@@ -1596,12 +1602,23 @@ const ControllerInstructions = () => {
       // Prepare container data (only for container-based calculations AND if unit type is Container)
       // Also ensure container details are not saved when rateWeight is kg or ton
       // Note: Surcharge amounts will be calculated by backend based on client rates
+      // CRITICAL FIX: Use containersRef.current to capture latest container data
+      const currentContainers = containersRef.current || []
+      
+      console.log("[SAVE DEBUG] Preparing container data:", {
+        containersState: containers,
+        containersRef: containersRef.current,
+        containerCount: currentContainers.length,
+        isWeightBased,
+        rateWeight: formData.rateWeight,
+        shipmentTypeId: formData.shipmentTypeId
+      })
       
       const containerData =
         !isWeightBased && formData.rateWeight === "Container" && formData.rateWeight !== "kg" && formData.rateWeight !== "ton"
-          ? containers.map((container) => ({
+          ? currentContainers.map((container) => ({
               container_type: container.containerType,
-              containerNum: container.containerNum,
+              containerNum: container.containerNum || "",  // Ensure containerNum is never undefined
               file_ref: container.fileRef || "", // Include file reference field for export shipments
               weight: (isImport || isExport || isCrossHaul) ? (container.weight === "" ? null : Number.parseFloat(container.weight || 0)) : null,
               cargo_description: container.cargoDescription || "",
@@ -1612,6 +1629,12 @@ const ControllerInstructions = () => {
               // Note: "Surcharge Amount" and "vgm amount" will be calculated by backend
             }))
           : []
+      
+      // Validate that containers with counts have container numbers
+      const containerValidation = containerData.filter(c => !c.containerNum || c.containerNum === "")
+      if (containerValidation.length > 0 && !isAddOn) {
+        console.warn("[SAVE WARNING] Containers missing numbers:", containerValidation)
+      }
 
       let weightData = []
       if (formData.shipmentTypeId === "4") {
