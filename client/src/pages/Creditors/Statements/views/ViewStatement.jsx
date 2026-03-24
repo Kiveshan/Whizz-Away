@@ -2,6 +2,7 @@ import React, { useRef } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { useEffect, useState } from "react";
 import html2pdf from "html2pdf.js";
+import { Workbook } from "exceljs";
 import CompanyHeader from "../../../../components/CompanyHeader";
 import "../../purchaseOrder/css/PO.css";
 import "../../purchaseOrder/css/ViewPOForm-print.css";
@@ -12,6 +13,7 @@ const ViewStatement = () => {
   const printRef = useRef();
   const navigate = useNavigate();
   const [poData, setPoData] = useState(null);
+  const [isExporting, setIsExporting] = useState(false);
   const currentDate = new Date();
   const year = state?.selectedYear || currentDate.getFullYear();
   const month =
@@ -105,6 +107,131 @@ const formatAmount = (amount) => {
     html2pdf().set(options).from(element).save();
   };
 
+  const handleExportExcel = async () => {
+    if (isExporting) return;
+    setIsExporting(true);
+
+    try {
+      const workbook = new Workbook();
+      workbook.created = new Date();
+      workbook.modified = new Date();
+
+      const worksheet = workbook.addWorksheet("Statement");
+
+      worksheet.columns = [
+        { key: "date", width: 14 },
+        { key: "type", width: 18 },
+        { key: "poNumber", width: 16 },
+        { key: "receivedBy", width: 18 },
+        { key: "invoice", width: 16 },
+        { key: "truckReg", width: 14 },
+        { key: "description", width: 30 },
+        { key: "amount", width: 14 },
+      ];
+
+      let rowIndex = 1;
+
+      worksheet.getCell(`A${rowIndex}`).value = "Supplier:";
+      worksheet.getCell(`B${rowIndex}`).value = supplierName;
+      worksheet.getCell(`D${rowIndex}`).value = "Generated at:";
+      worksheet.getCell(`E${rowIndex}`).value = new Date().toLocaleString("en-ZA");
+      rowIndex += 1;
+
+      worksheet.getCell(`A${rowIndex}`).value = "Period:";
+      worksheet.getCell(`B${rowIndex}`).value = `${month} ${year}`;
+      rowIndex += 2;
+
+      const headerRow = worksheet.getRow(rowIndex);
+      headerRow.values = [
+        "Date",
+        "Type",
+        "PO Number",
+        "Received By",
+        "Invoice #",
+        "Truck Reg",
+        "Description",
+        "Amount",
+      ];
+      headerRow.font = { bold: true };
+      headerRow.fill = {
+        type: "pattern",
+        pattern: "solid",
+        fgColor: { argb: "FFE6F3FF" },
+      };
+      headerRow.alignment = { vertical: "middle", horizontal: "center" };
+      headerRow.border = {
+        top: { style: "thin" },
+        left: { style: "thin" },
+        bottom: { style: "thin" },
+        right: { style: "thin" },
+      };
+      rowIndex += 1;
+
+      purchaseOrders.forEach((po, index) => {
+        const row = worksheet.getRow(rowIndex);
+        row.values = [
+          formatDate(po.date),
+          po.expense_type || "N/A",
+          po.ponum || "N/A",
+          po.received_by || "N/A",
+          po.invoice_number || "N/A",
+          po.truckregnum || "N/A",
+          po.description || "N/A",
+          Number(po.total || 0),
+        ];
+
+        row.getCell(8).numFmt = '"R"#,##0.00';
+        row.getCell(8).alignment = { horizontal: "right" };
+
+        if (index % 2 === 0) {
+          row.fill = {
+            type: "pattern",
+            pattern: "solid",
+            fgColor: { argb: "FFF8FAFC" },
+          };
+        }
+
+        row.border = {
+          top: { style: "thin" },
+          left: { style: "thin" },
+          bottom: { style: "thin" },
+          right: { style: "thin" },
+        };
+
+        rowIndex += 1;
+      });
+
+      rowIndex += 1;
+      worksheet.getCell(`G${rowIndex}`).value = "Total";
+      worksheet.getCell(`G${rowIndex}`).font = { bold: true };
+      worksheet.getCell(`H${rowIndex}`).value = Number(totalAmount || 0);
+      worksheet.getCell(`H${rowIndex}`).numFmt = '"R"#,##0.00';
+      worksheet.getCell(`H${rowIndex}`).font = { bold: true };
+      worksheet.getCell(`H${rowIndex}`).alignment = { horizontal: "right" };
+
+      const buffer = await workbook.xlsx.writeBuffer();
+      const blob = new Blob([buffer], {
+        type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+      });
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      const safeSupplier = String(supplierName || "Supplier")
+        .replace(/[^a-z0-9]+/gi, "-")
+        .replace(/(^-|-$)/g, "");
+      link.download = `Statement_${safeSupplier}_${month}_${year}.xlsx`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      window.URL.revokeObjectURL(url);
+    } catch (err) {
+      console.error("Failed to export statement to Excel:", err);
+      alert("Failed to export to Excel. Please try again.");
+    } finally {
+      setIsExporting(false);
+    }
+  };
+
   const handleBack = () => {
     navigate("/Creditors/CredStatements");
   };
@@ -184,6 +311,15 @@ const formatAmount = (amount) => {
             onClick={handleDownload}
           >
             Download
+          </button>
+          <button
+            type="button"
+            className="view-button"
+            onClick={handleExportExcel}
+            disabled={isExporting}
+            style={{ marginLeft: "10px" }}
+          >
+            {isExporting ? "Exporting..." : "Export to Excel"}
           </button>
         </div>
       </div>
