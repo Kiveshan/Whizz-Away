@@ -8,6 +8,11 @@ function calculateStatementDates() {
   const generationDate = new Date(currentYear, currentMonth, 1, 12, 0, 0);
   const formattedGenDate = generationDate.toISOString().split("T")[0];
 
+  const agingAsOfDate = new Date(generationDate);
+  agingAsOfDate.setDate(agingAsOfDate.getDate() - 1);
+  agingAsOfDate.setHours(23, 59, 59, 999);
+  const formattedAgingAsOfDate = agingAsOfDate.toISOString().split("T")[0];
+
   const previousMonth = currentMonth === 0 ? 11 : currentMonth - 1;
   const previousYear = currentMonth === 0 ? currentYear - 1 : currentYear;
 
@@ -29,7 +34,9 @@ function calculateStatementDates() {
     previousMonth,
     previousYear,
     generationDate,
+    agingAsOfDate,
     formattedGenDate,
+    formattedAgingAsOfDate,
     formattedInvoiceStartDate,
     formattedInvoiceEndDate,
     formattedPaymentStartDate,
@@ -40,7 +47,7 @@ function calculateStatementDates() {
 function logDateInfo(dates) {
   console.log(`Today: ${dates.today.toISOString().split("T")[0]}`);
   console.log(`Generation Date: ${dates.formattedGenDate}`);
-  console.log(`Aging based on outstanding instructions and add-ons as of ${dates.formattedGenDate}`);
+  console.log(`Aging based on outstanding instructions and add-ons as of ${dates.formattedAgingAsOfDate}`);
   console.log(`Fetching payments/credit notes from previous month (${dates.formattedPaymentStartDate} to ${dates.formattedPaymentEndDate}) for display only`);
 }
 
@@ -259,6 +266,7 @@ async function updateStatement(dbClient, statementKey, groupid, openingBalance, 
 async function processClient(dbClient, clientId, clientInsurance, dates, paymentsMap, creditNotesMap) {
   const {
     generationDate,
+    agingAsOfDate,
     formattedGenDate,
     formattedPaymentStartDate,
     formattedPaymentEndDate
@@ -274,7 +282,7 @@ async function processClient(dbClient, clientId, clientInsurance, dates, payment
 
   // Calculate fresh aging buckets from outstanding items
   const { newCurrent, new30days, new60days, new90days } =
-    await calculateAgingBucketsFromOutstanding(dbClient, clientId, generationDate);
+    await calculateAgingBucketsFromOutstanding(dbClient, clientId, agingAsOfDate);
 
   console.log(
     `Client ${clientId}: Aging - Current: R${newCurrent.toFixed(2)}, 30days: R${new30days.toFixed(2)}, 60days: R${new60days.toFixed(2)}, 90days: R${new90days.toFixed(2)}`
