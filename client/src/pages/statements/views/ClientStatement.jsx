@@ -81,6 +81,13 @@ const ClientStatement = () => {
   useEffect(() => {
     if (!statement) return;
 
+    const referenceCollator = new Intl.Collator(undefined, {
+      numeric: true,
+      sensitivity: "base",
+    });
+    const compareReferenceAsc = (a, b) =>
+      referenceCollator.compare(String(a || ""), String(b || ""));
+
     const openingBalance = statement.opening_balance;
 
     // Totals for the statement month (server already filtered by month)
@@ -119,7 +126,11 @@ const ClientStatement = () => {
         amount: addon.amount,
         payment: null,
       })),
-    ].sort((a, b) => a.date - b.date);
+    ].sort((a, b) => {
+      const refDiff = compareReferenceAsc(a.reference, b.reference);
+      if (refDiff !== 0) return refDiff;
+      return a.date - b.date;
+    });
 
     const insuranceRow =
       insuranceCredit > 0
@@ -493,6 +504,13 @@ const ClientStatement = () => {
   };
 
   // Build transactions array for UI/PDF: single Payments row, then all invoices/add-ons for the statement month
+  const referenceCollator = new Intl.Collator(undefined, {
+    numeric: true,
+    sensitivity: "base",
+  });
+  const compareReferenceAsc = (a, b) =>
+    referenceCollator.compare(String(a || ""), String(b || ""));
+
   const charges = [
     ...statement.invoices.map((invoice) => ({
       type: "Invoice",
@@ -510,7 +528,11 @@ const ClientStatement = () => {
       amount: addon.amount,
       payment: null,
     })),
-  ].sort((a, b) => a.date - b.date);
+  ].sort((a, b) => {
+    const refDiff = compareReferenceAsc(a.reference, b.reference);
+    if (refDiff !== 0) return refDiff;
+    return a.date - b.date;
+  });
 
   const insuranceRow =
     insuranceCredit > 0
