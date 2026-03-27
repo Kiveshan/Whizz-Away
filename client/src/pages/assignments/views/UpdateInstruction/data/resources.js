@@ -3,16 +3,7 @@ export const fetchDrivers = async ({ api, setEmployeeDrivers }) => {
     const response = await api.get("/employees/driverssub");
     const data = response.data;
     console.log("Drivers from backend:", data);
-    const filtered = Array.isArray(data)
-      ? data.filter((d) => {
-          if (d?.roleid === 6) {
-            return d?.status === true && d?.driverstatus === true;
-          }
-          return true;
-        })
-      : [];
-
-    setEmployeeDrivers(filtered);
+    setEmployeeDrivers(Array.isArray(data) ? data : []);
   } catch (error) {
     console.error("Error fetching drivers:", error);
   }

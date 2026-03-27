@@ -29,6 +29,13 @@ export default function DriversSection({
   savedMessage,
   savedLegs,
 }) {
+  const selectableEmployeeDrivers = employeeDrivers.filter((driver) => {
+    if (driver?.roleid === 6) {
+      return driver?.status === true && driver?.driverstatus === true;
+    }
+    return driver?.status !== false;
+  });
+
   return (
     <>
       {currentLagIndex !== null && (
@@ -163,14 +170,14 @@ export default function DriversSection({
                           Select driver
                         </option>
                         {entry.driverid &&
-                          !employeeDrivers.some(
+                          !selectableEmployeeDrivers.some(
                             (d) => d.userid.toString() === entry.driverid
                           ) && (
                             <option value={entry.driverid}>
                               {entry.full_name || `Driver ID: ${entry.driverid}`} (inactive)
                             </option>
                           )}
-                        {employeeDrivers.map((driver) => (
+                        {selectableEmployeeDrivers.map((driver) => (
                           <option
                             key={driver.userid}
                             value={driver.userid.toString()}
