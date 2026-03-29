@@ -74,10 +74,13 @@ const calculateTotalCost = (instructionData, containers = [], weightData = []) =
 
   // Calculate total surcharge from containers
   const totalSurchargeAmount = containers.reduce((total, container) => {
-    if (container["Add Surcharges"] && container["Surcharge Amount"]) {
-      return total + Number(container["Surcharge Amount"] || 0)
-    }
-    return total
+    if (!container["Add Surcharges"]) return total
+
+    const resolved = container.is_12m_surcharge
+      ? Number(container.surcharge_12m_amount || 0)
+      : Number(container["Surcharge Amount"] || 0)
+
+    return total + resolved
   }, 0)
 
   // Calculate total hazardous amount from containers

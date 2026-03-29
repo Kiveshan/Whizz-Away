@@ -349,6 +349,9 @@ const ControllerInstructions = () => {
           // Initialize hazardous, addSurcharges, and vgm properties for each container
           hazardous: false,
           addSurcharges: false,
+          surchargeAmount: 0,
+          is_12m_surcharge: type === "12m",
+          surcharge_12m_amount: 0,
           vgm: false,
         }
       }
@@ -385,6 +388,46 @@ const ControllerInstructions = () => {
   // Handle container input changes
   const handleContainerChange = useCallback(
     (id, field, value) => {
+      const fetchSurchargeAmount = async (containerId) => {
+        try {
+          if (!formData.clientId || !formData.pickup || !formData.dropoff) {
+            return 0
+          }
+
+          const response = await api.get(
+            `/api/instructions/client/${formData.clientId}/rates`,
+            {
+              params: {
+                start: formData.pickup,
+                destination: formData.dropoff,
+              },
+            },
+          )
+
+          const container = containersRef.current.find((c) => c.id === containerId)
+          const isTwelveMeter = container?.containerType === "12m"
+
+          const sixMeterSurcharge =
+            response.data.surcharges ??
+            response.data.surcharge ??
+            0
+
+          const twelveMeterSurcharge =
+            response.data.surcharge12m ??
+            response.data.surcharge_12m ??
+            response.data.surcharge12 ??
+            response.data.surcharge_12 ??
+            response.data.surcharges ??
+            response.data.surcharge ??
+            0
+
+          return isTwelveMeter ? twelveMeterSurcharge : sixMeterSurcharge
+        } catch (error) {
+          console.error("❌ Error fetching surcharge amount:", error)
+          return 0
+        }
+      }
+
       if (field === "containerNum") {
         // For export shipments, no validation is needed
         if (isExport || formData.shipmentTypeId === "2") {
@@ -442,6 +485,49 @@ const ControllerInstructions = () => {
       } else if (field === "weight" && value === "") {
         // Don't clear error immediately when field becomes empty for import
         // Let validation handle it
+      }
+
+      if (field === "addSurcharges") {
+        if (value) {
+          // Toggle on immediately for UI responsiveness, then fetch amount
+          setContainers((prev) =>
+            prev.map((container) =>
+              container.id === id ? { ...container, addSurcharges: true } : container,
+            ),
+          )
+
+          fetchSurchargeAmount(id).then((amount) => {
+            setContainers((prev) =>
+              prev.map((container) =>
+                container.id === id
+                  ? {
+                      ...container,
+                      surchargeAmount:
+                        container.containerType === "12m" ? 0 : (Number(amount) || 0),
+                      is_12m_surcharge: container.containerType === "12m",
+                      surcharge_12m_amount:
+                        container.containerType === "12m" ? (Number(amount) || 0) : 0,
+                    }
+                  : container,
+              ),
+            )
+          })
+        } else {
+          setContainers((prev) =>
+            prev.map((container) =>
+              container.id === id
+                ? {
+                    ...container,
+                    addSurcharges: false,
+                    surchargeAmount: 0,
+                    is_12m_surcharge: false,
+                    surcharge_12m_amount: 0,
+                  }
+                : container,
+            ),
+          )
+        }
+        return
       }
 
       // Update container
@@ -1422,7 +1508,17 @@ const ControllerInstructions = () => {
         // Break bulk cost only applies if it's cross-haul AND the rateWeight is 'Container'
         const breakBulkCost = isCrossHaul && formData.rateWeight === "Container" ? breakBulkRate * breakBulkCount : 0
 
-        totalCost = sixMeterCost + twelveMeterCost + abnormalCost + breakBulkCost
+        const surchargeTotal = (containersRef.current || []).reduce((sum, c) => {
+          if (c.addSurcharges) {
+            const resolved = c.is_12m_surcharge
+              ? (Number(c.surcharge_12m_amount) || 0)
+              : (Number(c.surchargeAmount) || 0)
+            return sum + resolved
+          }
+          return sum
+        }, 0)
+
+        totalCost = sixMeterCost + twelveMeterCost + abnormalCost + breakBulkCost + surchargeTotal
 
         costBreakdown.components = {
           sixMeter: { count: sixMeterCount, rate: sixMeterRate, cost: sixMeterCost },
@@ -1434,6 +1530,7 @@ const ControllerInstructions = () => {
             cost: breakBulkCost,
             applicable: isCrossHaul && formData.rateWeight === "Container",
           },
+          surcharges: { count: (containersRef.current || []).filter(c => c.addSurcharges).length, cost: surchargeTotal },
           containerBasedSubtotal: totalCost,
         }
 
@@ -1451,6 +1548,8 @@ const ControllerInstructions = () => {
         } else if (isCrossHaul) {
           console.log(`  Break Bulk: Not applicable (Unit type: ${formData.rateWeight})`)
         }
+
+        console.log(`  Surcharges: R${surchargeTotal.toFixed(2)}`)
 
         console.log(`  Container Subtotal: R${totalCost.toFixed(2)}`)
       }
@@ -1624,6 +1723,8 @@ const ControllerInstructions = () => {
               cargo_description: container.cargoDescription || "",
               "Hazardous": container.hazardous || false,
               "Add Surcharges": container.addSurcharges || false,
+              is_12m_surcharge: Boolean(container.is_12m_surcharge),
+              surcharge_12m_amount: Number(container.surcharge_12m_amount || 0),
               // Only allow VGM to be true for allowed shipment types; otherwise force false
               "vgm": allowVgmUI ? (container.vgm || false) : false,
               // Note: "Surcharge Amount" and "vgm amount" will be calculated by backend
