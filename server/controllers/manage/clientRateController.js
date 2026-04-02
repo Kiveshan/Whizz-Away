@@ -82,6 +82,15 @@ const saveClientRatesHandler = async (req, res) => {
         return res.status(400).json({ error: "Hazardous must be a non-negative number" })
       }
 
+      const surcharge6M = rate.surcharge6M ?? rate.surcharges
+      if (surcharge6M !== undefined && surcharge6M !== "" && (isNaN(surcharge6M) || Number.parseFloat(surcharge6M) < 0)) {
+        return res.status(400).json({ error: "Surcharge 6M must be a non-negative number" })
+      }
+
+      if (rate.surcharge12m !== undefined && rate.surcharge12m !== "" && (isNaN(rate.surcharge12m) || Number.parseFloat(rate.surcharge12m) < 0)) {
+        return res.status(400).json({ error: "Surcharge 12M must be a non-negative number" })
+      }
+
       // Validate vgm if provided
       if (rate.vgm !== undefined && rate.vgm !== "" && (isNaN(rate.vgm) || Number.parseFloat(rate.vgm) < 0)) {
         return res.status(400).json({ error: "VGM must be a non-negative number" })
