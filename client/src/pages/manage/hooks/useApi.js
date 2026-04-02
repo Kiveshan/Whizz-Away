@@ -733,9 +733,21 @@ export function useApi(state, actions) {
         // Validate each rate
         const hasValue = (v) => v !== "" && v !== null && v !== undefined
 
-        const validRates = ratesData.filter((rate) => {
-          return rate.starting_point && rate.destination && (hasValue(rate["6m_rate"]) || hasValue(rate["12m_rate"]))
-        })
+        const validRates = ratesData
+          .filter((rate) => {
+            return rate.starting_point && rate.destination && (hasValue(rate["6m_rate"]) || hasValue(rate["12m_rate"]))
+          })
+          .map((rate) => {
+            const surcharge6M = rate.surcharge6M ?? rate.surcharges ?? ""
+            const surcharge12m = rate.surcharge12m ?? ""
+
+            return {
+              ...rate,
+              surcharge6M,
+              surcharge12m,
+              surcharges: surcharge6M,
+            }
+          })
 
         if (validRates.length === 0) {
           actions.showAlert(
@@ -1442,17 +1454,31 @@ export function useApi(state, actions) {
           })
         } else if (type === "clientRate") {
           // Handle client rates - data should include client info and rates
+          const mappedRates = Array.isArray(data.rates)
+            ? data.rates.map((rate) => {
+                const surcharge6M = rate.surcharge6M ?? rate.surcharges ?? ""
+                const surcharge12m = rate.surcharge12m ?? ""
+
+                return {
+                  ...rate,
+                  surcharge6M,
+                  surcharge12m,
+                }
+              })
+            : null
+
           actions.updateFormData(formType, {
             ...data,
             clientId: id,
             rates:
-              data.rates || [
+              mappedRates || [
                 {
                   starting_point: "",
                   destination: "",
                   "6m_rate": "",
                   "12m_rate": "",
-                  surcharges: "",
+                  surcharge6M: "",
+                  surcharge12m: "",
                   hazardous: "",
                   vgm: "",
                   set_rate: "",

@@ -79,6 +79,8 @@ const getClientRatesByClientId = async (clientId) => {
             'destination', cr.destination,
             '6m_rate', cr."6m_rate",
             '12m_rate', cr."12m_rate",
+            'surcharge6M', cr.surcharges,
+            'surcharge12m', cr.surcharge12m,
             'surcharges', cr.surcharges,
             'hazardous', cr.hazardous,
             'vgm', cr.vgm,
@@ -126,9 +128,12 @@ const saveClientRates = async (clientId, rates) => {
 
     // Insert new rates
     const insertPromises = rates.map((rate) => {
+      const surcharge6M = rate.surcharge6M ?? rate.surcharges
+      const surcharge12m = rate.surcharge12m
+
       return client.query(
-        `INSERT INTO m5_client_rate (clientid, starting_point, destination, "6m_rate", "12m_rate", surcharges, hazardous, vgm, set_rate)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+        `INSERT INTO m5_client_rate (clientid, starting_point, destination, "6m_rate", "12m_rate", surcharges, surcharge12m, hazardous, vgm, set_rate)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
          RETURNING *`,
         [
           clientId,
@@ -136,7 +141,8 @@ const saveClientRates = async (clientId, rates) => {
           rate.destination || null,
           rate["6m_rate"] === "" || rate["6m_rate"] === undefined ? null : Number(rate["6m_rate"]),
           rate["12m_rate"] === "" || rate["12m_rate"] === undefined ? null : Number(rate["12m_rate"]),
-          rate.surcharges === "" || rate.surcharges === undefined ? null : Number(rate.surcharges),
+          surcharge6M === "" || surcharge6M === undefined ? null : Number(surcharge6M),
+          surcharge12m === "" || surcharge12m === undefined ? null : Number(surcharge12m),
           rate.hazardous === "" || rate.hazardous === undefined ? null : Number(rate.hazardous),
           rate.vgm === "" || rate.vgm === undefined ? null : Number(rate.vgm),
           rate.set_rate === "" || rate.set_rate === undefined ? null : Number(rate.set_rate),
