@@ -580,7 +580,7 @@ export const saveInstruction = async ({
       if (!isAddOnType && addSurcharges && clientId && pickup && dropoff) {
         try {
           const surchargeQuery = `
-            SELECT surcharges
+            SELECT surcharges, surcharge12m
             FROM public.m5_client_rate
             WHERE clientid = $1
               AND starting_point = $2
@@ -594,7 +594,11 @@ export const saveInstruction = async ({
             dropoff,
           ]);
           if (surchargeResult.rows.length > 0) {
-            const fetched = Number.parseFloat(surchargeResult.rows[0].surcharges);
+            const resolvedType = container.container_type || container.containerType || "";
+            const is12m = resolvedType === "12m";
+            const fetched6 = Number.parseFloat(surchargeResult.rows[0].surcharges);
+            const fetched12 = Number.parseFloat(surchargeResult.rows[0].surcharge12m);
+            const fetched = is12m ? fetched12 : fetched6;
             if (!Number.isNaN(fetched) && fetched > 0) surchargeAmount = fetched;
           }
         } catch (e) {
@@ -2950,7 +2954,7 @@ export const saveInstructionAndContainers = async (
       if (addSurcharges && clientId && pickup && dropoff) {
         try {
           const surchargeQuery = `
-            SELECT surcharges
+            SELECT surcharges, surcharge12m
             FROM public.m5_client_rate
             WHERE clientid = $1
               AND starting_point = $2
@@ -2969,18 +2973,17 @@ export const saveInstructionAndContainers = async (
           console.log(`DEBUG: Surcharge query result rows: ${surchargeResult.rows.length}`);
           console.log(`DEBUG: Raw surcharge result rows:`, JSON.stringify(surchargeResult.rows));
           if (surchargeResult.rows.length > 0) {
-            console.log(`DEBUG: First row surcharge value:`, surchargeResult.rows[0].surcharges);
-            if (surchargeResult.rows[0].surcharges) {
-              const fetchedAmount = Number.parseFloat(surchargeResult.rows[0].surcharges);
-              console.log(`DEBUG: Parsed surcharge amount: ${fetchedAmount}`);
-              if (!isNaN(fetchedAmount) && fetchedAmount > 0) {
-                surchargeAmount = fetchedAmount;
-                console.log(`SUCCESS: Fetched surcharge amount: ${surchargeAmount} for container ${container.containerNum || 'unnamed'}`);
-              } else {
-                console.log(`DEBUG: Surcharge amount is NaN or <= 0: ${fetchedAmount}`);
-              }
+            const resolvedType = container.container_type || container.containerType || "";
+            const is12m = resolvedType === "12m";
+            const fetched6 = Number.parseFloat(surchargeResult.rows[0].surcharges);
+            const fetched12 = Number.parseFloat(surchargeResult.rows[0].surcharge12m);
+            const fetchedAmount = is12m ? fetched12 : fetched6;
+            console.log(`DEBUG: Resolved surcharge amount (${is12m ? "12m" : "6m"}): ${fetchedAmount}`);
+            if (!isNaN(fetchedAmount) && fetchedAmount > 0) {
+              surchargeAmount = fetchedAmount;
+              console.log(`SUCCESS: Fetched surcharge amount: ${surchargeAmount} for container ${container.containerNum || 'unnamed'}`);
             } else {
-              console.log(`DEBUG: No surcharge value in database row`);
+              console.log(`DEBUG: Surcharge amount is NaN or <= 0: ${fetchedAmount}`);
             }
           } else {
             console.log(`DEBUG: No matching rates found in m5_client_rate table for surcharge`);
