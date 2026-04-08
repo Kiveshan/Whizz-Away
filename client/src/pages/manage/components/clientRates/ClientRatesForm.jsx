@@ -10,7 +10,8 @@ const ClientRatesForm = ({ clientData, loading, onSave, onCancel }) => {
       destination: "",
       "6m_rate": "",
       "12m_rate": "",
-      surcharges: "",
+      surcharge6M: "",
+      surcharge12m: "",
       hazardous: "",
       vgm: "",
       set_rate: "",
@@ -29,12 +30,19 @@ const ClientRatesForm = ({ clientData, loading, onSave, onCancel }) => {
             destination: rate.destination || "",
             "6m_rate": rate["6m_rate"] !== null && rate["6m_rate"] !== undefined ? rate["6m_rate"] : "",
             "12m_rate": rate["12m_rate"] !== null && rate["12m_rate"] !== undefined ? rate["12m_rate"] : "",
-            surcharges: rate.surcharges !== null && rate.surcharges !== undefined ? rate.surcharges : "",
+            surcharge6M:
+              rate.surcharge6M !== null && rate.surcharge6M !== undefined
+                ? rate.surcharge6M
+                : rate.surcharges !== null && rate.surcharges !== undefined
+                  ? rate.surcharges
+                  : "",
+            surcharge12m: rate.surcharge12m !== null && rate.surcharge12m !== undefined ? rate.surcharge12m : "",
             hazardous: rate.hazardous !== null && rate.hazardous !== undefined ? rate.hazardous : "",
             vgm: rate.vgm !== null && rate.vgm !== undefined ? rate.vgm : "",
             set_rate: rate.set_rate !== null && rate.set_rate !== undefined ? rate.set_rate : "",
           })),
         )
+
       } else {
         setRates([
           {
@@ -42,7 +50,8 @@ const ClientRatesForm = ({ clientData, loading, onSave, onCancel }) => {
             destination: "",
             "6m_rate": "",
             "12m_rate": "",
-            surcharges: "",
+            surcharge6M: "",
+            surcharge12m: "",
             hazardous: "",
             vgm: "",
             set_rate: "",
@@ -87,7 +96,8 @@ const ClientRatesForm = ({ clientData, loading, onSave, onCancel }) => {
         destination: "",
         "6m_rate": "",
         "12m_rate": "",
-        surcharges: "",
+        surcharge6M: "",
+        surcharge12m: "",
         hazardous: "",
         vgm: "",
         set_rate: "",
@@ -219,14 +229,28 @@ const ClientRatesForm = ({ clientData, loading, onSave, onCancel }) => {
 
                     <div className="manage-form-group">
                       <label>
-                        <strong>Surcharges (R)</strong>
+                        <strong>Surcharge 6M (R)</strong>
                       </label>
                       <input
                         type="number"
                         min="0"
                         step="0.01"
-                        value={rate.surcharges}
-                        onChange={(e) => handleRateChange(rowIndex * 5 + index, "surcharges", e.target.value)}
+                        value={rate.surcharge6M}
+                        onChange={(e) => handleRateChange(rowIndex * 5 + index, "surcharge6M", e.target.value)}
+                        placeholder="0.00"
+                      />
+                    </div>
+
+                    <div className="manage-form-group">
+                      <label>
+                        <strong>Surcharge 12M (R)</strong>
+                      </label>
+                      <input
+                        type="number"
+                        min="0"
+                        step="0.01"
+                        value={rate.surcharge12m}
+                        onChange={(e) => handleRateChange(rowIndex * 5 + index, "surcharge12m", e.target.value)}
                         placeholder="0.00"
                       />
                     </div>

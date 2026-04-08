@@ -31,6 +31,14 @@ const debug = (message, data) => {
   }
 };
 
+// Utility function to compute correct surcharge amount per container type
+const getSurchargeAmount = (container) => {
+  if (!container.add_surcharges) return 0;
+  return container.is_12m_surcharge
+    ? (container.surcharge_12m_amount || 0)
+    : (container.surcharge_amount || 0);
+};
+
 const ClientInvoice = forwardRef(({ 
   previewData, 
   isPreview = false, 
@@ -128,6 +136,8 @@ const ClientInvoice = forwardRef(({
               add_surcharges: container.add_surcharges || false,
               hazardous: container.hazardous || false,
               surcharge_amount: container.surcharge_amount || 0,
+              is_12m_surcharge: container.is_12m_surcharge || false,
+              surcharge_12m_amount: container.surcharge_12m_amount || 0,
               hazardous_amount: container.hazardous_amount || 0,
               vgm: container.vgm || false,
               vgm_amount: container.vgm_amount || 0,
@@ -573,10 +583,8 @@ const ClientInvoice = forwardRef(({
                 const baseRateValue = container.base_rate || 0;
                 row.push(formatCurrency(baseRateValue || 0));
                 if (hasSurcharges) {
-                  const surchargeText =
-                    container.surcharge_amount > 0
-                      ? formatCurrency(container.surcharge_amount)
-                      : "-";
+                  const surchargeAmt = getSurchargeAmount(container);
+                  const surchargeText = surchargeAmt > 0 ? formatCurrency(surchargeAmt) : "-";
                   row.push(surchargeText);
                 }
                 if (hasHazardous) {
@@ -594,7 +602,7 @@ const ClientInvoice = forwardRef(({
                   row.push(vgmText);
                 }
                 const totalValue = (baseRateValue || 0)
-                  + (container.surcharge_amount || 0)
+                  + getSurchargeAmount(container)
                   + (container.hazardous_amount || 0)
                   + (container.vgm_amount || 0);
                 row.push(formatCurrency(totalValue));
@@ -1083,8 +1091,7 @@ const ClientInvoice = forwardRef(({
                       ) && <th className="truck-header">Truck Reg</th>}
                       <th className="rate-header">Base Rate</th>
                       {containers.some(
-                        (container) =>
-                          container.add_surcharges || container.surcharge_amount > 0
+                        (c) => c.add_surcharges && (c.surcharge_amount > 0 || c.surcharge_12m_amount > 0)
                       ) && <th className="surcharge-header">Surcharge</th>}
                       {containers.some(
                         (container) =>
@@ -1104,12 +1111,12 @@ const ClientInvoice = forwardRef(({
                         const hasTruck = container.truckregnumber;
                         const baseRateValue = container.base_rate || 0;
                         const hasSurcharge =
-                          container.add_surcharges || container.surcharge_amount > 0;
+                          container.add_surcharges && (container.surcharge_amount > 0 || container.surcharge_12m_amount > 0);
                         const hasHazard =
                           container.hazardous || container.hazardous_amount > 0;
                         const hasVGM = container.vgm || container.vgm_amount > 0;
                         const totalValue = (baseRateValue || 0)
-                          + (container.surcharge_amount || 0)
+                          + getSurchargeAmount(container)
                           + (container.hazardous_amount || 0)
                           + (container.vgm_amount || 0);
 
@@ -1139,11 +1146,11 @@ const ClientInvoice = forwardRef(({
                               {formatCurrency(baseRateValue || 0)}
                             </td>
                             {containers.some(
-                              (c) => c.add_surcharges || c.surcharge_amount > 0
+                              (c) => c.add_surcharges && (c.surcharge_amount > 0 || c.surcharge_12m_amount > 0)
                             ) && (
                               <td className="surcharge">
                                 {hasSurcharge
-                                  ? formatCurrency(container.surcharge_amount)
+                                  ? formatCurrency(getSurchargeAmount(container))
                                   : "-"}
                               </td>
                             )}

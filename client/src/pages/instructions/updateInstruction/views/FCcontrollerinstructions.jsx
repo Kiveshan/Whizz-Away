@@ -455,6 +455,8 @@ const FCcontrollerinstructions = () => {
         hazardous: false,
         addSurcharges: false,
         surchargeAmount: 0,
+        is_12m_surcharge: false,
+        surcharge_12m_amount: 0,
         hazardousAmount: 0,
         vgm: false,
         vgmAmount: 0,
@@ -479,6 +481,8 @@ const FCcontrollerinstructions = () => {
         hazardous: false,
         addSurcharges: false,
         surchargeAmount: 0,
+        is_12m_surcharge: true,
+        surcharge_12m_amount: 0,
         hazardousAmount: 0,
         vgm: false,
         vgmAmount: 0,
@@ -503,6 +507,8 @@ const FCcontrollerinstructions = () => {
         hazardous: false,
         addSurcharges: false,
         surchargeAmount: 0,
+        is_12m_surcharge: false,
+        surcharge_12m_amount: 0,
         hazardousAmount: 0,
         vgm: false,
         vgmAmount: 0,
@@ -527,6 +533,8 @@ const FCcontrollerinstructions = () => {
         hazardous: false,
         addSurcharges: false,
         surchargeAmount: 0,
+        is_12m_surcharge: false,
+        surcharge_12m_amount: 0,
         hazardousAmount: 0,
       });
     }
@@ -709,7 +717,7 @@ const FCcontrollerinstructions = () => {
           setContainers((prevContainers) =>
             prevContainers.map((container) =>
               container.id === id 
-                ? { ...container, [field]: value, surchargeAmount: 0 }
+                ? { ...container, [field]: value, surchargeAmount: 0, is_12m_surcharge: false, surcharge_12m_amount: 0 }
                 : container
             )
           );
@@ -1437,16 +1445,45 @@ const FCcontrollerinstructions = () => {
               try {
                 const response = await api.get(
                   `/api/instructions/client/${formData.clientId}/rates`,
-                  { params: { pickup: formData.pickup, dropoff: formData.dropoff } }
+                  {
+                    params: {
+                      start: formData.pickup,
+                      destination: formData.dropoff
+                    }
+                  }
                 );
+
+                const sixMeterSurcharge =
+                  response.data.surcharges ?? 
+                  response.data.surcharge ?? 
+                  0;
+
+                const twelveMeterSurcharge =
+                  response.data.surcharge12m ?? 
+                  response.data.surcharge_12m ?? 
+                  response.data.surcharge12 ?? 
+                  response.data.surcharge_12 ?? 
+                  response.data.surcharges ?? 
+                  response.data.surcharge ?? 
+                  0;
+
+                const isTwelveMeter = container.containerType === "12m";
+                const resolvedSurcharge = isTwelveMeter ? twelveMeterSurcharge : sixMeterSurcharge;
+
                 return {
                   ...container,
-                  surchargeAmount: container.addSurcharges ? Number(response.data.surcharges || 0) : container.surchargeAmount,
+                  surchargeAmount: container.addSurcharges
+                    ? (isTwelveMeter ? 0 : Number(resolvedSurcharge || 0))
+                    : container.surchargeAmount,
+                  is_12m_surcharge: isTwelveMeter,
+                  surcharge_12m_amount: container.addSurcharges
+                    ? (isTwelveMeter ? Number(resolvedSurcharge || 0) : 0)
+                    : (container.surcharge_12m_amount || 0),
                   hazardousAmount: container.hazardous ? Number(response.data.hazardous || 0) : container.hazardousAmount,
                   vgmAmount: container.vgm ? Number(response.data.vgm || 0) : container.vgmAmount,
                 };
-              } catch (err) {
-                console.error("Error fetching fresh amounts:", err);
+              } catch (error) {
+                console.error('Error fetching fresh amounts:', error);
                 return container;
               }
             }
@@ -1460,10 +1497,11 @@ const FCcontrollerinstructions = () => {
 
       // Calculate total surcharge from containers (using fresh amounts)
       const totalSurchargeAmount = freshContainers.reduce((total, container) => {
-        if (container.addSurcharges && container.surchargeAmount) {
-          return total + Number(container.surchargeAmount || 0);
-        }
-        return total;
+        if (!container.addSurcharges) return total;
+        const resolved = container.is_12m_surcharge
+          ? Number(container.surcharge_12m_amount || 0)
+          : Number(container.surchargeAmount || 0)
+        return total + resolved
       }, 0);
       // Calculate total hazardous amount from containers (using fresh amounts)
       const totalHazardousAmount = freshContainers.reduce((total, container) => {
@@ -1570,9 +1608,9 @@ const FCcontrollerinstructions = () => {
         containersState: containers,
         containersRef: containersRef.current,
         containerCount: currentContainers.length,
-        shipmentTypeId: formData.shipmentTypeId
+        shipmentTypeId: formData.shipmentTypeId,
       });
-      
+
       const containerData =
         formData.rateWeight === "kg" || formData.rateWeight === "ton"
           ? []
@@ -1601,27 +1639,22 @@ const FCcontrollerinstructions = () => {
               }
 
               return {
-                containerKey: container.containerKey, // Important for smart updates
-                containernum: container.containerNum || "",  // Ensure containerNum is never undefined
-                file_ref: container.fileRef || "", // Added fileRef field
-                weight: sanitizedWeight, // Will be null for empty/invalid values
+                containerKey: container.containerKey,
+                containernum: container.containerNum || "",
+                file_ref: container.fileRef || "",
+                weight: sanitizedWeight,
                 container_type: container.containerType || "",
                 cargo_description: container.cargoDescription || "",
                 "Hazardous": Boolean(container.hazardous),
                 "Hazardous Amount": Number(container.hazardousAmount || 0),
                 "Add Surcharges": Boolean(container.addSurcharges),
                 "Surcharge Amount": Number(container.surchargeAmount || 0),
-                // Only allow VGM to be true for allowed shipment types; otherwise force false/0
+                is_12m_surcharge: Boolean(container.is_12m_surcharge),
+                surcharge_12m_amount: Number(container.surcharge_12m_amount || 0),
                 vgm: allowVgmUI ? Boolean(container.vgm) : false,
                 "vgm amount": allowVgmUI ? Number(container.vgmAmount || 0) : 0,
               };
             });
-      
-      // Validate that containers with counts have container numbers
-      const containerValidation = containerData.filter(c => !c.containernum || c.containernum === "");
-      if (containerValidation.length > 0 && !isAddOn) {
-        console.warn("[UPDATE SAVE WARNING] Containers missing numbers:", containerValidation);
-      }
 
       let weightData = [];
       if (String(formData.shipmentTypeId) === "4") {
@@ -1657,6 +1690,8 @@ const FCcontrollerinstructions = () => {
           file_ref: container.file_ref,
           "Add Surcharges": container["Add Surcharges"],
           "Surcharge Amount": container["Surcharge Amount"],
+          is_12m_surcharge: container.is_12m_surcharge,
+          surcharge_12m_amount: container.surcharge_12m_amount,
           "Hazardous": container["Hazardous"],
           "Hazardous Amount": container["Hazardous Amount"],
           addSurchargesType: typeof container["Add Surcharges"],
@@ -1951,7 +1986,9 @@ const FCcontrollerinstructions = () => {
             cargoDescription: container.cargo_description || "",
             hazardous: container.Hazardous || false,
             addSurcharges: container["Add Surcharges"] || false,
-            surchargeAmount: container["Surcharge Amount"] || 0,
+            surchargeAmount: Number(container["Surcharge Amount"] || 0),
+            is_12m_surcharge: Boolean(container.is_12m_surcharge),
+            surcharge_12m_amount: Number(container.surcharge_12m_amount || 0),
             hazardousAmount: container["Hazardous Amount"] || 0,
             vgm: container.vgm === true || container.vgm === 'true',
             vgmAmount: Number(container["vgm amount"] || 0),
@@ -2524,6 +2561,8 @@ const FCcontrollerinstructions = () => {
             hazardous: hazardousValue,
             addSurcharges: addSurchargesValue,
             surchargeAmount: Number(container["Surcharge Amount"] || 0),
+            is_12m_surcharge: Boolean(container.is_12m_surcharge),
+            surcharge_12m_amount: Number(container.surcharge_12m_amount || 0),
             hazardousAmount: Number(container["Hazardous Amount"] || 0),
             vgm: vgmValue,
             vgmAmount: Number(container["vgm amount"] || 0),
@@ -2767,14 +2806,43 @@ const FCcontrollerinstructions = () => {
           }
         }
       );
-      
-      const surchargeAmount = response.data.surcharges || 0;
-      console.log(`💰 Fetched surcharge amount: ${surchargeAmount} for container ${containerId}`);
+
+      const container = containers.find((c) => c.id === containerId);
+      const isTwelveMeter = container?.containerType === "12m";
+
+      // Backwards/forwards compatible mapping:
+      // - Existing field (6m): "surcharges" (legacy), or "surcharge"
+      // - New field (12m): "surcharge12m" (preferred), with fallbacks
+      const sixMeterSurcharge =
+        response.data.surcharges ??
+        response.data.surcharge ??
+        0;
+
+      const twelveMeterSurcharge =
+        response.data.surcharge12m ??
+        response.data.surcharge_12m ??
+        response.data.surcharge12 ??
+        response.data.surcharge_12 ??
+        response.data.surcharges ??
+        response.data.surcharge ??
+        0;
+
+      const surchargeAmount = isTwelveMeter ? twelveMeterSurcharge : sixMeterSurcharge;
+      console.log(
+        `💰 Fetched surcharge amount: ${surchargeAmount} for container ${containerId} (type: ${container?.containerType || "unknown"})`
+      );
       
       setContainers(prevContainers =>
         prevContainers.map(container =>
           container.id === containerId
-            ? { ...container, surchargeAmount }
+            ? {
+                ...container,
+                // Keep legacy field for 6m only
+                surchargeAmount: isTwelveMeter ? 0 : Number(surchargeAmount || 0),
+                // Backend-aligned fields
+                is_12m_surcharge: isTwelveMeter,
+                surcharge_12m_amount: isTwelveMeter ? Number(surchargeAmount || 0) : 0,
+              }
             : container
         )
       );
@@ -2786,7 +2854,7 @@ const FCcontrollerinstructions = () => {
       setContainers(prevContainers =>
         prevContainers.map(container =>
           container.id === containerId
-            ? { ...container, surchargeAmount: 0 }
+            ? { ...container, surchargeAmount: 0, is_12m_surcharge: false, surcharge_12m_amount: 0 }
             : container
         )
       );
@@ -2808,7 +2876,12 @@ const FCcontrollerinstructions = () => {
     // Add container surcharge amounts
     const surchargeTotal = containers
       .filter(container => container.addSurcharges === true)
-      .reduce((total, container) => total + (Number(container.surchargeAmount) || 0), 0);
+      .reduce((total, container) => {
+        const resolved = container.is_12m_surcharge
+          ? Number(container.surcharge_12m_amount || 0)
+          : Number(container.surchargeAmount || 0);
+        return total + resolved;
+      }, 0);
     
     // Add container hazardous amounts
     const hazardousTotal = containers
