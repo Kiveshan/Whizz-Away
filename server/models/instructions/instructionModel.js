@@ -2670,6 +2670,42 @@ export const updateFCInstructionAndContainers = async (
         }
       }
 
+      // Calculate surcharge amount for new container (similar to update section)
+      let insertSurchargeAmount = 0;
+      const hasAddSurcharges = container["Add Surcharges"] || container.addSurcharges || false;
+      
+      if (!isAddOnType && hasAddSurcharges && clientId && pickup && dropoff) {
+        try {
+          const surchargeQuery = `
+            SELECT surcharges, surcharge12m
+            FROM public.m5_client_rate
+            WHERE clientid = $1
+              AND starting_point = $2
+              AND destination = $3
+            ORDER BY client_rate_id DESC
+            LIMIT 1
+          `;
+          const surchargeResult = await client.query(surchargeQuery, [
+            clientId,
+            pickup,
+            dropoff,
+          ]);
+
+          if (surchargeResult.rows.length > 0) {
+            const is12m = (container.container_type || "") === "12m";
+            const fetched6 = Number.parseFloat(surchargeResult.rows[0].surcharges);
+            const fetched12 = Number.parseFloat(surchargeResult.rows[0].surcharge12m);
+            const fetched = is12m ? fetched12 : fetched6;
+            insertSurchargeAmount = !Number.isNaN(fetched) && fetched > 0 ? fetched : 0;
+          } else {
+            insertSurchargeAmount = 0;
+          }
+        } catch (e) {
+          console.error("ERROR: Failed to fetch surcharge for new container:", e.message);
+          // Keep insertSurchargeAmount as 0 on error
+        }
+      }
+
       const containerType =
         container.containerType || container.container_type || "";
       const cargoDescription =
