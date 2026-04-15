@@ -63,15 +63,36 @@ const createAddon = async (addonData) => {
     const today = new Date();
     const dateStr = today.toISOString().slice(0, 10).replace(/-/g, "");
 
-    // Generate invoice_number
-    const seqQueryText = `
-      SELECT COUNT(*) as count
-      FROM public.add_ons
-      WHERE invoice_number LIKE $1
-    `;
-    const seqResult = await query(seqQueryText, [`ADN-${dateStr}-%`]);
-    const seqNum = Number.parseInt(seqResult.rows[0].count, 10) + 1;
-    const invoiceNumber = `ADN-${dateStr}-${String(seqNum).padStart(3, "0")}`;
+    let invoiceNumber;
+
+    // Handle custom invoice number or auto-generate
+    if (addonData.invoice_number && addonData.invoice_number.trim()) {
+      // Validate custom invoice number for duplicates
+      const validation = await checkInvoiceNumberExists(addonData.invoice_number.trim());
+      if (!validation.success) {
+        return {
+          success: false,
+          message: "Failed to validate invoice number",
+        };
+      }
+      if (validation.exists) {
+        return {
+          success: false,
+          message: "Invoice number already exists. Please use a different number.",
+        };
+      }
+      invoiceNumber = addonData.invoice_number.trim();
+    } else {
+      // Auto-generate invoice_number
+      const seqQueryText = `
+        SELECT COUNT(*) as count
+        FROM public.add_ons
+        WHERE invoice_number LIKE $1
+      `;
+      const seqResult = await query(seqQueryText, [`ADN-${dateStr}-%`]);
+      const seqNum = Number.parseInt(seqResult.rows[0].count, 10) + 1;
+      invoiceNumber = `ADN-${dateStr}-${String(seqNum).padStart(3, "0")}`;
+    }
 
     // Generate group_id
     const currentYear = today.getFullYear();
@@ -231,8 +252,24 @@ const updateAddon = async (addonId, addonData) => {
       let paramIndex = 1;
 
       if (addonData.invoice_number !== undefined) {
+        // Validate invoice number if it's being updated
+        if (addonData.invoice_number && addonData.invoice_number.trim()) {
+          const validation = await checkInvoiceNumberExists(addonData.invoice_number.trim(), addonId);
+          if (!validation.success) {
+            return {
+              success: false,
+              message: "Failed to validate invoice number",
+            };
+          }
+          if (validation.exists) {
+            return {
+              success: false,
+              message: "Invoice number already exists. Please use a different number.",
+            };
+          }
+        }
         updates.push(`invoice_number = $${paramIndex}`);
-        values.push(addonData.invoice_number);
+        values.push(addonData.invoice_number ? addonData.invoice_number.trim() : null);
         paramIndex++;
       }
 
@@ -252,7 +289,23 @@ const updateAddon = async (addonId, addonData) => {
       `;
       params = values;
     } else {
-      // Full update
+      // Full update - validate invoice number if provided
+      if (addonData.invoice_number && addonData.invoice_number.trim()) {
+        const validation = await checkInvoiceNumberExists(addonData.invoice_number.trim(), addonId);
+        if (!validation.success) {
+          return {
+            success: false,
+            message: "Failed to validate invoice number",
+          };
+        }
+        if (validation.exists) {
+          return {
+            success: false,
+            message: "Invoice number already exists. Please use a different number.",
+          };
+        }
+      }
+
       const subtotal = addonData.items.reduce(
         (sum, item) => sum + Number(item.item_amount),
         0
@@ -273,7 +326,7 @@ const updateAddon = async (addonId, addonData) => {
         addonData.vat_applied,
         addonData.booking_ref,
         addonData.client_ref,
-        addonData.invoice_number,
+        addonData.invoice_number ? addonData.invoice_number.trim() : null,
         addonData.vessel_number,
         addonId,
       ];
@@ -367,6 +420,43 @@ const getCompanyInfo = async () => {
   }
 };
 
+const checkInvoiceNumberExists = async (invoiceNumber, excludeAddonId = null) => {
+  try {
+    if (!pool) {
+      throw new Error(
+        "Database connection not established. Please try again later."
+      );
+    }
+
+    let queryText = `
+      SELECT COUNT(*) as count
+      FROM public.add_ons
+      WHERE invoice_number = $1
+    `;
+    let queryParams = [invoiceNumber.trim()];
+
+    if (excludeAddonId) {
+      queryText += ` AND addon_id != $2`;
+      queryParams.push(excludeAddonId);
+    }
+
+    const result = await query(queryText, queryParams);
+    const exists = result.rows[0].count > 0;
+    
+    return {
+      success: true,
+      exists,
+      message: exists ? "Invoice number already exists" : "Invoice number is available"
+    };
+  } catch (error) {
+    console.error("Error checking invoice number:", error);
+    return {
+      success: false,
+      message: "Failed to validate invoice number"
+    };
+  }
+};
+
 const getClientById = async (clientId) => {
   try {
     if (!pool) {
@@ -404,4 +494,5 @@ export {
   deleteAddon,
   getCompanyInfo,
   getClientById,
+  checkInvoiceNumberExists,
 };

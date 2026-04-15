@@ -8,6 +8,7 @@ import {
   deleteAddonHandler,
   getCompanyInfoHandler,
   getClientByIdHandler,
+  checkInvoiceNumberHandler,
 } from "../../controllers/add-ons/addonController.js";
 
 const router = express.Router();
@@ -32,5 +33,8 @@ router.get("/api/companyinfo", verifyToken, getCompanyInfoHandler);
 
 // Get client info by ID
 router.get("/api/add-on/client/:clientId", verifyToken, getClientByIdHandler);
+
+// Check invoice number availability
+router.get("/api/addons/check-invoice/:invoiceNumber", verifyToken, checkInvoiceNumberHandler);
 
 export default router;
