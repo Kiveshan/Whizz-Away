@@ -56,6 +56,8 @@ const AddOnForm = () => {
   const [fetchingInfo, setFetchingInfo] = useState(true);
   const [isEditMode, setIsEditMode] = useState(false);
   const [isEditingInvoiceNum, setIsEditingInvoiceNum] = useState(false);
+  const [invoiceValidation, setInvoiceValidation] = useState({ isValid: true, message: "" });
+  const [validatingInvoice, setValidatingInvoice] = useState(false);
 
   useEffect(() => {
     const fetchCompanyAndClientInfo = async () => {
@@ -206,6 +208,54 @@ const AddOnForm = () => {
     if (error) setError(null);
   };
 
+  const validateInvoiceNumber = async (invoiceNumber) => {
+    if (!invoiceNumber || invoiceNumber.trim() === "") {
+      setInvoiceValidation({ isValid: true, message: "" });
+      return;
+    }
+
+    setValidatingInvoice(true);
+    try {
+      const response = await api.get(`/api/addons/check-invoice/${encodeURIComponent(invoiceNumber.trim())}${addonId ? `?excludeAddonId=${addonId}` : ""}`, {
+        headers: {
+          Authorization: `Bearer ${localStorage.getItem("token")}`,
+        },
+      });
+
+      if (response.data.success) {
+        setInvoiceValidation({
+          isValid: !response.data.exists,
+          message: response.data.message,
+        });
+      }
+    } catch (err) {
+      console.error("Error validating invoice number:", err);
+      setInvoiceValidation({
+        isValid: false,
+        message: "Failed to validate invoice number",
+      });
+    } finally {
+      setValidatingInvoice(false);
+    }
+  };
+
+  const handleInvoiceNumberChange = (e) => {
+    const value = e.target.value;
+    setFormData((prev) => ({ ...prev, invoice_number: value }));
+    
+    // Clear validation when user starts typing
+    if (invoiceValidation.message) {
+      setInvoiceValidation({ isValid: true, message: "" });
+    }
+    
+    // Validate after user stops typing (debounce)
+    const timeoutId = setTimeout(() => {
+      validateInvoiceNumber(value);
+    }, 500);
+
+    return () => clearTimeout(timeoutId);
+  };
+
   const addItem = () => {
     if (isViewMode && !isEditMode) return;
     setFormData((prev) => ({
@@ -259,6 +309,14 @@ const AddOnForm = () => {
     }
     if (formData.booking_ref.length > 50 || formData.client_ref.length > 50) {
       setError("Booking Ref and Client Ref must be at most 50 characters");
+      return false;
+    }
+    if (!invoiceValidation.isValid) {
+      setError(invoiceValidation.message);
+      return false;
+    }
+    if (validatingInvoice) {
+      setError("Please wait for invoice number validation to complete");
       return false;
     }
     return true;
@@ -672,24 +730,35 @@ const AddOnForm = () => {
             <p>VAT Reg No: {companyInfo.vat_reg_num}</p>
           </div>
           <div className="invoice-details">
-            {isViewMode && (
-              <div className="invoice-number" style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-                <span>Invoice #:</span>
-                {!isEditMode ? (
-                  <strong>{formData.invoice_number || "—"}</strong>
-                ) : (
+            <div className="invoice-number" style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+              <span>Invoice #:</span>
+              {isViewMode && !isEditMode ? (
+                <strong>{formData.invoice_number || "TBA"}</strong>
+              ) : (
+                <div style={{ display: "flex", flexDirection: "column", gap: "4px" }}>
                   <input
                     type="text"
                     value={formData.invoice_number}
-                    onChange={(e) =>
-                      setFormData((prev) => ({ ...prev, invoice_number: e.target.value }))
-                    }
+                    onChange={handleInvoiceNumberChange}
                     className="form-input"
-                    style={{ width: "150px", padding: "4px 8px" }}
+                    style={{ width: "200px", padding: "4px 8px" }}
+                    placeholder="Leave empty for auto-generation"
+                    readOnly={isViewMode && !isEditMode}
                   />
-                )}
-              </div>
-            )}
+                  {validatingInvoice && (
+                    <span style={{ fontSize: "12px", color: "#666" }}>Validating...</span>
+                  )}
+                  {invoiceValidation.message && (
+                    <span style={{ 
+                      fontSize: "12px", 
+                      color: invoiceValidation.isValid ? "#28a745" : "#dc3545" 
+                    }}>
+                      {invoiceValidation.message}
+                    </span>
+                  )}
+                </div>
+              )}
+            </div>
           </div>
         </div>
 

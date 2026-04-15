@@ -6,6 +6,7 @@ import {
   deleteAddon,
   getCompanyInfo,
   getClientById,
+  checkInvoiceNumberExists,
 } from "../../models/add-ons/addonModel.js";
 
 const getClientAddonsHandler = async (req, res) => {
@@ -48,7 +49,7 @@ const getClientAddonsHandler = async (req, res) => {
 const createAddonHandler = async (req, res) => {
   try {
     console.log("Creating add-on with data:", req.body);
-    const { client_id, items, date, vat_applied, booking_ref, client_ref, vessel_number } = req.body;
+    const { client_id, items, date, vat_applied, booking_ref, client_ref, vessel_number, invoice_number } = req.body;
 
     if (
       !client_id ||
@@ -104,6 +105,7 @@ const createAddonHandler = async (req, res) => {
       booking_ref: String(booking_ref).trim(),
       client_ref: String(client_ref).trim(),
       vessel_number: vessel_number ? String(vessel_number).trim() : null,
+      invoice_number: invoice_number ? String(invoice_number).trim() : null,
     });
 
     if (!result.success) {
@@ -355,6 +357,36 @@ const getClientByIdHandler = async (req, res) => {
   }
 };
 
+const checkInvoiceNumberHandler = async (req, res) => {
+  try {
+    console.log("Checking invoice number:", req.params.invoiceNumber);
+    const { invoiceNumber } = req.params;
+    const { excludeAddonId } = req.query;
+
+    if (!invoiceNumber) {
+      return res.status(400).json({
+        success: false,
+        message: "Invoice number is required",
+      });
+    }
+
+    const result = await checkInvoiceNumberExists(invoiceNumber, excludeAddonId);
+    
+    res.json({
+      success: result.success,
+      exists: result.exists,
+      message: result.message,
+    });
+  } catch (error) {
+    console.error("Error checking invoice number:", error);
+    res.status(500).json({
+      success: false,
+      message: error.message,
+      stack: process.env.NODE_ENV === "production" ? null : error.stack,
+    });
+  }
+};
+
 export {
   getClientAddonsHandler,
   createAddonHandler,
@@ -363,4 +395,5 @@ export {
   deleteAddonHandler,
   getCompanyInfoHandler,
   getClientByIdHandler,
+  checkInvoiceNumberHandler,
 };
