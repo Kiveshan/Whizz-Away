@@ -44,6 +44,12 @@ const login = async (req, res, next) => {
         .json({ message: "Access denied. Please contact an administrator." });
     }
 
+    if (user.roleid === 5 || user.roleid === 6) {
+      return res
+        .status(403)
+        .json({ message: "Access denied. Please contact an administrator." });
+    }
+
     if (user.roleid !== 7) {
       if (user.table === "usertable" && user.status !== "active") {
         console.log(

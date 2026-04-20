@@ -1,5 +1,7 @@
 import express from "express";
 import cors from "cors";
+import helmet from "helmet";
+import rateLimit from "express-rate-limit";
 import expressSession from "express-session";
 import passport from "passport";
 import { Strategy as LocalStrategy } from "passport-local";
@@ -27,9 +29,28 @@ const __dirname = path.dirname(__filename);
 const app = express();
 const PORT = process.env.PORT || 5000;
 
+// Security headers
+app.use(helmet({
+  crossOriginEmbedderPolicy: false, // Allow embedding for PDF/document views
+  contentSecurityPolicy: false,     // Disabled to avoid blocking inline styles during development
+}));
+
+// Global rate limiter — 200 requests per 15 minutes per IP
+const globalLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 200,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: "Too many requests, please try again later." },
+});
+app.use(globalLimiter);
+
 // Enhanced CORS configuration
+const rawOrigins = process.env.ALLOWED_ORIGINS || "http://localhost:3000,http://127.0.0.1:3000";
+const allowedOriginsArray = rawOrigins.split(",").map((o) => o.trim());
+
 app.use((req, res, next) => {
-  const allowedOrigins = ["http://localhost:3000", "http://127.0.0.1:3000"];
+  const allowedOrigins = allowedOriginsArray;
   const origin = req.headers.origin;
 
   if (allowedOrigins.includes(origin)) {
