@@ -302,6 +302,7 @@ Troubleshooting tips:
                 <thead>
                   <tr>
                     <th>Instruction No</th>
+                    <th>Inv Number</th>
                     <th>Type</th>
                     <th>File No</th>
                     <th>Date</th>
@@ -312,6 +313,7 @@ Troubleshooting tips:
                   {currentInstructions.map((instruction) => (
                     <tr key={instruction.m1key}>
                       <td>{instruction.m1key}</td>
+                      <td>{instruction.invoice_num}</td>
                       <td>{instruction.shipment_type}</td>
                       <td>{instruction.file_no}</td>
                       <td>{formatDate(instruction.date)}</td>
