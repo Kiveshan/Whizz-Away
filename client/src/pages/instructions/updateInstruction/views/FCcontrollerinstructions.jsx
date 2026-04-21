@@ -3773,10 +3773,10 @@ const FCcontrollerinstructions = () => {
   const handleRateChange = (e) => {
     const { name, value } = e.target;
     if (value === "" || /^\d*\.?\d*$/.test(value)) {
-      // Update the rate in form data
+      // Update the rate in form data (keep as string during editing to allow decimals)
       const updatedFormData = {
         ...formData,
-        [name]: value === "" ? "" : Number(value) || 0,
+        [name]: value === "" ? "" : value,
       };
 
       // Recalculate total cost
