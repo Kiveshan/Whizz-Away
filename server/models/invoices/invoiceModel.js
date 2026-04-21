@@ -16,6 +16,7 @@ const getCompletedInvoices = async ({ year, month, type, clientId }) => {
         m1."clientFileRef" as file_no, 
         m1.status,
         i.ikey,
+        i.invoice_num,
         i.date as date
       FROM 
         public.m1_controller m1
