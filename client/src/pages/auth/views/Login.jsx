@@ -5,6 +5,8 @@ import styles from "../css/login.module.css"; // Updated to CSS Module
 import { useNavigate } from "react-router-dom";
 import { Eye, EyeOff } from "lucide-react";
 import api from "../../../api";
+import { useAuth } from "../../../context/AuthContext";
+import { getPostLoginRoute } from "../../../router/AuthRouter";
 
 const Login = ({ switchToRegister, closePopup }) => {
   const [email, setEmail] = useState("");
@@ -12,6 +14,7 @@ const Login = ({ switchToRegister, closePopup }) => {
   const [error, setError] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const navigate = useNavigate();
+  const { login } = useAuth();
 
   const togglePasswordVisibility = () => {
     setShowPassword(!showPassword);
@@ -38,8 +41,16 @@ const Login = ({ switchToRegister, closePopup }) => {
         const data = response.data;
         console.log("Login successful. Token:", data.token);
 
-        localStorage.setItem("token", data.token);
-        navigate(data.redirectUrl);
+        // Store user + token in AuthContext (also persists to localStorage)
+        login(data.user, data.token);
+
+        // Subscription-aware routing overrides the backend redirectUrl
+        const route = getPostLoginRoute(
+          data.user.subscription_tier,
+          data.user.subscription_status,
+          data.user.roleid
+        );
+        navigate(route);
       } else {
         console.log("Error from server:", response.data);
         setError(response.data.message || "Login failed. Please try again.");

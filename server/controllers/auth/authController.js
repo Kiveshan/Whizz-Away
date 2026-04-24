@@ -77,6 +77,36 @@ const login = async (req, res, next) => {
       }
     }
 
+    // Fetch subscription fields for company admins (roleid 1) and employees
+    let subscription_tier = "none";
+    let subscription_status = "inactive";
+    let trial_ends_at = null;
+
+    if (user.company_reg_num) {
+      try {
+        const { pool } = await import("../../config/database.js");
+        const subClient = await pool.connect();
+        try {
+          const subResult = await subClient.query(
+            `SELECT subscription_tier, subscription_status, trial_ends_at
+             FROM usertable
+             WHERE company_reg_num = $1 AND roleid = 1
+             LIMIT 1`,
+            [user.company_reg_num]
+          );
+          if (subResult.rows[0]) {
+            subscription_tier   = subResult.rows[0].subscription_tier;
+            subscription_status = subResult.rows[0].subscription_status;
+            trial_ends_at       = subResult.rows[0].trial_ends_at;
+          }
+        } finally {
+          subClient.release();
+        }
+      } catch (subErr) {
+        console.error("Failed to fetch subscription for JWT:", subErr);
+      }
+    }
+
     const token = jwt.sign(
       {
         userid: user.userid,
@@ -86,6 +116,9 @@ const login = async (req, res, next) => {
         roleid: user.roleid,
         table: user.table,
         company_reg_num: user.company_reg_num,
+        subscription_tier,
+        subscription_status,
+        trial_ends_at,
       },
       secretKey,
       { expiresIn: "12h" }
@@ -99,6 +132,9 @@ const login = async (req, res, next) => {
       roleid: user.roleid,
       table: user.table,
       company_reg_num: user.company_reg_num,
+      subscription_tier,
+      subscription_status,
+      trial_ends_at,
     };
     console.log("User stored in session:", req.session.user);
 
@@ -121,6 +157,9 @@ const login = async (req, res, next) => {
         surname: user.surname,
         roleid: user.roleid,
         company_reg_num: user.company_reg_num,
+        subscription_tier,
+        subscription_status,
+        trial_ends_at,
       },
     });
   })(req, res, next);
@@ -276,6 +315,7 @@ const register = async (req, res) => {
     suburb,
     swift_code,
     cluster_box,
+    requested_plan,
   } = req.body;
 
   try {
@@ -308,6 +348,7 @@ const register = async (req, res) => {
       suburb,
       swift_code,
       cluster_box,
+      requested_plan,
     });
 
     return res.status(201).json({

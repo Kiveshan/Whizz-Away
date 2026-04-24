@@ -1,6 +1,7 @@
 import express from "express";
 import authroutes from "./auth/authRoutes.js";
 import adminroutes from "./admin/adminRoutes.js";
+import saasAdminRoutes from "./admin/saasAdminRoutes.js";
 import testroutes from "./test/testRoutes.js";
 import manageEmployeeRoutes from "./manage/employeeRoutes.js";
 import manageClientRoutes from "./manage/clientRoutes.js";
@@ -38,6 +39,7 @@ const router = express.Router();
 router.use(creditNoteRoutes);
 router.use(authroutes);
 router.use(adminroutes);
+router.use(saasAdminRoutes);
 router.use(testroutes);
 router.use(manageEmployeeRoutes);
 router.use(manageClientRoutes);

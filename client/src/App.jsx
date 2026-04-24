@@ -89,6 +89,12 @@ import {
   DirectorDocs,
 } from "./pages/assignments";
 import { AdminDashboard } from "./pages/admin";
+import LiteDashboard from "./pages/dashboard/LiteDashboard";
+import SuspensionScreen from "./pages/status/SuspensionScreen";
+import PendingActivation from "./pages/status/PendingActivation";
+import AccountCancelled from "./pages/status/AccountCancelled";
+import TrialBanner from "./components/billing/TrialBanner";
+import PostLoginRedirect from "./router/AuthRouter";
 
 // Finance Clerk Pages
 import {
@@ -180,6 +186,10 @@ function DynamicHeader() {
     "/Viewcontrollerinstructions": "Instruction",
     "/ViewcontrollerInstructionDetails": "Container Details",
     "/AdminDashboard": "Admin",
+    "/dashboard/lite":     "Dashboard",
+    "/suspended":          "Account Suspended",
+    "/pending-activation": "Pending Activation",
+    "/account-cancelled":  "Account Cancelled",
     "/Creditors/CreatePO": "Expenses",
     "/Creditors/POForm": "Purchase Order",
     "/Creditors/PurchaseOrder/View": "Purchase Order",
@@ -233,8 +243,8 @@ function DynamicHeader() {
 
 function ContentWrapper() {
   const location = useLocation();
-  const hideFooterOn = ["/login", "/register", "/"]; // hide global footer on landing
-  const hideLogoutOn = ["/login", "/register", "/landing", "/new-landing", "/"]; // hide logout on landing
+  const hideFooterOn = ["/login", "/register", "/", "/suspended", "/pending-activation", "/account-cancelled"];
+  const hideLogoutOn = ["/login", "/register", "/landing", "/new-landing", "/", "/suspended", "/pending-activation", "/account-cancelled"]; // hide logout on landing
   const shouldShowFooter = !hideFooterOn.includes(location.pathname);
   const shouldShowLogout = !hideLogoutOn.includes(location.pathname);
 
@@ -375,6 +385,12 @@ function ContentWrapper() {
           element={<ViewcontrollerInstructionDetails />}
         />
         <Route path="/AdminDashboard" element={<AdminDashboard />} />
+        {/* SaaS plan-based routes */}
+        <Route path="/dashboard/lite"       element={<LiteDashboard />} />
+        <Route path="/suspended"            element={<SuspensionScreen />} />
+        <Route path="/pending-activation"   element={<PendingActivation />} />
+        <Route path="/account-cancelled"    element={<AccountCancelled />} />
+        <Route path="/login-redirect"       element={<PostLoginRedirect />} />
         {/* Finance Clerk Routes */}
         <Route path="/instructions" element={<InstructionsList />} />
         <Route path="/update-instructions" element={<UpdateInstruction />} />
@@ -498,6 +514,7 @@ function App() {
       <Router>
         <div className="container">
           <TokenExpiryNotification />
+          <TrialBanner />
           <DynamicHeader />
           <ContentWrapper />
         </div>

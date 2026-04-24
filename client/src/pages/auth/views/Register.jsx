@@ -26,7 +26,47 @@ const Register = ({ switchToLogin, closePopup }) => {
     branch: "",
     branch_code: "",
     swift_code: "",
+    requested_plan: "",
   });
+
+  const PLAN_OPTIONS = [
+    {
+      key: "lite",
+      label: "Lite",
+      price: "R2 000/mo",
+      setup: "R2 500 once-off",
+      users: "2 users",
+      trucks: "5 trucks",
+      features: ["Instructions", "Assignment", "Invoice", "Statements", "Manage"],
+    },
+    {
+      key: "professional",
+      label: "Professional",
+      price: "R4 500/mo",
+      setup: "R7 500 once-off",
+      users: "5 users",
+      trucks: "15 trucks",
+      features: ["All Lite features", "Add-ons", "Analytics", "Reports"],
+    },
+    {
+      key: "growth",
+      label: "Growth",
+      price: "R7 500/mo",
+      setup: "R15 000 once-off",
+      users: "15 users",
+      trucks: "40 trucks",
+      features: ["All Professional features", "Payroll", "Biometric Register", "VAT Management"],
+    },
+    {
+      key: "enterprise",
+      label: "Enterprise",
+      price: "R10 500/mo",
+      setup: "R25 000 once-off",
+      users: "Unlimited",
+      trucks: "Unlimited",
+      features: ["All Growth features", "Creditors", "Priority Support"],
+    },
+  ];
 
   const [errorMessage, setErrorMessage] = useState("");
   const [successMessage, setSuccessMessage] = useState("");
@@ -231,6 +271,12 @@ const Register = ({ switchToLogin, closePopup }) => {
     const swiftValidation = validateSwiftCode(formData.swift_code);
     if (swiftValidation !== true) {
       setErrorMessage(swiftValidation);
+      setShowErrorPopup(true);
+      return;
+    }
+
+    if (!formData.requested_plan) {
+      setErrorMessage("Please select a plan to continue.");
       setShowErrorPopup(true);
       return;
     }
@@ -606,6 +652,50 @@ const Register = ({ switchToLogin, closePopup }) => {
               <small style={{ color: "#666", fontSize: "11px" }}>
                 Format: BANK+COUNTRY+LOCATION+[BRANCH]
               </small>
+            </div>
+          </div>
+
+          {/* Plan selection */}
+          <div className={styles.formRow} style={{ marginBottom: "20px" }}>
+            <div style={{ width: "100%" }}>
+              <h3 style={{ marginBottom: "12px", fontSize: "1rem", fontWeight: 600 }}>
+                Select Your Plan <span style={{ color: "red" }}>*</span>
+              </h3>
+              <p style={{ color: "#666", fontSize: "12px", marginBottom: "12px" }}>
+                A Whizz-Away team member will confirm your plan and billing during onboarding.
+              </p>
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: "12px" }}>
+                {PLAN_OPTIONS.map((plan) => (
+                  <button
+                    key={plan.key}
+                    type="button"
+                    onClick={() => setFormData((prev) => ({ ...prev, requested_plan: plan.key }))}
+                    style={{
+                      border: formData.requested_plan === plan.key
+                        ? "2px solid #2563eb"
+                        : "1px solid #d1d5db",
+                      borderRadius: "8px",
+                      padding: "12px",
+                      textAlign: "left",
+                      background: formData.requested_plan === plan.key ? "#eff6ff" : "#fff",
+                      cursor: "pointer",
+                    }}
+                  >
+                    <div style={{ fontWeight: 700, fontSize: "0.95rem", marginBottom: "2px" }}>
+                      {plan.label}
+                    </div>
+                    <div style={{ color: "#2563eb", fontSize: "0.85rem", marginBottom: "4px" }}>
+                      {plan.price} &bull; {plan.setup}
+                    </div>
+                    <div style={{ color: "#6b7280", fontSize: "0.78rem" }}>
+                      {plan.users} &bull; {plan.trucks}
+                    </div>
+                    <ul style={{ margin: "6px 0 0 14px", padding: 0, fontSize: "0.75rem", color: "#374151" }}>
+                      {plan.features.map((f) => <li key={f}>{f}</li>)}
+                    </ul>
+                  </button>
+                ))}
+              </div>
             </div>
           </div>
 

@@ -6,181 +6,191 @@ const AuthContext = createContext()
 
 export const useAuth = () => {
   const context = useContext(AuthContext)
-  if (!context) {
-    throw new Error("useAuth must be used within an AuthProvider")
-  }
+  if (!context) throw new Error("useAuth must be used within an AuthProvider")
   return context
 }
 
+// ─── Plan helpers (pure functions, no React needed) ──────────────────────────
+
+const PLAN_RANK = { lite: 1, professional: 2, growth: 3, enterprise: 4 }
+
+function decodeToken(token) {
+  if (!token) return null
+  try {
+    return JSON.parse(atob(token.split(".")[1]))
+  } catch {
+    return null
+  }
+}
+
+function buildSubscription(userData) {
+  if (!userData) return null
+  return {
+    tier:           userData.subscription_tier   || "none",
+    status:         userData.subscription_status || "inactive",
+    trial_ends_at:  userData.trial_ends_at       || null,
+    company_reg_num: userData.company_reg_num    || null,
+  }
+}
+
+// ─── Provider ────────────────────────────────────────────────────────────────
+
 export const AuthProvider = ({ children }) => {
-  const [user, setUser] = useState(null)
-  const [token, setToken] = useState(null)
+  const [user, setUser]       = useState(null)
+  const [token, setToken]     = useState(null)
   const [loading, setLoading] = useState(true)
 
-  // Check if token is expired
-  const isTokenExpired = useCallback((token) => {
-    if (!token) return true
-
-    try {
-      const payload = JSON.parse(atob(token.split(".")[1]))
-      const currentTime = Date.now() / 1000
-      return payload.exp < currentTime
-    } catch (error) {
-      console.error("Error checking token expiration:", error)
-      return true
-    }
+  const isTokenExpired = useCallback((t) => {
+    const payload = decodeToken(t)
+    if (!payload) return true
+    return payload.exp < Date.now() / 1000
   }, [])
 
-  // Get token expiration time in milliseconds
-  const getTokenExpirationTime = useCallback((token) => {
-    if (!token) return null
-
-    try {
-      const payload = JSON.parse(atob(token.split(".")[1]))
-      return payload.exp * 1000 // Convert to milliseconds
-    } catch (error) {
-      console.error("Error getting token expiration time:", error)
-      return null
-    }
+  const getTokenExpirationTime = useCallback((t) => {
+    const payload = decodeToken(t)
+    return payload ? payload.exp * 1000 : null
   }, [])
 
-  // Logout function
   const logout = useCallback(() => {
-    console.log("Logging out user...")
     localStorage.removeItem("token")
     localStorage.removeItem("user")
     setToken(null)
     setUser(null)
-
-    // Dispatch logout event
     window.dispatchEvent(new CustomEvent("userLoggedOut"))
-
-    // Redirect to login page
     window.location.href = "/"
   }, [])
 
-  // Login function
   const login = useCallback((userData, authToken) => {
-    console.log("Logging in user:", userData.name)
     localStorage.setItem("token", authToken)
     localStorage.setItem("user", JSON.stringify(userData))
     setToken(authToken)
     setUser(userData)
   }, [])
 
-  // Check token expiration and emit events
   const checkTokenExpiration = useCallback(() => {
     const currentToken = localStorage.getItem("token")
     if (!currentToken) return
-
     const expirationTime = getTokenExpirationTime(currentToken)
-    if (!expirationTime) {
-      console.log("Could not get token expiration time, logging out...")
-      logout()
-      return
-    }
-
-    const currentTime = Date.now()
-    const timeUntilExpiry = expirationTime - currentTime
-
-    console.log("Token check:", {
-      currentTime: new Date(currentTime).toISOString(),
-      expirationTime: new Date(expirationTime).toISOString(),
-      timeUntilExpiry: Math.floor(timeUntilExpiry / 1000) + " seconds",
-    })
-
-    // If token is expired
-    if (timeUntilExpiry <= 0) {
-      console.log("Token has expired, logging out...")
-      logout()
-      return
-    }
-
-    // If token expires in 2 minutes (120 seconds) or less, show warning
+    if (!expirationTime) { logout(); return }
+    const timeUntilExpiry = expirationTime - Date.now()
+    if (timeUntilExpiry <= 0) { logout(); return }
     if (timeUntilExpiry <= 120000) {
-      // 5 minutes in milliseconds
-      console.log("Token expiring soon, showing warning...")
-      window.dispatchEvent(
-        new CustomEvent("tokenExpiring", {
-          detail: { timeUntilExpiry },
-        }),
-      )
+      window.dispatchEvent(new CustomEvent("tokenExpiring", { detail: { timeUntilExpiry } }))
     }
   }, [getTokenExpirationTime, logout])
 
-  // Initialize auth state
   useEffect(() => {
-    const initializeAuth = () => {
-      const storedToken = localStorage.getItem("token")
-      const storedUser = localStorage.getItem("user")
-
-      if (storedToken && storedUser) {
-        try {
-          // Check if token is still valid
-          if (!isTokenExpired(storedToken)) {
-            setToken(storedToken)
-            setUser(JSON.parse(storedUser))
-            console.log("User authenticated from storage")
-          } else {
-            console.log("Stored token is expired, clearing storage...")
-            localStorage.removeItem("token")
-            localStorage.removeItem("user")
-          }
-        } catch (error) {
-          console.error("Error parsing stored user data:", error)
+    const storedToken = localStorage.getItem("token")
+    const storedUser  = localStorage.getItem("user")
+    if (storedToken && storedUser) {
+      try {
+        if (!isTokenExpired(storedToken)) {
+          setToken(storedToken)
+          setUser(JSON.parse(storedUser))
+        } else {
           localStorage.removeItem("token")
           localStorage.removeItem("user")
         }
+      } catch {
+        localStorage.removeItem("token")
+        localStorage.removeItem("user")
       }
-
-      setLoading(false)
     }
-
-    initializeAuth()
+    setLoading(false)
   }, [isTokenExpired])
 
-  // Set up token expiration checking interval
   useEffect(() => {
-    let intervalId
-
-    if (token && !isTokenExpired(token)) {
-      // Check token expiration every 10 seconds for more responsive detection
-      intervalId = setInterval(() => {
-        checkTokenExpiration()
-      }, 10000) // 10 seconds
-
-      // Also check immediately
-      checkTokenExpiration()
-    }
-
-    return () => {
-      if (intervalId) {
-        clearInterval(intervalId)
-      }
-    }
+    if (!token || isTokenExpired(token)) return
+    const id = setInterval(checkTokenExpiration, 10000)
+    checkTokenExpiration()
+    return () => clearInterval(id)
   }, [token, isTokenExpired, checkTokenExpiration])
 
-  // Listen for token expiration events from API calls
   useEffect(() => {
-    const handleTokenExpired = () => {
-      console.log("Received token expired event from API, logging out...")
-      logout()
-    }
-
-    const handleUserLoggedOut = () => {
-      console.log("User logged out event received")
-      setUser(null)
-      setToken(null)
-    }
-
-    window.addEventListener("tokenExpired", handleTokenExpired)
-    window.addEventListener("userLoggedOut", handleUserLoggedOut)
-
+    const onExpired   = () => logout()
+    const onLoggedOut = () => { setUser(null); setToken(null) }
+    window.addEventListener("tokenExpired",   onExpired)
+    window.addEventListener("userLoggedOut",  onLoggedOut)
     return () => {
-      window.removeEventListener("tokenExpired", handleTokenExpired)
-      window.removeEventListener("userLoggedOut", handleUserLoggedOut)
+      window.removeEventListener("tokenExpired",  onExpired)
+      window.removeEventListener("userLoggedOut", onLoggedOut)
     }
   }, [logout])
+
+  // ─── Subscription helpers ─────────────────────────────────────────────────
+
+  const subscription = buildSubscription(user)
+
+  /** Returns true if the company's plan ranks at or above `minimumPlan`. */
+  const hasPlan = useCallback((minimumPlan) => {
+    const tier = user?.subscription_tier || "none"
+    return (PLAN_RANK[tier] ?? 0) >= (PLAN_RANK[minimumPlan] ?? 99)
+  }, [user])
+
+  /**
+   * Returns true if `feature_key` is available on the current plan.
+   * Uses the static feature map (no DB call) for instant UI decisions.
+   */
+  const PLAN_FEATURES = {
+    lite:         ["instructions", "assignment", "invoice", "statements", "manage"],
+    professional: ["instructions", "assignment", "invoice", "statements", "manage", "addons", "analytics", "reports"],
+    growth:       ["instructions", "assignment", "invoice", "statements", "manage", "addons", "analytics", "reports", "payroll", "biometric", "vat"],
+    enterprise:   ["instructions", "assignment", "invoice", "statements", "manage", "addons", "analytics", "reports", "payroll", "biometric", "vat", "creditors", "priority_support"],
+  }
+
+  const hasFeature = useCallback((feature_key) => {
+    const tier = user?.subscription_tier || "none"
+    return (PLAN_FEATURES[tier] || []).includes(feature_key)
+  }, [user])
+
+  /** True when the company is on an active trial. */
+  const isTrial = useCallback(() => {
+    return user?.subscription_status === "trial"
+  }, [user])
+
+  /** Days remaining in trial (null if not on trial). */
+  const trialDaysRemaining = useCallback(() => {
+    if (!isTrial() || !user?.trial_ends_at) return null
+    const diff = new Date(user.trial_ends_at) - new Date()
+    return Math.max(0, Math.ceil(diff / (1000 * 60 * 60 * 24)))
+  }, [user, isTrial])
+
+  /**
+   * Returns { tier, status, maxUsers, maxTrucks }.
+   * maxUsers/maxTrucks are populated from the JWT; real counts require an API call.
+   */
+  const getUsage = useCallback(() => {
+    const PLAN_LIMITS = {
+      lite:         { maxUsers: 2,   maxTrucks: 5   },
+      professional: { maxUsers: 5,   maxTrucks: 15  },
+      growth:       { maxUsers: 15,  maxTrucks: 40  },
+      enterprise:   { maxUsers: 999, maxTrucks: 999 },
+    }
+    const tier = user?.subscription_tier || "none"
+    const limits = PLAN_LIMITS[tier] || { maxUsers: 0, maxTrucks: 0 }
+    return { tier, status: user?.subscription_status || "inactive", ...limits }
+  }, [user])
+
+  /** Derive the correct post-login route from subscription state. */
+  const getPostLoginRoute = useCallback((roleid) => {
+    const status = user?.subscription_status || "inactive"
+    const tier   = user?.subscription_tier   || "none"
+
+    if (status === "suspended")                          return "/suspended"
+    if (status === "cancelled")                          return "/account-cancelled"
+    if (status === "inactive" || status === "none" || tier === "none") return "/pending-activation"
+    if (status === "trial")                              return "/dashboard"
+    if (tier   === "lite")                               return "/dashboard/lite"
+
+    // Standard role-based routing for professional/growth/enterprise
+    if (roleid === 1) return "/Dashboard"
+    if (roleid === 2) return "/ControllerDashboard"
+    if (roleid === 3) return "/FDashboard"
+    if (roleid === 4) return "/DirectorDashboard"
+    if (roleid === 7) return "/AdminDashboard"
+    if (roleid === 8) return "/CreditorsDashboard"
+    return "/Dashboard"
+  }, [user])
 
   const value = {
     user,
@@ -189,6 +199,14 @@ export const AuthProvider = ({ children }) => {
     login,
     logout,
     isAuthenticated: !!token && !!user && !isTokenExpired(token),
+    // Subscription
+    subscription,
+    hasPlan,
+    hasFeature,
+    isTrial,
+    trialDaysRemaining,
+    getUsage,
+    getPostLoginRoute,
   }
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>

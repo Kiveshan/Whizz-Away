@@ -5,20 +5,21 @@ const getPendingUsers = async () => {
   try {
     client = await pool.connect();
     const result = await client.query(`
-      SELECT 
-        u.userid, 
-        e.name, 
-        e.surname, 
-        e.email, 
-        u.companyname, 
+      SELECT
+        u.userid,
+        e.name,
+        e.surname,
+        e.email,
+        u.companyname,
         u.company_reg_num,
-        u.roleid, 
-        u.status, 
+        u.roleid,
+        u.status,
         u.dateofreg,
+        u.plan_notes,
         e.status AS employee_status
       FROM usertable u
       INNER JOIN m5_employee e ON u.company_reg_num = e.company_reg_num
-      WHERE u.status = 'pending' 
+      WHERE u.status = 'pending'
     `);
     return result.rows;
   } catch (err) {

@@ -10,6 +10,7 @@ import {
   deleteEmployeeDocumentHandler,
 } from "../../controllers/manage/employeeController.js";
 import { verifyToken } from "../../middleware/auth.js";
+import { requireRolePermission, checkUsageLimits } from "../../middleware/planAuthorization.js";
 import { uploadEmployeeDocs } from "../../utils/s3Config.js";
 
 const router = express.Router();
@@ -26,6 +27,8 @@ router.get(
 router.post(
   "/api/employees",
   verifyToken,
+  checkUsageLimits,
+  requireRolePermission,
   uploadEmployeeDocs.array("documents", 3),
   createEmployeeHandler
 );

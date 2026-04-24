@@ -62,28 +62,51 @@ function UserApprovalList() {
               <th>Name</th>
               <th>Surname</th>
               <th>Email</th>
+              <th>Company</th>
+              <th>Requested Plan</th>
               <th>Registration Date</th>
               <th>Actions</th>
             </tr>
           </thead>
           <tbody>
-            {users.map((user) => (
-              <tr key={user.userid}>
-                <td>{user.userid}</td>
-                <td>{user.name}</td>
-                <td>{user.surname}</td>
-                <td>{user.email}</td>
-                <td>{new Date(user.dateofreg).toLocaleDateString()}</td>
-                <td>
-                  <button
-                    className="view-button"
-                    onClick={() => handleViewUser(user)}
-                  >
-                    View Details
-                  </button>
-                </td>
-              </tr>
-            ))}
+            {users.map((user) => {
+              const requestedPlan = user.plan_notes?.replace("Requested plan: ", "") || "—";
+              return (
+                <tr key={user.userid}>
+                  <td>{user.userid}</td>
+                  <td>{user.name}</td>
+                  <td>{user.surname}</td>
+                  <td>{user.email}</td>
+                  <td>{user.companyname || "—"}</td>
+                  <td>
+                    {requestedPlan !== "—" ? (
+                      <span
+                        style={{
+                          background: "#eff6ff",
+                          color: "#1d4ed8",
+                          padding: "2px 8px",
+                          borderRadius: "12px",
+                          fontSize: "0.8rem",
+                          fontWeight: 600,
+                          textTransform: "capitalize",
+                        }}
+                      >
+                        {requestedPlan}
+                      </span>
+                    ) : "—"}
+                  </td>
+                  <td>{new Date(user.dateofreg).toLocaleDateString()}</td>
+                  <td>
+                    <button
+                      className="view-button"
+                      onClick={() => handleViewUser(user)}
+                    >
+                      View Details
+                    </button>
+                  </td>
+                </tr>
+              );
+            })}
           </tbody>
         </table>
       )}

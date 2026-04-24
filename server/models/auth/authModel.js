@@ -279,6 +279,7 @@ const registerUser = async (userData) => {
     suburb,
     swift_code,
     cluster_box,
+    requested_plan,
   } = userData;
 
   let client;
@@ -291,12 +292,13 @@ const registerUser = async (userData) => {
     const hashedPassword = await bcrypt.hash(password, 10);
     
     // Insert into usertable (removed roleid)
+    const planNotes = requested_plan ? `Requested plan: ${requested_plan}` : null;
     const userResult = await client.query(
       `INSERT INTO usertable (
         companyname, company_reg_num, dateofreg, status,
         cell_num2, vat_reg_num, account_num, name_of_acc, bank, branch,
-        branch_code, address, suburb, swift_code, cluster_box
-      ) VALUES ($1, $2, CURRENT_DATE, 'pending', $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13) RETURNING *`,
+        branch_code, address, suburb, swift_code, cluster_box, plan_notes
+      ) VALUES ($1, $2, CURRENT_DATE, 'pending', $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14) RETURNING *`,
       [
         companyname,
         company_reg_num,
@@ -311,6 +313,7 @@ const registerUser = async (userData) => {
         suburb,
         swift_code || null,
         cluster_box || null,
+        planNotes,
       ]
     );
 
