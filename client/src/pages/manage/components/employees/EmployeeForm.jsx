@@ -3,7 +3,18 @@ import { extractFilenameFromUrl } from "../../utils/helpers";
 import { validatePassword, getPasswordStrength } from "../../../../utils/passwordValidator.js";
 import { Eye, EyeOff } from "lucide-react";
 
-const EmployeeForm = ({ employee, loading, isEditing, onSave, onCancel, onChange, onDeleteDocument }) => {
+// All roles available in the system
+const ALL_ROLES = [
+  { id: 1, label: "Business Manager" },
+  { id: 2, label: "Controller" },
+  { id: 4, label: "Director" },
+  { id: 5, label: "Driver" },
+  { id: 3, label: "Finance Clerk" },
+  { id: 8, label: "Creditors Clerk" },
+  { id: 9, label: "Yard Staff" },
+]
+
+const EmployeeForm = ({ employee, loading, isEditing, onSave, onCancel, onChange, onDeleteDocument, allowedRoleIds = [1, 2, 3, 4, 5, 8, 9] }) => {
   const emailRef = useRef(null);
   const [alert, setAlert] = useState({ show: false, message: "" });
   const [isCheckingEmail, setIsCheckingEmail] = useState(false);
@@ -372,7 +383,6 @@ const EmployeeForm = ({ employee, loading, isEditing, onSave, onCancel, onChange
               if (selectedRoleId === 5 || selectedRoleId === 9) {
                 onChange("email", "");
                 onChange("password", "");
-                // Clear email validation error messages and states
                 setAlert({ show: false, message: "" });
                 emailRef.current?.setCustomValidity("");
                 setIsCheckingEmail(false);
@@ -381,14 +391,15 @@ const EmployeeForm = ({ employee, loading, isEditing, onSave, onCancel, onChange
             required
           >
             <option value="" disabled>Select Role</option>
-            <option value="1">Business Manager</option>
-            <option value="2">Controller</option>
-            <option value="4">Director</option>
-            <option value="5">Driver</option>
-            <option value="3">Debtors Clerk</option>
-            <option value="8">Creditors Clerk</option>
-            <option value="9">Yard Staff</option>
+            {(isEditing ? ALL_ROLES : ALL_ROLES.filter(r => allowedRoleIds.includes(r.id))).map(r => (
+              <option key={r.id} value={r.id}>{r.label}</option>
+            ))}
           </select>
+          {!isEditing && allowedRoleIds.length < ALL_ROLES.length && (
+            <small style={{ color: "#6b7280", marginTop: "4px", display: "block" }}>
+              Some roles require a higher plan.
+            </small>
+          )}
         </div>
      {alert.show && (
           <div className="alert-box">

@@ -774,3 +774,14 @@
     width: 140px;
   }
 }
+
+/* ─── Manage page usage row ─── */
+
+.manage-usage-row {
+  display: flex;
+  gap: 32px;
+  flex-wrap: wrap;
+  padding: 12px 0 4px;
+  border-bottom: 1px solid #e5e7eb;
+  margin-bottom: 4px;
+}

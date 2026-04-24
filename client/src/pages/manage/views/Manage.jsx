@@ -5,6 +5,8 @@ import { useNavigate } from "react-router-dom"
 import "../css/Manage.css"
 import "../css/pagination.css"
 import "../css/additional-styles.css"
+import { useAuth } from "../../../context/AuthContext"
+import UsageBadge from "../../../components/billing/UsageBadge"
 
 // Hooks
 import { useManageState } from "../hooks/useManageState"
@@ -51,8 +53,26 @@ import CreditorsTab from "../components/creditors/CreditorsTab"
 import CompanyTable from "../components/company/CompanyTable"
 import CompanyForm from "../components/company/CompanyForm"
 
+// Mirror of backend ROLE_PLAN_MAP / PLAN_RANK so UI matches server enforcement
+const PLAN_RANK_MAP = { lite: 1, professional: 2, growth: 3, enterprise: 4 }
+const ROLE_MIN_PLAN  = { 1: "professional", 2: "growth", 3: "lite", 4: "professional", 8: "growth" }
+// roleid 5 (Driver) and 9 (Yard Staff) have no plan restriction
+
+function getAllowedRoleIds(tier) {
+  const rank = PLAN_RANK_MAP[tier] ?? 0
+  return [1, 2, 3, 4, 5, 8, 9].filter((id) => {
+    const minPlan = ROLE_MIN_PLAN[id]
+    if (!minPlan) return true
+    return rank >= (PLAN_RANK_MAP[minPlan] ?? 99)
+  })
+}
+
 const Manage = () => {
   const navigate = useNavigate()
+  const { getUsage } = useAuth()
+  const usage = getUsage()
+  const allowedRoleIds = getAllowedRoleIds(usage.tier)
+
   const { state, actions } = useManageState()
   const api = useApi(state, actions)
   const { notifications: truckNotifications, refreshNotifications: refreshTruckNotifications } = useTruckNotifications()
@@ -137,8 +157,7 @@ const Manage = () => {
       actions.setEditing("ExpenseType", null)
       actions.setEditing("Company", null)
     } else {
-      // If no form is showing (we're in table view), navigate to dashboard
-      navigate("/Dashboard")
+      navigate(localStorage.getItem("dashboardRoute") || "/Dashboard")
     }
   }
 
@@ -152,6 +171,13 @@ const Manage = () => {
   }
 
   const handleEmployeeAdd = () => {
+    const currentCount = state.pagination.employees.totalItems
+    if (usage.maxUsers < 999 && currentCount >= usage.maxUsers) {
+      actions.showAlert(
+        `User limit reached (${currentCount} / ${usage.maxUsers} on ${usage.tier} plan). Upgrade to add more employees.`
+      )
+      return
+    }
     actions.resetFormData("Employee")
     actions.setEditing("Employee", null)
     actions.showForm("showEmployeeForm")
@@ -324,6 +350,14 @@ const Manage = () => {
       {/* Alert */}
       {state.showAlert && <CustomAlert message={state.alertMessage} onClose={actions.hideAlert} />}
 
+      {/* Usage counters (shown when the plan has caps) */}
+      {usage.maxUsers < 999 && (
+        <div className="manage-usage-row">
+          <UsageBadge label="Users"  used={state.pagination.employees.totalItems} max={usage.maxUsers} />
+          <UsageBadge label="Trucks" used={state.pagination.trucks.totalItems}    max={usage.maxTrucks} />
+        </div>
+      )}
+
       {/* Tab Navigation */}
       <div className="manage-button-row">
         <button
@@ -416,6 +450,7 @@ const Manage = () => {
               onCancel={handleEmployeeCancel}
               onChange={handleEmployeeFormChange}
               onDeleteDocument={api.deleteDocument}
+              allowedRoleIds={allowedRoleIds}
             />
           ) : (
             <EmployeeTable
