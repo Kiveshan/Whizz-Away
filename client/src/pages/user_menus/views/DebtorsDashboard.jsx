@@ -1,22 +1,25 @@
 import React from "react";
 import { useNavigate } from "react-router-dom";
-import Card from "../../../components/Card";
+import FeatureGatedCard from "../../../components/FeatureGatedCard";
 
 const dashboardData = [
   {
     title: "Invoices",
     image: "/images/payments.jpeg",
     path: "/ViewClientInvoice",
+    featureKey: "invoice",
   },
   {
     title: "Add On's",
     image: "/images/Add-On's.jpg",
     path: "/view-client-list",
+    featureKey: "addons",
   },
   {
     title: "Statements",
     image: "/images/Statements.jpg",
     path: "/view-client-statements",
+    featureKey: "statements",
   },
 ];
 
@@ -33,30 +36,36 @@ const DebtorsDashboard = () => {
       </div>
       <div className="dashboard-row top-row">
         {dashboardData.slice(0, 3).map((item) => (
-          <Card
+          <FeatureGatedCard
             key={item.title}
             title={item.title}
             image={item.image}
+            path={item.path}
+            featureKey={item.featureKey}
             onClick={() => navigate(item.path)}
           />
         ))}
       </div>
       <div className="dashboard-row top-row">
         {dashboardData.slice(3, 6).map((item) => (
-          <Card
+          <FeatureGatedCard
             key={item.title}
             title={item.title}
             image={item.image}
+            path={item.path}
+            featureKey={item.featureKey}
             onClick={() => navigate(item.path)}
           />
         ))}
       </div>
       <div className="dashboard-row bottom-row">
         {dashboardData.slice(6, 9).map((item) => (
-          <Card
+          <FeatureGatedCard
             key={item.title}
             title={item.title}
             image={item.image}
+            path={item.path}
+            featureKey={item.featureKey}
             onClick={() => navigate(item.path)}
           />
         ))}
