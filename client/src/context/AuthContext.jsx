@@ -176,6 +176,9 @@ export const AuthProvider = ({ children }) => {
     const status = user?.subscription_status || "inactive"
     const tier   = user?.subscription_tier   || "none"
 
+    // Super admin bypasses subscription checks
+    if (roleid === 7) return "/AdminDashboard"
+
     if (status === "suspended")                          return "/suspended"
     if (status === "cancelled")                          return "/account-cancelled"
     if (status === "inactive" || status === "none" || tier === "none") return "/pending-activation"

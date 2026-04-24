@@ -6,6 +6,9 @@ import { useAuth } from "../context/AuthContext"
  * Used both in Login.jsx redirect and as a route guard component.
  */
 export function getPostLoginRoute(tier, status, roleid) {
+  // Super admin bypasses subscription checks
+  if (roleid === 7) return "/AdminDashboard"
+
   if (status === "suspended")                                    return "/suspended"
   if (status === "cancelled")                                    return "/account-cancelled"
   if (!status || status === "inactive" || !tier || tier === "none") return "/pending-activation"
