@@ -90,6 +90,8 @@ import {
 } from "./pages/assignments";
 import { AdminDashboard } from "./pages/admin";
 import LiteDashboard from "./pages/dashboard/LiteDashboard";
+import LiteInstructionsDash from "./pages/dashboard/LiteInstructionsDash";
+import LiteDebtorsDash from "./pages/dashboard/LiteDebtorsDash";
 import SuspensionScreen from "./pages/status/SuspensionScreen";
 import PendingActivation from "./pages/status/PendingActivation";
 import AccountCancelled from "./pages/status/AccountCancelled";
@@ -187,7 +189,9 @@ function DynamicHeader() {
     "/Viewcontrollerinstructions": "Instruction",
     "/ViewcontrollerInstructionDetails": "Container Details",
     "/AdminDashboard": "Admin",
-    "/dashboard/lite":     "Dashboard",
+    "/dashboard/lite":                "Dashboard",
+    "/dashboard/lite/instructions":   "Instructions",
+    "/dashboard/lite/debtors":        "Debtors",
     "/suspended":          "Account Suspended",
     "/pending-activation": "Pending Activation",
     "/account-cancelled":  "Account Cancelled",
@@ -387,7 +391,9 @@ function ContentWrapper() {
         />
         <Route path="/AdminDashboard" element={<AdminDashboard />} />
         {/* SaaS plan-based routes */}
-        <Route path="/dashboard/lite"       element={<LiteDashboard />} />
+        <Route path="/dashboard/lite"                element={<LiteDashboard />} />
+        <Route path="/dashboard/lite/instructions"   element={<LiteInstructionsDash />} />
+        <Route path="/dashboard/lite/debtors"        element={<LiteDebtorsDash />} />
         <Route path="/suspended"            element={<SuspensionScreen />} />
         <Route path="/pending-activation"   element={<PendingActivation />} />
         <Route path="/account-cancelled"    element={<AccountCancelled />} />

@@ -695,3 +695,82 @@
     grid-template-columns: repeat(2, 1fr);
   }
 }
+
+/* ═══════════════════════════════════════════════════════════════════
+   LOCKED CARD OVERLAY (Lite Dashboard upgrade section)
+   ═══════════════════════════════════════════════════════════════════ */
+
+.locked-card-wrapper {
+  position: relative;
+  cursor: pointer;
+  opacity: 0.78;
+  transition: opacity 0.2s, transform 0.2s;
+  border-radius: 8px;
+}
+
+.locked-card-wrapper:hover {
+  opacity: 1;
+  transform: translateY(-5px);
+}
+
+.locked-card-overlay {
+  position: absolute;
+  inset: 0;
+  background: rgba(15, 23, 42, 0.58);
+  border-radius: 8px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  color: #fff;
+  pointer-events: none;
+  transition: background 0.2s;
+}
+
+.locked-card-wrapper:hover .locked-card-overlay {
+  background: rgba(15, 23, 42, 0.72);
+}
+
+.locked-card-plan-label {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.9px;
+  text-transform: uppercase;
+  background: rgba(255, 255, 255, 0.18);
+  padding: 3px 10px;
+  border-radius: 20px;
+}
+
+/* ─── Upgrade section beneath main cards ─── */
+
+.lite-locked-section {
+  padding-top: 8px;
+}
+
+.lite-locked-heading {
+  text-align: center;
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: #94a3b8;
+  letter-spacing: 0.4px;
+  text-transform: uppercase;
+  margin-bottom: 24px;
+}
+
+.lite-locked-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 40px;
+  justify-content: center;
+}
+
+@media (max-width: 600px) {
+  .lite-locked-grid {
+    gap: 20px;
+  }
+
+  .locked-card-wrapper .card {
+    width: 140px;
+  }
+}

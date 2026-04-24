@@ -1,130 +1,81 @@
 import { useState } from "react"
 import { useNavigate } from "react-router-dom"
-import {
-  FileText, ClipboardList, Receipt, BarChart2, Settings,
-  Package, TrendingUp, FileBarChart, DollarSign, Fingerprint,
-  Calculator, Users, Headphones, Lock,
-} from "lucide-react"
-import { useAuth } from "../../context/AuthContext"
-import UsageBadge from "../../components/billing/UsageBadge"
+import { Lock } from "lucide-react"
+import Card from "../../components/Card"
 import UpgradePrompt from "../../components/billing/UpgradePrompt"
+import "../../pages/user_menus/css/card.css"
+import "../../pages/user_menus/css/dashboard.css"
 
-const SUPPORT_EMAIL = process.env.REACT_APP_SUPPORT_EMAIL || "support@whizzaway.co.za"
-
-const LITE_MODULES = [
-  { label: "Instructions", route: "/instructions",  Icon: FileText,     description: "Create and manage delivery instructions" },
-  { label: "Assignment",   route: "/update-instructions", Icon: ClipboardList, description: "Assign instructions to drivers" },
-  { label: "Invoice",      route: "/invoices",      Icon: Receipt,      description: "Generate and view invoices" },
-  { label: "Statements",   route: "/statements-list", Icon: BarChart2,  description: "View financial statements" },
-  { label: "Manage",       route: "/manage",        Icon: Settings,     description: "Manage company settings and users" },
+const MAIN_MODULES = [
+  { title: "Instructions", image: "/images/Instructions.png", path: "/dashboard/lite/instructions" },
+  { title: "Debtors",      image: "/images/Payment.jpg",      path: "/dashboard/lite/debtors" },
+  { title: "Manage",       image: "/images/manage.jpg",       path: "/manage" },
 ]
+
+const PLAN_LABEL = { professional: "Professional", growth: "Growth", enterprise: "Enterprise" }
 
 const LOCKED_MODULES = [
-  { key: "addons",           label: "Add-ons",             Icon: Package,     requiredPlan: "professional" },
-  { key: "analytics",        label: "Analytics",           Icon: TrendingUp,  requiredPlan: "professional" },
-  { key: "reports",          label: "Reports",             Icon: FileBarChart, requiredPlan: "professional" },
-  { key: "payroll",          label: "Payroll",             Icon: DollarSign,  requiredPlan: "growth" },
-  { key: "biometric",        label: "Biometric Register",  Icon: Fingerprint, requiredPlan: "growth" },
-  { key: "vat",              label: "VAT Management",      Icon: Calculator,  requiredPlan: "growth" },
-  { key: "creditors",        label: "Creditors",           Icon: Users,       requiredPlan: "enterprise" },
-  { key: "priority_support", label: "Priority Support",    Icon: Headphones,  requiredPlan: "enterprise" },
+  { key: "addons",           title: "Add-ons",            image: "/images/Add-On's.jpg",              requiredPlan: "professional" },
+  { key: "analytics",        title: "Analytics",          image: "/images/analytics.jpg",             requiredPlan: "professional" },
+  { key: "reports",          title: "Reports",            image: "/images/reports.jpg",               requiredPlan: "professional" },
+  { key: "payroll",          title: "Payroll",            image: "/images/wages.jpeg",                requiredPlan: "growth" },
+  { key: "biometric",        title: "Biometric Register", image: "/images/pexels-photo-8962519.jpeg", requiredPlan: "growth" },
+  { key: "vat",              title: "VAT Management",     image: "/images/expenses.jpeg",             requiredPlan: "growth" },
+  { key: "creditors",        title: "Creditors",          image: "/images/createpo.jpg",              requiredPlan: "enterprise" },
+  { key: "priority_support", title: "Priority Support",   image: "/images/team-management.png",       requiredPlan: "enterprise" },
 ]
 
-function ModuleCard({ label, route, Icon, description, locked, onLockedClick }) {
-  const navigate = useNavigate()
-
+function LockedCard({ title, image, requiredPlan, onClick }) {
   return (
-    <button
-      className={`lite-module-card ${locked ? "lite-module-card--locked" : ""}`}
-      onClick={() => (locked ? onLockedClick() : navigate(route))}
-      aria-label={locked ? `${label} — upgrade required` : label}
+    <div
+      className="locked-card-wrapper"
+      onClick={onClick}
+      role="button"
+      aria-label={`${title} — upgrade to ${PLAN_LABEL[requiredPlan]} to unlock`}
     >
-      <div className="lite-module-card-icon">
-        {locked ? <Lock size={22} /> : <Icon size={22} />}
+      <Card title={title} image={image} />
+      <div className="locked-card-overlay">
+        <Lock size={22} />
+        <span className="locked-card-plan-label">{PLAN_LABEL[requiredPlan]}</span>
       </div>
-      <span className="lite-module-card-label">{label}</span>
-      {locked && (
-        <span className="lite-module-card-plan-badge">
-          {label === "Add-ons" || label === "Analytics" || label === "Reports"
-            ? "Professional"
-            : label === "Payroll" || label === "Biometric Register" || label === "VAT Management"
-            ? "Growth"
-            : "Enterprise"}
-        </span>
-      )}
-      {!locked && description && (
-        <span className="lite-module-card-desc">{description}</span>
-      )}
-    </button>
+    </div>
   )
 }
 
 export default function LiteDashboard() {
-  const { user, subscription, getUsage } = useAuth()
-  const usage = getUsage()
+  const navigate = useNavigate()
+  const [upgradeModal, setUpgradeModal] = useState(null)
 
-  const [upgradeModal, setUpgradeModal] = useState(null) // { requiredPlan, featureName }
-
-  const openUpgrade = (mod) =>
-    setUpgradeModal({ requiredPlan: mod.requiredPlan, featureName: mod.label })
-
-  const companyName = user?.companyname || subscription?.company_reg_num || "Your Company"
+  const handleNavigate = (path) => {
+    localStorage.setItem("dashboardRoute", "/dashboard/lite")
+    navigate(path)
+  }
 
   return (
-    <div className="lite-dashboard">
-      {/* Top bar */}
-      <div className="lite-topbar">
-        <div className="lite-topbar-left">
-          <h1 className="lite-topbar-company">{companyName}</h1>
-          <span
-            className="lite-plan-badge"
-            title="Click to upgrade"
-            style={{ cursor: "pointer" }}
-            onClick={() => setUpgradeModal({ requiredPlan: "professional", featureName: null })}
-          >
-            LITE
-          </span>
-        </div>
-        <div className="lite-topbar-usage">
-          <UsageBadge label="Users"  used={0} max={usage.maxUsers} />
-          <UsageBadge label="Trucks" used={0} max={usage.maxTrucks} />
-        </div>
+    <div className="dashboard">
+      {/* Main unlocked modules */}
+      <div className="dashboard-row top-row">
+        {MAIN_MODULES.map((m) => (
+          <Card key={m.title} title={m.title} image={m.image} onClick={() => handleNavigate(m.path)} />
+        ))}
       </div>
 
-      {/* Welcome */}
-      <div className="lite-welcome-card">
-        <h2>Welcome back, {user?.name || "there"}!</h2>
-        <p>You are on the <strong>Lite</strong> plan. Access your five included modules below.</p>
-      </div>
-
-      {/* Module grid */}
-      <section className="lite-modules-section">
-        <h2 className="lite-section-title">Your Modules</h2>
-        <div className="lite-module-grid">
-          {LITE_MODULES.map((m) => (
-            <ModuleCard key={m.route} {...m} locked={false} />
-          ))}
+      {/* Locked / upgrade section */}
+      <div className="lite-locked-section">
+        <h3 className="lite-locked-heading">Upgrade to Unlock More Features</h3>
+        <div className="lite-locked-grid">
           {LOCKED_MODULES.map((m) => (
-            <ModuleCard
+            <LockedCard
               key={m.key}
-              label={m.label}
-              Icon={m.Icon}
-              locked={true}
-              onLockedClick={() => openUpgrade(m)}
+              title={m.title}
+              image={m.image}
+              requiredPlan={m.requiredPlan}
+              onClick={() => setUpgradeModal({ requiredPlan: m.requiredPlan, featureName: m.title })}
             />
           ))}
         </div>
-      </section>
-
-      {/* Contact banner */}
-      <div className="lite-contact-banner">
-        <p>Need more capacity or want to unlock additional modules?</p>
-        <a href={`mailto:${SUPPORT_EMAIL}`} className="lite-contact-link">
-          Contact your Whizz-Away account manager
-        </a>
       </div>
 
-      {/* Upgrade modal */}
       {upgradeModal && (
         <UpgradePrompt
           requiredPlan={upgradeModal.requiredPlan}
