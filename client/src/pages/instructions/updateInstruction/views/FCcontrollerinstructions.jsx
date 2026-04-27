@@ -2070,7 +2070,6 @@ const FCcontrollerinstructions = () => {
     formData.num_six_meters,
     formData.num_twelve_meters,
     formData.num_abnormal,
-    containers,
   ]);
 
   const scrollToField = (fieldName) => {
