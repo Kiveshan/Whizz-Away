@@ -170,7 +170,8 @@ const requireRolePermission = async (req, res, next) => {
 };
 
 // ─── checkUsageLimits ────────────────────────────────────────────────────────
-// Blocks employee creation if the company has hit its user cap.
+// Attaches req.usageWarning if the company is at or over its user cap.
+// Does NOT block — creation is allowed with overage charges.
 
 const checkUsageLimits = async (req, res, next) => {
   const company_reg_num = req.user?.company_reg_num;
@@ -181,7 +182,7 @@ const checkUsageLimits = async (req, res, next) => {
     try {
       const [planResult, countResult] = await Promise.all([
         client.query(
-          `SELECT sp.max_users FROM subscription_plans sp
+          `SELECT sp.max_users, sp.overage_user FROM subscription_plans sp
            JOIN usertable u ON u.subscription_tier = sp.plan_key
            WHERE u.company_reg_num = $1 AND u.roleid = 1 LIMIT 1`,
           [company_reg_num]
@@ -192,16 +193,18 @@ const checkUsageLimits = async (req, res, next) => {
         ),
       ]);
 
-      const maxUsers   = planResult.rows[0]?.max_users ?? 999;
-      const userCount  = parseInt(countResult.rows[0].count, 10);
+      const maxUsers    = planResult.rows[0]?.max_users ?? 999;
+      const overageCost = Number(planResult.rows[0]?.overage_user ?? 300);
+      const userCount   = parseInt(countResult.rows[0].count, 10);
 
       if (maxUsers !== 999 && userCount >= maxUsers) {
-        return res.status(403).json({
-          error: "USER_LIMIT_REACHED",
-          message: `Your plan allows a maximum of ${maxUsers} active users. Please upgrade to add more.`,
-          current_count: userCount,
-          max_users: maxUsers,
-        });
+        req.usageWarning = {
+          type:        "user_limit_exceeded",
+          current:     userCount,
+          max:         maxUsers,
+          overageCost,
+          message:     `You have reached your plan limit of ${maxUsers} users. Adding this employee will incur an overage charge of R${overageCost}/month.`,
+        };
       }
       next();
     } finally {
@@ -213,6 +216,57 @@ const checkUsageLimits = async (req, res, next) => {
   }
 };
 
+// ─── checkTruckUsageLimits ───────────────────────────────────────────────────
+// Attaches req.usageWarning if the company is at or over its truck cap.
+// Excludes subcontractor trucks from the count.
+// Does NOT block — creation is allowed with overage charges.
+
+const checkTruckUsageLimits = async (req, res, next) => {
+  const company_reg_num = req.user?.company_reg_num;
+  if (!company_reg_num) return next();
+
+  try {
+    const client = await pool.connect();
+    try {
+      const [planResult, countResult] = await Promise.all([
+        client.query(
+          `SELECT sp.max_trucks, sp.overage_truck FROM subscription_plans sp
+           JOIN usertable u ON u.subscription_tier = sp.plan_key
+           WHERE u.company_reg_num = $1 AND u.roleid = 1 LIMIT 1`,
+          [company_reg_num]
+        ),
+        client.query(
+          `SELECT COUNT(*) FROM m5_trucks
+           WHERE company_reg_num = $1
+             AND status = true
+             AND (is_subcontractor = false OR is_subcontractor IS NULL)`,
+          [company_reg_num]
+        ),
+      ]);
+
+      const maxTrucks   = planResult.rows[0]?.max_trucks ?? 999;
+      const overageCost = Number(planResult.rows[0]?.overage_truck ?? 250);
+      const truckCount  = parseInt(countResult.rows[0].count, 10);
+
+      if (maxTrucks !== 999 && truckCount >= maxTrucks) {
+        req.usageWarning = {
+          type:        "truck_limit_exceeded",
+          current:     truckCount,
+          max:         maxTrucks,
+          overageCost,
+          message:     `You have reached your plan limit of ${maxTrucks} trucks. Adding this truck will incur an overage charge of R${overageCost}/month.`,
+        };
+      }
+      next();
+    } finally {
+      client.release();
+    }
+  } catch (err) {
+    console.error("checkTruckUsageLimits error:", err);
+    next(); // fail open — don't block on a usage check error
+  }
+};
+
 export {
   isSuperAdmin,
   loadCompany,
@@ -220,6 +274,7 @@ export {
   requireFeature,
   requireRolePermission,
   checkUsageLimits,
+  checkTruckUsageLimits,
   PLAN_RANK,
   ROLE_PLAN_MAP,
   ROLEID_NAME_MAP,

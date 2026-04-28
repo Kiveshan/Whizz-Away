@@ -151,7 +151,10 @@ const createTruckHandler = async (req, res) => {
       fileLocations,
     )
 
-    res.status(201).json(newTruck)
+    const responseBody = req.usageWarning
+      ? { ...newTruck, warning: req.usageWarning }
+      : newTruck
+    res.status(201).json(responseBody)
   } catch (err) {
     console.error("Error creating truck:", err)
     res.status(500).json({ error: "Failed to create truck" })

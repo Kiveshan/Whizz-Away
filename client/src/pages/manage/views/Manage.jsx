@@ -157,7 +157,7 @@ const Manage = () => {
       actions.setEditing("ExpenseType", null)
       actions.setEditing("Company", null)
     } else {
-      navigate(localStorage.getItem("dashboardRoute") || "/Dashboard")
+      navigate(usage.tier === "lite" ? "/dashboard/lite" : "/Dashboard")
     }
   }
 
@@ -172,15 +172,14 @@ const Manage = () => {
 
   const handleEmployeeAdd = () => {
     const currentCount = state.pagination.employees.totalItems
-    if (usage.maxUsers < 999 && currentCount >= usage.maxUsers) {
-      actions.showAlert(
-        `User limit reached (${currentCount} / ${usage.maxUsers} on ${usage.tier} plan). Upgrade to add more employees.`
-      )
-      return
-    }
     actions.resetFormData("Employee")
     actions.setEditing("Employee", null)
     actions.showForm("showEmployeeForm")
+    if (usage.maxUsers < 999 && currentCount >= usage.maxUsers) {
+      actions.showAlert(
+        `⚠️ You have reached your plan limit of ${usage.maxUsers} users (${currentCount} active). Adding this employee will incur an overage charge of R300/month.`
+      )
+    }
   }
 
   const handleEmployeeCancel = () => {
@@ -220,9 +219,15 @@ const Manage = () => {
   }
 
   const handleTruckAdd = () => {
+    const currentCount = state.pagination.trucks.totalItems
     actions.resetFormData("Truck")
     actions.setEditing("Truck", null)
     actions.showForm("showTruckForm")
+    if (usage.maxTrucks < 999 && currentCount >= usage.maxTrucks) {
+      actions.showAlert(
+        `⚠️ You have reached your plan limit of ${usage.maxTrucks} trucks (${currentCount} active). Adding this truck will incur an overage charge of R250/month.`
+      )
+    }
   }
 
   const handleTruckCancel = () => {
