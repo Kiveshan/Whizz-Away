@@ -11,6 +11,7 @@ import {
   getTrucksWithExpiredLicensesHandler,
 } from "../../controllers/manage/truckController.js"
 import { verifyToken } from "../../middleware/auth.js"
+import { checkTruckUsageLimits } from "../../middleware/planAuthorization.js"
 import { uploadTruckDocs } from "../../utils/s3Config.js"
 
 const router = express.Router()
@@ -22,7 +23,7 @@ router.get("/api/trucks/notifications/expired", verifyToken, getTrucksWithExpire
 // Main CRUD routes
 router.get("/api/trucks", verifyToken, getAllTrucksHandler)
 router.get("/api/trucks/:id", verifyToken, getTruckByIdHandler)
-router.post("/api/trucks", verifyToken, uploadTruckDocs.array("documents", 3), createTruckHandler)
+router.post("/api/trucks", verifyToken, checkTruckUsageLimits, uploadTruckDocs.array("documents", 3), createTruckHandler)
 router.put("/api/trucks/:id", verifyToken, uploadTruckDocs.array("documents", 3), updateTruckHandler)
 
 // Status management route

@@ -141,7 +141,10 @@ const createEmployeeHandler = async (req, res) => {
       adminId,
       userAgent
     )
-    res.status(201).json(newEmployee)
+    const responseBody = req.usageWarning
+      ? { ...newEmployee, warning: req.usageWarning }
+      : newEmployee
+    res.status(201).json(responseBody)
   } catch (err) {
     console.error("Error in /api/employees POST:", err)
     res.status(500).json({ error: err.message || "Failed to create employee" })

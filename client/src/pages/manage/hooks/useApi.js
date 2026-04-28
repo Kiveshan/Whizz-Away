@@ -280,7 +280,11 @@ export function useApi(state, actions) {
         actions.resetFormData("Employee")
         actions.setEditing("Employee", null)
         actions.hideForm("showEmployeeForm")
-        actions.showAlert(state.editingEmployeeId ? "Employee updated!" : "Employee added!")
+        if (response.data?.warning) {
+          actions.showAlert(`Employee added! ⚠️ ${response.data.warning.message}`)
+        } else {
+          actions.showAlert(state.editingEmployeeId ? "Employee updated!" : "Employee added!")
+        }
         return true
       } catch (err) {
         console.error("Error saving employee:", err)
@@ -408,7 +412,11 @@ export function useApi(state, actions) {
         actions.resetFormData("Truck")
         actions.setEditing("Truck", null)
         actions.hideForm("showTruckForm")
-        actions.showAlert(state.editTruckId ? "Truck updated!" : "Truck added!")
+        if (response.data?.warning) {
+          actions.showAlert(`Truck added! ⚠️ ${response.data.warning.message}`)
+        } else {
+          actions.showAlert(state.editTruckId ? "Truck updated!" : "Truck added!")
+        }
         return true
       } catch (err) {
         console.error("Error saving truck:", err)
