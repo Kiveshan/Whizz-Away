@@ -1,4 +1,5 @@
 import { pool } from "../../config/database.js";
+import { getRateForLegDate } from "../manage/driverRatesModel.js";
 
 export const getDrivers = async () => {
   const query = "SELECT * FROM m5_driver_rate";
@@ -52,7 +53,34 @@ export const getDriversSub = async () => {
   }
 };
 
-export const getDriverRatesWithSubbie = async (startingpoint, destination) => {
+export const getDriverRatesWithSubbie = async (startingpoint, destination, legDate = null) => {
+  // If legDate provided, use effective date-based rate lookup
+  if (legDate) {
+    try {
+      const rateResult = await getRateForLegDate(startingpoint, destination, legDate, false, '6m');
+      if (rateResult.success) {
+        const row = rateResult.data;
+        return {
+          m5ratekey: row.m5ratekey,
+          startingpoint,
+          destination,
+          driver_six_meter_rate: row.driver_six_meter_rate,
+          driver_twelve_meter_rate: row.driver_twelve_meter_rate,
+          subie_six_meter_rate: row.subie_six_meter_rate,
+          subie_twelve_meter_rate: row.subie_twelve_meter_rate,
+          effective_from: row.effective_from,
+          effective_to: row.effective_to,
+          driver_rate: row.driver_six_meter_rate,
+        };
+      }
+      return null;
+    } catch (error) {
+      console.error('Error fetching rates with effective dates:', error);
+      // Fall through to default behavior
+    }
+  }
+  
+  // Default: fetch current rate (for backwards compatibility)
   const query = `
     SELECT 
       m5ratekey, 
@@ -61,11 +89,17 @@ export const getDriverRatesWithSubbie = async (startingpoint, destination) => {
       driver_six_meter_rate, 
       driver_twelve_meter_rate,
       subie_six_meter_rate,
-      subie_twelve_meter_rate
+      subie_twelve_meter_rate,
+      effective_from,
+      effective_to
     FROM 
       m5_driver_rate 
     WHERE 
-      startingpoint = $1 AND destination = $2`;
+      startingpoint = $1 AND destination = $2
+      AND effective_from <= CURRENT_DATE
+      AND (effective_to IS NULL OR effective_to >= CURRENT_DATE)
+    ORDER BY effective_from DESC
+    LIMIT 1`;
   try {
     const result = await pool.query(query, [startingpoint, destination]);
     if (result.rows.length > 0) {
@@ -213,8 +247,29 @@ export const getContainerDetails = async (containerNum) => {
 export const getDriverRates = async (
   startingpoint,
   destination,
-  containerType
+  containerType,
+  legDate = null
 ) => {
+  // If legDate provided, use effective date-based rate lookup
+  if (legDate) {
+    try {
+      const isSubcontractor = false; // This function is for drivers, not subbies
+      const rateResult = await getRateForLegDate(startingpoint, destination, legDate, isSubcontractor, containerType);
+      
+      if (rateResult.success) {
+        return {
+          ...rateResult.data,
+          applicable_rate: rateResult.data.applicable_rate
+        };
+      }
+      return null;
+    } catch (error) {
+      console.error('Error fetching driver rates with effective dates:', error);
+      // Fall through to default behavior
+    }
+  }
+  
+  // Default: fetch current rate (for backwards compatibility)
   const query = `
     SELECT 
       m5ratekey, 
@@ -222,11 +277,17 @@ export const getDriverRates = async (
       destination, 
       driver_rate,
       driver_six_meter_rate, 
-      driver_twelve_meter_rate
+      driver_twelve_meter_rate,
+      effective_from,
+      effective_to
     FROM 
       m5_driver_rate 
     WHERE 
-      startingpoint = $1 AND destination = $2`;
+      startingpoint = $1 AND destination = $2
+      AND effective_from <= CURRENT_DATE
+      AND (effective_to IS NULL OR effective_to >= CURRENT_DATE)
+    ORDER BY effective_from DESC
+    LIMIT 1`;
   try {
     const result = await pool.query(query, [startingpoint, destination]);
     if (result.rows.length > 0) {

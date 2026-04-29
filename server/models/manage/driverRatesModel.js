@@ -38,7 +38,7 @@ const getAllDriverRates = async (options = {}) => {
       FROM m5_driver_rate dr
       LEFT JOIN m5_employee e ON dr.driverid = e.userid
       ${whereClause}
-      ORDER BY dr.m5ratekey DESC
+      ORDER BY dr.startingpoint ASC, dr.destination ASC, dr.effective_from ASC, dr.m5ratekey ASC
       LIMIT $${paramIndex} OFFSET $${paramIndex + 1}
     `
 
@@ -93,6 +93,8 @@ const createDriverRate = async (driverRateData) => {
       driver_twelve_meter_rate,
       subie_six_meter_rate,
       subie_twelve_meter_rate,
+      effective_from,
+      effective_to,
     } = driverRateData
 
     // Validate required fields (only starting point and destination)
@@ -128,12 +130,17 @@ const createDriverRate = async (driverRateData) => {
       throw new Error("All rates must be valid numbers if provided")
     }
 
+    // Process effective dates - default to today if not provided
+    const effectiveFrom = effective_from ? new Date(effective_from) : new Date()
+    const effectiveTo = effective_to ? new Date(effective_to) : null
+
     const result = await client.query(
       `INSERT INTO m5_driver_rate (
         startingpoint, destination,
         driver_six_meter_rate, driver_twelve_meter_rate,
-        subie_six_meter_rate, subie_twelve_meter_rate
-      ) VALUES ($1, $2, $3, $4, $5, $6)
+        subie_six_meter_rate, subie_twelve_meter_rate,
+        effective_from, effective_to
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
       RETURNING *`,
       [
         startingpoint,
@@ -142,6 +149,8 @@ const createDriverRate = async (driverRateData) => {
         processedDriverTwelveRate,
         processedSubieSixRate,
         processedSubieTwelveRate,
+        effectiveFrom,
+        effectiveTo,
       ],
     )
     return result.rows[0]
@@ -169,6 +178,8 @@ const updateDriverRate = async (id, driverRateData) => {
       driver_twelve_meter_rate,
       subie_six_meter_rate,
       subie_twelve_meter_rate,
+      effective_from,
+      effective_to,
     } = driverRateData
 
     const updateFields = []
@@ -219,6 +230,18 @@ const updateDriverRate = async (id, driverRateData) => {
           ? null
           : Number.parseFloat(subie_twelve_meter_rate)
       queryParams.push(processedValue)
+      paramCounter++
+    }
+    if (effective_from !== undefined) {
+      updateFields.push(`effective_from = $${paramCounter}`)
+      const effectiveFromDate = effective_from ? new Date(effective_from) : new Date()
+      queryParams.push(effectiveFromDate)
+      paramCounter++
+    }
+    if (effective_to !== undefined) {
+      updateFields.push(`effective_to = $${paramCounter}`)
+      const effectiveToDate = effective_to ? new Date(effective_to) : null
+      queryParams.push(effectiveToDate)
       paramCounter++
     }
 
@@ -388,11 +411,160 @@ const getDriverRateUsage = async (id) => {
   }
 }
 
+// Get the appropriate rate for a leg based on its date and route
+// This function respects effective dates to determine which rate version applies
+export const getRateForLegDate = async (startingpoint, destination, legDate, isSubcontractor = false, containerType = '6m') => {
+  let client
+  try {
+    client = await pool.connect()
+
+    // Use the date value directly — passing a JS Date object for a 'YYYY-MM-DD' string
+    // causes UTC-midnight → local-date shift on UTC+ servers. Let PostgreSQL cast the
+    // string to DATE itself to avoid any timezone offset.
+    const targetDate = legDate instanceof Date
+      ? legDate.toISOString().split('T')[0]
+      : legDate
+
+    const query = `
+      SELECT
+        m5ratekey,
+        startingpoint,
+        destination,
+        driver_six_meter_rate,
+        driver_twelve_meter_rate,
+        subie_six_meter_rate,
+        subie_twelve_meter_rate,
+        effective_from,
+        effective_to
+      FROM m5_driver_rate
+      WHERE LOWER(TRIM(COALESCE(startingpoint, ''))) = LOWER(TRIM(COALESCE($1, '')))
+        AND LOWER(TRIM(COALESCE(destination, ''))) = LOWER(TRIM(COALESCE($2, '')))
+        AND effective_from <= $3::date
+        AND (effective_to IS NULL OR effective_to >= $3::date)
+      ORDER BY effective_from DESC, m5ratekey DESC
+      LIMIT 1
+    `
+
+    const result = await client.query(query, [
+      startingpoint,
+      destination,
+      targetDate
+    ])
+    
+    if (!result.rows.length) {
+      return {
+        success: false,
+        message: `No rate found for route ${startingpoint} to ${destination} effective on ${targetDate.toISOString().split('T')[0]}`,
+        data: null
+      }
+    }
+    
+    const rate = result.rows[0]
+    
+    // Determine which rate field to return based on driver type and container type
+    let applicableRate = null
+    let rateField = ''
+    
+    if (isSubcontractor) {
+      if (containerType.toLowerCase() === '12m') {
+        applicableRate = rate.subie_twelve_meter_rate
+        rateField = 'subie_twelve_meter_rate'
+      } else {
+        applicableRate = rate.subie_six_meter_rate
+        rateField = 'subie_six_meter_rate'
+      }
+    } else {
+      if (containerType.toLowerCase() === '12m') {
+        applicableRate = rate.driver_twelve_meter_rate
+        rateField = 'driver_twelve_meter_rate'
+      } else {
+        applicableRate = rate.driver_six_meter_rate
+        rateField = 'driver_six_meter_rate'
+      }
+    }
+    
+    return {
+      success: true,
+      data: {
+        ...rate,
+        applicable_rate: applicableRate,
+        rate_field: rateField,
+        is_subcontractor: isSubcontractor,
+        container_type: containerType
+      }
+    }
+  } catch (err) {
+    console.error(`Error fetching rate for leg date ${legDate}:`, err)
+    throw err
+  } finally {
+    if (client) client.release()
+  }
+}
+
+// Check for overlapping effective dates for a given route
+// Returns warnings if overlaps exist but doesn't block (manual resolution)
+export const checkRateDateOverlaps = async (startingpoint, destination, effectiveFrom, effectiveTo, excludeRateId = null) => {
+  let client
+  try {
+    client = await pool.connect()
+    
+    const query = `
+      SELECT 
+        m5ratekey,
+        startingpoint,
+        destination,
+        effective_from,
+        effective_to,
+        driver_six_meter_rate,
+        driver_twelve_meter_rate,
+        subie_six_meter_rate,
+        subie_twelve_meter_rate
+      FROM m5_driver_rate
+      WHERE LOWER(TRIM(COALESCE(startingpoint, ''))) = LOWER(TRIM(COALESCE($1, '')))
+        AND LOWER(TRIM(COALESCE(destination, ''))) = LOWER(TRIM(COALESCE($2, '')))
+        AND ($5::int IS NULL OR m5ratekey != $5)
+        AND (
+          -- Overlap condition: new effective_from falls within existing range
+          (effective_from <= $3 AND (effective_to IS NULL OR effective_to >= $3))
+          OR
+          -- Overlap condition: new effective_to falls within existing range (if provided)
+          ($4::date IS NOT NULL AND effective_from <= $4 AND (effective_to IS NULL OR effective_to >= $4))
+          OR
+          -- Overlap condition: new range completely covers existing range
+          (effective_from >= $3 AND ($4::date IS NULL OR effective_to IS NULL OR effective_to <= $4))
+        )
+      ORDER BY effective_from ASC
+    `
+    
+    const result = await client.query(query, [
+      startingpoint,
+      destination,
+      effectiveFrom,
+      effectiveTo,
+      excludeRateId
+    ])
+    
+    return {
+      success: true,
+      hasOverlaps: result.rows.length > 0,
+      overlappingRates: result.rows,
+      message: result.rows.length > 0 
+        ? `Warning: ${result.rows.length} overlapping rate(s) found for this route and date range`
+        : 'No overlapping rates found'
+    }
+  } catch (err) {
+    console.error(`Error checking rate date overlaps:`, err)
+    throw err
+  } finally {
+    if (client) client.release()
+  }
+}
+
 export { getAllDriverRates, getDriverRateById, createDriverRate, updateDriverRate, deleteDriverRate, getDriverRateUsage }
 
-// Refresh legs_m2.driverrate for a set of instructions using a specific driver rate ID
-// The update respects container_type (6m/12m) and driver role (subbie vs normal)
-// and only applies to instructions that are In Progress.
+// Refresh legs_m2.driverrate for a set of instructions, respecting effective dates.
+// For each leg, the rate is looked up using the leg's own date so that legs in different
+// rate periods within the same instruction each receive the correct rate version.
 export const refreshDriverRateLegsForInstructions = async (rateId, instructionIds) => {
   if (!Array.isArray(instructionIds) || instructionIds.length === 0) {
     return { success: true, updated: 0 }
@@ -400,41 +572,68 @@ export const refreshDriverRateLegsForInstructions = async (rateId, instructionId
   let client
   try {
     client = await pool.connect()
+
+    // Resolve the route for this rate record
+    const rateRecord = await client.query(
+      'SELECT startingpoint, destination FROM m5_driver_rate WHERE m5ratekey = $1',
+      [Number(rateId)]
+    )
+    if (!rateRecord.rows.length) {
+      return { success: false, updated: 0 }
+    }
+    const { startingpoint, destination } = rateRecord.rows[0]
+
+    // Fetch all legs on the affected in-progress instructions that match the route,
+    // including the driver's role and the container type for rate field selection.
+    const legsResult = await client.query(
+      `SELECT
+         l.legkey,
+         l.driverid,
+         l.containernumber,
+         l.date,
+         COALESCE(e.roleid, 5) AS roleid,
+         LOWER(TRIM(COALESCE(c.container_type, '6m'))) AS container_type
+       FROM legs_m2 l
+       INNER JOIN m1_controller mc ON mc.m1key = l.m1key
+       LEFT JOIN m5_employee e ON e.userid = l.driverid
+       LEFT JOIN container c
+         ON LOWER(TRIM(COALESCE(c.containernum::text, ''))) = LOWER(TRIM(COALESCE(l.containernumber, '')))
+         AND c.m1key = l.m1key
+       WHERE l.m1key = ANY($1::int[])
+         AND LOWER(COALESCE(mc.status, '')) = 'in progress'
+         AND LOWER(TRIM(COALESCE(l.startingpoint, ''))) = LOWER(TRIM($2))
+         AND LOWER(TRIM(COALESCE(l.destination, ''))) = LOWER(TRIM($3))
+         AND l.date IS NOT NULL`,
+      [instructionIds.map((v) => Number(v)), startingpoint, destination]
+    )
+
     await client.query('BEGIN')
 
-    const query = `
-      WITH target_instructions AS (
-        SELECT m1key
-        FROM m1_controller
-        WHERE m1key = ANY($2::int[])
-          AND LOWER(COALESCE(status, '')) = 'in progress'
-      )
-      UPDATE public.legs_m2 l
-      SET driverrate = CASE
-        WHEN COALESCE(e.roleid, 5) <> 6 AND LOWER(TRIM(COALESCE(c.container_type, ''))) = '6m'
-          THEN dr.driver_six_meter_rate
-        WHEN COALESCE(e.roleid, 5) <> 6 AND LOWER(TRIM(COALESCE(c.container_type, ''))) = '12m'
-          THEN dr.driver_twelve_meter_rate
-        WHEN e.roleid = 6 AND LOWER(TRIM(COALESCE(c.container_type, ''))) = '6m'
-          THEN dr.subie_six_meter_rate
-        WHEN e.roleid = 6 AND LOWER(TRIM(COALESCE(c.container_type, ''))) = '12m'
-          THEN dr.subie_twelve_meter_rate
-        ELSE l.driverrate
-      END
-      FROM target_instructions ti
-      JOIN public.container c ON c.m1key = ti.m1key
-      LEFT JOIN public.m5_employee e ON TRUE
-      JOIN public.m5_driver_rate dr ON dr.m5ratekey = $1
-      WHERE l.m1key = ti.m1key
-        AND LOWER(TRIM(COALESCE(c.containernum, ''))) = LOWER(TRIM(COALESCE(l.containernumber, '')))
-        AND e.userid = l.driverid
-        AND LOWER(TRIM(COALESCE(dr.startingpoint, ''))) = LOWER(TRIM(COALESCE(l.startingpoint, '')))
-        AND LOWER(TRIM(COALESCE(dr.destination, ''))) = LOWER(TRIM(COALESCE(l.destination, '')))
-    `
+    let updated = 0
+    for (const leg of legsResult.rows) {
+      const legDate = leg.date instanceof Date
+        ? leg.date.toISOString().split('T')[0]
+        : leg.date
 
-    const result = await client.query(query, [Number(rateId), instructionIds.map((v) => Number(v))])
+      const isSubcontractor = leg.roleid === 6
+      const containerType = leg.container_type || '6m'
+
+      try {
+        const rateResult = await getRateForLegDate(startingpoint, destination, legDate, isSubcontractor, containerType)
+        if (rateResult.success && rateResult.data?.applicable_rate != null) {
+          await client.query(
+            'UPDATE legs_m2 SET driverrate = $1 WHERE legkey = $2',
+            [rateResult.data.applicable_rate, leg.legkey]
+          )
+          updated++
+        }
+      } catch (legErr) {
+        console.error(`Skipping leg ${leg.legkey} during rate refresh:`, legErr.message)
+      }
+    }
+
     await client.query('COMMIT')
-    return { success: true, updated: result.rowCount }
+    return { success: true, updated }
   } catch (err) {
     if (client) await client.query('ROLLBACK')
     throw err

@@ -17,21 +17,11 @@ export const fetchRate = async ({
   setLegs,
   legs,
   employeeDrivers,
-  rates,
   setRates,
   ratesRouteKeyRef,
+  legDate = null,
 }) => {
-  console.log(
-    `fetchRate called with: startingPoint=${startingPoint}, destination=${destination}`
-  );
-
-  // For shipment type 4 (cross-haul break bulk), driver rates are manually
-  // maintained in legs_m2 and must not be overridden by automatic route rates.
-  if (shipmentType === 4) {
-    console.log("Shipment type 4 detected - skipping automatic rate fetch");
-    return Promise.resolve();
-  }
-
+  if (shipmentType === 4) return Promise.resolve();
   if (!startingPoint || !destination) return Promise.resolve();
 
   const resolvedTargetLegIndex =
@@ -39,110 +29,54 @@ export const fetchRate = async ({
       ? targetLegIndex
       : currentLagIndex;
 
-  const routeKey = `${startingPoint}-${destination}`;
+  // baseRouteKey guards against cross-route contamination in ratesRouteKeyRef.
+  // routeKey includes the date so a date change bypasses the noRatesRoutes cache.
+  const baseRouteKey = `${startingPoint}-${destination}`;
+  const routeKey = legDate ? `${baseRouteKey}-${legDate}` : baseRouteKey;
+
+  const applyNoRate = () => {
+    if (
+      legSwitchIdRef.current === requestId &&
+      currentLegIndexRef.current === resolvedTargetLegIndex
+    ) {
+      setFormData((prev) => ({ ...prev, driverRate: "0" }));
+      setDrivers((prevDrivers) => {
+        if (!Array.isArray(prevDrivers) || prevDrivers.length === 0) return prevDrivers;
+        return prevDrivers.map((driver) => ({
+          ...driver,
+          driverRate: "0",
+          isAbnormal: driver.container_type === "abnormal" || driver.isAbnormal,
+        }));
+      });
+    }
+    if (
+      resolvedTargetLegIndex !== null &&
+      resolvedTargetLegIndex !== undefined &&
+      legSwitchIdRef.current === requestId &&
+      currentLegIndexRef.current === resolvedTargetLegIndex
+    ) {
+      const updatedLegs = [...legs];
+      updatedLegs[resolvedTargetLegIndex] = {
+        ...updatedLegs[resolvedTargetLegIndex],
+        driverRate: "0",
+      };
+      setLegs(updatedLegs);
+    }
+  };
 
   try {
     setRateError("");
 
     if (noRatesRoutes.has(routeKey)) {
-      console.log(`Route ${routeKey} is known to have no rates, skipping fetch`);
-      // Only apply if still on same leg and request
-      if (
-        legSwitchIdRef.current === requestId &&
-        currentLegIndexRef.current === resolvedTargetLegIndex
-      ) {
-        setFormData((prev) => ({
-          ...prev,
-          driverRate: "0",
-        }));
-        setDrivers((prevDrivers) => {
-          if (!Array.isArray(prevDrivers) || prevDrivers.length === 0)
-            return prevDrivers;
-          return prevDrivers.map((driver) => ({
-            ...driver,
-            driverRate: "0",
-            isAbnormal: driver.container_type === "abnormal" || driver.isAbnormal,
-          }));
-        });
-      }
-      // Update legs state for current leg
-      if (
-        resolvedTargetLegIndex !== null &&
-        resolvedTargetLegIndex !== undefined &&
-        legSwitchIdRef.current === requestId &&
-        currentLegIndexRef.current === resolvedTargetLegIndex
-      ) {
-        const updatedLegs = [...legs];
-        updatedLegs[resolvedTargetLegIndex] = {
-          ...updatedLegs[resolvedTargetLegIndex],
-          driverRate: "0",
-        };
-        setLegs(updatedLegs);
-      }
+      applyNoRate();
       return Promise.resolve();
     }
 
-    console.log(
-      `Sending request to /api/driver-rates-with-subbie with params:`,
-      {
-        startingpoint: startingPoint,
-        destination: destination,
-      }
-    );
     const response = await api.get("/api/driver-rates-with-subbie", {
-      params: {
-        startingpoint: startingPoint,
-        destination: destination,
-      },
+      params: { startingpoint: startingPoint, destination, legDate },
     });
 
-    // Handle 404 as a successful case since no rates are a valid scenario
-    if (response.status === 404) {
-      setRateError("Driver rate not available for this route");
-      setNoRatesRoutes((prev) => {
-        const newSet = new Set(prev);
-        newSet.add(routeKey);
-        return newSet;
-      });
-      console.log(`Added route ${routeKey} to noRatesRoutes set`);
-      // Only apply if still on same leg and request
-      if (
-        legSwitchIdRef.current === requestId &&
-        currentLegIndexRef.current === resolvedTargetLegIndex
-      ) {
-        setFormData((prev) => ({
-          ...prev,
-          driverRate: "0",
-        }));
-        setDrivers((prevDrivers) => {
-          if (!Array.isArray(prevDrivers) || prevDrivers.length === 0)
-            return prevDrivers;
-          return prevDrivers.map((driver) => ({
-            ...driver,
-            driverRate: "0",
-            isAbnormal: driver.container_type === "abnormal" || driver.isAbnormal,
-          }));
-        });
-      }
-      // Update legs state for current leg
-      if (
-        resolvedTargetLegIndex !== null &&
-        resolvedTargetLegIndex !== undefined &&
-        legSwitchIdRef.current === requestId &&
-        currentLegIndexRef.current === resolvedTargetLegIndex
-      ) {
-        const updatedLegs = [...legs];
-        updatedLegs[resolvedTargetLegIndex] = {
-          ...updatedLegs[resolvedTargetLegIndex],
-          driverRate: "0",
-        };
-        setLegs(updatedLegs);
-      }
-      return Promise.resolve();
-    }
-
     const data = response.data;
-    console.log("Rates from backend:", data);
 
     setNoRatesRoutes((prev) => {
       const newSet = new Set(prev);
@@ -157,15 +91,13 @@ export const fetchRate = async ({
       subbie_twelve_meter: data.subie_twelve_meter_rate || 0,
     };
 
-    console.log("Setting new rates:", newRates);
-    ratesRouteKeyRef.current = routeKey;
+    ratesRouteKeyRef.current = baseRouteKey;
     setRates(newRates);
 
-    // Only apply if still on same leg and request
     if (
       legSwitchIdRef.current === requestId &&
       currentLegIndexRef.current === resolvedTargetLegIndex &&
-      ratesRouteKeyRef.current === routeKey
+      ratesRouteKeyRef.current === baseRouteKey
     ) {
       setFormData((prev) => ({
         ...prev,
@@ -175,7 +107,6 @@ export const fetchRate = async ({
             : "0",
       }));
 
-      // Only update driver rates with meter rates if instruction is not completed
       if (!isCompleted) {
         setDrivers((prevDrivers) => {
           if (!Array.isArray(prevDrivers) || prevDrivers.length === 0)
@@ -183,8 +114,6 @@ export const fetchRate = async ({
 
           return prevDrivers.map((driver) => {
             const newDriver = { ...driver };
-
-            // Check if driver is a subcontractor (roleid = 6)
             const isSubcontractor =
               employeeDrivers.find((d) => d.userid.toString() === driver.driverid)
                 ?.roleid === 6;
@@ -198,11 +127,8 @@ export const fetchRate = async ({
                 ? data.driver_twelve_meter_rate.toString()
                 : "0";
             } else if (newDriver.container_type === "abnormal") {
-              // For abnormal container types, keep existing rate or set to 0
-              if (!newDriver.driverRate) {
-                newDriver.driverRate = "0";
-              }
-              newDriver.isAbnormal = true; // Mark as abnormal to allow editing
+              if (!newDriver.driverRate) newDriver.driverRate = "0";
+              newDriver.isAbnormal = true;
             } else {
               newDriver.driverRate = isSubcontractor
                 ? data.subie_six_meter_rate
@@ -219,7 +145,6 @@ export const fetchRate = async ({
       }
     }
 
-    // Update legs state for current leg
     if (
       resolvedTargetLegIndex !== null &&
       resolvedTargetLegIndex !== undefined &&
@@ -236,32 +161,34 @@ export const fetchRate = async ({
 
     return Promise.resolve();
   } catch (error) {
+    // 404 means no rate exists for this route+date — treat as valid "no rate" scenario
+    if (error.response?.status === 404) {
+      setRateError("Driver rate not available for this route");
+      setNoRatesRoutes((prev) => {
+        const newSet = new Set(prev);
+        newSet.add(routeKey);
+        return newSet;
+      });
+      applyNoRate();
+      return Promise.resolve();
+    }
+
     console.error(
       "Unexpected error fetching rate:",
       error.response ? error.response.data : error.message
     );
     setRateError("Unexpected error fetching driver rate");
 
-    setRates({
-      six_meter: 0,
-      twelve_meter: 0,
-      subbie_six_meter: 0,
-      subbie_twelve_meter: 0,
-    });
+    setRates({ six_meter: 0, twelve_meter: 0, subbie_six_meter: 0, subbie_twelve_meter: 0 });
 
-    // Only apply if still on same leg and request
     if (
       legSwitchIdRef.current === requestId &&
       currentLegIndexRef.current === resolvedTargetLegIndex
     ) {
-      ratesRouteKeyRef.current = routeKey;
-      setFormData((prev) => ({
-        ...prev,
-        driverRate: "0",
-      }));
+      ratesRouteKeyRef.current = baseRouteKey;
+      setFormData((prev) => ({ ...prev, driverRate: "0" }));
       setDrivers((prevDrivers) => {
-        if (!Array.isArray(prevDrivers) || prevDrivers.length === 0)
-          return prevDrivers;
+        if (!Array.isArray(prevDrivers) || prevDrivers.length === 0) return prevDrivers;
         return prevDrivers.map((driver) => ({
           ...driver,
           driverRate: "0",
@@ -270,7 +197,6 @@ export const fetchRate = async ({
       });
     }
 
-    // Update legs state for current leg
     if (
       resolvedTargetLegIndex !== null &&
       resolvedTargetLegIndex !== undefined &&

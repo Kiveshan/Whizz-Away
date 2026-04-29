@@ -114,7 +114,7 @@ export const getDriversSubHandler = async (req, res) => {
 };
 
 export const getDriverRatesWithSubbieHandler = async (req, res) => {
-  const { startingpoint, destination, containerType } = req.query;
+  const { startingpoint, destination, containerType, legDate } = req.query;
   console.log(
     `Route /api/driver-rates-with-subbie was accessed with params:`,
     req.query
@@ -125,11 +125,12 @@ export const getDriverRatesWithSubbieHandler = async (req, res) => {
       .json({ error: "Starting point and destination are required" });
   }
   try {
-    const rateData = await getDriverRatesWithSubbie(startingpoint, destination);
+    const rateData = await getDriverRatesWithSubbie(startingpoint, destination, legDate || null);
+    
     if (!rateData) {
       return res.status(404).json({
         error: "Rate not found for the given route",
-        message: `No rate found for route from ${startingpoint} to ${destination}`,
+        message: `No rate found for route from ${startingpoint} to ${destination}${legDate ? ' effective on ' + legDate : ''}`,
       });
     }
     res.status(200).json(rateData);

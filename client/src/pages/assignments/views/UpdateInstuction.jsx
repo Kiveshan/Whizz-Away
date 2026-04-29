@@ -191,6 +191,11 @@ const [weightUnit, setWeightUnit] = useState('kg');
   });
   const ratesRouteKeyRef = useRef(null);
 
+  // Representative date used for rate pre-population when starting point or destination changes.
+  // Seeded from the leg's first driver date on leg switch so new route selections use the
+  // historically correct rate period rather than defaulting to today.
+  const [legRouteDate, setLegRouteDate] = useState("");
+
   const handleMoveLeg = async (fromIndex, toIndex) => {
     if (isCompleted) return;
     if (fromIndex === toIndex) return;
@@ -459,7 +464,7 @@ useEffect(() => {
 
   // Update the fetchRate function to return a Promise so we can chain .then() calls
   // Update fetchRate to use Axios
-  const fetchRate = async (startingPoint, destination, targetLegIndex = currentLagIndex, requestId = legSwitchIdRef.current) => {
+  const fetchRate = async (startingPoint, destination, targetLegIndex = currentLagIndex, requestId = legSwitchIdRef.current, legDate = null) => {
     return fetchRateService({
       api,
       startingPoint,
@@ -479,9 +484,9 @@ useEffect(() => {
       setLegs,
       legs,
       employeeDrivers,
-      rates,
       setRates,
       ratesRouteKeyRef,
+      legDate,
     });
   };
 
@@ -631,51 +636,8 @@ const newDriver = {
         setDrivers(updatedDrivers);
       }
 
-      // Then fetch new rates
-      fetchRate(startingPoint, formData.destination, currentLagIndex, legSwitchIdRef.current).then(() => {
-        console.log("Rates updated after starting point change");
-
-        // Force update driver rates based on the new rates
-        if (drivers.length > 0) {
-          const updatedDrivers = drivers.map((driver) => {
-            const newDriver = { ...driver };
-
-            // Check if driver is a subcontractor (roleid = 6)
-            const isSubcontractor =
-              employeeDrivers.find(
-                (d) => d.userid.toString() === driver.driverid
-              )?.roleid === 6;
-
-            if (newDriver.container_type === "12m") {
-              newDriver.driverRate = isSubcontractor
-                ? rates.subbie_twelve_meter
-                  ? rates.subbie_twelve_meter.toString()
-                  : "0"
-                : rates.twelve_meter
-                ? rates.twelve_meter.toString()
-                : "0";
-            } else if (newDriver.container_type === "abnormal") {
-              // For abnormal container types, keep existing rate or set to 0
-              if (!newDriver.driverRate) {
-                newDriver.driverRate = "0";
-              }
-              newDriver.isAbnormal = true; // Mark as abnormal to allow editing
-            } else {
-              newDriver.driverRate = isSubcontractor
-                ? rates.subbie_six_meter
-                  ? rates.subbie_six_meter.toString()
-                  : "0"
-                : rates.six_meter
-                ? rates.six_meter.toString()
-                : "0";
-            }
-
-            return newDriver;
-          });
-
-          setDrivers(updatedDrivers);
-        }
-      });
+      // Then fetch new rates, using legRouteDate so the correct rate period is loaded
+      fetchRate(startingPoint, formData.destination, currentLagIndex, legSwitchIdRef.current, legRouteDate || null);
     }
 
     // Update the current leg if one is selected
@@ -774,50 +736,7 @@ const newDriver = {
         setDrivers(updatedDrivers);
       }
 
-      fetchRate(formData.startingPoint, destination, currentLagIndex, legSwitchIdRef.current).then(() => {
-        console.log("Rates updated after destination change");
-
-        // Force update driver rates based on the new rates
-        if (drivers.length > 0) {
-          const updatedDrivers = drivers.map((driver) => {
-            const newDriver = { ...driver };
-
-            // Check if driver is a subcontractor (roleid = 6)
-            const isSubcontractor =
-              employeeDrivers.find(
-                (d) => d.userid.toString() === driver.driverid
-              )?.roleid === 6;
-
-            if (newDriver.container_type === "12m") {
-              newDriver.driverRate = isSubcontractor
-                ? rates.subbie_twelve_meter
-                  ? rates.subbie_twelve_meter.toString()
-                  : "0"
-                : rates.twelve_meter
-                ? rates.twelve_meter.toString()
-                : "0";
-            } else if (newDriver.container_type === "abnormal") {
-              // For abnormal container types, keep existing rate or set to 0
-              if (!newDriver.driverRate) {
-                newDriver.driverRate = "0";
-              }
-              newDriver.isAbnormal = true; // Mark as abnormal to allow editing
-            } else {
-              newDriver.driverRate = isSubcontractor
-                ? rates.subbie_six_meter
-                  ? rates.subbie_six_meter.toString()
-                  : "0"
-                : rates.six_meter
-                ? rates.six_meter.toString()
-                : "0";
-            }
-
-            return newDriver;
-          });
-
-          setDrivers(updatedDrivers);
-        }
-      });
+      fetchRate(formData.startingPoint, destination, currentLagIndex, legSwitchIdRef.current, legRouteDate || null);
     }
 
     // Update the current leg if one is selected
@@ -828,6 +747,73 @@ const newDriver = {
         destination,
       };
       setLegs(updatedLegs);
+    }
+  };
+
+  // Handle driver date change — fetch only for the specific driver that changed.
+  // Using a shared rates state here would overwrite all other drivers' rates,
+  // which breaks legs where different drivers straddle a rate change boundary.
+  const handleDriverDateChange = async (driverIndex, newDate) => {
+    if (!formData.startingPoint || !formData.destination || !newDate) return;
+
+    try {
+      const response = await api.get("/api/driver-rates-with-subbie", {
+        params: {
+          startingpoint: formData.startingPoint,
+          destination: formData.destination,
+          legDate: newDate,
+        },
+      });
+
+      const data = response.data;
+
+      setDrivers((prevDrivers) => {
+        if (!Array.isArray(prevDrivers) || !prevDrivers[driverIndex]) return prevDrivers;
+        const driver = prevDrivers[driverIndex];
+
+        // Abnormal rates are manually entered — never auto-update them.
+        if (driver.container_type === "abnormal") return prevDrivers;
+
+        const isSubcontractor =
+          employeeDrivers.find((d) => d.userid.toString() === driver.driverid)
+            ?.roleid === 6;
+
+        let newRate;
+        if (driver.container_type === "12m") {
+          newRate = isSubcontractor
+            ? data.subie_twelve_meter_rate
+            : data.driver_twelve_meter_rate;
+        } else {
+          newRate = isSubcontractor
+            ? data.subie_six_meter_rate
+            : data.driver_six_meter_rate;
+        }
+
+        const updated = [...prevDrivers];
+        updated[driverIndex] = {
+          ...driver,
+          driverRate: newRate != null ? newRate.toString() : "0",
+          _rateEffectiveFrom: data.effective_from || null,
+          _rateEffectiveTo: data.effective_to || null,
+        };
+        return updated;
+      });
+    } catch (error) {
+      if (error.response?.status === 404) {
+        setDrivers((prevDrivers) => {
+          if (!Array.isArray(prevDrivers) || !prevDrivers[driverIndex]) return prevDrivers;
+          const updated = [...prevDrivers];
+          updated[driverIndex] = {
+            ...updated[driverIndex],
+            driverRate: "0",
+            _rateEffectiveFrom: null,
+            _rateEffectiveTo: null,
+          };
+          return updated;
+        });
+        return;
+      }
+      console.error("Error fetching rate for date change:", error);
     }
   };
 
@@ -1089,6 +1075,14 @@ const missingItems = await checkContainersReachDropoff(dropoff);
   checkContainersDestination();
 }, [instructionId, legs, instructionContainers, isWeightBased]);
 
+  // Seed legRouteDate from the first driver date on the newly selected leg so that
+  // any subsequent starting-point / destination change fetches the correct rate period.
+  useEffect(() => {
+    if (currentLagIndex === null || !legs[currentLagIndex]) return;
+    const firstDate = legs[currentLagIndex].drivers?.find((d) => d.date)?.date;
+    setLegRouteDate(firstDate ? firstDate.toString().split("T")[0] : "");
+  }, [currentLagIndex]);
+
   useEffect(() => {
   // Set switching flag when leg changes
   setIsLegSwitching(true);
@@ -1284,6 +1278,7 @@ useEffect(() => {
           setShowRemoveDriverModal={setShowRemoveDriverModal}
           savedMessage={savedMessage}
           savedLegs={savedLegs}
+          onDateChange={handleDriverDateChange}
         />
       </div>
       <ContainerWarningModal
@@ -1351,16 +1346,10 @@ useEffect(() => {
                 driverrate: calculateLegDriverRate(updatedDrivers, rates, shipmentType),
                 m1key: instructionId,
                 drivers: updatedDrivers.map((driver) => {
-                  let driverRateToSave = "0";
-
-                  if (driver.container_type === "12m") {
-                    driverRateToSave = rates.twelve_meter.toString();
-                  } else if (driver.container_type === "abnormal") {
-                    driverRateToSave = driver.driverRate || "0";
-                  } else {
-
-                    driverRateToSave = rates.six_meter.toString();
-                  }
+                  // Use the per-driver rate already on the object (set via
+                  // handleDriverDateChange or fetchRate) — reflects the correct
+                  // date-aware rate rather than the shared rates snapshot.
+                  const driverRateToSave = driver.driverRate || "0";
                   console.log(
                     `Driver ${driver.driverid} with container type ${driver.container_type} has rate: ${driverRateToSave}`
                   );

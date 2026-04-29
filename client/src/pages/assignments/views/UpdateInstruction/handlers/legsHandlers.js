@@ -212,9 +212,6 @@ export const handleSelectLeg = ({
   if (selectedLeg.startingPoint && selectedLeg.destination) {
     const routeKey = `${selectedLeg.startingPoint}-${selectedLeg.destination}`;
     if (noRatesRoutes.has(routeKey)) {
-      console.log(
-        `Route ${routeKey} is known to have no rates, setting rates to 0`
-      );
       setRates({
         six_meter: 0,
         twelve_meter: 0,
@@ -224,11 +221,11 @@ export const handleSelectLeg = ({
       return;
     }
 
-    console.log(
-      "Fetching rates after selecting leg:",
-      selectedLeg.startingPoint,
-      selectedLeg.destination
-    );
-    fetchRate(selectedLeg.startingPoint, selectedLeg.destination, index, requestId);
+    // Use the first driver's date so the shared rates state reflects the
+    // historical rate period for this leg, not always today's rate.
+    const firstDriverDate =
+      selectedLeg.drivers?.find((d) => d.date)?.date || null;
+
+    fetchRate(selectedLeg.startingPoint, selectedLeg.destination, index, requestId, firstDriverDate);
   }
 };

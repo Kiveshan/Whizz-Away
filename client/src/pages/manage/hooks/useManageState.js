@@ -221,6 +221,8 @@ const initialState = {
     driver_twelve_meter_rate: "",
     subie_six_meter_rate: "",
     subie_twelve_meter_rate: "",
+    effective_from: new Date().toISOString().split('T')[0],
+    effective_to: "",
   },
 
   newSubcontractor: {

@@ -108,6 +108,8 @@ const createDriverRateHandler = async (req, res) => {
       driver_twelve_meter_rate,
       subie_six_meter_rate,
       subie_twelve_meter_rate,
+      effective_from,
+      effective_to,
     } = req.body
 
     // Validate required fields (only starting point and destination)
@@ -137,6 +139,10 @@ const createDriverRateHandler = async (req, res) => {
       return res.status(400).json({ error: "All rates must be valid numbers if provided" })
     }
 
+    if (effective_from && effective_to && effective_to < effective_from) {
+      return res.status(400).json({ error: "effective_to must be on or after effective_from" })
+    }
+
     console.log("Creating driver rate with data:", req.body)
     const newDriverRate = await createDriverRate({
       startingpoint,
@@ -145,6 +151,8 @@ const createDriverRateHandler = async (req, res) => {
       driver_twelve_meter_rate,
       subie_six_meter_rate,
       subie_twelve_meter_rate,
+      effective_from,
+      effective_to,
     })
     res.status(201).json(newDriverRate)
   } catch (err) {
@@ -163,6 +171,8 @@ const updateDriverRateHandler = async (req, res) => {
       driver_twelve_meter_rate,
       subie_six_meter_rate,
       subie_twelve_meter_rate,
+      effective_from,
+      effective_to,
     } = req.body
 
     // Validate ID
@@ -192,6 +202,10 @@ const updateDriverRateHandler = async (req, res) => {
       return res.status(400).json({ error: "All rates must be valid numbers if provided" })
     }
 
+    if (effective_from && effective_to && effective_to < effective_from) {
+      return res.status(400).json({ error: "effective_to must be on or after effective_from" })
+    }
+
     console.log(`Updating driver rate ID ${id}`)
     const result = await updateDriverRate(id, {
       startingpoint,
@@ -200,6 +214,8 @@ const updateDriverRateHandler = async (req, res) => {
       driver_twelve_meter_rate,
       subie_six_meter_rate,
       subie_twelve_meter_rate,
+      effective_from,
+      effective_to,
     })
     if (!result.success) {
       return res.status(404).json({ message: result.message })

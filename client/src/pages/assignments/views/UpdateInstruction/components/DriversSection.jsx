@@ -28,6 +28,7 @@ export default function DriversSection({
   setShowRemoveDriverModal,
   savedMessage,
   savedLegs,
+  onDateChange,
 }) {
   const selectableEmployeeDrivers = employeeDrivers.filter((driver) => {
     if (driver?.roleid === 6) {
@@ -473,6 +474,18 @@ export default function DriversSection({
                               "Updated driver data:",
                               updatedDrivers[index]
                             );
+
+                            // If the driver already has a date, re-fetch the date-aware rate
+                            // so the container type change picks up the correct rate version.
+                            // Skip for abnormal — those rates are manually entered.
+                            if (
+                              containerValue &&
+                              updatedDrivers[index].date &&
+                              updatedDrivers[index].container_type?.toLowerCase() !== "abnormal" &&
+                              onDateChange
+                            ) {
+                              onDateChange(index, updatedDrivers[index].date);
+                            }
                           }}
                         />
                       )}
@@ -537,13 +550,11 @@ export default function DriversSection({
                           padding: "0.5rem",
                           border: "1px solid #d1d5db",
                           borderRadius: "0.375rem",
-                          backgroundColor: (entry.isAbnormal || isWeightBased)
-                            ? "white"
-                            : "#f3f4f6",
+                          backgroundColor: isCompleted ? "#f3f4f6" : "white",
                         }}
                         value={entry.driverRate || ""}
                         onChange={(e) => {
-                          if (isCompleted || (!entry.isAbnormal && !isWeightBased)) return;
+                          if (isCompleted) return;
 
                           const value = e.target.value;
                           if (value === "" || /^[0-9]*\.?[0-9]*$/.test(value)) {
@@ -561,8 +572,14 @@ export default function DriversSection({
                             setDrivers(updatedDrivers);
                           }
                         }}
-                        readOnly={!entry.isAbnormal && !isWeightBased}
+                        readOnly={isCompleted}
                       />
+                      {entry._rateEffectiveFrom && (
+                        <small style={{ color: "#6b7280", fontSize: "0.7rem", marginTop: "2px", display: "block" }}>
+                          Rate from {entry._rateEffectiveFrom.split("T")[0]}
+                          {entry._rateEffectiveTo ? ` to ${entry._rateEffectiveTo.split("T")[0]}` : " (no expiry)"}
+                        </small>
+                      )}
                     </div>
 
                     <div
@@ -605,8 +622,9 @@ export default function DriversSection({
                           }
                           onChange={(e) => {
                             if (isCompleted) return;
+                            const newDate = e.target.value;
                             const updatedDrivers = [...drivers];
-                            updatedDrivers[index].date = e.target.value;
+                            updatedDrivers[index].date = newDate;
 
                             setEditedFields((prev) => ({
                               ...prev,
@@ -619,8 +637,13 @@ export default function DriversSection({
                             setDrivers(updatedDrivers);
                             console.log(
                               `Updated date for driver at index ${index}:`,
-                              e.target.value
+                              newDate
                             );
+
+                            // Trigger rate refetch with new date
+                            if (onDateChange) {
+                              onDateChange(index, newDate);
+                            }
                           }}
                           disabled={isCompleted}
                         />
