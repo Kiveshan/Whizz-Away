@@ -20,6 +20,7 @@ export const fetchRate = async ({
   setRates,
   ratesRouteKeyRef,
   legDate = null,
+  skipDriverUpdate = false,
 }) => {
   if (shipmentType === 4) return Promise.resolve();
   if (!startingPoint || !destination) return Promise.resolve();
@@ -107,7 +108,9 @@ export const fetchRate = async ({
             : "0",
       }));
 
-      if (!isCompleted) {
+      // Only update individual driver rates if not explicitly skipped
+      // (e.g., when switching legs, drivers are already loaded with their correct rates)
+      if (!isCompleted && !skipDriverUpdate) {
         setDrivers((prevDrivers) => {
           if (!Array.isArray(prevDrivers) || prevDrivers.length === 0)
             return prevDrivers;

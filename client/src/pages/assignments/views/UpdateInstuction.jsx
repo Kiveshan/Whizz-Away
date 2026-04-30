@@ -12,6 +12,8 @@ import {
   dedupeDrivers,
   debugDriverData,
   calculateLegDriverRate,
+  isAbnormalContainer,
+  isTwelveMeterContainer,
 } from "./UpdateInstruction/utils";
 import LegTabsBar from "./UpdateInstruction/components/LegTabsBar";
 import RouteHeader from "./UpdateInstruction/components/RouteHeader";
@@ -405,8 +407,6 @@ useEffect(() => {
     return fetchLegsForInstructionService({
       api,
       instructionId,
-      setRates,
-      ratesRouteKeyRef,
       setLegs,
       setSavedLegs,
       setExistingDrivers,
@@ -464,7 +464,7 @@ useEffect(() => {
 
   // Update the fetchRate function to return a Promise so we can chain .then() calls
   // Update fetchRate to use Axios
-  const fetchRate = async (startingPoint, destination, targetLegIndex = currentLagIndex, requestId = legSwitchIdRef.current, legDate = null) => {
+  const fetchRate = async (startingPoint, destination, targetLegIndex = currentLagIndex, requestId = legSwitchIdRef.current, legDate = null, skipDriverUpdate = false) => {
     return fetchRateService({
       api,
       startingPoint,
@@ -487,6 +487,7 @@ useEffect(() => {
       setRates,
       ratesRouteKeyRef,
       legDate,
+      skipDriverUpdate,
     });
   };
 
@@ -772,14 +773,14 @@ const newDriver = {
         const driver = prevDrivers[driverIndex];
 
         // Abnormal rates are manually entered — never auto-update them.
-        if (driver.container_type === "abnormal") return prevDrivers;
+        if (isAbnormalContainer(driver.container_type)) return prevDrivers;
 
         const isSubcontractor =
           employeeDrivers.find((d) => d.userid.toString() === driver.driverid)
             ?.roleid === 6;
 
         let newRate;
-        if (driver.container_type === "12m") {
+        if (isTwelveMeterContainer(driver.container_type)) {
           newRate = isSubcontractor
             ? data.subie_twelve_meter_rate
             : data.driver_twelve_meter_rate;
@@ -800,6 +801,7 @@ const newDriver = {
       });
     } catch (error) {
       if (error.response?.status === 404) {
+        setRateError("Driver rate not available for this route");
         setDrivers((prevDrivers) => {
           if (!Array.isArray(prevDrivers) || !prevDrivers[driverIndex]) return prevDrivers;
           const updated = [...prevDrivers];
@@ -1005,6 +1007,7 @@ const navigateBack = () => {
       employeeDrivers,
       calculateLegDriverRate,
       setDrivers,
+      api,
     });
   };
 
@@ -1112,6 +1115,16 @@ useEffect(() => {
   console.log("Rates changed, updating driver rates:", rates);
   const updatedDrivers = drivers.map((driver) => {
     const newDriver = { ...driver };
+
+    // Preserve existing rates loaded from database - only apply shared rates to new drivers
+    // or drivers without a rate set (e.g., newly added drivers)
+    if (newDriver.driverRate && newDriver.driverRate !== "0" && newDriver.driverRate !== "") {
+      console.log(
+        `Preserving existing rate ${newDriver.driverRate} for driver ${driver.driverid}`
+      );
+      return newDriver;
+    }
+
     const isSubcontractor =
       employeeDrivers.find((d) => d.userid.toString() === driver.driverid)
         ?.roleid === 6;
@@ -1131,7 +1144,7 @@ useEffect(() => {
       }
     }
 
-    if (newDriver.container_type === "12m") {
+    if (isTwelveMeterContainer(newDriver.container_type)) {
       newDriver.driverRate = isSubcontractor
         ? rates.subbie_twelve_meter
           ? rates.subbie_twelve_meter.toString()
@@ -1139,7 +1152,7 @@ useEffect(() => {
         : rates.twelve_meter
         ? rates.twelve_meter.toString()
         : "0";
-    } else if (newDriver.container_type === "abnormal") {
+    } else if (isAbnormalContainer(newDriver.container_type)) {
       // For abnormal container types, keep existing rate or set to 0
       if (!newDriver.driverRate) {
         newDriver.driverRate = "0";

@@ -116,7 +116,8 @@ export default function DriversSection({
                               );
 
                               if (updatedDrivers[index].container_type) {
-                                if (updatedDrivers[index].container_type === "12m") {
+                                const ct = (updatedDrivers[index].container_type || "").toLowerCase().trim();
+                                if (ct === "12m") {
                                   updatedDrivers[index].driverRate =
                                     isSubcontractor
                                       ? rates.subbie_twelve_meter
@@ -125,9 +126,7 @@ export default function DriversSection({
                                       : rates.twelve_meter
                                       ? rates.twelve_meter.toString()
                                       : "0";
-                                } else if (
-                                  updatedDrivers[index].container_type === "abnormal"
-                                ) {
+                                } else if (ct === "abnormal") {
                                   if (!updatedDrivers[index].driverRate) {
                                     updatedDrivers[index].driverRate = "0";
                                   }
@@ -163,6 +162,16 @@ export default function DriversSection({
                               `Updated driver at index ${index}:`,
                               updatedDrivers[index]
                             );
+
+                            // Re-fetch a date-aware rate using this driver's existing date
+                            // so changing the driver picks up the correct rate period.
+                            if (
+                              updatedDrivers[index].date &&
+                              (updatedDrivers[index].container_type || "").toLowerCase().trim() !== "abnormal" &&
+                              onDateChange
+                            ) {
+                              onDateChange(index, updatedDrivers[index].date);
+                            }
                           }
                         }}
                         disabled={isCompleted}
@@ -442,7 +451,7 @@ export default function DriversSection({
                                   "Setting abnormal rate (editable):",
                                   updatedDrivers[index].driverRate
                                 );
-                              } else if (containerType === "12m") {
+                              } else if (containerType.toLowerCase() === "12m") {
                                 updatedDrivers[index].driverRate = twelveMeterRate;
                                 updatedDrivers[index].isAbnormal = false;
                                 console.log("Setting 12m rate:", twelveMeterRate);

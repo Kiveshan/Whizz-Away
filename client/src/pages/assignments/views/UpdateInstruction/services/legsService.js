@@ -142,8 +142,6 @@ export const refreshLegData = async ({
 export const fetchLegsForInstruction = async ({
   api,
   instructionId,
-  setRates,
-  ratesRouteKeyRef,
   setLegs,
   setSavedLegs,
   setExistingDrivers,
@@ -162,42 +160,6 @@ export const fetchLegsForInstruction = async ({
     const response = await api.get(`/legs/${instructionId}`);
     const data = response.data;
     console.log("Legs data from server:", JSON.stringify(data, null, 2));
-
-    if (data.length > 0 && data[0].startingpoint && data[0].destination) {
-      try {
-        console.log(
-          "Fetching rates for route:",
-          data[0].startingpoint,
-          data[0].destination
-        );
-        const rateResponse = await api.get("/api/driver-rates-with-subbie", {
-          params: {
-            startingpoint: data[0].startingpoint,
-            destination: data[0].destination,
-          },
-        });
-
-        const rateData = rateResponse.data;
-        console.log("Fetched rates:", rateData);
-
-        ratesRouteKeyRef.current = `${data[0].startingpoint}-${data[0].destination}`;
-        setRates({
-          six_meter: rateData.driver_six_meter_rate || 0,
-          twelve_meter: rateData.driver_twelve_meter_rate || 0,
-          subbie_six_meter: rateData.subie_six_meter_rate || 0,
-          subbie_twelve_meter: rateData.subie_twelve_meter_rate || 0,
-        });
-
-        console.log("Updated rates state:", {
-          six_meter: rateData.driver_six_meter_rate || 0,
-          twelve_meter: rateData.driver_twelve_meter_rate || 0,
-          subbie_six_meter: rateData.subie_six_meter_rate || 0,
-          subbie_twelve_meter: rateData.subie_twelve_meter_rate || 0,
-        });
-      } catch (error) {
-        console.error("Error fetching rates:", error);
-      }
-    }
 
     const containerResponse = await api.get(
       `/containers/instruction/${instructionId}`

@@ -109,3 +109,11 @@ export const calculateLegDriverRate = (drivers, rates, shipmentType) => {
   }
   return Number.parseFloat(rates.six_meter) || 0;
 };
+
+export const isAbnormalContainer = (containerType) => {
+  return containerType === "abnormal";
+};
+
+export const isTwelveMeterContainer = (containerType) => {
+  return containerType === "12m";
+};

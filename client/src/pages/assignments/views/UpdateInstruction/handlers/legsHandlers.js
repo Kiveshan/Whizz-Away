@@ -210,7 +210,17 @@ export const handleSelectLeg = ({
   });
 
   if (selectedLeg.startingPoint && selectedLeg.destination) {
-    const routeKey = `${selectedLeg.startingPoint}-${selectedLeg.destination}`;
+    // Use the first driver's date so the shared rates state reflects the
+    // historical rate period for this leg, not always today's rate.
+    const firstDriverDate =
+      selectedLeg.drivers?.find((d) => d.date)?.date || null;
+
+    // Use date-aware cache key for consistency with ratesService.js
+    const baseRouteKey = `${selectedLeg.startingPoint}-${selectedLeg.destination}`;
+    const routeKey = firstDriverDate
+      ? `${baseRouteKey}-${firstDriverDate}`
+      : baseRouteKey;
+
     if (noRatesRoutes.has(routeKey)) {
       setRates({
         six_meter: 0,
@@ -221,11 +231,6 @@ export const handleSelectLeg = ({
       return;
     }
 
-    // Use the first driver's date so the shared rates state reflects the
-    // historical rate period for this leg, not always today's rate.
-    const firstDriverDate =
-      selectedLeg.drivers?.find((d) => d.date)?.date || null;
-
-    fetchRate(selectedLeg.startingPoint, selectedLeg.destination, index, requestId, firstDriverDate);
+    fetchRate(selectedLeg.startingPoint, selectedLeg.destination, index, requestId, firstDriverDate, true);
   }
 };
