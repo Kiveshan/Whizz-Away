@@ -605,13 +605,36 @@ export const getLegsByInstructionId = async (instructionId) => {
       l.date,
       e.name AS driver_name,
       e.surname AS driver_surname,
-      c.container_type
+      e.roleid,
+      c.container_type,
+      -- Get the applicable manage rate based on driver role and container type
+      CASE 
+        WHEN e.roleid = 6 AND LOWER(TRIM(COALESCE(c.container_type, '6m'))) = '12m' THEN dr.subie_twelve_meter_rate
+        WHEN e.roleid = 6 THEN dr.subie_six_meter_rate
+        WHEN LOWER(TRIM(COALESCE(c.container_type, '6m'))) = '12m' THEN dr.driver_twelve_meter_rate
+        ELSE dr.driver_six_meter_rate
+      END as applicable_manage_rate
     FROM 
       legs_m2 l
     LEFT JOIN 
       m5_employee e ON l.driverid = e.userid
     LEFT JOIN
       container c ON l.containernumber = c.containernum AND l.m1key = c.m1key
+    LEFT JOIN LATERAL (
+      -- Get the most recent rate for this route that's effective today
+      SELECT DISTINCT ON (startingpoint, destination)
+        driver_six_meter_rate,
+        driver_twelve_meter_rate,
+        subie_six_meter_rate,
+        subie_twelve_meter_rate
+      FROM m5_driver_rate
+      WHERE LOWER(TRIM(COALESCE(startingpoint, ''))) = LOWER(TRIM(COALESCE(l.startingpoint, '')))
+        AND LOWER(TRIM(COALESCE(destination, ''))) = LOWER(TRIM(COALESCE(l.destination, '')))
+        AND effective_from <= CURRENT_DATE
+        AND (effective_to IS NULL OR effective_to >= CURRENT_DATE)
+      ORDER BY startingpoint, destination, effective_from DESC, m5ratekey DESC
+      LIMIT 1
+    ) dr ON true
     WHERE 
       l.m1key = $1
     ORDER BY 
@@ -644,7 +667,9 @@ export const getLegsByInstructionId = async (instructionId) => {
           ? row.vgm.toString() 
           : (row.containernumber ? row.containernumber.toString() : ""),
         container_type: row.container_type || "",
-        driverRate: row.driverrate ? row.driverrate.toString() : "",
+        driverRate: row.driverrate ? row.driverrate.toString() : "0",
+        _rateNullInManage: row.applicable_manage_rate === null,
+        _debugManageRate: row.applicable_manage_rate,
         date: row.date || null,
         driver_name: row.driver_name || "",
         driver_surname: row.driver_surname || "",

@@ -1,3 +1,5 @@
+import { isAbnormalContainer } from "../utils.js";
+
 export const handleAddLeg = ({
   isCompleted,
   currentLagIndex,
@@ -162,7 +164,7 @@ export const handleSelectLeg = ({
 
   setFormData({
     startingPoint: selectedLeg.startingPoint || "",
-    driverRate: selectedLeg.driverRate || "",
+    driverRate: selectedLeg.driverRate ?? "",
     destination: selectedLeg.destination || "",
   });
 
@@ -180,11 +182,14 @@ export const handleSelectLeg = ({
             ? driver.containernumber.toString()
             : "",
         container_type: driver.container_type || "",
-        driverRate: driver.driverRate || driver.driverate || "",
+        driverRate: driver.driverRate ?? driver.driverate ?? "",
+        _rateNullInManage: driver._rateNullInManage,
+        _rateExplicitlyZero: driver._rateExplicitlyZero,
+        _debugManageRate: driver._debugManageRate,
         date: driver.date || "",
         driver_name: driver.driver_name || "",
         driver_surname: driver.driver_surname || "",
-        isAbnormal: driver.container_type === "abnormal" || driver.isAbnormal,
+        isAbnormal: isAbnormalContainer(driver.container_type) || driver.isAbnormal,
         full_name:
           driver.full_name ||
           (driver.driver_name && driver.driver_surname

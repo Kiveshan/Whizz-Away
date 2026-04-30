@@ -580,7 +580,7 @@ export default function DriversSection({
                           borderRadius: "0.375rem",
                           backgroundColor: isCompleted ? "#f3f4f6" : "white",
                         }}
-                        value={entry.driverRate || ""}
+                        value={entry.driverRate ?? ""}
                         onChange={(e) => {
                           if (isCompleted) return;
 

@@ -1,3 +1,5 @@
+import { isAbnormalContainer, isTwelveMeterContainer } from "../utils.js";
+
 export const fetchRate = async ({
   api,
   startingPoint,
@@ -46,7 +48,9 @@ export const fetchRate = async ({
         return prevDrivers.map((driver) => ({
           ...driver,
           driverRate: "0",
-          isAbnormal: driver.container_type === "abnormal" || driver.isAbnormal,
+          isAbnormal: isAbnormalContainer(driver.container_type) || driver.isAbnormal,
+          _rateExplicitlyZero: true,
+          _rateNullInManage: true,
         }));
       });
     }
@@ -121,25 +125,21 @@ export const fetchRate = async ({
               employeeDrivers.find((d) => d.userid.toString() === driver.driverid)
                 ?.roleid === 6;
 
-            if (newDriver.container_type === "12m") {
-              newDriver.driverRate = isSubcontractor
+            if (isTwelveMeterContainer(newDriver.container_type)) {
+              const rateValue = isSubcontractor
                 ? data.subie_twelve_meter_rate
-                  ? data.subie_twelve_meter_rate.toString()
-                  : "0"
-                : data.driver_twelve_meter_rate
-                ? data.driver_twelve_meter_rate.toString()
-                : "0";
-            } else if (newDriver.container_type === "abnormal") {
+                : data.driver_twelve_meter_rate;
+              newDriver.driverRate = rateValue ? rateValue.toString() : "0";
+              newDriver._rateNullInManage = rateValue == null;
+            } else if (isAbnormalContainer(newDriver.container_type)) {
               if (!newDriver.driverRate) newDriver.driverRate = "0";
               newDriver.isAbnormal = true;
             } else {
-              newDriver.driverRate = isSubcontractor
+              const rateValue = isSubcontractor
                 ? data.subie_six_meter_rate
-                  ? data.subie_six_meter_rate.toString()
-                  : "0"
-                : data.driver_six_meter_rate
-                ? data.driver_six_meter_rate.toString()
-                : "0";
+                : data.driver_six_meter_rate;
+              newDriver.driverRate = rateValue ? rateValue.toString() : "0";
+              newDriver._rateNullInManage = rateValue == null;
             }
 
             return newDriver;
@@ -195,7 +195,9 @@ export const fetchRate = async ({
         return prevDrivers.map((driver) => ({
           ...driver,
           driverRate: "0",
-          isAbnormal: driver.container_type === "abnormal" || driver.isAbnormal,
+          isAbnormal: isAbnormalContainer(driver.container_type) || driver.isAbnormal,
+          _rateExplicitlyZero: true,
+          _rateNullInManage: true,
         }));
       });
     }

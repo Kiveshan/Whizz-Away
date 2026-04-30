@@ -186,7 +186,7 @@ export const handleSave = async ({
       cleanDrivers.map(async (driver) => {
         let driverRateToSave = driver.driverRate || "0";
 
-        if (shipmentType !== 4 && (!driver.driverRate || driver.driverRate === "")) {
+        if (shipmentType !== 4 && (!driver.driverRate || driver.driverRate === "") && !driver._rateNullInManage && !driver._rateExplicitlyZero) {
           const isSubcontractor =
             employeeDrivers.find((d) => d.userid.toString() === driver.driverid)
               ?.roleid === 6;

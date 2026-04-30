@@ -69,9 +69,9 @@ export const calculateLegDriverRate = (drivers, rates, shipmentType) => {
   let abnormalCount = 0;
 
   drivers.forEach((driver) => {
-    if (driver.container_type === "12m") {
+    if (isTwelveMeterContainer(driver.container_type)) {
       twelveMeterCount++;
-    } else if (driver.container_type === "abnormal") {
+    } else if (isAbnormalContainer(driver.container_type)) {
       abnormalCount++;
     } else {
       sixMeterCount++;
@@ -91,10 +91,10 @@ export const calculateLegDriverRate = (drivers, rates, shipmentType) => {
   // This reflects the per-driver date-aware rate rather than the shared rates snapshot.
   const representative = drivers.find((d) =>
     dominantType === "12m"
-      ? d.container_type === "12m"
+      ? isTwelveMeterContainer(d.container_type)
       : dominantType === "abnormal"
-      ? d.container_type === "abnormal"
-      : d.container_type !== "12m" && d.container_type !== "abnormal"
+      ? isAbnormalContainer(d.container_type)
+      : !isTwelveMeterContainer(d.container_type) && !isAbnormalContainer(d.container_type)
   );
 
   if (representative?.driverRate !== undefined && representative?.driverRate !== "") {
@@ -104,16 +104,16 @@ export const calculateLegDriverRate = (drivers, rates, shipmentType) => {
   // Fallback to shared rates if driver rate not yet set on the driver object
   if (dominantType === "12m") return Number.parseFloat(rates.twelve_meter) || 0;
   if (dominantType === "abnormal") {
-    const abnormalDriver = drivers.find((d) => d.container_type === "abnormal");
+    const abnormalDriver = drivers.find((d) => isAbnormalContainer(d.container_type));
     return abnormalDriver ? Number.parseFloat(abnormalDriver.driverRate) || 0 : 0;
   }
   return Number.parseFloat(rates.six_meter) || 0;
 };
 
 export const isAbnormalContainer = (containerType) => {
-  return containerType === "abnormal";
+  return containerType?.toLowerCase() === "abnormal";
 };
 
 export const isTwelveMeterContainer = (containerType) => {
-  return containerType === "12m";
+  return containerType?.toLowerCase() === "12m";
 };

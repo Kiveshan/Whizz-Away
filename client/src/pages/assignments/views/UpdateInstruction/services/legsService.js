@@ -36,11 +36,14 @@ export const refreshLegData = async ({
             legnumber: leg.legnumber,
             startingPoint: leg.startingpoint,
             destination: leg.destination,
-            driverRate: leg.driverrate ? leg.driverrate.toString() : "",
+            driverRate: leg.driverrate != null ? leg.driverrate.toString() : "0",
             drivers: (leg.drivers || []).map((driver) => ({
               ...driver,
               container_type: driver.container_type || "",
-              driverRate: driver.driverRate || driver.driverate || "",
+              driverRate: driver.driverRate != null ? driver.driverRate.toString() : (driver.driverate != null ? driver.driverate.toString() : "0"),
+              _rateNullInManage: driver._rateNullInManage,
+              _rateExplicitlyZero: driver._rateExplicitlyZero,
+              _debugManageRate: driver._debugManageRate,
               isAbnormal: driver.container_type === "abnormal",
             })),
           };
@@ -114,7 +117,7 @@ export const refreshLegData = async ({
           ) {
             setFormData({
               startingPoint: currentLeg.startingPoint || "",
-              driverRate: currentLeg.driverRate || "",
+              driverRate: currentLeg.driverRate,
               destination: currentLeg.destination || "",
             });
 
@@ -228,7 +231,10 @@ export const fetchLegsForInstruction = async ({
             date: driver.date || "",
             driver_name: driver.driver_name || "",
             driver_surname: driver.driver_surname || "",
-            driverRate: driver.driverRate || "",
+            driverRate: driver.driverRate != null ? driver.driverRate.toString() : "0",
+            _rateNullInManage: driver._rateNullInManage,
+            _rateExplicitlyZero: driver._rateExplicitlyZero,
+            _debugManageRate: driver._debugManageRate,
             isAbnormal: containerType === "abnormal",
             full_name:
               driver.full_name ||
@@ -269,7 +275,7 @@ export const fetchLegsForInstruction = async ({
           legnumber: leg.legnumber,
           startingPoint: leg.startingpoint,
           destination: leg.destination,
-          driverRate: leg.driverrate ? leg.driverrate.toString() : "",
+          driverRate: leg.driverrate != null ? leg.driverrate.toString() : "0",
           drivers: normalizedDrivers,
         };
       });
@@ -300,7 +306,7 @@ export const fetchLegsForInstruction = async ({
         setCurrentLagIndex(0);
         setFormData({
           startingPoint: fetchedLegs[0].startingPoint || "",
-          driverRate: fetchedLegs[0].driverRate || "",
+          driverRate: fetchedLegs[0].driverRate,
           destination: fetchedLegs[0].destination || "",
         });
 

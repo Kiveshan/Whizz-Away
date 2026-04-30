@@ -1140,19 +1140,20 @@ useEffect(() => {
   const updatedDrivers = drivers.map((driver) => {
     const newDriver = { ...driver };
 
-    // Preserve existing rates loaded from database - only apply shared rates to new drivers
+    // Preserve any existing rate (including "0") - only apply shared rates to new drivers
     // or drivers without a rate set (e.g., newly added drivers)
-    if (newDriver.driverRate && newDriver.driverRate !== "0" && newDriver.driverRate !== "") {
+    if (newDriver.driverRate !== "" && newDriver.driverRate !== null && newDriver.driverRate !== undefined) {
       console.log(
         `Preserving existing rate ${newDriver.driverRate} for driver ${driver.driverid}`
       );
       return newDriver;
     }
-    
-    // Preserve explicitly zero rates (set when no rate exists for date in gap)
-    if (newDriver._rateExplicitlyZero) {
+
+    // If driver has no rate but flags indicate it should be zero, set to "0"
+    if (newDriver._rateExplicitlyZero || newDriver._rateNullInManage) {
+      newDriver.driverRate = "0";
       console.log(
-        `Preserving explicitly zero rate for driver ${driver.driverid}`
+        `Setting zero rate for driver ${driver.driverid} (explicit zero or no manage rate)`
       );
       return newDriver;
     }
