@@ -1988,10 +1988,29 @@ export const updateFCInstructionAndContainers = async (
     const allowVgm = newShipmentType !== "4";
 
     // Calculate total cost if not provided
-    const totalCost =
+    let totalCost =
       instructionData.total_cost !== undefined
         ? instructionData.total_cost
         : calculateTotalCost(instructionData);
+
+    // For shipment type 4, ALWAYS recalculate total_cost from weightData to ensure accuracy
+    // This overrides any value sent from the frontend since the backend has the authoritative weight data
+    if (newShipmentType === "4" && !isAddOnType) {
+      if (Array.isArray(weightData) && weightData.length > 0) {
+        const totalWeight = weightData.reduce((sum, row) => {
+          if (row.weight !== null && row.weight !== undefined && row.weight !== "") {
+            const parsed = Number.parseFloat(row.weight);
+            return Number.isNaN(parsed) ? sum : sum + parsed;
+          }
+          return sum;
+        }, 0);
+        const unitRate = Number(instructionData.unitrate || 0);
+        const calculatedCost = totalWeight * unitRate;
+        totalCost = calculatedCost;
+      } else {
+        totalCost = 0;
+      }
+    }
 
     // 2. Prepare instruction update data with proper null handling and numeric sanitization
     const updateData = {
@@ -2802,7 +2821,7 @@ export const updateFCInstructionAndContainers = async (
     
     // Get the instruction data for recalculation
     const currentInstructionQuery = `
-      SELECT 
+      SELECT
         num_six_meters, num_twelve_meters, num_abnormal,
         rateper_6, rateper_12, rateper_abnormal,
         total_cost, is_set_rate, rateweight, shipment_type,
@@ -2812,11 +2831,11 @@ export const updateFCInstructionAndContainers = async (
     `;
     const currentInstructionResult = await client.query(currentInstructionQuery, [instructionId]);
     const d = currentInstructionResult.rows[0]; // shorthand for instruction data
-    
+
     // Calculate base cost (matching frontend logic exactly)
     let baseCost = 0;
     let recalculatedTotalCost = 0;
-    
+
     if (isAddOnType) {
       // Add-on: total cost is always 0
       recalculatedTotalCost = 0;
@@ -2825,14 +2844,20 @@ export const updateFCInstructionAndContainers = async (
       // In Set Rate mode, there are no surcharges/hazardous/VGM added
       recalculatedTotalCost = Number(d.total_cost || 0);
     } else if ((d.rateweight === 'kg' || d.rateweight === 'ton') && String(d.shipment_type) === '4') {
-      // Shipment type 4: base cost = unit rate * weight
-      const weightValue = Number(d.weight || 0);
+      // Shipment type 4: base cost = unit rate * sum of weight rows
+      const weightRowsQuery = `
+        SELECT weight FROM public.m1_controller_weight WHERE m1_key = $1
+      `;
+      const weightRowsResult = await client.query(weightRowsQuery, [instructionId]);
+      const totalWeight = weightRowsResult.rows.reduce((sum, row) => {
+        return sum + (Number(row.weight) || 0);
+      }, 0);
       const unitRate = Number(d.unitrate || 0);
-      baseCost = weightValue * unitRate;
+      baseCost = totalWeight * unitRate;
       recalculatedTotalCost = Number((baseCost + totalSurcharge + totalHazardous + totalVgm).toFixed(2));
     } else {
       // Container-based calculation
-      baseCost = 
+      baseCost =
         (Number(d.num_six_meters || 0) * Number(d.rateper_6 || 0)) +
         (Number(d.num_twelve_meters || 0) * Number(d.rateper_12 || 0)) +
         (Number(d.num_abnormal || 0) * Number(d.rateper_abnormal || 0));
