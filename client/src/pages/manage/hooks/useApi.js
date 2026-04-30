@@ -635,6 +635,39 @@ export function useApi(state, actions) {
     [state, actions, fetchPaginatedData],
   )
 
+  const checkDriverRateOverlap = useCallback(
+    async (rateData) => {
+      try {
+        const { startingpoint, destination, effective_from, effective_to } = rateData
+
+        if (!startingpoint || !destination || !effective_from) {
+          return { hasOverlaps: false, overlappingRates: [], message: "" }
+        }
+
+        const params = new URLSearchParams({
+          startingpoint: startingpoint.trim(),
+          destination: destination.trim(),
+          effective_from,
+        })
+
+        if (effective_to) {
+          params.append("effective_to", effective_to)
+        }
+
+        if (state.editingRateId) {
+          params.append("exclude_id", state.editingRateId.toString())
+        }
+
+        const response = await api.get(`/api/driver-rates/check-overlaps?${params}`)
+        return response.data
+      } catch (err) {
+        console.error("Error checking driver rate overlap:", err)
+        return { hasOverlaps: false, overlappingRates: [], message: "" }
+      }
+    },
+    [state.editingRateId],
+  )
+
   const saveSubcontractor = useCallback(
     async (subcontractorData) => {
       actions.setLoading(true)
@@ -1505,6 +1538,28 @@ export function useApi(state, actions) {
             formattedData.effective_to = new Date(data.effective_to).toISOString().split("T")[0]
           }
           actions.updateFormData(formType, formattedData)
+
+          // Check for overlaps when loading existing rate
+          if (data.startingpoint && data.destination && data.effective_from) {
+            try {
+              const params = new URLSearchParams({
+                startingpoint: data.startingpoint.trim(),
+                destination: data.destination.trim(),
+                effective_from: formattedData.effective_from,
+              })
+              if (formattedData.effective_to) {
+                params.append("effective_to", formattedData.effective_to)
+              }
+              params.append("exclude_id", id.toString())
+
+              const overlapResponse = await api.get(`/api/driver-rates/check-overlaps?${params}`)
+              if (overlapResponse.data.hasOverlaps) {
+                actions.updateFormData(formType, { _overlapWarning: overlapResponse.data.message })
+              }
+            } catch (overlapErr) {
+              console.error("Error checking overlaps on load:", overlapErr)
+            }
+          }
         } else if (type === "company") {
           actions.updateFormData(formType, {
             ...data,
@@ -1596,6 +1651,7 @@ export function useApi(state, actions) {
     saveTruck,
     saveTrailer,
     saveDriverRate,
+    checkDriverRateOverlap,
     saveSubcontractor,
     saveClientRates,
     saveSupplier,

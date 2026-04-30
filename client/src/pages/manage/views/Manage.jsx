@@ -231,6 +231,27 @@ const Manage = () => {
     actions.updateFormData("DriverRate", { [field]: value })
   }
 
+  const handleDriverRateFormChangeWithOverlapCheck = async (field, value) => {
+    // First update the form data
+    const updatedRate = { ...state.newDriverRate, [field]: value }
+    actions.updateFormData("DriverRate", { [field]: value })
+
+    // Check for overlaps if we have the required fields
+    if (
+      updatedRate.startingpoint &&
+      updatedRate.destination &&
+      updatedRate.effective_from &&
+      (field === "startingpoint" || field === "destination" || field === "effective_from" || field === "effective_to")
+    ) {
+      const overlapResult = await api.checkDriverRateOverlap(updatedRate)
+      if (overlapResult.hasOverlaps) {
+        actions.updateFormData("DriverRate", { _overlapWarning: overlapResult.message })
+      } else {
+        actions.updateFormData("DriverRate", { _overlapWarning: null })
+      }
+    }
+  }
+
   const handleDriverRateEdit = (id) => {
     api.loadItemForEdit("rate", id)
   }
@@ -575,7 +596,7 @@ const Manage = () => {
               isEditing={state.isEditingRate}
               onSave={api.saveDriverRate}
               onCancel={handleDriverRateCancel}
-              onChange={handleDriverRateFormChange}
+              onChange={handleDriverRateFormChangeWithOverlapCheck}
             />
           ) : (
             <DriverRatesTable

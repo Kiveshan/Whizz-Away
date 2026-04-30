@@ -533,14 +533,11 @@ export const checkRateDateOverlaps = async (startingpoint, destination, effectiv
         AND LOWER(TRIM(COALESCE(destination, ''))) = LOWER(TRIM(COALESCE($2, '')))
         AND ($5::int IS NULL OR m5ratekey != $5)
         AND (
-          -- Overlap condition: new effective_from falls within existing range
-          (effective_from <= $3 AND (effective_to IS NULL OR effective_to >= $3))
-          OR
-          -- Overlap condition: new effective_to falls within existing range (if provided)
-          ($4::date IS NOT NULL AND effective_from <= $4 AND (effective_to IS NULL OR effective_to >= $4))
-          OR
-          -- Overlap condition: new range completely covers existing range
-          (effective_from >= $3 AND ($4::date IS NULL OR effective_to IS NULL OR effective_to <= $4))
+          -- Standard overlap check: two ranges overlap if
+          -- existing starts before new ends (or new has no end)
+          -- AND existing ends after new starts (or existing has no end)
+          (effective_from <= $4 OR $4 IS NULL)
+          AND (effective_to >= $3 OR effective_to IS NULL)
         )
       ORDER BY effective_from ASC
     `

@@ -6,6 +6,7 @@ import {
   deleteDriverRate,
   getDriverRateUsage,
   refreshDriverRateLegsForInstructions,
+  checkRateDateOverlaps,
 } from "../../models/manage/driverRatesModel.js"
 
 const getAllDriverRatesHandler = async (req, res) => {
@@ -264,6 +265,26 @@ const getDriverRateUsageHandler = async (req, res) => {
   }
 }
 
+const checkRateDateOverlapsHandler = async (req, res) => {
+  try {
+    const { startingpoint, destination, effective_from, effective_to, exclude_id } = req.query
+
+    if (!startingpoint || !destination || !effective_from) {
+      return res.status(400).json({ error: "Starting point, destination, and effective_from are required" })
+    }
+
+    const excludeRateId = exclude_id && /^\d+$/.test(exclude_id) ? parseInt(exclude_id) : null
+
+    console.log(`Checking rate overlaps for ${startingpoint} -> ${destination}, from ${effective_from} to ${effective_to || 'null'}, exclude: ${excludeRateId}`)
+    const result = await checkRateDateOverlaps(startingpoint, destination, effective_from, effective_to, excludeRateId)
+
+    res.json(result)
+  } catch (err) {
+    console.error(`Error checking rate date overlaps:`, err)
+    res.status(500).json({ error: "Failed to check rate date overlaps" })
+  }
+}
+
 export {
   getAllDriverRatesHandler,
   getDriverRateByIdHandler,
@@ -272,4 +293,5 @@ export {
   deleteDriverRateHandler,
   getDriverRateUsageHandler,
   refreshDriverRateLegsHandler,
+  checkRateDateOverlapsHandler,
 }
