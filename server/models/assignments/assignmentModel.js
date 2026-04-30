@@ -57,7 +57,9 @@ export const getDriverRatesWithSubbie = async (startingpoint, destination, legDa
   // If legDate provided, use effective date-based rate lookup
   if (legDate) {
     try {
+      console.log(`[getDriverRatesWithSubbie] Fetching rate for ${startingpoint} -> ${destination} on ${legDate}`);
       const rateResult = await getRateForLegDate(startingpoint, destination, legDate, false, '6m');
+      console.log(`[getDriverRatesWithSubbie] Result:`, rateResult);
       if (rateResult.success) {
         const row = rateResult.data;
         return {
@@ -73,9 +75,10 @@ export const getDriverRatesWithSubbie = async (startingpoint, destination, legDa
           driver_rate: row.driver_six_meter_rate,
         };
       }
+      console.log(`[getDriverRatesWithSubbie] No rate found for date ${legDate}, returning null`);
       return null;
     } catch (error) {
-      console.error('Error fetching rates with effective dates:', error);
+      console.error('[getDriverRatesWithSubbie] Error fetching rates with effective dates:', error);
       // Fall through to default behavior
     }
   }

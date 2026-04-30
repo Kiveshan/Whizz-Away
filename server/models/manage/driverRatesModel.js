@@ -424,6 +424,8 @@ export const getRateForLegDate = async (startingpoint, destination, legDate, isS
     const targetDate = legDate instanceof Date
       ? legDate.toISOString().split('T')[0]
       : legDate
+    
+    console.log(`[getRateForLegDate] Querying: ${startingpoint} -> ${destination}, date: ${targetDate}, isSubbie: ${isSubcontractor}, container: ${containerType}`);
 
     const query = `
       SELECT
@@ -450,6 +452,13 @@ export const getRateForLegDate = async (startingpoint, destination, legDate, isS
       destination,
       targetDate
     ])
+    
+    console.log(`[getRateForLegDate] Query returned ${result.rows.length} rows`);
+    if (result.rows.length > 0) {
+      console.log(`[getRateForLegDate] Found rate:`, result.rows[0]);
+    } else {
+      console.log(`[getRateForLegDate] No rate found for ${targetDate}`);
+    }
     
     if (!result.rows.length) {
       return {

@@ -29,7 +29,10 @@ export default function DriversSection({
   savedMessage,
   savedLegs,
   onDateChange,
+  rateError,
 }) {
+  console.log("DriversSection received rateError:", rateError);
+  
   const selectableEmployeeDrivers = employeeDrivers.filter((driver) => {
     if (driver?.roleid === 6) {
       return driver?.status === true && driver?.driverstatus === true;
@@ -42,6 +45,22 @@ export default function DriversSection({
       {currentLagIndex !== null && (
         <div className="bg-blue-50 p-6 rounded-md mb-4">
           <h3 className="text-lg font-medium mb-4">Driver Information</h3>
+
+          {rateError && (
+            <div
+              style={{
+                backgroundColor: "#fef3c7",
+                border: "1px solid #f59e0b",
+                color: "#92400e",
+                padding: "0.75rem",
+                borderRadius: "0.375rem",
+                marginBottom: "1rem",
+                fontSize: "0.875rem",
+              }}
+            >
+              ⚠️ {rateError}
+            </div>
+          )}
 
           {drivers && drivers.length > 0 ? (
             <>

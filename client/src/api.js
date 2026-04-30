@@ -62,9 +62,11 @@ api.interceptors.response.use(
         return Promise.reject(new Error("Session expired. Please log in again."))
       }
 
-      // Handle other HTTP errors
+      // Handle other HTTP errors - preserve status for frontend handling
       const errorMessage = data?.message || data?.error || `HTTP ${status}: ${error.response.statusText}`
-      return Promise.reject(new Error(errorMessage))
+      const enhancedError = new Error(errorMessage)
+      enhancedError.response = error.response  // Preserve the response object
+      return Promise.reject(enhancedError)
     } else if (error.request) {
       // Network error
       return Promise.reject(new Error("Network error - please check your connection"))

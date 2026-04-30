@@ -755,9 +755,16 @@ const newDriver = {
   // Using a shared rates state here would overwrite all other drivers' rates,
   // which breaks legs where different drivers straddle a rate change boundary.
   const handleDriverDateChange = async (driverIndex, newDate) => {
-    if (!formData.startingPoint || !formData.destination || !newDate) return;
+    console.log(`[handleDriverDateChange] Driver ${driverIndex}, new date: ${newDate}`);
+    console.log(`[handleDriverDateChange] Route: ${formData.startingPoint} -> ${formData.destination}`);
+    
+    if (!formData.startingPoint || !formData.destination || !newDate) {
+      console.log("[handleDriverDateChange] Missing required data, returning early");
+      return;
+    }
 
     try {
+      console.log("[handleDriverDateChange] Making API call...");
       const response = await api.get("/api/driver-rates-with-subbie", {
         params: {
           startingpoint: formData.startingPoint,
@@ -767,6 +774,8 @@ const newDriver = {
       });
 
       const data = response.data;
+      console.log("[handleDriverDateChange] Rate fetch success:", data);
+      setRateError(""); // Clear any previous rate error
 
       setDrivers((prevDrivers) => {
         if (!Array.isArray(prevDrivers) || !prevDrivers[driverIndex]) return prevDrivers;
@@ -796,12 +805,21 @@ const newDriver = {
           driverRate: newRate != null ? newRate.toString() : "0",
           _rateEffectiveFrom: data.effective_from || null,
           _rateEffectiveTo: data.effective_to || null,
+          _rateExplicitlyZero: false, // Clear the flag when valid rate is found
         };
         return updated;
       });
     } catch (error) {
+      console.log("[handleDriverDateChange] CATCH BLOCK ENTERED");
+      console.log("[handleDriverDateChange] Error:", error);
+      console.log("[handleDriverDateChange] Error.response:", error.response);
+      console.log("[handleDriverDateChange] Error.response?.status:", error.response?.status);
+      console.log("[handleDriverDateChange] Error.message:", error.message);
+      
       if (error.response?.status === 404) {
+        console.log("[handleDriverDateChange] 404 DETECTED - setting rate error and zero rate");
         setRateError("Driver rate not available for this route");
+        
         setDrivers((prevDrivers) => {
           if (!Array.isArray(prevDrivers) || !prevDrivers[driverIndex]) return prevDrivers;
           const updated = [...prevDrivers];
@@ -810,12 +828,14 @@ const newDriver = {
             driverRate: "0",
             _rateEffectiveFrom: null,
             _rateEffectiveTo: null,
+            _rateExplicitlyZero: true, // Flag to prevent useEffect from overwriting
           };
+          console.log("Updated driver with zero rate:", updated[driverIndex]);
           return updated;
         });
         return;
       }
-      console.error("Error fetching rate for date change:", error);
+      console.error("Error fetching rate for date change (non-404):", error);
     }
   };
 
@@ -1124,6 +1144,14 @@ useEffect(() => {
       );
       return newDriver;
     }
+    
+    // Preserve explicitly zero rates (set when no rate exists for date in gap)
+    if (newDriver._rateExplicitlyZero) {
+      console.log(
+        `Preserving explicitly zero rate for driver ${driver.driverid}`
+      );
+      return newDriver;
+    }
 
     const isSubcontractor =
       employeeDrivers.find((d) => d.userid.toString() === driver.driverid)
@@ -1292,6 +1320,7 @@ useEffect(() => {
           savedMessage={savedMessage}
           savedLegs={savedLegs}
           onDateChange={handleDriverDateChange}
+          rateError={rateError}
         />
       </div>
       <ContainerWarningModal
