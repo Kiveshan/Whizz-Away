@@ -818,7 +818,11 @@ const newDriver = {
       
       if (error.response?.status === 404) {
         console.log("[handleDriverDateChange] 404 DETECTED - setting rate error and zero rate");
-        setRateError("Driver rate not available for this route");
+        setRateError(
+          `No driver rate found for the selected date. ` +
+          `There is no active rate effective on ${newDate}. ` +
+          `Please check rate configuration or select a different date.`
+        );
         
         setDrivers((prevDrivers) => {
           if (!Array.isArray(prevDrivers) || !prevDrivers[driverIndex]) return prevDrivers;
