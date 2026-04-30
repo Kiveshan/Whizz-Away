@@ -354,6 +354,34 @@ const getAgingAnalysis = async (client, month, year, clientId = null) => {
   }))
 }
 
+const getDebtorAgeAnalysisPerClient = async (client, month, year) => {
+  const query = `
+    SELECT
+      c.m5clientkey  AS client_id,
+      c.client       AS client_name,
+      SUM(a.current)    AS current_amount,
+      SUM(a."30days")   AS thirty_days,
+      SUM(a."60days")   AS sixty_days,
+      SUM(a."90days")   AS ninety_days
+    FROM aging_analysis a
+    JOIN statements s ON a.aging_key = s.agingid
+    JOIN m5_client  c ON a.clientid  = c.m5clientkey
+    WHERE TRIM(to_char(s.generation_date, 'Month')) = $1
+      AND EXTRACT(YEAR FROM s.generation_date)::text = $2
+    GROUP BY c.m5clientkey, c.client
+    ORDER BY c.client
+  `
+  const result = await client.query(query, [month, year])
+  return result.rows.map((row) => ({
+    clientId:   row.client_id,
+    client:     row.client_name,
+    current:    parseFloat(row.current_amount)  || 0,
+    thirtyDays: parseFloat(row.thirty_days)     || 0,
+    sixtyDays:  parseFloat(row.sixty_days)      || 0,
+    ninetyDays: parseFloat(row.ninety_days)     || 0,
+  }))
+}
+
 const getTurnoverVsDieselCost = async (numericMonth, year) => {
   const turnoverQuery = `
     WITH DistinctLegs AS (
@@ -1601,6 +1629,7 @@ export {
   getAllSubcontractors,
   getAllTrucks,
   getAgingAnalysis,
+  getDebtorAgeAnalysisPerClient,
   getTurnoverVsDieselCost,
   getAllExpenses,
   getTurnoverPerTruck,

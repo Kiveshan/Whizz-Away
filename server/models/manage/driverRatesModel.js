@@ -454,7 +454,7 @@ export const getRateForLegDate = async (startingpoint, destination, legDate, isS
     if (!result.rows.length) {
       return {
         success: false,
-        message: `No rate found for route ${startingpoint} to ${destination} effective on ${targetDate.toISOString().split('T')[0]}`,
+        message: `No rate found for route ${startingpoint} to ${destination} effective on ${targetDate}`,
         data: null
       }
     }

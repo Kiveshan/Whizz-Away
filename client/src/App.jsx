@@ -108,6 +108,7 @@ import {
 } from "./pages/Creditors";
 
 import { ClientList, AddOnList, AddOnForm } from "./pages/add-on's";
+import DebtorsAgeAnalysis from "./pages/debtors/views/DebtorsAgeAnalysis";
 import {
   WageReports,
   ProfitLossReportsPage,
@@ -134,6 +135,7 @@ function DynamicHeader() {
     "/FCcontrollerInstructionDetails": "Container Details",
     "/expenses": "Truck Expenses",
     "/debtors": "Debtors",
+    "/debtors-age-analysis": "Age Analysis",
     "/FDashboard": "Debtors Clerk",
     "/instructions": "Instruction",
     "/update-instructions": "Assignment",
@@ -308,6 +310,7 @@ function ContentWrapper() {
           element={<UploadProof />}
         />
         <Route path="/debtors" element={<Debtors />} />
+        <Route path="/debtors-age-analysis" element={<DebtorsAgeAnalysis />} />
         <Route path="/manage" element={<Manage />} />
         <Route path="/login" element={<Login />} />
         <Route path="/Dashboard" element={<Dashboard />} />

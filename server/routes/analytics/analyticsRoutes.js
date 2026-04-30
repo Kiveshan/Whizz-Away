@@ -6,6 +6,7 @@ import {
   getAllSubcontractorsController,
   getAllTrucksController,
   getAgingAnalysisController,
+  getDebtorAgeAnalysisPerClientController,
   getTurnoverVsDieselCostController,
   getAllExpensesController,
   getTurnoverPerTruckController,
@@ -25,6 +26,7 @@ const router = express.Router();
 router.get("/api/fuel-expenses", verifyToken, getFuelExpensesController);
 router.get("/api/turnover-per-month", verifyToken, getTurnoverPerMonthController);
 router.get("/api/aging-analysis", verifyToken, getAgingAnalysisController);
+router.get("/api/debtor-age-analysis", verifyToken, getDebtorAgeAnalysisPerClientController);
 router.get("/api/get-clients", verifyToken, getAllClientsController);
 router.get("/api/get-subcontractors", verifyToken, getAllSubcontractorsController);
 router.get("/api/get-trucks", verifyToken, getAllTrucksController);
