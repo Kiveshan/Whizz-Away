@@ -20,6 +20,11 @@ const reportsData = [
     image: "/images/reports.jpg",
     path: "/client-subbie-commission",
   },
+  {
+    title: "VAT Recon",
+    image: "/images/reports.jpg",
+    path: "/vat-recon-reports",
+  },
 ]
 
 const ReportsPage = () => {
