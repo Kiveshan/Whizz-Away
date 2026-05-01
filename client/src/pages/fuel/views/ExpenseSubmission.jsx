@@ -18,6 +18,7 @@ const [formData, setFormData] = useState({
   expenseCost: "0",
   orderno: "",
   invoiceNumber: "", // Add invoice number field
+  vat: "", // Add VAT field
   ...(expenseType === 5 ? { documentFrom: "Controller", driverName: "", driverFullName: "" } : {}),
 });
 
@@ -152,6 +153,9 @@ if (expenseType === 5 && !truckId) {
       formDataToSend.append("ponum", ponum);
     }
     formDataToSend.append("invoiceNumber", formData.invoiceNumber);
+    if (formData.vat) {
+      formDataToSend.append("vat", formData.vat);
+    }
     if (truckRegNum) {
   formDataToSend.append("truckRegNum", truckRegNum);
 }
@@ -312,6 +316,36 @@ setTimeout(() => {
     placeholder="Enter invoice number"
   />
 </div>
+
+            <div className="form-field">
+              <label htmlFor="vat">Input VAT</label>
+              <div className="currency-field">
+                <span>R</span>
+                <input
+                  id="vat"
+                  type="text"
+                  name="vat"
+                  value={formData.vat.replace(/^R/, "")}
+                  onChange={(e) => {
+                    const value = e.target.value.replace(/[^0-9.]/g, "");
+                    // Ensure only 2 decimal places
+                    const parts = value.split(".");
+                    if (parts.length > 2) {
+                      parts.pop();
+                    }
+                    if (parts[1] && parts[1].length > 2) {
+                      parts[1] = parts[1].substring(0, 2);
+                    }
+                    const formattedValue = parts.join(".");
+                    setFormData({
+                      ...formData,
+                      vat: formattedValue,
+                    });
+                  }}
+                  placeholder="0.00"
+                />
+              </div>
+            </div>
 
 {expenseType === 5 && formData.documentFrom === "Driver" && (
   <div className="form-field driver-field">

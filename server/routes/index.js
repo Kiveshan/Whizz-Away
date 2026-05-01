@@ -32,6 +32,7 @@ import subcontractorsRoutes from "./subcontractors/subContractorRoutes.js";
 import addonRoutes from "./add-ons/addonRoutes.js";
 import creditNoteRoutes from "./creditNote/creditNoteRoutes.js";
 import profitLossRoutes from "./profit-loss/profitLossRoutes.js";
+import vatReconRoutes from "./vat-recon/vat-reconRoutes.js";
 import landingRoutes from "./landing/landingRoutes.js";
 
 const router = express.Router();
@@ -69,6 +70,7 @@ router.use(assignmentRoutes);
 router.use(subcontractorsRoutes);
 router.use(addonRoutes);
 router.use(profitLossRoutes);
+router.use(vatReconRoutes);
 router.use(landingRoutes);
 
 export default router;

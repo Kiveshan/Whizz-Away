@@ -1,3 +1,24 @@
+// Helper to fetch rate for a specific driver date
+const fetchRateForDriverDate = async (api, startingpoint, destination, date, isSubcontractor, containerType) => {
+  if (!startingpoint || !destination || !date) return null;
+  try {
+    const response = await api.get("/api/driver-rates-with-subbie", {
+      params: { startingpoint, destination, legDate: date },
+    });
+    const data = response.data;
+    if (containerType === "12m") {
+      return isSubcontractor ? data.subie_twelve_meter_rate : data.driver_twelve_meter_rate;
+    }
+    return isSubcontractor ? data.subie_six_meter_rate : data.driver_six_meter_rate;
+  } catch (error) {
+    if (error.response?.status === 404) {
+      return 0;
+    }
+    console.error("Error fetching rate for driver date:", error);
+    return null;
+  }
+};
+
 export const handleSave = async ({
   isSavingRef,
   currentLegIndexRef,
@@ -26,6 +47,7 @@ export const handleSave = async ({
   employeeDrivers,
   calculateLegDriverRate,
   setDrivers,
+  api,
 }) => {
   // Prevent concurrent saves
   if (isSavingRef.current) return;
@@ -156,34 +178,55 @@ export const handleSave = async ({
     };
     setLegs(updatedLegs);
 
-    const legData = {
-      legkey:
-        !isNewLeg && currentLeg.id && !isNaN(Number.parseInt(currentLeg.id))
-          ? currentLeg.id
-          : null,
-      legnumber: computedLegNumber,
-      startingpoint: currentLeg.startingPoint || formData.startingPoint,
-      destination: currentLeg.destination || formData.destination,
-      driverrate: calculateLegDriverRate(cleanDrivers, rates, shipmentType),
-      m1key: instructionId,
-      drivers: cleanDrivers.map((driver) => {
+    // Process drivers: fetch date-aware rates for drivers with date but no rate set
+    const startingpoint = currentLeg.startingPoint || formData.startingPoint;
+    const destination = currentLeg.destination || formData.destination;
+
+    const driversWithRates = await Promise.all(
+      cleanDrivers.map(async (driver) => {
         let driverRateToSave = driver.driverRate || "0";
 
-        if (shipmentType !== 4 && (!driver.driverRate || driver.driverRate === "")) {
+        if (shipmentType !== 4 && (!driver.driverRate || driver.driverRate === "") && !driver._rateNullInManage && !driver._rateExplicitlyZero) {
           const isSubcontractor =
             employeeDrivers.find((d) => d.userid.toString() === driver.driverid)
               ?.roleid === 6;
 
-          if (driver.container_type === "12m") {
-            driverRateToSave = isSubcontractor
-              ? rates.subbie_twelve_meter.toString()
-              : rates.twelve_meter.toString();
-          } else if (driver.container_type === "abnormal") {
-            driverRateToSave = driver.driverRate || "0";
+          // If driver has a date, fetch the rate effective on that date
+          if (driver.date && startingpoint && destination) {
+            const dateAwareRate = await fetchRateForDriverDate(
+              api,
+              startingpoint,
+              destination,
+              driver.date,
+              isSubcontractor,
+              driver.container_type
+            );
+            if (dateAwareRate !== null) {
+              driverRateToSave = dateAwareRate.toString();
+            } else if (driver.container_type === "abnormal") {
+              driverRateToSave = "0";
+            } else if (driver.container_type === "12m") {
+              driverRateToSave = isSubcontractor
+                ? rates.subbie_twelve_meter.toString()
+                : rates.twelve_meter.toString();
+            } else {
+              driverRateToSave = isSubcontractor
+                ? rates.subbie_six_meter.toString()
+                : rates.six_meter.toString();
+            }
           } else {
-            driverRateToSave = isSubcontractor
-              ? rates.subbie_six_meter.toString()
-              : rates.six_meter.toString();
+            // No date available - fall back to shared rates snapshot
+            if (driver.container_type === "12m") {
+              driverRateToSave = isSubcontractor
+                ? rates.subbie_twelve_meter.toString()
+                : rates.twelve_meter.toString();
+            } else if (driver.container_type === "abnormal") {
+              driverRateToSave = "0";
+            } else {
+              driverRateToSave = isSubcontractor
+                ? rates.subbie_six_meter.toString()
+                : rates.six_meter.toString();
+            }
           }
         }
 
@@ -201,7 +244,20 @@ export const handleSave = async ({
           driverRate: driverRateToSave,
           date: driver.date || null,
         };
-      }),
+      })
+    );
+
+    const legData = {
+      legkey:
+        !isNewLeg && currentLeg.id && !isNaN(Number.parseInt(currentLeg.id))
+          ? currentLeg.id
+          : null,
+      legnumber: computedLegNumber,
+      startingpoint,
+      destination,
+      driverrate: calculateLegDriverRate(cleanDrivers, rates, shipmentType),
+      m1key: instructionId,
+      drivers: driversWithRates,
     };
 
     console.log(

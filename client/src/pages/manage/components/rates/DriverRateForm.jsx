@@ -7,6 +7,16 @@ const DriverRateForm = ({ driverRate, loading, isEditing, onSave, onCancel, onCh
       e.target.reportValidity()
       return
     }
+
+    if (
+      driverRate.effective_from &&
+      driverRate.effective_to &&
+      driverRate.effective_to < driverRate.effective_from
+    ) {
+      alert("Effective To date cannot be before Effective From date.")
+      return
+    }
+
     const success = await onSave(driverRate)
     if (!success) {
       return
@@ -112,6 +122,48 @@ const DriverRateForm = ({ driverRate, loading, isEditing, onSave, onCancel, onCh
             />
           </div>
         </div>
+
+        <div className="form-row">
+          <div className="form-field">
+            <label>
+              <strong>Effective From *</strong>
+            </label>
+            <input
+              type="date"
+              className="form-input"
+              value={driverRate.effective_from || ""}
+              onChange={(e) => onChange("effective_from", e.target.value)}
+              required
+            />
+            <small className="form-hint">Rate becomes effective on this date</small>
+          </div>
+          <div className="form-field">
+            <label>
+              <strong>Effective To</strong>
+            </label>
+            <input
+              type="date"
+              className="form-input"
+              value={driverRate.effective_to || ""}
+              min={driverRate.effective_from || undefined}
+              onChange={(e) => onChange("effective_to", e.target.value || null)}
+            />
+            <small className="form-hint">Leave empty for no expiration</small>
+          </div>
+        </div>
+
+        {driverRate._overlapWarning && (
+          <div className="form-warning" style={{ 
+            padding: '10px', 
+            backgroundColor: '#fff3cd', 
+            border: '1px solid #ffc107', 
+            borderRadius: '4px',
+            marginTop: '10px',
+            color: '#856404'
+          }}>
+            <strong>Warning:</strong> {driverRate._overlapWarning}
+          </div>
+        )}
       </div>
 
       <div className="driver-rate-button-container">

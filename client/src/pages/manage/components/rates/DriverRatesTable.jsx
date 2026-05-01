@@ -160,15 +160,17 @@ const DriverRatesTable = ({
                   <th>Driver Rate (12m)</th>
                   <th>Subbie Rate (6m)</th>
                   <th>Subbie Rate (12m)</th>
-                  <th>Updated at</th>
-                  <th>Changes</th>
+                  <th>Effective From</th>
+                  <th>Effective To</th>
+                  <th>Status</th>
+                  <th>Edit</th>
                   <th>Delete</th>
                 </tr>
               </thead>
               <tbody>
                 {driverRates.length === 0 ? (
                   <tr>
-                    <td colSpan="9" className="no-data">
+                    <td colSpan="11" className="no-data">
                       No driver rates found
                     </td>
                   </tr>
@@ -197,7 +199,29 @@ const DriverRatesTable = ({
                           ? `R ${Number.parseFloat(rate.subie_twelve_meter_rate).toFixed(2)}`
                           : "N/A"}
                       </td>
-                      <td>{formatDate(rate.updated_at)}</td>
+                      <td>{formatDate(rate.effective_from)}</td>
+                      <td>{rate.effective_to ? formatDate(rate.effective_to) : <span style={{ color: '#6a737d' }}>No expiry</span>}</td>
+                      <td>
+                        {(() => {
+                          // Compare ISO date strings directly to avoid UTC-midnight timezone shift.
+                          const today = new Date().toISOString().split('T')[0]
+                          const from = rate.effective_from
+                            ? rate.effective_from.toString().split('T')[0]
+                            : null
+                          const to = rate.effective_to
+                            ? rate.effective_to.toString().split('T')[0]
+                            : null
+
+                          if (from && from > today) {
+                            return <span style={{ color: '#0366d6', fontWeight: 'bold' }}>Future</span>
+                          } else if (to && to < today) {
+                            return <span style={{ color: '#6a737d' }}>Expired</span>
+                          } else if (from && from <= today && (!to || to >= today)) {
+                            return <span style={{ color: '#28a745', fontWeight: 'bold' }}>Active</span>
+                          }
+                          return <span style={{ color: '#6a737d' }}>-</span>
+                        })()}
+                      </td>
                       <td>
                         <button className="manage-edit-button" onClick={() => onEdit(rate.m5ratekey)}>
                           Edit
