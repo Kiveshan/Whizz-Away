@@ -33,119 +33,219 @@ const VatReconReportPage = () => {
             const workbook = new ExcelJS.Workbook()
             workbook.created = new Date()
             workbook.modified = new Date()
+            
+            // Define styles
+            const headerStyle = {
+                font: { bold: true, color: { argb: "FFFFFF" }, size: 12 },
+                fill: { type: "pattern", pattern: "solid", fgColor: { argb: "2E75B6" } },
+                alignment: { horizontal: "center", vertical: "middle" },
+                border: { top: { style: "thin" }, left: { style: "thin" }, bottom: { style: "thin" }, right: { style: "thin" } }
+            }
+            
+            const totalStyle = {
+                font: { bold: true, size: 11 },
+                fill: { type: "pattern", pattern: "solid", fgColor: { argb: "D9E1F2" } },
+                border: { top: { style: "thin" }, left: { style: "thin" }, bottom: { style: "thin" }, right: { style: "thin" } }
+            }
 
             // Sheet 1: Output VAT
             const outputVatSheet = workbook.addWorksheet("Output VAT")
             outputVatSheet.columns = [
-                { header: "Client Name", key: "clientName", width: 32 },
-                { header: "Total Cost", key: "totalCost", width: 18 },
-                { header: "VAT Rate (%)", key: "vatRate", width: 14 },
-                { header: "VAT Amount", key: "vatAmount", width: 18 },
+                { header: "Client Name", key: "clientName", width: 35 },
+                { header: "Total Cost", key: "totalCost", width: 20 },
+                { header: "VAT Amount", key: "vatAmount", width: 20 },
             ]
 
             let totalOutputVat = 0
             let totalOutputCost = 0
+
+            // Add title row for Output VAT
+            outputVatSheet.mergeCells('A1:C1')
+            outputVatSheet.getCell('A1').value = `Output VAT - ${month} ${year}`
+            outputVatSheet.getCell('A1').font = { bold: true, size: 14, color: { argb: "2E75B6" } }
+            outputVatSheet.getCell('A1').alignment = { horizontal: "center" }
+            outputVatSheet.addRow([])
+
+            // Add headers
+            const headerRow = outputVatSheet.addRow({
+                clientName: "Client Name",
+                totalCost: "Total Cost",
+                vatAmount: "VAT Amount",
+            })
+            headerRow.eachCell((cell, colNumber) => {
+                cell.style = headerStyle
+            })
 
             if (data.outputVat && data.outputVat.length > 0) {
                 data.outputVat.forEach((item) => {
                     const vatAmount = (item.totalCost * item.vatRate) / 100
                     totalOutputVat += vatAmount
                     totalOutputCost += item.totalCost
-                    outputVatSheet.addRow({
+                    const row = outputVatSheet.addRow({
                         clientName: item.clientName,
                         totalCost: item.totalCost,
-                        vatRate: item.vatRate,
                         vatAmount: vatAmount,
+                    })
+                    // Apply currency formatting
+                    row.getCell(2).numFmt = "R #,##0.00"
+                    row.getCell(3).numFmt = "R #,##0.00"
+                    // Add borders
+                    row.eachCell((cell) => {
+                        cell.border = { top: { style: "thin" }, left: { style: "thin" }, bottom: { style: "thin" }, right: { style: "thin" } }
                     })
                 })
             }
 
             // Add totals row
-            outputVatSheet.addRow({})
+            outputVatSheet.addRow([])
             const outputTotalRow = outputVatSheet.addRow({
                 clientName: "TOTAL",
                 totalCost: totalOutputCost,
-                vatRate: "",
                 vatAmount: totalOutputVat,
             })
-            outputTotalRow.font = { bold: true }
-
-            outputVatSheet.getColumn("totalCost").numFmt = "R #,##0.00"
-            outputVatSheet.getColumn("vatRate").numFmt = "0.00"
-            outputVatSheet.getColumn("vatAmount").numFmt = "R #,##0.00"
+            outputTotalRow.eachCell((cell, colNumber) => {
+                cell.style = totalStyle
+                if (colNumber > 1) {
+                    cell.numFmt = "R #,##0.00"
+                }
+            })
 
             // Sheet 2: Input VAT
             const inputVatSheet = workbook.addWorksheet("Input VAT")
             inputVatSheet.columns = [
-                { header: "Date", key: "date", width: 14 },
-                { header: "Expense Type", key: "expenseType", width: 24 },
-                { header: "Total", key: "total", width: 18 },
-                { header: "VAT", key: "vat", width: 18 },
+                { header: "Date", key: "date", width: 15 },
+                { header: "Expense Type", key: "expenseType", width: 30 },
+                { header: "Total", key: "total", width: 20 },
+                { header: "VAT", key: "vat", width: 20 },
             ]
 
             let totalInputVat = 0
             let totalInputCost = 0
 
+            // Add title row for Input VAT
+            inputVatSheet.mergeCells('A1:D1')
+            inputVatSheet.getCell('A1').value = `Input VAT - ${month} ${year}`
+            inputVatSheet.getCell('A1').font = { bold: true, size: 14, color: { argb: "2E75B6" } }
+            inputVatSheet.getCell('A1').alignment = { horizontal: "center" }
+            inputVatSheet.addRow([])
+
+            // Add headers
+            const inputHeaderRow = inputVatSheet.addRow({
+                date: "Date",
+                expenseType: "Expense Type",
+                total: "Total",
+                vat: "VAT",
+            })
+            inputHeaderRow.eachCell((cell) => {
+                cell.style = headerStyle
+            })
+
             if (data.inputVat && data.inputVat.length > 0) {
                 data.inputVat.forEach((item) => {
                     totalInputVat += item.vat || 0
                     totalInputCost += item.total || 0
-                    inputVatSheet.addRow({
+                    const row = inputVatSheet.addRow({
                         date: item.date,
                         expenseType: item.expenseType,
                         total: item.total,
                         vat: item.vat,
                     })
+                    // Apply formatting
+                    row.getCell(1).numFmt = "YYYY-MM-DD"
+                    row.getCell(3).numFmt = "R #,##0.00"
+                    row.getCell(4).numFmt = "R #,##0.00"
+                    // Add borders
+                    row.eachCell((cell) => {
+                        cell.border = { top: { style: "thin" }, left: { style: "thin" }, bottom: { style: "thin" }, right: { style: "thin" } }
+                    })
                 })
             }
 
             // Add totals row
-            inputVatSheet.addRow({})
+            inputVatSheet.addRow([])
             const inputTotalRow = inputVatSheet.addRow({
                 date: "",
                 expenseType: "TOTAL",
                 total: totalInputCost,
                 vat: totalInputVat,
             })
-            inputTotalRow.font = { bold: true }
-
-            inputVatSheet.getColumn("date").numFmt = "YYYY-MM-DD"
-            inputVatSheet.getColumn("total").numFmt = "R #,##0.00"
-            inputVatSheet.getColumn("vat").numFmt = "R #,##0.00"
+            inputTotalRow.eachCell((cell, colNumber) => {
+                cell.style = totalStyle
+                if (colNumber > 2) {
+                    cell.numFmt = "R #,##0.00"
+                }
+            })
 
             // Sheet 3: VAT Owed to SARS
             const vatOwedSheet = workbook.addWorksheet("VAT Owed to SARS")
             vatOwedSheet.columns = [
-                { header: "Description", key: "description", width: 32 },
-                { header: "Amount", key: "amount", width: 18 },
+                { header: "Description", key: "description", width: 40 },
+                { header: "Amount", key: "amount", width: 25 },
             ]
 
             const vatOwed = totalOutputVat - totalInputVat
 
-            vatOwedSheet.addRow({
+            // Add title row for VAT Owed
+            vatOwedSheet.mergeCells('A1:B1')
+            vatOwedSheet.getCell('A1').value = `VAT Reconciliation - ${month} ${year}`
+            vatOwedSheet.getCell('A1').font = { bold: true, size: 14, color: { argb: "2E75B6" } }
+            vatOwedSheet.getCell('A1').alignment = { horizontal: "center" }
+            vatOwedSheet.addRow([])
+
+            // Add headers
+            const owedHeaderRow = vatOwedSheet.addRow({
+                description: "Description",
+                amount: "Amount",
+            })
+            owedHeaderRow.eachCell((cell) => {
+                cell.style = headerStyle
+            })
+
+            // Add data rows
+            const outputRow = vatOwedSheet.addRow({
                 description: "Total Output VAT (from clients)",
                 amount: totalOutputVat,
             })
-            vatOwedSheet.addRow({
+            outputRow.getCell(2).numFmt = "R #,##0.00"
+            outputRow.eachCell((cell) => {
+                cell.border = { top: { style: "thin" }, left: { style: "thin" }, bottom: { style: "thin" }, right: { style: "thin" } }
+            })
+
+            const inputRow = vatOwedSheet.addRow({
                 description: "Total Input VAT (from expenses)",
                 amount: totalInputVat,
             })
-            vatOwedSheet.addRow({})
+            inputRow.getCell(2).numFmt = "R #,##0.00"
+            inputRow.eachCell((cell) => {
+                cell.border = { top: { style: "thin" }, left: { style: "thin" }, bottom: { style: "thin" }, right: { style: "thin" } }
+            })
+
+            vatOwedSheet.addRow([])
             const owedRow = vatOwedSheet.addRow({
                 description: "VAT Owed to SARS (Output - Input)",
                 amount: vatOwed,
             })
-            owedRow.font = { bold: true }
+            owedRow.eachCell((cell, colNumber) => {
+                cell.style = totalStyle
+                if (colNumber === 2) {
+                    cell.numFmt = "R #,##0.00"
+                    // Color code based on value
+                    if (vatOwed < 0) {
+                        cell.font = { bold: true, color: { argb: "FF0000" } }
+                    } else {
+                        cell.font = { bold: true, color: { argb: "006100" } }
+                    }
+                }
+            })
 
             if (vatOwed < 0) {
                 const refundRow = vatOwedSheet.addRow({
                     description: "Note: Negative value indicates VAT refund due",
                     amount: "",
                 })
-                refundRow.font = { italic: true, color: { argb: "FF0000" } }
+                refundRow.font = { italic: true, color: { argb: "FF0000" }, size: 10 }
+                refundRow.getCell(1).alignment = { vertical: "top" }
             }
-
-            vatOwedSheet.getColumn("amount").numFmt = "R #,##0.00"
 
             const buffer = await workbook.xlsx.writeBuffer()
             const blob = new Blob([buffer], {
