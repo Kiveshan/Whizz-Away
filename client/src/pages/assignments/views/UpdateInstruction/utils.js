@@ -57,45 +57,63 @@ export const calculateLegDriverRate = (drivers, rates, shipmentType) => {
     return 0;
   }
 
+  if (shipmentType === 4) {
+    const first = drivers.find(
+      (d) => d.driverRate !== undefined && d.driverRate !== null && d.driverRate !== ""
+    );
+    return first ? Number.parseFloat(first.driverRate) || 0 : 0;
+  }
+
   let sixMeterCount = 0;
   let twelveMeterCount = 0;
   let abnormalCount = 0;
 
   drivers.forEach((driver) => {
-    if (driver.container_type === "12m") {
+    if (isTwelveMeterContainer(driver.container_type)) {
       twelveMeterCount++;
-    } else if (driver.container_type === "abnormal") {
+    } else if (isAbnormalContainer(driver.container_type)) {
       abnormalCount++;
     } else {
       sixMeterCount++;
     }
   });
 
-  if (shipmentType === 4) {
-    const firstDriverWithRate = drivers.find(
-      (d) => d.driverRate !== undefined && d.driverRate !== null && d.driverRate !== ""
-    );
-    return firstDriverWithRate
-      ? Number.parseFloat(firstDriverWithRate.driverRate) || 0
-      : 0;
+  let dominantType;
+  if (twelveMeterCount >= sixMeterCount && twelveMeterCount >= abnormalCount) {
+    dominantType = "12m";
+  } else if (sixMeterCount >= twelveMeterCount && sixMeterCount >= abnormalCount) {
+    dominantType = "6m";
+  } else {
+    dominantType = "abnormal";
   }
 
-  if (
-    twelveMeterCount >= sixMeterCount &&
-    twelveMeterCount >= abnormalCount
-  ) {
-    return Number.parseFloat(rates.twelve_meter) || 0;
-  } else if (
-    sixMeterCount >= twelveMeterCount &&
-    sixMeterCount >= abnormalCount
-  ) {
-    return Number.parseFloat(rates.six_meter) || 0;
-  } else {
-    const abnormalDriver = drivers.find(
-      (d) => d.container_type === "abnormal"
-    );
-    return abnormalDriver
-      ? Number.parseFloat(abnormalDriver.driverRate) || 0
-      : 0;
+  // Use the actual stored driverRate from the representative driver of the dominant type.
+  // This reflects the per-driver date-aware rate rather than the shared rates snapshot.
+  const representative = drivers.find((d) =>
+    dominantType === "12m"
+      ? isTwelveMeterContainer(d.container_type)
+      : dominantType === "abnormal"
+      ? isAbnormalContainer(d.container_type)
+      : !isTwelveMeterContainer(d.container_type) && !isAbnormalContainer(d.container_type)
+  );
+
+  if (representative?.driverRate !== undefined && representative?.driverRate !== "") {
+    return Number.parseFloat(representative.driverRate) || 0;
   }
+
+  // Fallback to shared rates if driver rate not yet set on the driver object
+  if (dominantType === "12m") return Number.parseFloat(rates.twelve_meter) || 0;
+  if (dominantType === "abnormal") {
+    const abnormalDriver = drivers.find((d) => isAbnormalContainer(d.container_type));
+    return abnormalDriver ? Number.parseFloat(abnormalDriver.driverRate) || 0 : 0;
+  }
+  return Number.parseFloat(rates.six_meter) || 0;
+};
+
+export const isAbnormalContainer = (containerType) => {
+  return containerType?.toLowerCase() === "abnormal";
+};
+
+export const isTwelveMeterContainer = (containerType) => {
+  return containerType?.toLowerCase() === "12m";
 };

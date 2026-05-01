@@ -19,6 +19,11 @@ const DirectorDebtors = () => {
   const handleAddOnClick = () => {
     navigate("/view-client-list");
   };
+
+  const handleAgeAnalysisClick = () => {
+    navigate("/debtors-age-analysis");
+  };
+
   return (
     <div className="debtors-container">
       <div className="header-actions">
@@ -50,6 +55,14 @@ const DirectorDebtors = () => {
           </div>
           <div className="card-title">
             <h3>Add On's</h3>
+          </div>
+        </div>
+        <div className="card" onClick={handleAgeAnalysisClick}>
+          <div className="card-image-container">
+            <img src="/images/Statements.jpg" alt="Age Analysis" />
+          </div>
+          <div className="card-title">
+            <h3>Age Analysis</h3>
           </div>
         </div>
       </div>

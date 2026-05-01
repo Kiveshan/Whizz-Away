@@ -36,11 +36,14 @@ export const refreshLegData = async ({
             legnumber: leg.legnumber,
             startingPoint: leg.startingpoint,
             destination: leg.destination,
-            driverRate: leg.driverrate ? leg.driverrate.toString() : "",
+            driverRate: leg.driverrate != null ? leg.driverrate.toString() : "0",
             drivers: (leg.drivers || []).map((driver) => ({
               ...driver,
               container_type: driver.container_type || "",
-              driverRate: driver.driverRate || driver.driverate || "",
+              driverRate: driver.driverRate != null ? driver.driverRate.toString() : (driver.driverate != null ? driver.driverate.toString() : "0"),
+              _rateNullInManage: driver._rateNullInManage,
+              _rateExplicitlyZero: driver._rateExplicitlyZero,
+              _debugManageRate: driver._debugManageRate,
               isAbnormal: driver.container_type === "abnormal",
             })),
           };
@@ -114,7 +117,7 @@ export const refreshLegData = async ({
           ) {
             setFormData({
               startingPoint: currentLeg.startingPoint || "",
-              driverRate: currentLeg.driverRate || "",
+              driverRate: currentLeg.driverRate,
               destination: currentLeg.destination || "",
             });
 
@@ -142,8 +145,6 @@ export const refreshLegData = async ({
 export const fetchLegsForInstruction = async ({
   api,
   instructionId,
-  setRates,
-  ratesRouteKeyRef,
   setLegs,
   setSavedLegs,
   setExistingDrivers,
@@ -162,42 +163,6 @@ export const fetchLegsForInstruction = async ({
     const response = await api.get(`/legs/${instructionId}`);
     const data = response.data;
     console.log("Legs data from server:", JSON.stringify(data, null, 2));
-
-    if (data.length > 0 && data[0].startingpoint && data[0].destination) {
-      try {
-        console.log(
-          "Fetching rates for route:",
-          data[0].startingpoint,
-          data[0].destination
-        );
-        const rateResponse = await api.get("/api/driver-rates-with-subbie", {
-          params: {
-            startingpoint: data[0].startingpoint,
-            destination: data[0].destination,
-          },
-        });
-
-        const rateData = rateResponse.data;
-        console.log("Fetched rates:", rateData);
-
-        ratesRouteKeyRef.current = `${data[0].startingpoint}-${data[0].destination}`;
-        setRates({
-          six_meter: rateData.driver_six_meter_rate || 0,
-          twelve_meter: rateData.driver_twelve_meter_rate || 0,
-          subbie_six_meter: rateData.subie_six_meter_rate || 0,
-          subbie_twelve_meter: rateData.subie_twelve_meter_rate || 0,
-        });
-
-        console.log("Updated rates state:", {
-          six_meter: rateData.driver_six_meter_rate || 0,
-          twelve_meter: rateData.driver_twelve_meter_rate || 0,
-          subbie_six_meter: rateData.subie_six_meter_rate || 0,
-          subbie_twelve_meter: rateData.subie_twelve_meter_rate || 0,
-        });
-      } catch (error) {
-        console.error("Error fetching rates:", error);
-      }
-    }
 
     const containerResponse = await api.get(
       `/containers/instruction/${instructionId}`
@@ -266,7 +231,10 @@ export const fetchLegsForInstruction = async ({
             date: driver.date || "",
             driver_name: driver.driver_name || "",
             driver_surname: driver.driver_surname || "",
-            driverRate: driver.driverRate || "",
+            driverRate: driver.driverRate != null ? driver.driverRate.toString() : "0",
+            _rateNullInManage: driver._rateNullInManage,
+            _rateExplicitlyZero: driver._rateExplicitlyZero,
+            _debugManageRate: driver._debugManageRate,
             isAbnormal: containerType === "abnormal",
             full_name:
               driver.full_name ||
@@ -307,7 +275,7 @@ export const fetchLegsForInstruction = async ({
           legnumber: leg.legnumber,
           startingPoint: leg.startingpoint,
           destination: leg.destination,
-          driverRate: leg.driverrate ? leg.driverrate.toString() : "",
+          driverRate: leg.driverrate != null ? leg.driverrate.toString() : "0",
           drivers: normalizedDrivers,
         };
       });
@@ -338,7 +306,7 @@ export const fetchLegsForInstruction = async ({
         setCurrentLagIndex(0);
         setFormData({
           startingPoint: fetchedLegs[0].startingPoint || "",
-          driverRate: fetchedLegs[0].driverRate || "",
+          driverRate: fetchedLegs[0].driverRate,
           destination: fetchedLegs[0].destination || "",
         });
 

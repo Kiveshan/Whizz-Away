@@ -28,7 +28,11 @@ export default function DriversSection({
   setShowRemoveDriverModal,
   savedMessage,
   savedLegs,
+  onDateChange,
+  rateError,
 }) {
+  console.log("DriversSection received rateError:", rateError);
+  
   const selectableEmployeeDrivers = employeeDrivers.filter((driver) => {
     if (driver?.roleid === 6) {
       return driver?.status === true && driver?.driverstatus === true;
@@ -41,6 +45,22 @@ export default function DriversSection({
       {currentLagIndex !== null && (
         <div className="bg-blue-50 p-6 rounded-md mb-4">
           <h3 className="text-lg font-medium mb-4">Driver Information</h3>
+
+          {rateError && (
+            <div
+              style={{
+                backgroundColor: "#fef3c7",
+                border: "1px solid #f59e0b",
+                color: "#92400e",
+                padding: "0.75rem",
+                borderRadius: "0.375rem",
+                marginBottom: "1rem",
+                fontSize: "0.875rem",
+              }}
+            >
+              ⚠️ {rateError}
+            </div>
+          )}
 
           {drivers && drivers.length > 0 ? (
             <>
@@ -115,7 +135,8 @@ export default function DriversSection({
                               );
 
                               if (updatedDrivers[index].container_type) {
-                                if (updatedDrivers[index].container_type === "12m") {
+                                const ct = (updatedDrivers[index].container_type || "").toLowerCase().trim();
+                                if (ct === "12m") {
                                   updatedDrivers[index].driverRate =
                                     isSubcontractor
                                       ? rates.subbie_twelve_meter
@@ -124,9 +145,7 @@ export default function DriversSection({
                                       : rates.twelve_meter
                                       ? rates.twelve_meter.toString()
                                       : "0";
-                                } else if (
-                                  updatedDrivers[index].container_type === "abnormal"
-                                ) {
+                                } else if (ct === "abnormal") {
                                   if (!updatedDrivers[index].driverRate) {
                                     updatedDrivers[index].driverRate = "0";
                                   }
@@ -162,6 +181,16 @@ export default function DriversSection({
                               `Updated driver at index ${index}:`,
                               updatedDrivers[index]
                             );
+
+                            // Re-fetch a date-aware rate using this driver's existing date
+                            // so changing the driver picks up the correct rate period.
+                            if (
+                              updatedDrivers[index].date &&
+                              (updatedDrivers[index].container_type || "").toLowerCase().trim() !== "abnormal" &&
+                              onDateChange
+                            ) {
+                              onDateChange(index, updatedDrivers[index].date);
+                            }
                           }
                         }}
                         disabled={isCompleted}
@@ -441,7 +470,7 @@ export default function DriversSection({
                                   "Setting abnormal rate (editable):",
                                   updatedDrivers[index].driverRate
                                 );
-                              } else if (containerType === "12m") {
+                              } else if (containerType.toLowerCase() === "12m") {
                                 updatedDrivers[index].driverRate = twelveMeterRate;
                                 updatedDrivers[index].isAbnormal = false;
                                 console.log("Setting 12m rate:", twelveMeterRate);
@@ -473,6 +502,18 @@ export default function DriversSection({
                               "Updated driver data:",
                               updatedDrivers[index]
                             );
+
+                            // If the driver already has a date, re-fetch the date-aware rate
+                            // so the container type change picks up the correct rate version.
+                            // Skip for abnormal — those rates are manually entered.
+                            if (
+                              containerValue &&
+                              updatedDrivers[index].date &&
+                              updatedDrivers[index].container_type?.toLowerCase() !== "abnormal" &&
+                              onDateChange
+                            ) {
+                              onDateChange(index, updatedDrivers[index].date);
+                            }
                           }}
                         />
                       )}
@@ -537,13 +578,11 @@ export default function DriversSection({
                           padding: "0.5rem",
                           border: "1px solid #d1d5db",
                           borderRadius: "0.375rem",
-                          backgroundColor: (entry.isAbnormal || isWeightBased)
-                            ? "white"
-                            : "#f3f4f6",
+                          backgroundColor: isCompleted ? "#f3f4f6" : "white",
                         }}
-                        value={entry.driverRate || ""}
+                        value={entry.driverRate ?? ""}
                         onChange={(e) => {
-                          if (isCompleted || (!entry.isAbnormal && !isWeightBased)) return;
+                          if (isCompleted) return;
 
                           const value = e.target.value;
                           if (value === "" || /^[0-9]*\.?[0-9]*$/.test(value)) {
@@ -561,8 +600,14 @@ export default function DriversSection({
                             setDrivers(updatedDrivers);
                           }
                         }}
-                        readOnly={!entry.isAbnormal && !isWeightBased}
+                        readOnly={isCompleted}
                       />
+                      {entry._rateEffectiveFrom && (
+                        <small style={{ color: "#6b7280", fontSize: "0.7rem", marginTop: "2px", display: "block" }}>
+                          Rate from {entry._rateEffectiveFrom.split("T")[0]}
+                          {entry._rateEffectiveTo ? ` to ${entry._rateEffectiveTo.split("T")[0]}` : " (no expiry)"}
+                        </small>
+                      )}
                     </div>
 
                     <div
@@ -605,8 +650,9 @@ export default function DriversSection({
                           }
                           onChange={(e) => {
                             if (isCompleted) return;
+                            const newDate = e.target.value;
                             const updatedDrivers = [...drivers];
-                            updatedDrivers[index].date = e.target.value;
+                            updatedDrivers[index].date = newDate;
 
                             setEditedFields((prev) => ({
                               ...prev,
@@ -619,8 +665,13 @@ export default function DriversSection({
                             setDrivers(updatedDrivers);
                             console.log(
                               `Updated date for driver at index ${index}:`,
-                              e.target.value
+                              newDate
                             );
+
+                            // Trigger rate refetch with new date
+                            if (onDateChange) {
+                              onDateChange(index, newDate);
+                            }
                           }}
                           disabled={isCompleted}
                         />

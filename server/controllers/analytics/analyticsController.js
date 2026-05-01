@@ -6,6 +6,7 @@ import {
   getAllSubcontractors,
   getAllTrucks,
   getAgingAnalysis,
+  getDebtorAgeAnalysisPerClient,
   getTurnoverVsDieselCost,
   getAllExpenses,
   getTurnoverPerTruck,
@@ -117,6 +118,25 @@ const getAgingAnalysisController = async (req, res) => {
     }
   } catch (error) {
     console.error("Error in getAgingAnalysisController:", error);
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+const getDebtorAgeAnalysisPerClientController = async (req, res) => {
+  const { month, year } = req.query;
+  if (!month || !year) {
+    return res.status(400).json({ success: false, message: "month and year are required" });
+  }
+  try {
+    const client = await pool.connect();
+    try {
+      const data = await getDebtorAgeAnalysisPerClient(client, month, year);
+      res.status(200).json({ success: true, data });
+    } finally {
+      client.release();
+    }
+  } catch (error) {
+    console.error("Error in getDebtorAgeAnalysisPerClientController:", error);
     res.status(500).json({ success: false, message: error.message });
   }
 };
@@ -315,6 +335,7 @@ export {
   getAllSubcontractorsController,
   getAllTrucksController,
   getAgingAnalysisController,
+  getDebtorAgeAnalysisPerClientController,
   getTurnoverVsDieselCostController,
   getAllExpensesController,
   getTurnoverPerTruckController,
