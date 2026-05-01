@@ -16,7 +16,6 @@ import LandingPage from "./pages/user_menus/views/LandingPage";
 
 // Import pages
 import {
-  Landing,
   ControllerDashboard,
   FDashboard,
   DirectorDashboard,
@@ -114,6 +113,7 @@ import {
   ProfitLossReportsPage,
   ProfitLossDetailPage,
   ClientSubbieCommissionReport,
+  VatReconReportPage,
 } from "./pages/Reports";
 
 // CSS Imports
@@ -203,6 +203,7 @@ function DynamicHeader() {
     "/profit-loss-reports": "Income & Expenditure Reports",
     "/income-expenditure-reports/:month/:year": "Income & Expenditure Report",
     "/client-subbie-commission": "Client Subbie Commission Report",
+    "/vat-recon-reports": "VAT Reconciliation Report",
   };
 
   const getTitle = () => {
@@ -221,6 +222,8 @@ function DynamicHeader() {
       return "Credit Note";
     if (location.pathname.startsWith("/income-expenditure-reports/"))
       return "Income & Expenditure Report";
+    if (location.pathname === "/vat-recon-reports")
+      return "VAT Reconciliation Report";
     return titleMap[location.pathname] || "Unknown Page";
   };
 
@@ -464,6 +467,10 @@ function ContentWrapper() {
           path="/income-expenditure-reports/:month/:year"
           element={<ProfitLossDetailPage />}
         />
+        <Route
+          path="/vat-recon-reports"
+          element={<VatReconReportPage />}
+        />
       </Routes>
       {shouldShowFooter && <Footer />} {/* Conditionally render footer */}
     </div>
@@ -487,6 +494,7 @@ function App() {
     "/wage-reports": "Wage Reports",
     "/profit-loss-reports": "Income & Expenditure Reports",
     "/income-expenditure-reports/:month/:year": "Income & Expenditure Report",
+    "/vat-recon-reports": "VAT Reconciliation Report",
   };
 
   // Set page title based on current route

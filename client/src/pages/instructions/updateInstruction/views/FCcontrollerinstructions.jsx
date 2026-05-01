@@ -353,6 +353,13 @@ const FCcontrollerinstructions = () => {
     setIsSetRateMode(isSetRate)
   }, [isSetRate])
 
+  // Recalculate total cost when weight rows or unit rate changes for shipment type 4
+  useEffect(() => {
+    if (String(formData.shipmentTypeId) === "4" && !isAddOn) {
+      recalculateTotalCost();
+    }
+  }, [weightRows, formData.unitRate, formData.shipmentTypeId]);
+
   // Check for set rate mismatch warning when historicalSetRate, setRateValue, status, or isSetRate changes
   useEffect(() => {
     // Only show warning when:
@@ -1792,6 +1799,9 @@ const FCcontrollerinstructions = () => {
         setContainerSuccessMessage("Changes saved successfully!");
         setIsContainerDataModified(false);
 
+        // Recalculate total cost to update UI with saved values
+        recalculateTotalCost();
+
         // Navigate after 2 seconds
         setTimeout(() => {
           console.log("🚀 Navigating to instructions list...");
@@ -2917,6 +2927,30 @@ const FCcontrollerinstructions = () => {
       return;
     }
 
+    // Handle shipment type 4 (break bulk) weight-based calculation
+    if (String(formData.shipmentTypeId) === "4") {
+      let baseCost = 0;
+      if (isSetRateMode) {
+        const setRateValue = Number.parseFloat(formData.setRateAmount || 0);
+        const weightRowCount = weightRows.length || 1;
+        baseCost = Number.isNaN(setRateValue) ? 0 : setRateValue * weightRowCount;
+      } else if (formData.rateWeight === "kg" || formData.rateWeight === "ton") {
+        const totalWeight = weightRows.reduce((sum, row) => {
+          if (row.weight === null || row.weight === undefined || row.weight === "") {
+            return sum;
+          }
+          const parsed = Number.parseFloat(row.weight);
+          return Number.isNaN(parsed) ? sum : sum + parsed;
+        }, 0);
+        const unitRate = Number.parseFloat(formData.unitRate || 0);
+        baseCost = totalWeight * unitRate;
+      }
+
+      setFormData(prev => ({ ...prev, total_cost: baseCost }));
+      return;
+    }
+
+    // Container-based calculation for other shipment types
     const newTotalCost = calculateTotalCostFromRates(
       formData.rateper_6 || 0,
       formData.rateper_12 || 0,
