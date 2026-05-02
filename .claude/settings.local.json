@@ -5,7 +5,9 @@
       "Bash(extract-text \"C:\\\\Users\\\\kives\\\\Documents\\\\GitHub\\\\Whizz-Away\\\\WhizzAway_Phase1_AdminBilling.docx\")",
       "Bash(pandoc \"C:\\\\Users\\\\kives\\\\Documents\\\\GitHub\\\\Whizz-Away\\\\WhizzAway_Phase1_AdminBilling.docx\" -t markdown)",
       "Bash(python \"C:\\\\Users\\\\kives\\\\AppData\\\\Roaming\\\\Claude\\\\local-agent-mode-sessions\\\\skills-plugin\\\\97cd09fc-904a-4660-82c0-c668279c7ba7\\\\f79a0a98-f5f9-49ef-b463-ddf0fca4a339\\\\skills\\\\docx\\\\scripts\\\\office\\\\unpack.py\" \"C:\\\\Users\\\\kives\\\\Documents\\\\GitHub\\\\Whizz-Away\\\\WhizzAway_Phase1_AdminBilling.docx\" \"C:\\\\Users\\\\kives\\\\Documents\\\\GitHub\\\\Whizz-Away\\\\docx_unpacked\")",
-      "Bash(grep -E \"\\\\.jsx$\")"
+      "Bash(grep -E \"\\\\.jsx$\")",
+      "Bash(grep -v \"^\\\\s*const\\\\|^\\\\s*//\")",
+      "Bash(npx react-scripts *)"
     ]
   }
 }

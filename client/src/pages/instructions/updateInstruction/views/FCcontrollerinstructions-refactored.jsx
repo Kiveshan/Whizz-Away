@@ -6,6 +6,10 @@ import { useNavigate, useLocation } from "react-router-dom";
 import ErrorModal from "../../../../components/ErrorModal";
 import api from "../../../../api";
 import { ErrorTooltip } from "../../../../components/instructions/ErrorTooltip";
+import { formatDateForDB, formatDateForInput as formatDateForInputUtil } from "../../../../utils/instructions/dateFormatting";
+import { calculateTotalCostFromRates, calcBreakBulkCost } from "../../../../utils/instructions/costCalculation";
+import { validateForm as validateFormUtil } from "../../../../utils/instructions/validation";
+import { checkRateCountMismatch as checkRateCountMismatchUtil } from "../../../../utils/instructions/rateCountMismatch";
 
 const FCcontrollerinstructions = () => {
   const navigate = useNavigate();
@@ -967,97 +971,21 @@ const FCcontrollerinstructions = () => {
 
   // Enhanced validation with field highlighting
   const validateAllFields = () => {
-    const newErrors = {};
-    let isValid = true;
-    const isCrossHaul = isCrossHaulShipment();
+    const { isValid, fieldErrors, containerErrors } = validateFormUtil(
+      formData,
+      containers,
+      { mode: "update", isAddOn, isImport, isSetRate }
+    );
 
-    // Required fields validation
-    const requiredFields = [
-      { name: "clientId", label: "Client" },
-      { name: "shipmentTypeId", label: "Shipment Type" },
-      { name: "pickup", label: "Pickup Location" },
-      { name: "dropoff", label: "Dropoff Location" },
-      // pickupDate field removed
-    ];
-
-    if (!isAddOn) {
-      requiredFields.push(
-        { name: "ksmFileRef", label: "KSM File Reference" },
-        { name: "clientFileRef", label: "Client File Reference" },
-        { name: "bookingRef", label: "Booking Reference" },
-        { name: "description", label: "Description" }
-      );
-    }
-
-    // Add vessel name and stack date specifically for import and export shipment types
-    if (!isAddOn && (formData.shipmentTypeId === "1" || formData.shipmentTypeId === "2")) {
-      requiredFields.push({ name: "vesselName", label: "Vessel Name" });
-      requiredFields.push({
-        name: "stackDate",
-        label: formData.shipmentTypeId === "1" ? "ETA Date" : "Stack Date",
-      });
-
-      console.log(
-        "Validating vessel name and stack date for shipment type:",
-        formData.shipmentTypeId
-      );
-    }
-
-    // Add weight and unitRate as required fields when rateWeight is ton or kg
-    // Skip unitRate requirement if Set Rate is checked
-    if (formData.rateWeight === "ton" || formData.rateWeight === "kg") {
-      if (String(formData.shipmentTypeId) !== "4") {
-        requiredFields.push(
-          { name: "weight", label: `Weight (${formData.rateWeight})` }
-        );
-      }
-      if (!isSetRate) {
-        requiredFields.push(
-          { name: "unitRate", label: `Rate per ${formData.rateWeight}` }
-        );
-      }
-    }
-
-    requiredFields.forEach((field) => {
-      if (!formData[field.name]) {
-        newErrors[field.name] = `${field.label} is required`;
-        isValid = false;
-      }
-    });
-
-    // Container validation (skip entirely for add-on shipments)
-    const containerErrors = {};
-    if (!isAddOn) {
-      containers.forEach((container) => {
-        // Only validate container number if not export shipment type
-        if (String(formData.shipmentTypeId) !== "2" && !container.containerNum) {
-          containerErrors[`container-${container.id}`] =
-            "Container number is required";
-          isValid = false;
-        }
-        // No format validation - allowing any alphanumeric characters up to 20 characters
-
-        // Weight validation - only validate format if weight is provided
-        if (
-          isImport &&
-          container.weight &&
-          container.weight !== "" &&
-          !/^[0-9]*\.?[0-9]*$/.test(container.weight)
-        ) {
-          containerErrors[`weight-${container.id}`] =
-            "Weight must be a valid number";
-          isValid = false;
-        }
-      });
-
-      // Check container uniqueness
-      if (!validateContainerUniqueness()) {
-        isValid = false;
-      }
-    }
-
-    setFieldErrors(newErrors);
+    setFieldErrors(fieldErrors);
     setContainerFieldErrors(containerErrors);
+
+    if (fieldErrors.containerUniqueness) {
+      setErrorModal({
+        isOpen: true,
+        message: fieldErrors.containerUniqueness,
+      });
+    }
 
     return isValid;
   };
@@ -1074,65 +1002,9 @@ const FCcontrollerinstructions = () => {
     }));
   };
 
-  // Check for rate/counter mismatch — returns { needsConfirmation, message }
-  // Caller owns the setConfirmationModal side-effect (Flag 2 resolution).
-  const checkRateCounterMismatch = () => {
-    if (isAddOn) {
-      return { needsConfirmation: false };
-    }
-    const mismatches = [];
-    const containerTypesWithCounts = [];
-
-    // Check each container type for rate > 0 but count = 0
-    if (
-      (formData.rateper_6 > 0 || Number(formData.rateper_6) > 0) &&
-      formData.num_six_meters === 0
-    ) {
-      mismatches.push("6m");
-    }
-    if (
-      (formData.rateper_12 > 0 || Number(formData.rateper_12) > 0) &&
-      formData.num_twelve_meters === 0
-    ) {
-      mismatches.push("12m");
-    }
-    if (
-      (formData.rateper_abnormal > 0 ||
-        Number(formData.rateper_abnormal) > 0) &&
-      formData.num_abnormal === 0
-    ) {
-      mismatches.push("Abnormal");
-    }
-
-    if (mismatches.length > 0) {
-      if (formData.num_six_meters > 0) {
-        containerTypesWithCounts.push(
-          `6m (${formData.num_six_meters} containers, Rate: R${formData.rateper_6})`
-        );
-      }
-      if (formData.num_twelve_meters > 0) {
-        containerTypesWithCounts.push(
-          `12m (${formData.num_twelve_meters} containers, Rate: R${formData.rateper_12})`
-        );
-      }
-      if (formData.num_abnormal > 0) {
-        containerTypesWithCounts.push(
-          `Abnormal (${formData.num_abnormal} containers, Rate: R${formData.rateper_abnormal})`
-        );
-      }
-
-      const message =
-        containerTypesWithCounts.length > 0
-          ? `You have containers with the following rates: ${containerTypesWithCounts.join(
-              ", "
-            )}. Are you sure you want to continue?`
-          : "You have set rates for container types with 0 containers. Are you sure you want to continue?";
-
-      return { needsConfirmation: true, message };
-    }
-
-    return { needsConfirmation: false };
-  };
+  // Delegates to utility — returns { needsConfirmation, message } (Flag 2 resolution).
+  const checkRateCounterMismatch = () =>
+    checkRateCountMismatchUtil(formData, { isAddOn });
 
   // Handle save changes with enhanced logic
   const handleSaveChanges = async () => {
@@ -1342,35 +1214,7 @@ const FCcontrollerinstructions = () => {
       console.log("📊 Fetching original data for comparison...");
       const originalData = await fetchOriginalData();
 
-      // Helper function to format dates for database (YYYY-MM-DD)
-      const formatDateForDB = (dateString) => {
-        if (!dateString) return null;
-        try {
-          // If already in YYYY-MM-DD format, return as is
-          if (/^\d{4}-\d{2}-\d{2}$/.test(dateString)) {
-            return dateString;
-          }
-          // Handle MM/DD/YYYY format
-          if (dateString.includes("/")) {
-            const [month, day, year] = dateString.split("/");
-            if (year && month && day) {
-              return `${year}-${month.padStart(2, "0")}-${day.padStart(
-                2,
-                "0"
-              )}`;
-            }
-          }
-          // Try to parse as Date object
-          const date = new Date(dateString);
-          if (!isNaN(date.getTime())) {
-            return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;  // Fixed timezone handling
-          }
-          return null;
-        } catch (e) {
-          console.error("Error formatting date:", e);
-          return null;
-        }
-      };
+      // formatDateForDB imported from dateFormatting utility
 
       // Helper function to format time for database (HH:MM:SS)
       const formatTimeForDB = (timeString) => {
@@ -1394,31 +1238,18 @@ const FCcontrollerinstructions = () => {
       const ratePerAbnormal =
         numAbnormal > 0 ? Number(formData.rateper_abnormal || 0) : 0;
 
-      let baseCost = 0;
       console.log("DEBUG UPDATE isSetRateMode:", isSetRateMode, "formData.rateWeight:", formData.rateWeight, "formData.setRateAmount:", formData.setRateAmount);
+      let baseCost = 0;
       if (isSetRateMode && !isAddOn) {
-        // Set Rate mode: use setRateAmount multiplied by weight row count
-        const setRateValue = Number.parseFloat(formData.setRateAmount || 0);
-        const weightRowCount = weightRows.length || 1;
-        baseCost = Number.isNaN(setRateValue) ? 0 : setRateValue * weightRowCount;
-        console.log("SET-RATE CALCULATION (UPDATE):");
-        console.log(`  Set Rate Amount: R${setRateValue.toFixed(2)}`);
-        console.log(`  Weight Row Count: ${weightRowCount}`);
-        console.log(`  Total Cost: R${setRateValue.toFixed(2)} × ${weightRowCount} = R${baseCost.toFixed(2)}`);
+        baseCost = calcBreakBulkCost(weightRows, 0, {
+          isSetRateMode: true,
+          setRateAmount: formData.setRateAmount || 0,
+        });
       } else if (
         (formData.rateWeight === "kg" || formData.rateWeight === "ton") &&
         String(formData.shipmentTypeId) === "4"
       ) {
-        // Shipment type 4: base cost = unit rate * sum(all row weights)
-        const totalWeight = weightRows.reduce((sum, row) => {
-          if (row.weight === null || row.weight === undefined || row.weight === "") {
-            return sum;
-          }
-          const parsed = Number.parseFloat(row.weight);
-          return Number.isNaN(parsed) ? sum : sum + parsed;
-        }, 0);
-        const unitRate = Number.parseFloat(formData.unitRate || 0);
-        baseCost = totalWeight * unitRate;
+        baseCost = calcBreakBulkCost(weightRows, formData.unitRate || 0);
       } else {
         // Container-based or simple weight-based using main counts
         baseCost =
@@ -2857,44 +2688,6 @@ const FCcontrollerinstructions = () => {
   };
 
   // Helper function to calculate total cost from individual rates
-  const calculateTotalCostFromRates = (
-    rate6,
-    rate12,
-    rateAbnormal,
-    count6,
-    count12,
-    countAbnormal
-  ) => {
-    const baseCost = rate6 * count6 + rate12 * count12 + rateAbnormal * countAbnormal;
-    
-    // Add container surcharge amounts
-    const surchargeTotal = containers
-      .filter(container => container.addSurcharges === true)
-      .reduce((total, container) => {
-        const resolved = container.is_12m_surcharge
-          ? Number(container.surcharge_12m_amount || 0)
-          : Number(container.surchargeAmount || 0);
-        return total + resolved;
-      }, 0);
-    
-    // Add container hazardous amounts
-    const hazardousTotal = containers
-      .filter(container => container.hazardous === true)
-      .reduce((total, container) => {
-        const hazAmount = Number(container.hazardousAmount) || 0;
-        console.log(`☢️ Container ${container.id} hazardous amount: ${hazAmount}`);
-        return total + hazAmount;
-      }, 0);
-
-    // Add container VGM amounts
-    const vgmTotal = containers
-      .filter(container => container.vgm === true)
-      .reduce((total, container) => total + (Number(container.vgmAmount) || 0), 0);
-    
-    console.log(`💲 Total cost calculation - Base: ${baseCost}, Surcharges: ${surchargeTotal}, Hazardous: ${hazardousTotal}, VGM: ${vgmTotal}`);
-    return baseCost + surchargeTotal + hazardousTotal + vgmTotal;
-  };
-
   // Function for real-time total cost recalculation
   const recalculateTotalCost = () => {
     // For add-on shipment type (5), always force zero cost and zero rates
@@ -2913,23 +2706,10 @@ const FCcontrollerinstructions = () => {
 
     // Handle shipment type 4 (break bulk) weight-based calculation
     if (String(formData.shipmentTypeId) === "4") {
-      let baseCost = 0;
-      if (isSetRateMode) {
-        const setRateValue = Number.parseFloat(formData.setRateAmount || 0);
-        const weightRowCount = weightRows.length || 1;
-        baseCost = Number.isNaN(setRateValue) ? 0 : setRateValue * weightRowCount;
-      } else if (formData.rateWeight === "kg" || formData.rateWeight === "ton") {
-        const totalWeight = weightRows.reduce((sum, row) => {
-          if (row.weight === null || row.weight === undefined || row.weight === "") {
-            return sum;
-          }
-          const parsed = Number.parseFloat(row.weight);
-          return Number.isNaN(parsed) ? sum : sum + parsed;
-        }, 0);
-        const unitRate = Number.parseFloat(formData.unitRate || 0);
-        baseCost = totalWeight * unitRate;
-      }
-
+      const baseCost = calcBreakBulkCost(weightRows, formData.unitRate || 0, {
+        isSetRateMode,
+        setRateAmount: formData.setRateAmount || 0,
+      });
       setFormData(prev => ({ ...prev, total_cost: baseCost }));
       return;
     }
@@ -2941,7 +2721,8 @@ const FCcontrollerinstructions = () => {
       formData.rateper_abnormal || 0,
       formData.num_six_meters || 0,
       formData.num_twelve_meters || 0,
-      formData.num_abnormal || 0
+      formData.num_abnormal || 0,
+      containers
     );
 
     setFormData(prev => ({ ...prev, total_cost: newTotalCost }));
@@ -3436,35 +3217,8 @@ const FCcontrollerinstructions = () => {
     );
   };
 
-  // Format date from any format to YYYY-MM-DD for input[type="date"]
-  const formatDateForInput = (dateString) => {
-    if (!dateString) return "";
-
-    // If already in YYYY-MM-DD format, return as is
-    if (/^\d{4}-\d{2}-\d{2}$/.test(dateString)) {
-      return dateString;
-    }
-
-    // Handle MM/DD/YYYY format
-    if (dateString.includes("/")) {
-      const [month, day, year] = dateString.split("/");
-      if (year && month && day) {
-        return `${year}-${month.padStart(2, "0")}-${day.padStart(2, "0")}`;
-      }
-    }
-
-    // Try to parse as Date object if not in expected format
-    try {
-      const date = new Date(dateString);
-      if (!isNaN(date.getTime())) {
-        return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;  // Fixed timezone handling
-      }
-    } catch (e) {
-      console.error("Error formatting date:", e);
-    }
-
-    return dateString; // Return original if can't parse
-  };
+  // Alias to utility — named locally so JSX references stay unchanged
+  const formatDateForInput = formatDateForInputUtil;
 
   // Fetch rates based on pickup and dropoff locations - always update rates
   const fetchRates = async (pickupLocation, dropoffLocation = null) => {
