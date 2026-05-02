@@ -3,8 +3,15 @@
 import { useState, useEffect, useRef, useMemo, useCallback } from "react"
 import "../../css/controllerinstruction.css"
 import { useNavigate, useLocation } from "react-router-dom"
-import api from "../../../../api"
 import { ErrorTooltip as SharedErrorTooltip } from "../../../../components/instructions/ErrorTooltip"
+import {
+  fetchClients as fetchClientsService,
+  fetchShipmentTypes as fetchShipmentTypesService,
+  fetchStartingPoints as fetchStartingPointsService,
+  fetchDestinations as fetchDestinationsService,
+  fetchRates as fetchRatesService,
+  saveInstruction as saveInstructionService,
+} from "../../../../services/instructionService"
 import { calcContainerBasedCost, calcBreakBulkCost } from "../../../../utils/instructions/costCalculation"
 import { validateForm as validateFormUtil } from "../../../../utils/instructions/validation"
 import { checkRateCountMismatch as checkRateCountMismatchUtil } from "../../../../utils/instructions/rateCountMismatch"
@@ -399,31 +406,23 @@ const ControllerInstructions = () => {
             return 0
           }
 
-          const response = await api.get(
-            `/api/instructions/client/${formData.clientId}/rates`,
-            {
-              params: {
-                start: formData.pickup,
-                destination: formData.dropoff,
-              },
-            },
-          )
+          const ratesData = await fetchRatesService(formData.clientId, formData.pickup, formData.dropoff)
 
           const container = containersRef.current.find((c) => c.id === containerId)
           const isTwelveMeter = container?.containerType === "12m"
 
           const sixMeterSurcharge =
-            response.data.surcharges ??
-            response.data.surcharge ??
+            ratesData.surcharges ??
+            ratesData.surcharge ??
             0
 
           const twelveMeterSurcharge =
-            response.data.surcharge12m ??
-            response.data.surcharge_12m ??
-            response.data.surcharge12 ??
-            response.data.surcharge_12 ??
-            response.data.surcharges ??
-            response.data.surcharge ??
+            ratesData.surcharge12m ??
+            ratesData.surcharge_12m ??
+            ratesData.surcharge12 ??
+            ratesData.surcharge_12 ??
+            ratesData.surcharges ??
+            ratesData.surcharge ??
             0
 
           return isTwelveMeter ? twelveMeterSurcharge : sixMeterSurcharge
@@ -729,13 +728,13 @@ const ControllerInstructions = () => {
     const loadInitialData = async () => {
       try {
         // Load clients
-        const clientsResponse = await api.get("/api/instructions/active-clients")
-        setClients(clientsResponse.data)
+        const clientsData = await fetchClientsService()
+        setClients(clientsData)
         setIsLoading((prev) => ({ ...prev, clients: false }))
 
         // Load shipment types
-        const shipmentTypesResponse = await api.get("/api/instructions/shipment-types")
-        setShipmentTypes(shipmentTypesResponse.data)
+        const shipmentTypesData = await fetchShipmentTypesService()
+        setShipmentTypes(shipmentTypesData)
         setIsLoading((prev) => ({ ...prev, shipmentTypes: false }))
 
         // Set other loading states to false since we're not loading them initially
@@ -764,12 +763,8 @@ const ControllerInstructions = () => {
       return null
     }
 
-    const url = `/api/instructions/client/${clientId}/rates`
-    const params = { start, destination }
-
     try {
-      const response = await api.get(url, { params })
-      return response.data
+      return await fetchRatesService(clientId, start, destination)
     } catch (error) {
       console.error("[fetchRates] Error fetching rates:", error)
       return null
@@ -973,8 +968,8 @@ const ControllerInstructions = () => {
       if (clientId) {
         setIsLoadingLocations(true)
         try {
-          const response = await api.get(`/api/instructions/client/${clientId}/starting-points`)
-          const startingPoints = response.data.map((point) => ({
+          const startingPointsData = await fetchStartingPointsService(clientId)
+          const startingPoints = startingPointsData.map((point) => ({
             value: point.starting_point,
             label: point.starting_point,
           }))
@@ -1029,9 +1024,8 @@ const ControllerInstructions = () => {
       if (pickup && formData.clientId) {
         setIsLoading((prev) => ({ ...prev, destinations: true }))
         try {
-          const encodedPickup = encodeURIComponent(pickup)
-          const response = await api.get(`/api/instructions/client/${formData.clientId}/destinations/${encodedPickup}`)
-          const destinations = response.data.map((dest) => ({
+          const destinationsData = await fetchDestinationsService(formData.clientId, pickup)
+          const destinations = destinationsData.map((dest) => ({
             value: dest.destination,
             label: dest.destination,
           }))
@@ -1606,19 +1600,15 @@ const ControllerInstructions = () => {
       console.log(`  rateper_breakbulk: ${instructionData.rateper_breakbulk} (count: ${instructionData.num_breakbulk})`)
 
       // Save the instruction
-      const response = await api.post("/api/instructions/save-instruction", {
-        controllerData: instructionData,
-        containerData: containerData,
-        weightData: weightData,
-      })
+      const saveData = await saveInstructionService(instructionData, containerData, weightData)
 
-      if (response.data.success) {
+      if (saveData.success) {
         console.log("=== INSTRUCTION SAVED SUCCESSFULLY ===")
-        console.log("Database response:", response.data)
+        console.log("Database response:", saveData)
         // Navigate to dashboard on success
         navigate("/ControllerDashboard")
       } else {
-        throw new Error(response.data.message || "Failed to save instruction")
+        throw new Error(saveData.message || "Failed to save instruction")
       }
     } catch (error) {
       console.error("=== ERROR SAVING INSTRUCTION ===")

@@ -4,8 +4,21 @@ import { useState, useEffect, useRef } from "react";
 import "../../css/controllerinstruction.css";
 import { useNavigate, useLocation } from "react-router-dom";
 import ErrorModal from "../../../../components/ErrorModal";
-import api from "../../../../api";
 import { ErrorTooltip } from "../../../../components/instructions/ErrorTooltip";
+import {
+  fetchClients as fetchClientsService,
+  fetchShipmentTypes as fetchShipmentTypesService,
+  fetchStartingPoints as fetchStartingPointsService,
+  fetchDestinations as fetchDestinationsService,
+  fetchRates as fetchRatesService,
+  fetchSetRate as fetchSetRateService,
+  fetchInstruction as fetchInstructionService,
+  updateInstruction as updateInstructionService,
+  deleteInstruction as deleteInstructionService,
+  generateInvoice as generateInvoiceService,
+  checkInvoiceStatus as checkInvoiceStatusService,
+  checkContainerLegsExist as checkContainerLegsExistService,
+} from "../../../../services/instructionService";
 import { formatDateForDB, formatDateForInput as formatDateForInputUtil } from "../../../../utils/instructions/dateFormatting";
 import { calculateTotalCostFromRates, calcBreakBulkCost } from "../../../../utils/instructions/costCalculation";
 import { validateForm as validateFormUtil } from "../../../../utils/instructions/validation";
@@ -64,17 +77,9 @@ const FCcontrollerinstructions = () => {
   const fetchVgmAmount = async (containerId) => {
     try {
       console.log(`⚖️ Fetching VGM rate for client ${formData.clientId}, route: ${formData.pickup} → ${formData.dropoff}`);
-      const response = await api.get(
-        `/api/instructions/client/${formData.clientId}/rates`,
-        {
-          params: {
-            start: formData.pickup,
-            destination: formData.dropoff
-          }
-        }
-      );
+      const ratesData = await fetchRatesService(formData.clientId, formData.pickup, formData.dropoff);
 
-      const vgmAmount = response.data.vgm || 0;
+      const vgmAmount = ratesData.vgm || 0;
       console.log(`⚖️ Fetched VGM amount: ${vgmAmount} for container ${containerId}`);
 
       setContainers(prevContainers =>
@@ -318,11 +323,9 @@ const FCcontrollerinstructions = () => {
     const fetchSetRate = async () => {
       if (isSetRate && formData.clientId && formData.pickup && formData.dropoff) {
         try {
-          const encodedPickup = encodeURIComponent(formData.pickup)
-          const encodedDropoff = encodeURIComponent(formData.dropoff)
-          const response = await api.get(`/api/instructions/client/${formData.clientId}/set-rate/${encodedPickup}/${encodedDropoff}`)
-          if (response.data && response.data.set_rate !== undefined) {
-            const numericSetRate = Number(response.data.set_rate)
+          const setRateData = await fetchSetRateService(formData.clientId, formData.pickup, formData.dropoff);
+          if (setRateData && setRateData.set_rate !== undefined) {
+            const numericSetRate = Number(setRateData.set_rate)
             setSetRateValue(numericSetRate)
             // Keep formData.setRateAmount in sync so save logic can use it
             setFormData((prev) => ({
@@ -657,17 +660,9 @@ const FCcontrollerinstructions = () => {
 
   try {
     console.log(`🌐 Fetching hazardous rates for client ${formData.clientId}, route: ${formData.pickup} → ${formData.dropoff}`);
-    const response = await api.get(
-      `/api/instructions/client/${formData.clientId}/rates`,
-      {
-        params: {
-          start: formData.pickup,
-          destination: formData.dropoff
-        }
-      }
-    )
-    
-    const hazardousAmount = response.data.hazardous || 0;
+    const ratesData = await fetchRatesService(formData.clientId, formData.pickup, formData.dropoff);
+
+    const hazardousAmount = ratesData.hazardous || 0;
     console.log(`☣️ Fetched hazardous amount: ${hazardousAmount} for container ${container.containerNum || containerId}`);
     
     // Update container with hazardous amount
@@ -731,16 +726,8 @@ const FCcontrollerinstructions = () => {
           // Checkbox checked - fetch amount first, then update state
           console.log(`☢️ Hazardous checkbox CHECKED for container ${id} - fetching rate first`);
           try {
-            const response = await api.get(
-              `/api/instructions/client/${formData.clientId}/rates`,
-              {
-                params: {
-                  start: formData.pickup,
-                  destination: formData.dropoff
-                }
-              }
-            );
-            const hazardousAmount = response.data.hazardous || 0;
+            const ratesData = await fetchRatesService(formData.clientId, formData.pickup, formData.dropoff);
+            const hazardousAmount = ratesData.hazardous || 0;
             console.log(`☣️ Fetched hazardous amount: ${hazardousAmount} for container ${id}`);
             
             // Update container with both flag and amount atomically
@@ -915,10 +902,7 @@ const FCcontrollerinstructions = () => {
   // Fetch original data for comparison
   const fetchOriginalData = async () => {
     try {
-      const response = await api.get(
-        `/api/instructions/fc/instruction/${instructionId}`
-      );
-      return response.data;
+      return await fetchInstructionService(instructionId);
     } catch (error) {
       console.error("Error fetching original data:", error);
       return null;
@@ -938,10 +922,8 @@ const FCcontrollerinstructions = () => {
       }
 
       // Check if m1key exists in invoice table
-      const response = await api.get(
-        `/api/invoice/check/${instructionData.m1key}`
-      );
-      setIsInvoiced(response.data.exists);
+      const invoiceData = await checkInvoiceStatusService(instructionData.m1key);
+      setIsInvoiced(invoiceData.exists);
     } catch (error) {
       console.error("Error checking if instruction is invoiced:", error);
       setIsInvoiced(false);
@@ -1129,11 +1111,9 @@ const FCcontrollerinstructions = () => {
       setIsContainerLoading(true);
 
       // Call the API to delete the instruction
-      const response = await api.delete(
-        `/api/instructions/fc/instruction/${instructionId}`
-      );
+      const deleteData = await deleteInstructionService(instructionId);
 
-      console.log("Delete response:", response.data);
+      console.log("Delete response:", deleteData);
 
       // Show success message
       setContainerSuccessMessage("Instruction deleted successfully!");
@@ -1178,11 +1158,9 @@ const FCcontrollerinstructions = () => {
       }
 
       // Call the API to create an invoice for the instruction
-      const response = await api.post(
-        `/generate-invoice/${instructionData.m1key}`
-      );
+      const invoiceResult = await generateInvoiceService(instructionData.m1key);
 
-      console.log("Invoice creation response:", response.data);
+      console.log("Invoice creation response:", invoiceResult);
 
       // Show success message
       setContainerSuccessMessage("Invoice created successfully!");
@@ -1266,28 +1244,20 @@ const FCcontrollerinstructions = () => {
             if ((container.addSurcharges || container.hazardous || container.vgm) && 
                 formData.clientId && formData.pickup && formData.dropoff) {
               try {
-                const response = await api.get(
-                  `/api/instructions/client/${formData.clientId}/rates`,
-                  {
-                    params: {
-                      start: formData.pickup,
-                      destination: formData.dropoff
-                    }
-                  }
-                );
+                const ratesData = await fetchRatesService(formData.clientId, formData.pickup, formData.dropoff);
 
                 const sixMeterSurcharge =
-                  response.data.surcharges ?? 
-                  response.data.surcharge ?? 
+                  ratesData.surcharges ??
+                  ratesData.surcharge ??
                   0;
 
                 const twelveMeterSurcharge =
-                  response.data.surcharge12m ?? 
-                  response.data.surcharge_12m ?? 
-                  response.data.surcharge12 ?? 
-                  response.data.surcharge_12 ?? 
-                  response.data.surcharges ?? 
-                  response.data.surcharge ?? 
+                  ratesData.surcharge12m ??
+                  ratesData.surcharge_12m ??
+                  ratesData.surcharge12 ??
+                  ratesData.surcharge_12 ??
+                  ratesData.surcharges ??
+                  ratesData.surcharge ??
                   0;
 
                 const isTwelveMeter = container.containerType === "12m";
@@ -1302,8 +1272,8 @@ const FCcontrollerinstructions = () => {
                   surcharge_12m_amount: container.addSurcharges
                     ? (isTwelveMeter ? Number(resolvedSurcharge || 0) : 0)
                     : (container.surcharge_12m_amount || 0),
-                  hazardousAmount: container.hazardous ? Number(response.data.hazardous || 0) : container.hazardousAmount,
-                  vgmAmount: container.vgm ? Number(response.data.vgm || 0) : container.vgmAmount,
+                  hazardousAmount: container.hazardous ? Number(ratesData.hazardous || 0) : container.hazardousAmount,
+                  vgmAmount: container.vgm ? Number(ratesData.vgm || 0) : container.vgmAmount,
                 };
               } catch (error) {
                 console.error('Error fetching fresh amounts:', error);
@@ -1596,41 +1566,24 @@ const FCcontrollerinstructions = () => {
       console.log("DEBUG PAYLOAD total_cost:", instructionUpdateData.total_cost, "isSetRateMode:", isSetRateMode);
 
       // Make the API call
-      const response = await api.put(
-        `/api/instructions/fc/update/${instructionId}`,
-        {
-          instructionData: instructionUpdateData,
-          containers: containerData,
-          weightData: weightData,
-        }
-      );
+      const saveResult = await updateInstructionService(instructionId, instructionUpdateData, containerData, weightData);
 
-      console.log("✅ Server response:", response.data);
+      console.log("✅ Server response:", saveResult);
 
-      // Check for successful response (status 200)
-      if (response.status === 200) {
-        console.log("🎉 Save operation completed successfully!");
+      console.log("🎉 Save operation completed successfully!");
 
-        // Show success message
-        setContainerSuccessMessage("Changes saved successfully!");
-        setIsContainerDataModified(false);
+      // Show success message
+      setContainerSuccessMessage("Changes saved successfully!");
+      setIsContainerDataModified(false);
 
-        // Recalculate total cost to update UI with saved values
-        recalculateTotalCost();
+      // Recalculate total cost to update UI with saved values
+      recalculateTotalCost();
 
-        // Navigate after 2 seconds
-        setTimeout(() => {
-          console.log("🚀 Navigating to instructions list...");
-          navigate("/ViewClientInstruction");
-        }, 2000);
-      } else {
-        console.warn("⚠️ Unexpected server response:", response);
-        setErrorModal({
-          isOpen: true,
-          message:
-            "Save completed but server response was unexpected. Please verify your changes.",
-        });
-      }
+      // Navigate after 2 seconds
+      setTimeout(() => {
+        console.log("🚀 Navigating to instructions list...");
+        navigate("/ViewClientInstruction");
+      }, 2000);
     } catch (error) {
       console.error("❌ Error saving changes:", error);
       console.error("Error details:", error.response?.data || error.message);
@@ -1727,12 +1680,8 @@ const FCcontrollerinstructions = () => {
       // Only check legs if we have both an instructionId and a
       // container number that could exist in the DB.
       if (instructionId && container.containerNum) {
-        const response = await api.get(
-          `/api/instructions/fc/container/${instructionId}/${encodeURIComponent(
-            container.containerNum
-          )}/legs-exists`,
-        );
-        hasLegs = Boolean(response.data?.hasLegs);
+        const legsData = await checkContainerLegsExistService(instructionId, container.containerNum);
+        hasLegs = Boolean(legsData?.hasLegs);
       }
 
       const message = hasLegs
@@ -1793,13 +1742,11 @@ const FCcontrollerinstructions = () => {
       setIsContainerLoading(true);
 
       try {
-        const response = await api.get(
-          `/api/instructions/fc/instruction/${instructionId}`
-        );
-        console.log("Containers API response:", response.data);
+        const containerApiData = await fetchInstructionService(instructionId);
+        console.log("Containers API response:", containerApiData);
 
-        if (response.data && response.data.length > 0) {
-          const containersList = response.data.map((container, index) => ({
+        if (containerApiData && containerApiData.length > 0) {
+          const containersList = containerApiData.map((container, index) => ({
             id: container.containerkey || index + 1,
             containerKey: container.containerkey,
             containerNum: container.containernum || "",
@@ -2117,8 +2064,7 @@ const FCcontrollerinstructions = () => {
     setIsLoading((prev) => ({ ...prev, instruction: true }));
     try {
       console.log(`Fetching instruction data for ID: ${id}`);
-      const response = await api.get(`/api/instructions/fc/instruction/${id}`);
-      const data = response.data;
+      const data = await fetchInstructionService(id);
 
       console.log("Instruction data received:", data);
 
@@ -2622,15 +2568,7 @@ const FCcontrollerinstructions = () => {
   const fetchSurchargeAmount = async (containerId) => {
     try {
       console.log(`🌐 Fetching surcharge rates for client ${formData.clientId}, route: ${formData.pickup} → ${formData.dropoff}`);
-      const response = await api.get(
-        `/api/instructions/client/${formData.clientId}/rates`,
-        {
-          params: {
-            start: formData.pickup,
-            destination: formData.dropoff
-          }
-        }
-      );
+      const ratesData = await fetchRatesService(formData.clientId, formData.pickup, formData.dropoff);
 
       const container = containers.find((c) => c.id === containerId);
       const isTwelveMeter = container?.containerType === "12m";
@@ -2639,17 +2577,17 @@ const FCcontrollerinstructions = () => {
       // - Existing field (6m): "surcharges" (legacy), or "surcharge"
       // - New field (12m): "surcharge12m" (preferred), with fallbacks
       const sixMeterSurcharge =
-        response.data.surcharges ??
-        response.data.surcharge ??
+        ratesData.surcharges ??
+        ratesData.surcharge ??
         0;
 
       const twelveMeterSurcharge =
-        response.data.surcharge12m ??
-        response.data.surcharge_12m ??
-        response.data.surcharge12 ??
-        response.data.surcharge_12 ??
-        response.data.surcharges ??
-        response.data.surcharge ??
+        ratesData.surcharge12m ??
+        ratesData.surcharge_12m ??
+        ratesData.surcharge12 ??
+        ratesData.surcharge_12 ??
+        ratesData.surcharges ??
+        ratesData.surcharge ??
         0;
 
       const surchargeAmount = isTwelveMeter ? twelveMeterSurcharge : sixMeterSurcharge;
@@ -2732,13 +2670,13 @@ const FCcontrollerinstructions = () => {
     setIsLoading((prev) => ({ ...prev, clients: true }));
     try {
       console.log("Fetching active clients...");
-      const response = await api.get("/api/instructions/active-clients");
+      const clientsData = await fetchClientsService();
       console.log(
         "Active clients data received:",
-        response.data.length,
+        clientsData.length,
         "records"
       );
-      setClients(response.data);
+      setClients(clientsData);
     } catch (error) {
       console.error("Error fetching active clients:", error);
       let errorMessage = "Failed to fetch active clients. Please try again.";
@@ -2763,13 +2701,13 @@ const FCcontrollerinstructions = () => {
     setIsLoading((prev) => ({ ...prev, shipmentTypes: true }));
     try {
       console.log("Fetching shipment types...");
-      const response = await api.get("/api/instructions/shipment-types");
+      const shipmentTypesData = await fetchShipmentTypesService();
       console.log(
         "Shipment types data received:",
-        response.data.length,
+        shipmentTypesData.length,
         "records"
       );
-      setShipmentTypes(response.data);
+      setShipmentTypes(shipmentTypesData);
     } catch (error) {
       console.error("Error fetching shipment types:", error);
       let errorMessage = "Failed to fetch shipment types. Please try again.";
@@ -2803,14 +2741,12 @@ const FCcontrollerinstructions = () => {
       console.log(
         `Fetching starting points for client ${formData.clientId}...`
       );
-      const response = await api.get(
-        `/api/instructions/client/${formData.clientId}/starting-points`
-      );
-      console.log("Starting points data received:", response.data);
+      const startingPointsData = await fetchStartingPointsService(formData.clientId);
+      console.log("Starting points data received:", startingPointsData);
 
       // Ensure we have an array of objects with the correct structure
-      const formattedStartingPoints = Array.isArray(response.data)
-        ? response.data
+      const formattedStartingPoints = Array.isArray(startingPointsData)
+        ? startingPointsData
             .map((point, index) => ({
               id: point.id || `point-${index}`,
               startingpoint:
@@ -2869,16 +2805,12 @@ const FCcontrollerinstructions = () => {
       console.log(
         `Fetching destinations for client ${formData.clientId} and starting point ${startingPoint}...`
       );
-      const response = await api.get(
-        `/api/instructions/client/${
-          formData.clientId
-        }/destinations/${encodeURIComponent(startingPoint)}`
-      );
-      console.log("Destinations data received:", response.data);
+      const destinationsData = await fetchDestinationsService(formData.clientId, startingPoint);
+      console.log("Destinations data received:", destinationsData);
 
       // Ensure we have an array of objects with the correct structure
-      const formattedDestinations = Array.isArray(response.data)
-        ? response.data.map((dest) => ({
+      const formattedDestinations = Array.isArray(destinationsData)
+        ? destinationsData.map((dest) => ({
             id: dest.id || dest.destination,
             destination: dest.destination || String(dest),
           }))
@@ -3238,12 +3170,8 @@ const FCcontrollerinstructions = () => {
 
       // If no dropoff provided, get the default destination for this client and pickup location
       if (!destinationToUse) {
-        const destinations = await api.get(
-          `/api/instructions/client/${
-            formData.clientId
-          }/destinations/${encodeURIComponent(pickupLocation)}`
-        );
-        destinationToUse = destinations.data?.[0]?.destination;
+        const destinationsResult = await fetchDestinationsService(formData.clientId, pickupLocation);
+        destinationToUse = destinationsResult?.[0]?.destination;
 
         if (!destinationToUse) {
           console.log(
@@ -3257,23 +3185,15 @@ const FCcontrollerinstructions = () => {
       console.log("Using destination:", destinationToUse);
 
       // Fetch rates with both start and destination using the correct endpoint
-      const response = await api.get(
-        `/api/instructions/client/${formData.clientId}/rates`,
-        {
-          params: {
-            start: pickupLocation,
-            destination: destinationToUse,
-          },
-        }
-      );
+      const responseData = await fetchRatesService(formData.clientId, pickupLocation, destinationToUse);
 
-      console.log("Rates API response:", response.data);
+      console.log("Rates API response:", responseData);
 
-      if (response.data) {
+      if (responseData) {
         // Handle both array and object responses
-        const rateData = Array.isArray(response.data)
-          ? response.data[0]
-          : response.data;
+        const rateData = Array.isArray(responseData)
+          ? responseData[0]
+          : responseData;
 
         if (rateData) {
           // Try to get rates with different possible property names

@@ -7,7 +7,14 @@
       "Bash(python \"C:\\\\Users\\\\kives\\\\AppData\\\\Roaming\\\\Claude\\\\local-agent-mode-sessions\\\\skills-plugin\\\\97cd09fc-904a-4660-82c0-c668279c7ba7\\\\f79a0a98-f5f9-49ef-b463-ddf0fca4a339\\\\skills\\\\docx\\\\scripts\\\\office\\\\unpack.py\" \"C:\\\\Users\\\\kives\\\\Documents\\\\GitHub\\\\Whizz-Away\\\\WhizzAway_Phase1_AdminBilling.docx\" \"C:\\\\Users\\\\kives\\\\Documents\\\\GitHub\\\\Whizz-Away\\\\docx_unpacked\")",
       "Bash(grep -E \"\\\\.jsx$\")",
       "Bash(grep -v \"^\\\\s*const\\\\|^\\\\s*//\")",
-      "Bash(npx react-scripts *)"
+      "Bash(npx react-scripts *)",
+      "Bash(npx jest *)",
+      "Bash(python3 -c \"import sys,json; d=json.load\\(sys.stdin\\); print\\(json.dumps\\(d.get\\('jest', {}\\), indent=2\\)\\)\")",
+      "Bash(python3 -c \"import sys,json; d=json.load\\(sys.stdin\\); print\\(json.dumps\\(d.get\\('babel', {}\\), indent=2\\)\\); print\\('---'\\); print\\(json.dumps\\(d.get\\('scripts', {}\\).get\\('test', ''\\)\\)\\)\")",
+      "Bash(node -e \"const b = require\\('./node_modules/babel-jest/build/index.js'\\); console.log\\(Object.keys\\(b\\)\\);\")",
+      "Bash(python3 -c \"import sys,json; d=json.load\\(sys.stdin\\); print\\([k for k in d.get\\('dependencies',{}\\).keys\\(\\) if 'babel' in k.lower\\(\\)]\\)\")",
+      "Bash(BABEL_ENV=test npx jest --testPathPattern=\"instructions\" --no-coverage)",
+      "Bash(python3 -c \"import sys,json; d=json.load\\(sys.stdin\\); print\\('type:', d.get\\('type', 'not set'\\)\\)\")"
     ]
   }
 }
