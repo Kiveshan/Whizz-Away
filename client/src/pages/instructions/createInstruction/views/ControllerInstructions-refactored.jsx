@@ -5,6 +5,9 @@ import "../../css/controllerinstruction.css"
 import { useNavigate, useLocation } from "react-router-dom"
 import api from "../../../../api"
 import { ErrorTooltip as SharedErrorTooltip } from "../../../../components/instructions/ErrorTooltip"
+import { calcContainerBasedCost, calcBreakBulkCost } from "../../../../utils/instructions/costCalculation"
+import { validateForm as validateFormUtil } from "../../../../utils/instructions/validation"
+import { checkRateCountMismatch as checkRateCountMismatchUtil } from "../../../../utils/instructions/rateCountMismatch"
 
 const ControllerInstructions = () => {
   const navigate = useNavigate()
@@ -1174,66 +1177,18 @@ const ControllerInstructions = () => {
     }
   }, [])
 
-  // Form validation
+  // Form validation — delegates to utility, returns errors object (legacy shape for call site)
   const validateForm = useCallback(() => {
-    const errors = {}
-
-    // Required fields
-    if (!formData.clientId) errors.clientId = "Client is required"
-    if (!formData.shipmentTypeId) errors.shipmentTypeId = "Shipment type is required"
-    if (!formData.pickup) errors.pickup = "Pickup location is required"
-    if (!formData.dropoff) errors.dropoff = "Dropoff location is required"
-
-    if (!isAddOn) {
-      if (!formData.task) errors.task = "KSM File Reference is required"
-      if (!formData.lastFreeDate) errors.lastFreeDate = "Last Free Date is required"
-      if (!formData.bookingRef) errors.bookingRef = "Booking reference is required"
-      if (!formData.fileRef) errors.fileRef = "Client File Reference is required"
-      if (!formData.description) errors.description = "Description is required"
-    }
-
-    // Cross-haul specific validations (vessel name and stack date not required for cross-haul types)
-    if (!isCrossHaul && !isAddOn) {
-      if (!formData.vesselName) errors.vesselName = "Vessel name is required"
-      if (!formData.stackDate) errors.stackDate = "Stack date is required"
-    }
-
-    // Weight-based validations
-    if (isWeightBased) {
-      if (formData.shipmentTypeId !== "4") {
-        if (!formData.weight || formData.weight === "") {
-          errors.weight = "Weight is required for weight-based calculations"
-        }
-      }
-      const isCrossHaulSetRate = formData.shipmentTypeId === "4" && isSetRate
-      if (!isCrossHaulSetRate && (!formData.unitrate || formData.unitrate === "")) {
-        errors.unitrate = "Unit rate is required for weight-based calculations"
-      }
-    } else if (isSetRateMode) {
-      if (!formData.setRateAmount || formData.setRateAmount === "") {
-        errors.setRateAmount = "Set rate amount is required when unit type is Set Rate"
-      }
-    } else if (!isAddOn) {
-      // Container-based validations (skip for add-on shipments)
-      const totalContainers =
-        formData.num_six_meters +
-        formData.num_twelve_meters +
-        formData.num_abnormal +
-        (isCrossHaul && formData.rateWeight === "Container" ? formData.num_breakbulk : 0) // Only count breakbulk if it's container-based
-      if (totalContainers === 0) {
-        errors.containerCount = "At least one container is required"
-      }
-
-      // Break bulk validation for cross-haul + container
-      if (isCrossHaul && formData.num_breakbulk > 0 && formData.rateWeight === "Container") {
-        if (!formData.rateper_breakbulk || formData.rateper_breakbulk === "") {
-          errors.rateper_breakbulk = "Break bulk rate is required when break bulk count > 0 and unit type is Container"
-        }
-      }
-    }
-
-    return errors
-  }, [formData, isCrossHaul, isWeightBased, isAddOn, isSetRate])
+    const { fieldErrors } = validateFormUtil(formData, [], {
+      mode: "create",
+      isAddOn,
+      isCrossHaul,
+      isWeightBased,
+      isSetRate,
+      isSetRateMode,
+    })
+    return fieldErrors
+  }, [formData, isCrossHaul, isWeightBased, isAddOn, isSetRate, isSetRateMode])
 
   // Container validation function
   const validateContainers = useCallback(() => {
@@ -1287,78 +1242,11 @@ const ControllerInstructions = () => {
     return isValid
   }, [isAddOn, isWeightBased, showContainerDetails, containers, isImport, isExport, formData.shipmentTypeId])
 
-  // Check for rate/count mismatch and generate confirmation message
-  const checkRateCountMismatch = useCallback(() => {
-    // Skip mismatch check for weight-based, set-rate, and add-on shipments
-    if (isWeightBased || isSetRateMode || isAddOn) {
-      return { needsConfirmation: false, message: "" }
-    }
-
-    const containerTypesWithRatesButZeroCount = []
-    const containerTypesWithCountAndRates = []
-
-    // Check 6m containers
-    const sixMeterRate = Number.parseFloat(formData.sixMeterRate) || 0
-    const sixMeterCount = formData.num_six_meters || 0
-    if (sixMeterRate > 0 && sixMeterCount === 0) {
-      containerTypesWithRatesButZeroCount.push("6m")
-    }
-    if (sixMeterCount > 0 && sixMeterRate > 0) {
-      containerTypesWithCountAndRates.push(`6m (${sixMeterCount} containers, Rate: R${sixMeterRate.toFixed(2)})`)
-    }
-
-    // Check 12m containers
-    const twelveMeterRate = Number.parseFloat(formData.twelveMeterRate) || 0
-    const twelveMeterCount = formData.num_twelve_meters || 0
-    if (twelveMeterRate > 0 && twelveMeterCount === 0) {
-      containerTypesWithRatesButZeroCount.push("12m")
-    }
-    if (twelveMeterCount > 0 && twelveMeterRate > 0) {
-      containerTypesWithCountAndRates.push(`12m (${twelveMeterCount} containers, Rate: R${twelveMeterRate.toFixed(2)})`)
-    }
-
-    // Check abnormal containers
-    const abnormalRate = Number.parseFloat(formData.abnormalRate) || 0
-    const abnormalCount = formData.num_abnormal || 0
-    if (abnormalRate > 0 && abnormalCount === 0) {
-      containerTypesWithRatesButZeroCount.push("Abnormal")
-    }
-    if (abnormalCount > 0 && abnormalRate > 0) {
-      containerTypesWithCountAndRates.push(`Abnormal (${abnormalCount} containers, Rate: R${abnormalRate.toFixed(2)})`)
-    }
-
-    // Check break bulk containers (only for cross-haul)
-    if (isCrossHaul) {
-      const breakBulkRate = Number.parseFloat(formData.rateper_breakbulk) || 0
-      const breakBulkCount = formData.num_breakbulk || 0
-      if (breakBulkRate > 0 && breakBulkCount === 0) {
-        containerTypesWithRatesButZeroCount.push("Break Bulk")
-      }
-      if (breakBulkCount > 0 && breakBulkRate > 0) {
-        containerTypesWithCountAndRates.push(
-          `Break Bulk (${breakBulkCount} containers, Rate: R${breakBulkRate.toFixed(2)})`,
-        )
-      }
-    }
-
-    // If there are rates set but counts are 0, show confirmation
-    if (containerTypesWithRatesButZeroCount.length > 0) {
-      let message = "You have containers with the following rates: "
-      if (containerTypesWithCountAndRates.length > 0) {
-        message += containerTypesWithCountAndRates.join(", ")
-        message += ". Are you sure you want to continue?"
-      } else {
-        message = "You have set rates for container types with 0 containers. Are you sure you want to continue?"
-      }
-
-      return {
-        needsConfirmation: true,
-        message: message,
-      }
-    }
-
-    return { needsConfirmation: false, message: "" }
-  }, [formData, isWeightBased, isCrossHaul, isAddOn])
+  // Delegates to utility
+  const checkRateCountMismatch = useCallback(
+    () => checkRateCountMismatchUtil(formData, { isAddOn, isWeightBased, isSetRateMode, isCrossHaul }),
+    [formData, isAddOn, isWeightBased, isSetRateMode, isCrossHaul]
+  )
 
   const handleSubmit = useCallback(
     async (e) => {
@@ -1450,110 +1338,31 @@ const ControllerInstructions = () => {
       const currentWeightRows = weightRowsRef.current || []
 
       if ((isSetRateMode || isSetRate) && !isAddOn) {
-        const weightRowCount = currentWeightRows.length || 1
-        totalCost = calculatedSetRateValue * weightRowCount
-
+        totalCost = calcBreakBulkCost(currentWeightRows, 0, {
+          isSetRateMode: true,
+          setRateAmount: calculatedSetRateValue,
+        })
         costBreakdown.components = {
-          setRateAmount: setRateValue,
-          weightRowCount: weightRowCount,
+          setRateAmount: calculatedSetRateValue,
+          weightRowCount: currentWeightRows.length || 1,
           setRateCost: totalCost,
         }
-
-        console.log("SET-RATE CALCULATION:")
-        console.log(`  Set Rate Amount: R${setRateValue.toFixed(2)}`)
-        console.log(`  Weight Row Count: ${weightRowCount}`)
-        console.log(`  Total Cost: R${setRateValue.toFixed(2)} × ${weightRowCount} = R${totalCost.toFixed(2)}`)
+        console.log(`SET-RATE CALCULATION: R${calculatedSetRateValue} × ${currentWeightRows.length || 1} = R${totalCost}`)
       } else if (isWeightBased && !isAddOn) {
-        // Weight-based calculation
-        let baseWeight = 0
         if (formData.shipmentTypeId === "4") {
-          baseWeight = currentWeightRows.reduce((sum, row) => {
-            if (row.weight === null || row.weight === undefined || row.weight === "") {
-              return sum
-            }
-            const parsed = Number.parseFloat(row.weight)
-            return Number.isNaN(parsed) ? sum : sum + parsed
-          }, 0)
+          totalCost = calcBreakBulkCost(currentWeightRows, formData.unitrate || 0)
         } else {
-          baseWeight = Number.parseFloat(formData.weight || 0)
+          const baseWeight = Number.parseFloat(formData.weight || 0)
+          const unitRate = Number.parseFloat(formData.unitrate || 0)
+          totalCost = baseWeight * unitRate
         }
-
-        const unitRate = Number.parseFloat(formData.unitrate || 0)
-        totalCost = baseWeight * unitRate
-
-        costBreakdown.components = {
-          weight: baseWeight,
-          unitRate: unitRate,
-          weightBasedCost: totalCost,
-        }
-
-        console.log("WEIGHT-BASED CALCULATION:")
-        console.log(`  Weight: ${baseWeight} ${formData.rateWeight}`)
-        console.log(`  Unit Rate: R${unitRate.toFixed(2)} per ${formData.rateWeight}`)
-        console.log(`  Base Cost: ${baseWeight} × R${unitRate.toFixed(2)} = R${totalCost.toFixed(2)}`)
+        costBreakdown.components = { weightBasedCost: totalCost }
+        console.log(`WEIGHT-BASED CALCULATION: R${totalCost}`)
       } else {
         // Container-based calculation
-        const sixMeterRate = Number.parseFloat(formData.sixMeterRate) || 0
-        const twelveMeterRate = Number.parseFloat(formData.twelveMeterRate) || 0
-        const abnormalRate = Number.parseFloat(formData.abnormalRate) || 0
-        const breakBulkRate = Number.parseFloat(formData.rateper_breakbulk) || 0
-
-        const sixMeterCount = formData.num_six_meters || 0
-        const twelveMeterCount = formData.num_twelve_meters || 0
-        const abnormalCount = formData.num_abnormal || 0
-        const breakBulkCount = formData.num_breakbulk || 0
-
-        const sixMeterCost = sixMeterRate * sixMeterCount
-        const twelveMeterCost = twelveMeterRate * twelveMeterCount
-        const abnormalCost = abnormalRate * abnormalCount
-
-        // Break bulk cost only applies if it's cross-haul AND the rateWeight is 'Container'
-        const breakBulkCost = isCrossHaul && formData.rateWeight === "Container" ? breakBulkRate * breakBulkCount : 0
-
-        const surchargeTotal = (containersRef.current || []).reduce((sum, c) => {
-          if (c.addSurcharges) {
-            const resolved = c.is_12m_surcharge
-              ? (Number(c.surcharge_12m_amount) || 0)
-              : (Number(c.surchargeAmount) || 0)
-            return sum + resolved
-          }
-          return sum
-        }, 0)
-
-        totalCost = sixMeterCost + twelveMeterCost + abnormalCost + breakBulkCost + surchargeTotal
-
-        costBreakdown.components = {
-          sixMeter: { count: sixMeterCount, rate: sixMeterRate, cost: sixMeterCost },
-          twelveMeter: { count: twelveMeterCount, rate: twelveMeterRate, cost: twelveMeterCost },
-          abnormal: { count: abnormalCount, rate: abnormalRate, cost: abnormalCost },
-          breakBulk: {
-            count: breakBulkCount,
-            rate: breakBulkRate,
-            cost: breakBulkCost,
-            applicable: isCrossHaul && formData.rateWeight === "Container",
-          },
-          surcharges: { count: (containersRef.current || []).filter(c => c.addSurcharges).length, cost: surchargeTotal },
-          containerBasedSubtotal: totalCost,
-        }
-
-        console.log("CONTAINER-BASED CALCULATION:")
-        console.log(`  6m Containers: ${sixMeterCount} × R${sixMeterRate.toFixed(2)} = R${sixMeterCost.toFixed(2)}`)
-        console.log(
-          `  12m Containers: ${twelveMeterCount} × R${twelveMeterRate.toFixed(2)} = R${twelveMeterCost.toFixed(2)}`,
-        )
-        console.log(
-          `  Abnormal Containers: ${abnormalCount} × R${abnormalRate.toFixed(2)} = R${abnormalCost.toFixed(2)}`,
-        )
-
-        if (isCrossHaul && formData.rateWeight === "Container") {
-          console.log(`  Break Bulk: ${breakBulkCount} × R${breakBulkRate.toFixed(2)} = R${breakBulkCost.toFixed(2)}`)
-        } else if (isCrossHaul) {
-          console.log(`  Break Bulk: Not applicable (Unit type: ${formData.rateWeight})`)
-        }
-
-        console.log(`  Surcharges: R${surchargeTotal.toFixed(2)}`)
-
-        console.log(`  Container Subtotal: R${totalCost.toFixed(2)}`)
+        totalCost = calcContainerBasedCost(formData, containersRef.current || [], { isCrossHaul })
+        costBreakdown.components = { containerBasedSubtotal: totalCost }
+        console.log(`CONTAINER-BASED CALCULATION: R${totalCost}`)
       }
 
       // For add-on shipment type (5), force all financial values to zero
