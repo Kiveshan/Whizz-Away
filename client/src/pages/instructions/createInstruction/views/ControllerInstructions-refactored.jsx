@@ -3,8 +3,14 @@
 import { useState, useEffect, useRef, useMemo, useCallback } from "react"
 import "../../css/controllerinstruction.css"
 import { useNavigate, useLocation } from "react-router-dom"
-import api from "../../../../api"
 import { ErrorTooltip as SharedErrorTooltip } from "../../../../components/instructions/ErrorTooltip"
+import {
+  fetchStartingPoints as fetchStartingPointsService,
+  fetchDestinations as fetchDestinationsService,
+  fetchRates as fetchRatesService,
+  saveInstruction as saveInstructionService,
+} from "../../../../services/instructionService"
+import { useInstructionData } from "../../../../hooks/useInstructionData"
 import { calcContainerBasedCost, calcBreakBulkCost } from "../../../../utils/instructions/costCalculation"
 import { validateForm as validateFormUtil } from "../../../../utils/instructions/validation"
 import { checkRateCountMismatch as checkRateCountMismatchUtil } from "../../../../utils/instructions/rateCountMismatch"
@@ -149,19 +155,29 @@ const ControllerInstructions = () => {
   const [locationError, setLocationError] = useState(null)
   const [showNoRatesModal, setShowNoRatesModal] = useState(false)
 
-  // Data loading states
-  const [isLoading, setIsLoading] = useState({
-    clients: true,
-    shipmentTypes: true,
-    startingPoints: true,
-    destinations: true,
+  // Route-level loading state (clients + shipmentTypes handled by hook)
+  const [locationIsLoading, setIsLoading] = useState({
+    startingPoints: false,
+    destinations: false,
   })
 
-  // Data states
-  const [clients, setClients] = useState([])
-  const [shipmentTypes, setShipmentTypes] = useState([])
-  const [startingPoints, setStartingPoints] = useState([])
-  const [destinations, setDestinations] = useState([])
+  // Base data from hook (clients, shipmentTypes + their loading flags)
+  const {
+    clients,
+    shipmentTypes,
+    isLoading: hookIsLoading,
+  } = useInstructionData({
+    onError: (msg) => console.error("[CREATE] data load error:", msg),
+    on404: () => setShowNoRatesModal(true),
+  })
+
+  // Merged loading object used throughout the component
+  const isLoading = {
+    clients: hookIsLoading.clients,
+    shipmentTypes: hookIsLoading.shipmentTypes,
+    startingPoints: locationIsLoading.startingPoints,
+    destinations: locationIsLoading.destinations,
+  }
 
   // Container states
   const [containers, setContainers] = useState([])
@@ -399,31 +415,23 @@ const ControllerInstructions = () => {
             return 0
           }
 
-          const response = await api.get(
-            `/api/instructions/client/${formData.clientId}/rates`,
-            {
-              params: {
-                start: formData.pickup,
-                destination: formData.dropoff,
-              },
-            },
-          )
+          const ratesData = await fetchRatesService(formData.clientId, formData.pickup, formData.dropoff)
 
           const container = containersRef.current.find((c) => c.id === containerId)
           const isTwelveMeter = container?.containerType === "12m"
 
           const sixMeterSurcharge =
-            response.data.surcharges ??
-            response.data.surcharge ??
+            ratesData.surcharges ??
+            ratesData.surcharge ??
             0
 
           const twelveMeterSurcharge =
-            response.data.surcharge12m ??
-            response.data.surcharge_12m ??
-            response.data.surcharge12 ??
-            response.data.surcharge_12 ??
-            response.data.surcharges ??
-            response.data.surcharge ??
+            ratesData.surcharge12m ??
+            ratesData.surcharge_12m ??
+            ratesData.surcharge12 ??
+            ratesData.surcharge_12 ??
+            ratesData.surcharges ??
+            ratesData.surcharge ??
             0
 
           return isTwelveMeter ? twelveMeterSurcharge : sixMeterSurcharge
@@ -724,52 +732,14 @@ const ControllerInstructions = () => {
     }
   }, [formData.shipmentTypeId, formData.rateWeight])
 
-  // Load initial data
-  useEffect(() => {
-    const loadInitialData = async () => {
-      try {
-        // Load clients
-        const clientsResponse = await api.get("/api/instructions/active-clients")
-        setClients(clientsResponse.data)
-        setIsLoading((prev) => ({ ...prev, clients: false }))
-
-        // Load shipment types
-        const shipmentTypesResponse = await api.get("/api/instructions/shipment-types")
-        setShipmentTypes(shipmentTypesResponse.data)
-        setIsLoading((prev) => ({ ...prev, shipmentTypes: false }))
-
-        // Set other loading states to false since we're not loading them initially
-        setIsLoading((prev) => ({
-          ...prev,
-          startingPoints: false,
-          destinations: false,
-        }))
-      } catch (error) {
-        console.error("Error loading initial data:", error)
-        setIsLoading({
-          clients: false,
-          shipmentTypes: false,
-          startingPoints: false,
-          destinations: false,
-        })
-      }
-    }
-
-    loadInitialData()
-  }, [])
-
   // Function to fetch rates for the selected client, pickup and dropoff
   const fetchRates = useCallback(async (clientId, start, destination) => {
     if (!clientId || !start || !destination) {
       return null
     }
 
-    const url = `/api/instructions/client/${clientId}/rates`
-    const params = { start, destination }
-
     try {
-      const response = await api.get(url, { params })
-      return response.data
+      return await fetchRatesService(clientId, start, destination)
     } catch (error) {
       console.error("[fetchRates] Error fetching rates:", error)
       return null
@@ -973,8 +943,8 @@ const ControllerInstructions = () => {
       if (clientId) {
         setIsLoadingLocations(true)
         try {
-          const response = await api.get(`/api/instructions/client/${clientId}/starting-points`)
-          const startingPoints = response.data.map((point) => ({
+          const startingPointsData = await fetchStartingPointsService(clientId)
+          const startingPoints = startingPointsData.map((point) => ({
             value: point.starting_point,
             label: point.starting_point,
           }))
@@ -1029,9 +999,8 @@ const ControllerInstructions = () => {
       if (pickup && formData.clientId) {
         setIsLoading((prev) => ({ ...prev, destinations: true }))
         try {
-          const encodedPickup = encodeURIComponent(pickup)
-          const response = await api.get(`/api/instructions/client/${formData.clientId}/destinations/${encodedPickup}`)
-          const destinations = response.data.map((dest) => ({
+          const destinationsData = await fetchDestinationsService(formData.clientId, pickup)
+          const destinations = destinationsData.map((dest) => ({
             value: dest.destination,
             label: dest.destination,
           }))
@@ -1606,19 +1575,15 @@ const ControllerInstructions = () => {
       console.log(`  rateper_breakbulk: ${instructionData.rateper_breakbulk} (count: ${instructionData.num_breakbulk})`)
 
       // Save the instruction
-      const response = await api.post("/api/instructions/save-instruction", {
-        controllerData: instructionData,
-        containerData: containerData,
-        weightData: weightData,
-      })
+      const saveData = await saveInstructionService(instructionData, containerData, weightData)
 
-      if (response.data.success) {
+      if (saveData.success) {
         console.log("=== INSTRUCTION SAVED SUCCESSFULLY ===")
-        console.log("Database response:", response.data)
+        console.log("Database response:", saveData)
         // Navigate to dashboard on success
         navigate("/ControllerDashboard")
       } else {
-        throw new Error(response.data.message || "Failed to save instruction")
+        throw new Error(saveData.message || "Failed to save instruction")
       }
     } catch (error) {
       console.error("=== ERROR SAVING INSTRUCTION ===")

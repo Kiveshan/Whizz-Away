@@ -1,11 +1,22 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import "../../css/controllerinstruction.css";
 import { useNavigate, useLocation } from "react-router-dom";
 import ErrorModal from "../../../../components/ErrorModal";
-import api from "../../../../api";
 import { ErrorTooltip } from "../../../../components/instructions/ErrorTooltip";
+import {
+  fetchDestinations as fetchDestinationsService,
+  fetchRates as fetchRatesService,
+  fetchSetRate as fetchSetRateService,
+  fetchInstruction as fetchInstructionService,
+  updateInstruction as updateInstructionService,
+  deleteInstruction as deleteInstructionService,
+  generateInvoice as generateInvoiceService,
+  checkInvoiceStatus as checkInvoiceStatusService,
+  checkContainerLegsExist as checkContainerLegsExistService,
+} from "../../../../services/instructionService";
+import { useInstructionData } from "../../../../hooks/useInstructionData";
 import { formatDateForDB, formatDateForInput as formatDateForInputUtil } from "../../../../utils/instructions/dateFormatting";
 import { calculateTotalCostFromRates, calcBreakBulkCost } from "../../../../utils/instructions/costCalculation";
 import { validateForm as validateFormUtil } from "../../../../utils/instructions/validation";
@@ -64,17 +75,9 @@ const FCcontrollerinstructions = () => {
   const fetchVgmAmount = async (containerId) => {
     try {
       console.log(`⚖️ Fetching VGM rate for client ${formData.clientId}, route: ${formData.pickup} → ${formData.dropoff}`);
-      const response = await api.get(
-        `/api/instructions/client/${formData.clientId}/rates`,
-        {
-          params: {
-            start: formData.pickup,
-            destination: formData.dropoff
-          }
-        }
-      );
+      const ratesData = await fetchRatesService(formData.clientId, formData.pickup, formData.dropoff);
 
-      const vgmAmount = response.data.vgm || 0;
+      const vgmAmount = ratesData.vgm || 0;
       console.log(`⚖️ Fetched VGM amount: ${vgmAmount} for container ${containerId}`);
 
       setContainers(prevContainers =>
@@ -259,26 +262,42 @@ const FCcontrollerinstructions = () => {
   // Allow editing while In Progress; only Completed is locked.
   const isReadOnly = formData.status === "Completed";
 
-  const [startingPoints, setStartingPoints] = useState([]);
-  const [destinations, setDestinations] = useState([]);
-  const [clients, setClients] = useState([]);
-  const [shipmentTypes, setShipmentTypes] = useState([]);
-  const [isLoading, setIsLoading] = useState({
-    clients: true,
-    shipmentTypes: true,
-    startingPoints: true,
-    destinations: true,
-    instruction: instructionId ? true : false,
-  });
   const [errorModal, setErrorModal] = useState({
     isOpen: false,
     message: "",
   });
 
-  // Track when the current pickup/dropoff no longer matches any client rate
-  const [hasRouteMismatch, setHasRouteMismatch] = useState(false);
-  // "locked" = show legacy route as read-only, "editable" = normal dropdown behaviour
-  const [routeEditMode, setRouteEditMode] = useState("editable");
+  const {
+    clients,
+    shipmentTypes,
+    startingPoints,
+    destinations,
+    instructionRecord,
+    isLoading,
+    isLoadingComplete,
+    hasRouteMismatch,
+    setHasRouteMismatch,
+    routeEditMode,
+    setRouteEditMode,
+    refetch: refetchBaseData,
+  } = useInstructionData({
+    fetchExisting: !!instructionId && !preservedFormData,
+    instructionId,
+    clientId: formData.clientId,
+    pickup: formData.pickup,
+    dropoff: formData.dropoff,
+    onFormUpdate: (partial) => setFormData((prev) => ({ ...prev, ...partial })),
+    onError: (msg) => setErrorModal({ isOpen: true, message: msg }),
+  });
+
+  // Apply fetched instruction record to form state (update form)
+  useEffect(() => {
+    if (instructionRecord) {
+      applyInstructionData(instructionRecord);
+    }
+  // applyInstructionData is stable (defined once); instructionRecord changes once on load
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [instructionRecord]);
 
   const isAddOn = (() => {
     const id = (formData.shipmentTypeId || "").toString();
@@ -318,11 +337,9 @@ const FCcontrollerinstructions = () => {
     const fetchSetRate = async () => {
       if (isSetRate && formData.clientId && formData.pickup && formData.dropoff) {
         try {
-          const encodedPickup = encodeURIComponent(formData.pickup)
-          const encodedDropoff = encodeURIComponent(formData.dropoff)
-          const response = await api.get(`/api/instructions/client/${formData.clientId}/set-rate/${encodedPickup}/${encodedDropoff}`)
-          if (response.data && response.data.set_rate !== undefined) {
-            const numericSetRate = Number(response.data.set_rate)
+          const setRateData = await fetchSetRateService(formData.clientId, formData.pickup, formData.dropoff);
+          if (setRateData && setRateData.set_rate !== undefined) {
+            const numericSetRate = Number(setRateData.set_rate)
             setSetRateValue(numericSetRate)
             // Keep formData.setRateAmount in sync so save logic can use it
             setFormData((prev) => ({
@@ -657,17 +674,9 @@ const FCcontrollerinstructions = () => {
 
   try {
     console.log(`🌐 Fetching hazardous rates for client ${formData.clientId}, route: ${formData.pickup} → ${formData.dropoff}`);
-    const response = await api.get(
-      `/api/instructions/client/${formData.clientId}/rates`,
-      {
-        params: {
-          start: formData.pickup,
-          destination: formData.dropoff
-        }
-      }
-    )
-    
-    const hazardousAmount = response.data.hazardous || 0;
+    const ratesData = await fetchRatesService(formData.clientId, formData.pickup, formData.dropoff);
+
+    const hazardousAmount = ratesData.hazardous || 0;
     console.log(`☣️ Fetched hazardous amount: ${hazardousAmount} for container ${container.containerNum || containerId}`);
     
     // Update container with hazardous amount
@@ -731,16 +740,8 @@ const FCcontrollerinstructions = () => {
           // Checkbox checked - fetch amount first, then update state
           console.log(`☢️ Hazardous checkbox CHECKED for container ${id} - fetching rate first`);
           try {
-            const response = await api.get(
-              `/api/instructions/client/${formData.clientId}/rates`,
-              {
-                params: {
-                  start: formData.pickup,
-                  destination: formData.dropoff
-                }
-              }
-            );
-            const hazardousAmount = response.data.hazardous || 0;
+            const ratesData = await fetchRatesService(formData.clientId, formData.pickup, formData.dropoff);
+            const hazardousAmount = ratesData.hazardous || 0;
             console.log(`☣️ Fetched hazardous amount: ${hazardousAmount} for container ${id}`);
             
             // Update container with both flag and amount atomically
@@ -915,10 +916,7 @@ const FCcontrollerinstructions = () => {
   // Fetch original data for comparison
   const fetchOriginalData = async () => {
     try {
-      const response = await api.get(
-        `/api/instructions/fc/instruction/${instructionId}`
-      );
-      return response.data;
+      return await fetchInstructionService(instructionId);
     } catch (error) {
       console.error("Error fetching original data:", error);
       return null;
@@ -938,10 +936,8 @@ const FCcontrollerinstructions = () => {
       }
 
       // Check if m1key exists in invoice table
-      const response = await api.get(
-        `/api/invoice/check/${instructionData.m1key}`
-      );
-      setIsInvoiced(response.data.exists);
+      const invoiceData = await checkInvoiceStatusService(instructionData.m1key);
+      setIsInvoiced(invoiceData.exists);
     } catch (error) {
       console.error("Error checking if instruction is invoiced:", error);
       setIsInvoiced(false);
@@ -1129,11 +1125,9 @@ const FCcontrollerinstructions = () => {
       setIsContainerLoading(true);
 
       // Call the API to delete the instruction
-      const response = await api.delete(
-        `/api/instructions/fc/instruction/${instructionId}`
-      );
+      const deleteData = await deleteInstructionService(instructionId);
 
-      console.log("Delete response:", response.data);
+      console.log("Delete response:", deleteData);
 
       // Show success message
       setContainerSuccessMessage("Instruction deleted successfully!");
@@ -1178,11 +1172,9 @@ const FCcontrollerinstructions = () => {
       }
 
       // Call the API to create an invoice for the instruction
-      const response = await api.post(
-        `/generate-invoice/${instructionData.m1key}`
-      );
+      const invoiceResult = await generateInvoiceService(instructionData.m1key);
 
-      console.log("Invoice creation response:", response.data);
+      console.log("Invoice creation response:", invoiceResult);
 
       // Show success message
       setContainerSuccessMessage("Invoice created successfully!");
@@ -1266,28 +1258,20 @@ const FCcontrollerinstructions = () => {
             if ((container.addSurcharges || container.hazardous || container.vgm) && 
                 formData.clientId && formData.pickup && formData.dropoff) {
               try {
-                const response = await api.get(
-                  `/api/instructions/client/${formData.clientId}/rates`,
-                  {
-                    params: {
-                      start: formData.pickup,
-                      destination: formData.dropoff
-                    }
-                  }
-                );
+                const ratesData = await fetchRatesService(formData.clientId, formData.pickup, formData.dropoff);
 
                 const sixMeterSurcharge =
-                  response.data.surcharges ?? 
-                  response.data.surcharge ?? 
+                  ratesData.surcharges ??
+                  ratesData.surcharge ??
                   0;
 
                 const twelveMeterSurcharge =
-                  response.data.surcharge12m ?? 
-                  response.data.surcharge_12m ?? 
-                  response.data.surcharge12 ?? 
-                  response.data.surcharge_12 ?? 
-                  response.data.surcharges ?? 
-                  response.data.surcharge ?? 
+                  ratesData.surcharge12m ??
+                  ratesData.surcharge_12m ??
+                  ratesData.surcharge12 ??
+                  ratesData.surcharge_12 ??
+                  ratesData.surcharges ??
+                  ratesData.surcharge ??
                   0;
 
                 const isTwelveMeter = container.containerType === "12m";
@@ -1302,8 +1286,8 @@ const FCcontrollerinstructions = () => {
                   surcharge_12m_amount: container.addSurcharges
                     ? (isTwelveMeter ? Number(resolvedSurcharge || 0) : 0)
                     : (container.surcharge_12m_amount || 0),
-                  hazardousAmount: container.hazardous ? Number(response.data.hazardous || 0) : container.hazardousAmount,
-                  vgmAmount: container.vgm ? Number(response.data.vgm || 0) : container.vgmAmount,
+                  hazardousAmount: container.hazardous ? Number(ratesData.hazardous || 0) : container.hazardousAmount,
+                  vgmAmount: container.vgm ? Number(ratesData.vgm || 0) : container.vgmAmount,
                 };
               } catch (error) {
                 console.error('Error fetching fresh amounts:', error);
@@ -1596,41 +1580,24 @@ const FCcontrollerinstructions = () => {
       console.log("DEBUG PAYLOAD total_cost:", instructionUpdateData.total_cost, "isSetRateMode:", isSetRateMode);
 
       // Make the API call
-      const response = await api.put(
-        `/api/instructions/fc/update/${instructionId}`,
-        {
-          instructionData: instructionUpdateData,
-          containers: containerData,
-          weightData: weightData,
-        }
-      );
+      const saveResult = await updateInstructionService(instructionId, instructionUpdateData, containerData, weightData);
 
-      console.log("✅ Server response:", response.data);
+      console.log("✅ Server response:", saveResult);
 
-      // Check for successful response (status 200)
-      if (response.status === 200) {
-        console.log("🎉 Save operation completed successfully!");
+      console.log("🎉 Save operation completed successfully!");
 
-        // Show success message
-        setContainerSuccessMessage("Changes saved successfully!");
-        setIsContainerDataModified(false);
+      // Show success message
+      setContainerSuccessMessage("Changes saved successfully!");
+      setIsContainerDataModified(false);
 
-        // Recalculate total cost to update UI with saved values
-        recalculateTotalCost();
+      // Recalculate total cost to update UI with saved values
+      recalculateTotalCost();
 
-        // Navigate after 2 seconds
-        setTimeout(() => {
-          console.log("🚀 Navigating to instructions list...");
-          navigate("/ViewClientInstruction");
-        }, 2000);
-      } else {
-        console.warn("⚠️ Unexpected server response:", response);
-        setErrorModal({
-          isOpen: true,
-          message:
-            "Save completed but server response was unexpected. Please verify your changes.",
-        });
-      }
+      // Navigate after 2 seconds
+      setTimeout(() => {
+        console.log("🚀 Navigating to instructions list...");
+        navigate("/ViewClientInstruction");
+      }, 2000);
     } catch (error) {
       console.error("❌ Error saving changes:", error);
       console.error("Error details:", error.response?.data || error.message);
@@ -1727,12 +1694,8 @@ const FCcontrollerinstructions = () => {
       // Only check legs if we have both an instructionId and a
       // container number that could exist in the DB.
       if (instructionId && container.containerNum) {
-        const response = await api.get(
-          `/api/instructions/fc/container/${instructionId}/${encodeURIComponent(
-            container.containerNum
-          )}/legs-exists`,
-        );
-        hasLegs = Boolean(response.data?.hasLegs);
+        const legsData = await checkContainerLegsExistService(instructionId, container.containerNum);
+        hasLegs = Boolean(legsData?.hasLegs);
       }
 
       const message = hasLegs
@@ -1793,13 +1756,11 @@ const FCcontrollerinstructions = () => {
       setIsContainerLoading(true);
 
       try {
-        const response = await api.get(
-          `/api/instructions/fc/instruction/${instructionId}`
-        );
-        console.log("Containers API response:", response.data);
+        const containerApiData = await fetchInstructionService(instructionId);
+        console.log("Containers API response:", containerApiData);
 
-        if (response.data && response.data.length > 0) {
-          const containersList = response.data.map((container, index) => ({
+        if (containerApiData && containerApiData.length > 0) {
+          const containersList = containerApiData.map((container, index) => ({
             id: container.containerkey || index + 1,
             containerKey: container.containerkey,
             containerNum: container.containernum || "",
@@ -1881,43 +1842,6 @@ const FCcontrollerinstructions = () => {
   const openCalendar = (ref) => {
     ref.current.click();
   };
-
-  // First useEffect: Fetch clients and shipment types on initial load
-  useEffect(() => {
-    console.log("Initial data fetch started");
-
-    const fetchInitialData = async () => {
-      try {
-        await Promise.all([fetchClients(), fetchShipmentTypes()]);
-
-        // If we have an instructionId and no preserved data, fetch the instruction
-        if (instructionId && !preservedFormData) {
-          console.log("Calling fetchInstructionData with ID:", instructionId);
-          await fetchInstructionData(instructionId);
-        } else if (preservedFormData) {
-          // If we have preserved data, update the import state
-          if (preservedFormData.shipmentTypeName) {
-            setIsImport(
-              preservedFormData.shipmentTypeName.toLowerCase() === "import"
-            );
-          }
-          // Update form data with preserved data
-          setFormData((prev) => ({ ...prev, ...preservedFormData }));
-        }
-      } catch (error) {
-        console.error("Error in initial data fetch:", error);
-        setErrorModal({
-          open: true,
-          message: "Failed to load initial form data. Please try again.",
-        });
-      } finally {
-        setIsLoading((prev) => ({ ...prev, instruction: false }));
-      }
-    };
-
-    // Call the fetchInitialData function
-    fetchInitialData();
-  }, [instructionId, preservedFormData]);
 
   // Update form data when preserved data changes
   useEffect(() => {
@@ -2106,26 +2030,11 @@ const FCcontrollerinstructions = () => {
     formData.clientId,
   ]);
 
-  // Fetch instruction data by ID
-  const fetchInstructionData = async (id) => {
-    if (!id) {
-      console.error("No instruction ID provided to fetchInstructionData");
-      return;
-    }
+  // Apply fetched instruction record to form state (data comes from useInstructionData hook)
+  const applyInstructionData = (data) => {
+    if (!data) return;
 
-    console.log("fetchInstructionData called with id:", id);
-    setIsLoading((prev) => ({ ...prev, instruction: true }));
     try {
-      console.log(`Fetching instruction data for ID: ${id}`);
-      const response = await api.get(`/api/instructions/fc/instruction/${id}`);
-      const data = response.data;
-
-      console.log("Instruction data received:", data);
-
-      if (!data) {
-        throw new Error("No data returned from server");
-      }
-
       // Set the main form data
       const newFormData = {
         clientId: data.client ? data.client.toString() : "",
@@ -2418,191 +2327,13 @@ const FCcontrollerinstructions = () => {
         initializeContainers();
       }
     } catch (error) {
-      console.error("Error fetching instruction data:", error);
-      let errorMessage = "Failed to fetch instruction data. Please try again.";
-
-      if (error.response) {
-        errorMessage = `Server error: ${error.response.status} ${error.response.statusText}`;
-      } else if (error.request) {
-        errorMessage = "Network error. Please check your connection.";
-      }
-
+      console.error("Error applying instruction data:", error);
       setErrorModal({
         isOpen: true,
-        message: errorMessage,
+        message: "Failed to apply instruction data. Please try again.",
       });
-    } finally {
-      setIsLoading((prev) => ({ ...prev, instruction: false }));
     }
   };
-
-  // Second useEffect: Fetch starting points and destinations when clientId is available
-  useEffect(() => {
-    if (formData.clientId) {
-      console.log(
-        "Client ID available, fetching starting points and destinations"
-      );
-      fetchStartingPoints();
-
-      // If we have a pickup value, use it to fetch destinations
-      if (formData.pickup) {
-        fetchDestinations(formData.pickup);
-      }
-    }
-  }, [formData.clientId, formData.pickup]);
-
-  // After data load, detect when there is no matching destination route for the
-  // current client + pickup/dropoff combination. This allows us to keep
-  // rendering the instruction while treating the route as a legacy, read-only
-  // value until the user explicitly opts to edit it.
-  useEffect(() => {
-    // When destinations finish loading and we still have no entries for the
-    // current client/pickup, treat the existing pickup/dropoff from the
-    // instruction as a legacy route.
-    if (
-      !isLoading.destinations &&
-      formData.clientId &&
-      formData.pickup &&
-      destinations.length === 0
-    ) {
-      console.log("[FC] Route mismatch detected for instruction:", {
-        clientId: formData.clientId,
-        pickup: formData.pickup,
-        dropoff: formData.dropoff,
-      });
-      setHasRouteMismatch(true);
-      setRouteEditMode("locked");
-    } else if (!isLoading.destinations && destinations.length > 0) {
-      // If we do have destinations for this pickup, clear any previous mismatch
-      setHasRouteMismatch(false);
-      setRouteEditMode("editable");
-    }
-  }, [
-    isLoading.destinations,
-    destinations.length,
-    formData.clientId,
-    formData.pickup,
-  ]);
-
-  // Sync pickup/dropoff values when client rate names are updated
-  // This handles the case where pickup/dropoff names in m5_client_rate table
-  // have been renamed - the formData needs to be updated to match the current API values
-  // IMPORTANT: Only skip sync when user has explicitly locked the route edit mode
-  useEffect(() => {
-    console.log(`[FC SYNC DEBUG] Pickup sync effect running:`, {
-      isLoadingStartingPoints: isLoading.startingPoints,
-      startingPointsCount: startingPoints.length,
-      formDataPickup: formData.pickup,
-      routeEditMode,
-      shouldSkipSync: routeEditMode === "locked"
-    });
-
-    // Only skip auto-sync if user explicitly locked the route (for deleted clients)
-    if (routeEditMode === "locked") {
-      console.log(
-        `[FC SYNC DEBUG] Skipping pickup sync - user locked route edit mode`
-      );
-      return;
-    }
-
-    if (
-      !isLoading.startingPoints &&
-      startingPoints.length > 0 &&
-      formData.pickup
-    ) {
-      // Check if the current pickup value exists in the startingPoints array
-      const matchingPoint = startingPoints.find(
-        (point) => point.startingpoint === formData.pickup
-      );
-
-      console.log(`[FC SYNC DEBUG] Looking for pickup "${formData.pickup}" in startingPoints:`, {
-        foundExactMatch: !!matchingPoint,
-        startingPoints: startingPoints.map(p => p.startingpoint)
-      });
-
-      if (!matchingPoint) {
-        // The current pickup value is not in the API results
-        // This means the name was likely renamed in the database
-        // Try to find a match by checking if any starting point name contains or is similar
-        const possibleMatch = startingPoints.find((point) =>
-          point.startingpoint
-            .toLowerCase()
-            .includes(formData.pickup.toLowerCase()) ||
-          formData.pickup
-            .toLowerCase()
-            .includes(point.startingpoint.toLowerCase())
-        );
-
-        console.log(`[FC SYNC DEBUG] No exact match. Possible fuzzy match:`, possibleMatch);
-
-        if (possibleMatch) {
-          console.log(
-            `[FC SYNC DEBUG] Updating pickup from "${formData.pickup}" to "${possibleMatch.startingpoint}"`
-          );
-          setFormData((prev) => ({
-            ...prev,
-            pickup: possibleMatch.startingpoint,
-          }));
-          // Also update destinations for the new pickup
-          fetchDestinations(possibleMatch.startingpoint);
-        } else {
-          console.log(`[FC SYNC DEBUG] No fuzzy match found - pickup may be a completely new route`);
-        }
-      } else {
-        console.log(`[FC SYNC DEBUG] Pickup "${formData.pickup}" matches API data - no update needed`);
-      }
-    } else {
-      console.log(`[FC SYNC DEBUG] Conditions not met for pickup sync`, {
-        loadingDone: !isLoading.startingPoints,
-        hasStartingPoints: startingPoints.length > 0,
-        hasPickup: !!formData.pickup
-      });
-    }
-  }, [isLoading.startingPoints, startingPoints, formData.pickup, routeEditMode]);
-
-  useEffect(() => {
-    // Only skip auto-sync if user explicitly locked the route (for deleted clients)
-    if (routeEditMode === "locked") {
-      console.log(
-        `[FC SYNC DEBUG] Skipping dropoff sync - user locked route edit mode`
-      );
-      return;
-    }
-
-    if (
-      !isLoading.destinations &&
-      destinations.length > 0 &&
-      formData.dropoff
-    ) {
-      // Check if the current dropoff value exists in the destinations array
-      const matchingDest = destinations.find(
-        (dest) => dest.destination === formData.dropoff
-      );
-
-      if (!matchingDest) {
-        // The current dropoff value is not in the API results
-        // Try to find a match by checking if any destination name contains or is similar
-        const possibleMatch = destinations.find((dest) =>
-          dest.destination
-            .toLowerCase()
-            .includes(formData.dropoff.toLowerCase()) ||
-          formData.dropoff
-            .toLowerCase()
-            .includes(dest.destination.toLowerCase())
-        );
-
-        if (possibleMatch) {
-          console.log(
-            `[FC SYNC DEBUG] Updating dropoff from "${formData.dropoff}" to "${possibleMatch.destination}"`
-          );
-          setFormData((prev) => ({
-            ...prev,
-            dropoff: possibleMatch.destination,
-          }));
-        }
-      }
-    }
-  }, [isLoading.destinations, destinations, formData.dropoff, routeEditMode]);
 
   // useEffect to recalculate total cost when container surcharges or hazardous flags/amounts change
   useEffect(() => {
@@ -2622,15 +2353,7 @@ const FCcontrollerinstructions = () => {
   const fetchSurchargeAmount = async (containerId) => {
     try {
       console.log(`🌐 Fetching surcharge rates for client ${formData.clientId}, route: ${formData.pickup} → ${formData.dropoff}`);
-      const response = await api.get(
-        `/api/instructions/client/${formData.clientId}/rates`,
-        {
-          params: {
-            start: formData.pickup,
-            destination: formData.dropoff
-          }
-        }
-      );
+      const ratesData = await fetchRatesService(formData.clientId, formData.pickup, formData.dropoff);
 
       const container = containers.find((c) => c.id === containerId);
       const isTwelveMeter = container?.containerType === "12m";
@@ -2639,17 +2362,17 @@ const FCcontrollerinstructions = () => {
       // - Existing field (6m): "surcharges" (legacy), or "surcharge"
       // - New field (12m): "surcharge12m" (preferred), with fallbacks
       const sixMeterSurcharge =
-        response.data.surcharges ??
-        response.data.surcharge ??
+        ratesData.surcharges ??
+        ratesData.surcharge ??
         0;
 
       const twelveMeterSurcharge =
-        response.data.surcharge12m ??
-        response.data.surcharge_12m ??
-        response.data.surcharge12 ??
-        response.data.surcharge_12 ??
-        response.data.surcharges ??
-        response.data.surcharge ??
+        ratesData.surcharge12m ??
+        ratesData.surcharge_12m ??
+        ratesData.surcharge12 ??
+        ratesData.surcharge_12 ??
+        ratesData.surcharges ??
+        ratesData.surcharge ??
         0;
 
       const surchargeAmount = isTwelveMeter ? twelveMeterSurcharge : sixMeterSurcharge;
@@ -2726,191 +2449,6 @@ const FCcontrollerinstructions = () => {
     );
 
     setFormData(prev => ({ ...prev, total_cost: newTotalCost }));
-  };
-
-  const fetchClients = async () => {
-    setIsLoading((prev) => ({ ...prev, clients: true }));
-    try {
-      console.log("Fetching active clients...");
-      const response = await api.get("/api/instructions/active-clients");
-      console.log(
-        "Active clients data received:",
-        response.data.length,
-        "records"
-      );
-      setClients(response.data);
-    } catch (error) {
-      console.error("Error fetching active clients:", error);
-      let errorMessage = "Failed to fetch active clients. Please try again.";
-      if (error.response) {
-        const { status } = error.response;
-        errorMessage = `Failed to fetch active clients: ${status} ${error.response.statusText}`;
-      } else if (error.request) {
-        errorMessage =
-          "No response received from server. Please check your connection.";
-      }
-      setErrorModal({
-        isOpen: true,
-        message: errorMessage,
-      });
-      setClients([]);
-    } finally {
-      setIsLoading((prev) => ({ ...prev, clients: false }));
-    }
-  };
-
-  const fetchShipmentTypes = async () => {
-    setIsLoading((prev) => ({ ...prev, shipmentTypes: true }));
-    try {
-      console.log("Fetching shipment types...");
-      const response = await api.get("/api/instructions/shipment-types");
-      console.log(
-        "Shipment types data received:",
-        response.data.length,
-        "records"
-      );
-      setShipmentTypes(response.data);
-    } catch (error) {
-      console.error("Error fetching shipment types:", error);
-      let errorMessage = "Failed to fetch shipment types. Please try again.";
-      if (error.response) {
-        const { status } = error.response;
-        errorMessage = `Failed to fetch shipment types: ${status} ${error.response.statusText}`;
-      } else if (error.request) {
-        errorMessage =
-          "No response received from server. Please check your connection.";
-      }
-      setErrorModal({
-        isOpen: true,
-        message: errorMessage,
-      });
-      setShipmentTypes([]);
-    } finally {
-      setIsLoading((prev) => ({ ...prev, shipmentTypes: false }));
-    }
-  };
-
-  const fetchStartingPoints = async () => {
-    if (!formData.clientId) {
-      console.log("No client ID available to fetch starting points");
-      setStartingPoints([]);
-      setIsLoading((prev) => ({ ...prev, startingPoints: false }));
-      return;
-    }
-
-    setIsLoading((prev) => ({ ...prev, startingPoints: true }));
-    try {
-      console.log(
-        `Fetching starting points for client ${formData.clientId}...`
-      );
-      const response = await api.get(
-        `/api/instructions/client/${formData.clientId}/starting-points`
-      );
-      console.log("Starting points data received:", response.data);
-
-      // Ensure we have an array of objects with the correct structure
-      const formattedStartingPoints = Array.isArray(response.data)
-        ? response.data
-            .map((point, index) => ({
-              id: point.id || `point-${index}`,
-              startingpoint:
-                point.starting_point || point.startingpoint || String(point),
-            }))
-            .filter((point) => point.startingpoint) // Filter out any null/undefined values
-        : [];
-
-      console.log("Formatted starting points:", formattedStartingPoints);
-
-      setStartingPoints(formattedStartingPoints);
-
-      // If there's only one starting point, select it by default
-      if (formattedStartingPoints.length === 1 && !formData.pickup) {
-        setFormData((prev) => ({
-          ...prev,
-          pickup: formattedStartingPoints[0].startingpoint,
-        }));
-      }
-    } catch (error) {
-      console.error("Error fetching starting points:", error);
-      let errorMessage = "Failed to fetch starting points. Please try again.";
-      if (error.response) {
-        const { status } = error.response;
-        errorMessage = `Failed to fetch starting points: ${status} ${error.response.statusText}`;
-      } else if (error.request) {
-        errorMessage =
-          "No response received from server. Please check your connection.";
-      }
-      setErrorModal({
-        isOpen: true,
-        message: errorMessage,
-      });
-      setStartingPoints([]);
-    } finally {
-      setIsLoading((prev) => ({ ...prev, startingPoints: false }));
-    }
-  };
-
-  const fetchDestinations = async (startingPoint) => {
-    if (!startingPoint) {
-      setDestinations([]);
-      return;
-    }
-    if (!formData.clientId || !startingPoint) {
-      console.log(
-        "No client ID or starting point available to fetch destinations"
-      );
-      setDestinations([]);
-      setIsLoading((prev) => ({ ...prev, destinations: false }));
-      return;
-    }
-
-    setIsLoading((prev) => ({ ...prev, destinations: true }));
-    try {
-      console.log(
-        `Fetching destinations for client ${formData.clientId} and starting point ${startingPoint}...`
-      );
-      const response = await api.get(
-        `/api/instructions/client/${
-          formData.clientId
-        }/destinations/${encodeURIComponent(startingPoint)}`
-      );
-      console.log("Destinations data received:", response.data);
-
-      // Ensure we have an array of objects with the correct structure
-      const formattedDestinations = Array.isArray(response.data)
-        ? response.data.map((dest) => ({
-            id: dest.id || dest.destination,
-            destination: dest.destination || String(dest),
-          }))
-        : [];
-
-      setDestinations(formattedDestinations);
-
-      // If there's only one destination, select it by default
-      if (formattedDestinations.length === 1 && !formData.dropoff) {
-        setFormData((prev) => ({
-          ...prev,
-          dropoff: formattedDestinations[0].destination,
-        }));
-      }
-    } catch (error) {
-      console.error("Error fetching destinations:", error);
-      let errorMessage = "Failed to fetch destinations. Please try again.";
-      if (error.response) {
-        const { status } = error.response;
-        errorMessage = `Failed to fetch destinations: ${status} ${error.response.statusText}`;
-      } else if (error.request) {
-        errorMessage =
-          "No response received from server. Please check your connection.";
-      }
-      setErrorModal({
-        isOpen: true,
-        message: errorMessage,
-      });
-      setDestinations([]);
-    } finally {
-      setIsLoading((prev) => ({ ...prev, destinations: false }));
-    }
   };
 
   const handleClientChange = (e) => {
@@ -3238,12 +2776,8 @@ const FCcontrollerinstructions = () => {
 
       // If no dropoff provided, get the default destination for this client and pickup location
       if (!destinationToUse) {
-        const destinations = await api.get(
-          `/api/instructions/client/${
-            formData.clientId
-          }/destinations/${encodeURIComponent(pickupLocation)}`
-        );
-        destinationToUse = destinations.data?.[0]?.destination;
+        const destinationsResult = await fetchDestinationsService(formData.clientId, pickupLocation);
+        destinationToUse = destinationsResult?.[0]?.destination;
 
         if (!destinationToUse) {
           console.log(
@@ -3257,23 +2791,15 @@ const FCcontrollerinstructions = () => {
       console.log("Using destination:", destinationToUse);
 
       // Fetch rates with both start and destination using the correct endpoint
-      const response = await api.get(
-        `/api/instructions/client/${formData.clientId}/rates`,
-        {
-          params: {
-            start: pickupLocation,
-            destination: destinationToUse,
-          },
-        }
-      );
+      const responseData = await fetchRatesService(formData.clientId, pickupLocation, destinationToUse);
 
-      console.log("Rates API response:", response.data);
+      console.log("Rates API response:", responseData);
 
-      if (response.data) {
+      if (responseData) {
         // Handle both array and object responses
-        const rateData = Array.isArray(response.data)
-          ? response.data[0]
-          : response.data;
+        const rateData = Array.isArray(responseData)
+          ? responseData[0]
+          : responseData;
 
         if (rateData) {
           // Try to get rates with different possible property names
@@ -3361,6 +2887,7 @@ const FCcontrollerinstructions = () => {
     const pickupLocation = e.target.value;
 
     // Update the pickup location in form data
+    // The hook will reactively re-fetch destinations when pickup changes
     setFormData((prev) => ({
       ...prev,
       pickup: pickupLocation,
@@ -3370,11 +2897,8 @@ const FCcontrollerinstructions = () => {
     // Clear field error
     clearFieldError("pickup");
 
-    // Fetch new destinations and rates for the selected pickup location
-    await Promise.all([
-      fetchDestinations(pickupLocation),
-      fetchRates(pickupLocation), // This will get default destination
-    ]);
+    // Fetch rates for the selected pickup location
+    await fetchRates(pickupLocation);
   };
 
   const handleInputChange = (e) => {
@@ -4000,13 +3524,8 @@ const FCcontrollerinstructions = () => {
     ) {
       return;
     }
-    fetchClients();
-    fetchShipmentTypes();
-    fetchStartingPoints();
-    fetchDestinations();
-    if (instructionId) {
-      fetchInstructionData(instructionId);
-    }
+    // Delegate base data re-fetch to the hook
+    refetchBaseData();
     setErrorModal({
       isOpen: false,
       message: "",
@@ -4025,14 +3544,9 @@ const FCcontrollerinstructions = () => {
     border: "1px solid #e9ecef",
   };
 
-  // Loading state check that includes all required data
-  const isLoadingComplete =
-    !isLoading.clients &&
-    !isLoading.shipmentTypes &&
-    !isLoading.startingPoints &&
-    !isLoading.destinations &&
-    !isLoading.instruction &&
-    Object.keys(formData).length > 0; // Ensure formData is initialized
+  // Loading state check: hook covers all fetch flags; also ensure formData is initialized
+  const isLoadingCompleteWithData =
+    isLoadingComplete && Object.keys(formData).length > 0;
 
   // Debug log for loading states
   console.log("Loading states:", {
@@ -4046,7 +3560,7 @@ const FCcontrollerinstructions = () => {
   });
 
   // Ensure we have all required data before rendering the form
-  if (!isLoadingComplete) {
+  if (!isLoadingCompleteWithData) {
     return (
       <div style={{ textAlign: "center", padding: "20px" }}>
         <p>Loading data...</p>
