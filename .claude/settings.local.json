@@ -14,7 +14,10 @@
       "Bash(node -e \"const b = require\\('./node_modules/babel-jest/build/index.js'\\); console.log\\(Object.keys\\(b\\)\\);\")",
       "Bash(python3 -c \"import sys,json; d=json.load\\(sys.stdin\\); print\\([k for k in d.get\\('dependencies',{}\\).keys\\(\\) if 'babel' in k.lower\\(\\)]\\)\")",
       "Bash(BABEL_ENV=test npx jest --testPathPattern=\"instructions\" --no-coverage)",
-      "Bash(python3 -c \"import sys,json; d=json.load\\(sys.stdin\\); print\\('type:', d.get\\('type', 'not set'\\)\\)\")"
+      "Bash(python3 -c \"import sys,json; d=json.load\\(sys.stdin\\); print\\('type:', d.get\\('type', 'not set'\\)\\)\")",
+      "Bash(python3 -c \"import sys,json; d=json.load\\(sys.stdin\\); deps = {**d.get\\('dependencies',{}\\), **d.get\\('devDependencies',{}\\)}; testing = {k:v for k,v in deps.items\\(\\) if 'testing' in k.lower\\(\\) or 'react-hooks' in k.lower\\(\\) or 'jest' in k.lower\\(\\)}; print\\(testing\\)\")",
+      "Bash(python3 -c \"import sys,json; d=json.load\\(sys.stdin\\); react = {k:v for k,v in d.get\\('dependencies',{}\\).items\\(\\) if 'react' in k.lower\\(\\)}; print\\(react\\)\")",
+      "Bash(BABEL_ENV=test npx jest --testPathPattern=\"useInstructionData\" --no-coverage)"
     ]
   }
 }

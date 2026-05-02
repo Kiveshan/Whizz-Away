@@ -5,13 +5,12 @@ import "../../css/controllerinstruction.css"
 import { useNavigate, useLocation } from "react-router-dom"
 import { ErrorTooltip as SharedErrorTooltip } from "../../../../components/instructions/ErrorTooltip"
 import {
-  fetchClients as fetchClientsService,
-  fetchShipmentTypes as fetchShipmentTypesService,
   fetchStartingPoints as fetchStartingPointsService,
   fetchDestinations as fetchDestinationsService,
   fetchRates as fetchRatesService,
   saveInstruction as saveInstructionService,
 } from "../../../../services/instructionService"
+import { useInstructionData } from "../../../../hooks/useInstructionData"
 import { calcContainerBasedCost, calcBreakBulkCost } from "../../../../utils/instructions/costCalculation"
 import { validateForm as validateFormUtil } from "../../../../utils/instructions/validation"
 import { checkRateCountMismatch as checkRateCountMismatchUtil } from "../../../../utils/instructions/rateCountMismatch"
@@ -156,19 +155,29 @@ const ControllerInstructions = () => {
   const [locationError, setLocationError] = useState(null)
   const [showNoRatesModal, setShowNoRatesModal] = useState(false)
 
-  // Data loading states
-  const [isLoading, setIsLoading] = useState({
-    clients: true,
-    shipmentTypes: true,
-    startingPoints: true,
-    destinations: true,
+  // Route-level loading state (clients + shipmentTypes handled by hook)
+  const [locationIsLoading, setIsLoading] = useState({
+    startingPoints: false,
+    destinations: false,
   })
 
-  // Data states
-  const [clients, setClients] = useState([])
-  const [shipmentTypes, setShipmentTypes] = useState([])
-  const [startingPoints, setStartingPoints] = useState([])
-  const [destinations, setDestinations] = useState([])
+  // Base data from hook (clients, shipmentTypes + their loading flags)
+  const {
+    clients,
+    shipmentTypes,
+    isLoading: hookIsLoading,
+  } = useInstructionData({
+    onError: (msg) => console.error("[CREATE] data load error:", msg),
+    on404: () => setShowNoRatesModal(true),
+  })
+
+  // Merged loading object used throughout the component
+  const isLoading = {
+    clients: hookIsLoading.clients,
+    shipmentTypes: hookIsLoading.shipmentTypes,
+    startingPoints: locationIsLoading.startingPoints,
+    destinations: locationIsLoading.destinations,
+  }
 
   // Container states
   const [containers, setContainers] = useState([])
@@ -722,40 +731,6 @@ const ControllerInstructions = () => {
       }))
     }
   }, [formData.shipmentTypeId, formData.rateWeight])
-
-  // Load initial data
-  useEffect(() => {
-    const loadInitialData = async () => {
-      try {
-        // Load clients
-        const clientsData = await fetchClientsService()
-        setClients(clientsData)
-        setIsLoading((prev) => ({ ...prev, clients: false }))
-
-        // Load shipment types
-        const shipmentTypesData = await fetchShipmentTypesService()
-        setShipmentTypes(shipmentTypesData)
-        setIsLoading((prev) => ({ ...prev, shipmentTypes: false }))
-
-        // Set other loading states to false since we're not loading them initially
-        setIsLoading((prev) => ({
-          ...prev,
-          startingPoints: false,
-          destinations: false,
-        }))
-      } catch (error) {
-        console.error("Error loading initial data:", error)
-        setIsLoading({
-          clients: false,
-          shipmentTypes: false,
-          startingPoints: false,
-          destinations: false,
-        })
-      }
-    }
-
-    loadInitialData()
-  }, [])
 
   // Function to fetch rates for the selected client, pickup and dropoff
   const fetchRates = useCallback(async (clientId, start, destination) => {
