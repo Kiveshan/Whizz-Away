@@ -462,7 +462,7 @@ const ControllerInstructions = () => {
           let error = null
           if (value.trim() !== "") {
             const upperCaseValue = value.toUpperCase()
-            const duplicateExists = containers.some(
+            const duplicateExists = containersRef.current.some(
               (container) => container.id !== id && container.containerNum.toUpperCase() === upperCaseValue,
             )
             if (duplicateExists) {
@@ -548,7 +548,9 @@ const ControllerInstructions = () => {
         prev.map((container) => (container.id === id ? { ...container, [field]: value } : container)),
       )
     },
-    [containers],
+    // containers removed from deps: duplicate check now uses containersRef.current (stable ref)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [],
   )
 
   // Initialize form data with preserved data if available, or default values
