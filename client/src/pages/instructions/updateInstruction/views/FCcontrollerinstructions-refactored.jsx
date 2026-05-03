@@ -15,6 +15,7 @@ import {
 import { useInstructionData } from "../../../../hooks/useInstructionData";
 import { useContainerManagement } from "../../../../hooks/useContainerManagement";
 import { useRateManagement } from "../../../../hooks/useRateManagement";
+import { useWeightRows } from "../../../../hooks/useWeightRows";
 import { formatDateForDB, formatDateForInput as formatDateForInputUtil } from "../../../../utils/instructions/dateFormatting";
 import { calculateTotalCostFromRates, calcBreakBulkCost } from "../../../../utils/instructions/costCalculation";
 import { validateForm as validateFormUtil } from "../../../../utils/instructions/validation";
@@ -74,30 +75,17 @@ const FCcontrollerinstructions = () => {
   const today = `${todayDate.getFullYear()}-${String(todayDate.getMonth() + 1).padStart(2, '0')}-${String(todayDate.getDate()).padStart(2, '0')}`;  // Fixed timezone handling
   const [weight, setWeight] = useState("");
 
-  const [weightRows, setWeightRows] = useState([]);
-
-  const addWeightRow = () => {
-    setWeightRows((prev) => [
-      ...prev,
-      {
-        id: prev.length > 0 ? prev[prev.length - 1].id + 1 : 1,
-        ksmDmNo: "",
-        ticketNo: "",
-        receiptBookNo: "",
-        weight: "",
-      },
-    ]);
-  };
-
-  const updateWeightRow = (id, field, value) => {
-    setWeightRows((prev) =>
-      prev.map((row) => (row.id === id ? { ...row, [field]: value } : row))
-    );
-  };
-
-  const removeWeightRow = (id) => {
-    setWeightRows((prev) => prev.filter((row) => row.id !== id));
-  };
+  const {
+    weightRows,
+    setWeightRows,
+    weightRowsRef,
+    weightRowToDelete,
+    addWeightRow,
+    updateWeightRow,
+    handleRequestDeleteWeightRow: hookRequestDeleteWeightRow,
+    confirmDeleteWeightRow,
+    cancelDeleteWeightRow,
+  } = useWeightRows();
 
   // Log the isImport state for debugging
   useEffect(() => {
@@ -386,8 +374,6 @@ const FCcontrollerinstructions = () => {
 
   const [isInvoiced, setIsInvoiced] = useState(false);
 
-  // Track pending delete target for weight rows
-  const [weightRowToDelete, setWeightRowToDelete] = useState(null);
 
 
   // Validate container data
@@ -1122,12 +1108,7 @@ const FCcontrollerinstructions = () => {
     } else if (confirmationModal.action === "delete-container") {
       confirmDeleteContainer();
     } else if (confirmationModal.action === "delete-weight") {
-      if (weightRowToDelete) {
-        setWeightRows((prev) =>
-          prev.filter((row) => row.id !== weightRowToDelete.id)
-        );
-      }
-      setWeightRowToDelete(null);
+      confirmDeleteWeightRow();
     } else if (confirmationModal.action === "save") {
       performSave();
     } else if (confirmationModal.action === "delete") {
@@ -1141,14 +1122,14 @@ const FCcontrollerinstructions = () => {
   const handleCancelAction = () => {
     setConfirmationModal({ isOpen: false, message: "", action: null });
     cancelDeleteContainer();
-    setWeightRowToDelete(null);
+    cancelDeleteWeightRow();
   };
 
   // Ask for confirmation before deleting a weight row
   const handleRequestDeleteWeightRow = (row) => {
     if (isReadOnly) return;
 
-    setWeightRowToDelete(row);
+    hookRequestDeleteWeightRow(row);
     setConfirmationModal({
       isOpen: true,
       message: "Are you sure you want to delete this weight row?",
@@ -1768,7 +1749,7 @@ const FCcontrollerinstructions = () => {
   // Wire recalculateTotalCost into the ref so the container hook can call it
   // without creating a circular dependency at hook-call time.
   recalculateTotalCostRef.current = () =>
-    recalculateTotalCost(formData, containersRef.current, weightRows);
+    recalculateTotalCost(formData, containersRef.current, weightRowsRef.current);
 
   const handleClientChange = (e) => {
     const clientId = e.target.value;
