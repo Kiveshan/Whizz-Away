@@ -14,9 +14,9 @@ import {
   deleteInstruction as deleteInstructionService,
   generateInvoice as generateInvoiceService,
   checkInvoiceStatus as checkInvoiceStatusService,
-  checkContainerLegsExist as checkContainerLegsExistService,
 } from "../../../../services/instructionService";
 import { useInstructionData } from "../../../../hooks/useInstructionData";
+import { useContainerManagement } from "../../../../hooks/useContainerManagement";
 import { formatDateForDB, formatDateForInput as formatDateForInputUtil } from "../../../../utils/instructions/dateFormatting";
 import { calculateTotalCostFromRates, calcBreakBulkCost } from "../../../../utils/instructions/costCalculation";
 import { validateForm as validateFormUtil } from "../../../../utils/instructions/validation";
@@ -69,38 +69,6 @@ const FCcontrollerinstructions = () => {
     rateWeight: useRef(null),
     unitRate: useRef(null),
     createdAt: useRef(null),
-  };
-
-  // Function to fetch VGM amount from client rates (mirrors surcharge/hazardous)
-  const fetchVgmAmount = async (containerId) => {
-    try {
-      console.log(`⚖️ Fetching VGM rate for client ${formData.clientId}, route: ${formData.pickup} → ${formData.dropoff}`);
-      const ratesData = await fetchRatesService(formData.clientId, formData.pickup, formData.dropoff);
-
-      const vgmAmount = ratesData.vgm || 0;
-      console.log(`⚖️ Fetched VGM amount: ${vgmAmount} for container ${containerId}`);
-
-      setContainers(prevContainers =>
-        prevContainers.map(container =>
-          container.id === containerId
-            ? { ...container, vgmAmount: Number(vgmAmount) }
-            : container
-        )
-      );
-
-      recalculateTotalCost();
-    } catch (error) {
-      console.error('❌ Error fetching VGM amount:', error);
-      // Fallback to 0 if fetch fails
-      setContainers(prevContainers =>
-        prevContainers.map(container =>
-          container.id === containerId
-            ? { ...container, vgmAmount: 0 }
-            : container
-        )
-      );
-      console.log(`⚠️ Using fallback VGM amount: 0 for container ${containerId}`);
-    }
   };
 
   const [isImport, setIsImport] = useState(location.state?.isImport || false);
@@ -402,21 +370,7 @@ const FCcontrollerinstructions = () => {
     location.state?.preservedContainers || []
   );
 
-  // Container state
-  const [containers, setContainers] = useState([]);
-  const containersRef = useRef([]);
-  
-  // Sync containersRef with containers state
-  useEffect(() => {
-    console.log("[UPDATE] containers state changed:", containers);
-    containersRef.current = containers;
-  }, [containers]);
-  
-  const [containerFieldErrors, setContainerFieldErrors] = useState({});
-  const [containerSuccessMessage, setContainerSuccessMessage] = useState("");
-  const [isContainerLoading, setIsContainerLoading] = useState(false);
-  const [isContainerDataModified, setIsContainerDataModified] = useState(false);
-  const [isInvoiced, setIsInvoiced] = useState(false);
+  const recalculateTotalCostRef = useRef(null);
 
   const [confirmationModal, setConfirmationModal] = useState({
     isOpen: false,
@@ -424,401 +378,51 @@ const FCcontrollerinstructions = () => {
     action: null,
   });
 
-  // Track pending delete targets for containers and weight rows
-  const [containerToDelete, setContainerToDelete] = useState(null);
+  const {
+    containers,
+    setContainers,
+    containersRef,
+    containerFieldErrors,
+    setContainerFieldErrors,
+    isContainerLoading,
+    setIsContainerLoading,
+    isContainerDataModified,
+    setIsContainerDataModified,
+    containerSuccessMessage,
+    setContainerSuccessMessage,
+    containerToDelete,
+    initializeContainers,
+    handleContainerChange,
+    validateContainerUniqueness,
+    handleRequestDeleteContainer,
+    confirmDeleteContainer,
+    cancelDeleteContainer,
+  } = useContainerManagement({
+    isImport,
+    isExport: String(formData.shipmentTypeId) === "2",
+    isCrossHaul:
+      String(formData.shipmentTypeId) === "3" ||
+      String(formData.shipmentTypeId) === "4",
+    isWeightBased: false,
+    clientId: formData.clientId,
+    pickup: formData.pickup,
+    dropoff: formData.dropoff,
+    shipmentTypeId: formData.shipmentTypeId,
+    isAddOn,
+    isReadOnly,
+    instructionId,
+    onRecalculateTotalCost: () => recalculateTotalCostRef.current?.(),
+    onUpdateFormCounts: (counts) => setFormData((prev) => ({ ...prev, ...counts })),
+    onRequestConfirmation: (message) =>
+      setConfirmationModal({ isOpen: true, message, action: "delete-container" }),
+    onError: (msg) => setErrorModal({ isOpen: true, message: msg }),
+  });
+
+  const [isInvoiced, setIsInvoiced] = useState(false);
+
+  // Track pending delete target for weight rows
   const [weightRowToDelete, setWeightRowToDelete] = useState(null);
 
-  // Initialize containers based on container counts
-  const initializeContainers = () => {
-    console.log("Initializing containers with form data:", formData);
-    const counts = {
-      "6m": formData.num_six_meters || 0,
-      "12m": formData.num_twelve_meters || 0,
-      Abnormal: formData.num_abnormal || 0,
-      BreakBulk: formData.num_breakbulk || 0,
-    };
-
-    // If we already have containers and counts are zero, don't clear them
-    if (
-      containers &&
-      containers.length > 0 &&
-      counts["6m"] === 0 &&
-      counts["12m"] === 0 &&
-      counts["Abnormal"] === 0 &&
-      counts["BreakBulk"] === 0
-    ) {
-      console.log("Keeping existing containers as counts are zero");
-      return;
-    }
-
-    const containersList = [];
-    let containerId = 1;
-
-    // Add 6m containers
-    for (let i = 0; i < counts["6m"]; i++) {
-      containersList.push({
-        id: containerId++,
-        containerKey: null,
-        containerNum: "",
-        fileRef: "", // Added fileRef field
-        weight:
-          isImport ||
-          String(formData.shipmentTypeId) === "2" ||
-          String(formData.shipmentTypeId) === "3"
-            ? ""
-            : null, // Initialize weight for import, export, and cross-haul
-        containerType: "6m",
-        cargoDescription: "",
-        hazardous: false,
-        addSurcharges: false,
-        surchargeAmount: 0,
-        is_12m_surcharge: false,
-        surcharge_12m_amount: 0,
-        hazardousAmount: 0,
-        vgm: false,
-        vgmAmount: 0,
-      });
-    }
-
-    // Add 12m containers
-    for (let i = 0; i < counts["12m"]; i++) {
-      containersList.push({
-        id: containerId++,
-        containerKey: null,
-        containerNum: "",
-        fileRef: "", // Added fileRef field
-        weight:
-          isImport ||
-          String(formData.shipmentTypeId) === "2" ||
-          String(formData.shipmentTypeId) === "3"
-            ? ""
-            : null, // Initialize weight for import, export, and cross-haul
-        containerType: "12m",
-        cargoDescription: "",
-        hazardous: false,
-        addSurcharges: false,
-        surchargeAmount: 0,
-        is_12m_surcharge: true,
-        surcharge_12m_amount: 0,
-        hazardousAmount: 0,
-        vgm: false,
-        vgmAmount: 0,
-      });
-    }
-
-    // Add abnormal containers
-    for (let i = 0; i < counts["Abnormal"]; i++) {
-      containersList.push({
-        id: containerId++,
-        containerKey: null,
-        containerNum: "",
-        fileRef: "", // Added fileRef field
-        weight:
-          isImport ||
-          String(formData.shipmentTypeId) === "2" ||
-          String(formData.shipmentTypeId) === "3"
-            ? ""
-            : null, // Initialize weight for import, export, and cross-haul
-        containerType: "Abnormal",
-        cargoDescription: "",
-        hazardous: false,
-        addSurcharges: false,
-        surchargeAmount: 0,
-        is_12m_surcharge: false,
-        surcharge_12m_amount: 0,
-        hazardousAmount: 0,
-        vgm: false,
-        vgmAmount: 0,
-      });
-    }
-
-    // Add break bulk containers
-    for (let i = 0; i < counts["BreakBulk"]; i++) {
-      containersList.push({
-        id: containerId++,
-        containerKey: null,
-        containerNum: "",
-        fileRef: "", // Added fileRef field
-        weight:
-          isImport ||
-          String(formData.shipmentTypeId) === "2" ||
-          String(formData.shipmentTypeId) === "3"
-            ? ""
-            : null, // Initialize weight for import, export, and cross-haul
-        containerType: "BreakBulk",
-        cargoDescription: "",
-        hazardous: false,
-        addSurcharges: false,
-        surchargeAmount: 0,
-        is_12m_surcharge: false,
-        surcharge_12m_amount: 0,
-        hazardousAmount: 0,
-      });
-    }
-
-    setContainers(containersList);
-    setIsContainerLoading(false);
-  };
-
-  // Handle container input change with real-time validation
-  const handleContainerChange = async (id, field, value) => {
-    // Handle both camelCase and snake_case for file reference field
-    if (field === "file_ref") {
-      field = "fileRef"; // Convert to camelCase for consistency
-    }
-    if (field === "containerNum") {
-      // Get the current container
-      const container = containers.find((c) => c.id === id);
-      const currentValue = container ? container.containerNum : "";
-
-      // For container numbers, limit to 20 characters and allow alphanumeric only
-      if (value.length > 20) {
-        // Prevent entering more than 20 characters
-        return;
-      }
-
-      // Create a new value by validating each character (alphanumeric only)
-      let newValue = "";
-      for (let i = 0; i < value.length; i++) {
-        const char = value[i];
-        // Allow only alphanumeric characters
-        if (/^[a-zA-Z0-9]$/.test(char)) {
-          newValue += char;
-        }
-      }
-
-      // Only update if the filtered value is different from the input
-      if (newValue !== value) {
-        return;
-      }
-
-      // Clear error when user starts typing
-      clearContainerFieldError(id, "container");
-    } else if (field === "fileRef") {
-      // Limit file reference to 20 characters (no special validation needed)
-      if (value.length > 20) {
-        return;
-      }
-      
-      // Update the container fileRef value
-      setContainers((prevContainers) =>
-        prevContainers.map((container) =>
-          container.id === id ? { ...container, fileRef: value } : container
-        )
-      );
-      setIsContainerDataModified(true);
-      console.log(`📄 Updated File Reference for container ${id} to: ${value}`);
-      // Don't return - allow the function to continue processing
-    }
-
-    if (field === "weight") {
-      // Clear error when user starts typing
-      clearContainerFieldError(id, "weight");
-
-      // Check if this container should have weight field based on shipment type
-      const shouldHaveWeight =
-        isImport ||
-        String(formData.shipmentTypeId) === "2" ||
-        String(formData.shipmentTypeId) === "3";
-
-      if (!shouldHaveWeight) {
-        console.log("Weight field not applicable for this shipment type");
-        return;
-      }
-
-      // Sanitize weight value - convert empty string to null, validate numeric input
-      let sanitizedValue = "";
-      if (value && value.trim() !== "") {
-        // Only allow valid numeric input (including decimals)
-        if (/^[0-9]*\.?[0-9]*$/.test(value.trim())) {
-          const numValue = Number.parseFloat(value.trim());
-          if (!isNaN(numValue) && numValue >= 0) {
-            sanitizedValue = numValue;
-            console.log(
-              `Container ${id} weight updated to:`,
-              sanitizedValue,
-              `(type: ${typeof sanitizedValue})`
-            );
-          } else {
-            // Invalid number, keep as string for user feedback but will be sanitized on save
-            sanitizedValue = value;
-            console.log(
-              `Container ${id} weight set to string value:`,
-              sanitizedValue
-            );
-          }
-        } else {
-          // Invalid format, don't update
-          console.log(`Container ${id} weight invalid format:`, value);
-          return;
-        }
-      } else {
-        console.log(`Container ${id} weight set to empty string`);
-      }
-
-      // Update with sanitized value (empty string for empty, number for valid input)
-      setContainers((prevContainers) =>
-        prevContainers.map((container) =>
-          container.id === id
-            ? { ...container, [field]: sanitizedValue }
-            : container
-        )
-      );
-      setIsContainerDataModified(true);
-      return;
-    }
-
-    const fetchHazardousAmount = async (containerId) => {
-  const container = containers.find(c => c.id === containerId)
-  if (!container) return
-
-  try {
-    console.log(`🌐 Fetching hazardous rates for client ${formData.clientId}, route: ${formData.pickup} → ${formData.dropoff}`);
-    const ratesData = await fetchRatesService(formData.clientId, formData.pickup, formData.dropoff);
-
-    const hazardousAmount = ratesData.hazardous || 0;
-    console.log(`☣️ Fetched hazardous amount: ${hazardousAmount} for container ${container.containerNum || containerId}`);
-    
-    // Update container with hazardous amount
-    setContainers(prevContainers => {
-      const updatedContainers = prevContainers.map(c =>
-        c.id === containerId
-          ? { ...c, hazardousAmount: Number(hazardousAmount) }
-          : c
-      );
-      console.log(`🔄 Updated container ${containerId} with hazardous amount: ${hazardousAmount}`);
-      return updatedContainers;
-    });
-    
-    // Force immediate recalculation to include hazardous amount
-    setTimeout(() => recalculateTotalCost(), 0);
-  } catch (error) {
-    console.error('❌ Error fetching hazardous amount:', error);
-    // Fallback to 0 if fetch fails
-    setContainers(prevContainers =>
-      prevContainers.map(c =>
-        c.id === containerId
-          ? { ...c, hazardousAmount: 0 }
-          : c
-      )
-    );
-    console.log(`⚠️ Using fallback hazardous amount: 0 for container ${container.containerNum || containerId}`);
-  }
-}
-
-    // Handle hazardous, addSurcharges and vgm checkbox fields
-    if (field === "hazardous" || field === "addSurcharges" || field === "vgm") {
-      if (field === "addSurcharges") {
-        console.log(`🔄 Surcharge checkbox ${value ? 'CHECKED' : 'UNCHECKED'} for container ${id}`);
-        if (value) {
-          // Checkbox checked - update state immediately, then fetch surcharge amount
-          setContainers((prevContainers) =>
-            prevContainers.map((container) =>
-              container.id === id 
-                ? { ...container, [field]: true }
-                : container
-            )
-          );
-          console.log(`📞 Calling fetchSurchargeAmount for container ${id}`);
-          fetchSurchargeAmount(id);
-        } else {
-          // Checkbox unchecked - reset surcharge amount to 0
-          setContainers((prevContainers) =>
-            prevContainers.map((container) =>
-              container.id === id 
-                ? { ...container, [field]: value, surchargeAmount: 0, is_12m_surcharge: false, surcharge_12m_amount: 0 }
-                : container
-            )
-          );
-          console.log(`🔄 Surcharge unchecked - reset amount to 0 for container ${id}`);
-          recalculateTotalCost();
-        }
-      } else if (field === "hazardous") {
-        // Handle hazardous checkbox with rate fetching
-        console.log(`☢️ Hazardous checkbox ${value ? 'CHECKED' : 'UNCHECKED'} for container ${id}`);
-        if (value) {
-          // Checkbox checked - fetch amount first, then update state
-          console.log(`☢️ Hazardous checkbox CHECKED for container ${id} - fetching rate first`);
-          try {
-            const ratesData = await fetchRatesService(formData.clientId, formData.pickup, formData.dropoff);
-            const hazardousAmount = ratesData.hazardous || 0;
-            console.log(`☣️ Fetched hazardous amount: ${hazardousAmount} for container ${id}`);
-            
-            // Update container with both flag and amount atomically
-            setContainers((prevContainers) =>
-              prevContainers.map((container) =>
-                container.id === id 
-                  ? { ...container, hazardous: true, hazardousAmount: Number(hazardousAmount) }
-                  : container
-              )
-            );
-            console.log(`🔄 Updated container ${id} with hazardous=true and amount=${hazardousAmount}`);
-            
-            // Force immediate recalculation
-            setTimeout(() => recalculateTotalCost(), 0);
-          } catch (error) {
-            console.error('❌ Error fetching hazardous amount:', error);
-            // Fallback: set flag true but amount 0
-            setContainers((prevContainers) =>
-              prevContainers.map((container) =>
-                container.id === id 
-                  ? { ...container, hazardous: true, hazardousAmount: 0 }
-                  : container
-              )
-            );
-          }
-        } else {
-          // Checkbox unchecked - reset hazardous amount to 0
-          console.log(`☢️ Hazardous checkbox UNCHECKED for container ${id} - updating state and resetting amount to 0`);
-          setContainers((prevContainers) =>
-            prevContainers.map((container) =>
-              container.id === id 
-                ? { ...container, [field]: value, hazardousAmount: 0 }
-                : container
-            )
-          );
-          console.log(`🔄 Hazardous unchecked - reset amount to 0 for container ${id}`);
-          console.log(`💲 Recalculating total cost due to hazardous flag change`);
-          recalculateTotalCost();
-        }
-      } else if (field === "vgm") {
-        console.log(`⚖️ VGM checkbox ${value ? 'CHECKED' : 'UNCHECKED'} for container ${id}`);
-        if (value) {
-          // Checkbox checked - update state immediately, then fetch VGM amount
-          setContainers((prevContainers) =>
-            prevContainers.map((container) =>
-              container.id === id 
-                ? { ...container, [field]: true }
-                : container
-            )
-          );
-          console.log(`📞 Calling fetchVgmAmount for container ${id}`);
-          fetchVgmAmount(id);
-        } else {
-          // Checkbox unchecked - reset VGM amount to 0
-          setContainers((prevContainers) =>
-            prevContainers.map((container) =>
-              container.id === id 
-                ? { ...container, [field]: value, vgmAmount: 0 }
-                : container
-            )
-          );
-          console.log(`🔄 VGM unchecked - reset amount to 0 for container ${id}`);
-          recalculateTotalCost();
-        }
-      }
-      setIsContainerDataModified(true);
-      return;
-    }
-
-    // Update the container value for other fields
-    setContainers((prevContainers) =>
-      prevContainers.map((container) =>
-        container.id === id ? { ...container, [field]: value } : container
-      )
-    );
-    setIsContainerDataModified(true);
-  };
 
   // Validate container data
   const validateContainers = () => {
@@ -944,27 +548,6 @@ const FCcontrollerinstructions = () => {
     }
   };
 
-  // Validate container uniqueness
-  const validateContainerUniqueness = () => {
-    if (isAddOn) {
-      return true;
-    }
-    const containerNumbers = containers
-      .map((c) => c.containerNum)
-      .filter((num) => num.trim() !== "");
-    const uniqueNumbers = new Set(containerNumbers);
-
-    if (containerNumbers.length !== uniqueNumbers.size) {
-      setErrorModal({
-        isOpen: true,
-        message:
-          "Container numbers must be unique within the same instruction.",
-      });
-      return false;
-    }
-    return true;
-  };
-
   // Enhanced validation with field highlighting
   const validateAllFields = () => {
     const { isValid, fieldErrors, containerErrors } = validateFormUtil(
@@ -989,13 +572,6 @@ const FCcontrollerinstructions = () => {
   // Clear field errors when user starts typing
   const clearFieldError = (fieldName) => {
     setFieldErrors((prev) => ({ ...prev, [fieldName]: "" }));
-  };
-
-  const clearContainerFieldError = (containerId, fieldType) => {
-    setContainerFieldErrors((prev) => ({
-      ...prev,
-      [`${fieldType}-${containerId}`]: "",
-    }));
   };
 
   // Delegates to utility — returns { needsConfirmation, message } (Flag 2 resolution).
@@ -1627,38 +1203,7 @@ const FCcontrollerinstructions = () => {
         dropoff: "",
       }));
     } else if (confirmationModal.action === "delete-container") {
-      if (containerToDelete) {
-        setContainers((prev) => {
-          const updated = prev.filter((c) => c.id !== containerToDelete.id);
-
-          // Recalculate container counts based on remaining containers so
-          // the "No. of Containers" fields stay in sync. The actual
-          // database deletion will occur when the user saves, via the
-          // existing update endpoint.
-          const numSix = updated.filter((c) => c.containerType === "6m").length;
-          const numTwelve = updated.filter(
-            (c) => c.containerType === "12m"
-          ).length;
-          const numAbnormal = updated.filter(
-            (c) => c.containerType === "Abnormal"
-          ).length;
-          const numBreakBulk = updated.filter(
-            (c) => c.containerType === "BreakBulk"
-          ).length;
-
-          setFormData((prevForm) => ({
-            ...prevForm,
-            num_six_meters: numSix,
-            num_twelve_meters: numTwelve,
-            num_abnormal: numAbnormal,
-            num_breakbulk: numBreakBulk,
-          }));
-
-          return updated;
-        });
-        setIsContainerDataModified(true);
-      }
-      setContainerToDelete(null);
+      confirmDeleteContainer();
     } else if (confirmationModal.action === "delete-weight") {
       if (weightRowToDelete) {
         setWeightRows((prev) =>
@@ -1678,44 +1223,8 @@ const FCcontrollerinstructions = () => {
 
   const handleCancelAction = () => {
     setConfirmationModal({ isOpen: false, message: "", action: null });
-    setContainerToDelete(null);
+    cancelDeleteContainer();
     setWeightRowToDelete(null);
-  };
-
-  // Ask for confirmation before deleting a container; if the
-  // container has been assigned to legs, we adjust the message
-  // based on a backend check.
-  const handleRequestDeleteContainer = async (container) => {
-    if (isReadOnly) return;
-
-    try {
-      let hasLegs = false;
-
-      // Only check legs if we have both an instructionId and a
-      // container number that could exist in the DB.
-      if (instructionId && container.containerNum) {
-        const legsData = await checkContainerLegsExistService(instructionId, container.containerNum);
-        hasLegs = Boolean(legsData?.hasLegs);
-      }
-
-      const message = hasLegs
-        ? "This container currently has legs assigned. Deleting this container will also remove all associated assignments. Are you sure you want to continue?"
-        : "Are you sure you want to delete this container?";
-
-      setContainerToDelete(container);
-      setConfirmationModal({
-        isOpen: true,
-        message,
-        action: "delete-container",
-      });
-    } catch (error) {
-      console.error("Error checking container legs before delete:", error);
-      setErrorModal({
-        isOpen: true,
-        message:
-          "Failed to verify container assignments before delete. Please try again.",
-      });
-    }
   };
 
   // Ask for confirmation before deleting a weight row
@@ -1732,39 +1241,35 @@ const FCcontrollerinstructions = () => {
 
   // Initialize containers when component mounts or container counts change
   useEffect(() => {
-    console.log("Container loading effect triggered");
-    console.log("Current instructionId:", instructionId);
-
     const loadContainers = async () => {
       // If we already have containers from the instruction data, don't load them again
       if (containers && containers.length > 0) {
-        console.log("Containers already loaded from instruction data");
         return;
       }
+
+      const counts = {
+        num_six_meters: formData.num_six_meters || 0,
+        num_twelve_meters: formData.num_twelve_meters || 0,
+        num_abnormal: formData.num_abnormal || 0,
+        num_breakbulk: formData.num_breakbulk || 0,
+      };
 
       if (!instructionId) {
-        console.log("No instructionId, initializing empty containers");
-        initializeContainers();
+        initializeContainers(containersRef.current, counts);
         return;
       }
 
-      // Only fetch containers if we don't have any yet
-      console.log(
-        "No containers loaded yet, fetching from API for instruction:",
-        instructionId
-      );
       setIsContainerLoading(true);
 
       try {
         const containerApiData = await fetchInstructionService(instructionId);
-        console.log("Containers API response:", containerApiData);
 
         if (containerApiData && containerApiData.length > 0) {
           const containersList = containerApiData.map((container, index) => ({
             id: container.containerkey || index + 1,
             containerKey: container.containerkey,
             containerNum: container.containernum || "",
-            fileRef: container.file_ref || "", // Added fileRef mapping
+            fileRef: container.file_ref || "",
             weight:
               container.weight !== null && container.weight !== undefined
                 ? container.weight
@@ -1777,39 +1282,27 @@ const FCcontrollerinstructions = () => {
             is_12m_surcharge: Boolean(container.is_12m_surcharge),
             surcharge_12m_amount: Number(container.surcharge_12m_amount || 0),
             hazardousAmount: container["Hazardous Amount"] || 0,
-            vgm: container.vgm === true || container.vgm === 'true',
+            vgm: container.vgm === true || container.vgm === "true",
             vgmAmount: Number(container["vgm amount"] || 0),
           }));
 
-          console.log("Setting containers from API:", containersList);
           setContainers(containersList);
           setIsContainerDataModified(false);
         } else if (
-          formData.num_six_meters > 0 ||
-          formData.num_twelve_meters > 0 ||
-          formData.num_abnormal > 0
+          counts.num_six_meters > 0 ||
+          counts.num_twelve_meters > 0 ||
+          counts.num_abnormal > 0
         ) {
-          console.log(
-            "No containers found in API, initializing based on form counts"
-          );
-          initializeContainers();
+          initializeContainers(containersRef.current, counts);
         }
       } catch (error) {
         console.error("Error loading containers:", error);
-        if (error.response) {
-          console.error("Error response data:", error.response.data);
-          console.error("Error status:", error.response.status);
-        }
-        // Even if there's an error, try to initialize containers based on form data
         if (
-          formData.num_six_meters > 0 ||
-          formData.num_twelve_meters > 0 ||
-          formData.num_abnormal > 0
+          counts.num_six_meters > 0 ||
+          counts.num_twelve_meters > 0 ||
+          counts.num_abnormal > 0
         ) {
-          console.log(
-            "Error occurred, initializing containers based on form counts"
-          );
-          initializeContainers();
+          initializeContainers(containersRef.current, counts);
         }
       } finally {
         setIsContainerLoading(false);
@@ -2324,7 +1817,12 @@ const FCcontrollerinstructions = () => {
         console.log(
           "No containers found in instruction data, initializing based on counts"
         );
-        initializeContainers();
+        initializeContainers(containersRef.current, {
+          num_six_meters: data.num_six_meters || 0,
+          num_twelve_meters: data.num_twelve_meters || 0,
+          num_abnormal: data.num_abnormal || 0,
+          num_breakbulk: data.num_breakbulk || 0,
+        });
       }
     } catch (error) {
       console.error("Error applying instruction data:", error);
@@ -2349,68 +1847,6 @@ const FCcontrollerinstructions = () => {
     containers.map(c => c.vgmAmount).join(',')
   ]);
 
-  // Function to fetch surcharge amount from client rates
-  const fetchSurchargeAmount = async (containerId) => {
-    try {
-      console.log(`🌐 Fetching surcharge rates for client ${formData.clientId}, route: ${formData.pickup} → ${formData.dropoff}`);
-      const ratesData = await fetchRatesService(formData.clientId, formData.pickup, formData.dropoff);
-
-      const container = containers.find((c) => c.id === containerId);
-      const isTwelveMeter = container?.containerType === "12m";
-
-      // Backwards/forwards compatible mapping:
-      // - Existing field (6m): "surcharges" (legacy), or "surcharge"
-      // - New field (12m): "surcharge12m" (preferred), with fallbacks
-      const sixMeterSurcharge =
-        ratesData.surcharges ??
-        ratesData.surcharge ??
-        0;
-
-      const twelveMeterSurcharge =
-        ratesData.surcharge12m ??
-        ratesData.surcharge_12m ??
-        ratesData.surcharge12 ??
-        ratesData.surcharge_12 ??
-        ratesData.surcharges ??
-        ratesData.surcharge ??
-        0;
-
-      const surchargeAmount = isTwelveMeter ? twelveMeterSurcharge : sixMeterSurcharge;
-      console.log(
-        `💰 Fetched surcharge amount: ${surchargeAmount} for container ${containerId} (type: ${container?.containerType || "unknown"})`
-      );
-      
-      setContainers(prevContainers =>
-        prevContainers.map(container =>
-          container.id === containerId
-            ? {
-                ...container,
-                // Keep legacy field for 6m only
-                surchargeAmount: isTwelveMeter ? 0 : Number(surchargeAmount || 0),
-                // Backend-aligned fields
-                is_12m_surcharge: isTwelveMeter,
-                surcharge_12m_amount: isTwelveMeter ? Number(surchargeAmount || 0) : 0,
-              }
-            : container
-        )
-      );
-      
-      recalculateTotalCost();
-    } catch (error) {
-      console.error('❌ Error fetching surcharge amount:', error);
-      // Fallback to 0 if fetch fails
-      setContainers(prevContainers =>
-        prevContainers.map(container =>
-          container.id === containerId
-            ? { ...container, surchargeAmount: 0, is_12m_surcharge: false, surcharge_12m_amount: 0 }
-            : container
-        )
-      );
-      console.log(`⚠️ Using fallback surcharge amount: 0 for container ${containerId}`);
-    }
-  };
-
-  // Helper function to calculate total cost from individual rates
   // Function for real-time total cost recalculation
   const recalculateTotalCost = () => {
     // For add-on shipment type (5), always force zero cost and zero rates
@@ -2450,6 +1886,10 @@ const FCcontrollerinstructions = () => {
 
     setFormData(prev => ({ ...prev, total_cost: newTotalCost }));
   };
+
+  // Wire recalculateTotalCost into the ref so the container hook can call it
+  // without creating a circular dependency at hook-call time.
+  recalculateTotalCostRef.current = recalculateTotalCost;
 
   const handleClientChange = (e) => {
     const clientId = e.target.value;
@@ -2520,7 +1960,7 @@ const FCcontrollerinstructions = () => {
 
             // Re-initialize containers with zero counts
             setTimeout(() => {
-              initializeContainers();
+              initializeContainers([], {});
             }, 0);
           },
         });
@@ -2624,7 +2064,8 @@ const FCcontrollerinstructions = () => {
       // Only re-initialize containers if not switching between container types
       if (!isContainerTypeSwitch) {
         setTimeout(() => {
-          initializeContainers();
+          // Counts were just reset to 0 above; clear containers
+          initializeContainers([], {});
         }, 0);
       }
       
@@ -2695,15 +2136,22 @@ const FCcontrollerinstructions = () => {
       formData.shipmentTypeId === "4"
     ) {
       console.log("Re-initializing containers for new shipment type");
+      // Capture counts before setTimeout so the closure sees current formData
+      const currentCounts = {
+        num_six_meters: formData.num_six_meters || 0,
+        num_twelve_meters: formData.num_twelve_meters || 0,
+        num_abnormal: formData.num_abnormal || 0,
+        num_breakbulk: formData.num_breakbulk || 0,
+      };
       setTimeout(() => {
         // Only re-initialize if container counts have changed
         if (
-          formData.num_six_meters > 0 ||
-          formData.num_twelve_meters > 0 ||
-          formData.num_abnormal > 0 ||
-          formData.num_breakbulk > 0
+          currentCounts.num_six_meters > 0 ||
+          currentCounts.num_twelve_meters > 0 ||
+          currentCounts.num_abnormal > 0 ||
+          currentCounts.num_breakbulk > 0
         ) {
-          initializeContainers();
+          initializeContainers(containersRef.current, currentCounts);
         }
 
         console.log(
