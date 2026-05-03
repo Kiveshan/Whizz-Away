@@ -5,6 +5,10 @@ import "../../css/controllerinstruction.css";
 import { useNavigate, useLocation } from "react-router-dom";
 import ErrorModal from "../../../../components/ErrorModal";
 import { ErrorTooltip } from "../../../../components/instructions/ErrorTooltip";
+import { ConfirmationModal } from "../../../../components/instructions/ConfirmationModal";
+import { InstructionLoadingGate } from "../../../../components/instructions/InstructionLoadingGate";
+import { InstructionBanners } from "../../../../components/instructions/InstructionBanners";
+import { ActionButtons } from "../../../../components/instructions/ActionButtons";
 import {
   fetchInstruction as fetchInstructionService,
   updateInstruction as updateInstructionService,
@@ -2759,58 +2763,17 @@ const FCcontrollerinstructions = () => {
     isLoadingComplete,
   });
 
-  // Ensure we have all required data before rendering the form
-  if (!isLoadingCompleteWithData) {
-    return (
-      <div style={{ textAlign: "center", padding: "20px" }}>
-        <p>Loading data...</p>
-      </div>
-    );
-  }
-
-  // Check if we have all required data
-  console.log("Data availability check:", {
-    clients: clients.length,
-    shipmentTypes: shipmentTypes.length,
-    startingPoints: startingPoints.length,
-    destinations: destinations.length,
-  });
-
-  if (
+  const hasDataFailure =
     clients.length === 0 ||
     shipmentTypes.length === 0 ||
-    startingPoints.length === 0
-  ) {
-    return (
-      <div style={{ textAlign: "center", padding: "20px" }}>
-        <p>Failed to load required data. Please try again.</p>
-        <button
-          onClick={handleRetryFetch}
-          style={{
-            padding: "8px 16px",
-            backgroundColor: "#4a90e2",
-            color: "white",
-            border: "none",
-            borderRadius: "4px",
-            cursor: "pointer",
-            marginTop: "10px",
-          }}
-        >
-          Retry
-        </button>
-      </div>
-    );
-  }
-
-  // Log form data before render
-  console.log("Rendering with formData:", formData);
-  console.log(
-    "Client options:",
-    clients.map((c) => ({ id: c.m5clientkey, name: c.companyname }))
-  );
-  console.log("Current client selection:", formData.clientId);
+    startingPoints.length === 0;
 
   return (
+    <InstructionLoadingGate
+      isLoadingComplete={isLoadingCompleteWithData}
+      hasDataFailure={hasDataFailure}
+      onRetry={handleRetryFetch}
+    >
     <div className="controller-instructions-root">
       <div className="controller-instructions-unique-wrapper">
         {errorModal.isOpen &&
@@ -2822,20 +2785,6 @@ const FCcontrollerinstructions = () => {
               type="error"
             />
           )}
-        {warningModal.isOpen && (
-          <ErrorModal
-            isOpen={warningModal.isOpen}
-            message={warningModal.message}
-            onClose={() =>
-              setWarningModal((prev) => ({ ...prev, isOpen: false }))
-            }
-            onConfirm={warningModal.onConfirm}
-            type="warning"
-            showConfirmButton={true}
-            confirmButtonText="Reset Counts & Continue"
-            cancelButtonText="Cancel"
-          />
-        )}
         <div className="controller-instructions-header">
           <button
             className="controller-instructions-back-button"
@@ -2848,38 +2797,13 @@ const FCcontrollerinstructions = () => {
           className="controller-instructions-form-container"
           style={{ maxWidth: "1200px" }}
         >
-          {isReadOnly && (
-            <div
-              style={{
-                backgroundColor: "#fff3cd",
-                border: "1px solid #ffeaa7",
-                borderRadius: "4px",
-                padding: "12px",
-                marginBottom: "20px",
-                textAlign: "center",
-                color: "#856404",
-                fontWeight: "bold",
-              }}
-            >
-              ⚠️ This instruction is {formData.status} and is in read-only mode
-            </div>
-          )}
-          {showSetRateWarning && !isReadOnly && (
-            <div
-              style={{
-                backgroundColor: "#f8d7da",
-                border: "1px solid #f5c6cb",
-                borderRadius: "4px",
-                padding: "12px",
-                marginBottom: "20px",
-                textAlign: "center",
-                color: "#721c24",
-                fontWeight: "bold",
-              }}
-            >
-              ⚠️ Break Bulk Set Rate Warning: The historical rate (R{historicalSetRate?.toFixed(2)}) differs from the current client rate (R{setRateValue?.toFixed(2)}). Saving will update the historical rate to the current rate.
-            </div>
-          )}
+          <InstructionBanners
+            isReadOnly={isReadOnly}
+            status={formData.status}
+            showSetRateWarning={showSetRateWarning}
+            historicalSetRate={historicalSetRate}
+            setRateValue={setRateValue}
+          />
           <div className="controller-instructions-form-section controller-instructions-client-info-section">
             <div className="controller-instructions-form-row">
               <div className="controller-instructions-form-field">
@@ -4549,169 +4473,47 @@ const FCcontrollerinstructions = () => {
               </div>
             </div>
           )}
-          {!isReadOnly && (
-            <div
-              className="controller-instructions-form-actions"
-              style={{ display: "flex", justifyContent: "center", gap: "15px" }}
-            >
-              <button
-                className="controller-instructions-save-button"
-                onClick={handleSaveChanges}
-                style={{
-                  backgroundColor: "#4a90e2",
-                  color: "white",
-                  padding: "12px 24px",
-                  border: "none",
-                  borderRadius: "4px",
-                  cursor: "pointer",
-                  fontSize: "16px",
-                  fontWeight: "bold",
-                }}
-              >
-                Save Changes
-              </button>
-              {(formData.status === "New" || formData.status === "In Progress") && (
-                <>
-                  <button
-                    className="controller-instructions-delete-button"
-                    onClick={handleDeleteInstruction}
-                    style={{
-                      backgroundColor: "#e74c3c",
-                      color: "white",
-                      padding: "12px 24px",
-                      border: "none",
-                      borderRadius: "4px",
-                      cursor: "pointer",
-                      fontSize: "16px",
-                      fontWeight: "bold",
-                      marginRight: "10px",
-                    }}
-                  >
-                    Delete Instruction
-                  </button>
-                  {!isInvoiced && (
-                    <button
-                      className="controller-instructions-invoice-button"
-                      onClick={handleCreateInvoice}
-                      style={{
-                        backgroundColor: "#27ae60",
-                        color: "white",
-                        padding: "12px 24px",
-                        border: "none",
-                        borderRadius: "4px",
-                        cursor: "pointer",
-                        fontSize: "16px",
-                        fontWeight: "bold",
-                      }}
-                    >
-                      Invoice
-                    </button>
-                  )}
-                </>
-              )}
-            </div>
-          )}
-
-          {isReadOnly && (
-            <div
-              className="controller-instructions-form-actions"
-              style={{ display: "flex", justifyContent: "center", gap: "15px" }}
-            >
-              <div
-                style={{
-                  backgroundColor: "#6c757d",
-                  color: "white",
-                  padding: "12px 24px",
-                  borderRadius: "4px",
-                  fontSize: "16px",
-                  fontWeight: "bold",
-                  textAlign: "center",
-                }}
-              >
-                This instruction is {formData.status} and cannot be edited
-              </div>
-            </div>
-          )}
+          <ActionButtons
+            isReadOnly={isReadOnly}
+            status={formData.status}
+            isInvoiced={isInvoiced}
+            onSave={handleSaveChanges}
+            onDelete={handleDeleteInstruction}
+            onInvoice={handleCreateInvoice}
+          />
         </div>
         {/* Confirmation Modal */}
-        {confirmationModal.isOpen && (
-          <div
-            className="controller-instructions-modal-overlay"
-            style={{
-              position: "fixed",
-              top: 0,
-              left: 0,
-              right: 0,
-              bottom: 0,
-              backgroundColor: "rgba(0, 0, 0, 0.5)",
-              display: "flex",
-              justifyContent: "center",
-              alignItems: "center",
-              zIndex: 1000,
-            }}
-          >
-            <div
-              className="controller-instructions-modal-content"
-              style={{
-                backgroundColor: "white",
-                padding: "24px",
-                borderRadius: "8px",
-                maxWidth: "500px",
-                width: "90%",
-                boxShadow: "0 4px 6px rgba(0, 0, 0, 0.1)",
-              }}
-            >
-              <h3 style={{ marginBottom: "16px", color: "#333" }}>
-                Confirm Save
-              </h3>
-              <p
-                style={{
-                  marginBottom: "24px",
-                  lineHeight: "1.5",
-                  color: "#666",
-                }}
-              >
-                {confirmationModal.message}
-              </p>
-              <div
-                style={{
-                  display: "flex",
-                  justifyContent: "flex-end",
-                  gap: "12px",
-                }}
-              >
-                <button
-                  onClick={handleCancelAction}
-                  style={{
-                    padding: "8px 16px",
-                    border: "1px solid #ddd",
-                    borderRadius: "4px",
-                    backgroundColor: "white",
-                    color: "#666",
-                    cursor: "pointer",
-                  }}
-                >
-                  No, Let Me Edit
-                </button>
-                <button
-                  onClick={handleConfirmAction}
-                  style={{
-                    padding: "8px 16px",
-                    border: "none",
-                    borderRadius: "4px",
-                    backgroundColor: "#4a90e2",
-                    color: "white",
-                    cursor: "pointer",
-                  }}
-                >
-                  Yes, Continue
-                </button>
-              </div>
-            </div>
-          </div>
-        )}
+        <ConfirmationModal
+          isOpen={confirmationModal.isOpen}
+          title={
+            confirmationModal.action === "delete" ? "Delete Instruction" :
+            confirmationModal.action === "invoice" ? "Create Invoice" :
+            confirmationModal.action === "delete-container" ? "Delete Container" :
+            confirmationModal.action === "delete-weight" ? "Delete Weight Row" :
+            confirmationModal.action === "unlock-route" ? "Unlock Route" :
+            "Confirm"
+          }
+          message={confirmationModal.message}
+          onConfirm={handleConfirmAction}
+          onCancel={handleCancelAction}
+        />
+        {/* Warning Modal (shipment type change) */}
+        <ConfirmationModal
+          isOpen={warningModal.isOpen}
+          title="Warning"
+          message={warningModal.message}
+          onConfirm={() => {
+            warningModal.onConfirm?.();
+            setWarningModal((prev) => ({ ...prev, isOpen: false }));
+          }}
+          onCancel={() => setWarningModal((prev) => ({ ...prev, isOpen: false }))}
+          confirmText="Reset Counts & Continue"
+          cancelText="Cancel"
+          variant="warning"
+        />
       </div>
     </div>
+    </InstructionLoadingGate>
   );
 };
 
