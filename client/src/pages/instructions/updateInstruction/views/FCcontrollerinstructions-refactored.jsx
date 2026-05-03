@@ -6,9 +6,6 @@ import { useNavigate, useLocation } from "react-router-dom";
 import ErrorModal from "../../../../components/ErrorModal";
 import { ErrorTooltip } from "../../../../components/instructions/ErrorTooltip";
 import {
-  fetchDestinations as fetchDestinationsService,
-  fetchRates as fetchRatesService,
-  fetchSetRate as fetchSetRateService,
   fetchInstruction as fetchInstructionService,
   updateInstruction as updateInstructionService,
   deleteInstruction as deleteInstructionService,
@@ -17,6 +14,7 @@ import {
 } from "../../../../services/instructionService";
 import { useInstructionData } from "../../../../hooks/useInstructionData";
 import { useContainerManagement } from "../../../../hooks/useContainerManagement";
+import { useRateManagement } from "../../../../hooks/useRateManagement";
 import { formatDateForDB, formatDateForInput as formatDateForInputUtil } from "../../../../utils/instructions/dateFormatting";
 import { calculateTotalCostFromRates, calcBreakBulkCost } from "../../../../utils/instructions/costCalculation";
 import { validateForm as validateFormUtil } from "../../../../utils/instructions/validation";
@@ -75,12 +73,6 @@ const FCcontrollerinstructions = () => {
   const todayDate = new Date();
   const today = `${todayDate.getFullYear()}-${String(todayDate.getMonth() + 1).padStart(2, '0')}-${String(todayDate.getDate()).padStart(2, '0')}`;  // Fixed timezone handling
   const [weight, setWeight] = useState("");
-  const [rateUpdateMessage, setRateUpdateMessage] = useState("");
-  const [isSetRateMode, setIsSetRateMode] = useState(false);
-  const [isSetRate, setIsSetRate] = useState(false);
-  const [setRateValue, setSetRateValue] = useState(0);
-  const [historicalSetRate, setHistoricalSetRate] = useState(null);
-  const [showSetRateWarning, setShowSetRateWarning] = useState(false);
 
   const [weightRows, setWeightRows] = useState([]);
 
@@ -300,62 +292,13 @@ const FCcontrollerinstructions = () => {
     }
   }, [formData.shipmentTypeId, formData.rateWeight]);
 
-  // Fetch set rate value when isSetRate is enabled
-  useEffect(() => {
-    const fetchSetRate = async () => {
-      if (isSetRate && formData.clientId && formData.pickup && formData.dropoff) {
-        try {
-          const setRateData = await fetchSetRateService(formData.clientId, formData.pickup, formData.dropoff);
-          if (setRateData && setRateData.set_rate !== undefined) {
-            const numericSetRate = Number(setRateData.set_rate)
-            setSetRateValue(numericSetRate)
-            // Keep formData.setRateAmount in sync so save logic can use it
-            setFormData((prev) => ({
-              ...prev,
-              setRateAmount: Number.isNaN(numericSetRate)
-                ? ""
-                : String(numericSetRate),
-            }))
-          }
-        } catch (error) {
-          console.error("Error fetching set_rate:", error)
-          setSetRateValue(0)
-        }
-      }
-    }
-    fetchSetRate()
-  }, [isSetRate, formData.clientId, formData.pickup, formData.dropoff])
-
-  // Keep internal "mode" flag in sync with the checkbox
-  useEffect(() => {
-    setIsSetRateMode(isSetRate)
-  }, [isSetRate])
-
   // Recalculate total cost when weight rows or unit rate changes for shipment type 4
   useEffect(() => {
     if (String(formData.shipmentTypeId) === "4" && !isAddOn) {
-      recalculateTotalCost();
+      recalculateTotalCost(formData, containersRef.current, weightRows);
     }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [weightRows, formData.unitRate, formData.shipmentTypeId]);
-
-  // Check for set rate mismatch warning when historicalSetRate, setRateValue, status, or isSetRate changes
-  useEffect(() => {
-    // Only show warning when:
-    // 1. Set rate is enabled
-    // 2. Status is "New" or "In Progress"
-    // 3. Both historical and current values are available and non-zero
-    // 4. They don't match
-    if (isSetRate && 
-        (formData.status === "New" || formData.status === "In Progress") &&
-        historicalSetRate !== null && 
-        historicalSetRate !== 0 &&
-        setRateValue !== 0 &&
-        historicalSetRate !== setRateValue) {
-      setShowSetRateWarning(true);
-    } else {
-      setShowSetRateWarning(false);
-    }
-  }, [isSetRate, formData.status, historicalSetRate, setRateValue]);
 
   // State for warning modal
   const [warningModal, setWarningModal] = useState({
@@ -415,6 +358,29 @@ const FCcontrollerinstructions = () => {
     onUpdateFormCounts: (counts) => setFormData((prev) => ({ ...prev, ...counts })),
     onRequestConfirmation: (message) =>
       setConfirmationModal({ isOpen: true, message, action: "delete-container" }),
+    onError: (msg) => setErrorModal({ isOpen: true, message: msg }),
+  });
+
+  const {
+    isSetRate,
+    setIsSetRate,
+    isSetRateMode,
+    setRateValue,
+    setSetRateValue,
+    historicalSetRate,
+    setHistoricalSetRate,
+    showSetRateWarning,
+    rateUpdateMessage,
+    fetchRates,
+    fetchFreshAmounts,
+    recalculateTotalCost,
+  } = useRateManagement({
+    isAddOn,
+    clientId: formData.clientId,
+    pickup: formData.pickup,
+    dropoff: formData.dropoff,
+    status: formData.status,
+    onFormUpdate: (partial) => setFormData((prev) => ({ ...prev, ...partial })),
     onError: (msg) => setErrorModal({ isOpen: true, message: msg }),
   });
 
@@ -827,56 +793,7 @@ const FCcontrollerinstructions = () => {
       }
       // Fetch fresh amounts on-the-fly to prevent race condition
       // If user clicks Save before async fetches complete, we need current values
-      const fetchFreshAmounts = async () => {
-        const freshContainers = await Promise.all(
-          containers.map(async (container) => {
-            // If flags are true but amounts might be stale, fetch fresh values
-            if ((container.addSurcharges || container.hazardous || container.vgm) && 
-                formData.clientId && formData.pickup && formData.dropoff) {
-              try {
-                const ratesData = await fetchRatesService(formData.clientId, formData.pickup, formData.dropoff);
-
-                const sixMeterSurcharge =
-                  ratesData.surcharges ??
-                  ratesData.surcharge ??
-                  0;
-
-                const twelveMeterSurcharge =
-                  ratesData.surcharge12m ??
-                  ratesData.surcharge_12m ??
-                  ratesData.surcharge12 ??
-                  ratesData.surcharge_12 ??
-                  ratesData.surcharges ??
-                  ratesData.surcharge ??
-                  0;
-
-                const isTwelveMeter = container.containerType === "12m";
-                const resolvedSurcharge = isTwelveMeter ? twelveMeterSurcharge : sixMeterSurcharge;
-
-                return {
-                  ...container,
-                  surchargeAmount: container.addSurcharges
-                    ? (isTwelveMeter ? 0 : Number(resolvedSurcharge || 0))
-                    : container.surchargeAmount,
-                  is_12m_surcharge: isTwelveMeter,
-                  surcharge_12m_amount: container.addSurcharges
-                    ? (isTwelveMeter ? Number(resolvedSurcharge || 0) : 0)
-                    : (container.surcharge_12m_amount || 0),
-                  hazardousAmount: container.hazardous ? Number(ratesData.hazardous || 0) : container.hazardousAmount,
-                  vgmAmount: container.vgm ? Number(ratesData.vgm || 0) : container.vgmAmount,
-                };
-              } catch (error) {
-                console.error('Error fetching fresh amounts:', error);
-                return container;
-              }
-            }
-            return container;
-          })
-        );
-        return freshContainers;
-      };
-
-      const freshContainers = await fetchFreshAmounts();
+      const freshContainers = await fetchFreshAmounts(containers, formData);
 
       // Calculate total surcharge from containers (using fresh amounts)
       const totalSurchargeAmount = freshContainers.reduce((total, container) => {
@@ -1167,7 +1084,7 @@ const FCcontrollerinstructions = () => {
       setIsContainerDataModified(false);
 
       // Recalculate total cost to update UI with saved values
-      recalculateTotalCost();
+      recalculateTotalCost(formData, containersRef.current, weightRows);
 
       // Navigate after 2 seconds
       setTimeout(() => {
@@ -1836,10 +1753,11 @@ const FCcontrollerinstructions = () => {
   // useEffect to recalculate total cost when container surcharges or hazardous flags/amounts change
   useEffect(() => {
     if (containers.length > 0) {
-      recalculateTotalCost();
+      recalculateTotalCost(formData, containers, weightRows);
     }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [
-    containers.map(c => c.addSurcharges).join(','), 
+    containers.map(c => c.addSurcharges).join(','),
     containers.map(c => c.surchargeAmount).join(','),
     containers.map(c => c.hazardous).join(','),
     containers.map(c => c.hazardousAmount).join(','),
@@ -1847,49 +1765,10 @@ const FCcontrollerinstructions = () => {
     containers.map(c => c.vgmAmount).join(',')
   ]);
 
-  // Function for real-time total cost recalculation
-  const recalculateTotalCost = () => {
-    // For add-on shipment type (5), always force zero cost and zero rates
-    if (isAddOn) {
-      setFormData(prev => ({
-        ...prev,
-        total_cost: 0,
-        rateper_6: 0,
-        rateper_12: 0,
-        rateper_abnormal: 0,
-        rateper_breakbulk: 0,
-        unitRate: 0,
-      }));
-      return;
-    }
-
-    // Handle shipment type 4 (break bulk) weight-based calculation
-    if (String(formData.shipmentTypeId) === "4") {
-      const baseCost = calcBreakBulkCost(weightRows, formData.unitRate || 0, {
-        isSetRateMode,
-        setRateAmount: formData.setRateAmount || 0,
-      });
-      setFormData(prev => ({ ...prev, total_cost: baseCost }));
-      return;
-    }
-
-    // Container-based calculation for other shipment types
-    const newTotalCost = calculateTotalCostFromRates(
-      formData.rateper_6 || 0,
-      formData.rateper_12 || 0,
-      formData.rateper_abnormal || 0,
-      formData.num_six_meters || 0,
-      formData.num_twelve_meters || 0,
-      formData.num_abnormal || 0,
-      containers
-    );
-
-    setFormData(prev => ({ ...prev, total_cost: newTotalCost }));
-  };
-
   // Wire recalculateTotalCost into the ref so the container hook can call it
   // without creating a circular dependency at hook-call time.
-  recalculateTotalCostRef.current = recalculateTotalCost;
+  recalculateTotalCostRef.current = () =>
+    recalculateTotalCost(formData, containersRef.current, weightRows);
 
   const handleClientChange = (e) => {
     const clientId = e.target.value;
@@ -2206,113 +2085,6 @@ const FCcontrollerinstructions = () => {
   // Alias to utility — named locally so JSX references stay unchanged
   const formatDateForInput = formatDateForInputUtil;
 
-  // Fetch rates based on pickup and dropoff locations - always update rates
-  const fetchRates = async (pickupLocation, dropoffLocation = null) => {
-    if (!formData.clientId || !pickupLocation) return;
-
-    console.log(
-      "Fetching rates for client:",
-      formData.clientId,
-      "pickup:",
-      pickupLocation,
-      "dropoff:",
-      dropoffLocation
-    );
-
-    try {
-      let destinationToUse = dropoffLocation;
-
-      // If no dropoff provided, get the default destination for this client and pickup location
-      if (!destinationToUse) {
-        const destinationsResult = await fetchDestinationsService(formData.clientId, pickupLocation);
-        destinationToUse = destinationsResult?.[0]?.destination;
-
-        if (!destinationToUse) {
-          console.log(
-            "No destination found for pickup location:",
-            pickupLocation
-          );
-          return;
-        }
-      }
-
-      console.log("Using destination:", destinationToUse);
-
-      // Fetch rates with both start and destination using the correct endpoint
-      const responseData = await fetchRatesService(formData.clientId, pickupLocation, destinationToUse);
-
-      console.log("Rates API response:", responseData);
-
-      if (responseData) {
-        // Handle both array and object responses
-        const rateData = Array.isArray(responseData)
-          ? responseData[0]
-          : responseData;
-
-        if (rateData) {
-          // Try to get rates with different possible property names
-          const rate6m =
-            rateData.rateper_6 ||
-            rateData["6m_rate"] ||
-            rateData.sixMeterRate ||
-            0;
-          const rate12m =
-            rateData.rateper_12 ||
-            rateData["12m_rate"] ||
-            rateData.twelveMeterRate ||
-            0;
-          const abnormalRate =
-            rateData.rateper_abnormal || rateData.abnormalRate || 0;
-          const surcharge = rateData.surcharge || rateData.surchages || 0;
-
-          console.log("Updating rates (always override):", {
-            rate6m,
-            rate12m,
-            abnormalRate,
-            surcharge,
-          });
-
-          // Always update rates regardless of current values
-          setFormData((prev) => {
-            const updatedData = {
-              ...prev,
-              rateper_6: rate6m,
-              rateper_12: rate12m,
-              rateper_abnormal: abnormalRate,
-              surcharge: surcharge,
-            };
-
-            // Recalculate total cost with new rates
-            const totalCost =
-              (updatedData.num_six_meters || 0) * rate6m +
-              (updatedData.num_twelve_meters || 0) * rate12m +
-              (updatedData.num_abnormal || 0) * abnormalRate +
-              (updatedData.num_breakbulk || 0) *
-                (updatedData.rateper_breakbulk || 0);
-
-            updatedData.total_cost = totalCost;
-
-            return updatedData;
-          });
-
-          // Show user feedback that rates were updated
-          setRateUpdateMessage("Rates updated based on selected route");
-          setTimeout(() => setRateUpdateMessage(""), 3000);
-        }
-      }
-    } catch (error) {
-      console.error("Error fetching rates:", error);
-      console.error("Error details:", error.response?.data || error.message);
-
-      // Show error message to user
-      setErrorModal({
-        isOpen: true,
-        message:
-          "Failed to fetch rates for selected route. Please check your selection or try again.",
-      });
-    }
-  };
-
   const handleDropoffChange = async (e) => {
     const dropoffLocation = e.target.value;
 
@@ -2327,7 +2099,7 @@ const FCcontrollerinstructions = () => {
 
     // Fetch new rates for the current pickup and new dropoff combination
     if (formData.pickup && dropoffLocation) {
-      await fetchRates(formData.pickup, dropoffLocation);
+      await fetchRates(formData.clientId, formData.pickup, dropoffLocation);
     }
   };
 
@@ -2335,7 +2107,6 @@ const FCcontrollerinstructions = () => {
     const pickupLocation = e.target.value;
 
     // Update the pickup location in form data
-    // The hook will reactively re-fetch destinations when pickup changes
     setFormData((prev) => ({
       ...prev,
       pickup: pickupLocation,
@@ -2346,7 +2117,7 @@ const FCcontrollerinstructions = () => {
     clearFieldError("pickup");
 
     // Fetch rates for the selected pickup location
-    await fetchRates(pickupLocation);
+    await fetchRates(formData.clientId, pickupLocation);
   };
 
   const handleInputChange = (e) => {
