@@ -9,6 +9,9 @@ import { ConfirmationModal } from "../../../../components/instructions/Confirmat
 import { InstructionLoadingGate } from "../../../../components/instructions/InstructionLoadingGate";
 import { InstructionBanners } from "../../../../components/instructions/InstructionBanners";
 import { ActionButtons } from "../../../../components/instructions/ActionButtons";
+import { ClientInfoSection } from "../../../../components/instructions/ClientInfoSection";
+import { ContainerCountsSection } from "../../../../components/instructions/ContainerCountsSection";
+import { ContainerCountsSection } from "../../../../components/instructions/ContainerCountsSection";
 import {
   fetchInstruction as fetchInstructionService,
   updateInstruction as updateInstructionService,
@@ -2804,97 +2807,19 @@ const FCcontrollerinstructions = () => {
             historicalSetRate={historicalSetRate}
             setRateValue={setRateValue}
           />
-          <div className="controller-instructions-form-section controller-instructions-client-info-section">
-            <div className="controller-instructions-form-row">
-              <div className="controller-instructions-form-field">
-                <label>Client</label>
-                <div
-                  className="controller-instructions-select-wrapper"
-                  ref={fieldRefs.clientId}
-                >
-                  <select
-                    style={isReadOnly ? readOnlyStyle : nonEditableStyle}
-                    className={`dropdown ${
-                      fieldErrors.clientId
-                        ? "controller-instructions-error-field"
-                        : ""
-                    }`}
-                    name="clientId"
-                    value={formData.clientId || ""}
-                    onChange={handleClientChange}
-                    disabled={true}
-                  >
-                    <option value="" disabled>
-                      Select Client
-                    </option>
-                    {clients.map((client) => (
-                      <option
-                        key={client.m5clientkey}
-                        value={client.m5clientkey}
-                      >
-                        {client.companyname}
-                      </option>
-                    ))}
-                  </select>
-                  <ErrorTooltip message={fieldErrors.clientId} />
-                </div>
-              </div>
-              <div className="controller-instructions-form-field">
-                <label>Representative</label>
-                <input
-                  type="text"
-                  className="controller-instructions-form-input"
-                  style={isReadOnly ? readOnlyStyle : nonEditableStyle}
-                  value={formData.representative || ""}
-                  readOnly
-                  placeholder="Autoload representative"
-                  name="representative"
-                  onChange={handleInputChange}
-                  disabled={true}
-                />
-                <ErrorTooltip message={fieldErrors.representative} />
-              </div>
-              <div className="controller-instructions-form-field">
-                <label>Contact Details</label>
-                <input
-                  type="text"
-                  className="controller-instructions-form-input"
-                  placeholder="Autoload contact details"
-                  name="contactDetails"
-                  value={formData.contactDetails}
-                  readOnly
-                  style={isReadOnly ? readOnlyStyle : nonEditableStyle}
-                  disabled={isReadOnly}
-                />
-              </div>
-              <div className="controller-instructions-form-field">
-                <label>Email</label>
-                <input
-                  type="email"
-                  className="controller-instructions-form-input"
-                  placeholder="Autoload email"
-                  name="email"
-                  value={formData.email}
-                  readOnly
-                  style={isReadOnly ? readOnlyStyle : nonEditableStyle}
-                  disabled={isReadOnly}
-                />
-              </div>
-              <div className="controller-instructions-form-field">
-                <label>Creation Date</label>
-                <input
-                  type="date"
-                  className="controller-instructions-form-input"
-                  name="createdAt"
-                  value={formData.createdAt || ""}
-                  onChange={handleInputChange}
-                  disabled={isReadOnly}
-                  style={isReadOnly ? readOnlyStyle : {}}
-                  ref={fieldRefs.createdAt}
-                />
-              </div>
-            </div>
-          </div>
+          <ClientInfoSection
+            formData={formData}
+            clients={clients}
+            fieldErrors={fieldErrors}
+            fieldRefs={fieldRefs}
+            isReadOnly={isReadOnly}
+            clientLocked={true}
+            readOnlyStyle={readOnlyStyle}
+            nonEditableStyle={nonEditableStyle}
+            onClientChange={handleClientChange}
+            onChange={handleInputChange}
+            showCreationDate={true}
+          />
           <div className="controller-instructions-form-section">
             {false && (
               <div
@@ -3060,158 +2985,16 @@ const FCcontrollerinstructions = () => {
               <div
                 className="controller-instructions-container-section"
               >
-                <div className="controller-instructions-container-group">
-                  <div className="controller-instructions-container-label">
-                    <span className="controller-instructions-trailer-size-label">
-                      Trailer Size
-                    </span>
-                    <label>No. of Containers</label>
-                    {fieldErrors.containers && (
-                      <div className="controller-instructions-container-error-message">
-                        {fieldErrors.containers}
-                      </div>
-                    )}
-                  </div>
-                  <div className="controller-instructions-container-inputs">
-                    <div className="controller-instructions-container-input">
-                      <label>6m</label>
-                      <div className="controller-instructions-container-rate-group">
-                        <input
-                          type="number"
-                          className={
-                            fieldErrors.containers
-                              ? "controller-instructions-error-field"
-                              : ""
-                          }
-                          value={formData.num_six_meters}
-                          min="0"
-                          name="num_six_meters"
-                          onChange={(e) => handleNumericInputChange(e)}
-                          disabled={
-                            formData.rateWeight !== "Container" || isReadOnly || isSetRateMode
-                          }
-                          style={isReadOnly ? readOnlyStyle : {}}
-                        />
-                        <div
-                          className="controller-instructions-input-wrapper controller-instructions-rate-input"
-                          ref={fieldRefs.rateper_6}
-                        >
-                          <input
-                            type="text"
-                            className={`controller-instructions-form-input ${
-                              fieldErrors.rateper_6
-                                ? "controller-instructions-error-field"
-                                : ""
-                            }`}
-                            placeholder="Rate"
-                            value={formData.rateper_6 || ""}
-                            name="rateper_6"
-                            onChange={handleRateChange}
-                            disabled={
-                              formData.rateWeight !== "Container" || isReadOnly
-                            }
-                            style={isReadOnly ? readOnlyStyle : {}}
-                          />
-                          <ErrorTooltip
-                            message={fieldErrors.rateper_6}
-                          />
-                        </div>
-                      </div>
-                    </div>
-                    <div className="controller-instructions-container-input">
-                      <label>12m</label>
-                      <div className="controller-instructions-container-rate-group">
-                        <input
-                          type="number"
-                          className={
-                            fieldErrors.containers
-                              ? "controller-instructions-error-field"
-                              : ""
-                          }
-                          value={formData.num_twelve_meters}
-                          min="0"
-                          name="num_twelve_meters"
-                          onChange={(e) => handleNumericInputChange(e)}
-                          disabled={
-                            formData.rateWeight !== "Container" || isReadOnly || isSetRateMode
-                          }
-                          style={isReadOnly ? readOnlyStyle : {}}
-                        />
-                        <div
-                          className="controller-instructions-input-wrapper controller-instructions-rate-input"
-                          ref={fieldRefs.rateper_12}
-                        >
-                          <input
-                            type="text"
-                            className={`controller-instructions-form-input ${
-                              fieldErrors.rateper_12
-                                ? "controller-instructions-error-field"
-                                : ""
-                            }`}
-                            placeholder="Rate"
-                            value={formData.rateper_12 || ""}
-                            name="rateper_12"
-                            onChange={handleRateChange}
-                            disabled={
-                              formData.rateWeight !== "Container" || isReadOnly
-                            }
-                            style={isReadOnly ? readOnlyStyle : {}}
-                          />
-                          <ErrorTooltip
-                            message={fieldErrors.rateper_12}
-                          />
-                        </div>
-                      </div>
-                    </div>
-                    <div className="controller-instructions-container-input">
-                      <label>Abnormal</label>
-                      <div className="controller-instructions-container-rate-group">
-                        <input
-                          type="number"
-                          className={
-                            fieldErrors.containers
-                              ? "controller-instructions-error-field"
-                              : ""
-                          }
-                          value={formData.num_abnormal}
-                          min="0"
-                          name="num_abnormal"
-                          onChange={(e) => handleNumericInputChange(e)}
-                          disabled={
-                            formData.rateWeight !== "Container" || isReadOnly || isSetRateMode
-                          }
-                          style={isReadOnly ? readOnlyStyle : {}}
-                        />
-                        <div
-                          className="controller-instructions-input-wrapper controller-instructions-rate-input"
-                          ref={fieldRefs.rateper_abnormal}
-                        >
-                          <input
-                            type="text"
-                            className={`controller-instructions-form-input ${
-                              fieldErrors.rateper_abnormal
-                                ? "controller-instructions-error-field"
-                                : ""
-                            }`}
-                            placeholder="Rate"
-                            value={formData.rateper_abnormal || ""}
-                            name="rateper_abnormal"
-                            onChange={handleRateChange}
-                            disabled={
-                              formData.rateWeight !== "Container" || isReadOnly
-                            }
-                            style={isReadOnly ? readOnlyStyle : {}}
-                          />
-                          <ErrorTooltip
-                            message={fieldErrors.rateper_abnormal}
-                          />
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Hazardous and Surcharges checkboxes have been removed from this section */}
-                </div>
+                <ContainerCountsSection
+                  formData={formData}
+                  fieldErrors={fieldErrors}
+                  fieldRefs={fieldRefs}
+                  isSetRateMode={isSetRateMode}
+                  isReadOnly={isReadOnly}
+                  readOnlyStyle={readOnlyStyle}
+                  onCountChange={handleNumericInputChange}
+                  onRateChange={handleRateChange}
+                />
                 {/* Main form section */}
                 <div
                   className="controller-instructions-booking-vertical-group"
