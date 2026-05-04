@@ -396,6 +396,17 @@ const FCcontrollerinstructions = () => {
   const [containers, setContainers] = useState([]);
   const containersRef = useRef([]);
   
+  // Keep containersRef in sync immediately for user edits. This prevents a race
+  // where the user clicks Save before React commits state and before the
+  // useEffect sync below runs.
+  const setContainersAndSyncRef = (updater) => {
+    setContainers((prev) => {
+      const next = typeof updater === "function" ? updater(prev) : updater;
+      containersRef.current = next;
+      return next;
+    });
+  };
+  
   // Sync containersRef with containers state
   useEffect(() => {
     console.log("[UPDATE] containers state changed:", containers);
@@ -591,7 +602,7 @@ const FCcontrollerinstructions = () => {
       }
       
       // Update the container fileRef value
-      setContainers((prevContainers) =>
+      setContainersAndSyncRef((prevContainers) =>
         prevContainers.map((container) =>
           container.id === id ? { ...container, fileRef: value } : container
         )
@@ -647,7 +658,7 @@ const FCcontrollerinstructions = () => {
       }
 
       // Update with sanitized value (empty string for empty, number for valid input)
-      setContainers((prevContainers) =>
+      setContainersAndSyncRef((prevContainers) =>
         prevContainers.map((container) =>
           container.id === id
             ? { ...container, [field]: sanitizedValue }
@@ -710,7 +721,7 @@ const FCcontrollerinstructions = () => {
         console.log(`🔄 Surcharge checkbox ${value ? 'CHECKED' : 'UNCHECKED'} for container ${id}`);
         if (value) {
           // Checkbox checked - update state immediately, then fetch surcharge amount
-          setContainers((prevContainers) =>
+          setContainersAndSyncRef((prevContainers) =>
             prevContainers.map((container) =>
               container.id === id 
                 ? { ...container, [field]: true }
@@ -721,7 +732,7 @@ const FCcontrollerinstructions = () => {
           fetchSurchargeAmount(id);
         } else {
           // Checkbox unchecked - reset surcharge amount to 0
-          setContainers((prevContainers) =>
+          setContainersAndSyncRef((prevContainers) =>
             prevContainers.map((container) =>
               container.id === id 
                 ? { ...container, [field]: value, surchargeAmount: 0, is_12m_surcharge: false, surcharge_12m_amount: 0 }
@@ -751,7 +762,7 @@ const FCcontrollerinstructions = () => {
             console.log(`☣️ Fetched hazardous amount: ${hazardousAmount} for container ${id}`);
             
             // Update container with both flag and amount atomically
-            setContainers((prevContainers) =>
+            setContainersAndSyncRef((prevContainers) =>
               prevContainers.map((container) =>
                 container.id === id 
                   ? { ...container, hazardous: true, hazardousAmount: Number(hazardousAmount) }
@@ -765,7 +776,7 @@ const FCcontrollerinstructions = () => {
           } catch (error) {
             console.error('❌ Error fetching hazardous amount:', error);
             // Fallback: set flag true but amount 0
-            setContainers((prevContainers) =>
+            setContainersAndSyncRef((prevContainers) =>
               prevContainers.map((container) =>
                 container.id === id 
                   ? { ...container, hazardous: true, hazardousAmount: 0 }
@@ -776,7 +787,7 @@ const FCcontrollerinstructions = () => {
         } else {
           // Checkbox unchecked - reset hazardous amount to 0
           console.log(`☢️ Hazardous checkbox UNCHECKED for container ${id} - updating state and resetting amount to 0`);
-          setContainers((prevContainers) =>
+          setContainersAndSyncRef((prevContainers) =>
             prevContainers.map((container) =>
               container.id === id 
                 ? { ...container, [field]: value, hazardousAmount: 0 }
@@ -791,7 +802,7 @@ const FCcontrollerinstructions = () => {
         console.log(`⚖️ VGM checkbox ${value ? 'CHECKED' : 'UNCHECKED'} for container ${id}`);
         if (value) {
           // Checkbox checked - update state immediately, then fetch VGM amount
-          setContainers((prevContainers) =>
+          setContainersAndSyncRef((prevContainers) =>
             prevContainers.map((container) =>
               container.id === id 
                 ? { ...container, [field]: true }
@@ -802,7 +813,7 @@ const FCcontrollerinstructions = () => {
           fetchVgmAmount(id);
         } else {
           // Checkbox unchecked - reset VGM amount to 0
-          setContainers((prevContainers) =>
+          setContainersAndSyncRef((prevContainers) =>
             prevContainers.map((container) =>
               container.id === id 
                 ? { ...container, [field]: value, vgmAmount: 0 }
@@ -818,7 +829,7 @@ const FCcontrollerinstructions = () => {
     }
 
     // Update the container value for other fields
-    setContainers((prevContainers) =>
+    setContainersAndSyncRef((prevContainers) =>
       prevContainers.map((container) =>
         container.id === id ? { ...container, [field]: value } : container
       )
