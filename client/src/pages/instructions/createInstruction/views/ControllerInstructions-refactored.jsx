@@ -11,6 +11,8 @@ import {
   saveInstruction as saveInstructionService,
 } from "../../../../services/instructionService"
 import { useInstructionData } from "../../../../hooks/useInstructionData"
+import { useWeightRows } from "../../../../hooks/useWeightRows"
+import { ConfirmationModal } from "../../../../components/instructions/ConfirmationModal"
 import { calcContainerBasedCost, calcBreakBulkCost } from "../../../../utils/instructions/costCalculation"
 import { validateForm as validateFormUtil } from "../../../../utils/instructions/validation"
 import { checkRateCountMismatch as checkRateCountMismatchUtil } from "../../../../utils/instructions/rateCountMismatch"
@@ -184,61 +186,22 @@ const ControllerInstructions = () => {
   const containersRef = useRef([])
   const [showContainerDetails, setShowContainerDetails] = useState(false)
 
-  const [weightRows, setWeightRows] = useState([])
-  const weightRowsRef = useRef([])
+  const {
+    weightRows,
+    setWeightRows,
+    weightRowsRef,
+    addWeightRow,
+    updateWeightRow,
+  } = useWeightRows()
 
-  const addWeightRow = useCallback(() => {
-    setWeightRows((prev) => {
-      const next = [
-        ...prev,
-        {
-          id: prev.length > 0 ? prev[prev.length - 1].id + 1 : 1,
-          ksmDmNo: "",
-          ticketNo: "",
-          receiptBookNo: "",
-          weight: "",
-        },
-      ]
-      console.log("[CREATE] ADD weight row - prev:", prev, "next:", next)
-      return next
-    })
-  }, [])
-
-  const updateWeightRow = useCallback((id, field, value) => {
-    setWeightRows((prev) => {
-      const next = prev.map((row) =>
-        row.id === id ? { ...row, [field]: value } : row,
-      )
-      console.log("[CREATE] UPDATE weight row", { id, field, value, prev, next })
-      return next
-    })
-  }, [])
-
-  const removeWeightRow = useCallback((id) => {
-    setWeightRows((prev) => {
-      const next = prev.filter((row) => row.id !== id)
-      console.log("[CREATE] REMOVE weight row", { id, prev, next })
-      return next
-    })
-  }, [])
+  const removeWeightRow = useCallback(
+    (id) => setWeightRows((prev) => prev.filter((row) => row.id !== id)),
+    [setWeightRows],
+  )
 
   useEffect(() => {
-    console.log("[CREATE] containers state changed:", containers)
     containersRef.current = containers
   }, [containers])
-
-  useEffect(() => {
-    console.log("[CREATE] weightRows changed:", weightRows)
-    try {
-      console.log(
-        "[CREATE] weightRows changed (JSON):",
-        JSON.stringify(weightRows, null, 2),
-      )
-    } catch (e) {
-      // ignore stringify errors
-    }
-    weightRowsRef.current = weightRows
-  }, [weightRows])
 
   // New state for rate locking
   const [rateLockStatus, setRateLockStatus] = useState({
@@ -1642,66 +1605,13 @@ const ControllerInstructions = () => {
       <style>{spinnerKeyframes}</style>
 
       {/* Confirmation Popup */}
-      {showConfirmationPopup && (
-        <div
-          className="modal-overlay"
-          style={{
-            position: "fixed",
-            top: 0,
-            left: 0,
-            right: 0,
-            bottom: 0,
-            backgroundColor: "rgba(0, 0, 0, 0.5)",
-            display: "flex",
-            justifyContent: "center",
-            alignItems: "center",
-            zIndex: 1000,
-          }}
-        >
-          <div
-            className="modal"
-            style={{
-              backgroundColor: "white",
-              padding: "20px",
-              borderRadius: "8px",
-              maxWidth: "500px",
-              width: "90%",
-              boxShadow: "0 4px 6px rgba(0, 0, 0, 0.1)",
-            }}
-          >
-            <h3 style={{ marginTop: 0, color: "#333" }}>Confirm Submission</h3>
-            <p style={{ marginBottom: "20px", lineHeight: "1.5" }}>{confirmationMessage}</p>
-            <div style={{ display: "flex", gap: "10px", justifyContent: "flex-end" }}>
-              <button
-                onClick={handleCancelSubmit}
-                style={{
-                  padding: "8px 16px",
-                  backgroundColor: "#6c757d",
-                  color: "white",
-                  border: "none",
-                  borderRadius: "4px",
-                  cursor: "pointer",
-                }}
-              >
-                No, Let Me Edit
-              </button>
-              <button
-                onClick={handleConfirmSubmit}
-                style={{
-                  padding: "8px 16px",
-                  backgroundColor: "#4a90e2",
-                  color: "white",
-                  border: "none",
-                  borderRadius: "4px",
-                  cursor: "pointer",
-                }}
-              >
-                Yes, Continue
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      <ConfirmationModal
+        isOpen={showConfirmationPopup}
+        title="Confirm Submission"
+        message={confirmationMessage}
+        onConfirm={handleConfirmSubmit}
+        onCancel={handleCancelSubmit}
+      />
 
       {/* No Rates Modal */}
       {showNoRatesModal && (
