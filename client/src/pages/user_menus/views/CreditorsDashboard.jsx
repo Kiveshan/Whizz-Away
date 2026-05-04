@@ -10,7 +10,7 @@ const creditorsDashboardData = [
     image: "/images/subconstructor.jpg",
     path: "/Creditors/SubcontractorList",
   },
-  { title: "Wages", image: "/images/wages.jpeg", path: "/finance-clerk-wage" },
+  { title: "Payroll", image: "/images/wages.jpeg", path: "/finance-clerk-wage" },
   {
     title: "Other Expenses",
     image: "/images/OtherExpence.jpg",

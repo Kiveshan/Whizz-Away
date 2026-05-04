@@ -129,7 +129,7 @@ function DynamicHeader() {
     "/client-list-payments": "Client Payments",
     "/director-client-list-payments": "Client Payments",
     "/client-documents": "Client Documents",
-    "/driver-wage": "Wages",
+    "/driver-wage": "Payroll",
     "/ControllerInstructions": "Instruction",
     "/ControllerInstructionDetails": "Container Details",
     "/FCcontrollerInstructionDetails": "Container Details",
@@ -145,10 +145,10 @@ function DynamicHeader() {
     "/view-client-statements": "Statements",
     "/statements-list": "Statements",
     "/client-statement": "Statements",
-    "/wages": "Wages",
-    "/finance-clerk-wage": "Wages",
-    "/finance-clerk-wage-details": "Wages",
-    "/finance-clerk-wage-slip": "Wages",
+    "/wages": "Payroll",
+    "/finance-clerk-wage": "Payroll",
+    "/finance-clerk-wage-details": "Payroll",
+    "/finance-clerk-wage-slip": "Payroll",
     "/ViewExpense": "Fuel Expenses",
     "/ExpenseDetails": "Fuel Expenses",
     "/ExpenseSubmission": "Expense",
@@ -159,7 +159,7 @@ function DynamicHeader() {
     "/CreditorsDashboard": "Creditors",
     "/FuelPage": "Fuel",
     "/DirectorDashboard": "Director",
-    "/FClerkLegDetails": "Wages",
+    "/FClerkLegDetails": "Payroll",
     "/ManagerViewAssignment": "View Assignment",
     "/FinancialDocumentsView": "Client Documents",
     "/Creditors/PurchaseOrders": "Purchase Orders",
@@ -213,11 +213,11 @@ function DynamicHeader() {
     if (location.pathname.startsWith("/ExpenseDetails/"))
       return "Fuel Expenses";
     if (location.pathname.startsWith("/finance-clerk-wage-details/"))
-      return "Wages";
+      return "Payroll";
     if (location.pathname.startsWith("/DirectorExpenses/"))
       return "Fuel Expenses";
     if (location.pathname.startsWith("/finance-clerk-wage-slip/"))
-      return "Wages";
+      return "Payroll";
     if (location.pathname.startsWith("/view-credit-note/"))
       return "Credit Note";
     if (location.pathname.startsWith("/income-expenditure-reports/"))
