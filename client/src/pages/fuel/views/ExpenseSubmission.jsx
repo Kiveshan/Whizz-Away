@@ -370,7 +370,7 @@ setTimeout(() => {
           </div>
 
           <div className="upload-section">
-            <label>Petrol Slip</label>
+            <label>Slip</label>
 
             {!file ? (
               <div
