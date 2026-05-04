@@ -18,6 +18,11 @@ const dashboardData = [
     image: "/images/Statements.jpg",
     path: "/view-client-statements",
   },
+  {
+    title: "Age Analysis",
+    image: "/images/Statements.jpg",
+    path: "/debtors-age-analysis",
+  },
 ];
 
 const DebtorsDashboard = () => {
