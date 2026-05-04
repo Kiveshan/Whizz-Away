@@ -112,8 +112,10 @@ const getProfitLossData = async (month, year) => {
   try {
     client = await pool.connect();
 
-    // === INCOME: Invoice Turnover (including subcontractor share) ===
-    const turnoverQuery = `
+    // === INCOME: Separate Categories ===
+    
+    // Instructions (subcontractor share from legs)
+    const instructionsQuery = `
       WITH DistinctLegs AS (
         SELECT m1key, COUNT(DISTINCT legnumber) AS num_legs
         FROM legs_m2 GROUP BY m1key
@@ -121,35 +123,45 @@ const getProfitLossData = async (month, year) => {
       DriverCountsPerLeg AS (
         SELECT m1key, legnumber, COUNT(DISTINCT driverid) AS drivers_per_leg
         FROM legs_m2 GROUP BY m1key, legnumber
-      ),
-      SubcontractorShare AS (
-        SELECT COALESCE(SUM(m.total_cost / dl.num_legs / dcpl.drivers_per_leg), 0) AS subcontractor_turnover
-        FROM legs_m2 l
-        JOIN m1_controller m ON l.m1key = m.m1key
-        JOIN DistinctLegs dl ON l.m1key = dl.m1key
-        JOIN DriverCountsPerLeg dcpl ON l.m1key = dcpl.m1key AND l.legnumber = dcpl.legnumber
-        JOIN m5_employee e ON l.driverid = e.userid
-        WHERE e.roleid = 6
-          AND TRIM(TO_CHAR(m.created_at, 'Month')) = $1
-          AND EXTRACT(YEAR FROM m.created_at)::text = $2
-      ),
-      InvoiceTurnover AS (
-        SELECT COALESCE(SUM(m.total_cost), 0) AS invoice_total
-        FROM invoice i
-        JOIN m1_controller m ON i.m1key = m.m1key
-        WHERE TRIM(TO_CHAR(i.date, 'Month')) = $1
-          AND EXTRACT(YEAR FROM i.date)::text = $2
       )
-      SELECT 
-        it.invoice_total + COALESCE(ss.subcontractor_turnover, 0) AS invoice_turnover
-      FROM InvoiceTurnover it
-      CROSS JOIN (SELECT COALESCE(subcontractor_turnover, 0) AS subcontractor_turnover FROM SubcontractorShare) ss;
+      SELECT COALESCE(SUM(m.total_cost / dl.num_legs / dcpl.drivers_per_leg), 0) AS instructions_total
+      FROM legs_m2 l
+      JOIN m1_controller m ON l.m1key = m.m1key
+      JOIN DistinctLegs dl ON l.m1key = dl.m1key
+      JOIN DriverCountsPerLeg dcpl ON l.m1key = dcpl.m1key AND l.legnumber = dcpl.legnumber
+      JOIN m5_employee e ON l.driverid = e.userid
+      WHERE e.roleid = 6
+        AND TRIM(TO_CHAR(m.created_at, 'Month')) = $1
+        AND EXTRACT(YEAR FROM m.created_at)::text = $2
     `;
 
-    const turnoverResult = await client.query(turnoverQuery, [month, year]);
-    const invoiceTurnover = Number(turnoverResult.rows[0]?.invoice_turnover || 0);
+    const instructionsResult = await client.query(instructionsQuery, [month, year]);
+    const instructionsTotal = Number(instructionsResult.rows[0]?.instructions_total || 0);
 
-    const totalIncome = invoiceTurnover;
+    // Invoices
+    const invoicesQuery = `
+      SELECT COALESCE(SUM(m.total_cost), 0) AS invoices_total
+      FROM invoice i
+      JOIN m1_controller m ON i.m1key = m.m1key
+      WHERE TRIM(TO_CHAR(i.date, 'Month')) = $1
+        AND EXTRACT(YEAR FROM i.date)::text = $2
+    `;
+
+    const invoicesResult = await client.query(invoicesQuery, [month, year]);
+    const invoicesTotal = Number(invoicesResult.rows[0]?.invoices_total || 0);
+
+    // Add-ons
+    const addOnsQuery = `
+      SELECT COALESCE(SUM(amount), 0) AS addons_total
+      FROM add_ons
+      WHERE TRIM(TO_CHAR(date, 'Month')) = $1
+        AND EXTRACT(YEAR FROM date)::text = $2
+    `;
+
+    const addOnsResult = await client.query(addOnsQuery, [month, year]);
+    const addOnsTotal = Number(addOnsResult.rows[0]?.addons_total || 0);
+
+    const totalIncome = instructionsTotal + invoicesTotal + addOnsTotal;
 
     // === EXPENSES ===
     const fuel = Number((await client.query(
@@ -196,7 +208,9 @@ const getProfitLossData = async (month, year) => {
     const netProfit = totalIncome - totalExpenses;
 
     const profitDetails = [
-      { source: "Instructions", amount: invoiceTurnover }
+      { source: "Instructions", amount: instructionsTotal },
+      { source: "Invoices", amount: invoicesTotal },
+      { source: "Add-ons", amount: addOnsTotal }
     ];
 
     const lossDetails = [
@@ -233,12 +247,16 @@ const getCompanyDetails = async () => {
     LIMIT 1
   `;
 
+  let client;
   try {
-    const result = await query(companyQuery);
+    client = await pool.connect();
+    const result = await client.query(companyQuery);
     return result.rows[0]?.companyname || "Company";
   } catch (error) {
     console.error("Error fetching company name:", error);
     return "Company";
+  } finally {
+    if (client) client.release();
   }
 };
 
