@@ -243,6 +243,17 @@ await pool.query(
           INSERT INTO expenses_m2 
           (type, documentfrom, expensecost, description, slipname, s3key, slipuploaddate, truckid, driverid, orderno)
           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+          ON CONFLICT (orderno)
+          DO UPDATE SET
+            type = EXCLUDED.type,
+            documentfrom = EXCLUDED.documentfrom,
+            expensecost = EXCLUDED.expensecost,
+            description = EXCLUDED.description,
+            slipname = EXCLUDED.slipname,
+            s3key = EXCLUDED.s3key,
+            slipuploaddate = EXCLUDED.slipuploaddate,
+            truckid = EXCLUDED.truckid,
+            driverid = EXCLUDED.driverid
           RETURNING ekey
         `;
         
@@ -260,7 +271,7 @@ await pool.query(
         ];
 
         const expenseResult = await pool.query(expenseQuery, expenseValues);
-        console.log("Expense record created with ID:", expenseResult.rows[0].ekey);
+        console.log("Expense record upserted with ID:", expenseResult.rows[0].ekey);
         
       } catch (expenseError) {
         console.error("Error creating expense record:", expenseError);

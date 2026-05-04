@@ -1,5 +1,5 @@
 "use client";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import Select from "react-select";
 import { useNavigate, useLocation } from "react-router-dom";
 import api from "../../../api"; // Import the configured Axios instance
@@ -25,6 +25,7 @@ const [formData, setFormData] = useState({
   const [file, setFile] = useState(null);
   const [driverOptions, setDriverOptions] = useState([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const submittingRef = useRef(false);
   const [submitMessage, setSubmitMessage] = useState("");
   const [uploadProgress, setUploadProgress] = useState(0);
   const [filePreview, setFilePreview] = useState(null);
@@ -107,17 +108,16 @@ const handleInputChange = (e) => {
 
 const handleSubmit = async (e) => {
   e.preventDefault();
+  if (submittingRef.current || isSubmitting || uploadProgress === 100) return;
+  submittingRef.current = true;
+
   setIsSubmitting(true);
   setSubmitMessage("");
   setUploadProgress(0);
-if (uploadProgress === 100) {
-    return;
-  }
-  
-  if (isSubmitting) return;
 if (expenseType === 5 && !truckId) {
   setSubmitMessage("Error: No truck selected for fuel expense");
   setIsSubmitting(false);
+  submittingRef.current = false;
   return;
 }
 
@@ -125,18 +125,21 @@ if (expenseType === 5 && !truckId) {
   if (expenseType === 5 && formData.documentFrom === "Driver" && !formData.driverName) {
     setSubmitMessage("Error: Please select a driver");
     setIsSubmitting(false);
+    submittingRef.current = false;
     return;
   }
 
   if (!file) {
     setSubmitMessage("Error: Please upload a petrol slip");
     setIsSubmitting(false);
+    submittingRef.current = false;
     return;
   }
 
   if (!formData.orderno) {
     setSubmitMessage("Error: Please enter an order number");
     setIsSubmitting(false);
+    submittingRef.current = false;
     return;
   }
 
@@ -232,6 +235,7 @@ setTimeout(() => {
     setUploadProgress(0);
   } finally {
     setIsSubmitting(false);
+    submittingRef.current = false;
   }
 };
   const handleCancel = () => {
