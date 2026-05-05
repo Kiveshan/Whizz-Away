@@ -50,7 +50,7 @@ import { useState, useRef, useCallback } from "react";
 import {
   fetchRates as fetchRatesService,
   checkContainerLegsExist as checkContainerLegsExistService,
-} from "../services/instructionService";
+} from "../services/instructionService.js";
 
 export function useContainerManagement({
   isImport = false,

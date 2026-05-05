@@ -43,7 +43,7 @@ import {
   fetchStartingPoints,
   fetchDestinations,
   fetchInstruction,
-} from "../services/instructionService";
+} from "../services/instructionService.js";
 
 export function useInstructionData({
   fetchExisting = false,
