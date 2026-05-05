@@ -1,4 +1,4 @@
-import api from "../api";
+import api from "../api.js";
 
 export async function fetchClients() {
   const response = await api.get("/api/instructions/active-clients");

@@ -37,11 +37,11 @@ import {
   fetchRates as fetchRatesService,
   fetchSetRate as fetchSetRateService,
   fetchDestinations as fetchDestinationsService,
-} from "../services/instructionService";
+} from "../services/instructionService.js";
 import {
   calculateTotalCostFromRates,
   calcBreakBulkCost,
-} from "../utils/instructions/costCalculation";
+} from "../utils/instructions/costCalculation.js";
 
 export function useRateManagement({
   isAddOn = false,
