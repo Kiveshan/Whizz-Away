@@ -78,10 +78,6 @@ export default function DirectorAnalytics() {
   const navigate = useNavigate();
   const wrapperRef = useRef(null);
 
-
-
-
-  
   useEffect(() => {
     fetchClients(setClients, setError);
     fetchSubcontractors(setSubcontractors, setError);
