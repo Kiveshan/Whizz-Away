@@ -337,22 +337,19 @@ export default function DirectorAnalytics() {
                 <div className="chart-legend">
                   <div className="legend-item">
                     <span
-                      className="legend-color"
-                      style={{ backgroundColor: "#4CAF50" }}
+                      className="legend-color green"
                     ></span>
                     <span>Good: R0-R3,500</span>
                   </div>
                   <div className="legend-item">
                     <span
-                      className="legend-color"
-                      style={{ backgroundColor: "#FFC107" }}
+                      className="legend-color yellow"
                     ></span>
                     <span>Warning: R3,501-R4,500</span>
                   </div>
                   <div className="legend-item">
                     <span
-                      className="legend-color"
-                      style={{ backgroundColor: "#F44336" }}
+                      className="legend-color red"
                     ></span>
                     <span>High: R4,501+</span>
                   </div>
@@ -378,16 +375,14 @@ export default function DirectorAnalytics() {
                 <div className="chart-header">
                   <div className="chart-header-item">
                     <span
-                      className="legend-color"
-                      style={{ backgroundColor: "#2196F3" }}
+                      className="legend-color blue"
                     ></span>
                     <span>Total Turnover</span>
                   </div>
                   {chartData.length > 1 && (
                     <div className="chart-header-item">
                       <span
-                        className="legend-color"
-                        style={{ backgroundColor: "#4169E1" }}
+                        className="legend-color royal-blue"
                       ></span>
                       <span>Selected Client</span>
                     </div>
@@ -456,29 +451,25 @@ export default function DirectorAnalytics() {
                 <div className="chart-header">
                   <div className="chart-header-item">
                     <span
-                      className="legend-color"
-                      style={{ backgroundColor: "#4169E1" }}
+                      className="legend-color royal-blue"
                     ></span>
                     <span>Current</span>
                   </div>
                   <div className="chart-header-item">
                     <span
-                      className="legend-color"
-                      style={{ backgroundColor: "#4CAF50" }}
+                      className="legend-color green"
                     ></span>
                     <span>30 Days</span>
                   </div>
                   <div className="chart-header-item">
                     <span
-                      className="legend-color"
-                      style={{ backgroundColor: "#FFC107" }}
+                      className="legend-color yellow"
                     ></span>
                     <span>60 Days</span>
                   </div>
                   <div className="chart-header-item">
                     <span
-                      className="legend-color"
-                      style={{ backgroundColor: "#F44336" }}
+                      className="legend-color red"
                     ></span>
                     <span>90 Days</span>
                   </div>
@@ -581,15 +572,13 @@ export default function DirectorAnalytics() {
                 <div className="chart-header">
                   <div className="chart-header-item">
                     <span
-                      className="legend-color"
-                      style={{ backgroundColor: "#2196F3" }}
+                      className="legend-color blue"
                     ></span>
                     <span>Total Turnover</span>
                   </div>
                   <div className="chart-header-item">
                     <span
-                      className="legend-color"
-                      style={{ backgroundColor: "#FF6347" }}
+                      className="legend-color tomato"
                     ></span>
                     <span>Total Subcontractor Turnover</span>
                   </div>
@@ -649,8 +638,7 @@ export default function DirectorAnalytics() {
                 <div className="chart-header">
                   <div className="chart-header-item">
                     <span
-                      className="legend-color"
-                      style={{ backgroundColor: "#2196F3" }}
+                      className="legend-color blue"
                     ></span>
                     <span>Total Turnover</span>
                   </div>
@@ -659,8 +647,7 @@ export default function DirectorAnalytics() {
                   ) && (
                       <div className="chart-header-item">
                         <span
-                          className="legend-color"
-                          style={{ backgroundColor: "#FF6347" }}
+                          className="legend-color tomato"
                         ></span>
                         <span>Selected Subcontractor</span>
                       </div>
@@ -722,8 +709,7 @@ export default function DirectorAnalytics() {
                 <div className="chart-header">
                   <div className="chart-header-item">
                     <span
-                      className="legend-color"
-                      style={{ backgroundColor: "#2196F3" }}
+                      className="legend-color blue"
                     ></span>
                     <span>Total Turnover</span>
                   </div>
@@ -732,8 +718,7 @@ export default function DirectorAnalytics() {
                   ) && (
                       <div className="chart-header-item">
                         <span
-                          className="legend-color"
-                          style={{ backgroundColor: "#FF6347" }}
+                          className="legend-color tomato"
                         ></span>
                         <span>Selected Subcontractor</span>
                       </div>
@@ -795,15 +780,13 @@ export default function DirectorAnalytics() {
                 <div className="chart-header">
                   <div className="chart-header-item">
                     <span
-                      className="legend-color"
-                      style={{ backgroundColor: "#2196F3" }}
+                      className="legend-color blue"
                     ></span>
                     <span>Turnover</span>
                   </div>
                   <div className="chart-header-item">
                     <span
-                      className="legend-color"
-                      style={{ backgroundColor: "#FF6347" }}
+                      className="legend-color tomato"
                     ></span>
                     <span>Diesel Cost</span>
                   </div>
@@ -924,22 +907,19 @@ export default function DirectorAnalytics() {
                 <div className="chart-legend">
                   <div className="legend-item">
                     <span
-                      className="legend-color"
-                      style={{ backgroundColor: "#4CAF50" }}
+                      className="legend-color green"
                     ></span>
                     <span>High: R10,000+</span>
                   </div>
                   <div className="legend-item">
                     <span
-                      className="legend-color"
-                      style={{ backgroundColor: "#FFC107" }}
+                      className="legend-color yellow"
                     ></span>
                     <span>Medium: R5,000-R9,999</span>
                   </div>
                   <div className="legend-item">
                     <span
-                      className="legend-color"
-                      style={{ backgroundColor: "#F44336" }}
+                      className="legend-color red"
                     ></span>
                     <span>Low: R0-R4,999</span>
                   </div>
@@ -968,15 +948,13 @@ export default function DirectorAnalytics() {
                 <div className="chart-header">
                   <div className="chart-header-item">
                     <span
-                      className="legend-color"
-                      style={{ backgroundColor: "#4169E1" }}
+                      className="legend-color royal-blue"
                     ></span>
                     <span>Income</span>
                   </div>
                   <div className="chart-header-item">
                     <span
-                      className="legend-color"
-                      style={{ backgroundColor: "#FF6347" }}
+                      className="legend-color tomato"
                     ></span>
                     <span>Expenses</span>
                   </div>
@@ -1037,15 +1015,13 @@ export default function DirectorAnalytics() {
                 <div className="chart-header">
                   <div className="chart-header-item">
                     <span
-                      className="legend-color"
-                      style={{ backgroundColor: "#4169E1" }}
+                      className="legend-color royal-blue"
                     ></span>
                     <span>Wages</span>
                   </div>
                   <div className="chart-header-item">
                     <span
-                      className="legend-color"
-                      style={{ backgroundColor: "#FF6347" }}
+                      className="legend-color tomato"
                     ></span>
                     <span>Expenses</span>
                   </div>
@@ -1119,15 +1095,13 @@ export default function DirectorAnalytics() {
                 <div className="chart-header">
                   <div className="chart-header-item">
                     <span
-                      className="legend-color"
-                      style={{ backgroundColor: "#2196F3" }}
+                      className="legend-color blue"
                     ></span>
                     <span>Turnover</span>
                   </div>
                   <div className="chart-header-item">
                     <span
-                      className="legend-color"
-                      style={{ backgroundColor: "#FF6347" }}
+                      className="legend-color tomato"
                     ></span>
                     <span>Diesel Cost</span>
                   </div>
@@ -1225,16 +1199,14 @@ export default function DirectorAnalytics() {
                 <div className="chart-header">
                   <div className="chart-header-item">
                     <span
-                      className="legend-color"
-                      style={{ backgroundColor: "#4169E1" }}
+                      className="legend-color royal-blue"
                     ></span>
                     <span>Total Payments</span>
                   </div>
                   {selectedClient && (
                     <div className="chart-header-item">
                       <span
-                        className="legend-color"
-                        style={{ backgroundColor: "#2196F3" }}
+                        className="legend-color blue"
                       ></span>
                       <span>Selected Client</span>
                     </div>
