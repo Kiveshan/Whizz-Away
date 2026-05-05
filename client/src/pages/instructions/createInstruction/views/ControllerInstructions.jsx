@@ -3,7 +3,24 @@
 import { useState, useEffect, useRef, useMemo, useCallback } from "react"
 import "../../css/controllerinstruction.css"
 import { useNavigate, useLocation } from "react-router-dom"
-import api from "../../../../api"
+import { ErrorTooltip as SharedErrorTooltip } from "../../../../components/instructions/ErrorTooltip"
+import {
+  fetchStartingPoints as fetchStartingPointsService,
+  fetchDestinations as fetchDestinationsService,
+  fetchRates as fetchRatesService,
+  saveInstruction as saveInstructionService,
+} from "../../../../services/instructionService"
+import { useInstructionData } from "../../../../hooks/useInstructionData"
+import { useContainerManagement } from "../../../../hooks/useContainerManagement"
+import { useWeightRows } from "../../../../hooks/useWeightRows"
+import { ConfirmationModal } from "../../../../components/instructions/ConfirmationModal"
+import { InstructionLoadingGate } from "../../../../components/instructions/InstructionLoadingGate"
+import { ClientInfoSection } from "../../../../components/instructions/ClientInfoSection"
+import { WeightDetailsTable } from "../../../../components/instructions/WeightDetailsTable"
+import { ContainerDetailsTable } from "../../../../components/instructions/ContainerDetailsTable"
+import { calcContainerBasedCost, calcBreakBulkCost } from "../../../../utils/instructions/costCalculation"
+import { validateForm as validateFormUtil } from "../../../../utils/instructions/validation"
+import { checkRateCountMismatch as checkRateCountMismatchUtil } from "../../../../utils/instructions/rateCountMismatch"
 
 const ControllerInstructions = () => {
   const navigate = useNavigate()
@@ -130,7 +147,6 @@ const ControllerInstructions = () => {
 
   // Form validation state
   const [fieldErrors, setFieldErrors] = useState({})
-  const [containerFieldErrors, setContainerFieldErrors] = useState({})
   const [submitError, setSubmitError] = useState("")
   const [isSubmitting, setIsSubmitting] = useState(false)
 
@@ -145,80 +161,42 @@ const ControllerInstructions = () => {
   const [locationError, setLocationError] = useState(null)
   const [showNoRatesModal, setShowNoRatesModal] = useState(false)
 
-  // Data loading states
-  const [isLoading, setIsLoading] = useState({
-    clients: true,
-    shipmentTypes: true,
-    startingPoints: true,
-    destinations: true,
+  // Route-level loading state (clients + shipmentTypes handled by hook)
+  const [locationIsLoading, setIsLoading] = useState({
+    startingPoints: false,
+    destinations: false,
   })
 
-  // Data states
-  const [clients, setClients] = useState([])
-  const [shipmentTypes, setShipmentTypes] = useState([])
-  const [startingPoints, setStartingPoints] = useState([])
-  const [destinations, setDestinations] = useState([])
+  // Base data from hook (clients, shipmentTypes + their loading flags)
+  const {
+    clients,
+    shipmentTypes,
+    isLoading: hookIsLoading,
+  } = useInstructionData({
+    onError: (msg) => console.error("[CREATE] data load error:", msg),
+    on404: () => setShowNoRatesModal(true),
+  })
 
-  // Container states
-  const [containers, setContainers] = useState([])
-  const containersRef = useRef([])
-  const [showContainerDetails, setShowContainerDetails] = useState(false)
+  // Merged loading object used throughout the component
+  const isLoading = {
+    clients: hookIsLoading.clients,
+    shipmentTypes: hookIsLoading.shipmentTypes,
+    startingPoints: locationIsLoading.startingPoints,
+    destinations: locationIsLoading.destinations,
+  }
 
-  const [weightRows, setWeightRows] = useState([])
-  const weightRowsRef = useRef([])
+  const {
+    weightRows,
+    setWeightRows,
+    weightRowsRef,
+    addWeightRow,
+    updateWeightRow,
+  } = useWeightRows()
 
-  const addWeightRow = useCallback(() => {
-    setWeightRows((prev) => {
-      const next = [
-        ...prev,
-        {
-          id: prev.length > 0 ? prev[prev.length - 1].id + 1 : 1,
-          ksmDmNo: "",
-          ticketNo: "",
-          receiptBookNo: "",
-          weight: "",
-        },
-      ]
-      console.log("[CREATE] ADD weight row - prev:", prev, "next:", next)
-      return next
-    })
-  }, [])
-
-  const updateWeightRow = useCallback((id, field, value) => {
-    setWeightRows((prev) => {
-      const next = prev.map((row) =>
-        row.id === id ? { ...row, [field]: value } : row,
-      )
-      console.log("[CREATE] UPDATE weight row", { id, field, value, prev, next })
-      return next
-    })
-  }, [])
-
-  const removeWeightRow = useCallback((id) => {
-    setWeightRows((prev) => {
-      const next = prev.filter((row) => row.id !== id)
-      console.log("[CREATE] REMOVE weight row", { id, prev, next })
-      return next
-    })
-  }, [])
-
-  useEffect(() => {
-    console.log("[CREATE] containers state changed:", containers)
-    containersRef.current = containers
-  }, [containers])
-
-  useEffect(() => {
-    console.log("[CREATE] weightRows changed:", weightRows)
-    try {
-      console.log(
-        "[CREATE] weightRows changed (JSON):",
-        JSON.stringify(weightRows, null, 2),
-      )
-    } catch (e) {
-      // ignore stringify errors
-    }
-    weightRowsRef.current = weightRows
-  }, [weightRows])
+  const removeWeightRow = useCallback(
+    (id) => setWeightRows((prev) => prev.filter((row) => row.id !== id)),
+    [setWeightRows],
+  )
 
   // New state for rate locking
   const [rateLockStatus, setRateLockStatus] = useState({
@@ -295,247 +273,6 @@ const ControllerInstructions = () => {
       }
     },
     [fieldErrors, isFieldValid],
-  )
-
-  // Initialize containers based on counts while preserving existing container data
-  const initializeContainers = useCallback(
-    (containerCounts = null) => {
-      const counts = containerCounts || {
-        num_six_meters: formData.num_six_meters || 0,
-        num_twelve_meters: formData.num_twelve_meters || 0,
-        num_abnormal: formData.num_abnormal || 0,
-        num_breakbulk: formData.num_breakbulk || 0,
-      }
-
-      // Create a map of existing containers by type and index
-      const existingContainersByType = {
-        "6m": [],
-        "12m": [],
-        Abnormal: [],
-        BreakBulk: [],
-      }
-
-      // Group existing containers by type
-      containers.forEach((container) => {
-        if (existingContainersByType[container.containerType]) {
-          existingContainersByType[container.containerType].push(container)
-        }
-      })
-
-      const containersList = []
-      let containerId = 1
-
-      // Helper function to get or create container
-      const getOrCreateContainer = (type, index) => {
-        const existing = existingContainersByType[type]
-        if (index < existing.length) {
-          // Use existing container if available
-          return {
-            ...existing[index],
-            id: containerId++,
-          }
-        }
-        // Create new container if needed
-        return {
-          id: containerId++,
-          containerKey: null,
-          containerNum: "",
-          // Initialize file reference field for export shipments
-          fileRef: "",
-          // Initialize weight field for import, export, and cross-haul shipments
-          weight: (isImport || isExport || isCrossHaul) ? "" : null,
-          containerType: type,
-          cargoDescription: "",
-          // Initialize hazardous, addSurcharges, and vgm properties for each container
-          hazardous: false,
-          addSurcharges: false,
-          surchargeAmount: 0,
-          is_12m_surcharge: type === "12m",
-          surcharge_12m_amount: 0,
-          vgm: false,
-        }
-      }
-
-      // Add 6m containers
-      for (let i = 0; i < (counts.num_six_meters || 0); i++) {
-        containersList.push(getOrCreateContainer("6m", i))
-      }
-
-      // Add 12m containers
-      for (let i = 0; i < (counts.num_twelve_meters || 0); i++) {
-        containersList.push(getOrCreateContainer("12m", i))
-      }
-
-      // Add abnormal containers
-      for (let i = 0; i < (counts.num_abnormal || 0); i++) {
-        containersList.push(getOrCreateContainer("Abnormal", i))
-      }
-
-      // Add break bulk containers for cross-haul
-      if (isCrossHaul) {
-        for (let i = 0; i < (counts.num_breakbulk || 0); i++) {
-          containersList.push(getOrCreateContainer("BreakBulk", i))
-        }
-      }
-
-      setContainers(containersList)
-      // Show container details if there are any containers AND it's not weight-based
-      setShowContainerDetails(containersList.length > 0 && !isWeightBased)
-    },
-    [containers, isImport, isExport, isCrossHaul, isWeightBased],
-  )
-
-  // Handle container input changes
-  const handleContainerChange = useCallback(
-    (id, field, value) => {
-      const fetchSurchargeAmount = async (containerId) => {
-        try {
-          if (!formData.clientId || !formData.pickup || !formData.dropoff) {
-            return 0
-          }
-
-          const response = await api.get(
-            `/api/instructions/client/${formData.clientId}/rates`,
-            {
-              params: {
-                start: formData.pickup,
-                destination: formData.dropoff,
-              },
-            },
-          )
-
-          const container = containersRef.current.find((c) => c.id === containerId)
-          const isTwelveMeter = container?.containerType === "12m"
-
-          const sixMeterSurcharge =
-            response.data.surcharges ??
-            response.data.surcharge ??
-            0
-
-          const twelveMeterSurcharge =
-            response.data.surcharge12m ??
-            response.data.surcharge_12m ??
-            response.data.surcharge12 ??
-            response.data.surcharge_12 ??
-            response.data.surcharges ??
-            response.data.surcharge ??
-            0
-
-          return isTwelveMeter ? twelveMeterSurcharge : sixMeterSurcharge
-        } catch (error) {
-          console.error("❌ Error fetching surcharge amount:", error)
-          return 0
-        }
-      }
-
-      if (field === "containerNum") {
-        // For export shipments, no validation is needed
-        if (isExport || formData.shipmentTypeId === "2") {
-          // Just ensure it doesn't exceed 20 characters
-          if (value.length > 20) return
-          
-          // Clear any existing errors
-          setContainerFieldErrors((prev) => {
-            const newErrors = { ...prev }
-            delete newErrors[`container-${id}`]
-            return newErrors
-          })
-        } else if (!isAddOn) {
-          // For other shipment types, only check for uniqueness
-          // No format validation, just ensure it doesn't exceed 20 characters
-          if (value.length > 20) return
-
-          // Check for duplicates in real-time
-          let error = null
-          if (value.trim() !== "") {
-            const upperCaseValue = value.toUpperCase()
-            const duplicateExists = containers.some(
-              (container) => container.id !== id && container.containerNum.toUpperCase() === upperCaseValue,
-            )
-            if (duplicateExists) {
-              error = "Container number must be unique"
-            }
-          }
-
-          setContainerFieldErrors((prev) => ({
-            ...prev,
-            [`container-${id}`]: error,
-          }))
-        }
-      } else if (field === "weight" && value !== "") {
-        // Only allow numbers and decimal point for weight
-        if (!/^\d*\.?\d*$/.test(value)) return
-
-        // Clear weight error when user starts typing valid input
-        setContainerFieldErrors((prev) => {
-          const newErrors = { ...prev }
-          delete newErrors[`weight-${id}`]
-          return newErrors
-        })
-      } else if (field === "fileRef") {
-        // Just ensure it doesn't exceed 20 characters
-        if (value.length > 20) return
-        
-        // Clear any existing errors
-        setContainerFieldErrors((prev) => {
-          const newErrors = { ...prev }
-          delete newErrors[`file-ref-${id}`]
-          return newErrors
-        })
-      } else if (field === "weight" && value === "") {
-        // Don't clear error immediately when field becomes empty for import
-        // Let validation handle it
-      }
-
-      if (field === "addSurcharges") {
-        if (value) {
-          // Toggle on immediately for UI responsiveness, then fetch amount
-          setContainers((prev) =>
-            prev.map((container) =>
-              container.id === id ? { ...container, addSurcharges: true } : container,
-            ),
-          )
-
-          fetchSurchargeAmount(id).then((amount) => {
-            setContainers((prev) =>
-              prev.map((container) =>
-                container.id === id
-                  ? {
-                      ...container,
-                      surchargeAmount:
-                        container.containerType === "12m" ? 0 : (Number(amount) || 0),
-                      is_12m_surcharge: container.containerType === "12m",
-                      surcharge_12m_amount:
-                        container.containerType === "12m" ? (Number(amount) || 0) : 0,
-                    }
-                  : container,
-              ),
-            )
-          })
-        } else {
-          setContainers((prev) =>
-            prev.map((container) =>
-              container.id === id
-                ? {
-                    ...container,
-                    addSurcharges: false,
-                    surchargeAmount: 0,
-                    is_12m_surcharge: false,
-                    surcharge_12m_amount: 0,
-                  }
-                : container,
-            ),
-          )
-        }
-        return
-      }
-
-      // Update container
-      setContainers((prev) =>
-        prev.map((container) => (container.id === id ? { ...container, [field]: value } : container)),
-      )
-    },
-    [containers],
   )
 
   // Initialize form data with preserved data if available, or default values
@@ -677,6 +414,30 @@ const ControllerInstructions = () => {
 
   const isAddOn = formData.shipmentTypeId === "5"
 
+  const {
+    containers,
+    setContainers,
+    containersRef,
+    containerFieldErrors,
+    setContainerFieldErrors,
+    initializeContainers,
+    handleContainerChange,
+    validateContainerUniqueness,
+  } = useContainerManagement({
+    isImport,
+    isExport,
+    isCrossHaul,
+    isWeightBased,
+    clientId: formData.clientId,
+    pickup: formData.pickup,
+    dropoff: formData.dropoff,
+    shipmentTypeId: formData.shipmentTypeId,
+    isAddOn,
+    isReadOnly: false,
+  })
+
+  const showContainerDetails = containers.length > 0 && !isWeightBased
+
   // VGM is only applicable for certain shipment types. For shipment types 4
   // (cross-haul/break bulk) and 5 (add-on), VGM should behave like the other
   // non-applicable fields (null/false). This flag controls the UI.
@@ -719,52 +480,14 @@ const ControllerInstructions = () => {
     }
   }, [formData.shipmentTypeId, formData.rateWeight])
 
-  // Load initial data
-  useEffect(() => {
-    const loadInitialData = async () => {
-      try {
-        // Load clients
-        const clientsResponse = await api.get("/api/instructions/active-clients")
-        setClients(clientsResponse.data)
-        setIsLoading((prev) => ({ ...prev, clients: false }))
-
-        // Load shipment types
-        const shipmentTypesResponse = await api.get("/api/instructions/shipment-types")
-        setShipmentTypes(shipmentTypesResponse.data)
-        setIsLoading((prev) => ({ ...prev, shipmentTypes: false }))
-
-        // Set other loading states to false since we're not loading them initially
-        setIsLoading((prev) => ({
-          ...prev,
-          startingPoints: false,
-          destinations: false,
-        }))
-      } catch (error) {
-        console.error("Error loading initial data:", error)
-        setIsLoading({
-          clients: false,
-          shipmentTypes: false,
-          startingPoints: false,
-          destinations: false,
-        })
-      }
-    }
-
-    loadInitialData()
-  }, [])
-
   // Function to fetch rates for the selected client, pickup and dropoff
   const fetchRates = useCallback(async (clientId, start, destination) => {
     if (!clientId || !start || !destination) {
       return null
     }
 
-    const url = `/api/instructions/client/${clientId}/rates`
-    const params = { start, destination }
-
     try {
-      const response = await api.get(url, { params })
-      return response.data
+      return await fetchRatesService(clientId, start, destination)
     } catch (error) {
       console.error("[fetchRates] Error fetching rates:", error)
       return null
@@ -968,8 +691,8 @@ const ControllerInstructions = () => {
       if (clientId) {
         setIsLoadingLocations(true)
         try {
-          const response = await api.get(`/api/instructions/client/${clientId}/starting-points`)
-          const startingPoints = response.data.map((point) => ({
+          const startingPointsData = await fetchStartingPointsService(clientId)
+          const startingPoints = startingPointsData.map((point) => ({
             value: point.starting_point,
             label: point.starting_point,
           }))
@@ -1024,9 +747,8 @@ const ControllerInstructions = () => {
       if (pickup && formData.clientId) {
         setIsLoading((prev) => ({ ...prev, destinations: true }))
         try {
-          const encodedPickup = encodeURIComponent(pickup)
-          const response = await api.get(`/api/instructions/client/${formData.clientId}/destinations/${encodedPickup}`)
-          const destinations = response.data.map((dest) => ({
+          const destinationsData = await fetchDestinationsService(formData.clientId, pickup)
+          const destinations = destinationsData.map((dest) => ({
             value: dest.destination,
             label: dest.destination,
           }))
@@ -1151,7 +873,7 @@ const ControllerInstructions = () => {
           num_abnormal: field === "num_abnormal" ? numValue : formData.num_abnormal,
           num_breakbulk: field === "num_breakbulk" ? numValue : formData.num_breakbulk,
         }
-        initializeContainers(newCounts)
+        initializeContainers(containersRef.current, newCounts)
       }
     },
     [
@@ -1172,66 +894,18 @@ const ControllerInstructions = () => {
     }
   }, [])
 
-  // Form validation
+  // Form validation — delegates to utility, returns errors object (legacy shape for call site)
   const validateForm = useCallback(() => {
-    const errors = {}
-
-    // Required fields
-    if (!formData.clientId) errors.clientId = "Client is required"
-    if (!formData.shipmentTypeId) errors.shipmentTypeId = "Shipment type is required"
-    if (!formData.pickup) errors.pickup = "Pickup location is required"
-    if (!formData.dropoff) errors.dropoff = "Dropoff location is required"
-
-    if (!isAddOn) {
-      if (!formData.task) errors.task = "KSM File Reference is required"
-      if (!formData.lastFreeDate) errors.lastFreeDate = "Last Free Date is required"
-      if (!formData.bookingRef) errors.bookingRef = "Booking reference is required"
-      if (!formData.fileRef) errors.fileRef = "Client File Reference is required"
-      if (!formData.description) errors.description = "Description is required"
-    }
-
-    // Cross-haul specific validations (vessel name and stack date not required for cross-haul types)
-    if (!isCrossHaul && !isAddOn) {
-      if (!formData.vesselName) errors.vesselName = "Vessel name is required"
-      if (!formData.stackDate) errors.stackDate = "Stack date is required"
-    }
-
-    // Weight-based validations
-    if (isWeightBased) {
-      if (formData.shipmentTypeId !== "4") {
-        if (!formData.weight || formData.weight === "") {
-          errors.weight = "Weight is required for weight-based calculations"
-        }
-      }
-      const isCrossHaulSetRate = formData.shipmentTypeId === "4" && isSetRate
-      if (!isCrossHaulSetRate && (!formData.unitrate || formData.unitrate === "")) {
-        errors.unitrate = "Unit rate is required for weight-based calculations"
-      }
-    } else if (isSetRateMode) {
-      if (!formData.setRateAmount || formData.setRateAmount === "") {
-        errors.setRateAmount = "Set rate amount is required when unit type is Set Rate"
-      }
-    } else if (!isAddOn) {
-      // Container-based validations (skip for add-on shipments)
-      const totalContainers =
-        formData.num_six_meters +
-        formData.num_twelve_meters +
-        formData.num_abnormal +
-        (isCrossHaul && formData.rateWeight === "Container" ? formData.num_breakbulk : 0) // Only count breakbulk if it's container-based
-      if (totalContainers === 0) {
-        errors.containerCount = "At least one container is required"
-      }
-
-      // Break bulk validation for cross-haul + container
-      if (isCrossHaul && formData.num_breakbulk > 0 && formData.rateWeight === "Container") {
-        if (!formData.rateper_breakbulk || formData.rateper_breakbulk === "") {
-          errors.rateper_breakbulk = "Break bulk rate is required when break bulk count > 0 and unit type is Container"
-        }
-      }
-    }
-
-    return errors
-  }, [formData, isCrossHaul, isWeightBased, isAddOn, isSetRate])
+    const { fieldErrors } = validateFormUtil(formData, [], {
+      mode: "create",
+      isAddOn,
+      isCrossHaul,
+      isWeightBased,
+      isSetRate,
+      isSetRateMode,
+    })
+    return fieldErrors
+  }, [formData, isCrossHaul, isWeightBased, isAddOn, isSetRate, isSetRateMode])
 
   // Container validation function
   const validateContainers = useCallback(() => {
@@ -1285,78 +959,11 @@ const ControllerInstructions = () => {
     return isValid
   }, [isAddOn, isWeightBased, showContainerDetails, containers, isImport, isExport, formData.shipmentTypeId])
 
-  // Check for rate/count mismatch and generate confirmation message
-  const checkRateCountMismatch = useCallback(() => {
-    // Skip mismatch check for weight-based, set-rate, and add-on shipments
-    if (isWeightBased || isSetRateMode || isAddOn) {
-      return { needsConfirmation: false, message: "" }
-    }
-
-    const containerTypesWithRatesButZeroCount = []
-    const containerTypesWithCountAndRates = []
-
-    // Check 6m containers
-    const sixMeterRate = Number.parseFloat(formData.sixMeterRate) || 0
-    const sixMeterCount = formData.num_six_meters || 0
-    if (sixMeterRate > 0 && sixMeterCount === 0) {
-      containerTypesWithRatesButZeroCount.push("6m")
-    }
-    if (sixMeterCount > 0 && sixMeterRate > 0) {
-      containerTypesWithCountAndRates.push(`6m (${sixMeterCount} containers, Rate: R${sixMeterRate.toFixed(2)})`)
-    }
-
-    // Check 12m containers
-    const twelveMeterRate = Number.parseFloat(formData.twelveMeterRate) || 0
-    const twelveMeterCount = formData.num_twelve_meters || 0
-    if (twelveMeterRate > 0 && twelveMeterCount === 0) {
-      containerTypesWithRatesButZeroCount.push("12m")
-    }
-    if (twelveMeterCount > 0 && twelveMeterRate > 0) {
-      containerTypesWithCountAndRates.push(`12m (${twelveMeterCount} containers, Rate: R${twelveMeterRate.toFixed(2)})`)
-    }
-
-    // Check abnormal containers
-    const abnormalRate = Number.parseFloat(formData.abnormalRate) || 0
-    const abnormalCount = formData.num_abnormal || 0
-    if (abnormalRate > 0 && abnormalCount === 0) {
-      containerTypesWithRatesButZeroCount.push("Abnormal")
-    }
-    if (abnormalCount > 0 && abnormalRate > 0) {
-      containerTypesWithCountAndRates.push(`Abnormal (${abnormalCount} containers, Rate: R${abnormalRate.toFixed(2)})`)
-    }
-
-    // Check break bulk containers (only for cross-haul)
-    if (isCrossHaul) {
-      const breakBulkRate = Number.parseFloat(formData.rateper_breakbulk) || 0
-      const breakBulkCount = formData.num_breakbulk || 0
-      if (breakBulkRate > 0 && breakBulkCount === 0) {
-        containerTypesWithRatesButZeroCount.push("Break Bulk")
-      }
-      if (breakBulkCount > 0 && breakBulkRate > 0) {
-        containerTypesWithCountAndRates.push(
-          `Break Bulk (${breakBulkCount} containers, Rate: R${breakBulkRate.toFixed(2)})`,
-        )
-      }
-    }
-
-    // If there are rates set but counts are 0, show confirmation
-    if (containerTypesWithRatesButZeroCount.length > 0) {
-      let message = "You have containers with the following rates: "
-      if (containerTypesWithCountAndRates.length > 0) {
-        message += containerTypesWithCountAndRates.join(", ")
-        message += ". Are you sure you want to continue?"
-      } else {
-        message = "You have set rates for container types with 0 containers. Are you sure you want to continue?"
-      }
-
-      return {
-        needsConfirmation: true,
-        message: message,
-      }
-    }
-
-    return { needsConfirmation: false, message: "" }
-  }, [formData, isWeightBased, isCrossHaul, isAddOn])
+  // Delegates to utility
+  const checkRateCountMismatch = useCallback(
+    () => checkRateCountMismatchUtil(formData, { isAddOn, isWeightBased, isSetRateMode, isCrossHaul }),
+    [formData, isAddOn, isWeightBased, isSetRateMode, isCrossHaul]
+  )
 
   const handleSubmit = useCallback(
     async (e) => {
@@ -1448,110 +1055,31 @@ const ControllerInstructions = () => {
       const currentWeightRows = weightRowsRef.current || []
 
       if ((isSetRateMode || isSetRate) && !isAddOn) {
-        const weightRowCount = currentWeightRows.length || 1
-        totalCost = calculatedSetRateValue * weightRowCount
-
+        totalCost = calcBreakBulkCost(currentWeightRows, 0, {
+          isSetRateMode: true,
+          setRateAmount: calculatedSetRateValue,
+        })
         costBreakdown.components = {
-          setRateAmount: setRateValue,
-          weightRowCount: weightRowCount,
+          setRateAmount: calculatedSetRateValue,
+          weightRowCount: currentWeightRows.length || 1,
           setRateCost: totalCost,
         }
-
-        console.log("SET-RATE CALCULATION:")
-        console.log(`  Set Rate Amount: R${setRateValue.toFixed(2)}`)
-        console.log(`  Weight Row Count: ${weightRowCount}`)
-        console.log(`  Total Cost: R${setRateValue.toFixed(2)} × ${weightRowCount} = R${totalCost.toFixed(2)}`)
+        console.log(`SET-RATE CALCULATION: R${calculatedSetRateValue} × ${currentWeightRows.length || 1} = R${totalCost}`)
       } else if (isWeightBased && !isAddOn) {
-        // Weight-based calculation
-        let baseWeight = 0
         if (formData.shipmentTypeId === "4") {
-          baseWeight = currentWeightRows.reduce((sum, row) => {
-            if (row.weight === null || row.weight === undefined || row.weight === "") {
-              return sum
-            }
-            const parsed = Number.parseFloat(row.weight)
-            return Number.isNaN(parsed) ? sum : sum + parsed
-          }, 0)
+          totalCost = calcBreakBulkCost(currentWeightRows, formData.unitrate || 0)
         } else {
-          baseWeight = Number.parseFloat(formData.weight || 0)
+          const baseWeight = Number.parseFloat(formData.weight || 0)
+          const unitRate = Number.parseFloat(formData.unitrate || 0)
+          totalCost = baseWeight * unitRate
         }
-
-        const unitRate = Number.parseFloat(formData.unitrate || 0)
-        totalCost = baseWeight * unitRate
-
-        costBreakdown.components = {
-          weight: baseWeight,
-          unitRate: unitRate,
-          weightBasedCost: totalCost,
-        }
-
-        console.log("WEIGHT-BASED CALCULATION:")
-        console.log(`  Weight: ${baseWeight} ${formData.rateWeight}`)
-        console.log(`  Unit Rate: R${unitRate.toFixed(2)} per ${formData.rateWeight}`)
-        console.log(`  Base Cost: ${baseWeight} × R${unitRate.toFixed(2)} = R${totalCost.toFixed(2)}`)
+        costBreakdown.components = { weightBasedCost: totalCost }
+        console.log(`WEIGHT-BASED CALCULATION: R${totalCost}`)
       } else {
         // Container-based calculation
-        const sixMeterRate = Number.parseFloat(formData.sixMeterRate) || 0
-        const twelveMeterRate = Number.parseFloat(formData.twelveMeterRate) || 0
-        const abnormalRate = Number.parseFloat(formData.abnormalRate) || 0
-        const breakBulkRate = Number.parseFloat(formData.rateper_breakbulk) || 0
-
-        const sixMeterCount = formData.num_six_meters || 0
-        const twelveMeterCount = formData.num_twelve_meters || 0
-        const abnormalCount = formData.num_abnormal || 0
-        const breakBulkCount = formData.num_breakbulk || 0
-
-        const sixMeterCost = sixMeterRate * sixMeterCount
-        const twelveMeterCost = twelveMeterRate * twelveMeterCount
-        const abnormalCost = abnormalRate * abnormalCount
-
-        // Break bulk cost only applies if it's cross-haul AND the rateWeight is 'Container'
-        const breakBulkCost = isCrossHaul && formData.rateWeight === "Container" ? breakBulkRate * breakBulkCount : 0
-
-        const surchargeTotal = (containersRef.current || []).reduce((sum, c) => {
-          if (c.addSurcharges) {
-            const resolved = c.is_12m_surcharge
-              ? (Number(c.surcharge_12m_amount) || 0)
-              : (Number(c.surchargeAmount) || 0)
-            return sum + resolved
-          }
-          return sum
-        }, 0)
-
-        totalCost = sixMeterCost + twelveMeterCost + abnormalCost + breakBulkCost + surchargeTotal
-
-        costBreakdown.components = {
-          sixMeter: { count: sixMeterCount, rate: sixMeterRate, cost: sixMeterCost },
-          twelveMeter: { count: twelveMeterCount, rate: twelveMeterRate, cost: twelveMeterCost },
-          abnormal: { count: abnormalCount, rate: abnormalRate, cost: abnormalCost },
-          breakBulk: {
-            count: breakBulkCount,
-            rate: breakBulkRate,
-            cost: breakBulkCost,
-            applicable: isCrossHaul && formData.rateWeight === "Container",
-          },
-          surcharges: { count: (containersRef.current || []).filter(c => c.addSurcharges).length, cost: surchargeTotal },
-          containerBasedSubtotal: totalCost,
-        }
-
-        console.log("CONTAINER-BASED CALCULATION:")
-        console.log(`  6m Containers: ${sixMeterCount} × R${sixMeterRate.toFixed(2)} = R${sixMeterCost.toFixed(2)}`)
-        console.log(
-          `  12m Containers: ${twelveMeterCount} × R${twelveMeterRate.toFixed(2)} = R${twelveMeterCost.toFixed(2)}`,
-        )
-        console.log(
-          `  Abnormal Containers: ${abnormalCount} × R${abnormalRate.toFixed(2)} = R${abnormalCost.toFixed(2)}`,
-        )
-
-        if (isCrossHaul && formData.rateWeight === "Container") {
-          console.log(`  Break Bulk: ${breakBulkCount} × R${breakBulkRate.toFixed(2)} = R${breakBulkCost.toFixed(2)}`)
-        } else if (isCrossHaul) {
-          console.log(`  Break Bulk: Not applicable (Unit type: ${formData.rateWeight})`)
-        }
-
-        console.log(`  Surcharges: R${surchargeTotal.toFixed(2)}`)
-
-        console.log(`  Container Subtotal: R${totalCost.toFixed(2)}`)
+        totalCost = calcContainerBasedCost(formData, containersRef.current || [], { isCrossHaul })
+        costBreakdown.components = { containerBasedSubtotal: totalCost }
+        console.log(`CONTAINER-BASED CALCULATION: R${totalCost}`)
       }
 
       // For add-on shipment type (5), force all financial values to zero
@@ -1795,19 +1323,15 @@ const ControllerInstructions = () => {
       console.log(`  rateper_breakbulk: ${instructionData.rateper_breakbulk} (count: ${instructionData.num_breakbulk})`)
 
       // Save the instruction
-      const response = await api.post("/api/instructions/save-instruction", {
-        controllerData: instructionData,
-        containerData: containerData,
-        weightData: weightData,
-      })
+      const saveData = await saveInstructionService(instructionData, containerData, weightData)
 
-      if (response.data.success) {
+      if (saveData.success) {
         console.log("=== INSTRUCTION SAVED SUCCESSFULLY ===")
-        console.log("Database response:", response.data)
+        console.log("Database response:", saveData)
         // Navigate to dashboard on success
         navigate("/ControllerDashboard")
       } else {
-        throw new Error(response.data.message || "Failed to save instruction")
+        throw new Error(saveData.message || "Failed to save instruction")
       }
     } catch (error) {
       console.error("=== ERROR SAVING INSTRUCTION ===")
@@ -1827,8 +1351,8 @@ const ControllerInstructions = () => {
     setShowConfirmationPopup(false)
   }, [])
 
-  // ErrorTooltip component - Disabled
-  const ErrorTooltip = () => null
+  // ErrorTooltip disabled in create form — tooltips are suppressed here (Flag 5)
+  const ErrorTooltip = (props) => <SharedErrorTooltip {...props} disabled />
 
   // Style objects
   const nonEditableStyle = useMemo(
@@ -1859,71 +1383,21 @@ const ControllerInstructions = () => {
   // Determine if break bulk fields should be disabled
   const disableBreakBulkFields = formData.rateWeight !== "Container" || !isCrossHaul
 
+  const isLoadingComplete = !isLoading.clients && !isLoading.shipmentTypes
+  const hasDataFailure = isLoadingComplete && (clients.length === 0 || shipmentTypes.length === 0)
+
   return (
     <div className="controller-instructions-unique-wrapper">
       <style>{spinnerKeyframes}</style>
 
       {/* Confirmation Popup */}
-      {showConfirmationPopup && (
-        <div
-          className="modal-overlay"
-          style={{
-            position: "fixed",
-            top: 0,
-            left: 0,
-            right: 0,
-            bottom: 0,
-            backgroundColor: "rgba(0, 0, 0, 0.5)",
-            display: "flex",
-            justifyContent: "center",
-            alignItems: "center",
-            zIndex: 1000,
-          }}
-        >
-          <div
-            className="modal"
-            style={{
-              backgroundColor: "white",
-              padding: "20px",
-              borderRadius: "8px",
-              maxWidth: "500px",
-              width: "90%",
-              boxShadow: "0 4px 6px rgba(0, 0, 0, 0.1)",
-            }}
-          >
-            <h3 style={{ marginTop: 0, color: "#333" }}>Confirm Submission</h3>
-            <p style={{ marginBottom: "20px", lineHeight: "1.5" }}>{confirmationMessage}</p>
-            <div style={{ display: "flex", gap: "10px", justifyContent: "flex-end" }}>
-              <button
-                onClick={handleCancelSubmit}
-                style={{
-                  padding: "8px 16px",
-                  backgroundColor: "#6c757d",
-                  color: "white",
-                  border: "none",
-                  borderRadius: "4px",
-                  cursor: "pointer",
-                }}
-              >
-                No, Let Me Edit
-              </button>
-              <button
-                onClick={handleConfirmSubmit}
-                style={{
-                  padding: "8px 16px",
-                  backgroundColor: "#4a90e2",
-                  color: "white",
-                  border: "none",
-                  borderRadius: "4px",
-                  cursor: "pointer",
-                }}
-              >
-                Yes, Continue
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      <ConfirmationModal
+        isOpen={showConfirmationPopup}
+        title="Confirm Submission"
+        message={confirmationMessage}
+        onConfirm={handleConfirmSubmit}
+        onCancel={handleCancelSubmit}
+      />
 
       {/* No Rates Modal */}
       {showNoRatesModal && (
@@ -1978,33 +1452,13 @@ const ControllerInstructions = () => {
         </button>
       </div>
 
-      {/* Loading state removed as per requirements */}
       {isLoadingLocations && <div style={{ height: "20px" }}></div>}
 
-      {/* Location error popup removed as per requirements */}
-      {isLoading.clients || isLoading.shipmentTypes || isLoading.startingPoints || isLoading.destinations ? (
-        <div style={{ textAlign: "center", padding: "20px" }}>
-          <p>Loading data...</p>
-        </div>
-      ) : clients.length === 0 || shipmentTypes.length === 0 ? (
-        <div style={{ textAlign: "center", padding: "20px" }}>
-          <p>Failed to load data from the database. Please try again.</p>
-          <button
-            onClick={() => window.location.reload()}
-            style={{
-              padding: "8px 16px",
-              backgroundColor: "#4a90e2",
-              color: "white",
-              border: "none",
-              borderRadius: "4px",
-              cursor: "pointer",
-              marginTop: "10px",
-            }}
-          >
-            Retry
-          </button>
-        </div>
-      ) : null}
+      <InstructionLoadingGate
+        isLoadingComplete={isLoadingComplete}
+        hasDataFailure={hasDataFailure}
+        onRetry={() => window.location.reload()}
+      >
       <form
         onSubmit={handleSubmit}
         className="controller-instructions-form-container"
@@ -3719,6 +3173,7 @@ const ControllerInstructions = () => {
           )}
         </div>
       </form>
+      </InstructionLoadingGate>
     </div>
   )
 }
