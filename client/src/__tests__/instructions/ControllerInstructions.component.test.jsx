@@ -84,7 +84,7 @@ describe("ControllerInstructions component — data load failure", () => {
 
     await waitFor(() => {
       expect(
-        screen.getByText("Failed to load data from the database. Please try again.")
+        screen.getByText("Failed to load required data. Please try again.")
       ).toBeInTheDocument();
     });
 
@@ -98,7 +98,7 @@ describe("ControllerInstructions component — data load failure", () => {
 
     await waitFor(() => {
       expect(
-        screen.getByText("Failed to load data from the database. Please try again.")
+        screen.getByText("Failed to load required data. Please try again.")
       ).toBeInTheDocument();
     });
   });
