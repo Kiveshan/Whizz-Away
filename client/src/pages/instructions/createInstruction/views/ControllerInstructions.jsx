@@ -8,6 +8,7 @@ import {
   fetchStartingPoints as fetchStartingPointsService,
   fetchDestinations as fetchDestinationsService,
   fetchRates as fetchRatesService,
+  fetchSetRate as fetchSetRateService,
   saveInstruction as saveInstructionService,
 } from "../../../../services/instructionService"
 import { useInstructionData } from "../../../../hooks/useInstructionData"
@@ -499,21 +500,14 @@ const ControllerInstructions = () => {
     const fetchSetRate = async () => {
       const { clientId, pickup, dropoff } = formData
 
-      // Only fetch when the checkbox is on and we have a fully selected route
-      if (!isSetRate || !clientId || !pickup || !dropoff) {
-        return
-      }
+      if (!isSetRate || !clientId || !pickup || !dropoff) return
 
       try {
-        // Reuse the same client-rate endpoint used for normal rates so that
-        // we respect the selected starting point and destination.
-        const rates = await fetchRates(clientId, pickup, dropoff)
-
-        if (rates && rates.setRate != null) {
-          const numericSetRate = Number(rates.setRate)
+        const data = await fetchSetRateService(clientId, pickup, dropoff)
+        if (data && data.set_rate != null) {
+          const numericSetRate = Number(data.set_rate)
           setSetRateValue(Number.isNaN(numericSetRate) ? 0 : numericSetRate)
         } else {
-          // No set_rate defined for this route – treat as 0 for now
           setSetRateValue(0)
         }
       } catch (error) {
@@ -523,7 +517,7 @@ const ControllerInstructions = () => {
     }
 
     fetchSetRate()
-  }, [isSetRate, formData.clientId, formData.pickup, formData.dropoff, fetchRates])
+  }, [isSetRate, formData.clientId, formData.pickup, formData.dropoff])
 
   // Update rates when pickup or dropoff changes (only for container-based calculations)
   useEffect(() => {
@@ -1015,9 +1009,9 @@ const ControllerInstructions = () => {
       if (isSetRate && formData.clientId && formData.pickup && formData.dropoff) {
         console.log("[SET RATE] Fetching set rate on-the-fly to avoid race condition...")
         try {
-          const rates = await fetchRates(formData.clientId, formData.pickup, formData.dropoff)
-          if (rates && rates.setRate != null) {
-            currentSetRateValue = Number(rates.setRate)
+          const data = await fetchSetRateService(formData.clientId, formData.pickup, formData.dropoff)
+          if (data && data.set_rate != null) {
+            currentSetRateValue = Number(data.set_rate)
             console.log(`[SET RATE] Fetched fresh value: ${currentSetRateValue}`)
           } else {
             currentSetRateValue = 0
