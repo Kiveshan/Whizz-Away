@@ -690,6 +690,15 @@ const ClientInvoice = forwardRef(({
         ["Total Amount", formatCurrency(total)],
       ];
 
+      // Estimate height needed for summary table: header row + body rows at ~9mm each
+      const summaryRowHeight = 9;
+      const summaryTableHeight = (1 + summaryData.length) * summaryRowHeight;
+      const bottomMargin = 16; // reserve for footer
+      if (currentY + summaryTableHeight > pageHeight - bottomMargin) {
+        doc.addPage();
+        currentY = margins.top;
+      }
+
       autoTable(doc, {
         startY: currentY,
         head: [summaryHeaders],
