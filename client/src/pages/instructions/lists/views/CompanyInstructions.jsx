@@ -95,13 +95,15 @@ const CompanyInstructions = () => {
     return new Date().getFullYear().toString()
   }
 
-  // Always default to current month and year regardless of passed values
-  const [selectedMonth, setSelectedMonth] = useState(getCurrentMonthName())
-  const [selectedYear, setSelectedYear] = useState(getCurrentYear())
+  // Clear month/year filters when arriving with a container search so all matching instructions are visible
+  const [selectedMonth, setSelectedMonth] = useState(location.state?.containerSearch ? "" : getCurrentMonthName())
+  const [selectedYear, setSelectedYear] = useState(location.state?.containerSearch ? "" : getCurrentYear())
   const [instructions, setInstructions] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
   const [activeFilter, setActiveFilter] = useState(initialFilter || "All")
+  const [containerSearch, setContainerSearch] = useState(location.state?.containerSearch || "")
+  const [containersByInstruction, setContainersByInstruction] = useState({})
 
   // Pagination state - ADDED
   const [currentPage, setCurrentPage] = useState(1)
@@ -190,6 +192,41 @@ const CompanyInstructions = () => {
 
     fetchInstructions()
   }, [clientId])
+
+  useEffect(() => {
+    if (!containerSearch.trim()) {
+      setContainersByInstruction({})
+      return
+    }
+    if (!instructions || instructions.length === 0) return
+
+    const loadContainers = async () => {
+      try {
+        const uniqueIds = Array.from(new Set(instructions.map((item) => item.m1key))).filter(Boolean)
+
+        const results = await Promise.all(
+          uniqueIds.map(async (id) => {
+            try {
+              const response = await api.get(`/containers/instruction/${id}`)
+              return { id, data: response.data || [] }
+            } catch {
+              return { id, data: [] }
+            }
+          }),
+        )
+
+        const containersMap = {}
+        results.forEach(({ id, data }) => {
+          containersMap[id] = data
+        })
+        setContainersByInstruction(containersMap)
+      } catch (err) {
+        console.error("Error fetching containers for instructions", err)
+      }
+    }
+
+    loadContainers()
+  }, [containerSearch, instructions])
 
   const handleFilterClick = (filter) => {
     setActiveFilter(filter)
@@ -295,6 +332,19 @@ const CompanyInstructions = () => {
           )
         })
       }
+    }
+
+    // Filter by container number search
+    if (containerSearch.trim()) {
+      const searchTerm = containerSearch.trim().toLowerCase()
+
+      filtered = filtered.filter((item) => {
+        const containers = containersByInstruction[item.m1key] || []
+        if (!Array.isArray(containers) || containers.length === 0) return false
+        return containers.some((container) =>
+          (container.containernum || "").toString().toLowerCase().includes(searchTerm),
+        )
+      })
     }
 
     // Sort by status priority first, then by instruction number (descending)
@@ -470,6 +520,26 @@ const CompanyInstructions = () => {
               Add-on
             </button>
           </div>
+        </div>
+
+        <div style={{ margin: "10px 0", textAlign: "center" }}>
+          <input
+            type="text"
+            placeholder="Search by container number"
+            value={containerSearch}
+            onChange={(e) => {
+              setContainerSearch(e.target.value)
+              setCurrentPage(1)
+            }}
+            style={{
+              padding: "6px 10px",
+              borderRadius: "4px",
+              border: "1px solid #ccc",
+              minWidth: "220px",
+              fontFamily: "inherit",
+              fontSize: "14px",
+            }}
+          />
         </div>
 
         <div className="tables-container">
