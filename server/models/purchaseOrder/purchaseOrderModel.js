@@ -48,13 +48,13 @@ export const getPurchaseOrderByPonum = async (ponum) => {
     LEFT JOIN m5_trucks t ON po.truckid = t.m5truckskey
     WHERE po.ponum = $1
   `;
-  
+
   try {
     const result = await pool.query(query, [ponum]);
     if (result.rows.length === 0) {
       return null;
     }
-    
+
     // Group line items for this PO
     const poData = result.rows[0];
     const lineItemsQuery = `
@@ -68,9 +68,9 @@ export const getPurchaseOrderByPonum = async (ponum) => {
       LEFT JOIN m5_trucks t ON po.truckid = t.m5truckskey
       WHERE ponum = $1
     `;
-    
+
     const lineItemsResult = await pool.query(lineItemsQuery, [ponum]);
-    
+
     return {
       ...poData,
       line_items: lineItemsResult.rows
@@ -96,7 +96,7 @@ export const getExpenseTypes = async () => {
 }
 
 export const getStatements = async (supplierId, fromDate, toDate) => {
-let query = `
+  let query = `
   SELECT 
     po.ponum,
     MIN(po.date) AS date,
@@ -104,6 +104,7 @@ let query = `
     s.supplier_id,
     STRING_AGG(DISTINCT e.expense, ', ') AS expense_type,
     SUM(po.total) AS total,
+    SUM(po.vat) AS vat,
     MIN(po.received_by) AS received_by,
     MIN(po.invoice_number) AS invoice_number,
     STRING_AGG(DISTINCT po.description, ', ') AS description,
@@ -133,7 +134,7 @@ let query = `
     values.push(toDate)
   }
 
- query += ` GROUP BY po.ponum, s.supplier, s.supplier_id ORDER BY MIN(po.date) DESC`
+  query += ` GROUP BY po.ponum, s.supplier, s.supplier_id ORDER BY MIN(po.date) DESC`
 
   try {
     const result = await pool.query(query, values)
@@ -359,30 +360,30 @@ export const createMultiplePurchaseOrders = async ({
     for (const item of lineItems) {
       console.log(`Raw line item: ${JSON.stringify(item)}`) // Log raw item
       const expenseTypeId = Number(item.expenseTypeId)
-const truckId = expenseTypeId === 5 && item.truckid ? Number(item.truckid) : null
+      const truckId = expenseTypeId === 5 && item.truckid ? Number(item.truckid) : null
       if (item.expenseTypeId === "5" && !truckId) {
         console.error(`Missing or invalid truckid for fuel expense line item: ${JSON.stringify(item)}`)
         throw new Error("truckid is required for fuel expense purchase orders")
       }
-// Calculate total only once for the entire PO
-const isFirstItem = lineItems.indexOf(item) === 0;
-const totalAmount = 0;
+      // Calculate total only once for the entire PO
+      const isFirstItem = lineItems.indexOf(item) === 0;
+      const totalAmount = 0;
 
-const values = [
-  expenseTypeId,
-  supplierId,
-  regNo,
-  attentionTo,
-  receivedBy,
-  expenseTypeId === 5 ? 0 : item.quantity,
-  0,
-  item.description,
-  subbie,
-  date || new Date().toISOString().split("T")[0],
-  poNum,
-  totalAmount,  // Only set total for first item
-  expenseTypeId === 5 ? truckId : null,
-]
+      const values = [
+        expenseTypeId,
+        supplierId,
+        regNo,
+        attentionTo,
+        receivedBy,
+        expenseTypeId === 5 ? 0 : item.quantity,
+        0,
+        item.description,
+        subbie,
+        date || new Date().toISOString().split("T")[0],
+        poNum,
+        totalAmount,  // Only set total for first item
+        expenseTypeId === 5 ? truckId : null,
+      ]
 
 
       console.log("Inserting line item with values:", values)

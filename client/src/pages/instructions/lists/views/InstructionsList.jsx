@@ -85,8 +85,8 @@ const Instructions = () => {
   const clientName = location.state?.clientName
 
   // Initialize state with current month and year
-  const [selectedMonth, setSelectedMonth] = useState(getCurrentMonthName())
-  const [selectedYear, setSelectedYear] = useState(getCurrentYear())
+  const [selectedMonth, setSelectedMonth] = useState(location.state?.containerSearch ? "" : getCurrentMonthName())
+  const [selectedYear, setSelectedYear] = useState(location.state?.containerSearch ? "" : getCurrentYear())
   const [activeFilter, setActiveFilter] = useState(location.state?.activeFilter || "All")
 
   const [instructions, setInstructions] = useState([])
@@ -94,7 +94,7 @@ const Instructions = () => {
   const [error, setError] = useState(null)
   const [currentPage, setCurrentPage] = useState(1)
   const [recordsPerPage] = useState(10)
-  const [containerSearch, setContainerSearch] = useState("")
+  const [containerSearch, setContainerSearch] = useState(location.state?.containerSearch || "")
   const [containersByInstruction, setContainersByInstruction] = useState({})
 
   // Add the shake animation when component mounts - exactly like in CompanyInstructions.jsx

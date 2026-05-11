@@ -16,7 +16,6 @@ import LandingPage from "./pages/user_menus/views/LandingPage";
 
 // Import pages
 import {
-  Landing,
   ControllerDashboard,
   FDashboard,
   DirectorDashboard,
@@ -108,11 +107,13 @@ import {
 } from "./pages/Creditors";
 
 import { ClientList, AddOnList, AddOnForm } from "./pages/add-on's";
+import DebtorsAgeAnalysis from "./pages/debtors/views/DebtorsAgeAnalysis";
 import {
   WageReports,
   ProfitLossReportsPage,
   ProfitLossDetailPage,
   ClientSubbieCommissionReport,
+  VatReconReportPage,
 } from "./pages/Reports";
 
 // CSS Imports
@@ -128,12 +129,13 @@ function DynamicHeader() {
     "/client-list-payments": "Client Payments",
     "/director-client-list-payments": "Client Payments",
     "/client-documents": "Client Documents",
-    "/driver-wage": "Wages",
+    "/driver-wage": "Payroll",
     "/ControllerInstructions": "Instruction",
     "/ControllerInstructionDetails": "Container Details",
     "/FCcontrollerInstructionDetails": "Container Details",
     "/expenses": "Truck Expenses",
     "/debtors": "Debtors",
+    "/debtors-age-analysis": "Age Analysis",
     "/FDashboard": "Debtors Clerk",
     "/instructions": "Instruction",
     "/update-instructions": "Assignment",
@@ -143,10 +145,10 @@ function DynamicHeader() {
     "/view-client-statements": "Statements",
     "/statements-list": "Statements",
     "/client-statement": "Statements",
-    "/wages": "Wages",
-    "/finance-clerk-wage": "Wages",
-    "/finance-clerk-wage-details": "Wages",
-    "/finance-clerk-wage-slip": "Wages",
+    "/wages": "Payroll",
+    "/finance-clerk-wage": "Payroll",
+    "/finance-clerk-wage-details": "Payroll",
+    "/finance-clerk-wage-slip": "Payroll",
     "/ViewExpense": "Fuel Expenses",
     "/ExpenseDetails": "Fuel Expenses",
     "/ExpenseSubmission": "Expense",
@@ -157,7 +159,7 @@ function DynamicHeader() {
     "/CreditorsDashboard": "Creditors",
     "/FuelPage": "Fuel",
     "/DirectorDashboard": "Director",
-    "/FClerkLegDetails": "Wages",
+    "/FClerkLegDetails": "Payroll",
     "/ManagerViewAssignment": "View Assignment",
     "/FinancialDocumentsView": "Client Documents",
     "/Creditors/PurchaseOrders": "Purchase Orders",
@@ -201,6 +203,7 @@ function DynamicHeader() {
     "/profit-loss-reports": "Income & Expenditure Reports",
     "/income-expenditure-reports/:month/:year": "Income & Expenditure Report",
     "/client-subbie-commission": "Client Subbie Commission Report",
+    "/vat-recon-reports": "VAT Reconciliation Report",
   };
 
   const getTitle = () => {
@@ -210,15 +213,17 @@ function DynamicHeader() {
     if (location.pathname.startsWith("/ExpenseDetails/"))
       return "Fuel Expenses";
     if (location.pathname.startsWith("/finance-clerk-wage-details/"))
-      return "Wages";
+      return "Payroll";
     if (location.pathname.startsWith("/DirectorExpenses/"))
       return "Fuel Expenses";
     if (location.pathname.startsWith("/finance-clerk-wage-slip/"))
-      return "Wages";
+      return "Payroll";
     if (location.pathname.startsWith("/view-credit-note/"))
       return "Credit Note";
     if (location.pathname.startsWith("/income-expenditure-reports/"))
       return "Income & Expenditure Report";
+    if (location.pathname === "/vat-recon-reports")
+      return "VAT Reconciliation Report";
     return titleMap[location.pathname] || "Unknown Page";
   };
 
@@ -308,6 +313,7 @@ function ContentWrapper() {
           element={<UploadProof />}
         />
         <Route path="/debtors" element={<Debtors />} />
+        <Route path="/debtors-age-analysis" element={<DebtorsAgeAnalysis />} />
         <Route path="/manage" element={<Manage />} />
         <Route path="/login" element={<Login />} />
         <Route path="/Dashboard" element={<Dashboard />} />
@@ -461,6 +467,10 @@ function ContentWrapper() {
           path="/income-expenditure-reports/:month/:year"
           element={<ProfitLossDetailPage />}
         />
+        <Route
+          path="/vat-recon-reports"
+          element={<VatReconReportPage />}
+        />
       </Routes>
       {shouldShowFooter && <Footer />} {/* Conditionally render footer */}
     </div>
@@ -484,6 +494,7 @@ function App() {
     "/wage-reports": "Wage Reports",
     "/profit-loss-reports": "Income & Expenditure Reports",
     "/income-expenditure-reports/:month/:year": "Income & Expenditure Report",
+    "/vat-recon-reports": "VAT Reconciliation Report",
   };
 
   // Set page title based on current route

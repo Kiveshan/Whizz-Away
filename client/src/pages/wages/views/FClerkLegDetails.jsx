@@ -2,6 +2,7 @@
 "use client";
 import { useState, useEffect } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
+import ExcelJS from "exceljs";
 import api from "../../../api";
 import "../css/finance-clerk-wage.css";
 
@@ -78,6 +79,131 @@ const FClerkLegDetails = () => {
     fetchLegDetails();
   }, [driverId, location.state?.selectedMonth, location.state?.selectedYear]);
 
+  const exportToExcel = async () => {
+    const workbook = new ExcelJS.Workbook();
+    workbook.creator = "Whizz-Away";
+    workbook.created = new Date();
+
+    const worksheet = workbook.addWorksheet("Leg Details", {
+      pageSetup: { paperSize: 9, orientation: "landscape", fitToPage: true },
+    });
+
+    // Title row
+    worksheet.mergeCells("A1:I1");
+    const titleCell = worksheet.getCell("A1");
+    titleCell.value = `${driverName || `Driver ${driverId}`} — Leg Details: ${selectedMonth} ${selectedYear}`;
+    titleCell.font = { bold: true, size: 14, color: { argb: "FF1F3864" } };
+    titleCell.alignment = { horizontal: "center", vertical: "middle" };
+    titleCell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFD9E1F2" } };
+    worksheet.getRow(1).height = 30;
+
+    // Blank spacer row
+    worksheet.addRow([]);
+
+    // Column definitions (row 3)
+    const columns = [
+      { header: "Instruction ID", key: "instructionId", width: 18 },
+      { header: "Leg Number", key: "legNumber", width: 14 },
+      { header: "Truck Reg", key: "truckReg", width: 14 },
+      { header: "Container Number", key: "containerNumber", width: 22 },
+      { header: "Starting Point", key: "startingPoint", width: 22 },
+      { header: "Ending Point", key: "endingPoint", width: 22 },
+      { header: "Date", key: "date", width: 14 },
+      { header: "Amount (R)", key: "amount", width: 14 },
+      { header: "Status", key: "status", width: 16 },
+    ];
+    worksheet.columns = columns;
+
+    // Header row styling (row 3)
+    const headerRow = worksheet.getRow(3);
+    headerRow.values = columns.map((c) => c.header);
+    headerRow.height = 22;
+    headerRow.eachCell((cell) => {
+      cell.font = { bold: true, size: 11, color: { argb: "FFFFFFFF" } };
+      cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FF1F3864" } };
+      cell.alignment = { horizontal: "center", vertical: "middle" };
+      cell.border = {
+        top: { style: "thin", color: { argb: "FF1F3864" } },
+        bottom: { style: "thin", color: { argb: "FF1F3864" } },
+        left: { style: "thin", color: { argb: "FF1F3864" } },
+        right: { style: "thin", color: { argb: "FF1F3864" } },
+      };
+    });
+
+    // Data rows
+    let totalAmount = 0;
+    legs.forEach((leg, index) => {
+      const amount = leg.driverrate || 0;
+      totalAmount += amount;
+      const row = worksheet.addRow({
+        instructionId: leg.displayInstructionId,
+        legNumber: leg.legnumber || "N/A",
+        truckReg: leg.truckregnumber || "N/A",
+        containerNumber: leg.containernumber || "N/A",
+        startingPoint: leg.startingpoint || "N/A",
+        endingPoint: leg.destination || "N/A",
+        date: formatDate(leg.date),
+        amount: amount,
+        status: leg.instruction_status || "N/A",
+      });
+
+      const rowFill = index % 2 === 0
+        ? { type: "pattern", pattern: "solid", fgColor: { argb: "FFFFFFFF" } }
+        : { type: "pattern", pattern: "solid", fgColor: { argb: "FFF2F6FF" } };
+
+      row.eachCell((cell, colNumber) => {
+        cell.fill = rowFill;
+        cell.font = { size: 11 };
+        cell.alignment = { vertical: "middle", horizontal: colNumber === 8 ? "right" : "left" };
+        cell.border = {
+          top: { style: "hair", color: { argb: "FFCCCCCC" } },
+          bottom: { style: "hair", color: { argb: "FFCCCCCC" } },
+          left: { style: "hair", color: { argb: "FFCCCCCC" } },
+          right: { style: "hair", color: { argb: "FFCCCCCC" } },
+        };
+      });
+
+      // Format amount cell as currency
+      row.getCell(8).numFmt = '"R"#,##0.00';
+      row.height = 18;
+    });
+
+    // Total row
+    const totalRow = worksheet.addRow({
+      instructionId: "",
+      legNumber: "",
+      truckReg: "",
+      containerNumber: "",
+      startingPoint: "",
+      endingPoint: "",
+      date: "TOTAL",
+      amount: totalAmount,
+      status: "",
+    });
+    totalRow.height = 22;
+    totalRow.eachCell((cell, colNumber) => {
+      cell.font = { bold: true, size: 11, color: { argb: "FF1F3864" } };
+      cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFD9E1F2" } };
+      cell.alignment = { vertical: "middle", horizontal: colNumber === 8 ? "right" : colNumber === 7 ? "right" : "left" };
+      cell.border = {
+        top: { style: "medium", color: { argb: "FF1F3864" } },
+        bottom: { style: "medium", color: { argb: "FF1F3864" } },
+      };
+    });
+    totalRow.getCell(8).numFmt = '"R"#,##0.00';
+
+    const buffer = await workbook.xlsx.writeBuffer();
+    const blob = new Blob([buffer], {
+      type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `${driverName || `Driver_${driverId}`}_${selectedMonth}_${selectedYear}_Legs.xlsx`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
   const formatDate = (dateString) => {
     if (!dateString) return "N/A";
     const date = new Date(dateString);
@@ -86,37 +212,30 @@ const FClerkLegDetails = () => {
 
   return (
     <>
-      <div
-        style={{
-          display: "flex",
-          justifyContent: "space-between",
-          padding: "5px",
-          marginBottom: "15px",
-        }}
-      >
+      <div className="legdetails-header">
         <button
           onClick={() =>
             navigate(`/finance-clerk-wage-details/${driverId}`, {
               state: { name: driverName },
             })
           }
-          className="back-button"
+          className="legdetails-back-btn"
         >
           Back
         </button>
       </div>
 
-      <h2
-        style={{
-          textAlign: "center",
-          margin: "0 0 15px 0",
-          fontWeight: "normal",
-          fontSize: "24px",
-          marginTop: "-35px",
-        }}
-      >
+      <h2 className="legdetails-title">
         {driverName || `Driver ${driverId}`} - {selectedMonth} {selectedYear}
       </h2>
+
+      {!loading && !error && legs.length > 0 && (
+        <div className="legdetails-export-container">
+          <button onClick={exportToExcel} className="legdetails-export-btn">
+            Export to Excel
+          </button>
+        </div>
+      )}
 
       {loading ? (
         <div style={{ textAlign: "center", padding: "20px" }}>

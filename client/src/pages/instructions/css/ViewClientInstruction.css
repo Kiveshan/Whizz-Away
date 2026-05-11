@@ -151,6 +151,22 @@
   color: #6b7280;
 }
 
+/* Container Search */
+.view-client-instruction-search-bar {
+  display: flex;
+  justify-content: center;
+  margin: 10px 0 12px;
+}
+
+.view-client-instruction-search-input {
+  padding: 6px 10px;
+  border-radius: 4px;
+  border: 1px solid #ccc;
+  min-width: 220px;
+  font-size: 14px;
+  font-family: Arial, sans-serif;
+}
+
 /* Pagination Styles */
 .view-client-instruction-pagination-container {
   display: flex;

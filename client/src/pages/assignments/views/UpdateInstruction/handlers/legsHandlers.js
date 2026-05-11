@@ -1,3 +1,5 @@
+import { isAbnormalContainer } from "../utils.js";
+
 export const handleAddLeg = ({
   isCompleted,
   currentLagIndex,
@@ -162,7 +164,7 @@ export const handleSelectLeg = ({
 
   setFormData({
     startingPoint: selectedLeg.startingPoint || "",
-    driverRate: selectedLeg.driverRate || "",
+    driverRate: selectedLeg.driverRate ?? "",
     destination: selectedLeg.destination || "",
   });
 
@@ -180,11 +182,14 @@ export const handleSelectLeg = ({
             ? driver.containernumber.toString()
             : "",
         container_type: driver.container_type || "",
-        driverRate: driver.driverRate || driver.driverate || "",
+        driverRate: driver.driverRate ?? driver.driverate ?? "",
+        _rateNullInManage: driver._rateNullInManage,
+        _rateExplicitlyZero: driver._rateExplicitlyZero,
+        _debugManageRate: driver._debugManageRate,
         date: driver.date || "",
         driver_name: driver.driver_name || "",
         driver_surname: driver.driver_surname || "",
-        isAbnormal: driver.container_type === "abnormal" || driver.isAbnormal,
+        isAbnormal: isAbnormalContainer(driver.container_type) || driver.isAbnormal,
         full_name:
           driver.full_name ||
           (driver.driver_name && driver.driver_surname
@@ -210,11 +215,18 @@ export const handleSelectLeg = ({
   });
 
   if (selectedLeg.startingPoint && selectedLeg.destination) {
-    const routeKey = `${selectedLeg.startingPoint}-${selectedLeg.destination}`;
+    // Use the first driver's date so the shared rates state reflects the
+    // historical rate period for this leg, not always today's rate.
+    const firstDriverDate =
+      selectedLeg.drivers?.find((d) => d.date)?.date || null;
+
+    // Use date-aware cache key for consistency with ratesService.js
+    const baseRouteKey = `${selectedLeg.startingPoint}-${selectedLeg.destination}`;
+    const routeKey = firstDriverDate
+      ? `${baseRouteKey}-${firstDriverDate}`
+      : baseRouteKey;
+
     if (noRatesRoutes.has(routeKey)) {
-      console.log(
-        `Route ${routeKey} is known to have no rates, setting rates to 0`
-      );
       setRates({
         six_meter: 0,
         twelve_meter: 0,
@@ -224,11 +236,6 @@ export const handleSelectLeg = ({
       return;
     }
 
-    console.log(
-      "Fetching rates after selecting leg:",
-      selectedLeg.startingPoint,
-      selectedLeg.destination
-    );
-    fetchRate(selectedLeg.startingPoint, selectedLeg.destination, index, requestId);
+    fetchRate(selectedLeg.startingPoint, selectedLeg.destination, index, requestId, firstDriverDate, true);
   }
 };

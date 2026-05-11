@@ -272,7 +272,7 @@ const DirectorExpenses = () => {
               <th>Document by</th>
               <th>Date</th>
               <th>Display</th>
-              <th>Petrol Slip</th>
+              <th>Slip</th>
             </tr>
           </thead>
           <tbody>

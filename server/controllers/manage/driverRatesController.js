@@ -6,6 +6,7 @@ import {
   deleteDriverRate,
   getDriverRateUsage,
   refreshDriverRateLegsForInstructions,
+  checkRateDateOverlaps,
 } from "../../models/manage/driverRatesModel.js"
 
 const getAllDriverRatesHandler = async (req, res) => {
@@ -108,6 +109,8 @@ const createDriverRateHandler = async (req, res) => {
       driver_twelve_meter_rate,
       subie_six_meter_rate,
       subie_twelve_meter_rate,
+      effective_from,
+      effective_to,
     } = req.body
 
     // Validate required fields (only starting point and destination)
@@ -137,6 +140,10 @@ const createDriverRateHandler = async (req, res) => {
       return res.status(400).json({ error: "All rates must be valid numbers if provided" })
     }
 
+    if (effective_from && effective_to && effective_to < effective_from) {
+      return res.status(400).json({ error: "effective_to must be on or after effective_from" })
+    }
+
     console.log("Creating driver rate with data:", req.body)
     const newDriverRate = await createDriverRate({
       startingpoint,
@@ -145,6 +152,8 @@ const createDriverRateHandler = async (req, res) => {
       driver_twelve_meter_rate,
       subie_six_meter_rate,
       subie_twelve_meter_rate,
+      effective_from,
+      effective_to,
     })
     res.status(201).json(newDriverRate)
   } catch (err) {
@@ -163,6 +172,8 @@ const updateDriverRateHandler = async (req, res) => {
       driver_twelve_meter_rate,
       subie_six_meter_rate,
       subie_twelve_meter_rate,
+      effective_from,
+      effective_to,
     } = req.body
 
     // Validate ID
@@ -192,6 +203,10 @@ const updateDriverRateHandler = async (req, res) => {
       return res.status(400).json({ error: "All rates must be valid numbers if provided" })
     }
 
+    if (effective_from && effective_to && effective_to < effective_from) {
+      return res.status(400).json({ error: "effective_to must be on or after effective_from" })
+    }
+
     console.log(`Updating driver rate ID ${id}`)
     const result = await updateDriverRate(id, {
       startingpoint,
@@ -200,6 +215,8 @@ const updateDriverRateHandler = async (req, res) => {
       driver_twelve_meter_rate,
       subie_six_meter_rate,
       subie_twelve_meter_rate,
+      effective_from,
+      effective_to,
     })
     if (!result.success) {
       return res.status(404).json({ message: result.message })
@@ -248,6 +265,26 @@ const getDriverRateUsageHandler = async (req, res) => {
   }
 }
 
+const checkRateDateOverlapsHandler = async (req, res) => {
+  try {
+    const { startingpoint, destination, effective_from, effective_to, exclude_id } = req.query
+
+    if (!startingpoint || !destination || !effective_from) {
+      return res.status(400).json({ error: "Starting point, destination, and effective_from are required" })
+    }
+
+    const excludeRateId = exclude_id && /^\d+$/.test(exclude_id) ? parseInt(exclude_id) : null
+
+    console.log(`Checking rate overlaps for ${startingpoint} -> ${destination}, from ${effective_from} to ${effective_to || 'null'}, exclude: ${excludeRateId}`)
+    const result = await checkRateDateOverlaps(startingpoint, destination, effective_from, effective_to, excludeRateId)
+
+    res.json(result)
+  } catch (err) {
+    console.error(`Error checking rate date overlaps:`, err)
+    res.status(500).json({ error: "Failed to check rate date overlaps" })
+  }
+}
+
 export {
   getAllDriverRatesHandler,
   getDriverRateByIdHandler,
@@ -256,4 +293,5 @@ export {
   deleteDriverRateHandler,
   getDriverRateUsageHandler,
   refreshDriverRateLegsHandler,
+  checkRateDateOverlapsHandler,
 }

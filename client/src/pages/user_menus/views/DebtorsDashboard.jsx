@@ -18,6 +18,11 @@ const dashboardData = [
     image: "/images/Statements.jpg",
     path: "/view-client-statements",
   },
+  {
+    title: "Age Analysis",
+    image: "/images/Statements.jpg",
+    path: "/debtors-age-analysis",
+  },
 ];
 
 const DebtorsDashboard = () => {
@@ -32,27 +37,7 @@ const DebtorsDashboard = () => {
         </button>
       </div>
       <div className="dashboard-row top-row">
-        {dashboardData.slice(0, 3).map((item) => (
-          <Card
-            key={item.title}
-            title={item.title}
-            image={item.image}
-            onClick={() => navigate(item.path)}
-          />
-        ))}
-      </div>
-      <div className="dashboard-row top-row">
-        {dashboardData.slice(3, 6).map((item) => (
-          <Card
-            key={item.title}
-            title={item.title}
-            image={item.image}
-            onClick={() => navigate(item.path)}
-          />
-        ))}
-      </div>
-      <div className="dashboard-row bottom-row">
-        {dashboardData.slice(6, 9).map((item) => (
+        {dashboardData.map((item) => (
           <Card
             key={item.title}
             title={item.title}

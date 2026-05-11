@@ -140,7 +140,7 @@ export const getPurchaseOrderByPonumHandler = async (req, res) => {
   }
 };
 export const uploadPurchaseOrderSlipHandler = async (req, res) => {
-  const { ponum, expenseCost, expenseType, truckRegNum, invoiceNumber, documentFrom, driverId } = req.body
+  const { ponum, expenseCost, expenseType, truckRegNum, invoiceNumber, documentFrom, driverId, vat } = req.body
   const file = req.file
 
   if (!ponum || !expenseCost || !file || !invoiceNumber) {
@@ -175,8 +175,8 @@ export const uploadPurchaseOrderSlipHandler = async (req, res) => {
       })
       .promise()
 await pool.query(
-  `UPDATE purchase_orders SET slip_s3key = $1, invoice_number = $2 WHERE ponum = $3`,
-  [s3Key, invoiceNumber, ponum]
+  `UPDATE purchase_orders SET slip_s3key = $1, invoice_number = $2, vat = $3 WHERE ponum = $4`,
+  [s3Key, invoiceNumber, vat ? parseFloat(vat) : null, ponum]
 )
 
 // Update total only for the first record of this PONUM
@@ -243,6 +243,17 @@ await pool.query(
           INSERT INTO expenses_m2 
           (type, documentfrom, expensecost, description, slipname, s3key, slipuploaddate, truckid, driverid, orderno)
           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+          ON CONFLICT (orderno)
+          DO UPDATE SET
+            type = EXCLUDED.type,
+            documentfrom = EXCLUDED.documentfrom,
+            expensecost = EXCLUDED.expensecost,
+            description = EXCLUDED.description,
+            slipname = EXCLUDED.slipname,
+            s3key = EXCLUDED.s3key,
+            slipuploaddate = EXCLUDED.slipuploaddate,
+            truckid = EXCLUDED.truckid,
+            driverid = EXCLUDED.driverid
           RETURNING ekey
         `;
         
@@ -260,7 +271,7 @@ await pool.query(
         ];
 
         const expenseResult = await pool.query(expenseQuery, expenseValues);
-        console.log("Expense record created with ID:", expenseResult.rows[0].ekey);
+        console.log("Expense record upserted with ID:", expenseResult.rows[0].ekey);
         
       } catch (expenseError) {
         console.error("Error creating expense record:", expenseError);

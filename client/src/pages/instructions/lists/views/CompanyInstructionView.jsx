@@ -16,6 +16,9 @@ const CompanyInstructionView = () => {
   // Pagination state
   const [currentPage, setCurrentPage] = useState(1)
   const [recordsPerPage] = useState(10)
+  const [containerSearch, setContainerSearch] = useState("")
+  const [allInstructions, setAllInstructions] = useState([])
+  const [containersByInstruction, setContainersByInstruction] = useState({})
 
   useEffect(() => {
     const fetchClientStats = async () => {
@@ -52,15 +55,86 @@ const CompanyInstructionView = () => {
     fetchClientStats()
   }, [])
 
+  useEffect(() => {
+    if (!containerSearch.trim()) {
+      setContainersByInstruction({})
+      return
+    }
+
+    const loadContainersForSearch = async () => {
+      try {
+        let instructions = allInstructions
+        if (instructions.length === 0) {
+          const response = await api.get("/api/instructions/instructions")
+          instructions = response.data || []
+          setAllInstructions(instructions)
+        }
+
+        const uniqueIds = Array.from(new Set(instructions.map((item) => item.m1key))).filter(Boolean)
+
+        const results = await Promise.all(
+          uniqueIds.map(async (id) => {
+            try {
+              const response = await api.get(`/containers/instruction/${id}`)
+              return { id: String(id), data: response.data || [] }
+            } catch {
+              return { id: String(id), data: [] }
+            }
+          }),
+        )
+
+        const containersMap = {}
+        results.forEach(({ id, data }) => {
+          containersMap[id] = data
+        })
+        setContainersByInstruction(containersMap)
+      } catch (err) {
+        console.error("Error loading containers for client search", err)
+      }
+    }
+
+    loadContainersForSearch()
+  }, [containerSearch])
+
+  const getFilteredClients = () => {
+    if (!containerSearch.trim()) return clients
+
+    const searchTerm = containerSearch.trim().toLowerCase()
+
+    const matchingInstructionIds = new Set(
+      Object.entries(containersByInstruction)
+        .filter(([, containers]) =>
+          containers.some((c) => (c.containernum || "").toString().toLowerCase().includes(searchTerm)),
+        )
+        .map(([id]) => id),
+    )
+
+    const matchingClientIds = new Set(
+      allInstructions
+        .filter((i) => matchingInstructionIds.has(String(i.m1key)))
+        .flatMap((i) => [i.client, i.clientid, i.m5clientkey, i.client_id, i.client_key, i.clientId])
+        .filter(Boolean)
+        .map((id) => String(id).trim()),
+    )
+
+    return clients.filter((client) => matchingClientIds.has(String(client.m5clientkey).trim()))
+  }
+
+  const filteredClients = getFilteredClients()
+
   // Calculate pagination
   const indexOfLastRecord = currentPage * recordsPerPage
   const indexOfFirstRecord = indexOfLastRecord - recordsPerPage
-  const currentClients = clients.slice(indexOfFirstRecord, indexOfLastRecord)
+  const currentClients = filteredClients.slice(indexOfFirstRecord, indexOfLastRecord)
 
   // Handle page change
   const handlePageChange = (pageNumber) => {
     setCurrentPage(pageNumber)
   }
+
+  useEffect(() => {
+    setCurrentPage(1)
+  }, [containerSearch])
 
   // Style for centered cells
   const centeredCellStyle = {
@@ -221,6 +295,17 @@ const CompanyInstructionView = () => {
         </div>
       </div>
 
+      {/* Container search - above the table */}
+      <div className="company-instruction-view-search-bar">
+        <input
+          type="text"
+          className="company-instruction-view-search-input"
+          placeholder="Search by container number"
+          value={containerSearch}
+          onChange={(e) => setContainerSearch(e.target.value)}
+        />
+      </div>
+
       {/* Table */}
       <div className="table3" style={{ display: "flex", justifyContent: "center" }}>
         {loading ? (
@@ -261,7 +346,7 @@ const CompanyInstructionView = () => {
                 {currentClients.length === 0 ? (
                   <tr>
                     <td colSpan="7" className="text-center p-3">
-                      No client data available
+                      {containerSearch.trim() ? "No clients found for that container number" : "No client data available"}
                     </td>
                   </tr>
                 ) : (
@@ -287,6 +372,7 @@ const CompanyInstructionView = () => {
                               state: {
                                 clientId: client.m5clientkey,
                                 clientName: client.companyname,
+                                containerSearch: containerSearch.trim() || undefined,
                               },
                             })
                           }
@@ -304,10 +390,10 @@ const CompanyInstructionView = () => {
       </div>
 
       {/* Pagination */}
-      {!loading && !error && clients.length > 0 && (
+      {!loading && !error && filteredClients.length > 0 && (
         <div className="company-instruction-view-pagination-container">
           <Pagination
-            totalRecords={clients.length}
+            totalRecords={filteredClients.length}
             recordsPerPage={recordsPerPage}
             currentPage={currentPage}
             onPageChange={handlePageChange}
