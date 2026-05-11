@@ -54,7 +54,6 @@ const DebtorsAgeAnalysis = () => {
     <div className="age-analysis-container">
       <div className="age-analysis-header">
         <button className="back-button" onClick={() => navigate(-1)}>Back</button>
-        <h2>Debtors Age Analysis</h2>
       </div>
 
       <div className="age-analysis-filters">
