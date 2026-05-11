@@ -1421,16 +1421,29 @@ const FCcontrollerinstructions = () => {
         numAbnormal > 0 ? Number(formData.rateper_abnormal || 0) : 0;
 
       let baseCost = 0;
-      console.log("DEBUG UPDATE isSetRateMode:", isSetRateMode, "formData.rateWeight:", formData.rateWeight, "formData.setRateAmount:", formData.setRateAmount);
-      if (isSetRateMode && !isAddOn) {
-        // Set Rate mode: use setRateAmount multiplied by weight row count
-        const setRateValue = Number.parseFloat(formData.setRateAmount || 0);
+      console.log("=== SET RATE DEBUG ===");
+      console.log("  isSetRate:", isSetRate);
+      console.log("  isAddOn:", isAddOn);
+      console.log("  formData.shipmentTypeId:", formData.shipmentTypeId);
+      console.log("  formData.setRateAmount:", formData.setRateAmount, "(type:", typeof formData.setRateAmount, ")");
+      console.log("  historicalSetRate:", historicalSetRate);
+      console.log("  setRateValue (state):", setRateValue);
+      console.log("  weightRows:", weightRows);
+      console.log("  weightRows.length:", weightRows.length);
+      console.log("======================");
+      if (isSetRate && !isAddOn) {
+        // Set Rate mode: use setRateAmount multiplied by weight row count.
+        // fetchSetRate can overwrite setRateAmount with 0/"" when the API has no
+        // set_rate configured — fall back to historicalSetRate in that case.
+        const rawRate = Number.parseFloat(formData.setRateAmount);
+        console.log("  rawRate parsed:", rawRate, "isNaN:", Number.isNaN(rawRate));
+        const setRateValue = (!Number.isNaN(rawRate) && rawRate > 0) ? rawRate : (historicalSetRate || 0);
         const weightRowCount = weightRows.length || 1;
-        baseCost = Number.isNaN(setRateValue) ? 0 : setRateValue * weightRowCount;
+        baseCost = setRateValue * weightRowCount;
         console.log("SET-RATE CALCULATION (UPDATE):");
-        console.log(`  Set Rate Amount: R${setRateValue.toFixed(2)}`);
+        console.log(`  Effective Set Rate: R${setRateValue}`);
         console.log(`  Weight Row Count: ${weightRowCount}`);
-        console.log(`  Total Cost: R${setRateValue.toFixed(2)} × ${weightRowCount} = R${baseCost.toFixed(2)}`);
+        console.log(`  baseCost: R${baseCost}`);
       } else if (
         (formData.rateWeight === "kg" || formData.rateWeight === "ton") &&
         String(formData.shipmentTypeId) === "4"
@@ -1537,10 +1550,10 @@ const FCcontrollerinstructions = () => {
       }, 0);
       console.log(`💲 Total cost components (fresh) - Base: ${baseCost}, Surcharges: ${totalSurchargeAmount}, Hazardous: ${totalHazardousAmount}, VGM: ${totalVgmAmount}`);
       // In Set Rate mode, total cost is exactly the set rate amount (no surcharges/hazardous/VGM)
-      const totalCost = isSetRateMode
+      const totalCost = isSetRate
         ? baseCost
         : Number((baseCost + totalSurchargeAmount + totalHazardousAmount + totalVgmAmount).toFixed(2));
-      console.log("DEBUG FINAL totalCost before payload:", totalCost, "isSetRateMode:", isSetRateMode);
+      console.log("DEBUG FINAL totalCost before payload:", totalCost, "isSetRate:", isSetRate);
 
       // Prepare instruction update data with proper field mapping
       const isAddOnType = isAddOn;
@@ -2942,10 +2955,11 @@ const FCcontrollerinstructions = () => {
     // Handle shipment type 4 (break bulk) weight-based calculation
     if (String(formData.shipmentTypeId) === "4") {
       let baseCost = 0;
-      if (isSetRateMode) {
-        const setRateValue = Number.parseFloat(formData.setRateAmount || 0);
+      if (isSetRate) {
+        const rawRate = Number.parseFloat(formData.setRateAmount);
+        const setRateValue = (!Number.isNaN(rawRate) && rawRate > 0) ? rawRate : (historicalSetRate || 0);
         const weightRowCount = weightRows.length || 1;
-        baseCost = Number.isNaN(setRateValue) ? 0 : setRateValue * weightRowCount;
+        baseCost = setRateValue * weightRowCount;
       } else if (formData.rateWeight === "kg" || formData.rateWeight === "ton") {
         const totalWeight = weightRows.reduce((sum, row) => {
           if (row.weight === null || row.weight === undefined || row.weight === "") {
@@ -2956,6 +2970,15 @@ const FCcontrollerinstructions = () => {
         }, 0);
         const unitRate = Number.parseFloat(formData.unitRate || 0);
         baseCost = totalWeight * unitRate;
+      } else {
+        // Container-based fallback for type 4
+        const numSix = formData.num_six_meters || 0;
+        const numTwelve = formData.num_twelve_meters || 0;
+        const numAbnormal = formData.num_abnormal || 0;
+        const ratePer6 = numSix > 0 ? Number(formData.rateper_6 || 0) : 0;
+        const ratePer12 = numTwelve > 0 ? Number(formData.rateper_12 || 0) : 0;
+        const ratePerAbnormal = numAbnormal > 0 ? Number(formData.rateper_abnormal || 0) : 0;
+        baseCost = ratePer6 * numSix + ratePer12 * numTwelve + ratePerAbnormal * numAbnormal;
       }
 
       setFormData(prev => ({ ...prev, total_cost: baseCost }));
