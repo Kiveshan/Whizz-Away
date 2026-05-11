@@ -639,13 +639,7 @@ export default function DriversSection({
                           }}
                           value={
                             entry.date
-                              ? (() => {
-                                  const date = new Date(entry.date);
-                                  const year = date.getFullYear();
-                                  const month = String(date.getMonth() + 1).padStart(2, "0");
-                                  const day = String(date.getDate()).padStart(2, "0");
-                                  return `${year}-${month}-${day}`;
-                                })()
+                              ? entry.date.toString().split("T")[0]
                               : ""
                           }
                           onChange={(e) => {
