@@ -1993,9 +1993,10 @@ export const updateFCInstructionAndContainers = async (
         ? instructionData.total_cost
         : calculateTotalCost(instructionData);
 
-    // For shipment type 4, ALWAYS recalculate total_cost from weightData to ensure accuracy
-    // This overrides any value sent from the frontend since the backend has the authoritative weight data
-    if (newShipmentType === "4" && !isAddOnType) {
+    // For shipment type 4, recalculate total_cost from weightData unless set rate is enabled.
+    // Set rate instructions send the correct total from the frontend; unitrate is 0 for them
+    // so recalculating would always produce 0.
+    if (newShipmentType === "4" && !isAddOnType && !instructionData.is_set_rate) {
       if (Array.isArray(weightData) && weightData.length > 0) {
         const totalWeight = weightData.reduce((sum, row) => {
           if (row.weight !== null && row.weight !== undefined && row.weight !== "") {
@@ -2005,8 +2006,7 @@ export const updateFCInstructionAndContainers = async (
           return sum;
         }, 0);
         const unitRate = Number(instructionData.unitrate || 0);
-        const calculatedCost = totalWeight * unitRate;
-        totalCost = calculatedCost;
+        totalCost = totalWeight * unitRate;
       } else {
         totalCost = 0;
       }
