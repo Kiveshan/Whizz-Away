@@ -1421,19 +1421,29 @@ const FCcontrollerinstructions = () => {
         numAbnormal > 0 ? Number(formData.rateper_abnormal || 0) : 0;
 
       let baseCost = 0;
-      console.log("DEBUG UPDATE isSetRate:", isSetRate, "formData.rateWeight:", formData.rateWeight, "formData.setRateAmount:", formData.setRateAmount);
+      console.log("=== SET RATE DEBUG ===");
+      console.log("  isSetRate:", isSetRate);
+      console.log("  isAddOn:", isAddOn);
+      console.log("  formData.shipmentTypeId:", formData.shipmentTypeId);
+      console.log("  formData.setRateAmount:", formData.setRateAmount, "(type:", typeof formData.setRateAmount, ")");
+      console.log("  historicalSetRate:", historicalSetRate);
+      console.log("  setRateValue (state):", setRateValue);
+      console.log("  weightRows:", weightRows);
+      console.log("  weightRows.length:", weightRows.length);
+      console.log("======================");
       if (isSetRate && !isAddOn) {
         // Set Rate mode: use setRateAmount multiplied by weight row count.
         // fetchSetRate can overwrite setRateAmount with 0/"" when the API has no
         // set_rate configured — fall back to historicalSetRate in that case.
         const rawRate = Number.parseFloat(formData.setRateAmount);
+        console.log("  rawRate parsed:", rawRate, "isNaN:", Number.isNaN(rawRate));
         const setRateValue = (!Number.isNaN(rawRate) && rawRate > 0) ? rawRate : (historicalSetRate || 0);
         const weightRowCount = weightRows.length || 1;
         baseCost = setRateValue * weightRowCount;
         console.log("SET-RATE CALCULATION (UPDATE):");
-        console.log(`  Set Rate Amount: R${setRateValue.toFixed(2)}`);
+        console.log(`  Effective Set Rate: R${setRateValue}`);
         console.log(`  Weight Row Count: ${weightRowCount}`);
-        console.log(`  Total Cost: R${setRateValue.toFixed(2)} × ${weightRowCount} = R${baseCost.toFixed(2)}`);
+        console.log(`  baseCost: R${baseCost}`);
       } else if (
         (formData.rateWeight === "kg" || formData.rateWeight === "ton") &&
         String(formData.shipmentTypeId) === "4"
