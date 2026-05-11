@@ -1813,10 +1813,11 @@ const FCcontrollerinstructions = () => {
         // Recalculate total cost to update UI with saved values
         recalculateTotalCost();
 
-        // Navigate after 2 seconds
+        // Navigate back to the client's instruction list with filters preserved
         setTimeout(() => {
-          console.log("🚀 Navigating to instructions list...");
-          navigate("/ViewClientInstruction");
+          navigate("/instructions", {
+            state: { clientId, clientName, selectedMonth, selectedYear, activeFilter },
+          });
         }, 2000);
       } else {
         console.warn("⚠️ Unexpected server response:", response);
