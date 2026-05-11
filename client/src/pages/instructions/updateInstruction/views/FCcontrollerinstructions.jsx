@@ -1423,10 +1423,13 @@ const FCcontrollerinstructions = () => {
       let baseCost = 0;
       console.log("DEBUG UPDATE isSetRate:", isSetRate, "formData.rateWeight:", formData.rateWeight, "formData.setRateAmount:", formData.setRateAmount);
       if (isSetRate && !isAddOn) {
-        // Set Rate mode: use setRateAmount multiplied by weight row count
-        const setRateValue = Number.parseFloat(formData.setRateAmount || 0);
+        // Set Rate mode: use setRateAmount multiplied by weight row count.
+        // fetchSetRate can overwrite setRateAmount with 0/"" when the API has no
+        // set_rate configured — fall back to historicalSetRate in that case.
+        const rawRate = Number.parseFloat(formData.setRateAmount);
+        const setRateValue = (!Number.isNaN(rawRate) && rawRate > 0) ? rawRate : (historicalSetRate || 0);
         const weightRowCount = weightRows.length || 1;
-        baseCost = Number.isNaN(setRateValue) ? 0 : setRateValue * weightRowCount;
+        baseCost = setRateValue * weightRowCount;
         console.log("SET-RATE CALCULATION (UPDATE):");
         console.log(`  Set Rate Amount: R${setRateValue.toFixed(2)}`);
         console.log(`  Weight Row Count: ${weightRowCount}`);
@@ -2943,9 +2946,10 @@ const FCcontrollerinstructions = () => {
     if (String(formData.shipmentTypeId) === "4") {
       let baseCost = 0;
       if (isSetRate) {
-        const setRateValue = Number.parseFloat(formData.setRateAmount || 0);
+        const rawRate = Number.parseFloat(formData.setRateAmount);
+        const setRateValue = (!Number.isNaN(rawRate) && rawRate > 0) ? rawRate : (historicalSetRate || 0);
         const weightRowCount = weightRows.length || 1;
-        baseCost = Number.isNaN(setRateValue) ? 0 : setRateValue * weightRowCount;
+        baseCost = setRateValue * weightRowCount;
       } else if (formData.rateWeight === "kg" || formData.rateWeight === "ton") {
         const totalWeight = weightRows.reduce((sum, row) => {
           if (row.weight === null || row.weight === undefined || row.weight === "") {
