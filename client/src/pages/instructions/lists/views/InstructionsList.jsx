@@ -95,7 +95,9 @@ const Instructions = () => {
   const [currentPage, setCurrentPage] = useState(1)
   const [recordsPerPage] = useState(10)
   const [containerSearch, setContainerSearch] = useState(location.state?.containerSearch || "")
-  const [containersByInstruction, setContainersByInstruction] = useState({})
+  const [debouncedSearch, setDebouncedSearch] = useState(location.state?.containerSearch || "")
+  const [containerSearchLoading, setContainerSearchLoading] = useState(false)
+  const [searchMatchedKeys, setSearchMatchedKeys] = useState(null)
 
   // Add the shake animation when component mounts - exactly like in CompanyInstructions.jsx
   useEffect(() => {
@@ -241,21 +243,8 @@ const Instructions = () => {
       }
     }
 
-    // Filter by container number search
-    if (containerSearch.trim()) {
-      const searchTerm = containerSearch.trim().toLowerCase()
-
-      filtered = filtered.filter((item) => {
-        const containers = containersByInstruction[item.m1key] || []
-        if (!Array.isArray(containers) || containers.length === 0) {
-          return false
-        }
-
-        return containers.some((container) => {
-          const num = (container.containernum || "").toString().toLowerCase()
-          return num.includes(searchTerm)
-        })
-      })
+    if (searchMatchedKeys !== null) {
+      filtered = filtered.filter((item) => searchMatchedKeys.has(String(item.m1key)))
     }
 
     // Sort by status priority first, then by instruction number (descending)
@@ -277,39 +266,35 @@ const Instructions = () => {
     return filtered
   }
 
-  // When a container search term is entered, fetch containers for all instructions
   useEffect(() => {
-    if (!containerSearch.trim()) return
-    if (!instructions || instructions.length === 0) return
+    const timer = setTimeout(() => setDebouncedSearch(containerSearch), 400)
+    return () => clearTimeout(timer)
+  }, [containerSearch])
 
-    const loadContainers = async () => {
+  useEffect(() => {
+    if (!debouncedSearch.trim()) {
+      setSearchMatchedKeys(null)
+      setContainerSearchLoading(false)
+      return
+    }
+
+    const runSearch = async () => {
       try {
-        const uniqueIds = Array.from(new Set(instructions.map((item) => item.m1key))).filter(Boolean)
-
-        const results = await Promise.all(
-          uniqueIds.map(async (id) => {
-            try {
-              const response = await api.get(`/containers/instruction/${id}`)
-              return { id, data: response.data || [] }
-            } catch (err) {
-              console.error("Error fetching containers for instruction", id, err)
-              return { id, data: [] }
-            }
-          }),
-        )
-
-        const containersMap = {}
-        results.forEach(({ id, data }) => {
-          containersMap[id] = data
-        })
-        setContainersByInstruction(containersMap)
+        setContainerSearchLoading(true)
+        const params = new URLSearchParams({ q: debouncedSearch.trim() })
+        if (clientId) params.append("clientId", clientId)
+        const response = await api.get(`/api/instructions/search?${params}`)
+        const matched = new Set((response.data || []).map((i) => String(i.m1key)))
+        setSearchMatchedKeys(matched)
       } catch (err) {
-        console.error("Error loading containers for instructions", err)
+        console.error("Error running instruction search", err)
+      } finally {
+        setContainerSearchLoading(false)
       }
     }
 
-    loadContainers()
-  }, [containerSearch, instructions])
+    runSearch()
+  }, [debouncedSearch, clientId])
 
   // Pagination logic
   const filteredInstructions = getFilteredInstructions()
@@ -473,7 +458,7 @@ const Instructions = () => {
         <div style={{ margin: "10px 0", textAlign: "center" }}>
           <input
             type="text"
-            placeholder="Search by container number"
+            placeholder="Search by container number or client ref"
             value={containerSearch}
             onChange={(e) => setContainerSearch(e.target.value)}
             style={{
@@ -506,7 +491,11 @@ const Instructions = () => {
                 </tr>
               </thead>
 <tbody>
-  {currentInstructions.length === 0 ? (
+  {containerSearchLoading ? (
+    <tr>
+      <td colSpan="10">Searching...</td>
+    </tr>
+  ) : currentInstructions.length === 0 ? (
     <tr>
       <td colSpan="10">No instructions found</td>
     </tr>

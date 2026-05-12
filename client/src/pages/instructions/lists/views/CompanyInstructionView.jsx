@@ -17,8 +17,9 @@ const CompanyInstructionView = () => {
   const [currentPage, setCurrentPage] = useState(1)
   const [recordsPerPage] = useState(10)
   const [containerSearch, setContainerSearch] = useState("")
-  const [allInstructions, setAllInstructions] = useState([])
-  const [containersByInstruction, setContainersByInstruction] = useState({})
+  const [debouncedSearch, setDebouncedSearch] = useState("")
+  const [containerSearchLoading, setContainerSearchLoading] = useState(false)
+  const [searchMatchingClientIds, setSearchMatchingClientIds] = useState(null)
 
   useEffect(() => {
     const fetchClientStats = async () => {
@@ -56,68 +57,42 @@ const CompanyInstructionView = () => {
   }, [])
 
   useEffect(() => {
-    if (!containerSearch.trim()) {
-      setContainersByInstruction({})
+    const timer = setTimeout(() => setDebouncedSearch(containerSearch), 400)
+    return () => clearTimeout(timer)
+  }, [containerSearch])
+
+  useEffect(() => {
+    if (!debouncedSearch.trim()) {
+      setSearchMatchingClientIds(null)
+      setContainerSearchLoading(false)
       return
     }
 
-    const loadContainersForSearch = async () => {
+    const runSearch = async () => {
       try {
-        let instructions = allInstructions
-        if (instructions.length === 0) {
-          const response = await api.get("/api/instructions/instructions")
-          instructions = response.data || []
-          setAllInstructions(instructions)
-        }
-
-        const uniqueIds = Array.from(new Set(instructions.map((item) => item.m1key))).filter(Boolean)
-
-        const results = await Promise.all(
-          uniqueIds.map(async (id) => {
-            try {
-              const response = await api.get(`/containers/instruction/${id}`)
-              return { id: String(id), data: response.data || [] }
-            } catch {
-              return { id: String(id), data: [] }
-            }
-          }),
+        setContainerSearchLoading(true)
+        const response = await api.get(`/api/instructions/search?q=${encodeURIComponent(debouncedSearch.trim())}`)
+        const instructions = response.data || []
+        const clientIds = new Set(
+          instructions
+            .flatMap((i) => [i.client, i.clientid, i.m5clientkey, i.client_id, i.client_key, i.clientId])
+            .filter(Boolean)
+            .map((id) => String(id).trim()),
         )
-
-        const containersMap = {}
-        results.forEach(({ id, data }) => {
-          containersMap[id] = data
-        })
-        setContainersByInstruction(containersMap)
+        setSearchMatchingClientIds(clientIds)
       } catch (err) {
-        console.error("Error loading containers for client search", err)
+        console.error("Error running instruction search", err)
+      } finally {
+        setContainerSearchLoading(false)
       }
     }
 
-    loadContainersForSearch()
-  }, [containerSearch])
+    runSearch()
+  }, [debouncedSearch])
 
   const getFilteredClients = () => {
-    if (!containerSearch.trim()) return clients
-
-    const searchTerm = containerSearch.trim().toLowerCase()
-
-    const matchingInstructionIds = new Set(
-      Object.entries(containersByInstruction)
-        .filter(([, containers]) =>
-          containers.some((c) => (c.containernum || "").toString().toLowerCase().includes(searchTerm)),
-        )
-        .map(([id]) => id),
-    )
-
-    const matchingClientIds = new Set(
-      allInstructions
-        .filter((i) => matchingInstructionIds.has(String(i.m1key)))
-        .flatMap((i) => [i.client, i.clientid, i.m5clientkey, i.client_id, i.client_key, i.clientId])
-        .filter(Boolean)
-        .map((id) => String(id).trim()),
-    )
-
-    return clients.filter((client) => matchingClientIds.has(String(client.m5clientkey).trim()))
+    if (!debouncedSearch.trim() || searchMatchingClientIds === null) return clients
+    return clients.filter((client) => searchMatchingClientIds.has(String(client.m5clientkey).trim()))
   }
 
   const filteredClients = getFilteredClients()
@@ -134,7 +109,7 @@ const CompanyInstructionView = () => {
 
   useEffect(() => {
     setCurrentPage(1)
-  }, [containerSearch])
+  }, [debouncedSearch])
 
   // Style for centered cells
   const centeredCellStyle = {
@@ -280,7 +255,6 @@ const CompanyInstructionView = () => {
     maxWidth: "1200px",
     marginLeft: "auto",
     marginRight: "auto",
-    marginTop: "-110px",
     borderCollapse: "collapse",
   }
 
@@ -300,7 +274,7 @@ const CompanyInstructionView = () => {
         <input
           type="text"
           className="company-instruction-view-search-input"
-          placeholder="Search by container number"
+          placeholder="Search by container number or client ref"
           value={containerSearch}
           onChange={(e) => setContainerSearch(e.target.value)}
         />
@@ -343,10 +317,16 @@ const CompanyInstructionView = () => {
                 </tr>
               </thead>
               <tbody>
-                {currentClients.length === 0 ? (
+                {containerSearchLoading ? (
                   <tr>
                     <td colSpan="7" className="text-center p-3">
-                      {containerSearch.trim() ? "No clients found for that container number" : "No client data available"}
+                      Searching...
+                    </td>
+                  </tr>
+                ) : currentClients.length === 0 ? (
+                  <tr>
+                    <td colSpan="7" className="text-center p-3">
+                      {containerSearch.trim() ? "No clients found for that container number or client ref" : "No client data available"}
                     </td>
                   </tr>
                 ) : (

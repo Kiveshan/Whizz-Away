@@ -1080,6 +1080,72 @@ export const getInstructions = async (clientId) => {
   }
 };
 
+// Searchable fields for the instruction search endpoint.
+// Each entry is a SQL expression. Add new entries here to extend search coverage.
+const INSTRUCTION_SEARCH_FIELDS = [
+  `cont.containernum`,
+  `m."clientFileRef"`,
+]
+
+export const searchInstructions = async ({ q, clientId } = {}) => {
+  const queryParams = []
+  const conditions = []
+
+  if (q && q.trim()) {
+    queryParams.push(`%${q.trim()}%`)
+    const idx = queryParams.length
+    conditions.push(`(${INSTRUCTION_SEARCH_FIELDS.map((f) => `${f} ILIKE $${idx}`).join(" OR ")})`)
+  }
+
+  if (clientId) {
+    queryParams.push(clientId)
+    conditions.push(`m.client = $${queryParams.length}`)
+  }
+
+  const whereClause = conditions.length > 0 ? `WHERE ${conditions.join(" AND ")}` : ""
+
+  const sql = `
+    SELECT DISTINCT ON (m.m1key)
+      m.m1key,
+      m."clientFileRef" AS fileno,
+      m."clientFileRef" AS client_ref,
+      m.booking_ref,
+      m."ksmFileRef" AS ksm_file_ref,
+      m.shipment_type,
+      s.shipmenttype AS type_text,
+      m.status,
+      m."lastFreeDate",
+      m.client,
+      c.client AS companyname,
+      c.m5clientkey,
+      m.created_at AS startingdate,
+      COALESCE(m.num_six_meters, 0) AS num_six_meters,
+      COALESCE(m.num_twelve_meters, 0) AS num_twelve_meters,
+      COALESCE(m.num_abnormal, 0) AS num_abnormal,
+      (
+        SELECT COUNT(*) > 0
+        FROM public.container cn
+        WHERE cn.m1key = m.m1key
+      ) AS has_valid_containers,
+      i.invoice_num
+    FROM public.m1_controller m
+    JOIN public.m5_client c ON m.client = c.m5clientkey
+    LEFT JOIN public.shipment s ON m.shipment_type = s.shipkey
+    LEFT JOIN public.invoice i ON m.m1key = i.m1key
+    LEFT JOIN public.container cont ON cont.m1key = m.m1key
+    ${whereClause}
+    ORDER BY m.m1key, m.created_at DESC
+  `
+
+  try {
+    const result = await query(sql, queryParams)
+    return result.recordset || result.rows || []
+  } catch (error) {
+    console.error(`[${new Date().toISOString()}] searchInstructions: Error:`, error)
+    throw error
+  }
+}
+
 export const getInstructionById = async (instructionId) => {
   const sql = `
     WITH instruction_data AS (
