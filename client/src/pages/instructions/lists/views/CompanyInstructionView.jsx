@@ -101,13 +101,21 @@ const CompanyInstructionView = () => {
 
     const searchTerm = containerSearch.trim().toLowerCase()
 
-    const matchingInstructionIds = new Set(
+    const matchingByContainer = new Set(
       Object.entries(containersByInstruction)
         .filter(([, containers]) =>
           containers.some((c) => (c.containernum || "").toString().toLowerCase().includes(searchTerm)),
         )
         .map(([id]) => id),
     )
+
+    const matchingByClientRef = new Set(
+      allInstructions
+        .filter((i) => (i.client_ref || "").toLowerCase().includes(searchTerm))
+        .map((i) => String(i.m1key)),
+    )
+
+    const matchingInstructionIds = new Set([...matchingByContainer, ...matchingByClientRef])
 
     const matchingClientIds = new Set(
       allInstructions
@@ -300,7 +308,7 @@ const CompanyInstructionView = () => {
         <input
           type="text"
           className="company-instruction-view-search-input"
-          placeholder="Search by container number"
+          placeholder="Search by container number or client ref"
           value={containerSearch}
           onChange={(e) => setContainerSearch(e.target.value)}
         />
@@ -346,7 +354,7 @@ const CompanyInstructionView = () => {
                 {currentClients.length === 0 ? (
                   <tr>
                     <td colSpan="7" className="text-center p-3">
-                      {containerSearch.trim() ? "No clients found for that container number" : "No client data available"}
+                      {containerSearch.trim() ? "No clients found for that container number or client ref" : "No client data available"}
                     </td>
                   </tr>
                 ) : (

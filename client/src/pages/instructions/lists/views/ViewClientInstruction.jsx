@@ -15,6 +15,8 @@ const ViewClientInstruction = () => {
   const [currentPage, setCurrentPage] = useState(1)
   const [recordsPerPage] = useState(10)
   const [containerSearch, setContainerSearch] = useState("")
+  const [debouncedSearch, setDebouncedSearch] = useState("")
+  const [containerSearchLoading, setContainerSearchLoading] = useState(false)
   const [allInstructions, setAllInstructions] = useState([])
   const [containersByInstruction, setContainersByInstruction] = useState({})
 
@@ -97,14 +99,22 @@ const ViewClientInstruction = () => {
     )
   }
 
+  // Debounce the search term by 400ms to avoid firing API calls on every keystroke
   useEffect(() => {
-    if (!containerSearch.trim()) {
+    const timer = setTimeout(() => setDebouncedSearch(containerSearch), 400)
+    return () => clearTimeout(timer)
+  }, [containerSearch])
+
+  useEffect(() => {
+    if (!debouncedSearch.trim()) {
       setContainersByInstruction({})
+      setContainerSearchLoading(false)
       return
     }
 
     const loadContainersForSearch = async () => {
       try {
+        setContainerSearchLoading(true)
         let instructions = allInstructions
         if (instructions.length === 0) {
           const response = await api.get("/api/instructions/instructions")
@@ -132,24 +142,34 @@ const ViewClientInstruction = () => {
         setContainersByInstruction(containersMap)
       } catch (err) {
         console.error("Error loading containers for client search", err)
+      } finally {
+        setContainerSearchLoading(false)
       }
     }
 
     loadContainersForSearch()
-  }, [containerSearch])
+  }, [debouncedSearch])
 
   const getFilteredClients = () => {
-    if (!containerSearch.trim()) return clients
+    if (!debouncedSearch.trim()) return clients
 
-    const searchTerm = containerSearch.trim().toLowerCase()
+    const searchTerm = debouncedSearch.trim().toLowerCase()
 
-    const matchingInstructionIds = new Set(
+    const matchingByContainer = new Set(
       Object.entries(containersByInstruction)
         .filter(([, containers]) =>
           containers.some((c) => (c.containernum || "").toString().toLowerCase().includes(searchTerm)),
         )
         .map(([id]) => id),
     )
+
+    const matchingByClientRef = new Set(
+      allInstructions
+        .filter((i) => (i.client_ref || "").toLowerCase().includes(searchTerm))
+        .map((i) => String(i.m1key)),
+    )
+
+    const matchingInstructionIds = new Set([...matchingByContainer, ...matchingByClientRef])
 
     const matchingClientIds = new Set(
       allInstructions
@@ -187,7 +207,7 @@ const ViewClientInstruction = () => {
 
   useEffect(() => {
     setCurrentPage(1)
-  }, [containerSearch])
+  }, [debouncedSearch])
 
   return (
     <div className="view-client-instruction-wrapper">
@@ -202,7 +222,7 @@ const ViewClientInstruction = () => {
           <input
             type="text"
             className="view-client-instruction-search-input"
-            placeholder="Search by container number"
+            placeholder="Search by container number or client ref"
             value={containerSearch}
             onChange={(e) => setContainerSearch(e.target.value)}
           />
@@ -230,10 +250,16 @@ const ViewClientInstruction = () => {
                 </tr>
               </thead>
               <tbody>
-                {currentClients.length === 0 ? (
+                {containerSearchLoading ? (
                   <tr>
                     <td colSpan="7" className="view-client-instruction-no-data">
-                      {containerSearch.trim() ? "No clients found for that container number" : "No client data available"}
+                      Searching...
+                    </td>
+                  </tr>
+                ) : currentClients.length === 0 ? (
+                  <tr>
+                    <td colSpan="7" className="view-client-instruction-no-data">
+                      {containerSearch.trim() ? "No clients found for that container number or client ref" : "No client data available"}
                     </td>
                   </tr>
                 ) : (

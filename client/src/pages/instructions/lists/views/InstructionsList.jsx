@@ -241,11 +241,16 @@ const Instructions = () => {
       }
     }
 
-    // Filter by container number search
+    // Filter by container number or client ref search
     if (containerSearch.trim()) {
       const searchTerm = containerSearch.trim().toLowerCase()
 
       filtered = filtered.filter((item) => {
+        // Check client ref match
+        const clientRef = (item.client_ref || "").toLowerCase()
+        if (clientRef.includes(searchTerm)) return true
+
+        // Check container number match
         const containers = containersByInstruction[item.m1key] || []
         if (!Array.isArray(containers) || containers.length === 0) {
           return false
@@ -473,7 +478,7 @@ const Instructions = () => {
         <div style={{ margin: "10px 0", textAlign: "center" }}>
           <input
             type="text"
-            placeholder="Search by container number"
+            placeholder="Search by container number or client ref"
             value={containerSearch}
             onChange={(e) => setContainerSearch(e.target.value)}
             style={{
