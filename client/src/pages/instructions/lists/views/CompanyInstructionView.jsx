@@ -17,6 +17,8 @@ const CompanyInstructionView = () => {
   const [currentPage, setCurrentPage] = useState(1)
   const [recordsPerPage] = useState(10)
   const [containerSearch, setContainerSearch] = useState("")
+  const [debouncedSearch, setDebouncedSearch] = useState("")
+  const [containerSearchLoading, setContainerSearchLoading] = useState(false)
   const [allInstructions, setAllInstructions] = useState([])
   const [containersByInstruction, setContainersByInstruction] = useState({})
 
@@ -56,13 +58,20 @@ const CompanyInstructionView = () => {
   }, [])
 
   useEffect(() => {
-    if (!containerSearch.trim()) {
+    const timer = setTimeout(() => setDebouncedSearch(containerSearch), 400)
+    return () => clearTimeout(timer)
+  }, [containerSearch])
+
+  useEffect(() => {
+    if (!debouncedSearch.trim()) {
       setContainersByInstruction({})
+      setContainerSearchLoading(false)
       return
     }
 
     const loadContainersForSearch = async () => {
       try {
+        setContainerSearchLoading(true)
         let instructions = allInstructions
         if (instructions.length === 0) {
           const response = await api.get("/api/instructions/instructions")
@@ -90,16 +99,18 @@ const CompanyInstructionView = () => {
         setContainersByInstruction(containersMap)
       } catch (err) {
         console.error("Error loading containers for client search", err)
+      } finally {
+        setContainerSearchLoading(false)
       }
     }
 
     loadContainersForSearch()
-  }, [containerSearch])
+  }, [debouncedSearch])
 
   const getFilteredClients = () => {
-    if (!containerSearch.trim()) return clients
+    if (!debouncedSearch.trim()) return clients
 
-    const searchTerm = containerSearch.trim().toLowerCase()
+    const searchTerm = debouncedSearch.trim().toLowerCase()
 
     const matchingByContainer = new Set(
       Object.entries(containersByInstruction)
@@ -142,7 +153,7 @@ const CompanyInstructionView = () => {
 
   useEffect(() => {
     setCurrentPage(1)
-  }, [containerSearch])
+  }, [debouncedSearch])
 
   // Style for centered cells
   const centeredCellStyle = {
@@ -351,7 +362,13 @@ const CompanyInstructionView = () => {
                 </tr>
               </thead>
               <tbody>
-                {currentClients.length === 0 ? (
+                {containerSearchLoading ? (
+                  <tr>
+                    <td colSpan="7" className="text-center p-3">
+                      Searching...
+                    </td>
+                  </tr>
+                ) : currentClients.length === 0 ? (
                   <tr>
                     <td colSpan="7" className="text-center p-3">
                       {containerSearch.trim() ? "No clients found for that container number or client ref" : "No client data available"}

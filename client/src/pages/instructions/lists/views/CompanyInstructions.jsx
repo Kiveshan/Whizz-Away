@@ -103,6 +103,8 @@ const CompanyInstructions = () => {
   const [error, setError] = useState(null)
   const [activeFilter, setActiveFilter] = useState(initialFilter || "All")
   const [containerSearch, setContainerSearch] = useState(location.state?.containerSearch || "")
+  const [debouncedSearch, setDebouncedSearch] = useState(location.state?.containerSearch || "")
+  const [containerSearchLoading, setContainerSearchLoading] = useState(false)
   const [containersByInstruction, setContainersByInstruction] = useState({})
 
   // Pagination state - ADDED
@@ -194,14 +196,21 @@ const CompanyInstructions = () => {
   }, [clientId])
 
   useEffect(() => {
-    if (!containerSearch.trim()) {
+    const timer = setTimeout(() => setDebouncedSearch(containerSearch), 400)
+    return () => clearTimeout(timer)
+  }, [containerSearch])
+
+  useEffect(() => {
+    if (!debouncedSearch.trim()) {
       setContainersByInstruction({})
+      setContainerSearchLoading(false)
       return
     }
     if (!instructions || instructions.length === 0) return
 
     const loadContainers = async () => {
       try {
+        setContainerSearchLoading(true)
         const uniqueIds = Array.from(new Set(instructions.map((item) => item.m1key))).filter(Boolean)
 
         const results = await Promise.all(
@@ -222,11 +231,13 @@ const CompanyInstructions = () => {
         setContainersByInstruction(containersMap)
       } catch (err) {
         console.error("Error fetching containers for instructions", err)
+      } finally {
+        setContainerSearchLoading(false)
       }
     }
 
     loadContainers()
-  }, [containerSearch, instructions])
+  }, [debouncedSearch, instructions])
 
   const handleFilterClick = (filter) => {
     setActiveFilter(filter)
@@ -334,11 +345,14 @@ const CompanyInstructions = () => {
       }
     }
 
-    // Filter by container number search
-    if (containerSearch.trim()) {
-      const searchTerm = containerSearch.trim().toLowerCase()
+    // Filter by container number or client ref search
+    if (debouncedSearch.trim()) {
+      const searchTerm = debouncedSearch.trim().toLowerCase()
 
       filtered = filtered.filter((item) => {
+        const clientRef = (item.client_ref || "").toLowerCase()
+        if (clientRef.includes(searchTerm)) return true
+
         const containers = containersByInstruction[item.m1key] || []
         if (!Array.isArray(containers) || containers.length === 0) return false
         return containers.some((container) =>
@@ -525,7 +539,7 @@ const CompanyInstructions = () => {
         <div style={{ margin: "10px 0", textAlign: "center" }}>
           <input
             type="text"
-            placeholder="Search by container number"
+            placeholder="Search by container number or client ref"
             value={containerSearch}
             onChange={(e) => {
               setContainerSearch(e.target.value)
@@ -561,7 +575,11 @@ const CompanyInstructions = () => {
                 </tr>
               </thead>
               <tbody>
-                {getFilteredInstructions().length === 0 ? (
+                {containerSearchLoading ? (
+                  <tr>
+                    <td colSpan="7">Searching...</td>
+                  </tr>
+                ) : getFilteredInstructions().length === 0 ? (
                   <tr>
                     <td colSpan="7">No instructions found</td>
                   </tr>
