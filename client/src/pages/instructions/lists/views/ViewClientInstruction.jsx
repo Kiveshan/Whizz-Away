@@ -17,8 +17,7 @@ const ViewClientInstruction = () => {
   const [containerSearch, setContainerSearch] = useState("")
   const [debouncedSearch, setDebouncedSearch] = useState("")
   const [containerSearchLoading, setContainerSearchLoading] = useState(false)
-  const [allInstructions, setAllInstructions] = useState([])
-  const [containersByInstruction, setContainersByInstruction] = useState({})
+  const [searchMatchingClientIds, setSearchMatchingClientIds] = useState(null)
 
   useEffect(() => {
     const fetchClientStats = async () => {
@@ -99,7 +98,6 @@ const ViewClientInstruction = () => {
     )
   }
 
-  // Debounce the search term by 400ms to avoid firing API calls on every keystroke
   useEffect(() => {
     const timer = setTimeout(() => setDebouncedSearch(containerSearch), 400)
     return () => clearTimeout(timer)
@@ -107,79 +105,36 @@ const ViewClientInstruction = () => {
 
   useEffect(() => {
     if (!debouncedSearch.trim()) {
-      setContainersByInstruction({})
+      setSearchMatchingClientIds(null)
       setContainerSearchLoading(false)
       return
     }
 
-    const loadContainersForSearch = async () => {
+    const runSearch = async () => {
       try {
         setContainerSearchLoading(true)
-        let instructions = allInstructions
-        if (instructions.length === 0) {
-          const response = await api.get("/api/instructions/instructions")
-          instructions = response.data || []
-          setAllInstructions(instructions)
-        }
-
-        const uniqueIds = Array.from(new Set(instructions.map((item) => item.m1key))).filter(Boolean)
-
-        const results = await Promise.all(
-          uniqueIds.map(async (id) => {
-            try {
-              const response = await api.get(`/containers/instruction/${id}`)
-              return { id: String(id), data: response.data || [] }
-            } catch {
-              return { id: String(id), data: [] }
-            }
-          }),
+        const response = await api.get(`/api/instructions/search?q=${encodeURIComponent(debouncedSearch.trim())}`)
+        const instructions = response.data || []
+        const clientIds = new Set(
+          instructions
+            .flatMap((i) => [i.client, i.clientid, i.m5clientkey, i.client_id, i.client_key, i.clientId])
+            .filter(Boolean)
+            .map((id) => String(id).trim()),
         )
-
-        const containersMap = {}
-        results.forEach(({ id, data }) => {
-          containersMap[id] = data
-        })
-        setContainersByInstruction(containersMap)
+        setSearchMatchingClientIds(clientIds)
       } catch (err) {
-        console.error("Error loading containers for client search", err)
+        console.error("Error running instruction search", err)
       } finally {
         setContainerSearchLoading(false)
       }
     }
 
-    loadContainersForSearch()
+    runSearch()
   }, [debouncedSearch])
 
   const getFilteredClients = () => {
-    if (!debouncedSearch.trim()) return clients
-
-    const searchTerm = debouncedSearch.trim().toLowerCase()
-
-    const matchingByContainer = new Set(
-      Object.entries(containersByInstruction)
-        .filter(([, containers]) =>
-          containers.some((c) => (c.containernum || "").toString().toLowerCase().includes(searchTerm)),
-        )
-        .map(([id]) => id),
-    )
-
-    const matchingByClientRef = new Set(
-      allInstructions
-        .filter((i) => (i.client_ref || "").toLowerCase().includes(searchTerm))
-        .map((i) => String(i.m1key)),
-    )
-
-    const matchingInstructionIds = new Set([...matchingByContainer, ...matchingByClientRef])
-
-    const matchingClientIds = new Set(
-      allInstructions
-        .filter((i) => matchingInstructionIds.has(String(i.m1key)))
-        .flatMap((i) => [i.client, i.clientid, i.m5clientkey, i.client_id, i.client_key, i.clientId])
-        .filter(Boolean)
-        .map((id) => String(id).trim()),
-    )
-
-    return clients.filter((client) => matchingClientIds.has(String(client.m5clientkey).trim()))
+    if (!debouncedSearch.trim() || searchMatchingClientIds === null) return clients
+    return clients.filter((client) => searchMatchingClientIds.has(String(client.m5clientkey).trim()))
   }
 
   // Handle view instructions click - explicitly pass clientId and clientName

@@ -5,6 +5,7 @@ import {
   saveInstructionHandler,
   getClientInstructionStatsHandler,
   getInstructionsHandler,
+  searchInstructionsHandler,
   getInstructionByIdHandler,
   updateInstructionHandler,
   updateContainersHandler,
@@ -43,6 +44,7 @@ router.get('/containers/:instructionId', getContainersHandler);
 router.post("/save-instruction", verifyToken, saveInstructionHandler)
 router.get("/client-instruction-stats", getClientInstructionStatsHandler)
 router.get("/instructions", getInstructionsHandler)
+router.get("/search", searchInstructionsHandler)
 router.get("/instruction/:id", getInstructionByIdHandler)
 router.put("/instruction/:id", updateInstructionHandler)
 router.post("/containers/:instructionId", updateContainersHandler)
