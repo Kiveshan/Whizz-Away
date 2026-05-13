@@ -577,9 +577,9 @@ const FCcontrollerinstructions = () => {
       // Show success message
       setContainerSuccessMessage("Instruction deleted successfully!");
 
-      // Navigate back to the instructions list after a short delay
+      // Navigate back to the client's instruction list with filters preserved
       setTimeout(() => {
-        navigate("/ViewClientInstruction", {
+        navigate("/instructions", {
           state: {
             clientId,
             clientName,
@@ -989,10 +989,11 @@ const FCcontrollerinstructions = () => {
       // Recalculate total cost to update UI with saved values
       recalculateTotalCost(formData, containersRef.current, weightRows);
 
-      // Navigate after 2 seconds
+      // Navigate back to the client's instruction list with filters preserved
       setTimeout(() => {
-        console.log("🚀 Navigating to instructions list...");
-        navigate("/ViewClientInstruction");
+        navigate("/instructions", {
+          state: { clientId, clientName, selectedMonth, selectedYear, activeFilter },
+        });
       }, 2000);
     } catch (error) {
       console.error("❌ Error saving changes:", error);
