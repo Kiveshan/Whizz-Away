@@ -81,6 +81,43 @@
   background-color: #0056b3;
 }
 
+/* Filter rows with labels */
+.filter-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 2px;
+}
+
+.filter-label {
+  font-size: 13px;
+  font-weight: 600;
+  color: #555;
+  min-width: 52px;
+  text-align: right;
+}
+
+/* Status badges */
+.status-badge {
+  display: inline-block;
+  padding: 3px 10px;
+  border-radius: 12px;
+  font-size: 12px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+}
+
+.status-pending {
+  background-color: #fff3cd;
+  color: #856404;
+}
+
+.status-submitted {
+  background-color: #d1e7dd;
+  color: #0a5933;
+}
+
 /* Loading and error states */
 .loading,
 .error {
