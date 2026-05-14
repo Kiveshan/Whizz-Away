@@ -485,3 +485,60 @@
   /* Let pagination sit naturally below the table instead of overlaying it */
   margin-bottom: 40px;
 }
+
+/* FClerkLegDetails specific button styles - isolated to prevent inheritance issues */
+.legdetails-header {
+  position: absolute;
+  left: 20px;
+  z-index: 1001;
+}
+
+.legdetails-back-btn {
+  background-color: #28a745;
+  color: white;
+  border: none;
+  padding: 6px 16px;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: normal;
+  width: 80px;
+  font-family: Arial, sans-serif;
+  transition: background-color 0.2s;
+}
+
+.legdetails-back-btn:hover {
+  background-color: #218838;
+}
+
+.legdetails-export-btn {
+  background-color: #2196f3;
+  color: white;
+  border: none;
+  padding: 6px 16px;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: normal;
+  width: 110px;
+  font-family: Arial, sans-serif;
+  transition: background-color 0.2s;
+}
+
+.legdetails-export-btn:hover {
+  background-color: #1976d2;
+}
+
+.legdetails-title {
+  text-align: center;
+  margin: 15px 0;
+  font-weight: normal;
+  font-size: 24px;
+  font-family: Arial, sans-serif;
+}
+
+.legdetails-export-container {
+  width: 1000px;
+  margin: 0 auto 15px auto;
+  text-align: right;
+}

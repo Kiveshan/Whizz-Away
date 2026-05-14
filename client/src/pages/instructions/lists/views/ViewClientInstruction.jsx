@@ -14,6 +14,10 @@ const ViewClientInstruction = () => {
   const [totalNewInstructions, setTotalNewInstructions] = useState(0)
   const [currentPage, setCurrentPage] = useState(1)
   const [recordsPerPage] = useState(10)
+  const [containerSearch, setContainerSearch] = useState("")
+  const [debouncedSearch, setDebouncedSearch] = useState("")
+  const [containerSearchLoading, setContainerSearchLoading] = useState(false)
+  const [searchMatchingClientIds, setSearchMatchingClientIds] = useState(null)
 
   useEffect(() => {
     const fetchClientStats = async () => {
@@ -94,6 +98,45 @@ const ViewClientInstruction = () => {
     )
   }
 
+  useEffect(() => {
+    const timer = setTimeout(() => setDebouncedSearch(containerSearch), 400)
+    return () => clearTimeout(timer)
+  }, [containerSearch])
+
+  useEffect(() => {
+    if (!debouncedSearch.trim()) {
+      setSearchMatchingClientIds(null)
+      setContainerSearchLoading(false)
+      return
+    }
+
+    const runSearch = async () => {
+      try {
+        setContainerSearchLoading(true)
+        const response = await api.get(`/api/instructions/search?q=${encodeURIComponent(debouncedSearch.trim())}`)
+        const instructions = response.data || []
+        const clientIds = new Set(
+          instructions
+            .flatMap((i) => [i.client, i.clientid, i.m5clientkey, i.client_id, i.client_key, i.clientId])
+            .filter(Boolean)
+            .map((id) => String(id).trim()),
+        )
+        setSearchMatchingClientIds(clientIds)
+      } catch (err) {
+        console.error("Error running instruction search", err)
+      } finally {
+        setContainerSearchLoading(false)
+      }
+    }
+
+    runSearch()
+  }, [debouncedSearch])
+
+  const getFilteredClients = () => {
+    if (!debouncedSearch.trim() || searchMatchingClientIds === null) return clients
+    return clients.filter((client) => searchMatchingClientIds.has(String(client.m5clientkey).trim()))
+  }
+
   // Handle view instructions click - explicitly pass clientId and clientName
   const handleViewInstructions = (clientId, clientName) => {
     console.log("Navigating to instructions with clientId:", clientId, "and clientName:", clientName)
@@ -101,18 +144,25 @@ const ViewClientInstruction = () => {
       state: {
         clientId: clientId,
         clientName: clientName,
+        containerSearch: containerSearch.trim() || undefined,
       },
     })
   }
 
+  const filteredClients = getFilteredClients()
+
   // Pagination logic
   const indexOfLastRecord = currentPage * recordsPerPage
   const indexOfFirstRecord = indexOfLastRecord - recordsPerPage
-  const currentClients = clients.slice(indexOfFirstRecord, indexOfLastRecord)
+  const currentClients = filteredClients.slice(indexOfFirstRecord, indexOfLastRecord)
 
   const handlePageChange = (pageNumber) => {
     setCurrentPage(pageNumber)
   }
+
+  useEffect(() => {
+    setCurrentPage(1)
+  }, [debouncedSearch])
 
   return (
     <div className="view-client-instruction-wrapper">
@@ -123,6 +173,15 @@ const ViewClientInstruction = () => {
       </div>
 
       <div className="view-client-instruction-table-container">
+        <div className="view-client-instruction-search-bar">
+          <input
+            type="text"
+            className="view-client-instruction-search-input"
+            placeholder="Search by container number or client ref"
+            value={containerSearch}
+            onChange={(e) => setContainerSearch(e.target.value)}
+          />
+        </div>
         {loading ? (
           <p className="view-client-instruction-loading">Loading client data...</p>
         ) : error ? (
@@ -146,10 +205,16 @@ const ViewClientInstruction = () => {
                 </tr>
               </thead>
               <tbody>
-                {clients.length === 0 ? (
+                {containerSearchLoading ? (
                   <tr>
                     <td colSpan="7" className="view-client-instruction-no-data">
-                      No client data available
+                      Searching...
+                    </td>
+                  </tr>
+                ) : currentClients.length === 0 ? (
+                  <tr>
+                    <td colSpan="7" className="view-client-instruction-no-data">
+                      {containerSearch.trim() ? "No clients found for that container number or client ref" : "No client data available"}
                     </td>
                   </tr>
                 ) : (
@@ -180,11 +245,11 @@ const ViewClientInstruction = () => {
         )}
 
         {/* Pagination - Centered below the table */}
-        {clients.length > recordsPerPage && (
+        {filteredClients.length > recordsPerPage && (
           <div className="view-client-instruction-pagination-container">
             <Pagination
               currentPage={currentPage}
-              totalRecords={clients.length}
+              totalRecords={filteredClients.length}
               recordsPerPage={recordsPerPage}
               onPageChange={handlePageChange}
             />
