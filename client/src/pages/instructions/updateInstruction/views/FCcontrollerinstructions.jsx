@@ -678,9 +678,15 @@ const FCcontrollerinstructions = () => {
       console.log("DEBUG UPDATE isSetRateMode:", isSetRateMode, "formData.rateWeight:", formData.rateWeight, "formData.setRateAmount:", formData.setRateAmount);
       let baseCost = 0;
       if (isSetRateMode && !isAddOn) {
+        // fetchSetRate can overwrite setRateAmount with 0/"" when the API has no
+        // set_rate configured — fall back to historicalSetRate in that case.
+        const rawSaveRate = Number.parseFloat(formData.setRateAmount);
+        const resolvedSaveRate = (!Number.isNaN(rawSaveRate) && rawSaveRate > 0)
+          ? rawSaveRate
+          : (historicalSetRate || 0);
         baseCost = calcBreakBulkCost(weightRows, 0, {
           isSetRateMode: true,
-          setRateAmount: formData.setRateAmount || 0,
+          setRateAmount: resolvedSaveRate,
         });
       } else if (
         (formData.rateWeight === "kg" || formData.rateWeight === "ton") &&

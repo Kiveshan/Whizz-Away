@@ -261,6 +261,47 @@ describe("handleContainerChange — addSurcharges", () => {
   });
 });
 
+// ── handleContainerChange — fileRef ──────────────────────────────────────────
+
+describe("handleContainerChange — fileRef", () => {
+  it("updates fileRef and marks container data as modified", async () => {
+    const { result } = renderContainerHook();
+    act(() => result.current.initializeContainers([], COUNTS_1));
+    const id = result.current.containers[0].id;
+    await act(async () => {
+      await result.current.handleContainerChange(id, "fileRef", "ABC123");
+    });
+    expect(result.current.containers[0].fileRef).toBe("ABC123");
+    expect(result.current.isContainerDataModified).toBe(true);
+  });
+});
+
+// ── handleContainerChange — addSurcharges 12m branching ──────────────────────
+
+describe("handleContainerChange — addSurcharges 12m surcharge branching", () => {
+  it("updates surcharge_12m_amount (not surchargeAmount) when container is_12m_surcharge=true", async () => {
+    fetchRates.mockResolvedValue({ surcharge: 40, surcharge_12m: 80 });
+    const { result } = renderContainerHook({
+      clientId: "1", pickup: "Cape Town", dropoff: "Durban",
+    });
+    // Initialize a 12m container (is_12m_surcharge=true by default)
+    act(() => result.current.initializeContainers([], {
+      num_six_meters: 0, num_twelve_meters: 1, num_abnormal: 0, num_breakbulk: 0,
+    }));
+    const id = result.current.containers[0].id;
+    expect(result.current.containers[0].is_12m_surcharge).toBe(true);
+
+    await act(async () => {
+      await result.current.handleContainerChange(id, "addSurcharges", true);
+    });
+    await act(async () => {}); // flush async surcharge fetch
+
+    // 12m container: surcharge_12m_amount should be set, not surchargeAmount
+    expect(result.current.containers[0].is_12m_surcharge).toBe(true);
+    expect(result.current.containers[0].surcharge_12m_amount).toBeGreaterThan(0);
+  });
+});
+
 // ── validateContainerUniqueness ───────────────────────────────────────────────
 
 describe("validateContainerUniqueness", () => {

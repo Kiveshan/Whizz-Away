@@ -33,6 +33,13 @@ describe("calcBreakBulkCost", () => {
   it("set-rate mode: uses length 1 minimum when rows is empty", () => {
     expect(calcBreakBulkCost([], 0, { isSetRateMode: true, setRateAmount: 500 })).toBe(500);
   });
+
+  it("set-rate mode: returns 0 when setRateAmount is 0 (caller must resolve historicalSetRate before passing)", () => {
+    // calcBreakBulkCost has no knowledge of historicalSetRate.
+    // The caller (useRateManagement / performSave) is responsible for
+    // resolving the fallback before calling this function.
+    expect(calcBreakBulkCost([{}], 0, { isSetRateMode: true, setRateAmount: 0 })).toBe(0);
+  });
 });
 
 // ── calculateTotalCostFromRates ──────────────────────────────────────────────
