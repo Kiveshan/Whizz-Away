@@ -15,7 +15,7 @@ const AddOnForm = () => {
   const isViewMode = !!addonId;
 
   const [formData, setFormData] = useState({
-    items: [{ category: "", description: "", item_amount: "" }],
+    items: [{ category: "", description: "", units: "", rate: "", item_amount: "" }],
     date: new Date().toISOString().split("T")[0],
     invoice_number: "",
     group_id: "",
@@ -145,9 +145,13 @@ const AddOnForm = () => {
           if (response.data.success) {
             const addon = response.data.data;
             setFormData({
-              items: addon.items || [
-                { category: "", description: "", item_amount: "" },
-              ],
+              items: (addon.items || [{ category: "", description: "", units: "", rate: "", item_amount: "" }]).map((item) => ({
+                category: item.category || "",
+                description: item.description || "",
+                units: item.units != null ? String(item.units) : "",
+                rate: item.rate != null ? String(item.rate) : "",
+                item_amount: item.item_amount != null ? String(item.item_amount) : "",
+              })),
               date: new Date(addon.date).toISOString().split("T")[0] || "",
               invoice_number: addon.invoice_number || "",
               group_id: addon.group_id || "",
@@ -187,17 +191,30 @@ const AddOnForm = () => {
     if (isViewMode && !isEditMode) return;
     const { name, value } = e.target;
     const newItems = [...formData.items];
+    const current = { ...newItems[index] };
+
     if (name === "item_amount") {
       const numericValue = value.replace(/[^0-9.]/g, "");
-      if (
-        numericValue === "" ||
-        (!isNaN(numericValue) && Number.parseFloat(numericValue) >= 0)
-      ) {
-        newItems[index] = { ...newItems[index], [name]: numericValue };
+      if (numericValue === "" || (!isNaN(numericValue) && Number.parseFloat(numericValue) >= 0)) {
+        current[name] = numericValue;
+      }
+    } else if (name === "units" || name === "rate") {
+      const numericValue = value.replace(/[^0-9.]/g, "");
+      if (numericValue === "" || (!isNaN(numericValue) && Number.parseFloat(numericValue) >= 0)) {
+        current[name] = numericValue;
+        const updatedUnits = name === "units" ? numericValue : current.units;
+        const updatedRate = name === "rate" ? numericValue : current.rate;
+        if (updatedUnits && updatedRate) {
+          current.item_amount = (Number.parseFloat(updatedUnits) * Number.parseFloat(updatedRate)).toFixed(2);
+        } else {
+          current.item_amount = "";
+        }
       }
     } else {
-      newItems[index] = { ...newItems[index], [name]: value };
+      current[name] = value;
     }
+
+    newItems[index] = current;
     setFormData((prev) => ({ ...prev, items: newItems }));
     if (error) setError(null);
   };
@@ -262,7 +279,7 @@ const AddOnForm = () => {
       ...prev,
       items: [
         ...prev.items,
-        { category: "", description: "", item_amount: "" },
+        { category: "", description: "", units: "", rate: "", item_amount: "" },
       ],
     }));
   };
@@ -334,6 +351,8 @@ const AddOnForm = () => {
         items: formData.items.map((item) => ({
           category: item.category.trim(),
           description: item.description.trim(),
+          units: item.units ? Number.parseFloat(item.units) : null,
+          rate: item.rate ? Number.parseFloat(item.rate) : null,
           item_amount: Number.parseFloat(item.item_amount),
         })),
         date: formData.date,
@@ -547,11 +566,13 @@ const AddOnForm = () => {
         formatDate(formData.date),
         item.category || "N/A",
         item.description || "N/A",
+        item.units ? String(item.units) : "-",
+        item.rate ? formatCurrency(item.rate) : "-",
         formatCurrency(item.item_amount || 0),
       ]);
       autoTable(doc, {
         startY: currentY,
-        head: [["Date", "Category", "Description", "Amount"]],
+        head: [["Date", "Category", "Description", "Units", "Rate", "Amount"]],
         body: serviceData,
         theme: "grid",
         styles: {
@@ -562,10 +583,12 @@ const AddOnForm = () => {
           lineColor: brand.gray,
         },
         columnStyles: {
-          0: { cellWidth: 25 },
-          1: { cellWidth: 30 },
+          0: { cellWidth: 22 },
+          1: { cellWidth: 26 },
           2: { cellWidth: "auto" },
-          3: { cellWidth: 28, halign: "right" },
+          3: { cellWidth: 14, halign: "right" },
+          4: { cellWidth: 22, halign: "right" },
+          5: { cellWidth: 26, halign: "right" },
         },
         headStyles: {
           fillColor: brand.accent,
@@ -907,9 +930,7 @@ const AddOnForm = () => {
                     </div>
 
                     <div className="form-group">
-                      <label htmlFor={`description-${index}`}>
-                        Description
-                      </label>
+                      <label htmlFor={`description-${index}`}>Description</label>
                       <textarea
                         id={`description-${index}`}
                         name="description"
@@ -922,9 +943,44 @@ const AddOnForm = () => {
                         readOnly={isViewMode && !isEditMode}
                       />
                     </div>
+                  </div>
+
+                  <div className="form-row form-row-calc">
+                    <div className="form-group">
+                      <label htmlFor={`units-${index}`}>Units</label>
+                      <input
+                        type="text"
+                        id={`units-${index}`}
+                        name="units"
+                        value={item.units}
+                        onChange={(e) => handleInputChange(index, e)}
+                        placeholder="0"
+                        className="form-input"
+                        readOnly={isViewMode && !isEditMode}
+                      />
+                    </div>
 
                     <div className="form-group">
-                      <label htmlFor={`item_amount-${index}`}>Amount</label>
+                      <label htmlFor={`rate-${index}`}>Rate per Unit (R)</label>
+                      <div className="amount-input-wrapper">
+                        <span className="currency-symbol">R</span>
+                        <input
+                          type="text"
+                          id={`rate-${index}`}
+                          name="rate"
+                          value={item.rate}
+                          onChange={(e) => handleInputChange(index, e)}
+                          placeholder="0.00"
+                          className="amount-input"
+                          readOnly={isViewMode && !isEditMode}
+                        />
+                      </div>
+                    </div>
+
+                    <div className="form-group">
+                      <label htmlFor={`item_amount-${index}`}>
+                        Amount {item.units && item.rate && <span className="calc-badge">Auto</span>}
+                      </label>
                       <div className="amount-input-wrapper">
                         <span className="currency-symbol">R</span>
                         <input
@@ -936,7 +992,8 @@ const AddOnForm = () => {
                           placeholder="0.00"
                           className="amount-input"
                           required
-                          readOnly={isViewMode && !isEditMode}
+                          readOnly={(isViewMode && !isEditMode) || !!(item.units && item.rate)}
+                          style={(item.units && item.rate) ? { backgroundColor: "#f3f4f6" } : {}}
                         />
                       </div>
                     </div>

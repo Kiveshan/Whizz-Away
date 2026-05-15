@@ -24,7 +24,12 @@ SELECT
     JOIN expense_types et ON po.expense_type_id = et.id
     JOIN suppliers s ON po.supplier_id = s.supplier_id
     GROUP BY po.ponum, et.expense, s.supplier
-    ORDER BY MIN(po.date) DESC
+    ORDER BY
+      CASE
+        WHEN COUNT(po.slip_s3key) FILTER (WHERE po.slip_s3key IS NOT NULL) = COUNT(*) THEN 1
+        ELSE 0
+      END ASC,
+      MIN(po.date) DESC
   `
   try {
     const result = await pool.query(query)

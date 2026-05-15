@@ -13,6 +13,7 @@ const POTable = ({ showFilterButtons = true }) => {
   const [selectedYear, setSelectedYear] = useState(currentYear)
   const [selectedMonth, setSelectedMonth] = useState(currentMonth)
   const [activeFilter, setActiveFilter] = useState("All")
+  const [activeStatusFilter, setActiveStatusFilter] = useState("All")
   const [isDropdownOpen, setIsDropdownOpen] = useState(false)
   const [expenses, setExpenses] = useState([])
   const [loading, setLoading] = useState(true)
@@ -124,6 +125,11 @@ const POTable = ({ showFilterButtons = true }) => {
     setIsDropdownOpen(false)
   }
 
+  const handleStatusFilterClick = (status) => {
+    setActiveStatusFilter(status)
+    setCurrentPage(1)
+  }
+
   const toggleDropdown = () => {
     setIsDropdownOpen(!isDropdownOpen)
   }
@@ -162,10 +168,20 @@ const POTable = ({ showFilterButtons = true }) => {
       )
     }
 
-    if (activeFilter === "All") {
-      return filtered
+    if (activeFilter !== "All") {
+      filtered = filtered.filter((expense) => expense.type === activeFilter)
     }
-    return filtered.filter((expense) => expense.type === activeFilter)
+
+    if (activeStatusFilter !== "All") {
+      filtered = filtered.filter((expense) => expense.status === activeStatusFilter)
+    }
+
+    return [...filtered].sort((a, b) => {
+      const statusOrder = { Pending: 0, Submitted: 1 }
+      const statusDiff = (statusOrder[a.status] ?? 1) - (statusOrder[b.status] ?? 1)
+      if (statusDiff !== 0) return statusDiff
+      return new Date(b.date) - new Date(a.date)
+    })
   }
 
   const handleViewClick = async (expense) => {
@@ -316,7 +332,23 @@ const POTable = ({ showFilterButtons = true }) => {
 
       {showFilterButtons && (
         <div className="button-group">
-          <div className="filter-buttons filter-btn-group">
+          <div className="filter-row">
+            <span className="filter-label">Status:</span>
+            <div className="filter-buttons filter-btn-group">
+              {["All", "Pending", "Submitted"].map((s) => (
+                <button
+                  key={s}
+                  className={activeStatusFilter === s ? "active" : ""}
+                  onClick={() => handleStatusFilterClick(s)}
+                >
+                  {s}
+                </button>
+              ))}
+            </div>
+          </div>
+          <div className="filter-row">
+            <span className="filter-label">Type:</span>
+            <div className="filter-buttons filter-btn-group">
             <button
               className={activeFilter === "All" ? "active" : ""}
               onClick={() => handleFilterClick("All")}
@@ -342,6 +374,7 @@ const POTable = ({ showFilterButtons = true }) => {
                   ))}
                 </div>
               )}
+            </div>
             </div>
           </div>
         </div>
@@ -396,7 +429,11 @@ const POTable = ({ showFilterButtons = true }) => {
                             <td>{expense.type}</td>
                             <td>{expense.suppliedBy}</td>
                             <td>{expense.date}</td>
-                            <td>{expense.status}</td>
+                            <td>
+                              <span className={`status-badge status-${expense.status?.toLowerCase()}`}>
+                                {expense.status}
+                              </span>
+                            </td>
                             <td>{expense.amount}</td>
                             <td>
                               <button

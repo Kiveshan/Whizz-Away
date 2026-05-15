@@ -275,6 +275,50 @@ const ExpenseSubmission = ({ onBack }) => {
               </div>
             )}
 
+            {expenseType === 5 && formData.documentFrom === "Driver" && (
+              <div className="form-field driver-field">
+                <label htmlFor="driverSelect">Driver Name</label>
+                <Select
+                  inputId="driverSelect"
+                  options={driverOptions}
+                  onChange={handleDriverChange}
+                  isSearchable
+                  placeholder="Select a driver"
+                  className="driver-select"
+                  classNamePrefix="driver-select"
+                />
+                {formData.driverFullName && (
+                  <div className="driver-info">
+                    Selected: {formData.driverFullName}
+                  </div>
+                )}
+              </div>
+            )}
+
+            <div className="form-field">
+              <label htmlFor="invoiceNumber">Invoice Number</label>
+              <input
+                id="invoiceNumber"
+                type="text"
+                name="invoiceNumber"
+                value={formData.invoiceNumber}
+                onChange={handleInputChange}
+                placeholder="Enter invoice number"
+              />
+            </div>
+
+            <div className="form-field">
+              <label htmlFor="orderno">Purchase Order Number</label>
+              <input
+                id="orderno"
+                type="text"
+                name="orderno"
+                value={ponum}
+                // onChange={handleInputChange}
+                // placeholder="Enter order number"
+                required
+              />
+            </div>
 
             <div className="form-field">
               <label htmlFor="expenseCost">Expense Cost (Excl. VAT)</label>
@@ -295,30 +339,6 @@ const ExpenseSubmission = ({ onBack }) => {
                   placeholder="0.00"
                 />
               </div>
-            </div>
-
-            <div className="form-field">
-              <label htmlFor="orderno">Purchase Order Number</label>
-              <input
-                id="orderno"
-                type="text"
-                name="orderno"
-                value={ponum}
-                // onChange={handleInputChange}
-                // placeholder="Enter order number"
-                required
-              />
-            </div>
-            <div className="form-field">
-              <label htmlFor="invoiceNumber">Invoice Number</label>
-              <input
-                id="invoiceNumber"
-                type="text"
-                name="invoiceNumber"
-                value={formData.invoiceNumber}
-                onChange={handleInputChange}
-                placeholder="Enter invoice number"
-              />
             </div>
 
             <div className="form-field">
@@ -351,25 +371,6 @@ const ExpenseSubmission = ({ onBack }) => {
               </div>
             </div>
 
-            {expenseType === 5 && formData.documentFrom === "Driver" && (
-              <div className="form-field driver-field">
-                <label htmlFor="driverSelect">Driver Name</label>
-                <Select
-                  inputId="driverSelect"
-                  options={driverOptions}
-                  onChange={handleDriverChange}
-                  isSearchable
-                  placeholder="Select a driver"
-                  className="driver-select"
-                  classNamePrefix="driver-select"
-                />
-                {formData.driverFullName && (
-                  <div className="driver-info">
-                    Selected: {formData.driverFullName}
-                  </div>
-                )}
-              </div>
-            )}
 
           </div>
 

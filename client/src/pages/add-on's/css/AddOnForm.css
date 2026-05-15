@@ -185,8 +185,8 @@
 
 .addon-form-wrapper .item-row {
   border-bottom: 1px solid #e5e7eb;
-  padding-bottom: 8px;
-  margin-bottom: 8px;
+  padding-bottom: 12px;
+  margin-bottom: 12px;
 }
 
 .addon-form-wrapper .remove-item-button {
@@ -224,9 +224,29 @@
 
 .addon-form-wrapper .form-row {
   display: grid;
-  grid-template-columns: 1fr 3fr 1fr;
+  grid-template-columns: 1fr 3fr;
   gap: 10px;
   margin-bottom: 8px;
+}
+
+.addon-form-wrapper .form-row.form-row-calc {
+  grid-template-columns: 1fr 1fr 1fr;
+  margin-bottom: 0;
+  padding-top: 8px;
+  border-top: 1px dashed #e5e7eb;
+}
+
+.addon-form-wrapper .calc-badge {
+  display: inline-block;
+  font-size: 10px;
+  font-weight: 600;
+  color: #3498db;
+  background: #ebf5fb;
+  border: 1px solid #aed6f1;
+  border-radius: 3px;
+  padding: 0 4px;
+  margin-left: 4px;
+  vertical-align: middle;
 }
 
 .addon-form-wrapper .form-group {
