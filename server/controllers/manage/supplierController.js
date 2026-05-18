@@ -14,7 +14,7 @@ export const getAllSuppliersHandler = async (req, res) => {
     console.log("Fetching suppliers with params:", { page, limit, search })
 
     // Remove status filtering - fetch all suppliers
-    const result = await getAllSuppliers(Number.parseInt(page), Number.parseInt(limit), search)
+    const result = await getAllSuppliers(Number.parseInt(page), Number.parseInt(limit), search, req.user.company_reg_num)
 
     res.json({
       success: true,
@@ -49,7 +49,7 @@ export const getSupplierByIdHandler = async (req, res) => {
 
     console.log("Fetching supplier with ID:", supplierId)
 
-    const supplier = await getSupplierById(supplierId)
+    const supplier = await getSupplierById(supplierId, req.user.company_reg_num)
 
     if (!supplier) {
       return res.status(404).json({
@@ -86,7 +86,7 @@ export const createSupplierHandler = async (req, res) => {
 
     console.log("Creating supplier with data:", supplierData)
 
-    const supplier = await createSupplier(supplierData)
+    const supplier = await createSupplier(supplierData, req.user.company_reg_num)
 
     res.status(201).json({
       success: true,
@@ -127,7 +127,7 @@ export const updateSupplierHandler = async (req, res) => {
 
     console.log("Updating supplier with ID:", supplierId, "Data:", supplierData)
 
-    const supplier = await updateSupplier(supplierId, supplierData)
+    const supplier = await updateSupplier(supplierId, supplierData, req.user.company_reg_num)
 
     if (!supplier) {
       return res.status(404).json({
@@ -164,7 +164,7 @@ export const deleteSupplierHandler = async (req, res) => {
       })
     }
 
-    const deleted = await deleteSupplier(supplierId)
+    const deleted = await deleteSupplier(supplierId, req.user.company_reg_num)
 
     if (!deleted) {
       return res.status(404).json({
@@ -202,7 +202,7 @@ export const toggleSupplierStatusHandler = async (req, res) => {
 
     console.log("Toggle supplier status request for ID:", supplierId)
 
-    const supplier = await toggleSupplierStatus(supplierId)
+    const supplier = await toggleSupplierStatus(supplierId, req.user.company_reg_num)
 
     if (!supplier) {
       return res.status(404).json({

@@ -19,6 +19,7 @@ CREATE TABLE IF NOT EXISTS public.add_ons
     paid_amount numeric(12, 2) DEFAULT 0,
     status character varying(20) COLLATE pg_catalog."default" DEFAULT 'unpaid'::character varying,
     vessel_number character varying COLLATE pg_catalog."default",
+    company_reg_num character varying(20) COLLATE pg_catalog."default" NOT NULL,
     CONSTRAINT add_ons_pkey PRIMARY KEY (addon_id)
 );
 
@@ -30,6 +31,7 @@ CREATE TABLE IF NOT EXISTS public.aging_analysis
     "30days" numeric,
     "60days" numeric,
     "90days" numeric,
+    company_reg_num character varying(20) COLLATE pg_catalog."default" NOT NULL,
     CONSTRAINT aging_analysis_pkey PRIMARY KEY (aging_key)
 );
 
@@ -45,6 +47,7 @@ CREATE TABLE IF NOT EXISTS public.audit_log
     ip_address inet,
     user_agent text COLLATE pg_catalog."default",
     created_at timestamp with time zone DEFAULT now(),
+    company_reg_num character varying(20) COLLATE pg_catalog."default" NOT NULL,
     CONSTRAINT audit_log_pkey PRIMARY KEY (id)
 );
 
@@ -81,7 +84,36 @@ CREATE TABLE IF NOT EXISTS public.base_salary_history
     userid integer,
     base double precision,
     date date,
+    company_reg_num character varying(20) COLLATE pg_catalog."default" NOT NULL,
     CONSTRAINT base_salary_history_pkey PRIMARY KEY (id)
+);
+
+CREATE TABLE IF NOT EXISTS public.billing_events
+(
+    id serial NOT NULL,
+    company_reg_num character varying(20) COLLATE pg_catalog."default" NOT NULL,
+    event_type character varying(50) COLLATE pg_catalog."default" NOT NULL,
+    old_value character varying(100) COLLATE pg_catalog."default",
+    new_value character varying(100) COLLATE pg_catalog."default",
+    performed_by character varying(100) COLLATE pg_catalog."default",
+    notes text COLLATE pg_catalog."default",
+    created_at timestamp without time zone NOT NULL DEFAULT now(),
+    CONSTRAINT billing_events_pkey PRIMARY KEY (id)
+);
+
+CREATE TABLE IF NOT EXISTS public.company_usage
+(
+    id serial NOT NULL,
+    company_reg_num character varying(20) COLLATE pg_catalog."default" NOT NULL,
+    snapshot_month date NOT NULL,
+    user_count smallint NOT NULL DEFAULT 0,
+    truck_count smallint NOT NULL DEFAULT 0,
+    overage_users smallint NOT NULL DEFAULT 0,
+    overage_trucks smallint NOT NULL DEFAULT 0,
+    overage_amount numeric(10, 2) NOT NULL DEFAULT 0,
+    created_at timestamp without time zone NOT NULL DEFAULT now(),
+    CONSTRAINT company_usage_pkey PRIMARY KEY (id),
+    CONSTRAINT company_usage_company_reg_num_snapshot_month_key UNIQUE (company_reg_num, snapshot_month)
 );
 
 CREATE TABLE IF NOT EXISTS public.container
@@ -101,6 +133,7 @@ CREATE TABLE IF NOT EXISTS public.container
     vgm boolean,
     is_12m_surcharge boolean NOT NULL DEFAULT false,
     surcharge_12m_amount numeric(12, 2) NOT NULL DEFAULT 0,
+    company_reg_num character varying(20) COLLATE pg_catalog."default" NOT NULL,
     CONSTRAINT container_pkey PRIMARY KEY (containerkey)
 );
 
@@ -116,6 +149,7 @@ CREATE TABLE IF NOT EXISTS public.credit_notes
     description text COLLATE pg_catalog."default",
     account_no character varying(50) COLLATE pg_catalog."default",
     vat double precision,
+    company_reg_num character varying(20) COLLATE pg_catalog."default" NOT NULL,
     CONSTRAINT credit_notes_pkey PRIMARY KEY (creditnote_id)
 );
 
@@ -130,6 +164,7 @@ CREATE TABLE IF NOT EXISTS public.documents
     m1key integer,
     client integer,
     url text COLLATE pg_catalog."default",
+    company_reg_num character varying(20) COLLATE pg_catalog."default" NOT NULL,
     CONSTRAINT documents_pkey PRIMARY KEY (document_id)
 );
 
@@ -146,6 +181,7 @@ CREATE TABLE IF NOT EXISTS public.employee_deduction_history
     deduction_savings double precision,
     deduction_loan double precision,
     deduction_damage double precision,
+    company_reg_num character varying(20) COLLATE pg_catalog."default" NOT NULL,
     CONSTRAINT employee_deduction_history_pkey PRIMARY KEY (history_id)
 );
 
@@ -153,9 +189,8 @@ CREATE TABLE IF NOT EXISTS public.expense_types
 (
     id serial NOT NULL,
     expense text COLLATE pg_catalog."default" NOT NULL,
-    company_reg_num integer NOT NULL,
-    CONSTRAINT expense_types_pkey PRIMARY KEY (id),
-    CONSTRAINT expense_types_expense_company_key UNIQUE (expense, company_reg_num)
+    company_reg_num integer,
+    CONSTRAINT expense_types_pkey PRIMARY KEY (id)
 );
 
 CREATE TABLE IF NOT EXISTS public.expenses_m2
@@ -172,7 +207,9 @@ CREATE TABLE IF NOT EXISTS public.expenses_m2
     slipurl text COLLATE pg_catalog."default",
     s3key text COLLATE pg_catalog."default",
     orderno character varying COLLATE pg_catalog."default",
-    CONSTRAINT expenses_m2_pkey PRIMARY KEY (ekey)
+    company_reg_num character varying(20) COLLATE pg_catalog."default" NOT NULL,
+    CONSTRAINT expenses_m2_pkey PRIMARY KEY (ekey),
+    CONSTRAINT expenses_m2_orderno_unique UNIQUE (orderno)
 );
 
 CREATE TABLE IF NOT EXISTS public.invoice
@@ -185,6 +222,7 @@ CREATE TABLE IF NOT EXISTS public.invoice
     groupid character varying(20) COLLATE pg_catalog."default",
     date date,
     additional_destination_info character varying COLLATE pg_catalog."default",
+    company_reg_num character varying(20) COLLATE pg_catalog."default" NOT NULL,
     CONSTRAINT invoice_pkey PRIMARY KEY (ikey)
 );
 
@@ -206,6 +244,7 @@ CREATE TABLE IF NOT EXISTS public.legs_m2
     documentuploaddate date,
     m1key integer,
     m5ratekey integer,
+    company_reg_num character varying(20) COLLATE pg_catalog."default" NOT NULL,
     CONSTRAINT legs_m2_pkey PRIMARY KEY (legkey),
     CONSTRAINT legs_m2_unique_assignment UNIQUE (m1key, legnumber, driverid, truckregnumber, containernumber, vgm, date)
 );
@@ -244,6 +283,7 @@ CREATE TABLE IF NOT EXISTS public.m1_controller
     payment_status character varying(20) COLLATE pg_catalog."default" DEFAULT 'unpaid'::character varying,
     is_set_rate boolean NOT NULL DEFAULT false,
     historical_set_rate numeric(10, 2),
+    company_reg_num character varying(20) COLLATE pg_catalog."default" NOT NULL,
     CONSTRAINT m1_controller_pkey PRIMARY KEY (m1key)
 );
 
@@ -255,6 +295,7 @@ CREATE TABLE IF NOT EXISTS public.m1_controller_weight
     ticket_no character varying COLLATE pg_catalog."default",
     receipt_book_no character varying COLLATE pg_catalog."default",
     weight double precision,
+    company_reg_num character varying(20) COLLATE pg_catalog."default" NOT NULL,
     CONSTRAINT m1_controller_weight_pkey PRIMARY KEY (weight_pk)
 );
 
@@ -279,6 +320,7 @@ CREATE TABLE IF NOT EXISTS public.m5_client
     driver_six_meter_rate double precision,
     driver_twelve_meter_rate double precision,
     insurance numeric(12, 2),
+    company_reg_num character varying(20) COLLATE pg_catalog."default" NOT NULL,
     CONSTRAINT m5_client_pkey PRIMARY KEY (m5clientkey)
 );
 
@@ -295,6 +337,7 @@ CREATE TABLE IF NOT EXISTS public.m5_client_rate
     vgm double precision,
     set_rate double precision,
     surcharge12m double precision,
+    company_reg_num character varying(20) COLLATE pg_catalog."default" NOT NULL,
     CONSTRAINT m5_client_rate_pkey PRIMARY KEY (client_rate_id)
 );
 
@@ -310,6 +353,9 @@ CREATE TABLE IF NOT EXISTS public.m5_driver_rate
     subie_six_meter_rate double precision,
     subie_twelve_meter_rate double precision,
     updated_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP,
+    effective_from date NOT NULL DEFAULT '2020-01-01'::date,
+    effective_to date,
+    company_reg_num character varying(20) COLLATE pg_catalog."default" NOT NULL,
     CONSTRAINT m5_driver_rate_pkey PRIMARY KEY (m5ratekey)
 );
 
@@ -367,6 +413,7 @@ CREATE TABLE IF NOT EXISTS public.m5_trailers
     document_url3 character varying COLLATE pg_catalog."default",
     trailer_license_expiry date,
     status boolean DEFAULT true,
+    company_reg_num character varying(20) COLLATE pg_catalog."default" NOT NULL,
     CONSTRAINT m5_trailers_pkey PRIMARY KEY (m5trailerskey)
 );
 
@@ -395,6 +442,7 @@ CREATE TABLE IF NOT EXISTS public.m5_trucks
     subei_reg_num character varying(250) COLLATE pg_catalog."default",
     git character varying(255) COLLATE pg_catalog."default",
     status boolean DEFAULT true,
+    company_reg_num character varying(20) COLLATE pg_catalog."default" NOT NULL,
     CONSTRAINT m5_trucks_pkey PRIMARY KEY (m5truckskey)
 );
 
@@ -418,7 +466,17 @@ CREATE TABLE IF NOT EXISTS public.payment_m3
     reference character varying COLLATE pg_catalog."default",
     addon_id integer,
     line_items jsonb,
+    company_reg_num character varying(20) COLLATE pg_catalog."default" NOT NULL,
     CONSTRAINT payment_m3_pkey PRIMARY KEY (paykey)
+);
+
+CREATE TABLE IF NOT EXISTS public.plan_features
+(
+    id serial NOT NULL,
+    plan_key character varying(20) COLLATE pg_catalog."default" NOT NULL,
+    feature_key character varying(50) COLLATE pg_catalog."default" NOT NULL,
+    CONSTRAINT plan_features_pkey PRIMARY KEY (id),
+    CONSTRAINT plan_features_plan_key_feature_key_key UNIQUE (plan_key, feature_key)
 );
 
 CREATE TABLE IF NOT EXISTS public.purchase_orders
@@ -440,6 +498,8 @@ CREATE TABLE IF NOT EXISTS public.purchase_orders
     slip_s3key text COLLATE pg_catalog."default",
     invoice_number character varying COLLATE pg_catalog."default",
     truckid integer,
+    vat double precision,
+    company_reg_num character varying(20) COLLATE pg_catalog."default" NOT NULL,
     CONSTRAINT purchase_orders_pkey PRIMARY KEY (po_id)
 );
 
@@ -468,6 +528,7 @@ CREATE TABLE IF NOT EXISTS public.statements
     agingid integer,
     opening_balance numeric,
     insurance_amount numeric(12, 2) DEFAULT 0,
+    company_reg_num character varying(20) COLLATE pg_catalog."default" NOT NULL,
     CONSTRAINT statements_pkey PRIMARY KEY (statement_key)
 );
 
@@ -479,7 +540,23 @@ CREATE TABLE IF NOT EXISTS public.subcontractor_statements
     amount numeric,
     legids json,
     vat_status character varying COLLATE pg_catalog."default" DEFAULT 'VAT'::character varying,
+    company_reg_num character varying(20) COLLATE pg_catalog."default" NOT NULL,
     CONSTRAINT subcontractor_statements_pkey PRIMARY KEY (sub_state_id)
+);
+
+CREATE TABLE IF NOT EXISTS public.subscription_plans
+(
+    plan_key character varying(20) COLLATE pg_catalog."default" NOT NULL,
+    display_name character varying(50) COLLATE pg_catalog."default" NOT NULL,
+    setup_fee_zar numeric(10, 2) NOT NULL,
+    monthly_fee_zar numeric(10, 2) NOT NULL,
+    max_users smallint NOT NULL,
+    max_trucks smallint NOT NULL,
+    overage_user numeric(10, 2) NOT NULL DEFAULT 300,
+    overage_truck numeric(10, 2) NOT NULL DEFAULT 250,
+    sort_order smallint NOT NULL DEFAULT 0,
+    is_active boolean NOT NULL DEFAULT true,
+    CONSTRAINT subscription_plans_pkey PRIMARY KEY (plan_key)
 );
 
 CREATE TABLE IF NOT EXISTS public.supplier_expense_types
@@ -504,6 +581,7 @@ CREATE TABLE IF NOT EXISTS public.suppliers
     streetaddress text COLLATE pg_catalog."default",
     payment_type text COLLATE pg_catalog."default",
     status boolean NOT NULL DEFAULT true,
+    company_reg_num character varying(20) COLLATE pg_catalog."default" NOT NULL,
     CONSTRAINT suppliers_pkey PRIMARY KEY (supplier_id)
 );
 
@@ -541,6 +619,16 @@ CREATE TABLE IF NOT EXISTS public.usertable
     address text COLLATE pg_catalog."default",
     suburb text COLLATE pg_catalog."default",
     swift_code character varying(11) COLLATE pg_catalog."default",
+    subscription_tier character varying(20) COLLATE pg_catalog."default" NOT NULL DEFAULT 'none'::character varying,
+    subscription_status character varying(20) COLLATE pg_catalog."default" NOT NULL DEFAULT 'inactive'::character varying,
+    trial_ends_at timestamp without time zone,
+    setup_fee_paid boolean NOT NULL DEFAULT false,
+    monthly_billing_anchor smallint,
+    plan_approved_by character varying(100) COLLATE pg_catalog."default",
+    plan_approved_at timestamp without time zone,
+    plan_notes text COLLATE pg_catalog."default",
+    created_at timestamp without time zone NOT NULL DEFAULT now(),
+    updated_at timestamp without time zone NOT NULL DEFAULT now(),
     CONSTRAINT usertable_pkey PRIMARY KEY (userid),
     CONSTRAINT usertable_email_key UNIQUE (email)
 );
@@ -568,6 +656,7 @@ CREATE TABLE IF NOT EXISTS public.wages
     employee_date date,
     employerid integer,
     employer_date date,
+    company_reg_num character varying(20) COLLATE pg_catalog."default" NOT NULL,
     CONSTRAINT wages_pkey PRIMARY KEY (wageskey),
     CONSTRAINT unique_wage_per_employee_month_year UNIQUE (employeeid, employee_date)
 );
@@ -739,6 +828,13 @@ ALTER TABLE IF EXISTS public.payment_m3
     REFERENCES public.invoice (ikey) MATCH SIMPLE
     ON UPDATE NO ACTION
     ON DELETE SET NULL;
+
+
+ALTER TABLE IF EXISTS public.plan_features
+    ADD CONSTRAINT plan_features_plan_key_fkey FOREIGN KEY (plan_key)
+    REFERENCES public.subscription_plans (plan_key) MATCH SIMPLE
+    ON UPDATE NO ACTION
+    ON DELETE NO ACTION;
 
 
 ALTER TABLE IF EXISTS public.purchase_orders

@@ -18,7 +18,7 @@ const checkClientEmailExistsHandler = async (req, res) => {
 
     console.log(`Checking email existence for ${email}`)
 
-    const exists = await checkClientEmailExists(email)
+    const exists = await checkClientEmailExists(email, req.user.company_reg_num)
 
     res.json({ exists })
   } catch (err) {
@@ -42,7 +42,7 @@ const getAllClientsHandler = async (req, res) => {
       limit: limitNum,
       search,
       status,
-    })
+    }, req.user.company_reg_num)
 
     res.json({
       items: result.clients,
@@ -63,7 +63,7 @@ const getClientByIdHandler = async (req, res) => {
 
     console.log(`Fetching client ID ${id}`)
 
-    const result = await getClientById(id)
+    const result = await getClientById(id, req.user.company_reg_num)
 
     if (!result.success) {
       return res.status(404).json({ message: result.message })
@@ -115,7 +115,7 @@ const createClientHandler = async (req, res) => {
       streetaddress,
       payment_type,
       insurance,
-    })
+    }, req.user.company_reg_num)
 
     res.status(201).json(newClient)
   } catch (err) {
@@ -165,7 +165,7 @@ const updateClientHandler = async (req, res) => {
       streetaddress,
       payment_type,
       insurance,
-    })
+    }, req.user.company_reg_num)
 
     if (!result.success) {
       return res.status(404).json({ error: result.message })
@@ -185,7 +185,7 @@ const toggleClientStatusHandler = async (req, res) => {
 
     console.log(`Toggling status for client ID ${id} to ${status}`)
 
-    const result = await toggleClientStatus(id, status)
+    const result = await toggleClientStatus(id, status, req.user.company_reg_num)
 
     if (!result.success) {
       return res.status(404).json({ message: result.message })
@@ -204,7 +204,7 @@ const deleteClientHandler = async (req, res) => {
 
     console.log(`Deleting client ID ${id}`)
 
-    const result = await deleteClient(id)
+    const result = await deleteClient(id, req.user.company_reg_num)
 
     if (!result.success) {
       return res.status(404).json({ message: result.message })

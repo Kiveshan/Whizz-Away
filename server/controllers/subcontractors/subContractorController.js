@@ -27,7 +27,7 @@ const authenticateScheduledJob = (req, res, next) => {
 const getAllSubContractorsHandler = async (req, res) => {
   try {
     console.log("Fetching subcontractors from database...");
-    const subcontractors = await getAllSubContractors();
+    const subcontractors = await getAllSubContractors(req.user.company_reg_num);
     console.log(`Found ${subcontractors.length} subcontractors`);
     res.json(subcontractors);
   } catch (error) {
@@ -52,7 +52,8 @@ const getSubContractorStatementsHandler = async (req, res) => {
     const statements = await getSubContractorStatements(
       subei_reg_num,
       year,
-      month
+      month,
+      req.user.company_reg_num
     );
     console.log(`Found ${statements.length} statements`);
     res.json(statements);
@@ -77,7 +78,8 @@ const getStatementDetailsHandler = async (req, res) => {
     const details = await getStatementDetails(
       statementId,
       legKeysArray,
-      subei_reg_num
+      subei_reg_num,
+      req.user.company_reg_num
     );
     console.log(`Found ${details.length} leg details`);
     res.json(details);
@@ -90,7 +92,7 @@ const getStatementDetailsHandler = async (req, res) => {
 const getCompanyInfoHandler = async (req, res) => {
   try {
     const { roleid, status } = req.query;
-    const companyInfo = await getCompanyInfo(roleid, status);
+    const companyInfo = await getCompanyInfo(roleid, status, req.user.company_reg_num);
     res.json(companyInfo);
   } catch (error) {
     console.error("Error fetching company info:", error);
@@ -106,7 +108,7 @@ const getSubcontractorInfoHandler = async (req, res) => {
         .status(400)
         .json({ error: "Subcontractor registration number is required" });
     }
-    const subInfo = await getSubcontractorInfo(subei_reg_num);
+    const subInfo = await getSubcontractorInfo(subei_reg_num, req.user.company_reg_num);
     res.json(subInfo);
   } catch (error) {
     console.error("Error fetching subcontractor info:", error);

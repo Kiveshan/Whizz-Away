@@ -15,7 +15,7 @@ const getCompletedInvoicesHandler = async (req, res) => {
     );
 
     const { year, month, type, clientId } = req.query;
-    const result = await getCompletedInvoices({ year, month, type, clientId });
+    const result = await getCompletedInvoices({ year, month, type, clientId, company_reg_num: req.user.company_reg_num });
     console.log(`Query returned ${result.data.length} rows`);
 
     res.json({
@@ -37,7 +37,7 @@ const getInvoiceDetailsHandler = async (req, res) => {
     console.log("Received request for invoice details with ID:", req.params.id);
     const { id } = req.params;
 
-    const result = await getInvoiceDetails(id);
+    const result = await getInvoiceDetails(id, req.user.company_reg_num);
     if (!result.success) {
       return res.status(404).json({
         success: false,
@@ -89,7 +89,7 @@ const checkInvoiceExistsHandler = async (req, res) => {
       });
     }
 
-    const result = await checkInvoiceExists(m1key);
+    const result = await checkInvoiceExists(m1key, req.user.company_reg_num);
 
     if (!result.success) {
       return res.status(500).json({
@@ -125,7 +125,7 @@ const createInvoiceHandler = async (req, res) => {
       });
     }
 
-    const result = await createInvoice({ m1key, clientId });
+    const result = await createInvoice({ m1key, clientId, company_reg_num: req.user.company_reg_num });
 
     if (!result.success) {
       return res.status(400).json({
@@ -219,6 +219,7 @@ const updateInstructionDetailsHandler = async (req, res) => {
       invoice_num,
       additional_destination_info, // Pass the new field
       date,
+      company_reg_num: req.user.company_reg_num,
     });
 
     if (!result.success) {
@@ -265,7 +266,7 @@ const generateInvoicePreviewHandler = async (req, res) => {
     // }
 
     // Get instruction details for preview
-    const instructionDetails = await getInstructionDetailsForPreview(instructionId);
+    const instructionDetails = await getInstructionDetailsForPreview(instructionId, req.user.company_reg_num);
     
     if (!instructionDetails.success) {
       return res.status(400).json({

@@ -22,7 +22,7 @@ const getEmployeeBasicHandler = async (req, res) => {
     }
 
     console.log(`Fetching basic employee data for ID ${id}`)
-    const result = await getEmployeeBasic(Number.parseInt(id))
+    const result = await getEmployeeBasic(Number.parseInt(id), req.user.company_reg_num)
     if (!result.success) {
       return res.status(404).json({
         error: "Employee not found",
@@ -55,7 +55,7 @@ const getAllEmployeesHandler = async (req, res) => {
       limit: limitNum,
       search,
       status,
-    })
+    }, req.user.company_reg_num)
 
     res.json({
       items: result.employees,
@@ -76,7 +76,7 @@ const checkEmployeeEmailExistsHandler = async (req, res) => {
     if (!email) {
       return res.status(400).json({ error: "Email parameter is required" })
     }
-    const exists = await checkEmployeeEmailExists(email)
+    const exists = await checkEmployeeEmailExists(email, req.user.company_reg_num)
     res.json({ exists })
   } catch (err) {
     console.error("Error checking email existence:", err)
@@ -213,7 +213,8 @@ const updateEmployeeHandler = async (req, res) => {
       },
       newFileUrls,
       adminId,
-      userAgent
+      userAgent,
+      req.user.company_reg_num,
     )
     res.json(updatedEmployee)
   } catch (err) {
@@ -235,7 +236,7 @@ const toggleEmployeeStatusHandler = async (req, res) => {
 
     const { status } = req.body
     console.log(`Toggling status for employee ID ${id} to ${status}`)
-    const result = await toggleEmployeeStatus(Number.parseInt(id), status)
+    const result = await toggleEmployeeStatus(Number.parseInt(id), status, req.user.company_reg_num)
     if (!result.success) {
       return res.status(404).json({ message: result.message })
     }
@@ -258,7 +259,7 @@ const getEmployeeDetailsHandler = async (req, res) => {
     }
 
     console.log(`Fetching detailed employee data for ID ${id}`)
-    const result = await getEmployeeDetails(Number.parseInt(id))
+    const result = await getEmployeeDetails(Number.parseInt(id), req.user.company_reg_num)
     if (!result.success) {
       return res.status(404).json({ error: result.message })
     }
@@ -341,7 +342,7 @@ const deleteEmployeeDocumentHandler = async (req, res) => {
       })
       .promise()
 
-    const result = await deleteEmployeeDocument(Number.parseInt(employeeId), s3Key)
+    const result = await deleteEmployeeDocument(Number.parseInt(employeeId), s3Key, req.user.company_reg_num)
     if (!result.success) {
       return res.status(404).json({ message: result.message })
     }

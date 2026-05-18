@@ -165,7 +165,7 @@ export const getContainersHandler = async (req, res) => {
       query: req.query,
     })
 
-    const containers = await getContainersByInstructionId(instructionId)
+    const containers = await getContainersByInstructionId(instructionId, req.user.company_reg_num)
     console.log(`[${new Date().toISOString()}] getContainersHandler: Found containers:`, {
       instructionId,
       containerCount: containers.length,
@@ -603,7 +603,7 @@ export const getFCContainersHandler = async (req, res) => {
       instructionId,
     )
 
-    const containers = await getContainersByInstructionId(instructionId)
+    const containers = await getContainersByInstructionId(instructionId, req.user.company_reg_num)
     console.log(`[${new Date().toISOString()}] [FC] getContainersHandler: Found ${containers.length} containers`)
 
     if (containers.length === 0) {
@@ -781,7 +781,7 @@ export const saveInstructionController = async (req, res) => {
         ? []
         : containerData
 
-    const result = await saveInstructionAndContainers(updatedControllerData, containersToSave)
+    const result = await saveInstructionAndContainers(updatedControllerData, containersToSave, req.user.company_reg_num)
     res
       .status(201)
       .json({ success: true, message: "Instruction saved successfully!", instructionId: result.instructionId })
@@ -842,6 +842,7 @@ export const updateFCInstructionAndContainersHandler = async (req, res) => {
       updatedInstructionData,
       containersToSave,
       Array.isArray(weightData) ? weightData : [],
+      req.user.company_reg_num,
     )
     res.status(200).json({ success: true, message: "Instruction and containers updated successfully", data: result })
   } catch (error) {
@@ -868,7 +869,7 @@ export const deleteInstructionHandler = async (req, res) => {
     console.log(`[${new Date().toISOString()}] [CONTROLLER] deleteInstructionHandler: Processing request to delete instruction ${id}`)
 
     // Call the model function to delete the instruction and its containers
-    const result = await deleteInstruction(id)
+    const result = await deleteInstruction(id, req.user.company_reg_num)
 
     console.log(`[${new Date().toISOString()}] [CONTROLLER] deleteInstructionHandler: Delete successful for instruction ${id}`)
 

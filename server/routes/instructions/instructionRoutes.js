@@ -39,7 +39,7 @@ router.get('/test-containers/:id', (req, res) => {
 });
 
 // Containers routes
-router.get('/containers/:instructionId', getContainersHandler);
+router.get('/containers/:instructionId', verifyToken, getContainersHandler);
 router.post("/save-instruction", verifyToken, saveInstructionHandler)
 router.get("/client-instruction-stats", getClientInstructionStatsHandler)
 router.get("/instructions", getInstructionsHandler)
@@ -48,15 +48,15 @@ router.put("/instruction/:id", updateInstructionHandler)
 router.post("/containers/:instructionId", updateContainersHandler)
 
 // ========== FC Controller Instructions Endpoints ==========
-router.get("/fc/containers/:instructionId", getFCContainersHandler);
+router.get("/fc/containers/:instructionId", verifyToken, getFCContainersHandler);
 router.post("/fc/save-instruction", verifyToken, saveFCInstructionHandler)
 router.get("/fc/instruction/:id", getFCInstructionByIdHandler)
 router.put("/fc/instruction/:id", updateFCInstructionHandler)
 router.put("/fc/containers/:instructionId", updateFCContainersHandler)
 // New unified endpoint for updating both instruction and containers
-router.put("/fc/update/:id", updateFCInstructionAndContainersHandler)
+router.put("/fc/update/:id", verifyToken, updateFCInstructionAndContainersHandler)
 // Delete instruction and its containers
-router.delete("/fc/instruction/:id", deleteInstructionHandler)
+router.delete("/fc/instruction/:id", verifyToken, deleteInstructionHandler)
 // Check and delete specific containers (and their legs) for FC
 router.get(
   "/fc/container/:instructionId/:containerNum/legs-exists",

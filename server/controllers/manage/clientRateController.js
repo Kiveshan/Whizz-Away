@@ -22,7 +22,7 @@ const getAllClientsForRatesHandler = async (req, res) => {
       limit: limitNum,
       search,
       status,
-    })
+    }, req.user.company_reg_num)
 
     res.json({
       items: result.clients,
@@ -42,7 +42,7 @@ const getClientRatesByClientIdHandler = async (req, res) => {
     const { clientId } = req.params
     console.log(`Fetching rates for client ID ${clientId}`)
 
-    const result = await getClientRatesByClientId(clientId)
+    const result = await getClientRatesByClientId(clientId, req.user.company_reg_num)
 
     if (!result.success) {
       return res.status(404).json({ message: result.message })
@@ -97,7 +97,7 @@ const saveClientRatesHandler = async (req, res) => {
       }
     }
 
-    const result = await saveClientRates(clientId, rates)
+    const result = await saveClientRates(clientId, rates, req.user.company_reg_num)
 
     if (!result.success) {
       return res.status(400).json({ error: result.message })
@@ -118,7 +118,7 @@ const deleteClientRateHandler = async (req, res) => {
     const { rateId } = req.params
     console.log(`Deleting client rate ID ${rateId}`)
 
-    const result = await deleteClientRate(rateId)
+    const result = await deleteClientRate(rateId, req.user.company_reg_num)
 
     if (!result.success) {
       return res.status(404).json({ message: result.message })

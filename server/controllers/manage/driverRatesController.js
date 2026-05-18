@@ -19,7 +19,7 @@ const getAllDriverRatesHandler = async (req, res) => {
 
     console.log(`Fetching driver rates - Page: ${pageNum}, Limit: ${limitNum}, Search: ${search}`)
 
-    const result = await getAllDriverRates({
+    const result = await getAllDriverRates(req.user.company_reg_num, {
       offset,
       limit: limitNum,
       search,
@@ -56,7 +56,7 @@ const refreshDriverRateLegsHandler = async (req, res) => {
         .map((v) => Number(v))
         .filter((v) => Number.isInteger(v) && v > 0)
     } else {
-      const usageResult = await getDriverRateUsage(id)
+      const usageResult = await getDriverRateUsage(id, req.user.company_reg_num)
       if (!usageResult.success) {
         return res.status(404).json({ message: usageResult.message })
       }
@@ -66,7 +66,7 @@ const refreshDriverRateLegsHandler = async (req, res) => {
 
     // Refresh legs for all affected instructions using the specific driver rate id.
     // This avoids relying on assignmentModel and is deterministic.
-    const refreshResult = await refreshDriverRateLegsForInstructions(Number(id), instructions)
+    const refreshResult = await refreshDriverRateLegsForInstructions(Number(id), instructions, req.user.company_reg_num)
 
     return res.status(200).json({
       success: true,
@@ -89,7 +89,7 @@ const getDriverRateByIdHandler = async (req, res) => {
   try {
     const { id } = req.params
     console.log(`Fetching driver rate ID ${id}`)
-    const result = await getDriverRateById(id)
+    const result = await getDriverRateById(id, req.user.company_reg_num)
     if (!result.success) {
       return res.status(404).json({ message: result.message })
     }
@@ -154,7 +154,7 @@ const createDriverRateHandler = async (req, res) => {
       subie_twelve_meter_rate,
       effective_from,
       effective_to,
-    })
+    }, req.user.company_reg_num)
     res.status(201).json(newDriverRate)
   } catch (err) {
     console.error("Error creating driver rate:", err)
@@ -217,7 +217,7 @@ const updateDriverRateHandler = async (req, res) => {
       subie_twelve_meter_rate,
       effective_from,
       effective_to,
-    })
+    }, req.user.company_reg_num)
     if (!result.success) {
       return res.status(404).json({ message: result.message })
     }
@@ -232,7 +232,7 @@ const deleteDriverRateHandler = async (req, res) => {
   try {
     const { id } = req.params
     console.log(`Deleting driver rate ID ${id}`)
-    const result = await deleteDriverRate(id)
+    const result = await deleteDriverRate(id, req.user.company_reg_num)
     if (!result.success) {
       return res.status(404).json({ message: result.message })
     }
@@ -252,7 +252,7 @@ const getDriverRateUsageHandler = async (req, res) => {
     }
 
     console.log(`Checking usage for driver rate ID ${id}`)
-    const result = await getDriverRateUsage(id)
+    const result = await getDriverRateUsage(id, req.user.company_reg_num)
 
     if (!result.success) {
       return res.status(404).json({ message: result.message })
@@ -276,7 +276,7 @@ const checkRateDateOverlapsHandler = async (req, res) => {
     const excludeRateId = exclude_id && /^\d+$/.test(exclude_id) ? parseInt(exclude_id) : null
 
     console.log(`Checking rate overlaps for ${startingpoint} -> ${destination}, from ${effective_from} to ${effective_to || 'null'}, exclude: ${excludeRateId}`)
-    const result = await checkRateDateOverlaps(startingpoint, destination, effective_from, effective_to, excludeRateId)
+    const result = await checkRateDateOverlaps(startingpoint, destination, effective_from, effective_to, excludeRateId, req.user.company_reg_num)
 
     res.json(result)
   } catch (err) {

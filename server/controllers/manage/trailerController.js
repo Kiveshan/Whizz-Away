@@ -27,7 +27,7 @@ const getAllTrailersHandler = async (req, res) => {
       offset,
       limit: limitNum,
       search,
-    })
+    }, req.user.company_reg_num)
 
     console.log("Database result:", {
       trailerCount: result.trailers?.length || 0,
@@ -56,7 +56,7 @@ const getTrailerByIdHandler = async (req, res) => {
   try {
     const { id } = req.params
     console.log(`Fetching trailer ID ${id}`)
-    const result = await getTrailerById(id)
+    const result = await getTrailerById(id, req.user.company_reg_num)
     if (!result.success) {
       return res.status(404).json({ error: result.message })
     }
@@ -156,6 +156,7 @@ const createTrailerHandler = async (req, res) => {
         trailer_license_expiry,
       },
       fileLocations,
+      req.user.company_reg_num,
     )
     res.status(201).json(newTrailer)
   } catch (err) {
@@ -204,6 +205,7 @@ const updateTrailerHandler = async (req, res) => {
         trailer_license_expiry,
       },
       newDocLocations,
+      req.user.company_reg_num,
     )
     if (!result.success) {
       return res.status(404).json({ error: result.message })
@@ -223,7 +225,7 @@ const toggleTrailerStatusHandler = async (req, res) => {
 
     console.log(`Toggling trailer ${id} status to ${status}`)
 
-    const result = await toggleTrailerStatus(id, status)
+    const result = await toggleTrailerStatus(id, status, req.user.company_reg_num)
     if (!result.success) {
       return res.status(404).json({ error: result.message })
     }
@@ -242,7 +244,7 @@ const toggleTrailerStatusHandler = async (req, res) => {
 const getTrailersWithExpiringLicensesHandler = async (req, res) => {
   try {
     const { days = 30 } = req.query
-    const expiringTrailers = await getTrailersWithExpiringLicenses(Number.parseInt(days))
+    const expiringTrailers = await getTrailersWithExpiringLicenses(Number.parseInt(days), req.user.company_reg_num)
     res.json(expiringTrailers)
   } catch (err) {
     console.error("Error fetching trailers with expiring licenses:", err)
@@ -253,7 +255,7 @@ const getTrailersWithExpiringLicensesHandler = async (req, res) => {
 // New endpoint to get trailers with expired licenses
 const getTrailersWithExpiredLicensesHandler = async (req, res) => {
   try {
-    const expiredTrailers = await getTrailersWithExpiredLicenses()
+    const expiredTrailers = await getTrailersWithExpiredLicenses(req.user.company_reg_num)
     res.json(expiredTrailers)
   } catch (err) {
     console.error("Error fetching trailers with expired licenses:", err)
@@ -283,7 +285,7 @@ const deleteTrailerDocumentHandler = async (req, res) => {
       })
       .promise()
 
-    const result = await deleteTrailerDocument(trailerId, s3Key)
+    const result = await deleteTrailerDocument(trailerId, s3Key, req.user.company_reg_num)
     if (!result.success) {
       return res.status(404).json({ message: result.message })
     }

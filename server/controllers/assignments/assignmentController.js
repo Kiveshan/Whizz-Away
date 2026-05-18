@@ -126,7 +126,7 @@ export const getDriverRatesWithSubbieHandler = async (req, res) => {
   }
   try {
     console.log(`[getDriverRatesWithSubbieHandler] Request: ${startingpoint} -> ${destination}, legDate: ${legDate}`);
-    const rateData = await getDriverRatesWithSubbie(startingpoint, destination, legDate || null);
+    const rateData = await getDriverRatesWithSubbie(startingpoint, destination, legDate || null, req.user.company_reg_num);
     
     console.log(`[getDriverRatesWithSubbieHandler] rateData:`, rateData);
     
@@ -179,7 +179,7 @@ export const getInstructionByIdHandler = async (req, res) => {
   const { instructionId } = req.params;
   console.log(`Route /instructions/${instructionId} was accessed`);
   try {
-    const instruction = await getInstructionById(instructionId);
+    const instruction = await getInstructionById(instructionId, req.user.company_reg_num);
     if (!instruction)
       return res.status(404).json({ error: "Instruction not found" });
     const isCompleted = instruction.status === "Completed";
@@ -320,7 +320,8 @@ export const getDriverRatesHandler = async (req, res) => {
     const rateData = await getDriverRates(
       startingpoint,
       destination,
-      containerType
+      containerType,
+      req.user.company_reg_num
     );
     if (!rateData) {
       return res.status(404).json({
@@ -342,7 +343,7 @@ export const getDriverRatesHandler = async (req, res) => {
 export const getContainerNumbersHandler = async (req, res) => {
   console.log("Route /containers/numbers was accessed");
   try {
-    const containerNumbers = await getContainerNumbers();
+    const containerNumbers = await getContainerNumbers(req.user.company_reg_num);
     console.log("Container numbers found:", containerNumbers);
     if (containerNumbers.length === 0)
       console.log("No container numbers found in the container table");
@@ -357,7 +358,7 @@ export const getContainerNumbersHandler = async (req, res) => {
 export const getContainerTypesHandler = async (req, res) => {
   console.log("Route /api/container-types was accessed");
   try {
-    const containerTypes = await getContainerTypes();
+    const containerTypes = await getContainerTypes(req.user.company_reg_num);
     console.log(`Found ${containerTypes.length} container types`);
     res.status(200).json(containerTypes);
   } catch (err) {
@@ -401,7 +402,7 @@ export const saveLegHandler = async (req, res) => {
       driverrate,
       m1key,
       drivers,
-    });
+    }, req.user.company_reg_num);
     res.status(200).json({
       success: true,
       message: isNewLeg
@@ -424,7 +425,7 @@ export const getLegsByInstructionIdHandler = async (req, res) => {
   const { instructionId } = req.params;
   console.log(`Route /legs/${instructionId} was accessed`);
   try {
-    const legs = await getLegsByInstructionId(instructionId);
+    const legs = await getLegsByInstructionId(instructionId, req.user.company_reg_num);
     console.log(
       `Found ${legs.length} unique legs for instruction ID ${instructionId}`
     );
@@ -443,7 +444,7 @@ export const deleteLegHandler = async (req, res) => {
   const { legId } = req.params;
   console.log(`Route DELETE /legs/${legId} was accessed`);
   try {
-    const result = await deleteLeg(legId);
+    const result = await deleteLeg(legId, req.user.company_reg_num);
     console.log(`Successfully deleted leg with ID ${legId}`);
     res.status(200).json({
       success: true,
@@ -464,7 +465,7 @@ export const getContainersByInstructionIdHandler = async (req, res) => {
   const { instructionId } = req.params;
   console.log(`Route /containers/instruction/${instructionId} was accessed`);
   try {
-    const containers = await getContainersByInstructionId(instructionId);
+    const containers = await getContainersByInstructionId(instructionId, req.user.company_reg_num);
     console.log(
       `Found ${containers.length} containers for instruction ID ${instructionId}`
     );
@@ -503,7 +504,7 @@ export const getInstructionDetailsHandler = async (req, res) => {
   const { instructionId } = req.params;
   console.log(`Route /instructions/${instructionId}/details was accessed`);
   try {
-    const details = await getInstructionDetails(instructionId);
+    const details = await getInstructionDetails(instructionId, req.user.company_reg_num);
     if (!details)
       return res.status(404).json({ error: "Instruction not found" });
     console.log(`Instruction details for ID ${instructionId}:`, details);
@@ -567,7 +568,7 @@ export const getCompletedDriverLegsHandler = async (req, res) => {
     `Route /api/completed-driver-legs/${driverId} was accessed with instructionId=${instructionId}`
   );
   try {
-    const legs = await getCompletedDriverLegs(driverId, instructionId);
+    const legs = await getCompletedDriverLegs(driverId, instructionId, req.user.company_reg_num);
     console.log(
       `Found ${legs.length} completed legs for driver ID ${driverId}`
     );
@@ -587,7 +588,7 @@ export const getDriverLegsHandler = async (req, res) => {
   if (!driverId)
     return res.status(400).json({ error: "Driver ID is required" });
   try {
-    const legs = await getDriverLegs(driverId, instructionId);
+    const legs = await getDriverLegs(driverId, instructionId, req.user.company_reg_num);
     console.log(`Found ${legs.length} legs for driver ID ${driverId}`);
     res.status(200).json(legs);
   } catch (error) {
@@ -608,7 +609,7 @@ export const getDocumentsHandler = async (req, res) => {
     console.log(
       `Executing query to fetch documents for instruction ID: ${instructionId}`
     );
-    const documents = await getDocuments(instructionId);
+    const documents = await getDocuments(instructionId, req.user.company_reg_num);
     console.log(
       `Found ${documents.length} documents for instruction ID ${instructionId}`
     );
@@ -629,7 +630,7 @@ export const generateInvoiceHandler = async (req, res) => {
     console.log(
       `Attempting to generate invoice for instruction ID: ${instructionId}`
     );
-    const result = await generateInvoice(instructionId);
+    const result = await generateInvoice(instructionId, req.user.company_reg_num);
     console.log(`Invoice generation result:`, result);
     if (result.success) res.status(201).json(result);
     else res.status(400).json(result);
@@ -649,7 +650,7 @@ export const updateLegNumberHandler = async (req, res) => {
     return res.status(400).json({ success: false, message: "Missing required field: legnumber" });
   }
   try {
-    const result = await updateLegNumber(legId, legnumber);
+    const result = await updateLegNumber(legId, legnumber, req.user.company_reg_num);
     res.status(200).json({
       success: true,
       message: `Leg number updated successfully to ${legnumber}`,

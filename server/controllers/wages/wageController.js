@@ -28,7 +28,7 @@ const getStoredWageDataHandler = async (req, res) => {
   }
   
   try {
-    const result = await getStoredWageData(employeeId, month, year);
+    const result = await getStoredWageData(employeeId, month, year, req.user.company_reg_num);
     res.json(result);
   } catch (error) {
     console.error(`Error fetching stored wage data for employee ${employeeId}:`, error);
@@ -37,7 +37,7 @@ const getStoredWageDataHandler = async (req, res) => {
 };
 const getAllEmployeesHandler = async (req, res) => {
   try {
-    const employees = await getAllEmployees();
+    const employees = await getAllEmployees(req.user.company_reg_num);
     res.status(200).json(employees);
   } catch (error) {
     console.error("Error fetching all employees:", error);
@@ -55,7 +55,7 @@ const getBaseSalaryHistoryHandler = async (req, res) => {
   }
   
   try {
-    const result = await getBaseSalaryHistory(employeeId, month, year);
+    const result = await getBaseSalaryHistory(employeeId, month, year, req.user.company_reg_num);
     res.json(result);
   } catch (error) {
     console.error(`Error fetching base salary history for employee ${employeeId}:`, error);
@@ -78,7 +78,7 @@ const saveWageDataHandler = async (req, res) => {
       totalEarnings,
       totalDeductions,
       netPay,
-    });
+    }, req.user.company_reg_num);
     if (!result.success) {
       return res.status(404).json({ error: result.message });
     }
@@ -111,7 +111,7 @@ const checkWageSlipHandler = async (req, res) => {
       return res.status(400).json({ error: "Missing required parameters" });
     }
 
-    const result = await checkWageSlip(employeeId, month, year);
+    const result = await checkWageSlip(employeeId, month, year, req.user.company_reg_num);
     return res.json(result);
   } catch (error) {
     console.error("Error checking existing wage slip:", error);
@@ -134,7 +134,7 @@ const getEmployeeDeductionsHandler = async (req, res) => {
   }
 
   try {
-    const result = await getEmployeeDeductions(employeeId, month, year);
+    const result = await getEmployeeDeductions(employeeId, month, year, req.user.company_reg_num);
     if (!result.success) {
       return res.status(404).json({ error: result.message });
     }
@@ -164,7 +164,7 @@ const updateEmployeeDeductionsHandler = async (req, res) => {
   console.log("Deduction data:", deductionData);
 
   try {
-    const result = await updateEmployeeDeductions(employeeId, deductionData);
+    const result = await updateEmployeeDeductions(employeeId, deductionData, req.user.company_reg_num);
     if (!result.success) {
       return res.status(404).json({ error: result.message });
     }
@@ -189,7 +189,8 @@ const getDriverWageDetailsByInstructionHandler = async (req, res) => {
   try {
     const result = await getDriverWageDetailsByInstruction(
       driverId,
-      instructionId
+      instructionId,
+      req.user.company_reg_num
     );
     res.json(result);
   } catch (error) {
@@ -205,7 +206,7 @@ const getDriverWageDetailsHandler = async (req, res) => {
   console.log(`Route /wage-details/driver/${driverId} was accessed`);
 
   try {
-    const result = await getDriverWageDetails(driverId);
+    const result = await getDriverWageDetails(driverId, req.user.company_reg_num);
     if (!result.success) {
       return res.status(404).json({
         error: result.error,
@@ -226,7 +227,7 @@ const getDriverInstructionsHandler = async (req, res) => {
   console.log(`Route /api/driver-instructions/${driverId} was accessed`);
 
   try {
-    const result = await getDriverInstructions(driverId);
+    const result = await getDriverInstructions(driverId, req.user.company_reg_num);
     res.json(result);
   } catch (error) {
     console.error(
@@ -255,7 +256,7 @@ const getDriverLegsByMonthHandler = async (req, res) => {
   }
 
   try {
-    const result = await getDriverLegsByMonth(driverId, month, year);
+    const result = await getDriverLegsByMonth(driverId, month, year, req.user.company_reg_num);
     res.json(result);
   } catch (error) {
     console.error("Error fetching driver legs by month:", error);
@@ -264,7 +265,7 @@ const getDriverLegsByMonthHandler = async (req, res) => {
 };
 const getAllRolesHandler = async (req, res) => {
   try {
-    const roles = await getAllRoles();
+    const roles = await getAllRoles(req.user.company_reg_num);
     res.status(200).json(roles);
   } catch (error) {
     console.error("Error fetching roles:", error);
@@ -273,7 +274,7 @@ const getAllRolesHandler = async (req, res) => {
 };
 const getAllRolesExcludingSixHandler = async (req, res) => {
   try {
-    const roles = await getAllRolesExcludingSix();
+    const roles = await getAllRolesExcludingSix(req.user.company_reg_num);
     res.status(200).json(roles);
   } catch (error) {
     console.error("Error fetching roles (excluding roleid 6):", error);

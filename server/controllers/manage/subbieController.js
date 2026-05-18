@@ -24,7 +24,7 @@ const getAllSubcontractorsHandler = async (req, res) => {
       limit: limitNum,
       search,
       status,
-    })
+    }, req.user.company_reg_num)
 
     res.json({
       items: result.subcontractors,
@@ -49,7 +49,7 @@ const getSubcontractorByIdHandler = async (req, res) => {
     }
 
     console.log(`Fetching subcontractor ID ${parsedId}`)
-    const result = await getSubcontractorById(parsedId)
+    const result = await getSubcontractorById(parsedId, req.user.company_reg_num)
     if (!result.success) {
       return res.status(404).json({ message: result.message })
     }
@@ -92,6 +92,7 @@ const createSubcontractorHandler = async (req, res) => {
       location,
       contact_person,
       subei_reg_num,
+      company_reg_num: req.user.company_reg_num,
       drivers: validDrivers,
       trucks: validTrucks,
     })
@@ -148,7 +149,7 @@ const updateSubcontractorHandler = async (req, res) => {
       subei_reg_num,
       drivers: validDrivers,
       trucks: validTrucks,
-    })
+    }, req.user.company_reg_num)
 
     if (!result.success) {
       return res.status(404).json({ error: result.message })
@@ -171,7 +172,7 @@ const deleteSubcontractorDriverHandler = async (req, res) => {
     }
 
     console.log(`Deleting subcontractor driver ID ${parsedId}`)
-    const result = await deleteSubcontractorDriver(parsedId)
+    const result = await deleteSubcontractorDriver(parsedId, req.user.company_reg_num)
 
     if (!result.success) {
       return res.status(404).json({ message: result.message })
@@ -194,7 +195,7 @@ const deleteSubcontractorTruckHandler = async (req, res) => {
     }
 
     console.log(`Deleting subcontractor truck ID ${parsedId}`)
-    const result = await deleteSubcontractorTruck(parsedId)
+    const result = await deleteSubcontractorTruck(parsedId, req.user.company_reg_num)
 
     if (!result.success) {
       return res.status(404).json({ message: result.message })
@@ -218,7 +219,7 @@ const toggleSubcontractorStatusHandler = async (req, res) => {
     }
 
     console.log(`Toggling status for subcontractor ID ${parsedId} to ${status}`)
-    const result = await toggleSubcontractorStatus(parsedId, status)
+    const result = await toggleSubcontractorStatus(parsedId, status, req.user.company_reg_num)
     if (!result.success) {
       return res.status(404).json({ message: result.message })
     }
@@ -240,7 +241,7 @@ const toggleSubcontractorDriverStatusHandler = async (req, res) => {
     }
 
     console.log(`Toggling driver status for driver ID ${parsedId} to ${driverstatus}`)
-    const result = await toggleSubcontractorDriverStatus(parsedId, driverstatus)
+    const result = await toggleSubcontractorDriverStatus(parsedId, driverstatus, req.user.company_reg_num)
     if (!result.success) {
       return res.status(404).json({ message: result.message })
     }

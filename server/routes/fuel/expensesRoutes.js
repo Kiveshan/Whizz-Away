@@ -5,6 +5,7 @@ import {
   getExpenseDocumentHandler,
 } from "../../controllers/fuel/expenseController.js";
 import { uploadFuelExpense } from "../../utils/s3-config.js";
+import { verifyToken } from "../../middleware/auth.js";
 
 const router = express.Router();
 
@@ -27,13 +28,14 @@ const handleMulterError = (err, req, res, next) => {
   next();
 };
 
-router.get("/truck/:truckId", getExpensesByTruckHandler);
+router.get("/truck/:truckId", verifyToken, getExpensesByTruckHandler);
 router.post(
   "/",
+  verifyToken,
   uploadFuelExpense.single("slip"),
   handleMulterError,
   uploadFuelExpenseHandler
 );
-router.get("/document/:id", getExpenseDocumentHandler);
+router.get("/document/:id", verifyToken, getExpenseDocumentHandler);
 
 export default router;

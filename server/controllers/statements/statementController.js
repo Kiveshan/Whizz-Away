@@ -31,7 +31,7 @@ const getClientStatementsHandler = async (req, res) => {
       req.query
     );
 
-    const result = await getClientStatements(clientId, { year, month });
+    const result = await getClientStatements(clientId, { year, month }, req.user.company_reg_num);
     console.log(
       `Query returned ${result.data.length} statements for client ${clientId}`
     );
@@ -58,7 +58,7 @@ const getStatementDetailsHandler = async (req, res) => {
     const { statementId } = req.params;
     console.log(`Fetching statement details for statement ${statementId}`);
 
-    const result = await getStatementDetails(statementId);
+    const result = await getStatementDetails(statementId, req.user.company_reg_num);
     if (!result.success) {
       return res.status(404).json({
         success: false,
@@ -152,7 +152,8 @@ const generateStatementsHandler = async (req, res) => {
 
     // Call the statement generation function
     const result = await generateMonthlyStatements(
-      specificClient ? clientId : null
+      specificClient ? clientId : null,
+      req.user.company_reg_num
     );
 
     console.log(`Statement generation completed: ${result.message}`);

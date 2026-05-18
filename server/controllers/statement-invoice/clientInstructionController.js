@@ -10,7 +10,7 @@ const getClientInstructionsHandler = async (req, res) => {
       req.query
     );
 
-    const result = await getClientInstructions(clientId, { year, month, type });
+    const result = await getClientInstructions(clientId, { year, month, type }, req.user.company_reg_num);
     console.log(
       `Query returned ${result.data.length} instructions for client ${clientId}`
     );

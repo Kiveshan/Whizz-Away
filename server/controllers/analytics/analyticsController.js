@@ -26,7 +26,7 @@ const getFuelExpensesController = async (req, res) => {
   try {
     const client = await pool.connect();
     try {
-      const data = await getFuelExpenses(client, month, year);
+      const data = await getFuelExpenses(client, month, year, req.user.company_reg_num);
       console.log("Fuel expenses data:", data);
       res.status(200).json({ success: true, data });
     } finally {
@@ -44,7 +44,7 @@ const getTurnoverPerMonthController = async (req, res) => {
   try {
     const client = await pool.connect();
     try {
-      const data = await getTurnoverPerMonth(client, month, year, clientId);
+      const data = await getTurnoverPerMonth(client, month, year, clientId, req.user.company_reg_num);
       console.log("Turnover data:", data);
       res.status(200).json({ success: true, data });
     } finally {
@@ -60,7 +60,7 @@ const getAllClientsController = async (req, res) => {
   try {
     const client = await pool.connect();
     try {
-      const data = await getAllClients(client);
+      const data = await getAllClients(client, req.user.company_reg_num);
       console.log("Clients data:", data);
       res.status(200).json({ success: true, data });
     } finally {
@@ -76,7 +76,7 @@ const getAllSubcontractorsController = async (req, res) => {
   try {
     const client = await pool.connect();
     try {
-      const data = await getAllSubcontractors(client);
+      const data = await getAllSubcontractors(client, req.user.company_reg_num);
       console.log("Subcontractors data:", data);
       res.status(200).json({ success: true, data });
     } finally {
@@ -92,7 +92,7 @@ const getAllTrucksController = async (req, res) => {
   try {
     const client = await pool.connect();
     try {
-      const data = await getAllTrucks(client);
+      const data = await getAllTrucks(client, req.user.company_reg_num);
       console.log("Trucks data:", data);
       res.status(200).json({ success: true, data });
     } finally {
@@ -110,7 +110,7 @@ const getAgingAnalysisController = async (req, res) => {
   try {
     const client = await pool.connect();
     try {
-      const data = await getAgingAnalysis(client, month, year, clientId);
+      const data = await getAgingAnalysis(client, month, year, clientId, req.user.company_reg_num);
       console.log("Aging analysis data:", data);
       res.status(200).json({ success: true, data });
     } finally {
@@ -130,7 +130,7 @@ const getDebtorAgeAnalysisPerClientController = async (req, res) => {
   try {
     const client = await pool.connect();
     try {
-      const data = await getDebtorAgeAnalysisPerClient(client, month, year);
+      const data = await getDebtorAgeAnalysisPerClient(client, month, year, req.user.company_reg_num);
       res.status(200).json({ success: true, data });
     } finally {
       client.release();
@@ -145,7 +145,7 @@ const getTurnoverVsDieselCostController = async (req, res) => {
   const { month, year } = req.query;
   console.log(`Received request for turnover vs diesel cost: month=${month}, year=${year}`);
   try {
-    const data = await getTurnoverVsDieselCost(month, year);
+    const data = await getTurnoverVsDieselCost(month, year, req.user.company_reg_num);
     console.log("Turnover vs diesel cost data:", data);
     res.status(200).json({ success: true, data });
   } catch (error) {
@@ -160,7 +160,7 @@ const getAllExpensesController = async (req, res) => {
   try {
     const client = await pool.connect();
     try {
-      const data = await getAllExpenses(client, month, year);
+      const data = await getAllExpenses(client, month, year, req.user.company_reg_num);
       console.log("All expenses data:", data);
       res.status(200).json({ success: true, data });
     } finally {
@@ -178,7 +178,7 @@ const getTurnoverPerTruckController = async (req, res) => {
   try {
     const client = await pool.connect();
     try {
-      const data = await getTurnoverPerTruck(client, month, year);
+      const data = await getTurnoverPerTruck(client, month, year, req.user.company_reg_num);
       console.log("Turnover per truck data:", data);
       res.status(200).json({ success: true, data });
     } finally {
@@ -194,7 +194,7 @@ const getSubcontractorTurnoverPerMonthController = async (req, res) => {
   try {
     const { month, year } = req.query;
     console.log(`Received request for subcontractor turnover per month: month=${month}, year=${year}`);
-    const data = await getSubcontractorTurnoverPerMonth(pool, month, year);
+    const data = await getSubcontractorTurnoverPerMonth(pool, month, year, req.user.company_reg_num);
     res.status(200).json({ success: true, data });
   } catch (error) {
     console.error("Error in getSubcontractorTurnoverPerMonthController:", error);
@@ -206,7 +206,7 @@ const getSubcontractorVsTurnoverController = async (req, res) => {
   try {
     const { month, year, subcontractorId } = req.query;
     console.log(`Received request for subcontractor vs turnover: month=${month}, year=${year}, subcontractorId=${subcontractorId}`);
-    const data = await getSubcontractorVsTurnover(pool, month, year, subcontractorId);
+    const data = await getSubcontractorVsTurnover(pool, month, year, subcontractorId, req.user.company_reg_num);
     res.status(200).json({ success: true, data });
   } catch (error) {
     console.error("Error in getSubcontractorVsTurnoverController:", error);
@@ -220,7 +220,7 @@ const getWagesVsExpensesController = async (req, res) => {
   try {
     const client = await pool.connect();
     try {
-      const data = await getWagesVsExpenses(client, month, year);
+      const data = await getWagesVsExpenses(client, month, year, req.user.company_reg_num);
       console.log("Wages vs expenses data:", data);
       res.status(200).json({ success: true, data });
     } finally {
@@ -238,7 +238,7 @@ const getTurnoverVsSubbieExpenseController = async (req, res) => {
   try {
     const client = await pool.connect();
     try {
-      const data = await getTurnoverVsSubbieExpense(client, month, year, subcontractorId);
+      const data = await getTurnoverVsSubbieExpense(client, month, year, subcontractorId, req.user.company_reg_num);
       console.log("Turnover vs subbie expense data:", data);
       res.status(200).json({ success: true, data });
     } finally {
@@ -256,7 +256,7 @@ const getTurnoverVsFuelPerTruckController = async (req, res) => {
   try {
     const client = await pool.connect();
     try {
-      const data = await getTurnoverVsFuelPerTruck(client, month, year, truckId);
+      const data = await getTurnoverVsFuelPerTruck(client, month, year, truckId, req.user.company_reg_num);
       console.log("Turnover vs fuel per truck data:", data);
       res.status(200).json({ success: true, data });
     } finally {
@@ -274,7 +274,7 @@ const getPaymentsReceivedPerMonthController = async (req, res) => {
   try {
     const client = await pool.connect();
     try {
-      const data = await getPaymentsReceivedPerMonth(client, month, year, clientId);
+      const data = await getPaymentsReceivedPerMonth(client, month, year, clientId, req.user.company_reg_num);
       console.log("Payments received data:", data);
       res.status(200).json({ success: true, data });
     } finally {
@@ -292,7 +292,7 @@ const getPaymentClientsController = async (req, res) => {
   try {
     const client = await pool.connect();
     try {
-      const data = await getPaymentClients(client, month, year);
+      const data = await getPaymentClients(client, month, year, req.user.company_reg_num);
       console.log("Payment clients data:", data);
       res.status(200).json({ success: true, data });
     } finally {
@@ -317,7 +317,7 @@ const getClientSubbieCommissionReportController = async (req, res) => {
   try {
     const dbClient = await pool.connect();
     try {
-      const data = await getClientSubbieCommissionReport(dbClient, month, year, clientId);
+      const data = await getClientSubbieCommissionReport(dbClient, month, year, clientId, req.user.company_reg_num);
       res.status(200).json({ success: true, data });
     } finally {
       dbClient.release();

@@ -28,7 +28,7 @@ const getClientAddonsHandler = async (req, res) => {
       });
     }
 
-    const result = await getAddonsByClient(clientId, { year, month });
+    const result = await getAddonsByClient(clientId, { year, month }, req.user.company_reg_num);
     console.log(`Query returned ${result.data.length} add-ons`);
 
     res.json({
@@ -106,7 +106,7 @@ const createAddonHandler = async (req, res) => {
       client_ref: String(client_ref).trim(),
       vessel_number: vessel_number ? String(vessel_number).trim() : null,
       invoice_number: invoice_number ? String(invoice_number).trim() : null,
-    });
+    }, req.user.company_reg_num);
 
     if (!result.success) {
       return res.status(400).json({
@@ -144,7 +144,7 @@ const getAddonByIdHandler = async (req, res) => {
       });
     }
 
-    const result = await getAddonById(addonId);
+    const result = await getAddonById(addonId, req.user.company_reg_num);
     if (!result.success) {
       return res.status(404).json({
         success: false,
@@ -240,7 +240,7 @@ const updateAddonHandler = async (req, res) => {
           vessel_number,
         };
 
-    const result = await updateAddon(addonId, updateData);
+    const result = await updateAddon(addonId, updateData, req.user.company_reg_num);
 
     if (!result.success) {
       return res.status(400).json({
@@ -276,7 +276,7 @@ const deleteAddonHandler = async (req, res) => {
       });
     }
 
-    const result = await deleteAddon(addonId);
+    const result = await deleteAddon(addonId, req.user.company_reg_num);
 
     if (!result.success) {
       return res.status(404).json({
@@ -302,7 +302,7 @@ const deleteAddonHandler = async (req, res) => {
 const getCompanyInfoHandler = async (req, res) => {
   try {
     console.log("Received request for company info");
-    const result = await getCompanyInfo();
+    const result = await getCompanyInfo(req.user.company_reg_num);
     if (!result.success) {
       return res.status(404).json({
         success: false,
@@ -335,7 +335,7 @@ const getClientByIdHandler = async (req, res) => {
       });
     }
 
-    const result = await getClientById(clientId);
+    const result = await getClientById(clientId, req.user.company_reg_num);
     if (!result.success) {
       return res.status(404).json({
         success: false,
@@ -370,7 +370,7 @@ const checkInvoiceNumberHandler = async (req, res) => {
       });
     }
 
-    const result = await checkInvoiceNumberExists(invoiceNumber, excludeAddonId);
+    const result = await checkInvoiceNumberExists(invoiceNumber, excludeAddonId, req.user.company_reg_num);
     
     res.json({
       success: result.success,

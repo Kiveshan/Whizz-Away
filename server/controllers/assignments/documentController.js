@@ -12,7 +12,7 @@ const getDocumentsByInstructionHandler = async (req, res) => {
     const { instructionId } = req.params;
     console.log(`Fetching documents for instruction ID: ${instructionId}`);
 
-    const documents = await getDocumentsByInstructionId(instructionId);
+    const documents = await getDocumentsByInstructionId(instructionId, req.user.company_reg_num);
 
     const documentsWithUrls = documents.map((doc) => ({
       id: doc.document_id.toString(),
@@ -64,7 +64,7 @@ const uploadDocumentHandler = async (req, res) => {
       s3Key,
       uploadDate,
       instructionId,
-    });
+    }, req.user.company_reg_num);
 
     res.status(201).json({
       success: true,
@@ -120,7 +120,7 @@ const deleteDocumentHandler = async (req, res) => {
     const { documentId } = req.params;
     console.log(`Deleting document with ID: ${documentId}`);
 
-    const result = await deleteDocument(documentId, s3);
+    const result = await deleteDocument(documentId, s3, req.user.company_reg_num);
     if (!result.success) {
       return res.status(404).json({
         success: false,

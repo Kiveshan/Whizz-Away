@@ -11,11 +11,11 @@ export const getVatReconHandler = async (req, res) => {
         console.log(`Generating VAT recon report for ${month} ${year}`)
 
         // Fetch output VAT (from m1_controller - client invoices)
-        const outputVat = await getOutputVat(month, year)
+        const outputVat = await getOutputVat(month, year, req.user.company_reg_num)
         console.log(`Fetched ${outputVat.length} output VAT records`)
 
         // Fetch input VAT (from purchase_orders - expenses)
-        const inputVat = await getInputVat(month, year)
+        const inputVat = await getInputVat(month, year, req.user.company_reg_num)
         console.log(`Fetched ${inputVat.length} input VAT records`)
 
         // Calculate totals

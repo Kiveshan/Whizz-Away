@@ -64,7 +64,7 @@ const deleteS3Prefix = async (prefix) => {
 
 export const getPurchaseOrdersHandler = async (req, res) => {
   try {
-    const purchaseOrders = await getPurchaseOrders()
+    const purchaseOrders = await getPurchaseOrders(req.user.company_reg_num)
     res.json(purchaseOrders)
   } catch (error) {
     console.error("Error fetching purchase orders:", error)
@@ -127,7 +127,7 @@ export const deletePurchaseOrderByPonumHandler = async (req, res) => {
 export const getPurchaseOrderByPonumHandler = async (req, res) => {
   try {
     const { ponum } = req.params;
-    const purchaseOrder = await getPurchaseOrderByPonum(ponum);
+    const purchaseOrder = await getPurchaseOrderByPonum(ponum, req.user.company_reg_num);
     
     if (!purchaseOrder) {
       return res.status(404).json({ error: "Purchase order not found" });
@@ -279,7 +279,7 @@ await pool.query(
 }
 export const getCompanyOwnedTrucksHandler = async (req, res) => {
   try {
-    const trucks = await getCompanyOwnedTrucks()
+    const trucks = await getCompanyOwnedTrucks(req.user.company_reg_num)
     res.json(trucks)
   } catch (error) {
     console.error("Error fetching company trucks:", error)
@@ -290,7 +290,7 @@ export const getCompanyOwnedTrucksHandler = async (req, res) => {
 export const getExpenseTypesHandler = async (req, res) => {
   try {
     console.log("Fetching expense types from database...")
-    const expenseTypes = await getExpenseTypes()
+    const expenseTypes = await getExpenseTypes(req.user.company_reg_num)
     console.log(`Found ${expenseTypes.length} expense types`)
     res.json(expenseTypes)
   } catch (error) {
@@ -311,7 +311,7 @@ export const getStatementsHandler = async (req, res) => {
       toDate,
     })
 
-    const statements = await getStatements(supplierId, fromDate, toDate)
+    const statements = await getStatements(supplierId, fromDate, toDate, req.user.company_reg_num)
     console.log("Query result:", statements.length, "rows found")
 
     res.json(statements)
@@ -325,7 +325,7 @@ export const getSupplierSummaryHandler = async (req, res) => {
     const { year, month } = req.query
     console.log("Fetching supplier statements with params:", { year, month })
 
-    const summary = await getSupplierSummary(year, month)
+    const summary = await getSupplierSummary(year, month, req.user.company_reg_num)
     console.log("Supplier summary result:", summary.length, "supplier-month combinations found")
 
     res.json(summary)
@@ -338,7 +338,7 @@ export const getSupplierSummaryHandler = async (req, res) => {
 export const getSuppliersByExpenseTypeHandler = async (req, res) => {
   try {
     const { expenseTypeId } = req.params
-    const suppliers = await getSuppliersByExpenseType(expenseTypeId)
+    const suppliers = await getSuppliersByExpenseType(expenseTypeId, req.user.company_reg_num)
     res.json(suppliers)
   } catch (error) {
     console.error("Error fetching suppliers:", error)
@@ -385,7 +385,7 @@ export const createPurchaseOrderHandler = async (req, res) => {
       subbie,
       date,
       total,
-    })
+    }, req.user.company_reg_num)
 
     res.status(201).json({
       success: true,
@@ -412,7 +412,7 @@ export const createMultiplePurchaseOrdersHandler = async (req, res) => {
       subbie,
       lineItems,
       totals,
-    })
+    }, req.user.company_reg_num)
 
     res.status(201).json({
       success: true,
@@ -429,7 +429,7 @@ export const getPurchaseOrderListHandler = async (req, res) => {
   try {
     const { supplierId, expenseTypeId, fromDate, toDate, poId, ponum } = req.query // ADD: ponum to query params
 
-    const purchaseOrders = await getPurchaseOrderList(supplierId, expenseTypeId, fromDate, toDate, poId, ponum)
+    const purchaseOrders = await getPurchaseOrderList(supplierId, expenseTypeId, fromDate, toDate, poId, ponum, req.user.company_reg_num)
 
     res.json(purchaseOrders)
   } catch (error) {

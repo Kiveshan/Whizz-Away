@@ -26,7 +26,7 @@ import {
 // };
 const getAllCompanyOwnedTrucksHandler = async (req, res) => {
   try {
-    const trucks = await getAllCompanyOwnedTrucks();
+    const trucks = await getAllCompanyOwnedTrucks(req.user.company_reg_num);
     res.status(200).json(trucks);
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -38,7 +38,7 @@ const getTruckExpensesHandler = async (req, res) => {
   console.log(`Route /expenses/truck/${truckId} was accessed`);
 
   try {
-    const expenses = await getExpensesByTruckId(truckId);
+    const expenses = await getExpensesByTruckId(truckId, req.user.company_reg_num);
     console.log(`Found ${expenses.length} expenses for truck ID ${truckId}`);
 
     const processedResults = expenses.map((row) => ({
@@ -57,7 +57,7 @@ const getAllExpensesHandler = async (req, res) => {
   console.log("Route GET /expenses was accessed");
 
   try {
-    const expenses = await getAllExpenses();
+    const expenses = await getAllExpenses(req.user.company_reg_num);
     console.log(`Found ${expenses.length} expenses`);
 
     res.status(200).json(expenses);

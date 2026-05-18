@@ -24,7 +24,7 @@ const getAllTrucksHandler = async (req, res) => {
       offset,
       limit: limitNum,
       search,
-    })
+    }, req.user.company_reg_num)
 
     res.json({
       items: result.trucks,
@@ -44,7 +44,7 @@ const getTruckByIdHandler = async (req, res) => {
     const { id } = req.params
     console.log(`Fetching truck ID ${id}`)
 
-    const result = await getTruckById(id)
+    const result = await getTruckById(id, req.user.company_reg_num)
 
     if (!result.success) {
       return res.status(404).json({ error: result.message })
@@ -149,6 +149,7 @@ const createTruckHandler = async (req, res) => {
         git,
       },
       fileLocations,
+      req.user.company_reg_num,
     )
 
     const responseBody = req.usageWarning
@@ -204,6 +205,7 @@ const updateTruckHandler = async (req, res) => {
         git,
       },
       newDocLocations,
+      req.user.company_reg_num,
     )
 
     if (!result.success) {
@@ -225,7 +227,7 @@ const toggleTruckStatusHandler = async (req, res) => {
 
     console.log(`Toggling truck status - ID: ${id}, New Status: ${status}`)
 
-    const result = await toggleTruckStatus(id, status)
+    const result = await toggleTruckStatus(id, status, req.user.company_reg_num)
 
     if (!result.success) {
       return res.status(404).json({ error: result.message })
@@ -245,7 +247,7 @@ const toggleTruckStatusHandler = async (req, res) => {
 const getTrucksWithExpiringLicensesHandler = async (req, res) => {
   try {
     const { days = 30 } = req.query
-    const expiringTrucks = await getTrucksWithExpiringLicenses(Number.parseInt(days))
+    const expiringTrucks = await getTrucksWithExpiringLicenses(Number.parseInt(days), req.user.company_reg_num)
     res.json(expiringTrucks)
   } catch (err) {
     console.error("Error fetching trucks with expiring licenses:", err)
@@ -256,7 +258,7 @@ const getTrucksWithExpiringLicensesHandler = async (req, res) => {
 // New endpoint to get trucks with expired licenses
 const getTrucksWithExpiredLicensesHandler = async (req, res) => {
   try {
-    const expiredTrucks = await getTrucksWithExpiredLicenses()
+    const expiredTrucks = await getTrucksWithExpiredLicenses(req.user.company_reg_num)
     res.json(expiredTrucks)
   } catch (err) {
     console.error("Error fetching trucks with expired licenses:", err)
@@ -288,7 +290,7 @@ const deleteTruckDocumentHandler = async (req, res) => {
       })
       .promise()
 
-    const result = await deleteTruckDocument(truckId, s3Key)
+    const result = await deleteTruckDocument(truckId, s3Key, req.user.company_reg_num)
 
     if (!result.success) {
       return res.status(404).json({ message: result.message })
@@ -306,7 +308,7 @@ const deleteTruckHandler = async (req, res) => {
     const { id } = req.params
     console.log(`Deleting truck ID ${id}`)
 
-    const result = await deleteTruck(id)
+    const result = await deleteTruck(id, req.user.company_reg_num)
 
     if (!result.success) {
       return res.status(404).json({ message: result.message })

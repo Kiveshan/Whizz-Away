@@ -15,7 +15,7 @@ const getExpensesByTruckHandler = async (req, res) => {
     console.log(`Getting expenses for truck ID: ${truckId}`);
     
     // Use the new function that includes PO data
-    const expenses = await getPOExpensesByTruckId(truckId);
+    const expenses = await getPOExpensesByTruckId(truckId, req.user.company_reg_num);
     
     console.log(`Found ${expenses.length} expenses for truck ID: ${truckId}`);
     res.json(expenses);
@@ -155,7 +155,7 @@ const uploadFuelExpenseHandler = async (req, res) => {
         truckId: parsedTruckId,
         driverId: userId,
         orderno: parsedOrderNo,
-      });
+      }, req.user.company_reg_num);
       console.log("Expense created successfully with ID:", result.ekey);
 
       res.status(201).json({
@@ -185,7 +185,7 @@ const uploadFuelExpenseHandler = async (req, res) => {
             truckId: parsedTruckId,
             driverId: userId,
             orderno: parsedOrderNo,
-          });
+          }, req.user.company_reg_num);
           console.log(
             "Expense created successfully with ID (without s3key):",
             fallbackResult.ekey
@@ -220,7 +220,7 @@ const uploadFuelExpenseHandler = async (req, res) => {
               truckId: parsedTruckId,
               driverId: userId,
               orderno: parsedOrderNo,
-            });
+            }, req.user.company_reg_num);
             console.log(
               "Expense created successfully with ID (basic):",
               basicResult.ekey
@@ -258,7 +258,7 @@ const uploadFuelExpenseHandler = async (req, res) => {
           truckId: parsedTruckId,
           driverId: userId,
           orderno: parsedOrderNo,
-        });
+        }, req.user.company_reg_num);
 
         res.status(201).json({
           success: true,
@@ -289,7 +289,7 @@ const getExpenseDocumentHandler = async (req, res) => {
     const { id } = req.params;
     
     // First try to get from expenses_m2 table
-    const document = await getExpenseDocumentById(id);
+    const document = await getExpenseDocumentById(id, req.user.company_reg_num);
     
     if (document.success && document.data.s3key) {
       const { slipname, s3key } = document.data;

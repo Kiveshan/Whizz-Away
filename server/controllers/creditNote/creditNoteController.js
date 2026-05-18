@@ -7,7 +7,7 @@ const getClientCreditNotesHandler = async (req, res) => {
 
     console.log(`Fetching credit notes for client ${clientId} with query:`, req.query);
 
-    const result = await getClientCreditNotes(clientId, { year, month });
+    const result = await getClientCreditNotes(clientId, { year, month }, req.user.company_reg_num);
     res.json({
       success: true,
       data: result.data,
@@ -29,7 +29,7 @@ const getInstructionsHandler = async (req, res) => {
 
     console.log(`Fetching instructions for client ${clientId} with query:`, req.query);
 
-    const result = await getInstructions(clientId, { year, month });
+    const result = await getInstructions(clientId, { year, month }, req.user.company_reg_num);
     res.json({
       success: true,
       data: result.data,
@@ -49,7 +49,7 @@ const getContainersHandler = async (req, res) => {
     const { m1key } = req.params;
     console.log(`Fetching containers for m1key ${m1key}`);
 
-    const result = await getContainers(m1key);
+    const result = await getContainers(m1key, req.user.company_reg_num);
     res.json({
       success: true,
       data: result.data,
@@ -67,7 +67,7 @@ const getCompanyDetailsHandler = async (req, res) => {
   try {
     console.log(`Fetching company details for KSM Carriers`);
 
-    const result = await getCompanyDetails();
+    const result = await getCompanyDetails(req.user.company_reg_num);
     res.json({
       success: true,
       data: result.data,
@@ -85,7 +85,7 @@ const getClientDetailsHandler = async (req, res) => {
   try {
     const { clientId } = req.params;
 
-    const result = await getClientDetails(clientId);
+    const result = await getClientDetails(clientId, req.user.company_reg_num);
 
     res.json({
       success: true,
@@ -104,7 +104,7 @@ const getLatestDocumentNumberHandler = async (req, res) => {
   try {
     console.log(`Fetching latest document number`);
 
-    const result = await getLatestDocumentNumber();
+    const result = await getLatestDocumentNumber(req.user.company_reg_num);
     res.json({
       success: true,
       data: result.data,
@@ -124,7 +124,7 @@ const getInstructionDetailsHandler = async (req, res) => {
     const { m1key } = req.params;
     console.log(`Fetching instruction details for m1key ${m1key}`);
 
-    const result = await getInstructionDetails(m1key);
+    const result = await getInstructionDetails(m1key, req.user.company_reg_num);
     res.json({
       success: true,
       data: result.data,
@@ -144,7 +144,7 @@ const createCreditNoteHandler = async (req, res) => {
     const creditNoteData = req.body;
     console.log(`Creating credit note for client ${creditNoteData.client_id}`);
 
-    const result = await createCreditNote(creditNoteData);
+    const result = await createCreditNote(creditNoteData, req.user.company_reg_num);
     res.status(201).json({
       success: true,
       data: result.data,
@@ -164,7 +164,7 @@ const getCreditNoteByIdHandler = async (req, res) => {
     const { creditNoteId } = req.params;
     console.log(`Fetching credit note by ID: ${creditNoteId}`);
 
-    const result = await getCreditNoteById(creditNoteId);
+    const result = await getCreditNoteById(creditNoteId, req.user.company_reg_num);
     res.json({
       success: true,
       data: result.data,

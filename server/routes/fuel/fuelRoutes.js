@@ -5,12 +5,13 @@ import {
   getTruckExpensesHandler,
   getAllExpensesHandler,
 } from "../../controllers/fuel/fuelController.js";
+import { verifyToken } from "../../middleware/auth.js";
 
 const router = express.Router();
 
 // router.get("/trucks/fuel-expenses", getTrucksWithFuelExpensesHandler);
-router.get("/expenses/truck/:truckId", getTruckExpensesHandler);
-router.get("/expenses", getAllExpensesHandler);
-router.get("/trucks/company-owned", getAllCompanyOwnedTrucksHandler);
+router.get("/expenses/truck/:truckId", verifyToken, getTruckExpensesHandler);
+router.get("/expenses", verifyToken, getAllExpensesHandler);
+router.get("/trucks/company-owned", verifyToken, getAllCompanyOwnedTrucksHandler);
 
 export default router;

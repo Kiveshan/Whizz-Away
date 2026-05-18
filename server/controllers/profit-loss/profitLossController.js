@@ -8,7 +8,7 @@ const generateProfitLossReport = async (req, res) => {
     }
 
     try {
-        const { profitDetails, lossDetails, totalProfit, totalLoss, net } = await getProfitLossData(month, year);
+        const { profitDetails, lossDetails, totalProfit, totalLoss, net } = await getProfitLossData(month, year, req.user.company_reg_num);
 
         const responseData = {
             month,
@@ -29,7 +29,7 @@ const generateProfitLossReport = async (req, res) => {
 
 const getCompanyDetailsHandler = async (req, res) => {
     try {
-        const companyname = await getCompanyDetails();
+        const companyname = await getCompanyDetails(req.user.company_reg_num);
         res.json({ companyname });
     } catch (error) {
         console.error('Error fetching company details:', error);

@@ -4,7 +4,7 @@ const getDriversHandler = async (req, res) => {
   console.log("Route /employees/drivers was accessed");
 
   try {
-    const result = await getAllDrivers();
+    const result = await getAllDrivers(req.user.company_reg_num);
     console.log("Drivers found:", result);
     if (result.length === 0) {
       console.log("No drivers found in the m5_employee table");

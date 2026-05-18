@@ -7,25 +7,26 @@ import {
   deleteExpenseTypeHandler,
   getSimpleExpenseTypesHandler
 } from "../../controllers/manage/expenseTypeController.js"
+import { verifyToken } from "../../middleware/auth.js"
 
 const router = express.Router()
 
 // Get all expense types with pagination and search
-router.get("/api/expense-types", getAllExpenseTypesHandler)
+router.get("/api/expense-types", verifyToken, getAllExpenseTypesHandler)
 
 // Get simple expense types for dropdown (all records)
-router.get("/api/expense-types/simple", getSimpleExpenseTypesHandler)
+router.get("/api/expense-types/simple", verifyToken, getSimpleExpenseTypesHandler)
 
 // Get expense type by ID
-router.get("/api/expense-types/:id", getExpenseTypeByIdHandler)
+router.get("/api/expense-types/:id", verifyToken, getExpenseTypeByIdHandler)
 
 // Create new expense type
-router.post("/api/expense-types", createExpenseTypeHandler)
+router.post("/api/expense-types", verifyToken, createExpenseTypeHandler)
 
 // Update expense type
-router.put("/api/expense-types/:id", updateExpenseTypeHandler)
+router.put("/api/expense-types/:id", verifyToken, updateExpenseTypeHandler)
 
 // Delete expense type
-router.delete("/api/expense-types/:id", deleteExpenseTypeHandler)
+router.delete("/api/expense-types/:id", verifyToken, deleteExpenseTypeHandler)
 
 export default router

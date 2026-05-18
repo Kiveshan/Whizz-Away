@@ -24,7 +24,7 @@ const createPaymentHandler = async (req, res) => {
       fileupload,
       reference: reference ? reference.trim() : null,
       line_items,
-    });
+    }, req.user.company_reg_num);
 
     res.json({
       success: true,
@@ -48,7 +48,7 @@ const getPaymentHandler = async (req, res) => {
     const { clientId, paymentId } = req.params;
     console.log(`Fetching payment ${paymentId} for client ${clientId}`);
 
-    const result = await getPayment(clientId, paymentId);
+    const result = await getPayment(clientId, paymentId, req.user.company_reg_num);
     if (!result.success) {
       return res.status(404).json({
         success: false,
@@ -83,7 +83,7 @@ const getClientPaymentsHandler = async (req, res) => {
       req.query
     );
 
-    const result = await getClientPayments(clientId, { year, month });
+    const result = await getClientPayments(clientId, { year, month }, req.user.company_reg_num);
     console.log(
       `Query returned ${result.data.length} payments for client ${clientId}`
     );
@@ -110,7 +110,7 @@ const getClientInvoicesHandler = async (req, res) => {
     const { clientId } = req.params;
     console.log(`Fetching invoices and add-ons for client ${clientId}`);
 
-    const result = await getClientInvoices(clientId);
+    const result = await getClientInvoices(clientId, req.user.company_reg_num);
     res.json({
       success: true,
       data: result.data,
@@ -133,7 +133,7 @@ const deletePaymentHandler = async (req, res) => {
     const { clientId, paymentId } = req.params;
     console.log(`Deleting payment ${paymentId} for client ${clientId}`);
 
-    await deletePayment(clientId, paymentId);
+    await deletePayment(clientId, paymentId, req.user.company_reg_num);
 
     res.json({
       success: true,

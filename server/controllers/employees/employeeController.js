@@ -5,7 +5,7 @@ const getEmployeeHandler = async (req, res) => {
   console.log(`Route /api/employee/${id} was accessed`);
 
   try {
-    const result = await getEmployeeById(id);
+    const result = await getEmployeeById(id, req.user.company_reg_num);
     if (!result.success) {
       return res.status(404).json({ error: result.message });
     }
