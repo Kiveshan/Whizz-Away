@@ -70,6 +70,61 @@ export function calculateTotalCostFromRates(
 }
 
 /**
+ * Resolve the base cost for the UPDATE form save path (performSave).
+ *
+ * Mirrors the three-way branch in useRateManagement.recalculateTotalCost so
+ * the display path and save path can never diverge again.
+ *
+ * Does NOT include per-container surcharge / hazardous / VGM — those are
+ * fetched fresh by the caller and added on top of this value.
+ *
+ * Three-way branch (same priority order as recalculateTotalCost):
+ *  1. Set-rate mode (with historicalSetRate fallback)
+ *  2. Weight-based type-4  (rateWeight = "kg" | "ton")
+ *  3. Container-based      (rateper_6/12/abnormal × counts)
+ *
+ * @param {object} formData
+ * @param {Array}  weightRows
+ * @param {{ isSetRateMode: boolean, historicalSetRate: number, isAddOn: boolean }} flags
+ * @returns {number}
+ */
+export function resolveBaseCost(
+  formData,
+  weightRows,
+  { isSetRateMode = false, historicalSetRate = 0, isAddOn = false } = {}
+) {
+  // ── Branch 1: Set-rate ───────────────────────────────────────────────────
+  if (isSetRateMode && !isAddOn) {
+    const rawRate = Number.parseFloat(formData.setRateAmount);
+    const resolvedSetRateAmount =
+      !Number.isNaN(rawRate) && rawRate > 0 ? rawRate : historicalSetRate || 0;
+    return calcBreakBulkCost(weightRows, 0, {
+      isSetRateMode: true,
+      setRateAmount: resolvedSetRateAmount,
+    });
+  }
+
+  // ── Branch 2: Weight-based type-4 ───────────────────────────────────────
+  if (
+    (formData.rateWeight === "kg" || formData.rateWeight === "ton") &&
+    String(formData.shipmentTypeId) === "4"
+  ) {
+    return calcBreakBulkCost(weightRows, formData.unitRate || 0);
+  }
+
+  // ── Branch 3: Container-based ────────────────────────────────────────────
+  // Rates are zeroed when the corresponding count is 0 (prevents phantom cost
+  // when a count is cleared without also clearing the stored rate).
+  const numSix = formData.num_six_meters || 0;
+  const numTwelve = formData.num_twelve_meters || 0;
+  const numAbnormal = formData.num_abnormal || 0;
+  const ratePer6 = numSix > 0 ? Number(formData.rateper_6 || 0) : 0;
+  const ratePer12 = numTwelve > 0 ? Number(formData.rateper_12 || 0) : 0;
+  const ratePerAbnormal = numAbnormal > 0 ? Number(formData.rateper_abnormal || 0) : 0;
+  return ratePer6 * numSix + ratePer12 * numTwelve + ratePerAbnormal * numAbnormal;
+}
+
+/**
  * Container-based cost for the CREATE form.
  * Uses create-form field naming (sixMeterRate / twelveMeterRate / abnormalRate).
  * Does NOT include hazardous/VGM — those are only on the update form.

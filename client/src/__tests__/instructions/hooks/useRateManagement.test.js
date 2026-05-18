@@ -235,10 +235,11 @@ describe("recalculateTotalCost", () => {
     calculateTotalCostFromRates.mockReturnValueOnce(400);
     const { result, onFormUpdate } = renderRateHook();
     const formData4 = {
-      ...BASE_FORM,
       shipmentTypeId: "4",
       rateWeight: "Container",
       rateper_6: 200,
+      rateper_12: 0,
+      rateper_abnormal: 0,
       num_six_meters: 2,
       num_twelve_meters: 0,
       num_abnormal: 0,

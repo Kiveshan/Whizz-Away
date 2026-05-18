@@ -27,7 +27,7 @@ import { useContainerManagement } from "../../../../hooks/useContainerManagement
 import { useRateManagement } from "../../../../hooks/useRateManagement";
 import { useWeightRows } from "../../../../hooks/useWeightRows";
 import { formatDateForDB, formatDateForInput as formatDateForInputUtil } from "../../../../utils/instructions/dateFormatting";
-import { calculateTotalCostFromRates, calcBreakBulkCost } from "../../../../utils/instructions/costCalculation";
+import { calculateTotalCostFromRates, resolveBaseCost } from "../../../../utils/instructions/costCalculation";
 import { validateForm as validateFormUtil } from "../../../../utils/instructions/validation";
 import { checkRateCountMismatch as checkRateCountMismatchUtil } from "../../../../utils/instructions/rateCountMismatch";
 
@@ -665,41 +665,13 @@ const FCcontrollerinstructions = () => {
         }
       };
 
-      // Recalculate total cost based on current values
-      const numSix = formData.num_six_meters || 0;
-      const numTwelve = formData.num_twelve_meters || 0;
-      const numAbnormal = formData.num_abnormal || 0;
-
-      const ratePer6 = numSix > 0 ? Number(formData.rateper_6 || 0) : 0;
-      const ratePer12 = numTwelve > 0 ? Number(formData.rateper_12 || 0) : 0;
-      const ratePerAbnormal =
-        numAbnormal > 0 ? Number(formData.rateper_abnormal || 0) : 0;
-
+      // Recalculate base cost — shared logic with recalculateTotalCost (display path)
       console.log("DEBUG UPDATE isSetRateMode:", isSetRateMode, "formData.rateWeight:", formData.rateWeight, "formData.setRateAmount:", formData.setRateAmount);
-      let baseCost = 0;
-      if (isSetRateMode && !isAddOn) {
-        // fetchSetRate can overwrite setRateAmount with 0/"" when the API has no
-        // set_rate configured — fall back to historicalSetRate in that case.
-        const rawSaveRate = Number.parseFloat(formData.setRateAmount);
-        const resolvedSaveRate = (!Number.isNaN(rawSaveRate) && rawSaveRate > 0)
-          ? rawSaveRate
-          : (historicalSetRate || 0);
-        baseCost = calcBreakBulkCost(weightRows, 0, {
-          isSetRateMode: true,
-          setRateAmount: resolvedSaveRate,
-        });
-      } else if (
-        (formData.rateWeight === "kg" || formData.rateWeight === "ton") &&
-        String(formData.shipmentTypeId) === "4"
-      ) {
-        baseCost = calcBreakBulkCost(weightRows, formData.unitRate || 0);
-      } else {
-        // Container-based or simple weight-based using main counts
-        baseCost =
-          ratePer6 * numSix +
-          ratePer12 * numTwelve +
-          ratePerAbnormal * numAbnormal;
-      }
+      const baseCost = resolveBaseCost(formData, weightRows, {
+        isSetRateMode,
+        historicalSetRate,
+        isAddOn,
+      });
       // Fetch fresh amounts on-the-fly to prevent race condition
       // If user clicks Save before async fetches complete, we need current values
       const freshContainers = await fetchFreshAmounts(containers, formData);
