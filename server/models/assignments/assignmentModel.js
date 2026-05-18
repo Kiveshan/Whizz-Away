@@ -1,59 +1,59 @@
 import { pool } from "../../config/database.js";
 import { getRateForLegDate } from "../manage/driverRatesModel.js";
 
-export const getDrivers = async () => {
-  const query = "SELECT * FROM m5_driver_rate";
+export const getDrivers = async (company_reg_num) => {
+  const query = "SELECT * FROM m5_driver_rate WHERE company_reg_num = $1";
   try {
-    const result = await pool.query(query);
+    const result = await pool.query(query, [company_reg_num]);
     return result.rows;
   } catch (error) {
     throw error;
   }
 };
 
-export const getStartingPoints = async () => {
+export const getStartingPoints = async (company_reg_num) => {
   const query =
-    "SELECT DISTINCT startingpoint FROM m5_driver_rate ORDER BY startingpoint";
+    "SELECT DISTINCT startingpoint FROM m5_driver_rate WHERE company_reg_num = $1 ORDER BY startingpoint";
   try {
-    const result = await pool.query(query);
+    const result = await pool.query(query, [company_reg_num]);
     return result.rows.map((row) => row.startingpoint);
   } catch (error) {
     throw error;
   }
 };
 
-export const getDestinations = async () => {
+export const getDestinations = async (company_reg_num) => {
   const query =
-    "SELECT DISTINCT destination FROM m5_driver_rate ORDER BY destination";
+    "SELECT DISTINCT destination FROM m5_driver_rate WHERE company_reg_num = $1 ORDER BY destination";
   try {
-    const result = await pool.query(query);
+    const result = await pool.query(query, [company_reg_num]);
     return result.rows.map((row) => row.destination);
   } catch (error) {
     throw error;
   }
 };
 
-export const updateInstructionStatus = async (instructionId, status) => {
-  const query = `UPDATE m1_controller SET status = $1 WHERE m1key = $2`;
+export const updateInstructionStatus = async (instructionId, status, company_reg_num) => {
+  const query = `UPDATE m1_controller SET status = $1 WHERE m1key = $2 AND company_reg_num = $3`;
   try {
-    await pool.query(query, [status, instructionId]);
+    await pool.query(query, [status, instructionId, company_reg_num]);
   } catch (error) {
     throw error;
   }
 };
 
-export const getDriversSub = async () => {
+export const getDriversSub = async (company_reg_num) => {
   const query =
-    "SELECT userid, name, surname, roleid, status, driverstatus FROM m5_employee WHERE roleid IN (5, 6) AND status = true ORDER BY name, surname";
+    "SELECT userid, name, surname, roleid, status, driverstatus FROM m5_employee WHERE roleid IN (5, 6) AND status = true AND company_reg_num = $1 ORDER BY name, surname";
   try {
-    const result = await pool.query(query);
+    const result = await pool.query(query, [company_reg_num]);
     return result.rows;
   } catch (error) {
     throw error;
   }
 };
 
-export const getDriverRatesWithSubbie = async (startingpoint, destination, legDate = null) => {
+export const getDriverRatesWithSubbie = async (startingpoint, destination, legDate = null, company_reg_num) => {
   // If legDate provided, use effective date-based rate lookup
   if (legDate) {
     try {
@@ -82,29 +82,30 @@ export const getDriverRatesWithSubbie = async (startingpoint, destination, legDa
       // Fall through to default behavior
     }
   }
-  
+
   // Default: fetch current rate (for backwards compatibility)
   const query = `
-    SELECT 
-      m5ratekey, 
-      startingpoint, 
-      destination, 
-      driver_six_meter_rate, 
+    SELECT
+      m5ratekey,
+      startingpoint,
+      destination,
+      driver_six_meter_rate,
       driver_twelve_meter_rate,
       subie_six_meter_rate,
       subie_twelve_meter_rate,
       effective_from,
       effective_to
-    FROM 
-      m5_driver_rate 
-    WHERE 
+    FROM
+      m5_driver_rate
+    WHERE
       startingpoint = $1 AND destination = $2
+      AND company_reg_num = $3
       AND effective_from <= CURRENT_DATE
       AND (effective_to IS NULL OR effective_to >= CURRENT_DATE)
     ORDER BY effective_from DESC
     LIMIT 1`;
   try {
-    const result = await pool.query(query, [startingpoint, destination]);
+    const result = await pool.query(query, [startingpoint, destination, company_reg_num]);
     if (result.rows.length > 0) {
       const rateData = result.rows[0];
       rateData.driver_rate = rateData.driver_six_meter_rate;
@@ -116,120 +117,123 @@ export const getDriverRatesWithSubbie = async (startingpoint, destination, legDa
   }
 };
 
-export const getControllers = async () => {
+export const getControllers = async (company_reg_num) => {
   const query =
-    "SELECT userid, name, surname FROM m5_employee WHERE roleid = 2 ORDER BY name, surname";
+    "SELECT userid, name, surname FROM m5_employee WHERE roleid = 2 AND company_reg_num = $1 ORDER BY name, surname";
   try {
-    const result = await pool.query(query);
+    const result = await pool.query(query, [company_reg_num]);
     return result.rows;
   } catch (error) {
     throw error;
   }
 };
 
-export const getManagers = async () => {
+export const getManagers = async (company_reg_num) => {
   const query =
-    "SELECT userid, name, surname FROM usertable WHERE roleid = 1 ORDER BY name, surname";
+    "SELECT userid, name, surname FROM usertable WHERE roleid = 1 AND company_reg_num = $1 ORDER BY name, surname";
   try {
-    const result = await pool.query(query);
+    const result = await pool.query(query, [company_reg_num]);
     return result.rows;
   } catch (error) {
     throw error;
   }
 };
 
-export const getInstructionById = async (instructionId) => {
-  const query = `SELECT m1key, status FROM m1_controller WHERE m1key = $1`;
+export const getInstructionById = async (instructionId, company_reg_num) => {
+  const query = `SELECT m1key, status FROM m1_controller WHERE m1key = $1 AND company_reg_num = $2`;
   try {
-    const result = await pool.query(query, [instructionId]);
+    const result = await pool.query(query, [instructionId, company_reg_num]);
     return result.rows.length > 0 ? result.rows[0] : null;
   } catch (error) {
     throw error;
   }
 };
 
-export const getShipmentTypeByInstructionId = async (instructionId) => {
-  const query = `SELECT shipment_type FROM m1_controller WHERE m1key = $1`;
+export const getShipmentTypeByInstructionId = async (instructionId, company_reg_num) => {
+  const query = `SELECT shipment_type FROM m1_controller WHERE m1key = $1 AND company_reg_num = $2`;
   try {
-    const result = await pool.query(query, [instructionId]);
+    const result = await pool.query(query, [instructionId, company_reg_num]);
     return result.rows.length > 0 ? result.rows[0].shipment_type : null;
   } catch (error) {
     throw error;
   }
 };
 
-export const getInstructions = async () => {
+export const getInstructions = async (company_reg_num) => {
   const query =
-    "SELECT m1key, shipment_type, status, fileref FROM m1_controller ORDER BY m1key DESC";
+    "SELECT m1key, shipment_type, status, fileref FROM m1_controller WHERE company_reg_num = $1 ORDER BY m1key DESC";
   try {
-    const result = await pool.query(query);
+    const result = await pool.query(query, [company_reg_num]);
     return result.rows;
   } catch (error) {
     throw error;
   }
 };
 
-export const getTruckRegNums = async () => {
-  const query = "SELECT truckregnum FROM m5_trucks WHERE status = true ORDER BY truckregnum";
+export const getTruckRegNums = async (company_reg_num) => {
+  const query = "SELECT truckregnum FROM m5_trucks WHERE status = true AND company_reg_num = $1 ORDER BY truckregnum";
   try {
-    const result = await pool.query(query);
+    const result = await pool.query(query, [company_reg_num]);
     return result.rows.map((row) => row.truckregnum);
   } catch (error) {
     throw error;
   }
 };
 
-export const getTrucks = async () => {
+export const getTrucks = async (company_reg_num) => {
   const query =
-    "SELECT m5truckskey as truckid, truckregnum as registration FROM m5_trucks WHERE status = true ORDER BY truckregnum";
+    "SELECT m5truckskey as truckid, truckregnum as registration FROM m5_trucks WHERE status = true AND company_reg_num = $1 ORDER BY truckregnum";
   try {
-    const result = await pool.query(query);
+    const result = await pool.query(query, [company_reg_num]);
     return result.rows;
   } catch (error) {
     throw error;
   }
 };
 
-export const getClientInstructions = async () => {
+export const getClientInstructions = async (company_reg_num) => {
   const query = `
-    SELECT 
-      c.m5clientkey, 
-      c.client AS companyname, 
-      c.representative, 
+    SELECT
+      c.m5clientkey,
+      c.client AS companyname,
+      c.representative,
       c.email,
       COUNT(CASE WHEN m.status = 'New' THEN 1 ELSE NULL END) AS new_count,
       COUNT(CASE WHEN LOWER(m.status) = 'in progress' THEN 1 ELSE NULL END) AS in_progress_count
-    FROM 
+    FROM
       m5_client c
-    LEFT JOIN 
+    LEFT JOIN
       m1_controller m ON c.m5clientkey = m.client
-    GROUP BY 
+    WHERE
+      c.company_reg_num = $1
+    GROUP BY
       c.m5clientkey, c.client, c.representative, c.email
-    ORDER BY 
+    ORDER BY
       c.client`;
   try {
-    const result = await pool.query(query);
+    const result = await pool.query(query, [company_reg_num]);
     return result.rows;
   } catch (error) {
     throw error;
   }
 };
 
-export const getClientInstructionsDetails = async (clientId) => {
+export const getClientInstructionsDetails = async (clientId, company_reg_num) => {
   const query = `
-    SELECT 
-      m1.m1key, 
-      s.shipkey AS shippy, 
-      m1.status, 
+    SELECT
+      m1.m1key,
+      s.shipkey AS shippy,
+      m1.status,
       m1.fileref
-    FROM 
+    FROM
       public.m1_controller m1
-    JOIN 
+    JOIN
       public.shipment s ON m1.shipment_type = s.shipkey
-    WHERE 
-      m1.client = $1`;
+    WHERE
+      m1.client = $1
+      AND m1.company_reg_num = $2`;
   try {
-    const result = await pool.query(query, [clientId]);
+    const result = await pool.query(query, [clientId, company_reg_num]);
     return result.rows;
   } catch (error) {
     throw error;
@@ -251,14 +255,15 @@ export const getDriverRates = async (
   startingpoint,
   destination,
   containerType,
-  legDate = null
+  legDate = null,
+  company_reg_num
 ) => {
   // If legDate provided, use effective date-based rate lookup
   if (legDate) {
     try {
       const isSubcontractor = false; // This function is for drivers, not subbies
       const rateResult = await getRateForLegDate(startingpoint, destination, legDate, isSubcontractor, containerType);
-      
+
       if (rateResult.success) {
         return {
           ...rateResult.data,
@@ -271,28 +276,29 @@ export const getDriverRates = async (
       // Fall through to default behavior
     }
   }
-  
+
   // Default: fetch current rate (for backwards compatibility)
   const query = `
-    SELECT 
-      m5ratekey, 
-      startingpoint, 
-      destination, 
+    SELECT
+      m5ratekey,
+      startingpoint,
+      destination,
       driver_rate,
-      driver_six_meter_rate, 
+      driver_six_meter_rate,
       driver_twelve_meter_rate,
       effective_from,
       effective_to
-    FROM 
-      m5_driver_rate 
-    WHERE 
+    FROM
+      m5_driver_rate
+    WHERE
       startingpoint = $1 AND destination = $2
+      AND company_reg_num = $3
       AND effective_from <= CURRENT_DATE
       AND (effective_to IS NULL OR effective_to >= CURRENT_DATE)
     ORDER BY effective_from DESC
     LIMIT 1`;
   try {
-    const result = await pool.query(query, [startingpoint, destination]);
+    const result = await pool.query(query, [startingpoint, destination, company_reg_num]);
     if (result.rows.length > 0) {
       const rateData = result.rows[0];
       let applicableRate = rateData.driver_rate;
@@ -309,22 +315,22 @@ export const getDriverRates = async (
   }
 };
 
-export const getContainerNumbers = async () => {
+export const getContainerNumbers = async (company_reg_num) => {
   const query =
-    "SELECT containernum, container_type FROM container ORDER BY containernum";
+    "SELECT DISTINCT containernum, container_type FROM container WHERE company_reg_num = $1 ORDER BY containernum";
   try {
-    const result = await pool.query(query);
+    const result = await pool.query(query, [company_reg_num]);
     return result.rows;
   } catch (error) {
     throw error;
   }
 };
 
-export const getContainerTypes = async () => {
+export const getContainerTypes = async (company_reg_num) => {
   const query =
-    "SELECT DISTINCT container_type FROM container WHERE container_type IS NOT NULL ORDER BY container_type";
+    "SELECT DISTINCT container_type FROM container WHERE container_type IS NOT NULL AND company_reg_num = $1 ORDER BY container_type";
   try {
-    const result = await pool.query(query);
+    const result = await pool.query(query, [company_reg_num]);
     return result.rows.map((row) => row.container_type);
   } catch (error) {
     throw error;
@@ -338,6 +344,7 @@ export const saveLeg = async ({
   driverrate,
   m1key,
   drivers,
+  company_reg_num,
 }) => {
   const client = await pool.connect();
   try {
@@ -364,8 +371,8 @@ export const saveLeg = async ({
     if (isNewLeg || (drivers && drivers.length > 0)) {
       if (isNewLeg && (!drivers || drivers.length === 0)) {
         const insertResult = await client.query(
-          `INSERT INTO legs_m2 (legnumber, startingpoint, destination, driverrate, m1key) VALUES ($1, $2, $3, $4, $5) RETURNING legkey`,
-          [legnumber, startingpoint, destination, driverrate, m1key]
+          `INSERT INTO legs_m2 (legnumber, startingpoint, destination, driverrate, m1key, company_reg_num) VALUES ($1, $2, $3, $4, $5, $6) RETURNING legkey`,
+          [legnumber, startingpoint, destination, driverrate, m1key, company_reg_num]
         );
         legId = insertResult.rows[0].legkey;
       }
@@ -424,17 +431,18 @@ export const saveLeg = async ({
           } else {
             const insertResult = await client.query(
               `INSERT INTO legs_m2 (
-                legnumber, 
-                startingpoint, 
-                destination, 
-                driverrate, 
-                m1key, 
-                driverid, 
-                truckregnumber, 
-                containernumber, 
+                legnumber,
+                startingpoint,
+                destination,
+                driverrate,
+                m1key,
+                driverid,
+                truckregnumber,
+                containernumber,
                 vgm,
-                date
-              ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10) RETURNING legkey`,
+                date,
+                company_reg_num
+              ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11) RETURNING legkey`,
               [
                 legnumber,
                 startingpoint,
@@ -446,6 +454,7 @@ export const saveLeg = async ({
                 containerNumber,
                 vgmValue,
                 date,
+                company_reg_num,
               ]
             );
             if (isNewLeg && index === 0) legId = insertResult.rows[0].legkey;
@@ -590,9 +599,9 @@ export const saveLeg = async ({
 //   }
 // };
 
-export const getLegsByInstructionId = async (instructionId) => {
+export const getLegsByInstructionId = async (instructionId, company_reg_num) => {
   const query = `
-    SELECT 
+    SELECT
       l.legkey,
       l.legnumber,
       l.startingpoint,
@@ -608,15 +617,15 @@ export const getLegsByInstructionId = async (instructionId) => {
       e.roleid,
       c.container_type,
       -- Get the applicable manage rate based on driver role and container type
-      CASE 
+      CASE
         WHEN e.roleid = 6 AND LOWER(TRIM(COALESCE(c.container_type, '6m'))) = '12m' THEN dr.subie_twelve_meter_rate
         WHEN e.roleid = 6 THEN dr.subie_six_meter_rate
         WHEN LOWER(TRIM(COALESCE(c.container_type, '6m'))) = '12m' THEN dr.driver_twelve_meter_rate
         ELSE dr.driver_six_meter_rate
       END as applicable_manage_rate
-    FROM 
+    FROM
       legs_m2 l
-    LEFT JOIN 
+    LEFT JOIN
       m5_employee e ON l.driverid = e.userid
     LEFT JOIN
       container c ON l.containernumber = c.containernum AND l.m1key = c.m1key
@@ -630,18 +639,20 @@ export const getLegsByInstructionId = async (instructionId) => {
       FROM m5_driver_rate
       WHERE LOWER(TRIM(COALESCE(startingpoint, ''))) = LOWER(TRIM(COALESCE(l.startingpoint, '')))
         AND LOWER(TRIM(COALESCE(destination, ''))) = LOWER(TRIM(COALESCE(l.destination, '')))
+        AND company_reg_num = l.company_reg_num
         AND effective_from <= CURRENT_DATE
         AND (effective_to IS NULL OR effective_to >= CURRENT_DATE)
       ORDER BY startingpoint, destination, effective_from DESC, m5ratekey DESC
       LIMIT 1
     ) dr ON true
-    WHERE 
+    WHERE
       l.m1key = $1
-    ORDER BY 
+      AND l.company_reg_num = $2
+    ORDER BY
       l.legnumber, l.legkey`;
 
   try {
-    const result = await pool.query(query, [instructionId]);
+    const result = await pool.query(query, [instructionId, company_reg_num]);
     const legMap = new Map();
 
     for (const row of result.rows) {
@@ -699,13 +710,13 @@ export const getLegsByInstructionId = async (instructionId) => {
     throw error;
   }
 };
-export const deleteLeg = async (legId) => {
+export const deleteLeg = async (legId, company_reg_num) => {
   const client = await pool.connect();
   try {
     await client.query("BEGIN");
     const legInfo = await client.query(
-      `SELECT legkey, legnumber, m1key FROM legs_m2 WHERE legkey = $1`,
-      [legId]
+      `SELECT legkey, legnumber, m1key FROM legs_m2 WHERE legkey = $1 AND company_reg_num = $2`,
+      [legId, company_reg_num]
     );
     if (legInfo.rows.length === 0)
       throw new Error(`Leg with ID ${legId} not found`);
@@ -716,8 +727,8 @@ export const deleteLeg = async (legId) => {
     // CRITICAL FIX: Delete ALL rows with this legnumber and m1key, not just one row
     // A leg can have multiple drivers, each stored as separate rows with the same legnumber
     const result = await client.query(
-      `DELETE FROM legs_m2 WHERE legnumber = $1 AND m1key = $2`,
-      [legnumber, m1key]
+      `DELETE FROM legs_m2 WHERE legnumber = $1 AND m1key = $2 AND company_reg_num = $3`,
+      [legnumber, m1key, company_reg_num]
     );
     console.log(
       `Deleted ${result.rowCount} rows for leg number ${legnumber} from instruction ${m1key}`
@@ -745,13 +756,13 @@ export const deleteLeg = async (legId) => {
     client.release();
   }
 };
-export const updateLegNumber = async (legId, legnumber) => {
+export const updateLegNumber = async (legId, legnumber, company_reg_num) => {
   const client = await pool.connect();
   try {
     await client.query("BEGIN");
     const info = await client.query(
-      `SELECT m1key, legnumber FROM legs_m2 WHERE legkey = $1`,
-      [legId]
+      `SELECT m1key, legnumber FROM legs_m2 WHERE legkey = $1 AND company_reg_num = $2`,
+      [legId, company_reg_num]
     );
     if (info.rows.length === 0) {
       throw new Error(`Leg with ID ${legId} not found`);
@@ -765,9 +776,9 @@ export const updateLegNumber = async (legId, legnumber) => {
     const result = await client.query(
       `UPDATE legs_m2
        SET legnumber = $1
-       WHERE m1key = $2 AND legnumber = $3
+       WHERE m1key = $2 AND legnumber = $3 AND company_reg_num = $4
        RETURNING legkey`,
-      [legnumber, m1key, previousLegNumber]
+      [legnumber, m1key, previousLegNumber, company_reg_num]
     );
     if (result.rows.length === 0) {
       throw new Error(
@@ -799,10 +810,10 @@ export const updateLegNumber = async (legId, legnumber) => {
     client.release();
   }
 };
-export const getContainersByInstructionId = async (instructionId) => {
-  const query = `SELECT * FROM container WHERE m1key = $1`;
+export const getContainersByInstructionId = async (instructionId, company_reg_num) => {
+  const query = `SELECT * FROM container WHERE m1key = $1 AND company_reg_num = $2`;
   try {
-    const result = await pool.query(query, [instructionId]);
+    const result = await pool.query(query, [instructionId, company_reg_num]);
     return result.rows;
   } catch (error) {
     throw error;
@@ -812,7 +823,7 @@ export const getContainersByInstructionId = async (instructionId) => {
 // Helper to refresh driverrate on legs for a single instruction based on
 // the latest m5_driver_rate values, using roleid (5 = driver, 6 = subbie)
 // and container_type (6m/12m). Only applies to In Progress instructions.
-export const refreshInstructionLegRates = async (instructionId) => {
+export const refreshInstructionLegRates = async (instructionId, company_reg_num) => {
   const client = await pool.connect();
   try {
     await client.query("BEGIN");
@@ -821,7 +832,7 @@ export const refreshInstructionLegRates = async (instructionId) => {
       WITH target_instruction AS (
         SELECT m1key
         FROM m1_controller
-        WHERE m1key = $1 AND LOWER(COALESCE(status, '')) = 'in progress'
+        WHERE m1key = $1 AND company_reg_num = $2 AND LOWER(COALESCE(status, '')) = 'in progress'
       )
       UPDATE public.legs_m2 l
       SET driverrate = CASE
@@ -853,7 +864,7 @@ export const refreshInstructionLegRates = async (instructionId) => {
         AND LOWER(TRIM(COALESCE(dr.destination, ''))) = LOWER(TRIM(COALESCE(l.destination, '')));
     `;
 
-    await client.query(refreshQuery, [instructionId]);
+    await client.query(refreshQuery, [instructionId, company_reg_num]);
 
     await client.query("COMMIT");
   } catch (error) {
@@ -864,10 +875,10 @@ export const refreshInstructionLegRates = async (instructionId) => {
   }
 };
 
-export const completeInstruction = async (instructionId, status) => {
-  const query = `UPDATE m1_controller SET status = $1 WHERE m1key = $2`;
+export const completeInstruction = async (instructionId, status, company_reg_num) => {
+  const query = `UPDATE m1_controller SET status = $1 WHERE m1key = $2 AND company_reg_num = $3`;
   try {
-    await pool.query(query, [status, instructionId]);
+    await pool.query(query, [status, instructionId, company_reg_num]);
   } catch (error) {
     throw error;
   }
@@ -883,21 +894,21 @@ export const completeInstruction = async (instructionId, status) => {
 //   }
 // };
 // Add this new function to your database service
-export const getInstructionDetails = async (instructionId) => {
+export const getInstructionDetails = async (instructionId, company_reg_num) => {
   const query = `
-    SELECT 
-      m1key, 
-      client, 
-      pickup, 
-      dropoff, 
-      status, 
+    SELECT
+      m1key,
+      client,
+      pickup,
+      dropoff,
+      status,
       rateweight,
       weight
-    FROM m1_controller 
-    WHERE m1key = $1
+    FROM m1_controller
+    WHERE m1key = $1 AND company_reg_num = $2
   `;
   try {
-    const result = await pool.query(query, [instructionId]);
+    const result = await pool.query(query, [instructionId, company_reg_num]);
     return result.rows.length > 0 ? result.rows[0] : null;
   } catch (error) {
     throw error;
@@ -914,24 +925,25 @@ export const getDriverById = async (driverId) => {
   }
 };
 
-export const getDriverInstructions = async (driverId) => {
+export const getDriverInstructions = async (driverId, company_reg_num) => {
   const query = `
-    SELECT 
-      m1.m1key, 
+    SELECT
+      m1.m1key,
       m1.pickupdate,
       COUNT(l.legkey) as leg_count
-    FROM 
+    FROM
       public.m1_controller m1
-    JOIN 
+    JOIN
       public.legs_m2 l ON m1.m1key = l.m1key
-    WHERE 
+    WHERE
       l.driverid = $1
-    GROUP BY 
+      AND m1.company_reg_num = $2
+    GROUP BY
       m1.m1key, m1.pickupdate
-    ORDER BY 
+    ORDER BY
       m1.pickupdate DESC`;
   try {
-    const result = await pool.query(query, [driverId]);
+    const result = await pool.query(query, [driverId, company_reg_num]);
     return result.rows;
   } catch (error) {
     throw error;
@@ -965,7 +977,7 @@ export const getLegDetailsByInstructionAndDriver = async (
   }
 };
 
-export const getCompletedDriverLegs = async (driverId, instructionId) => {
+export const getCompletedDriverLegs = async (driverId, instructionId, company_reg_num) => {
   const client = await pool.connect();
   try {
     let query;
@@ -991,8 +1003,9 @@ export const getCompletedDriverLegs = async (driverId, instructionId) => {
           l.driverid = $1::integer
           AND l.m1key = $2::integer
           AND m.status = 'Completed'
+          AND m.company_reg_num = $3
         ORDER BY l.date DESC, l.legnumber`;
-      params = [driverId, instructionId];
+      params = [driverId, instructionId, company_reg_num];
     } else {
       query = `
         SELECT
@@ -1013,8 +1026,9 @@ export const getCompletedDriverLegs = async (driverId, instructionId) => {
         WHERE
           l.driverid = $1::integer
           AND m.status = 'Completed'
+          AND m.company_reg_num = $2
         ORDER BY l.date DESC, l.legnumber`;
-      params = [driverId];
+      params = [driverId, company_reg_num];
     }
     const result = await client.query(query, params);
     return result.rows;
@@ -1025,11 +1039,11 @@ export const getCompletedDriverLegs = async (driverId, instructionId) => {
   }
 };
 
-export const getDriverLegs = async (driverId, instructionId) => {
+export const getDriverLegs = async (driverId, instructionId, company_reg_num) => {
   const client = await pool.connect();
   try {
     let query = `
-      SELECT 
+      SELECT
         l.legkey,
         l.legnumber,
         l.startingpoint,
@@ -1039,13 +1053,14 @@ export const getDriverLegs = async (driverId, instructionId) => {
         l.truckregnumber,
         l.containernumber,
         l.legstatus
-      FROM 
+      FROM
         public.legs_m2 l
-      WHERE 
-        l.driverid = $1::integer`;
-    const queryParams = [driverId];
+      WHERE
+        l.driverid = $1::integer
+        AND l.company_reg_num = $2`;
+    const queryParams = [driverId, company_reg_num];
     if (instructionId) {
-      query += ` AND l.m1key = $2::integer`;
+      query += ` AND l.m1key = $3::integer`;
       queryParams.push(instructionId);
     }
     query += ` ORDER BY l.date DESC, l.legnumber`;
@@ -1058,17 +1073,17 @@ export const getDriverLegs = async (driverId, instructionId) => {
   }
 };
 
-export const getDocuments = async (instructionId) => {
-  const query = "SELECT * FROM documents WHERE m1key = $1";
+export const getDocuments = async (instructionId, company_reg_num) => {
+  const query = "SELECT * FROM documents WHERE m1key = $1 AND company_reg_num = $2";
   try {
-    const result = await pool.query(query, [instructionId]);
+    const result = await pool.query(query, [instructionId, company_reg_num]);
     return result.rows;
   } catch (error) {
     throw error;
   }
 };
 
-export const generateInvoice = async (instructionId) => {
+export const generateInvoice = async (instructionId, company_reg_num) => {
   const client = await pool.connect();
   try {
     // Check if a record already exists for this instructionId
@@ -1106,8 +1121,8 @@ export const generateInvoice = async (instructionId) => {
     const monthName = monthNames[currentMonth - 1];
 
     const instructionResult = await client.query(
-      "SELECT client, m1key FROM m1_controller WHERE m1key = $1",
-      [instructionId]
+      "SELECT client, m1key FROM m1_controller WHERE m1key = $1 AND company_reg_num = $2",
+      [instructionId, company_reg_num]
     );
 
     if (instructionResult.rows.length === 0)
@@ -1138,8 +1153,8 @@ export const generateInvoice = async (instructionId) => {
     const invoiceDate = firstLegDate || currentDate;
 
     const insertResult = await client.query(
-      "INSERT INTO invoice (clientid, m1key, invoice_num, groupid, date) VALUES ($1, $2, $3, $4, $5) RETURNING ikey",
-      [clientId, m1key, invoiceNum, groupId, invoiceDate]
+      "INSERT INTO invoice (clientid, m1key, invoice_num, groupid, date, company_reg_num) VALUES ($1, $2, $3, $4, $5, $6) RETURNING ikey",
+      [clientId, m1key, invoiceNum, groupId, invoiceDate, company_reg_num]
     );
 
     return {

@@ -1,7 +1,7 @@
 import { pool } from "../../config/database.js";
 
 // Re-use the exact same wage calculation logic as analytics
-async function getTotalWagesForMonth(client, month, year) {
+async function getTotalWagesForMonth(client, month, year, company_reg_num) {
   const monthNames = [
     "January", "February", "March", "April", "May", "June",
     "July", "August", "September", "October", "November", "December"
@@ -14,8 +14,9 @@ async function getTotalWagesForMonth(client, month, year) {
     SELECT userid
     FROM m5_employee
     WHERE roleid != 6
+    AND company_reg_num = $1
   `;
-  const empRes = await client.query(employeesQuery);
+  const empRes = await client.query(employeesQuery, [company_reg_num]);
   const employees = empRes.rows;
 
   let totalSum = 0;
@@ -32,9 +33,9 @@ async function getTotalWagesForMonth(client, month, year) {
 
     const storedQuery = `
       SELECT net_pay as total_payable
-      FROM wages 
-      WHERE employeeid = $1 
-        AND EXTRACT(MONTH FROM employee_date) = $2 
+      FROM wages
+      WHERE employeeid = $1
+        AND EXTRACT(MONTH FROM employee_date) = $2
         AND EXTRACT(YEAR FROM employee_date) = $3
     `;
     const storedRes = await client.query(storedQuery, [employeeId, monthNumber, year]);
@@ -107,7 +108,7 @@ async function calculateTotalPayable(client, employeeId, month, year) {
   return afterLoan + additions;
 }
 
-const getProfitLossData = async (month, year) => {
+const getProfitLossData = async (month, year, company_reg_num) => {
   let client;
   try {
     client = await pool.connect();
@@ -132,6 +133,7 @@ const getProfitLossData = async (month, year) => {
         WHERE e.roleid = 6
           AND TRIM(TO_CHAR(m.created_at, 'Month')) = $1
           AND EXTRACT(YEAR FROM m.created_at)::text = $2
+          AND m.company_reg_num = $3
       ),
       InvoiceTurnover AS (
         SELECT COALESCE(SUM(m.total_cost), 0) AS invoice_total
@@ -139,14 +141,15 @@ const getProfitLossData = async (month, year) => {
         JOIN m1_controller m ON i.m1key = m.m1key
         WHERE TRIM(TO_CHAR(i.date, 'Month')) = $1
           AND EXTRACT(YEAR FROM i.date)::text = $2
+          AND m.company_reg_num = $3
       )
-      SELECT 
+      SELECT
         it.invoice_total + COALESCE(ss.subcontractor_turnover, 0) AS invoice_turnover
       FROM InvoiceTurnover it
       CROSS JOIN (SELECT COALESCE(subcontractor_turnover, 0) AS subcontractor_turnover FROM SubcontractorShare) ss;
     `;
 
-    const turnoverResult = await client.query(turnoverQuery, [month, year]);
+    const turnoverResult = await client.query(turnoverQuery, [month, year, company_reg_num]);
     const invoiceTurnover = Number(turnoverResult.rows[0]?.invoice_turnover || 0);
 
     const totalIncome = invoiceTurnover;
@@ -157,16 +160,18 @@ const getProfitLossData = async (month, year) => {
        FROM expenses_m2
        WHERE type = 'fuel'
          AND TRIM(TO_CHAR(slipuploaddate, 'Month')) = $1
-         AND EXTRACT(YEAR FROM slipuploaddate)::text = $2`,
-      [month, year]
+         AND EXTRACT(YEAR FROM slipuploaddate)::text = $2
+         AND company_reg_num = $3`,
+      [month, year, company_reg_num]
     )).rows[0].total || 0);
 
     const purchaseOrders = Number((await client.query(
       `SELECT COALESCE(SUM(total), 0) AS total
        FROM purchase_orders
        WHERE TRIM(TO_CHAR(date, 'Month')) = $1
-         AND EXTRACT(YEAR FROM date)::text = $2`,
-      [month, year]
+         AND EXTRACT(YEAR FROM date)::text = $2
+         AND company_reg_num = $3`,
+      [month, year, company_reg_num]
     )).rows[0].total || 0);
 
     const subcontractors = Number((await client.query(
@@ -175,11 +180,12 @@ const getProfitLossData = async (month, year) => {
        JOIN m5_employee e ON l.driverid = e.userid
        WHERE e.roleid = 6
          AND TRIM(TO_CHAR(l.date, 'Month')) = $1
-         AND EXTRACT(YEAR FROM l.date)::text = $2`,
-      [month, year]
+         AND EXTRACT(YEAR FROM l.date)::text = $2
+         AND e.company_reg_num = $3`,
+      [month, year, company_reg_num]
     )).rows[0].total || 0);
 
-    const wages = await getTotalWagesForMonth(client, month, year);
+    const wages = await getTotalWagesForMonth(client, month, year, company_reg_num);
 
     // FIXED: Credit Notes — unnest safely using LATERAL
     const creditNotesResult = await client.query(
@@ -187,8 +193,9 @@ const getProfitLossData = async (month, year) => {
        FROM credit_notes cn
        CROSS JOIN LATERAL unnest(cn.amount) AS t(val)
        WHERE TRIM(TO_CHAR(cn.creditnote_date, 'Month')) = $1
-         AND EXTRACT(YEAR FROM cn.creditnote_date)::text = $2`,
-      [month, year]
+         AND EXTRACT(YEAR FROM cn.creditnote_date)::text = $2
+         AND cn.company_reg_num = $3`,
+      [month, year, company_reg_num]
     );
     const creditNotes = Number(creditNotesResult.rows[0]?.total || 0);
 

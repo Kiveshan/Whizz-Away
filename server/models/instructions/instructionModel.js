@@ -65,29 +65,30 @@ export const getShipmentTypes = async () => {
   return result.recordset || result.rows;
 };
 
-export const getContainersByInstructionId = async (instructionId) => {
+export const getContainersByInstructionId = async (instructionId, company_reg_num) => {
   // Convert instructionId to string to match database type
   const instructionIdStr = String(instructionId);
   const sql = `
-    SELECT 
-      containerkey,
-      containernum,
-      weight,
-      m1key,
-      container_type,
-      cargo_description,
-      "Hazardous",
-      "Add Surcharges",
-      "Surcharge Amount",
-      is_12m_surcharge,
-      surcharge_12m_amount,
-      "Hazardous Amount",
-      file_ref,
-      vgm,
-      "vgm amount"
-    FROM public.container
-    WHERE m1key = $1
-    ORDER BY containerkey
+    SELECT
+      c.containerkey,
+      c.containernum,
+      c.weight,
+      c.m1key,
+      c.container_type,
+      c.cargo_description,
+      c."Hazardous",
+      c."Add Surcharges",
+      c."Surcharge Amount",
+      c.is_12m_surcharge,
+      c.surcharge_12m_amount,
+      c."Hazardous Amount",
+      c.file_ref,
+      c.vgm,
+      c."vgm amount"
+    FROM public.container c
+    JOIN public.m1_controller m ON c.m1key = m.m1key
+    WHERE c.m1key = $1 AND m.company_reg_num = $2
+    ORDER BY c.containerkey
   `;
 
   console.log(
@@ -95,7 +96,7 @@ export const getContainersByInstructionId = async (instructionId) => {
     {
       query: sql,
       sql,
-      params: [instructionIdStr],
+      params: [instructionIdStr, company_reg_num],
       instructionId,
       instructionIdType: typeof instructionId,
       instructionIdStr,
@@ -104,7 +105,7 @@ export const getContainersByInstructionId = async (instructionId) => {
   );
 
   try {
-    const result = await query(sql, [instructionIdStr]);
+    const result = await query(sql, [instructionIdStr, company_reg_num]);
     const duration = result.duration || 0;
 
     console.log(
@@ -243,6 +244,7 @@ export const saveInstruction = async ({
   controllerData,
   containerData = [],
   weightData = [],
+  company_reg_num,
 }) => {
   const client = await pool.connect();
   try {
@@ -254,17 +256,17 @@ export const saveInstruction = async ({
 
     const controllerQuery = `
       INSERT INTO public.m1_controller (
-        client, "ksmFileRef", shipment_type, pickup, dropoff, 
-        stackdate, "lastFreeDate", "clientFileRef", rateweight, 
+        client, "ksmFileRef", shipment_type, pickup, dropoff,
+        stackdate, "lastFreeDate", "clientFileRef", rateweight,
         description, status, vat,
         num_six_meters, num_twelve_meters, num_abnormal, num_breakbulk,
         weight, total_cost, booking_ref, vessel_name,
         rateper_6, rateper_12, rateper_abnormal, rateper_breakbulk, unitrate,
-        is_set_rate, historical_set_rate, created_at
+        is_set_rate, historical_set_rate, created_at, company_reg_num
       ) VALUES (
-        $1, $2, $3, $4, $5, 
+        $1, $2, $3, $4, $5,
         $6, $7, $8, $9, $10, $11, $12, $13, $14, $15,
-        $16, $17, $18, $19, $20, $21, $22, $23, $24, $25, $26, $27, $28
+        $16, $17, $18, $19, $20, $21, $22, $23, $24, $25, $26, $27, $28, $29
       ) RETURNING m1key
     `;
 
@@ -446,6 +448,7 @@ export const saveInstruction = async ({
       fields.is_set_rate, // Set rate flag
       fields.historical_set_rate, // Historical set rate value
       formatDate(new Date()), // Current date for created_at
+      company_reg_num,
     ];
 
     const controllerResult = await client.query(
@@ -886,12 +889,12 @@ export const saveInstruction = async ({
   }
 };
 
-export const getClientInstructionStats = async () => {
+export const getClientInstructionStats = async (company_reg_num) => {
   const statusCheckQuery = `
-    SELECT DISTINCT status FROM public.m1_controller
+    SELECT DISTINCT status FROM public.m1_controller WHERE company_reg_num = $1
   `;
   const queryText = `
-    SELECT 
+    SELECT
       c.m5clientkey,
       c.client AS companyname,
       c.representative,
@@ -901,25 +904,26 @@ export const getClientInstructionStats = async () => {
       SUM(CASE WHEN m.status = 'New' THEN 1 ELSE 0 END) as new_count,
       SUM(CASE WHEN LOWER(m.status) = 'in progress' THEN 1 ELSE 0 END) as in_progress_count,
       SUM(CASE WHEN m.status = 'Completed' THEN 1 ELSE 0 END) as completed_count
-    FROM 
+    FROM
       public.m5_client c
-    LEFT JOIN 
-      public.m1_controller m ON c.m5clientkey = m.client
-    WHERE 
+    LEFT JOIN
+      public.m1_controller m ON c.m5clientkey = m.client AND m.company_reg_num = $1
+    WHERE
       c.status = true
-    GROUP BY 
+      AND c.company_reg_num = $1
+    GROUP BY
       c.m5clientkey, c.client, c.representative, c.email
-    ORDER BY 
+    ORDER BY
       c.client
   `;
   const client = await pool.connect();
   try {
-    const statusResult = await client.query(statusCheckQuery);
+    const statusResult = await client.query(statusCheckQuery, [company_reg_num]);
     console.log(
       "Available status values in database:",
       statusResult.rows.map((row) => row.status)
     );
-    const result = await client.query(queryText);
+    const result = await client.query(queryText, [company_reg_num]);
     return result.rows;
   } catch (error) {
     throw error;
@@ -989,7 +993,7 @@ export const ensureCreatedAtColumnExists = async () => {
   }
 };
 
-export const getInstructions = async (clientId) => {
+export const getInstructions = async (clientId, company_reg_num) => {
   console.log(
     `[${new Date().toISOString()}] getInstructions: Starting with clientId:`,
     clientId
@@ -999,7 +1003,7 @@ export const getInstructions = async (clientId) => {
   await ensureCreatedAtColumnExists();
 
   let sql = `
-    SELECT 
+    SELECT
       m.m1key,
       m."clientFileRef" as fileno,
       m."clientFileRef" as client_ref,
@@ -1021,18 +1025,19 @@ export const getInstructions = async (clientId) => {
         WHERE cn.m1key = m.m1key
       ) AS has_valid_containers,
       i.invoice_num
-    FROM 
+    FROM
       public.m1_controller m
-    JOIN 
+    JOIN
       public.m5_client c ON m.client = c.m5clientkey
     LEFT JOIN
       public.shipment s ON m.shipment_type = s.shipkey
     LEFT JOIN
       public.invoice i ON m.m1key = i.m1key
+    WHERE m.company_reg_num = $1
   `;
-  const queryParams = [];
+  const queryParams = [company_reg_num];
   if (clientId) {
-    sql += ` WHERE m.client = $1`;
+    sql += ` AND m.client = $2`;
     queryParams.push(clientId);
   }
   sql += ` ORDER BY m.created_at DESC`;
@@ -1080,24 +1085,25 @@ export const getInstructions = async (clientId) => {
   }
 };
 
-export const getInstructionById = async (instructionId) => {
+export const getInstructionById = async (instructionId, company_reg_num) => {
   const sql = `
     WITH instruction_data AS (
-      SELECT 
+      SELECT
         m.*,
         c.client AS companyname,
         c.representative,
         c.cellnum,
         c.email,
         s.shipmenttype
-      FROM 
+      FROM
         public.m1_controller m
-      JOIN 
+      JOIN
         public.m5_client c ON m.client = c.m5clientkey
       JOIN
         public.shipment s ON m.shipment_type = s.shipkey
-      WHERE 
+      WHERE
         m.m1key = $1
+        AND m.company_reg_num = $2
     ),
     container_data AS (
       SELECT 
@@ -1179,15 +1185,15 @@ export const getInstructionById = async (instructionId) => {
         ),
         '[]'::json
       ) AS weight_rows
-    FROM 
+    FROM
       instruction_data i`;
-  const result = await query(sql, [instructionId]);
+  const result = await query(sql, [instructionId, company_reg_num]);
   return (result.recordset || result.rows || []).length > 0
     ? (result.recordset || result.rows)[0]
     : null;
 };
 
-export const updateInstruction = async (instructionId, updatedData) => {
+export const updateInstruction = async (instructionId, updatedData, company_reg_num) => {
   const client = await pool.connect();
   try {
     await client.query("BEGIN");
@@ -1226,9 +1232,10 @@ export const updateInstruction = async (instructionId, updatedData) => {
         rateper_12 = $22,
         rateper_abnormal = $23,
         rateper_breakbulk = $24,
-        unitrate = $25,
-        
-      WHERE m1key = $29 -- adjusted parameter number
+        unitrate = $25
+
+      WHERE m1key = $29
+      AND company_reg_num = $30
       RETURNING *
     `;
 
@@ -1265,6 +1272,7 @@ export const updateInstruction = async (instructionId, updatedData) => {
       updatedData.unitrate,
       updatedData.surcharge,
       instructionId,
+      company_reg_num,
     ];
 
     const result = await client.query(queryText, values);
@@ -1951,7 +1959,8 @@ export const updateFCInstructionAndContainers = async (
   instructionId,
   instructionData,
   containerData,
-  weightData = []
+  weightData = [],
+  company_reg_num
 ) => {
   const client = await pool.connect();
   try {
@@ -2209,13 +2218,13 @@ export const updateFCInstructionAndContainers = async (
 
       const updateInstructionQuery = `
         UPDATE public.m1_controller
-        SET 
+        SET
           client = $1, "ksmFileRef" = $2, shipment_type = $3, pickup = $4, dropoff = $5,
           stackdate = $6, "lastFreeDate" = $7, "clientFileRef" = $8, rateweight = $9, description = $10,
           status = $11, vat = $12, num_six_meters = $13, num_twelve_meters = $14, num_abnormal = $15,
           num_breakbulk = $16, weight = $17, total_cost = $18, booking_ref = $19, vessel_name = $20,
           rateper_6 = $21, rateper_12 = $22, rateper_abnormal = $23, rateper_breakbulk = $24, unitrate = $25, is_set_rate = $26, historical_set_rate = $27, created_at = $28
-        WHERE m1key = $29
+        WHERE m1key = $29 AND company_reg_num = $30
         RETURNING *
       `;
 
@@ -2250,6 +2259,7 @@ export const updateFCInstructionAndContainers = async (
         updateData.historical_set_rate,
         updateData.created_at,
         instructionId,
+        company_reg_num,
       ];
 
       console.log(
@@ -2917,7 +2927,8 @@ export const updateFCInstructionAndContainers = async (
 
 export const saveInstructionAndContainers = async (
   controllerData,
-  containerData
+  containerData,
+  company_reg_num
 ) => {
   const client = await pool.connect();
   try {
@@ -2938,10 +2949,10 @@ export const saveInstructionAndContainers = async (
         stackdate, "lastFreeDate", "clientFileRef", rateweight, description,
         status, vat, num_six_meters, num_twelve_meters, num_abnormal, num_breakbulk,
         weight, total_cost, booking_ref, vessel_name, rateper_6, rateper_12,
-        rateper_abnormal, rateper_breakbulk, unitrate
+        rateper_abnormal, rateper_breakbulk, unitrate, company_reg_num
       ) VALUES (
         $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14,
-        $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25, $26, $27
+        $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25, $26, $27, $28
       ) RETURNING m1key
     `;
 
@@ -2973,6 +2984,7 @@ export const saveInstructionAndContainers = async (
       controllerData.rateper_abnormal,
       controllerData.rateper_breakbulk,
       controllerData.unitrate,
+      company_reg_num,
     ];
 
     const instructionResult = await client.query(
@@ -3222,17 +3234,17 @@ export const saveInstructionAndContainers = async (
 };
 
 // Function to delete an instruction and its associated containers
-export const deleteInstruction = async (instructionId) => {
+export const deleteInstruction = async (instructionId, company_reg_num) => {
   const client = await pool.connect();
   try {
     await client.query("BEGIN");
 
     // First check if the instruction exists and has an allowed status
     const checkQuery = `
-      SELECT status FROM public.m1_controller 
-      WHERE m1key = $1
+      SELECT status FROM public.m1_controller
+      WHERE m1key = $1 AND company_reg_num = $2
     `;
-    const checkResult = await client.query(checkQuery, [instructionId]);
+    const checkResult = await client.query(checkQuery, [instructionId, company_reg_num]);
 
     if (checkResult.rows.length === 0) {
       throw new Error("Instruction not found");
@@ -3276,10 +3288,10 @@ export const deleteInstruction = async (instructionId) => {
 
     // Then delete the instruction
     const deleteInstructionQuery = `
-      DELETE FROM public.m1_controller 
-      WHERE m1key = $1
+      DELETE FROM public.m1_controller
+      WHERE m1key = $1 AND company_reg_num = $2
     `;
-    const result = await client.query(deleteInstructionQuery, [instructionId]);
+    const result = await client.query(deleteInstructionQuery, [instructionId, company_reg_num]);
 
     await client.query("COMMIT");
     return { success: true, deletedRows: result.rowCount };

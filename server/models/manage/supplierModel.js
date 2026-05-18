@@ -1,13 +1,13 @@
 import { query, pool } from "../../config/database.js"
 
-export const getAllSuppliers = async (page = 1, limit = 10, search = "") => {
+export const getAllSuppliers = async (page = 1, limit = 10, search = "", company_reg_num) => {
   try {
     const offset = (page - 1) * limit
 
     // Build WHERE clause - removed status filtering
-    let whereClause = "WHERE 1=1"
-    const params = []
-    let paramCount = 0
+    let whereClause = "WHERE s.company_reg_num = $1"
+    const params = [company_reg_num]
+    let paramCount = 1
 
     if (search) {
       paramCount++
@@ -76,10 +76,10 @@ export const getAllSuppliers = async (page = 1, limit = 10, search = "") => {
   }
 }
 
-export const getSupplierById = async (id) => {
+export const getSupplierById = async (id, company_reg_num) => {
   try {
     const result = await query(
-      `SELECT 
+      `SELECT
         s.supplier_id,
         s.supplier,
         s.representative,
@@ -95,26 +95,26 @@ export const getSupplierById = async (id) => {
         s.status,
         COALESCE(
           json_agg(
-            CASE 
-              WHEN et.id IS NOT NULL 
+            CASE
+              WHEN et.id IS NOT NULL
               THEN json_build_object('id', et.id, 'expense', et.expense)
-              ELSE NULL 
+              ELSE NULL
             END
-          ) FILTER (WHERE et.id IS NOT NULL), 
+          ) FILTER (WHERE et.id IS NOT NULL),
           '[]'::json
         ) as expense_types,
         COALESCE(
-          array_agg(et.id) FILTER (WHERE et.id IS NOT NULL), 
+          array_agg(et.id) FILTER (WHERE et.id IS NOT NULL),
           ARRAY[]::integer[]
         ) as expense_type_ids
       FROM suppliers s
       LEFT JOIN supplier_expense_types set ON s.supplier_id = set.se_id
       LEFT JOIN expense_types et ON set.expense_type_id = et.id
-      WHERE s.supplier_id = $1
-      GROUP BY s.supplier_id, s.supplier, s.representative, s.address, s.suburb, 
-               s.postalcode, s.email, s.cellnum, s.vatregno, s.city, 
+      WHERE s.supplier_id = $1 AND s.company_reg_num = $2
+      GROUP BY s.supplier_id, s.supplier, s.representative, s.address, s.suburb,
+               s.postalcode, s.email, s.cellnum, s.vatregno, s.city,
                s.streetaddress, s.payment_type, s.status`,
-      [id],
+      [id, company_reg_num],
     )
 
     if (result.rows.length === 0) {
@@ -133,7 +133,7 @@ export const getSupplierById = async (id) => {
   }
 }
 
-export const createSupplier = async (supplierData) => {
+export const createSupplier = async (supplierData, company_reg_num) => {
   const client = await pool.connect()
 
   try {
@@ -159,10 +159,10 @@ export const createSupplier = async (supplierData) => {
     // Insert supplier
     const supplierResult = await client.query(
       `INSERT INTO suppliers (
-        supplier, representative, address, suburb, postalcode, 
-        email, cellnum, vatregno, city, streetaddress, payment_type
-      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11) 
-      RETURNING supplier_id, supplier, representative, address, suburb, postalcode, 
+        supplier, representative, address, suburb, postalcode,
+        email, cellnum, vatregno, city, streetaddress, payment_type, company_reg_num
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
+      RETURNING supplier_id, supplier, representative, address, suburb, postalcode,
                 email, cellnum, vatregno, city, streetaddress, payment_type, status`,
       [
         supplier,
@@ -176,6 +176,7 @@ export const createSupplier = async (supplierData) => {
         city || null,
         streetaddress || null,
         payment_type || null,
+        company_reg_num,
       ],
     )
 
@@ -209,7 +210,7 @@ export const createSupplier = async (supplierData) => {
   }
 }
 
-export const updateSupplier = async (id, supplierData) => {
+export const updateSupplier = async (id, supplierData, company_reg_num) => {
   const client = await pool.connect()
 
   try {
@@ -234,11 +235,11 @@ export const updateSupplier = async (id, supplierData) => {
 
     // Update supplier
     const supplierResult = await client.query(
-      `UPDATE suppliers SET 
+      `UPDATE suppliers SET
         supplier = $1, representative = $2, address = $3, suburb = $4, postalcode = $5,
         email = $6, cellnum = $7, vatregno = $8, city = $9, streetaddress = $10, payment_type = $11
-      WHERE supplier_id = $12
-      RETURNING supplier_id, supplier, representative, address, suburb, postalcode, 
+      WHERE supplier_id = $12 AND company_reg_num = $13
+      RETURNING supplier_id, supplier, representative, address, suburb, postalcode,
                 email, cellnum, vatregno, city, streetaddress, payment_type, status`,
       [
         supplier,
@@ -253,6 +254,7 @@ export const updateSupplier = async (id, supplierData) => {
         streetaddress || null,
         payment_type || null,
         id,
+        company_reg_num,
       ],
     )
 
@@ -289,10 +291,13 @@ export const updateSupplier = async (id, supplierData) => {
   }
 }
 
-export const deleteSupplier = async (id) => {
+export const deleteSupplier = async (id, company_reg_num) => {
   try {
     // The CASCADE constraint will automatically delete related records in supplier_expense_types
-    const result = await query("DELETE FROM suppliers WHERE supplier_id = $1", [id])
+    const result = await query(
+      "DELETE FROM suppliers WHERE supplier_id = $1 AND company_reg_num = $2",
+      [id, company_reg_num],
+    )
     return result.rowCount > 0
   } catch (error) {
     console.error("Error in deleteSupplier:", error)
@@ -300,16 +305,16 @@ export const deleteSupplier = async (id) => {
   }
 }
 
-export const toggleSupplierStatus = async (id) => {
+export const toggleSupplierStatus = async (id, company_reg_num) => {
   try {
     console.log("Toggling supplier status for ID:", id)
 
     const result = await query(
-      `UPDATE suppliers SET status = NOT status 
-      WHERE supplier_id = $1 
-      RETURNING supplier_id, supplier, representative, address, suburb, postalcode, 
+      `UPDATE suppliers SET status = NOT status
+      WHERE supplier_id = $1 AND company_reg_num = $2
+      RETURNING supplier_id, supplier, representative, address, suburb, postalcode,
                 email, cellnum, vatregno, city, streetaddress, payment_type, status`,
-      [id],
+      [id, company_reg_num],
     )
 
     console.log("Toggle result:", result.rows)

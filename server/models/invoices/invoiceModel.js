@@ -1,6 +1,6 @@
 import { pool, query } from "../../config/database.js";
 
-const getCompletedInvoices = async ({ year, month, type, clientId }) => {
+const getCompletedInvoices = async ({ year, month, type, clientId, company_reg_num }) => {
   try {
     if (!pool) {
       throw new Error(
@@ -35,6 +35,10 @@ const getCompletedInvoices = async ({ year, month, type, clientId }) => {
       paramIndex++;
     }
 
+    queryText += ` ${clientId ? "AND" : "WHERE"} m1.company_reg_num = $${paramIndex}`;
+    queryParams.push(company_reg_num);
+    paramIndex++;
+
     if (type && type !== "All") {
       queryText += ` AND s.shipmenttype = $${paramIndex}`;
       queryParams.push(type);
@@ -67,7 +71,7 @@ const getCompletedInvoices = async ({ year, month, type, clientId }) => {
 };
 
 // In invoiceModel.js - Update the getInvoiceDetails function
-const getInvoiceDetails = async (id) => {
+const getInvoiceDetails = async (id, company_reg_num) => {
   let client;
   try {
     if (!pool) {
@@ -130,11 +134,12 @@ const getInvoiceDetails = async (id) => {
       LEFT JOIN 
         public.m5_client c ON i.clientid = c.m5clientkey
       INNER JOIN
-        usertable ut ON ut.roleid = 1 AND ut.status = 'active'
-      WHERE 
+        usertable ut ON ut.roleid = 1 AND ut.status = 'active' AND ut.company_reg_num = $2
+      WHERE
         i.ikey = $1
+        AND m1.company_reg_num = $2
     `;
-    const result = await query(queryText, [id]);
+    const result = await query(queryText, [id, company_reg_num]);
 
     if (result.rows.length === 0) {
       return { success: false, message: "Instruction not found" };
@@ -331,6 +336,7 @@ const updateInstructionDetails = async ({
   invoice_num,
   additional_destination_info, // New parameter
   date,
+  company_reg_num,
 }) => {
   try {
     if (!pool) {
@@ -396,7 +402,7 @@ const updateInstructionDetails = async ({
 
       // Check if invoice_num already exists
       if (invoice_num !== undefined) {
-        const invoiceNumCheck = await checkInvoiceNumExists(invoice_num, m1key);
+        const invoiceNumCheck = await checkInvoiceNumExists(invoice_num, m1key, company_reg_num);
         if (invoiceNumCheck.exists) {
           throw new Error("Invoice number already exists in the database");
         }
@@ -421,11 +427,13 @@ const updateInstructionDetails = async ({
         }
 
         m1QueryParams.push(m1key);
+        m1QueryParams.push(company_reg_num);
 
         const m1QueryText = `
           UPDATE public.m1_controller
           SET ${m1UpdateFields.join(", ")}
           WHERE m1key = $${paramIndex}
+            AND company_reg_num = $${paramIndex + 1}
           RETURNING m1key, dropoff, total_cost
         `;
 
@@ -467,11 +475,13 @@ const updateInstructionDetails = async ({
         }
 
         invoiceQueryParams.push(m1key);
+        invoiceQueryParams.push(company_reg_num);
 
         const invoiceQueryText = `
           UPDATE public.invoice
           SET ${invoiceUpdateFields.join(", ")}
           WHERE m1key = $${paramIndex}
+            AND company_reg_num = $${paramIndex + 1}
           RETURNING ikey, invoice_num, additional_destination_info, date
         `;
 
@@ -518,7 +528,7 @@ const updateInstructionDetails = async ({
 };
 
 // Check if an m1key exists in the invoice table
-const checkInvoiceExists = async (m1key) => {
+const checkInvoiceExists = async (m1key, company_reg_num) => {
   try {
     if (!pool) {
       throw new Error(
@@ -530,9 +540,10 @@ const checkInvoiceExists = async (m1key) => {
       SELECT COUNT(*) as count
       FROM public.invoice
       WHERE m1key = $1
+        AND company_reg_num = $2
     `;
 
-    const result = await query(queryText, [m1key]);
+    const result = await query(queryText, [m1key, company_reg_num]);
     const count = Number.parseInt(result.rows[0].count, 10);
 
     return {
@@ -550,7 +561,7 @@ const checkInvoiceExists = async (m1key) => {
 };
 
 // Check if an invoice number already exists in the invoice table
-const checkInvoiceNumExists = async (invoice_num, m1key) => {
+const checkInvoiceNumExists = async (invoice_num, m1key, company_reg_num) => {
   try {
     if (!pool) {
       throw new Error(
@@ -561,10 +572,12 @@ const checkInvoiceNumExists = async (invoice_num, m1key) => {
     const queryText = `
       SELECT COUNT(*) as count
       FROM public.invoice
-      WHERE invoice_num = $1 AND m1key != $2
+      WHERE invoice_num = $1
+        AND m1key != $2
+        AND company_reg_num = $3
     `;
 
-    const result = await query(queryText, [invoice_num, m1key]);
+    const result = await query(queryText, [invoice_num, m1key, company_reg_num]);
     const count = Number.parseInt(result.rows[0].count, 10);
 
     return {
@@ -582,7 +595,7 @@ const checkInvoiceNumExists = async (invoice_num, m1key) => {
 };
 
 // Create a new invoice for an instruction
-const createInvoice = async ({ m1key, clientId }) => {
+const createInvoice = async ({ m1key, clientId, company_reg_num }) => {
   try {
     if (!pool) {
       throw new Error(
@@ -591,7 +604,7 @@ const createInvoice = async ({ m1key, clientId }) => {
     }
 
     // Check if invoice already exists for this m1key
-    const existsCheck = await checkInvoiceExists(m1key);
+    const existsCheck = await checkInvoiceExists(m1key, company_reg_num);
     if (existsCheck.exists) {
       return {
         success: false,
@@ -618,8 +631,8 @@ const createInvoice = async ({ m1key, clientId }) => {
     // Insert the new invoice
     const insertQueryText = `
       INSERT INTO public.invoice
-      (clientid, m1key, invoice_num, date)
-      VALUES ($1, $2, $3, $4)
+      (clientid, m1key, invoice_num, date, company_reg_num)
+      VALUES ($1, $2, $3, $4, $5)
       RETURNING ikey
     `;
 
@@ -641,6 +654,7 @@ const createInvoice = async ({ m1key, clientId }) => {
       m1key,
       invoiceNum,
       invoiceDate,
+      company_reg_num,
     ]);
 
     return {
@@ -661,7 +675,7 @@ const createInvoice = async ({ m1key, clientId }) => {
 
 
 // Helper function to get instruction details for preview
-const getInstructionDetailsForPreview = async (instructionId) => {
+const getInstructionDetailsForPreview = async (instructionId, company_reg_num) => {
   try {
     if (!pool) {
       throw new Error("Database connection not established");
@@ -703,9 +717,10 @@ const getInstructionDetailsForPreview = async (instructionId) => {
         LEFT JOIN public.m5_client c ON m1.client = c.m5clientkey
         LEFT JOIN public.shipment s ON m1.shipment_type = s.shipkey
         WHERE m1.m1key = $1
+          AND m1.company_reg_num = $2
       `;
-      
-      const m1Result = await client.query(m1Query, [instructionId]);
+
+      const m1Result = await client.query(m1Query, [instructionId, company_reg_num]);
       
       if (m1Result.rows.length === 0) {
         return { success: false, message: "Instruction not found" };
@@ -753,12 +768,12 @@ const getInstructionDetailsForPreview = async (instructionId) => {
           swift_code,
           account_num,
           COALESCE(cell_num, cell_num2) AS phonenumber
-        FROM usertable 
-        WHERE roleid = 1 AND status = 'active'
+        FROM usertable
+        WHERE roleid = 1 AND status = 'active' AND company_reg_num = $1
         LIMIT 1
       `;
       
-      const companyResult = await client.query(companyQuery);
+      const companyResult = await client.query(companyQuery, [company_reg_num]);
 
       const baseRates = {
         rateper_6: m1Result.rows[0].rateper_6 || 0,

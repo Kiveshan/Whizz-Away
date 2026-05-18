@@ -1,6 +1,6 @@
 import { pool, query } from "../../config/database.js";
 
-const getClientStatements = async (clientId, { year, month }) => {
+const getClientStatements = async (clientId, { year, month }, company_reg_num) => {
   try {
     if (!pool) {
       throw new Error(
@@ -14,11 +14,12 @@ const getClientStatements = async (clientId, { year, month }) => {
         generation_date
       FROM 
         statements
-      WHERE 
+      WHERE
         clientid = $1
+        AND company_reg_num = $2
     `;
-    const queryParams = [clientId];
-    let paramIndex = 2;
+    const queryParams = [clientId, company_reg_num];
+    let paramIndex = 3;
 
     if (year) {
       // Filter by the year of generation_date - 1 day so statements generated
@@ -43,7 +44,7 @@ const getClientStatements = async (clientId, { year, month }) => {
   }
 };
 
-const getStatementDetails = async (statementId) => {
+const getStatementDetails = async (statementId, company_reg_num) => {
   let client;
   try {
     if (!pool) {
@@ -107,10 +108,11 @@ const getStatementDetails = async (statementId) => {
       ON a2.client_id = s.clientid
       AND a2.date >= DATE_TRUNC('month', s.generation_date - INTERVAL '1 month')
       AND a2.date < s.generation_date
-    INNER JOIN usertable ut ON ut.roleid = 1 AND ut.status = 'active'
+    INNER JOIN usertable ut ON ut.roleid = 1 AND ut.status = 'active' AND ut.company_reg_num = $2
     WHERE s.statement_key = $1
+      AND s.company_reg_num = $2
   `;
-    const result = await query(queryText, [statementId]);
+    const result = await query(queryText, [statementId, company_reg_num]);
 
     if (result.rows.length === 0) {
       return { success: false, message: "Statement not found" };
@@ -149,33 +151,35 @@ const getStatementDetails = async (statementId) => {
     const formattedPaymentEndDate = paymentEndDate.toISOString().split("T")[0];
 
     const paymentsQuery = `
-      SELECT 
+      SELECT
         p.paykey,
         (item->>'line_date')::date AS date,
         (item->>'this_payment')::numeric AS amount,
         item->>'line_reference' AS reference,
         item->>'invoice_num' AS invoice_num
-      FROM 
+      FROM
         payment_m3 p
       CROSS JOIN LATERAL jsonb_array_elements(p.line_items) AS item
-      WHERE 
+      WHERE
         p.clientid = $1
+        AND p.company_reg_num = $4
         AND (item->>'line_date')::date BETWEEN $2 AND $3
     `;
     const creditNotesQuery = `
-      SELECT 
+      SELECT
         cn.creditnote_id,
         cn.creditnote_date AS date,
         SUM(cn_amount.amount) AS amount,
         cn.doc_no AS reference,
         cn.description
-      FROM 
+      FROM
         credit_notes cn
       CROSS JOIN LATERAL unnest(cn.amount) AS cn_amount(amount)
-      WHERE 
+      WHERE
         cn.client_id = $1
+        AND cn.company_reg_num = $4
         AND cn.creditnote_date BETWEEN $2 AND $3
-      GROUP BY 
+      GROUP BY
         cn.creditnote_id,
         cn.creditnote_date,
         cn.doc_no,
@@ -186,11 +190,13 @@ const getStatementDetails = async (statementId) => {
         clientId,
         formattedPaymentStartDate,
         formattedPaymentEndDate,
+        company_reg_num,
       ]),
       query(creditNotesQuery, [
         clientId,
         formattedPaymentStartDate,
         formattedPaymentEndDate,
+        company_reg_num,
       ]),
     ]);
 

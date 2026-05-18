@@ -1,6 +1,6 @@
 import { pool } from "../../config/database.js"
 
-const getAllSubcontractors = async (options = {}) => {
+const getAllSubcontractors = async (options = {}, company_reg_num) => {
   let client
   try {
     client = await pool.connect()
@@ -8,9 +8,9 @@ const getAllSubcontractors = async (options = {}) => {
     const { offset = 0, limit = 10, search = "", status = "all" } = options
 
     // Build WHERE clause for filtering - group by company info
-    let whereClause = "WHERE roleid = 6"
-    const queryParams = []
-    let paramIndex = 1
+    let whereClause = "WHERE roleid = 6 AND company_reg_num = $1"
+    const queryParams = [company_reg_num]
+    let paramIndex = 2
 
     // Search filter
     if (search && search.trim() !== "") {
@@ -93,13 +93,16 @@ const getAllSubcontractors = async (options = {}) => {
   }
 }
 
-const getSubcontractorById = async (id) => {
+const getSubcontractorById = async (id, company_reg_num) => {
   let client
   try {
     client = await pool.connect()
 
     // First get the company info from any record with this userid
-    const mainResult = await client.query("SELECT * FROM m5_employee WHERE userid = $1 AND roleid = 6", [id])
+    const mainResult = await client.query(
+      "SELECT * FROM m5_employee WHERE userid = $1 AND roleid = 6 AND company_reg_num = $2",
+      [id, company_reg_num],
+    )
 
     if (!mainResult.rows.length) {
       return { success: false, message: "Subcontractor not found" }
@@ -160,16 +163,16 @@ const getSubcontractorById = async (id) => {
   }
 }
 
-const checkSubcontractorEmailExists = async (email, excludeSubeiRegNum = null) => {
+const checkSubcontractorEmailExists = async (email, excludeSubeiRegNum = null, company_reg_num) => {
   let client
   try {
     client = await pool.connect()
 
-    let query = "SELECT 1 FROM m5_employee WHERE email = $1 AND roleid = 6"
-    const params = [email]
+    let query = "SELECT 1 FROM m5_employee WHERE email = $1 AND roleid = 6 AND company_reg_num = $2"
+    const params = [email, company_reg_num]
 
     if (excludeSubeiRegNum !== null) {
-      query += " AND subei_reg_num != $2"
+      query += " AND subei_reg_num != $3"
       params.push(excludeSubeiRegNum)
     }
 
@@ -197,12 +200,13 @@ const createSubcontractor = async (subcontractorData) => {
       location,
       contact_person,
       subei_reg_num,
+      company_reg_num,
       drivers = [],
       trucks = [],
     } = subcontractorData
 
     // Validate email uniqueness
-    const emailExists = await checkSubcontractorEmailExists(email)
+    const emailExists = await checkSubcontractorEmailExists(email, null, company_reg_num)
     if (emailExists) {
       await client.query("ROLLBACK")
       return { success: false, message: "Email already exists" }
@@ -234,9 +238,9 @@ const createSubcontractor = async (subcontractorData) => {
 
       const driverResult = await client.query(
         `INSERT INTO m5_employee (
-          name, surname, cellnum, email, companyname, location, 
-          contact_person, subei_reg_num, roleid, status, driverstatus
-        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+          name, surname, cellnum, email, companyname, location,
+          contact_person, subei_reg_num, roleid, status, driverstatus, company_reg_num
+        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
         RETURNING *`,
         [
           firstName,
@@ -250,6 +254,7 @@ const createSubcontractor = async (subcontractorData) => {
           6, // roleid for subcontractor
           true, // status
           true, // driverstatus - default to active
+          company_reg_num,
         ],
       )
 
@@ -262,9 +267,9 @@ const createSubcontractor = async (subcontractorData) => {
 
       const truckResult = await client.query(
         `INSERT INTO m5_trucks (
-          truckregnum, trailersize, year, model, vin_num, 
-          truck_license_expiry, is_subcontractor, subei_reg_num
-        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+          truckregnum, trailersize, year, model, vin_num,
+          truck_license_expiry, is_subcontractor, subei_reg_num, company_reg_num
+        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
         RETURNING *`,
         [
           truck.truckregnum.trim(),
@@ -275,6 +280,7 @@ const createSubcontractor = async (subcontractorData) => {
           truck.truck_license_expiry || null,
           true, // is_subcontractor
           subei_reg_num,
+          company_reg_num,
         ],
       )
 
@@ -299,16 +305,17 @@ const createSubcontractor = async (subcontractorData) => {
   }
 }
 
-const updateSubcontractor = async (id, subcontractorData) => {
+const updateSubcontractor = async (id, subcontractorData, company_reg_num) => {
   let client
   try {
     client = await pool.connect()
     await client.query("BEGIN")
 
     // Get the current record to find the subei_reg_num
-    const currentResult = await client.query("SELECT subei_reg_num FROM m5_employee WHERE userid = $1 AND roleid = 6", [
-      id,
-    ])
+    const currentResult = await client.query(
+      "SELECT subei_reg_num FROM m5_employee WHERE userid = $1 AND roleid = 6 AND company_reg_num = $2",
+      [id, company_reg_num],
+    )
 
     if (!currentResult.rows.length) {
       await client.query("ROLLBACK")
@@ -329,7 +336,7 @@ const updateSubcontractor = async (id, subcontractorData) => {
     } = subcontractorData
 
     // Validate email uniqueness (excluding current company)
-    const emailExists = await checkSubcontractorEmailExists(email, currentSubeiRegNum)
+    const emailExists = await checkSubcontractorEmailExists(email, currentSubeiRegNum, company_reg_num)
     if (emailExists) {
       await client.query("ROLLBACK")
       return { success: false, message: "Email already exists" }
@@ -412,9 +419,9 @@ const updateSubcontractor = async (id, subcontractorData) => {
 
       const driverResult = await client.query(
         `INSERT INTO m5_employee (
-          name, surname, cellnum, email, companyname, location, 
-          contact_person, subei_reg_num, roleid, status, driverstatus
-        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+          name, surname, cellnum, email, companyname, location,
+          contact_person, subei_reg_num, roleid, status, driverstatus, company_reg_num
+        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
         RETURNING *`,
         [
           firstName,
@@ -428,6 +435,7 @@ const updateSubcontractor = async (id, subcontractorData) => {
           6, // roleid for subcontractor
           true, // status
           true, // driverstatus - default to active for new drivers
+          company_reg_num,
         ],
       )
 
@@ -449,9 +457,9 @@ const updateSubcontractor = async (id, subcontractorData) => {
 
       const truckResult = await client.query(
         `INSERT INTO m5_trucks (
-          truckregnum, trailersize, year, model, vin_num, 
-          truck_license_expiry, is_subcontractor, subei_reg_num
-        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+          truckregnum, trailersize, year, model, vin_num,
+          truck_license_expiry, is_subcontractor, subei_reg_num, company_reg_num
+        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
         RETURNING *`,
         [
           truck.truckregnum.trim(),
@@ -462,6 +470,7 @@ const updateSubcontractor = async (id, subcontractorData) => {
           truck.truck_license_expiry || null,
           true, // is_subcontractor
           subei_reg_num,
+          company_reg_num,
         ],
       )
 
@@ -486,16 +495,16 @@ const updateSubcontractor = async (id, subcontractorData) => {
   }
 }
 
-const deleteSubcontractorDriver = async (driverId) => {
+const deleteSubcontractorDriver = async (driverId, company_reg_num) => {
   let client
   try {
     client = await pool.connect()
 
     const result = await client.query(
-      `DELETE FROM m5_employee 
-       WHERE userid = $1 AND roleid = 6
+      `DELETE FROM m5_employee
+       WHERE userid = $1 AND roleid = 6 AND company_reg_num = $2
        RETURNING subei_reg_num`,
-      [driverId],
+      [driverId, company_reg_num],
     )
 
     if (!result.rowCount) {
@@ -511,16 +520,16 @@ const deleteSubcontractorDriver = async (driverId) => {
   }
 }
 
-const deleteSubcontractorTruck = async (truckId) => {
+const deleteSubcontractorTruck = async (truckId, company_reg_num) => {
   let client
   try {
     client = await pool.connect()
 
     const result = await client.query(
-      `DELETE FROM m5_trucks 
-       WHERE m5truckskey = $1 AND is_subcontractor = true
+      `DELETE FROM m5_trucks
+       WHERE m5truckskey = $1 AND is_subcontractor = true AND company_reg_num = $2
        RETURNING subei_reg_num`,
-      [truckId],
+      [truckId, company_reg_num],
     )
 
     if (!result.rowCount) {
@@ -536,15 +545,16 @@ const deleteSubcontractorTruck = async (truckId) => {
   }
 }
 
-const toggleSubcontractorStatus = async (id, status) => {
+const toggleSubcontractorStatus = async (id, status, company_reg_num) => {
   let client
   try {
     client = await pool.connect()
 
     // Get the subei_reg_num for this record
-    const currentResult = await client.query("SELECT subei_reg_num FROM m5_employee WHERE userid = $1 AND roleid = 6", [
-      id,
-    ])
+    const currentResult = await client.query(
+      "SELECT subei_reg_num FROM m5_employee WHERE userid = $1 AND roleid = 6 AND company_reg_num = $2",
+      [id, company_reg_num],
+    )
 
     if (!currentResult.rows.length) {
       return { success: false, message: "Subcontractor not found" }
@@ -556,9 +566,9 @@ const toggleSubcontractorStatus = async (id, status) => {
     const result = await client.query(
       `UPDATE m5_employee
        SET status = $1
-       WHERE subei_reg_num = $2 AND roleid = 6
+       WHERE subei_reg_num = $2 AND roleid = 6 AND company_reg_num = $3
        RETURNING *`,
-      [status, subeiRegNum],
+      [status, subeiRegNum, company_reg_num],
     )
 
     if (!result.rowCount) {
@@ -574,7 +584,7 @@ const toggleSubcontractorStatus = async (id, status) => {
   }
 }
 
-const toggleSubcontractorDriverStatus = async (driverId, driverstatus) => {
+const toggleSubcontractorDriverStatus = async (driverId, driverstatus, company_reg_num) => {
   let client
   try {
     client = await pool.connect()
@@ -583,9 +593,9 @@ const toggleSubcontractorDriverStatus = async (driverId, driverstatus) => {
     const result = await client.query(
       `UPDATE m5_employee
        SET driverstatus = $1
-       WHERE userid = $2 AND roleid = 6
+       WHERE userid = $2 AND roleid = 6 AND company_reg_num = $3
        RETURNING *`,
-      [driverstatus, driverId],
+      [driverstatus, driverId, company_reg_num],
     )
 
     if (!result.rowCount) {

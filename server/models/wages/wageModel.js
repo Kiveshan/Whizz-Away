@@ -14,6 +14,7 @@ const saveWageData = async ({
   totalEarnings,
   totalDeductions,
   netPay,
+  company_reg_num,
 }) => {
   let client;
   try {
@@ -36,8 +37,8 @@ const saveWageData = async ({
     );
 
     // Check if employee exists
-    const employeeQuery = `SELECT * FROM m5_employee WHERE userid = $1`;
-    const employeeResult = await client.query(employeeQuery, [employeeId]);
+    const employeeQuery = `SELECT * FROM m5_employee WHERE userid = $1 AND company_reg_num = $2`;
+    const employeeResult = await client.query(employeeQuery, [employeeId, company_reg_num]);
 
     if (employeeResult.rows.length === 0) {
       await client.query("ROLLBACK");
@@ -48,8 +49,8 @@ const saveWageData = async ({
     const insertQuery = `
 INSERT INTO wages (
     employeeid, total_earnings, total_deductions, net_pay,
-    employee_date
-  ) VALUES ($1, $2, $3, $4, $5)
+    employee_date, company_reg_num
+  ) VALUES ($1, $2, $3, $4, $5, $6)
   ON CONFLICT ON CONSTRAINT unique_wage_per_employee_month_year
   DO UPDATE SET
     total_earnings = EXCLUDED.total_earnings,
@@ -64,6 +65,7 @@ const params = [
   Number(totalDeductions.toFixed(2)), // This can be 0 or actual deductions
   Number(netPay.toFixed(2)), // This is now "Total Payable to Labour Consultant"
   normalizedDate,
+  company_reg_num,
 ];
 
 const result = await client.query(insertQuery, params);
@@ -162,17 +164,18 @@ const getBaseSalaryHistory = async (employeeId, month, year) => {
     if (client) client.release();
   }
 };
-const checkWageSlip = async (employeeId, month, year) => {
+const checkWageSlip = async (employeeId, month, year, company_reg_num) => {
   // Normalize the date to the last day of the month
   const targetDate = new Date(Number.parseInt(year), Number.parseInt(month), 0);
 
   // Query the database to check if a wage slip already exists
   const queryText = `
-    SELECT w.*, e.deduction_date 
+    SELECT w.*, e.deduction_date
     FROM public.wages w
     JOIN public.m5_employee e ON w.employeeid = e.userid
-    WHERE w.employeeid = $1 
+    WHERE w.employeeid = $1
       AND w.employee_date = $2
+      AND w.company_reg_num = $3
     ORDER BY w.wageskey
     LIMIT 1
   `;
@@ -180,7 +183,7 @@ const checkWageSlip = async (employeeId, month, year) => {
   console.log(
     `Executing query with params: employeeId=${employeeId}, month=${month}, year=${year}`
   );
-  const result = await query(queryText, [employeeId, targetDate]);
+  const result = await query(queryText, [employeeId, targetDate, company_reg_num]);
 
   if (result.rows.length > 0) {
     const wageSlip = result.rows[0];
@@ -207,20 +210,21 @@ const checkWageSlip = async (employeeId, month, year) => {
     return { exists: false };
   }
 };
-const getAllEmployees = async () => {
+const getAllEmployees = async (company_reg_num) => {
   const sql = `
     SELECT userid, name, surname, roleid
     FROM m5_employee
+    WHERE company_reg_num = $1
     ORDER BY name, surname
   `;
-  const result = await query(sql);
+  const result = await query(sql, [company_reg_num]);
   return result.rows;
 };
-const getStoredWageData = async (employeeId, month, year) => {
+const getStoredWageData = async (employeeId, month, year, company_reg_num) => {
   let client;
   try {
     client = await pool.connect();
-    
+
     // Convert month name to number if it's a string
     let monthNumber = month;
     if (typeof month === 'string') {
@@ -230,19 +234,20 @@ const getStoredWageData = async (employeeId, month, year) => {
       ];
       monthNumber = monthNames.indexOf(month) + 1;
     }
-    
+
     const query = `
-      SELECT 
+      SELECT
         total_earnings,
         net_pay as total_payable,
         employee_date
-      FROM wages 
-      WHERE employeeid = $1 
-      AND EXTRACT(MONTH FROM employee_date) = $2 
+      FROM wages
+      WHERE employeeid = $1
+      AND EXTRACT(MONTH FROM employee_date) = $2
       AND EXTRACT(YEAR FROM employee_date) = $3
+      AND company_reg_num = $4
     `;
-    
-    const result = await client.query(query, [employeeId, monthNumber, year]);
+
+    const result = await client.query(query, [employeeId, monthNumber, year, company_reg_num]);
     
     if (result.rows.length > 0) {
       console.log(`Found stored wage data for employee ${employeeId} - ${month} ${year}`);
@@ -260,7 +265,7 @@ const getStoredWageData = async (employeeId, month, year) => {
     if (client) client.release();
   }
 };
-const getEmployeeDeductions = async (employeeId, month, year) => {
+const getEmployeeDeductions = async (employeeId, month, year, company_reg_num) => {
   let client;
   try {
     client = await pool.connect();
@@ -293,17 +298,19 @@ const getEmployeeDeductions = async (employeeId, month, year) => {
 
     // Get total earnings
     const totalEarningsQuery = `
-      SELECT total_earnings 
-      FROM wages 
-      WHERE employeeid = $1 
-      AND EXTRACT(MONTH FROM employee_date) = $2 
+      SELECT total_earnings
+      FROM wages
+      WHERE employeeid = $1
+      AND EXTRACT(MONTH FROM employee_date) = $2
       AND EXTRACT(YEAR FROM employee_date) = $3
+      AND company_reg_num = $4
     `;
 
     const earningsResult = await client.query(totalEarningsQuery, [
       employeeId,
       monthIndex + 1,
       year,
+      company_reg_num,
     ]);
     let totalEarnings = 0;
 
@@ -312,9 +319,10 @@ const getEmployeeDeductions = async (employeeId, month, year) => {
         Number.parseFloat(earningsResult.rows[0].total_earnings) || 0;
     } else {
       // Calculate total earnings if no wage record exists
-      const baseSalaryQuery = `SELECT base_salary FROM m5_employee WHERE userid = $1`;
+      const baseSalaryQuery = `SELECT base_salary FROM m5_employee WHERE userid = $1 AND company_reg_num = $2`;
       const baseSalaryResult = await client.query(baseSalaryQuery, [
         employeeId,
+        company_reg_num,
       ]);
 
       if (baseSalaryResult.rows.length > 0) {
@@ -379,7 +387,7 @@ const getEmployeeDeductions = async (employeeId, month, year) => {
   }
 };
 
-const updateEmployeeDeductions = async (employeeId, deductionData) => {
+const updateEmployeeDeductions = async (employeeId, deductionData, company_reg_num) => {
   let client;
   try {
     client = await pool.connect();
@@ -389,8 +397,8 @@ const updateEmployeeDeductions = async (employeeId, deductionData) => {
 
     // First check if employee exists
     const employeeCheck = await client.query(
-      `SELECT userid FROM m5_employee WHERE userid = $1`,
-      [employeeId]
+      `SELECT userid FROM m5_employee WHERE userid = $1 AND company_reg_num = $2`,
+      [employeeId, company_reg_num]
     );
 
     if (employeeCheck.rows.length === 0) {
@@ -447,7 +455,7 @@ const updateEmployeeDeductions = async (employeeId, deductionData) => {
     // Update the m5_employee table
     await client.query(
       `UPDATE m5_employee
-      SET 
+      SET
         deduction_income_tax = $1,
         deduction_other_deductions = $2,
         deduction_uif = $3,
@@ -456,7 +464,7 @@ const updateEmployeeDeductions = async (employeeId, deductionData) => {
         deduction_loan = $6,
         deduction_damage = $7,
         deduction_date = $8
-      WHERE userid = $9`,
+      WHERE userid = $9 AND company_reg_num = $10`,
       [
         roundedDeductionData.deduction_income_tax || 0,
         roundedDeductionData.deduction_other_deductions || 0,
@@ -467,6 +475,7 @@ const updateEmployeeDeductions = async (employeeId, deductionData) => {
         roundedDeductionData.deduction_damage || 0,
         today,
         employeeId,
+        company_reg_num,
       ]
     );
 
@@ -483,23 +492,23 @@ const updateEmployeeDeductions = async (employeeId, deductionData) => {
   }
 };
 
-const getDriverWageDetailsByInstruction = async (driverId, instructionId) => {
+const getDriverWageDetailsByInstruction = async (driverId, instructionId, company_reg_num) => {
   const employeeQuery = `
     SELECT base_salary
     FROM public.m5_employee
-    WHERE userid = $1
+    WHERE userid = $1 AND company_reg_num = $2
   `;
 
-  const employeeResult = await query(employeeQuery, [driverId]);
+  const employeeResult = await query(employeeQuery, [driverId, company_reg_num]);
   const baseSalary = employeeResult.rows[0]?.base_salary || 0;
 
   const legsQuery = `
-    SELECT 
+    SELECT
       SUM(driverrate) as leg_payments,
       MAX(date) as date
-    FROM 
+    FROM
       public.legs_m2
-    WHERE 
+    WHERE
       driverid = $1 AND m1key = $2
   `;
 
@@ -521,14 +530,14 @@ const getDriverWageDetailsByInstruction = async (driverId, instructionId) => {
   };
 };
 
-const getDriverWageDetails = async (driverId) => {
+const getDriverWageDetails = async (driverId, company_reg_num) => {
   const checkQuery = `
     SELECT COUNT(*) as count
     FROM public.m5_employee
-    WHERE userid = $1
+    WHERE userid = $1 AND company_reg_num = $2
   `;
 
-  const checkResult = await query(checkQuery, [driverId]);
+  const checkResult = await query(checkQuery, [driverId, company_reg_num]);
   const driverExists = checkResult.rows[0].count > 0;
 
   if (!driverExists) {
@@ -543,10 +552,10 @@ const getDriverWageDetails = async (driverId) => {
   const employeeQuery = `
     SELECT base_salary
     FROM public.m5_employee
-    WHERE userid = $1
+    WHERE userid = $1 AND company_reg_num = $2
   `;
 
-  const employeeResult = await query(employeeQuery, [driverId]);
+  const employeeResult = await query(employeeQuery, [driverId, company_reg_num]);
   const baseSalary = employeeResult.rows[0]?.base_salary || 0;
 
   const legsQuery = `
@@ -580,30 +589,33 @@ const getDriverWageDetails = async (driverId) => {
   };
 };
 
-const getDriverInstructions = async (driverId) => {
+const getDriverInstructions = async (driverId, company_reg_num) => {
   let client;
   try {
     client = await pool.connect();
 
     const queryText = `
-        SELECT 
-        m1.m1key, 
+        SELECT
+        m1.m1key,
         m1."lastFreeDate",
         m1.created_at,
         COUNT(l.legkey) as leg_count
-      FROM 
+      FROM
         public.m1_controller m1
-      JOIN 
+      JOIN
         public.legs_m2 l ON m1.m1key = l.m1key
-      WHERE 
+      JOIN
+        public.m5_employee e ON l.driverid = e.userid
+      WHERE
         l.driverid = $1
-      GROUP BY 
+        AND e.company_reg_num = $2
+      GROUP BY
         m1.m1key, m1."lastFreeDate", m1.created_at
-      ORDER BY 
+      ORDER BY
         COALESCE(m1."lastFreeDate", m1.created_at) DESC
     `;
 
-    const result = await client.query(queryText, [driverId]);
+    const result = await client.query(queryText, [driverId, company_reg_num]);
     console.log(
       `Found ${result.rows.length} instructions for driver ID ${driverId}`
     );
@@ -614,7 +626,7 @@ const getDriverInstructions = async (driverId) => {
   }
 };
 
-const getDriverLegsByMonth = async (driverId, month, year) => {
+const getDriverLegsByMonth = async (driverId, month, year, company_reg_num) => {
   let client;
   try {
     client = await pool.connect();
@@ -666,15 +678,18 @@ const getDriverLegsByMonth = async (driverId, month, year) => {
         public.legs_m2 l
       JOIN
         public.m1_controller m ON l.m1key = m.m1key
+      JOIN
+        public.m5_employee e ON l.driverid = e.userid
       WHERE
         l.driverid = $1
         AND l.date >= $2
         AND l.date <= $3
+        AND e.company_reg_num = $4
       ORDER BY
         l.date ASC, l.legnumber
     `;
 
-    const params = [driverId, formattedStartDate, formattedEndDate];
+    const params = [driverId, formattedStartDate, formattedEndDate, company_reg_num];
     console.log("Executing query:", queryText);
     console.log("Query parameters:", params);
 

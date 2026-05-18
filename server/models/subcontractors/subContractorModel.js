@@ -1,11 +1,11 @@
 import { pool } from "../../config/database.js";
 
-const getAllSubContractors = async () => {
+const getAllSubContractors = async (company_reg_num) => {
   let client;
   try {
     client = await pool.connect();
     const query = `
-      SELECT 
+      SELECT
         companyname,
         location,
         contact_person,
@@ -13,20 +13,21 @@ const getAllSubContractors = async () => {
         cellnum,
         email,
         subei_reg_num
-      FROM 
+      FROM
         m5_employee
-      WHERE 
-        companyname IS NOT NULL 
+      WHERE
+        companyname IS NOT NULL
         AND companyname != ''
-        AND location IS NOT NULL 
+        AND location IS NOT NULL
         AND location != ''
-        AND contact_person IS NOT NULL 
+        AND contact_person IS NOT NULL
         AND contact_person != ''
         AND status = true
+        AND company_reg_num = $1
       GROUP BY companyname, location, contact_person, cellnum, email, subei_reg_num
       ORDER BY companyname
     `;
-    const result = await client.query(query);
+    const result = await client.query(query, [company_reg_num]);
     return result.rows;
   } catch (error) {
     throw error;
@@ -35,29 +36,30 @@ const getAllSubContractors = async () => {
   }
 };
 
-const getSubContractorStatements = async (subei_reg_num, year, month) => {
+const getSubContractorStatements = async (subei_reg_num, year, month, company_reg_num) => {
   let client;
   try {
     client = await pool.connect();
     const query = `
-      SELECT 
+      SELECT
         sub_state_id,
         subbie_reg_num,
         date,
         amount,
         legids,
         COALESCE(vat_status, 'VAT') AS vat_status
-      FROM 
+      FROM
         subcontractor_statements
-      WHERE 
+      WHERE
         subbie_reg_num = $1
+        AND company_reg_num = $4
         AND ($2::text IS NULL OR EXTRACT(YEAR FROM (date - INTERVAL '1 day')) = $2::integer)
         AND ($3::text IS NULL OR EXTRACT(MONTH FROM (date - INTERVAL '1 day')) = $3::integer)
-      ORDER BY 
+      ORDER BY
         date DESC,
         vat_status ASC
     `;
-    const values = [subei_reg_num, year || null, month || null];
+    const values = [subei_reg_num, year || null, month || null, company_reg_num];
     const result = await client.query(query, values);
     return result.rows;
   } catch (error) {
@@ -67,16 +69,16 @@ const getSubContractorStatements = async (subei_reg_num, year, month) => {
   }
 };
 
-const getStatementLegIds = async (statementId, subei_reg_num) => {
+const getStatementLegIds = async (statementId, subei_reg_num, company_reg_num) => {
   let client;
   try {
     client = await pool.connect();
     const query = `
-      SELECT legids 
-      FROM subcontractor_statements 
-      WHERE subbie_reg_num = $1 AND sub_state_id = $2
+      SELECT legids
+      FROM subcontractor_statements
+      WHERE subbie_reg_num = $1 AND sub_state_id = $2 AND company_reg_num = $3
     `;
-    const values = [subei_reg_num, statementId];
+    const values = [subei_reg_num, statementId, company_reg_num];
     const result = await client.query(query, values);
     return result.rows.length > 0 ? result.rows[0].legids : null;
   } catch (error) {
@@ -86,20 +88,21 @@ const getStatementLegIds = async (statementId, subei_reg_num) => {
   }
 };
 
-const getStatementDetails = async (statementId, legKeys, subei_reg_num) => {
+const getStatementDetails = async (statementId, legKeys, subei_reg_num, company_reg_num) => {
   let client;
   try {
     client = await pool.connect();
 
     // First, get the stored legids from the statement (which now contain VAT-inclusive rates)
     const statementQuery = `
-      SELECT legids 
-      FROM subcontractor_statements 
-      WHERE sub_state_id = $1 AND subbie_reg_num = $2
+      SELECT legids
+      FROM subcontractor_statements
+      WHERE sub_state_id = $1 AND subbie_reg_num = $2 AND company_reg_num = $3
     `;
     const statementResult = await client.query(statementQuery, [
       statementId,
       subei_reg_num,
+      company_reg_num,
     ]);
 
     if (statementResult.rows.length === 0) {
@@ -136,11 +139,12 @@ const getStatementDetails = async (statementId, legKeys, subei_reg_num) => {
       LEFT JOIN
         m5_client c ON m1.client = c.m5clientkey
       WHERE l.legkey = ANY($1)
+        AND m1.company_reg_num = $2
       ORDER BY l.date, l.legkey
     `;
 
     console.log("Executing query with legKeys:", legKeysFromStatement);
-    const legDetailsResult = await client.query(query, [legKeysFromStatement]);
+    const legDetailsResult = await client.query(query, [legKeysFromStatement, company_reg_num]);
 
     // Merge leg details with stored VAT-inclusive rates
     const enrichedLegDetails = legDetailsResult.rows.map((leg) => {
@@ -174,28 +178,29 @@ const getStatementDetails = async (statementId, legKeys, subei_reg_num) => {
   }
 };
 
-const getCompanyInfo = async (roleid, status) => {
+const getCompanyInfo = async (roleid, status, company_reg_num) => {
   let client;
   try {
     client = await pool.connect();
     const query = `
-      SELECT 
+      SELECT
         companyname,
         address,
         cell_num AS phone,
         email
-      FROM 
+      FROM
         usertable
-      WHERE 
+      WHERE
         roleid = $1
         AND status = $2
+        AND company_reg_num = $3
         AND companyname IS NOT NULL
         AND address IS NOT NULL
         AND cell_num IS NOT NULL
         AND email IS NOT NULL
       LIMIT 1
     `;
-    const values = [roleid, status];
+    const values = [roleid, status, company_reg_num];
     const result = await client.query(query, values);
     return result.rows;
   } catch (error) {
@@ -205,22 +210,23 @@ const getCompanyInfo = async (roleid, status) => {
   }
 };
 
-const getSubcontractorInfo = async (subei_reg_num) => {
+const getSubcontractorInfo = async (subei_reg_num, company_reg_num) => {
   let client;
   try {
     client = await pool.connect();
     const query = `
-      SELECT 
+      SELECT
         location,
         contact_person
-      FROM 
+      FROM
         m5_employee
-      WHERE 
+      WHERE
         subei_reg_num = $1
+        AND company_reg_num = $2
         AND status = true
       LIMIT 1
     `;
-    const values = [subei_reg_num];
+    const values = [subei_reg_num, company_reg_num];
     const result = await client.query(query, values);
     return result.rows;
   } catch (error) {

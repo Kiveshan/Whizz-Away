@@ -16,10 +16,10 @@ const monthNames = {
   12: "December",
 }
 
-const getFuelExpenses = async (client, month, year) => {
+const getFuelExpenses = async (client, month, year, company_reg_num) => {
   const query = `
-    SELECT t.truckregnum, 
-           SUM(e.expensecost) as total_cost, 
+    SELECT t.truckregnum,
+           SUM(e.expensecost) as total_cost,
            to_char(e.slipuploaddate, 'Month') as month_name,
            EXTRACT(YEAR FROM e.slipuploaddate) as year
     FROM expenses_m2 e
@@ -29,10 +29,11 @@ const getFuelExpenses = async (client, month, year) => {
     AND EXTRACT(YEAR FROM e.slipuploaddate)::text = $2
     AND t.is_subcontractor = false
     AND t.status = true
+    AND e.company_reg_num = $3
     GROUP BY t.truckregnum, to_char(e.slipuploaddate, 'Month'), EXTRACT(YEAR FROM e.slipuploaddate)
     ORDER BY total_cost DESC
   `
-  const result = await client.query(query, [month, year])
+  const result = await client.query(query, [month, year, company_reg_num])
   console.log("Raw query result:", result.rows)
   console.log(`Query returned ${result.rows.length} rows`)
 
@@ -56,7 +57,7 @@ const getFuelExpenses = async (client, month, year) => {
   })
 }
 
-const getTurnoverPerMonth = async (client, month, year, clientId = null) => {
+const getTurnoverPerMonth = async (client, month, year, clientId = null, company_reg_num) => {
   const totalQuery = `
     WITH DistinctLegs AS (
       SELECT m1key, COUNT(DISTINCT legnumber) AS num_legs
@@ -69,7 +70,7 @@ const getTurnoverPerMonth = async (client, month, year, clientId = null) => {
       GROUP BY m1key, legnumber
     ),
     LegDriverContributions AS (
-      SELECT 
+      SELECT
         l.m1key,
         SUM(m.total_cost / dl.num_legs / dcpl.drivers_per_leg) AS subcontractor_turnover
       FROM legs_m2 l
@@ -80,10 +81,11 @@ const getTurnoverPerMonth = async (client, month, year, clientId = null) => {
       WHERE e.roleid = 6
         AND TRIM(TO_CHAR(m.created_at, 'Month')) = $1
         AND EXTRACT(YEAR FROM m.created_at)::text = $2
+        AND m.company_reg_num = $3
       GROUP BY l.m1key
     ),
     InvoiceTurnover AS (
-      SELECT 
+      SELECT
         SUM(m.total_cost) as invoice_turnover,
         to_char(i.date, 'Month') as month_name,
         EXTRACT(YEAR FROM i.date) as year
@@ -91,9 +93,10 @@ const getTurnoverPerMonth = async (client, month, year, clientId = null) => {
       JOIN m1_controller m ON i.m1key = m.m1key
       WHERE TRIM(to_char(i.date, 'Month')) = $1
       AND EXTRACT(YEAR FROM i.date)::text = $2
+      AND m.company_reg_num = $3
       GROUP BY to_char(i.date, 'Month'), EXTRACT(YEAR FROM i.date)
     )
-    SELECT 
+    SELECT
       COALESCE(it.invoice_turnover, 0) + COALESCE(SUM(ldc.subcontractor_turnover), 0) as turnover,
       it.month_name,
       it.year
@@ -102,7 +105,7 @@ const getTurnoverPerMonth = async (client, month, year, clientId = null) => {
     GROUP BY it.invoice_turnover, it.month_name, it.year
   `
 
-  const totalResult = await client.query(totalQuery, [month, year])
+  const totalResult = await client.query(totalQuery, [month, year, company_reg_num])
   console.log("Total turnover query result:", totalResult.rows)
 
   const totalTurnover = Number.parseFloat(totalResult.rows[0]?.turnover || 0)
@@ -122,8 +125,8 @@ const getTurnoverPerMonth = async (client, month, year, clientId = null) => {
 
   if (clientId) {
     const clientQuery = `
-      SELECT 
-        c.client, 
+      SELECT
+        c.client,
         SUM(m.total_cost) as turnover,
         to_char(i.date, 'Month') as month_name,
         EXTRACT(YEAR FROM i.date) as year
@@ -133,10 +136,11 @@ const getTurnoverPerMonth = async (client, month, year, clientId = null) => {
       WHERE TRIM(to_char(i.date, 'Month')) = $1
       AND EXTRACT(YEAR FROM i.date)::text = $2
       AND i.clientid = $3
+      AND m.company_reg_num = $4
       GROUP BY c.client, to_char(i.date, 'Month'), EXTRACT(YEAR FROM i.date)
       ORDER BY turnover DESC
     `
-    const clientResult = await client.query(clientQuery, [month, year, clientId])
+    const clientResult = await client.query(clientQuery, [month, year, clientId, company_reg_num])
     console.log("Client query result:", clientResult.rows)
 
     if (clientResult.rows.length > 0) {
@@ -178,7 +182,7 @@ const getTurnoverPerMonth = async (client, month, year, clientId = null) => {
 }
 
 // Payments Received per Month (analytics)
-const getPaymentsReceivedPerMonth = async (client, month, year, clientId = null) => {
+const getPaymentsReceivedPerMonth = async (client, month, year, clientId = null, company_reg_num) => {
   // Total payments for the month
   const totalQuery = `
     SELECT COALESCE(SUM((li.item->>'this_payment')::numeric), 0) AS total_payments
@@ -186,9 +190,10 @@ const getPaymentsReceivedPerMonth = async (client, month, year, clientId = null)
     CROSS JOIN LATERAL jsonb_array_elements(p.line_items) AS li(item)
     WHERE TRIM(TO_CHAR((li.item->>'line_date')::date, 'Month')) = $1
       AND EXTRACT(YEAR FROM (li.item->>'line_date')::date)::TEXT = $2
+      AND p.company_reg_num = $3
   `
 
-  const totalRes = await client.query(totalQuery, [month, year])
+  const totalRes = await client.query(totalQuery, [month, year, company_reg_num])
   const totalPayments = Number.parseFloat(totalRes.rows[0]?.total_payments || 0)
 
   const data = [
@@ -211,9 +216,10 @@ const getPaymentsReceivedPerMonth = async (client, month, year, clientId = null)
       WHERE TRIM(TO_CHAR((li.item->>'line_date')::date, 'Month')) = $1
         AND EXTRACT(YEAR FROM (li.item->>'line_date')::date)::TEXT = $2
         AND p.clientid = $3
+        AND p.company_reg_num = $4
       GROUP BY c.client
     `
-    const perClientRes = await client.query(perClientQuery, [month, year, clientId])
+    const perClientRes = await client.query(perClientQuery, [month, year, clientId, company_reg_num])
     const clientPayments = Number.parseFloat(perClientRes.rows[0]?.client_payments || 0)
     const clientName = perClientRes.rows[0]?.client
     if (clientName) {
@@ -248,7 +254,7 @@ const getPaymentsReceivedPerMonth = async (client, month, year, clientId = null)
 }
 
 // List distinct clients that have payments for the given month/year
-const getPaymentClients = async (client, month, year) => {
+const getPaymentClients = async (client, month, year, company_reg_num) => {
   const query = `
     SELECT DISTINCT c.m5clientkey, c.client
     FROM payment_m3 p
@@ -256,20 +262,22 @@ const getPaymentClients = async (client, month, year) => {
     CROSS JOIN LATERAL jsonb_array_elements(p.line_items) AS li(item)
     WHERE TRIM(TO_CHAR((li.item->>'line_date')::date, 'Month')) = $1
       AND EXTRACT(YEAR FROM (li.item->>'line_date')::date)::TEXT = $2
+      AND p.company_reg_num = $3
     ORDER BY c.client
   `
-  const res = await client.query(query, [month, year])
+  const res = await client.query(query, [month, year, company_reg_num])
   return res.rows.map((row) => ({ m5clientkey: row.m5clientkey, client: row.client }))
 }
 
-const getAllClients = async (client) => {
+const getAllClients = async (client, company_reg_num) => {
   const query = `
     SELECT m5clientkey, client
     FROM m5_client
     WHERE status = true
+    AND company_reg_num = $1
     ORDER BY client
   `
-  const result = await client.query(query)
+  const result = await client.query(query, [company_reg_num])
   console.log("Clients query result:", result.rows)
   console.log(`Query returned ${result.rows.length} rows`)
   return result.rows.map((row) => ({
@@ -278,18 +286,19 @@ const getAllClients = async (client) => {
   }))
 }
 
-const getAllSubcontractors = async (client) => {
+const getAllSubcontractors = async (client, company_reg_num) => {
   const query = `
-    SELECT 
+    SELECT
       MIN(userid) AS userid,
       companyname,
       subei_reg_num
     FROM m5_employee
     WHERE roleid = 6
+    AND company_reg_num = $1
     GROUP BY companyname, subei_reg_num
     ORDER BY companyname
   `
-  const result = await client.query(query)
+  const result = await client.query(query, [company_reg_num])
   console.log("Subcontractors query result:", result.rows)
   console.log(`Query returned ${result.rows.length} rows`)
   return result.rows.map((row) => ({
@@ -299,14 +308,15 @@ const getAllSubcontractors = async (client) => {
   }))
 }
 
-const getAllTrucks = async (client) => {
+const getAllTrucks = async (client, company_reg_num) => {
   const query = `
     SELECT m5truckskey, truckregnum
     FROM m5_trucks
     WHERE is_subcontractor = false AND status = true
+    AND company_reg_num = $1
     ORDER BY truckregnum
   `
-  const result = await client.query(query)
+  const result = await client.query(query, [company_reg_num])
   console.log("Trucks query result:", result.rows)
   console.log(`Query returned ${result.rows.length} rows`)
   return result.rows.map((row) => ({
@@ -315,11 +325,11 @@ const getAllTrucks = async (client) => {
   }))
 }
 
-const getAgingAnalysis = async (client, month, year, clientId = null) => {
-  const params = [month, year]
+const getAgingAnalysis = async (client, month, year, clientId = null, company_reg_num) => {
+  const params = [month, year, company_reg_num]
   let query = `
-    SELECT 
-      ${clientId ? "c.client" : "'Total Aging' as client"}, 
+    SELECT
+      ${clientId ? "c.client" : "'Total Aging' as client"},
       SUM(a.current) as current_amount,
       SUM(a."30days") as thirty_days,
       SUM(a."60days") as sixty_days,
@@ -331,9 +341,10 @@ const getAgingAnalysis = async (client, month, year, clientId = null) => {
     JOIN m5_client c ON a.clientid = c.m5clientkey
     WHERE TRIM(to_char(s.generation_date, 'Month')) = $1
     AND EXTRACT(YEAR FROM s.generation_date)::text = $2
+    AND s.company_reg_num = $3
   `
   if (clientId) {
-    query += ` AND a.clientid = $3`
+    query += ` AND a.clientid = $4`
     params.push(clientId)
   }
   query += `
@@ -354,7 +365,7 @@ const getAgingAnalysis = async (client, month, year, clientId = null) => {
   }))
 }
 
-const getDebtorAgeAnalysisPerClient = async (client, month, year) => {
+const getDebtorAgeAnalysisPerClient = async (client, month, year, company_reg_num) => {
   const query = `
     SELECT
       c.m5clientkey  AS client_id,
@@ -368,10 +379,11 @@ const getDebtorAgeAnalysisPerClient = async (client, month, year) => {
     JOIN m5_client  c ON a.clientid  = c.m5clientkey
     WHERE TRIM(to_char(s.generation_date, 'Month')) = $1
       AND EXTRACT(YEAR FROM s.generation_date)::text = $2
+      AND s.company_reg_num = $3
     GROUP BY c.m5clientkey, c.client
     ORDER BY c.client
   `
-  const result = await client.query(query, [month, year])
+  const result = await client.query(query, [month, year, company_reg_num])
   return result.rows.map((row) => ({
     clientId:   row.client_id,
     client:     row.client_name,
@@ -382,7 +394,7 @@ const getDebtorAgeAnalysisPerClient = async (client, month, year) => {
   }))
 }
 
-const getTurnoverVsDieselCost = async (numericMonth, year) => {
+const getTurnoverVsDieselCost = async (numericMonth, year, company_reg_num) => {
   const turnoverQuery = `
     WITH DistinctLegs AS (
       SELECT m1key, COUNT(DISTINCT legnumber) AS num_legs
@@ -395,7 +407,7 @@ const getTurnoverVsDieselCost = async (numericMonth, year) => {
       GROUP BY m1key, legnumber
     ),
     LegDriverContributions AS (
-      SELECT 
+      SELECT
         l.m1key,
         SUM(m.total_cost / dl.num_legs / dcpl.drivers_per_leg) AS subcontractor_turnover
       FROM legs_m2 l
@@ -406,10 +418,11 @@ const getTurnoverVsDieselCost = async (numericMonth, year) => {
       WHERE e.roleid = 6
         AND EXTRACT(MONTH FROM m.created_at) = $1
         AND EXTRACT(YEAR FROM m.created_at) = $2
+        AND m.company_reg_num = $3
       GROUP BY l.m1key
     ),
     InvoiceTurnover AS (
-      SELECT 
+      SELECT
         SUM(m.total_cost) as invoice_turnover,
         TO_CHAR(i.date, 'Month') as month_name,
         EXTRACT(YEAR FROM i.date) as year
@@ -417,9 +430,10 @@ const getTurnoverVsDieselCost = async (numericMonth, year) => {
       JOIN m1_controller m ON i.m1key = m.m1key
       WHERE EXTRACT(MONTH FROM i.date) = $1
       AND EXTRACT(YEAR FROM i.date) = $2
+      AND m.company_reg_num = $3
       GROUP BY TO_CHAR(i.date, 'Month'), EXTRACT(YEAR FROM i.date)
     )
-    SELECT 
+    SELECT
       COALESCE(it.invoice_turnover, 0) + COALESCE(SUM(ldc.subcontractor_turnover), 0) as total_turnover,
       it.month_name,
       it.year
@@ -433,12 +447,13 @@ const getTurnoverVsDieselCost = async (numericMonth, year) => {
     FROM expenses_m2
     WHERE EXTRACT(MONTH FROM slipuploaddate) = $1
       AND EXTRACT(YEAR FROM slipuploaddate) = $2
-      AND type = 'fuel';
+      AND type = 'fuel'
+      AND company_reg_num = $3;
   `
 
   const [turnoverResult, dieselResult] = await Promise.all([
-    pool.query(turnoverQuery, [numericMonth, year]),
-    pool.query(dieselQuery, [numericMonth, year]),
+    pool.query(turnoverQuery, [numericMonth, year, company_reg_num]),
+    pool.query(dieselQuery, [numericMonth, year, company_reg_num]),
   ])
 
   const totalTurnover = Number(turnoverResult.rows[0]?.total_turnover || 0)
@@ -471,18 +486,18 @@ const getTurnoverVsDieselCost = async (numericMonth, year) => {
   ]
 }
 
-const getTurnoverPerTruck = async (client, month, year) => {
-  const params = [month, year]
+const getTurnoverPerTruck = async (client, month, year, company_reg_num) => {
+  const params = [month, year, company_reg_num]
   const query = `
     WITH DistinctLegs AS (
-      SELECT 
+      SELECT
         m1key,
         COUNT(DISTINCT legnumber) AS num_legs
       FROM legs_m2
       GROUP BY m1key
     ),
     TruckCountsPerLeg AS (
-      SELECT 
+      SELECT
         m1key,
         legnumber,
         COUNT(DISTINCT truckregnumber) AS trucks_per_leg
@@ -490,7 +505,7 @@ const getTurnoverPerTruck = async (client, month, year) => {
       GROUP BY m1key, legnumber
     ),
     TurnoverPerTruck AS (
-      SELECT 
+      SELECT
         l.truckregnumber,
         SUM(m.total_cost / dl.num_legs / tcpl.trucks_per_leg) AS total_turnover,
         TO_CHAR(m.created_at, 'Month') AS month_name,
@@ -504,9 +519,10 @@ const getTurnoverPerTruck = async (client, month, year) => {
         AND TRIM(TO_CHAR(m.created_at, 'Month')) = $1
         AND EXTRACT(YEAR FROM m.created_at)::TEXT = $2
         AND t.status = true
+        AND m.company_reg_num = $3
       GROUP BY l.truckregnumber, TO_CHAR(m.created_at, 'Month'), EXTRACT(YEAR FROM m.created_at)
     )
-    SELECT 
+    SELECT
       truckregnumber,
       COALESCE(total_turnover, 0) AS total_turnover,
       month_name,
@@ -548,17 +564,17 @@ const getTurnoverPerTruck = async (client, month, year) => {
   }
 }
 
-const getSubcontractorTurnoverPerMonth = async (client, month, year) => {
+const getSubcontractorTurnoverPerMonth = async (client, month, year, company_reg_num) => {
   const query = `
     WITH DistinctLegs AS (
-      SELECT 
+      SELECT
         m1key,
         COUNT(DISTINCT legnumber) AS num_legs
       FROM legs_m2
       GROUP BY m1key
     ),
     DriverCountsPerLeg AS (
-      SELECT 
+      SELECT
         m1key,
         legnumber,
         COUNT(DISTINCT driverid) AS drivers_per_leg
@@ -566,7 +582,7 @@ const getSubcontractorTurnoverPerMonth = async (client, month, year) => {
       GROUP BY m1key, legnumber
     ),
     LegDriverContributions AS (
-      SELECT 
+      SELECT
         l.m1key,
         SUM(m.total_cost / dl.num_legs / dcpl.drivers_per_leg) AS subcontractor_turnover
       FROM legs_m2 l
@@ -577,10 +593,11 @@ const getSubcontractorTurnoverPerMonth = async (client, month, year) => {
       WHERE e.roleid = 6
         AND TRIM(TO_CHAR(m.created_at, 'Month')) = $1
         AND EXTRACT(YEAR FROM m.created_at)::text = $2
+        AND m.company_reg_num = $3
       GROUP BY l.m1key
     ),
     TotalSubcontractorTurnover AS (
-      SELECT 
+      SELECT
         COALESCE(SUM(ldc.subcontractor_turnover), 0) AS total_subcontractor_turnover,
         TO_CHAR(m.created_at, 'Month') AS month_name,
         EXTRACT(YEAR FROM m.created_at)::TEXT AS year
@@ -588,10 +605,11 @@ const getSubcontractorTurnoverPerMonth = async (client, month, year) => {
       JOIN m1_controller m ON ldc.m1key = m.m1key
       WHERE TRIM(TO_CHAR(m.created_at, 'Month')) = $1
         AND EXTRACT(YEAR FROM m.created_at)::TEXT = $2
+        AND m.company_reg_num = $3
       GROUP BY TO_CHAR(m.created_at, 'Month'), EXTRACT(YEAR FROM m.created_at)
     ),
     TotalTurnover AS (
-      SELECT 
+      SELECT
         COALESCE(SUM(m.total_cost), 0) + COALESCE((SELECT SUM(ldc.subcontractor_turnover) FROM LegDriverContributions ldc), 0) AS total_turnover,
         TO_CHAR(i.date, 'Month') AS month_name,
         EXTRACT(YEAR FROM i.date)::TEXT AS year
@@ -599,6 +617,7 @@ const getSubcontractorTurnoverPerMonth = async (client, month, year) => {
       JOIN m1_controller m ON i.m1key = m.m1key
       WHERE TRIM(TO_CHAR(i.date, 'Month')) = $1
         AND EXTRACT(YEAR FROM i.date)::TEXT = $2
+        AND m.company_reg_num = $3
       GROUP BY TO_CHAR(i.date, 'Month'), EXTRACT(YEAR FROM i.date)
     )
     SELECT 
@@ -622,7 +641,7 @@ const getSubcontractorTurnoverPerMonth = async (client, month, year) => {
     ORDER BY value DESC;
   `
 
-  const result = await client.query(query, [month, year])
+  const result = await client.query(query, [month, year, company_reg_num])
   console.log("Subcontractor turnover query result for month", month, year, ":", result.rows)
   console.log(`Query returned ${result.rows ? result.rows.length : 0} rows`)
 
@@ -647,18 +666,18 @@ const getSubcontractorTurnoverPerMonth = async (client, month, year) => {
   return turnoverData
 }
 
-const getSubcontractorVsTurnover = async (client, month, year, subcontractorId = null) => {
-  const params = [month, year]
+const getSubcontractorVsTurnover = async (client, month, year, subcontractorId = null, company_reg_num) => {
+  const params = [month, year, company_reg_num]
   let subcontractorQuery = `
     WITH DistinctLegs AS (
-      SELECT 
+      SELECT
         m1key,
         COUNT(DISTINCT legnumber) AS num_legs
       FROM legs_m2
       GROUP BY m1key
     ),
     DriverCountsPerLeg AS (
-      SELECT 
+      SELECT
         m1key,
         legnumber,
         COUNT(DISTINCT driverid) AS drivers_per_leg
@@ -666,7 +685,7 @@ const getSubcontractorVsTurnover = async (client, month, year, subcontractorId =
       GROUP BY m1key, legnumber
     ),
     LegDriverContributions AS (
-      SELECT 
+      SELECT
         l.m1key,
         l.driverid,
         m.total_cost,
@@ -683,15 +702,16 @@ const getSubcontractorVsTurnover = async (client, month, year, subcontractorId =
         AND m.created_at IS NOT NULL
         AND TRIM(TO_CHAR(m.created_at, 'Month')) = $1
         AND EXTRACT(YEAR FROM m.created_at)::TEXT = $2
+        AND m.company_reg_num = $3
   `
   if (subcontractorId) {
-    subcontractorQuery += ` AND e.subei_reg_num = $3`
+    subcontractorQuery += ` AND e.subei_reg_num = $4`
     params.push(subcontractorId)
   }
   subcontractorQuery += `
       ),
       SubcontractorTurnover AS (
-        SELECT 
+        SELECT
           COALESCE(e.companyname, 'Unknown') AS companyname,
           e.subei_reg_num,
           SUM(ltc.turnover_contribution) AS subcontractor_turnover,
@@ -701,7 +721,7 @@ const getSubcontractorVsTurnover = async (client, month, year, subcontractorId =
         JOIN m5_employee e ON ltc.driverid = e.userid
         GROUP BY e.companyname, e.subei_reg_num, TO_CHAR(ltc.created_at, 'Month'), EXTRACT(YEAR FROM ltc.created_at)
       )
-      SELECT 
+      SELECT
         companyname AS name,
         subcontractor_turnover AS value,
         'subcontractor' AS type,
@@ -723,7 +743,7 @@ const getSubcontractorVsTurnover = async (client, month, year, subcontractorId =
       GROUP BY m1key, legnumber
     ),
     LegDriverContributions AS (
-      SELECT 
+      SELECT
         l.m1key,
         SUM(m.total_cost / dl.num_legs / dcpl.drivers_per_leg) AS subcontractor_turnover
       FROM legs_m2 l
@@ -734,10 +754,11 @@ const getSubcontractorVsTurnover = async (client, month, year, subcontractorId =
       WHERE e.roleid = 6
         AND TRIM(TO_CHAR(m.created_at, 'Month')) = $1
         AND EXTRACT(YEAR FROM m.created_at)::text = $2
+        AND m.company_reg_num = $3
       GROUP BY l.m1key
     ),
     InvoiceTurnover AS (
-      SELECT 
+      SELECT
         SUM(m.total_cost) as invoice_turnover,
         TO_CHAR(i.date, 'Month') as month_name,
         EXTRACT(YEAR FROM i.date)::TEXT AS year
@@ -745,9 +766,10 @@ const getSubcontractorVsTurnover = async (client, month, year, subcontractorId =
       JOIN m1_controller m ON i.m1key = m.m1key
       WHERE TRIM(TO_CHAR(i.date, 'Month')) = $1
       AND EXTRACT(YEAR FROM i.date)::TEXT = $2
+      AND m.company_reg_num = $3
       GROUP BY TO_CHAR(i.date, 'Month'), EXTRACT(YEAR FROM i.date)
     )
-    SELECT 
+    SELECT
       COALESCE(it.invoice_turnover, 0) + COALESCE(SUM(ldc.subcontractor_turnover), 0) as total_turnover,
       it.month_name,
       it.year
@@ -758,7 +780,7 @@ const getSubcontractorVsTurnover = async (client, month, year, subcontractorId =
 
   const [subcontractorResult, totalTurnoverResult] = await Promise.all([
     subcontractorId ? client.query(subcontractorQuery, params) : Promise.resolve({ rows: [] }),
-    client.query(totalTurnoverQuery, [month, year]),
+    client.query(totalTurnoverQuery, [month, year, company_reg_num]),
   ])
 
   console.log("Subcontractor turnover query result:", subcontractorResult.rows)
@@ -796,10 +818,10 @@ const getSubcontractorVsTurnover = async (client, month, year, subcontractorId =
   return turnoverData
 }
 
-const getTurnoverVsSubbieExpense = async (client, month, year, subcontractorId = null) => {
-  const params = [month, year]
+const getTurnoverVsSubbieExpense = async (client, month, year, subcontractorId = null, company_reg_num) => {
+  const params = [month, year, company_reg_num]
   let subcontractorQuery = `
-    SELECT 
+    SELECT
       e.companyname,
       COALESCE(SUM(l.driverrate), 0) as subcontractor_expense,
       TO_CHAR(l.date, 'Month') as month_name,
@@ -809,9 +831,10 @@ const getTurnoverVsSubbieExpense = async (client, month, year, subcontractorId =
     WHERE e.roleid = 6
       AND TRIM(TO_CHAR(l.date, 'Month')) = $1
       AND EXTRACT(YEAR FROM l.date)::text = $2
+      AND e.company_reg_num = $3
   `
   if (subcontractorId) {
-    subcontractorQuery += ` AND e.subei_reg_num = $3`
+    subcontractorQuery += ` AND e.subei_reg_num = $4`
     params.push(subcontractorId)
   }
   subcontractorQuery += `
@@ -830,7 +853,7 @@ const getTurnoverVsSubbieExpense = async (client, month, year, subcontractorId =
       GROUP BY m1key, legnumber
     ),
     LegDriverContributions AS (
-      SELECT 
+      SELECT
         l.m1key,
         SUM(m.total_cost / dl.num_legs / dcpl.drivers_per_leg) AS subcontractor_turnover
       FROM legs_m2 l
@@ -841,10 +864,11 @@ const getTurnoverVsSubbieExpense = async (client, month, year, subcontractorId =
       WHERE e.roleid = 6
         AND TRIM(TO_CHAR(m.created_at, 'Month')) = $1
         AND EXTRACT(YEAR FROM m.created_at)::text = $2
+        AND m.company_reg_num = $3
       GROUP BY l.m1key
     ),
     InvoiceTurnover AS (
-      SELECT 
+      SELECT
         SUM(m.total_cost) as invoice_turnover,
         TO_CHAR(i.date, 'Month') as month_name,
         EXTRACT(YEAR FROM i.date)::text as year
@@ -852,9 +876,10 @@ const getTurnoverVsSubbieExpense = async (client, month, year, subcontractorId =
       JOIN m1_controller m ON i.m1key = m.m1key
       WHERE TRIM(TO_CHAR(i.date, 'Month')) = $1
       AND EXTRACT(YEAR FROM i.date)::text = $2
+      AND m.company_reg_num = $3
       GROUP BY TO_CHAR(i.date, 'Month'), EXTRACT(YEAR FROM i.date)
     )
-    SELECT 
+    SELECT
       COALESCE(it.invoice_turnover, 0) + COALESCE(SUM(ldc.subcontractor_turnover), 0) as total_turnover,
       it.month_name,
       it.year
@@ -865,7 +890,7 @@ const getTurnoverVsSubbieExpense = async (client, month, year, subcontractorId =
 
   const [subcontractorResult, totalTurnoverResult] = await Promise.all([
     subcontractorId ? client.query(subcontractorQuery, params) : Promise.resolve({ rows: [] }),
-    client.query(totalTurnoverQuery, [month, year]),
+    client.query(totalTurnoverQuery, [month, year, company_reg_num]),
   ])
 
   console.log("Subcontractor expense query result:", subcontractorResult.rows)
@@ -905,22 +930,22 @@ const getTurnoverVsSubbieExpense = async (client, month, year, subcontractorId =
   return turnoverData
 }
 
-const getTurnoverVsFuelPerTruck = async (client, month, year, truckId = null) => {
-  const params = [month, year]
+const getTurnoverVsFuelPerTruck = async (client, month, year, truckId = null, company_reg_num) => {
+  const params = [month, year, company_reg_num]
   let query
 
   if (!truckId) {
     // Aggregate totals when no truckId is provided
     query = `
       WITH DistinctLegs AS (
-        SELECT 
+        SELECT
           m1key,
           COUNT(DISTINCT legnumber) AS num_legs
         FROM legs_m2
         GROUP BY m1key
       ),
       TruckCountsPerLeg AS (
-        SELECT 
+        SELECT
           m1key,
           legnumber,
           COUNT(DISTINCT truckregnumber) AS trucks_per_leg
@@ -928,7 +953,7 @@ const getTurnoverVsFuelPerTruck = async (client, month, year, truckId = null) =>
         GROUP BY m1key, legnumber
       ),
       TurnoverPerTruck AS (
-        SELECT 
+        SELECT
           SUM(m.total_cost / dl.num_legs / tcpl.trucks_per_leg) AS total_turnover,
           TO_CHAR(m.created_at, 'Month') AS month_name,
           EXTRACT(YEAR FROM m.created_at)::TEXT AS year
@@ -941,10 +966,11 @@ const getTurnoverVsFuelPerTruck = async (client, month, year, truckId = null) =>
           AND TRIM(TO_CHAR(m.created_at, 'Month')) = $1
           AND EXTRACT(YEAR FROM m.created_at)::TEXT = $2
           AND t.status = true
+          AND m.company_reg_num = $3
         GROUP BY TO_CHAR(m.created_at, 'Month'), EXTRACT(YEAR FROM m.created_at)
       ),
       FuelPerTruck AS (
-        SELECT 
+        SELECT
           COALESCE(SUM(e.expensecost), 0) AS total_fuel_cost,
           to_char(e.slipuploaddate, 'Month') AS month_name,
           EXTRACT(YEAR FROM e.slipuploaddate)::TEXT AS year
@@ -955,9 +981,10 @@ const getTurnoverVsFuelPerTruck = async (client, month, year, truckId = null) =>
           AND TRIM(to_char(e.slipuploaddate, 'Month')) = $1
           AND EXTRACT(YEAR FROM e.slipuploaddate)::text = $2
           AND t.status = true
+          AND e.company_reg_num = $3
         GROUP BY to_char(e.slipuploaddate, 'Month'), EXTRACT(YEAR FROM e.slipuploaddate)
       )
-      SELECT 
+      SELECT
         'Total' AS truckregnumber,
         COALESCE(tp.total_turnover, 0) AS total_turnover,
         COALESCE(fp.total_fuel_cost, 0) AS total_fuel_cost,
@@ -970,14 +997,14 @@ const getTurnoverVsFuelPerTruck = async (client, month, year, truckId = null) =>
     // Existing query for specific truckId
     query = `
       WITH DistinctLegs AS (
-        SELECT 
+        SELECT
           m1key,
           COUNT(DISTINCT legnumber) AS num_legs
         FROM legs_m2
         GROUP BY m1key
       ),
       TruckCountsPerLeg AS (
-        SELECT 
+        SELECT
           m1key,
           legnumber,
           COUNT(DISTINCT truckregnumber) AS trucks_per_leg
@@ -985,7 +1012,7 @@ const getTurnoverVsFuelPerTruck = async (client, month, year, truckId = null) =>
         GROUP BY m1key, legnumber
       ),
       TurnoverPerTruck AS (
-        SELECT 
+        SELECT
           l.truckregnumber,
           SUM(m.total_cost / dl.num_legs / tcpl.trucks_per_leg) AS total_turnover,
           TO_CHAR(m.created_at, 'Month') AS month_name,
@@ -998,12 +1025,13 @@ const getTurnoverVsFuelPerTruck = async (client, month, year, truckId = null) =>
         WHERE t.is_subcontractor = false
           AND TRIM(TO_CHAR(m.created_at, 'Month')) = $1
           AND EXTRACT(YEAR FROM m.created_at)::TEXT = $2
-          AND t.m5truckskey = $3
+          AND m.company_reg_num = $3
+          AND t.m5truckskey = $4
           AND t.status = true
         GROUP BY l.truckregnumber, TO_CHAR(m.created_at, 'Month'), EXTRACT(YEAR FROM m.created_at)
       ),
       FuelPerTruck AS (
-        SELECT 
+        SELECT
           t.truckregnum,
           COALESCE(SUM(e.expensecost), 0) AS total_fuel_cost,
           to_char(e.slipuploaddate, 'Month') AS month_name,
@@ -1014,11 +1042,12 @@ const getTurnoverVsFuelPerTruck = async (client, month, year, truckId = null) =>
           AND t.is_subcontractor = false
           AND TRIM(to_char(e.slipuploaddate, 'Month')) = $1
           AND EXTRACT(YEAR FROM e.slipuploaddate)::text = $2
-          AND t.m5truckskey = $3
+          AND e.company_reg_num = $3
+          AND t.m5truckskey = $4
           AND t.status = true
         GROUP BY t.truckregnum, to_char(e.slipuploaddate, 'Month'), EXTRACT(YEAR FROM e.slipuploaddate)
       )
-      SELECT 
+      SELECT
         COALESCE(tp.truckregnumber, fp.truckregnum) AS truckregnumber,
         COALESCE(tp.total_turnover, 0) AS total_turnover,
         COALESCE(fp.total_fuel_cost, 0) AS total_fuel_cost,
@@ -1065,9 +1094,9 @@ const getTurnoverVsFuelPerTruck = async (client, month, year, truckId = null) =>
   return data
 }
 
-const getAllExpenses = async (client, month, year) => {
+const getAllExpenses = async (client, month, year, company_reg_num) => {
   const fuelQuery = `
-    SELECT 
+    SELECT
       COALESCE(SUM(e.expensecost), 0) as total_fuel_cost,
       to_char(e.slipuploaddate, 'Month') as month_name,
       EXTRACT(YEAR FROM e.slipuploaddate) as year
@@ -1075,22 +1104,24 @@ const getAllExpenses = async (client, month, year) => {
     WHERE e.type = 'fuel'
       AND TRIM(to_char(e.slipuploaddate, 'Month')) = $1
       AND EXTRACT(YEAR FROM e.slipuploaddate)::text = $2
+      AND e.company_reg_num = $3
     GROUP BY to_char(e.slipuploaddate, 'Month'), EXTRACT(YEAR FROM e.slipuploaddate)
   `
 
   const purchaseOrderQuery = `
-    SELECT 
+    SELECT
       COALESCE(SUM(p.total), 0) as total_po_cost,
       to_char(p.date, 'Month') as month_name,
       EXTRACT(YEAR FROM p.date) as year
     FROM purchase_orders p
     WHERE TRIM(to_char(p.date, 'Month')) = $1
       AND EXTRACT(YEAR FROM p.date)::text = $2
+      AND p.company_reg_num = $3
     GROUP BY to_char(p.date, 'Month'), EXTRACT(YEAR FROM p.date)
   `
 
   const subcontractorQuery = `
-    SELECT 
+    SELECT
       COALESCE(SUM(l.driverrate), 0) as total_subcontractor_expense,
       TO_CHAR(l.date, 'Month') as month_name,
       EXTRACT(YEAR FROM l.date) as year
@@ -1099,11 +1130,12 @@ const getAllExpenses = async (client, month, year) => {
     WHERE e.roleid = 6
       AND TRIM(TO_CHAR(l.date, 'Month')) = $1
       AND EXTRACT(YEAR FROM l.date)::text = $2
+      AND e.company_reg_num = $3
     GROUP BY TO_CHAR(l.date, 'Month'), EXTRACT(YEAR FROM l.date)
   `
 
   const incomeQuery = `
-    SELECT 
+    SELECT
       COALESCE(SUM(m.total_cost), 0) as total_income,
       to_char(i.date, 'Month') as month_name,
       EXTRACT(YEAR FROM i.date) as year
@@ -1111,33 +1143,35 @@ const getAllExpenses = async (client, month, year) => {
     JOIN m1_controller m ON i.m1key = m.m1key
     WHERE TRIM(to_char(i.date, 'Month')) = $1
     AND EXTRACT(YEAR FROM i.date)::text = $2
+    AND m.company_reg_num = $3
     GROUP BY to_char(i.date, 'Month'), EXTRACT(YEAR FROM i.date)
   `
 
   const creditNotesQuery = `
-    SELECT 
+    SELECT
       COALESCE(SUM(amount_value), 0) as total_credit_notes,
       month_name,
       year
     FROM (
-      SELECT 
+      SELECT
         unnest(cn.amount) as amount_value,
         to_char(cn.creditnote_date, 'Month') as month_name,
         EXTRACT(YEAR FROM cn.creditnote_date) as year
       FROM credit_notes cn
       WHERE TRIM(to_char(cn.creditnote_date, 'Month')) = $1
       AND EXTRACT(YEAR FROM cn.creditnote_date)::text = $2
+      AND cn.company_reg_num = $3
     ) subquery
     GROUP BY month_name, year
   `
 
   const [fuelResult, purchaseOrderResult, subcontractorResult, incomeResult, creditNotesResult] =
     await Promise.all([
-      client.query(fuelQuery, [month, year]),
-      client.query(purchaseOrderQuery, [month, year]),
-      client.query(subcontractorQuery, [month, year]),
-      client.query(incomeQuery, [month, year]),
-      client.query(creditNotesQuery, [month, year]),
+      client.query(fuelQuery, [month, year, company_reg_num]),
+      client.query(purchaseOrderQuery, [month, year, company_reg_num]),
+      client.query(subcontractorQuery, [month, year, company_reg_num]),
+      client.query(incomeQuery, [month, year, company_reg_num]),
+      client.query(creditNotesQuery, [month, year, company_reg_num]),
     ])
 
   console.log("Fuel query result:", fuelResult.rows)
@@ -1149,7 +1183,7 @@ const getAllExpenses = async (client, month, year) => {
   const totalFuelCost = Number.parseFloat(fuelResult.rows[0]?.total_fuel_cost || 0)
   const totalPurchaseOrderCost = Number.parseFloat(purchaseOrderResult.rows[0]?.total_po_cost || 0)
   const totalSubcontractorExpense = Number.parseFloat(subcontractorResult.rows[0]?.total_subcontractor_expense || 0)
-  const totalWages = await getTotalWagesForMonth(client, month, year)
+  const totalWages = await getTotalWagesForMonth(client, month, year, company_reg_num)
   const totalIncome = Number.parseFloat(incomeResult.rows[0]?.total_income || 0)
   const totalCreditNotes = Number.parseFloat(creditNotesResult.rows[0]?.total_credit_notes || 0)
 
@@ -1181,9 +1215,9 @@ const getAllExpenses = async (client, month, year) => {
   }
 }
 
-const getWagesVsExpenses = async (client, month, year) => {
+const getWagesVsExpenses = async (client, month, year, company_reg_num) => {
   const fuelQuery = `
-    SELECT 
+    SELECT
       COALESCE(SUM(e.expensecost), 0) as total_fuel_cost,
       to_char(e.slipuploaddate, 'Month') as month_name,
       EXTRACT(YEAR FROM e.slipuploaddate) as year
@@ -1191,22 +1225,24 @@ const getWagesVsExpenses = async (client, month, year) => {
     WHERE e.type = 'fuel'
       AND TRIM(to_char(e.slipuploaddate, 'Month')) = $1
       AND EXTRACT(YEAR FROM e.slipuploaddate)::text = $2
+      AND e.company_reg_num = $3
     GROUP BY to_char(e.slipuploaddate, 'Month'), EXTRACT(YEAR FROM e.slipuploaddate)
   `
 
   const purchaseOrderQuery = `
-    SELECT 
+    SELECT
       COALESCE(SUM(p.total), 0) as total_po_cost,
       to_char(p.date, 'Month') as month_name,
       EXTRACT(YEAR FROM p.date) as year
     FROM purchase_orders p
     WHERE TRIM(to_char(p.date, 'Month')) = $1
       AND EXTRACT(YEAR FROM p.date)::text = $2
+      AND p.company_reg_num = $3
     GROUP BY to_char(p.date, 'Month'), EXTRACT(YEAR FROM p.date)
   `
 
   const subcontractorQuery = `
-    SELECT 
+    SELECT
       COALESCE(SUM(l.driverrate), 0) as total_subcontractor_expense,
       TO_CHAR(l.date, 'Month') as month_name,
       EXTRACT(YEAR FROM l.date) as year
@@ -1215,31 +1251,33 @@ const getWagesVsExpenses = async (client, month, year) => {
     WHERE e.roleid = 6
       AND TRIM(TO_CHAR(l.date, 'Month')) = $1
       AND EXTRACT(YEAR FROM l.date)::text = $2
+      AND e.company_reg_num = $3
     GROUP BY TO_CHAR(l.date, 'Month'), EXTRACT(YEAR FROM l.date)
   `
 
   const creditNotesQuery = `
-    SELECT 
+    SELECT
       COALESCE(SUM(amount_value), 0) as total_credit_notes,
       month_name,
       year
     FROM (
-      SELECT 
+      SELECT
         unnest(cn.amount) as amount_value,
         to_char(cn.creditnote_date, 'Month') as month_name,
         EXTRACT(YEAR FROM cn.creditnote_date) as year
       FROM credit_notes cn
       WHERE TRIM(to_char(cn.creditnote_date, 'Month')) = $1
       AND EXTRACT(YEAR FROM cn.creditnote_date)::text = $2
+      AND cn.company_reg_num = $3
     ) subquery
     GROUP BY month_name, year
   `
 
   const [fuelResult, purchaseOrderResult, subcontractorResult, creditNotesResult] = await Promise.all([
-    client.query(fuelQuery, [month, year]),
-    client.query(purchaseOrderQuery, [month, year]),
-    client.query(subcontractorQuery, [month, year]),
-    client.query(creditNotesQuery, [month, year]),
+    client.query(fuelQuery, [month, year, company_reg_num]),
+    client.query(purchaseOrderQuery, [month, year, company_reg_num]),
+    client.query(subcontractorQuery, [month, year, company_reg_num]),
+    client.query(creditNotesQuery, [month, year, company_reg_num]),
   ])
 
   console.log("Fuel query result:", fuelResult.rows)
@@ -1247,7 +1285,7 @@ const getWagesVsExpenses = async (client, month, year) => {
   console.log("Subcontractor expense query result:", subcontractorResult.rows)
   console.log("Credit notes query result:", creditNotesResult.rows)
 
-  const totalWages = await getTotalWagesForMonth(client, month, year)
+  const totalWages = await getTotalWagesForMonth(client, month, year, company_reg_num)
   const totalFuelCost = Number.parseFloat(fuelResult.rows[0]?.total_fuel_cost || 0)
   const totalPurchaseOrderCost = Number.parseFloat(purchaseOrderResult.rows[0]?.total_po_cost || 0)
   const totalSubcontractorExpense = Number.parseFloat(subcontractorResult.rows[0]?.total_subcontractor_expense || 0)
@@ -1286,7 +1324,7 @@ const getWagesVsExpenses = async (client, month, year) => {
   return wagesVsExpensesData
 }
 
-const getClientSubbieCommissionReport = async (client, month, year, clientId) => {
+const getClientSubbieCommissionReport = async (client, month, year, clientId, company_reg_num) => {
   if (!clientId) {
     throw new Error("clientId is required")
   }
@@ -1302,14 +1340,15 @@ const getClientSubbieCommissionReport = async (client, month, year, clientId) =>
     SELECT m5clientkey, client
     FROM m5_client
     WHERE m5clientkey = $1
+    AND company_reg_num = $2
   `
 
-  const clientInfoResult = await client.query(clientInfoQuery, [clientId])
+  const clientInfoResult = await client.query(clientInfoQuery, [clientId, company_reg_num])
   const clientInfo = clientInfoResult.rows[0] || null
 
   const invoicesQuery = `
     WITH filtered_invoices AS (
-      SELECT 
+      SELECT
         i.ikey,
         i.invoice_num,
         i.doc_num,
@@ -1323,6 +1362,7 @@ const getClientSubbieCommissionReport = async (client, month, year, clientId) =>
       WHERE i.clientid = $1
         AND TRIM(TO_CHAR(i.date, 'Month')) = $2
         AND EXTRACT(YEAR FROM i.date)::text = $3
+        AND m.company_reg_num = $4
     )
     SELECT 
       fi.ikey,
@@ -1338,7 +1378,7 @@ const getClientSubbieCommissionReport = async (client, month, year, clientId) =>
   `
 
   const addOnsQuery = `
-    SELECT 
+    SELECT
       ao.addon_id,
       ao.invoice_number,
       ao.date,
@@ -1349,18 +1389,21 @@ const getClientSubbieCommissionReport = async (client, month, year, clientId) =>
     WHERE ao.client_id = $1
       AND TRIM(TO_CHAR(ao.date, 'Month')) = $2
       AND EXTRACT(YEAR FROM ao.date)::text = $3
+      AND ao.company_reg_num = $4
   `
 
   const subcontractorQuery = `
     WITH filtered_invoices AS (
-      SELECT 
+      SELECT
         i.m1key
       FROM invoice i
+      JOIN m1_controller m ON i.m1key = m.m1key
       WHERE i.clientid = $1
         AND TRIM(TO_CHAR(i.date, 'Month')) = $2
         AND EXTRACT(YEAR FROM i.date)::text = $3
+        AND m.company_reg_num = $4
     )
-    SELECT 
+    SELECT
       MIN(e.userid) AS subcontractor_id,
       COALESCE(e.companyname, 'Unknown') AS companyname,
       e.subei_reg_num,
@@ -1374,7 +1417,7 @@ const getClientSubbieCommissionReport = async (client, month, year, clientId) =>
     ORDER BY total_earned DESC
   `
 
-  const params = [clientId, trimmedMonth, yearText]
+  const params = [clientId, trimmedMonth, yearText, company_reg_num]
   const [invoiceResults, subcontractorResults, addOnResults] = await Promise.all([
     client.query(invoicesQuery, params),
     client.query(subcontractorQuery, params),
@@ -1561,7 +1604,7 @@ async function calculateTotalPayable(client, employeeId, month, year) {
   return totalPayable;
 }
 
-async function getTotalWagesForMonth(client, month, year) {
+async function getTotalWagesForMonth(client, month, year, company_reg_num) {
   const monthNames = [
     "January", "February", "March", "April", "May", "June",
     "July", "August", "September", "October", "November", "December"
@@ -1575,8 +1618,9 @@ async function getTotalWagesForMonth(client, month, year) {
     SELECT userid
     FROM m5_employee
     WHERE roleid != 6
+    AND company_reg_num = $1
   `;
-  const empRes = await client.query(employeesQuery);
+  const empRes = await client.query(employeesQuery, [company_reg_num]);
   const employees = empRes.rows;
 
   let totalSum = 0;

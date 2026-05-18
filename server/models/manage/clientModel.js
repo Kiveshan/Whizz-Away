@@ -1,10 +1,10 @@
 import { pool } from "../../config/database.js"
 
-const checkClientEmailExists = async (email) => {
+const checkClientEmailExists = async (email, company_reg_num) => {
   let client
   try {
     client = await pool.connect()
-    const result = await client.query("SELECT 1 FROM m5_client WHERE email = $1", [email])
+    const result = await client.query("SELECT 1 FROM m5_client WHERE email = $1 AND company_reg_num = $2", [email, company_reg_num])
     return result.rows.length > 0
   } catch (err) {
     console.error("Error checking email existence:", err)
@@ -14,7 +14,7 @@ const checkClientEmailExists = async (email) => {
   }
 }
 
-const getAllClients = async (options = {}) => {
+const getAllClients = async (options = {}, company_reg_num) => {
   let client
   try {
     client = await pool.connect()
@@ -22,9 +22,9 @@ const getAllClients = async (options = {}) => {
     const { offset = 0, limit = 10, search = "", status = "all" } = options
 
     // Build WHERE clause for filtering
-    let whereClause = "WHERE 1=1"
-    const queryParams = []
-    let paramIndex = 1
+    let whereClause = "WHERE company_reg_num = $1"
+    const queryParams = [company_reg_num]
+    let paramIndex = 2
 
     // Search filter
     if (search && search.trim() !== "") {
@@ -74,11 +74,11 @@ const getAllClients = async (options = {}) => {
   }
 }
 
-const getClientById = async (id) => {
+const getClientById = async (id, company_reg_num) => {
   let client
   try {
     client = await pool.connect()
-    const result = await client.query("SELECT * FROM m5_client WHERE m5clientkey = $1", [id])
+    const result = await client.query("SELECT * FROM m5_client WHERE m5clientkey = $1 AND company_reg_num = $2", [id, company_reg_num])
 
     if (!result.rows.length) {
       return { success: false, message: "Client not found" }
@@ -93,7 +93,7 @@ const getClientById = async (id) => {
   }
 }
 
-const createClient = async (clientData) => {
+const createClient = async (clientData, company_reg_num) => {
   let client
   try {
     client = await pool.connect()
@@ -124,9 +124,9 @@ const createClient = async (clientData) => {
     const result = await client.query(
       `INSERT INTO m5_client (
          client, representative, companyaddress, suburb, postalcode,
-         email, client_reg_num, cellnum, vatregno, city, streetaddress, 
-         payment_type, insurance, status
-       ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
+         email, client_reg_num, cellnum, vatregno, city, streetaddress,
+         payment_type, insurance, status, company_reg_num
+       ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)
        RETURNING *`,
       [
         clientName.trim(),
@@ -143,6 +143,7 @@ const createClient = async (clientData) => {
         payment_type || null,
         insuranceValue,
         true, // status
+        company_reg_num,
       ],
     )
 
@@ -155,7 +156,7 @@ const createClient = async (clientData) => {
   }
 }
 
-const updateClient = async (id, clientData) => {
+const updateClient = async (id, clientData, company_reg_num) => {
   let client
   try {
     client = await pool.connect()
@@ -189,7 +190,7 @@ const updateClient = async (id, clientData) => {
            postalcode = $5, email = $6, client_reg_num = $7, cellnum = $8,
            vatregno = $9, city = $10, streetaddress = $11, payment_type = $12,
            insurance = $13
-       WHERE m5clientkey = $14
+       WHERE m5clientkey = $14 AND company_reg_num = $15
        RETURNING *`,
       [
         clientName.trim(),
@@ -206,6 +207,7 @@ const updateClient = async (id, clientData) => {
         payment_type || null,
         insuranceValue,
         id,
+        company_reg_num,
       ],
     )
 
@@ -222,12 +224,12 @@ const updateClient = async (id, clientData) => {
   }
 }
 
-const toggleClientStatus = async (id, status) => {
+const toggleClientStatus = async (id, status, company_reg_num) => {
   let client
   try {
     client = await pool.connect()
 
-    const checkResult = await client.query("SELECT m5clientkey FROM m5_client WHERE m5clientkey = $1", [id])
+    const checkResult = await client.query("SELECT m5clientkey FROM m5_client WHERE m5clientkey = $1 AND company_reg_num = $2", [id, company_reg_num])
 
     if (!checkResult.rows.length) {
       return { success: false, message: "Client not found" }
@@ -236,9 +238,9 @@ const toggleClientStatus = async (id, status) => {
     const result = await client.query(
       `UPDATE m5_client
        SET status = $1
-       WHERE m5clientkey = $2
+       WHERE m5clientkey = $2 AND company_reg_num = $3
        RETURNING m5clientkey, client, representative, email, status`,
-      [status, id],
+      [status, id, company_reg_num],
     )
 
     return { success: true, data: result.rows[0] }
@@ -250,18 +252,18 @@ const toggleClientStatus = async (id, status) => {
   }
 }
 
-const deleteClient = async (id) => {
+const deleteClient = async (id, company_reg_num) => {
   let client
   try {
     client = await pool.connect()
 
-    const checkResult = await client.query("SELECT m5clientkey FROM m5_client WHERE m5clientkey = $1", [id])
+    const checkResult = await client.query("SELECT m5clientkey FROM m5_client WHERE m5clientkey = $1 AND company_reg_num = $2", [id, company_reg_num])
 
     if (!checkResult.rows.length) {
       return { success: false, message: "Client not found" }
     }
 
-    await client.query("DELETE FROM m5_client WHERE m5clientkey = $1", [id])
+    await client.query("DELETE FROM m5_client WHERE m5clientkey = $1 AND company_reg_num = $2", [id, company_reg_num])
 
     return { success: true, message: "Client deleted successfully" }
   } catch (err) {

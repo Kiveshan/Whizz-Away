@@ -17,7 +17,7 @@ const toNullIfEmptyNumber = (value) => {
   return isNaN(num) ? null : num
 }
 
-const getAllTrailers = async (options = {}) => {
+const getAllTrailers = async (options = {}, company_reg_num) => {
   let client
   try {
     client = await pool.connect()
@@ -25,15 +25,15 @@ const getAllTrailers = async (options = {}) => {
     const { offset = 0, limit = 10, search = "" } = options
 
     // Build WHERE clause for filtering
-    let whereClause = "WHERE 1=1"
-    const queryParams = []
-    let paramIndex = 1
+    let whereClause = "WHERE company_reg_num = $1"
+    const queryParams = [company_reg_num]
+    let paramIndex = 2
 
     // Search filter
     if (search && search.trim() !== "") {
       whereClause += ` AND (
-        LOWER(trailerregnum) LIKE LOWER($${paramIndex}) OR 
-        LOWER(model) LIKE LOWER($${paramIndex}) OR 
+        LOWER(trailerregnum) LIKE LOWER($${paramIndex}) OR
+        LOWER(model) LIKE LOWER($${paramIndex}) OR
         LOWER(vin_num) LIKE LOWER($${paramIndex}) OR
         LOWER(trailersize) LIKE LOWER($${paramIndex})
       )`
@@ -69,11 +69,14 @@ const getAllTrailers = async (options = {}) => {
   }
 }
 
-const getTrailerById = async (id) => {
+const getTrailerById = async (id, company_reg_num) => {
   let client
   try {
     client = await pool.connect()
-    const result = await client.query("SELECT * FROM m5_trailers WHERE m5trailerskey = $1", [id])
+    const result = await client.query(
+      "SELECT * FROM m5_trailers WHERE m5trailerskey = $1 AND company_reg_num = $2",
+      [id, company_reg_num],
+    )
     if (!result.rows.length) {
       return { success: false, message: "Trailer not found" }
     }
@@ -97,7 +100,7 @@ const getTrailerById = async (id) => {
   }
 }
 
-const createTrailer = async (trailerData, documentKeys) => {
+const createTrailer = async (trailerData, documentKeys, company_reg_num) => {
   let client
   try {
     client = await pool.connect()
@@ -130,8 +133,8 @@ const createTrailer = async (trailerData, documentKeys) => {
       `INSERT INTO m5_trailers (
          trailerregnum, trailersize, trailerpurchasedate, year, model,
          purchase_price, current_evaluation, vin_num,
-         trailer_license_expiry, document_url1, document_url2, document_url3, status
-       ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
+         trailer_license_expiry, document_url1, document_url2, document_url3, status, company_reg_num
+       ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
        RETURNING *`,
       [
         trailerregnum,
@@ -147,6 +150,7 @@ const createTrailer = async (trailerData, documentKeys) => {
         document_url2,
         document_url3,
         true, // Default status to enabled
+        company_reg_num,
       ],
     )
     return result.rows[0]
@@ -158,7 +162,7 @@ const createTrailer = async (trailerData, documentKeys) => {
   }
 }
 
-const updateTrailer = async (id, trailerData, newDocKeys) => {
+const updateTrailer = async (id, trailerData, newDocKeys, company_reg_num) => {
   let client
   try {
     client = await pool.connect()
@@ -184,8 +188,8 @@ const updateTrailer = async (id, trailerData, newDocKeys) => {
     const vin_numValue = toNullIfEmpty(vin_num)
 
     const existingResult = await client.query(
-      "SELECT document_url1, document_url2, document_url3 FROM m5_trailers WHERE m5trailerskey = $1",
-      [id],
+      "SELECT document_url1, document_url2, document_url3 FROM m5_trailers WHERE m5trailerskey = $1 AND company_reg_num = $2",
+      [id, company_reg_num],
     )
     if (!existingResult.rows.length) {
       return { success: false, message: "Trailer not found" }
@@ -209,7 +213,7 @@ const updateTrailer = async (id, trailerData, newDocKeys) => {
            year = $4, model = $5, purchase_price = $6,
            current_evaluation = $7, vin_num = $8,
            trailer_license_expiry = $9, document_url1 = $10, document_url2 = $11, document_url3 = $12
-       WHERE m5trailerskey = $13
+       WHERE m5trailerskey = $13 AND company_reg_num = $14
        RETURNING *`,
       [
         trailerregnum,
@@ -225,6 +229,7 @@ const updateTrailer = async (id, trailerData, newDocKeys) => {
         document_url2,
         document_url3,
         id,
+        company_reg_num,
       ],
     )
     if (!result.rowCount) {
@@ -240,14 +245,14 @@ const updateTrailer = async (id, trailerData, newDocKeys) => {
 }
 
 // New function to toggle trailer status
-const toggleTrailerStatus = async (id, newStatus) => {
+const toggleTrailerStatus = async (id, newStatus, company_reg_num) => {
   let client
   try {
     client = await pool.connect()
-    const result = await client.query("UPDATE m5_trailers SET status = $1 WHERE m5trailerskey = $2 RETURNING *", [
-      newStatus,
-      id,
-    ])
+    const result = await client.query(
+      "UPDATE m5_trailers SET status = $1 WHERE m5trailerskey = $2 AND company_reg_num = $3 RETURNING *",
+      [newStatus, id, company_reg_num],
+    )
     if (!result.rowCount) {
       return { success: false, message: "Trailer not found" }
     }
@@ -261,23 +266,24 @@ const toggleTrailerStatus = async (id, newStatus) => {
 }
 
 // New function to get trailers with expiring licenses
-const getTrailersWithExpiringLicenses = async (daysAhead = 30) => {
+const getTrailersWithExpiringLicenses = async (daysAhead = 30, company_reg_num) => {
   let client
   try {
     client = await pool.connect()
 
     const query = `
-      SELECT trailerregnum, trailer_license_expiry, 
+      SELECT trailerregnum, trailer_license_expiry,
              (trailer_license_expiry - CURRENT_DATE) as days_until_expiry
-      FROM m5_trailers 
-      WHERE trailer_license_expiry IS NOT NULL 
+      FROM m5_trailers
+      WHERE trailer_license_expiry IS NOT NULL
         AND trailer_license_expiry <= CURRENT_DATE + INTERVAL '${daysAhead} days'
         AND trailer_license_expiry >= CURRENT_DATE
-         AND status = true 
+        AND status = true
+        AND company_reg_num = $1
       ORDER BY trailer_license_expiry ASC
     `
 
-    const result = await client.query(query)
+    const result = await client.query(query, [company_reg_num])
     return result.rows
   } catch (err) {
     console.error("Error fetching trailers with expiring licenses:", err)
@@ -288,7 +294,7 @@ const getTrailersWithExpiringLicenses = async (daysAhead = 30) => {
 }
 
 // New function to get expired licenses
-const getTrailersWithExpiredLicenses = async () => {
+const getTrailersWithExpiredLicenses = async (company_reg_num) => {
   let client
   try {
     client = await pool.connect()
@@ -296,14 +302,15 @@ const getTrailersWithExpiredLicenses = async () => {
     const query = `
       SELECT trailerregnum, trailer_license_expiry,
              (CURRENT_DATE - trailer_license_expiry) as days_expired
-      FROM m5_trailers 
-      WHERE trailer_license_expiry IS NOT NULL 
+      FROM m5_trailers
+      WHERE trailer_license_expiry IS NOT NULL
         AND trailer_license_expiry < CURRENT_DATE
-         AND status = true 
+        AND status = true
+        AND company_reg_num = $1
       ORDER BY trailer_license_expiry ASC
     `
 
-    const result = await client.query(query)
+    const result = await client.query(query, [company_reg_num])
     return result.rows
   } catch (err) {
     console.error("Error fetching trailers with expired licenses:", err)
@@ -313,13 +320,13 @@ const getTrailersWithExpiredLicenses = async () => {
   }
 }
 
-const deleteTrailerDocument = async (trailerId, url) => {
+const deleteTrailerDocument = async (trailerId, url, company_reg_num) => {
   let client
   try {
     client = await pool.connect()
     const { rows } = await client.query(
-      "SELECT document_url1, document_url2, document_url3 FROM m5_trailers WHERE m5trailerskey = $1",
-      [trailerId],
+      "SELECT document_url1, document_url2, document_url3 FROM m5_trailers WHERE m5trailerskey = $1 AND company_reg_num = $2",
+      [trailerId, company_reg_num],
     )
     if (!rows.length) {
       return { success: false, message: "Trailer not found" }
@@ -343,12 +350,42 @@ const deleteTrailerDocument = async (trailerId, url) => {
     }
 
     if (updateField) {
-      await client.query(`UPDATE m5_trailers SET ${updateField} = NULL WHERE m5trailerskey = $1`, [trailerId])
+      await client.query(
+        `UPDATE m5_trailers SET ${updateField} = NULL WHERE m5trailerskey = $1 AND company_reg_num = $2`,
+        [trailerId, company_reg_num],
+      )
       return { success: true, message: "Document deleted successfully" }
     }
     return { success: false, message: "No matching document URL found" }
   } catch (err) {
     console.error("Error deleting trailer document:", err)
+    throw err
+  } finally {
+    if (client) client.release()
+  }
+}
+
+const deleteTrailer = async (id, company_reg_num) => {
+  let client
+  try {
+    client = await pool.connect()
+
+    const checkResult = await client.query(
+      "SELECT m5trailerskey FROM m5_trailers WHERE m5trailerskey = $1 AND company_reg_num = $2",
+      [id, company_reg_num],
+    )
+
+    if (!checkResult.rows.length) {
+      return { success: false, message: "Trailer not found" }
+    }
+
+    await client.query("DELETE FROM m5_trailers WHERE m5trailerskey = $1 AND company_reg_num = $2", [
+      id,
+      company_reg_num,
+    ])
+    return { success: true, message: "Trailer deleted successfully" }
+  } catch (err) {
+    console.error(`Error deleting trailer ${id}:`, err)
     throw err
   } finally {
     if (client) client.release()
@@ -361,6 +398,7 @@ export {
   createTrailer,
   updateTrailer,
   deleteTrailerDocument,
+  deleteTrailer,
   toggleTrailerStatus,
   getTrailersWithExpiringLicenses,
   getTrailersWithExpiredLicenses,

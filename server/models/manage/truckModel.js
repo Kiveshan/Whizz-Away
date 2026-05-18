@@ -1,21 +1,21 @@
 import { pool } from "../../config/database.js"
 
-const getAllTrucks = async (options = {}) => {
+const getAllTrucks = async (options = {}, company_reg_num) => {
   let client
   try {
     client = await pool.connect()
     const { offset = 0, limit = 10, search = "" } = options
 
     // Build WHERE clause for filtering - EXCLUDE subcontractor trucks
-    let whereClause = "WHERE (is_subcontractor = false OR is_subcontractor IS NULL)"
-    const queryParams = []
-    let paramIndex = 1
+    let whereClause = "WHERE (is_subcontractor = false OR is_subcontractor IS NULL) AND company_reg_num = $1"
+    const queryParams = [company_reg_num]
+    let paramIndex = 2
 
     // Search filter
     if (search && search.trim() !== "") {
       whereClause += ` AND (
-        LOWER(truckregnum) LIKE LOWER($${paramIndex}) OR 
-        LOWER(model) LIKE LOWER($${paramIndex}) OR 
+        LOWER(truckregnum) LIKE LOWER($${paramIndex}) OR
+        LOWER(model) LIKE LOWER($${paramIndex}) OR
         LOWER(vin_num) LIKE LOWER($${paramIndex}) OR
         LOWER(trailersize) LIKE LOWER($${paramIndex})
       )`
@@ -51,11 +51,14 @@ const getAllTrucks = async (options = {}) => {
   }
 }
 
-const getTruckById = async (id) => {
+const getTruckById = async (id, company_reg_num) => {
   let client
   try {
     client = await pool.connect()
-    const result = await client.query("SELECT * FROM m5_trucks WHERE m5truckskey = $1", [id])
+    const result = await client.query(
+      "SELECT * FROM m5_trucks WHERE m5truckskey = $1 AND company_reg_num = $2",
+      [id, company_reg_num],
+    )
 
     if (!result.rows.length) {
       return { success: false, message: "Truck not found" }
@@ -80,7 +83,7 @@ const getTruckById = async (id) => {
   }
 }
 
-const createTruck = async (truckData, documentKeys) => {
+const createTruck = async (truckData, documentKeys, company_reg_num) => {
   let client
   try {
     client = await pool.connect()
@@ -134,8 +137,8 @@ const createTruck = async (truckData, documentKeys) => {
       `INSERT INTO m5_trucks (
         truckregnum, trailersize, truckpurchasedate, year, model,
         purchase_price, current_evaluation, vin_num, is_subcontractor,
-        truck_license_expiry, git, document_url1, document_url2, document_url3, status
-      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)
+        truck_license_expiry, git, document_url1, document_url2, document_url3, status, company_reg_num
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16)
       RETURNING *`,
       [
         truckregnum, // Required field
@@ -153,6 +156,7 @@ const createTruck = async (truckData, documentKeys) => {
         document_url2,
         document_url3,
         true, // Default status is active
+        company_reg_num,
       ],
     )
 
@@ -165,7 +169,7 @@ const createTruck = async (truckData, documentKeys) => {
   }
 }
 
-const updateTruck = async (id, truckData, newDocKeys) => {
+const updateTruck = async (id, truckData, newDocKeys, company_reg_num) => {
   let client
   try {
     client = await pool.connect()
@@ -212,8 +216,8 @@ const updateTruck = async (id, truckData, newDocKeys) => {
     const gitValue = toNullIfEmpty(git)
 
     const existingResult = await client.query(
-      "SELECT document_url1, document_url2, document_url3 FROM m5_trucks WHERE m5truckskey = $1",
-      [id],
+      "SELECT document_url1, document_url2, document_url3 FROM m5_trucks WHERE m5truckskey = $1 AND company_reg_num = $2",
+      [id, company_reg_num],
     )
 
     if (!existingResult.rows.length) {
@@ -233,12 +237,12 @@ const updateTruck = async (id, truckData, newDocKeys) => {
     ;[document_url1, document_url2, document_url3] = currentDocs
 
     const result = await client.query(
-      `UPDATE m5_trucks 
+      `UPDATE m5_trucks
       SET truckregnum = $1, trailersize = $2, truckpurchasedate = $3,
           year = $4, model = $5, purchase_price = $6,
           current_evaluation = $7, vin_num = $8, is_subcontractor = $9,
           truck_license_expiry = $10, git = $11, document_url1 = $12, document_url2 = $13, document_url3 = $14
-      WHERE m5truckskey = $15
+      WHERE m5truckskey = $15 AND company_reg_num = $16
       RETURNING *`,
       [
         truckregnum, // Required field
@@ -256,6 +260,7 @@ const updateTruck = async (id, truckData, newDocKeys) => {
         document_url2,
         document_url3,
         id,
+        company_reg_num,
       ],
     )
 
@@ -273,15 +278,15 @@ const updateTruck = async (id, truckData, newDocKeys) => {
 }
 
 // New function to toggle truck status
-const toggleTruckStatus = async (id, newStatus) => {
+const toggleTruckStatus = async (id, newStatus, company_reg_num) => {
   let client
   try {
     client = await pool.connect()
 
-    const result = await client.query("UPDATE m5_trucks SET status = $1 WHERE m5truckskey = $2 RETURNING *", [
-      newStatus,
-      id,
-    ])
+    const result = await client.query(
+      "UPDATE m5_trucks SET status = $1 WHERE m5truckskey = $2 AND company_reg_num = $3 RETURNING *",
+      [newStatus, id, company_reg_num],
+    )
 
     if (!result.rowCount) {
       return { success: false, message: "Truck not found" }
@@ -297,22 +302,23 @@ const toggleTruckStatus = async (id, newStatus) => {
 }
 
 // Updated function to get trucks with expiring licenses (EXCLUDE disabled and subcontractor trucks)
-const getTrucksWithExpiringLicenses = async (daysAhead = 30) => {
+const getTrucksWithExpiringLicenses = async (daysAhead = 30, company_reg_num) => {
   let client
   try {
     client = await pool.connect()
     const query = `
       SELECT truckregnum, truck_license_expiry,
              (truck_license_expiry - CURRENT_DATE) as days_until_expiry
-      FROM m5_trucks 
-      WHERE truck_license_expiry IS NOT NULL 
+      FROM m5_trucks
+      WHERE truck_license_expiry IS NOT NULL
         AND truck_license_expiry <= CURRENT_DATE + INTERVAL '${daysAhead} days'
         AND truck_license_expiry >= CURRENT_DATE
         AND (is_subcontractor = false OR is_subcontractor IS NULL)
-        AND status = true 
+        AND status = true
+        AND company_reg_num = $1
       ORDER BY truck_license_expiry ASC
     `
-    const result = await client.query(query)
+    const result = await client.query(query, [company_reg_num])
     return result.rows
   } catch (err) {
     console.error("Error fetching trucks with expiring licenses:", err)
@@ -323,21 +329,22 @@ const getTrucksWithExpiringLicenses = async (daysAhead = 30) => {
 }
 
 // Updated function to get expired licenses (EXCLUDE disabled and subcontractor trucks)
-const getTrucksWithExpiredLicenses = async () => {
+const getTrucksWithExpiredLicenses = async (company_reg_num) => {
   let client
   try {
     client = await pool.connect()
     const query = `
       SELECT truckregnum, truck_license_expiry,
             (CURRENT_DATE - truck_license_expiry) as days_expired
-      FROM m5_trucks 
-      WHERE truck_license_expiry IS NOT NULL 
+      FROM m5_trucks
+      WHERE truck_license_expiry IS NOT NULL
         AND truck_license_expiry < CURRENT_DATE
         AND (is_subcontractor = false OR is_subcontractor IS NULL)
         AND status = true
+        AND company_reg_num = $1
       ORDER BY truck_license_expiry ASC
     `
-    const result = await client.query(query)
+    const result = await client.query(query, [company_reg_num])
     return result.rows
   } catch (err) {
     console.error("Error fetching trucks with expired licenses:", err)
@@ -347,14 +354,14 @@ const getTrucksWithExpiredLicenses = async () => {
   }
 }
 
-const deleteTruckDocument = async (truckId, url) => {
+const deleteTruckDocument = async (truckId, url, company_reg_num) => {
   let client
   try {
     client = await pool.connect()
 
     const { rows } = await client.query(
-      "SELECT document_url1, document_url2, document_url3 FROM m5_trucks WHERE m5truckskey = $1",
-      [truckId],
+      "SELECT document_url1, document_url2, document_url3 FROM m5_trucks WHERE m5truckskey = $1 AND company_reg_num = $2",
+      [truckId, company_reg_num],
     )
 
     if (!rows.length) {
@@ -381,7 +388,10 @@ const deleteTruckDocument = async (truckId, url) => {
     }
 
     if (updateField) {
-      await client.query(`UPDATE m5_trucks SET ${updateField} = NULL WHERE m5truckskey = $1`, [truckId])
+      await client.query(
+        `UPDATE m5_trucks SET ${updateField} = NULL WHERE m5truckskey = $1 AND company_reg_num = $2`,
+        [truckId, company_reg_num],
+      )
       return { success: true, message: "Document deleted successfully" }
     }
 
@@ -394,18 +404,21 @@ const deleteTruckDocument = async (truckId, url) => {
   }
 }
 
-const deleteTruck = async (id) => {
+const deleteTruck = async (id, company_reg_num) => {
   let client
   try {
     client = await pool.connect()
 
-    const checkResult = await client.query("SELECT m5truckskey FROM m5_trucks WHERE m5truckskey = $1", [id])
+    const checkResult = await client.query(
+      "SELECT m5truckskey FROM m5_trucks WHERE m5truckskey = $1 AND company_reg_num = $2",
+      [id, company_reg_num],
+    )
 
     if (!checkResult.rows.length) {
       return { success: false, message: "Truck not found" }
     }
 
-    await client.query("DELETE FROM m5_trucks WHERE m5truckskey = $1", [id])
+    await client.query("DELETE FROM m5_trucks WHERE m5truckskey = $1 AND company_reg_num = $2", [id, company_reg_num])
     return { success: true, message: "Truck deleted successfully" }
   } catch (err) {
     console.error(`Error deleting truck ${id}:`, err)

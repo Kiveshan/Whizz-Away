@@ -4,7 +4,6 @@ import { secretKey } from "../config/secrets.js"
 const verifyToken = (req, res, next) => {
   const authHeader = req.headers.authorization
   const publicEndpoints = [
-    "/api/clients",
     "/api/shipment-types",
     "/api/check-auth",
     "/test-connection",
@@ -26,45 +25,11 @@ const verifyToken = (req, res, next) => {
       return next()
     }
 
-    if (
-      (req.url === "/api/client-instruction-stats" ||
-        req.url.startsWith("/api/instructions") ||
-        req.url.match(/^\/api\/instruction\/\d+$/) ||
-        req.url.match(/^\/api\/containers\/\d+$/)) &&
-      process.env.NODE_ENV !== "production"
-    ) {
-      console.log("DEV MODE: Allowing unauthenticated access to:", req.url)
-      req.user = {
-        name: "Development",
-        surname: "User",
-        roleid: 1,
-        userid: 0,
-        email: "dev@example.com",
-      }
-      return next()
-    }
-
-    if (req.url === "/api/client-instruction-stats" && process.env.NODE_ENV !== "production") {
-      console.log("DEV MODE: Allowing unauthenticated access to:", req.url)
-      req.user = {
-        name: "Development",
-        surname: "User",
-        roleid: 1,
-        userid: 0,
-        email: "dev@example.com",
-      }
-      return next()
-    }
-
-    if (req.query.token) {
-      req.headers.authorization = `Bearer ${req.query.token}`
-    } else {
-      return res.status(401).json({
-        error: "Authentication required",
-        message: "No token provided",
-        code: "NO_TOKEN",
-      })
-    }
+    return res.status(401).json({
+      error: "Authentication required",
+      message: "No token provided",
+      code: "NO_TOKEN",
+    })
   }
 
   if (req.headers.authorization) {
@@ -85,12 +50,6 @@ const verifyToken = (req, res, next) => {
       next()
     } catch (err) {
       console.error("Token verification failed:", err)
-
-      if (process.env.NODE_ENV !== "production" && isPublicEndpoint) {
-        console.log("DEV MODE: Allowing access with invalid token for public endpoint")
-        req.user = null
-        return next()
-      }
 
       // Handle specific JWT errors
       if (err.name === "TokenExpiredError") {

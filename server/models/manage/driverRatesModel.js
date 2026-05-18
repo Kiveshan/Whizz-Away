@@ -1,6 +1,6 @@
 import { pool } from "../../config/database.js"
 
-const getAllDriverRates = async (options = {}) => {
+const getAllDriverRates = async (company_reg_num, options = {}) => {
   let client
   try {
     client = await pool.connect()
@@ -8,14 +8,14 @@ const getAllDriverRates = async (options = {}) => {
     const { offset = 0, limit = 10, search = "" } = options
 
     // Build WHERE clause for filtering
-    let whereClause = "WHERE 1=1"
-    const queryParams = []
-    let paramIndex = 1
+    let whereClause = "WHERE dr.company_reg_num = $1"
+    const queryParams = [company_reg_num]
+    let paramIndex = 2
 
     // Search filter
     if (search && search.trim() !== "") {
       whereClause += ` AND (
-        LOWER(dr.startingpoint) LIKE LOWER($${paramIndex}) OR 
+        LOWER(dr.startingpoint) LIKE LOWER($${paramIndex}) OR
         LOWER(dr.destination) LIKE LOWER($${paramIndex})
       )`
       queryParams.push(`%${search.trim()}%`)
@@ -57,18 +57,19 @@ const getAllDriverRates = async (options = {}) => {
   }
 }
 
-const getDriverRateById = async (id) => {
+const getDriverRateById = async (id, company_reg_num) => {
   let client
   try {
     client = await pool.connect()
     const result = await client.query(
       `
-      SELECT dr.*, e.name, e.surname 
+      SELECT dr.*, e.name, e.surname
       FROM m5_driver_rate dr
       LEFT JOIN m5_employee e ON dr.driverid = e.userid
       WHERE dr.m5ratekey = $1
+        AND dr.company_reg_num = $2
     `,
-      [id],
+      [id, company_reg_num],
     )
     if (!result.rows.length) {
       return { success: false, message: "Driver rate not found" }
@@ -82,7 +83,7 @@ const getDriverRateById = async (id) => {
   }
 }
 
-const createDriverRate = async (driverRateData) => {
+const createDriverRate = async (driverRateData, company_reg_num) => {
   let client
   try {
     client = await pool.connect()
@@ -139,8 +140,9 @@ const createDriverRate = async (driverRateData) => {
         startingpoint, destination,
         driver_six_meter_rate, driver_twelve_meter_rate,
         subie_six_meter_rate, subie_twelve_meter_rate,
-        effective_from, effective_to
-      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+        effective_from, effective_to,
+        company_reg_num
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
       RETURNING *`,
       [
         startingpoint,
@@ -151,6 +153,7 @@ const createDriverRate = async (driverRateData) => {
         processedSubieTwelveRate,
         effectiveFrom,
         effectiveTo,
+        company_reg_num,
       ],
     )
     return result.rows[0]
@@ -162,11 +165,11 @@ const createDriverRate = async (driverRateData) => {
   }
 }
 
-const updateDriverRate = async (id, driverRateData) => {
+const updateDriverRate = async (id, driverRateData, company_reg_num) => {
   let client
   try {
     client = await pool.connect()
-    const checkResult = await client.query("SELECT * FROM m5_driver_rate WHERE m5ratekey = $1", [id])
+    const checkResult = await client.query("SELECT * FROM m5_driver_rate WHERE m5ratekey = $1 AND company_reg_num = $2", [id, company_reg_num])
     if (!checkResult.rows.length) {
       return { success: false, message: "Driver rate not found" }
     }
@@ -251,11 +254,13 @@ const updateDriverRate = async (id, driverRateData) => {
 
     updateFields.push(`updated_at = CURRENT_TIMESTAMP`)
     queryParams.push(id)
+    queryParams.push(company_reg_num)
 
     const updateQuery = `
-      UPDATE m5_driver_rate 
-      SET ${updateFields.join(", ")} 
-      WHERE m5ratekey = $${paramCounter} 
+      UPDATE m5_driver_rate
+      SET ${updateFields.join(", ")}
+      WHERE m5ratekey = $${paramCounter}
+        AND company_reg_num = $${paramCounter + 1}
       RETURNING *
     `
 
@@ -269,15 +274,15 @@ const updateDriverRate = async (id, driverRateData) => {
   }
 }
 
-const deleteDriverRate = async (id) => {
+const deleteDriverRate = async (id, company_reg_num) => {
   let client
   try {
     client = await pool.connect()
-    const checkResult = await client.query("SELECT * FROM m5_driver_rate WHERE m5ratekey = $1", [id])
+    const checkResult = await client.query("SELECT * FROM m5_driver_rate WHERE m5ratekey = $1 AND company_reg_num = $2", [id, company_reg_num])
     if (!checkResult.rows.length) {
       return { success: false, message: "Driver rate not found" }
     }
-    await client.query("DELETE FROM m5_driver_rate WHERE m5ratekey = $1", [id])
+    await client.query("DELETE FROM m5_driver_rate WHERE m5ratekey = $1 AND company_reg_num = $2", [id, company_reg_num])
     return { success: true, message: "Driver rate deleted successfully" }
   } catch (err) {
     console.error(`Error deleting driver rate ${id}:`, err)
@@ -287,12 +292,12 @@ const deleteDriverRate = async (id) => {
   }
 }
 
-const getDriverRateUsage = async (id) => {
+const getDriverRateUsage = async (id, company_reg_num) => {
   let client
   try {
     client = await pool.connect()
 
-    const rateResult = await client.query("SELECT * FROM m5_driver_rate WHERE m5ratekey = $1", [id])
+    const rateResult = await client.query("SELECT * FROM m5_driver_rate WHERE m5ratekey = $1 AND company_reg_num = $2", [id, company_reg_num])
     if (!rateResult.rows.length) {
       return { success: false, message: "Driver rate not found" }
     }
@@ -308,6 +313,7 @@ const getDriverRateUsage = async (id) => {
         WHERE LOWER(COALESCE(c.status, '')) = LOWER($2)
           AND LOWER(TRIM(COALESCE(l.startingpoint, ''))) = LOWER(TRIM(COALESCE($3, '')))
           AND LOWER(TRIM(COALESCE(l.destination, ''))) = LOWER(TRIM(COALESCE($4, '')))
+          AND l.company_reg_num = $6
           AND (
             l.m5ratekey = $1
             OR (
@@ -335,6 +341,7 @@ const getDriverRateUsage = async (id) => {
           .filter((v) => v !== null && v !== undefined && v !== "")
           .map((v) => Number(v))
           .filter((v) => !Number.isNaN(v)),
+        company_reg_num,
       ],
     )
 
@@ -413,7 +420,7 @@ const getDriverRateUsage = async (id) => {
 
 // Get the appropriate rate for a leg based on its date and route
 // This function respects effective dates to determine which rate version applies
-export const getRateForLegDate = async (startingpoint, destination, legDate, isSubcontractor = false, containerType = '6m') => {
+export const getRateForLegDate = async (startingpoint, destination, legDate, isSubcontractor = false, containerType = '6m', company_reg_num) => {
   let client
   try {
     client = await pool.connect()
@@ -424,7 +431,7 @@ export const getRateForLegDate = async (startingpoint, destination, legDate, isS
     const targetDate = legDate instanceof Date
       ? legDate.toISOString().split('T')[0]
       : legDate
-    
+
     console.log(`[getRateForLegDate] Querying: ${startingpoint} -> ${destination}, date: ${targetDate}, isSubbie: ${isSubcontractor}, container: ${containerType}`);
 
     const query = `
@@ -443,6 +450,7 @@ export const getRateForLegDate = async (startingpoint, destination, legDate, isS
         AND LOWER(TRIM(COALESCE(destination, ''))) = LOWER(TRIM(COALESCE($2, '')))
         AND effective_from <= $3::date
         AND (effective_to IS NULL OR effective_to >= $3::date)
+        AND company_reg_num = $4
       ORDER BY effective_from DESC, m5ratekey DESC
       LIMIT 1
     `
@@ -450,7 +458,8 @@ export const getRateForLegDate = async (startingpoint, destination, legDate, isS
     const result = await client.query(query, [
       startingpoint,
       destination,
-      targetDate
+      targetDate,
+      company_reg_num
     ])
     
     console.log(`[getRateForLegDate] Query returned ${result.rows.length} rows`);
@@ -512,13 +521,13 @@ export const getRateForLegDate = async (startingpoint, destination, legDate, isS
 
 // Check for overlapping effective dates for a given route
 // Returns warnings if overlaps exist but doesn't block (manual resolution)
-export const checkRateDateOverlaps = async (startingpoint, destination, effectiveFrom, effectiveTo, excludeRateId = null) => {
+export const checkRateDateOverlaps = async (startingpoint, destination, effectiveFrom, effectiveTo, excludeRateId = null, company_reg_num) => {
   let client
   try {
     client = await pool.connect()
-    
+
     const query = `
-      SELECT 
+      SELECT
         m5ratekey,
         startingpoint,
         destination,
@@ -532,6 +541,7 @@ export const checkRateDateOverlaps = async (startingpoint, destination, effectiv
       WHERE LOWER(TRIM(COALESCE(startingpoint, ''))) = LOWER(TRIM(COALESCE($1, '')))
         AND LOWER(TRIM(COALESCE(destination, ''))) = LOWER(TRIM(COALESCE($2, '')))
         AND ($5::int IS NULL OR m5ratekey != $5)
+        AND company_reg_num = $6
         AND (
           -- Standard overlap check: two ranges overlap if
           -- existing starts before new ends (or new has no end)
@@ -541,13 +551,14 @@ export const checkRateDateOverlaps = async (startingpoint, destination, effectiv
         )
       ORDER BY effective_from ASC
     `
-    
+
     const result = await client.query(query, [
       startingpoint,
       destination,
       effectiveFrom,
       effectiveTo,
-      excludeRateId
+      excludeRateId,
+      company_reg_num
     ])
     
     return {
@@ -571,7 +582,7 @@ export { getAllDriverRates, getDriverRateById, createDriverRate, updateDriverRat
 // Refresh legs_m2.driverrate for a set of instructions, respecting effective dates.
 // For each leg, the rate is looked up using the leg's own date so that legs in different
 // rate periods within the same instruction each receive the correct rate version.
-export const refreshDriverRateLegsForInstructions = async (rateId, instructionIds) => {
+export const refreshDriverRateLegsForInstructions = async (rateId, instructionIds, company_reg_num) => {
   if (!Array.isArray(instructionIds) || instructionIds.length === 0) {
     return { success: true, updated: 0 }
   }
@@ -581,8 +592,8 @@ export const refreshDriverRateLegsForInstructions = async (rateId, instructionId
 
     // Resolve the route for this rate record
     const rateRecord = await client.query(
-      'SELECT startingpoint, destination FROM m5_driver_rate WHERE m5ratekey = $1',
-      [Number(rateId)]
+      'SELECT startingpoint, destination FROM m5_driver_rate WHERE m5ratekey = $1 AND company_reg_num = $2',
+      [Number(rateId), company_reg_num]
     )
     if (!rateRecord.rows.length) {
       return { success: false, updated: 0 }
@@ -609,8 +620,9 @@ export const refreshDriverRateLegsForInstructions = async (rateId, instructionId
          AND LOWER(COALESCE(mc.status, '')) = 'in progress'
          AND LOWER(TRIM(COALESCE(l.startingpoint, ''))) = LOWER(TRIM($2))
          AND LOWER(TRIM(COALESCE(l.destination, ''))) = LOWER(TRIM($3))
+         AND l.company_reg_num = $4
          AND l.date IS NOT NULL`,
-      [instructionIds.map((v) => Number(v)), startingpoint, destination]
+      [instructionIds.map((v) => Number(v)), startingpoint, destination, company_reg_num]
     )
 
     await client.query('BEGIN')
@@ -625,7 +637,7 @@ export const refreshDriverRateLegsForInstructions = async (rateId, instructionId
       const containerType = leg.container_type || '6m'
 
       try {
-        const rateResult = await getRateForLegDate(startingpoint, destination, legDate, isSubcontractor, containerType)
+        const rateResult = await getRateForLegDate(startingpoint, destination, legDate, isSubcontractor, containerType, company_reg_num)
         if (rateResult.success && rateResult.data?.applicable_rate != null) {
           await client.query(
             'UPDATE legs_m2 SET driverrate = $1 WHERE legkey = $2',

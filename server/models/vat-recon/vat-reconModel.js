@@ -1,6 +1,6 @@
 import { pool } from "../../config/database.js"
 
-export const getOutputVat = async (month, year) => {
+export const getOutputVat = async (month, year, company_reg_num) => {
     const monthIndex = [
         "January",
         "February",
@@ -17,7 +17,7 @@ export const getOutputVat = async (month, year) => {
     ].indexOf(month) + 1
 
     const query = `
-        SELECT 
+        SELECT
             c.m5clientkey,
             c.client AS client_name,
             SUM(m.total_cost) AS total_cost,
@@ -26,6 +26,7 @@ export const getOutputVat = async (month, year) => {
         JOIN m5_client c ON m.client = c.m5clientkey
         WHERE EXTRACT(MONTH FROM m.created_at) = $1
         AND EXTRACT(YEAR FROM m.created_at) = $2
+        AND m.company_reg_num = $3
         AND m.total_cost IS NOT NULL
         AND m.total_cost > 0
         GROUP BY c.m5clientkey, c.client, COALESCE(m.vat, 15)
@@ -33,7 +34,7 @@ export const getOutputVat = async (month, year) => {
     `
 
     try {
-        const result = await pool.query(query, [monthIndex, year])
+        const result = await pool.query(query, [monthIndex, year, company_reg_num])
         return result.rows.map((row) => ({
             clientId: row.m5clientkey,
             clientName: row.client_name,
@@ -46,7 +47,7 @@ export const getOutputVat = async (month, year) => {
     }
 }
 
-export const getInputVat = async (month, year) => {
+export const getInputVat = async (month, year, company_reg_num) => {
     const monthIndex = [
         "January",
         "February",
@@ -63,7 +64,7 @@ export const getInputVat = async (month, year) => {
     ].indexOf(month) + 1
 
     const query = `
-        SELECT 
+        SELECT
             po.date,
             et.expense AS expense_type,
             po.total,
@@ -72,13 +73,14 @@ export const getInputVat = async (month, year) => {
         JOIN expense_types et ON po.expense_type_id = et.id
         WHERE EXTRACT(MONTH FROM po.date) = $1
         AND EXTRACT(YEAR FROM po.date) = $2
+        AND po.company_reg_num = $3
         AND po.vat IS NOT NULL
         AND po.vat > 0
         ORDER BY po.date, et.expense
     `
 
     try {
-        const result = await pool.query(query, [monthIndex, year])
+        const result = await pool.query(query, [monthIndex, year, company_reg_num])
         return result.rows.map((row) => ({
             date: row.date ? new Date(row.date).toISOString().split("T")[0] : null,
             expenseType: row.expense_type,

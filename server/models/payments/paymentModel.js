@@ -2,7 +2,8 @@ import { pool } from "../../config/database.js";
 
 const createPayment = async (
   clientId,
-  { fileupload, reference, line_items }
+  { fileupload, reference, line_items },
+  company_reg_num
 ) => {
   let client;
   try {
@@ -223,8 +224,8 @@ const createPayment = async (
     const headerDate = fileupload ? new Date(fileupload) : new Date();
 
     const insertQuery = `
-      INSERT INTO payment_m3 (clientid, amount, reference, fileupload, invoiceid, addon_id, line_items)
-      VALUES ($1, $2, $3, $4, $5, $6, $7::jsonb)
+      INSERT INTO payment_m3 (clientid, amount, reference, fileupload, invoiceid, addon_id, line_items, company_reg_num)
+      VALUES ($1, $2, $3, $4, $5, $6, $7::jsonb, $8)
       RETURNING *
     `;
     const insertParams = [
@@ -235,6 +236,7 @@ const createPayment = async (
       primaryInvoiceId,
       primaryAddonId,
       JSON.stringify(enrichedLineItems),
+      company_reg_num,
     ];
 
     const insertResult = await client.query(insertQuery, insertParams);
@@ -303,7 +305,7 @@ const createPayment = async (
   }
 };
 
-const getPayment = async (clientId, paymentId) => {
+const getPayment = async (clientId, paymentId, company_reg_num) => {
   let client;
   try {
     if (!pool) {
@@ -329,10 +331,10 @@ const getPayment = async (clientId, paymentId) => {
       LEFT JOIN invoice i ON p.invoiceid = i.ikey
       LEFT JOIN add_ons a ON p.addon_id = a.addon_id
       LEFT JOIN m5_client c ON p.clientid = c.m5clientkey
-      WHERE 
-        p.clientid = $1 AND p.paykey = $2
+      WHERE
+        p.clientid = $1 AND p.paykey = $2 AND p.company_reg_num = $3
     `;
-    const queryParams = [clientId, paymentId];
+    const queryParams = [clientId, paymentId, company_reg_num];
 
     const result = await client.query(queryText, queryParams);
     if (result.rows.length === 0) {
@@ -347,7 +349,7 @@ const getPayment = async (clientId, paymentId) => {
   }
 };
 
-const getClientPayments = async (clientId, { year, month }) => {
+const getClientPayments = async (clientId, { year, month }, company_reg_num) => {
   let client;
   try {
     if (!pool) {
@@ -373,11 +375,12 @@ const getClientPayments = async (clientId, { year, month }) => {
       LEFT JOIN invoice i ON p.invoiceid = i.ikey
       LEFT JOIN add_ons a ON p.addon_id = a.addon_id
       LEFT JOIN m5_client c ON p.clientid = c.m5clientkey
-      WHERE 
+      WHERE
         p.clientid = $1
+        AND p.company_reg_num = $2
     `;
-    const queryParams = [clientId];
-    let paramIndex = 2;
+    const queryParams = [clientId, company_reg_num];
+    let paramIndex = 3;
 
     if (year) {
       queryText += ` AND EXTRACT(YEAR FROM p.fileupload) = $${paramIndex}`;
@@ -401,7 +404,7 @@ const getClientPayments = async (clientId, { year, month }) => {
   }
 };
 
-const getClientInvoices = async (clientId) => {
+const getClientInvoices = async (clientId, company_reg_num) => {
   let client;
   try {
     if (!pool) {
@@ -425,9 +428,10 @@ const getClientInvoices = async (clientId) => {
       FROM invoice i
       JOIN m1_controller m ON i.m1key = m.m1key
       WHERE i.clientid = $1
+        AND i.company_reg_num = $2
         AND (m.total_cost + (m.total_cost * (COALESCE(m.vat, 0)::numeric / 100)) - COALESCE(m.paid_amount, 0)) > 0
       UNION ALL
-      SELECT 
+      SELECT
         'Add-on' AS type,
         a.addon_id AS id,
         a.invoice_number AS invoice_num,
@@ -439,10 +443,11 @@ const getClientInvoices = async (clientId) => {
         (a.amount - COALESCE(a.paid_amount, 0)) AS amount_due
       FROM add_ons a
       WHERE a.client_id = $1
+        AND a.company_reg_num = $2
         AND (a.amount - COALESCE(a.paid_amount, 0)) > 0
       ORDER BY date DESC
     `;
-    const queryParams = [clientId];
+    const queryParams = [clientId, company_reg_num];
 
     const result = await client.query(queryText, queryParams);
     return { success: true, data: result.rows };
@@ -453,7 +458,7 @@ const getClientInvoices = async (clientId) => {
   }
 };
 
-const deletePayment = async (clientId, paymentId) => {
+const deletePayment = async (clientId, paymentId, company_reg_num) => {
   let client;
   try {
     if (!pool) {
@@ -469,10 +474,10 @@ const deletePayment = async (clientId, paymentId) => {
     const paymentQuery = `
       SELECT paykey, line_items
       FROM payment_m3
-      WHERE clientid = $1 AND paykey = $2
+      WHERE clientid = $1 AND paykey = $2 AND company_reg_num = $3
       FOR UPDATE
     `;
-    const paymentResult = await client.query(paymentQuery, [clientId, paymentId]);
+    const paymentResult = await client.query(paymentQuery, [clientId, paymentId, company_reg_num]);
     if (paymentResult.rows.length === 0) {
       throw new Error("Payment not found");
     }
@@ -599,9 +604,9 @@ const deletePayment = async (clientId, paymentId) => {
     // Hard delete the payment row
     const deleteQuery = `
       DELETE FROM payment_m3
-      WHERE clientid = $1 AND paykey = $2
+      WHERE clientid = $1 AND paykey = $2 AND company_reg_num = $3
     `;
-    await client.query(deleteQuery, [clientId, paymentId]);
+    await client.query(deleteQuery, [clientId, paymentId, company_reg_num]);
 
     await client.query("COMMIT");
 

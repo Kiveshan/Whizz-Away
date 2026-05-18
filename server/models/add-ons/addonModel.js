@@ -1,6 +1,6 @@
 import { pool, query } from "../../config/database.js";
 
-const getAddonsByClient = async (clientId, filters = {}) => {
+const getAddonsByClient = async (clientId, company_reg_num, filters = {}) => {
   try {
     if (!pool) {
       throw new Error(
@@ -9,7 +9,7 @@ const getAddonsByClient = async (clientId, filters = {}) => {
     }
 
     let queryText = `
-      SELECT 
+      SELECT
         addon_id,
         client_id,
         items,
@@ -22,12 +22,13 @@ const getAddonsByClient = async (clientId, filters = {}) => {
         booking_ref,
         client_ref,
         vessel_number
-      FROM public.add_ons 
+      FROM public.add_ons
       WHERE client_id = $1
+        AND company_reg_num = $2
     `;
 
-    const queryParams = [clientId];
-    let paramIndex = 2;
+    const queryParams = [clientId, company_reg_num];
+    let paramIndex = 3;
 
     if (filters.year) {
       queryText += ` AND EXTRACT(YEAR FROM date) = $${paramIndex}`;
@@ -52,7 +53,7 @@ const getAddonsByClient = async (clientId, filters = {}) => {
 };
 
 
-const createAddon = async (addonData) => {
+const createAddon = async (addonData, company_reg_num) => {
   try {
     if (!pool) {
       throw new Error(
@@ -124,18 +125,19 @@ const createAddon = async (addonData) => {
     // Insert into add_ons table
     const insertQueryText = `
       INSERT INTO public.add_ons (
-        client_id, 
-        items, 
-        amount, 
-        date, 
+        client_id,
+        items,
+        amount,
+        date,
         invoice_number,
         group_id,
         created_at,
         vat_applied,
         booking_ref,
         client_ref,
-        vessel_number
-      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+        vessel_number,
+        company_reg_num
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
       RETURNING addon_id, items, amount, date, invoice_number, group_id, vat_applied, booking_ref, client_ref, vessel_number
     `;
 
@@ -151,6 +153,7 @@ const createAddon = async (addonData) => {
       addonData.booking_ref,
       addonData.client_ref,
       addonData.vessel_number || null,
+      company_reg_num,
     ]);
 
     return {
@@ -178,7 +181,7 @@ const createAddon = async (addonData) => {
   }
 };
 
-const getAddonById = async (addonId) => {
+const getAddonById = async (addonId, company_reg_num) => {
   let client;
   try {
     if (!pool) {
@@ -189,7 +192,7 @@ const getAddonById = async (addonId) => {
     client = await pool.connect();
 
     const queryText = `
-      SELECT 
+      SELECT
         a.addon_id,
         a.client_id,
         a.items,
@@ -205,9 +208,10 @@ const getAddonById = async (addonId) => {
       FROM public.add_ons a
       LEFT JOIN public.m5_client c ON a.client_id = c.m5clientkey
       WHERE a.addon_id = $1
+        AND a.company_reg_num = $2
     `;
 
-    const result = await query(queryText, [addonId]);
+    const result = await query(queryText, [addonId, company_reg_num]);
 
     if (result.rows.length === 0) {
       return { success: false, message: "Add-on not found" };
@@ -224,7 +228,7 @@ const getAddonById = async (addonId) => {
   }
 };
 
-const updateAddon = async (addonId, addonData) => {
+const updateAddon = async (addonId, addonData, company_reg_num) => {
   try {
     if (!pool) {
       throw new Error(
@@ -280,11 +284,13 @@ const updateAddon = async (addonId, addonData) => {
       }
 
       values.push(addonId);
+      values.push(company_reg_num);
 
       queryText = `
-        UPDATE public.add_ons 
+        UPDATE public.add_ons
         SET ${updates.join(', ')}
         WHERE addon_id = $${paramIndex}
+          AND company_reg_num = $${paramIndex + 1}
         RETURNING addon_id, items, amount, date, invoice_number, vat_applied, booking_ref, client_ref, vessel_number
       `;
       params = values;
@@ -313,9 +319,10 @@ const updateAddon = async (addonId, addonData) => {
       const totalAmount = addonData.vat_applied ? subtotal * 1.15 : subtotal;
 
       queryText = `
-        UPDATE public.add_ons 
+        UPDATE public.add_ons
         SET items = $1, amount = $2, date = $3, vat_applied = $4, booking_ref = $5, client_ref = $6, invoice_number = $7, vessel_number = $8
         WHERE addon_id = $9
+          AND company_reg_num = $10
         RETURNING addon_id, items, amount, date, invoice_number, vat_applied, booking_ref, client_ref, vessel_number
       `;
 
@@ -329,6 +336,7 @@ const updateAddon = async (addonId, addonData) => {
         addonData.invoice_number ? addonData.invoice_number.trim() : null,
         addonData.vessel_number,
         addonId,
+        company_reg_num,
       ];
     }
 
@@ -355,7 +363,7 @@ const updateAddon = async (addonId, addonData) => {
   }
 };
 
-const deleteAddon = async (addonId) => {
+const deleteAddon = async (addonId, company_reg_num) => {
   try {
     if (!pool) {
       throw new Error(
@@ -363,8 +371,8 @@ const deleteAddon = async (addonId) => {
       );
     }
 
-    const queryText = `DELETE FROM public.add_ons WHERE addon_id = $1`;
-    const result = await query(queryText, [addonId]);
+    const queryText = `DELETE FROM public.add_ons WHERE addon_id = $1 AND company_reg_num = $2`;
+    const result = await query(queryText, [addonId, company_reg_num]);
 
     if (result.rowCount === 0) {
       return {

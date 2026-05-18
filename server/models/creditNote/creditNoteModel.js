@@ -1,6 +1,6 @@
 import { pool } from "../../config/database.js";
 
-const getClientCreditNotes = async (clientId, { year, month }) => {
+const getClientCreditNotes = async (clientId, company_reg_num, { year, month }) => {
   let client;
   try {
     if (!pool) {
@@ -9,22 +9,23 @@ const getClientCreditNotes = async (clientId, { year, month }) => {
     client = await pool.connect();
 
     let queryText = `
-      SELECT 
+      SELECT
         cn.creditnote_id,
         cn.creditnote_date,
         cn.amount,
         COALESCE(STRING_AGG(c.containernum, ', '), '') AS containernum,
         cn.doc_no,
         cn.m1key
-      FROM 
+      FROM
         credit_notes cn
       LEFT JOIN container c ON c.containerkey = ANY(cn.containerids)
       LEFT JOIN m1_controller m ON cn.m1key = m.m1key
-      WHERE 
+      WHERE
         cn.client_id = $1
+        AND cn.company_reg_num = $2
     `;
-    const queryParams = [clientId];
-    let paramIndex = 2;
+    const queryParams = [clientId, company_reg_num];
+    let paramIndex = 3;
 
 if (year) {
   queryText += ` AND EXTRACT(YEAR FROM cn.creditnote_date) = $${paramIndex}`;
@@ -49,7 +50,7 @@ if (month) {
   }
 };
 
-const getInstructions = async (clientId) => {
+const getInstructions = async (clientId, company_reg_num) => {
   let client;
   try {
     client = await pool.connect();
@@ -58,9 +59,10 @@ const getInstructions = async (clientId) => {
       SELECT m1key
       FROM m1_controller
       WHERE client = $1
+        AND company_reg_num = $2
       ORDER BY m1key ASC
     `;
-    const queryParams = [clientId];
+    const queryParams = [clientId, company_reg_num];
 
     const result = await client.query(queryText, queryParams);
     return { success: true, data: result.rows };
@@ -70,7 +72,7 @@ const getInstructions = async (clientId) => {
 };
 
 
-const getContainers = async (m1key) => {
+const getContainers = async (m1key, company_reg_num) => {
   let client;
   try {
     if (!pool) {
@@ -82,9 +84,10 @@ const getContainers = async (m1key) => {
       SELECT containerkey, containernum
       FROM container
       WHERE m1key = $1
+        AND company_reg_num = $2
       ORDER BY containernum
     `;
-    const queryParams = [m1key];
+    const queryParams = [m1key, company_reg_num];
 
     const result = await client.query(queryText, queryParams);
     return { success: true, data: result.rows };
@@ -191,7 +194,7 @@ const getLatestDocumentNumber = async () => {
 };
 
 
-const getInstructionDetails = async (m1key) => {
+const getInstructionDetails = async (m1key, company_reg_num) => {
   let client;
   try {
     if (!pool) {
@@ -203,8 +206,9 @@ const getInstructionDetails = async (m1key) => {
       SELECT dropoff, vessel_name, "clientFileRef", vat
       FROM m1_controller
       WHERE m1key = $1
+        AND company_reg_num = $2
     `;
-    const queryParams = [m1key];
+    const queryParams = [m1key, company_reg_num];
 
     const result = await client.query(queryText, queryParams);
     return { success: true, data: result.rows[0] || {} };
@@ -215,7 +219,7 @@ const getInstructionDetails = async (m1key) => {
   }
 };
 
-const createCreditNote = async (creditNoteData) => {
+const createCreditNote = async (creditNoteData, company_reg_num) => {
   let client;
   try {
     if (!pool) {
@@ -227,8 +231,8 @@ const createCreditNote = async (creditNoteData) => {
     await client.query("BEGIN");
 
     const insertQuery = `
-      INSERT INTO credit_notes (client_id, creditnote_date, amount, containerids, doc_no, m1key, description, account_no)
-      VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+      INSERT INTO credit_notes (client_id, creditnote_date, amount, containerids, doc_no, m1key, description, account_no, company_reg_num)
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
       RETURNING creditnote_id
     `;
 
@@ -241,6 +245,7 @@ const createCreditNote = async (creditNoteData) => {
       creditNoteData.m1key,
       creditNoteData.description,
       creditNoteData.account_no,
+      company_reg_num,
     ];
 
     const insertResult = await client.query(insertQuery, insertParams);
@@ -310,7 +315,7 @@ const createCreditNote = async (creditNoteData) => {
   }
 };
 
-const getCreditNoteById = async (creditNoteId) => {
+const getCreditNoteById = async (creditNoteId, company_reg_num) => {
   let client;
   try {
     if (!pool) {
@@ -319,7 +324,7 @@ const getCreditNoteById = async (creditNoteId) => {
     client = await pool.connect();
 
     const queryText = `
-  SELECT 
+  SELECT
     cn.creditnote_id,
     cn.client_id,
     TO_CHAR(cn.creditnote_date, 'YYYY-MM-DD') AS creditnote_date,
@@ -330,14 +335,15 @@ const getCreditNoteById = async (creditNoteId) => {
     cn.description,
     cn.account_no,
     STRING_AGG(c.containernum, ', ') AS containernum
-  FROM 
+  FROM
     credit_notes cn
   LEFT JOIN container c ON c.containerkey = ANY(cn.containerids)
-  WHERE 
+  WHERE
     cn.creditnote_id = $1
+    AND cn.company_reg_num = $2
   GROUP BY cn.creditnote_id
 `;
-    const queryParams = [creditNoteId];
+    const queryParams = [creditNoteId, company_reg_num];
 
     const result = await client.query(queryText, queryParams);
     return { success: true, data: result.rows[0] || {} };

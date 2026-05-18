@@ -1,6 +1,6 @@
 import { pool } from "../../config/database.js"
 
-const getAllClientsForRates = async (options = {}) => {
+const getAllClientsForRates = async (options = {}, company_reg_num) => {
   let client
   try {
     client = await pool.connect()
@@ -8,9 +8,9 @@ const getAllClientsForRates = async (options = {}) => {
     const { offset = 0, limit = 10, search = "", status = "all" } = options
 
     // Build WHERE clause for filtering
-    let whereClause = "WHERE 1=1"
-    const queryParams = []
-    let paramIndex = 1
+    let whereClause = "WHERE c.company_reg_num = $1"
+    const queryParams = [company_reg_num]
+    let paramIndex = 2
 
     // Search filter
     if (search && search.trim() !== "") {
@@ -63,14 +63,14 @@ const getAllClientsForRates = async (options = {}) => {
   }
 }
 
-const getClientRatesByClientId = async (clientId) => {
+const getClientRatesByClientId = async (clientId, company_reg_num) => {
   let client
   try {
     client = await pool.connect()
 
     // Get client info and their rates
     const clientQuery = `
-      SELECT 
+      SELECT
         c.*,
         json_agg(
           json_build_object(
@@ -89,11 +89,11 @@ const getClientRatesByClientId = async (clientId) => {
         ) FILTER (WHERE cr.client_rate_id IS NOT NULL) as rates
       FROM m5_client c
       LEFT JOIN m5_client_rate cr ON c.m5clientkey = cr.clientid
-      WHERE c.m5clientkey = $1
+      WHERE c.m5clientkey = $1 AND c.company_reg_num = $2
       GROUP BY c.m5clientkey
     `
 
-    const result = await client.query(clientQuery, [clientId])
+    const result = await client.query(clientQuery, [clientId, company_reg_num])
 
     if (!result.rows.length) {
       return { success: false, message: "Client not found" }
@@ -115,7 +115,7 @@ const getClientRatesByClientId = async (clientId) => {
   }
 }
 
-const saveClientRates = async (clientId, rates) => {
+const saveClientRates = async (clientId, rates, company_reg_num) => {
   let client
   try {
     client = await pool.connect()
@@ -123,8 +123,11 @@ const saveClientRates = async (clientId, rates) => {
     // Start transaction
     await client.query("BEGIN")
 
-    // Delete existing rates for this client
-    await client.query("DELETE FROM m5_client_rate WHERE clientid = $1", [clientId])
+    // Delete existing rates for this client (scoped to tenant via client ownership)
+    await client.query(
+      "DELETE FROM m5_client_rate WHERE clientid = $1 AND clientid IN (SELECT m5clientkey FROM m5_client WHERE company_reg_num = $2)",
+      [clientId, company_reg_num]
+    )
 
     // Insert new rates
     const insertPromises = rates.map((rate) => {
@@ -169,20 +172,24 @@ const saveClientRates = async (clientId, rates) => {
   }
 }
 
-const deleteClientRate = async (rateId) => {
+const deleteClientRate = async (rateId, company_reg_num) => {
   let client
   try {
     client = await pool.connect()
 
-    const checkResult = await client.query("SELECT client_rate_id FROM m5_client_rate WHERE client_rate_id = $1", [
-      rateId,
-    ])
+    const checkResult = await client.query(
+      "SELECT cr.client_rate_id FROM m5_client_rate cr JOIN m5_client c ON cr.clientid = c.m5clientkey WHERE cr.client_rate_id = $1 AND c.company_reg_num = $2",
+      [rateId, company_reg_num]
+    )
 
     if (!checkResult.rows.length) {
       return { success: false, message: "Rate not found" }
     }
 
-    await client.query("DELETE FROM m5_client_rate WHERE client_rate_id = $1", [rateId])
+    await client.query(
+      "DELETE FROM m5_client_rate WHERE client_rate_id = $1 AND clientid IN (SELECT m5clientkey FROM m5_client WHERE company_reg_num = $2)",
+      [rateId, company_reg_num]
+    )
 
     return { success: true, message: "Rate deleted successfully" }
   } catch (err) {

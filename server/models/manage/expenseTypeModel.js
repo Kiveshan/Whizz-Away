@@ -1,25 +1,26 @@
 import { query } from "../../config/database.js"
 
-export const getAllExpenseTypes = async (page = 1, limit = 50) => {
+export const getAllExpenseTypes = async (page = 1, limit = 50, company_reg_num) => {
   try {
     const offset = (page - 1) * limit
 
     // Get total count
-    const countQuery = `SELECT COUNT(*) as total FROM expense_types`
-    const countResult = await query(countQuery)
+    const countQuery = `SELECT COUNT(*) as total FROM expense_types WHERE company_reg_num = $1`
+    const countResult = await query(countQuery, [company_reg_num])
     const totalItems = Number.parseInt(countResult.rows[0].total)
 
     // Get expense types
     const expenseTypesQuery = `
-      SELECT 
+      SELECT
         id,
         expense
       FROM expense_types
+      WHERE company_reg_num = $3
       ORDER BY expense ASC
       LIMIT $1 OFFSET $2
     `
 
-    const params = [limit, offset]
+    const params = [limit, offset, company_reg_num]
     const expenseTypesResult = await query(expenseTypesQuery, params)
 
     const totalPages = Math.ceil(totalItems / limit)
@@ -37,15 +38,16 @@ export const getAllExpenseTypes = async (page = 1, limit = 50) => {
   }
 }
 
-export const getExpenseTypeById = async (id) => {
+export const getExpenseTypeById = async (id, company_reg_num) => {
   try {
     const result = await query(
-      `SELECT 
+      `SELECT
         id,
         expense
-      FROM expense_types 
-      WHERE id = $1`,
-      [id],
+      FROM expense_types
+      WHERE id = $1
+      AND company_reg_num = $2`,
+      [id, company_reg_num],
     )
 
     if (result.rows.length === 0) {
@@ -59,15 +61,15 @@ export const getExpenseTypeById = async (id) => {
   }
 }
 
-export const createExpenseType = async (expenseTypeData) => {
+export const createExpenseType = async (expenseTypeData, company_reg_num) => {
   try {
     const { expense } = expenseTypeData
 
     const result = await query(
-      `INSERT INTO expense_types (expense) 
-      VALUES ($1) 
+      `INSERT INTO expense_types (expense, company_reg_num)
+      VALUES ($1, $2)
       RETURNING id, expense`,
-      [expense],
+      [expense, company_reg_num],
     )
 
     return result.rows[0]
@@ -77,15 +79,16 @@ export const createExpenseType = async (expenseTypeData) => {
   }
 }
 
-export const updateExpenseType = async (id, expenseTypeData) => {
+export const updateExpenseType = async (id, expenseTypeData, company_reg_num) => {
   try {
     const { expense } = expenseTypeData
 
     const result = await query(
       `UPDATE expense_types SET expense = $1
       WHERE id = $2
+      AND company_reg_num = $3
       RETURNING id, expense`,
-      [expense, id],
+      [expense, id, company_reg_num],
     )
 
     if (result.rowCount === 0) {
@@ -99,9 +102,9 @@ export const updateExpenseType = async (id, expenseTypeData) => {
   }
 }
 
-export const deleteExpenseType = async (id) => {
+export const deleteExpenseType = async (id, company_reg_num) => {
   try {
-    const result = await query("DELETE FROM expense_types WHERE id = $1", [id])
+    const result = await query("DELETE FROM expense_types WHERE id = $1 AND company_reg_num = $2", [id, company_reg_num])
     return result.rowCount > 0
   } catch (error) {
     console.error("Error in deleteExpenseType:", error)
@@ -109,16 +112,17 @@ export const deleteExpenseType = async (id) => {
   }
 }
 
-export const getSimpleExpenseTypes = async () => {
+export const getSimpleExpenseTypes = async (company_reg_num) => {
   try {
     console.log("Getting simple expense types for dropdown")
 
     const expenseTypesQuery = `
       SELECT expense_type_id as id, expense
       FROM expense_types
+      WHERE company_reg_num = $1
       ORDER BY expense ASC
     `
-    const result = await query(expenseTypesQuery)
+    const result = await query(expenseTypesQuery, [company_reg_num])
 
     console.log(`Found ${result.rows.length} expense types for dropdown`)
     return result.rows

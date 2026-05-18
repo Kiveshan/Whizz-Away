@@ -1,6 +1,6 @@
 import { pool, query } from "../../config/database.js";
 
-const getClientInstructions = async (clientId, { year, month, type }) => {
+const getClientInstructions = async (clientId, { year, month, type }, company_reg_num) => {
   try {
     if (!pool) {
       throw new Error(
@@ -9,11 +9,11 @@ const getClientInstructions = async (clientId, { year, month, type }) => {
     }
 
     let queryText = `
-      SELECT 
-        m1.m1key, 
-        m1."ksmFileRef" as instruction_no, 
-        s.shipmenttype as shipment_type, 
-        m1."clientFileRef" as file_no, 
+      SELECT
+        m1.m1key,
+        m1."ksmFileRef" as instruction_no,
+        s.shipmenttype as shipment_type,
+        m1."clientFileRef" as file_no,
         m1.status,
         m1.created_at as pickupdate,
         m1.total_cost AS base_total_cost,
@@ -24,9 +24,9 @@ const getClientInstructions = async (clientId, { year, month, type }) => {
         i.date as invoice_date,
         i.groupid as invoice_group_id,
         st.statement_key as statement_id
-      FROM 
+      FROM
         public.m1_controller m1
-      LEFT JOIN 
+      LEFT JOIN
         public.shipment s ON m1.shipment_type = s.shipkey
       INNER JOIN
         public.invoice i ON m1.m1key = i.m1key
@@ -37,13 +37,14 @@ const getClientInstructions = async (clientId, { year, month, type }) => {
         ORDER BY st.generation_date DESC
         LIMIT 1
       ) st ON TRUE
-      WHERE 
+      WHERE
         m1.client = $1
         AND m1.status = 'Completed'
+        AND m1.company_reg_num = $2
     `;
 
-    const queryParams = [clientId];
-    let paramIndex = 2;
+    const queryParams = [clientId, company_reg_num];
+    let paramIndex = 3;
 
     // Add type filter if provided and not "All"
     if (type && type !== "All") {

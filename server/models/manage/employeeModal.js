@@ -3,7 +3,7 @@ import bcrypt from "bcrypt"
 import { validatePassword } from "../../utils/passwordValidator.js"
 import { logPasswordChange, logEmployeeCreation } from "../../utils/auditLogger.js"
 
-const getEmployeeBasic = async (id) => {
+const getEmployeeBasic = async (id, company_reg_num) => {
   let client
   try {
     client = await pool.connect()
@@ -11,28 +11,30 @@ const getEmployeeBasic = async (id) => {
       SELECT COUNT(*) as count
       FROM public.m5_employee
       WHERE userid = $1
+      AND company_reg_num = $2
     `
-    const checkResult = await client.query(checkQuery, [id])
+    const checkResult = await client.query(checkQuery, [id, company_reg_num])
     if (checkResult.rows[0].count == 0) {
       return { success: false, message: `No employee found with ID ${id}` }
     }
 
     const query = `
-      SELECT 
-        e.userid, 
-        e.name, 
-        e.surname, 
-        e.cellnum, 
+      SELECT
+        e.userid,
+        e.name,
+        e.surname,
+        e.cellnum,
         e.base_salary,
         r.rolename
-      FROM 
+      FROM
         public.m5_employee e
-      LEFT JOIN 
+      LEFT JOIN
         public.roles r ON e.roleid = r.roleid
-      WHERE 
+      WHERE
         e.userid = $1
+        AND e.company_reg_num = $2
     `
-    const result = await client.query(query, [id])
+    const result = await client.query(query, [id, company_reg_num])
     return { success: true, data: result.rows[0] }
   } catch (error) {
     console.error(`Error fetching employee data for ID ${id}:`, error)
@@ -42,7 +44,7 @@ const getEmployeeBasic = async (id) => {
   }
 }
 
-const getAllEmployees = async (options = {}) => {
+const getAllEmployees = async (options = {}, company_reg_num) => {
   let client
   try {
     client = await pool.connect()
@@ -64,21 +66,22 @@ const getAllEmployees = async (options = {}) => {
         JOIN roles r ON e.roleid = r.roleid
         LEFT JOIN employee_deduction_history edh ON e.userid = edh.employeeid
         WHERE e.roleid != 6
+        AND e.company_reg_num = $1
         ORDER BY e.userid
       `
-      const result = await client.query(query)
+      const result = await client.query(query, [company_reg_num])
       return result.rows
     }
 
     const { offset = 0, limit = 10, search = "", status = "all" } = options
 
-    let whereClause = "WHERE e.roleid != 6"
-    const queryParams = []
-    let paramIndex = 1
+    let whereClause = "WHERE e.roleid != 6 AND e.company_reg_num = $1"
+    const queryParams = [company_reg_num]
+    let paramIndex = 2
 
     if (search && search.trim() !== "") {
       whereClause += ` AND (
-        LOWER(e.name) LIKE LOWER($${paramIndex}) OR 
+        LOWER(e.name) LIKE LOWER($${paramIndex}) OR
         LOWER(e.surname) LIKE LOWER($${paramIndex})
       )`
       queryParams.push(`%${search.trim()}%`)
@@ -92,7 +95,7 @@ const getAllEmployees = async (options = {}) => {
     }
 
     const countQuery = `
-      SELECT COUNT(*) 
+      SELECT COUNT(*)
       FROM m5_employee e
       JOIN roles r ON e.roleid = r.roleid
       ${whereClause}
@@ -135,11 +138,14 @@ const getAllEmployees = async (options = {}) => {
   }
 }
 
-const checkEmployeeEmailExists = async (email) => {
+const checkEmployeeEmailExists = async (email, company_reg_num) => {
   let client
   try {
     client = await pool.connect()
-    const result = await client.query("SELECT 1 FROM m5_employee WHERE email = $1", [email])
+    const result = await client.query(
+      "SELECT 1 FROM m5_employee WHERE email = $1 AND company_reg_num = $2",
+      [email, company_reg_num],
+    )
     return result.rows.length > 0
   } catch (err) {
     console.error("Error checking email existence:", err)
@@ -271,7 +277,7 @@ const createEmployee = async (employeeData, documentUrls, adminId = null, userAg
   }
 }
 
-const updateEmployee = async (id, employeeData, documentUrls, adminId = null, userAgent = null) => {
+const updateEmployee = async (id, employeeData, documentUrls, adminId = null, userAgent = null, company_reg_num) => {
   let client
   try {
     client = await pool.connect()
@@ -301,8 +307,8 @@ const updateEmployee = async (id, employeeData, documentUrls, adminId = null, us
     }
 
     const existingResult = await client.query(
-      "SELECT document_url1, document_url2, document_url3, base_salary, password FROM m5_employee WHERE userid = $1",
-      [id],
+      "SELECT document_url1, document_url2, document_url3, base_salary, password FROM m5_employee WHERE userid = $1 AND company_reg_num = $2",
+      [id, company_reg_num],
     )
     if (!existingResult.rows.length) {
       throw new Error("Employee not found")
@@ -343,7 +349,7 @@ const updateEmployee = async (id, employeeData, documentUrls, adminId = null, us
         name = $1, surname = $2, telephonenum = $3, cellnum = $4, employeenum = $5,
         roleid = $6, email = $7, password = $8, base_salary = $9,
         document_url1 = $10, document_url2 = $11, document_url3 = $12
-      WHERE userid = $13
+      WHERE userid = $13 AND company_reg_num = $14
       RETURNING *
     `
     const updateValues = [
@@ -360,6 +366,7 @@ const updateEmployee = async (id, employeeData, documentUrls, adminId = null, us
       document_url2 || null,
       document_url3 || null,
       id,
+      company_reg_num,
     ]
     const result = await client.query(updateEmpQuery, updateValues)
     const updatedEmployee = result.rows[0]
@@ -474,18 +481,21 @@ const updateEmployee = async (id, employeeData, documentUrls, adminId = null, us
   }
 }
 
-const toggleEmployeeStatus = async (id, status) => {
+const toggleEmployeeStatus = async (id, status, company_reg_num) => {
   let client
   try {
     client = await pool.connect()
-    const checkResult = await client.query("SELECT * FROM m5_employee WHERE userid = $1", [id])
+    const checkResult = await client.query(
+      "SELECT * FROM m5_employee WHERE userid = $1 AND company_reg_num = $2",
+      [id, company_reg_num],
+    )
     if (!checkResult.rows.length) {
       return { success: false, message: "Employee not found" }
     }
-    const updateResult = await client.query("UPDATE m5_employee SET status = $1 WHERE userid = $2 RETURNING *", [
-      status,
-      id,
-    ])
+    const updateResult = await client.query(
+      "UPDATE m5_employee SET status = $1 WHERE userid = $2 AND company_reg_num = $3 RETURNING *",
+      [status, id, company_reg_num],
+    )
     return { success: true, data: updateResult.rows[0] }
   } catch (err) {
     console.error(`Error toggling employee ${id} status:`, err)
@@ -495,18 +505,18 @@ const toggleEmployeeStatus = async (id, status) => {
   }
 }
 
-const getEmployeeDetails = async (id) => {
+const getEmployeeDetails = async (id, company_reg_num) => {
   let client
   try {
     client = await pool.connect()
     const result = await client.query(`
-      SELECT 
+      SELECT
         userid, name, surname, telephonenum, cellnum, employeenum,
         roleid, email, base_salary, company_reg_num, status,
         document_url1, document_url2, document_url3
-      FROM m5_employee 
-      WHERE userid = $1
-    `, [id])
+      FROM m5_employee
+      WHERE userid = $1 AND company_reg_num = $2
+    `, [id, company_reg_num])
     if (!result.rows.length) {
       return { success: false, message: "Employee not found" }
     }
@@ -525,13 +535,13 @@ const getEmployeeDetails = async (id) => {
   }
 }
 
-const deleteEmployeeDocument = async (employeeId, url) => {
+const deleteEmployeeDocument = async (employeeId, url, company_reg_num) => {
   let client
   try {
     client = await pool.connect()
     const { rows } = await client.query(
-      "SELECT document_url1, document_url2, document_url3 FROM m5_employee WHERE userid = $1",
-      [employeeId],
+      "SELECT document_url1, document_url2, document_url3 FROM m5_employee WHERE userid = $1 AND company_reg_num = $2",
+      [employeeId, company_reg_num],
     )
     if (!rows.length) {
       return { success: false, message: "Employee not found" }
@@ -547,7 +557,7 @@ const deleteEmployeeDocument = async (employeeId, url) => {
     }
 
     if (updateField) {
-      await client.query(`UPDATE m5_employee SET ${updateField} = NULL WHERE userid = $1`, [employeeId])
+      await client.query(`UPDATE m5_employee SET ${updateField} = NULL WHERE userid = $1 AND company_reg_num = $2`, [employeeId, company_reg_num])
       return { success: true, message: "Document deleted successfully" }
     }
     return { success: false, message: "No matching document URL found" }

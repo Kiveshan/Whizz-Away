@@ -1,7 +1,7 @@
 import { pool } from "../../config/database.js"
-export const getPurchaseOrders = async () => {
+export const getPurchaseOrders = async (company_reg_num) => {
   const query = `
-SELECT 
+SELECT
   po.ponum,
   MIN(po.date) AS date,
   et.expense AS expense_type,
@@ -15,28 +15,29 @@ SELECT
       'truckid', po.truckid
     )
   ) AS line_items,
-      CASE 
-        WHEN COUNT(po.slip_s3key) FILTER (WHERE po.slip_s3key IS NOT NULL) = COUNT(*) 
+      CASE
+        WHEN COUNT(po.slip_s3key) FILTER (WHERE po.slip_s3key IS NOT NULL) = COUNT(*)
         THEN 'Submitted'
         ELSE 'Pending'
       END AS status
     FROM purchase_orders po
     JOIN expense_types et ON po.expense_type_id = et.id
     JOIN suppliers s ON po.supplier_id = s.supplier_id
+    WHERE po.company_reg_num = $1
     GROUP BY po.ponum, et.expense, s.supplier
     ORDER BY MIN(po.date) DESC
   `
   try {
-    const result = await pool.query(query)
+    const result = await pool.query(query, [company_reg_num])
     return result.rows
   } catch (error) {
     throw error
   }
 }
 
-export const getPurchaseOrderByPonum = async (ponum) => {
+export const getPurchaseOrderByPonum = async (ponum, company_reg_num) => {
   const query = `
-    SELECT 
+    SELECT
       po.*,
       s.supplier,
       e.expense,
@@ -47,10 +48,11 @@ export const getPurchaseOrderByPonum = async (ponum) => {
     JOIN expense_types e ON po.expense_type_id = e.id
     LEFT JOIN m5_trucks t ON po.truckid = t.m5truckskey
     WHERE po.ponum = $1
+    AND po.company_reg_num = $2
   `;
 
   try {
-    const result = await pool.query(query, [ponum]);
+    const result = await pool.query(query, [ponum, company_reg_num]);
     if (result.rows.length === 0) {
       return null;
     }
@@ -58,7 +60,7 @@ export const getPurchaseOrderByPonum = async (ponum) => {
     // Group line items for this PO
     const poData = result.rows[0];
     const lineItemsQuery = `
-      SELECT 
+      SELECT
         po_id,
         description,
         quantity,
@@ -67,9 +69,10 @@ export const getPurchaseOrderByPonum = async (ponum) => {
       FROM purchase_orders po
       LEFT JOIN m5_trucks t ON po.truckid = t.m5truckskey
       WHERE ponum = $1
+      AND po.company_reg_num = $2
     `;
 
-    const lineItemsResult = await pool.query(lineItemsQuery, [ponum]);
+    const lineItemsResult = await pool.query(lineItemsQuery, [ponum, company_reg_num]);
 
     return {
       ...poData,
@@ -80,24 +83,25 @@ export const getPurchaseOrderByPonum = async (ponum) => {
   }
 };
 
-export const getExpenseTypes = async () => {
+export const getExpenseTypes = async (company_reg_num) => {
   const query = `
-    SELECT id, expense 
+    SELECT id, expense
     FROM expense_types
+    WHERE company_reg_num = $1
     ORDER BY expense
   `
 
   try {
-    const result = await pool.query(query)
+    const result = await pool.query(query, [company_reg_num])
     return result.rows
   } catch (error) {
     throw error
   }
 }
 
-export const getStatements = async (supplierId, fromDate, toDate) => {
+export const getStatements = async (supplierId, fromDate, toDate, company_reg_num) => {
   let query = `
-  SELECT 
+  SELECT
     po.ponum,
     MIN(po.date) AS date,
     s.supplier,
@@ -112,11 +116,11 @@ export const getStatements = async (supplierId, fromDate, toDate) => {
   JOIN suppliers s ON po.supplier_id = s.supplier_id
   LEFT JOIN expense_types e ON po.expense_type_id = e.id
   LEFT JOIN m5_trucks t ON po.truckid = t.m5truckskey
-  WHERE 1=1
+  WHERE po.company_reg_num = $1
 `
 
-  const values = []
-  let paramIndex = 1
+  const values = [company_reg_num]
+  let paramIndex = 2
 
   if (supplierId) {
     query += ` AND po.supplier_id = $${paramIndex++}`
@@ -143,9 +147,9 @@ export const getStatements = async (supplierId, fromDate, toDate) => {
   }
 }
 
-export const getSupplierSummary = async (year, month) => {
+export const getSupplierSummary = async (year, month, company_reg_num) => {
   let query = `
-SELECT 
+SELECT
   s.supplier_id,
   s.supplier,
   EXTRACT(YEAR FROM po.date) as year,
@@ -157,11 +161,11 @@ SELECT
   SUM(po.total) as total_amount
     FROM purchase_orders po
     JOIN suppliers s ON po.supplier_id = s.supplier_id
-    WHERE 1=1
+    WHERE po.company_reg_num = $1
   `
 
-  const values = []
-  let paramIndex = 1
+  const values = [company_reg_num]
+  let paramIndex = 2
 
   if (year && year !== "All") {
     query += ` AND EXTRACT(YEAR FROM po.date) = $${paramIndex++}`
@@ -202,17 +206,17 @@ SELECT
   }
 }
 
-export const getSuppliersByExpenseType = async (expenseTypeId) => {
+export const getSuppliersByExpenseType = async (expenseTypeId, company_reg_num) => {
   const query = `
     SELECT s.supplier_id, s.supplier, s.representative, s.email, s.cellnum
     FROM suppliers s
     JOIN supplier_expense_types set ON s.supplier_id = set.se_id
-    WHERE set.expense_type_id = $1 AND s.status = true
+    WHERE set.expense_type_id = $1 AND s.status = true AND s.company_reg_num = $2
     ORDER BY s.supplier
   `
 
   try {
-    const result = await pool.query(query, [expenseTypeId])
+    const result = await pool.query(query, [expenseTypeId, company_reg_num])
     return result.rows
   } catch (error) {
     throw error
@@ -247,6 +251,7 @@ export const createPurchaseOrder = async ({
   subbie,
   date,
   truckid,
+  company_reg_num,
 }) => {
   const currentDate = new Date()
   const datePrefix = `PO-${currentDate.getFullYear()}${(currentDate.getMonth() + 1)
@@ -254,14 +259,15 @@ export const createPurchaseOrder = async ({
     .padStart(2, "0")}${currentDate.getDate().toString().padStart(2, "0")}`
 
   const latestPoQuery = `
-    SELECT ponum 
-    FROM purchase_orders 
-    WHERE ponum LIKE $1 
-    ORDER BY ponum DESC 
+    SELECT ponum
+    FROM purchase_orders
+    WHERE ponum LIKE $1
+    AND company_reg_num = $2
+    ORDER BY ponum DESC
     LIMIT 1
   `
 
-  const latestPoResult = await pool.query(latestPoQuery, [`${datePrefix}%`])
+  const latestPoResult = await pool.query(latestPoQuery, [`${datePrefix}%`, company_reg_num])
 
   let sequenceNumber = 1
   if (latestPoResult.rows.length > 0) {
@@ -275,9 +281,9 @@ export const createPurchaseOrder = async ({
   const query = `
     INSERT INTO purchase_orders (
       expense_type_id, supplier_id, reg_no, attention_to, received_by,
-      quantity, unit_price, description, subbie, date, ponum, total, truckid
+      quantity, unit_price, description, subbie, date, ponum, total, truckid, company_reg_num
     )
-    VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
+    VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
     RETURNING po_id, truckid
   `
 
@@ -295,6 +301,7 @@ export const createPurchaseOrder = async ({
     poNum,
     0,
     expenseTypeId === 5 ? truckid : null,
+    company_reg_num,
   ]
 
   try {
@@ -315,6 +322,7 @@ export const createMultiplePurchaseOrders = async ({
   regNo,
   subbie,
   lineItems,
+  company_reg_num,
 }) => {
   const client = await pool.connect()
 
@@ -327,14 +335,15 @@ export const createMultiplePurchaseOrders = async ({
       .padStart(2, "0")}${currentDate.getDate().toString().padStart(2, "0")}`
 
     const latestPoQuery = `
-      SELECT ponum 
-      FROM purchase_orders 
-      WHERE ponum LIKE $1 
-      ORDER BY ponum DESC 
+      SELECT ponum
+      FROM purchase_orders
+      WHERE ponum LIKE $1
+      AND company_reg_num = $2
+      ORDER BY ponum DESC
       LIMIT 1
     `
 
-    const latestPoResult = await client.query(latestPoQuery, [`${datePrefix}%`])
+    const latestPoResult = await client.query(latestPoQuery, [`${datePrefix}%`, company_reg_num])
 
     let sequenceNumber = 1
     if (latestPoResult.rows.length > 0) {
@@ -348,9 +357,9 @@ export const createMultiplePurchaseOrders = async ({
     const insertQuery = `
       INSERT INTO purchase_orders (
         expense_type_id, supplier_id, reg_no, attention_to, received_by,
-        quantity, unit_price, description, subbie, date, ponum, total, truckid
+        quantity, unit_price, description, subbie, date, ponum, total, truckid, company_reg_num
       )
-      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
       RETURNING po_id, truckid
     `
 
@@ -382,6 +391,7 @@ export const createMultiplePurchaseOrders = async ({
         poNum,
         totalAmount,  // Only set total for first item
         expenseTypeId === 5 ? truckId : null,
+        company_reg_num,
       ]
 
 
@@ -407,22 +417,23 @@ export const createMultiplePurchaseOrders = async ({
   }
 }
 
-export const getCompanyOwnedTrucks = async () => {
+export const getCompanyOwnedTrucks = async (company_reg_num) => {
   const query = `
-    SELECT 
-      m5truckskey AS truckid, 
-      truckregnum 
+    SELECT
+      m5truckskey AS truckid,
+      truckregnum
     FROM m5_trucks
     WHERE is_subcontractor IS DISTINCT FROM TRUE AND status= true
+    AND company_reg_num = $1
     ORDER BY truckregnum
   `
-  const result = await pool.query(query)
+  const result = await pool.query(query, [company_reg_num])
   return result.rows
 }
 
-export const getPurchaseOrderList = async (supplierId, expenseTypeId, fromDate, toDate, poId, ponum) => {
+export const getPurchaseOrderList = async (supplierId, expenseTypeId, fromDate, toDate, poId, ponum, company_reg_num) => {
   let query = `
-    SELECT 
+    SELECT
       po.ponum,
       po.date,
       s.supplier,
@@ -445,11 +456,11 @@ export const getPurchaseOrderList = async (supplierId, expenseTypeId, fromDate, 
     JOIN suppliers s ON po.supplier_id = s.supplier_id
     JOIN expense_types e ON po.expense_type_id = e.id
     LEFT JOIN m5_trucks t ON po.truckid = t.m5truckskey
-    WHERE 1=1
+    WHERE po.company_reg_num = $1
   `
 
-  const values = []
-  let paramIndex = 1
+  const values = [company_reg_num]
+  let paramIndex = 2
 
   if (poId) {
     query += ` AND po.po_id = $${paramIndex++}`
@@ -481,8 +492,8 @@ export const getPurchaseOrderList = async (supplierId, expenseTypeId, fromDate, 
     values.push(toDate)
   }
 
-  query += ` 
-GROUP BY 
+  query += `
+GROUP BY
   po.ponum, po.date, s.supplier, s.supplier_id, e.expense,
   po.subbie, po.attention_to, po.received_by, po.reg_no
 

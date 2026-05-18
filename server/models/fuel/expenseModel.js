@@ -1,12 +1,13 @@
 import { pool } from "../../config/database.js";
 
-const getExpensesByTruckId = async (truckId) => {
+const getExpensesByTruckId = async (truckId, company_reg_num) => {
   const queryText = `
-    SELECT * FROM public.expenses_m2 
+    SELECT * FROM public.expenses_m2
     WHERE truckid = $1
+      AND company_reg_num = $2
     ORDER BY slipuploaddate DESC
   `;
-  const result = await pool.query(queryText, [truckId]);
+  const result = await pool.query(queryText, [truckId, company_reg_num]);
   return result.rows;
 };
 
@@ -21,11 +22,12 @@ const insertFuelExpense = async ({
   truckId,
   driverId,
   orderno,
+  company_reg_num,
 }) => {
   const query = `
-    INSERT INTO public.expenses_m2 
-    (type, documentfrom, expensecost, description, slipname, s3key, slipuploaddate, truckid, driverid, orderno)
-    VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+    INSERT INTO public.expenses_m2
+    (type, documentfrom, expensecost, description, slipname, s3key, slipuploaddate, truckid, driverid, orderno, company_reg_num)
+    VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
     RETURNING ekey
   `;
   const values = [
@@ -39,6 +41,7 @@ const insertFuelExpense = async ({
     truckId || null,
     driverId || null,
     orderno,
+    company_reg_num,
   ];
 
   try {
@@ -61,11 +64,12 @@ const insertFuelExpenseWithoutS3Key = async ({
   truckId,
   driverId,
   orderno,
+  company_reg_num,
 }) => {
   const query = `
-    INSERT INTO public.expenses_m2 
-    (type, documentfrom, expensecost, description, slipname, slipuploaddate, truckid, driverid, orderno)
-    VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+    INSERT INTO public.expenses_m2
+    (type, documentfrom, expensecost, description, slipname, slipuploaddate, truckid, driverid, orderno, company_reg_num)
+    VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
     RETURNING ekey
   `;
   const values = [
@@ -78,6 +82,7 @@ const insertFuelExpenseWithoutS3Key = async ({
     truckId || null,
     driverId || null,
     orderno,
+    company_reg_num,
   ];
 
   try {
@@ -124,23 +129,24 @@ const getExpenseDocumentById = async (id) => {
 
   return { success: true, data: result.rows[0] };
 };
-const getPOExpensesByTruckId = async (truckId) => {
+const getPOExpensesByTruckId = async (truckId, company_reg_num) => {
   const queryText = `
-    SELECT 
+    SELECT
       e.*,
       po.ponum,
       po.slip_s3key as po_slip_s3key,
       po.invoice_number,
-      CASE 
+      CASE
         WHEN po.ponum IS NOT NULL THEN CONCAT(e.documentfrom, ' (PO: ', po.ponum, ')')
         ELSE e.documentfrom
       END as documentfrom_display
     FROM public.expenses_m2 e
     LEFT JOIN public.purchase_orders po ON e.orderno::text = po.ponum
     WHERE e.truckid = $1
+      AND e.company_reg_num = $2
     ORDER BY e.slipuploaddate DESC
   `;
-  const result = await pool.query(queryText, [truckId]);
+  const result = await pool.query(queryText, [truckId, company_reg_num]);
   return result.rows;
 };
 
