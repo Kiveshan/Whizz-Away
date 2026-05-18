@@ -15,13 +15,18 @@ export function getPostLoginRoute(tier, status, roleid) {
   if (status === "trial")                                        return "/dashboard"
   if (tier === "lite")                                           return "/dashboard/lite"
 
+  // Creditors (roleid 8) require enterprise plan - keep on login page if not enterprise
+  if (roleid === 8) {
+    if (tier === "enterprise") return "/CreditorsDashboard"
+    return "/login?upgrade=enterprise" // Stay on login page with upgrade prompt
+  }
+
   // Professional / Growth / Enterprise — role-based
   if (roleid === 1) return "/Dashboard"
   if (roleid === 2) return "/ControllerDashboard"
   if (roleid === 3) return "/FDashboard"
   if (roleid === 4) return "/DirectorDashboard"
   if (roleid === 7) return "/AdminDashboard"
-  if (roleid === 8) return "/CreditorsDashboard"
   return "/Dashboard"
 }
 

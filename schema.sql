@@ -153,8 +153,9 @@ CREATE TABLE IF NOT EXISTS public.expense_types
 (
     id serial NOT NULL,
     expense text COLLATE pg_catalog."default" NOT NULL,
+    company_reg_num integer NOT NULL,
     CONSTRAINT expense_types_pkey PRIMARY KEY (id),
-    CONSTRAINT expense_types_name_key UNIQUE (expense)
+    CONSTRAINT expense_types_expense_company_key UNIQUE (expense, company_reg_num)
 );
 
 CREATE TABLE IF NOT EXISTS public.expenses_m2

@@ -1,12 +1,12 @@
 import { query } from "../../config/database.js"
 
-export const getAllExpenseTypes = async (page = 1, limit = 50, company_reg_num) => {
+export const getAllExpenseTypes = async (page = 1, limit = 50, search = "", company_reg_num) => {
   try {
     const offset = (page - 1) * limit
 
     // Get total count
-    const countQuery = `SELECT COUNT(*) as total FROM expense_types WHERE company_reg_num = $1`
-    const countResult = await query(countQuery, [company_reg_num])
+    const countQuery = `SELECT COUNT(*) as total FROM expense_types WHERE company_reg_num = $1 AND ($2 = '' OR expense ILIKE '%' || $2 || '%')`
+    const countResult = await query(countQuery, [company_reg_num, search])
     const totalItems = Number.parseInt(countResult.rows[0].total)
 
     // Get expense types
@@ -16,11 +16,12 @@ export const getAllExpenseTypes = async (page = 1, limit = 50, company_reg_num) 
         expense
       FROM expense_types
       WHERE company_reg_num = $3
+      AND ($4 = '' OR expense ILIKE '%' || $4 || '%')
       ORDER BY expense ASC
       LIMIT $1 OFFSET $2
     `
 
-    const params = [limit, offset, company_reg_num]
+    const params = [limit, offset, company_reg_num, search]
     const expenseTypesResult = await query(expenseTypesQuery, params)
 
     const totalPages = Math.ceil(totalItems / limit)
@@ -117,7 +118,7 @@ export const getSimpleExpenseTypes = async (company_reg_num) => {
     console.log("Getting simple expense types for dropdown")
 
     const expenseTypesQuery = `
-      SELECT expense_type_id as id, expense
+      SELECT id, expense
       FROM expense_types
       WHERE company_reg_num = $1
       ORDER BY expense ASC

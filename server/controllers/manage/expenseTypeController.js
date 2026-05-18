@@ -10,10 +10,11 @@ import {
 export const getAllExpenseTypesHandler = async (req, res) => {
   try {
     const { page = 1, limit = 50, search = "" } = req.query
+    const company_reg_num = req.user?.company_reg_num
 
     console.log("Fetching expense types with params:", { page, limit, search })
 
-    const result = await getAllExpenseTypes(Number.parseInt(page), Number.parseInt(limit), search)
+    const result = await getAllExpenseTypes(Number.parseInt(page), Number.parseInt(limit), search, company_reg_num)
 
     res.json({
       success: true,
@@ -46,7 +47,8 @@ export const getExpenseTypeByIdHandler = async (req, res) => {
       })
     }
 
-    const expenseType = await getExpenseTypeById(expenseTypeId)
+    const company_reg_num = req.user?.company_reg_num
+    const expenseType = await getExpenseTypeById(expenseTypeId, company_reg_num)
 
     if (!expenseType) {
       return res.status(404).json({
@@ -80,9 +82,10 @@ export const createExpenseTypeHandler = async (req, res) => {
       })
     }
 
+    const company_reg_num = req.user?.company_reg_num
     console.log("Creating expense type with data:", { expense })
 
-    const expenseType = await createExpenseType({ expense: expense.trim() })
+    const expenseType = await createExpenseType({ expense: expense.trim() }, company_reg_num)
 
     res.status(201).json({
       success: true,
@@ -129,9 +132,10 @@ export const updateExpenseTypeHandler = async (req, res) => {
       })
     }
 
+    const company_reg_num = req.user?.company_reg_num
     console.log("Updating expense type with ID:", expenseTypeId, "Data:", { expense })
 
-    const expenseType = await updateExpenseType(expenseTypeId, { expense: expense.trim() })
+    const expenseType = await updateExpenseType(expenseTypeId, { expense: expense.trim() }, company_reg_num)
 
     if (!expenseType) {
       return res.status(404).json({
@@ -177,7 +181,8 @@ export const deleteExpenseTypeHandler = async (req, res) => {
       })
     }
 
-    const deleted = await deleteExpenseType(expenseTypeId)
+    const company_reg_num = req.user?.company_reg_num
+    const deleted = await deleteExpenseType(expenseTypeId, company_reg_num)
 
     if (!deleted) {
       return res.status(404).json({
@@ -212,9 +217,10 @@ export const deleteExpenseTypeHandler = async (req, res) => {
 // Get simple expense types for dropdown
 export const getSimpleExpenseTypesHandler = async (req, res) => {
   try {
+    const company_reg_num = req.user?.company_reg_num
     console.log("Getting simple expense types for dropdown")
 
-    const expenseTypes = await getSimpleExpenseTypes.getSimpleExpenseTypes()
+    const expenseTypes = await getSimpleExpenseTypes(company_reg_num)
 
     console.log(`Returning ${expenseTypes.length} simple expense types`)
     res.json(expenseTypes)
