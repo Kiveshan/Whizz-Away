@@ -288,7 +288,7 @@ export const getClientInstructionStatsHandler = async (req, res) => {
       "User making request:",
       req.user ? `${req.user.name} ${req.user.surname} (Role ID: ${req.user.roleid})` : "Unauthenticated",
     )
-    const stats = await getClientInstructionStats()
+    const stats = await getClientInstructionStats(req.user?.company_reg_num)
     console.log("Client stats query result count:", stats.length)
     res.json(stats)
   } catch (error) {
@@ -308,7 +308,7 @@ export const getInstructionsHandler = async (req, res) => {
       "User making request:",
       req.user ? `${req.user.name} ${req.user.surname} (Role ID: ${req.user.roleid})` : "Unauthenticated",
     )
-    const instructions = await getInstructions(clientId)
+    const instructions = await getInstructions(clientId, req.user?.company_reg_num)
     console.log(`Found ${instructions.length} instructions`)
     res.json(instructions)
   } catch (error) {
@@ -323,7 +323,7 @@ export const getInstructionsHandler = async (req, res) => {
 export const searchInstructionsHandler = async (req, res) => {
   try {
     const { q, clientId } = req.query
-    const results = await searchInstructions({ q, clientId })
+    const results = await searchInstructions({ q, clientId, company_reg_num: req.user?.company_reg_num })
     res.json(results)
   } catch (error) {
     console.error("Error in searchInstructionsHandler:", error)
@@ -335,7 +335,7 @@ export const getInstructionByIdHandler = async (req, res) => {
   try {
     const instructionId = req.params.id
     console.log(`Fetching instruction with ID: ${instructionId}`)
-    const instruction = await getInstructionById(instructionId)
+    const instruction = await getInstructionById(instructionId, req.user?.company_reg_num)
     if (!instruction) {
       return res.status(404).json({ error: "Instruction not found" })
     }
@@ -657,7 +657,7 @@ export const getFCInstructionByIdHandler = async (req, res) => {
     const { id } = req.params
     console.log(`[${new Date().toISOString()}] [FC] getFCInstructionByIdHandler: Fetching instruction ${id}`)
 
-    const instruction = await getInstructionById(id)
+    const instruction = await getInstructionById(id, req.user?.company_reg_num)
     if (!instruction) {
       return res.status(404).json({ error: "Instruction not found" })
     }

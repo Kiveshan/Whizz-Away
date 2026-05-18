@@ -1092,9 +1092,14 @@ const INSTRUCTION_SEARCH_FIELDS = [
   `m."clientFileRef"`,
 ]
 
-export const searchInstructions = async ({ q, clientId } = {}) => {
+export const searchInstructions = async ({ q, clientId, company_reg_num } = {}) => {
   const queryParams = []
   const conditions = []
+
+  if (company_reg_num) {
+    queryParams.push(company_reg_num)
+    conditions.push(`m.company_reg_num = $${queryParams.length}`)
+  }
 
   if (q && q.trim()) {
     queryParams.push(`%${q.trim()}%`)

@@ -8,8 +8,6 @@ const verifyToken = (req, res, next) => {
     "/api/check-auth",
     "/test-connection",
     "/check-email",
-    "/api/instructions",
-    "/api/client-instruction-stats",
   ]
 
   const isPublicEndpoint =
