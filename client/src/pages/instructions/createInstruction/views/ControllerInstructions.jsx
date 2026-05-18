@@ -283,7 +283,7 @@ const ControllerInstructions = () => {
           }
         }
       }
-      if (isImport && container.weight && container.weight.trim() !== "") {
+      if (isImport && container.weight && typeof container.weight === "string" && container.weight.trim() !== "") {
         if (!/^\d*\.?\d*$/.test(container.weight)) {
           errors[`weight-${containerId}`] = "Weight must be a valid number"
           isValid = false
