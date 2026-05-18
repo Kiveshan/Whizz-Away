@@ -1,4 +1,4 @@
-import { getOutputVat, getInputVat } from "../../models/vat-recon/vat-reconModel.js"
+import { getOutputVat, getInputVat, getSubbieRates } from "../../models/vat-recon/vat-reconModel.js"
 
 export const getVatReconHandler = async (req, res) => {
     try {
@@ -18,6 +18,10 @@ export const getVatReconHandler = async (req, res) => {
         const inputVat = await getInputVat(month, year)
         console.log(`Fetched ${inputVat.length} input VAT records`)
 
+        // Fetch subbie rates (from legs_m2)
+        const subbieRates = await getSubbieRates(month, year)
+        console.log(`Fetched subbie rates: ${subbieRates.total}`)
+
         // Calculate totals
         const totalOutputVat = outputVat.reduce((sum, item) => {
             return sum + (item.totalCost * item.vatRate) / 100
@@ -35,6 +39,7 @@ export const getVatReconHandler = async (req, res) => {
             year,
             outputVat,
             inputVat,
+            subbieRates,
             summary: {
                 totalOutputVat: parseFloat(totalOutputVat.toFixed(2)),
                 totalInputVat: parseFloat(totalInputVat.toFixed(2)),

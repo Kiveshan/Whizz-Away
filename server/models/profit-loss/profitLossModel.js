@@ -114,31 +114,7 @@ const getProfitLossData = async (month, year) => {
 
     // === INCOME: Separate Categories ===
     
-    // Instructions (subcontractor share from legs)
-    const instructionsQuery = `
-      WITH DistinctLegs AS (
-        SELECT m1key, COUNT(DISTINCT legnumber) AS num_legs
-        FROM legs_m2 GROUP BY m1key
-      ),
-      DriverCountsPerLeg AS (
-        SELECT m1key, legnumber, COUNT(DISTINCT driverid) AS drivers_per_leg
-        FROM legs_m2 GROUP BY m1key, legnumber
-      )
-      SELECT COALESCE(SUM(m.total_cost / dl.num_legs / dcpl.drivers_per_leg), 0) AS instructions_total
-      FROM legs_m2 l
-      JOIN m1_controller m ON l.m1key = m.m1key
-      JOIN DistinctLegs dl ON l.m1key = dl.m1key
-      JOIN DriverCountsPerLeg dcpl ON l.m1key = dcpl.m1key AND l.legnumber = dcpl.legnumber
-      JOIN m5_employee e ON l.driverid = e.userid
-      WHERE e.roleid = 6
-        AND TRIM(TO_CHAR(m.created_at, 'Month')) = $1
-        AND EXTRACT(YEAR FROM m.created_at)::text = $2
-    `;
-
-    const instructionsResult = await client.query(instructionsQuery, [month, year]);
-    const instructionsTotal = Number(instructionsResult.rows[0]?.instructions_total || 0);
-
-    // Invoices
+    // Invoices (instructions that have entries in the invoice table)
     const invoicesQuery = `
       SELECT COALESCE(SUM(m.total_cost), 0) AS invoices_total
       FROM invoice i
@@ -161,7 +137,7 @@ const getProfitLossData = async (month, year) => {
     const addOnsResult = await client.query(addOnsQuery, [month, year]);
     const addOnsTotal = Number(addOnsResult.rows[0]?.addons_total || 0);
 
-    const totalIncome = instructionsTotal + invoicesTotal + addOnsTotal;
+    const totalIncome = invoicesTotal + addOnsTotal;
 
     // === EXPENSES ===
     const fuel = Number((await client.query(
@@ -208,7 +184,6 @@ const getProfitLossData = async (month, year) => {
     const netProfit = totalIncome - totalExpenses;
 
     const profitDetails = [
-      { source: "Instructions", amount: instructionsTotal },
       { source: "Invoices", amount: invoicesTotal },
       { source: "Add-ons", amount: addOnsTotal }
     ];

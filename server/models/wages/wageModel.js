@@ -642,8 +642,13 @@ const getDriverLegsByMonth = async (driverId, month, year) => {
     const startDate = new Date(Number.parseInt(year), monthIndex, 1);
     const endDate = new Date(Number.parseInt(year), monthIndex + 1, 0);
 
-    const formattedStartDate = startDate.toISOString().split("T")[0];
-    const formattedEndDate = endDate.toISOString().split("T")[0];
+    // Adjust for timezone: add timezone offset to get local date
+    const timezoneOffset = startDate.getTimezoneOffset() * 60000; // offset in milliseconds
+    const localStartDate = new Date(startDate.getTime() - timezoneOffset);
+    const localEndDate = new Date(endDate.getTime() - timezoneOffset);
+    
+    const formattedStartDate = localStartDate.toISOString().split("T")[0];
+    const formattedEndDate = localEndDate.toISOString().split("T")[0];
 
     console.log(
       `Filtering legs between ${formattedStartDate} and ${formattedEndDate}`

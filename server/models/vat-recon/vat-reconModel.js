@@ -90,3 +90,51 @@ export const getInputVat = async (month, year) => {
         throw error
     }
 }
+
+export const getSubbieRates = async (month, year) => {
+    const monthIndex = [
+        "January",
+        "February",
+        "March",
+        "April",
+        "May",
+        "June",
+        "July",
+        "August",
+        "September",
+        "October",
+        "November",
+        "December",
+    ].indexOf(month) + 1
+
+    const query = `
+        SELECT 
+            date,
+            driverrate
+        FROM legs_m2
+        WHERE EXTRACT(MONTH FROM date) = $1
+        AND EXTRACT(YEAR FROM date) = $2
+        AND driverrate IS NOT NULL
+        AND driverrate > 0
+        ORDER BY date
+    `
+
+    try {
+        const result = await pool.query(query, [monthIndex, year])
+        
+        // Aggregate by date and return as a single entry with total
+        const totalSubbieRate = result.rows.reduce((sum, row) => {
+            return sum + (parseFloat(row.driverrate) || 0)
+        }, 0)
+
+        return {
+            expenseType: "Subbie rate",
+            total: totalSubbieRate,
+            vat: 0, // No VAT for subbie rates
+            date: null, // Aggregated data, no specific date
+        }
+    } catch (error) {
+        console.error("Error fetching subbie rates:", error)
+        throw error
+    }
+}
