@@ -2,6 +2,7 @@ import {
   calcBreakBulkCost,
   calculateTotalCostFromRates,
   calcContainerBasedCost,
+  resolveBaseCost,
 } from "../../../utils/instructions/costCalculation";
 
 // ── calcBreakBulkCost ────────────────────────────────────────────────────────
@@ -32,6 +33,13 @@ describe("calcBreakBulkCost", () => {
 
   it("set-rate mode: uses length 1 minimum when rows is empty", () => {
     expect(calcBreakBulkCost([], 0, { isSetRateMode: true, setRateAmount: 500 })).toBe(500);
+  });
+
+  it("set-rate mode: returns 0 when setRateAmount is 0 (caller must resolve historicalSetRate before passing)", () => {
+    // calcBreakBulkCost has no knowledge of historicalSetRate.
+    // The caller (useRateManagement / performSave) is responsible for
+    // resolving the fallback before calling this function.
+    expect(calcBreakBulkCost([{}], 0, { isSetRateMode: true, setRateAmount: 0 })).toBe(0);
   });
 });
 
@@ -120,5 +128,91 @@ describe("calcContainerBasedCost", () => {
     ];
     const fd = { ...baseFormData, sixMeterRate: "0", twelveMeterRate: "0", abnormalRate: "0" };
     expect(calcContainerBasedCost(fd, containers)).toBe(40);
+  });
+});
+
+// ── resolveBaseCost ──────────────────────────────────────────────────────────
+
+describe("resolveBaseCost", () => {
+  // ── Branch 1: Set-rate ───────────────────────────────────────────────────
+
+  it("set-rate: uses setRateAmount when valid", () => {
+    const formData = { setRateAmount: "300" };
+    const weightRows = [{}, {}]; // 2 rows
+    expect(resolveBaseCost(formData, weightRows, { isSetRateMode: true, historicalSetRate: 500 })).toBe(600); // 300 × 2
+  });
+
+  it("set-rate: falls back to historicalSetRate when setRateAmount is empty", () => {
+    const formData = { setRateAmount: "" };
+    const weightRows = [{}, {}]; // 2 rows
+    expect(resolveBaseCost(formData, weightRows, { isSetRateMode: true, historicalSetRate: 500 })).toBe(1000); // 500 × 2
+  });
+
+  it("set-rate: falls back to historicalSetRate when setRateAmount is 0", () => {
+    const formData = { setRateAmount: "0" };
+    const weightRows = [{}]; // 1 row
+    expect(resolveBaseCost(formData, weightRows, { isSetRateMode: true, historicalSetRate: 400 })).toBe(400); // 400 × 1
+  });
+
+  it("set-rate: skipped entirely when isAddOn=true (falls through to container branch)", () => {
+    // isAddOn instructions are never set-rate; the branch is skipped
+    const formData = {
+      setRateAmount: "999",
+      shipmentTypeId: "1",
+      rateper_6: 100, num_six_meters: 2,
+      rateper_12: 0,  num_twelve_meters: 0,
+      rateper_abnormal: 0, num_abnormal: 0,
+    };
+    expect(resolveBaseCost(formData, [], { isSetRateMode: true, historicalSetRate: 999, isAddOn: true })).toBe(200);
+  });
+
+  // ── Branch 2: Weight-based type-4 ───────────────────────────────────────
+
+  it("weight-based type-4 (rateWeight=kg): sum(weights) × unitRate", () => {
+    const formData = { shipmentTypeId: "4", rateWeight: "kg", unitRate: 10 };
+    const weightRows = [{ weight: "5" }, { weight: "3" }];
+    expect(resolveBaseCost(formData, weightRows, { isSetRateMode: false })).toBe(80); // 8 × 10
+  });
+
+  it("weight-based type-4 (rateWeight=ton): sum(weights) × unitRate", () => {
+    const formData = { shipmentTypeId: "4", rateWeight: "ton", unitRate: 50 };
+    const weightRows = [{ weight: "2" }];
+    expect(resolveBaseCost(formData, weightRows, { isSetRateMode: false })).toBe(100); // 2 × 50
+  });
+
+  it("weight-based branch NOT taken for non-type-4 even if rateWeight=kg", () => {
+    // shipmentTypeId "1" → falls through to container branch
+    const formData = {
+      shipmentTypeId: "1",
+      rateWeight: "kg",
+      unitRate: 50,
+      rateper_6: 100, num_six_meters: 3,
+      rateper_12: 0,  num_twelve_meters: 0,
+      rateper_abnormal: 0, num_abnormal: 0,
+    };
+    expect(resolveBaseCost(formData, [{ weight: "10" }], { isSetRateMode: false })).toBe(300); // 100 × 3
+  });
+
+  // ── Branch 3: Container-based ────────────────────────────────────────────
+
+  it("container-based: rate × count for each size", () => {
+    const formData = {
+      shipmentTypeId: "1", rateWeight: "Container",
+      rateper_6: 100,  num_six_meters: 2,
+      rateper_12: 200, num_twelve_meters: 1,
+      rateper_abnormal: 300, num_abnormal: 1,
+    };
+    expect(resolveBaseCost(formData, [], { isSetRateMode: false })).toBe(700); // 200+200+300
+  });
+
+  it("container-based: rate is zeroed when count is 0 (prevents phantom cost)", () => {
+    // num_twelve_meters is 0 — rateper_12 should not contribute even though it's non-zero
+    const formData = {
+      shipmentTypeId: "1", rateWeight: "Container",
+      rateper_6: 100,  num_six_meters: 2,
+      rateper_12: 200, num_twelve_meters: 0,
+      rateper_abnormal: 0, num_abnormal: 0,
+    };
+    expect(resolveBaseCost(formData, [], { isSetRateMode: false })).toBe(200); // only 6m contributes
   });
 });

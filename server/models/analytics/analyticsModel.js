@@ -110,8 +110,7 @@ const getTurnoverPerMonth = async (client, month, year, clientId = null, company
 
   const totalTurnover = Number.parseFloat(totalResult.rows[0]?.turnover || 0)
 
-  // Do not include payments received in turnover analytics
-  console.log(`Total turnover (including subcontractors) for ${month} ${year}: ${totalTurnover}`)
+  console.log(`Total turnover (invoices + add-ons) for ${month} ${year}: ${totalTurnover}`)
 
   let turnoverData = [
     {
@@ -385,12 +384,12 @@ const getDebtorAgeAnalysisPerClient = async (client, month, year, company_reg_nu
   `
   const result = await client.query(query, [month, year, company_reg_num])
   return result.rows.map((row) => ({
-    clientId:   row.client_id,
-    client:     row.client_name,
-    current:    parseFloat(row.current_amount)  || 0,
-    thirtyDays: parseFloat(row.thirty_days)     || 0,
-    sixtyDays:  parseFloat(row.sixty_days)      || 0,
-    ninetyDays: parseFloat(row.ninety_days)     || 0,
+    clientId: row.client_id,
+    client: row.client_name,
+    current: parseFloat(row.current_amount) || 0,
+    thirtyDays: parseFloat(row.thirty_days) || 0,
+    sixtyDays: parseFloat(row.sixty_days) || 0,
+    ninetyDays: parseFloat(row.ninety_days) || 0,
   }))
 }
 
@@ -459,7 +458,7 @@ const getTurnoverVsDieselCost = async (numericMonth, year, company_reg_num) => {
   const totalTurnover = Number(turnoverResult.rows[0]?.total_turnover || 0)
   const totalDieselCost = Number(dieselResult.rows[0]?.total_diesel_cost || 0)
 
-  console.log(`Total turnover (including subcontractors) for ${monthNames[numericMonth]} ${year}: ${totalTurnover}`)
+  console.log(`Total turnover (invoices + add-ons) for ${monthNames[numericMonth]} ${year}: ${totalTurnover}`)
   console.log(`Total diesel cost for ${monthNames[numericMonth]} ${year}: ${totalDieselCost}`)
 
   const total = totalTurnover + totalDieselCost
@@ -651,7 +650,7 @@ const getSubcontractorTurnoverPerMonth = async (client, month, year, company_reg
   }
 
   const totalTurnover = Number.parseFloat(result.rows.find((row) => row.type === "total")?.value || 0)
-  console.log(`Total turnover (including subcontractors) for ${month} ${year}: ${totalTurnover}`)
+  console.log(`Total turnover (invoices + add-ons) for ${month} ${year}: ${totalTurnover}`)
 
   const turnoverData = result.rows.map((row) => ({
     name: row.name,
@@ -787,7 +786,7 @@ const getSubcontractorVsTurnover = async (client, month, year, subcontractorId =
   console.log("Total turnover query result:", totalTurnoverResult.rows)
 
   const totalTurnover = Number.parseFloat(totalTurnoverResult.rows[0]?.total_turnover || 0)
-  console.log(`Total turnover (including subcontractors) for ${month} ${year}: ${totalTurnover}`)
+  console.log(`Total turnover (invoices + add-ons) for ${month} ${year}: ${totalTurnover}`)
 
   const turnoverData = [
     {
@@ -897,7 +896,7 @@ const getTurnoverVsSubbieExpense = async (client, month, year, subcontractorId =
   console.log("Total turnover query result:", totalTurnoverResult.rows)
 
   const totalTurnover = Number.parseFloat(totalTurnoverResult.rows[0]?.total_turnover || 0)
-  console.log(`Total turnover (including subcontractors) for ${month} ${year}: ${totalTurnover}`)
+  console.log(`Total turnover (invoices + add-ons) for ${month} ${year}: ${totalTurnover}`)
 
   const turnoverData = []
 
@@ -1502,9 +1501,9 @@ const getClientSubbieCommissionReport = async (client, month, year, clientId, co
   return {
     client: clientInfo
       ? {
-          id: clientInfo.m5clientkey,
-          name: clientInfo.client,
-        }
+        id: clientInfo.m5clientkey,
+        name: clientInfo.client,
+      }
       : null,
     period: {
       month: trimmedMonth,
@@ -1629,8 +1628,8 @@ async function getTotalWagesForMonth(client, month, year, company_reg_num) {
   const currentYear = currentDate.getFullYear();
   const reportMonth = monthNumber;
   const reportYear = parseInt(year);
-  const isPastMonth = (reportYear < currentYear) || 
-                      (reportYear === currentYear && reportMonth < currentMonth);
+  const isPastMonth = (reportYear < currentYear) ||
+    (reportYear === currentYear && reportMonth < currentMonth);
 
   for (const emp of employees) {
     const employeeId = emp.userid;

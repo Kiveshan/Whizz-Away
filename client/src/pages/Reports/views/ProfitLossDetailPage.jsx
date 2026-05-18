@@ -13,6 +13,15 @@ const ProfitLossDetailPage = () => {
     const [loading, setLoading] = useState(true)
     const [companyData, setCompanyData] = useState(null)
 
+    // Helper function for readable currency formatting
+    const formatCurrency = (amount) => {
+        const num = Number(amount || 0)
+        return num.toLocaleString("en-US", {
+            minimumFractionDigits: 2,
+            maximumFractionDigits: 2
+        })
+    }
+
     useEffect(() => {
         if (month && year) {
             fetchReport()
@@ -40,18 +49,15 @@ const ProfitLossDetailPage = () => {
             setCompanyData(response.data)
         } catch (error) {
             console.error("Error fetching company details:", error)
-            setCompanyData({ companyname:"Test" })
+            setCompanyData({ companyname: "Test" })
         }
     }
 
     const aggregateData = (details) => {
         const aggregated = (details || []).reduce((acc, item) => {
-            const key = item?.source ?? "Unknown";
-            const amt = Number(item?.amount ?? 0);
-            if (!Object.prototype.hasOwnProperty.call(acc, key)) {
-                acc[key] = 0
-            }
-            acc[key] += amt
+            const key = item?.source ?? "Unknown"
+            const amt = Number(item?.amount ?? 0)
+            acc[key] = (acc[key] || 0) + amt
             return acc
         }, {})
         return aggregated
@@ -77,9 +83,6 @@ const ProfitLossDetailPage = () => {
         doc.setFont("helvetica", "bold")
         const companyName = companyData?.companyname || 'N/A'
         doc.text(companyName, pageWidth / 2, 20, { align: "center" })
-
-        doc.setFontSize(12)
-        doc.setFont("helvetica", "normal")
 
         doc.setTextColor(0, 0, 0)
         doc.setFontSize(11)
@@ -136,7 +139,7 @@ const ProfitLossDetailPage = () => {
             doc.setTextColor(0, 0, 0)
 
             doc.text(label, margin + (isTotal ? 5 : 10), yPosition + 2)
-            doc.text(amount, pageWidth - margin - 5, yPosition + 2, { align: "right" })
+            doc.text(`R ${amount}`, pageWidth - margin - 5, yPosition + 2, { align: "right" })
 
             return yPosition + (isTotal ? 15 : 8)
         }
@@ -145,17 +148,17 @@ const ProfitLossDetailPage = () => {
 
         const profitAgg = aggregateData(reportData.profitDetails)
         Object.entries(profitAgg).forEach(([source, amount]) => {
-            yPos = addTableRow(source, `R ${amount.toLocaleString("en-ZA", { minimumFractionDigits: 2 })}`, yPos)
+            yPos = addTableRow(source, formatCurrency(amount), yPos)
         })
 
         const profitAggSum = Object.values(profitAgg).reduce((s, v) => s + Number(v || 0), 0)
         const totalProfitVal = (reportData.totalProfit ?? reportData.totalIncome ?? profitAggSum)
         yPos = addTableRow(
             "Total Income",
-            `R ${totalProfitVal.toLocaleString("en-ZA", { minimumFractionDigits: 2 })}`,
+            formatCurrency(totalProfitVal),
             yPos,
             true,
-            true,
+            true
         )
 
         yPos += 15
@@ -163,36 +166,37 @@ const ProfitLossDetailPage = () => {
 
         const lossAgg = aggregateData(reportData.lossDetails)
         Object.entries(lossAgg).forEach(([source, amount]) => {
-            yPos = addTableRow(source, `R ${amount.toLocaleString("en-ZA", { minimumFractionDigits: 2 })}`, yPos)
+            yPos = addTableRow(source, formatCurrency(amount), yPos)
         })
 
         const lossAggSum = Object.values(lossAgg).reduce((s, v) => s + Number(v || 0), 0)
         const totalLossVal = (reportData.totalLoss ?? reportData.totalExpenses ?? lossAggSum)
         yPos = addTableRow(
             "Total Expenditure",
-            `R ${Math.abs(totalLossVal).toLocaleString("en-ZA", { minimumFractionDigits: 2 })}`,
+            formatCurrency(Math.abs(totalLossVal)),
             yPos,
             true,
-            true,
+            true
         )
 
         yPos += 15
-        const net = (reportData.net ?? reportData.netProfit ?? (totalProfitVal - totalLossVal));
-        const isProfit = net >= 0;
-        doc.setFillColor(isProfit ? (232, 245, 233) : (255, 235, 238));
-        doc.rect(margin, yPos - 5, contentWidth, 20, "F");
-        doc.setDrawColor(isProfit ? (76, 175, 80) : (244, 67, 54));
-        doc.setLineWidth(2);
-        doc.rect(margin, yPos - 5, contentWidth, 20);
+        const net = (reportData.net ?? reportData.netProfit ?? (totalProfitVal - totalLossVal))
+        const isProfit = net >= 0
 
-        doc.setFontSize(16);
-        doc.setFont("helvetica", "bold");
-        doc.setTextColor(isProfit ? (27, 94, 32) : (183, 28, 28));
-        doc.text("NET PROFIT (LOSS)", margin + 10, yPos + 5);
+        doc.setFillColor(isProfit ? (232, 245, 233) : (255, 235, 238))
+        doc.rect(margin, yPos - 5, contentWidth, 20, "F")
+        doc.setDrawColor(isProfit ? (76, 175, 80) : (244, 67, 54))
+        doc.setLineWidth(2)
+        doc.rect(margin, yPos - 5, contentWidth, 20)
+
+        doc.setFontSize(16)
+        doc.setFont("helvetica", "bold")
+        doc.setTextColor(isProfit ? (27, 94, 32) : (183, 28, 28))
+        doc.text("NET PROFIT (LOSS)", margin + 10, yPos + 5)
 
         const netText = isProfit
-            ? `R ${net.toLocaleString("en-ZA", { minimumFractionDigits: 2 })}`
-            : `R (${Math.abs(net).toLocaleString("en-ZA", { minimumFractionDigits: 2 })})`
+            ? `R ${formatCurrency(net)}`
+            : `R (${formatCurrency(Math.abs(net))})`
         doc.text(netText, pageWidth - margin - 10, yPos + 5, { align: "right" })
 
         doc.setFontSize(9)
@@ -241,10 +245,10 @@ const ProfitLossDetailPage = () => {
 
     const profitAgg = aggregateData(reportData.profitDetails)
     const lossAgg = aggregateData(reportData.lossDetails)
-    const profitAggSum = Object.values(profitAgg).reduce((s, v) => s + Number(v || 0), 0)
-    const lossAggSum = Object.values(lossAgg).reduce((s, v) => s + Number(v || 0), 0)
-    const uiTotalProfitVal = (reportData.totalProfit ?? reportData.totalIncome ?? profitAggSum)
-    const uiTotalLossVal = (reportData.totalLoss ?? reportData.totalExpenses ?? lossAggSum)
+    const uiTotalProfitVal = (reportData.totalProfit ?? reportData.totalIncome ?? 
+        Object.values(profitAgg).reduce((s, v) => s + Number(v || 0), 0))
+    const uiTotalLossVal = (reportData.totalLoss ?? reportData.totalExpenses ?? 
+        Object.values(lossAgg).reduce((s, v) => s + Number(v || 0), 0))
     const uiNet = (reportData.net ?? reportData.netProfit ?? (uiTotalProfitVal - uiTotalLossVal))
 
     return (
@@ -275,12 +279,12 @@ const ProfitLossDetailPage = () => {
                                 {Object.entries(profitAgg).map(([source, amount], index) => (
                                     <tr key={index}>
                                         <td>{source}</td>
-                                        <td>R {amount.toFixed(2)}</td>
+                                        <td>R {formatCurrency(amount)}</td>
                                     </tr>
                                 ))}
                                 <tr className="pl-total-row">
                                     <td>Total Income</td>
-                                    <td>R {Number(uiTotalProfitVal).toFixed(2)}</td>
+                                    <td>R {formatCurrency(uiTotalProfitVal)}</td>
                                 </tr>
                             </tbody>
                         </table>
@@ -298,12 +302,12 @@ const ProfitLossDetailPage = () => {
                                 {Object.entries(lossAgg).map(([source, amount], index) => (
                                     <tr key={index}>
                                         <td>{source}</td>
-                                        <td>R {amount.toFixed(2)}</td>
+                                        <td>R {formatCurrency(amount)}</td>
                                     </tr>
                                 ))}
                                 <tr className="pl-total-row">
                                     <td>Total Expenditure</td>
-                                    <td>R {Math.abs(Number(uiTotalLossVal)).toFixed(2)}</td>
+                                    <td>R {formatCurrency(Math.abs(uiTotalLossVal))}</td>
                                 </tr>
                             </tbody>
                         </table>
@@ -322,8 +326,8 @@ const ProfitLossDetailPage = () => {
                                     <td>Net Profit (Loss)</td>
                                     <td className={`pl-net-amount ${uiNet >= 0 ? "pl-profit" : "pl-loss"}`}>
                                         {uiNet >= 0
-                                            ? `R ${Number(uiNet).toFixed(2)}`
-                                            : `R (${Math.abs(Number(uiNet)).toFixed(2)})`}
+                                            ? `R ${formatCurrency(uiNet)}`
+                                            : `R (${formatCurrency(Math.abs(uiNet))})`}
                                     </td>
                                 </tr>
                             </tbody>

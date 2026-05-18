@@ -210,12 +210,13 @@ describe("recalculateTotalCost", () => {
     expect(calculateTotalCostFromRates).not.toHaveBeenCalled();
   });
 
-  it("calls calcBreakBulkCost for shipmentTypeId=4", () => {
+  it("calls calcBreakBulkCost (weight-based) for shipmentTypeId=4 with rateWeight=ton", () => {
     calcBreakBulkCost.mockReturnValueOnce(300);
     const { result, onFormUpdate } = renderRateHook();
     const formData4 = {
       ...BASE_FORM,
       shipmentTypeId: "4",
+      rateWeight: "ton",
       unitRate: 50,
       setRateAmount: 0,
     };
@@ -228,6 +229,80 @@ describe("recalculateTotalCost", () => {
       setRateAmount: 0,
     });
     expect(onFormUpdate).toHaveBeenCalledWith({ total_cost: 300 });
+  });
+
+  it("type 4 container-based fallback: calls calculateTotalCostFromRates when rateWeight=Container", () => {
+    calculateTotalCostFromRates.mockReturnValueOnce(400);
+    const { result, onFormUpdate } = renderRateHook();
+    const formData4 = {
+      shipmentTypeId: "4",
+      rateWeight: "Container",
+      rateper_6: 200,
+      rateper_12: 0,
+      rateper_abnormal: 0,
+      num_six_meters: 2,
+      num_twelve_meters: 0,
+      num_abnormal: 0,
+      unitRate: 0,
+      setRateAmount: 0,
+    };
+    act(() => {
+      result.current.recalculateTotalCost(formData4, [], []);
+    });
+    expect(calculateTotalCostFromRates).toHaveBeenCalledWith(
+      200, 0, 0, 2, 0, 0, []
+    );
+    expect(onFormUpdate).toHaveBeenCalledWith({ total_cost: 400 });
+  });
+
+  it("type 4 set-rate: falls back to historicalSetRate when setRateAmount is empty", async () => {
+    calcBreakBulkCost.mockReturnValueOnce(1000);
+    const { result, onFormUpdate } = renderRateHook();
+    act(() => {
+      result.current.setIsSetRate(true);
+      result.current.setHistoricalSetRate(500);
+    });
+    await waitFor(() => expect(result.current.isSetRateMode).toBe(true));
+    const formData4 = {
+      ...BASE_FORM,
+      shipmentTypeId: "4",
+      rateWeight: "ton",
+      setRateAmount: "",   // empty — API returned nothing
+      unitRate: 0,
+    };
+    act(() => {
+      result.current.recalculateTotalCost(formData4, [], [{}, {}]);
+    });
+    expect(calcBreakBulkCost).toHaveBeenCalledWith(
+      expect.any(Array),
+      expect.any(Number),
+      expect.objectContaining({ isSetRateMode: true, setRateAmount: 500 })
+    );
+  });
+
+  it("type 4 set-rate: uses setRateAmount directly when it is a valid positive number", async () => {
+    calcBreakBulkCost.mockReturnValueOnce(300);
+    const { result } = renderRateHook();
+    act(() => {
+      result.current.setIsSetRate(true);
+      result.current.setHistoricalSetRate(500); // should be ignored
+    });
+    await waitFor(() => expect(result.current.isSetRateMode).toBe(true));
+    const formData4 = {
+      ...BASE_FORM,
+      shipmentTypeId: "4",
+      rateWeight: "ton",
+      setRateAmount: "300",  // valid — historicalSetRate should NOT be used
+      unitRate: 0,
+    };
+    act(() => {
+      result.current.recalculateTotalCost(formData4, [], [{}]);
+    });
+    expect(calcBreakBulkCost).toHaveBeenCalledWith(
+      expect.any(Array),
+      expect.any(Number),
+      expect.objectContaining({ isSetRateMode: true, setRateAmount: 300 })
+    );
   });
 
   it("uses isSetRateMode=true inside calcBreakBulkCost after toggle", async () => {

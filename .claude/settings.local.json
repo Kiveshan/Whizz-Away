@@ -20,7 +20,8 @@
       "Bash(BABEL_ENV=test npx jest --testPathPattern=\"useInstructionData\" --no-coverage)",
       "Bash(node -e \"require\\('express-rate-limit'\\); console.log\\('installed'\\)\")",
       "Bash(npm install *)",
-      "Bash(npm list *)"
+      "Bash(npm list *)",
+      "Bash(git checkout *)"
     ]
   }
 }

@@ -18,6 +18,7 @@ import {
   checkContainerHasLegs,
   deleteContainerAndLegs,
   getClientSetRate,
+  searchInstructions,
 } from "../../models/instructions/instructionModel.js"
 
 // Helper function to calculate total cost based on rate weight type
@@ -316,6 +317,17 @@ export const getInstructionsHandler = async (req, res) => {
       error: error.message,
       stack: process.env.NODE_ENV === "production" ? undefined : error.stack,
     })
+  }
+}
+
+export const searchInstructionsHandler = async (req, res) => {
+  try {
+    const { q, clientId } = req.query
+    const results = await searchInstructions({ q, clientId })
+    res.json(results)
+  } catch (error) {
+    console.error("Error in searchInstructionsHandler:", error)
+    res.status(500).json({ error: error.message })
   }
 }
 

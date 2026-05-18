@@ -21,6 +21,11 @@ const dashboardData = [
     path: "/view-client-statements",
     featureKey: "statements",
   },
+  {
+    title: "Age Analysis",
+    image: "/images/Statements.jpg",
+    path: "/debtors-age-analysis",
+  },
 ];
 
 const DebtorsDashboard = () => {
@@ -46,20 +51,8 @@ const DebtorsDashboard = () => {
           />
         ))}
       </div>
-      <div className="dashboard-row top-row">
-        {dashboardData.slice(3, 6).map((item) => (
-          <FeatureGatedCard
-            key={item.title}
-            title={item.title}
-            image={item.image}
-            path={item.path}
-            featureKey={item.featureKey}
-            onClick={() => navigate(item.path)}
-          />
-        ))}
-      </div>
       <div className="dashboard-row bottom-row">
-        {dashboardData.slice(6, 9).map((item) => (
+        {dashboardData.slice(3).map((item) => (
           <FeatureGatedCard
             key={item.title}
             title={item.title}

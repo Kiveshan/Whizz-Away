@@ -266,12 +266,37 @@ export function useRateManagement({
         return;
       }
 
-      // Break-bulk (type 4): weight-based calculation
+      // Break-bulk (type 4): three-way branch matching the original orchestrator logic
       if (String(formData.shipmentTypeId) === "4") {
-        const baseCost = calcBreakBulkCost(weightRows, formData.unitRate || 0, {
-          isSetRateMode,
-          setRateAmount: formData.setRateAmount || 0,
-        });
+        let baseCost = 0;
+        if (isSetRateMode) {
+          // Set-rate mode: fall back to historicalSetRate if API returns 0/""
+          const rawRate = Number.parseFloat(formData.setRateAmount);
+          const resolvedSetRateAmount = (!Number.isNaN(rawRate) && rawRate > 0)
+            ? rawRate
+            : (historicalSetRate || 0);
+          baseCost = calcBreakBulkCost(weightRows, formData.unitRate || 0, {
+            isSetRateMode: true,
+            setRateAmount: resolvedSetRateAmount,
+          });
+        } else if (formData.rateWeight === "kg" || formData.rateWeight === "ton") {
+          // Weight-based mode
+          baseCost = calcBreakBulkCost(weightRows, formData.unitRate || 0, {
+            isSetRateMode: false,
+            setRateAmount: 0,
+          });
+        } else {
+          // Container-based fallback for type 4 (rateWeight is "Container" or unset)
+          baseCost = calculateTotalCostFromRates(
+            formData.rateper_6 || 0,
+            formData.rateper_12 || 0,
+            formData.rateper_abnormal || 0,
+            formData.num_six_meters || 0,
+            formData.num_twelve_meters || 0,
+            formData.num_abnormal || 0,
+            containers
+          );
+        }
         onFormUpdateRef.current({ total_cost: baseCost });
         return;
       }
@@ -288,7 +313,7 @@ export function useRateManagement({
       );
       onFormUpdateRef.current({ total_cost: newTotalCost });
     },
-    [isAddOn, isSetRateMode]
+    [isAddOn, isSetRateMode, historicalSetRate]
   );
 
   return {

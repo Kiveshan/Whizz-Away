@@ -113,7 +113,7 @@ const getProfitLossData = async (month, year, company_reg_num) => {
   try {
     client = await pool.connect();
 
-    // === INCOME: Invoice Turnover (including subcontractor share) ===
+    // === INCOME: Invoice Turnover (including subcontractor share) + Add-ons ===
     const turnoverQuery = `
       WITH DistinctLegs AS (
         SELECT m1key, COUNT(DISTINCT legnumber) AS num_legs
@@ -150,9 +150,21 @@ const getProfitLossData = async (month, year, company_reg_num) => {
     `;
 
     const turnoverResult = await client.query(turnoverQuery, [month, year, company_reg_num]);
-    const invoiceTurnover = Number(turnoverResult.rows[0]?.invoice_turnover || 0);
+    const invoicesTotal = Number(turnoverResult.rows[0]?.invoice_turnover || 0);
 
-    const totalIncome = invoiceTurnover;
+    // Add-ons
+    const addOnsQuery = `
+      SELECT COALESCE(SUM(amount), 0) AS addons_total
+      FROM add_ons
+      WHERE TRIM(TO_CHAR(date, 'Month')) = $1
+        AND EXTRACT(YEAR FROM date)::text = $2
+        AND company_reg_num = $3
+    `;
+
+    const addOnsResult = await client.query(addOnsQuery, [month, year, company_reg_num]);
+    const addOnsTotal = Number(addOnsResult.rows[0]?.addons_total || 0);
+
+    const totalIncome = invoicesTotal + addOnsTotal;
 
     // === EXPENSES ===
     const fuel = Number((await client.query(
@@ -203,7 +215,8 @@ const getProfitLossData = async (month, year, company_reg_num) => {
     const netProfit = totalIncome - totalExpenses;
 
     const profitDetails = [
-      { source: "Instructions", amount: invoiceTurnover }
+      { source: "Invoices", amount: invoicesTotal },
+      { source: "Add-ons", amount: addOnsTotal }
     ];
 
     const lossDetails = [
@@ -240,12 +253,16 @@ const getCompanyDetails = async () => {
     LIMIT 1
   `;
 
+  let client;
   try {
-    const result = await query(companyQuery);
+    client = await pool.connect();
+    const result = await client.query(companyQuery);
     return result.rows[0]?.companyname || "Company";
   } catch (error) {
     console.error("Error fetching company name:", error);
     return "Company";
+  } finally {
+    if (client) client.release();
   }
 };
 

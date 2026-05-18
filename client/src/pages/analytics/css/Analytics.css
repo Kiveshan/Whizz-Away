@@ -239,6 +239,31 @@ body.no-vertical-scroll {
   border-radius: 4px;
 }
 
+/* Legend color classes */
+.analytics-page-wrapper .legend-color.green {
+  background-color: #4CAF50;
+}
+
+.analytics-page-wrapper .legend-color.yellow {
+  background-color: #FFC107;
+}
+
+.analytics-page-wrapper .legend-color.red {
+  background-color: #F44336;
+}
+
+.analytics-page-wrapper .legend-color.blue {
+  background-color: #2196F3;
+}
+
+.analytics-page-wrapper .legend-color.royal-blue {
+  background-color: #4169E1;
+}
+
+.analytics-page-wrapper .legend-color.tomato {
+  background-color: #FF6347;
+}
+
 .analytics-page-wrapper .chart-header {
   display: flex;
   justify-content: center;

@@ -95,13 +95,17 @@ const CompanyInstructions = () => {
     return new Date().getFullYear().toString()
   }
 
-  // Always default to current month and year regardless of passed values
-  const [selectedMonth, setSelectedMonth] = useState(getCurrentMonthName())
-  const [selectedYear, setSelectedYear] = useState(getCurrentYear())
+  // Clear month/year filters when arriving with a container search so all matching instructions are visible
+  const [selectedMonth, setSelectedMonth] = useState(location.state?.containerSearch ? "" : getCurrentMonthName())
+  const [selectedYear, setSelectedYear] = useState(location.state?.containerSearch ? "" : getCurrentYear())
   const [instructions, setInstructions] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
   const [activeFilter, setActiveFilter] = useState(initialFilter || "All")
+  const [containerSearch, setContainerSearch] = useState(location.state?.containerSearch || "")
+  const [debouncedSearch, setDebouncedSearch] = useState(location.state?.containerSearch || "")
+  const [containerSearchLoading, setContainerSearchLoading] = useState(false)
+  const [searchMatchedKeys, setSearchMatchedKeys] = useState(null)
 
   // Pagination state - ADDED
   const [currentPage, setCurrentPage] = useState(1)
@@ -190,6 +194,36 @@ const CompanyInstructions = () => {
 
     fetchInstructions()
   }, [clientId])
+
+  useEffect(() => {
+    const timer = setTimeout(() => setDebouncedSearch(containerSearch), 400)
+    return () => clearTimeout(timer)
+  }, [containerSearch])
+
+  useEffect(() => {
+    if (!debouncedSearch.trim()) {
+      setSearchMatchedKeys(null)
+      setContainerSearchLoading(false)
+      return
+    }
+
+    const runSearch = async () => {
+      try {
+        setContainerSearchLoading(true)
+        const params = new URLSearchParams({ q: debouncedSearch.trim() })
+        if (clientId) params.append("clientId", clientId)
+        const response = await api.get(`/api/instructions/search?${params}`)
+        const matched = new Set((response.data || []).map((i) => String(i.m1key)))
+        setSearchMatchedKeys(matched)
+      } catch (err) {
+        console.error("Error running instruction search", err)
+      } finally {
+        setContainerSearchLoading(false)
+      }
+    }
+
+    runSearch()
+  }, [debouncedSearch, clientId])
 
   const handleFilterClick = (filter) => {
     setActiveFilter(filter)
@@ -295,6 +329,10 @@ const CompanyInstructions = () => {
           )
         })
       }
+    }
+
+    if (searchMatchedKeys !== null) {
+      filtered = filtered.filter((item) => searchMatchedKeys.has(String(item.m1key)))
     }
 
     // Sort by status priority first, then by instruction number (descending)
@@ -472,6 +510,26 @@ const CompanyInstructions = () => {
           </div>
         </div>
 
+        <div style={{ margin: "10px 0", textAlign: "center" }}>
+          <input
+            type="text"
+            placeholder="Search by container number or client ref"
+            value={containerSearch}
+            onChange={(e) => {
+              setContainerSearch(e.target.value)
+              setCurrentPage(1)
+            }}
+            style={{
+              padding: "6px 10px",
+              borderRadius: "4px",
+              border: "1px solid #ccc",
+              minWidth: "220px",
+              fontFamily: "inherit",
+              fontSize: "14px",
+            }}
+          />
+        </div>
+
         <div className="tables-container">
           {loading ? (
             <p>Loading instructions...</p>
@@ -482,7 +540,10 @@ const CompanyInstructions = () => {
               <thead>
                 <tr>
                   <th>Instruction No</th>
-                  <th>File No</th>
+                  <th>Invoice No</th>
+                  <th>Booking Ref</th>
+                  <th>Client Ref</th>
+                  <th>KSM File Ref</th>
                   <th>Type</th>
                   <th>Status</th>
                   <th>Creation Date</th>
@@ -491,49 +552,74 @@ const CompanyInstructions = () => {
                 </tr>
               </thead>
               <tbody>
-                {getFilteredInstructions().length === 0 ? (
+                {containerSearchLoading ? (
                   <tr>
-                    <td colSpan="7">No instructions found</td>
+                    <td colSpan="10">Searching...</td>
+                  </tr>
+                ) : getFilteredInstructions().length === 0 ? (
+                  <tr>
+                    <td colSpan="10">No instructions found</td>
                   </tr>
                 ) : (
-                  currentInstructions.map((item) => (
-                    <tr key={item.m1controllerkey || item.m1key}>
-                      <td>Instruction {item.m1controllerkey || item.m1key}</td>
-                      <td>{item.fileno}</td>
-                      <td>
-                        {item.type_text ||
-                          (item.shipment_type === 1 || item.shipment_type === "1"
-                            ? "import"
-                            : item.shipment_type === 2 || item.shipment_type === "2"
-                              ? "export"
-                              : item.shipment_type === 3 || item.shipment_type === "3"
-                                ? "cross-haul"
-                                : item.shipment_type === 4 || item.shipment_type === "4"
-                                  ? "cross-haul (break bulk)"
-                                  : item.shipment_type === 5 || item.shipment_type === "5"
-                                    ? "add-on"
-                                    : item.type)}
-                      </td>
-                      <td>{renderStatus(item.status)}</td>
-                      <td>{item.startingdate ? new Date(item.startingdate).toLocaleDateString() : 'N/A'}</td>
-                      <td>
-                        <button
-                          className="view-btn"
-                          onClick={() => handleViewInstruction(item.m1controllerkey || item.m1key)}
-                        >
-                          View
-                        </button>
-                      </td>
-                      <td>
-                        <button
-                          className="view-btn"
-                          onClick={() => handleViewAssignment(item.m1controllerkey || item.m1key)}
-                        >
-                          View
-                        </button>
-                      </td>
-                    </tr>
-                  ))
+                  currentInstructions.map((item) => {
+                    const disableAssignment = (item.has_valid_containers !== true) && (item.shipment_type !== 4)
+                    return (
+                      <tr key={item.m1controllerkey || item.m1key}>
+                        <td>Instruction {item.m1controllerkey || item.m1key}</td>
+                        <td>
+                          {item.shipment_type === 5 || item.shipment_type === "5" || (item.type_text || "").toLowerCase() === "add-on" || (item.type_text || "").toLowerCase() === "add on"
+                            ? ""
+                            : (item.invoice_num || "N/A")}
+                        </td>
+                        <td>{item.booking_ref || "N/A"}</td>
+                        <td>{item.client_ref || "N/A"}</td>
+                        <td>{item.ksm_file_ref || "N/A"}</td>
+                        <td>
+                          {item.type_text ||
+                            (item.shipment_type === 1 || item.shipment_type === "1"
+                              ? "import"
+                              : item.shipment_type === 2 || item.shipment_type === "2"
+                                ? "export"
+                                : item.shipment_type === 3 || item.shipment_type === "3"
+                                  ? "cross-haul"
+                                  : item.shipment_type === 4 || item.shipment_type === "4"
+                                    ? "cross-haul (break bulk)"
+                                    : item.shipment_type === 5 || item.shipment_type === "5"
+                                      ? "add-on"
+                                      : item.type)}
+                        </td>
+                        <td>{renderStatus(item.status)}</td>
+                        <td>{item.startingdate ? new Date(item.startingdate).toLocaleDateString() : "N/A"}</td>
+                        <td>
+                          <button
+                            className="view-btn"
+                            onClick={() => handleViewInstruction(item.m1controllerkey || item.m1key)}
+                          >
+                            View
+                          </button>
+                        </td>
+                        <td>
+                          {disableAssignment ? (
+                            <span className="tooltip-wrapper">
+                              <button className="view-btn disabled" disabled>
+                                View
+                              </button>
+                              <span className="tooltip-text">
+                                Please allocate containers to proceed to assignment
+                              </span>
+                            </span>
+                          ) : (
+                            <button
+                              className="view-btn"
+                              onClick={() => handleViewAssignment(item.m1controllerkey || item.m1key)}
+                            >
+                              View
+                            </button>
+                          )}
+                        </td>
+                      </tr>
+                    )
+                  })
                 )}
               </tbody>
             </table>

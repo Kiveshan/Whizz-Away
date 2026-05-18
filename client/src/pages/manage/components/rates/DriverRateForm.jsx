@@ -1,10 +1,17 @@
 "use client"
 
 const DriverRateForm = ({ driverRate, loading, isEditing, onSave, onCancel, onChange }) => {
+  const hasOverlap = Boolean(driverRate?._overlapWarning)
+
   const handleSubmit = async (e) => {
     e.preventDefault()
     if (!e.target.checkValidity()) {
       e.target.reportValidity()
+      return
+    }
+
+    if (hasOverlap) {
+      alert("Please select a date range that does not overlap with an existing rate before saving.")
       return
     }
 
@@ -167,7 +174,7 @@ const DriverRateForm = ({ driverRate, loading, isEditing, onSave, onCancel, onCh
       </div>
 
       <div className="driver-rate-button-container">
-        <button type="submit" className="driver-rate-save-button" disabled={loading}>
+        <button type="submit" className="driver-rate-save-button" disabled={loading || hasOverlap}>
           {loading ? "Saving..." : "Save"}
         </button>
         <button type="button" className="driver-rate-cancel-button" onClick={onCancel}>

@@ -23,7 +23,7 @@ const dashboardData = [
     image: "/images/clientDoc.jpeg",
     path: "/client-documents",
   },
-  { title: "Wages", image: "/images/wage.jpeg", path: "/wages" },
+  { title: "Payroll", image: "/images/wage.jpeg", path: "/wages" },
   { title: "Manage", image: "/images/team-management.png", path: "/creditors" },
   { title: "Analytics", image: "/images/analytics.jpg", path: "/creditors" },
 ];

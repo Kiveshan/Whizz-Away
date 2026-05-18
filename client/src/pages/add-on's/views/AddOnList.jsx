@@ -19,6 +19,7 @@ const AddOnList = () => {
     year: currentDate.getFullYear().toString(),
     month: (currentDate.getMonth() + 1).toString(),
   });
+  const [bookingRefSearch, setBookingRefSearch] = useState("");
   const roleId = JSON.parse(localStorage.getItem("user")).roleid;
 
   // Pagination state
@@ -88,7 +89,11 @@ const AddOnList = () => {
         });
 
         if (response.data.success) {
-          setAddOns(response.data.data);
+          setAddOns(
+            [...response.data.data].sort((a, b) =>
+              String(a.invoice_number).localeCompare(String(b.invoice_number), undefined, { numeric: true, sensitivity: "base" })
+            )
+          );
           setCurrentPage(1);
         } else {
           throw new Error(response.data.message || "Failed to fetch add-ons");
@@ -113,6 +118,7 @@ const AddOnList = () => {
       ...prev,
       [name]: value === "Year" || value === "Month" ? "" : value,
     }));
+    setBookingRefSearch("");
   };
 
   const handleCreateAddOn = () => {
@@ -184,6 +190,12 @@ const AddOnList = () => {
       </div>
     );
 
+  const filteredAddOns = bookingRefSearch.trim()
+    ? addOns.filter((a) =>
+        String(a.booking_ref ?? "").toLowerCase().includes(bookingRefSearch.trim().toLowerCase())
+      )
+    : addOns;
+
   return (
     <div className="add-on-list-wrapper">
       <div className="client-payment-container">
@@ -221,6 +233,22 @@ const AddOnList = () => {
                   </option>
                 ))}
               </select>
+              <input
+                type="text"
+                className="dropdown"
+                placeholder="Search booking ref..."
+                value={bookingRefSearch}
+                onChange={(e) => {
+                  setBookingRefSearch(e.target.value);
+                  setCurrentPage(1);
+                }}
+                style={{
+                  backgroundImage: "none",
+                  paddingRight: "12px",
+                  width: "220px",
+                  cursor: "text",
+                }}
+              />
             </div>
           </div>
         </div>
@@ -235,7 +263,7 @@ const AddOnList = () => {
             </tr>
           </thead>
           <tbody>
-            {addOns
+            {filteredAddOns
               .slice(
                 (currentPage - 1) * recordsPerPage,
                 currentPage * recordsPerPage
@@ -266,7 +294,7 @@ const AddOnList = () => {
                   </td>
                 </tr>
               ))}
-            {addOns.length === 0 && (
+            {filteredAddOns.length === 0 && (
               <tr>
                 <td colSpan="5" className="p-3 text-center">
                   No add-ons found
@@ -286,7 +314,7 @@ const AddOnList = () => {
           </div>
         )}
         <Pagination
-          totalRecords={addOns.length}
+          totalRecords={filteredAddOns.length}
           recordsPerPage={recordsPerPage}
           currentPage={currentPage}
           onPageChange={setCurrentPage}

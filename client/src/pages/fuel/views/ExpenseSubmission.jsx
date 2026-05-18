@@ -1,5 +1,5 @@
 "use client";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import Select from "react-select";
 import { useNavigate, useLocation } from "react-router-dom";
 import api from "../../../api"; // Import the configured Axios instance
@@ -11,74 +11,75 @@ const ExpenseSubmission = ({ onBack }) => {
   const truckId = location.state?.truckId;
   const truckRegNum = location.state?.truckRegNum;
   const ponum = location.state?.ponum || "";
-// Ensure expenseType is parsed as a number
-const expenseType = Number(location.state?.expenseType) || null;
+  // Ensure expenseType is parsed as a number
+  const expenseType = Number(location.state?.expenseType) || null;
 
-const [formData, setFormData] = useState({
-  expenseCost: "0",
-  orderno: "",
-  invoiceNumber: "", // Add invoice number field
-  vat: "", // Add VAT field
-  ...(expenseType === 5 ? { documentFrom: "Controller", driverName: "", driverFullName: "" } : {}),
-});
+  const [formData, setFormData] = useState({
+    expenseCost: "0",
+    orderno: "",
+    invoiceNumber: "", // Add invoice number field
+    vat: "", // Add VAT field
+    ...(expenseType === 5 ? { documentFrom: "Controller", driverName: "", driverFullName: "" } : {}),
+  });
 
   const [file, setFile] = useState(null);
   const [driverOptions, setDriverOptions] = useState([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const submittingRef = useRef(false);
   const [submitMessage, setSubmitMessage] = useState("");
   const [uploadProgress, setUploadProgress] = useState(0);
   const [filePreview, setFilePreview] = useState(null);
 
-useEffect(() => {
-if (!ponum) {
-  setSubmitMessage("Error: Missing required purchase order number. Redirecting...");
-  setTimeout(() => navigate("/Creditors/PurchaseOrders"), 2000);
-}
-}, [truckId, ponum, navigate]);
-useEffect(() => {
-  if (ponum) {
-    setFormData((prev) => ({ ...prev, orderno: ponum }));
-  }
-}, [ponum]);
+  useEffect(() => {
+    if (!ponum) {
+      setSubmitMessage("Error: Missing required purchase order number. Redirecting...");
+      setTimeout(() => navigate("/Creditors/PurchaseOrders"), 2000);
+    }
+  }, [truckId, ponum, navigate]);
+  useEffect(() => {
+    if (ponum) {
+      setFormData((prev) => ({ ...prev, orderno: ponum }));
+    }
+  }, [ponum]);
 
-useEffect(() => {
-  if (expenseType === 5) {
-    const fetchDrivers = async () => {
-      try {
-        const response = await api.get("/employees/drivers");
-        if (!response.data) {
-          throw new Error("Failed to fetch drivers");
+  useEffect(() => {
+    if (expenseType === 5) {
+      const fetchDrivers = async () => {
+        try {
+          const response = await api.get("/employees/drivers");
+          if (!response.data) {
+            throw new Error("Failed to fetch drivers");
+          }
+          const data = response.data;
+          console.log("Drivers from backend:", data);
+          const options = data.map((driver) => ({
+            value: driver.userid,
+            label: `${driver.name} ${driver.surname}`,
+            fullName: `${driver.name} ${driver.surname}`,
+          }));
+          setDriverOptions(options);
+        } catch (error) {
+          console.error("Error fetching drivers:", error);
         }
-        const data = response.data;
-        console.log("Drivers from backend:", data);
-        const options = data.map((driver) => ({
-          value: driver.userid,
-          label: `${driver.name} ${driver.surname}`,
-          fullName: `${driver.name} ${driver.surname}`,
-        }));
-        setDriverOptions(options);
-      } catch (error) {
-        console.error("Error fetching drivers:", error);
-      }
-    };
-    fetchDrivers();
-  }
-}, [expenseType]);
+      };
+      fetchDrivers();
+    }
+  }, [expenseType]);
 
-const handleInputChange = (e) => {
-  const { name, value } = e.target;
-  setFormData({
-    ...formData,
-    [name]: value,
-  });
-  if (expenseType === 5 && name === "documentFrom" && value !== "Driver") {
-    setFormData((prev) => ({
-      ...prev,
-      driverName: "",
-      driverFullName: "",
-    }));
-  }
-};
+  const handleInputChange = (e) => {
+    const { name, value } = e.target;
+    setFormData({
+      ...formData,
+      [name]: value,
+    });
+    if (expenseType === 5 && name === "documentFrom" && value !== "Driver") {
+      setFormData((prev) => ({
+        ...prev,
+        driverName: "",
+        driverFullName: "",
+      }));
+    }
+  };
 
   const handleDriverChange = (selectedOption) => {
     setFormData({
@@ -105,135 +106,138 @@ const handleInputChange = (e) => {
     }
   };
 
-const handleSubmit = async (e) => {
-  e.preventDefault();
-  setIsSubmitting(true);
-  setSubmitMessage("");
-  setUploadProgress(0);
-if (uploadProgress === 100) {
-    return;
-  }
-  
-  if (isSubmitting) return;
-if (expenseType === 5 && !truckId) {
-  setSubmitMessage("Error: No truck selected for fuel expense");
-  setIsSubmitting(false);
-  return;
-}
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    if (submittingRef.current || isSubmitting || uploadProgress === 100) return;
+    submittingRef.current = true;
 
-
-  if (expenseType === 5 && formData.documentFrom === "Driver" && !formData.driverName) {
-    setSubmitMessage("Error: Please select a driver");
-    setIsSubmitting(false);
-    return;
-  }
-
-  if (!file) {
-    setSubmitMessage("Error: Please upload a petrol slip");
-    setIsSubmitting(false);
-    return;
-  }
-
-  if (!formData.orderno) {
-    setSubmitMessage("Error: Please enter an order number");
-    setIsSubmitting(false);
-    return;
-  }
-
-  try {
-    const formDataToSend = new FormData();
-    if (expenseType === 5) {
-      formDataToSend.append("documentFrom", formData.documentFrom);
-    }
-    formDataToSend.append("expenseCost", formData.expenseCost);
-    if (truckId) {
-      formDataToSend.append("truckId", truckId);
-    }
-    if (ponum) {
-      formDataToSend.append("ponum", ponum);
-    }
-    formDataToSend.append("invoiceNumber", formData.invoiceNumber);
-    if (formData.vat) {
-      formDataToSend.append("vat", formData.vat);
-    }
-    if (truckRegNum) {
-  formDataToSend.append("truckRegNum", truckRegNum);
-}
-if (expenseType) {
-  formDataToSend.append("expenseType", expenseType);
-}
-    if (file) formDataToSend.append("slip", file);
-    formDataToSend.append("orderno", formData.orderno);
-    if (expenseType === 5 && formData.documentFrom === "Driver" && formData.driverName) {
-      formDataToSend.append("driverId", formData.driverName);
+    setIsSubmitting(true);
+    setSubmitMessage("");
+    setUploadProgress(0);
+    if (expenseType === 5 && !truckId) {
+      setSubmitMessage("Error: No truck selected for fuel expense");
+      setIsSubmitting(false);
+      submittingRef.current = false;
+      return;
     }
 
-    setUploadProgress(10);
-    setTimeout(() => setUploadProgress(30), 300);
-    setTimeout(() => setUploadProgress(50), 600);
 
-    console.log("Sending expense data to server with S3 upload...");
-    const response = await api.post("/api/po-form/upload-slip", formDataToSend, {
-      headers: {
-        "Content-Type": "multipart/form-data",
-      },
-    });
-    setUploadProgress(80);
-setTimeout(() => setUploadProgress(100), 200);
+    if (expenseType === 5 && formData.documentFrom === "Driver" && !formData.driverName) {
+      setSubmitMessage("Error: Please select a driver");
+      setIsSubmitting(false);
+      submittingRef.current = false;
+      return;
+    }
 
-console.log("Upload response:", response.data);
+    if (!file) {
+      setSubmitMessage("Error: Please upload a petrol slip");
+      setIsSubmitting(false);
+      submittingRef.current = false;
+      return;
+    }
 
-if (response.data.success) {
-  setSubmitMessage("Expense submitted successfully!");
-  
-  // Redirect back to ViewPOForm after 2 seconds
-setTimeout(() => {
-  // Fetch the complete PO data before navigating back
-  const fetchPODataAndNavigate = async () => {
+    if (!formData.orderno) {
+      setSubmitMessage("Error: Please enter an order number");
+      setIsSubmitting(false);
+      submittingRef.current = false;
+      return;
+    }
+
     try {
-      const response = await api.get(`/api/po-form/details/${ponum}`);
-      const completePOData = response.data;
-      
-      navigate("/Creditors/PurchaseOrder/View", {
-        state: {
-          poData: completePOData,
-          truckId: truckId,
-          truckRegNum: truckRegNum,
-          uploadSuccess: true
-        }
+      const formDataToSend = new FormData();
+      if (expenseType === 5) {
+        formDataToSend.append("documentFrom", formData.documentFrom);
+      }
+      formDataToSend.append("expenseCost", formData.expenseCost);
+      if (truckId) {
+        formDataToSend.append("truckId", truckId);
+      }
+      if (ponum) {
+        formDataToSend.append("ponum", ponum);
+      }
+      formDataToSend.append("invoiceNumber", formData.invoiceNumber);
+      if (formData.vat) {
+        formDataToSend.append("vat", formData.vat);
+      }
+      if (truckRegNum) {
+        formDataToSend.append("truckRegNum", truckRegNum);
+      }
+      if (expenseType) {
+        formDataToSend.append("expenseType", expenseType);
+      }
+      if (file) formDataToSend.append("slip", file);
+      formDataToSend.append("orderno", formData.orderno);
+      if (expenseType === 5 && formData.documentFrom === "Driver" && formData.driverName) {
+        formDataToSend.append("driverId", formData.driverName);
+      }
+
+      setUploadProgress(10);
+      setTimeout(() => setUploadProgress(30), 300);
+      setTimeout(() => setUploadProgress(50), 600);
+
+      console.log("Sending expense data to server with S3 upload...");
+      const response = await api.post("/api/po-form/upload-slip", formDataToSend, {
+        headers: {
+          "Content-Type": "multipart/form-data",
+        },
       });
+      setUploadProgress(80);
+      setTimeout(() => setUploadProgress(100), 200);
+
+      console.log("Upload response:", response.data);
+
+      if (response.data.success) {
+        setSubmitMessage("Expense submitted successfully!");
+
+        // Redirect back to ViewPOForm after 2 seconds
+        setTimeout(() => {
+          // Fetch the complete PO data before navigating back
+          const fetchPODataAndNavigate = async () => {
+            try {
+              const response = await api.get(`/api/po-form/details/${ponum}`);
+              const completePOData = response.data;
+
+              navigate("/Creditors/PurchaseOrder/View", {
+                state: {
+                  poData: completePOData,
+                  truckId: truckId,
+                  truckRegNum: truckRegNum,
+                  uploadSuccess: true
+                }
+              });
+            } catch (error) {
+              console.error('Error fetching PO data for navigation:', error);
+              // Fallback navigation with minimal data
+              navigate("/Creditors/PurchaseOrder/View", {
+                state: {
+                  poData: {
+                    ponum: ponum,
+                    expense: expenseType === 5 ? "Fuel" : "Other"
+                  },
+                  truckId: truckId,
+                  truckRegNum: truckRegNum,
+                  uploadSuccess: true
+                }
+              });
+            }
+          };
+
+          fetchPODataAndNavigate();
+        }, 2000);
+      } else {
+        setSubmitMessage("Error: Failed to submit expense");
+      }
+
+      // Rest of the submit logic remains unchanged
     } catch (error) {
-      console.error('Error fetching PO data for navigation:', error);
-      // Fallback navigation with minimal data
-      navigate("/Creditors/PurchaseOrder/View", {
-        state: {
-          poData: {
-            ponum: ponum,
-            expense: expenseType === 5 ? "Fuel" : "Other"
-          },
-          truckId: truckId,
-          truckRegNum: truckRegNum,
-          uploadSuccess: true
-        }
-      });
+      console.error("Error submitting expense:", error);
+      setSubmitMessage(`Error: ${error.message}`);
+      setUploadProgress(0);
+    } finally {
+      setIsSubmitting(false);
+      submittingRef.current = false;
     }
   };
-  
-  fetchPODataAndNavigate();
-}, 2000);
-} else {
-  setSubmitMessage("Error: Failed to submit expense");
-}
-
-    // Rest of the submit logic remains unchanged
-  } catch (error) {
-    console.error("Error submitting expense:", error);
-    setSubmitMessage(`Error: ${error.message}`);
-    setUploadProgress(0);
-  } finally {
-    setIsSubmitting(false);
-  }
-};
   const handleCancel = () => {
     setFile(null);
     setFilePreview(null);
@@ -254,26 +258,70 @@ setTimeout(() => {
       <form onSubmit={handleSubmit} className="expense-form">
         <div className="form-card">
           <div className="form-grid">
-{expenseType === 5 && (
-  <div className="form-field">
-    <label htmlFor="documentFrom">Document From</label>
-    <select
-      id="documentFrom"
-      name="documentFrom"
-      value={formData.documentFrom || "Controller"}
-      onChange={handleInputChange}
-      className="dropdown"
-    >
-      <option value="Controller">Controller</option>
-      <option value="Driver">Driver</option>
-      <option value="Manager">Manager</option>
-    </select>
-  </div>
-)}
+            {expenseType === 5 && (
+              <div className="form-field">
+                <label htmlFor="documentFrom">Document From</label>
+                <select
+                  id="documentFrom"
+                  name="documentFrom"
+                  value={formData.documentFrom || "Controller"}
+                  onChange={handleInputChange}
+                  className="dropdown"
+                >
+                  <option value="Controller">Controller</option>
+                  <option value="Driver">Driver</option>
+                  <option value="Manager">Manager</option>
+                </select>
+              </div>
+            )}
 
+            {expenseType === 5 && formData.documentFrom === "Driver" && (
+              <div className="form-field driver-field">
+                <label htmlFor="driverSelect">Driver Name</label>
+                <Select
+                  inputId="driverSelect"
+                  options={driverOptions}
+                  onChange={handleDriverChange}
+                  isSearchable
+                  placeholder="Select a driver"
+                  className="driver-select"
+                  classNamePrefix="driver-select"
+                />
+                {formData.driverFullName && (
+                  <div className="driver-info">
+                    Selected: {formData.driverFullName}
+                  </div>
+                )}
+              </div>
+            )}
 
             <div className="form-field">
-              <label htmlFor="expenseCost">Expense Cost</label>
+              <label htmlFor="invoiceNumber">Invoice Number</label>
+              <input
+                id="invoiceNumber"
+                type="text"
+                name="invoiceNumber"
+                value={formData.invoiceNumber}
+                onChange={handleInputChange}
+                placeholder="Enter invoice number"
+              />
+            </div>
+
+            <div className="form-field">
+              <label htmlFor="orderno">Purchase Order Number</label>
+              <input
+                id="orderno"
+                type="text"
+                name="orderno"
+                value={ponum}
+                // onChange={handleInputChange}
+                // placeholder="Enter order number"
+                required
+              />
+            </div>
+
+            <div className="form-field">
+              <label htmlFor="expenseCost">Expense Cost (Excl. VAT)</label>
               <div className="currency-field">
                 <span>R</span>
                 <input
@@ -292,30 +340,6 @@ setTimeout(() => {
                 />
               </div>
             </div>
-
-            <div className="form-field">
-              <label htmlFor="orderno">Purchase Order Number</label>
-              <input
-                id="orderno"
-                type="text"
-                name="orderno"
-                value={ponum}
-                // onChange={handleInputChange}
-                // placeholder="Enter order number"
-                required
-              />
-            </div>
-            <div className="form-field">
-  <label htmlFor="invoiceNumber">Invoice Number</label>
-  <input
-    id="invoiceNumber"
-    type="text"
-    name="invoiceNumber"
-    value={formData.invoiceNumber}
-    onChange={handleInputChange}
-    placeholder="Enter invoice number"
-  />
-</div>
 
             <div className="form-field">
               <label htmlFor="vat">Input VAT</label>
@@ -347,30 +371,11 @@ setTimeout(() => {
               </div>
             </div>
 
-{expenseType === 5 && formData.documentFrom === "Driver" && (
-  <div className="form-field driver-field">
-    <label htmlFor="driverSelect">Driver Name</label>
-    <Select
-      inputId="driverSelect"
-      options={driverOptions}
-      onChange={handleDriverChange}
-      isSearchable
-      placeholder="Select a driver"
-      className="driver-select"
-      classNamePrefix="driver-select"
-    />
-    {formData.driverFullName && (
-      <div className="driver-info">
-        Selected: {formData.driverFullName}
-      </div>
-    )}
-  </div>
-)}
 
           </div>
 
           <div className="upload-section">
-            <label>Petrol Slip</label>
+            <label>Slip</label>
 
             {!file ? (
               <div
@@ -446,22 +451,21 @@ setTimeout(() => {
 
           {submitMessage && (
             <div
-              className={`message ${
-                submitMessage.includes("Error") ? "error" : "success"
-              }`}
+              className={`message ${submitMessage.includes("Error") ? "error" : "success"
+                }`}
             >
               {submitMessage}
             </div>
           )}
 
           <div className="form-actions">
-<button
-  type="submit"
-  className={`submit-button ${isSubmitting ? 'submitting' : ''}`}
-  disabled={isSubmitting || uploadProgress === 100}
->
-  {isSubmitting ? "Uploading..." : uploadProgress === 100 ? "Submitted" : "Submit"}
-</button>
+            <button
+              type="submit"
+              className={`submit-button ${isSubmitting ? 'submitting' : ''}`}
+              disabled={isSubmitting || uploadProgress === 100}
+            >
+              {isSubmitting ? "Uploading..." : uploadProgress === 100 ? "Submitted" : "Submit"}
+            </button>
           </div>
         </div>
       </form>
