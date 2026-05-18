@@ -665,6 +665,14 @@ const FCcontrollerinstructions = () => {
         }
       };
 
+      // Container counts and rates — used both for cost calculation and the API payload
+      const numSix = formData.num_six_meters || 0;
+      const numTwelve = formData.num_twelve_meters || 0;
+      const numAbnormal = formData.num_abnormal || 0;
+      const ratePer6 = numSix > 0 ? Number(formData.rateper_6 || 0) : 0;
+      const ratePer12 = numTwelve > 0 ? Number(formData.rateper_12 || 0) : 0;
+      const ratePerAbnormal = numAbnormal > 0 ? Number(formData.rateper_abnormal || 0) : 0;
+
       // Recalculate base cost — shared logic with recalculateTotalCost (display path)
       console.log("DEBUG UPDATE isSetRateMode:", isSetRateMode, "formData.rateWeight:", formData.rateWeight, "formData.setRateAmount:", formData.setRateAmount);
       const baseCost = resolveBaseCost(formData, weightRows, {
