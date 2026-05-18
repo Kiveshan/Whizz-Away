@@ -161,6 +161,24 @@ const VatReconReportPage = () => {
                 })
             }
 
+            // Add subbie rates to Input VAT sheet
+            if (data.subbieRates && data.subbieRates.total > 0) {
+                const row = inputVatSheet.addRow({
+                    date: "",
+                    expenseType: data.subbieRates.expenseType,
+                    total: data.subbieRates.total,
+                    vat: data.subbieRates.vat,
+                })
+                totalInputCost += data.subbieRates.total
+                // Apply formatting
+                row.getCell(3).numFmt = "R #,##0.00"
+                row.getCell(4).numFmt = "R #,##0.00"
+                // Add borders
+                row.eachCell((cell) => {
+                    cell.border = { top: { style: "thin" }, left: { style: "thin" }, bottom: { style: "thin" }, right: { style: "thin" } }
+                })
+            }
+
             // Add totals row
             inputVatSheet.addRow([])
             const inputTotalRow = inputVatSheet.addRow({
