@@ -119,7 +119,7 @@ const ClientStatement = () => {
         payment: null,
       })),
       ...statement.addons.map((addon) => ({
-        type: "Add-on",
+        type: "Invoice",
         date: new Date(addon.date),
         details: addon.formatted_details || "",
         reference: addon.addon_num || addon.invoice_num || "",
@@ -521,7 +521,7 @@ const ClientStatement = () => {
       payment: null,
     })),
     ...statement.addons.map((addon) => ({
-      type: "Add-on",
+      type: "Invoice",
       date: new Date(addon.date),
       details: formatDetails(addon, "Add-on"),
       reference: addon.addon_num || addon.invoice_num || "",
