@@ -3,116 +3,37 @@
 import { useState, useEffect, useRef, useMemo, useCallback } from "react"
 import "../../css/controllerinstruction.css"
 import { useNavigate, useLocation } from "react-router-dom"
-import { ErrorTooltip as SharedErrorTooltip } from "../../../../components/instructions/ErrorTooltip"
 import {
-  fetchStartingPoints as fetchStartingPointsService,
-  fetchDestinations as fetchDestinationsService,
   fetchRates as fetchRatesService,
   fetchSetRate as fetchSetRateService,
-  saveInstruction as saveInstructionService,
 } from "../../../../services/instructionService"
 import { useInstructionData } from "../../../../hooks/useInstructionData"
 import { useContainerManagement } from "../../../../hooks/useContainerManagement"
 import { useWeightRows } from "../../../../hooks/useWeightRows"
-import { ConfirmationModal } from "../../../../components/instructions/ConfirmationModal"
-import { InstructionLoadingGate } from "../../../../components/instructions/InstructionLoadingGate"
-import { ClientInfoSection } from "../../../../components/instructions/ClientInfoSection"
-import { WeightDetailsTable } from "../../../../components/instructions/WeightDetailsTable"
-import { ContainerDetailsTable } from "../../../../components/instructions/ContainerDetailsTable"
-import { calcContainerBasedCost, calcBreakBulkCost } from "../../../../utils/instructions/costCalculation"
+import { useCreateInstructionSubmit } from "../../../../hooks/useCreateInstructionSubmit"
+import { useCreateFormHandlers } from "../../../../hooks/useCreateFormHandlers"
 import { validateForm as validateFormUtil } from "../../../../utils/instructions/validation"
 import { checkRateCountMismatch as checkRateCountMismatchUtil } from "../../../../utils/instructions/rateCountMismatch"
+import { ControllerInstructionsLayout } from "./ControllerInstructionsLayout"
 
 const ControllerInstructions = () => {
   const navigate = useNavigate()
   const location = useLocation()
   const isMounted = useRef(true)
 
-  // Inline styles for the vessel name field
   const vesselNameStyles = useMemo(
     () => ({
-      container: {
-        width: "150px",
-        minWidth: "150px",
-        maxWidth: "150px",
-        margin: "0",
-        padding: "0",
-        flex: "0 0 150px",
-        position: "relative",
-        zIndex: 1,
-      },
-      input: {
-        width: "100%",
-        minWidth: "100%",
-        maxWidth: "100%",
-        padding: "6px 8px",
-        fontSize: "0.9rem",
-        height: "32px",
-        boxSizing: "border-box",
-        margin: "0",
-        display: "block",
-        flex: "0 0 100%",
-        border: "1px solid #ced4da",
-        borderRadius: "4px",
-      },
-      label: {
-        fontSize: "0.85rem",
-        marginBottom: "4px",
-        display: "block",
-      },
-      wrapper: {
-        padding: "4px 0",
-        width: "100%",
-        margin: "0",
-      },
-    }),
-    [],
-  )
-
-  // Memoize initial data to prevent recreation on re-renders
-  const initialData = useMemo(
-    () => ({
-      clientId: "",
-      representative: "",
-      contactDetails: "",
-      email: "",
-      shipmentTypeId: "",
-      shipmentTypeName: "",
-      task: "",
-      pickup: "",
-      dropoff: "",
-      hazardous: false,
-      surcharges: false,
-      surchargesAmount: "",
-      num_six_meters: 0,
-      num_twelve_meters: 0,
-      num_abnormal: 0,
-      stackDate: "",
-      lastFreeDate: "",
-      fileRef: "",
-      bookingRef: "",
-      vesselName: "",
-      rateWeight: "Container",
-      weight: "",
-      vat: 15,
-      description: "",
-      total_cost: 0,
-      sixMeterRate: "",
-      twelveMeterRate: "",
-      abnormalRate: "",
-      unitrate: "",
+      container: { width: "150px", minWidth: "150px", maxWidth: "150px", margin: "0", padding: "0", flex: "0 0 150px", position: "relative", zIndex: 1 },
+      input: { width: "100%", minWidth: "100%", maxWidth: "100%", padding: "6px 8px", fontSize: "0.9rem", height: "32px", boxSizing: "border-box", margin: "0", display: "block", flex: "0 0 100%", border: "1px solid #ced4da", borderRadius: "4px" },
+      label: { fontSize: "0.85rem", marginBottom: "4px", display: "block" },
+      wrapper: { padding: "4px 0", width: "100%", margin: "0" },
     }),
     [],
   )
 
   const preservedFormData = useMemo(() => location.state?.preservedFormData || null, [location.state])
   const containerCounts = useMemo(
-    () =>
-      location.state?.containerCounts || {
-        "6m": 0,
-        "12m": 0,
-        Abnormal: 0,
-      },
+    () => location.state?.containerCounts || { "6m": 0, "12m": 0, Abnormal: 0 },
     [location.state],
   )
 
@@ -146,39 +67,22 @@ const ControllerInstructions = () => {
   const [setRateValue, setSetRateValue] = useState(0)
   const today = useMemo(() => new Date().toISOString().split("T")[0], [])
 
-  // Form validation state
   const [fieldErrors, setFieldErrors] = useState({})
-  const [submitError, setSubmitError] = useState("")
-  const [isSubmitting, setIsSubmitting] = useState(false)
-
-  // Confirmation popup state
   const [showConfirmationPopup, setShowConfirmationPopup] = useState(false)
   const [confirmationMessage, setConfirmationMessage] = useState("")
 
-  // State for client-specific locations
   const [clientStartingPoints, setClientStartingPoints] = useState([])
   const [clientDestinations, setClientDestinations] = useState([])
   const [isLoadingLocations, setIsLoadingLocations] = useState(false)
-  const [locationError, setLocationError] = useState(null)
   const [showNoRatesModal, setShowNoRatesModal] = useState(false)
 
-  // Route-level loading state (clients + shipmentTypes handled by hook)
-  const [locationIsLoading, setIsLoading] = useState({
-    startingPoints: false,
-    destinations: false,
-  })
+  const [locationIsLoading, setIsLoading] = useState({ startingPoints: false, destinations: false })
 
-  // Base data from hook (clients, shipmentTypes + their loading flags)
-  const {
-    clients,
-    shipmentTypes,
-    isLoading: hookIsLoading,
-  } = useInstructionData({
+  const { clients, shipmentTypes, isLoading: hookIsLoading } = useInstructionData({
     onError: (msg) => console.error("[CREATE] data load error:", msg),
     on404: () => setShowNoRatesModal(true),
   })
 
-  // Merged loading object used throughout the component
   const isLoading = {
     clients: hookIsLoading.clients,
     shipmentTypes: hookIsLoading.shipmentTypes,
@@ -199,41 +103,19 @@ const ControllerInstructions = () => {
     [setWeightRows],
   )
 
-  // New state for rate locking
-  const [rateLockStatus, setRateLockStatus] = useState({
-    sixMeter: false,
-    twelveMeter: false,
-  })
+  const [rateLockStatus, setRateLockStatus] = useState({ sixMeter: false, twelveMeter: false })
+  const [rateFieldsEnabled, setRateFieldsEnabled] = useState({ sixMeter: false, twelveMeter: false, abnormal: false })
 
-  // Track which rate fields should be enabled
-  const [rateFieldsEnabled, setRateFieldsEnabled] = useState({
-    sixMeter: false,
-    twelveMeter: false,
-    abnormal: false,
-  })
-
-  // Helper function to check if a field is valid
   const isFieldValid = useCallback(
     (fieldName, value) => {
       switch (fieldName) {
-        case "clientId":
-        case "shipmentTypeId":
-        case "task":
-        case "pickup":
-        case "dropoff":
-        case "pickupTime":
-        case "pickupDate":
-        case "deadline":
-        case "bookingRef":
-        case "fileRef":
-        case "description":
+        case "clientId": case "shipmentTypeId": case "task": case "pickup": case "dropoff":
+        case "pickupTime": case "pickupDate": case "deadline": case "bookingRef":
+        case "fileRef": case "description":
           return value && value.trim() !== ""
-        case "stackDate":
+        case "stackDate": case "vesselName":
           return !isCrossHaul ? value && value.trim() !== "" : true
-        case "vesselName":
-          return !isCrossHaul ? value && value.trim() !== "" : true
-        case "weight":
-        case "unitrate":
+        case "weight": case "unitrate":
           if (fieldName === "unitrate" && isCrossHaul && isSetRate) return true
           return !isWeightBased || (value && value.trim() !== "")
         default:
@@ -246,171 +128,48 @@ const ControllerInstructions = () => {
   const handleInputChange = useCallback(
     (e) => {
       const { name, value, type, checked } = e.target
-
-      // Special handling for IMO number (numbers only)
-      if (name === "imoNo" && value !== "" && !/^\d*$/.test(value)) {
-        return // Don't update if not a number
-      }
-
-      // Special handling for Flag Registration (letters and spaces only)
-      if (name === "flagReg" && value !== "" && !/^[A-Za-z\s]*$/.test(value)) {
-        return // Don't update if contains non-letter characters
-      }
-
-      // Update form data
+      if (name === "imoNo" && value !== "" && !/^\d*$/.test(value)) return
+      if (name === "flagReg" && value !== "" && !/^[A-Za-z\s]*$/.test(value)) return
       const newValue = type === "checkbox" ? checked : value
-      setFormData((prev) => ({
-        ...prev,
-        [name]: newValue,
-      }))
-
-      // Clear error when user starts typing and the field is no longer empty/invalid
+      setFormData((prev) => ({ ...prev, [name]: newValue }))
       if (fieldErrors[name] && isFieldValid(name, newValue)) {
-        setFieldErrors((prev) => {
-          const newErrors = { ...prev }
-          delete newErrors[name]
-          return newErrors
-        })
+        setFieldErrors((prev) => { const n = { ...prev }; delete n[name]; return n })
       }
     },
     [fieldErrors, isFieldValid],
   )
 
-  // Initialize form data with preserved data if available, or default values
   const [formData, setFormData] = useState(() => {
-    // Default form data structure
     const defaultFormData = {
-      // Client and basic info
-      clientId: "",
-      clientName: "",
-      representative: "",
-      contactDetails: "",
-      email: "",
-      task: "",
-      shipmentTypeId: "",
-      shipmentTypeName: "",
-
-      // Location data
-      startingPoints: [],
-      destinations: [],
-      selectedStartingPoint: "",
-      selectedDestination: "",
-      pickup: "",
-      dropoff: "",
-
-      // Other form fields
-      surchargesAmount: "",
-      stackDate: "",
-      lastFreeDate: "",
-      fileRef: "",
-      bookingRef: "",
-      vesselName: "",
-      rateWeight: "Container",
-      weight: "",
-      vat: 15,
-      description: "",
-      rateper_6: "",
-      rateper_12: "",
-      abnormalRate: "",
-      rateper_breakbulk: "",
-      unitrate: "",
-      setRateAmount: "",
-      num_six_meters: 0,
-      num_twelve_meters: 0,
-      num_abnormal: 0,
-      num_breakbulk: 0,
-      total_cost: 0,
-      preserveSurcharges: false,
-      sixMeterRate: "",
-      twelveMeterRate: "",
+      clientId: "", clientName: "", representative: "", contactDetails: "", email: "",
+      task: "", shipmentTypeId: "", shipmentTypeName: "", startingPoints: [],
+      destinations: [], selectedStartingPoint: "", selectedDestination: "",
+      pickup: "", dropoff: "", surchargesAmount: "", stackDate: "", lastFreeDate: "",
+      fileRef: "", bookingRef: "", vesselName: "", rateWeight: "Container", weight: "",
+      vat: 15, description: "", rateper_6: "", rateper_12: "", abnormalRate: "",
+      rateper_breakbulk: "", unitrate: "", setRateAmount: "", num_six_meters: 0,
+      num_twelve_meters: 0, num_abnormal: 0, num_breakbulk: 0, total_cost: 0,
+      preserveSurcharges: false, sixMeterRate: "", twelveMeterRate: "",
     }
 
-    // If no preserved data, return defaults
-    if (!preservedFormData && !location.state) {
-      return defaultFormData
-    }
+    if (!preservedFormData && !location.state) return defaultFormData
 
-    // Get location data from multiple possible sources with priority to location.state
     const locationData = {
       startingPoints: location.state?.startingPoints || preservedFormData?.startingPoints || [],
       destinations: location.state?.destinations || preservedFormData?.destinations || [],
-      selectedStartingPoint:
-        location.state?.selectedStartingPoint ||
-        preservedFormData?.selectedStartingPoint ||
-        preservedFormData?.pickup ||
-        location.state?.pickup ||
-        "",
-      selectedDestination:
-        location.state?.selectedDestination ||
-        preservedFormData?.selectedDestination ||
-        preservedFormData?.dropoff ||
-        location.state?.dropoff ||
-        "",
+      selectedStartingPoint: location.state?.selectedStartingPoint || preservedFormData?.selectedStartingPoint || preservedFormData?.pickup || location.state?.pickup || "",
+      selectedDestination: location.state?.selectedDestination || preservedFormData?.selectedDestination || preservedFormData?.dropoff || location.state?.dropoff || "",
     }
 
-    // Get container counts from multiple possible sources
-    const containerCountsData = {
-      num_six_meters: containerCounts?.["6m"] ?? preservedFormData?.num_six_meters ?? 0,
-      num_twelve_meters: containerCounts?.["12m"] ?? preservedFormData?.num_twelve_meters ?? 0,
-      num_abnormal: containerCounts?.["Abnormal"] ?? preservedFormData?.num_abnormal ?? 0,
-      num_breakbulk: containerCounts?.["BreakBulk"] ?? preservedFormData?.num_breakbulk ?? 0,
-    }
-
-    // Create form data with preserved values or fall back to defaults
-    const formData = {
-      // Start with default values
+    return {
       ...defaultFormData,
-
-      // Apply preserved form data (from sessionStorage or previous navigation)
-      ...(preservedFormData || {}),
-
-      // Then apply any controller data from location state (highest priority)
-      ...(location.state?.controllerData || {}),
-
-      // Apply location data with proper fallbacks
-      startingPoints: Array.isArray(locationData.startingPoints) ? [...locationData.startingPoints] : [],
-      destinations: Array.isArray(locationData.destinations) ? [...locationData.destinations] : [],
-      selectedStartingPoint: locationData.selectedStartingPoint || "",
-      selectedDestination: locationData.selectedDestination || "",
-
-      // Apply container counts
-      ...containerCountsData,
-
-      // Explicitly set client data from controller data if available
-      ...(location.state?.controllerData?.clientId && {
-        clientId: location.state.controllerData.clientId,
-        clientName: location.state.controllerData.clientName,
-        representative: location.state.controllerData.representative,
-        contactDetails: location.state.controllerData.contactDetails,
-        email: location.state.controllerData.email,
-      }),
-
-      // Handle pickup and dropoff with multiple fallback sources
-      pickup:
-        preservedFormData?.pickup ||
-        location.state?.pickup ||
-        location.state?.controllerData?.pickup ||
-        locationData.selectedStartingPoint ||
-        locationData.pickup ||
-        "",
-      dropoff:
-        preservedFormData?.dropoff ||
-        location.state?.dropoff ||
-        location.state?.controllerData?.dropoff ||
-        locationData.selectedDestination ||
-        locationData.dropoff ||
-        "",
-
-      // Other special cases
-      // IMPORTANT: preserve 0 as a valid VAT value instead of falling back to 15
-      vat:
-        preservedFormData && preservedFormData.vat !== undefined
-          ? Number(preservedFormData.vat)
-          : 15,
+      ...preservedFormData,
+      ...locationData,
+      pickup: preservedFormData?.pickup || location.state?.pickup || location.state?.controllerData?.pickup || locationData.selectedStartingPoint || locationData.pickup || "",
+      dropoff: preservedFormData?.dropoff || location.state?.dropoff || location.state?.controllerData?.dropoff || locationData.selectedDestination || locationData.dropoff || "",
+      vat: preservedFormData && preservedFormData.vat !== undefined ? Number(preservedFormData.vat) : 15,
       total_cost: Number(preservedFormData?.total_cost) || 0,
     }
-
-    return formData
   })
 
   const isAddOn = formData.shipmentTypeId === "5"
@@ -423,7 +182,6 @@ const ControllerInstructions = () => {
     setContainerFieldErrors,
     initializeContainers,
     handleContainerChange,
-    validateContainerUniqueness,
   } = useContainerManagement({
     isImport,
     isExport,
@@ -438,55 +196,30 @@ const ControllerInstructions = () => {
   })
 
   const showContainerDetails = containers.length > 0 && !isWeightBased
+  const allowVgmUI = formData.shipmentTypeId !== "4"
 
-  // VGM is only applicable for certain shipment types. For shipment types 4
-  // (cross-haul/break bulk) and 5 (add-on), VGM should behave like the other
-  // non-applicable fields (null/false). This flag controls the UI.
-  const allowVgmUI =
-    formData.shipmentTypeId !== "4"
+  // ─── new hooks ───────────────────────────────────────────────────────────────
 
-  // Update unit type and cross-haul states when form data changes
-  useEffect(() => {
-    const weightBasedUnits = ["kg", "mÂ³", "ton"]
-    const newIsWeightBased = weightBasedUnits.includes(formData.rateWeight)
-    const newIsSetRateMode = formData.rateWeight === "SetRate"
-    const newIsCrossHaul = formData.shipmentTypeId === "3" || formData.shipmentTypeId === "4"
-    const newIsImport = formData.shipmentTypeId === "1"
-    const newIsExport = formData.shipmentTypeId === "2"
+  const { submitInstruction, isSubmitting, submitError, setSubmitError } =
+    useCreateInstructionSubmit({
+      formData,
+      containers,
+      isWeightBased,
+      isCrossHaul,
+      isImport,
+      isExport,
+      isSetRate,
+      isSetRateMode,
+      isAddOn,
+      allowVgmUI,
+      setRateValue,
+      containersRef,
+      weightRowsRef,
+      navigate,
+    })
 
-    if (newIsWeightBased !== isWeightBased) {
-      setIsWeightBased(newIsWeightBased)
-    }
-    if (newIsSetRateMode !== isSetRateMode) {
-      setIsSetRateMode(newIsSetRateMode)
-    }
-    if (newIsCrossHaul !== isCrossHaul) {
-      setIsCrossHaul(newIsCrossHaul)
-    }
-    if (newIsImport !== isImport) {
-      setIsImport(newIsImport)
-    }
-    if (newIsExport !== isExport) {
-      setIsExport(newIsExport)
-    }
-  }, [formData.rateWeight, formData.shipmentTypeId, isWeightBased, isCrossHaul, isImport, isExport, isSetRateMode])
-
-  // Ensure add-on shipment type (5) always uses Container as unit per
-  useEffect(() => {
-    if (formData.shipmentTypeId === "5" && formData.rateWeight !== "Container") {
-      setFormData((prev) => ({
-        ...prev,
-        rateWeight: "Container",
-      }))
-    }
-  }, [formData.shipmentTypeId, formData.rateWeight])
-
-  // Function to fetch rates for the selected client, pickup and dropoff
   const fetchRates = useCallback(async (clientId, start, destination) => {
-    if (!clientId || !start || !destination) {
-      return null
-    }
-
+    if (!clientId || !start || !destination) return null
     try {
       return await fetchRatesService(clientId, start, destination)
     } catch (error) {
@@ -495,449 +228,61 @@ const ControllerInstructions = () => {
     }
   }, [])
 
-  // Fetch set_rate for the current client + route when Set Rate is enabled
-  useEffect(() => {
-    const fetchSetRate = async () => {
-      const { clientId, pickup, dropoff } = formData
+  const {
+    handleClientChange,
+    handlePickupChange,
+    handleDropoffChange,
+    handleShipmentTypeChange,
+    handleContainerCountChange,
+    openCalendar,
+  } = useCreateFormHandlers({
+    formData,
+    setFormData,
+    clients,
+    shipmentTypes,
+    initializeContainers,
+    containersRef,
+    setWeightRows,
+    setFieldErrors,
+    setRateLockStatus,
+    setClientStartingPoints,
+    setClientDestinations,
+    setIsLoadingLocations,
+    setIsLoading,
+    setShowNoRatesModal,
+  })
 
-      if (!isSetRate || !clientId || !pickup || !dropoff) return
+  // ─── validation ──────────────────────────────────────────────────────────────
 
-      try {
-        const data = await fetchSetRateService(clientId, pickup, dropoff)
-        if (data && data.set_rate != null) {
-          const numericSetRate = Number(data.set_rate)
-          setSetRateValue(Number.isNaN(numericSetRate) ? 0 : numericSetRate)
-        } else {
-          setSetRateValue(0)
-        }
-      } catch (error) {
-        console.error("Error fetching set_rate:", error)
-        setSetRateValue(0)
-      }
-    }
-
-    fetchSetRate()
-  }, [isSetRate, formData.clientId, formData.pickup, formData.dropoff])
-
-  // Update rates when pickup or dropoff changes (only for container-based calculations)
-  useEffect(() => {
-    // Skip rate fetching for weight-based calculations and for add-on shipment type
-    if (isWeightBased || isAddOn) {
-      // Also reset rate lock status when switching to weight-based
-      setRateLockStatus({ sixMeter: false, twelveMeter: false })
-      return
-    }
-
-    const { pickup, dropoff, clientId } = formData
-
-    // Check if we have all required fields
-    if (!clientId || !pickup || !dropoff) {
-      // Clear rates and unlock fields if conditions are not met
-      setFormData((prev) => ({
-        ...prev,
-        sixMeterRate: "",
-        twelveMeterRate: "",
-        abnormalRate: "",
-        rateper_breakbulk: "",
-        surchargesAmount: "",
-      }))
-      setRateLockStatus({ sixMeter: false, twelveMeter: false })
-      return
-    }
-
-    const fetchAndUpdateRates = async () => {
-      try {
-        const rates = await fetchRates(clientId, pickup, dropoff)
-
-        setFormData((prev) => {
-          const updates = { ...prev }
-          const newRateLockStatus = { sixMeter: false, twelveMeter: false }
-
-          if (rates) {
-            // Update 6m rate and lock status
-            if (rates.sixMeterRate != null && Number.parseFloat(rates.sixMeterRate) > 0) {
-              updates.sixMeterRate = Number.parseFloat(rates.sixMeterRate).toFixed(2)
-              newRateLockStatus.sixMeter = true
-            } else {
-              updates.sixMeterRate = "" // Clear if null/undefined/0
-              newRateLockStatus.sixMeter = false // Ensure it's editable
-            }
-
-            // Update 12m rate and lock status
-            if (rates.twelveMeterRate != null && Number.parseFloat(rates.twelveMeterRate) > 0) {
-              updates.twelveMeterRate = Number.parseFloat(rates.twelveMeterRate).toFixed(2)
-              newRateLockStatus.twelveMeter = true
-            } else {
-              updates.twelveMeterRate = "" // Clear if null/undefined/0
-              newRateLockStatus.twelveMeter = false // Ensure it's editable
-            }
-
-            // Abnormal rate is always editable if count > 0, so no locking based on DB
-            if (rates.abnormalRate != null) {
-              updates.abnormalRate = Number.parseFloat(rates.abnormalRate).toFixed(2)
-            } else {
-              updates.abnormalRate = ""
-            }
-
-            // Break bulk rate is always editable if count > 0, so no locking based on DB
-            if (rates.rateper_breakbulk != null) {
-              updates.rateper_breakbulk = Number.parseFloat(rates.rateper_breakbulk).toFixed(2)
-            } else {
-              updates.rateper_breakbulk = ""
-            }
-
-            // Surcharge amounts will be calculated by backend on submit
-            // No need to fetch or store surcharge amounts in frontend
-          } else {
-            // Clear all rate fields when no rates are found
-            updates.sixMeterRate = ""
-            updates.twelveMeterRate = ""
-            updates.abnormalRate = ""
-            updates.rateper_breakbulk = ""
-            updates.surchargesAmount = ""
-            newRateLockStatus.sixMeter = false
-            newRateLockStatus.twelveMeter = false
-          }
-
-          setRateLockStatus(newRateLockStatus)
-          return updates
-        })
-      } catch (error) {
-        console.error("Error in fetchAndUpdateRates:", error)
-          // Clear rates and unlock fields on error
-          setFormData((prev) => ({
-            ...prev,
-            sixMeterRate: "",
-            twelveMeterRate: "",
-            abnormalRate: "",
-            rateper_breakbulk: "",
-            surchargesAmount: "",
-          }))
-          setRateLockStatus({ sixMeter: false, twelveMeter: false })
-      }
-    }
-
-    fetchAndUpdateRates()
-  }, [formData.clientId, formData.pickup, formData.dropoff, fetchRates, isWeightBased, isAddOn])
-
-  // Update rate fields enabled state when container counts change
-  useEffect(() => {
-    const sixMeterEnabled = formData.num_six_meters > 0
-    const twelveMeterEnabled = formData.num_twelve_meters > 0
-    const abnormalEnabled = formData.num_abnormal > 0
-    const breakBulkEnabled = formData.num_breakbulk > 0
-
-    const newState = {
-      sixMeter: sixMeterEnabled,
-      twelveMeter: twelveMeterEnabled,
-      abnormal: abnormalEnabled,
-      breakBulk: breakBulkEnabled,
-    }
-
-    // Only update state if it has changed
-    if (JSON.stringify(rateFieldsEnabled) !== JSON.stringify(newState)) {
-      setRateFieldsEnabled(newState)
-    }
-  }, [
-    formData.num_six_meters,
-    formData.num_twelve_meters,
-    formData.num_abnormal,
-    formData.num_breakbulk,
-    rateFieldsEnabled,
-  ])
-
-  // Handle client selection - FIXED VERSION
-  const handleClientChange = useCallback(
-    async (e) => {
-      const clientId = e.target.value
-      // Convert clientId to number for comparison since m5clientkey is an integer
-      const selectedClient = clients.find((client) => client.m5clientkey === Number.parseInt(clientId, 10))
-
-      setFormData((prev) => ({
-        ...prev,
-        clientId: clientId,
-        clientName: selectedClient?.companyname || "",
-        representative: selectedClient?.representative || "",
-        contactDetails: selectedClient?.cellnum || "",
-        email: selectedClient?.email || "",
-        // Reset location-related fields when client changes
-        pickup: "",
-        dropoff: "",
-        selectedStartingPoint: "",
-        selectedDestination: "",
-        // Reset rates and lock status when client changes
-        sixMeterRate: "",
-        twelveMeterRate: "",
-        abnormalRate: "",
-        rateper_breakbulk: "",
-        surchargesAmount: "",
-      }))
-      setRateLockStatus({ sixMeter: false, twelveMeter: false })
-
-      // Clear any existing errors
-      setFieldErrors((prev) => {
-        const newErrors = { ...prev }
-        delete newErrors.clientId
-        return newErrors
-      })
-
-      // Load starting points for the selected client
-      if (clientId) {
-        setIsLoadingLocations(true)
-        try {
-          const startingPointsData = await fetchStartingPointsService(clientId)
-          const startingPoints = startingPointsData.map((point) => ({
-            value: point.starting_point,
-            label: point.starting_point,
-          }))
-          setClientStartingPoints(startingPoints)
-          setFormData((prev) => ({ ...prev, startingPoints }))
-        } catch (error) {
-          console.error("Error loading starting points:", error)
-          setClientStartingPoints([])
-          if (error.response?.status === 404) {
-            setShowNoRatesModal(true)
-          }
-        } finally {
-          setIsLoadingLocations(false)
-        }
-      } else {
-        setClientStartingPoints([])
-        setClientDestinations([])
-      }
-    },
-    [clients],
-  )
-
-  // Handle pickup location change
-  const handlePickupChange = useCallback(
-    async (e) => {
-      const pickup = e.target.value
-      setFormData((prev) => ({
-        ...prev,
-        pickup: pickup,
-        selectedStartingPoint: pickup,
-        // Reset destination when pickup changes
-        dropoff: "",
-        selectedDestination: "",
-        // Reset rates and lock status when pickup changes
-        sixMeterRate: "",
-        twelveMeterRate: "",
-        abnormalRate: "",
-        rateper_breakbulk: "",
-        surchargesAmount: "",
-        surcharges: false, // Uncheck surcharges when pickup changes
-      }))
-      setRateLockStatus({ sixMeter: false, twelveMeter: false })
-
-      // Clear any existing errors
-      setFieldErrors((prev) => {
-        const newErrors = { ...prev }
-        delete newErrors.pickup
-        return newErrors
-      })
-
-      // Load destinations for the selected pickup
-      if (pickup && formData.clientId) {
-        setIsLoading((prev) => ({ ...prev, destinations: true }))
-        try {
-          const destinationsData = await fetchDestinationsService(formData.clientId, pickup)
-          const destinations = destinationsData.map((dest) => ({
-            value: dest.destination,
-            label: dest.destination,
-          }))
-          setClientDestinations(destinations)
-          setFormData((prev) => ({ ...prev, destinations }))
-        } catch (error) {
-          console.error("Error loading destinations:", error)
-          setClientDestinations([])
-        } finally {
-          setIsLoading((prev) => ({ ...prev, destinations: false }))
-        }
-      } else {
-        setClientDestinations([])
-      }
-    },
-    [formData.clientId],
-  )
-
-  // Handle dropoff location change
-  const handleDropoffChange = useCallback((e) => {
-    const dropoff = e.target.value
-    setFormData((prev) => ({
-      ...prev,
-      dropoff: dropoff,
-      selectedDestination: dropoff,
-      // Reset rates and lock status when dropoff changes
-      sixMeterRate: "",
-      twelveMeterRate: "",
-      abnormalRate: "",
-      rateper_breakbulk: "",
-      surchargesAmount: "",
-      surcharges: false, // Uncheck surcharges when dropoff changes
-    }))
-    setRateLockStatus({ sixMeter: false, twelveMeter: false })
-
-    // Clear any existing errors
-    setFieldErrors((prev) => {
-      const newErrors = { ...prev }
-      delete newErrors.dropoff
-      return newErrors
-    })
-  }, [])
-
-  // Handle shipment type change
-  const handleShipmentTypeChange = useCallback(
-    (e) => {
-      const shipmentTypeId = e.target.value
-      const selectedType = shipmentTypes.find((type) => type.shipkey === shipmentTypeId)
-      const isCrossHaulType = shipmentTypeId === "3" || shipmentTypeId === "4"
-      const isBreakBulkType = shipmentTypeId === "4"
-      const isImportType = shipmentTypeId === "1"
-      const isExportType = shipmentTypeId === "2"
-      const isRegularCrossHaulType = shipmentTypeId === "3"
-
-      // Set appropriate rateWeight based on shipment type
-      let newRateWeight = prev => prev.rateWeight;
-      if (isImportType || isExportType || isRegularCrossHaulType) {
-        // For import, export, and regular cross-haul, default to Container
-        newRateWeight = "Container";
-      } else if (isBreakBulkType) {
-        // For cross-haul (break bulk), default to ton
-        newRateWeight = "ton";
-      }
-
-      setFormData((prev) => ({
-        ...prev,
-        shipmentTypeId: shipmentTypeId,
-        shipmentTypeName: selectedType?.shipmenttype || "",
-        // Set vessel_name and stackDate to null for cross-haul types
-        ...(isCrossHaulType && {
-          vesselName: "",
-          stackDate: "",
-        }),
-        // Set appropriate rateWeight based on shipment type
-        rateWeight: newRateWeight,
-      }))
-
-      if (isBreakBulkType) {
-        setWeightRows((prev) =>
-          prev.length > 0
-            ? prev
-            : [
-                {
-                  id: 1,
-                  ksmDmNo: "",
-                  ticketNo: "",
-                  receiptBookNo: "",
-                  weight: "",
-                },
-              ],
-        )
-      } else {
-        setWeightRows([])
-      }
-
-      // Clear any existing errors
-      setFieldErrors((prev) => {
-        const newErrors = { ...prev }
-        delete newErrors.shipmentTypeId
-        return newErrors
-      })
-    },
-    [shipmentTypes],
-  )
-
-  // Handle container count changes
-  const handleContainerCountChange = useCallback(
-    (field, value) => {
-      const numValue = Number.parseInt(value, 10) || 0
-      setFormData((prev) => ({
-        ...prev,
-        [field]: numValue,
-      }))
-
-      // Update containers when counts change
-      // This logic needs to be careful not to re-initialize containers if it's weight-based,
-      // even if break bulk is displayed.
-      if (formData.rateWeight === "Container") {
-        const newCounts = {
-          num_six_meters: field === "num_six_meters" ? numValue : formData.num_six_meters,
-          num_twelve_meters: field === "num_twelve_meters" ? numValue : formData.num_twelve_meters,
-          num_abnormal: field === "num_abnormal" ? numValue : formData.num_abnormal,
-          num_breakbulk: field === "num_breakbulk" ? numValue : formData.num_breakbulk,
-        }
-        initializeContainers(containersRef.current, newCounts)
-      }
-    },
-    [
-      formData.rateWeight,
-      formData.num_six_meters,
-      formData.num_twelve_meters,
-      formData.num_abnormal,
-      formData.num_breakbulk,
-      initializeContainers,
-    ],
-  )
-
-  // Calendar helper function
-  // Calendar helper function - using focus instead of showPicker
-  const openCalendar = useCallback((ref) => {
-    if (ref.current) {
-      ref.current.focus()
-    }
-  }, [])
-
-  // Form validation — delegates to utility, returns errors object (legacy shape for call site)
   const validateForm = useCallback(() => {
-    const { fieldErrors } = validateFormUtil(formData, [], {
-      mode: "create",
-      isAddOn,
-      isCrossHaul,
-      isWeightBased,
-      isSetRate,
-      isSetRateMode,
+    const { fieldErrors: fErrors } = validateFormUtil(formData, [], {
+      mode: "create", isAddOn, isCrossHaul, isWeightBased, isSetRate, isSetRateMode,
     })
-    return fieldErrors
+    return fErrors
   }, [formData, isCrossHaul, isWeightBased, isAddOn, isSetRate, isSetRateMode])
 
-  // Container validation function
   const validateContainers = useCallback(() => {
-    if (isAddOn || isWeightBased || isSetRateMode || !showContainerDetails || containers.length === 0) {
-      return true // No validation needed for weight-based, set-rate, or when no containers
-    }
-
+    if (isAddOn || isWeightBased || isSetRateMode || !showContainerDetails || containers.length === 0) return true
     const errors = {}
     const containerNumbers = []
     let isValid = true
-
-    // For export shipments, skip container number validation
     const isExportShipment = isExport || formData.shipmentTypeId === "2"
-
-    // Check each container
     for (const container of containers) {
       const containerId = container.id
-
-      // For export shipments, File Reference is optional
       if (!isExportShipment) {
-        // Check if container number is required and present
         if (!container.containerNum || container.containerNum.trim() === "") {
           errors[`container-${containerId}`] = "Container number is required"
           isValid = false
         } else {
-          // Check for duplicates within current instruction
-          const upperCaseContainerNum = container.containerNum.toUpperCase()
-          if (containerNumbers.includes(upperCaseContainerNum)) {
+          const upper = container.containerNum.toUpperCase()
+          if (containerNumbers.includes(upper)) {
             errors[`container-${containerId}`] = "Container number must be unique"
             isValid = false
           } else {
-            containerNumbers.push(upperCaseContainerNum)
+            containerNumbers.push(upper)
           }
         }
       }
-
-      // Weight validation removed - weight is now optional for all containers
-      // Still validate the format if weight is provided
       if (isImport && container.weight && container.weight.trim() !== "") {
         if (!/^\d*\.?\d*$/.test(container.weight)) {
           errors[`weight-${containerId}`] = "Weight must be a valid number"
@@ -948,12 +293,10 @@ const ControllerInstructions = () => {
         }
       }
     }
-
     setContainerFieldErrors(errors)
     return isValid
-  }, [isAddOn, isWeightBased, showContainerDetails, containers, isImport, isExport, formData.shipmentTypeId])
+  }, [isAddOn, isWeightBased, isSetRateMode, showContainerDetails, containers, isImport, isExport, formData.shipmentTypeId])
 
-  // Delegates to utility
   const checkRateCountMismatch = useCallback(
     () => checkRateCountMismatchUtil(formData, { isAddOn, isWeightBased, isSetRateMode, isCrossHaul }),
     [formData, isAddOn, isWeightBased, isSetRateMode, isCrossHaul]
@@ -962,411 +305,120 @@ const ControllerInstructions = () => {
   const handleSubmit = useCallback(
     async (e) => {
       e.preventDefault()
-
-      // Validate form fields
       const errors = validateForm()
-      if (Object.keys(errors).length > 0) {
-        setFieldErrors(errors)
-        return
-      }
-
-      // Validate containers if container details are shown
+      if (Object.keys(errors).length > 0) { setFieldErrors(errors); return }
       if (!isWeightBased && !isSetRateMode && showContainerDetails) {
-        const containerValidationPassed = validateContainers()
-        if (!containerValidationPassed) {
-          // Scroll to container details section
+        if (!validateContainers()) {
           const containerSection = document.querySelector(".container-details-section")
-          if (containerSection) {
-            containerSection.scrollIntoView({ behavior: "smooth", block: "start" })
-          }
+          if (containerSection) containerSection.scrollIntoView({ behavior: "smooth", block: "start" })
           return
         }
       }
-
-      // Check for rate/count mismatch
       const { needsConfirmation, message } = checkRateCountMismatch()
-      if (needsConfirmation) {
-        setConfirmationMessage(message)
-        setShowConfirmationPopup(true)
-        return
-      }
-
-      // Proceed with submission
+      if (needsConfirmation) { setConfirmationMessage(message); setShowConfirmationPopup(true); return }
       await submitInstruction()
     },
-    [validateForm, validateContainers, checkRateCountMismatch, isWeightBased, showContainerDetails],
+    [validateForm, validateContainers, checkRateCountMismatch, isWeightBased, isSetRateMode, showContainerDetails, submitInstruction],
   )
-
-  const submitInstruction = useCallback(async () => {
-    setIsSubmitting(true)
-    setSubmitError("")
-
-    try {
-      console.log("=== STARTING TOTAL COST CALCULATION ===")
-
-      // Fetch set rate on-the-fly if Set Rate checkbox is checked (prevents race condition)
-      let currentSetRateValue = setRateValue
-      if (isSetRate && formData.clientId && formData.pickup && formData.dropoff) {
-        console.log("[SET RATE] Fetching set rate on-the-fly to avoid race condition...")
-        try {
-          const data = await fetchSetRateService(formData.clientId, formData.pickup, formData.dropoff)
-          if (data && data.set_rate != null) {
-            currentSetRateValue = Number(data.set_rate)
-            console.log(`[SET RATE] Fetched fresh value: ${currentSetRateValue}`)
-          } else {
-            currentSetRateValue = 0
-            console.log("[SET RATE] No set rate found for this route")
-          }
-        } catch (err) {
-          console.error("[SET RATE] Error fetching:", err)
-          currentSetRateValue = 0
-        }
-      }
-
-      let totalCost = 0
-      const costBreakdown = {
-        calculationType: isWeightBased ? "weight-based" : isSetRateMode ? "set-rate" : "container-based",
-        isWeightBased,
-        isCrossHaul,
-        unitType: formData.rateWeight,
-        components: {},
-      }
-
-      // Calculate set rate value using the freshly fetched value
-      const calculatedSetRateValue = Number.isFinite(Number(currentSetRateValue)) ? Number(currentSetRateValue) : 0
-
-      console.log("DEBUG VALUES:", {
-        isSetRateMode,
-        isSetRate,
-        isAddOn,
-        shipmentTypeId: formData.shipmentTypeId,
-        rateWeight: formData.rateWeight,
-        setRateValue,
-        currentSetRateValue,
-        calculatedSetRateValue
-      })
-
-      const currentWeightRows = weightRowsRef.current || []
-
-      if ((isSetRateMode || isSetRate) && !isAddOn) {
-        totalCost = calcBreakBulkCost(currentWeightRows, 0, {
-          isSetRateMode: true,
-          setRateAmount: calculatedSetRateValue,
-        })
-        costBreakdown.components = {
-          setRateAmount: calculatedSetRateValue,
-          weightRowCount: currentWeightRows.length || 1,
-          setRateCost: totalCost,
-        }
-        console.log(`SET-RATE CALCULATION: R${calculatedSetRateValue} × ${currentWeightRows.length || 1} = R${totalCost}`)
-      } else if (isWeightBased && !isAddOn) {
-        if (formData.shipmentTypeId === "4") {
-          totalCost = calcBreakBulkCost(currentWeightRows, formData.unitrate || 0)
-        } else {
-          const baseWeight = Number.parseFloat(formData.weight || 0)
-          const unitRate = Number.parseFloat(formData.unitrate || 0)
-          totalCost = baseWeight * unitRate
-        }
-        costBreakdown.components = { weightBasedCost: totalCost }
-        console.log(`WEIGHT-BASED CALCULATION: R${totalCost}`)
-      } else {
-        // Container-based calculation
-        totalCost = calcContainerBasedCost(formData, containersRef.current || [], { isCrossHaul })
-        costBreakdown.components = { containerBasedSubtotal: totalCost }
-        console.log(`CONTAINER-BASED CALCULATION: R${totalCost}`)
-      }
-
-      // For add-on shipment type (5), force all financial values to zero
-      if (formData.shipmentTypeId === "5") {
-        console.log("[ADD-ON] Forcing totalCost to 0 for shipment type 5")
-        totalCost = 0
-      }
-
-      // Note: Surcharge amounts are now calculated by the backend on submit
-      // Frontend only tracks which containers have surcharges enabled
-      const subtotalBeforeVAT = totalCost;
-
-      costBreakdown.components.surcharges = {
-        applied: containers.some(c => c.addSurcharges),
-        amount: 0, // Backend will calculate actual amount
-      };
-      costBreakdown.components.subtotalBeforeVAT = subtotalBeforeVAT;
-
-      console.log("SURCHARGES:");
-      console.log(`  Containers with Surcharges: ${containers.filter(c => c.addSurcharges).length}`);
-      console.log(`  Surcharge amounts will be calculated by backend on submit`);
-      console.log(`  Subtotal (before VAT): R${subtotalBeforeVAT.toFixed(2)}`)
-
-      // Calculate VAT (for display purposes only - not added to total cost saved to DB)
-      const vatRate = formData.vat / 100
-      const vatAmount = subtotalBeforeVAT * vatRate
-      const totalWithVAT = subtotalBeforeVAT + vatAmount
-
-      costBreakdown.components.vat = {
-        rate: formData.vat,
-        rateDecimal: vatRate,
-        amount: vatAmount,
-      }
-      costBreakdown.components.totalWithVAT = totalWithVAT
-
-      console.log("VAT CALCULATION (for reference only - NOT added to saved total):")
-      console.log(`  VAT Rate: ${formData.vat}%`)
-      console.log(`  VAT Amount: R${subtotalBeforeVAT.toFixed(2)} × ${vatRate} = R${vatAmount.toFixed(2)}`)
-      console.log(`  Total with VAT: R${totalWithVAT.toFixed(2)}`)
-
-      // Set the total cost to save (WITHOUT VAT)
-      // Use set rate value if either isSetRateMode (SetRate unit type) or isSetRate (checkbox) is true
-      if ((isSetRateMode || isSetRate) && !isAddOn) {
-        const weightRowCount = currentWeightRows.length || 1
-        totalCost = calculatedSetRateValue * weightRowCount
-        costBreakdown.components.finalTotalSaved = totalCost
-        console.log("FINAL COST BREAKDOWN (SET RATE):")
-        console.log(`  Set Rate Amount: R${setRateValue.toFixed(2)}`)
-        console.log(`  Weight Row Count: ${weightRowCount}`)
-        console.log(`  Set Rate Cost: R${totalCost.toFixed(2)}`)
-      } else {
-        totalCost = subtotalBeforeVAT
-        costBreakdown.components.finalTotalSaved = totalCost
-        console.log("FINAL COST BREAKDOWN:")
-        console.log(`  Base Cost: R${totalCost.toFixed(2)}`)
-        console.log(`  Surcharges: Will be calculated by backend`)
-        console.log(`  TOTAL COST SAVED TO DB (excluding VAT): R${totalCost.toFixed(2)}`)
-        console.log(`  VAT (calculated but not saved): R${vatAmount.toFixed(2)}`)
-        console.log(`  Total with VAT (for reference): R${totalWithVAT.toFixed(2)}`)
-      }
-
-      console.log("=== COST BREAKDOWN SUMMARY ===")
-      console.log(JSON.stringify(costBreakdown, null, 2))
-      console.log("=== END TOTAL COST CALCULATION ===")
-
-      // Prepare instruction data with null values for cross-haul and weight-based
-      // Remove hazardous and surcharges fields from formData to prevent them from being sent to m1_controller table
-      const { hazardous, surcharges, ...formDataWithoutContainerFields } = formData;
-      const isAddOnType = formData.shipmentTypeId === "5"
-
-      const instructionData = {
-        ...formDataWithoutContainerFields,
-        total_cost: isAddOnType ? 0 : totalCost, // For add-on, always save 0
-        is_set_rate: isSetRate, // Add is_set_rate boolean
-        historical_set_rate: isSetRate ? currentSetRateValue : null, // Use freshly fetched value to avoid race condition
-        // Set vessel_name and stackdate to null for cross-haul types
-        vessel_name: isCrossHaul ? null : formData.vesselName,
-        stackdate: isCrossHaul ? null : formData.stackDate,
-        // UPDATED RATE SAVING LOGIC: For add-on (type 5), force all rates to 0.
-        // Otherwise, set container rates to 0 if count is 0, null for weight-based, or 0 when unit is kg or ton
-        rateper_6: isAddOnType
-          ? 0
-          : formData.rateWeight === "kg" || formData.rateWeight === "ton"
-            ? 0
-            : isWeightBased
-              ? null
-              : formData.num_six_meters === 0
-                ? 0
-                : formData.sixMeterRate === ""
-                  ? null
-                  : Number.parseFloat(formData.sixMeterRate || 0),
-        rateper_12: isAddOnType
-          ? 0
-          : formData.rateWeight === "kg" || formData.rateWeight === "ton"
-            ? 0
-            : isWeightBased
-              ? null
-              : formData.num_twelve_meters === 0
-                ? 0
-                : formData.twelveMeterRate === ""
-                  ? null
-                  : Number.parseFloat(formData.twelveMeterRate || 0),
-        rateper_abnormal: isAddOnType
-          ? 0
-          : formData.rateWeight === "kg" || formData.rateWeight === "ton"
-            ? 0
-            : isWeightBased
-              ? null
-              : formData.num_abnormal === 0
-                ? 0
-                : formData.abnormalRate === ""
-                  ? null
-                  : Number.parseFloat(formData.abnormalRate || 0),
-        // Set container counts to 0 for weight-based or when unit is kg or ton or when Set Rate is active
-        num_six_meters: (formData.rateWeight === "kg" || formData.rateWeight === "ton" || isSetRate) ? 0 : formData.num_six_meters || 0,
-        num_twelve_meters: (formData.rateWeight === "kg" || formData.rateWeight === "ton" || isSetRate) ? 0 : formData.num_twelve_meters || 0,
-        num_abnormal: (formData.rateWeight === "kg" || formData.rateWeight === "ton" || isSetRate) ? 0 : formData.num_abnormal || 0,
-        // Set break bulk fields. For add-on, force 0; otherwise null as it's removed from UI
-        rateper_breakbulk: isAddOnType ? 0 : null,
-        num_breakbulk: 0,
-        // Set weight and unitrate appropriately. For add-on, force unitrate to 0.
-        weight:
-          isWeightBased && formData.shipmentTypeId !== "4"
-            ? formData.weight === ""
-              ? null
-              : Number.parseFloat(formData.weight || 0)
-            : null,
-        unitrate: isAddOnType
-          ? 0
-          : isWeightBased
-            ? formData.unitrate === "" ? null : Number.parseFloat(formData.unitrate || 0)
-            : null,
-        // Map field names for backend
-        client: formData.clientId,
-        shipment_type: formData.shipmentTypeId,
-        pickuptime: formData.pickupTime,
-        pickupdate: formData.pickupDate,
-        deadline: formData.deadline,
-        fileref: formData.fileRef,
-        booking_ref: formData.bookingRef,
-        rateweight: formData.rateWeight,
-        status: "New",
-        vat: formData.vat,
-        // Note: surcharge_amount is now stored in container table, not in instruction table
-      }
-
-      // Prepare container data (only for container-based calculations AND if unit type is Container)
-      // Also ensure container details are not saved when rateWeight is kg or ton
-      // Note: Surcharge amounts will be calculated by backend based on client rates
-      // CRITICAL FIX: Use containersRef.current to capture latest container data
-      const currentContainers = containersRef.current || []
-      
-      console.log("[SAVE DEBUG] Preparing container data:", {
-        containersState: containers,
-        containersRef: containersRef.current,
-        containerCount: currentContainers.length,
-        isWeightBased,
-        rateWeight: formData.rateWeight,
-        shipmentTypeId: formData.shipmentTypeId
-      })
-      
-      const containerData =
-        !isWeightBased && formData.rateWeight === "Container" && formData.rateWeight !== "kg" && formData.rateWeight !== "ton"
-          ? currentContainers.map((container) => ({
-              container_type: container.containerType,
-              containerNum: container.containerNum || "",  // Ensure containerNum is never undefined
-              file_ref: container.fileRef || "", // Include file reference field for export shipments
-              weight: (isImport || isExport || isCrossHaul) ? (container.weight === "" ? null : Number.parseFloat(container.weight || 0)) : null,
-              cargo_description: container.cargoDescription || "",
-              "Hazardous": container.hazardous || false,
-              "Add Surcharges": container.addSurcharges || false,
-              is_12m_surcharge: Boolean(container.is_12m_surcharge),
-              surcharge_12m_amount: Number(container.surcharge_12m_amount || 0),
-              // Only allow VGM to be true for allowed shipment types; otherwise force false
-              "vgm": allowVgmUI ? (container.vgm || false) : false,
-              // Note: "Surcharge Amount" and "vgm amount" will be calculated by backend
-            }))
-          : []
-      
-      // Validate that containers with counts have container numbers
-      const containerValidation = containerData.filter(c => !c.containerNum || c.containerNum === "")
-      if (containerValidation.length > 0 && !isAddOn) {
-        console.warn("[SAVE WARNING] Containers missing numbers:", containerValidation)
-      }
-
-      let weightData = []
-      if (formData.shipmentTypeId === "4") {
-        // For cross-haul/break bulk, always send every visible row so the
-        // backend can persist all of them exactly as entered.
-        weightData = currentWeightRows.map((row) => {
-          let numericWeight = null
-          if (row.weight !== null && row.weight !== undefined && row.weight !== "") {
-            const parsed = Number.parseFloat(row.weight)
-            numericWeight = Number.isNaN(parsed) ? null : parsed
-          }
-
-          const ksm = row.ksmDmNo || row.ksm_dm_no || null
-          const ticket = row.ticketNo || row.ticket_no || null
-          const receipt = row.receiptBookNo || row.receipt_book_no || null
-
-          return {
-            ksm_dm_no: ksm,
-            ticket_no: ticket,
-            receipt_book_no: receipt,
-            weight: numericWeight,
-          }
-        })
-      }
-
-      console.log("=== SUBMITTING TO DATABASE ===")
-      console.log("DEBUG FINAL VALUES:", {
-        totalCost,
-        isSetRateMode,
-        isSetRate,
-        isAddOn,
-        isAddOnType,
-        calculatedSetRateValue,
-        setRateValue,
-        currentSetRateValue
-      })
-      console.log("Instruction data being saved:", {
-        ...instructionData,
-        description: instructionData.description ? instructionData.description.substring(0, 50) + "..." : null, // Truncate for logging
-      })
-      console.log("Container data being saved:", containerData)
-      console.log("Raw weightRows state (shipment type 4 only):", currentWeightRows)
-      console.log(
-        "Raw weightRows JSON (shipment type 4 only):",
-        JSON.stringify(currentWeightRows, null, 2),
-      )
-      console.log("Weight rows being saved (shipment type 4 only):", weightData)
-      console.log(
-        "Weight rows JSON being saved (shipment type 4 only):",
-        JSON.stringify(weightData, null, 2),
-      )
-      console.log("Final calculated total cost (WITHOUT VAT):", totalCost)
-      console.log("Rate saving logic applied:")
-      console.log(`  rateper_6: ${instructionData.rateper_6} (count: ${instructionData.num_six_meters})`)
-      console.log(`  rateper_12: ${instructionData.rateper_12} (count: ${instructionData.num_twelve_meters})`)
-      console.log(`  rateper_abnormal: ${instructionData.rateper_abnormal} (count: ${instructionData.num_abnormal})`)
-      console.log(`  rateper_breakbulk: ${instructionData.rateper_breakbulk} (count: ${instructionData.num_breakbulk})`)
-
-      // Save the instruction
-      const saveData = await saveInstructionService(instructionData, containerData, weightData)
-
-      if (saveData.success) {
-        console.log("=== INSTRUCTION SAVED SUCCESSFULLY ===")
-        console.log("Database response:", saveData)
-        // Navigate to dashboard on success
-        navigate("/ControllerDashboard")
-      } else {
-        throw new Error(saveData.message || "Failed to save instruction")
-      }
-    } catch (error) {
-      console.error("=== ERROR SAVING INSTRUCTION ===")
-      console.error("Error submitting form:", error)
-      setSubmitError(error.response?.data?.message || error.message || "An error occurred while saving the instruction")
-    } finally {
-      setIsSubmitting(false)
-    }
-  }, [formData, isWeightBased, isCrossHaul, isImport, isSetRate, isSetRateMode, isAddOn, setRateValue, fetchRates, containers, weightRows, navigate])
 
   const handleConfirmSubmit = useCallback(async () => {
     setShowConfirmationPopup(false)
     await submitInstruction()
   }, [submitInstruction])
 
-  const handleCancelSubmit = useCallback(() => {
-    setShowConfirmationPopup(false)
-  }, [])
+  const handleCancelSubmit = useCallback(() => setShowConfirmationPopup(false), [])
 
-  // ErrorTooltip disabled in create form — tooltips are suppressed here (Flag 5)
-  const ErrorTooltip = (props) => <SharedErrorTooltip {...props} disabled />
+  // ─── effects ────────────────────────────────────────────────────────────────
 
-  // Style objects
-  const nonEditableStyle = useMemo(
-    () => ({
-      backgroundColor: "#f5f5f5",
-      cursor: "not-allowed",
-    }),
-    [],
-  )
+  useEffect(() => {
+    const weightBasedUnits = ["kg", "mÂ³", "ton"]
+    const newIsWeightBased = weightBasedUnits.includes(formData.rateWeight)
+    const newIsSetRateMode = formData.rateWeight === "SetRate"
+    const newIsCrossHaul = formData.shipmentTypeId === "3" || formData.shipmentTypeId === "4"
+    const newIsImport = formData.shipmentTypeId === "1"
+    const newIsExport = formData.shipmentTypeId === "2"
+    if (newIsWeightBased !== isWeightBased) setIsWeightBased(newIsWeightBased)
+    if (newIsSetRateMode !== isSetRateMode) setIsSetRateMode(newIsSetRateMode)
+    if (newIsCrossHaul !== isCrossHaul) setIsCrossHaul(newIsCrossHaul)
+    if (newIsImport !== isImport) setIsImport(newIsImport)
+    if (newIsExport !== isExport) setIsExport(newIsExport)
+  }, [formData.rateWeight, formData.shipmentTypeId, isWeightBased, isCrossHaul, isImport, isExport, isSetRateMode])
 
-  const disabledRateStyle = useMemo(
-    () => ({
-      backgroundColor: "#f5f5f5",
-      color: "rgba(0, 0, 0, 0.38)",
-      cursor: "not-allowed",
-    }),
-    [],
-  )
+  useEffect(() => {
+    if (formData.shipmentTypeId === "5" && formData.rateWeight !== "Container") {
+      setFormData((prev) => ({ ...prev, rateWeight: "Container" }))
+    }
+  }, [formData.shipmentTypeId, formData.rateWeight])
 
-  // Spinner styles
+  useEffect(() => {
+    const fetchSetRate = async () => {
+      const { clientId, pickup, dropoff } = formData
+      if (!isSetRate || !clientId || !pickup || !dropoff) return
+      try {
+        const data = await fetchSetRateService(clientId, pickup, dropoff)
+        if (data && data.set_rate != null) {
+          const n = Number(data.set_rate)
+          setSetRateValue(Number.isNaN(n) ? 0 : n)
+        } else {
+          setSetRateValue(0)
+        }
+      } catch {
+        setSetRateValue(0)
+      }
+    }
+    fetchSetRate()
+  }, [isSetRate, formData.clientId, formData.pickup, formData.dropoff])
+
+  useEffect(() => {
+    if (isWeightBased || isAddOn) { setRateLockStatus({ sixMeter: false, twelveMeter: false }); return }
+    const { pickup, dropoff, clientId } = formData
+    if (!clientId || !pickup || !dropoff) {
+      setFormData((prev) => ({ ...prev, sixMeterRate: "", twelveMeterRate: "", abnormalRate: "", rateper_breakbulk: "", surchargesAmount: "" }))
+      setRateLockStatus({ sixMeter: false, twelveMeter: false })
+      return
+    }
+    const fetchAndUpdateRates = async () => {
+      try {
+        const rates = await fetchRates(clientId, pickup, dropoff)
+        setFormData((prev) => {
+          const updates = { ...prev }
+          const newLock = { sixMeter: false, twelveMeter: false }
+          if (rates) {
+            if (rates.sixMeterRate != null && Number.parseFloat(rates.sixMeterRate) > 0) { updates.sixMeterRate = Number.parseFloat(rates.sixMeterRate).toFixed(2); newLock.sixMeter = true } else { updates.sixMeterRate = "" }
+            if (rates.twelveMeterRate != null && Number.parseFloat(rates.twelveMeterRate) > 0) { updates.twelveMeterRate = Number.parseFloat(rates.twelveMeterRate).toFixed(2); newLock.twelveMeter = true } else { updates.twelveMeterRate = "" }
+            updates.abnormalRate = rates.abnormalRate != null ? Number.parseFloat(rates.abnormalRate).toFixed(2) : ""
+            updates.rateper_breakbulk = rates.rateper_breakbulk != null ? Number.parseFloat(rates.rateper_breakbulk).toFixed(2) : ""
+          } else {
+            updates.sixMeterRate = ""; updates.twelveMeterRate = ""; updates.abnormalRate = ""; updates.rateper_breakbulk = ""; updates.surchargesAmount = ""
+          }
+          setRateLockStatus(newLock)
+          return updates
+        })
+      } catch {
+        setFormData((prev) => ({ ...prev, sixMeterRate: "", twelveMeterRate: "", abnormalRate: "", rateper_breakbulk: "", surchargesAmount: "" }))
+        setRateLockStatus({ sixMeter: false, twelveMeter: false })
+      }
+    }
+    fetchAndUpdateRates()
+  }, [formData.clientId, formData.pickup, formData.dropoff, fetchRates, isWeightBased, isAddOn])
+
+  useEffect(() => {
+    const newState = {
+      sixMeter: formData.num_six_meters > 0,
+      twelveMeter: formData.num_twelve_meters > 0,
+      abnormal: formData.num_abnormal > 0,
+      breakBulk: formData.num_breakbulk > 0,
+    }
+    if (JSON.stringify(rateFieldsEnabled) !== JSON.stringify(newState)) {
+      setRateFieldsEnabled(newState)
+    }
+  }, [formData.num_six_meters, formData.num_twelve_meters, formData.num_abnormal, formData.num_breakbulk, rateFieldsEnabled])
+
+  // ─── display values ──────────────────────────────────────────────────────────
+
+  const nonEditableStyle = useMemo(() => ({ backgroundColor: "#f5f5f5", cursor: "not-allowed" }), [])
+  const disabledRateStyle = useMemo(() => ({ backgroundColor: "#f5f5f5", color: "rgba(0, 0, 0, 0.38)", cursor: "not-allowed" }), [])
+
   const spinnerKeyframes = `
     @keyframes spin {
       0% { transform: rotate(0deg); }
@@ -1374,1805 +426,72 @@ const ControllerInstructions = () => {
     }
   `
 
-  // Determine if break bulk fields should be disabled
-  const disableBreakBulkFields = formData.rateWeight !== "Container" || !isCrossHaul
-
   const isLoadingComplete = !isLoading.clients && !isLoading.shipmentTypes
   const hasDataFailure = isLoadingComplete && (clients.length === 0 || shipmentTypes.length === 0)
 
+  // ─── render ──────────────────────────────────────────────────────────────────
+
   return (
-    <div className="controller-instructions-unique-wrapper">
-      <style>{spinnerKeyframes}</style>
-
-      {/* Confirmation Popup */}
-      <ConfirmationModal
-        isOpen={showConfirmationPopup}
-        title="Confirm Submission"
-        message={confirmationMessage}
-        onConfirm={handleConfirmSubmit}
-        onCancel={handleCancelSubmit}
-      />
-
-      {/* No Rates Modal */}
-      {showNoRatesModal && (
-        <div
-          className="modal-overlay"
-          style={{
-            position: "fixed",
-            top: 0,
-            left: 0,
-            right: 0,
-            bottom: 0,
-            backgroundColor: "rgba(0, 0, 0, 0.5)",
-            display: "flex",
-            justifyContent: "center",
-            alignItems: "center",
-            zIndex: 1000,
-          }}
-        >
-          <div
-            className="modal"
-            style={{
-              backgroundColor: "white",
-              padding: "20px",
-              borderRadius: "8px",
-              maxWidth: "500px",
-              width: "90%",
-            }}
-          >
-            <h3 style={{ marginTop: 0 }}>No Rates Available</h3>
-            <p>This client has no rates configured. Please contact the manager to set up rates.</p>
-            <button
-              style={{
-                padding: "8px 16px",
-                backgroundColor: "#4a90e2",
-                color: "white",
-                border: "none",
-                borderRadius: "4px",
-                cursor: "pointer",
-                marginTop: "10px",
-              }}
-              onClick={() => setShowNoRatesModal(false)}
-            >
-              OK
-            </button>
-          </div>
-        </div>
-      )}
-
-      <div className="controller-instructions-header">
-        <button className="controller-instructions-back-button" onClick={() => navigate("/ControllerDashboard")}>
-          Back
-        </button>
-      </div>
-
-      {isLoadingLocations && <div style={{ height: "20px" }}></div>}
-
-      <InstructionLoadingGate
-        isLoadingComplete={isLoadingComplete}
-        hasDataFailure={hasDataFailure}
-        onRetry={() => window.location.reload()}
-      >
-      <form
-        onSubmit={handleSubmit}
-        className="controller-instructions-form-container"
-        style={{ maxWidth: "1200px", width: "calc(100% - 40px)", margin: "0 auto", boxSizing: "border-box" }}
-      >
-        <div className="controller-instructions-form-section controller-instructions-client-info-section">
-          <div className="controller-instructions-form-row">
-            <div className="controller-instructions-form-field">
-              <label>Client</label>
-              <div className="controller-instructions-select-wrapper" ref={fieldRefs.current.clientId}>
-                <select
-                  className={`dropdown ${fieldErrors.clientId ? "controller-instructions-error-field" : ""}`}
-                  name="clientId"
-                  value={formData.clientId}
-                  onChange={handleClientChange}
-                >
-                  <option value="" disabled>
-                    Select Client
-                  </option>
-                  {clients.map((client) => (
-                    <option key={client.m5clientkey} value={client.m5clientkey}>
-                      {client.companyname}
-                    </option>
-                  ))}
-                </select>
-                <ErrorTooltip message={fieldErrors.clientId} />
-              </div>
-            </div>
-            <div className="controller-instructions-form-field">
-              <label>Pick-Up Location</label>
-              <div className="controller-instructions-select-wrapper" ref={fieldRefs.current.pickup}>
-                <select
-                  className={`dropdown ${fieldErrors.pickup ? "controller-instructions-error-field" : ""}`}
-                  name="pickup"
-                  value={formData.pickup}
-                  onChange={handlePickupChange}
-                  disabled={!formData.clientId || isLoadingLocations}
-                >
-                  <option value="" disabled>
-                    Select Pick-Up Location
-                  </option>
-                  {Array.isArray(clientStartingPoints) &&
-                    clientStartingPoints.map((location, index) => (
-                      <option key={index} value={location.value}>
-                        {location.label}
-                      </option>
-                    ))}
-                </select>
-                <ErrorTooltip message={fieldErrors.pickup} />
-              </div>
-            </div>
-            <div className="controller-instructions-form-field">
-              <label>Drop-Off Location</label>
-              <div className="controller-instructions-select-wrapper" ref={fieldRefs.current.dropoff}>
-                <select
-                  name="dropoff"
-                  value={formData.dropoff}
-                  onChange={handleDropoffChange}
-                  disabled={!formData.clientId || !formData.pickup || isLoading.destinations}
-                  className={
-                    !formData.clientId || !formData.pickup
-                      ? "controller-instructions-form-input disabled-field"
-                      : "controller-instructions-form-input"
-                  }
-                >
-                  {!formData.clientId || !formData.pickup ? (
-                    <option value="">Please select client and pickup first</option>
-                  ) : (
-                    <option value="">Select Destination</option>
-                  )}
-                  {Array.isArray(clientDestinations) &&
-                    clientDestinations.map((location, index) => (
-                      <option key={index} value={location.value}>
-                        {location.label}
-                      </option>
-                    ))}
-                </select>
-                <ErrorTooltip message={fieldErrors.dropoff} />
-              </div>
-            </div>
-            <div className="controller-instructions-form-field">
-              <label>Representative</label>
-              <input
-                type="text"
-                className="controller-instructions-form-input"
-                name="representative"
-                value={formData.representative}
-                readOnly
-                style={nonEditableStyle}
-              />
-            </div>
-            <div className="controller-instructions-form-field">
-              <label>Contact Details</label>
-              <input
-                type="text"
-                className="controller-instructions-form-input"
-                name="contactDetails"
-                value={formData.contactDetails}
-                readOnly
-                style={nonEditableStyle}
-              />
-            </div>
-            <div className="controller-instructions-form-field">
-              <label>Email</label>
-              <input
-                type="email"
-                className="controller-instructions-form-input"
-                name="email"
-                value={formData.email}
-                readOnly
-                style={nonEditableStyle}
-              />
-            </div>
-          </div>
-        </div>
-        {false && (
-          <div className="controller-instructions-form-section">
-            <div className="controller-instructions-form-row">
-              <div className="controller-instructions-form-field">
-                <label>Shipment Type</label>
-                <div
-                  className="controller-instructions-select-wrapper"
-                  ref={fieldRefs.current.shipmentTypeId}
-                >
-                  <select
-                    className={`dropdown ${
-                      fieldErrors.shipmentTypeId
-                        ? "controller-instructions-error-field"
-                        : ""
-                    }`}
-                    name="shipmentTypeId"
-                    value={formData.shipmentTypeId}
-                    onChange={handleShipmentTypeChange}
-                    disabled={isLoading.shipmentTypes || shipmentTypes.length === 0}
-                  >
-                    <option value="" disabled>
-                      Select Shipment
-                    </option>
-                    {shipmentTypes.map((type) => (
-                      <option key={type.shipkey} value={type.shipkey}>
-                        {type.shipmenttype}
-                      </option>
-                    ))}
-                  </select>
-                  <ErrorTooltip message={fieldErrors.shipmentTypeId} />
-                </div>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* Main container + booking section: two columns side by side */}
-        <div className="controller-instructions-form-section">
-          <div className="controller-instructions-container-section">
-            {/* LEFT: Trailer size / containers / unit per */}
-            <div className="controller-instructions-container-group">
-              <div className="controller-instructions-container-label">
-                <span className="controller-instructions-trailer-size-label">Trailer Size</span>
-                <label>No. of Containers</label>
-                {fieldErrors.containers && (
-                  <div className="controller-instructions-container-error-message">{fieldErrors.containers}</div>
-                )}
-              </div>
-              <div
-                className="controller-instructions-container-inputs"
-                style={{
-                  opacity: isWeightBased || isSetRateMode ? 0.5 : 1,
-                  pointerEvents: isWeightBased || isSetRateMode ? "none" : "auto",
-                }}
-              >
-                <div className="controller-instructions-container-input">
-                  <label>6m</label>
-                  <div className="controller-instructions-container-rate-group" style={{ display: "flex", width: "100px" }}>
-                    <input
-                      type="number"
-                      className={fieldErrors.containers ? "controller-instructions-error-field" : ""}
-                      value={formData.num_six_meters}
-                      min="0"
-                      name="num_six_meters"
-                      onChange={(e) => handleContainerCountChange("num_six_meters", e.target.value)}
-                      disabled={isWeightBased || isSetRateMode}
-                    />
-                    <div style={{ width: "100%", marginLeft: "10px" }}>
-                      <input
-                        type="text"
-                        value={
-                          formData.sixMeterRate !== undefined && formData.sixMeterRate !== ""
-                            ? Number.parseFloat(formData.sixMeterRate).toFixed(2)
-                            : ""
-                        }
-                        onChange={(e) => {
-                          const value = e.target.value
-                          if (value === "" || /^\d*\.?\d*$/.test(value)) {
-                            setFormData((prev) => ({
-                              ...prev,
-                              sixMeterRate: value === "" ? "" : Number.parseFloat(value) || 0,
-                            }))
-                          }
-                        }}
-                        onFocus={(e) => {
-                          e.target.select()
-                          if (formData.sixMeterRate) {
-                            setFormData((prev) => ({
-                              ...prev,
-                              sixMeterRate: Number.parseFloat(prev.sixMeterRate).toString(),
-                            }))
-                          }
-                        }}
-                        onBlur={() => {
-                          if (formData.sixMeterRate !== "") {
-                            setFormData((prev) => ({
-                              ...prev,
-                              sixMeterRate: Number.parseFloat(prev.sixMeterRate),
-                            }))
-                          }
-                        }}
-                        style={{
-                          width: "90px",
-                          padding: "8px",
-                          border: "1px solid #000",
-                          borderRadius: "4px",
-                          backgroundColor:
-                            rateFieldsEnabled.sixMeter && !isWeightBased && !rateLockStatus.sixMeter
-                              ? "#fff"
-                              : "#f5f5f5",
-                          fontSize: "16px",
-                          position: "relative",
-                          zIndex: 1000,
-                          cursor:
-                            rateFieldsEnabled.sixMeter && !isWeightBased && !rateLockStatus.sixMeter
-                              ? "text"
-                              : "not-allowed",
-                        }}
-                        disabled={!rateFieldsEnabled.sixMeter || isWeightBased || rateLockStatus.sixMeter}
-                        placeholder={
-                          rateFieldsEnabled.sixMeter && !isWeightBased && !rateLockStatus.sixMeter ? "0.00" : ""
-                        }
-                      />
-                    </div>
-                  </div>
-                </div>
-
-                <div className="controller-instructions-container-input">
-                  <label>12m</label>
-                  <div className="controller-instructions-container-rate-group" style={{ display: "flex", width: "100px" }}>
-                    <input
-                      type="number"
-                      className={fieldErrors.containers ? "controller-instructions-error-field" : ""}
-                      value={formData.num_twelve_meters}
-                      min="0"
-                      name="num_twelve_meters"
-                      onChange={(e) => handleContainerCountChange("num_twelve_meters", e.target.value)}
-                      disabled={isWeightBased || isSetRateMode}
-                    />
-                    <div style={{ width: "100%", marginLeft: "10px" }}>
-                      <input
-                        type="text"
-                        value={
-                          formData.twelveMeterRate !== undefined && formData.twelveMeterRate !== ""
-                            ? Number.parseFloat(formData.twelveMeterRate).toFixed(2)
-                            : ""
-                        }
-                        onChange={(e) => {
-                          const value = e.target.value
-                          if (value === "" || /^\d*\.?\d*$/.test(value)) {
-                            setFormData((prev) => ({
-                              ...prev,
-                              twelveMeterRate: value === "" ? "" : Number.parseFloat(value) || 0,
-                            }))
-                          }
-                        }}
-                        onFocus={(e) => {
-                          e.target.select()
-                          if (formData.twelveMeterRate) {
-                            setFormData((prev) => ({
-                              ...prev,
-                              twelveMeterRate: Number.parseFloat(prev.twelveMeterRate).toString(),
-                            }))
-                          }
-                        }}
-                        onBlur={() => {
-                          if (formData.twelveMeterRate !== "") {
-                            setFormData((prev) => ({
-                              ...prev,
-                              twelveMeterRate: Number.parseFloat(prev.twelveMeterRate),
-                            }))
-                          }
-                        }}
-                        style={{
-                          width: "90px",
-                          padding: "8px",
-                          border: "1px solid #000",
-                          borderRadius: "4px",
-                          backgroundColor:
-                            rateFieldsEnabled.twelveMeter && !isWeightBased && !rateLockStatus.twelveMeter
-                              ? "#fff"
-                              : "#f5f5f5",
-                          fontSize: "16px",
-                          position: "relative",
-                          zIndex: 1000,
-                          cursor:
-                            rateFieldsEnabled.twelveMeter && !isWeightBased && !rateLockStatus.twelveMeter
-                              ? "text"
-                              : "not-allowed",
-                        }}
-                        disabled={!rateFieldsEnabled.twelveMeter || isWeightBased || rateLockStatus.twelveMeter}
-                        placeholder={
-                          rateFieldsEnabled.twelveMeter && !isWeightBased && !rateLockStatus.twelveMeter ? "0.00" : ""
-                        }
-                      />
-                    </div>
-                  </div>
-                </div>
-
-                <div className="controller-instructions-container-input">
-                  <label>Abnormal</label>
-                  <div className="controller-instructions-container-rate-group" style={{ display: "flex", width: "100px" }}>
-                    <input
-                      type="number"
-                      className={fieldErrors.containers ? "controller-instructions-error-field" : ""}
-                      value={formData.num_abnormal}
-                      min="0"
-                      name="num_abnormal"
-                      onChange={(e) => handleContainerCountChange("num_abnormal", e.target.value)}
-                      disabled={isWeightBased || isSetRateMode}
-                    />
-                    <div style={{ width: "100%", marginLeft: "10px" }}>
-                      <input
-                        type="text"
-                        value={
-                          formData.abnormalRate !== undefined && formData.abnormalRate !== ""
-                            ? Number.parseFloat(formData.abnormalRate).toFixed(2)
-                            : ""
-                        }
-                        onChange={(e) => {
-                          const value = e.target.value
-                          if (value === "" || /^\d*\.?\d*$/.test(value)) {
-                            setFormData((prev) => ({
-                              ...prev,
-                              abnormalRate: value === "" ? "" : Number.parseFloat(value) || 0,
-                            }))
-                          }
-                        }}
-                        onFocus={(e) => {
-                          e.target.select()
-                          if (formData.abnormalRate) {
-                            setFormData((prev) => ({
-                              ...prev,
-                              abnormalRate: Number.parseFloat(prev.abnormalRate).toString(),
-                            }))
-                          }
-                        }}
-                        onBlur={() => {
-                          if (formData.abnormalRate !== "") {
-                            setFormData((prev) => ({
-                              ...prev,
-                              abnormalRate: Number.parseFloat(prev.abnormalRate),
-                            }))
-                          }
-                        }}
-                        style={{
-                          width: "90px",
-                          padding: "8px",
-                          border: "1px solid #000",
-                          borderRadius: "4px",
-                          backgroundColor: rateFieldsEnabled.abnormal && !isWeightBased ? "#fff" : "#f5f5f5",
-                          fontSize: "16px",
-                          position: "relative",
-                          zIndex: 1000,
-                          cursor: rateFieldsEnabled.abnormal && !isWeightBased ? "text" : "not-allowed",
-                        }}
-                        disabled={!rateFieldsEnabled.abnormal || isWeightBased}
-                        placeholder={rateFieldsEnabled.abnormal && !isWeightBased ? "0.00" : ""}
-                      />
-                    </div>
-                  </div>
-                </div>
-
-                {fieldErrors.containerCount && (
-                  <div
-                    className="controller-instructions-error-message"
-                    style={{
-                      color: "#d32f2f",
-                      fontSize: "0.75rem",
-                      marginTop: "4px",
-                      gridColumn: "1 / -1",
-                      textAlign: "center",
-                      padding: "4px 8px",
-                      backgroundColor: "#ffebee",
-                      borderRadius: "4px",
-                    }}
-                  >
-                    {fieldErrors.containerCount}
-                  </div>
-                )}
-              </div>
-
-              {/* Unit per / weight rate row */}
-              <div className="controller-instructions-form-row" style={{ margin: "16px 0", padding: "0 10px" }}>
-                <div
-                  style={{
-                    display: "flex",
-                    alignItems: "center",
-                    gap: "8px",
-                    flexWrap: "nowrap",
-                    width: "100%",
-                    justifyContent: "flex-start",
-                    flexShrink: 1,
-                    minWidth: 0,
-                  }}
-                >
-                  <div
-                    style={{
-                      display: "flex",
-                      alignItems: "center",
-                      gap: "8px",
-                      whiteSpace: "nowrap",
-                      flexShrink: 0,
-                    }}
-                  >
-                    <div style={{ display: "flex", flexDirection: "column" }}>
-                      <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-                        <span style={{ whiteSpace: "nowrap", fontSize: "13px", color: "#333" }}>Unit per:</span>
-                        <div className="controller-instructions-select-wrapper" style={{ width: "100px" }}>
-                          <select
-                            className="controller-instructions-dropdown"
-                            name="rateWeight"
-                            value={String(formData.rateWeight || "Container")}
-                            onChange={handleInputChange}
-                            disabled={
-                              formData.shipmentTypeId === "1" ||
-                              formData.shipmentTypeId === "2" ||
-                              formData.shipmentTypeId === "3" ||
-                              formData.shipmentTypeId === "5"
-                            }
-                            style={{
-                              width: "100%",
-                              padding: "6px 8px",
-                              border: "1px solid #ced4da",
-                              borderRadius: "4px",
-                              fontSize: "13px",
-                              backgroundColor:
-                                formData.shipmentTypeId === "1" ||
-                                formData.shipmentTypeId === "2" ||
-                                formData.shipmentTypeId === "3" ||
-                                formData.shipmentTypeId === "4" ||
-                                formData.shipmentTypeId === "5"
-                                  ? "#e9ecef"
-                                  : "#fff",
-                              height: "32px",
-                              lineHeight: "1",
-                              cursor:
-                                formData.shipmentTypeId === "1" ||
-                                formData.shipmentTypeId === "2" ||
-                                formData.shipmentTypeId === "3" ||
-                                formData.shipmentTypeId === "5"
-                                  ? "not-allowed"
-                                  : "pointer",
-                            }}
-                          >
-                            {formData.shipmentTypeId === "1" ||
-                            formData.shipmentTypeId === "2" ||
-                            formData.shipmentTypeId === "3" ||
-                            formData.shipmentTypeId === "5" ? (
-                              <option value="Container">Container</option>
-                            ) : formData.shipmentTypeId === "4" ? (
-                              <>
-                                <option value="kg">kg</option>
-                                <option value="ton">ton</option>
-                              </>
-                            ) : (
-                              <>
-                                <option value="kg">kg</option>
-                                <option value="ton">ton</option>
-                                <option value="Container">Container</option>
-                              </>
-                            )}
-                          </select>
-                        </div>
-                      </div>
-                    </div>
-                    {isWeightBased && formData.shipmentTypeId !== "4" && (
-                      <div
-                        className="controller-instructions-weight-input-group"
-                        ref={fieldRefs.current.weight}
-                        style={{ display: "flex", alignItems: "center", gap: "4px" }}
-                      >
-                        <div style={{ display: "flex", gap: "4px", alignItems: "center" }}>
-                          <div className="controller-instructions-input-wrapper" style={{ width: "100%" }}>
-                            <input
-                              type="text"
-                              className={`controller-instructions-form-input ${fieldErrors.weight ? "controller-instructions-error-field" : ""}`}
-                              placeholder="Wt"
-                              name="weight"
-                              value={formData.weight}
-                              onChange={(e) => {
-                                const value = e.target.value
-                                if (value === "" || /^[0-9]*\.?[0-9]*$/.test(value)) {
-                                  handleInputChange(e)
-                                }
-                              }}
-                              style={{
-                                width: "100%",
-                                padding: "4px 6px",
-                                border: "1px solid #ced4da",
-                                borderRadius: "4px",
-                                fontSize: "12px",
-                                height: "28px",
-                                lineHeight: "1",
-                              }}
-                            />
-                          </div>
-                          <div className="controller-instructions-input-wrapper" style={{ width: "100%" }}>
-                            <input
-                              type="text"
-                              className={`controller-instructions-form-input ${fieldErrors.unitrate ? "controller-instructions-error-field" : ""}`}
-                              placeholder="Rate"
-                              name="unitrate"
-                              value={formData.unitrate || ""}
-                              onChange={(e) => {
-                                const value = e.target.value
-                                if (value === "" || /^[0-9]*\.?[0-9]*$/.test(value)) {
-                                  handleInputChange(e)
-                                }
-                              }}
-                              style={{
-                                width: "100%",
-                                padding: "4px 6px",
-                                border: "1px solid #ced4da",
-                                borderRadius: "4px",
-                                fontSize: "12px",
-                                height: "28px",
-                                lineHeight: "1",
-                              }}
-                            />
-                          </div>
-                          <span style={{ whiteSpace: "nowrap", fontSize: "13px", color: "#333" }}>
-                            {formData.rateWeight}
-                          </span>
-                        </div>
-                        <ErrorTooltip message={fieldErrors.weight} />
-                        <ErrorTooltip message={fieldErrors.unitrate} />
-                      </div>
-                    )}
-                    {isWeightBased && formData.shipmentTypeId === "4" && (
-                      <div>
-                        <div
-                          className="controller-instructions-weight-input-group"
-                          ref={fieldRefs.current.weight}
-                          style={{ display: "flex", alignItems: "center", gap: "4px" }}
-                        >
-                          <div className="controller-instructions-input-wrapper" style={{ width: "100%" }}>
-                            <input
-                              type="text"
-                              className={`controller-instructions-form-input ${fieldErrors.unitrate ? "controller-instructions-error-field" : ""}`}
-                              placeholder="Rate"
-                              name="unitrate"
-                              value={formData.unitrate || ""}
-                              disabled={isSetRate}
-                              onChange={(e) => {
-                                const value = e.target.value
-                                if (value === "" || /^[0-9]*\.?[0-9]*$/.test(value)) {
-                                  handleInputChange(e)
-                                }
-                              }}
-                              style={{
-                                width: "100%",
-                                padding: "4px 6px",
-                                border: "1px solid #ced4da",
-                                borderRadius: "4px",
-                                fontSize: "12px",
-                                height: "28px",
-                                lineHeight: "1",
-                                backgroundColor: isSetRate ? "#e9ecef" : "#fff",
-                                cursor: isSetRate ? "not-allowed" : "text",
-                              }}
-                            />
-                          </div>
-                          <span style={{ whiteSpace: "nowrap", fontSize: "13px", color: "#333" }}>
-                            {formData.rateWeight}
-                          </span>
-                          <ErrorTooltip message={fieldErrors.unitrate} />
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                </div>
-              </div>
-              {/* Set Rate checkbox - positioned below Unit per with spacing, completely outside flex row */}
-              {formData.shipmentTypeId === "4" && (
-                <div style={{ margin: "24px 10px 0", padding: "0" }}>
-                  <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
-                    <label style={{ display: "inline-flex", alignItems: "center", gap: "6px", fontSize: "13px" }}>
-                      <input
-                        type="checkbox"
-                        checked={isSetRate}
-                        onChange={(e) => {
-                          const nextChecked = e.target.checked
-                          setIsSetRate(nextChecked)
-                          if (nextChecked) {
-                            setFormData((prev) => ({ ...prev, unitrate: "" }))
-                            setFieldErrors((prev) => {
-                              if (!prev.unitrate) return prev
-                              const next = { ...prev }
-                              delete next.unitrate
-                              return next
-                            })
-                          }
-                        }}
-                      />
-                      Break Bulk Set Rate
-                    </label>
-                    {isSetRate && (
-                      <div className="controller-instructions-input-wrapper" style={{ width: "140px" }}>
-                        <input
-                          type="text"
-                          className="controller-instructions-form-input"
-                          value={Number.isFinite(Number(setRateValue)) ? String(setRateValue) : ""}
-                          readOnly
-                          disabled
-                          style={{
-                            width: "100%",
-                            padding: "4px 6px",
-                            border: "1px solid #ced4da",
-                            borderRadius: "4px",
-                            fontSize: "12px",
-                            height: "28px",
-                            lineHeight: "1",
-                            backgroundColor: "#e9ecef",
-                            cursor: "not-allowed",
-                          }}
-                        />
-                      </div>
-                    )}
-                  </div>
-                </div>
-              )}
-            </div>
-
-            {/* RIGHT: Booking + dates + VAT/vessel/description */}
-            {true && (
-              <div className="controller-instructions-booking-rates-group">
-                {/* Top row: shipment type + refs */}
-                <div
-                  className="controller-instructions-booking-rates-row"
-                  style={{ marginBottom: "8px", flexWrap: "wrap" }}
-                >
-                  {/* Shipment Type (normal shipments) */}
-                  <div
-                    className="controller-instructions-form-field"
-                    style={{ flex: "1 1 160px" }}
-                  >
-                    <label>Shipment Type</label>
-                    <div
-                      className="controller-instructions-select-wrapper"
-                      ref={fieldRefs.current.shipmentTypeId}
-                    >
-                      <select
-                        className={`dropdown ${
-                          fieldErrors.shipmentTypeId
-                            ? "controller-instructions-error-field"
-                            : ""
-                        }`}
-                        name="shipmentTypeId"
-                        value={formData.shipmentTypeId}
-                        onChange={handleShipmentTypeChange}
-                        disabled={
-                          isLoading.shipmentTypes || shipmentTypes.length === 0
-                        }
-                      >
-                        <option value="" disabled>
-                          Select Shipment
-                        </option>
-                        {shipmentTypes.map((type) => (
-                          <option key={type.shipkey} value={type.shipkey}>
-                            {type.shipmenttype}
-                          </option>
-                        ))}
-                      </select>
-                      <ErrorTooltip message={fieldErrors.shipmentTypeId} />
-                    </div>
-                  </div>
-
-                  {/* Booking Ref */}
-                  <div
-                    className="controller-instructions-form-field"
-                    style={{ flex: "1 1 180px" }}
-                  >
-                    <label>Booking Ref</label>
-                    <div className="controller-instructions-input-wrapper" ref={fieldRefs.current.bookingRef}>
-                      <input
-                        type="text"
-                        className={`controller-instructions-form-input ${fieldErrors.bookingRef ? "controller-instructions-error-field" : ""}`}
-                        placeholder="Booking ref"
-                        name="bookingRef"
-                        value={formData.bookingRef}
-                        onChange={handleInputChange}
-                        style={{ width: "100%" }}
-                      />
-                      <ErrorTooltip message={fieldErrors.bookingRef} />
-                    </div>
-                  </div>
-
-                  {/* File Ref */}
-                  <div className="controller-instructions-form-field" style={{ flex: "1 1 120px" }}>
-                    <label>Client File Reference</label>
-                    <div className="controller-instructions-input-wrapper" ref={fieldRefs.current.fileRef}>
-                      <input
-                        type="text"
-                        className={`controller-instructions-form-input ${fieldErrors.fileRef ? "controller-instructions-error-field" : ""}`}
-                        placeholder="Client File Reference"
-                        name="fileRef"
-                        value={formData.fileRef}
-                        onChange={handleInputChange}
-                        style={{ width: "100%" }}
-                      />
-                      <ErrorTooltip message={fieldErrors.fileRef} />
-                    </div>
-                  </div>
-
-                  {/* Name of Task */}
-                  <div className="controller-instructions-form-field" style={{ flex: "1 1 160px" }}>
-                    <label>KSM File Reference</label>
-                    <div className="controller-instructions-input-wrapper" ref={fieldRefs.current.task}>
-                      <input
-                        type="text"
-                        className={`controller-instructions-form-input ${fieldErrors.task ? "controller-instructions-error-field" : ""}`}
-                        placeholder="KSM File Reference"
-                        name="task"
-                        value={formData.task}
-                        onChange={handleInputChange}
-                        style={{ width: "100%" }}
-                      />
-                      <ErrorTooltip message={fieldErrors.task} />
-                    </div>
-                  </div>
-                </div>
-
-                {/* Date / description rows */}
-                {isCrossHaul ? (
-                  <>
-                    {/* Cross-haul: Last Free Date row */}
-                    <div
-                      className="controller-instructions-booking-rates-row"
-                      style={{ marginBottom: "8px", flexWrap: "wrap" }}
-                    >
-                      <div
-                        className="controller-instructions-form-field"
-                        style={{ flex: "0 0 140px" }}
-                      >
-                        <label>Last Free Date</label>
-                        <div
-                          className="controller-instructions-input-wrapper"
-                          ref={fieldRefs.current.lastFreeDate}
-                        >
-                          <input
-                            type="date"
-                            className={`controller-instructions-form-input ${
-                              fieldErrors.lastFreeDate
-                                ? "controller-instructions-error-field"
-                                : ""
-                            }`}
-                            ref={lastFreeDateRef}
-                            placeholder="Date here"
-                            name="lastFreeDate"
-                            value={formData.lastFreeDate}
-                            onChange={handleInputChange}
-                            min={today}
-                            style={{ width: "100%" }}
-                            onKeyDown={(e) => e.preventDefault()}
-                          />
-                          <ErrorTooltip message={fieldErrors.lastFreeDate} />
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* Cross-haul: Description row */}
-                    <div
-                      className="controller-instructions-booking-rates-row"
-                      style={{ flexWrap: "wrap" }}
-                    >
-                      <div
-                        className="controller-instructions-form-field"
-                        style={{ width: "100%" }}
-                      >
-                        <label>Description from Client</label>
-                        <div
-                          className="controller-instructions-input-wrapper"
-                          ref={fieldRefs.current.description}
-                        >
-                          <input
-                            type="text"
-                            className={`controller-instructions-form-input ${
-                              fieldErrors.description
-                                ? "controller-instructions-error-field"
-                                : ""
-                            }`}
-                            placeholder="Description from Client"
-                            name="description"
-                            value={formData.description}
-                            onChange={handleInputChange}
-                            style={{
-                              width: "100%",
-                              padding: "8px 12px",
-                              border: "1px solid #ced4da",
-                              borderRadius: "4px",
-                              fontSize: "14px",
-                              boxSizing: "border-box",
-                              height: "36px",
-                            }}
-                          />
-                          <ErrorTooltip message={fieldErrors.description} />
-                        </div>
-                      </div>
-                    </div>
-                    {formData.shipmentTypeId === "4" && (
-                      <div
-                        className="controller-instructions-form-row"
-                        style={{ margin: "24px 0 8px", padding: "0 10px" }}
-                      >
-                        <div style={{ width: "100%" }}>
-                          <table
-                            style={{
-                              width: "100%",
-                              borderCollapse: "collapse",
-                              fontSize: "13px",
-                              backgroundColor: "#ffffff",
-                            }}
-                          >
-                            <thead>
-                              <tr>
-                                <th
-                                  style={{
-                                    border: "1px solid #dee2e6",
-                                    padding: "10px 14px",
-                                    backgroundColor: "#cfe5ff",
-                                    fontWeight: 600,
-                                    textAlign: "center",
-                                    whiteSpace: "nowrap",
-                                    minWidth: "170px",
-                                  }}
-                                >
-                                  KSM DN Number
-                                </th>
-                                <th
-                                  style={{
-                                    border: "1px solid #dee2e6",
-                                    padding: "10px 14px",
-                                    backgroundColor: "#cfe5ff",
-                                    fontWeight: 600,
-                                    textAlign: "center",
-                                    whiteSpace: "nowrap",
-                                    minWidth: "150px",
-                                  }}
-                                >
-                                  Ticket Number
-                                </th>
-                                <th
-                                  style={{
-                                    border: "1px solid #dee2e6",
-                                    padding: "10px 14px",
-                                    backgroundColor: "#cfe5ff",
-                                    fontWeight: 600,
-                                    textAlign: "center",
-                                    whiteSpace: "nowrap",
-                                    minWidth: "180px",
-                                  }}
-                                >
-                                  Receipt Book Number
-                                </th>
-                                <th
-                                  style={{
-                                    border: "1px solid #dee2e6",
-                                    padding: "10px 14px",
-                                    backgroundColor: "#cfe5ff",
-                                    fontWeight: 600,
-                                    textAlign: "center",
-                                    whiteSpace: "nowrap",
-                                    minWidth: "140px",
-                                  }}
-                                >
-                                  Weight ({formData.rateWeight})
-                                </th>
-                                <th
-                                  style={{
-                                    border: "1px solid #dee2e6",
-                                    padding: "10px 14px",
-                                    backgroundColor: "#cfe5ff",
-                                    minWidth: "110px",
-                                  }}
-                                ></th>
-                              </tr>
-                            </thead>
-                            <tbody>
-                              {weightRows.map((row) => (
-                                <tr key={row.id}>
-                                  <td
-                                    style={{
-                                      border: "1px solid #dee2e6",
-                                      padding: "6px 10px",
-                                      verticalAlign: "middle",
-                                    }}
-                                  >
-                                    <input
-                                      type="text"
-                                      className="controller-instructions-form-input"
-                                      value={row.ksmDmNo || ""}
-                                      onChange={(e) => updateWeightRow(row.id, "ksmDmNo", e.target.value)}
-                                      style={{ width: "100%", fontSize: "13px", height: "32px" }}
-                                    />
-                                  </td>
-                                  <td
-                                    style={{
-                                      border: "1px solid #dee2e6",
-                                      padding: "6px 10px",
-                                      verticalAlign: "middle",
-                                    }}
-                                  >
-                                    <input
-                                      type="text"
-                                      className="controller-instructions-form-input"
-                                      value={row.ticketNo || ""}
-                                      onChange={(e) => updateWeightRow(row.id, "ticketNo", e.target.value)}
-                                      style={{ width: "100%", fontSize: "13px", height: "32px" }}
-                                    />
-                                  </td>
-                                  <td
-                                    style={{
-                                      border: "1px solid #dee2e6",
-                                      padding: "6px 10px",
-                                      verticalAlign: "middle",
-                                    }}
-                                  >
-                                    <input
-                                      type="text"
-                                      className="controller-instructions-form-input"
-                                      value={row.receiptBookNo || ""}
-                                      onChange={(e) => updateWeightRow(row.id, "receiptBookNo", e.target.value)}
-                                      style={{ width: "100%", fontSize: "13px", height: "32px" }}
-                                    />
-                                  </td>
-                                  <td
-                                    style={{
-                                      border: "1px solid #dee2e6",
-                                      padding: "6px 10px",
-                                      verticalAlign: "middle",
-                                    }}
-                                  >
-                                    <input
-                                      type="text"
-                                      className="controller-instructions-form-input"
-                                      value={row.weight || ""}
-                                      onChange={(e) => updateWeightRow(row.id, "weight", e.target.value)}
-                                      style={{ width: "100%", fontSize: "13px", height: "32px" }}
-                                    />
-                                  </td>
-                                  <td
-                                    style={{
-                                      border: "1px solid #dee2e6",
-                                      padding: "6px 10px",
-                                      textAlign: "center",
-                                      whiteSpace: "nowrap",
-                                    }}
-                                  >
-                                    <button
-                                      type="button"
-                                      onClick={() => removeWeightRow(row.id)}
-                                      style={{
-                                        padding: "4px 10px",
-                                        fontSize: "12px",
-                                        borderRadius: "4px",
-                                        border: "1px solid #dc3545",
-                                        backgroundColor: "#fff",
-                                        color: "#dc3545",
-                                        cursor: "pointer",
-                                      }}
-                                    >
-                                      Remove
-                                    </button>
-                                  </td>
-                                </tr>
-                              ))}
-                              <tr>
-                                <td
-                                  colSpan={5}
-                                  style={{ padding: "10px 14px", textAlign: "left", backgroundColor: "#f4f8ff" }}
-                                >
-                                  <button
-                                    type="button"
-                                    onClick={addWeightRow}
-                                    style={{
-                                      padding: "6px 12px",
-                                      fontSize: "13px",
-                                      borderRadius: "4px",
-                                      border: "1px solid #4a90e2",
-                                      backgroundColor: "#4a90e2",
-                                      color: "#fff",
-                                      cursor: "pointer",
-                                    }}
-                                  >
-                                    Add Row
-                                  </button>
-                                </td>
-                              </tr>
-                            </tbody>
-                          </table>
-                        </div>
-                      </div>
-                    )}
-                  </>
-                ) : (
-                  <>
-                    {/* Import/Export: Stack Date + Last Free Date row */}
-                    <div
-                      className="controller-instructions-booking-rates-row"
-                      style={{ marginBottom: "8px", flexWrap: "wrap" }}
-                    >
-                      {/* Stack/ETA Date */}
-                      <div
-                        className="controller-instructions-form-field"
-                        style={{ flex: "0 0 140px" }}
-                      >
-                        <label>{isImport ? "ETA" : "Stack Date"}</label>
-                        <div
-                          className="controller-instructions-input-wrapper"
-                          ref={etaDateRef}
-                        >
-                          <input
-                            type="date"
-                            className={`controller-instructions-form-input ${
-                              fieldErrors.stackDate
-                                ? "controller-instructions-error-field"
-                                : ""
-                            }`}
-                            ref={etaDateRef}
-                            name="stackDate"
-                            value={formData.stackDate}
-                            onChange={handleInputChange}
-                            style={{
-                              width: "100%",
-                              padding: "6px 8px",
-                              border: "1px solid #ced4da",
-                              borderRadius: "4px",
-                              fontSize: "13px",
-                              height: "32px",
-                            }}
-                            min={today}
-                            disabled={false}
-                            onClick={() => openCalendar(etaDateRef)}
-                            onKeyDown={(e) => e.preventDefault()}
-                          />
-                          <ErrorTooltip message={fieldErrors.stackDate} />
-                        </div>
-                      </div>
-
-                      {/* Last Free Date */}
-                      <div
-                        className="controller-instructions-form-field"
-                        style={{ flex: "0 0 140px" }}
-                      >
-                        <label>Last Free Date</label>
-                        <div
-                          className="controller-instructions-input-wrapper"
-                          ref={fieldRefs.current.lastFreeDate}
-                        >
-                          <input
-                            type="date"
-                            className={`controller-instructions-form-input ${
-                              fieldErrors.lastFreeDate
-                                ? "controller-instructions-error-field"
-                                : ""
-                            }`}
-                            ref={lastFreeDateRef}
-                            placeholder="Date here"
-                            name="lastFreeDate"
-                            value={formData.lastFreeDate}
-                            onChange={handleInputChange}
-                            min={today}
-                            style={{ width: "100%" }}
-                            onKeyDown={(e) => e.preventDefault()}
-                          />
-                          <ErrorTooltip message={fieldErrors.lastFreeDate} />
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* Import/Export: VAT + Vessel + Description row */}
-                    <div
-                      className="controller-instructions-booking-rates-row"
-                      style={{ flexWrap: "wrap" }}
-                    >
-                      {/* VAT toggle */}
-                      <div
-                        className="controller-instructions-form-field"
-                        style={{ flex: "0 0 120px", minWidth: "100px" }}
-                      >
-                        <label>VAT</label>
-                        <div className="controller-instructions-input-wrapper">
-                          <label
-                            style={{
-                              display: "inline-flex",
-                              alignItems: "center",
-                              gap: "8px",
-                              cursor: "pointer",
-                            }}
-                          >
-                            <span style={{ fontSize: "12px" }}>0%</span>
-                            <input
-                              type="checkbox"
-                              checked={formData.vat !== 0}
-                              onChange={(e) =>
-                                setFormData((prev) => ({
-                                  ...prev,
-                                  vat: e.target.checked ? 15 : 0,
-                                }))
-                              }
-                              style={{ display: "none" }}
-                            />
-                            <span
-                              className="vat-toggle-slider"
-                              style={{
-                                position: "relative",
-                                width: "40px",
-                                height: "20px",
-                                borderRadius: "10px",
-                                backgroundColor: formData.vat !== 0 ? "#4a90e2" : "#ccc",
-                                transition: "background-color 0.2s ease",
-                                display: "inline-block",
-                              }}
-                            >
-                              <span
-                                style={{
-                                  position: "absolute",
-                                  top: "2px",
-                                  left: formData.vat !== 0 ? "22px" : "2px",
-                                  width: "16px",
-                                  height: "16px",
-                                  borderRadius: "50%",
-                                  backgroundColor: "#fff",
-                                  boxShadow: "0 1px 3px rgba(0,0,0,0.3)",
-                                  transition: "left 0.2s ease",
-                                }}
-                              />
-                            </span>
-                            <span style={{ fontSize: "12px" }}>15%</span>
-                          </label>
-                        </div>
-                      </div>
-
-                      {/* Vessel Name */}
-                      <div
-                        className="controller-instructions-form-field"
-                        style={{ flex: "1 1 160px", minWidth: "140px" }}
-                      >
-                        <label>Vessel Name</label>
-                        <div
-                          className="controller-instructions-input-wrapper"
-                          ref={fieldRefs.current.vesselName}
-                        >
-                          <input
-                            type="text"
-                            className={`controller-instructions-form-input vessel-name-input ${
-                              fieldErrors.vesselName
-                                ? "controller-instructions-error-field"
-                                : ""
-                            }`}
-                            placeholder="Vessel name"
-                            name="vesselName"
-                            value={formData.vesselName}
-                            onChange={handleInputChange}
-                            style={{
-                              width: "100%",
-                              padding: "4px 6px",
-                              border: "1px solid #ced4da",
-                              borderRadius: "4px",
-                              fontSize: "12px",
-                              height: "30px",
-                            }}
-                          />
-                          <ErrorTooltip message={fieldErrors.vesselName} />
-                        </div>
-                      </div>
-
-                      {/* Description */}
-                      <div
-                        className="controller-instructions-form-field"
-                        style={{ flex: "2 1 200px", minWidth: "160px" }}
-                      >
-                        <label>Description</label>
-                        <div
-                          className="controller-instructions-input-wrapper"
-                          ref={fieldRefs.current.description}
-                        >
-                          <input
-                            type="text"
-                            className={`controller-instructions-form-input ${
-                              fieldErrors.description
-                                ? "controller-instructions-error-field"
-                                : ""
-                            }`}
-                            placeholder="Description"
-                            name="description"
-                            value={formData.description}
-                            onChange={handleInputChange}
-                            style={{
-                              width: "100%",
-                              padding: "4px 6px",
-                              border: "1px solid #ced4da",
-                              borderRadius: "4px",
-                              fontSize: "12px",
-                              height: "30px",
-                            }}
-                          />
-                          <ErrorTooltip message={fieldErrors.description} />
-                        </div>
-                      </div>
-                    </div>
-                    {formData.shipmentTypeId === "4" && (
-                      <div
-                        className="controller-instructions-form-row"
-                        style={{ margin: "24px 0 8px", padding: "0 10px" }}
-                      >
-                        <div style={{ width: "100%" }}>
-                          <table
-                            style={{
-                              width: "100%",
-                              borderCollapse: "collapse",
-                              fontSize: "13px",
-                              backgroundColor: "#ffffff",
-                            }}
-                          >
-                            <thead>
-                              <tr>
-                                <th
-                                  style={{
-                                    border: "1px solid #dee2e6",
-                                    padding: "10px 14px",
-                                    backgroundColor: "#cfe5ff",
-                                    fontWeight: 600,
-                                    textAlign: "center",
-                                    whiteSpace: "nowrap",
-                                    minWidth: "170px",
-                                  }}
-                                >
-                                  KSM DN Number
-                                </th>
-                                <th
-                                  style={{
-                                    border: "1px solid #dee2e6",
-                                    padding: "10px 14px",
-                                    backgroundColor: "#cfe5ff",
-                                    fontWeight: 600,
-                                    textAlign: "center",
-                                    whiteSpace: "nowrap",
-                                    minWidth: "150px",
-                                  }}
-                                >
-                                  Ticket Number
-                                </th>
-                                <th
-                                  style={{
-                                    border: "1px solid #dee2e6",
-                                    padding: "10px 14px",
-                                    backgroundColor: "#cfe5ff",
-                                    fontWeight: 600,
-                                    textAlign: "center",
-                                    whiteSpace: "nowrap",
-                                    minWidth: "180px",
-                                  }}
-                                >
-                                  Receipt Book Number
-                                </th>
-                                <th
-                                  style={{
-                                    border: "1px solid #dee2e6",
-                                    padding: "10px 14px",
-                                    backgroundColor: "#cfe5ff",
-                                    fontWeight: 600,
-                                    textAlign: "center",
-                                    whiteSpace: "nowrap",
-                                    minWidth: "140px",
-                                  }}
-                                >
-                                  Weight ({formData.rateWeight})
-                                </th>
-                                <th
-                                  style={{
-                                    border: "1px solid #dee2e6",
-                                    padding: "10px 14px",
-                                    backgroundColor: "#cfe5ff",
-                                    minWidth: "110px",
-                                  }}
-                                ></th>
-                              </tr>
-                            </thead>
-                            <tbody>
-                              {weightRows.map((row) => (
-                                <tr key={row.id}>
-                                  <td
-                                    style={{
-                                      border: "1px solid #dee2e6",
-                                      padding: "6px 10px",
-                                      verticalAlign: "middle",
-                                    }}
-                                  >
-                                    <input
-                                      type="text"
-                                      className="controller-instructions-form-input"
-                                      value={row.ksmDmNo || ""}
-                                      onChange={(e) => updateWeightRow(row.id, "ksmDmNo", e.target.value)}
-                                      style={{ width: "100%", fontSize: "13px", height: "32px" }}
-                                    />
-                                  </td>
-                                  <td
-                                    style={{
-                                      border: "1px solid #dee2e6",
-                                      padding: "6px 10px",
-                                      verticalAlign: "middle",
-                                    }}
-                                  >
-                                    <input
-                                      type="text"
-                                      className="controller-instructions-form-input"
-                                      value={row.ticketNo || ""}
-                                      onChange={(e) => updateWeightRow(row.id, "ticketNo", e.target.value)}
-                                      style={{ width: "100%", fontSize: "13px", height: "32px" }}
-                                    />
-                                  </td>
-                                  <td
-                                    style={{
-                                      border: "1px solid #dee2e6",
-                                      padding: "6px 10px",
-                                      verticalAlign: "middle",
-                                    }}
-                                  >
-                                    <input
-                                      type="text"
-                                      className="controller-instructions-form-input"
-                                      value={row.receiptBookNo || ""}
-                                      onChange={(e) => updateWeightRow(row.id, "receiptBookNo", e.target.value)}
-                                      style={{ width: "100%", fontSize: "13px", height: "32px" }}
-                                    />
-                                  </td>
-                                  <td
-                                    style={{
-                                      border: "1px solid #dee2e6",
-                                      padding: "6px 10px",
-                                      verticalAlign: "middle",
-                                    }}
-                                  >
-                                    <input
-                                      type="text"
-                                      className="controller-instructions-form-input"
-                                      value={row.weight || ""}
-                                      onChange={(e) => updateWeightRow(row.id, "weight", e.target.value)}
-                                      style={{ width: "100%", fontSize: "13px", height: "32px" }}
-                                    />
-                                  </td>
-                                  <td
-                                    style={{
-                                      border: "1px solid #dee2e6",
-                                      padding: "6px 10px",
-                                      textAlign: "center",
-                                      whiteSpace: "nowrap",
-                                    }}
-                                  >
-                                    <button
-                                      type="button"
-                                      onClick={() => removeWeightRow(row.id)}
-                                      style={{
-                                        padding: "4px 10px",
-                                        fontSize: "12px",
-                                        borderRadius: "4px",
-                                        border: "1px solid #dc3545",
-                                        backgroundColor: "#fff",
-                                        color: "#dc3545",
-                                        cursor: "pointer",
-                                      }}
-                                    >
-                                      Remove
-                                    </button>
-                                  </td>
-                                </tr>
-                              ))}
-                              <tr>
-                                <td
-                                  colSpan={5}
-                                  style={{ padding: "10px 14px", textAlign: "left", backgroundColor: "#f4f8ff" }}
-                                >
-                                  <button
-                                    type="button"
-                                    onClick={addWeightRow}
-                                    style={{
-                                      padding: "6px 12px",
-                                      fontSize: "13px",
-                                      borderRadius: "4px",
-                                      border: "1px solid #4a90e2",
-                                      backgroundColor: "#4a90e2",
-                                      color: "#fff",
-                                      cursor: "pointer",
-                                    }}
-                                  >
-                                    Add Row
-                                  </button>
-                                </td>
-                              </tr>
-                            </tbody>
-                          </table>
-                        </div>
-                      </div>
-                    )}
-                  </>
-                )}
-              </div>
-            )}
-          </div>
-        </div>
-        {/* Container Details Section - Only show for container-based calculations */}
-        {!isWeightBased && showContainerDetails ? (
-          <div className="container-details-section" style={{ margin: "20px 0", width: "100%" }}>
-            <div
-              className="controller-instructions-form-section"
-              style={{ backgroundColor: "#f8f9fa", padding: "15px", borderRadius: "4px" }}
-            >
-              <h4 style={{ marginBottom: "15px", color: "#0d6efd" }}>Container Details</h4>
-              <div style={{ overflowX: "auto" }}>
-                <table className="table" style={{ marginBottom: "0", backgroundColor: "white" }}>
-                  <thead className="table-primary">
-                    <tr>
-                      <th style={{ width: "5%" }}>#</th>
-                      <th style={{ width: "15%" }}>Container Type</th>
-                      <th style={{ width: "15%" }}>Container Number</th>
-                      {(isExport || formData.shipmentTypeId === "2") && <th style={{ width: "15%" }}>File Reference</th>}
-                      {(isImport || isExport || isCrossHaul) && <th style={{ width: "10%" }}>Weight</th>}
-                      <th style={{ width: (isImport || isExport || isCrossHaul) ? "25%" : "40%" }}>Cargo Description</th>
-                      <th style={{ width: "80px", textAlign: "center" }}>Hazardous</th>
-                      <th style={{ width: "100px", textAlign: "center" }}>Add Surcharges</th>
-                      {allowVgmUI && (
-                        <th style={{ width: "60px", textAlign: "center" }}>VGM</th>
-                      )}
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {containers.map((container) => (
-                      <tr key={container.id}>
-                        <td>{container.id}</td>
-                        <td>{container.containerType}</td>
-                        <td>
-                          <div style={{ position: "relative" }}>
-                            <input
-                              type="text"
-                              className={`form-control form-control-sm ${containerFieldErrors[`container-${container.id}`] ? "is-invalid" : ""}`}
-                              value={container.containerNum}
-                              onChange={(e) => handleContainerChange(container.id, "containerNum", e.target.value)}
-                              placeholder="Enter container number"
-                              maxLength={20}
-                              style={{
-                                minWidth: "120px",
-                                backgroundColor: containerFieldErrors[`container-${container.id}`]
-                                  ? "#ffebee"
-                                  : "white",
-                                borderColor: containerFieldErrors[`container-${container.id}`] ? "#f44336" : "#ced4da",
-                              }}
-                            />
-                            {containerFieldErrors[`container-${container.id}`] && (
-                              <div
-                                style={{
-                                  position: "fixed",
-                                  zIndex: 9999,
-                                  backgroundColor: "#f44336",
-                                  color: "white",
-                                  padding: "6px 10px",
-                                  borderRadius: "4px",
-                                  fontSize: "12px",
-                                  whiteSpace: "nowrap",
-                                  boxShadow: "0 4px 8px rgba(0,0,0,0.3)",
-                                  transform: "translateY(4px)",
-                                  pointerEvents: "none",
-                                  maxWidth: "250px",
-                                }}
-                                ref={(el) => {
-                                  if (el) {
-                                    const input = el.previousElementSibling
-                                    if (input) {
-                                      const rect = input.getBoundingClientRect()
-                                      el.style.left = `${rect.left}px`
-                                      el.style.top = `${rect.bottom + 4}px`
-                                    }
-                                  }
-                                }}
-                              >
-                                {containerFieldErrors[`container-${container.id}`]}
-                                <div
-                                  style={{
-                                    position: "absolute",
-                                    top: "-4px",
-                                    left: "10px",
-                                    width: "0",
-                                    height: "0",
-                                    borderLeft: "4px solid transparent",
-                                    borderRight: "4px solid transparent",
-                                    borderBottom: "4px solid #f44336",
-                                  }}
-                                />
-                              </div>
-                            )}
-                          </div>
-                        </td>
-                        {(isExport || formData.shipmentTypeId === "2") && (
-                          <td>
-                            <div style={{ position: "relative" }}>
-                              <input
-                                type="text"
-                                className={`form-control form-control-sm ${containerFieldErrors[`file-ref-${container.id}`] ? "is-invalid" : ""}`}
-                                value={container.fileRef || ""}
-                                onChange={(e) => handleContainerChange(container.id, "fileRef", e.target.value)}
-                                placeholder="Enter file reference"
-                                maxLength={20}
-                                style={{
-                                  minWidth: "120px",
-                                  backgroundColor: containerFieldErrors[`file-ref-${container.id}`]
-                                    ? "#ffebee"
-                                    : "white",
-                                  borderColor: containerFieldErrors[`file-ref-${container.id}`] ? "#f44336" : "#ced4da",
-                                }}
-                              />
-                              {containerFieldErrors[`file-ref-${container.id}`] && (
-                                <div
-                                  style={{
-                                    position: "fixed",
-                                    zIndex: 9999,
-                                    backgroundColor: "#f44336",
-                                    color: "white",
-                                    padding: "6px 10px",
-                                    borderRadius: "4px",
-                                    fontSize: "12px",
-                                    whiteSpace: "nowrap",
-                                    boxShadow: "0 4px 8px rgba(0,0,0,0.3)",
-                                    transform: "translateY(4px)",
-                                    pointerEvents: "none",
-                                    maxWidth: "250px",
-                                  }}
-                                  ref={(el) => {
-                                    if (el) {
-                                      const input = el.previousElementSibling
-                                      if (input) {
-                                        const rect = input.getBoundingClientRect()
-                                        el.style.left = `${rect.left}px`
-                                        el.style.top = `${rect.bottom + 4}px`
-                                      }
-                                    }
-                                  }}
-                                >
-                                  {containerFieldErrors[`file-ref-${container.id}`]}
-                                  <div
-                                    style={{
-                                      position: "absolute",
-                                      top: "-4px",
-                                      left: "10px",
-                                      width: "0",
-                                      height: "0",
-                                      borderLeft: "4px solid transparent",
-                                      borderRight: "4px solid transparent",
-                                      borderBottom: "4px solid #f44336",
-                                    }}
-                                  />
-                                </div>
-                              )}
-                            </div>
-                          </td>
-                        )}
-                        {(isImport || isExport || isCrossHaul) && (
-                          <td>
-                            <div style={{ position: "relative" }}>
-                              <input
-                                type="text"
-                                className={`form-control form-control-sm ${containerFieldErrors[`weight-${container.id}`] ? "is-invalid" : ""}`}
-                                value={container.weight || ""}
-                                onChange={(e) => handleContainerChange(container.id, "weight", e.target.value)}
-                                placeholder="Enter weight"
-                                style={{
-                                  minWidth: "80px",
-                                  backgroundColor: containerFieldErrors[`weight-${container.id}`] ? "#ffebee" : "white",
-                                  borderColor: containerFieldErrors[`weight-${container.id}`] ? "#f44336" : "#ced4da",
-                                }}
-                              />
-                              {containerFieldErrors[`weight-${container.id}`] && (
-                                <div
-                                  style={{
-                                    position: "fixed",
-                                    zIndex: 9999,
-                                    backgroundColor: "#f44336",
-                                    color: "white",
-                                    padding: "6px 10px",
-                                    borderRadius: "4px",
-                                    fontSize: "12px",
-                                    whiteSpace: "nowrap",
-                                    boxShadow: "0 4px 8px rgba(0,0,0,0.3)",
-                                    transform: "translateY(4px)",
-                                    pointerEvents: "none",
-                                    maxWidth: "250px",
-                                  }}
-                                  ref={(el) => {
-                                    if (el) {
-                                      const input = el.previousElementSibling
-                                      if (input) {
-                                        const rect = input.getBoundingClientRect()
-                                        el.style.left = `${rect.left}px`
-                                        el.style.top = `${rect.bottom + 4}px`
-                                      }
-                                    }
-                                  }}
-                                >
-                                  {containerFieldErrors[`weight-${container.id}`]}
-                                  <div
-                                    style={{
-                                      position: "absolute",
-                                      top: "-4px",
-                                      left: "10px",
-                                      width: "0",
-                                      height: "0",
-                                      borderLeft: "4px solid transparent",
-                                      borderRight: "4px solid transparent",
-                                      borderBottom: "4px solid #f44336",
-                                    }}
-                                  />
-                                </div>
-                              )}
-                            </div>
-                          </td>
-                        )}
-                        <td>
-                          <input
-                            type="text"
-                            className="form-control form-control-sm"
-                            value={container.cargoDescription}
-                            onChange={(e) => handleContainerChange(container.id, "cargoDescription", e.target.value)}
-                            placeholder="Enter cargo description"
-                          />
-                        </td>
-                        <td style={{ textAlign: "center" }}>
-                          <div className="form-check" style={{ display: "flex", justifyContent: "center" }}>
-                            <input
-                              type="checkbox"
-                              className="form-check-input"
-                              checked={container.hazardous || false}
-                              onChange={(e) => handleContainerChange(container.id, "hazardous", e.target.checked)}
-                              style={{ cursor: "pointer" }}
-                            />
-                          </div>
-                        </td>
-                        <td style={{ textAlign: "center" }}>
-                          <div className="form-check" style={{ display: "flex", justifyContent: "center" }}>
-                            <input
-                              type="checkbox"
-                              className="form-check-input"
-                              checked={container.addSurcharges || false}
-                              onChange={(e) => handleContainerChange(container.id, "addSurcharges", e.target.checked)}
-                              style={{ cursor: "pointer" }}
-                            />
-                          </div>
-                        </td>
-                        {allowVgmUI && (
-                          <td style={{ textAlign: "center" }}>
-                            <div className="form-check" style={{ display: "flex", justifyContent: "center" }}>
-                              <input
-                                type="checkbox"
-                                className="form-check-input"
-                                checked={container.vgm || false}
-                                onChange={(e) => handleContainerChange(container.id, "vgm", e.target.checked)}
-                                style={{ cursor: "pointer" }}
-                              />
-                            </div>
-                          </td>
-                        )}
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            </div>
-          </div>
-        ) : null}
-        <div className="controller-instructions-button-container" style={{ margin: "20px 0" }}>
-          <button
-            type="submit"
-            className="btn btn-primary"
-            disabled={isSubmitting}
-            style={{
-              padding: "8px 24px",
-              fontSize: "16px",
-              fontWeight: "500",
-              borderRadius: "4px",
-              boxShadow: "0 2px 4px rgba(0,0,0,0.1)",
-              backgroundColor: "#4a90e2",
-              borderColor: "#4a90e2",
-            }}
-          >
-            {isSubmitting ? (
-              <>
-                <span className="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
-                Submitting...
-              </>
-            ) : (
-              "Submit Instruction"
-            )}
-          </button>
-          {submitError && (
-            <div className="alert alert-danger mt-3" role="alert" style={{ marginTop: "15px" }}>
-              {submitError}
-            </div>
-          )}
-        </div>
-      </form>
-      </InstructionLoadingGate>
-    </div>
+    <ControllerInstructionsLayout
+      spinnerKeyframes={spinnerKeyframes}
+      showConfirmationPopup={showConfirmationPopup}
+      confirmationMessage={confirmationMessage}
+      handleConfirmSubmit={handleConfirmSubmit}
+      handleCancelSubmit={handleCancelSubmit}
+      showNoRatesModal={showNoRatesModal}
+      setShowNoRatesModal={setShowNoRatesModal}
+      isLoadingLocations={isLoadingLocations}
+      isLoadingComplete={isLoadingComplete}
+      hasDataFailure={hasDataFailure}
+      handleSubmit={handleSubmit}
+      formData={formData}
+      setFormData={setFormData}
+      clients={clients}
+      fieldErrors={fieldErrors}
+      setFieldErrors={setFieldErrors}
+      fieldRefs={fieldRefs}
+      handleClientChange={handleClientChange}
+      handlePickupChange={handlePickupChange}
+      clientStartingPoints={clientStartingPoints}
+      handleDropoffChange={handleDropoffChange}
+      clientDestinations={clientDestinations}
+      isLoading={isLoading}
+      isWeightBased={isWeightBased}
+      isSetRateMode={isSetRateMode}
+      isSetRate={isSetRate}
+      setIsSetRate={setIsSetRate}
+      setRateValue={setRateValue}
+      rateFieldsEnabled={rateFieldsEnabled}
+      rateLockStatus={rateLockStatus}
+      handleInputChange={handleInputChange}
+      handleShipmentTypeChange={handleShipmentTypeChange}
+      handleContainerCountChange={handleContainerCountChange}
+      shipmentTypes={shipmentTypes}
+      isCrossHaul={isCrossHaul}
+      isImport={isImport}
+      isExport={isExport}
+      isAddOn={isAddOn}
+      lastFreeDateRef={lastFreeDateRef}
+      etaDateRef={etaDateRef}
+      today={today}
+      showContainerDetails={showContainerDetails}
+      allowVgmUI={allowVgmUI}
+      containers={containers}
+      containerFieldErrors={containerFieldErrors}
+      handleContainerChange={handleContainerChange}
+      isSubmitting={isSubmitting}
+      submitError={submitError}
+      weightRows={weightRows}
+      updateWeightRow={updateWeightRow}
+      removeWeightRow={removeWeightRow}
+      addWeightRow={addWeightRow}
+      vesselNameStyles={vesselNameStyles}
+      nonEditableStyle={nonEditableStyle}
+      disabledRateStyle={disabledRateStyle}
+      navigate={navigate}
+      openCalendar={openCalendar}
+    />
   )
 }
 
 export default ControllerInstructions
-
-
-
