@@ -111,7 +111,7 @@ export const getClientSetRateHandler = async (req, res) => {
 
     console.log(`[${new Date().toISOString()}] getClientSetRateHandler: Request for client ${clientId}, starting_point ${starting_point}, destination ${destination}`)
 
-    const result = await getClientSetRate(clientId, starting_point, destination)
+    const result = await getClientSetRate(clientId, starting_point, destination, req.user?.company_reg_num)
 
     res.status(200).json(result)
   } catch (error) {
@@ -136,7 +136,7 @@ export const getShipmentTypesHandler = async (req, res) => {
 export const checkFCContainerLegsHandler = async (req, res) => {
   try {
     const { instructionId, containerNum } = req.params;
-    const hasLegs = await checkContainerHasLegs(instructionId, containerNum);
+    const hasLegs = await checkContainerHasLegs(instructionId, containerNum, req.user?.company_reg_num);
     res.json({ hasLegs });
   } catch (error) {
     console.error("[FC] Error in checkFCContainerLegsHandler:", error);
@@ -148,7 +148,7 @@ export const checkFCContainerLegsHandler = async (req, res) => {
 export const deleteFCContainerAndLegsHandler = async (req, res) => {
   try {
     const { instructionId, containerNum } = req.params;
-    const result = await deleteContainerAndLegs(instructionId, containerNum);
+    const result = await deleteContainerAndLegs(instructionId, containerNum, req.user?.company_reg_num);
     res.json({ success: true, ...result });
   } catch (error) {
     console.error("[FC] Error in deleteFCContainerAndLegsHandler:", error);
@@ -479,7 +479,7 @@ export const updateContainersHandler = async (req, res) => {
 export const getActiveClientsHandler = async (req, res) => {
   try {
     console.log("Fetching active clients from database...")
-    const clients = await getActiveClients()
+    const clients = await getActiveClients(req.user?.company_reg_num)
     console.log(`Found ${clients.length} active clients`)
     res.json(clients)
   } catch (error) {
@@ -491,10 +491,11 @@ export const getActiveClientsHandler = async (req, res) => {
 export const getClientStartingPointsHandler = async (req, res) => {
   try {
     const { clientId } = req.params
+    const company_reg_num = req.user?.company_reg_num
     console.log(`Fetching starting points for client ID: ${clientId}`)
 
     // First check if client has any rates with valid starting points
-    const hasRates = await checkClientHasRates(clientId)
+    const hasRates = await checkClientHasRates(clientId, company_reg_num)
     if (!hasRates) {
       console.log(`No rates with valid starting points found for client ID: ${clientId}`)
       return res.status(404).json({
@@ -502,7 +503,7 @@ export const getClientStartingPointsHandler = async (req, res) => {
       })
     }
 
-    const startingPoints = await getClientStartingPoints(clientId)
+    const startingPoints = await getClientStartingPoints(clientId, company_reg_num)
     console.log(`Found ${startingPoints.length} starting points for client ID: ${clientId}`)
 
     if (!startingPoints || startingPoints.length === 0) {
@@ -525,9 +526,10 @@ export const getClientStartingPointsHandler = async (req, res) => {
 export const getClientDestinationsHandler = async (req, res) => {
   try {
     const { clientId, startingPoint } = req.params
+    const company_reg_num = req.user?.company_reg_num
     console.log(`Fetching destinations for client ID: ${clientId}, starting point: ${startingPoint}`)
 
-    const destinations = await getClientDestinations(clientId, startingPoint)
+    const destinations = await getClientDestinations(clientId, startingPoint, company_reg_num)
     console.log(
       `Found ${destinations.length} destinations for client ID: ${clientId} and starting point: ${startingPoint}`,
     )
@@ -544,9 +546,10 @@ export const getClientDestinationsHandler = async (req, res) => {
 export const checkClientRatesHandler = async (req, res) => {
   try {
     const { clientId } = req.params
+    const company_reg_num = req.user?.company_reg_num
     console.log(`Checking if client ID ${clientId} has rates...`)
 
-    const hasRates = await checkClientHasRates(clientId)
+    const hasRates = await checkClientHasRates(clientId, company_reg_num)
     console.log(`Client ID ${clientId} has rates: ${hasRates}`)
 
     res.json({ hasRates })
@@ -582,7 +585,7 @@ export const getClientRatesHandler = async (req, res) => {
       `[getClientRatesHandler] Fetching rates for client ${clientId}, start: ${start}, destination: ${destination}`,
     )
 
-    const rates = await getClientRates(clientId, start, destination)
+    const rates = await getClientRates(clientId, start, destination, req.user?.company_reg_num)
 
     console.log("[getClientRatesHandler] getClientRates returned:", rates)
 

@@ -200,13 +200,14 @@ export const getContainersByInstructionId = async (instructionId, company_reg_nu
 // Check if a specific container for an instruction has any associated legs
 // in the legs_m2 table. We key by m1key (instructionId) and containernumber
 // to stay consistent with existing joins.
-export const checkContainerHasLegs = async (instructionId, containerNum) => {
+export const checkContainerHasLegs = async (instructionId, containerNum, company_reg_num) => {
   const sql = `
     SELECT COUNT(*) AS leg_count
-    FROM public.legs_m2
-    WHERE m1key = $1 AND containernumber = $2
+    FROM public.legs_m2 l
+    JOIN public.m1_controller m ON m.m1key = l.m1key
+    WHERE l.m1key = $1 AND l.containernumber = $2 AND m.company_reg_num = $3
   `;
-  const result = await query(sql, [instructionId, containerNum]);
+  const result = await query(sql, [instructionId, containerNum, company_reg_num]);
   const count = Number(result.rows[0]?.leg_count || 0);
   return count > 0;
 };
@@ -214,10 +215,19 @@ export const checkContainerHasLegs = async (instructionId, containerNum) => {
 // Delete a container and any associated legs for a given instruction.
 // This is used by the FC screen when the user confirms they want to
 // remove a container that may already be assigned.
-export const deleteContainerAndLegs = async (instructionId, containerNum) => {
+export const deleteContainerAndLegs = async (instructionId, containerNum, company_reg_num) => {
   const client = await pool.connect();
   try {
     await client.query("BEGIN");
+
+    // Verify instruction belongs to this tenant before deleting
+    const ownerCheck = await client.query(
+      `SELECT 1 FROM public.m1_controller WHERE m1key = $1 AND company_reg_num = $2`,
+      [instructionId, company_reg_num]
+    );
+    if (ownerCheck.rowCount === 0) {
+      throw new Error("Instruction not found or access denied");
+    }
 
     await client.query(
       `DELETE FROM public.legs_m2 WHERE m1key = $1 AND containernumber = $2`,
@@ -225,8 +235,8 @@ export const deleteContainerAndLegs = async (instructionId, containerNum) => {
     );
 
     const deleteContainerResult = await client.query(
-      `DELETE FROM public.container WHERE m1key = $1 AND containernum = $2`,
-      [instructionId, containerNum]
+      `DELETE FROM public.container WHERE m1key = $1 AND containernum = $2 AND company_reg_num = $3`,
+      [instructionId, containerNum, company_reg_num]
     );
 
     await client.query("COMMIT");
@@ -1521,26 +1531,27 @@ export const updateContainersByInstructionId = async (
   }
 };
 
-export const getActiveClients = async () => {
+export const getActiveClients = async (company_reg_num) => {
   const sql = `
-    SELECT 
+    SELECT
       m5clientkey,
       client AS companyname,
       representative,
       email,
       cellnum
-    FROM 
+    FROM
       public.m5_client
-    WHERE 
+    WHERE
       status = true
-    ORDER BY 
+      AND company_reg_num = $1
+    ORDER BY
       client
   `;
 
   console.log("Executing getActiveClients query:", sql);
 
   try {
-    const result = await query(sql);
+    const result = await query(sql, [company_reg_num]);
     const clients = result.recordset || result.rows || [];
     console.log(`Found ${clients.length} active clients`);
     if (clients.length > 0) {
@@ -1553,19 +1564,20 @@ export const getActiveClients = async () => {
   }
 };
 
-export const getClientStartingPoints = async (clientId) => {
+export const getClientStartingPoints = async (clientId, company_reg_num) => {
   const sql = `
     SELECT DISTINCT starting_point
     FROM public.m5_client_rate
-    WHERE clientid = $1 
-      AND starting_point IS NOT NULL 
+    WHERE clientid = $1
+      AND company_reg_num = $2
+      AND starting_point IS NOT NULL
       AND starting_point IS DISTINCT FROM ''
     ORDER BY starting_point
   `;
   console.log(`[MODEL] Executing query for client ${clientId}:`, sql);
 
   try {
-    const result = await query(sql, [clientId]);
+    const result = await query(sql, [clientId, company_reg_num]);
     const startingPoints = result.recordset || result.rows || [];
     console.log(`[MODEL] Query result for client ${clientId}:`, {
       rowCount: result.rowCount || startingPoints.length,
@@ -1581,7 +1593,7 @@ export const getClientStartingPoints = async (clientId) => {
   }
 };
 
-export const getClientDestinations = async (clientId, startingPoint) => {
+export const getClientDestinations = async (clientId, startingPoint, company_reg_num) => {
   if (!clientId || !startingPoint) {
     throw new Error("Both clientId and startingPoint are required");
   }
@@ -1589,15 +1601,16 @@ export const getClientDestinations = async (clientId, startingPoint) => {
   const sql = `
     SELECT DISTINCT destination
     FROM public.m5_client_rate
-    WHERE clientid = $1 
+    WHERE clientid = $1
       AND starting_point = $2
-      AND destination IS NOT NULL 
+      AND company_reg_num = $3
+      AND destination IS NOT NULL
       AND destination != ''
     ORDER BY destination
   `;
 
   try {
-    const result = await query(sql, [clientId, startingPoint]);
+    const result = await query(sql, [clientId, startingPoint, company_reg_num]);
     const destinations = result.recordset || result.rows || [];
     if (destinations.length === 0) {
       console.warn(
@@ -1611,19 +1624,20 @@ export const getClientDestinations = async (clientId, startingPoint) => {
   }
 };
 
-export const checkClientHasRates = async (clientId) => {
+export const checkClientHasRates = async (clientId, company_reg_num) => {
   const sql = `
     SELECT EXISTS (
-      SELECT 1 
-      FROM public.m5_client_rate 
+      SELECT 1
+      FROM public.m5_client_rate
       WHERE clientid = $1
-      AND starting_point IS NOT NULL 
-      AND starting_point IS DISTINCT FROM ''
+        AND company_reg_num = $2
+        AND starting_point IS NOT NULL
+        AND starting_point IS DISTINCT FROM ''
     ) as has_rates
   `;
 
   try {
-    const result = await query(sql, [clientId]);
+    const result = await query(sql, [clientId, company_reg_num]);
     const hasRates =
       (result.recordset || result.rows || [])[0]?.has_rates || false;
     console.log(`Client ${clientId} has rates with starting points:`, hasRates);
@@ -1634,13 +1648,13 @@ export const checkClientHasRates = async (clientId) => {
   }
 };
 
-export const getClientRates = async (clientId, start, destination) => {
+export const getClientRates = async (clientId, start, destination, company_reg_num) => {
   if (!clientId || !start || !destination) {
     throw new Error("clientId, start, and destination are required");
   }
 
   const sql = `
-    SELECT 
+    SELECT
       "6m_rate" as "sixMeterRate",
       "12m_rate" as "twelveMeterRate",
       set_rate as "setRate",
@@ -1654,6 +1668,7 @@ export const getClientRates = async (clientId, start, destination) => {
     WHERE clientid = $1
       AND starting_point = $2
       AND destination = $3
+      AND company_reg_num = $4
     ORDER BY client_rate_id DESC
     LIMIT 1
   `;
@@ -1666,9 +1681,10 @@ export const getClientRates = async (clientId, start, destination) => {
       clientId,
       start,
       destination,
+      company_reg_num,
     ]);
 
-    const result = await query(sql, [clientId, start, destination]);
+    const result = await query(sql, [clientId, start, destination, company_reg_num]);
     const rates = result.recordset || result.rows || [];
 
     console.log(`[getClientRates] Query result:`, {
@@ -3378,20 +3394,20 @@ export const deleteInstruction = async (instructionId, company_reg_num) => {
   }
 };
 
-export const getClientSetRate = async (clientId, starting_point, destination) => {
+export const getClientSetRate = async (clientId, starting_point, destination, company_reg_num) => {
   const sql = `
     SELECT set_rate
     FROM public.m5_client_rate
-    WHERE clientid = $1 AND starting_point = $2 AND destination = $3
+    WHERE clientid = $1 AND starting_point = $2 AND destination = $3 AND company_reg_num = $4
     ORDER BY client_rate_id DESC
     LIMIT 1
   `;
 
   console.log(`[${new Date().toISOString()}] getClientSetRate: Executing SQL:`, sql);
-  console.log(`[${new Date().toISOString()}] getClientSetRate: With params:`, [clientId, starting_point, destination]);
+  console.log(`[${new Date().toISOString()}] getClientSetRate: With params:`, [clientId, starting_point, destination, company_reg_num]);
 
   try {
-    const result = await query(sql, [clientId, starting_point, destination]);
+    const result = await query(sql, [clientId, starting_point, destination, company_reg_num]);
     const rows = result.recordset || result.rows || [];
 
     console.log(`[${new Date().toISOString()}] getClientSetRate: Query completed, found ${rows.length} rates`);

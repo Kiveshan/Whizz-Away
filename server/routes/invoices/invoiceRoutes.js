@@ -14,7 +14,7 @@ const router = express.Router();
 
 router.get("/api/invoices/completed", verifyToken, getCompletedInvoicesHandler);
 router.get("/api/invoices/:id", verifyToken, getInvoiceDetailsHandler);
-router.get("/api/invoice/check/:m1key", checkInvoiceExistsHandler);
+router.get("/api/invoice/check/:m1key", verifyToken, checkInvoiceExistsHandler);
 router.post("/api/invoice/create", verifyToken, createInvoiceHandler);
 router.put(
   "/api/invoice/update-instruction",

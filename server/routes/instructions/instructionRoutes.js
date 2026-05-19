@@ -62,19 +62,21 @@ router.delete("/fc/instruction/:id", verifyToken, deleteInstructionHandler)
 // Check and delete specific containers (and their legs) for FC
 router.get(
   "/fc/container/:instructionId/:containerNum/legs-exists",
+  verifyToken,
   checkFCContainerLegsHandler,
 )
 router.delete(
   "/fc/container/:instructionId/:containerNum",
+  verifyToken,
   deleteFCContainerAndLegsHandler,
 )
 
 // Shared routes
-router.get("/active-clients", getActiveClientsHandler)
-router.get("/client/:clientId/starting-points", getClientStartingPointsHandler)
-router.get("/client/:clientId/destinations/:startingPoint", getClientDestinationsHandler)
-router.get("/client/:clientId/check-rates", checkClientRatesHandler)
-router.get("/client/:clientId/rates", getClientRatesHandler)
-router.get("/client/:clientId/set-rate/:starting_point/:destination", getClientSetRateHandler)
+router.get("/active-clients", verifyToken, getActiveClientsHandler)
+router.get("/client/:clientId/starting-points", verifyToken, getClientStartingPointsHandler)
+router.get("/client/:clientId/destinations/:startingPoint", verifyToken, getClientDestinationsHandler)
+router.get("/client/:clientId/check-rates", verifyToken, checkClientRatesHandler)
+router.get("/client/:clientId/rates", verifyToken, getClientRatesHandler)
+router.get("/client/:clientId/set-rate/:starting_point/:destination", verifyToken, getClientSetRateHandler)
 
 export default router
