@@ -93,46 +93,46 @@ export const getInputVat = async (month, year) => {
 
 export const getSubbieRates = async (month, year) => {
     const monthIndex = [
-        "January",
-        "February",
-        "March",
-        "April",
-        "May",
-        "June",
-        "July",
-        "August",
-        "September",
-        "October",
-        "November",
-        "December",
+        "January", "February", "March", "April", "May", "June",
+        "July", "August", "September", "October", "November", "December",
     ].indexOf(month) + 1
 
     const query = `
         SELECT 
-            date,
-            driverrate
-        FROM legs_m2
-        WHERE EXTRACT(MONTH FROM date) = $1
-        AND EXTRACT(YEAR FROM date) = $2
-        AND driverrate IS NOT NULL
-        AND driverrate > 0
-        ORDER BY date
+            e.companyname,
+            m.vat AS vat_rate,
+            SUM(l.driverrate) AS total_rate
+        FROM legs_m2 l
+        JOIN m5_employee e ON l.driverid = e.userid
+        JOIN m1_controller m ON l.m1key = m.m1key
+        WHERE EXTRACT(MONTH FROM l.date) = $1
+        AND EXTRACT(YEAR FROM l.date) = $2
+        AND l.driverrate IS NOT NULL
+        AND l.driverrate > 0
+        AND e.roleid = 6
+        AND e.companyname IS NOT NULL
+        GROUP BY e.companyname, m.vat
+        ORDER BY e.companyname
     `
 
     try {
         const result = await pool.query(query, [monthIndex, year])
-        
-        // Aggregate by date and return as a single entry with total
-        const totalSubbieRate = result.rows.reduce((sum, row) => {
-            return sum + (parseFloat(row.driverrate) || 0)
-        }, 0)
 
-        return {
-            expenseType: "Subbie rate",
-            total: totalSubbieRate,
-            vat: 0, // No VAT for subbie rates
-            date: null, // Aggregated data, no specific date
-        }
+        return result.rows.map((row) => {
+            const totalRate = parseFloat(row.total_rate) || 0
+            // Only apply VAT if m1_controller.vat is set (not null)
+            const vatRate = row.vat_rate !== null ? parseFloat(row.vat_rate) : null
+            const vat = vatRate !== null ? (totalRate * vatRate) / 100 : 0
+
+            return {
+                expenseType: `Subbie rate - ${row.companyname}`,
+                total: totalRate,
+                vat: vat,
+                date: null,
+                companyName: row.companyname,
+                vatRate: vatRate,
+            }
+        })
     } catch (error) {
         console.error("Error fetching subbie rates:", error)
         throw error
