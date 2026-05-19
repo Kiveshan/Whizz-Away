@@ -226,13 +226,14 @@ const createEmployee = async (employeeData, documentUrls, adminId = null, userAg
 
     if (base_salary != null) {
       const insertSalaryHistoryQuery = `
-        INSERT INTO base_salary_history (userid, base, date)
-        VALUES ($1, $2, $3)
+        INSERT INTO base_salary_history (userid, base, date, company_reg_num)
+        VALUES ($1, $2, $3, $4)
       `
       const salaryHistoryValues = [
         newEmployee.userid,
         Number.parseFloat(base_salary),
         deductionDate,
+        company_reg_num,
       ]
       await client.query(insertSalaryHistoryQuery, salaryHistoryValues)
     }
@@ -241,8 +242,8 @@ const createEmployee = async (employeeData, documentUrls, adminId = null, userAg
       INSERT INTO employee_deduction_history (
         employeeid, effective_date, income_tax_rate,
         deduction_other_deductions, deduction_uif, deduction_bonus,
-        deduction_savings, deduction_loan, deduction_damage
-      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+        deduction_savings, deduction_loan, deduction_damage, company_reg_num
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
     `
     const historyValues = [
       newEmployee.userid,
@@ -254,6 +255,7 @@ const createEmployee = async (employeeData, documentUrls, adminId = null, userAg
       Number.parseFloat(deduction_savings || 0),
       Number.parseFloat(deduction_loan || 0),
       Number.parseFloat(deduction_damage || 0),
+      company_reg_num,
     ]
     await client.query(insertHistoryQuery, historyValues)
 
@@ -396,13 +398,14 @@ const updateEmployee = async (id, employeeData, documentUrls, adminId = null, us
         await client.query(updateSalaryHistoryQuery, updateSalaryHistoryValues)
       } else {
         const insertSalaryHistoryQuery = `
-          INSERT INTO base_salary_history (userid, base, date)
-          VALUES ($1, $2, $3)
+          INSERT INTO base_salary_history (userid, base, date, company_reg_num)
+          VALUES ($1, $2, $3, $4)
         `
         const salaryHistoryValues = [
           updatedEmployee.userid,
           Number.parseFloat(base_salary),
           currentDate,
+          company_reg_num,
         ]
         await client.query(insertSalaryHistoryQuery, salaryHistoryValues)
       }
@@ -441,8 +444,8 @@ const updateEmployee = async (id, employeeData, documentUrls, adminId = null, us
         INSERT INTO employee_deduction_history (
           employeeid, effective_date, income_tax_rate, deduction_other_deductions,
           deduction_uif, deduction_bonus, deduction_savings,
-          deduction_loan, deduction_damage
-        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+          deduction_loan, deduction_damage, company_reg_num
+        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
       `
       const deductionDate = new Date()
       const historyValues = [
@@ -455,6 +458,7 @@ const updateEmployee = async (id, employeeData, documentUrls, adminId = null, us
         newValues.savings,
         newValues.loan,
         newValues.damage,
+        company_reg_num,
       ]
       await client.query(insertHistoryQuery, historyValues)
     }

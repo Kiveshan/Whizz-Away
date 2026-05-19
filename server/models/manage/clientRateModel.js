@@ -135,8 +135,8 @@ const saveClientRates = async (clientId, rates, company_reg_num) => {
       const surcharge12m = rate.surcharge12m
 
       return client.query(
-        `INSERT INTO m5_client_rate (clientid, starting_point, destination, "6m_rate", "12m_rate", surcharges, surcharge12m, hazardous, vgm, set_rate)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+        `INSERT INTO m5_client_rate (clientid, starting_point, destination, "6m_rate", "12m_rate", surcharges, surcharge12m, hazardous, vgm, set_rate, company_reg_num)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
          RETURNING *`,
         [
           clientId,
@@ -149,6 +149,7 @@ const saveClientRates = async (clientId, rates, company_reg_num) => {
           rate.hazardous === "" || rate.hazardous === undefined ? null : Number(rate.hazardous),
           rate.vgm === "" || rate.vgm === undefined ? null : Number(rate.vgm),
           rate.set_rate === "" || rate.set_rate === undefined ? null : Number(rate.set_rate),
+          company_reg_num,
         ],
       )
     })

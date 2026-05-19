@@ -55,7 +55,7 @@ import CompanyForm from "../components/company/CompanyForm"
 
 // Mirror of backend ROLE_PLAN_MAP / PLAN_RANK so UI matches server enforcement
 const PLAN_RANK_MAP = { lite: 1, professional: 2, growth: 3, enterprise: 4 }
-const ROLE_MIN_PLAN  = { 1: "professional", 2: "growth", 3: "lite", 4: "professional", 8: "growth" }
+const ROLE_MIN_PLAN  = { 1: "professional", 2: "professional", 3: "lite", 4: "professional", 8: "growth" }
 // roleid 5 (Driver) and 9 (Yard Staff) have no plan restriction
 
 function getAllowedRoleIds(tier) {

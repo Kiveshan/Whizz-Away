@@ -10,7 +10,7 @@ const ROLE_PLAN_MAP = {
   "Finance Clerk":    "lite",
   "Business Manager": "professional",
   "Director":         "professional",
-  "Controller":       "growth",
+  "Controller":       "professional",
   "Debtors Clerk":    "growth",
   "Creditors Clerk":  "growth",
 };
