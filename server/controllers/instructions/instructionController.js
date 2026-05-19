@@ -273,6 +273,7 @@ export const saveInstructionHandler = async (req, res) => {
       controllerData: updatedControllerData,
       containerData: containersToSave,
       weightData: Array.isArray(weightData) ? weightData : [],
+      company_reg_num: req.user.company_reg_num,
     })
     res.json({ success: true, m1key: result.m1key })
   } catch (error) {

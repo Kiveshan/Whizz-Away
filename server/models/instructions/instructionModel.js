@@ -506,8 +506,9 @@ export const saveInstruction = async ({
             ksm_dm_no,
             ticket_no,
             receipt_book_no,
-            weight
-          ) VALUES ($1, $2, $3, $4, $5)
+            weight,
+            company_reg_num
+          ) VALUES ($1, $2, $3, $4, $5, $6)
         `;
         const weightValues = [
           m1key,
@@ -515,6 +516,7 @@ export const saveInstruction = async ({
           row.ticket_no || row.ticketNo || null,
           row.receipt_book_no || row.receiptBookNo || null,
           rowWeight,
+          company_reg_num,
         ];
 
         console.log("MODEL: Inserting weight row into m1_controller_weight:", {
@@ -718,6 +720,7 @@ export const saveInstruction = async ({
         container.file_ref || container.fileRef || "", // File reference field for export shipments
         isVgm,
         vgmAmount,
+        company_reg_num,
       ];
 
       console.log("Container values with VGM:", { isVgm, vgmAmount });
@@ -742,8 +745,8 @@ export const saveInstruction = async ({
           containernum, weight, m1key, container_type, cargo_description,
           "Hazardous", "Add Surcharges", "Surcharge Amount", "Hazardous Amount",
           is_12m_surcharge, surcharge_12m_amount,
-          file_ref, vgm, "vgm amount"
-        ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14)
+          file_ref, vgm, "vgm amount", company_reg_num
+        ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15)
       `;
       await client.query(insertContainerQuery, containerValues);
 
