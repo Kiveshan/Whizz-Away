@@ -2,7 +2,7 @@ name: Deploy to Elastic Beanstalk SAAS
 on:
   push:
     branches:
-      - kiveshan-saas
+      -kiveshan-saas
 
 env:
   AWS_REGION: af-south-1
