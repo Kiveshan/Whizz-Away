@@ -38,7 +38,7 @@ import {
 export const getDriversHandler = async (req, res) => {
   console.log("Route /drivers was accessed");
   try {
-    const drivers = await getDrivers();
+    const drivers = await getDrivers(req.user.company_reg_num);
     console.log("Query result:", drivers);
     console.log("Rows:", drivers);
     if (drivers.length === 0)
@@ -54,7 +54,7 @@ export const getDriversHandler = async (req, res) => {
 export const getStartingPointsHandler = async (req, res) => {
   console.log("Route /starting-points was accessed");
   try {
-    const startingPoints = await getStartingPoints();
+    const startingPoints = await getStartingPoints(req.user.company_reg_num);
     console.log("Unique starting points:", startingPoints);
     res.status(200).json(startingPoints);
   } catch (err) {
@@ -66,7 +66,7 @@ export const getStartingPointsHandler = async (req, res) => {
 export const getDestinationsHandler = async (req, res) => {
   console.log("Route /destinations was accessed");
   try {
-    const destinations = await getDestinations();
+    const destinations = await getDestinations(req.user.company_reg_num);
     console.log("Unique destinations:", destinations);
     res.status(200).json(destinations);
   } catch (err) {
@@ -82,7 +82,7 @@ export const updateInstructionStatusHandler = async (req, res) => {
     `Route PUT /instructions/${instructionId}/status was accessed, setting status to ${status}`
   );
   try {
-    await updateInstructionStatus(instructionId, status);
+    await updateInstructionStatus(instructionId, status, req.user.company_reg_num);
     console.log(`Instruction ${instructionId} status updated to ${status}`);
     res.status(200).json({
       success: true,
@@ -101,7 +101,7 @@ export const updateInstructionStatusHandler = async (req, res) => {
 export const getDriversSubHandler = async (req, res) => {
   console.log("Route /employees/drivers was accessed");
   try {
-    const drivers = await getDriversSub();
+    const drivers = await getDriversSub(req.user.company_reg_num);
     console.log("Drivers found:", drivers);
     if (drivers.length === 0)
       console.log("No drivers found in the m5_employee table");
@@ -148,7 +148,7 @@ export const getDriverRatesWithSubbieHandler = async (req, res) => {
 export const getControllersHandler = async (req, res) => {
   console.log("Route /employees/controllers was accessed");
   try {
-    const controllers = await getControllers();
+    const controllers = await getControllers(req.user.company_reg_num);
     console.log("Controllers found:", controllers);
     if (controllers.length === 0)
       console.log("No controllers found in the m5_employee table");
@@ -163,7 +163,7 @@ export const getControllersHandler = async (req, res) => {
 export const getManagersHandler = async (req, res) => {
   console.log("Route /employees/managers was accessed");
   try {
-    const managers = await getManagers();
+    const managers = await getManagers(req.user.company_reg_num);
     console.log("Managers found:", managers);
     if (managers.length === 0)
       console.log("No managers found in the usertable");
@@ -200,7 +200,7 @@ export const getShipmentTypeByInstructionIdHandler = async (req, res) => {
     `Route /instructions/${instructionId}/shipment-type was accessed`
   );
   try {
-    const shipmentType = await getShipmentTypeByInstructionId(instructionId);
+    const shipmentType = await getShipmentTypeByInstructionId(instructionId, req.user.company_reg_num);
     if (shipmentType === null) {
       console.log(`No instruction found with ID ${instructionId}`);
       return res.status(404).json({ error: "Instruction not found" });
@@ -223,7 +223,7 @@ export const getShipmentTypeByInstructionIdHandler = async (req, res) => {
 export const getInstructionsHandler = async (req, res) => {
   console.log("Route /instructions was accessed");
   try {
-    const instructions = await getInstructions();
+    const instructions = await getInstructions(req.user.company_reg_num);
     console.log("Instructions found:", instructions);
     if (instructions.length === 0)
       console.log("No instructions found in the m1_controller table");
@@ -238,7 +238,7 @@ export const getInstructionsHandler = async (req, res) => {
 export const getTruckRegNumsHandler = async (req, res) => {
   console.log("Route /trucks/regnums was accessed");
   try {
-    const truckRegNums = await getTruckRegNums();
+    const truckRegNums = await getTruckRegNums(req.user.company_reg_num);
     console.log("Truck registration numbers found:", truckRegNums);
     if (truckRegNums.length === 0)
       console.log("No truck registration numbers found in the m5_trucks table");
@@ -253,7 +253,7 @@ export const getTruckRegNumsHandler = async (req, res) => {
 export const getTrucksHandler = async (req, res) => {
   console.log("Route /trucks was accessed");
   try {
-    const trucks = await getTrucks();
+    const trucks = await getTrucks(req.user.company_reg_num);
     console.log("Trucks found:", trucks);
     if (trucks.length === 0)
       console.log("No trucks found in the m5_trucks table");
@@ -268,7 +268,7 @@ export const getTrucksHandler = async (req, res) => {
 export const getClientInstructionsHandler = async (req, res) => {
   console.log("Route /client-instructions was accessed");
   try {
-    const clientInstructions = await getClientInstructions();
+    const clientInstructions = await getClientInstructions(req.user.company_reg_num);
     console.log("Query result:", clientInstructions);
     res.status(200).json(clientInstructions);
   } catch (error) {
@@ -284,7 +284,7 @@ export const getClientInstructionsHandler = async (req, res) => {
 export const getClientInstructionsDetailsHandler = async (req, res) => {
   const { clientId } = req.params;
   try {
-    const details = await getClientInstructionsDetails(clientId);
+    const details = await getClientInstructionsDetails(clientId, req.user.company_reg_num);
     console.log(details);
     res.json(details);
   } catch (err) {
@@ -402,7 +402,19 @@ export const saveLegHandler = async (req, res) => {
       driverrate,
       m1key,
       drivers,
-    }, req.user.company_reg_num);
+      company_reg_num: req.user.company_reg_num,
+    });
+
+    // Promote instruction status from New → In Progress on first leg save
+    try {
+      const instruction = await getInstructionById(m1key, req.user.company_reg_num);
+      if (instruction?.status === "New") {
+        await updateInstructionStatus(m1key, "In Progress", req.user.company_reg_num);
+      }
+    } catch (statusErr) {
+      console.error("Error updating instruction status to In Progress:", statusErr);
+    }
+
     res.status(200).json({
       success: true,
       message: isNewLeg
@@ -484,7 +496,7 @@ export const completeInstructionHandler = async (req, res) => {
   const { status } = req.body;
   console.log(`Route PUT /instructions/${instructionId}/complete was accessed`);
   try {
-    await completeInstruction(instructionId, status);
+    await completeInstruction(instructionId, status, req.user.company_reg_num);
     console.log(`Instruction ${instructionId} marked as ${status}`);
     res.status(200).json({
       success: true,
@@ -534,7 +546,7 @@ export const getDriverByIdHandler = async (req, res) => {
 export const getDriverInstructionsHandler = async (req, res) => {
   const driverId = req.params.id;
   try {
-    const instructions = await getDriverInstructions(driverId);
+    const instructions = await getDriverInstructions(driverId, req.user.company_reg_num);
     res.json(instructions);
   } catch (error) {
     console.error("Error fetching driver instructions:", error);

@@ -424,7 +424,7 @@ export const updateInstructionHandler = async (req, res) => {
       rateweight: updatedDataWithCost.rateweight,
       unitrate: updatedDataWithCost.unitrate,
     })
-    const result = await updateInstruction(instructionId, updatedDataWithCost)
+    const result = await updateInstruction(instructionId, updatedDataWithCost, req.user.company_reg_num)
     if (!result) {
       return res.status(404).json({ error: "Instruction not found" })
     }
@@ -718,7 +718,7 @@ export const updateFCContainersHandler = async (req, res) => {
 
 export const getActiveClientsController = async (req, res) => {
   try {
-    const clients = await getActiveClients()
+    const clients = await getActiveClients(req.user.company_reg_num)
     res.status(200).json(clients)
   } catch (error) {
     console.error("Error fetching active clients:", error)
@@ -739,7 +739,7 @@ export const getShipmentTypesController = async (req, res) => {
 export const getClientStartingPointsController = async (req, res) => {
   const { clientId } = req.params
   try {
-    const startingPoints = await getClientStartingPoints(clientId)
+    const startingPoints = await getClientStartingPoints(clientId, req.user.company_reg_num)
     if (startingPoints.length === 0) {
       return res.status(404).json({ message: "No starting points found for this client." })
     }
@@ -753,7 +753,7 @@ export const getClientStartingPointsController = async (req, res) => {
 export const getClientDestinationsController = async (req, res) => {
   const { clientId, startingPoint } = req.params
   try {
-    const destinations = await getClientDestinations(clientId, startingPoint)
+    const destinations = await getClientDestinations(clientId, startingPoint, req.user.company_reg_num)
     res.status(200).json(destinations)
   } catch (error) {
     console.error("Error fetching client destinations:", error)
@@ -765,7 +765,7 @@ export const getClientRatesController = async (req, res) => {
   const { clientId } = req.params
   const { start, destination } = req.query
   try {
-    const rates = await getClientRates(clientId, start, destination)
+    const rates = await getClientRates(clientId, start, destination, req.user.company_reg_num)
     if (!rates) {
       return res.status(404).json({ message: "No rates found for the selected route." })
     }

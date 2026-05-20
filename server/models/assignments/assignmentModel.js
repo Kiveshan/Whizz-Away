@@ -58,7 +58,7 @@ export const getDriverRatesWithSubbie = async (startingpoint, destination, legDa
   if (legDate) {
     try {
       console.log(`[getDriverRatesWithSubbie] Fetching rate for ${startingpoint} -> ${destination} on ${legDate}`);
-      const rateResult = await getRateForLegDate(startingpoint, destination, legDate, false, '6m');
+      const rateResult = await getRateForLegDate(startingpoint, destination, legDate, false, '6m', company_reg_num);
       console.log(`[getDriverRatesWithSubbie] Result:`, rateResult);
       if (rateResult.success) {
         const row = rateResult.data;
@@ -262,7 +262,7 @@ export const getDriverRates = async (
   if (legDate) {
     try {
       const isSubcontractor = false; // This function is for drivers, not subbies
-      const rateResult = await getRateForLegDate(startingpoint, destination, legDate, isSubcontractor, containerType);
+      const rateResult = await getRateForLegDate(startingpoint, destination, legDate, isSubcontractor, containerType, company_reg_num);
 
       if (rateResult.success) {
         return {

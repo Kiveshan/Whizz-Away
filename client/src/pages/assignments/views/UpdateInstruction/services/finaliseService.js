@@ -30,7 +30,7 @@ export const handleFinaliseClick = async ({
   setShowNoDriversModal,
   hasUnsavedChanges,
   setShowUnsavedChangesModal,
-  API_BASE_URL,
+  api,
   instructionId,
   checkContainersReachDropoff,
   isWeightBased,
@@ -55,14 +55,8 @@ export const handleFinaliseClick = async ({
   }
 
   try {
-    const response = await fetch(
-      `${API_BASE_URL}/instructions/${instructionId}/details`
-    );
-    if (!response.ok) {
-      throw new Error("Failed to fetch instruction details");
-    }
-
-    const instructionDetails = await response.json();
+    const response = await api.get(`/instructions/${instructionId}/details`);
+    const instructionDetails = response.data;
     const pickup = instructionDetails.pickup;
     const dropoff = instructionDetails.dropoff;
 

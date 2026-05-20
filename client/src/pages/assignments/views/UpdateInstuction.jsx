@@ -951,7 +951,7 @@ const navigateBack = () => {
       setShowNoDriversModal,
       hasUnsavedChanges,
       setShowUnsavedChangesModal,
-      API_BASE_URL,
+      api,
       instructionId,
       checkContainersReachDropoff,
       isWeightBased,
@@ -1047,10 +1047,8 @@ const shouldDisableAddLeg = async () => {
   if (legs.length === 0) return false;
 
   try {
-    const response = await fetch(`${API_BASE_URL}/instructions/${instructionId}/details`);
-    if (!response.ok) return false;
-
-    const instructionDetails = await response.json();
+    const response = await api.get(`/instructions/${instructionId}/details`);
+    const instructionDetails = response.data;
     const dropoff = instructionDetails.dropoff;
 
     if (!dropoff) return false;
@@ -1075,15 +1073,15 @@ const checkContainersDestination = async () => {
 
   try {
     // Fetch the instruction details to get the dropoff location
-    const response = await fetch(
-      `${API_BASE_URL}/instructions/${instructionId}/details`
-    );
-    if (!response.ok) {
+    let instructionDetails;
+    try {
+      const response = await api.get(`/instructions/${instructionId}/details`);
+      instructionDetails = response.data;
+    } catch {
       setShouldHideAddLegButton(false);
       return;
     }
 
-    const instructionDetails = await response.json();
     const dropoff = instructionDetails.dropoff;
         if (!dropoff) {
           setShouldHideAddLegButton(false);
@@ -1214,12 +1212,13 @@ useEffect(() => {
   }
 }, [
   rates,
+  drivers,
   employeeDrivers,
   formData.startingPoint,
   formData.destination,
   noRatesRoutes,
-  isLegSwitching, // Add this dependency
-  isCompleted, // Add this dependency
+  isLegSwitching,
+  isCompleted,
   shipmentType,
 ]);
 
@@ -1420,25 +1419,7 @@ useEffect(() => {
                 return;
               }
               lastSavedLegRef.current = currentPayload;
-              const response = await fetch(`${API_BASE_URL}/legs/save`, {
-                method: "POST",
-                headers: {
-                  "Content-Type": "application/json",
-                },
-                body: JSON.stringify(legData),
-              });
-
-              const responseText = await response.text();
-              let result;
-              try {
-                result = JSON.parse(responseText);
-              } catch (e) {
-                throw new Error(`Invalid JSON response: ${responseText}`);
-              }
-
-              if (!response.ok) {
-                throw new Error(result.message || "Failed to save leg data");
-              }
+              await api.post("/legs/save", legData);
               setSavedMessage("Driver removed successfully!");
               setTimeout(() => setSavedMessage(""), 5000);
               await refreshLegData();

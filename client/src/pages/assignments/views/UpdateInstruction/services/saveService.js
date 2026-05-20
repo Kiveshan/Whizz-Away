@@ -77,31 +77,13 @@ export const handleSave = async ({
   }
   if (instructionId) {
     try {
-      const instructionResponse = await fetch(
-        `${API_BASE_URL}/instructions/${instructionId}`
-      );
-      if (instructionResponse.ok) {
-        const instructionData = await instructionResponse.json();
+      const instructionResponse = await api.get(`/instructions/${instructionId}`);
+      const instructionData = instructionResponse.data;
 
-        if (instructionData.status === "New") {
-          const updateStatusResponse = await fetch(
-            `${API_BASE_URL}/instructions/${instructionId}/status`,
-            {
-              method: "PUT",
-              headers: {
-                "Content-Type": "application/json",
-              },
-              body: JSON.stringify({ status: "In Progress" }),
-            }
-          );
-
-          if (updateStatusResponse.ok) {
-            console.log(
-              `Updated instruction ${instructionId} status from New to In Progress`
-            );
-            setInstructionStatus("In Progress");
-          }
-        }
+      if (instructionData.status === "New") {
+        await api.put(`/instructions/${instructionId}/status`, { status: "In Progress" });
+        console.log(`Updated instruction ${instructionId} status from New to In Progress`);
+        setInstructionStatus("In Progress");
       }
     } catch (statusError) {
       console.error("Error updating instruction status:", statusError);
@@ -265,27 +247,8 @@ export const handleSave = async ({
       JSON.stringify(legData, null, 2)
     );
 
-    const response = await fetch(`${API_BASE_URL}/legs/save`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify(legData),
-    });
-
-    const responseText = await response.text();
-    console.log("Server response:", responseText);
-
-    let result;
-    try {
-      result = JSON.parse(responseText);
-    } catch (e) {
-      throw new Error(`Invalid JSON response: ${responseText}`);
-    }
-
-    if (!response.ok) {
-      throw new Error(result.message || "Failed to save leg data");
-    }
+    const saveResponse = await api.post("/legs/save", legData);
+    const result = saveResponse.data;
 
     console.log("Leg saved successfully:", result);
 
