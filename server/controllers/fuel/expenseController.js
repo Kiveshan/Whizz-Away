@@ -110,7 +110,8 @@ const uploadFuelExpenseHandler = async (req, res) => {
         console.log("Manager selected, querying usertable for manager");
 
         const managerResult = await pool.query(
-          "SELECT * FROM usertable WHERE roleid = 1 AND userid = 1"
+          "SELECT userid, name, surname FROM usertable WHERE roleid = 1 AND company_reg_num = $1 LIMIT 1",
+          [req.user.company_reg_num]
         );
 
         console.log("Manager query result:", managerResult.rows);
@@ -120,7 +121,7 @@ const uploadFuelExpenseHandler = async (req, res) => {
           userId = managerResult.rows[0].userid;
           console.log("Manager found:", documentSource, "userId:", userId);
         } else {
-          console.error("No manager found in usertable with roleid = 1");
+          console.error("No manager found for this company");
           documentSource = "Manager";
           userId = null;
         }
@@ -132,7 +133,8 @@ const uploadFuelExpenseHandler = async (req, res) => {
     } else if (documentFrom === "Controller") {
       try {
         const controllerResult = await pool.query(
-          "SELECT userid, CONCAT(name, ' ', surname) as fullname FROM m5_employee WHERE roleid = 2 LIMIT 1"
+          "SELECT userid, CONCAT(name, ' ', surname) as fullname FROM m5_employee WHERE roleid = 2 AND company_reg_num = $1 LIMIT 1",
+          [req.user.company_reg_num]
         );
 
         if (controllerResult.rows.length > 0) {
@@ -155,7 +157,8 @@ const uploadFuelExpenseHandler = async (req, res) => {
         truckId: parsedTruckId,
         driverId: userId,
         orderno: parsedOrderNo,
-      }, req.user.company_reg_num);
+        company_reg_num: req.user.company_reg_num,
+      });
       console.log("Expense created successfully with ID:", result.ekey);
 
       res.status(201).json({
@@ -185,7 +188,8 @@ const uploadFuelExpenseHandler = async (req, res) => {
             truckId: parsedTruckId,
             driverId: userId,
             orderno: parsedOrderNo,
-          }, req.user.company_reg_num);
+            company_reg_num: req.user.company_reg_num,
+          });
           console.log(
             "Expense created successfully with ID (without s3key):",
             fallbackResult.ekey
@@ -220,7 +224,8 @@ const uploadFuelExpenseHandler = async (req, res) => {
               truckId: parsedTruckId,
               driverId: userId,
               orderno: parsedOrderNo,
-            }, req.user.company_reg_num);
+              company_reg_num: req.user.company_reg_num,
+            });
             console.log(
               "Expense created successfully with ID (basic):",
               basicResult.ekey
@@ -258,7 +263,8 @@ const uploadFuelExpenseHandler = async (req, res) => {
           truckId: parsedTruckId,
           driverId: userId,
           orderno: parsedOrderNo,
-        }, req.user.company_reg_num);
+          company_reg_num: req.user.company_reg_num,
+        });
 
         res.status(201).json({
           success: true,

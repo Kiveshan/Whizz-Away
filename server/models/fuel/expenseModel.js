@@ -95,11 +95,11 @@ const insertFuelExpenseWithoutS3Key = async ({
   }
 };
 
-const getExpenseDocumentById = async (id) => {
+const getExpenseDocumentById = async (id, company_reg_num) => {
   const columnsResult = await pool.query(`
-    SELECT column_name 
-    FROM information_schema.columns 
-    WHERE table_name = 'expenses_m2' 
+    SELECT column_name
+    FROM information_schema.columns
+    WHERE table_name = 'expenses_m2'
     AND table_schema = 'public'
   `);
   const columnNames = columnsResult.rows.map((row) =>
@@ -112,11 +112,11 @@ const getExpenseDocumentById = async (id) => {
   }
 
   const queryText = `
-    SELECT ${selectColumns.join(", ")} 
-    FROM expenses_m2 
-    WHERE ekey = $1
+    SELECT ${selectColumns.join(", ")}
+    FROM expenses_m2
+    WHERE ekey = $1 AND company_reg_num = $2
   `;
-  const result = await pool.query(queryText, [id]);
+  const result = await pool.query(queryText, [id, company_reg_num]);
 
   if (result.rows.length === 0) {
     return { success: false, message: "Document not found" };
@@ -141,7 +141,9 @@ const getPOExpensesByTruckId = async (truckId, company_reg_num) => {
         ELSE e.documentfrom
       END as documentfrom_display
     FROM public.expenses_m2 e
-    LEFT JOIN public.purchase_orders po ON e.orderno::text = po.ponum
+    LEFT JOIN public.purchase_orders po
+      ON e.orderno = po.ponum
+      AND po.company_reg_num = $2
     WHERE e.truckid = $1
       AND e.company_reg_num = $2
     ORDER BY e.slipuploaddate DESC

@@ -28,7 +28,7 @@ const getClientAddonsHandler = async (req, res) => {
       });
     }
 
-    const result = await getAddonsByClient(clientId, { year, month }, req.user.company_reg_num);
+    const result = await getAddonsByClient(clientId, req.user.company_reg_num, { year, month });
     console.log(`Query returned ${result.data.length} add-ons`);
 
     res.json({

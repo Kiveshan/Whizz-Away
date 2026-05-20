@@ -78,7 +78,8 @@ const saveWageDataHandler = async (req, res) => {
       totalEarnings,
       totalDeductions,
       netPay,
-    }, req.user.company_reg_num);
+      company_reg_num: req.user.company_reg_num,
+    });
     if (!result.success) {
       return res.status(404).json({ error: result.message });
     }

@@ -69,7 +69,7 @@ const createAddon = async (addonData, company_reg_num) => {
     // Handle custom invoice number or auto-generate
     if (addonData.invoice_number && addonData.invoice_number.trim()) {
       // Validate custom invoice number for duplicates
-      const validation = await checkInvoiceNumberExists(addonData.invoice_number.trim());
+      const validation = await checkInvoiceNumberExists(addonData.invoice_number.trim(), null, company_reg_num);
       if (!validation.success) {
         return {
           success: false,
@@ -258,7 +258,7 @@ const updateAddon = async (addonId, addonData, company_reg_num) => {
       if (addonData.invoice_number !== undefined) {
         // Validate invoice number if it's being updated
         if (addonData.invoice_number && addonData.invoice_number.trim()) {
-          const validation = await checkInvoiceNumberExists(addonData.invoice_number.trim(), addonId);
+          const validation = await checkInvoiceNumberExists(addonData.invoice_number.trim(), addonId, company_reg_num);
           if (!validation.success) {
             return {
               success: false,
@@ -394,7 +394,7 @@ const deleteAddon = async (addonId, company_reg_num) => {
   }
 };
 
-const getCompanyInfo = async () => {
+const getCompanyInfo = async (company_reg_num) => {
   try {
     if (!pool) {
       throw new Error(
@@ -402,7 +402,7 @@ const getCompanyInfo = async () => {
       );
     }
     const queryText = `
-      SELECT 
+      SELECT
         companyname AS name,
         address,
         suburb AS city,
@@ -414,10 +414,11 @@ const getCompanyInfo = async () => {
         bank,
         branch_code,
         swift_code
-      FROM public.usertable 
-      WHERE userid = 1 AND status = 'active'
+      FROM public.usertable
+      WHERE company_reg_num = $1 AND status = 'active'
+      LIMIT 1
     `;
-    const result = await query(queryText);
+    const result = await query(queryText, [company_reg_num]);
     if (result.rows.length === 0) {
       return { success: false, message: "Company info not found" };
     }
@@ -428,7 +429,7 @@ const getCompanyInfo = async () => {
   }
 };
 
-const checkInvoiceNumberExists = async (invoiceNumber, excludeAddonId = null) => {
+const checkInvoiceNumberExists = async (invoiceNumber, excludeAddonId = null, company_reg_num = null) => {
   try {
     if (!pool) {
       throw new Error(
@@ -442,15 +443,22 @@ const checkInvoiceNumberExists = async (invoiceNumber, excludeAddonId = null) =>
       WHERE invoice_number = $1
     `;
     let queryParams = [invoiceNumber.trim()];
+    let paramIndex = 2;
+
+    if (company_reg_num) {
+      queryText += ` AND company_reg_num = $${paramIndex}`;
+      queryParams.push(company_reg_num);
+      paramIndex++;
+    }
 
     if (excludeAddonId) {
-      queryText += ` AND addon_id != $2`;
+      queryText += ` AND addon_id != $${paramIndex}`;
       queryParams.push(excludeAddonId);
     }
 
     const result = await query(queryText, queryParams);
     const exists = result.rows[0].count > 0;
-    
+
     return {
       success: true,
       exists,
@@ -465,7 +473,7 @@ const checkInvoiceNumberExists = async (invoiceNumber, excludeAddonId = null) =>
   }
 };
 
-const getClientById = async (clientId) => {
+const getClientById = async (clientId, company_reg_num) => {
   try {
     if (!pool) {
       throw new Error(
@@ -473,7 +481,7 @@ const getClientById = async (clientId) => {
       );
     }
     const queryText = `
-      SELECT 
+      SELECT
         client AS name,
         streetaddress AS address,
         city,
@@ -481,9 +489,9 @@ const getClientById = async (clientId) => {
         email,
         vatregno AS vat_reg_num
       FROM public.m5_client
-      WHERE m5clientkey = $1 AND status = true
+      WHERE m5clientkey = $1 AND status = true AND company_reg_num = $2
     `;
-    const result = await query(queryText, [clientId]);
+    const result = await query(queryText, [clientId, company_reg_num]);
     if (result.rows.length === 0) {
       return { success: false, message: "Client not found" };
     }

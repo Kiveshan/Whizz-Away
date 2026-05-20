@@ -6,6 +6,7 @@ import { Upload } from "lucide-react"
 import "../css/PO.css"
 import "../css/ViewPOForm-print.css"
 import CompanyHeader from "../../../../components/CompanyHeader"
+import api from "../../../../api.js"
 
 const ViewPOForm = () => {
   const navigate = useNavigate()
@@ -24,8 +25,8 @@ useEffect(() => {
   const fetchCompletePOData = async () => {
     if (ponum) {
       try {
-        const response = await fetch(`/api/po-form/details/${ponum}`);
-        const data = await response.json();
+        const response = await api.get(`/api/po-form/details/${ponum}`);
+        const data = response.data;
         setCompletePOData(data);
         console.log("Complete PO Data:", data);
       } catch (error) {
@@ -40,8 +41,8 @@ useEffect(() => {
   const checkSlipStatus = async () => {
     if (ponum) {
       try {
-        const response = await fetch(`/api/po-form/slip-status/${ponum}`);
-        const data = await response.json();
+        const response = await api.get(`/api/po-form/slip-status/${ponum}`);
+        const data = response.data;
         setSlipStatus({ ...data, loading: false });
       } catch (error) {
         console.error('Error checking slip status:', error);
@@ -76,8 +77,8 @@ useEffect(() => {
   }
 const handleViewSlip = async () => {
   try {
-    const response = await fetch(`/api/po-form/view-slip/${ponum}`);
-    const data = await response.json();
+    const response = await api.get(`/api/po-form/view-slip/${ponum}`);
+    const data = response.data;
     
     if (data.success && data.url) {
       window.open(data.url, '_blank');
@@ -234,7 +235,7 @@ onClick={() => {
       truckId: finalTruckId,
       truckRegNum: finalTruckRegNum,
       ponum,
-      expenseType: poDataToUse.expense === "Fuel" ? 5 : null, 
+      expenseType: poDataToUse.expense, 
     },
   });
 }}

@@ -157,8 +157,8 @@ const getTurnoverPerMonth = async (client, month, year, clientId = null, company
       turnoverData = [...clientData, ...turnoverData]
     } else {
       // Fetch client name and add zero entry if no data for selected client
-      const nameQuery = `SELECT client FROM m5_client WHERE m5clientkey = $1`
-      const nameResult = await client.query(nameQuery, [clientId])
+      const nameQuery = `SELECT client FROM m5_client WHERE m5clientkey = $1 AND company_reg_num = $2`
+      const nameResult = await client.query(nameQuery, [clientId, company_reg_num])
       const clientName = nameResult.rows[0]?.client || ''
       if (clientName) {
         turnoverData = [
@@ -233,8 +233,8 @@ const getPaymentsReceivedPerMonth = async (client, month, year, clientId = null,
       })
     } else {
       // If no payments for selected client, still include zero entry with client name
-      const nameQuery = `SELECT client FROM m5_client WHERE m5clientkey = $1`
-      const nameRes = await client.query(nameQuery, [clientId])
+      const nameQuery = `SELECT client FROM m5_client WHERE m5clientkey = $1 AND company_reg_num = $2`
+      const nameRes = await client.query(nameQuery, [clientId, company_reg_num])
       const fallbackName = nameRes.rows[0]?.client
       if (fallbackName) {
         data.push({
@@ -1521,7 +1521,7 @@ const getClientSubbieCommissionReport = async (client, month, year, clientId, co
   }
 }
 
-async function calculateTotalPayable(client, employeeId, month, year) {
+async function calculateTotalPayable(client, employeeId, month, year, company_reg_num) {
   const monthNames = [
     "January", "February", "March", "April", "May", "June",
     "July", "August", "September", "October", "November", "December"
@@ -1545,11 +1545,11 @@ async function calculateTotalPayable(client, employeeId, month, year) {
     baseSalary = parseFloat(historyBaseRes.rows[0].base) || 0;
   } else {
     const currentBaseQuery = `
-      SELECT base_salary 
-      FROM m5_employee 
-      WHERE userid = $1
+      SELECT base_salary
+      FROM m5_employee
+      WHERE userid = $1 AND company_reg_num = $2
     `;
-    const currentBaseRes = await client.query(currentBaseQuery, [employeeId]);
+    const currentBaseRes = await client.query(currentBaseQuery, [employeeId, company_reg_num]);
     if (currentBaseRes.rows.length > 0) {
       baseSalary = parseFloat(currentBaseRes.rows[0].base_salary) || 0;
     }
@@ -1584,11 +1584,11 @@ async function calculateTotalPayable(client, employeeId, month, year) {
     loanDeduction = parseFloat(historyDedRes.rows[0].deduction_loan) || 0;
   } else {
     const currentDedQuery = `
-      SELECT deduction_loan 
-      FROM m5_employee 
-      WHERE userid = $1
+      SELECT deduction_loan
+      FROM m5_employee
+      WHERE userid = $1 AND company_reg_num = $2
     `;
-    const currentDedRes = await client.query(currentDedQuery, [employeeId]);
+    const currentDedRes = await client.query(currentDedQuery, [employeeId, company_reg_num]);
     if (currentDedRes.rows.length > 0) {
       loanDeduction = parseFloat(currentDedRes.rows[0].deduction_loan) || 0;
     }
@@ -1637,12 +1637,13 @@ async function getTotalWagesForMonth(client, month, year, company_reg_num) {
     // Check stored wage data
     const storedQuery = `
       SELECT net_pay as total_payable
-      FROM wages 
-      WHERE employeeid = $1 
-        AND EXTRACT(MONTH FROM employee_date) = $2 
+      FROM wages
+      WHERE employeeid = $1
+        AND EXTRACT(MONTH FROM employee_date) = $2
         AND EXTRACT(YEAR FROM employee_date) = $3
+        AND company_reg_num = $4
     `;
-    const storedRes = await client.query(storedQuery, [employeeId, monthNumber, year]);
+    const storedRes = await client.query(storedQuery, [employeeId, monthNumber, year, company_reg_num]);
     let totalPayable = 0;
     const exists = storedRes.rows.length > 0;
 
@@ -1651,10 +1652,10 @@ async function getTotalWagesForMonth(client, month, year, company_reg_num) {
       if (isPastMonth) {
         totalPayable = storedPayable;
       } else {
-        totalPayable = await calculateTotalPayable(client, employeeId, month, year);
+        totalPayable = await calculateTotalPayable(client, employeeId, month, year, company_reg_num);
       }
     } else {
-      totalPayable = await calculateTotalPayable(client, employeeId, month, year);
+      totalPayable = await calculateTotalPayable(client, employeeId, month, year, company_reg_num);
     }
 
     if (totalPayable > 0) {

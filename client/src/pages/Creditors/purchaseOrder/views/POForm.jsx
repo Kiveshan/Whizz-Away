@@ -16,7 +16,7 @@ const POForm = () => {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState(null)
   const [trucks, setTrucks] = useState([]) 
-  const isFuelExpense = categoryId === 5 || categoryId === "5"
+  const isFuelExpense = categoryName?.toLowerCase() === 'fuel'
 
   const [headerData, setHeaderData] = useState({
     supplier: "",
@@ -132,6 +132,7 @@ const handleSubmit = async (e) => {
         console.log(`Submitting line item: expenseTypeId=${item.expenseTypeId}, truckid=${truckId}, quantity=${isFuelExpense ? 0 : Number.parseInt(item.trucks)}`)
         return {
           expenseTypeId: item.expenseTypeId,
+          expenseTypeName: item.expenseType,
           description: item.description,
           quantity: isFuelExpense ? 0 : Number.parseInt(item.trucks),
           truckid: isFuelExpense && item.trucks ? truckId : null,

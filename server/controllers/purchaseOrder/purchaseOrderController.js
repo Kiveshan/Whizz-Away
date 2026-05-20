@@ -82,9 +82,11 @@ export const deletePurchaseOrderByPonumHandler = async (req, res) => {
   try {
     await client.query("BEGIN")
 
+    const company_reg_num = req.user.company_reg_num
+
     const poRows = await client.query(
-      `SELECT slip_s3key FROM purchase_orders WHERE ponum = $1`,
-      [ponum],
+      `SELECT slip_s3key FROM purchase_orders WHERE ponum = $1 AND company_reg_num = $2`,
+      [ponum, company_reg_num],
     )
 
     if (poRows.rows.length === 0) {
@@ -95,13 +97,13 @@ export const deletePurchaseOrderByPonumHandler = async (req, res) => {
     const slipKeys = [...new Set(poRows.rows.map((r) => r.slip_s3key).filter(Boolean))]
 
     const expenseRows = await client.query(
-      `SELECT s3key FROM expenses_m2 WHERE orderno::text = $1`,
-      [ponum],
+      `SELECT s3key FROM expenses_m2 WHERE orderno::text = $1 AND company_reg_num = $2`,
+      [ponum, company_reg_num],
     )
     const expenseSlipKeys = [...new Set(expenseRows.rows.map((r) => r.s3key).filter(Boolean))]
 
-    await client.query(`DELETE FROM expenses_m2 WHERE orderno::text = $1`, [ponum])
-    await client.query(`DELETE FROM purchase_orders WHERE ponum = $1`, [ponum])
+    await client.query(`DELETE FROM expenses_m2 WHERE orderno::text = $1 AND company_reg_num = $2`, [ponum, company_reg_num])
+    await client.query(`DELETE FROM purchase_orders WHERE ponum = $1 AND company_reg_num = $2`, [ponum, company_reg_num])
 
     await client.query("COMMIT")
 
@@ -152,7 +154,7 @@ export const uploadPurchaseOrderSlipHandler = async (req, res) => {
   let uniqueFileName;
   const fileExt = path.extname(file.originalname);
 
-  if (expenseType === "5" || expenseType === 5) {
+  if (expenseType?.toLowerCase() === 'fuel') {
     // Fuel expenses go to trucks folder
     folderKey = `Trucks/${truckRegNum}`;
     uniqueFileName = `${truckRegNum}-${uuidv4()}${fileExt}`;
@@ -174,23 +176,25 @@ export const uploadPurchaseOrderSlipHandler = async (req, res) => {
         ContentType: file.mimetype,
       })
       .promise()
+const company_reg_num = req.user.company_reg_num
+
 await pool.query(
-  `UPDATE purchase_orders SET slip_s3key = $1, invoice_number = $2, vat = $3 WHERE ponum = $4`,
-  [s3Key, invoiceNumber, vat ? parseFloat(vat) : null, ponum]
+  `UPDATE purchase_orders SET slip_s3key = $1, invoice_number = $2, vat = $3 WHERE ponum = $4 AND company_reg_num = $5`,
+  [s3Key, invoiceNumber, vat ? parseFloat(vat) : null, ponum, company_reg_num]
 )
 
 // Update total only for the first record of this PONUM
 await pool.query(
-  `UPDATE purchase_orders 
-   SET total = $1 
-   WHERE ponum = $2 AND po_id = (
-     SELECT MIN(po_id) FROM purchase_orders WHERE ponum = $2
+  `UPDATE purchase_orders
+   SET total = $1
+   WHERE ponum = $2 AND company_reg_num = $3 AND po_id = (
+     SELECT MIN(po_id) FROM purchase_orders WHERE ponum = $2 AND company_reg_num = $3
    )`,
-  [parseFloat(expenseCost), ponum]
+  [parseFloat(expenseCost), ponum, company_reg_num]
 )
 
     // If this is a fuel expense (expenseType = 5), also save to expenses_m2 table
-    if (expenseType === "5" || expenseType === 5) {
+    if (expenseType?.toLowerCase() === 'fuel') {
       const truckId = req.body.truckId;
       const uploadDate = new Date().toISOString().split("T")[0];
       
@@ -214,7 +218,8 @@ await pool.query(
       } else if (documentFrom === "Manager") {
         try {
           const managerResult = await pool.query(
-            "SELECT * FROM usertable WHERE roleid = 1 AND userid = 1"
+            "SELECT userid, name, surname FROM usertable WHERE roleid = 1 AND company_reg_num = $1 LIMIT 1",
+            [company_reg_num]
           );
           if (managerResult.rows.length > 0) {
             documentSource = `${managerResult.rows[0].name} ${managerResult.rows[0].surname}`;
@@ -226,7 +231,8 @@ await pool.query(
       } else if (documentFrom === "Controller") {
         try {
           const controllerResult = await pool.query(
-            "SELECT userid, CONCAT(name, ' ', surname) as fullname FROM m5_employee WHERE roleid = 2 LIMIT 1"
+            "SELECT userid, CONCAT(name, ' ', surname) as fullname FROM m5_employee WHERE roleid = 2 AND company_reg_num = $1 LIMIT 1",
+            [company_reg_num]
           );
           if (controllerResult.rows.length > 0) {
             documentSource = controllerResult.rows[0].fullname;
@@ -237,44 +243,50 @@ await pool.query(
         }
       }
 
-      // Insert into expenses_m2 table
+      // Upsert into expenses_m2.
+      // orderno is a VARCHAR column — store the PO number string directly so the
+      // JOIN in getPOExpensesByTruckId (e.orderno::text = po.ponum) resolves correctly.
+      // Requires migration 003 to have been run first, which changes the UNIQUE
+      // constraint from UNIQUE (orderno) to UNIQUE (orderno, company_reg_num).
       try {
-        const expenseQuery = `
-          INSERT INTO expenses_m2 
-          (type, documentfrom, expensecost, description, slipname, s3key, slipuploaddate, truckid, driverid, orderno)
-          VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
-          ON CONFLICT (orderno)
-          DO UPDATE SET
-            type = EXCLUDED.type,
-            documentfrom = EXCLUDED.documentfrom,
-            expensecost = EXCLUDED.expensecost,
-            description = EXCLUDED.description,
-            slipname = EXCLUDED.slipname,
-            s3key = EXCLUDED.s3key,
-            slipuploaddate = EXCLUDED.slipuploaddate,
-            truckid = EXCLUDED.truckid,
-            driverid = EXCLUDED.driverid
-          RETURNING ekey
-        `;
-        
-        const expenseValues = [
-          "fuel",
-          documentSource,
-          parseFloat(expenseCost),
-          `Fuel expense for PO: ${ponum}`,
-          file.originalname,
-          s3Key,
-          uploadDate,
-          truckId ? parseInt(truckId) : null,
-          userId,
-          ponum
-        ];
-
-        const expenseResult = await pool.query(expenseQuery, expenseValues);
-        console.log("Expense record upserted with ID:", expenseResult.rows[0].ekey);
-        
+        const upsertResult = await pool.query(
+          `INSERT INTO expenses_m2
+           (type, documentfrom, expensecost, description, slipname, s3key, slipuploaddate, truckid, driverid, orderno, company_reg_num)
+           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+           ON CONFLICT (orderno, company_reg_num) DO UPDATE SET
+             documentfrom   = EXCLUDED.documentfrom,
+             expensecost    = EXCLUDED.expensecost,
+             description    = EXCLUDED.description,
+             slipname       = EXCLUDED.slipname,
+             s3key          = EXCLUDED.s3key,
+             slipuploaddate = EXCLUDED.slipuploaddate,
+             truckid        = EXCLUDED.truckid,
+             driverid       = EXCLUDED.driverid
+           RETURNING ekey`,
+          [
+            "fuel",
+            documentSource,
+            parseFloat(expenseCost),
+            `Fuel expense for PO: ${ponum}`,
+            file.originalname,
+            s3Key,
+            uploadDate,
+            truckId ? parseInt(truckId) : null,
+            userId,
+            ponum,
+            company_reg_num,
+          ]
+        );
+        console.log("Expense record upserted with ekey:", upsertResult.rows[0].ekey);
       } catch (expenseError) {
-        console.error("Error creating expense record:", expenseError);
+        console.error("Error upserting expense record:", expenseError.message, expenseError.detail || "");
+        // Surface the error in the response so it's visible during development
+        return res.status(200).json({
+          success: true,
+          message: "PO document uploaded but expense record failed to save",
+          s3Key,
+          expenseWarning: expenseError.message,
+        });
       }
     }
 
@@ -396,7 +408,8 @@ export const createPurchaseOrderHandler = async (req, res) => {
       subbie,
       date,
       total,
-    }, req.user.company_reg_num)
+      company_reg_num: req.user.company_reg_num,
+    })
 
     res.status(201).json({
       success: true,
@@ -423,7 +436,8 @@ export const createMultiplePurchaseOrdersHandler = async (req, res) => {
       subbie,
       lineItems,
       totals,
-    }, req.user.company_reg_num)
+      company_reg_num: req.user.company_reg_num,
+    })
 
     res.status(201).json({
       success: true,
@@ -452,11 +466,11 @@ export const checkSlipStatusHandler = async (req, res) => {
   try {
     const { ponum } = req.params;
     const query = `
-      SELECT slip_s3key, invoice_number 
-      FROM purchase_orders 
-      WHERE ponum = $1
+      SELECT slip_s3key, invoice_number
+      FROM purchase_orders
+      WHERE ponum = $1 AND company_reg_num = $2
     `;
-    const result = await pool.query(query, [ponum]);
+    const result = await pool.query(query, [ponum, req.user.company_reg_num]);
     
     if (result.rows.length === 0) {
       return res.json({ hasSlip: false });
@@ -478,11 +492,11 @@ export const viewSlipHandler = async (req, res) => {
   try {
     const { ponum } = req.params;
     const query = `
-      SELECT slip_s3key 
-      FROM purchase_orders 
-      WHERE ponum = $1 AND slip_s3key IS NOT NULL
+      SELECT slip_s3key
+      FROM purchase_orders
+      WHERE ponum = $1 AND slip_s3key IS NOT NULL AND company_reg_num = $2
     `;
-    const result = await pool.query(query, [ponum]);
+    const result = await pool.query(query, [ponum, req.user.company_reg_num]);
     
     if (result.rows.length === 0) {
       return res.status(404).json({ error: 'No slip found for this PO' });

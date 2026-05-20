@@ -1,6 +1,6 @@
 import { pool } from "../../config/database.js";
 
-const getClientCreditNotes = async (clientId, company_reg_num, { year, month }) => {
+const getClientCreditNotes = async (clientId, { year, month }, company_reg_num) => {
   let client;
   try {
     if (!pool) {
@@ -50,7 +50,7 @@ if (month) {
   }
 };
 
-const getInstructions = async (clientId, company_reg_num) => {
+const getInstructions = async (clientId, { year, month } = {}, company_reg_num) => {
   let client;
   try {
     client = await pool.connect();
@@ -97,53 +97,54 @@ const getContainers = async (m1key, company_reg_num) => {
     if (client) client.release();
   }
 };
-const getCompanyDetails = async () => {
+const getCompanyDetails = async (company_reg_num) => {
   let client;
   try {
     if (!pool) {
-      throw newError("Database connection not established. Please try again later.");
+      throw new Error("Database connection not established. Please try again later.");
     }
     client = await pool.connect();
 
-const queryText = `
-  SELECT 
-    companyname,
-    company_reg_num,
-    address,
-    cluster_box,
-    email,
-    cell_num,
-    cell_num2,
-    name_of_acc,
-    bank,
-    account_num,
-    branch,
-    branch_code
-  FROM 
-    usertable
-  WHERE 
-    status = 'active'
-    AND roleid = 1;
-`;
+    const queryText = `
+      SELECT
+        companyname,
+        company_reg_num,
+        address,
+        cluster_box,
+        email,
+        cell_num,
+        cell_num2,
+        name_of_acc,
+        bank,
+        account_num,
+        branch,
+        branch_code
+      FROM
+        usertable
+      WHERE
+        company_reg_num = $1
+        AND status = 'active'
+        AND roleid = 1
+      LIMIT 1
+    `;
 
-
-    const result = await client.query(queryText);
-    return { success: true, data: result.rows[0] || {} }; // Return the first row or empty object
+    const result = await client.query(queryText, [company_reg_num]);
+    return { success: true, data: result.rows[0] || {} };
   } catch (error) {
     throw error;
   } finally {
     if (client) client.release();
   }
 };
-const getClientDetails = async (clientId) => {
+const getClientDetails = async (clientId, company_reg_num) => {
   let client;
   try {
     client = await pool.connect();
 
     const queryText = `
-      SELECT 
-        client, 
-        companyaddress, 
+      SELECT
+        client,
+        companyaddress,
         suburb,
         postalcode,
         vatregno,
@@ -151,8 +152,9 @@ const getClientDetails = async (clientId) => {
         email
       FROM m5_client
       WHERE m5clientkey = $1
+        AND company_reg_num = $2
     `;
-    const queryParams = [clientId];
+    const queryParams = [clientId, company_reg_num];
 
     const result = await client.query(queryText, queryParams);
 
@@ -163,7 +165,7 @@ const getClientDetails = async (clientId) => {
     if (client) client.release();
   }
 };
-const getLatestDocumentNumber = async () => {
+const getLatestDocumentNumber = async (company_reg_num) => {
   let client;
   try {
     if (!pool) {
@@ -175,11 +177,12 @@ const getLatestDocumentNumber = async () => {
       SELECT doc_no
       FROM credit_notes
       WHERE doc_no ~ '^CR-[0-9]+$'
+        AND company_reg_num = $1
       ORDER BY CAST(SUBSTRING(doc_no FROM '[0-9]+') AS INTEGER) DESC
-      LIMIT 1;
+      LIMIT 1
     `;
 
-    const result = await client.query(queryText);
+    const result = await client.query(queryText, [company_reg_num]);
     if (result.rows.length > 0) {
       const latestDocNo = result.rows[0].doc_no;
       const number = parseInt(latestDocNo.replace('CR-', '')) + 1;

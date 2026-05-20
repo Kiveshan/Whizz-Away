@@ -248,6 +248,7 @@ export const calculatePurchaseOrder = (quantity, unitPrice) => {
 
 export const createPurchaseOrder = async ({
   expenseTypeId,
+  expenseTypeName,
   supplierId,
   regNo,
   attentionTo,
@@ -293,20 +294,22 @@ export const createPurchaseOrder = async ({
     RETURNING po_id, truckid
   `
 
+  const isFuel = expenseTypeName?.toLowerCase() === 'fuel'
+
   const values = [
     expenseTypeId,
     supplierId,
     regNo,
     attentionTo,
     receivedBy,
-    expenseTypeId === 5 ? 0 : quantity,
+    isFuel ? 0 : quantity,
     0,
     description,
     subbie,
     date || new Date().toISOString().split("T")[0],
     poNum,
     0,
-    expenseTypeId === 5 ? truckid : null,
+    isFuel ? truckid : null,
     company_reg_num,
   ]
 
@@ -374,8 +377,9 @@ export const createMultiplePurchaseOrders = async ({
     for (const item of lineItems) {
       console.log(`Raw line item: ${JSON.stringify(item)}`) // Log raw item
       const expenseTypeId = Number(item.expenseTypeId)
-      const truckId = expenseTypeId === 5 && item.truckid ? Number(item.truckid) : null
-      if (item.expenseTypeId === "5" && !truckId) {
+      const isFuel = item.expenseTypeName?.toLowerCase() === 'fuel'
+      const truckId = isFuel && item.truckid ? Number(item.truckid) : null
+      if (isFuel && !truckId) {
         console.error(`Missing or invalid truckid for fuel expense line item: ${JSON.stringify(item)}`)
         throw new Error("truckid is required for fuel expense purchase orders")
       }
@@ -389,14 +393,14 @@ export const createMultiplePurchaseOrders = async ({
         regNo,
         attentionTo,
         receivedBy,
-        expenseTypeId === 5 ? 0 : item.quantity,
+        isFuel ? 0 : item.quantity,
         0,
         item.description,
         subbie,
         date || new Date().toISOString().split("T")[0],
         poNum,
         totalAmount,  // Only set total for first item
-        expenseTypeId === 5 ? truckId : null,
+        isFuel ? truckId : null,
         company_reg_num,
       ]
 

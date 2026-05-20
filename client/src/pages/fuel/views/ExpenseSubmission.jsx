@@ -11,15 +11,15 @@ const ExpenseSubmission = ({ onBack }) => {
   const truckId = location.state?.truckId;
   const truckRegNum = location.state?.truckRegNum;
   const ponum = location.state?.ponum || "";
-  // Ensure expenseType is parsed as a number
-  const expenseType = Number(location.state?.expenseType) || null;
+  const expenseType = location.state?.expenseType || null;
+  const isFuelExpense = expenseType?.toLowerCase() === 'fuel';
 
   const [formData, setFormData] = useState({
     expenseCost: "0",
     orderno: "",
     invoiceNumber: "", // Add invoice number field
     vat: "", // Add VAT field
-    ...(expenseType === 5 ? { documentFrom: "Controller", driverName: "", driverFullName: "" } : {}),
+    ...(isFuelExpense ? { documentFrom: "Controller", driverName: "", driverFullName: "" } : {}),
   });
 
   const [file, setFile] = useState(null);
@@ -43,7 +43,7 @@ const ExpenseSubmission = ({ onBack }) => {
   }, [ponum]);
 
   useEffect(() => {
-    if (expenseType === 5) {
+    if (isFuelExpense) {
       const fetchDrivers = async () => {
         try {
           const response = await api.get("/employees/drivers");
@@ -72,7 +72,7 @@ const ExpenseSubmission = ({ onBack }) => {
       ...formData,
       [name]: value,
     });
-    if (expenseType === 5 && name === "documentFrom" && value !== "Driver") {
+    if (isFuelExpense && name === "documentFrom" && value !== "Driver") {
       setFormData((prev) => ({
         ...prev,
         driverName: "",
@@ -114,7 +114,7 @@ const ExpenseSubmission = ({ onBack }) => {
     setIsSubmitting(true);
     setSubmitMessage("");
     setUploadProgress(0);
-    if (expenseType === 5 && !truckId) {
+    if (isFuelExpense && !truckId) {
       setSubmitMessage("Error: No truck selected for fuel expense");
       setIsSubmitting(false);
       submittingRef.current = false;
@@ -122,7 +122,7 @@ const ExpenseSubmission = ({ onBack }) => {
     }
 
 
-    if (expenseType === 5 && formData.documentFrom === "Driver" && !formData.driverName) {
+    if (isFuelExpense && formData.documentFrom === "Driver" && !formData.driverName) {
       setSubmitMessage("Error: Please select a driver");
       setIsSubmitting(false);
       submittingRef.current = false;
@@ -131,6 +131,20 @@ const ExpenseSubmission = ({ onBack }) => {
 
     if (!file) {
       setSubmitMessage("Error: Please upload a petrol slip");
+      setIsSubmitting(false);
+      submittingRef.current = false;
+      return;
+    }
+
+    if (!formData.invoiceNumber || !formData.invoiceNumber.trim()) {
+      setSubmitMessage("Error: Please enter an invoice number");
+      setIsSubmitting(false);
+      submittingRef.current = false;
+      return;
+    }
+
+    if (!formData.expenseCost || parseFloat(formData.expenseCost) <= 0) {
+      setSubmitMessage("Error: Please enter a valid expense cost");
       setIsSubmitting(false);
       submittingRef.current = false;
       return;
@@ -145,7 +159,7 @@ const ExpenseSubmission = ({ onBack }) => {
 
     try {
       const formDataToSend = new FormData();
-      if (expenseType === 5) {
+      if (isFuelExpense) {
         formDataToSend.append("documentFrom", formData.documentFrom);
       }
       formDataToSend.append("expenseCost", formData.expenseCost);
@@ -167,7 +181,7 @@ const ExpenseSubmission = ({ onBack }) => {
       }
       if (file) formDataToSend.append("slip", file);
       formDataToSend.append("orderno", formData.orderno);
-      if (expenseType === 5 && formData.documentFrom === "Driver" && formData.driverName) {
+      if (isFuelExpense && formData.documentFrom === "Driver" && formData.driverName) {
         formDataToSend.append("driverId", formData.driverName);
       }
 
@@ -212,7 +226,7 @@ const ExpenseSubmission = ({ onBack }) => {
                 state: {
                   poData: {
                     ponum: ponum,
-                    expense: expenseType === 5 ? "Fuel" : "Other"
+                    expense: isFuelExpense ? "Fuel" : "Other"
                   },
                   truckId: truckId,
                   truckRegNum: truckRegNum,
@@ -258,7 +272,7 @@ const ExpenseSubmission = ({ onBack }) => {
       <form onSubmit={handleSubmit} className="expense-form">
         <div className="form-card">
           <div className="form-grid">
-            {expenseType === 5 && (
+            {isFuelExpense && (
               <div className="form-field">
                 <label htmlFor="documentFrom">Document From</label>
                 <select
@@ -275,7 +289,7 @@ const ExpenseSubmission = ({ onBack }) => {
               </div>
             )}
 
-            {expenseType === 5 && formData.documentFrom === "Driver" && (
+            {isFuelExpense && formData.documentFrom === "Driver" && (
               <div className="form-field driver-field">
                 <label htmlFor="driverSelect">Driver Name</label>
                 <Select
@@ -304,6 +318,7 @@ const ExpenseSubmission = ({ onBack }) => {
                 value={formData.invoiceNumber}
                 onChange={handleInputChange}
                 placeholder="Enter invoice number"
+                required
               />
             </div>
 
@@ -314,8 +329,7 @@ const ExpenseSubmission = ({ onBack }) => {
                 type="text"
                 name="orderno"
                 value={ponum}
-                // onChange={handleInputChange}
-                // placeholder="Enter order number"
+                readOnly
                 required
               />
             </div>
