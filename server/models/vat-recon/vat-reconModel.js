@@ -93,7 +93,7 @@ export const getInputVat = async (month, year, company_reg_num) => {
     }
 }
 
-export const getSubbieRates = async (month, year) => {
+export const getSubbieRates = async (month, year, company_reg_num) => {
     const monthIndex = [
         "January", "February", "March", "April", "May", "June",
         "July", "August", "September", "October", "November", "December",
@@ -113,12 +113,13 @@ export const getSubbieRates = async (month, year) => {
         AND l.driverrate > 0
         AND e.roleid = 6
         AND e.companyname IS NOT NULL
+        AND m.company_reg_num = $3
         GROUP BY e.companyname, m.vat
         ORDER BY e.companyname
     `
 
     try {
-        const result = await pool.query(query, [monthIndex, year])
+        const result = await pool.query(query, [monthIndex, year, company_reg_num])
 
         return result.rows.map((row) => {
             const totalRate = parseFloat(row.total_rate) || 0
