@@ -57,25 +57,42 @@ const getFuelExpenses = async (client, month, year) => {
 }
 
 const getTurnoverPerMonth = async (client, month, year, clientId = null) => {
+
+  // Convert month name + year into a date range (e.g. April 2026 → 2026-04-01 to 2026-05-01)
+  const monthIndex = Object.values({
+    January: 1, February: 2, March: 3, April: 4, May: 5, June: 6,
+    July: 7, August: 8, September: 9, October: 10, November: 11, December: 12,
+  }).indexOf(Object.keys({
+    January: 1, February: 2, March: 3, April: 4, May: 5, June: 6,
+    July: 7, August: 8, September: 9, October: 10, November: 11, December: 12,
+  }).find(k => k === month.trim())) + 1
+
+  const monthNum = new Date(`${month.trim()} 1, ${year}`).getMonth() + 1
+  const paddedMonth = String(monthNum).padStart(2, '0')
+  const dateFrom = `${year}-${paddedMonth}-01`
+  const nextMonth = monthNum === 12 ? 1 : monthNum + 1
+  const nextYear = monthNum === 12 ? parseInt(year) + 1 : parseInt(year)
+  const dateTo = `${nextYear}-${String(nextMonth).padStart(2, '0')}-01`
+
+  console.log(`Date range: ${dateFrom} to ${dateTo}`)
+
   const totalQuery = `
     SELECT
       COALESCE(SUM(m.total_cost), 0) + COALESCE((
-        SELECT SUM(amount)
-        FROM add_ons
-        WHERE TRIM(TO_CHAR(date, 'Month')) = $1
-          AND EXTRACT(YEAR FROM date)::text = $2
+        SELECT SUM(a.amount)
+        FROM add_ons a
+        WHERE a.date >= $1
+          AND a.date < $2
       ), 0) AS turnover
     FROM invoice i
     JOIN m1_controller m ON i.m1key = m.m1key
-    WHERE TRIM(TO_CHAR(i.date, 'Month')) = $1
-      AND EXTRACT(YEAR FROM i.date)::text = $2
+    WHERE m.created_at >= $1
+      AND m.created_at < $2
   `
 
-  const totalResult = await client.query(totalQuery, [month, year])
+  const totalResult = await client.query(totalQuery, [dateFrom, dateTo])
   console.log("Total turnover query result:", totalResult.rows)
-
   const totalTurnover = Number.parseFloat(totalResult.rows[0]?.turnover || 0)
-
   console.log(`Total turnover (invoices + add-ons) for ${month} ${year}: ${totalTurnover}`)
 
   let turnoverData = [
@@ -90,21 +107,26 @@ const getTurnoverPerMonth = async (client, month, year, clientId = null) => {
 
   if (clientId) {
     const clientQuery = `
-      SELECT 
-        c.client, 
-        SUM(m.total_cost) as turnover,
-        to_char(i.date, 'Month') as month_name,
-        EXTRACT(YEAR FROM i.date) as year
+      SELECT
+        c.client,
+        COALESCE(SUM(m.total_cost), 0) + COALESCE((
+          SELECT SUM(a.amount)
+          FROM add_ons a
+          WHERE a.client_id = $3
+            AND a.date >= $1
+            AND a.date < $2
+        ), 0) AS turnover,
+        $4 AS month_name,
+        $5 AS year
       FROM invoice i
       JOIN m1_controller m ON i.m1key = m.m1key
       JOIN m5_client c ON i.clientid = c.m5clientkey
-      WHERE TRIM(to_char(i.date, 'Month')) = $1
-      AND EXTRACT(YEAR FROM i.date)::text = $2
-      AND i.clientid = $3
-      GROUP BY c.client, to_char(i.date, 'Month'), EXTRACT(YEAR FROM i.date)
-      ORDER BY turnover DESC
+      WHERE m.created_at >= $1
+        AND m.created_at < $2
+        AND i.clientid = $3
+      GROUP BY c.client
     `
-    const clientResult = await client.query(clientQuery, [month, year, clientId])
+    const clientResult = await client.query(clientQuery, [dateFrom, dateTo, clientId, month.trim(), year.toString()])
     console.log("Client query result:", clientResult.rows)
 
     if (clientResult.rows.length > 0) {
@@ -121,22 +143,54 @@ const getTurnoverPerMonth = async (client, month, year, clientId = null) => {
       })
       turnoverData = [...clientData, ...turnoverData]
     } else {
-      // Fetch client name and add zero entry if no data for selected client
-      const nameQuery = `SELECT client FROM m5_client WHERE m5clientkey = $1`
-      const nameResult = await client.query(nameQuery, [clientId])
-      const clientName = nameResult.rows[0]?.client || ''
-      if (clientName) {
+      // Client has no invoices — check if they have add-ons only
+      const addOnOnlyQuery = `
+        SELECT
+          c.client,
+          COALESCE(SUM(a.amount), 0) AS turnover
+        FROM add_ons a
+        JOIN m5_client c ON a.client_id = c.m5clientkey
+        WHERE a.client_id = $3
+          AND a.date >= $1
+          AND a.date < $2
+        GROUP BY c.client
+      `
+      const addOnResult = await client.query(addOnOnlyQuery, [dateFrom, dateTo, clientId])
+      console.log("Add-on only query result:", addOnResult.rows)
+
+      if (addOnResult.rows.length > 0) {
+        const row = addOnResult.rows[0]
+        const turnover = Number.parseFloat(row.turnover || 0)
+        const percentage = totalTurnover > 0 ? ((turnover / totalTurnover) * 100).toFixed(2) : 0
         turnoverData = [
           {
-            client: clientName,
-            turnover: 0,
+            client: row.client,
+            turnover: turnover,
             month_name: month.trim(),
             year: year.toString(),
-            percentage: 0,
+            percentage: Number.parseFloat(percentage),
           },
           ...turnoverData,
         ]
-        console.log(`Added zero-turnover entry for selected client: ${clientName}`)
+        console.log(`Added add-on-only turnover entry for client: ${row.client}`)
+      } else {
+        // No invoices and no add-ons — zero entry
+        const nameQuery = `SELECT client FROM m5_client WHERE m5clientkey = $1`
+        const nameResult = await client.query(nameQuery, [clientId])
+        const clientName = nameResult.rows[0]?.client || ''
+        if (clientName) {
+          turnoverData = [
+            {
+              client: clientName,
+              turnover: 0,
+              month_name: month.trim(),
+              year: year.toString(),
+              percentage: 0,
+            },
+            ...turnoverData,
+          ]
+          console.log(`Added zero-turnover entry for selected client: ${clientName}`)
+        }
       }
     }
   }
