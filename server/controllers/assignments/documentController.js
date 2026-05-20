@@ -64,7 +64,8 @@ const uploadDocumentHandler = async (req, res) => {
       s3Key,
       uploadDate,
       instructionId,
-    }, req.user.company_reg_num);
+      company_reg_num: req.user.company_reg_num,
+    });
 
     res.status(201).json({
       success: true,
@@ -91,7 +92,7 @@ const getDocumentsByClientHandler = async (req, res) => {
     const { clientId } = req.params;
     console.log(`Fetching documents for client ID: ${clientId}`);
 
-    const documents = await getDocumentsByClientId(clientId);
+    const documents = await getDocumentsByClientId(clientId, req.user.company_reg_num);
 
     const documentsWithUrls = documents.map((doc) => ({
       id: doc.document_id.toString(),

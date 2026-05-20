@@ -21,8 +21,8 @@ const insertDocument = async ({
   company_reg_num,
 }) => {
   const instructionResult = await pool.query(
-    "SELECT client FROM m1_controller WHERE m1key = $1",
-    [instructionId]
+    "SELECT client FROM m1_controller WHERE m1key = $1 AND company_reg_num = $2",
+    [instructionId, company_reg_num]
   );
   const clientId =
     instructionResult.rows.length > 0 ? instructionResult.rows[0].client : 0;
