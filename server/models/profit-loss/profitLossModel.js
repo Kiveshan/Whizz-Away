@@ -112,11 +112,15 @@ const getProfitLossData = async (month, year) => {
   try {
     client = await pool.connect();
 
-    // === INCOME: Separate Categories ===
-    
-    // Invoices (instructions that have entries in the invoice table)
+    // === INCOME: Separate Categories (VAT-inclusive for Invoices) ===
+
+    // Invoices — now matches calculateMonthlyTurnover (VAT-inclusive)
     const invoicesQuery = `
-      SELECT COALESCE(SUM(m.total_cost), 0) AS invoices_total
+      SELECT
+        COALESCE(
+          SUM(m.total_cost + (m.total_cost * (COALESCE(m.vat, 0)::numeric / 100))),
+          0
+        ) AS invoices_total
       FROM invoice i
       JOIN m1_controller m ON i.m1key = m.m1key
       WHERE TRIM(TO_CHAR(i.date, 'Month')) = $1
@@ -126,7 +130,7 @@ const getProfitLossData = async (month, year) => {
     const invoicesResult = await client.query(invoicesQuery, [month, year]);
     const invoicesTotal = Number(invoicesResult.rows[0]?.invoices_total || 0);
 
-    // Add-ons
+    // Add-ons (unchanged)
     const addOnsQuery = `
       SELECT COALESCE(SUM(amount), 0) AS addons_total
       FROM add_ons
@@ -139,7 +143,7 @@ const getProfitLossData = async (month, year) => {
 
     const totalIncome = invoicesTotal + addOnsTotal;
 
-    // === EXPENSES ===
+    // === EXPENSES === (unchanged)
     const fuel = Number((await client.query(
       `SELECT COALESCE(SUM(expensecost), 0) AS total
        FROM expenses_m2
@@ -169,7 +173,7 @@ const getProfitLossData = async (month, year) => {
 
     const wages = await getTotalWagesForMonth(client, month, year);
 
-    // FIXED: Credit Notes — unnest safely using LATERAL
+    // Credit Notes
     const creditNotesResult = await client.query(
       `SELECT COALESCE(SUM(val), 0) AS total
        FROM credit_notes cn
