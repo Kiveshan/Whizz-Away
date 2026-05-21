@@ -133,9 +133,9 @@ export const AuthProvider = ({ children }) => {
    */
   const PLAN_FEATURES = {
     lite:         ["instructions", "assignment", "invoice", "statements", "manage"],
-    professional: ["instructions", "assignment", "invoice", "statements", "manage", "addons", "analytics", "reports"],
-    growth:       ["instructions", "assignment", "invoice", "statements", "manage", "addons", "analytics", "reports", "payroll", "biometric", "vat"],
-    enterprise:   ["instructions", "assignment", "invoice", "statements", "manage", "addons", "analytics", "reports", "payroll", "biometric", "vat", "creditors", "priority_support"],
+    professional: ["instructions", "assignment", "invoice", "statements", "manage", "addons", "analytics", "age_analysis", "reports"],
+    growth:       ["instructions", "assignment", "invoice", "statements", "manage", "addons", "analytics", "age_analysis", "reports", "payroll", "biometric", "vat"],
+    enterprise:   ["instructions", "assignment", "invoice", "statements", "manage", "addons", "analytics", "age_analysis", "reports", "payroll", "biometric", "vat", "creditors", "priority_support"],
   }
 
   const hasFeature = useCallback((feature_key) => {

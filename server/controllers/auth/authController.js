@@ -9,6 +9,7 @@ import {
 import passport from "passport";
 import jwt from "jsonwebtoken";
 import { secretKey } from "../../config/secrets.js";
+import { PLAN_RANK, ROLE_PLAN_MAP, ROLEID_NAME_MAP } from "../../middleware/planAuthorization.js";
 
 const login = async (req, res, next) => {
   passport.authenticate("local", async (err, user, info) => {
@@ -104,6 +105,22 @@ const login = async (req, res, next) => {
         }
       } catch (subErr) {
         console.error("Failed to fetch subscription for JWT:", subErr);
+      }
+    }
+
+    // Block login if the company's plan is below the minimum required for this role.
+    // roleid 1 (company admin) and 7 (super admin) are always allowed.
+    if (user.roleid !== 1 && user.roleid !== 7) {
+      const roleName = ROLEID_NAME_MAP[user.roleid];
+      const minimumPlan = roleName ? ROLE_PLAN_MAP[roleName] : null;
+      if (minimumPlan) {
+        const tierRank = PLAN_RANK[subscription_tier] ?? 0;
+        const requiredRank = PLAN_RANK[minimumPlan] ?? 99;
+        if (tierRank < requiredRank) {
+          return res.status(403).json({
+            message: `Your role requires the ${minimumPlan} plan or above. Please contact your company administrator.`,
+          });
+        }
       }
     }
 

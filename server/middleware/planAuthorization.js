@@ -12,7 +12,7 @@ const ROLE_PLAN_MAP = {
   "Director":         "professional",
   "Controller":       "professional",
   "Debtors Clerk":    "growth",
-  "Creditors Clerk":  "growth",
+  "Creditors Clerk":  "enterprise",
 };
 
 // roleid → role name (matches roles table + EmployeeForm.jsx options)
