@@ -1,4 +1,4 @@
-import { getOutputVat, getInputVat } from "../../models/vat-recon/vat-reconModel.js"
+import { getOutputVat, getInputVat, getSubbieRates } from "../../models/vat-recon/vat-reconModel.js"
 
 export const getVatReconHandler = async (req, res) => {
     try {
@@ -10,22 +10,30 @@ export const getVatReconHandler = async (req, res) => {
 
         console.log(`Generating VAT recon report for ${month} ${year}`)
 
-        // Fetch output VAT (from m1_controller - client invoices)
         const outputVat = await getOutputVat(month, year)
         console.log(`Fetched ${outputVat.length} output VAT records`)
 
-        // Fetch input VAT (from purchase_orders - expenses)
         const inputVat = await getInputVat(month, year)
         console.log(`Fetched ${inputVat.length} input VAT records`)
 
-        // Calculate totals
+        const subbieRates = await getSubbieRates(month, year)
+        console.log(`Fetched ${subbieRates.length} subbie rate records`) // ✅ fix: .length not .total
+
+        // Output VAT: sum of (totalCost * vatRate / 100) per client
         const totalOutputVat = outputVat.reduce((sum, item) => {
             return sum + (item.totalCost * item.vatRate) / 100
         }, 0)
 
-        const totalInputVat = inputVat.reduce((sum, item) => {
+        // Input VAT: purchase orders VAT + subbie rates VAT ✅ fix: subbies now included
+        const totalPurchaseOrderVat = inputVat.reduce((sum, item) => {
             return sum + item.vat
         }, 0)
+
+        const totalSubbieVat = subbieRates.reduce((sum, item) => {
+            return sum + item.vat
+        }, 0)
+
+        const totalInputVat = totalPurchaseOrderVat + totalSubbieVat
 
         const vatOwed = totalOutputVat - totalInputVat
 
@@ -35,9 +43,12 @@ export const getVatReconHandler = async (req, res) => {
             year,
             outputVat,
             inputVat,
+            subbieRates,
             summary: {
                 totalOutputVat: parseFloat(totalOutputVat.toFixed(2)),
                 totalInputVat: parseFloat(totalInputVat.toFixed(2)),
+                totalPurchaseOrderVat: parseFloat(totalPurchaseOrderVat.toFixed(2)), // optional breakdown
+                totalSubbieVat: parseFloat(totalSubbieVat.toFixed(2)),               // optional breakdown
                 vatOwed: parseFloat(vatOwed.toFixed(2)),
             },
         })

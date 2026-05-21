@@ -98,6 +98,8 @@ const createAddonHandler = async (req, res) => {
       items: items.map((item) => ({
         category: item.category.trim(),
         description: item.description.trim(),
+        units: item.units != null ? Number.parseFloat(item.units) : null,
+        rate: item.rate != null ? Number.parseFloat(item.rate) : null,
         item_amount: Number.parseFloat(item.item_amount),
       })),
       date,
@@ -230,6 +232,8 @@ const updateAddonHandler = async (req, res) => {
           items: items.map((item) => ({
             category: item.category.trim(),
             description: item.description.trim(),
+            units: item.units != null ? Number.parseFloat(item.units) : null,
+            rate: item.rate != null ? Number.parseFloat(item.rate) : null,
             item_amount: Number.parseFloat(item.item_amount),
           })),
           date,

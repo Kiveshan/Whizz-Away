@@ -214,7 +214,7 @@ export const handleSelectLeg = ({
     drivers: {},
   });
 
-  if (selectedLeg.startingPoint && selectedLeg.destination) {
+  if (!isCompleted && selectedLeg.startingPoint && selectedLeg.destination) {
     // Use the first driver's date so the shared rates state reflects the
     // historical rate period for this leg, not always today's rate.
     const firstDriverDate =

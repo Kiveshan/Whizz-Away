@@ -115,7 +115,7 @@ function UpdateInstruction() {
   });
   // Flag to track if initial data has been loaded
   const [initialDataLoaded, setInitialDataLoaded] = useState(false);
-  const [isCompleted, setIsCompleted] = useState(false);
+  const [isCompleted, setIsCompleted] = useState(location.state?.isCompleted ?? false);
   const [shipmentType, setShipmentType] = useState(null);
   // New state for container validation
   const [showContainerModal, setShowContainerModal] = useState(false);

@@ -149,6 +149,7 @@ export const fetchRate = async ({
     }
 
     if (
+      !isCompleted &&
       resolvedTargetLegIndex !== null &&
       resolvedTargetLegIndex !== undefined &&
       legSwitchIdRef.current === requestId &&
