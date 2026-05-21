@@ -13,6 +13,7 @@ const FEATURE_PLAN_MAP = {
   manage: "lite",
   addons: "professional",
   analytics: "professional",
+  age_analysis: "professional",
   reports: "professional",
   payroll: "growth",
   biometric: "growth",

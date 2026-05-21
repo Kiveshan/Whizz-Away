@@ -25,6 +25,7 @@ const dashboardData = [
     title: "Age Analysis",
     image: "/images/Statements.jpg",
     path: "/debtors-age-analysis",
+    featureKey: "age_analysis",
   },
 ];
 

@@ -1,5 +1,6 @@
 import React from "react";
 import { useNavigate } from "react-router-dom";
+import FeatureGatedCard from "../../../components/FeatureGatedCard";
 import "../css/Debtors.css";
 import "../css/card.css";
 const Debtors = () => {
@@ -17,10 +18,6 @@ const Debtors = () => {
 
   const handleAddOnClick = () => {
     navigate("/view-client-list");
-  };
-
-  const handleAgeAnalysisClick = () => {
-    navigate("/debtors-age-analysis");
   };
 
   return (
@@ -56,14 +53,13 @@ const Debtors = () => {
             <h3>Add On's</h3>
           </div>
         </div>
-        <div className="card" onClick={handleAgeAnalysisClick}>
-          <div className="card-image-container">
-            <img src="/images/Statements.jpg" alt="Age Analysis" />
-          </div>
-          <div className="card-title">
-            <h3>Age Analysis</h3>
-          </div>
-        </div>
+        <FeatureGatedCard
+          title="Age Analysis"
+          image="/images/Statements.jpg"
+          path="/debtors-age-analysis"
+          featureKey="age_analysis"
+          onClick={() => navigate("/debtors-age-analysis")}
+        />
       </div>
     </div>
   );
