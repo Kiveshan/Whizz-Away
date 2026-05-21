@@ -4,8 +4,9 @@ import "../../pages/user_menus/css/card.css"
 import "../../pages/user_menus/css/dashboard.css"
 
 const dashboardData = [
-  { title: "Create Instruction", image: "/images/New Instruction.png",   path: "/CompanyInstructions" },
-  { title: "View Instructions",  image: "/images/Track Instruction.png", path: "/CompanyInstructionView" },
+  { title: "New Instruction",   image: "/images/newinstruction.jpeg",         path: "/ControllerInstructions" },
+  { title: "Track Instruction", image: "/images/trackinstruction.jpg",         path: "/CompanyInstructionView" },
+  { title: "Instructions",      image: "/images/pexels-photo-7947758.jpeg",    path: "/ViewClientInstruction" },
 ]
 
 export default function LiteInstructionsDash() {

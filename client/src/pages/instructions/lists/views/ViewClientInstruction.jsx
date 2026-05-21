@@ -5,6 +5,7 @@ import { useNavigate } from "react-router-dom"
 import "../../css/ViewClientInstruction.css"
 import api from "../../../../api"
 import Pagination from "../../../../components/Pagination"
+import { isLiteUser } from "../../../../utils/userTier"
 
 const ViewClientInstruction = () => {
   const navigate = useNavigate()
@@ -167,7 +168,7 @@ const ViewClientInstruction = () => {
   return (
     <div className="view-client-instruction-wrapper">
       <div className="client-payments-header">
-        <button className="back-button" onClick={() => navigate("/FDashboard")}>
+        <button className="back-button" onClick={() => navigate(isLiteUser() ? "/dashboard/lite/instructions" : "/FDashboard")}>
           Back
         </button>
       </div>

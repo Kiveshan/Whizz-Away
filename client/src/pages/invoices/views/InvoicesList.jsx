@@ -3,8 +3,9 @@
 import { useState, useEffect, useCallback } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import "../css/InvoicesList.css";
-import api from "../../../api"; // Import the axios instance
-import Pagination from "../../../components/Pagination"; // Import the Pagination component
+import api from "../../../api";
+import Pagination from "../../../components/Pagination";
+import { isLiteUser } from "../../../utils/userTier";
 
 // Utility function for formatting dates
 const formatDate = (dateString) => {
@@ -178,11 +179,11 @@ Troubleshooting tips:
 
   // Determine the back button destination
   const handleBackClick = useCallback(() => {
-    // If we came from client selection, go back to that page
     if (clientId) {
       navigate("/ViewClientInvoice");
+    } else if (isLiteUser()) {
+      navigate("/dashboard/lite/debtors");
     } else {
-      // Otherwise go to the default dashboard
       navigate("/FDashboard");
     }
   }, [clientId, navigate]);

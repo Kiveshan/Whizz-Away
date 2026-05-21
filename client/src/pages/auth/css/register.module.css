@@ -12,171 +12,178 @@
 .registerForm {
   background: #bae6fd;
   padding: 1.5rem 2rem 1rem 2rem;
-  border-radius: 4px;
+  border-radius: 8px;
   width: 100%;
-  max-width: 850px;
+  max-width: 900px;
   box-sizing: border-box;
   margin-bottom: 20px;
 }
 
-.logoContainer1 {
-  width: 100px;
-  height: 100px;
+.registerTitle {
+  text-align: center;
+  margin-bottom: 1.25rem;
+  margin-top: 6px;
+  font-size: 1.4rem;
+  font-weight: 700;
+  color: #1e3a8a;
+}
+
+/* ── Stepper ─────────────────────────────────── */
+.stepper {
+  display: flex;
+  align-items: flex-start;
+  margin-bottom: 1.25rem;
+}
+
+.stepItem {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  flex-shrink: 0;
+}
+
+.stepCircle {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
   display: flex;
   align-items: center;
   justify-content: center;
-  margin-bottom: -5px;
+  font-size: 13px;
+  font-weight: 700;
+  transition: background 0.2s, color 0.2s;
 }
 
-.logoImage1 {
-  max-width: 100%;
-  max-height: 100%;
-  object-fit: contain;
+.stepActive {
+  background: #1e3a8a;
+  color: #fff;
 }
 
-.registerTitle {
+.stepCompleted {
+  background: #28a745;
+  color: #fff;
+}
+
+.stepInactive {
+  background: #d1d5db;
+  color: #6b7280;
+}
+
+.stepLabel {
+  font-size: 0.7rem;
+  margin-top: 5px;
+  color: #6b7280;
   text-align: center;
-  margin-bottom: -8px;
-  margin-left: 2px;
+  max-width: 72px;
+  line-height: 1.2;
 }
 
+.stepLabelActive {
+  color: #1e3a8a;
+  font-weight: 600;
+}
+
+.stepLine {
+  flex: 1;
+  height: 2px;
+  background: #d1d5db;
+  margin: 15px 6px 0;
+  transition: background 0.2s;
+}
+
+.stepLineCompleted {
+  background: #28a745;
+}
+
+/* ── Step card ───────────────────────────────── */
+.stepCard {
+  background: #fff;
+  border-radius: 8px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+  padding: 1.5rem;
+  margin-bottom: 1rem;
+}
+
+.stepHeader {
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+  margin-bottom: 1.25rem;
+  padding-bottom: 0.85rem;
+  border-bottom: 1px solid #e5e7eb;
+}
+
+.stepHeaderIcon {
+  color: #1e3a8a;
+  flex-shrink: 0;
+}
+
+.stepHeaderTitle {
+  font-size: 1.05rem;
+  font-weight: 700;
+  color: #1e3a8a;
+  margin: 0;
+}
+
+/* ── Form fields ─────────────────────────────── */
 .formRow {
   display: flex;
   gap: 1rem;
-  margin-bottom: 0.5rem;
+  margin-bottom: 0.85rem;
 }
 
 .formGroup {
   flex: 1;
-  margin-bottom: 0.5rem;
   min-width: 0;
-}
-
-.threeFields .formGroup {
-  flex: 1 1 30%;
 }
 
 label {
   display: block;
-  margin-bottom: 0.5rem;
+  margin-bottom: 0.35rem;
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: #374151;
+}
+
+.required {
+  color: #dc3545;
+  margin-left: 2px;
 }
 
 .formInput {
   width: 100%;
-  padding: 0.75rem;
-  border: 1px solid #ddd;
+  padding: 0.65rem 0.75rem;
+  border: 1px solid #d1d5db;
   border-radius: 4px;
   box-sizing: border-box;
+  font-size: 0.9rem;
+  color: #111827;
+  transition: border-color 0.15s, box-shadow 0.15s;
 }
 
-.loginLink {
-  margin: 0.5rem 0;
-  text-align: center;
+.formInput:focus {
+  outline: none;
+  border-color: #2563eb;
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
 }
 
-.linkButton {
-  background: none;
-  border: none;
-  color: #1e3a8a;
-  text-decoration: underline;
-  cursor: pointer;
-  font-size: 0.95rem;
-}
-
-.submitButton1 {
+.formHint {
   display: block;
-  width: 200px;
-  margin: 0.5rem auto;
-  padding: 0.6rem;
-  background-color: #1e3a8a;
-  color: white;
-  border: none;
-  border-radius: 4px;
-  font-size: 1rem;
-  cursor: pointer;
+  font-size: 0.72rem;
+  color: #6b7280;
+  margin-top: 3px;
 }
 
-.visilyLogo {
-  position: absolute;
-  bottom: 1rem;
-  left: 1rem;
-  font-size: 0.75rem;
-  color: #666;
-}
-
-@media (max-width: 768px) {
-  .formRow {
-    flex-direction: column;
-  }
-
-  .threeFields .formGroup {
-    flex: 1 1 100%;
-  }
-
-  .registerForm {
-    max-width: 90%;
-  }
-}
-
-.inputError {
-  border: 1px solid red !important;
-}
-
-.errorPopup {
-  position: fixed;
-  top: 20px;
-  left: 50%;
-  transform: translateX(-50%);
-  z-index: 1000;
-  animation: slideDown 0.3s ease-out forwards;
-}
-
-@keyframes slideDown {
-  from {
-    top: -100px;
-    opacity: 0;
-  }
-  to {
-    top: 20px;
-    opacity: 1;
-  }
-}
-
-.errorPopupContent {
-  background-color: #fff;
-  border-left: 4px solid #dc3545;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
-  padding: 15px 20px;
-  border-radius: 4px;
-  min-width: 300px;
-  max-width: 500px;
-  position: relative;
-}
-
-.closePopup {
-  position: absolute;
-  top: 10px;
-  right: 15px;
-  font-size: 18px;
-  font-weight: bold;
-  cursor: pointer;
-  color: #666;
-}
-
-.closePopup:hover {
-  color: #333;
-}
-
-.errorPopupContent p {
-  margin: 0;
-  color: #dc3545;
-  font-weight: 500;
-}
-
+/* ── Password field ──────────────────────────── */
 .passwordInputContainer {
   position: relative;
   display: flex;
   align-items: center;
+}
+
+.passwordInputContainer .formInput {
+  padding-right: 60px;
+  width: 100%;
 }
 
 .validPassword {
@@ -234,12 +241,153 @@ label {
   color: #dc3545;
 }
 
-.passwordInputContainer .formInput {
-  padding-right: 60px;
-  width: 100%;
-  box-sizing: border-box;
+/* ── Plan cards ──────────────────────────────── */
+.planIntro {
+  font-size: 0.82rem;
+  color: #6b7280;
+  margin-bottom: 1rem;
+  margin-top: -0.5rem;
 }
 
+.planGrid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 12px;
+}
+
+.planCard {
+  border: 1.5px solid #d1d5db;
+  border-radius: 8px;
+  padding: 14px;
+  text-align: left;
+  background: #fff;
+  cursor: pointer;
+  position: relative;
+  transition: border-color 0.15s, background 0.15s;
+  width: 100%;
+}
+
+.planCard:hover {
+  border-color: #93c5fd;
+}
+
+.planCardSelected {
+  border: 2px solid #1e3a8a;
+  background: #eff6ff;
+}
+
+.planCheckmark {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: #1e3a8a;
+  color: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.planName {
+  font-weight: 700;
+  font-size: 0.95rem;
+  margin-bottom: 2px;
+  color: #111827;
+}
+
+.planPrice {
+  color: #2563eb;
+  font-size: 0.83rem;
+  margin-bottom: 4px;
+}
+
+.planMeta {
+  color: #6b7280;
+  font-size: 0.76rem;
+  margin-bottom: 6px;
+}
+
+.planFeatures {
+  margin: 0;
+  padding-left: 14px;
+  font-size: 0.73rem;
+  color: #374151;
+}
+
+.planFeatures li {
+  margin-bottom: 1px;
+}
+
+/* ── Step navigation ─────────────────────────── */
+.stepNav {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-top: 1.25rem;
+  padding-top: 1rem;
+  border-top: 1px solid #e5e7eb;
+}
+
+.backBtn {
+  background: transparent;
+  border: 1.5px solid #1e3a8a;
+  color: #1e3a8a;
+  padding: 0.55rem 1.4rem;
+  border-radius: 4px;
+  font-size: 0.93rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+.backBtn:hover {
+  background: #eff6ff;
+}
+
+.nextBtn,
+.submitBtn {
+  background: #1e3a8a;
+  color: #fff;
+  border: none;
+  padding: 0.55rem 1.6rem;
+  border-radius: 4px;
+  font-size: 0.93rem;
+  font-weight: 500;
+  cursor: pointer;
+  margin-left: auto;
+  transition: background 0.15s;
+}
+
+.nextBtn:hover,
+.submitBtn:hover {
+  background: #1e40af;
+}
+
+.nextBtn:disabled,
+.submitBtn:disabled {
+  background: #9ca3af;
+  cursor: not-allowed;
+}
+
+/* ── Footer links ────────────────────────────── */
+.loginLink {
+  margin: 0.5rem 0;
+  text-align: center;
+}
+
+.linkButton {
+  background: none;
+  border: none;
+  color: #1e3a8a;
+  text-decoration: underline;
+  cursor: pointer;
+  font-size: 0.93rem;
+}
+
+/* ── Popups ──────────────────────────────────── */
+.errorPopup,
 .successPopup {
   position: fixed;
   top: 20px;
@@ -247,6 +395,34 @@ label {
   transform: translateX(-50%);
   z-index: 1000;
   animation: slideDown 0.3s ease-out forwards;
+}
+
+@keyframes slideDown {
+  from {
+    top: -100px;
+    opacity: 0;
+  }
+  to {
+    top: 20px;
+    opacity: 1;
+  }
+}
+
+.errorPopupContent {
+  background-color: #fff;
+  border-left: 4px solid #dc3545;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  padding: 15px 20px;
+  border-radius: 4px;
+  min-width: 300px;
+  max-width: 500px;
+  position: relative;
+}
+
+.errorPopupContent p {
+  margin: 0;
+  color: #dc3545;
+  font-weight: 500;
 }
 
 .successPopupContent {
@@ -266,42 +442,46 @@ label {
   font-weight: 500;
 }
 
-.fourFields {
-  display: flex;
-  gap: 10px;
-  margin-bottom: 1px;
+.closePopup {
+  position: absolute;
+  top: 10px;
+  right: 15px;
+  font-size: 18px;
+  font-weight: bold;
+  cursor: pointer;
+  color: #666;
 }
 
-.fourFields .formGroup {
-  flex: 1;
-  min-width: 0;
+.closePopup:hover {
+  color: #333;
 }
 
-@media (max-width: 1200px) {
-  .fourFields {
-    flex-wrap: wrap;
-  }
-
-  .fourFields .formGroup {
-    flex-basis: calc(50% - 5px);
-  }
+.inputError {
+  border: 1px solid #dc3545 !important;
 }
 
+/* ── Responsive ──────────────────────────────── */
 @media (max-width: 768px) {
-  .fourFields .formGroup {
-    flex-basis: 100%;
+  .registerForm {
+    max-width: 95%;
+    padding: 1rem;
+  }
+
+  .formRow {
+    flex-direction: column;
+  }
+
+  .stepLabel {
+    display: none;
+  }
+
+  .planGrid {
+    grid-template-columns: 1fr;
   }
 }
 
-.fourFields .formInput {
-  width: 100%;
-  box-sizing: border-box;
-}
-
-.fourFields label {
-  font-size: 0.9rem;
-}
-
-.fourFields small {
-  font-size: 10px !important;
+@media (max-width: 600px) {
+  .planGrid {
+    grid-template-columns: 1fr;
+  }
 }

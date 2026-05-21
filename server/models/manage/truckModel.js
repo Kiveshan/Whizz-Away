@@ -28,6 +28,13 @@ const getAllTrucks = async (options = {}, company_reg_num) => {
     const countResult = await client.query(countQuery, queryParams)
     const totalCount = Number.parseInt(countResult.rows[0].count)
 
+    // Get active-only count for usage billing (ignores current search filter)
+    const activeCountResult = await client.query(
+      `SELECT COUNT(*) FROM m5_trucks WHERE (is_subcontractor = false OR is_subcontractor IS NULL) AND status = true AND company_reg_num = $1`,
+      [company_reg_num]
+    )
+    const activeCount = Number.parseInt(activeCountResult.rows[0].count)
+
     // Get paginated results - Order by status (active first), then by key
     const dataQuery = `
       SELECT * FROM m5_trucks 
@@ -42,6 +49,7 @@ const getAllTrucks = async (options = {}, company_reg_num) => {
     return {
       trucks: dataResult.rows,
       totalCount,
+      activeCount,
     }
   } catch (err) {
     console.error("Error fetching trucks:", err)

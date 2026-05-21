@@ -1,9 +1,10 @@
 "use client";
 import { useState, useEffect, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
-import api from "../../../api"; // Import the configured Axios instance
+import api from "../../../api";
 import "../css/ViewClientInvoice.css";
-import Pagination from "../../../components/Pagination.jsx"; // Import the Pagination component
+import Pagination from "../../../components/Pagination.jsx";
+import { isLiteUser } from "../../../utils/userTier";
 
 // Debug utility
 const debug = (message, data) => {
@@ -106,7 +107,7 @@ const ViewClientInvoice = () => {
         <div className="client-payments-header">
           <button
             className="back-button"
-            onClick={() => navigate("/DebtorsDashboard")}
+            onClick={() => navigate(isLiteUser() ? "/dashboard/lite/debtors" : "/DebtorsDashboard")}
           >
             Back
           </button>

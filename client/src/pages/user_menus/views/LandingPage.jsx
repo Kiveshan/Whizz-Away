@@ -5,17 +5,9 @@ import Header from "../../../components/landingHeader";
 import Modal from "../../../components/modal";
 import Footer from "../../../components/Footer";
 import "../css/index.css";
-import { FiFileText, FiBookOpen, FiCheckCircle, FiActivity } from "react-icons/fi";
-import api from "../../../api";
-
-const dashboardData = [];
-
 const LandingPage = () => {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [modalForm, setModalForm] = useState("login");
-  const [flipped, setFlipped] = useState(false);
-  const [stats, setStats] = useState({ total: 0, completed: 0, new: 0, in_progress: 0 });
-  const [loadingStats, setLoadingStats] = useState(false);
 
   const images = [
     "/images/landingpage/photo-1516216628859-9bccecab13ca.jpg",
@@ -78,11 +70,6 @@ const LandingPage = () => {
   }, []);
 
   useEffect(() => {
-    const id = setInterval(() => setFlipped((f) => !f), 4000);
-    return () => clearInterval(id);
-  }, []);
-
-  useEffect(() => {
     images.forEach((src) => {
       const img = new Image();
       img.src = src;
@@ -110,67 +97,6 @@ const LandingPage = () => {
       if (fadeTimeout) clearTimeout(fadeTimeout);
     };
   }, []);
-
-  useEffect(() => {
-    const fetchStats = async () => {
-      try {
-        setLoadingStats(true);
-        const res = await api.get("/api/landing/stats");
-        const data = res.data || {};
-        setStats({
-          total: Number(data.total) || 0,
-          completed: Number(data.completed) || 0,
-          new: Number(data.new) || 0,
-          in_progress: Number(data.in_progress) || 0,
-        });
-      } catch (e) {
-        setStats({ total: 0, completed: 0, new: 0, in_progress: 0 });
-      } finally {
-        setLoadingStats(false);
-      }
-    };
-    fetchStats();
-  }, []);
-
-  const CardFront1 = () => (
-    <div className="stat-card-face">
-      <div className="stat-icon"><FiFileText /></div>
-      <div className="stat-texts">
-        <span className="stat-title">Total Instructions</span>
-        <span className="stat-number">{loadingStats ? "-" : stats.total}</span>
-      </div>
-    </div>
-  );
-
-  const CardBack1 = () => (
-    <div className="stat-card-face">
-      <div className="stat-icon success"><FiCheckCircle /></div>
-      <div className="stat-texts">
-        <span className="stat-title">Completed Instructions</span>
-        <span className="stat-number">{loadingStats ? "-" : stats.completed}</span>
-      </div>
-    </div>
-  );
-
-  const CardFront2 = () => (
-    <div className="stat-card-face">
-      <div className="stat-icon"><FiBookOpen /></div>
-      <div className="stat-texts">
-        <span className="stat-title">New Instructions</span>
-        <span className="stat-number">{loadingStats ? "-" : stats.new}</span>
-      </div>
-    </div>
-  );
-
-  const CardBack2 = () => (
-    <div className="stat-card-face">
-      <div className="stat-icon warning"><FiActivity /></div>
-      <div className="stat-texts">
-        <span className="stat-title">In Progress Instructions</span>
-        <span className="stat-number">{loadingStats ? "-" : stats.in_progress}</span>
-      </div>
-    </div>
-  );
 
   return (
     <div className="landing">
@@ -205,29 +131,7 @@ const LandingPage = () => {
             Whizz-Away: one platform for logistics, payments, and analytics to keep every delivery on time.
           </p>
         </div>
-        <div className="stats-panel">
-          <div className={`flip-card ${flipped ? "flipped" : ""}`}>
-            <div className="flip-card-inner">
-              <div className="flip-card-front">
-                <CardFront1 />
-              </div>
-              <div className="flip-card-back">
-                <CardBack1 />
-              </div>
-            </div>
-          </div>
 
-          <div className={`flip-card ${flipped ? "flipped" : ""}`}>
-            <div className="flip-card-inner">
-              <div className="flip-card-front">
-                <CardFront2 />
-              </div>
-              <div className="flip-card-back">
-                <CardBack2 />
-              </div>
-            </div>
-          </div>
-        </div>
       </div>
 
       {/* Modal for login/register - using key prop to force remount when form changes */}

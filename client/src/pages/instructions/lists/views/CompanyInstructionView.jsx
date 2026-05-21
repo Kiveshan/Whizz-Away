@@ -5,6 +5,7 @@ import { useNavigate } from "react-router-dom"
 import "../../css/CompanyInstructionView.css"
 import api from "../../../../api"
 import Pagination from "../../../../components/Pagination"
+import { isLiteUser } from "../../../../utils/userTier"
 
 const CompanyInstructionView = () => {
   const navigate = useNavigate()
@@ -157,6 +158,11 @@ const CompanyInstructionView = () => {
     // Convert to number if it's a string
     userRoleId = Number.parseInt(userRoleId, 10)
     console.log("Final user role ID for navigation:", userRoleId)
+
+    if (isLiteUser()) {
+      navigate("/dashboard/lite/instructions")
+      return
+    }
 
     // Navigate based on role ID
     if (userRoleId === 1) {

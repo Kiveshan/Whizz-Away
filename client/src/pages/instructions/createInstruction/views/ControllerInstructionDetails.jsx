@@ -5,7 +5,8 @@ import "../../css/containerdetails.css"
 import { useNavigate, useLocation } from "react-router-dom"
 import "../../../../css/components.css"
 import ErrorModal from "../../../../components/ErrorModal.jsx"
-import api from "../../../../api" // Import the axios instance
+import api from "../../../../api"
+import { isLiteUser } from "../../../../utils/userTier"
 
 // Add this debug logging function at the top of the file, after imports
 const logDebug = (message, data) => {
@@ -904,20 +905,18 @@ const ContainerDetailsPage = () => {
       console.log("API response:", response.data)
 
       if (response.data.success) {
-        // Show success message if using mock data
+        const afterSaveRoute = isLiteUser() ? "/dashboard/lite/instructions" : "/ControllerDashboard"
         if (response.data.mockData) {
           setErrorModal({
             isOpen: true,
             message: "Success! (Using mock data: " + response.data.message + ")",
             onClose: () => {
-              // Navigate to ControllerDashboard immediately after closing the modal
               setErrorModal({ isOpen: false, message: "" })
-              navigate("/ControllerDashboard")
+              navigate(afterSaveRoute)
             },
           })
         } else {
-          // Navigate to ControllerDashboard immediately
-          navigate("/ControllerDashboard")
+          navigate(afterSaveRoute)
         }
       } else {
         throw new Error("Failed to save instruction: " + (response.data.message || "Unknown error"))

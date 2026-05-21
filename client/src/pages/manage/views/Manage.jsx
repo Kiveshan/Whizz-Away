@@ -171,7 +171,7 @@ const Manage = () => {
   }
 
   const handleEmployeeAdd = () => {
-    const currentCount = state.pagination.employees.totalItems
+    const currentCount = state.pagination.employees.activeItems ?? state.pagination.employees.totalItems
     actions.resetFormData("Employee")
     actions.setEditing("Employee", null)
     actions.showForm("showEmployeeForm")
@@ -219,7 +219,7 @@ const Manage = () => {
   }
 
   const handleTruckAdd = () => {
-    const currentCount = state.pagination.trucks.totalItems
+    const currentCount = state.pagination.trucks.activeItems ?? state.pagination.trucks.totalItems
     actions.resetFormData("Truck")
     actions.setEditing("Truck", null)
     actions.showForm("showTruckForm")
@@ -379,8 +379,8 @@ const Manage = () => {
       {/* Usage counters (shown when the plan has caps) */}
       {usage.maxUsers < 999 && (
         <div className="manage-usage-row">
-          <UsageBadge label="Users"  used={state.pagination.employees.totalItems} max={usage.maxUsers} />
-          <UsageBadge label="Trucks" used={state.pagination.trucks.totalItems}    max={usage.maxTrucks} />
+          <UsageBadge label="Users"  used={state.pagination.employees.activeItems ?? state.pagination.employees.totalItems} max={usage.maxUsers} />
+          <UsageBadge label="Trucks" used={state.pagination.trucks.activeItems ?? state.pagination.trucks.totalItems}    max={usage.maxTrucks} />
         </div>
       )}
 

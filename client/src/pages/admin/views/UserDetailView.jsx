@@ -32,7 +32,7 @@ function UserDetailView({ user, onBack }) {
       setIsSubmitting(true);
       setError(null);
 
-      const response = await api.post(
+      await api.post(
         `/admin/${action === "approve" ? "approve-user" : "reject-user"}`,
         {
           userid: user.userid,
@@ -40,9 +40,47 @@ function UserDetailView({ user, onBack }) {
         }
       );
 
-      setSuccessMessage(response.data.message);
+      if (action === "approve") {
+        const requestedPlan =
+          user.plan_notes?.startsWith("Requested plan: ")
+            ? user.plan_notes.replace("Requested plan: ", "").trim()
+            : null;
 
-      // After 2 seconds, go back to the list
+        if (requestedPlan && user.company_reg_num) {
+          try {
+            const profileRes = await api.get(
+              `/api/admin/companies/${encodeURIComponent(user.company_reg_num)}`
+            );
+            const currentTier = profileRes.data?.company?.subscription_tier;
+
+            if (!currentTier || currentTier === "none") {
+              await api.post(
+                `/api/admin/companies/${encodeURIComponent(user.company_reg_num)}/assign-plan`,
+                {
+                  plan: requestedPlan,
+                  setup_fee_paid: false,
+                  billing_anchor_day: null,
+                  notes: "Auto-assigned on user approval",
+                }
+              );
+              setSuccessMessage(
+                `User approved and subscribed to the ${requestedPlan} plan.`
+              );
+            } else {
+              setSuccessMessage("User approved successfully.");
+            }
+          } catch {
+            setSuccessMessage(
+              "User approved. Could not auto-assign plan — please assign it manually."
+            );
+          }
+        } else {
+          setSuccessMessage("User approved successfully.");
+        }
+      } else {
+        setSuccessMessage("User rejected.");
+      }
+
       setTimeout(() => {
         onBack();
       }, 2000);
@@ -101,6 +139,30 @@ function UserDetailView({ user, onBack }) {
             {new Date(user.dateofreg).toISOString().split("T")[0]}
           </div>
         </div>
+
+        {user.plan_notes?.startsWith("Requested plan: ") && (
+          <div className="user-detail-row">
+            <div className="detail-label">Requested Plan:</div>
+            <div className="detail-value">
+              <span
+                style={{
+                  background: "#eff6ff",
+                  color: "#1d4ed8",
+                  padding: "2px 10px",
+                  borderRadius: "12px",
+                  fontSize: "0.85rem",
+                  fontWeight: 600,
+                  textTransform: "capitalize",
+                }}
+              >
+                {user.plan_notes.replace("Requested plan: ", "").trim()}
+              </span>
+              <span style={{ marginLeft: 8, fontSize: "0.8rem", color: "#666" }}>
+                — will be auto-assigned on approval
+              </span>
+            </div>
+          </div>
+        )}
       </div>
 
       <div className="action-buttons">

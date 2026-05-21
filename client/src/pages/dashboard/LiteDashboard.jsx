@@ -4,7 +4,7 @@ import "../../pages/user_menus/css/card.css"
 import "../../pages/user_menus/css/dashboard.css"
 
 const MAIN_MODULES = [
-  { title: "Instructions", image: "/images/Instructions.png", path: "/dashboard/lite/instructions" },
+  { title: "Instructions", image: "/images/monitor.jpeg", path: "/dashboard/lite/instructions" },
   { title: "Debtors",      image: "/images/Payment.jpg",      path: "/dashboard/lite/debtors" },
   { title: "Manage",       image: "/images/manage.jpg",       path: "/manage" },
 ]

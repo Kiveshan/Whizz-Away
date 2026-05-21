@@ -3,6 +3,7 @@ import {
   fetchSetRate as fetchSetRateService,
   saveInstruction as saveInstructionService,
 } from "../services/instructionService.js";
+import { isLiteUser } from "../utils/userTier.js";
 import { calcContainerBasedCost, calcBreakBulkCost } from "../utils/instructions/costCalculation.js";
 
 /**
@@ -207,7 +208,7 @@ export function useCreateInstructionSubmit({
       const saveData = await saveInstructionService(instructionData, containerData, weightData);
 
       if (saveData.success) {
-        navigate("/ControllerDashboard");
+        navigate(isLiteUser() ? "/dashboard/lite/instructions" : "/ControllerDashboard");
       } else {
         throw new Error(saveData.message || "Failed to save instruction");
       }

@@ -3,8 +3,9 @@
 import { useState, useEffect, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import "../css/ViewClientStatements.css";
-import api from "../../../api"; // Import the axios instance
-import Pagination from "../../../components/Pagination"; // Import the Pagination component
+import api from "../../../api";
+import Pagination from "../../../components/Pagination";
+import { isLiteUser } from "../../../utils/userTier";
 
 const ViewClientStatement = () => {
   const navigate = useNavigate();
@@ -81,7 +82,7 @@ const ViewClientStatement = () => {
       <div className="client-payments-header">
         <button
           className="back-button"
-          onClick={() => navigate("/DebtorsDashboard")}
+          onClick={() => navigate(isLiteUser() ? "/dashboard/lite/debtors" : "/DebtorsDashboard")}
         >
           Back
         </button>

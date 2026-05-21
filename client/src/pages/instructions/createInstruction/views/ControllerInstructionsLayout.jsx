@@ -1,6 +1,7 @@
 ﻿import { ErrorTooltip as SharedErrorTooltip } from "../../../../components/instructions/ErrorTooltip"
 import { ConfirmationModal } from "../../../../components/instructions/ConfirmationModal"
 import { InstructionLoadingGate } from "../../../../components/instructions/InstructionLoadingGate"
+import { isLiteUser } from "../../../../utils/userTier"
 
 const ErrorTooltip = (props) => <SharedErrorTooltip {...props} disabled />
 
@@ -124,7 +125,7 @@ export function ControllerInstructionsLayout({
       )}
 
       <div className="controller-instructions-header">
-        <button className="controller-instructions-back-button" onClick={() => navigate("/ControllerDashboard")}>
+        <button className="controller-instructions-back-button" onClick={() => navigate(isLiteUser() ? "/dashboard/lite/instructions" : "/ControllerDashboard")}>
           Back
         </button>
       </div>

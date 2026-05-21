@@ -4,8 +4,8 @@ import "../../pages/user_menus/css/card.css"
 import "../../pages/user_menus/css/dashboard.css"
 
 const dashboardData = [
-  { title: "Invoices",   image: "/images/Client Invoice.png",   path: "/invoices" },
-  { title: "Statements", image: "/images/Client Statement.png", path: "/statements-list" },
+  { title: "Invoices",   image: "/images/payments.jpeg",   path: "/ViewClientInvoice" },
+  { title: "Statements", image: "/images/Statements.jpg",  path: "/view-client-statements" },
 ]
 
 export default function LiteDebtorsDash() {

@@ -103,6 +103,13 @@ const getAllEmployees = async (options = {}, company_reg_num) => {
     const countResult = await client.query(countQuery, queryParams)
     const totalCount = Number.parseInt(countResult.rows[0].count)
 
+    // Active-only count for usage billing (ignores current search/status filter)
+    const activeCountResult = await client.query(
+      `SELECT COUNT(*) FROM m5_employee e JOIN roles r ON e.roleid = r.roleid WHERE e.roleid != 6 AND e.status = true AND e.company_reg_num = $1`,
+      [company_reg_num]
+    )
+    const activeCount = Number.parseInt(activeCountResult.rows[0].count)
+
     const dataQuery = `
       SELECT
         e.*,
@@ -129,6 +136,7 @@ const getAllEmployees = async (options = {}, company_reg_num) => {
     return {
       employees: dataResult.rows,
       totalCount,
+      activeCount,
     }
   } catch (err) {
     console.error("Error fetching employees:", err)

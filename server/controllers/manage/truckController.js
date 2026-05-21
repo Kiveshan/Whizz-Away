@@ -31,6 +31,7 @@ const getAllTrucksHandler = async (req, res) => {
       currentPage: pageNum,
       totalPages: Math.ceil(result.totalCount / limitNum),
       totalItems: result.totalCount,
+      activeItems: result.activeCount,
       itemsPerPage: limitNum,
     })
   } catch (err) {

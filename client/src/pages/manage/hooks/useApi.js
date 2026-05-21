@@ -74,6 +74,7 @@ export function useApi(state, actions) {
           currentPage: responseData.currentPage || page,
           totalPages: responseData.totalPages || 1,
           totalItems: responseData.totalItems || responseData.items?.length || responseData.length || 0,
+          activeItems: responseData.activeItems ?? responseData.totalItems ?? 0,
           itemsPerPage: responseData.itemsPerPage || itemsPerPage,
         })
       } catch (err) {
