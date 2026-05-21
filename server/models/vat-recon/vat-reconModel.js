@@ -113,6 +113,7 @@ export const getSubbieRates = async (month, year, company_reg_num) => {
         AND l.driverrate > 0
         AND e.roleid = 6
         AND e.companyname IS NOT NULL
+        AND l.company_reg_num = $3
         AND m.company_reg_num = $3
         GROUP BY e.companyname, m.vat
         ORDER BY e.companyname

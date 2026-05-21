@@ -4,7 +4,7 @@ import { pool } from "../config/database.js";
  * Generate statements for current month based on previous month's legs
  * If running in July: looks at June legs, generation date = July 1st
  */
-const generateCurrentMonthStatements = async (specificSubeiRegNum = null) => {
+const generateCurrentMonthStatements = async (specificSubeiRegNum = null, company_reg_num = null) => {
   console.log("Starting subcontractor statement generation process...");
 
   const today = new Date();
@@ -41,34 +41,35 @@ const generateCurrentMonthStatements = async (specificSubeiRegNum = null) => {
     await client.query("BEGIN");
 
     let subcontractorQuery = `
-      SELECT 
+      SELECT
         e.subei_reg_num,
         e.companyname,
         e.contact_person,
+        l.company_reg_num,
         ARRAY_AGG(l.legkey) as leg_ids,
         COUNT(l.legkey) as total_legs
       FROM m5_employee e
       INNER JOIN legs_m2 l ON e.userid = l.driverid
-      WHERE 
-        e.subei_reg_num IS NOT NULL 
+      WHERE
+        e.subei_reg_num IS NOT NULL
         AND e.subei_reg_num != ''
-        AND l.date >= $1 
+        AND l.date >= $1
         AND l.date <= $2
         AND l.driverrate IS NOT NULL
         AND l.driverrate > 0
+        AND l.company_reg_num = $3
     `;
 
-    
-    const queryParams = [formattedLegsStartDate, formattedLegsEndDate];
+    const queryParams = [formattedLegsStartDate, formattedLegsEndDate, company_reg_num];
 
     // Add specific subcontractor filter if provided
     if (specificSubeiRegNum) {
-      subcontractorQuery += ` AND e.subei_reg_num = $3`;
+      subcontractorQuery += ` AND e.subei_reg_num = $4`;
       queryParams.push(specificSubeiRegNum);
     }
 
     subcontractorQuery += `
-      GROUP BY e.subei_reg_num, e.companyname, e.contact_person
+      GROUP BY e.subei_reg_num, e.companyname, e.contact_person, l.company_reg_num
     `;
 
     console.log("Executing query with params:", queryParams);
@@ -156,7 +157,8 @@ const generateCurrentMonthStatements = async (specificSubeiRegNum = null) => {
 const generateStatementsForMonth = async (
   year,
   month,
-  specificSubeiRegNum = null
+  specificSubeiRegNum = null,
+  company_reg_num = null
 ) => {
   console.log(
     `Generating subcontractor statements for ${year}-${month
@@ -192,33 +194,35 @@ const generateStatementsForMonth = async (
     await client.query("BEGIN");
 
     let subcontractorQuery = `
-      SELECT 
+      SELECT
         e.subei_reg_num,
         e.companyname,
         e.contact_person,
+        l.company_reg_num,
         ARRAY_AGG(l.legkey) as leg_ids,
         COUNT(l.legkey) as total_legs
       FROM m5_employee e
       INNER JOIN legs_m2 l ON e.userid = l.driverid
-      WHERE 
-        e.subei_reg_num IS NOT NULL 
+      WHERE
+        e.subei_reg_num IS NOT NULL
         AND e.subei_reg_num != ''
-        AND l.date >= $1 
+        AND l.date >= $1
         AND l.date <= $2
         AND l.driverrate IS NOT NULL
         AND l.driverrate > 0
+        AND l.company_reg_num = $3
     `;
 
-    const queryParams = [formattedLegsStartDate, formattedLegsEndDate];
+    const queryParams = [formattedLegsStartDate, formattedLegsEndDate, company_reg_num];
 
     // Add specific subcontractor filter if provided
     if (specificSubeiRegNum) {
-      subcontractorQuery += ` AND e.subei_reg_num = $3`;
+      subcontractorQuery += ` AND e.subei_reg_num = $4`;
       queryParams.push(specificSubeiRegNum);
     }
 
     subcontractorQuery += `
-      GROUP BY e.subei_reg_num, e.companyname, e.contact_person
+      GROUP BY e.subei_reg_num, e.companyname, e.contact_person, l.company_reg_num
     `;
 
     const subcontractorResult = await client.query(
@@ -500,17 +504,19 @@ const upsertStatementForBucket = async (
   vatStatus
 ) => {
   const existingStatementQuery = `
-    SELECT sub_state_id 
-    FROM subcontractor_statements 
-    WHERE subbie_reg_num = $1 
+    SELECT sub_state_id
+    FROM subcontractor_statements
+    WHERE subbie_reg_num = $1
       AND date = $2
       AND vat_status = $3
+      AND company_reg_num = $4
   `;
 
   const existingResult = await client.query(existingStatementQuery, [
     subcontractor.subei_reg_num,
     formattedGenDate,
     vatStatus,
+    subcontractor.company_reg_num,
   ]);
 
   const legPayload = JSON.stringify(
@@ -549,12 +555,13 @@ const upsertStatementForBucket = async (
 
   const insertQuery = `
     INSERT INTO subcontractor_statements (
-      subbie_reg_num, 
-      date, 
-      amount, 
+      subbie_reg_num,
+      date,
+      amount,
       legids,
-      vat_status
-    ) VALUES ($1, $2, $3, $4, $5)
+      vat_status,
+      company_reg_num
+    ) VALUES ($1, $2, $3, $4, $5, $6)
     RETURNING sub_state_id
   `;
 
@@ -564,6 +571,7 @@ const upsertStatementForBucket = async (
     subcontractor.bucketTotal,
     legPayload,
     vatStatus,
+    subcontractor.company_reg_num,
   ];
 
   const insertResult = await client.query(insertQuery, insertParams);

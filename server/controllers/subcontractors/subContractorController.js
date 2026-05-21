@@ -139,7 +139,8 @@ const generateSubcontractorStatementHandler = async (req, res) => {
 
     // Call the statement generation function
     const result = await generateCurrentMonthStatements(
-      specificSubcontractor ? subei_reg_num : null
+      specificSubcontractor ? subei_reg_num : null,
+      req.user.company_reg_num
     );
 
     console.log(
