@@ -67,43 +67,61 @@ const getFuelExpenses = async (client, month, year) => {
   })
 }
 
-const getTurnoverPerMonth = async (client, month, year, clientId = null) => {
+const calculateMonthlyTurnover = async (client, dateFrom, dateTo, clientId = null) => {
+  // --- Invoice portion (VAT-inclusive per instruction) ---
+  const invoiceParams = [dateFrom, dateTo]
+  let invoiceFilter = ''
+  if (clientId) {
+    invoiceFilter = 'AND i.clientid = $3'
+    invoiceParams.push(clientId)
+  }
 
-  // Convert month name + year into a date range (e.g. April 2026 → 2026-04-01 to 2026-05-01)
-  const monthIndex = Object.values({
-    January: 1, February: 2, March: 3, April: 4, May: 5, June: 6,
-    July: 7, August: 8, September: 9, October: 10, November: 11, December: 12,
-  }).indexOf(Object.keys({
-    January: 1, February: 2, March: 3, April: 4, May: 5, June: 6,
-    July: 7, August: 8, September: 9, October: 10, November: 11, December: 12,
-  }).find(k => k === month.trim())) + 1
-
-  const monthNum = new Date(`${month.trim()} 1, ${year}`).getMonth() + 1
-  const paddedMonth = String(monthNum).padStart(2, '0')
-  const dateFrom = `${year}-${paddedMonth}-01`
-  const nextMonth = monthNum === 12 ? 1 : monthNum + 1
-  const nextYear = monthNum === 12 ? parseInt(year) + 1 : parseInt(year)
-  const dateTo = `${nextYear}-${String(nextMonth).padStart(2, '0')}-01`
-
-  console.log(`Date range: ${dateFrom} to ${dateTo}`)
-
-  const totalQuery = `
+  const invoiceQuery = `
     SELECT
-      COALESCE(SUM(m.total_cost), 0) + COALESCE((
-        SELECT SUM(a.amount)
-        FROM add_ons a
-        WHERE a.date >= $1
-          AND a.date < $2
-      ), 0) AS turnover
+      COALESCE(
+        SUM(m.total_cost + (m.total_cost * (COALESCE(m.vat, 0)::numeric / 100))),
+        0
+      ) AS invoice_turnover
     FROM invoice i
     JOIN m1_controller m ON i.m1key = m.m1key
-    WHERE m.created_at >= $1
-      AND m.created_at < $2
+    WHERE i.date >= $1
+      AND i.date < $2
+      ${invoiceFilter}
   `
 
-  const totalResult = await client.query(totalQuery, [dateFrom, dateTo])
-  console.log("Total turnover query result:", totalResult.rows)
-  const totalTurnover = Number.parseFloat(totalResult.rows[0]?.turnover || 0)
+  // --- Add-ons portion ---
+  const addOnParams = [dateFrom, dateTo]
+  let addOnFilter = ''
+  if (clientId) {
+    addOnFilter = 'AND a.client_id = $3'
+    addOnParams.push(clientId)
+  }
+
+  const addOnQuery = `
+    SELECT COALESCE(SUM(a.amount), 0) AS addon_turnover
+    FROM add_ons a
+    WHERE a.date >= $1
+      AND a.date < $2
+      ${addOnFilter}
+  `
+
+  const [invoiceResult, addOnResult] = await Promise.all([
+    client.query(invoiceQuery, invoiceParams),
+    client.query(addOnQuery, addOnParams),
+  ])
+
+  const invoiceTurnover = Number(invoiceResult.rows[0]?.invoice_turnover || 0)
+  const addonTurnover = Number(addOnResult.rows[0]?.addon_turnover || 0)
+
+  return invoiceTurnover + addonTurnover
+}
+
+const getTurnoverPerMonth = async (client, month, year, clientId = null) => {
+  const { dateFrom, dateTo } = getDateRange(month, year)
+  console.log(`Date range: ${dateFrom} to ${dateTo}`)
+
+  // Total turnover across all clients via the shared helper
+  const totalTurnover = await calculateMonthlyTurnover(client, dateFrom, dateTo)
   console.log(`Total turnover (invoices + add-ons) for ${month} ${year}: ${totalTurnover}`)
 
   let turnoverData = [
@@ -117,91 +135,51 @@ const getTurnoverPerMonth = async (client, month, year, clientId = null) => {
   ]
 
   if (clientId) {
-    const clientQuery = `
-      SELECT
-        c.client,
-        COALESCE(SUM(m.total_cost), 0) + COALESCE((
-          SELECT SUM(a.amount)
-          FROM add_ons a
-          WHERE a.client_id = $3
-            AND a.date >= $1
-            AND a.date < $2
-        ), 0) AS turnover,
-        $4 AS month_name,
-        $5 AS year
-      FROM invoice i
-      JOIN m1_controller m ON i.m1key = m.m1key
-      JOIN m5_client c ON i.clientid = c.m5clientkey
-      WHERE m.created_at >= $1
-        AND m.created_at < $2
-        AND i.clientid = $3
-      GROUP BY c.client
-    `
-    const clientResult = await client.query(clientQuery, [dateFrom, dateTo, clientId, month.trim(), year.toString()])
-    console.log("Client query result:", clientResult.rows)
+    // Client-scoped turnover via the shared helper
+    const clientTurnover = await calculateMonthlyTurnover(client, dateFrom, dateTo, clientId)
+    console.log(`Client ${clientId} turnover for ${month} ${year}: ${clientTurnover}`)
 
-    if (clientResult.rows.length > 0) {
-      const clientData = clientResult.rows.map((row) => {
-        const turnover = Number.parseFloat(row.turnover || 0)
-        const percentage = totalTurnover > 0 ? ((turnover / totalTurnover) * 100).toFixed(2) : 0
-        return {
-          client: row.client,
-          turnover: turnover,
-          month_name: row.month_name.trim(),
-          year: row.year.toString(),
-          percentage: Number.parseFloat(percentage),
-        }
-      })
-      turnoverData = [...clientData, ...turnoverData]
+    if (clientTurnover > 0) {
+      // Fetch the client name
+      const nameResult = await client.query(
+        `SELECT client FROM m5_client WHERE m5clientkey = $1`,
+        [clientId]
+      )
+      const clientName = nameResult.rows[0]?.client || ''
+      const percentage = totalTurnover > 0
+        ? Number(((clientTurnover / totalTurnover) * 100).toFixed(2))
+        : 0
+
+      turnoverData = [
+        {
+          client: clientName,
+          turnover: clientTurnover,
+          month_name: month.trim(),
+          year: year.toString(),
+          percentage,
+        },
+        ...turnoverData,
+      ]
+      console.log(`Added turnover entry for client: ${clientName}`)
     } else {
-      // Client has no invoices — check if they have add-ons only
-      const addOnOnlyQuery = `
-        SELECT
-          c.client,
-          COALESCE(SUM(a.amount), 0) AS turnover
-        FROM add_ons a
-        JOIN m5_client c ON a.client_id = c.m5clientkey
-        WHERE a.client_id = $3
-          AND a.date >= $1
-          AND a.date < $2
-        GROUP BY c.client
-      `
-      const addOnResult = await client.query(addOnOnlyQuery, [dateFrom, dateTo, clientId])
-      console.log("Add-on only query result:", addOnResult.rows)
-
-      if (addOnResult.rows.length > 0) {
-        const row = addOnResult.rows[0]
-        const turnover = Number.parseFloat(row.turnover || 0)
-        const percentage = totalTurnover > 0 ? ((turnover / totalTurnover) * 100).toFixed(2) : 0
+      // No activity at all — still show a zero entry with the client name
+      const nameResult = await client.query(
+        `SELECT client FROM m5_client WHERE m5clientkey = $1`,
+        [clientId]
+      )
+      const clientName = nameResult.rows[0]?.client || ''
+      if (clientName) {
         turnoverData = [
           {
-            client: row.client,
-            turnover: turnover,
+            client: clientName,
+            turnover: 0,
             month_name: month.trim(),
             year: year.toString(),
-            percentage: Number.parseFloat(percentage),
+            percentage: 0,
           },
           ...turnoverData,
         ]
-        console.log(`Added add-on-only turnover entry for client: ${row.client}`)
-      } else {
-        // No invoices and no add-ons — zero entry
-        const nameQuery = `SELECT client FROM m5_client WHERE m5clientkey = $1`
-        const nameResult = await client.query(nameQuery, [clientId])
-        const clientName = nameResult.rows[0]?.client || ''
-        if (clientName) {
-          turnoverData = [
-            {
-              client: clientName,
-              turnover: 0,
-              month_name: month.trim(),
-              year: year.toString(),
-              percentage: 0,
-            },
-            ...turnoverData,
-          ]
-          console.log(`Added zero-turnover entry for selected client: ${clientName}`)
-        }
+        console.log(`Added zero-turnover entry for selected client: ${clientName}`)
       }
     }
   }
@@ -418,35 +396,18 @@ const getDebtorAgeAnalysisPerClient = async (client, month, year) => {
 const getTurnoverVsDieselCost = async (numericMonth, year) => {
   const month = monthNames[numericMonth]
   const { dateFrom, dateTo } = getDateRange(month, year)
-
-  const turnoverQuery = `
-    SELECT
-      COALESCE(SUM(m.total_cost), 0) + COALESCE((
-        SELECT SUM(amount)
-        FROM add_ons
-        WHERE date >= $1
-          AND date < $2
-      ), 0) AS total_turnover
-    FROM invoice i
-    JOIN m1_controller m ON i.m1key = m.m1key
-    WHERE m.created_at >= $1
-      AND m.created_at < $2
-  `
-
-  const dieselQuery = `
-    SELECT COALESCE(SUM(expensecost), 0) as total_diesel_cost
-    FROM expenses_m2
-    WHERE slipuploaddate >= $1
-      AND slipuploaddate < $2
-      AND type = 'fuel'
-  `
-
-  const [turnoverResult, dieselResult] = await Promise.all([
-    pool.query(turnoverQuery, [dateFrom, dateTo]),
-    pool.query(dieselQuery, [dateFrom, dateTo]),
+  const [totalTurnover, dieselResult] = await Promise.all([
+    calculateMonthlyTurnover(pool, dateFrom, dateTo),
+    pool.query(
+      `SELECT COALESCE(SUM(expensecost), 0) AS total_diesel_cost
+       FROM expenses_m2
+       WHERE slipuploaddate >= $1
+         AND slipuploaddate < $2
+         AND type = 'fuel'`,
+      [dateFrom, dateTo]
+    ),
   ])
 
-  const totalTurnover = Number(turnoverResult.rows[0]?.total_turnover || 0)
   const totalDieselCost = Number(dieselResult.rows[0]?.total_diesel_cost || 0)
 
   console.log(`Total turnover (invoices + add-ons) for ${month} ${year}: ${totalTurnover}`)
@@ -556,16 +517,17 @@ const getTurnoverPerTruck = async (client, month, year) => {
 const getSubcontractorTurnoverPerMonth = async (client, month, year) => {
   const { dateFrom, dateTo } = getDateRange(month, year)
 
-  const query = `
+  // Fetch total turnover and subcontractor portion in parallel
+  const subbieQuery = `
     WITH DistinctLegs AS (
-      SELECT 
+      SELECT
         m1key,
         COUNT(DISTINCT legnumber) AS num_legs
       FROM legs_m2
       GROUP BY m1key
     ),
     DriverCountsPerLeg AS (
-      SELECT 
+      SELECT
         m1key,
         legnumber,
         COUNT(DISTINCT driverid) AS drivers_per_leg
@@ -573,7 +535,7 @@ const getSubcontractorTurnoverPerMonth = async (client, month, year) => {
       GROUP BY m1key, legnumber
     ),
     LegDriverContributions AS (
-      SELECT 
+      SELECT
         l.m1key,
         SUM(m.total_cost / dl.num_legs / dcpl.drivers_per_leg) AS subcontractor_turnover
       FROM legs_m2 l
@@ -585,73 +547,44 @@ const getSubcontractorTurnoverPerMonth = async (client, month, year) => {
         AND m.created_at >= $1
         AND m.created_at < $2
       GROUP BY l.m1key
-    ),
-    TotalSubcontractorTurnover AS (
-      SELECT 
-        COALESCE(SUM(ldc.subcontractor_turnover), 0) AS total_subcontractor_turnover,
-        $3 AS month_name,
-        $4 AS year
-      FROM LegDriverContributions ldc
-    ),
-    TotalTurnover AS (
-      SELECT 
-        COALESCE(SUM(m.total_cost), 0) + COALESCE((
-          SELECT SUM(amount)
-          FROM add_ons
-          WHERE date >= $1
-            AND date < $2
-        ), 0) AS total_turnover,
-        $3 AS month_name,
-        $4 AS year
-      FROM invoice i
-      JOIN m1_controller m ON i.m1key = m.m1key
-      WHERE m.created_at >= $1
-        AND m.created_at < $2
     )
-    SELECT 
-      'Total Turnover' AS name,
-      tt.total_turnover AS value,
-      'total' AS type,
-      100 AS percentage,
-      tt.month_name AS month,
-      tt.year
-    FROM TotalTurnover tt
-    UNION ALL
-    SELECT 
-      'Total Subcontractor Turnover' AS name,
-      tst.total_subcontractor_turnover AS value,
-      'subcontractor' AS type,
-      CASE WHEN tt.total_turnover > 0
-        THEN (tst.total_subcontractor_turnover / tt.total_turnover * 100)::NUMERIC(5,2)
-        ELSE 0
-      END AS percentage,
-      tst.month_name AS month,
-      tst.year
-    FROM TotalSubcontractorTurnover tst
-    CROSS JOIN TotalTurnover tt
-    ORDER BY value DESC
+    SELECT COALESCE(SUM(subcontractor_turnover), 0) AS total_subcontractor_turnover
+    FROM LegDriverContributions
   `
 
-  const result = await client.query(query, [dateFrom, dateTo, month.trim(), year.toString()])
-  console.log("Subcontractor turnover query result for month", month, year, ":", result.rows)
-  console.log(`Query returned ${result.rows ? result.rows.length : 0} rows`)
+  const [totalTurnover, subbieResult] = await Promise.all([
+    calculateMonthlyTurnover(client, dateFrom, dateTo),
+    client.query(subbieQuery, [dateFrom, dateTo]),
+  ])
 
-  if (!result.rows || result.rows.length === 0) {
-    console.log(`No rows returned for ${month} ${year}. Check query or data.`)
-    return []
-  }
+  const totalSubcontractorTurnover = Number.parseFloat(
+    subbieResult.rows[0]?.total_subcontractor_turnover || 0
+  )
 
-  const totalTurnover = Number.parseFloat(result.rows.find((row) => row.type === "total")?.value || 0)
   console.log(`Total turnover (invoices + add-ons) for ${month} ${year}: ${totalTurnover}`)
 
-  const turnoverData = result.rows.map((row) => ({
-    name: row.name,
-    value: Number.parseFloat(row.value || 0),
-    type: row.type,
-    percentage: Number.parseFloat(row.percentage || 0),
-    month: row.month.trim(),
-    year: row.year,
-  }))
+  const subbiePercentage = totalTurnover > 0
+    ? Number(((totalSubcontractorTurnover / totalTurnover) * 100).toFixed(2))
+    : 0
+
+  const turnoverData = [
+    {
+      name: "Total Turnover",
+      value: totalTurnover,
+      type: "total",
+      percentage: 100,
+      month: month.trim(),
+      year: year.toString(),
+    },
+    {
+      name: "Total Subcontractor Turnover",
+      value: totalSubcontractorTurnover,
+      type: "subcontractor",
+      percentage: subbiePercentage,
+      month: month.trim(),
+      year: year.toString(),
+    },
+  ].sort((a, b) => b.value - a.value)
 
   console.log("Processed turnover vs total subcontractor data:", turnoverData)
   return turnoverData
@@ -723,29 +656,12 @@ const getSubcontractorVsTurnover = async (client, month, year, subcontractorId =
     ORDER BY value DESC
   `
 
-  const totalTurnoverQuery = `
-    SELECT
-      COALESCE(SUM(m.total_cost), 0) + COALESCE((
-        SELECT SUM(amount)
-        FROM add_ons
-        WHERE date >= $1
-          AND date < $2
-      ), 0) AS total_turnover
-    FROM invoice i
-    JOIN m1_controller m ON i.m1key = m.m1key
-    WHERE m.created_at >= $1
-      AND m.created_at < $2
-  `
-
-  const [subcontractorResult, totalTurnoverResult] = await Promise.all([
+  const [subcontractorResult, totalTurnover] = await Promise.all([
     subcontractorId ? client.query(subcontractorQuery, params) : Promise.resolve({ rows: [] }),
-    client.query(totalTurnoverQuery, [dateFrom, dateTo]),
+    calculateMonthlyTurnover(client, dateFrom, dateTo),
   ])
 
   console.log("Subcontractor turnover query result:", subcontractorResult.rows)
-  console.log("Total turnover query result:", totalTurnoverResult.rows)
-
-  const totalTurnover = Number.parseFloat(totalTurnoverResult.rows[0]?.total_turnover || 0)
   console.log(`Total turnover (invoices + add-ons) for ${month} ${year}: ${totalTurnover}`)
 
   const turnoverData = [
@@ -801,29 +717,12 @@ const getTurnoverVsSubbieExpense = async (client, month, year, subcontractorId =
     GROUP BY e.companyname, TO_CHAR(l.date, 'Month'), EXTRACT(YEAR FROM l.date)
   `
 
-  const totalTurnoverQuery = `
-    SELECT
-      COALESCE(SUM(m.total_cost), 0) + COALESCE((
-        SELECT SUM(amount)
-        FROM add_ons
-        WHERE date >= $1
-          AND date < $2
-      ), 0) AS total_turnover
-    FROM invoice i
-    JOIN m1_controller m ON i.m1key = m.m1key
-    WHERE m.created_at >= $1
-      AND m.created_at < $2
-  `
-
-  const [subcontractorResult, totalTurnoverResult] = await Promise.all([
+  const [subcontractorResult, totalTurnover] = await Promise.all([
     subcontractorId ? client.query(subcontractorQuery, params) : Promise.resolve({ rows: [] }),
-    client.query(totalTurnoverQuery, [dateFrom, dateTo]),
+    calculateMonthlyTurnover(client, dateFrom, dateTo),
   ])
 
   console.log("Subcontractor expense query result:", subcontractorResult.rows)
-  console.log("Total turnover query result:", totalTurnoverResult.rows)
-
-  const totalTurnover = Number.parseFloat(totalTurnoverResult.rows[0]?.total_turnover || 0)
   console.log(`Total turnover (invoices + add-ons) for ${month} ${year}: ${totalTurnover}`)
 
   const turnoverData = []
@@ -1573,6 +1472,7 @@ async function getTotalWagesForMonth(client, month, year) {
 }
 
 export {
+  calculateMonthlyTurnover,
   getFuelExpenses,
   getTurnoverPerMonth,
   getAllClients,
