@@ -482,7 +482,6 @@ useEffect(() => {
       setFormData,
       setDrivers,
       setLegs,
-      legs,
       employeeDrivers,
       setRates,
       ratesRouteKeyRef,

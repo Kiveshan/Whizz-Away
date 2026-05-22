@@ -598,14 +598,16 @@ export default function DriversSection({
 
                           const value = e.target.value;
                           if (value === "" || /^[0-9]*\.?[0-9]*$/.test(value)) {
-                            const updatedDrivers = [...drivers];
-                            updatedDrivers[index].driverRate = value;
+                            const updatedDriver = { ...drivers[index], driverRate: value };
+                            const updatedDrivers = drivers.map((d, i) =>
+                              i === index ? updatedDriver : d
+                            );
 
                             setEditedFields((prev) => ({
                               ...prev,
                               drivers: {
                                 ...prev.drivers,
-                                [updatedDrivers[index].id]: true,
+                                [updatedDriver.id]: true,
                               },
                             }));
 
@@ -657,14 +659,16 @@ export default function DriversSection({
                           onChange={(e) => {
                             if (isCompleted) return;
                             const newDate = e.target.value;
-                            const updatedDrivers = [...drivers];
-                            updatedDrivers[index].date = newDate;
+                            const updatedDriver = { ...drivers[index], date: newDate };
+                            const updatedDrivers = drivers.map((d, i) =>
+                              i === index ? updatedDriver : d
+                            );
 
                             setEditedFields((prev) => ({
                               ...prev,
                               drivers: {
                                 ...prev.drivers,
-                                [updatedDrivers[index].id]: true,
+                                [updatedDriver.id]: true,
                               },
                             }));
 
