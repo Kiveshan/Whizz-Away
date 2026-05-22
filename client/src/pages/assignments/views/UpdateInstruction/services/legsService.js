@@ -126,9 +126,8 @@ export const refreshLegData = async ({
                 "Setting drivers for refreshed leg:",
                 currentLeg.drivers
               );
-              const clonedDrivers = JSON.parse(JSON.stringify(currentLeg.drivers));
-              setDrivers(clonedDrivers);
-              debugDriverData(clonedDrivers);
+              setDrivers(currentLeg.drivers);
+              debugDriverData(currentLeg.drivers);
             } else {
               setDrivers([]);
             }
@@ -316,9 +315,8 @@ export const fetchLegsForInstruction = async ({
             "Setting drivers for first leg:",
             JSON.stringify(fetchedLegs[0].drivers, null, 2)
           );
-          const clonedFirstLegDrivers = JSON.parse(JSON.stringify(fetchedLegs[0].drivers));
-          setDrivers(clonedFirstLegDrivers);
-          debugDriverData(clonedFirstLegDrivers);
+          setDrivers(fetchedLegs[0].drivers);
+          debugDriverData(fetchedLegs[0].drivers);
         } else {
           console.log("No drivers for first leg, setting empty array");
           setDrivers([]);

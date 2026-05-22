@@ -482,6 +482,7 @@ useEffect(() => {
       setFormData,
       setDrivers,
       setLegs,
+      legs,
       employeeDrivers,
       setRates,
       ratesRouteKeyRef,
@@ -1497,7 +1498,7 @@ useEffect(() => {
                         i < updatedLegs.length;
                         i++
                       ) {
-                        updatedLegs[i] = { ...updatedLegs[i], legnumber: i + 1 };
+                        updatedLegs[i].legnumber = i + 1;
                       }
 
                       const hasRemainingUnsavedLeg = updatedLegs.some(

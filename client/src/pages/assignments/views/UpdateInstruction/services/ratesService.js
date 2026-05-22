@@ -60,16 +60,12 @@ export const fetchRate = async ({
       legSwitchIdRef.current === requestId &&
       currentLegIndexRef.current === resolvedTargetLegIndex
     ) {
-      // Use functional update so the async callback never overwrites leg-switch state
-      // committed between when fetchRate was called and when the response arrived.
-      setLegs((prevLegs) => {
-        const updatedLegs = [...prevLegs];
-        updatedLegs[resolvedTargetLegIndex] = {
-          ...updatedLegs[resolvedTargetLegIndex],
-          driverRate: "0",
-        };
-        return updatedLegs;
-      });
+      const updatedLegs = [...legs];
+      updatedLegs[resolvedTargetLegIndex] = {
+        ...updatedLegs[resolvedTargetLegIndex],
+        driverRate: "0",
+      };
+      setLegs(updatedLegs);
     }
   };
 
@@ -159,17 +155,12 @@ export const fetchRate = async ({
       legSwitchIdRef.current === requestId &&
       currentLegIndexRef.current === resolvedTargetLegIndex
     ) {
-      // Functional update — reads current legs state, not the stale closure value.
-      // Without this, the async callback overwrites leg-switch setLegs calls that
-      // committed while the rate fetch was in flight.
-      setLegs((prevLegs) => {
-        const updatedLegs = [...prevLegs];
-        updatedLegs[resolvedTargetLegIndex] = {
-          ...updatedLegs[resolvedTargetLegIndex],
-          driverRate: data.driver_rate ? data.driver_rate.toString() : "0",
-        };
-        return updatedLegs;
-      });
+      const updatedLegs = [...legs];
+      updatedLegs[resolvedTargetLegIndex] = {
+        ...updatedLegs[resolvedTargetLegIndex],
+        driverRate: data.driver_rate ? data.driver_rate.toString() : "0",
+      };
+      setLegs(updatedLegs);
     }
 
     return Promise.resolve();
@@ -218,14 +209,12 @@ export const fetchRate = async ({
       legSwitchIdRef.current === requestId &&
       currentLegIndexRef.current === resolvedTargetLegIndex
     ) {
-      setLegs((prevLegs) => {
-        const updatedLegs = [...prevLegs];
-        updatedLegs[resolvedTargetLegIndex] = {
-          ...updatedLegs[resolvedTargetLegIndex],
-          driverRate: "0",
-        };
-        return updatedLegs;
-      });
+      const updatedLegs = [...legs];
+      updatedLegs[resolvedTargetLegIndex] = {
+        ...updatedLegs[resolvedTargetLegIndex],
+        driverRate: "0",
+      };
+      setLegs(updatedLegs);
     }
 
     return Promise.resolve();
