@@ -1498,7 +1498,7 @@ useEffect(() => {
                         i < updatedLegs.length;
                         i++
                       ) {
-                        updatedLegs[i].legnumber = i + 1;
+                        updatedLegs[i] = { ...updatedLegs[i], legnumber: i + 1 };
                       }
 
                       const hasRemainingUnsavedLeg = updatedLegs.some(

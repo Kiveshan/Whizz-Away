@@ -341,7 +341,7 @@ const Instructions = () => {
     navigate("/FCcontrollerinstructions", { state: stateToPass })
   }
   // Added this new function
-  const handleViewAssignment = (instructionId) => {
+  const handleViewAssignment = (instructionId, status) => {
     // Create state object with all necessary parameters
     const stateToPass = {
       instructionId,
@@ -350,6 +350,7 @@ const Instructions = () => {
       selectedMonth,
       selectedYear,
       activeFilter,
+      isCompleted: (status || "").toLowerCase() === "completed",
     }
 
     // Log the state being passed to update-instructions
@@ -565,6 +566,7 @@ const Instructions = () => {
           selectedYear,
           activeFilter,
           selectedLegIndex: 0,
+          isCompleted: (item.status || "").toLowerCase() === "completed",
         };
         console.log("Navigating to update-instructions with state:", stateToPass);
         navigate("/update-instructions", {

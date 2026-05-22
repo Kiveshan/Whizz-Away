@@ -339,6 +339,17 @@ export const saveLeg = async ({
   m1key,
   drivers,
 }) => {
+  // Reject payloads with duplicate container numbers — these indicate corrupted frontend state.
+  if (drivers && drivers.length > 0) {
+    const containerNumbers = drivers.map((d) => d.containernumber).filter(Boolean);
+    const uniqueContainers = new Set(containerNumbers);
+    if (containerNumbers.length !== uniqueContainers.size) {
+      throw new Error(
+        `Duplicate container numbers detected in leg save payload for instruction ${m1key}, leg ${legnumber}`
+      );
+    }
+  }
+
   const client = await pool.connect();
   try {
     await client.query("BEGIN");

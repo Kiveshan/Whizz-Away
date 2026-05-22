@@ -117,27 +117,26 @@ export default function DriversSection({
                         onChange={(e) => {
                           if (isCompleted) return;
                           const driverId = e.target.value;
-                          const updatedDrivers = [...drivers];
-                          updatedDrivers[index].driverid = e.target.value;
+                          // Create a new driver object — never mutate the existing one, as it may
+                          // share a reference with legs[n].drivers after refreshLegData.
+                          const updatedDriver = { ...drivers[index], driverid: driverId };
 
-                          if (e.target.value) {
+                          if (driverId) {
                             const selectedDriver = employeeDrivers.find(
-                              (d) => d.userid.toString() === e.target.value
+                              (d) => d.userid.toString() === driverId
                             );
                             if (selectedDriver) {
-                              updatedDrivers[
-                                index
-                              ].full_name = `${selectedDriver.name} ${selectedDriver.surname}`;
+                              updatedDriver.full_name = `${selectedDriver.name} ${selectedDriver.surname}`;
 
                               const isSubcontractor = selectedDriver.roleid === 6;
                               console.log(
                                 `Selected driver ${driverId} is subcontractor: ${isSubcontractor}`
                               );
 
-                              if (updatedDrivers[index].container_type) {
-                                const ct = (updatedDrivers[index].container_type || "").toLowerCase().trim();
+                              if (updatedDriver.container_type) {
+                                const ct = (updatedDriver.container_type || "").toLowerCase().trim();
                                 if (ct === "12m") {
-                                  updatedDrivers[index].driverRate =
+                                  updatedDriver.driverRate =
                                     isSubcontractor
                                       ? rates.subbie_twelve_meter
                                         ? rates.subbie_twelve_meter.toString()
@@ -146,12 +145,12 @@ export default function DriversSection({
                                       ? rates.twelve_meter.toString()
                                       : "0";
                                 } else if (ct === "abnormal") {
-                                  if (!updatedDrivers[index].driverRate) {
-                                    updatedDrivers[index].driverRate = "0";
+                                  if (!updatedDriver.driverRate) {
+                                    updatedDriver.driverRate = "0";
                                   }
-                                  updatedDrivers[index].isAbnormal = true;
+                                  updatedDriver.isAbnormal = true;
                                 } else {
-                                  updatedDrivers[index].driverRate =
+                                  updatedDriver.driverRate =
                                     isSubcontractor
                                       ? rates.subbie_six_meter
                                         ? rates.subbie_six_meter.toString()
@@ -161,35 +160,39 @@ export default function DriversSection({
                                       : "0";
                                 }
                                 console.log(
-                                  `Updated rate for driver ${driverId} to ${updatedDrivers[index].driverRate}`
+                                  `Updated rate for driver ${driverId} to ${updatedDriver.driverRate}`
                                 );
                               }
                             } else {
-                              updatedDrivers[index].full_name = "";
+                              updatedDriver.full_name = "";
                             }
+
+                            const updatedDrivers = drivers.map((d, i) =>
+                              i === index ? updatedDriver : d
+                            );
 
                             setEditedFields((prev) => ({
                               ...prev,
                               drivers: {
                                 ...prev.drivers,
-                                [updatedDrivers[index].id]: true,
+                                [updatedDriver.id]: true,
                               },
                             }));
 
                             setDrivers(updatedDrivers);
                             console.log(
                               `Updated driver at index ${index}:`,
-                              updatedDrivers[index]
+                              updatedDriver
                             );
 
                             // Re-fetch a date-aware rate using this driver's existing date
                             // so changing the driver picks up the correct rate period.
                             if (
-                              updatedDrivers[index].date &&
-                              (updatedDrivers[index].container_type || "").toLowerCase().trim() !== "abnormal" &&
+                              updatedDriver.date &&
+                              (updatedDriver.container_type || "").toLowerCase().trim() !== "abnormal" &&
                               onDateChange
                             ) {
-                              onDateChange(index, updatedDrivers[index].date);
+                              onDateChange(index, updatedDriver.date);
                             }
                           }
                         }}
@@ -246,14 +249,16 @@ export default function DriversSection({
                         value={entry.truckregnumber || ""}
                         onChange={(e) => {
                           if (isCompleted) return;
-                          const updatedDrivers = [...drivers];
-                          updatedDrivers[index].truckregnumber = e.target.value;
+                          const updatedDriver = { ...drivers[index], truckregnumber: e.target.value };
+                          const updatedDrivers = drivers.map((d, i) =>
+                            i === index ? updatedDriver : d
+                          );
 
                           setEditedFields((prev) => ({
                             ...prev,
                             drivers: {
                               ...prev.drivers,
-                              [updatedDrivers[index].id]: true,
+                              [updatedDriver.id]: true,
                             },
                           }));
 
@@ -308,17 +313,21 @@ export default function DriversSection({
                             if (isCompleted) return;
                             const weightValue = e.target.value;
 
-                            const updatedDrivers = [...drivers];
-                            updatedDrivers[index].containernumber = weightValue;
-
-                            updatedDrivers[index].container_type = "";
-                            updatedDrivers[index].driverRate = formData.driverRate || "0";
+                            const updatedDriver = {
+                              ...drivers[index],
+                              containernumber: weightValue,
+                              container_type: "",
+                              driverRate: formData.driverRate || "0",
+                            };
+                            const updatedDrivers = drivers.map((d, i) =>
+                              i === index ? updatedDriver : d
+                            );
 
                             setEditedFields((prev) => ({
                               ...prev,
                               drivers: {
                                 ...prev.drivers,
-                                [updatedDrivers[index].id]: true,
+                                [updatedDriver.id]: true,
                               },
                             }));
 
@@ -420,23 +429,24 @@ export default function DriversSection({
                               }
                             }
 
-                            const updatedDrivers = [...drivers];
-                            updatedDrivers[index].containernumber = containerValue;
+                            // Create a new driver object — never mutate the existing one.
+                            const currentDriver = drivers[index];
+                            let updatedDriver = { ...currentDriver, containernumber: containerValue };
 
                             if (containerValue && containerDetailsMap[containerValue]) {
                               const containerType = (
                                 containerDetailsMap[containerValue].type || ""
                               ).trim();
-                              updatedDrivers[index].container_type = containerType;
+                              updatedDriver = { ...updatedDriver, container_type: containerType };
 
                               const isSubcontractor =
                                 employeeDrivers.find(
                                   (d) =>
                                     d.userid.toString() ===
-                                    updatedDrivers[index].driverid
+                                    currentDriver.driverid
                                 )?.roleid === 6;
                               console.log(
-                                `Driver ${updatedDrivers[index].driverid} is subcontractor: ${isSubcontractor}`
+                                `Driver ${currentDriver.driverid} is subcontractor: ${isSubcontractor}`
                               );
 
                               const sixMeterRate = isSubcontractor
@@ -463,33 +473,35 @@ export default function DriversSection({
                               );
 
                               if (containerType.toLowerCase() === "abnormal") {
-                                updatedDrivers[index].driverRate =
-                                  updatedDrivers[index].driverRate || twelveMeterRate;
-                                updatedDrivers[index].isAbnormal = true;
+                                updatedDriver = {
+                                  ...updatedDriver,
+                                  driverRate: updatedDriver.driverRate || twelveMeterRate,
+                                  isAbnormal: true,
+                                };
                                 console.log(
                                   "Setting abnormal rate (editable):",
-                                  updatedDrivers[index].driverRate
+                                  updatedDriver.driverRate
                                 );
                               } else if (containerType.toLowerCase() === "12m") {
-                                updatedDrivers[index].driverRate = twelveMeterRate;
-                                updatedDrivers[index].isAbnormal = false;
+                                updatedDriver = { ...updatedDriver, driverRate: twelveMeterRate, isAbnormal: false };
                                 console.log("Setting 12m rate:", twelveMeterRate);
                               } else {
-                                updatedDrivers[index].driverRate = sixMeterRate;
-                                updatedDrivers[index].isAbnormal = false;
+                                updatedDriver = { ...updatedDriver, driverRate: sixMeterRate, isAbnormal: false };
                                 console.log("Setting 6m rate:", sixMeterRate);
                               }
                             } else {
-                              updatedDrivers[index].container_type = "";
-                              updatedDrivers[index].driverRate = "";
-                              updatedDrivers[index].isAbnormal = false;
+                              updatedDriver = { ...updatedDriver, container_type: "", driverRate: "", isAbnormal: false };
                             }
+
+                            const updatedDrivers = drivers.map((d, i) =>
+                              i === index ? updatedDriver : d
+                            );
 
                             setEditedFields((prev) => ({
                               ...prev,
                               drivers: {
                                 ...prev.drivers,
-                                [updatedDrivers[index].id]: true,
+                                [updatedDriver.id]: true,
                               },
                             }));
 
@@ -500,7 +512,7 @@ export default function DriversSection({
                             );
                             console.log(
                               "Updated driver data:",
-                              updatedDrivers[index]
+                              updatedDriver
                             );
 
                             // If the driver already has a date, re-fetch the date-aware rate
@@ -508,11 +520,11 @@ export default function DriversSection({
                             // Skip for abnormal — those rates are manually entered.
                             if (
                               containerValue &&
-                              updatedDrivers[index].date &&
-                              updatedDrivers[index].container_type?.toLowerCase() !== "abnormal" &&
+                              updatedDriver.date &&
+                              updatedDriver.container_type?.toLowerCase() !== "abnormal" &&
                               onDateChange
                             ) {
-                              onDateChange(index, updatedDrivers[index].date);
+                              onDateChange(index, updatedDriver.date);
                             }
                           }}
                         />
