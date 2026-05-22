@@ -662,10 +662,9 @@ export const getLegsByInstructionId = async (instructionId) => {
         id: row.legkey,
         driverid: row.driverid ? row.driverid.toString() : "",
         truckregnumber: row.truckregnumber || "",
-        // UPDATED: Use vgm for weight-based, containernumber for container-based
-        containernumber: row.vgm 
-          ? row.vgm.toString() 
-          : (row.containernumber ? row.containernumber.toString() : ""),
+        containernumber: row.containernumber
+          ? row.containernumber.toString()
+          : (row.vgm ? row.vgm.toString() : ""),
         container_type: row.container_type || "",
         driverRate: row.driverrate ? row.driverrate.toString() : "0",
         _rateNullInManage: row.applicable_manage_rate === null,
