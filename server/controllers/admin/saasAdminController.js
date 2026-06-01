@@ -327,10 +327,21 @@ const reactivateCompany = async (req, res) => {
 };
 
 // POST /api/admin/companies/:company_reg_num/trial
-// Start a 14-day Professional-tier trial.
+// Start a 14-day trial on any plan tier.
+// Body: { plan: "lite" | "professional" | "growth" | "enterprise" }  (defaults to "professional")
+const VALID_TRIAL_PLANS = ["lite", "professional", "growth", "enterprise"];
+
 const startTrial = async (req, res) => {
   const { company_reg_num } = req.params;
+  const { plan = "professional" } = req.body;
   const adminEmail = req.user.email;
+
+  if (!VALID_TRIAL_PLANS.includes(plan)) {
+    return res.status(400).json({
+      error: "INVALID_PLAN",
+      message: `Plan must be one of: ${VALID_TRIAL_PLANS.join(", ")}.`,
+    });
+  }
 
   const trialEndsAt = new Date();
   trialEndsAt.setDate(trialEndsAt.getDate() + 14);
@@ -339,6 +350,7 @@ const startTrial = async (req, res) => {
   try {
     await client.query("BEGIN");
 
+    // Confirm company exists
     const check = await client.query(
       `SELECT subscription_status FROM usertable WHERE company_reg_num = $1 AND roleid = 1 LIMIT 1`,
       [company_reg_num]
@@ -348,28 +360,42 @@ const startTrial = async (req, res) => {
       return res.status(404).json({ error: "Company not found." });
     }
 
+    // Anti-abuse: block if this company has ever had a trial before
+    const history = await client.query(
+      `SELECT COUNT(*) FROM billing_events
+       WHERE company_reg_num = $1 AND event_type = 'trial_started'`,
+      [company_reg_num]
+    );
+    if (parseInt(history.rows[0].count) > 0) {
+      await client.query("ROLLBACK");
+      return res.status(409).json({
+        error:   "TRIAL_ALREADY_USED",
+        message: "This company has already used a trial and cannot receive another.",
+      });
+    }
+
     await updateSubscriptionTier(client, company_reg_num, {
-      subscription_tier:   "professional",
+      subscription_tier:   plan,
       subscription_status: "trial",
-      trial_ends_at:        trialEndsAt.toISOString(),
-      plan_approved_by:     adminEmail,
-      plan_approved_at:     new Date().toISOString(),
+      trial_ends_at:       trialEndsAt.toISOString(),
+      plan_approved_by:    adminEmail,
+      plan_approved_at:    new Date().toISOString(),
     });
 
     await recordBillingEvent(client, {
       company_reg_num,
       event_type:   "trial_started",
-      new_value:    "professional",
+      new_value:    plan,
       performed_by: adminEmail,
-      notes:        `Trial ends ${trialEndsAt.toISOString().split("T")[0]}`,
+      notes:        `14-day ${plan} trial — ends ${trialEndsAt.toISOString().split("T")[0]}`,
     });
 
     await client.query("COMMIT");
     return res.json({
-      success:      true,
+      success:       true,
       company_reg_num,
-      status:       "trial",
-      plan:         "professional",
+      status:        "trial",
+      plan,
       trial_ends_at: trialEndsAt.toISOString(),
     });
   } catch (err) {

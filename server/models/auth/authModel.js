@@ -280,19 +280,23 @@ const registerUser = async (userData) => {
     swift_code,
     cluster_box,
     requested_plan,
+    trial_requested,
   } = userData;
 
   let client;
   try {
     client = await pool.connect();
-    
+
     // Begin transaction
     await client.query('BEGIN');
-    
+
     const hashedPassword = await bcrypt.hash(password, 10);
-    
-    // Insert into usertable (removed roleid)
-    const planNotes = requested_plan ? `Requested plan: ${requested_plan}` : null;
+
+    // Build plan_notes so the admin can see both the desired plan and trial intent
+    const planNoteParts = [];
+    if (requested_plan) planNoteParts.push(`Requested plan: ${requested_plan}`);
+    if (trial_requested) planNoteParts.push("Trial requested: yes");
+    const planNotes = planNoteParts.length ? planNoteParts.join(" | ") : null;
     const userResult = await client.query(
       `INSERT INTO usertable (
         companyname, company_reg_num, dateofreg, status,

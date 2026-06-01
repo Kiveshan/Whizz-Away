@@ -239,6 +239,19 @@ const checkEmail = async (req, res) => {
   }
 };
 
+const checkCompanyReg = async (req, res) => {
+  const { company_reg_num } = req.query;
+  if (!company_reg_num) {
+    return res.status(400).json({ error: "company_reg_num parameter is required" });
+  }
+  try {
+    const exists = await checkCompanyRegNumExists(company_reg_num);
+    return res.json({ exists });
+  } catch (error) {
+    return res.status(500).json({ error: "Server error" });
+  }
+};
+
 // const register = async (req, res) => {
 //   const {
 //     name,
@@ -333,6 +346,7 @@ const register = async (req, res) => {
     swift_code,
     cluster_box,
     requested_plan,
+    trial_requested,
   } = req.body;
 
   try {
@@ -366,6 +380,7 @@ const register = async (req, res) => {
       swift_code,
       cluster_box,
       requested_plan,
+      trial_requested: !!trial_requested,
     });
 
     return res.status(201).json({
@@ -388,4 +403,4 @@ const register = async (req, res) => {
   }
 };
 
-export { login, logout, getUserInfo, getUserRole, checkEmail, register };
+export { login, logout, getUserInfo, getUserRole, checkEmail, checkCompanyReg, register };

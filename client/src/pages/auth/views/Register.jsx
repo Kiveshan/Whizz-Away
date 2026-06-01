@@ -76,6 +76,7 @@ const Register = ({ switchToLogin, closePopup }) => {
     branch_code: "",
     swift_code: "",
     requested_plan: "",
+    trial_requested: false,
   });
 
   const [errorMessage, setErrorMessage] = useState("");
@@ -84,6 +85,7 @@ const Register = ({ switchToLogin, closePopup }) => {
   const [showSuccessPopup, setShowSuccessPopup] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [isCheckingEmail, setIsCheckingEmail] = useState(false);
+  const [isCheckingReg, setIsCheckingReg]     = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [passwordStrength, setPasswordStrength] = useState({
     length: false,
@@ -117,7 +119,8 @@ const Register = ({ switchToLogin, closePopup }) => {
   const handleChange = (e) => {
     const { name, value } = e.target;
 
-    const numericFields = ["cellnum", "cellnum2", "vat_reg_num", "account_num", "branch_code", "company_reg_num"];
+    // company_reg_num allows digits AND forward-slash (e.g. 2023/123456/07)
+    const numericFields = ["cellnum", "cellnum2", "vat_reg_num", "account_num", "branch_code"];
 
     if (numericFields.includes(name) && value !== "" && !/^\d+$/.test(value)) return;
 
@@ -158,6 +161,26 @@ const Register = ({ switchToLogin, closePopup }) => {
     }
   };
 
+  const checkCompanyRegExists = async (company_reg_num) => {
+    if (!company_reg_num) return false;
+    try {
+      setIsCheckingReg(true);
+      const response = await fetch(
+        `${API_BASE_URL}/check-company-reg?company_reg_num=${encodeURIComponent(company_reg_num)}`
+      );
+      const data = await response.json();
+      if (data.exists) {
+        showError("This company registration number is already registered. Please login or contact support.");
+        return true;
+      }
+      return false;
+    } catch {
+      return false;
+    } finally {
+      setIsCheckingReg(false);
+    }
+  };
+
   const validateSwiftCode = (code) => {
     if (!code) return true;
     if (code.length !== 8 && code.length !== 11) return "SWIFT code must be either 8 or 11 characters long";
@@ -194,8 +217,8 @@ const Register = ({ switchToLogin, closePopup }) => {
         showError("Please fill in all required fields.");
         return false;
       }
-      if (!/^\d+$/.test(formData.company_reg_num)) {
-        showError("Company Registration Number must contain only numbers.");
+      if (!/^[\d/]+$/.test(formData.company_reg_num)) {
+        showError("Company Registration Number may only contain numbers and forward slashes (e.g. 2023/123456/07).");
         return false;
       }
       if (!/^\d{10}$/.test(formData.cellnum)) {
@@ -210,6 +233,8 @@ const Register = ({ switchToLogin, closePopup }) => {
         showError("VAT Registration Number must contain only numbers.");
         return false;
       }
+      const regExists = await checkCompanyRegExists(formData.company_reg_num);
+      if (regExists) return false;
       return true;
     }
 
@@ -428,10 +453,11 @@ const Register = ({ switchToLogin, closePopup }) => {
                   name="company_reg_num"
                   value={formData.company_reg_num}
                   onChange={handleChange}
-                  placeholder="Registration Number"
+                  onBlur={(e) => e.target.value && checkCompanyRegExists(e.target.value)}
+                  placeholder="e.g. 2023/123456/07"
                   className={styles.formInput}
                 />
-                <small className={styles.formHint}>Numbers only</small>
+                <small className={styles.formHint}>Digits and / only (e.g. 2023/123456/07)</small>
               </div>
             </div>
             <div className={styles.formRow}>
@@ -603,6 +629,23 @@ const Register = ({ switchToLogin, closePopup }) => {
             <p className={styles.planIntro}>
               A Whizz-Away team member will confirm your plan and billing during onboarding.
             </p>
+
+            {/* Trial toggle */}
+            <label className={styles.trialToggleRow}>
+              <input
+                type="checkbox"
+                checked={formData.trial_requested}
+                onChange={(e) =>
+                  setFormData((prev) => ({ ...prev, trial_requested: e.target.checked }))
+                }
+                className={styles.trialCheckbox}
+              />
+              <span className={styles.trialToggleLabel}>
+                Start with a <strong>14-day free trial</strong> of my chosen plan
+                <span className={styles.trialToggleHint}> — no payment required during the trial</span>
+              </span>
+            </label>
+
             <div className={styles.planGrid}>
               {PLAN_OPTIONS.map((plan) => {
                 const isSelected = formData.requested_plan === plan.key;
@@ -699,9 +742,9 @@ const Register = ({ switchToLogin, closePopup }) => {
                   type="button"
                   className={styles.nextBtn}
                   onClick={handleNext}
-                  disabled={isCheckingEmail}
+                  disabled={isCheckingEmail || isCheckingReg}
                 >
-                  {isCheckingEmail ? "Checking..." : "Next"}
+                  {isCheckingEmail || isCheckingReg ? "Checking..." : "Next"}
                 </button>
               )}
             </div>

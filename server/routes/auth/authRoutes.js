@@ -6,6 +6,7 @@ import {
   getUserInfo,
   getUserRole,
   checkEmail,
+  checkCompanyReg,
   register,
 } from "../../controllers/auth/authController.js";
 import { verifyToken } from "../../middleware/auth.js";
@@ -25,6 +26,7 @@ router.post("/logout", logout);
 router.get("/user-info", verifyToken, getUserInfo);
 router.get("/api/user-role", verifyToken, getUserRole);
 router.get("/check-email", checkEmail);
+router.get("/check-company-reg", checkCompanyReg);
 router.post("/register", register);
 
 export default router;
