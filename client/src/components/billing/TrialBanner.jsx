@@ -7,27 +7,25 @@ export default function TrialBanner() {
 
   if (!isTrial()) return null
 
-  const days = trialDaysRemaining()
+  const days   = trialDaysRemaining()
   const urgent = days !== null && days <= 3
 
+  const message =
+    days === null  ? "You are on a 14-day Professional trial."
+    : days === 0   ? "Your trial expires today — activate now to keep access."
+    :                `${days} day${days === 1 ? "" : "s"} left on your Professional trial.`
+
   return (
-    <div
-      className="trial-banner"
-      style={{ backgroundColor: urgent ? "#d97706" : "#2563eb" }}
-      role="banner"
-    >
-      <span className="trial-banner-text">
-        {days === null
-          ? "You are on a 14-day Professional trial."
-          : days === 0
-          ? "Your trial expires today."
-          : `Your trial ends in ${days} day${days === 1 ? "" : "s"}.`}
+    <div className={`trial-notification${urgent ? " trial-notification--urgent" : ""}`}>
+      <span className="trial-notification__icon" aria-hidden="true">
+        {urgent ? "⚠" : "ℹ"}
       </span>
+      <span className="trial-notification__message">{message}</span>
       <a
         href={`mailto:${SUPPORT_EMAIL}?subject=Activate My Plan`}
-        className="trial-banner-cta"
+        className="trial-notification__cta"
       >
-        Contact your account manager to activate your plan
+        Activate plan
       </a>
     </div>
   )

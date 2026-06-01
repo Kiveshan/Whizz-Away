@@ -182,7 +182,6 @@ export const AuthProvider = ({ children }) => {
     if (status === "suspended")                          return "/suspended"
     if (status === "cancelled")                          return "/account-cancelled"
     if (status === "inactive" || status === "none" || tier === "none") return "/pending-activation"
-    if (status === "trial")                              return "/dashboard"
     if (tier   === "lite")                               return "/dashboard/lite"
 
     // Creditors (roleid 8) require enterprise plan - keep on login page if not enterprise

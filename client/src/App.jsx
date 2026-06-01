@@ -239,7 +239,7 @@ function DynamicHeader() {
       return "Income & Expenditure Report";
     if (location.pathname === "/vat-recon-reports")
       return "VAT Reconciliation Report";
-    return titleMap[location.pathname] || "Unknown Page";
+    return titleMap[location.pathname] || "";
   };
 
   if (
@@ -532,8 +532,8 @@ function App() {
       <Router>
         <div className="container">
           <TokenExpiryNotification />
-          <TrialBanner />
           <DynamicHeader />
+          <TrialBanner />
           <ContentWrapper />
         </div>
       </Router>

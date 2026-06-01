@@ -81,7 +81,12 @@ const loadCompany = async (req, res, next) => {
 // Blocks the request if the company's tier ranks below the required tier.
 
 const requirePlan = (minimumPlan) => (req, res, next) => {
-  const tier = req.user?.subscription_tier || "none";
+  // Trial access is capped at professional (the tier just above lite)
+  const rawTier   = req.user?.subscription_tier    || "none";
+  const status    = req.user?.subscription_status  || "inactive";
+  const tier      = (status === "trial" && (PLAN_RANK[rawTier] ?? 0) > PLAN_RANK["professional"])
+    ? "professional"
+    : rawTier;
   const rank = PLAN_RANK[tier] ?? 0;
   const required = PLAN_RANK[minimumPlan] ?? 99;
   if (rank >= required) return next();
@@ -98,7 +103,12 @@ const requirePlan = (minimumPlan) => (req, res, next) => {
 // Checks the plan_features table for the company's current tier.
 
 const requireFeature = (feature_key) => async (req, res, next) => {
-  const tier = req.user?.subscription_tier || "none";
+  // Trial access is capped at professional (the tier just above lite)
+  const rawTier = req.user?.subscription_tier   || "none";
+  const status  = req.user?.subscription_status || "inactive";
+  const tier    = (status === "trial" && (PLAN_RANK[rawTier] ?? 0) > PLAN_RANK["professional"])
+    ? "professional"
+    : rawTier;
   if (!PLAN_RANK[tier]) {
     return res.status(403).json({
       error: "PLAN_UPGRADE_REQUIRED",
