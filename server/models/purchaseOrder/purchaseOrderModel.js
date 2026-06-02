@@ -109,7 +109,7 @@ export const getStatements = async (supplierId, fromDate, toDate) => {
     s.supplier_id,
     STRING_AGG(DISTINCT e.expense, ', ') AS expense_type,
     SUM(po.total) AS total,
-    SUM(po.vat) AS vat,
+    MAX(po.vat) AS vat,
     MIN(po.received_by) AS received_by,
     MIN(po.invoice_number) AS invoice_number,
     STRING_AGG(DISTINCT po.description, ', ') AS description,
