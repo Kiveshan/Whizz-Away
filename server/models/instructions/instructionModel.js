@@ -1378,6 +1378,7 @@ export const updateContainersByInstructionId = async (
   pickup = null,
   dropoff = null,
   allowVgm = true,
+  company_reg_num,
 ) => {
   const client = await pool.connect();
   try {
@@ -1387,8 +1388,8 @@ export const updateContainersByInstructionId = async (
     // identify which container numbers are being removed and clean up
     // any related legs in legs_m2.
     const existingRes = await client.query(
-      `SELECT containernum FROM public.container WHERE m1key = $1`,
-      [instructionId]
+      `SELECT containernum FROM public.container WHERE m1key = $1 AND company_reg_num = $2`,
+      [instructionId, company_reg_num]
     );
     const existingNums = existingRes.rows
       .map((row) => row.containernum)
@@ -1412,12 +1413,12 @@ export const updateContainersByInstructionId = async (
       }
     }
 
-    // Delete existing containers so we can insert the new set
+    // Delete existing containers so we can insert the new set — scoped to tenant
     const deleteQuery = `
       DELETE FROM public.container
-      WHERE m1key = $1
+      WHERE m1key = $1 AND company_reg_num = $2
     `;
-    const deleteResult = await client.query(deleteQuery, [instructionId]);
+    const deleteResult = await client.query(deleteQuery, [instructionId, company_reg_num]);
     console.log(
       `Deleted ${deleteResult.rowCount} existing containers for instruction ID: ${instructionId}`
     );
@@ -2061,11 +2062,11 @@ export const updateFCInstructionAndContainers = async (
       `[${new Date().toISOString()}] [MODEL] updateFCInstructionAndContainers: Starting transaction for instruction ${instructionId}`
     );
 
-    // 1. Fetch current instruction data
+    // 1. Fetch current instruction data — scoped to tenant
     const getCurrentQuery = `
-      SELECT * FROM public.m1_controller WHERE m1key = $1
+      SELECT * FROM public.m1_controller WHERE m1key = $1 AND company_reg_num = $2
     `;
-    const currentResult = await client.query(getCurrentQuery, [instructionId]);
+    const currentResult = await client.query(getCurrentQuery, [instructionId, company_reg_num]);
 
     if (currentResult.rows.length === 0) {
       throw new Error(`Instruction with ID ${instructionId} not found`);
@@ -2979,17 +2980,17 @@ export const updateFCInstructionAndContainers = async (
       `[${new Date().toISOString()}] [MODEL] Updated instruction ${instructionId} with recalculated total_cost: ${recalculatedTotalCost}`
     );
 
-    // Return updated data
+    // Return updated data — scoped to tenant
     const finalInstructionQuery = `
-      SELECT * FROM public.m1_controller WHERE m1key = $1
+      SELECT * FROM public.m1_controller WHERE m1key = $1 AND company_reg_num = $2
     `;
     const finalContainersQuery = `
-      SELECT * FROM public.container WHERE m1key = $1 ORDER BY containerkey
+      SELECT * FROM public.container WHERE m1key = $1 AND company_reg_num = $2 ORDER BY containerkey
     `;
 
     const [finalInstructionResult, finalContainersResult] = await Promise.all([
-      client.query(finalInstructionQuery, [instructionId]),
-      client.query(finalContainersQuery, [instructionId]),
+      client.query(finalInstructionQuery, [instructionId, company_reg_num]),
+      client.query(finalContainersQuery, [instructionId, company_reg_num]),
     ]);
 
     return {
@@ -3358,23 +3359,23 @@ export const deleteInstruction = async (instructionId, company_reg_num) => {
     // Delete any associated legs for this instruction
     const deleteLegsQuery = `
       DELETE FROM public.legs_m2
-      WHERE m1key = $1
+      WHERE m1key = $1 AND company_reg_num = $2
     `;
-    await client.query(deleteLegsQuery, [instructionId]);
+    await client.query(deleteLegsQuery, [instructionId, company_reg_num]);
 
     // Delete containers for this instruction (due to foreign key constraints)
     const deleteContainersQuery = `
-      DELETE FROM public.container 
-      WHERE m1key = $1
+      DELETE FROM public.container
+      WHERE m1key = $1 AND company_reg_num = $2
     `;
-    await client.query(deleteContainersQuery, [instructionId]);
+    await client.query(deleteContainersQuery, [instructionId, company_reg_num]);
 
     // Delete any associated invoice rows for this instruction
     const deleteInvoiceQuery = `
       DELETE FROM public.invoice
-      WHERE m1key = $1
+      WHERE m1key = $1 AND company_reg_num = $2
     `;
-    await client.query(deleteInvoiceQuery, [instructionId]);
+    await client.query(deleteInvoiceQuery, [instructionId, company_reg_num]);
 
     // Then delete the instruction
     const deleteInstructionQuery = `

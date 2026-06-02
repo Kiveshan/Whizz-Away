@@ -87,7 +87,7 @@ return {
     if (client) client.release();
   }
 };
-const getBaseSalaryHistory = async (employeeId, month, year) => {
+const getBaseSalaryHistory = async (employeeId, month, year, company_reg_num) => {
   let client;
   try {
     client = await pool.connect();
@@ -112,16 +112,16 @@ const getBaseSalaryHistory = async (employeeId, month, year) => {
     
     console.log(`Getting base salary for employee ${employeeId} as of ${monthEndDate}`);
     
-    // Query to get the most recent base salary on or before the month end
+    // Query to get the most recent base salary on or before the month end — scoped to tenant
     const historyQuery = `
-      SELECT base, date 
-      FROM base_salary_history 
-      WHERE userid = $1 AND date <= $2 
-      ORDER BY date DESC 
+      SELECT base, date
+      FROM base_salary_history
+      WHERE userid = $1 AND date <= $2 AND company_reg_num = $3
+      ORDER BY date DESC
       LIMIT 1
     `;
-    
-    const historyResult = await client.query(historyQuery, [employeeId, monthEndDate]);
+
+    const historyResult = await client.query(historyQuery, [employeeId, monthEndDate, company_reg_num]);
     
     if (historyResult.rows.length > 0) {
       console.log(`✅ Found historical base salary: ${historyResult.rows[0].base} as of ${historyResult.rows[0].date}`);
@@ -132,15 +132,15 @@ const getBaseSalaryHistory = async (employeeId, month, year) => {
         source: 'historical'
       };
     } else {
-      // Fallback to current base salary from m5_employee table
+      // Fallback to current base salary from m5_employee table — scoped to tenant
       console.log('No historical base salary found, checking current base salary');
       const currentQuery = `
-        SELECT base_salary 
-        FROM m5_employee 
-        WHERE userid = $1
+        SELECT base_salary
+        FROM m5_employee
+        WHERE userid = $1 AND company_reg_num = $2
       `;
-      
-      const currentResult = await client.query(currentQuery, [employeeId]);
+
+      const currentResult = await client.query(currentQuery, [employeeId, company_reg_num]);
       
       if (currentResult.rows.length > 0 && currentResult.rows[0].base_salary) {
         console.log(`⚠️ Using current base salary: ${currentResult.rows[0].base_salary}`);
@@ -330,7 +330,7 @@ const getEmployeeDeductions = async (employeeId, month, year, company_reg_num) =
           Number.parseFloat(baseSalaryResult.rows[0].base_salary) || 0;
       }
 
-      // Add legs earnings for this month/year
+      // Add legs earnings for this month/year — scoped to tenant
       const legsQuery = `
         SELECT SUM(driverrate) as legs_total
         FROM legs_m2 l
@@ -338,12 +338,14 @@ const getEmployeeDeductions = async (employeeId, month, year, company_reg_num) =
         WHERE l.driverid = $1
         AND EXTRACT(MONTH FROM i.pickupdate) = $2
         AND EXTRACT(YEAR FROM i.pickupdate) = $3
+        AND l.company_reg_num = $4
       `;
 
       const legsResult = await client.query(legsQuery, [
         employeeId,
         monthIndex + 1,
         year,
+        company_reg_num,
       ]);
       if (legsResult.rows.length > 0 && legsResult.rows[0].legs_total) {
         totalEarnings += Number.parseFloat(legsResult.rows[0].legs_total);
@@ -509,10 +511,10 @@ const getDriverWageDetailsByInstruction = async (driverId, instructionId, compan
     FROM
       public.legs_m2
     WHERE
-      driverid = $1 AND m1key = $2
+      driverid = $1 AND m1key = $2 AND company_reg_num = $3
   `;
 
-  const legsResult = await query(legsQuery, [driverId, instructionId]);
+  const legsResult = await query(legsQuery, [driverId, instructionId, company_reg_num]);
   const legPayments = legsResult.rows[0]?.leg_payments || 0;
   const date = legsResult.rows[0]?.date;
 
@@ -559,16 +561,16 @@ const getDriverWageDetails = async (driverId, company_reg_num) => {
   const baseSalary = employeeResult.rows[0]?.base_salary || 0;
 
   const legsQuery = `
-    SELECT 
+    SELECT
       SUM(driverrate) as leg_payments,
       MAX(date) as date
-    FROM 
+    FROM
       public.legs_m2
-    WHERE 
-      driverid = $1
+    WHERE
+      driverid = $1 AND company_reg_num = $2
   `;
 
-  const legsResult = await query(legsQuery, [driverId]);
+  const legsResult = await query(legsQuery, [driverId, company_reg_num]);
   const legPayments = legsResult.rows[0]?.leg_payments || 0;
   const date = legsResult.rows[0]?.date;
 

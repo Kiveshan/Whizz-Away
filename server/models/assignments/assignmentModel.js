@@ -353,17 +353,17 @@ export const saveLeg = async ({
 
     if (!isNewLeg) {
       await client.query(
-        `DELETE FROM legs_m2 WHERE m1key = $1 AND legnumber = $2 AND legkey != $3`,
-        [m1key, legnumber, legkey]
+        `DELETE FROM legs_m2 WHERE m1key = $1 AND legnumber = $2 AND legkey != $3 AND company_reg_num = $4`,
+        [m1key, legnumber, legkey, company_reg_num]
       );
       await client.query(
-        `UPDATE legs_m2 SET startingpoint = $1, destination = $2, driverrate = $3 WHERE legkey = $4`,
-        [startingpoint, destination, driverrate, legkey]
+        `UPDATE legs_m2 SET startingpoint = $1, destination = $2, driverrate = $3 WHERE legkey = $4 AND company_reg_num = $5`,
+        [startingpoint, destination, driverrate, legkey, company_reg_num]
       );
     } else {
       await client.query(
-        `DELETE FROM legs_m2 WHERE m1key = $1 AND legnumber = $2`,
-        [m1key, legnumber]
+        `DELETE FROM legs_m2 WHERE m1key = $1 AND legnumber = $2 AND company_reg_num = $3`,
+        [m1key, legnumber, company_reg_num]
       );
     }
 
@@ -487,8 +487,8 @@ export const saveLeg = async ({
         ? new Date(legDateResult.rows[0].first_leg_date)
         : new Date();
     await client.query(
-      `UPDATE public.invoice SET date = $2 WHERE m1key = $1`,
-      [m1key, firstLegDate]
+      `UPDATE public.invoice SET date = $2 WHERE m1key = $1 AND company_reg_num = $3`,
+      [m1key, firstLegDate, company_reg_num]
     );
 
     await client.query("COMMIT");
@@ -744,8 +744,8 @@ export const deleteLeg = async (legId, company_reg_num) => {
         ? new Date(legDateResult.rows[0].first_leg_date)
         : new Date();
     await client.query(
-      `UPDATE public.invoice SET date = $2 WHERE m1key = $1`,
-      [m1key, firstLegDate]
+      `UPDATE public.invoice SET date = $2 WHERE m1key = $1 AND company_reg_num = $3`,
+      [m1key, firstLegDate, company_reg_num]
     );
     await client.query("COMMIT");
     return { deletedLegId: legId, deletedRows: result.rowCount };
@@ -797,8 +797,8 @@ export const updateLegNumber = async (legId, legnumber, company_reg_num) => {
           ? new Date(legDateResult.rows[0].first_leg_date)
           : new Date();
       await client.query(
-        `UPDATE public.invoice SET date = $2 WHERE m1key = $1`,
-        [m1key, firstLegDate]
+        `UPDATE public.invoice SET date = $2 WHERE m1key = $1 AND company_reg_num = $3`,
+        [m1key, firstLegDate, company_reg_num]
       );
     }
     await client.query("COMMIT");
@@ -1086,10 +1086,10 @@ export const getDocuments = async (instructionId, company_reg_num) => {
 export const generateInvoice = async (instructionId, company_reg_num) => {
   const client = await pool.connect();
   try {
-    // Check if a record already exists for this instructionId
+    // Check if a record already exists for this instructionId — scoped to tenant
     const existingInvoiceResult = await client.query(
-      "SELECT ikey FROM invoice WHERE m1key = $1",
-      [instructionId]
+      "SELECT ikey FROM invoice WHERE m1key = $1 AND company_reg_num = $2",
+      [instructionId, company_reg_num]
     );
 
     // If a record exists, return early without creating a new invoice

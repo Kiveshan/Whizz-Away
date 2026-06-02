@@ -62,8 +62,8 @@ const getDocumentsByClientId = async (clientId, company_reg_num) => {
 
 const deleteDocument = async (documentId, s3, company_reg_num) => {
   const keyResult = await pool.query(
-    "SELECT s3key FROM documents WHERE document_id = $1",
-    [documentId]
+    "SELECT s3key FROM documents WHERE document_id = $1 AND company_reg_num = $2",
+    [documentId, company_reg_num]
   );
   if (keyResult.rows.length === 0) {
     return { success: false, message: "Document not found" };

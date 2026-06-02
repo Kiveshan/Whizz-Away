@@ -171,18 +171,19 @@ const getInvoiceDetails = async (id, company_reg_num) => {
         l.driverrate as leg_rate,
         l.date as leg_date,
         ROW_NUMBER() OVER (PARTITION BY c.containernum ORDER BY l.date DESC) as rn
-      FROM 
+      FROM
         public.container c
       INNER JOIN
         invoice i ON i.m1key = c.m1key
-      LEFT JOIN 
+      LEFT JOIN
         public.legs_m2 l ON c.containernum = l.containernumber AND c.m1key = l.m1key
       WHERE
         i.ikey = $1
+        AND i.company_reg_num = $2
       ORDER BY c.containerkey, l.date DESC
     `;
-    
-    const containerResult = await query(containerQuery, [id]);
+
+    const containerResult = await query(containerQuery, [id, company_reg_num]);
     
     // Process container data to get the most recent truck for each container and determine the correct rate
     const containerMap = new Map();
@@ -746,13 +747,14 @@ const getInstructionDetailsForPreview = async (instructionId, company_reg_num) =
           l.date as leg_date,
           ROW_NUMBER() OVER (PARTITION BY c.containernum ORDER BY l.date DESC) as rn
         FROM public.container c
-        LEFT JOIN public.legs_m2 l 
+        LEFT JOIN public.legs_m2 l
           ON c.containernum = l.containernumber AND c.m1key = l.m1key
         WHERE c.m1key = $1
+          AND c.company_reg_num = $2
         ORDER BY c.containerkey, l.date DESC
       `;
-      
-      const containerResult = await client.query(containerQuery, [instructionId]);
+
+      const containerResult = await client.query(containerQuery, [instructionId, company_reg_num]);
 
       // Get company details (same as regular invoice)
       const companyQuery = `

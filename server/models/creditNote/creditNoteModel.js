@@ -273,9 +273,9 @@ const createCreditNote = async (creditNoteData, company_reg_num) => {
     const m1Query = `
       SELECT total_cost, COALESCE(vat, 0) AS vat, COALESCE(paid_amount, 0) AS paid_amount
       FROM m1_controller
-      WHERE m1key = $1
+      WHERE m1key = $1 AND company_reg_num = $2
     `;
-    const m1Result = await client.query(m1Query, [m1key]);
+    const m1Result = await client.query(m1Query, [m1key, company_reg_num]);
     if (m1Result.rows.length === 0) {
       throw new Error("Instruction (m1_controller) not found for provided m1key");
     }
@@ -299,9 +299,9 @@ const createCreditNote = async (creditNoteData, company_reg_num) => {
       UPDATE m1_controller
       SET paid_amount = $1,
           payment_status = $2
-      WHERE m1key = $3
+      WHERE m1key = $3 AND company_reg_num = $4
     `;
-    await client.query(updateM1Query, [newPaid, status, m1key]);
+    await client.query(updateM1Query, [newPaid, status, m1key, company_reg_num]);
 
     await client.query("COMMIT");
 

@@ -138,7 +138,7 @@ const login = async (req, res, next) => {
         trial_ends_at,
       },
       secretKey,
-      { expiresIn: "2h" }
+      { expiresIn: "24h" }
     );
 
     req.session.user = {

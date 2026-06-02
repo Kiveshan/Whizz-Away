@@ -60,12 +60,12 @@ const getAllSubcontractors = async (options = {}, company_reg_num) => {
         GROUP BY subei_reg_num, companyname, location, contact_person, cellnum, email, status
       ),
       truck_counts AS (
-        SELECT 
+        SELECT
           subei_reg_num,
           COUNT(*) as truck_count,
           STRING_AGG(truckregnum, ', ' ORDER BY truckregnum) as truck_registrations
-        FROM m5_trucks 
-        WHERE is_subcontractor = true AND subei_reg_num IS NOT NULL
+        FROM m5_trucks
+        WHERE is_subcontractor = true AND subei_reg_num IS NOT NULL AND company_reg_num = $1
         GROUP BY subei_reg_num
       )
       SELECT 
@@ -110,22 +110,22 @@ const getSubcontractorById = async (id, company_reg_num) => {
 
     const mainRecord = mainResult.rows[0]
 
-    // Get all driver records for this company (same subei_reg_num)
+    // Get all driver records for this company (same subei_reg_num) — scoped to tenant
     const driversResult = await client.query(
-      `SELECT userid, name, surname, driverstatus 
-       FROM m5_employee 
-       WHERE subei_reg_num = $1 AND roleid = 6 
+      `SELECT userid, name, surname, driverstatus
+       FROM m5_employee
+       WHERE subei_reg_num = $1 AND roleid = 6 AND company_reg_num = $2
        ORDER BY userid`,
-      [mainRecord.subei_reg_num],
+      [mainRecord.subei_reg_num, company_reg_num],
     )
 
-    // Get all truck records for this company from m5_trucks
+    // Get all truck records for this company from m5_trucks — scoped to tenant
     const trucksResult = await client.query(
       `SELECT m5truckskey, truckregnum, trailersize, year, model, vin_num, truck_license_expiry
-       FROM m5_trucks 
-       WHERE subei_reg_num = $1 AND is_subcontractor = true 
+       FROM m5_trucks
+       WHERE subei_reg_num = $1 AND is_subcontractor = true AND company_reg_num = $2
        ORDER BY m5truckskey`,
-      [mainRecord.subei_reg_num],
+      [mainRecord.subei_reg_num, company_reg_num],
     )
 
     // Build the drivers array
@@ -348,10 +348,10 @@ const updateSubcontractor = async (id, subcontractorData, company_reg_num) => {
       return { success: false, message: "At least one driver is required" }
     }
 
-    // Get existing driver IDs for this company
+    // Get existing driver IDs for this company — scoped to tenant
     const existingDriversResult = await client.query(
-      "SELECT userid FROM m5_employee WHERE subei_reg_num = $1 AND roleid = 6",
-      [currentSubeiRegNum]
+      "SELECT userid FROM m5_employee WHERE subei_reg_num = $1 AND roleid = 6 AND company_reg_num = $2",
+      [currentSubeiRegNum, company_reg_num]
     )
     const existingDriverIds = existingDriversResult.rows.map(row => row.userid)
 
@@ -365,8 +365,8 @@ const updateSubcontractor = async (id, subcontractorData, company_reg_num) => {
       const idsToDelete = existingDriverIds.filter(id => !driverIdsToKeep.includes(id))
       if (idsToDelete.length > 0) {
         await client.query(
-          "DELETE FROM m5_employee WHERE userid = ANY($1) AND roleid = 6",
-          [idsToDelete]
+          "DELETE FROM m5_employee WHERE userid = ANY($1) AND roleid = 6 AND company_reg_num = $2",
+          [idsToDelete, company_reg_num]
         )
       }
     }
@@ -388,17 +388,17 @@ const updateSubcontractor = async (id, subcontractorData, company_reg_num) => {
       }
 
       await client.query(
-        `UPDATE m5_employee 
-         SET name = $1, surname = $2, cellnum = $3, email = $4, companyname = $5, location = $6, 
+        `UPDATE m5_employee
+         SET name = $1, surname = $2, cellnum = $3, email = $4, companyname = $5, location = $6,
              contact_person = $7, subei_reg_num = $8
-         WHERE userid = $9 AND roleid = 6
+         WHERE userid = $9 AND roleid = 6 AND company_reg_num = $10
          RETURNING *`,
-        [firstName, lastName, cellnum, email, companyname, location, contact_person, subei_reg_num, driver.userid]
+        [firstName, lastName, cellnum, email, companyname, location, contact_person, subei_reg_num, driver.userid, company_reg_num]
       )
-      
+
       const updatedResult = await client.query(
-        "SELECT * FROM m5_employee WHERE userid = $1",
-        [driver.userid]
+        "SELECT * FROM m5_employee WHERE userid = $1 AND company_reg_num = $2",
+        [driver.userid, company_reg_num]
       )
       updatedDrivers.push(updatedResult.rows[0])
     }
@@ -444,9 +444,10 @@ const updateSubcontractor = async (id, subcontractorData, company_reg_num) => {
 
     const allDrivers = [...updatedDrivers, ...createdDrivers]
 
-    // Delete all existing truck records for this company (trucks are always recreated)
-    await client.query("DELETE FROM m5_trucks WHERE subei_reg_num = $1 AND is_subcontractor = true", [
+    // Delete all existing truck records for this company (trucks are always recreated) — scoped to tenant
+    await client.query("DELETE FROM m5_trucks WHERE subei_reg_num = $1 AND is_subcontractor = true AND company_reg_num = $2", [
       currentSubeiRegNum,
+      company_reg_num,
     ])
 
     const createdTrucks = []

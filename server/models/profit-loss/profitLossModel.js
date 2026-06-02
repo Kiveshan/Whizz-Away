@@ -37,14 +37,15 @@ async function getTotalWagesForMonth(client, month, year, company_reg_num) {
       WHERE employeeid = $1
         AND EXTRACT(MONTH FROM employee_date) = $2
         AND EXTRACT(YEAR FROM employee_date) = $3
+        AND company_reg_num = $4
     `;
-    const storedRes = await client.query(storedQuery, [employeeId, monthNumber, year]);
+    const storedRes = await client.query(storedQuery, [employeeId, monthNumber, year, company_reg_num]);
     let totalPayable = 0;
 
     if (storedRes.rows.length > 0 && isPastMonth) {
       totalPayable = parseFloat(storedRes.rows[0].total_payable) || 0;
     } else {
-      totalPayable = await calculateTotalPayable(client, employeeId, month, year);
+      totalPayable = await calculateTotalPayable(client, employeeId, month, year, company_reg_num);
     }
 
     if (totalPayable > 0) {
@@ -55,51 +56,52 @@ async function getTotalWagesForMonth(client, month, year, company_reg_num) {
   return totalSum;
 }
 
-async function calculateTotalPayable(client, employeeId, month, year) {
+async function calculateTotalPayable(client, employeeId, month, year, company_reg_num) {
   const monthNames = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
   const monthIndex = monthNames.indexOf(month);
   if (monthIndex === -1) return 0;
   const monthNumber = monthIndex + 1;
   const lastDayOfMonth = new Date(parseInt(year), monthNumber, 0).toISOString().split('T')[0];
 
-  // Base Salary (historical or current)
+  // Base Salary (historical or current) — scoped to tenant
   let baseSalary = 0;
   const baseHist = await client.query(
-    `SELECT base FROM base_salary_history WHERE userid = $1 AND date <= $2 ORDER BY date DESC LIMIT 1`,
-    [employeeId, lastDayOfMonth]
+    `SELECT base FROM base_salary_history WHERE userid = $1 AND date <= $2 AND company_reg_num = $3 ORDER BY date DESC LIMIT 1`,
+    [employeeId, lastDayOfMonth, company_reg_num]
   );
   if (baseHist.rows.length > 0) {
     baseSalary = parseFloat(baseHist.rows[0].base) || 0;
   } else {
-    const curr = await client.query(`SELECT base_salary FROM m5_employee WHERE userid = $1`, [employeeId]);
+    const curr = await client.query(`SELECT base_salary FROM m5_employee WHERE userid = $1 AND company_reg_num = $2`, [employeeId, company_reg_num]);
     baseSalary = parseFloat(curr.rows[0]?.base_salary) || 0;
   }
 
-  // Legs earnings
+  // Legs earnings — scoped to tenant
   const legsRes = await client.query(
     `SELECT COALESCE(SUM(l.driverrate), 0) as total
      FROM legs_m2 l
      JOIN m1_controller i ON l.m1key = i.m1key
      WHERE l.driverid = $1
        AND EXTRACT(MONTH FROM l.date) = $2
-       AND EXTRACT(YEAR FROM l.date) = $3`,
-    [employeeId, monthNumber, year]
+       AND EXTRACT(YEAR FROM l.date) = $3
+       AND l.company_reg_num = $4`,
+    [employeeId, monthNumber, year, company_reg_num]
   );
   const legsAmount = parseFloat(legsRes.rows[0].total) || 0;
 
   const totalEarnings = baseSalary + legsAmount;
   if (totalEarnings === 0) return 0;
 
-  // Loan deduction
+  // Loan deduction — scoped to tenant
   let loan = 0;
   const loanHist = await client.query(
-    `SELECT deduction_loan FROM employee_deduction_history WHERE employeeid = $1 AND effective_date <= $2 ORDER BY effective_date DESC LIMIT 1`,
-    [employeeId, lastDayOfMonth]
+    `SELECT deduction_loan FROM employee_deduction_history WHERE employeeid = $1 AND effective_date <= $2 AND company_reg_num = $3 ORDER BY effective_date DESC LIMIT 1`,
+    [employeeId, lastDayOfMonth, company_reg_num]
   );
   if (loanHist.rows.length > 0) {
     loan = parseFloat(loanHist.rows[0].deduction_loan) || 0;
   } else {
-    const currLoan = await client.query(`SELECT deduction_loan FROM m5_employee WHERE userid = $1`, [employeeId]);
+    const currLoan = await client.query(`SELECT deduction_loan FROM m5_employee WHERE userid = $1 AND company_reg_num = $2`, [employeeId, company_reg_num]);
     loan = parseFloat(currLoan.rows[0]?.deduction_loan) || 0;
   }
 
@@ -193,6 +195,7 @@ const getProfitLossData = async (month, year, company_reg_num) => {
        WHERE e.roleid = 6
          AND TRIM(TO_CHAR(l.date, 'Month')) = $1
          AND EXTRACT(YEAR FROM l.date)::text = $2
+         AND l.company_reg_num = $3
          AND e.company_reg_num = $3`,
       [month, year, company_reg_num]
     )).rows[0].total || 0);
@@ -245,18 +248,19 @@ const getProfitLossData = async (month, year, company_reg_num) => {
   }
 };
 
-const getCompanyDetails = async () => {
+const getCompanyDetails = async (company_reg_num) => {
   const companyQuery = `
     SELECT companyname
     FROM usertable
     WHERE status = 'active'
+      AND company_reg_num = $1
     LIMIT 1
   `;
 
   let client;
   try {
     client = await pool.connect();
-    const result = await client.query(companyQuery);
+    const result = await client.query(companyQuery, [company_reg_num]);
     return result.rows[0]?.companyname || "Company";
   } catch (error) {
     console.error("Error fetching company name:", error);
