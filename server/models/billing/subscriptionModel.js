@@ -119,7 +119,7 @@ const getCurrentUsage = async (company_reg_num) => {
   try {
     const [usersResult, trucksResult] = await Promise.all([
       client.query(
-        `SELECT COUNT(*) AS count FROM m5_employee WHERE company_reg_num = $1 AND status = true`,
+        `SELECT COUNT(*) AS count FROM m5_employee WHERE company_reg_num = $1 AND status = true AND roleid != 5 AND roleid != 6`,
         [company_reg_num]
       ),
       client.query(

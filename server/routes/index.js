@@ -34,6 +34,7 @@ import creditNoteRoutes from "./creditNote/creditNoteRoutes.js";
 import profitLossRoutes from "./profit-loss/profitLossRoutes.js";
 import vatReconRoutes from "./vat-recon/vat-reconRoutes.js";
 import landingRoutes from "./landing/landingRoutes.js";
+import usageRoutes from "./billing/usageRoutes.js";
 
 const router = express.Router();
 
@@ -72,5 +73,6 @@ router.use(addonRoutes);
 router.use(profitLossRoutes);
 router.use(vatReconRoutes);
 router.use(landingRoutes);
+router.use(usageRoutes);
 
 export default router;

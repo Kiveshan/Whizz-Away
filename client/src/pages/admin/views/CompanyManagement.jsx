@@ -21,6 +21,9 @@ function CompanyManagement() {
   const [modalSetupFeePaid, setModalSetupFeePaid] = useState(false);
   const [modalNotes, setModalNotes] = useState("");
   const [suspendReason, setSuspendReason] = useState("");
+  const [showLimitsModal, setShowLimitsModal] = useState(false);
+  const [limitsUsersOverride, setLimitsUsersOverride] = useState("");
+  const [limitsTrucksOverride, setLimitsTrucksOverride] = useState("");
 
   useEffect(() => {
     fetchCompanies();
@@ -112,6 +115,29 @@ function CompanyManagement() {
     setSelectedCompany(company);
     setSuspendReason("");
     setShowSuspendModal(true);
+  };
+
+  const openLimitsModal = (company) => {
+    setSelectedCompany(company);
+    setLimitsUsersOverride(company.max_users_override ?? "");
+    setLimitsTrucksOverride(company.max_trucks_override ?? "");
+    setShowLimitsModal(true);
+  };
+
+  const handleUpdateLimits = async () => {
+    try {
+      await api.put(
+        `/api/admin/companies/${encodeURIComponent(selectedCompany.company_reg_num)}/limits`,
+        {
+          max_users_override:  limitsUsersOverride === "" ? null : Number(limitsUsersOverride),
+          max_trucks_override: limitsTrucksOverride === "" ? null : Number(limitsTrucksOverride),
+        }
+      );
+      fetchCompanies();
+      setShowLimitsModal(false);
+    } catch (err) {
+      setError(err.response?.data?.error || err.message);
+    }
   };
 
   if (loading) return <div className="loading">Loading companies...</div>;
@@ -209,6 +235,13 @@ function CompanyManagement() {
                         title="Manage Plan"
                       >
                         Plan
+                      </button>
+                      <button
+                        className="limits-button"
+                        onClick={() => openLimitsModal(company)}
+                        title="Edit Limits"
+                      >
+                        Limits
                       </button>
                       {company.subscription_status === "suspended" ? (
                         <button
@@ -350,6 +383,63 @@ function CompanyManagement() {
           </div>
         );
       })()}
+
+      {/* Limits Modal */}
+      {showLimitsModal && selectedCompany && (
+        <div className="modal-overlay">
+          <div className="modal-content">
+            <div className="modal-header">
+              <h3>Edit Limits</h3>
+            </div>
+            <div className="modal-body">
+              <div className="modal-company-info">
+                <span className="modal-company-name">{selectedCompany.companyname}</span>
+                <span className={`plan-badge ${selectedCompany.subscription_tier || "none"}`}>
+                  {selectedCompany.subscription_tier || "None"}
+                </span>
+              </div>
+
+              <div className="form-group">
+                <label>Max Users</label>
+                <input
+                  type="number"
+                  min="1"
+                  max="9999"
+                  value={limitsUsersOverride}
+                  onChange={(e) => setLimitsUsersOverride(e.target.value)}
+                  placeholder={`Plan default: ${selectedCompany.plan_max_users ?? "—"}`}
+                />
+                <span style={{ fontSize: 11, color: "#94a3b8", marginTop: 4, display: "block" }}>
+                  Leave blank to use the plan default ({selectedCompany.plan_max_users ?? "—"})
+                </span>
+              </div>
+
+              <div className="form-group">
+                <label>Max Trucks</label>
+                <input
+                  type="number"
+                  min="1"
+                  max="9999"
+                  value={limitsTrucksOverride}
+                  onChange={(e) => setLimitsTrucksOverride(e.target.value)}
+                  placeholder={`Plan default: ${selectedCompany.plan_max_trucks ?? "—"}`}
+                />
+                <span style={{ fontSize: 11, color: "#94a3b8", marginTop: 4, display: "block" }}>
+                  Leave blank to use the plan default ({selectedCompany.plan_max_trucks ?? "—"})
+                </span>
+              </div>
+            </div>
+            <div className="modal-actions">
+              <button className="cancel-button" onClick={() => setShowLimitsModal(false)}>
+                Cancel
+              </button>
+              <button className="confirm-button" onClick={handleUpdateLimits}>
+                Save Limits
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Suspend Modal */}
       {showSuspendModal && selectedCompany && (

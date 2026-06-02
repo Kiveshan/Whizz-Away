@@ -240,6 +240,7 @@
 }
 
 .plan-button,
+.limits-button,
 .suspend-button,
 .reactivate-button,
 .trial-button {
@@ -258,6 +259,15 @@
 
 .plan-button:hover {
   background-color: #357abd;
+}
+
+.limits-button {
+  background-color: #7c3aed;
+  color: white;
+}
+
+.limits-button:hover {
+  background-color: #6d28d9;
 }
 
 .suspend-button {

@@ -29,9 +29,14 @@ const listCompanies = async (req, res) => {
           u.plan_approved_at,
           u.plan_notes,
           u.dateofreg,
-          (SELECT COUNT(*) FROM m5_employee e WHERE e.company_reg_num = u.company_reg_num AND e.status = true) AS active_user_count,
+          u.max_users_override,
+          u.max_trucks_override,
+          sp.max_users  AS plan_max_users,
+          sp.max_trucks AS plan_max_trucks,
+          (SELECT COUNT(*) FROM m5_employee e WHERE e.company_reg_num = u.company_reg_num AND e.status = true AND e.roleid != 5 AND e.roleid != 6) AS active_user_count,
           (SELECT COUNT(*) FROM m5_trucks  t WHERE t.company_reg_num = u.company_reg_num AND t.status = true) AS active_truck_count
         FROM usertable u
+        LEFT JOIN subscription_plans sp ON sp.plan_key = u.subscription_tier
         WHERE u.roleid = 1
         ORDER BY u.companyname ASC
       `);
@@ -56,8 +61,11 @@ const getCompanyProfile = async (req, res) => {
         `SELECT u.company_reg_num, u.companyname, u.email, u.status,
                 u.subscription_tier, u.subscription_status, u.trial_ends_at,
                 u.setup_fee_paid, u.monthly_billing_anchor,
-                u.plan_approved_by, u.plan_approved_at, u.plan_notes, u.dateofreg
+                u.plan_approved_by, u.plan_approved_at, u.plan_notes, u.dateofreg,
+                u.max_users_override, u.max_trucks_override,
+                sp.max_users AS plan_max_users, sp.max_trucks AS plan_max_trucks
          FROM usertable u
+         LEFT JOIN subscription_plans sp ON sp.plan_key = u.subscription_tier
          WHERE u.company_reg_num = $1 AND u.roleid = 1
          LIMIT 1`,
         [company_reg_num]
@@ -407,6 +415,79 @@ const startTrial = async (req, res) => {
   }
 };
 
+// PUT /api/admin/companies/:company_reg_num/limits
+// Set per-company user/truck overrides. Pass null to remove an override and fall back to plan default.
+const updateLimits = async (req, res) => {
+  const { company_reg_num } = req.params;
+  let { max_users_override, max_trucks_override } = req.body;
+  const adminEmail = req.user.email;
+
+  // Coerce empty string to null; validate positive integers
+  if (max_users_override === "" || max_users_override === undefined) max_users_override = null;
+  if (max_trucks_override === "" || max_trucks_override === undefined) max_trucks_override = null;
+
+  if (max_users_override !== null) {
+    const v = parseInt(max_users_override, 10);
+    if (isNaN(v) || v < 1 || v > 9999) {
+      return res.status(400).json({ error: "max_users_override must be between 1 and 9999." });
+    }
+    max_users_override = v;
+  }
+  if (max_trucks_override !== null) {
+    const v = parseInt(max_trucks_override, 10);
+    if (isNaN(v) || v < 1 || v > 9999) {
+      return res.status(400).json({ error: "max_trucks_override must be between 1 and 9999." });
+    }
+    max_trucks_override = v;
+  }
+
+  const client = await pool.connect();
+  try {
+    await client.query("BEGIN");
+
+    const check = await client.query(
+      `SELECT max_users_override, max_trucks_override
+       FROM usertable WHERE company_reg_num = $1 AND roleid = 1 LIMIT 1`,
+      [company_reg_num]
+    );
+    if (!check.rows[0]) {
+      await client.query("ROLLBACK");
+      return res.status(404).json({ error: "Company not found." });
+    }
+
+    const old = check.rows[0];
+
+    await client.query(
+      `UPDATE usertable
+       SET max_users_override = $2, max_trucks_override = $3
+       WHERE company_reg_num = $1`,
+      [company_reg_num, max_users_override, max_trucks_override]
+    );
+
+    await recordBillingEvent(client, {
+      company_reg_num,
+      event_type:   "limits_updated",
+      old_value:    `users:${old.max_users_override ?? "plan"},trucks:${old.max_trucks_override ?? "plan"}`,
+      new_value:    `users:${max_users_override ?? "plan"},trucks:${max_trucks_override ?? "plan"}`,
+      performed_by: adminEmail,
+    });
+
+    await client.query("COMMIT");
+    return res.json({
+      success:             true,
+      company_reg_num,
+      max_users_override,
+      max_trucks_override,
+    });
+  } catch (err) {
+    await client.query("ROLLBACK");
+    console.error("updateLimits error:", err);
+    return res.status(500).json({ error: "Failed to update limits." });
+  } finally {
+    client.release();
+  }
+};
+
 // GET /api/admin/billing-events
 // Paginated log of all billing events across all companies.
 const listBillingEvents = async (req, res) => {
@@ -443,4 +524,5 @@ export {
   startTrial,
   listBillingEvents,
   listPlans,
+  updateLimits,
 };

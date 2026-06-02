@@ -182,13 +182,15 @@ const checkUsageLimits = async (req, res, next) => {
     try {
       const [planResult, countResult] = await Promise.all([
         client.query(
-          `SELECT sp.max_users, sp.overage_user FROM subscription_plans sp
+          `SELECT COALESCE(u.max_users_override, sp.max_users) AS max_users,
+                  sp.overage_user
+           FROM subscription_plans sp
            JOIN usertable u ON u.subscription_tier = sp.plan_key
            WHERE u.company_reg_num = $1 AND u.roleid = 1 LIMIT 1`,
           [company_reg_num]
         ),
         client.query(
-          `SELECT COUNT(*) FROM m5_employee WHERE company_reg_num = $1 AND status = true`,
+          `SELECT COUNT(*) FROM m5_employee WHERE company_reg_num = $1 AND status = true AND roleid != 5 AND roleid != 6`,
           [company_reg_num]
         ),
       ]);
@@ -230,7 +232,9 @@ const checkTruckUsageLimits = async (req, res, next) => {
     try {
       const [planResult, countResult] = await Promise.all([
         client.query(
-          `SELECT sp.max_trucks, sp.overage_truck FROM subscription_plans sp
+          `SELECT COALESCE(u.max_trucks_override, sp.max_trucks) AS max_trucks,
+                  sp.overage_truck
+           FROM subscription_plans sp
            JOIN usertable u ON u.subscription_tier = sp.plan_key
            WHERE u.company_reg_num = $1 AND u.roleid = 1 LIMIT 1`,
           [company_reg_num]

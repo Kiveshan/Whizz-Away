@@ -1,12 +1,13 @@
 "use client"
 
-import { useEffect } from "react"
+import { useEffect, useState } from "react"
 import { useNavigate } from "react-router-dom"
 import "../css/Manage.css"
 import "../css/pagination.css"
 import "../css/additional-styles.css"
 import { useAuth } from "../../../context/AuthContext"
 import UsageBadge from "../../../components/billing/UsageBadge"
+import axiosApi from "../../../api.js"
 
 // Hooks
 import { useManageState } from "../hooks/useManageState"
@@ -73,6 +74,10 @@ const Manage = () => {
   const usage = getUsage()
   const allowedRoleIds = getAllowedRoleIds(usage.tier)
 
+  // Effective limits — fetched from server so per-company overrides are respected.
+  // Falls back to plan defaults from getUsage() while loading or on error.
+  const [effectiveLimits, setEffectiveLimits] = useState(null)
+
   const { state, actions } = useManageState()
   const api = useApi(state, actions)
   const { notifications: truckNotifications, refreshNotifications: refreshTruckNotifications } = useTruckNotifications()
@@ -82,6 +87,9 @@ const Manage = () => {
   // Fetch data on component mount
   useEffect(() => {
     api.fetchAllData()
+    axiosApi.get("/api/subscription/usage")
+      .then((res) => setEffectiveLimits(res.data))
+      .catch((err) => console.error("Failed to fetch subscription usage:", err))
   }, [])
 
   // Auto-hide alerts after 5 seconds
@@ -172,12 +180,13 @@ const Manage = () => {
 
   const handleEmployeeAdd = () => {
     const currentCount = state.pagination.employees.activeItems ?? state.pagination.employees.totalItems
+    const maxUsers = effectiveLimits?.max_users ?? usage.maxUsers
     actions.resetFormData("Employee")
     actions.setEditing("Employee", null)
     actions.showForm("showEmployeeForm")
-    if (usage.maxUsers < 999 && currentCount >= usage.maxUsers) {
+    if (maxUsers < 999 && currentCount >= maxUsers) {
       actions.showAlert(
-        `⚠️ You have reached your plan limit of ${usage.maxUsers} users (${currentCount} active). Adding this employee will incur an overage charge of R300/month.`
+        `⚠️ You have reached your limit of ${maxUsers} users (${currentCount} active). Adding this employee will incur an overage charge of R300/month.`
       )
     }
   }
@@ -220,12 +229,13 @@ const Manage = () => {
 
   const handleTruckAdd = () => {
     const currentCount = state.pagination.trucks.activeItems ?? state.pagination.trucks.totalItems
+    const maxTrucks = effectiveLimits?.max_trucks ?? usage.maxTrucks
     actions.resetFormData("Truck")
     actions.setEditing("Truck", null)
     actions.showForm("showTruckForm")
-    if (usage.maxTrucks < 999 && currentCount >= usage.maxTrucks) {
+    if (maxTrucks < 999 && currentCount >= maxTrucks) {
       actions.showAlert(
-        `⚠️ You have reached your plan limit of ${usage.maxTrucks} trucks (${currentCount} active). Adding this truck will incur an overage charge of R250/month.`
+        `⚠️ You have reached your limit of ${maxTrucks} trucks (${currentCount} active). Adding this truck will incur an overage charge of R250/month.`
       )
     }
   }
@@ -376,13 +386,34 @@ const Manage = () => {
       {/* Alert */}
       {state.showAlert && <CustomAlert message={state.alertMessage} onClose={actions.hideAlert} />}
 
-      {/* Usage counters (shown when the plan has caps) */}
-      {usage.maxUsers < 999 && (
-        <div className="manage-usage-row">
-          <UsageBadge label="Users"  used={state.pagination.employees.activeItems ?? state.pagination.employees.totalItems} max={usage.maxUsers} />
-          <UsageBadge label="Trucks" used={state.pagination.trucks.activeItems ?? state.pagination.trucks.totalItems}    max={usage.maxTrucks} />
-        </div>
-      )}
+      {/* Usage counters — shown whenever either resource has a cap.
+          Limits come from the server (respects per-company overrides set by super admin).
+          Drivers are not counted as user seats. */}
+      {(() => {
+        const maxUsers  = effectiveLimits?.max_users  ?? usage.maxUsers
+        const maxTrucks = effectiveLimits?.max_trucks ?? usage.maxTrucks
+        if (maxUsers >= 999 && maxTrucks >= 999) return null
+        const userLabel  = effectiveLimits?.max_users_override  != null ? "Users (custom)"  : "Users"
+        const truckLabel = effectiveLimits?.max_trucks_override != null ? "Trucks (custom)" : "Trucks"
+        return (
+          <div className="manage-usage-row">
+            {maxUsers < 999 && (
+              <UsageBadge
+                label={userLabel}
+                used={state.pagination.employees.activeItems ?? state.pagination.employees.totalItems ?? 0}
+                max={maxUsers}
+              />
+            )}
+            {maxTrucks < 999 && (
+              <UsageBadge
+                label={truckLabel}
+                used={state.pagination.trucks.activeItems ?? state.pagination.trucks.totalItems ?? 0}
+                max={maxTrucks}
+              />
+            )}
+          </div>
+        )
+      })()}
 
       {/* Tab Navigation */}
       <div className="manage-button-row">

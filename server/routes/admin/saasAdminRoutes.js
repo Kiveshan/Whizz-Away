@@ -9,6 +9,7 @@ import {
   startTrial,
   listBillingEvents,
   listPlans,
+  updateLimits,
 } from "../../controllers/admin/saasAdminController.js";
 import { verifyToken } from "../../middleware/auth.js";
 import { isSuperAdmin } from "../../middleware/planAuthorization.js";
@@ -25,6 +26,7 @@ router.put("/api/admin/companies/:company_reg_num/upgrade-plan",          ...adm
 router.put("/api/admin/companies/:company_reg_num/suspend",               ...adminGuard, suspendCompany);
 router.put("/api/admin/companies/:company_reg_num/reactivate",            ...adminGuard, reactivateCompany);
 router.post("/api/admin/companies/:company_reg_num/trial",                ...adminGuard, startTrial);
+router.put("/api/admin/companies/:company_reg_num/limits",                ...adminGuard, updateLimits);
 router.get("/api/admin/billing-events",                                   ...adminGuard, listBillingEvents);
 router.get("/api/admin/plans",                                            ...adminGuard, listPlans);
 

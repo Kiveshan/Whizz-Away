@@ -189,7 +189,7 @@ CREATE TABLE IF NOT EXISTS public.expense_types
 (
     id serial NOT NULL,
     expense text COLLATE pg_catalog."default" NOT NULL,
-    company_reg_num integer,
+    company_reg_num character varying(20) COLLATE pg_catalog."default" NOT NULL,
     CONSTRAINT expense_types_pkey PRIMARY KEY (id)
 );
 
@@ -209,7 +209,7 @@ CREATE TABLE IF NOT EXISTS public.expenses_m2
     orderno character varying COLLATE pg_catalog."default",
     company_reg_num character varying(20) COLLATE pg_catalog."default" NOT NULL,
     CONSTRAINT expenses_m2_pkey PRIMARY KEY (ekey),
-    CONSTRAINT expenses_m2_orderno_unique UNIQUE (orderno)
+    CONSTRAINT expenses_m2_orderno_company_unique UNIQUE (orderno, company_reg_num)
 );
 
 CREATE TABLE IF NOT EXISTS public.invoice
@@ -629,6 +629,8 @@ CREATE TABLE IF NOT EXISTS public.usertable
     plan_notes text COLLATE pg_catalog."default",
     created_at timestamp without time zone NOT NULL DEFAULT now(),
     updated_at timestamp without time zone NOT NULL DEFAULT now(),
+    max_users_override smallint,
+    max_trucks_override smallint,
     CONSTRAINT usertable_pkey PRIMARY KEY (userid),
     CONSTRAINT usertable_email_key UNIQUE (email)
 );

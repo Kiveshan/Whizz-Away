@@ -103,9 +103,10 @@ const getAllEmployees = async (options = {}, company_reg_num) => {
     const countResult = await client.query(countQuery, queryParams)
     const totalCount = Number.parseInt(countResult.rows[0].count)
 
-    // Active-only count for usage billing (ignores current search/status filter)
+    // Active-only count for usage billing (ignores current search/status filter).
+    // Drivers (roleid 5) are excluded — they are billed separately and do not consume a user seat.
     const activeCountResult = await client.query(
-      `SELECT COUNT(*) FROM m5_employee e JOIN roles r ON e.roleid = r.roleid WHERE e.roleid != 6 AND e.status = true AND e.company_reg_num = $1`,
+      `SELECT COUNT(*) FROM m5_employee e WHERE e.roleid != 5 AND e.roleid != 6 AND e.status = true AND e.company_reg_num = $1`,
       [company_reg_num]
     )
     const activeCount = Number.parseInt(activeCountResult.rows[0].count)
