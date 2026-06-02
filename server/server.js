@@ -28,8 +28,18 @@ const app = express();
 const PORT = process.env.PORT || 5000;
 
 // Enhanced CORS configuration
+// ALLOWED_ORIGINS env var: comma-separated list of allowed origins
+// e.g. "https://app.whizzaway.co.za,https://www.whizzaway.co.za"
 app.use((req, res, next) => {
-  const allowedOrigins = ["http://localhost:3000", "http://127.0.0.1:3000"];
+  const envOrigins = process.env.ALLOWED_ORIGINS
+    ? process.env.ALLOWED_ORIGINS.split(",").map((o) => o.trim())
+    : [];
+  const allowedOrigins = [
+    "http://localhost:3000",
+    "http://127.0.0.1:3000",
+    "https://whizz-away.co.za",
+    ...envOrigins,
+  ];
   const origin = req.headers.origin;
 
   if (allowedOrigins.includes(origin)) {
