@@ -21,9 +21,9 @@ const createPayment = async (
     // Wrap everything in a transaction so payment and allocations stay in sync
     await client.query("BEGIN");
 
-    // Fetch client name
-    const clientQuery = `SELECT client FROM m5_client WHERE m5clientkey = $1`;
-    const clientResult = await client.query(clientQuery, [clientId]);
+    // Fetch client name — scoped to this tenant
+    const clientQuery = `SELECT client FROM m5_client WHERE m5clientkey = $1 AND company_reg_num = $2`;
+    const clientResult = await client.query(clientQuery, [clientId, company_reg_num]);
     if (clientResult.rows.length === 0) {
       throw new Error("Client not found");
     }
@@ -54,7 +54,7 @@ const createPayment = async (
       if (type === "Invoice") {
         // Load invoice + controller to compute VAT-inclusive total and amount due
         const invoiceQuery = `
-          SELECT 
+          SELECT
             i.ikey AS invoice_id,
             i.invoice_num,
             i.date,
@@ -64,9 +64,9 @@ const createPayment = async (
             COALESCE(m.paid_amount, 0) AS paid_amount
           FROM invoice i
           JOIN m1_controller m ON i.m1key = m.m1key
-          WHERE i.ikey = $1 AND i.clientid = $2
+          WHERE i.ikey = $1 AND i.clientid = $2 AND i.company_reg_num = $3
         `;
-        const invoiceResult = await client.query(invoiceQuery, [id, clientId]);
+        const invoiceResult = await client.query(invoiceQuery, [id, clientId, company_reg_num]);
         if (invoiceResult.rows.length === 0) {
           throw new Error("Invoice not found for this client");
         }
@@ -102,15 +102,15 @@ const createPayment = async (
       } else if (type === "Add-on") {
         // Load add-on to compute amount due
         const addonQuery = `
-          SELECT 
+          SELECT
             addon_id,
             invoice_number,
             amount,
             COALESCE(paid_amount, 0) AS paid_amount
           FROM add_ons
-          WHERE addon_id = $1 AND client_id = $2
+          WHERE addon_id = $1 AND client_id = $2 AND company_reg_num = $3
         `;
-        const addonResult = await client.query(addonQuery, [id, clientId]);
+        const addonResult = await client.query(addonQuery, [id, clientId, company_reg_num]);
         if (addonResult.rows.length === 0) {
           throw new Error("Add-on not found for this client");
         }
@@ -254,12 +254,14 @@ const createPayment = async (
           WHERE i.m1key = m1_controller.m1key
             AND i.ikey = $3
             AND i.clientid = $4
+            AND i.company_reg_num = $5
         `;
         await client.query(updateInvoiceQuery, [
           newPaid,
           status,
           item.invoice_id,
           clientId,
+          company_reg_num,
         ]);
       } else if (item.type === "Add-on") {
         const newPaid = item.current_paid + item.amount_to_pay;
@@ -268,13 +270,14 @@ const createPayment = async (
         const updateAddonQuery = `
           UPDATE add_ons
           SET paid_amount = $1, status = $2
-          WHERE addon_id = $3 AND client_id = $4
+          WHERE addon_id = $3 AND client_id = $4 AND company_reg_num = $5
         `;
         await client.query(updateAddonQuery, [
           newPaid,
           status,
           item.addon_id,
           clientId,
+          company_reg_num,
         ]);
       }
     }
@@ -506,7 +509,7 @@ const deletePayment = async (clientId, paymentId, company_reg_num) => {
       if (type === "Invoice") {
         // Load invoice + controller to recompute totals and current paid
         const invoiceQuery = `
-          SELECT 
+          SELECT
             i.ikey AS invoice_id,
             m.m1key,
             m.total_cost,
@@ -514,9 +517,9 @@ const deletePayment = async (clientId, paymentId, company_reg_num) => {
             COALESCE(m.paid_amount, 0) AS paid_amount
           FROM invoice i
           JOIN m1_controller m ON i.m1key = m.m1key
-          WHERE i.ikey = $1 AND i.clientid = $2
+          WHERE i.ikey = $1 AND i.clientid = $2 AND i.company_reg_num = $3
         `;
-        const invoiceResult = await client.query(invoiceQuery, [id, clientId]);
+        const invoiceResult = await client.query(invoiceQuery, [id, clientId, company_reg_num]);
         if (invoiceResult.rows.length === 0) {
           // If the invoice is gone, skip reversing for this line
           continue;
@@ -549,24 +552,26 @@ const deletePayment = async (clientId, paymentId, company_reg_num) => {
           WHERE i.m1key = m1_controller.m1key
             AND i.ikey = $3
             AND i.clientid = $4
+            AND i.company_reg_num = $5
         `;
         await client.query(updateInvoiceQuery, [
           newPaid,
           status,
           row.invoice_id,
           clientId,
+          company_reg_num,
         ]);
       } else if (type === "Add-on") {
         // Load add-on to recompute totals and current paid
         const addonQuery = `
-          SELECT 
+          SELECT
             addon_id,
             amount,
             COALESCE(paid_amount, 0) AS paid_amount
           FROM add_ons
-          WHERE addon_id = $1 AND client_id = $2
+          WHERE addon_id = $1 AND client_id = $2 AND company_reg_num = $3
         `;
-        const addonResult = await client.query(addonQuery, [id, clientId]);
+        const addonResult = await client.query(addonQuery, [id, clientId, company_reg_num]);
         if (addonResult.rows.length === 0) {
           continue;
         }
@@ -590,13 +595,14 @@ const deletePayment = async (clientId, paymentId, company_reg_num) => {
         const updateAddonQuery = `
           UPDATE add_ons
           SET paid_amount = $1, status = $2
-          WHERE addon_id = $3 AND client_id = $4
+          WHERE addon_id = $3 AND client_id = $4 AND company_reg_num = $5
         `;
         await client.query(updateAddonQuery, [
           newPaid,
           status,
           row.addon_id,
           clientId,
+          company_reg_num,
         ]);
       }
     }
