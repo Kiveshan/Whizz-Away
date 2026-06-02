@@ -5,7 +5,7 @@ import {
   getCompanyInfo,
   getSubcontractorInfo,
 } from "../../models/subcontractors/subContractorModel.js";
-import { generateCurrentMonthStatements } from "../../utils/subcontractorStatementGeneration.js";
+import { generateCurrentMonthStatements, generateStatementsForMonth } from "../../utils/subcontractorStatementGeneration.js";
 import { verifyToken } from "../../middleware/auth.js";
 
 const authenticateScheduledJob = (req, res, next) => {
@@ -159,6 +159,53 @@ const generateSubcontractorStatementHandler = async (req, res) => {
   }
 };
 
+const backfillSubcontractorStatementsHandler = async (req, res) => {
+  try {
+    const { fromYear, fromMonth, toYear, toMonth, subei_reg_num } = req.body;
+
+    if (!fromYear || !fromMonth || !toYear || !toMonth) {
+      return res.status(400).json({
+        success: false,
+        message: "fromYear, fromMonth, toYear and toMonth are all required",
+      });
+    }
+
+    const results = [];
+    let y = parseInt(fromYear);
+    let m = parseInt(fromMonth);
+    const endYear = parseInt(toYear);
+    const endMonth = parseInt(toMonth);
+
+    while (y < endYear || (y === endYear && m <= endMonth)) {
+      const label = `${y}-${String(m).padStart(2, "0")}`;
+      try {
+        const result = await generateStatementsForMonth(y, m, subei_reg_num || null);
+        results.push({ month: label, success: true, stats: result.stats });
+        console.log(`Backfill ${label}: ${result.message}`);
+      } catch (err) {
+        results.push({ month: label, success: false, error: err.message });
+        console.error(`Backfill ${label} failed:`, err.message);
+      }
+      m++;
+      if (m > 12) { m = 1; y++; }
+    }
+
+    const failed = results.filter((r) => !r.success);
+    res.json({
+      success: true,
+      message: `Backfill complete. ${results.length - failed.length}/${results.length} months succeeded.`,
+      results,
+    });
+  } catch (error) {
+    console.error("Error in backfill handler:", error);
+    res.status(500).json({
+      success: false,
+      message: "Internal server error during backfill",
+      error: process.env.NODE_ENV === "production" ? "Internal server error" : error.message,
+    });
+  }
+};
+
 export {
   getAllSubContractorsHandler,
   getSubContractorStatementsHandler,
@@ -166,5 +213,6 @@ export {
   getCompanyInfoHandler,
   getSubcontractorInfoHandler,
   generateSubcontractorStatementHandler,
+  backfillSubcontractorStatementsHandler,
   authenticateScheduledJob,
 };

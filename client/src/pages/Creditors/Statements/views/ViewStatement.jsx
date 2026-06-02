@@ -75,7 +75,7 @@ const ViewStatement = () => {
   const purchaseOrders = poData.purchaseOrders || [];
   const supplierName = poData.supplier_name || "Unknown Supplier";
   const totalAmount = purchaseOrders.reduce(
-    (sum, po) => sum + (po.total || 0) + (po.vat || 0),
+    (sum, po) => sum + (po.total || 0),
     0
   );
 
@@ -177,7 +177,7 @@ const formatAmount = (amount) => {
           po.invoice_number || "N/A",
           po.truckregnum || "N/A",
           po.description || "N/A",
-          Number((po.total || 0) + (po.vat || 0)),
+          Number(po.total || 0),
         ];
 
         row.getCell(8).numFmt = '"R"#,##0.00';
@@ -284,7 +284,7 @@ const formatAmount = (amount) => {
                       <td>{po.invoice_number || "N/A"}</td>
                       <td>{po.truckregnum || "N/A"}</td>
                       <td>{po.description || "N/A"}</td>
-                      <td>{formatAmount((po.total || 0) + (po.vat || 0))}</td>
+                      <td>{formatAmount(po.total || 0)}</td>
                     </tr>
                   ))
                 )}
