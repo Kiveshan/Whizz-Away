@@ -52,13 +52,11 @@ const generateCurrentMonthStatements = async (specificSubeiRegNum = null) => {
       WHERE 
         e.subei_reg_num IS NOT NULL 
         AND e.subei_reg_num != ''
-        AND l.date >= $1 
+        AND l.date >= $1
         AND l.date <= $2
-        AND l.driverrate IS NOT NULL
-        AND l.driverrate > 0
     `;
 
-    
+
     const queryParams = [formattedLegsStartDate, formattedLegsEndDate];
 
     // Add specific subcontractor filter if provided
@@ -203,10 +201,8 @@ const generateStatementsForMonth = async (
       WHERE 
         e.subei_reg_num IS NOT NULL 
         AND e.subei_reg_num != ''
-        AND l.date >= $1 
+        AND l.date >= $1
         AND l.date <= $2
-        AND l.driverrate IS NOT NULL
-        AND l.driverrate > 0
     `;
 
     const queryParams = [formattedLegsStartDate, formattedLegsEndDate];
