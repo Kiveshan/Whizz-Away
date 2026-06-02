@@ -321,6 +321,7 @@ export const getDriverRatesHandler = async (req, res) => {
       startingpoint,
       destination,
       containerType,
+      null,
       req.user.company_reg_num
     );
     if (!rateData) {

@@ -468,7 +468,7 @@ export const updateContainersHandler = async (req, res) => {
       ),
     )
 
-    const result = await updateContainersByInstructionId(instructionId, containerData)
+    const result = await updateContainersByInstructionId(instructionId, containerData, false, null, null, null, true, req.user.company_reg_num)
     console.log(`Successfully updated ${result.data.length} containers for instruction ID: ${instructionId}`)
     res.json({ success: true, ...result })
   } catch (error) {
@@ -708,7 +708,7 @@ export const updateFCContainersHandler = async (req, res) => {
       `[${new Date().toISOString()}] [FC] updateFCContainersHandler: Updating containers for instruction ${instructionId}`,
     )
 
-    const result = await updateContainersByInstructionId(instructionId, containers)
+    const result = await updateContainersByInstructionId(instructionId, containers, false, null, null, null, true, req.user.company_reg_num)
     res.json(result)
   } catch (error) {
     console.error(`[${new Date().toISOString()}] [FC] Error in updateFCContainersHandler:`, error)
