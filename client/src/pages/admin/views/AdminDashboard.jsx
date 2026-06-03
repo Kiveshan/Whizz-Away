@@ -3,6 +3,7 @@
 import { useState } from "react";
 import UserApprovalList from "./UserApprovalList";
 import CompanyManagement from "./CompanyManagement";
+import SubcontractorBackfill from "./SubcontractorBackfill";
 import "../css/AdminDashboard.css";
 // Import the TestConnection component
 // import TestConnection from "./TestConnection"
@@ -29,11 +30,20 @@ function AdminDashboard() {
           >
             Company Management
           </button>
+          <button
+            className={`tab-button ${
+              activeTab === "backfill" ? "active" : ""
+            }`}
+            onClick={() => setActiveTab("backfill")}
+          >
+            Statement Backfill
+          </button>
         </div>
 
         <div className="admin-content">
           {activeTab === "users" && <UserApprovalList />}
           {activeTab === "companies" && <CompanyManagement />}
+          {activeTab === "backfill" && <SubcontractorBackfill />}
         </div>
       </div>
     </div>

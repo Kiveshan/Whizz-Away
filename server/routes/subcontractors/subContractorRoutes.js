@@ -6,7 +6,8 @@ import {
   getCompanyInfoHandler,
   getSubcontractorInfoHandler,
   generateSubcontractorStatementHandler,
-  authenticateScheduledJob, // Add this import
+  backfillSubcontractorStatementsHandler,
+  authenticateScheduledJob,
 } from "../../controllers/subcontractors/subContractorController.js";
 import { verifyToken } from "../../middleware/auth.js";
 
@@ -24,6 +25,12 @@ router.post(
   "/subcontractor/generate-statement",
   authenticateScheduledJob,
   generateSubcontractorStatementHandler
+);
+
+router.post(
+  "/subcontractor/backfill-statements",
+  authenticateScheduledJob,
+  backfillSubcontractorStatementsHandler
 );
 
 export default router;

@@ -115,46 +115,25 @@ const getProfitLossData = async (month, year, company_reg_num) => {
   try {
     client = await pool.connect();
 
-    // === INCOME: Invoice Turnover (including subcontractor share) + Add-ons ===
+    // === INCOME: Invoice Turnover (VAT-inclusive) + Add-ons ===
     const turnoverQuery = `
-      WITH DistinctLegs AS (
-        SELECT m1key, COUNT(DISTINCT legnumber) AS num_legs
-        FROM legs_m2 GROUP BY m1key
-      ),
-      DriverCountsPerLeg AS (
-        SELECT m1key, legnumber, COUNT(DISTINCT driverid) AS drivers_per_leg
-        FROM legs_m2 GROUP BY m1key, legnumber
-      ),
-      SubcontractorShare AS (
-        SELECT COALESCE(SUM(m.total_cost / dl.num_legs / dcpl.drivers_per_leg), 0) AS subcontractor_turnover
-        FROM legs_m2 l
-        JOIN m1_controller m ON l.m1key = m.m1key
-        JOIN DistinctLegs dl ON l.m1key = dl.m1key
-        JOIN DriverCountsPerLeg dcpl ON l.m1key = dcpl.m1key AND l.legnumber = dcpl.legnumber
-        JOIN m5_employee e ON l.driverid = e.userid
-        WHERE e.roleid = 6
-          AND TRIM(TO_CHAR(m.created_at, 'Month')) = $1
-          AND EXTRACT(YEAR FROM m.created_at)::text = $2
-          AND m.company_reg_num = $3
-      ),
-      InvoiceTurnover AS (
-        SELECT COALESCE(SUM(m.total_cost), 0) AS invoice_total
-        FROM invoice i
-        JOIN m1_controller m ON i.m1key = m.m1key
-        WHERE TRIM(TO_CHAR(i.date, 'Month')) = $1
-          AND EXTRACT(YEAR FROM i.date)::text = $2
-          AND m.company_reg_num = $3
-      )
       SELECT
-        it.invoice_total + COALESCE(ss.subcontractor_turnover, 0) AS invoice_turnover
-      FROM InvoiceTurnover it
-      CROSS JOIN (SELECT COALESCE(subcontractor_turnover, 0) AS subcontractor_turnover FROM SubcontractorShare) ss;
+        COALESCE(
+          SUM(m.total_cost + (m.total_cost * (COALESCE(m.vat, 0)::numeric / 100))),
+          0
+        ) AS invoice_turnover
+      FROM invoice i
+      JOIN m1_controller m ON i.m1key = m.m1key
+      WHERE TRIM(TO_CHAR(i.date, 'Month')) = $1
+        AND EXTRACT(YEAR FROM i.date)::text = $2
+        AND i.company_reg_num = $3
+        AND m.company_reg_num = $3
     `;
 
     const turnoverResult = await client.query(turnoverQuery, [month, year, company_reg_num]);
     const invoicesTotal = Number(turnoverResult.rows[0]?.invoice_turnover || 0);
 
-    // Add-ons
+    // Add-ons (unchanged)
     const addOnsQuery = `
       SELECT COALESCE(SUM(amount), 0) AS addons_total
       FROM add_ons
@@ -168,7 +147,7 @@ const getProfitLossData = async (month, year, company_reg_num) => {
 
     const totalIncome = invoicesTotal + addOnsTotal;
 
-    // === EXPENSES ===
+    // === EXPENSES === (unchanged)
     const fuel = Number((await client.query(
       `SELECT COALESCE(SUM(expensecost), 0) AS total
        FROM expenses_m2
@@ -202,7 +181,7 @@ const getProfitLossData = async (month, year, company_reg_num) => {
 
     const wages = await getTotalWagesForMonth(client, month, year, company_reg_num);
 
-    // FIXED: Credit Notes — unnest safely using LATERAL
+    // Credit Notes
     const creditNotesResult = await client.query(
       `SELECT COALESCE(SUM(val), 0) AS total
        FROM credit_notes cn
