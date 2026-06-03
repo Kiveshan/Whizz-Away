@@ -30,7 +30,8 @@ export default function PendingActivation() {
         const route = getPostLoginRoute(
           data.user.subscription_tier,
           data.user.subscription_status,
-          data.user.roleid
+          data.user.roleid,
+          data.user.trial_ends_at
         )
         if (route !== "/pending-activation") {
           navigate(route, { replace: true })

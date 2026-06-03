@@ -5,13 +5,14 @@ import { useAuth } from "../context/AuthContext"
  * Determines the correct post-login route from subscription state.
  * Used both in Login.jsx redirect and as a route guard component.
  */
-export function getPostLoginRoute(tier, status, roleid) {
+export function getPostLoginRoute(tier, status, roleid, trialEndsAt = null) {
   // Super admin bypasses subscription checks
   if (roleid === 7) return "/AdminDashboard"
 
   if (status === "suspended")                                    return "/suspended"
   if (status === "cancelled")                                    return "/account-cancelled"
   if (!status || status === "inactive" || !tier || tier === "none") return "/pending-activation"
+  if (status === "trial" && trialEndsAt && new Date(trialEndsAt) < new Date()) return "/trial-expired"
   if (tier === "lite")                                           return "/dashboard/lite"
 
   // Creditors (roleid 8) require enterprise plan - keep on login page if not enterprise
@@ -51,11 +52,11 @@ export function SubscriptionGuard({ children, allowedTiers, allowedStatuses }) {
   const status = user?.subscription_status || "inactive"
 
   if (allowedStatuses && !allowedStatuses.includes(status)) {
-    return <Navigate to={getPostLoginRoute(tier, status, user?.roleid)} replace />
+    return <Navigate to={getPostLoginRoute(tier, status, user?.roleid, user?.trial_ends_at)} replace />
   }
 
   if (allowedTiers && !allowedTiers.includes(tier)) {
-    return <Navigate to={getPostLoginRoute(tier, status, user?.roleid)} replace />
+    return <Navigate to={getPostLoginRoute(tier, status, user?.roleid, user?.trial_ends_at)} replace />
   }
 
   return children
@@ -83,7 +84,7 @@ export default function PostLoginRedirect() {
 
   const tier   = user?.subscription_tier   || "none"
   const status = user?.subscription_status || "inactive"
-  const route  = getPostLoginRoute(tier, status, user?.roleid)
+  const route  = getPostLoginRoute(tier, status, user?.roleid, user?.trial_ends_at)
 
   return <Navigate to={route} replace />
 }

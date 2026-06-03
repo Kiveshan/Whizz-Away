@@ -82,7 +82,8 @@ const Login = ({ switchToRegister, closePopup }) => {
         const route = getPostLoginRoute(
           data.user.subscription_tier,
           data.user.subscription_status,
-          data.user.roleid
+          data.user.roleid,
+          data.user.trial_ends_at
         );
         navigate(route);
       } else {

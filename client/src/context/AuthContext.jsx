@@ -138,22 +138,31 @@ export const AuthProvider = ({ children }) => {
     enterprise:   ["instructions", "assignment", "invoice", "statements", "manage", "addons", "analytics", "age_analysis", "reports", "payroll", "biometric", "vat", "creditors", "priority_support"],
   }
 
+  const isTrialExpired = useCallback(() => {
+    return (
+      user?.subscription_status === "trial" &&
+      user?.trial_ends_at &&
+      new Date(user.trial_ends_at) < new Date()
+    )
+  }, [user])
+
   const hasFeature = useCallback((feature_key) => {
+    if (isTrialExpired()) return false
     const tier = user?.subscription_tier || "none"
     return (PLAN_FEATURES[tier] || []).includes(feature_key)
-  }, [user])
+  }, [user, isTrialExpired])
 
-  /** True when the company is on an active trial. */
+  /** True when the company is on an active (non-expired) trial. */
   const isTrial = useCallback(() => {
-    return user?.subscription_status === "trial"
-  }, [user])
+    return user?.subscription_status === "trial" && !isTrialExpired()
+  }, [user, isTrialExpired])
 
-  /** Days remaining in trial (null if not on trial). */
+  /** Days remaining in trial (null if not on trial, 0 if expired). */
   const trialDaysRemaining = useCallback(() => {
-    if (!isTrial() || !user?.trial_ends_at) return null
+    if (user?.subscription_status !== "trial" || !user?.trial_ends_at) return null
     const diff = new Date(user.trial_ends_at) - new Date()
     return Math.max(0, Math.ceil(diff / (1000 * 60 * 60 * 24)))
-  }, [user, isTrial])
+  }, [user])
 
   /**
    * Returns { tier, status, maxUsers, maxTrucks }.
@@ -181,6 +190,7 @@ export const AuthProvider = ({ children }) => {
 
     if (status === "suspended")                          return "/suspended"
     if (status === "cancelled")                          return "/account-cancelled"
+    if (status === "trial" && user?.trial_ends_at && new Date(user.trial_ends_at) < new Date()) return "/trial-expired"
     if (status === "inactive" || status === "none" || tier === "none") return "/pending-activation"
     if (tier   === "lite")                               return "/dashboard/lite"
 
@@ -211,6 +221,7 @@ export const AuthProvider = ({ children }) => {
     hasPlan,
     hasFeature,
     isTrial,
+    isTrialExpired,
     trialDaysRemaining,
     getUsage,
     getPostLoginRoute,

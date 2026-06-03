@@ -76,11 +76,26 @@ const loadCompany = async (req, res, next) => {
   }
 };
 
+// ─── isTrialExpired ───────────────────────────────────────────────────────────
+
+const isTrialExpired = (user) =>
+  user?.subscription_status === "trial" &&
+  user?.trial_ends_at &&
+  new Date(user.trial_ends_at) < new Date();
+
 // ─── requirePlan ─────────────────────────────────────────────────────────────
 // Usage: requirePlan('professional')
-// Blocks the request if the company's tier ranks below the required tier.
+// Blocks the request if the company's tier ranks below the required tier,
+// or if the company is on an expired trial.
 
 const requirePlan = (minimumPlan) => (req, res, next) => {
+  if (isTrialExpired(req.user)) {
+    return res.status(403).json({
+      error: "TRIAL_EXPIRED",
+      message: "Your free trial has expired. Please subscribe to continue using this feature.",
+      subscription_status: "trial_expired",
+    });
+  }
   const tier = req.user?.subscription_tier || "none";
   const rank = PLAN_RANK[tier] ?? 0;
   const required = PLAN_RANK[minimumPlan] ?? 99;
@@ -98,6 +113,13 @@ const requirePlan = (minimumPlan) => (req, res, next) => {
 // Checks the plan_features table for the company's current tier.
 
 const requireFeature = (feature_key) => async (req, res, next) => {
+  if (isTrialExpired(req.user)) {
+    return res.status(403).json({
+      error: "TRIAL_EXPIRED",
+      message: "Your free trial has expired. Please subscribe to continue using this feature.",
+      subscription_status: "trial_expired",
+    });
+  }
   const tier = req.user?.subscription_tier || "none";
   if (!PLAN_RANK[tier]) {
     return res.status(403).json({

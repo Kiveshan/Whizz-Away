@@ -94,6 +94,7 @@ import LiteDebtorsDash from "./pages/dashboard/LiteDebtorsDash";
 import SuspensionScreen from "./pages/status/SuspensionScreen";
 import PendingActivation from "./pages/status/PendingActivation";
 import AccountCancelled from "./pages/status/AccountCancelled";
+import TrialExpiredScreen from "./pages/status/TrialExpiredScreen";
 import TrialBanner from "./components/billing/TrialBanner";
 import PostLoginRedirect from "./router/AuthRouter";
 
@@ -253,8 +254,8 @@ function DynamicHeader() {
 
 function ContentWrapper() {
   const location = useLocation();
-  const hideFooterOn = ["/login", "/register", "/", "/suspended", "/pending-activation", "/account-cancelled"];
-  const hideLogoutOn = ["/login", "/register", "/landing", "/new-landing", "/", "/suspended", "/pending-activation", "/account-cancelled"]; // hide logout on landing
+  const hideFooterOn = ["/login", "/register", "/", "/suspended", "/pending-activation", "/account-cancelled", "/trial-expired"];
+  const hideLogoutOn = ["/login", "/register", "/landing", "/new-landing", "/", "/suspended", "/pending-activation", "/account-cancelled", "/trial-expired"]; // hide logout on landing
   const shouldShowFooter = !hideFooterOn.includes(location.pathname);
   const shouldShowLogout = !hideLogoutOn.includes(location.pathname);
 
@@ -403,6 +404,7 @@ function ContentWrapper() {
         <Route path="/suspended"            element={<SuspensionScreen />} />
         <Route path="/pending-activation"   element={<PendingActivation />} />
         <Route path="/account-cancelled"    element={<AccountCancelled />} />
+        <Route path="/trial-expired"        element={<TrialExpiredScreen />} />
         <Route path="/login-redirect"       element={<PostLoginRedirect />} />
         {/* Finance Clerk Routes */}
         <Route path="/instructions" element={<InstructionsList />} />

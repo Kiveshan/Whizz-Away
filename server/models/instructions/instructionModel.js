@@ -1475,19 +1475,19 @@ export const updateContainersByInstructionId = async (
 
       const insertQuery = `
         INSERT INTO public.container (
-          containernum, weight, m1key, container_type, cargo_description, 
-          "Hazardous", "Add Surcharges", "Surcharge Amount", 
+          containernum, weight, m1key, container_type, cargo_description,
+          "Hazardous", "Add Surcharges", "Surcharge Amount",
           is_12m_surcharge, surcharge_12m_amount,
-          "Hazardous Amount", file_ref, vgm, "vgm amount"
+          "Hazardous Amount", file_ref, vgm, "vgm amount", company_reg_num
         )
-        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)
         RETURNING containerkey
       `;
       // Get file_ref value from container with proper fallback
       const fileRef = container.file_ref || container.fileRef || "";
-      
+
       console.log(`File Reference for container: ${fileRef}`);
-      
+
       const values = [
         containerNum,
         sanitizedWeight,
@@ -1503,6 +1503,7 @@ export const updateContainersByInstructionId = async (
         fileRef,
         vgm,
         vgmAmount,
+        company_reg_num,
       ];
 
       console.log("Container values with VGM:", { vgm, vgmAmount });
@@ -2845,12 +2846,12 @@ export const updateFCInstructionAndContainers = async (
       
       const insertQuery = `
         INSERT INTO public.container (
-          containernum, weight, m1key, container_type, cargo_description, 
+          containernum, weight, m1key, container_type, cargo_description,
           "Add Surcharges", "Hazardous", "Surcharge Amount",
           is_12m_surcharge, surcharge_12m_amount,
-          "Hazardous Amount", file_ref, vgm, "vgm amount"
+          "Hazardous Amount", file_ref, vgm, "vgm amount", company_reg_num
         )
-        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)
         RETURNING containerkey
       `;
 
@@ -2869,6 +2870,7 @@ export const updateFCInstructionAndContainers = async (
         container.file_ref || "",
         isVgm,
         isAddOnType ? 0 : vgmAmount,
+        company_reg_num,
       ]);
 
       console.log("Inserted new container with VGM values:", { isVgm, vgmAmount });
@@ -3281,9 +3283,9 @@ export const saveInstructionAndContainers = async (
           containernum, weight, m1key, container_type, cargo_description,
           "Add Surcharges", "Hazardous", "Surcharge Amount",
           is_12m_surcharge, surcharge_12m_amount,
-          "Hazardous Amount", file_ref
+          "Hazardous Amount", file_ref, company_reg_num
         )
-        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
       `;
 
       const resolvedContainerType = container.container_type || container.containerType || "";
@@ -3299,16 +3301,16 @@ export const saveInstructionAndContainers = async (
         container.cargo_description || container.cargoDescription || "",
         addSurcharges,
         isHazardous,
-        sixmSurchargeAmount, // Legacy 6m surcharge amount
+        sixmSurchargeAmount,
         is12mSurcharge,
         surcharge12mAmount,
-        hazardousAmount, // Backend-calculated hazardous amount
-        // Extract file_ref value, ensuring proper case handling for all possible variations
+        hazardousAmount,
         (container.file_ref !== undefined
           ? container.file_ref
           : container.fileRef !== undefined
           ? container.fileRef
-          : ""), // New file reference field for export shipments
+          : ""),
+        company_reg_num,
       ];
       await client.query(containerQuery, containerValues);
     }
