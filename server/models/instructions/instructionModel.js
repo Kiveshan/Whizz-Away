@@ -2389,44 +2389,34 @@ export const updateFCInstructionAndContainers = async (
       await client.query(deleteWeightsQuery, [instructionId]);
 
       if (Array.isArray(weightData) && weightData.length > 0) {
-        for (const row of weightData) {
+        const weightRows = weightData.map((row) => {
           let rowWeight = null;
-          if (
-            row.weight !== null &&
-            row.weight !== undefined &&
-            row.weight !== ""
-          ) {
+          if (row.weight !== null && row.weight !== undefined && row.weight !== "") {
             if (typeof row.weight === "string") {
               const trimmed = row.weight.trim();
               if (trimmed !== "") {
-                const parsedWeight = Number.parseFloat(trimmed);
-                if (!Number.isNaN(parsedWeight) && parsedWeight >= 0) {
-                  rowWeight = parsedWeight;
-                }
+                const parsed = Number.parseFloat(trimmed);
+                if (!Number.isNaN(parsed) && parsed >= 0) rowWeight = parsed;
               }
             } else if (typeof row.weight === "number" && row.weight >= 0) {
               rowWeight = row.weight;
             }
           }
-
-          const insertWeightQuery = `
-            INSERT INTO public.m1_controller_weight (
-              m1_key,
-              ksm_dm_no,
-              ticket_no,
-              receipt_book_no,
-              weight
-            ) VALUES ($1, $2, $3, $4, $5)
-          `;
-          const weightValues = [
+          return [
             instructionId,
             row.ksm_dm_no || row.ksmDmNo || null,
             row.ticket_no || row.ticketNo || null,
             row.receipt_book_no || row.receiptBookNo || null,
             rowWeight,
           ];
-          await client.query(insertWeightQuery, weightValues);
-        }
+        });
+        const placeholders = weightRows
+          .map((_, i) => `($${i * 5 + 1}, $${i * 5 + 2}, $${i * 5 + 3}, $${i * 5 + 4}, $${i * 5 + 5})`)
+          .join(", ");
+        await client.query(
+          `INSERT INTO public.m1_controller_weight (m1_key, ksm_dm_no, ticket_no, receipt_book_no, weight) VALUES ${placeholders}`,
+          weightRows.flat()
+        );
       }
     } else if (String(currentInstruction.shipment_type) === "4") {
       const deleteWeightsQuery =
@@ -2475,83 +2465,56 @@ export const updateFCInstructionAndContainers = async (
     const pickup = currentInstruction.pickup;
     const dropoff = currentInstruction.dropoff;
 
-    // Delete containers (and any associated legs for those containers)
-    for (const containerKey of containerChanges.toDelete) {
-      // Find the full container record so we can get its container number
-      const containerRecord = currentContainers.find(
-        (c) => c.containerkey === containerKey
-      );
-
-      if (containerRecord && containerRecord.containernum) {
-        // Remove any legs that reference this container for this instruction
-        await client.query(
-          `DELETE FROM public.legs_m2 WHERE m1key = $1 AND containernumber = $2`,
-          [instructionId, containerRecord.containernum]
+    // Fetch client rate once for all containers — avoids N+1 round trips to RDS
+    let clientRate = { hazardous: 0, vgm: 0, surcharges: 0, surcharge12m: 0 };
+    if (!isAddOnType && clientId && pickup && dropoff) {
+      try {
+        const clientRateResult = await client.query(
+          `SELECT hazardous, vgm, surcharges, surcharge12m
+           FROM public.m5_client_rate
+           WHERE clientid = $1 AND starting_point = $2 AND destination = $3
+           ORDER BY client_rate_id DESC LIMIT 1`,
+          [clientId, pickup, dropoff]
         );
-        console.log(
-          `[${new Date().toISOString()}] [MODEL] Deleted legs for container ${containerRecord.containernum} on instruction ${instructionId}`
+        if (clientRateResult.rows.length > 0) {
+          const r = clientRateResult.rows[0];
+          clientRate = {
+            hazardous: Number(r.hazardous) || 0,
+            vgm: Number(r.vgm) || 0,
+            surcharges: Number(r.surcharges) || 0,
+            surcharge12m: Number(r.surcharge12m) || 0,
+          };
+        }
+      } catch (e) {
+        console.error("[MODEL] Error fetching client rate:", e.message);
+      }
+    }
+
+    // Batch delete legs and containers in two queries instead of one per container
+    if (containerChanges.toDelete.length > 0) {
+      const numsToDelete = containerChanges.toDelete
+        .map((key) => currentContainers.find((c) => c.containerkey === key)?.containernum)
+        .filter(Boolean);
+      if (numsToDelete.length > 0) {
+        await client.query(
+          `DELETE FROM public.legs_m2 WHERE m1key = $1 AND containernumber = ANY($2)`,
+          [instructionId, numsToDelete]
         );
       }
-
-      const deleteQuery = `DELETE FROM public.container WHERE containerkey = $1`;
-      await client.query(deleteQuery, [containerKey]);
+      await client.query(
+        `DELETE FROM public.container WHERE containerkey = ANY($1)`,
+        [containerChanges.toDelete]
+      );
       console.log(
-        `[${new Date().toISOString()}] [MODEL] Deleted container ${containerKey}`
+        `[${new Date().toISOString()}] [MODEL] Deleted ${containerChanges.toDelete.length} containers and their legs`
       );
     }
 
     // Update containers
     for (const container of containerChanges.toUpdate) {
 
-      // Always recompute hazardous amount from current client rates when the
-      // hazardous flag is true (except for add-on shipments where amounts
-      // must remain 0). This ensures we refresh from m5_client_rate even if
-      // the frontend sends a non-zero "Hazardous Amount" from a previous rate.
-      let hazardousAmount = 0;
       const isHazardous = container["Hazardous"] || container.hazardous || false;
-      
-      if (!isAddOnType && isHazardous && clientId && pickup && dropoff) {
-        try {
-          console.log(
-            `[${new Date().toISOString()}] [MODEL] Container ${container.containerkey} is hazardous, refreshing hazardous amount for client ${clientId}, pickup ${pickup}, dropoff ${dropoff}`
-          );
-
-          const hazardousRateQuery = `
-            SELECT hazardous
-            FROM public.m5_client_rate
-            WHERE clientid = $1
-              AND starting_point = $2
-              AND destination = $3
-            ORDER BY client_rate_id DESC
-            LIMIT 1
-          `;
-
-          const hazardousRateResult = await client.query(hazardousRateQuery, [
-            clientId,
-            pickup,
-            dropoff
-          ]);
-
-          if (hazardousRateResult.rows.length > 0) {
-            const fetchedHaz = hazardousRateResult.rows[0].hazardous;
-            const numericHaz = Number.parseFloat(fetchedHaz);
-            hazardousAmount = Number.isNaN(numericHaz) ? 0 : numericHaz;
-            console.log(
-              `[${new Date().toISOString()}] [MODEL] Refreshed hazardous amount ${hazardousAmount} for container ${container.containerkey}`
-            );
-          } else {
-            console.log(
-              `[${new Date().toISOString()}] [MODEL] No hazardous rate found for client ${clientId}, pickup ${pickup}, dropoff ${dropoff}`
-            );
-          }
-        } catch (error) {
-          console.error(
-            `[${new Date().toISOString()}] [MODEL] Error fetching hazardous amount:`,
-            error.message
-          );
-          // Continue with hazardousAmount = 0 if there's an error
-        }
-      }
+      const hazardousAmount = (!isAddOnType && isHazardous) ? clientRate.hazardous : 0;
 
       // Debug log container data before update
       console.log(
@@ -2583,39 +2546,7 @@ export const updateFCInstructionAndContainers = async (
       const rawIsVgm = container.vgm || container["vgm"] || false;
       const isVgm = allowVgm ? rawIsVgm : false;
 
-      let vgmAmount = 0;
-
-      if (!isAddOnType && allowVgm && isVgm && clientId && pickup && dropoff) {
-        try {
-          const vgmQuery = `
-            SELECT vgm
-            FROM public.m5_client_rate
-            WHERE clientid = $1
-              AND starting_point = $2
-              AND destination = $3
-            ORDER BY client_rate_id DESC
-            LIMIT 1
-          `;
-          const vgmResult = await client.query(vgmQuery, [
-            clientId,
-            pickup,
-            dropoff,
-          ]);
-          if (vgmResult.rows.length > 0) {
-            const fetched = Number.parseFloat(vgmResult.rows[0].vgm);
-            if (!Number.isNaN(fetched) && fetched >= 0) vgmAmount = fetched;
-          }
-        } catch (e) {
-          console.error("ERROR: Failed to fetch VGM:", e.message);
-        }
-      }
-
-      // For shipment type 5 (add-on), force all surcharge/hazardous/VGM
-      // amounts to 0 even if the flags are true.
-      if (isAddOnType) {
-        hazardousAmount = 0;
-        vgmAmount = 0;
-      }
+      const vgmAmount = (!isAddOnType && allowVgm && isVgm) ? clientRate.vgm : 0;
 
       const updateContainerQuery = `
         UPDATE public.container 
@@ -2637,47 +2568,11 @@ export const updateFCInstructionAndContainers = async (
         RETURNING *
       `;
 
-      // Always recompute surcharge amount from current client rates when the
-      // "Add Surcharges" flag is true (except for add-on shipments where
-      // amounts must remain 0). This keeps container surcharges aligned with
-      // m5_client_rate even if the frontend sends an older amount.
-      let rawSurchargeAmount =
-        container["Surcharge Amount"] || container.surchargeAmount || 0;
-      let surchargeAmount = isAddOnType ? 0 : rawSurchargeAmount;
-
-      const hasAddSurcharges =
-        container["Add Surcharges"] || container.addSurcharges || false;
-
-      if (!isAddOnType && hasAddSurcharges && clientId && pickup && dropoff) {
-        try {
-          const surchargeQuery = `
-            SELECT surcharges, surcharge12m
-            FROM public.m5_client_rate
-            WHERE clientid = $1
-              AND starting_point = $2
-              AND destination = $3
-            ORDER BY client_rate_id DESC
-            LIMIT 1
-          `;
-          const surchargeResult = await client.query(surchargeQuery, [
-            clientId,
-            pickup,
-            dropoff,
-          ]);
-
-          if (surchargeResult.rows.length > 0) {
-            const is12m = (container.container_type || "") === "12m";
-            const fetched6 = Number.parseFloat(surchargeResult.rows[0].surcharges);
-            const fetched12 = Number.parseFloat(surchargeResult.rows[0].surcharge12m);
-            const fetched = is12m ? fetched12 : fetched6;
-            surchargeAmount = !Number.isNaN(fetched) && fetched > 0 ? fetched : 0;
-          } else {
-            surchargeAmount = 0;
-          }
-        } catch (e) {
-          console.error("ERROR: Failed to fetch surcharge:", e.message);
-          // Keep surchargeAmount as 0 on error
-        }
+      const hasAddSurcharges = container["Add Surcharges"] || container.addSurcharges || false;
+      let surchargeAmount = 0;
+      if (!isAddOnType && hasAddSurcharges) {
+        const is12m = (container.container_type || "") === "12m";
+        surchargeAmount = is12m ? clientRate.surcharge12m : clientRate.surcharges;
       }
 
       const updateValues = [
@@ -2735,96 +2630,14 @@ export const updateFCInstructionAndContainers = async (
         }
       }
       
-      // Fetch hazardous amount if container is marked as hazardous
-      let hazardousAmount = container["Hazardous Amount"] || container.hazardousAmount || 0;
       const isHazardous = container["Hazardous"] || container.hazardous || false;
-      
-      if (isHazardous && hazardousAmount === 0) {
-        try {
-          // Get current instruction data to access client ID, pickup and dropoff
-          const currentInstructionResult = await client.query(
-            "SELECT client, pickup, dropoff FROM public.m1_controller WHERE m1key = $1",
-            [instructionId]
-          );
-          
-          if (currentInstructionResult.rows.length > 0) {
-            const { client: clientId, pickup, dropoff } = currentInstructionResult.rows[0];
-            
-            console.log(
-              `[${new Date().toISOString()}] [MODEL] New container is hazardous, fetching hazardous amount for client ${clientId}, pickup ${pickup}, dropoff ${dropoff}`
-            );
-            
-            // Query to fetch hazardous amount from m5_client_rate table
-            const hazardousRateQuery = `
-              SELECT hazardous
-              FROM public.m5_client_rate
-              WHERE clientid = $1
-                AND starting_point = $2
-                AND destination = $3
-              ORDER BY client_rate_id DESC
-              LIMIT 1
-            `;
-            
-            const hazardousRateResult = await client.query(hazardousRateQuery, [
-              clientId,
-              pickup,
-              dropoff
-            ]);
-            
-            if (hazardousRateResult.rows.length > 0) {
-              hazardousAmount = hazardousRateResult.rows[0].hazardous || 0;
-              console.log(
-                `[${new Date().toISOString()}] [MODEL] Found hazardous amount ${hazardousAmount} for new container`
-              );
-            } else {
-              console.log(
-                `[${new Date().toISOString()}] [MODEL] No hazardous rate found for client ${clientId}, pickup ${pickup}, dropoff ${dropoff}`
-              );
-            }
-          }
-        } catch (error) {
-          console.error(
-            `[${new Date().toISOString()}] [MODEL] Error fetching hazardous amount for new container:`,
-            error.message
-          );
-          // Continue with hazardous amount as 0 if there's an error
-        }
-      }
+      const hazardousAmount = (!isAddOnType && isHazardous) ? clientRate.hazardous : 0;
 
-      // Calculate surcharge amount for new container (similar to update section)
-      let insertSurchargeAmount = 0;
       const hasAddSurcharges = container["Add Surcharges"] || container.addSurcharges || false;
-      
-      if (!isAddOnType && hasAddSurcharges && clientId && pickup && dropoff) {
-        try {
-          const surchargeQuery = `
-            SELECT surcharges, surcharge12m
-            FROM public.m5_client_rate
-            WHERE clientid = $1
-              AND starting_point = $2
-              AND destination = $3
-            ORDER BY client_rate_id DESC
-            LIMIT 1
-          `;
-          const surchargeResult = await client.query(surchargeQuery, [
-            clientId,
-            pickup,
-            dropoff,
-          ]);
-
-          if (surchargeResult.rows.length > 0) {
-            const is12m = (container.container_type || "") === "12m";
-            const fetched6 = Number.parseFloat(surchargeResult.rows[0].surcharges);
-            const fetched12 = Number.parseFloat(surchargeResult.rows[0].surcharge12m);
-            const fetched = is12m ? fetched12 : fetched6;
-            insertSurchargeAmount = !Number.isNaN(fetched) && fetched > 0 ? fetched : 0;
-          } else {
-            insertSurchargeAmount = 0;
-          }
-        } catch (e) {
-          console.error("ERROR: Failed to fetch surcharge for new container:", e.message);
-          // Keep insertSurchargeAmount as 0 on error
-        }
+      let insertSurchargeAmount = 0;
+      if (!isAddOnType && hasAddSurcharges) {
+        const is12m = (container.containerType || container.container_type || "") === "12m";
+        insertSurchargeAmount = is12m ? clientRate.surcharge12m : clientRate.surcharges;
       }
 
       const containerType =
