@@ -16,13 +16,7 @@ const getAllSubContractors = async (company_reg_num) => {
       FROM
         m5_employee
       WHERE
-        companyname IS NOT NULL
-        AND companyname != ''
-        AND location IS NOT NULL
-        AND location != ''
-        AND contact_person IS NOT NULL
-        AND contact_person != ''
-        AND status = true
+        roleid = 6
         AND company_reg_num = $1
       GROUP BY companyname, location, contact_person, cellnum, email, subei_reg_num
       ORDER BY companyname
