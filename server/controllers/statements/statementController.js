@@ -149,10 +149,12 @@ const generateStatementsHandler = async (req, res) => {
         try {
           console.log(`Processing client statements for company: ${companyname} (${company_reg_num})`);
           const result = await generateMonthlyStatements(null, company_reg_num);
-          companyResults.push({ company_reg_num, companyname, success: true, stats: result.stats });
-          totalProcessed += result.stats.processed;
-          totalCreated   += result.stats.created;
-          totalUpdated   += result.stats.updated;
+          // result.stats is undefined when the company has no clients (valid no-op)
+          const stats = result.stats ?? { processed: 0, created: 0, updated: 0 };
+          totalProcessed += stats.processed;
+          totalCreated   += stats.created;
+          totalUpdated   += stats.updated;
+          companyResults.push({ company_reg_num, companyname, success: true, stats });
         } catch (companyError) {
           // Log failure but continue with remaining companies
           console.error(`Failed to generate statements for ${companyname} (${company_reg_num}):`, companyError.message);
