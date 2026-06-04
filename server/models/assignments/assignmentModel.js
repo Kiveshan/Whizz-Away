@@ -240,11 +240,11 @@ export const getClientInstructionsDetails = async (clientId, company_reg_num) =>
   }
 };
 
-export const getContainerDetails = async (containerNum) => {
+export const getContainerDetails = async (containerNum, company_reg_num) => {
   const query =
-    "SELECT containerkey, containernum, weight, container_type FROM container WHERE containernum = $1";
+    "SELECT containerkey, containernum, weight, container_type FROM container WHERE containernum = $1 AND company_reg_num = $2";
   try {
-    const result = await pool.query(query, [containerNum]);
+    const result = await pool.query(query, [containerNum, company_reg_num]);
     return result.rows.length > 0 ? result.rows[0] : null;
   } catch (error) {
     throw error;
@@ -464,15 +464,15 @@ export const saveLeg = async ({
     } else if (!isNewLeg && (!drivers || drivers.length === 0)) {
       // Existing leg saved with no drivers: clear any persisted driver assignment data
       await client.query(
-        `UPDATE legs_m2 SET 
+        `UPDATE legs_m2 SET
           driverid = NULL,
           truckregnumber = NULL,
           containernumber = NULL,
           vgm = NULL,
           date = NULL,
           driverrate = $1
-        WHERE legkey = $2`,
-        [driverrate, legkey]
+        WHERE legkey = $2 AND company_reg_num = $3`,
+        [driverrate, legkey, company_reg_num]
       );
     }
     // Recompute invoice date based on earliest date for legnumber = 1 and update invoice if exists
@@ -915,10 +915,10 @@ export const getInstructionDetails = async (instructionId, company_reg_num) => {
   }
 };
 
-export const getDriverById = async (driverId) => {
-  const query = `SELECT userid, name, surname FROM m5_employee WHERE userid = $1`;
+export const getDriverById = async (driverId, company_reg_num) => {
+  const query = `SELECT userid, name, surname FROM m5_employee WHERE userid = $1 AND company_reg_num = $2`;
   try {
-    const result = await pool.query(query, [driverId]);
+    const result = await pool.query(query, [driverId, company_reg_num]);
     return result.rows.length > 0 ? result.rows[0] : null;
   } catch (error) {
     throw error;
@@ -952,10 +952,11 @@ export const getDriverInstructions = async (driverId, company_reg_num) => {
 
 export const getLegDetailsByInstructionAndDriver = async (
   instructionId,
-  driverId
+  driverId,
+  company_reg_num
 ) => {
   const query = `
-    SELECT 
+    SELECT
       l.legkey,
       l.legnumber,
       l.startingpoint,
@@ -963,14 +964,14 @@ export const getLegDetailsByInstructionAndDriver = async (
       l.date,
       l.driverrate,
       l.legstatus
-    FROM 
+    FROM
       public.legs_m2 l
-    WHERE 
-      l.m1key = $1 AND l.driverid = $2
-    ORDER BY 
+    WHERE
+      l.m1key = $1 AND l.driverid = $2 AND l.company_reg_num = $3
+    ORDER BY
       l.legnumber`;
   try {
-    const result = await pool.query(query, [instructionId, driverId]);
+    const result = await pool.query(query, [instructionId, driverId, company_reg_num]);
     return result.rows;
   } catch (error) {
     throw error;

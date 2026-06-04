@@ -295,9 +295,10 @@ export const getClientInstructionsDetailsHandler = async (req, res) => {
 
 export const getContainerDetailsHandler = async (req, res) => {
   const { containerNum } = req.params;
+  const company_reg_num = req.user.company_reg_num;
   console.log(`Route /api/container-details/${containerNum} was accessed`);
   try {
-    const container = await getContainerDetails(containerNum);
+    const container = await getContainerDetails(containerNum, company_reg_num);
     if (!container)
       return res.status(404).json({ error: "Container not found" });
     console.log(`Found container details for ${containerNum}:`, container);
@@ -533,9 +534,10 @@ export const getInstructionDetailsHandler = async (req, res) => {
 
 export const getDriverByIdHandler = async (req, res) => {
   const { driverId } = req.params;
+  const company_reg_num = req.user.company_reg_num;
   console.log(`Route /driver/${driverId} was accessed`);
   try {
-    const driver = await getDriverById(driverId);
+    const driver = await getDriverById(driverId, company_reg_num);
     if (!driver) return res.status(404).json({ error: "Driver not found" });
     res.status(200).json(driver);
   } catch (err) {
@@ -560,10 +562,12 @@ export const getDriverInstructionsHandler = async (req, res) => {
 export const getLegDetailsByInstructionAndDriverHandler = async (req, res) => {
   const instructionId = req.params.id;
   const driverId = req.params.driverId;
+  const company_reg_num = req.user.company_reg_num;
   try {
     const legDetails = await getLegDetailsByInstructionAndDriver(
       instructionId,
-      driverId
+      driverId,
+      company_reg_num
     );
     res.json(legDetails);
   } catch (error) {
