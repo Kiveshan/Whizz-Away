@@ -891,6 +891,7 @@ async function operationalSeed(client) {
       id: invoice1Key,
       invoice_num: "INV-SEED-001",
       amount_to_pay: 5000.00,
+      this_payment: 5000.00,
       line_date: paymentDateStr,
     }
   ]);

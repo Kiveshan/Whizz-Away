@@ -2408,13 +2408,14 @@ export const updateFCInstructionAndContainers = async (
             row.ticket_no || row.ticketNo || null,
             row.receipt_book_no || row.receiptBookNo || null,
             rowWeight,
+            company_reg_num,
           ];
         });
         const placeholders = weightRows
-          .map((_, i) => `($${i * 5 + 1}, $${i * 5 + 2}, $${i * 5 + 3}, $${i * 5 + 4}, $${i * 5 + 5})`)
+          .map((_, i) => `($${i * 6 + 1}, $${i * 6 + 2}, $${i * 6 + 3}, $${i * 6 + 4}, $${i * 6 + 5}, $${i * 6 + 6})`)
           .join(", ");
         await client.query(
-          `INSERT INTO public.m1_controller_weight (m1_key, ksm_dm_no, ticket_no, receipt_book_no, weight) VALUES ${placeholders}`,
+          `INSERT INTO public.m1_controller_weight (m1_key, ksm_dm_no, ticket_no, receipt_book_no, weight, company_reg_num) VALUES ${placeholders}`,
           weightRows.flat()
         );
       }
