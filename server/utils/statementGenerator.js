@@ -323,10 +323,6 @@ async function generateMonthlyStatements(specificClientId = null, company_reg_nu
   let dbClient;
   try {
     dbClient = await pool.connect();
-    await dbClient.query(
-      `ALTER TABLE statements
-       ADD COLUMN IF NOT EXISTS insurance_amount NUMERIC(12, 2) DEFAULT 0`
-    );
     await dbClient.query("BEGIN");
 
     const clients = await fetchClients(specificClientId, company_reg_num);

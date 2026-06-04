@@ -175,6 +175,26 @@ const getAllBillingEvents = async (page = 1, pageSize = 50) => {
   }
 };
 
+/**
+ * Returns all companies that should receive scheduled statement generation.
+ * Excludes suspended/cancelled tenants so we don't waste cycles on inactive accounts.
+ */
+const getAllActiveCompanies = async () => {
+  const client = await pool.connect();
+  try {
+    const result = await client.query(
+      `SELECT DISTINCT ON (company_reg_num) company_reg_num, companyname
+       FROM usertable
+       WHERE roleid = 1
+         AND subscription_status IN ('active', 'trial')
+       ORDER BY company_reg_num`
+    );
+    return result.rows;
+  } finally {
+    client.release();
+  }
+};
+
 export {
   getCompanySubscription,
   updateSubscriptionTier,
@@ -184,4 +204,5 @@ export {
   getCurrentUsage,
   getBillingEvents,
   getAllBillingEvents,
+  getAllActiveCompanies,
 };

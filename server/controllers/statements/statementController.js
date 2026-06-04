@@ -3,6 +3,7 @@ import {
   getStatementDetails,
 } from "../../models/statements/statementModel.js";
 import { generateMonthlyStatements } from "../../utils/statementGenerator.js";
+import { getAllActiveCompanies } from "../../models/billing/subscriptionModel.js";
 import { verifyToken } from "../../middleware/auth.js";
 
 const authenticateScheduledJob = (req, res, next) => {
@@ -10,7 +11,7 @@ const authenticateScheduledJob = (req, res, next) => {
   const authHeader = req.headers.authorization;
   const token = authHeader && authHeader.split(" ")[1];
 
-  if (token === process.env.API_SECRET) {
+  if (process.env.API_SECRET && token === process.env.API_SECRET) {
     console.log("Authenticated scheduled job request");
     req.isScheduledJob = true;
     return next();
@@ -134,6 +135,46 @@ const getStatementDetailsHandler = async (req, res) => {
 
 const generateStatementsHandler = async (req, res) => {
   try {
+    // ── Scheduled job path: loop every active tenant ──────────────────────
+    if (req.isScheduledJob) {
+      console.log("Scheduled statement generation: fetching all active companies...");
+
+      const companies = await getAllActiveCompanies();
+      console.log(`Found ${companies.length} active companies to process`);
+
+      const companyResults = [];
+      let totalProcessed = 0, totalCreated = 0, totalUpdated = 0;
+
+      for (const { company_reg_num, companyname } of companies) {
+        try {
+          console.log(`Processing client statements for company: ${companyname} (${company_reg_num})`);
+          const result = await generateMonthlyStatements(null, company_reg_num);
+          companyResults.push({ company_reg_num, companyname, success: true, stats: result.stats });
+          totalProcessed += result.stats.processed;
+          totalCreated   += result.stats.created;
+          totalUpdated   += result.stats.updated;
+        } catch (companyError) {
+          // Log failure but continue with remaining companies
+          console.error(`Failed to generate statements for ${companyname} (${company_reg_num}):`, companyError.message);
+          companyResults.push({ company_reg_num, companyname, success: false, error: companyError.message });
+        }
+      }
+
+      const failures = companyResults.filter((r) => !r.success);
+      console.log(
+        `Scheduled statement generation complete. Companies: ${companies.length}, ` +
+        `Failures: ${failures.length}, Processed: ${totalProcessed}, Created: ${totalCreated}, Updated: ${totalUpdated}`
+      );
+
+      return res.json({
+        success: failures.length === 0,
+        message: `Scheduled generation complete. ${companies.length} companies processed, ${failures.length} failed.`,
+        stats: { processed: totalProcessed, created: totalCreated, updated: totalUpdated },
+        companies: companyResults,
+      });
+    }
+
+    // ── Manual / JWT path: single tenant ─────────────────────────────────
     const { clientId, specificClient } = req.body;
 
     console.log(
@@ -142,7 +183,6 @@ const generateStatementsHandler = async (req, res) => {
       }`
     );
 
-    // Validate input for specific client generation
     if (specificClient && !clientId) {
       return res.status(400).json({
         success: false,
@@ -150,17 +190,16 @@ const generateStatementsHandler = async (req, res) => {
       });
     }
 
-    // Call the statement generation function
     const result = await generateMonthlyStatements(
       specificClient ? clientId : null,
       req.user.company_reg_num
     );
 
     console.log(`Statement generation completed: ${result.message}`);
-
     res.json(result);
+
   } catch (error) {
-    console.error("Error in manual statement generation:", error);
+    console.error("Error in statement generation:", error);
     res.status(500).json({
       success: false,
       message: "Internal server error during statement generation",
