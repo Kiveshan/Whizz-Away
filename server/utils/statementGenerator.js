@@ -83,8 +83,7 @@ function validateClients(clients, specificClientId) {
 }
 
 // ==================== PAYMENT AND CREDIT NOTE UTILITIES (FOR DISPLAY ONLY) ====================
-async function fetchPaymentsMap(dbClient, start, end) {
-  // Aggregate actual applied payments per client by exploding JSONB line_items
+async function fetchPaymentsMap(dbClient, start, end, company_reg_num) {
   const result = await dbClient.query(
     `SELECT
        p.clientid,
@@ -92,43 +91,45 @@ async function fetchPaymentsMap(dbClient, start, end) {
      FROM payment_m3 p
      CROSS JOIN LATERAL jsonb_array_elements(p.line_items) AS item
      WHERE (item->>'line_date')::date BETWEEN $1 AND $2
+       AND p.company_reg_num = $3
      GROUP BY p.clientid`,
-    [start, end]
+    [start, end, company_reg_num]
   );
   return new Map(
     result.rows.map((r) => [r.clientid, Number.parseFloat(r.total_payments) || 0])
   );
 }
 
-async function fetchCreditNotesMap(dbClient, start, end) {
+async function fetchCreditNotesMap(dbClient, start, end, company_reg_num) {
   const result = await dbClient.query(
     `SELECT cn.client_id, SUM(cn_amount.amount) as total_credit_notes
      FROM credit_notes cn
      CROSS JOIN LATERAL unnest(cn.amount) AS cn_amount(amount)
      WHERE cn.creditnote_date BETWEEN $1 AND $2
+       AND cn.company_reg_num = $3
      GROUP BY cn.client_id`,
-    [start, end]
+    [start, end, company_reg_num]
   );
   return new Map(result.rows.map(r => [r.client_id, Number.parseFloat(r.total_credit_notes) || 0]));
 }
 
 // ==================== STATEMENT UTILITIES ====================
-async function checkExistingStatement(dbClient, clientId, formattedGenDate) {
+async function checkExistingStatement(dbClient, clientId, formattedGenDate, company_reg_num) {
   const result = await dbClient.query(
-    "SELECT statement_key, agingid, groupid FROM statements WHERE clientid = $1 AND generation_date = $2",
-    [clientId, formattedGenDate]
+    "SELECT statement_key, agingid, groupid FROM statements WHERE clientid = $1 AND generation_date = $2 AND company_reg_num = $3",
+    [clientId, formattedGenDate, company_reg_num]
   );
   return result.rows.length > 0 ? result.rows[0] : null;
 }
 
-async function fetchPreviousStatementAging(dbClient, clientId, formattedGenDate) {
+async function fetchPreviousStatementAging(dbClient, clientId, formattedGenDate, company_reg_num) {
   const prevResult = await dbClient.query(
     `SELECT s.agingid
      FROM statements s
-     WHERE s.clientid = $1 AND s.generation_date < $2
+     WHERE s.clientid = $1 AND s.generation_date < $2 AND s.company_reg_num = $3
      ORDER BY s.generation_date DESC
      LIMIT 1`,
-    [clientId, formattedGenDate]
+    [clientId, formattedGenDate, company_reg_num]
   );
 
   if (prevResult.rows.length === 0) {
@@ -138,8 +139,8 @@ async function fetchPreviousStatementAging(dbClient, clientId, formattedGenDate)
   const agingResult = await dbClient.query(
     `SELECT current, "30days", "60days", "90days"
      FROM aging_analysis
-     WHERE aging_key = $1`,
-    [prevResult.rows[0].agingid]
+     WHERE aging_key = $1 AND company_reg_num = $2`,
+    [prevResult.rows[0].agingid, company_reg_num]
   );
 
   if (agingResult.rows.length === 0) {
@@ -157,10 +158,10 @@ async function fetchPreviousStatementAging(dbClient, clientId, formattedGenDate)
 }
 
 // ==================== NEW AGING CALCULATION FROM OUTSTANDING ITEMS ====================
-async function calculateAgingBucketsFromOutstanding(dbClient, clientId, genDate) {
+async function calculateAgingBucketsFromOutstanding(dbClient, clientId, genDate, company_reg_num) {
   // 1. Outstanding instructions (m1_controller)
   const instructionsQuery = `
-    SELECT 
+    SELECT
       i.date AS invoice_date,
       m1.total_cost,
       COALESCE(m1.vat, 0) AS vat,
@@ -169,24 +170,26 @@ async function calculateAgingBucketsFromOutstanding(dbClient, clientId, genDate)
     JOIN m1_controller m1 ON i.m1key = m1.m1key
     WHERE i.clientid = $1
       AND i.date <= $2
+      AND i.company_reg_num = $3
       AND m1.payment_status IN ('unpaid', 'partial')
   `;
 
   // 2. Outstanding add-ons
   const addonsQuery = `
-    SELECT 
+    SELECT
       date AS addon_date,
       amount,
       COALESCE(paid_amount, 0) AS paid_amount
     FROM add_ons
     WHERE client_id = $1
       AND date <= $2
+      AND company_reg_num = $3
       AND status IN ('unpaid', 'partial')
   `;
 
   const [instResult, addonResult] = await Promise.all([
-    dbClient.query(instructionsQuery, [clientId, genDate]),
-    dbClient.query(addonsQuery, [clientId, genDate])
+    dbClient.query(instructionsQuery, [clientId, genDate, company_reg_num]),
+    dbClient.query(addonsQuery, [clientId, genDate, company_reg_num])
   ]);
 
   let current = 0, _30days = 0, _60days = 0, _90days = 0;
@@ -239,12 +242,12 @@ async function createAgingAnalysis(dbClient, clientId, current, _30days, _60days
   return result.rows[0].aging_key;
 }
 
-async function updateAgingAnalysis(dbClient, agingId, current, _30days, _60days, _90days) {
+async function updateAgingAnalysis(dbClient, agingId, current, _30days, _60days, _90days, company_reg_num) {
   await dbClient.query(
     `UPDATE aging_analysis
      SET current = $2, "30days" = $3, "60days" = $4, "90days" = $5
-     WHERE aging_key = $1`,
-    [agingId, current, _30days, _60days, _90days]
+     WHERE aging_key = $1 AND company_reg_num = $6`,
+    [agingId, current, _30days, _60days, _90days, company_reg_num]
   );
 }
 
@@ -259,12 +262,12 @@ async function createStatement(dbClient, groupid, genDate, clientId, agingId, op
   return result.rows[0].statement_key;
 }
 
-async function updateStatement(dbClient, statementKey, groupid, openingBalance, genDate, insuranceAmount) {
+async function updateStatement(dbClient, statementKey, groupid, openingBalance, genDate, insuranceAmount, company_reg_num) {
   await dbClient.query(
     `UPDATE statements
      SET groupid = $2, opening_balance = $3, generation_date = $4, insurance_amount = $5
-     WHERE statement_key = $1`,
-    [statementKey, groupid, openingBalance, genDate, insuranceAmount]
+     WHERE statement_key = $1 AND company_reg_num = $6`,
+    [statementKey, groupid, openingBalance, genDate, insuranceAmount, company_reg_num]
   );
 }
 
@@ -278,7 +281,7 @@ async function processClient(dbClient, clientId, clientInsurance, dates, payment
     formattedPaymentEndDate
   } = dates;
 
-  const existingStatement = await checkExistingStatement(dbClient, clientId, formattedGenDate);
+  const existingStatement = await checkExistingStatement(dbClient, clientId, formattedGenDate, company_reg_num);
   const isUpdate = existingStatement !== null;
 
   const insuranceAmount = Number.parseFloat(clientInsurance) || 0;
@@ -288,21 +291,21 @@ async function processClient(dbClient, clientId, clientInsurance, dates, payment
 
   // Calculate fresh aging buckets from outstanding items
   const { newCurrent, new30days, new60days, new90days } =
-    await calculateAgingBucketsFromOutstanding(dbClient, clientId, agingAsOfDate);
+    await calculateAgingBucketsFromOutstanding(dbClient, clientId, agingAsOfDate, company_reg_num);
 
   console.log(
     `Client ${clientId}: Aging - Current: R${newCurrent.toFixed(2)}, 30days: R${new30days.toFixed(2)}, 60days: R${new60days.toFixed(2)}, 90days: R${new90days.toFixed(2)}`
   );
 
-  const { openingBalance } = await fetchPreviousStatementAging(dbClient, clientId, formattedGenDate);
+  const { openingBalance } = await fetchPreviousStatementAging(dbClient, clientId, formattedGenDate, company_reg_num);
   console.log(`Client ${clientId}: Opening balance: R${openingBalance.toFixed(2)}`);
 
   // groupid = null (we no longer rely on period groupid)
   const groupid = null;
 
   if (isUpdate) {
-    await updateAgingAnalysis(dbClient, existingStatement.agingid, newCurrent, new30days, new60days, new90days);
-    await updateStatement(dbClient, existingStatement.statement_key, groupid, openingBalance, formattedGenDate, insuranceAmount);
+    await updateAgingAnalysis(dbClient, existingStatement.agingid, newCurrent, new30days, new60days, new90days, company_reg_num);
+    await updateStatement(dbClient, existingStatement.statement_key, groupid, openingBalance, formattedGenDate, insuranceAmount, company_reg_num);
     console.log(`Client ${clientId}: Updated existing statement #${existingStatement.statement_key}`);
     return { processed: true, created: false, updated: true };
   } else {
@@ -332,8 +335,8 @@ async function generateMonthlyStatements(specificClientId = null, company_reg_nu
 
     // Fetch payments/credit notes for display only
     const [paymentsMap, creditNotesMap] = await Promise.all([
-      fetchPaymentsMap(dbClient, dates.formattedPaymentStartDate, dates.formattedPaymentEndDate),
-      fetchCreditNotesMap(dbClient, dates.formattedPaymentStartDate, dates.formattedPaymentEndDate)
+      fetchPaymentsMap(dbClient, dates.formattedPaymentStartDate, dates.formattedPaymentEndDate, company_reg_num),
+      fetchCreditNotesMap(dbClient, dates.formattedPaymentStartDate, dates.formattedPaymentEndDate, company_reg_num)
     ]);
 
     let processedCount = 0, createdCount = 0, updatedCount = 0;
