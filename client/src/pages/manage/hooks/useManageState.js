@@ -438,7 +438,7 @@ function manageReducer(state, action) {
           ...state.driverRatePeriods,
           {
             m5ratekey: null,
-            effective_from: new Date().toISOString().split("T")[0],
+            effective_from: "",
             effective_to: "",
             driver_six_meter_rate: "",
             driver_twelve_meter_rate: "",

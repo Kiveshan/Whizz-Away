@@ -58,7 +58,9 @@ const DriverRatePeriodsForm = ({
       if (card.effective_to) params.append("effective_to", card.effective_to)
       if (card.m5ratekey) params.append("exclude_id", card.m5ratekey.toString())
       const res = await api.get(`/api/driver-rates/check-overlaps?${params}`)
-      onChangePeriod(index, "_overlapWarning", res.data?.hasOverlaps ? res.data.message : null)
+      const hasOverlap = res.data?.hasOverlaps
+      onChangePeriod(index, "_overlapWarning", hasOverlap ? res.data.message : null)
+      if (!hasOverlap) clearCardError(index)
     } catch (_) {
       onChangePeriod(index, "_overlapWarning", null)
     }
@@ -159,6 +161,9 @@ const DriverRatePeriodsForm = ({
         (card.subie_twelve_meter_rate !== "" && card.subie_twelve_meter_rate != null)
       if (!hasRate) {
         msgs.push("At least one rate value is required")
+      }
+      if (card._overlapWarning) {
+        msgs.push("This period overlaps with another — fix the dates before saving")
       }
       if (msgs.length) errors[index] = msgs
     })
