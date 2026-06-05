@@ -642,7 +642,18 @@ export const getPeriodsForRoute = async (startingpoint, destination) => {
 }
 
 // Replace-all: delete existing periods for the route then bulk-insert the new set
+// Collapse any sequence of whitespace to a single space and strip leading/trailing
+// whitespace so "Cape Town " and "Cape  Town" both normalize to "Cape Town".
+const normalizeName = (s) => (s || "").trim().replace(/\s+/g, " ")
+
 export const saveRoutePeriods = async (startingpoint, destination, periods, originalStartingpoint, originalDestination) => {
+  // Normalize before anything touches the DB so misspaced names can never
+  // create phantom duplicate routes.
+  startingpoint = normalizeName(startingpoint)
+  destination   = normalizeName(destination)
+  if (originalStartingpoint) originalStartingpoint = normalizeName(originalStartingpoint)
+  if (originalDestination)   originalDestination   = normalizeName(originalDestination)
+
   const deleteSp = originalStartingpoint || startingpoint
   const deleteDest = originalDestination || destination
   const isRename =
