@@ -3,9 +3,18 @@
 import api from "../../../../api.js"
 import Swal from "sweetalert2"
 
+const isCoveredByPeriods = (dateStr, periods) =>
+  periods.some((card) => {
+    if (!card.effective_from) return false
+    if (dateStr < card.effective_from) return false
+    if (card.effective_to && dateStr > card.effective_to) return false
+    return true
+  })
+
 const DriverRatePeriodsForm = ({
   route,
   periods,
+  legDates = [],
   loading,
   onSave,
   onCancel,
@@ -14,6 +23,16 @@ const DriverRatePeriodsForm = ({
   onChangePeriod,
 }) => {
   const { startingpoint, destination } = route
+
+  // Compute coverage gaps on every render — fires automatically when periods change
+  const uncoveredByInstruction = legDates.reduce((acc, leg) => {
+    const d = leg.date ? leg.date.toString().split("T")[0] : null
+    if (!d || isCoveredByPeriods(d, periods)) return acc
+    if (!acc[leg.m1key]) acc[leg.m1key] = []
+    acc[leg.m1key].push(d)
+    return acc
+  }, {})
+  const uncoveredInstructions = Object.entries(uncoveredByInstruction)
 
   const checkOverlap = async (index, card) => {
     if (!card.effective_from) return
@@ -122,6 +141,24 @@ const DriverRatePeriodsForm = ({
           </button>
         </div>
       </div>
+
+      {/* Coverage gap banner */}
+      {uncoveredInstructions.length > 0 && (
+        <div className="drf-coverage-warning">
+          <span className="drf-warning-icon">⚠</span>
+          <div className="drf-coverage-warning-body">
+            <strong>Some legs fall outside all current periods and will have no rate:</strong>
+            <ul className="drf-coverage-list">
+              {uncoveredInstructions.map(([instrNum, dates]) => (
+                <li key={instrNum}>
+                  Instruction <strong>#{instrNum}</strong> — leg date{dates.length > 1 ? "s" : ""}: {dates.join(", ")}
+                </li>
+              ))}
+            </ul>
+            Ensure you add or extend a period to cover these dates before saving.
+          </div>
+        </div>
+      )}
 
       {/* Cards grid */}
       <div className="drf-cards-grid">

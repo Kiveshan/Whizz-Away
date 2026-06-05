@@ -761,6 +761,31 @@ export const getRouteOptions = async () => {
   }
 }
 
+// All leg dates for in-progress instructions that use this route — used to check coverage gaps
+export const getRouteLegDates = async (startingpoint, destination) => {
+  let client
+  try {
+    client = await pool.connect()
+    const result = await client.query(
+      `SELECT l.m1key, l.date::text AS date
+       FROM legs_m2 l
+       INNER JOIN m1_controller c ON c.m1key = l.m1key
+       WHERE LOWER(COALESCE(c.status, '')) = 'in progress'
+         AND LOWER(TRIM(COALESCE(l.startingpoint, ''))) = LOWER(TRIM(COALESCE($1, '')))
+         AND LOWER(TRIM(COALESCE(l.destination, ''))) = LOWER(TRIM(COALESCE($2, '')))
+         AND l.date IS NOT NULL
+       ORDER BY l.date ASC`,
+      [startingpoint, destination],
+    )
+    return { success: true, data: result.rows }
+  } catch (err) {
+    console.error("Error fetching route leg dates:", err)
+    throw err
+  } finally {
+    if (client) client.release()
+  }
+}
+
 // Refresh legs_m2.driverrate for a set of instructions, respecting effective dates.
 // For each leg, the rate is looked up using the leg's own date so that legs in different
 // rate periods within the same instruction each receive the correct rate version.

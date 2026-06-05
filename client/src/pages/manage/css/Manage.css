@@ -1869,6 +1869,40 @@ tr:hover {
   font-size: 0.85rem;
 }
 
+/* Coverage gap banner — shown when in-progress leg dates fall outside all periods */
+.drf-coverage-warning {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  background: #fff3cd;
+  border-left: 4px solid #e67e22;
+  border-radius: 6px;
+  padding: 12px 16px;
+  margin-bottom: 16px;
+  font-size: 0.82rem;
+  color: #7a4f00;
+  line-height: 1.5;
+}
+
+.drf-coverage-warning .drf-warning-icon {
+  font-size: 1.1rem;
+  margin-top: 2px;
+  flex-shrink: 0;
+}
+
+.drf-coverage-warning-body {
+  flex: 1;
+}
+
+.drf-coverage-list {
+  margin: 6px 0 6px 16px;
+  padding: 0;
+}
+
+.drf-coverage-list li {
+  margin-bottom: 3px;
+}
+
 /* Add Period tile */
 .drf-add-tile {
   background: #ffffff;

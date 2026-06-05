@@ -675,8 +675,14 @@ export function useApi(state, actions) {
       actions.setLoading(true)
       try {
         const params = new URLSearchParams({ startingpoint, destination })
-        const response = await api.get(`/api/driver-rates/route-periods?${params}`)
-        const periods = response.data
+
+        // Fetch periods and leg dates in parallel
+        const [periodsResp, legDatesResp] = await Promise.all([
+          api.get(`/api/driver-rates/route-periods?${params}`),
+          api.get(`/api/driver-rates/route-leg-dates?${params}`).catch(() => ({ data: [] })),
+        ])
+        const periods = periodsResp.data
+        const legDates = Array.isArray(legDatesResp.data) ? legDatesResp.data : []
 
         // Attach overlap warnings to each existing period
         const periodsWithWarnings = await Promise.all(
@@ -708,7 +714,7 @@ export function useApi(state, actions) {
           }),
         )
 
-        actions.showPeriods(startingpoint, destination, periodsWithWarnings)
+        actions.showPeriods(startingpoint, destination, periodsWithWarnings, legDates)
       } catch (err) {
         console.error("Error loading route for edit:", err)
         actions.showAlert("Failed to load rate periods for this route")
@@ -744,25 +750,62 @@ export function useApi(state, actions) {
           }
         }
 
-        // Check if any in-progress instructions are using this route
+        // Check if any in-progress instructions are using this route AND a rate value changed
         let affectedInstructions = []
         try {
-          const usageParams = new URLSearchParams({ startingpoint, destination })
-          const usageResp = await api.get(`/api/driver-rates/route-usage?${usageParams}`)
+          const routeParams = new URLSearchParams({ startingpoint, destination })
+
+          // Fetch current DB periods and usage check in parallel
+          const [dbPeriodsResp, usageResp] = await Promise.all([
+            api.get(`/api/driver-rates/route-periods?${routeParams}`),
+            api.get(`/api/driver-rates/route-usage?${routeParams}`),
+          ])
+
           if (usageResp.data?.inUse) {
-            affectedInstructions = usageResp.data.instructions || []
-            const instrText = affectedInstructions.join(", ")
-            const confirmed = await showConfirmDialog(
-              "Rate Change Warning",
-              `<div style="text-align:left;">
-                <div style="margin-bottom:10px;"><strong>Changing these rates will update the following in-progress instructions:</strong></div>
-                <div style="margin-bottom:10px;"><strong>Instruction no:</strong> ${instrText}</div>
-                <div>The driver rate on their legs will be recalculated to match the new periods.</div>
-              </div>`,
-              "Continue",
-              { html: true },
-            )
-            if (!confirmed) return false
+            const rateFields = [
+              "driver_six_meter_rate",
+              "driver_twelve_meter_rate",
+              "subie_six_meter_rate",
+              "subie_twelve_meter_rate",
+            ]
+
+            const rateChanged = (a, b) => {
+              const na = a === "" || a == null ? null : Number(a)
+              const nb = b === "" || b == null ? null : Number(b)
+              if (na === null && nb === null) return false
+              if (na === null || nb === null) return true
+              return Math.abs(na - nb) >= 0.005
+            }
+
+            // Build a lookup of DB periods by m5ratekey
+            const dbById = {}
+            for (const p of dbPeriodsResp.data) {
+              if (p.m5ratekey) dbById[p.m5ratekey] = p
+            }
+
+            // A rate change exists if any existing period has at least one changed rate field
+            const hasRateChange = periods.some((card) => {
+              if (!card.m5ratekey) return false // new card — no prior value to compare
+              const db = dbById[card.m5ratekey]
+              if (!db) return false
+              return rateFields.some((f) => rateChanged(card[f], db[f]))
+            })
+
+            if (hasRateChange) {
+              affectedInstructions = usageResp.data.instructions || []
+              const instrText = affectedInstructions.join(", ")
+              const confirmed = await showConfirmDialog(
+                "Rate Change Warning",
+                `<div style="text-align:left;">
+                  <div style="margin-bottom:10px;"><strong>Changing these rates will update the following in-progress instructions:</strong></div>
+                  <div style="margin-bottom:10px;"><strong>Instruction no:</strong> ${instrText}</div>
+                  <div>The driver rate on their legs will be recalculated to match the new periods.</div>
+                </div>`,
+                "Continue",
+                { html: true },
+              )
+              if (!confirmed) return false
+            }
           }
         } catch (usageErr) {
           console.error("Error checking route usage before save:", usageErr)

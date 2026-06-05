@@ -120,6 +120,7 @@ const initialState = {
   showDriverRatePeriods: false,
   editingRoute: { startingpoint: "", destination: "" },
   driverRatePeriods: [],
+  routeLegDates: [],
 
   // Form States
   showEmployeeForm: false,
@@ -418,6 +419,7 @@ function manageReducer(state, action) {
         showDriverRatePeriods: true,
         editingRoute: action.payload.route,
         driverRatePeriods: action.payload.periods,
+        routeLegDates: action.payload.legDates,
       }
 
     case "HIDE_DRIVER_RATE_PERIODS":
@@ -426,6 +428,7 @@ function manageReducer(state, action) {
         showDriverRatePeriods: false,
         editingRoute: { startingpoint: "", destination: "" },
         driverRatePeriods: [],
+        routeLegDates: [],
       }
 
     case "ADD_PERIOD_CARD":
@@ -529,10 +532,10 @@ export function useManageState() {
     }, []),
 
     // Driver rate periods actions
-    showPeriods: useCallback((startingpoint, destination, periods) => {
+    showPeriods: useCallback((startingpoint, destination, periods, legDates = []) => {
       dispatch({
         type: "SHOW_DRIVER_RATE_PERIODS",
-        payload: { route: { startingpoint, destination }, periods },
+        payload: { route: { startingpoint, destination }, periods, legDates },
       })
     }, []),
 

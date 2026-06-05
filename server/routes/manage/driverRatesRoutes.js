@@ -12,6 +12,7 @@ import {
   getPeriodsForRouteHandler,
   saveRoutePeriodsHandler,
   deleteRouteHandler,
+  getRouteLegDatesHandler,
   getRouteUsageCheckHandler,
   getRouteOptionsHandler,
 } from "../../controllers/manage/driverRatesController.js";
@@ -24,6 +25,7 @@ router.get("/api/driver-rates/routes", verifyToken, getDistinctRoutesHandler);
 router.get("/api/driver-rates/route-periods", verifyToken, getPeriodsForRouteHandler);
 router.post("/api/driver-rates/route-periods", verifyToken, saveRoutePeriodsHandler);
 router.delete("/api/driver-rates/route", verifyToken, deleteRouteHandler);
+router.get("/api/driver-rates/route-leg-dates", verifyToken, getRouteLegDatesHandler);
 router.get("/api/driver-rates/route-usage", verifyToken, getRouteUsageCheckHandler);
 router.get("/api/driver-rates/route-options", verifyToken, getRouteOptionsHandler);
 

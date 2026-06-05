@@ -596,6 +596,7 @@ const Manage = () => {
             <DriverRatePeriodsForm
               route={state.editingRoute}
               periods={state.driverRatePeriods}
+              legDates={state.routeLegDates}
               loading={state.loading}
               onSave={api.saveRoutePeriods}
               onCancel={actions.hidePeriods}

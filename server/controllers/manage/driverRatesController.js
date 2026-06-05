@@ -12,6 +12,7 @@ import {
   saveRoutePeriods,
   getRouteUsage,
   deleteRoute,
+  getRouteLegDates,
   getRouteOptions,
 } from "../../models/manage/driverRatesModel.js"
 
@@ -387,6 +388,20 @@ const deleteRouteHandler = async (req, res) => {
   }
 }
 
+const getRouteLegDatesHandler = async (req, res) => {
+  try {
+    const { startingpoint, destination } = req.query
+    if (!startingpoint || !destination) {
+      return res.status(400).json({ error: "startingpoint and destination are required" })
+    }
+    const result = await getRouteLegDates(startingpoint, destination)
+    res.json(result.data)
+  } catch (err) {
+    console.error("Error fetching route leg dates:", err)
+    res.status(500).json({ error: "Failed to fetch route leg dates" })
+  }
+}
+
 const getRouteUsageCheckHandler = async (req, res) => {
   try {
     const { startingpoint, destination } = req.query
@@ -424,6 +439,7 @@ export {
   getPeriodsForRouteHandler,
   saveRoutePeriodsHandler,
   deleteRouteHandler,
+  getRouteLegDatesHandler,
   getRouteUsageCheckHandler,
   getRouteOptionsHandler,
 }
