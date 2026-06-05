@@ -847,7 +847,7 @@ const newDriver = {
             driverRate: "0",
             _rateEffectiveFrom: null,
             _rateEffectiveTo: null,
-            _rateExplicitlyZero: true,
+            _rateExplicitlyZero: true, // Flag to prevent useEffect from overwriting
           };
           console.log("Updated driver with zero rate:", updated[driverIndex]);
           return updated;
