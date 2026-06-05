@@ -1,7 +1,7 @@
 
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import "../css/UpdateInstruction.css";
 import api from "../../../api";
@@ -758,7 +758,7 @@ const newDriver = {
   // silent=true is used by the leg-entry refresh loop so individual driver calls
   // don't flicker the banner mid-loop. The loop sets the banner once after all
   // drivers are checked. silent=false (default) is normal user-interaction behaviour.
-  const handleDriverDateChange = async (driverIndex, newDate, silent = false) => {
+  const handleDriverDateChange = useCallback(async (driverIndex, newDate, silent = false) => {
     console.log(`[handleDriverDateChange] Driver ${driverIndex}, new date: ${newDate}`);
     console.log(`[handleDriverDateChange] Route: ${formData.startingPoint} -> ${formData.destination}`);
 
@@ -857,7 +857,9 @@ const newDriver = {
       console.error("Error fetching rate for date change (non-404):", error);
       return { hadError: false };
     }
-  };
+  // Deps: re-create only when the route or driver-role data changes so the
+  // useEffect([isLegSwitching]) refresh loop always closes over current values.
+  }, [formData.startingPoint, formData.destination, employeeDrivers]);
 
   // Replace the handleBackClick function with this version
 const handleBackClick = () => {
@@ -1171,7 +1173,7 @@ const missingItems = await checkContainersReachDropoff(dropoff);
         setRateError(firstError);
       }
     })();
-  }, [isLegSwitching]);
+  }, [isLegSwitching, handleDriverDateChange]);
 useEffect(() => {
   // Don't update rates if we're currently switching legs or if instruction is completed
   if (isLegSwitching || drivers.length === 0 || isCompleted) {
