@@ -1,6 +1,41 @@
 "use client"
 
+import { useState, useEffect } from "react"
+import api from "../../../../api.js"
+
 const DriverRateForm = ({ driverRate, loading, isEditing, onSave, onCancel, onChange }) => {
+  const [routeOptions, setRouteOptions] = useState([])
+  const [duplicateWarning, setDuplicateWarning] = useState("")
+
+  // Load existing routes for autocomplete once on mount
+  useEffect(() => {
+    api.get("/api/driver-rates/route-options")
+      .then((res) => setRouteOptions(Array.isArray(res.data) ? res.data : []))
+      .catch(() => setRouteOptions([]))
+  }, [])
+
+  // Warn if the typed route already exists
+  useEffect(() => {
+    if (!driverRate.startingpoint || !driverRate.destination) {
+      setDuplicateWarning("")
+      return
+    }
+    const sp = driverRate.startingpoint.trim().toLowerCase()
+    const dest = driverRate.destination.trim().toLowerCase()
+    const exists = routeOptions.some(
+      (r) =>
+        r.startingpoint.trim().toLowerCase() === sp &&
+        r.destination.trim().toLowerCase() === dest,
+    )
+    setDuplicateWarning(
+      exists
+        ? "This route already exists. Use Edit on the route to add a new period instead."
+        : "",
+    )
+  }, [driverRate.startingpoint, driverRate.destination, routeOptions])
+
+  const startingpoints = [...new Set(routeOptions.map((r) => r.startingpoint))]
+  const destinations = [...new Set(routeOptions.map((r) => r.destination))]
   const hasOverlap = Boolean(driverRate?._overlapWarning)
 
   const handleSubmit = async (e) => {
@@ -39,7 +74,7 @@ const DriverRateForm = ({ driverRate, loading, isEditing, onSave, onCancel, onCh
 
   return (
     <form onSubmit={handleSubmit} className="manage-driver-rate-form" noValidate>
-      <h2 className="manage-form-title">{isEditing ? "Edit Rate" : "Add Rate"}</h2>
+      <h2 className="manage-form-title">{isEditing ? "Edit Rate" : "New Route"}</h2>
 
       <div className="manage-form-group">
         <div className="form-row">
@@ -50,10 +85,16 @@ const DriverRateForm = ({ driverRate, loading, isEditing, onSave, onCancel, onCh
             <input
               type="text"
               className="form-input"
+              list="startingpoint-options"
               value={driverRate.startingpoint || ""}
               onChange={(e) => onChange("startingpoint", e.target.value)}
               required
             />
+            <datalist id="startingpoint-options">
+              {startingpoints.map((sp) => (
+                <option key={sp} value={sp} />
+              ))}
+            </datalist>
           </div>
           <div className="form-field">
             <label>
@@ -62,12 +103,33 @@ const DriverRateForm = ({ driverRate, loading, isEditing, onSave, onCancel, onCh
             <input
               type="text"
               className="form-input"
+              list="destination-options"
               value={driverRate.destination || ""}
               onChange={(e) => onChange("destination", e.target.value)}
               required
             />
+            <datalist id="destination-options">
+              {destinations.map((dest) => (
+                <option key={dest} value={dest} />
+              ))}
+            </datalist>
           </div>
         </div>
+
+        {duplicateWarning && (
+          <div
+            style={{
+              padding: "10px",
+              backgroundColor: "#fff3cd",
+              border: "1px solid #ffc107",
+              borderRadius: "4px",
+              marginBottom: "10px",
+              color: "#856404",
+            }}
+          >
+            <strong>⚠ Note:</strong> {duplicateWarning}
+          </div>
+        )}
 
         <div className="form-row">
           <div className="form-field">

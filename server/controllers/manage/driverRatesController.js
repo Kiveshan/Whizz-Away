@@ -7,6 +7,12 @@ import {
   getDriverRateUsage,
   refreshDriverRateLegsForInstructions,
   checkRateDateOverlaps,
+  getDistinctRoutes,
+  getPeriodsForRoute,
+  saveRoutePeriods,
+  getRouteUsage,
+  deleteRoute,
+  getRouteOptions,
 } from "../../models/manage/driverRatesModel.js"
 
 const getAllDriverRatesHandler = async (req, res) => {
@@ -285,6 +291,126 @@ const checkRateDateOverlapsHandler = async (req, res) => {
   }
 }
 
+// ─── Route-grouped handlers (new UX) ────────────────────────────────────────
+
+const getDistinctRoutesHandler = async (req, res) => {
+  try {
+    const { page = 1, limit = 10, search = "" } = req.query
+    const pageNum = parseInt(page)
+    const limitNum = parseInt(limit)
+    const offset = (pageNum - 1) * limitNum
+
+    const result = await getDistinctRoutes({ offset, limit: limitNum, search })
+
+    res.json({
+      items: result.routes,
+      currentPage: pageNum,
+      totalPages: Math.ceil(result.totalCount / limitNum),
+      totalItems: result.totalCount,
+      itemsPerPage: limitNum,
+    })
+  } catch (err) {
+    console.error("Error fetching distinct routes:", err)
+    res.status(500).json({ error: "Failed to fetch routes" })
+  }
+}
+
+const getPeriodsForRouteHandler = async (req, res) => {
+  try {
+    const { startingpoint, destination } = req.query
+    if (!startingpoint || !destination) {
+      return res.status(400).json({ error: "startingpoint and destination are required" })
+    }
+    const result = await getPeriodsForRoute(startingpoint, destination)
+    if (!result.success) return res.status(500).json({ error: "Failed to fetch periods" })
+    res.json(result.data)
+  } catch (err) {
+    console.error("Error fetching periods for route:", err)
+    res.status(500).json({ error: "Failed to fetch periods for route" })
+  }
+}
+
+const saveRoutePeriodsHandler = async (req, res) => {
+  try {
+    const { startingpoint, destination, periods } = req.body
+
+    if (!startingpoint || !destination) {
+      return res.status(400).json({ error: "startingpoint and destination are required" })
+    }
+    if (!Array.isArray(periods) || periods.length === 0) {
+      return res.status(400).json({ error: "At least one period is required" })
+    }
+
+    for (const period of periods) {
+      if (!period.effective_from) {
+        return res.status(400).json({ error: "Each period must have an effective_from date" })
+      }
+      const hasAtLeastOneRate =
+        (period.driver_six_meter_rate !== "" && period.driver_six_meter_rate != null) ||
+        (period.driver_twelve_meter_rate !== "" && period.driver_twelve_meter_rate != null) ||
+        (period.subie_six_meter_rate !== "" && period.subie_six_meter_rate != null) ||
+        (period.subie_twelve_meter_rate !== "" && period.subie_twelve_meter_rate != null)
+      if (!hasAtLeastOneRate) {
+        return res.status(400).json({ error: "Each period must have at least one rate value" })
+      }
+    }
+
+    const result = await saveRoutePeriods(startingpoint, destination, periods)
+    res.json(result.data)
+  } catch (err) {
+    console.error("Error saving route periods:", err)
+    res.status(500).json({ error: "Failed to save route periods" })
+  }
+}
+
+const deleteRouteHandler = async (req, res) => {
+  try {
+    const { startingpoint, destination } = req.query
+
+    if (!startingpoint || !destination) {
+      return res.status(400).json({ error: "startingpoint and destination are required" })
+    }
+
+    const usageResult = await getRouteUsage(startingpoint, destination)
+    if (usageResult.success && usageResult.data.inUse) {
+      return res.status(409).json({
+        error: "This route cannot be deleted while it is being used in instructions",
+        instructions: usageResult.data.instructions,
+      })
+    }
+
+    await deleteRoute(startingpoint, destination)
+    res.json({ message: "Route deleted successfully" })
+  } catch (err) {
+    console.error("Error deleting route:", err)
+    res.status(500).json({ error: "Failed to delete route" })
+  }
+}
+
+const getRouteUsageCheckHandler = async (req, res) => {
+  try {
+    const { startingpoint, destination } = req.query
+    if (!startingpoint || !destination) {
+      return res.status(400).json({ error: "startingpoint and destination are required" })
+    }
+    const result = await getRouteUsage(startingpoint, destination)
+    res.json(result.data)
+  } catch (err) {
+    console.error("Error checking route usage:", err)
+    res.status(500).json({ error: "Failed to check route usage" })
+  }
+}
+
+const getRouteOptionsHandler = async (req, res) => {
+  try {
+    const result = await getRouteOptions()
+    res.json(result.data)
+  } catch (err) {
+    console.error("Error fetching route options:", err)
+    res.status(500).json({ error: "Failed to fetch route options" })
+  }
+}
+
 export {
   getAllDriverRatesHandler,
   getDriverRateByIdHandler,
@@ -294,4 +420,10 @@ export {
   getDriverRateUsageHandler,
   refreshDriverRateLegsHandler,
   checkRateDateOverlapsHandler,
+  getDistinctRoutesHandler,
+  getPeriodsForRouteHandler,
+  saveRoutePeriodsHandler,
+  deleteRouteHandler,
+  getRouteUsageCheckHandler,
+  getRouteOptionsHandler,
 }

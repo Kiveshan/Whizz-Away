@@ -35,6 +35,7 @@ import TrailerForm from "../components/trailers/TrailerForm"
 // Driver Rate Components
 import DriverRatesTable from "../components/rates/DriverRatesTable"
 import DriverRateForm from "../components/rates/DriverRateForm"
+import DriverRatePeriodsForm from "../components/rates/DriverRatePeriodsForm"
 
 // Subcontractor Components
 import SubcontractorTable from "../components/subcontractors/SubcontractorTable"
@@ -97,6 +98,7 @@ const Manage = () => {
       state.showTruckForm ||
       state.showTrailerForm ||
       state.showDriverRateForm ||
+      state.showDriverRatePeriods ||
       state.showSubcontractorForm ||
       state.showSupplierForm ||
       state.showExpenseTypeForm ||
@@ -110,6 +112,7 @@ const Manage = () => {
       actions.hideForm("showTruckForm")
       actions.hideForm("showTrailerForm")
       actions.hideForm("showDriverRateForm")
+      actions.hidePeriods()
       actions.hideForm("showSubcontractorForm")
       actions.hideForm("showSupplierForm")
       actions.hideForm("showExpenseTypeForm")
@@ -252,8 +255,8 @@ const Manage = () => {
     }
   }
 
-  const handleDriverRateEdit = (id) => {
-    api.loadItemForEdit("rate", id)
+  const handleDriverRateEdit = (startingpoint, destination) => {
+    api.loadRouteForEdit(startingpoint, destination)
   }
 
   const handleDriverRateAdd = () => {
@@ -589,7 +592,18 @@ const Manage = () => {
       {/* Driver Rates Tab */}
       {state.activeTab === "rates" && (
         <>
-          {state.showDriverRateForm ? (
+          {state.showDriverRatePeriods ? (
+            <DriverRatePeriodsForm
+              route={state.editingRoute}
+              periods={state.driverRatePeriods}
+              loading={state.loading}
+              onSave={api.saveRoutePeriods}
+              onCancel={actions.hidePeriods}
+              onAddPeriod={actions.addPeriodCard}
+              onRemovePeriod={actions.removePeriodCard}
+              onChangePeriod={actions.updatePeriodCard}
+            />
+          ) : state.showDriverRateForm ? (
             <DriverRateForm
               driverRate={state.newDriverRate}
               loading={state.loading}
@@ -603,8 +617,8 @@ const Manage = () => {
               driverRates={state.driverRates}
               loading={state.loading}
               error={state.error}
-              onEdit={handleDriverRateEdit}
-              onDelete={(id) => api.deleteItem("rate", id)}
+              onEdit={(sp, dest) => api.loadRouteForEdit(sp, dest)}
+              onDelete={(sp, dest) => api.deleteRoute(sp, dest)}
               onAdd={handleDriverRateAdd}
               pagination={state.pagination.driverRates}
               onPageChange={(page) => api.changePage("driverRates", page)}

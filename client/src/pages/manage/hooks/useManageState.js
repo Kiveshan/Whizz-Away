@@ -116,6 +116,11 @@ const initialState = {
     },
   },
 
+  // Driver rate periods view (edit route → card-based period editor)
+  showDriverRatePeriods: false,
+  editingRoute: { startingpoint: "", destination: "" },
+  driverRatePeriods: [],
+
   // Form States
   showEmployeeForm: false,
   showClientForm: false,
@@ -406,6 +411,57 @@ function manageReducer(state, action) {
     case "HIDE_ALERT":
       return { ...state, showAlert: false, alertMessage: "" }
 
+    // Driver rate periods (card-based edit view)
+    case "SHOW_DRIVER_RATE_PERIODS":
+      return {
+        ...state,
+        showDriverRatePeriods: true,
+        editingRoute: action.payload.route,
+        driverRatePeriods: action.payload.periods,
+      }
+
+    case "HIDE_DRIVER_RATE_PERIODS":
+      return {
+        ...state,
+        showDriverRatePeriods: false,
+        editingRoute: { startingpoint: "", destination: "" },
+        driverRatePeriods: [],
+      }
+
+    case "ADD_PERIOD_CARD":
+      return {
+        ...state,
+        driverRatePeriods: [
+          ...state.driverRatePeriods,
+          {
+            m5ratekey: null,
+            effective_from: new Date().toISOString().split("T")[0],
+            effective_to: "",
+            driver_six_meter_rate: "",
+            driver_twelve_meter_rate: "",
+            subie_six_meter_rate: "",
+            subie_twelve_meter_rate: "",
+            _overlapWarning: null,
+          },
+        ],
+      }
+
+    case "REMOVE_PERIOD_CARD":
+      return {
+        ...state,
+        driverRatePeriods: state.driverRatePeriods.filter((_, i) => i !== action.payload),
+      }
+
+    case "UPDATE_PERIOD_CARD":
+      return {
+        ...state,
+        driverRatePeriods: state.driverRatePeriods.map((card, i) =>
+          i === action.payload.index
+            ? { ...card, [action.payload.field]: action.payload.value }
+            : card,
+        ),
+      }
+
     default:
       return state
   }
@@ -470,6 +526,30 @@ export function useManageState() {
 
     hideAlert: useCallback(() => {
       dispatch({ type: "HIDE_ALERT" })
+    }, []),
+
+    // Driver rate periods actions
+    showPeriods: useCallback((startingpoint, destination, periods) => {
+      dispatch({
+        type: "SHOW_DRIVER_RATE_PERIODS",
+        payload: { route: { startingpoint, destination }, periods },
+      })
+    }, []),
+
+    hidePeriods: useCallback(() => {
+      dispatch({ type: "HIDE_DRIVER_RATE_PERIODS" })
+    }, []),
+
+    addPeriodCard: useCallback(() => {
+      dispatch({ type: "ADD_PERIOD_CARD" })
+    }, []),
+
+    removePeriodCard: useCallback((index) => {
+      dispatch({ type: "REMOVE_PERIOD_CARD", payload: index })
+    }, []),
+
+    updatePeriodCard: useCallback((index, field, value) => {
+      dispatch({ type: "UPDATE_PERIOD_CARD", payload: { index, field, value } })
     }, []),
   }
 

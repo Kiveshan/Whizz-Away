@@ -311,10 +311,12 @@
 .manage-driver-rate-form {
   max-width: 800px;
   margin: auto;
-  padding: 20px;
-  background: #f9fafb;
-  border-radius: 8px;
-  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+  padding: 24px;
+  background: linear-gradient(135deg, #f0f4ff 0%, #ffffff 100%);
+  border-radius: 10px;
+  border: 1px solid #dfe4ff;
+  border-left: 4px solid #4169e1;
+  box-shadow: 0 4px 12px rgba(65, 105, 225, 0.1);
   display: flex;
   flex-direction: column;
   gap: 15px;
@@ -487,6 +489,17 @@
   overflow-x: auto;
   margin-bottom: 20px;
   margin-top: -30px;
+}
+
+/* Routes table override — wider than the 800px global default */
+.manage-DriverRates-table1 {
+  overflow-x: auto;
+  margin-bottom: 20px;
+}
+
+.manage-DriverRates-table1 table {
+  width: 100%;
+  min-width: 600px;
 }
 
 table {
@@ -1624,6 +1637,298 @@ tr:hover {
 
   .company-save-button,
   .company-cancel-button {
+    width: 100%;
+  }
+}
+
+/* ── Driver Rate Period Badge (routes table) ─────────────────────────────── */
+.drf-period-badge {
+  display: inline-block;
+  background: #e6e6fa;
+  color: #4169e1;
+  border: 1px solid #b3c0ff;
+  border-radius: 12px;
+  padding: 2px 10px;
+  font-size: 0.78em;
+  font-weight: 600;
+  letter-spacing: 0.2px;
+}
+
+/* ── Driver Rate Periods Form ─────────────────────────────────────────────── */
+.drf-wrapper {
+  width: 100%;
+  padding: 0 4px;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+}
+
+/* Page header: route breadcrumb + action buttons */
+.drf-page-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 12px;
+  background: linear-gradient(135deg, #f0f4ff 0%, #ffffff 100%);
+  border: 1px solid #b3c0ff;
+  border-left: 4px solid #4169e1;
+  border-radius: 8px;
+  padding: 14px 20px;
+  margin-bottom: 24px;
+  box-shadow: 0 2px 6px rgba(65, 105, 225, 0.08);
+}
+
+.drf-route-badge {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 1.05rem;
+  font-weight: 700;
+  color: #2c3e50;
+}
+
+.drf-route-point {
+  background: #e6e6fa;
+  color: #4169e1;
+  border-radius: 6px;
+  padding: 4px 12px;
+  font-size: 0.95rem;
+  font-weight: 700;
+  letter-spacing: 0.3px;
+}
+
+.drf-route-arrow {
+  color: #9ca3af;
+  font-size: 1.1rem;
+}
+
+.drf-header-actions {
+  display: flex;
+  gap: 10px;
+}
+
+/* Cards grid */
+.drf-cards-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px;
+  align-items: flex-start;
+  margin-bottom: 8px;
+}
+
+/* Individual period card */
+.drf-card {
+  background: #ffffff;
+  border: 1px solid #dfe4ff;
+  border-radius: 10px;
+  min-width: 260px;
+  flex: 1 1 260px;
+  max-width: 320px;
+  box-shadow: 0 2px 6px rgba(65, 105, 225, 0.07);
+  overflow: hidden;
+  transition: box-shadow 0.2s ease;
+}
+
+.drf-card:hover {
+  box-shadow: 0 4px 12px rgba(65, 105, 225, 0.15);
+}
+
+.drf-card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  background: #e6e6fa;
+  padding: 8px 14px;
+  border-bottom: 1px solid #dfe4ff;
+}
+
+.drf-period-label {
+  font-size: 0.82rem;
+  font-weight: 700;
+  color: #4169e1;
+  letter-spacing: 0.3px;
+  text-transform: uppercase;
+}
+
+.drf-remove-btn {
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: #e74c3c;
+  font-size: 0.85rem;
+  font-weight: 700;
+  padding: 2px 4px;
+  border-radius: 4px;
+  line-height: 1;
+  transition: background 0.15s, color 0.15s;
+}
+
+.drf-remove-btn:hover {
+  background: #fde8e8;
+  color: #c0392b;
+}
+
+.drf-card-body {
+  padding: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+/* Dates row inside card */
+.drf-dates-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+
+/* Rate fields 2×2 grid */
+.drf-rates-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+
+.drf-field {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.drf-label {
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: #374151;
+}
+
+.drf-required {
+  color: #e74c3c;
+  margin-left: 2px;
+}
+
+.drf-hint {
+  font-size: 0.68rem;
+  color: #9ca3af;
+  margin-top: 1px;
+}
+
+/* R prefix on rate inputs */
+.drf-input-prefix-wrapper {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.drf-prefix {
+  position: absolute;
+  left: 9px;
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: #6b7280;
+  pointer-events: none;
+  z-index: 1;
+}
+
+.drf-rate-input {
+  padding-left: 22px !important;
+}
+
+/* Override form-input inside cards to be compact */
+.drf-card-body .form-input {
+  padding: 6px 10px;
+  font-size: 0.82rem;
+  height: 34px;
+  border: 1px solid #ddd;
+  border-radius: 5px;
+  width: 100%;
+  box-sizing: border-box;
+  outline: none;
+  transition: border-color 0.2s, box-shadow 0.2s;
+}
+
+.drf-card-body .form-input:focus {
+  border-color: #4169e1;
+  box-shadow: 0 0 0 2px rgba(65, 105, 225, 0.15);
+}
+
+/* Overlap warning inside card */
+.drf-overlap-warning {
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+  background: #fff3cd;
+  border: 1px solid #ffc107;
+  border-radius: 5px;
+  padding: 7px 10px;
+  font-size: 0.75rem;
+  color: #856404;
+  line-height: 1.4;
+}
+
+.drf-warning-icon {
+  flex-shrink: 0;
+  font-size: 0.85rem;
+}
+
+/* Add Period tile */
+.drf-add-tile {
+  background: #ffffff;
+  border: 2px dashed #b3c0ff;
+  border-radius: 10px;
+  min-width: 260px;
+  flex: 1 1 260px;
+  max-width: 320px;
+  min-height: 120px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  cursor: pointer;
+  color: #4169e1;
+  transition: background 0.15s, border-color 0.15s, box-shadow 0.15s;
+  user-select: none;
+}
+
+.drf-add-tile:hover {
+  background: #f0f4ff;
+  border-color: #4169e1;
+  box-shadow: 0 2px 8px rgba(65, 105, 225, 0.12);
+}
+
+.drf-add-icon {
+  font-size: 1.6rem;
+  font-weight: 300;
+  line-height: 1;
+  color: #4169e1;
+}
+
+.drf-add-label {
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: #4169e1;
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+  .drf-dates-row,
+  .drf-rates-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .drf-card {
+    max-width: 100%;
+  }
+
+  .drf-add-tile {
+    max-width: 100%;
+  }
+
+  .drf-page-header {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .drf-header-actions {
     width: 100%;
   }
 }
