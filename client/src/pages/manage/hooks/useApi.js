@@ -843,18 +843,30 @@ export function useApi(state, actions) {
           ...(isRename && { originalStartingpoint, originalDestination }),
         })
 
-        // If in-progress instructions were affected, refresh their leg rates
-        if (affectedInstructions.length > 0) {
-          const savedPeriods = Array.isArray(saveResp.data) ? saveResp.data : []
-          const firstId = savedPeriods[0]?.m5ratekey
-          if (firstId) {
-            try {
-              await api.post(`/api/driver-rates/${firstId}/refresh-legs`, {
-                instructions: affectedInstructions,
-              })
-            } catch (refreshErr) {
-              console.error("Error refreshing legs after route period save:", refreshErr)
-            }
+        const savedPeriods = Array.isArray(saveResp.data?.periods) ? saveResp.data.periods : []
+        const firstId = savedPeriods[0]?.m5ratekey
+
+        // Refresh leg rates for instructions affected by a rate value change
+        if (affectedInstructions.length > 0 && firstId) {
+          try {
+            await api.post(`/api/driver-rates/${firstId}/refresh-legs`, {
+              instructions: affectedInstructions,
+            })
+          } catch (refreshErr) {
+            console.error("Error refreshing legs after route period save:", refreshErr)
+          }
+        }
+
+        // On a rename: the legs already have their route names updated server-side (in the
+        // same transaction). Now refresh their driverrate values against the new periods.
+        const renamedInstructions = saveResp.data?.renamedInstructions || []
+        if (renamedInstructions.length > 0 && firstId) {
+          try {
+            await api.post(`/api/driver-rates/${firstId}/refresh-legs`, {
+              instructions: renamedInstructions,
+            })
+          } catch (refreshErr) {
+            console.error("Error refreshing legs after route rename:", refreshErr)
           }
         }
 

@@ -27,6 +27,7 @@ const DriverRatePeriodsForm = ({
   const [editStartingpoint, setEditStartingpoint] = useState(originalStartingpoint)
   const [editDestination, setEditDestination] = useState(originalDestination)
   const [showCoverageModal, setShowCoverageModal] = useState(false)
+  const [showSaveModal, setShowSaveModal] = useState(false)
 
   const routeChanged =
     editStartingpoint.trim().toLowerCase() !== originalStartingpoint.trim().toLowerCase() ||
@@ -123,11 +124,16 @@ const DriverRatePeriodsForm = ({
     onRemovePeriod(index)
   }
 
-  const handleSubmit = async () => {
+  const openSaveModal = () => {
     if (!editStartingpoint.trim() || !editDestination.trim()) {
       alert("Starting point and destination cannot be empty.")
       return
     }
+    setShowSaveModal(true)
+  }
+
+  const confirmSave = async () => {
+    setShowSaveModal(false)
     await onSave(
       editStartingpoint.trim(),
       editDestination.trim(),
@@ -136,6 +142,10 @@ const DriverRatePeriodsForm = ({
       originalDestination,
     )
   }
+
+  const newPeriodCount = periods.filter((p) => !p.m5ratekey).length
+  const existingPeriodCount = periods.filter((p) => p.m5ratekey).length
+  const inProgressLegsAffected = legDates.length > 0
 
   const rateFields = [
     { field: "driver_six_meter_rate", label: "Driver Rate (6m)" },
@@ -174,7 +184,7 @@ const DriverRatePeriodsForm = ({
           <button className="driver-rate-cancel-button" type="button" onClick={onCancel} disabled={loading}>
             Cancel
           </button>
-          <button className="driver-rate-save-button" type="button" onClick={handleSubmit} disabled={loading}>
+          <button className="driver-rate-save-button" type="button" onClick={openSaveModal} disabled={loading}>
             {loading ? "Saving…" : "Save All"}
           </button>
         </div>
@@ -325,13 +335,83 @@ const DriverRatePeriodsForm = ({
 
       {/* Bottom action bar */}
       <div className="driver-rate-button-container">
-        <button className="driver-rate-save-button" type="button" onClick={handleSubmit} disabled={loading}>
+        <button className="driver-rate-save-button" type="button" onClick={openSaveModal} disabled={loading}>
           {loading ? "Saving…" : "Save All"}
         </button>
         <button className="driver-rate-cancel-button" type="button" onClick={onCancel} disabled={loading}>
           Cancel
         </button>
       </div>
+
+      {/* Save confirmation modal */}
+      {showSaveModal && (
+        <div className="drf-modal-overlay" onClick={() => setShowSaveModal(false)}>
+          <div className="drf-modal drf-save-modal" onClick={(e) => e.stopPropagation()}>
+            <div className="drf-modal-header">
+              <h3 className="drf-modal-title">Confirm Save</h3>
+              <button type="button" className="drf-modal-close" onClick={() => setShowSaveModal(false)}>✕</button>
+            </div>
+
+            <div className="drf-save-modal-body">
+              {/* Route */}
+              <div className="drf-save-section">
+                <div className="drf-save-label">Route</div>
+                {routeChanged ? (
+                  <div className="drf-save-rename">
+                    <span className="drf-save-route-old">{originalStartingpoint} → {originalDestination}</span>
+                    <span className="drf-save-rename-arrow">will be renamed to</span>
+                    <span className="drf-save-route-new">{editStartingpoint} → {editDestination}</span>
+                  </div>
+                ) : (
+                  <div className="drf-save-route-current">{editStartingpoint} → {editDestination}</div>
+                )}
+              </div>
+
+              {/* Periods */}
+              <div className="drf-save-section">
+                <div className="drf-save-label">Periods</div>
+                <ul className="drf-save-list">
+                  {existingPeriodCount > 0 && (
+                    <li>{existingPeriodCount} existing period{existingPeriodCount > 1 ? "s" : ""} will be updated</li>
+                  )}
+                  {newPeriodCount > 0 && (
+                    <li>{newPeriodCount} new period{newPeriodCount > 1 ? "s" : ""} will be added</li>
+                  )}
+                </ul>
+              </div>
+
+              {/* Impact on in-progress instructions */}
+              {inProgressLegsAffected && (
+                <div className="drf-save-section drf-save-impact">
+                  <div className="drf-save-label">Impact on in-progress instructions</div>
+                  <ul className="drf-save-list">
+                    {routeChanged && (
+                      <li>Legs matching the old route name will have their starting point and destination updated to the new name</li>
+                    )}
+                    <li>If any rate values changed, affected leg rates will be recalculated to match the new periods</li>
+                  </ul>
+                </div>
+              )}
+
+              {uncoveredInstructions.length > 0 && (
+                <div className="drf-save-section drf-save-warning">
+                  <span className="drf-warning-icon">⚠</span>
+                  <span>{uncoveredInstructions.length} instruction{uncoveredInstructions.length > 1 ? "s have" : " has"} legs on dates not covered by any period — those legs will have no rate.</span>
+                </div>
+              )}
+            </div>
+
+            <div className="drf-modal-footer">
+              <button type="button" className="driver-rate-cancel-button" onClick={() => setShowSaveModal(false)}>
+                Cancel
+              </button>
+              <button type="button" className="driver-rate-save-button" onClick={confirmSave}>
+                Confirm &amp; Save
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

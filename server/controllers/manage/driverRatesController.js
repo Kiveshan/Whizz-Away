@@ -357,7 +357,7 @@ const saveRoutePeriodsHandler = async (req, res) => {
     }
 
     const result = await saveRoutePeriods(startingpoint, destination, periods, originalStartingpoint, originalDestination)
-    res.json(result.data)
+    res.json({ periods: result.data, renamedInstructions: result.renamedInstructions || [] })
   } catch (err) {
     console.error("Error saving route periods:", err)
     res.status(500).json({ error: "Failed to save route periods" })

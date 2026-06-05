@@ -643,9 +643,13 @@ export const getPeriodsForRoute = async (startingpoint, destination) => {
 
 // Replace-all: delete existing periods for the route then bulk-insert the new set
 export const saveRoutePeriods = async (startingpoint, destination, periods, originalStartingpoint, originalDestination) => {
-  // When renaming a route the DELETE must target the OLD name; inserts use the NEW name
   const deleteSp = originalStartingpoint || startingpoint
   const deleteDest = originalDestination || destination
+  const isRename =
+    originalStartingpoint &&
+    originalDestination &&
+    (startingpoint.trim().toLowerCase() !== originalStartingpoint.trim().toLowerCase() ||
+      destination.trim().toLowerCase() !== originalDestination.trim().toLowerCase())
 
   let client
   try {
@@ -658,6 +662,23 @@ export const saveRoutePeriods = async (startingpoint, destination, periods, orig
          AND LOWER(TRIM(COALESCE(destination, ''))) = LOWER(TRIM(COALESCE($2, '')))`,
       [deleteSp, deleteDest],
     )
+
+    // When renaming, update legs_m2 for in-progress instructions so legs stay in sync
+    let renamedInstructions = []
+    if (isRename) {
+      const legUpdateResult = await client.query(
+        `UPDATE legs_m2 l
+         SET startingpoint = $3, destination = $4
+         FROM m1_controller c
+         WHERE c.m1key = l.m1key
+           AND LOWER(COALESCE(c.status, '')) = 'in progress'
+           AND LOWER(TRIM(COALESCE(l.startingpoint, ''))) = LOWER(TRIM(COALESCE($1, '')))
+           AND LOWER(TRIM(COALESCE(l.destination, ''))) = LOWER(TRIM(COALESCE($2, '')))
+         RETURNING l.m1key`,
+        [deleteSp, deleteDest, startingpoint, destination],
+      )
+      renamedInstructions = [...new Set(legUpdateResult.rows.map((r) => r.m1key))]
+    }
 
     const processRate = (val) => (val === "" || val == null ? null : parseFloat(val))
     const insertedPeriods = []
@@ -692,7 +713,7 @@ export const saveRoutePeriods = async (startingpoint, destination, periods, orig
     }
 
     await client.query("COMMIT")
-    return { success: true, data: insertedPeriods }
+    return { success: true, data: insertedPeriods, renamedInstructions }
   } catch (err) {
     if (client) await client.query("ROLLBACK")
     console.error("Error saving route periods:", err)
