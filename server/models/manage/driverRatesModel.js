@@ -131,8 +131,8 @@ const createDriverRate = async (driverRateData) => {
     }
 
     // Process effective dates - default to today if not provided
-    const effectiveFrom = effective_from ? new Date(effective_from) : new Date()
-    const effectiveTo = effective_to ? new Date(effective_to) : null
+    const effectiveFrom = effective_from || new Date().toISOString().split('T')[0]
+    const effectiveTo = effective_to || null
 
     const result = await client.query(
       `INSERT INTO m5_driver_rate (
@@ -234,14 +234,12 @@ const updateDriverRate = async (id, driverRateData) => {
     }
     if (effective_from !== undefined) {
       updateFields.push(`effective_from = $${paramCounter}`)
-      const effectiveFromDate = effective_from ? new Date(effective_from) : new Date()
-      queryParams.push(effectiveFromDate)
+      queryParams.push(effective_from || new Date().toISOString().split('T')[0])
       paramCounter++
     }
     if (effective_to !== undefined) {
       updateFields.push(`effective_to = $${paramCounter}`)
-      const effectiveToDate = effective_to ? new Date(effective_to) : null
-      queryParams.push(effectiveToDate)
+      queryParams.push(effective_to || null)
       paramCounter++
     }
 

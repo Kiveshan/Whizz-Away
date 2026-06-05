@@ -22,6 +22,9 @@ const pool = new Pool({
 
 types.setTypeParser(types.builtins.NUMERIC, (value) => parseFloat(value));
 types.setTypeParser(types.builtins.FLOAT8, (value) => parseFloat(value));
+// Return DATE columns as plain "YYYY-MM-DD" strings to avoid the local-midnight
+// timezone shift that postgres-date introduces on UTC+ servers.
+types.setTypeParser(1082, (value) => value);
 
 // Log connection status
 console.log("Database connection configured with:", {
