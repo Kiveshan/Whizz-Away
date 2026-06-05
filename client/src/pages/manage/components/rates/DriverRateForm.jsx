@@ -20,12 +20,13 @@ const DriverRateForm = ({ driverRate, loading, isEditing, onSave, onCancel, onCh
       setDuplicateWarning("")
       return
     }
-    const sp = driverRate.startingpoint.trim().toLowerCase()
-    const dest = driverRate.destination.trim().toLowerCase()
+    const normalize = (s) => (s || "").trim().replace(/\s+/g, " ").toLowerCase()
+    const sp = normalize(driverRate.startingpoint)
+    const dest = normalize(driverRate.destination)
     const exists = routeOptions.some(
       (r) =>
-        r.startingpoint.trim().toLowerCase() === sp &&
-        r.destination.trim().toLowerCase() === dest,
+        normalize(r.startingpoint) === sp &&
+        normalize(r.destination) === dest,
     )
     setDuplicateWarning(
       exists
@@ -34,8 +35,6 @@ const DriverRateForm = ({ driverRate, loading, isEditing, onSave, onCancel, onCh
     )
   }, [driverRate.startingpoint, driverRate.destination, routeOptions])
 
-  const startingpoints = [...new Set(routeOptions.map((r) => r.startingpoint))]
-  const destinations = [...new Set(routeOptions.map((r) => r.destination))]
   const hasOverlap = Boolean(driverRate?._overlapWarning)
 
   const handleSubmit = async (e) => {
@@ -85,16 +84,10 @@ const DriverRateForm = ({ driverRate, loading, isEditing, onSave, onCancel, onCh
             <input
               type="text"
               className="form-input"
-              list="startingpoint-options"
               value={driverRate.startingpoint || ""}
               onChange={(e) => onChange("startingpoint", e.target.value)}
               required
             />
-            <datalist id="startingpoint-options">
-              {startingpoints.map((sp) => (
-                <option key={sp} value={sp} />
-              ))}
-            </datalist>
           </div>
           <div className="form-field">
             <label>
@@ -103,16 +96,10 @@ const DriverRateForm = ({ driverRate, loading, isEditing, onSave, onCancel, onCh
             <input
               type="text"
               className="form-input"
-              list="destination-options"
               value={driverRate.destination || ""}
               onChange={(e) => onChange("destination", e.target.value)}
               required
             />
-            <datalist id="destination-options">
-              {destinations.map((dest) => (
-                <option key={dest} value={dest} />
-              ))}
-            </datalist>
           </div>
         </div>
 
@@ -236,7 +223,7 @@ const DriverRateForm = ({ driverRate, loading, isEditing, onSave, onCancel, onCh
       </div>
 
       <div className="driver-rate-button-container">
-        <button type="submit" className="driver-rate-save-button" disabled={loading || hasOverlap}>
+        <button type="submit" className="driver-rate-save-button" disabled={loading || hasOverlap || !!duplicateWarning}>
           {loading ? "Saving..." : "Save"}
         </button>
         <button type="button" className="driver-rate-cancel-button" onClick={onCancel}>
