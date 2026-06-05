@@ -145,7 +145,8 @@ const DriverRatePeriodsForm = ({
 
   const newPeriodCount = periods.filter((p) => !p.m5ratekey).length
   const existingPeriodCount = periods.filter((p) => p.m5ratekey).length
-  const inProgressLegsAffected = legDates.length > 0
+  const affectedInstructionNums = [...new Set(legDates.map((l) => l.m1key))].sort((a, b) => a - b)
+  const inProgressLegsAffected = affectedInstructionNums.length > 0
 
   const rateFields = [
     { field: "driver_six_meter_rate", label: "Driver Rate (6m)" },
@@ -383,7 +384,12 @@ const DriverRatePeriodsForm = ({
               {/* Impact on in-progress instructions */}
               {inProgressLegsAffected && (
                 <div className="drf-save-section drf-save-impact">
-                  <div className="drf-save-label">Impact on in-progress instructions</div>
+                  <div className="drf-save-label">In-progress instructions affected</div>
+                  <div className="drf-save-instr-chips">
+                    {affectedInstructionNums.map((num) => (
+                      <span key={num} className="drf-save-instr-chip">#{num}</span>
+                    ))}
+                  </div>
                   <ul className="drf-save-list">
                     {routeChanged && (
                       <li>Legs matching the old route name will have their starting point and destination updated to the new name</li>

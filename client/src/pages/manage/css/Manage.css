@@ -2131,6 +2131,23 @@ tr:hover {
   color: #4169e1;
 }
 
+.drf-save-instr-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-bottom: 4px;
+}
+
+.drf-save-instr-chip {
+  background: #4169e1;
+  color: #fff;
+  font-size: 0.75rem;
+  font-weight: 700;
+  border-radius: 20px;
+  padding: 2px 10px;
+  letter-spacing: 0.2px;
+}
+
 .drf-save-warning {
   display: flex;
   flex-direction: row;
