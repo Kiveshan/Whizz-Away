@@ -174,11 +174,13 @@ const DriverRatePeriodsForm = ({
     setShowSaveModal(true)
   }
 
+  const normalizeName = (s) => s.trim().replace(/\s+/g, " ")
+
   const confirmSave = async () => {
     setShowSaveModal(false)
     await onSave(
-      editStartingpoint.trim(),
-      editDestination.trim(),
+      normalizeName(editStartingpoint),
+      normalizeName(editDestination),
       periods,
       originalStartingpoint,
       originalDestination,
