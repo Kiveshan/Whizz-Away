@@ -333,7 +333,7 @@ const getPeriodsForRouteHandler = async (req, res) => {
 
 const saveRoutePeriodsHandler = async (req, res) => {
   try {
-    const { startingpoint, destination, periods } = req.body
+    const { startingpoint, destination, periods, originalStartingpoint, originalDestination } = req.body
 
     if (!startingpoint || !destination) {
       return res.status(400).json({ error: "startingpoint and destination are required" })
@@ -356,7 +356,7 @@ const saveRoutePeriodsHandler = async (req, res) => {
       }
     }
 
-    const result = await saveRoutePeriods(startingpoint, destination, periods)
+    const result = await saveRoutePeriods(startingpoint, destination, periods, originalStartingpoint, originalDestination)
     res.json(result.data)
   } catch (err) {
     console.error("Error saving route periods:", err)

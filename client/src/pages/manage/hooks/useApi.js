@@ -726,7 +726,7 @@ export function useApi(state, actions) {
   )
 
   const saveRoutePeriods = useCallback(
-    async (startingpoint, destination, periods) => {
+    async (startingpoint, destination, periods, originalStartingpoint, originalDestination) => {
       actions.setLoading(true)
       try {
         // Client-side validation
@@ -750,10 +750,35 @@ export function useApi(state, actions) {
           }
         }
 
+        // If the route name changed, check the new name doesn't already exist in DB
+        const isRename =
+          originalStartingpoint &&
+          originalDestination &&
+          (startingpoint.trim().toLowerCase() !== originalStartingpoint.trim().toLowerCase() ||
+            destination.trim().toLowerCase() !== originalDestination.trim().toLowerCase())
+
+        if (isRename) {
+          try {
+            const newRouteParams = new URLSearchParams({ startingpoint, destination })
+            const conflictResp = await api.get(`/api/driver-rates/route-periods?${newRouteParams}`)
+            if (Array.isArray(conflictResp.data) && conflictResp.data.length > 0) {
+              await showAlert(
+                "Route Already Exists",
+                `A route "${startingpoint} → ${destination}" already exists. Choose a different name or delete the existing route first.`,
+                "error",
+              )
+              return false
+            }
+          } catch (_) { /* non-blocking */ }
+        }
+
         // Check if any in-progress instructions are using this route AND a rate value changed
         let affectedInstructions = []
         try {
-          const routeParams = new URLSearchParams({ startingpoint, destination })
+          // When renaming, usage is on the original route name
+          const lookupSp = (isRename ? originalStartingpoint : startingpoint)
+          const lookupDest = (isRename ? originalDestination : destination)
+          const routeParams = new URLSearchParams({ startingpoint: lookupSp, destination: lookupDest })
 
           // Fetch current DB periods and usage check in parallel
           const [dbPeriodsResp, usageResp] = await Promise.all([
@@ -811,7 +836,12 @@ export function useApi(state, actions) {
           console.error("Error checking route usage before save:", usageErr)
         }
 
-        const saveResp = await api.post("/api/driver-rates/route-periods", { startingpoint, destination, periods })
+        const saveResp = await api.post("/api/driver-rates/route-periods", {
+          startingpoint,
+          destination,
+          periods,
+          ...(isRename && { originalStartingpoint, originalDestination }),
+        })
 
         // If in-progress instructions were affected, refresh their leg rates
         if (affectedInstructions.length > 0) {

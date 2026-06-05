@@ -642,7 +642,11 @@ export const getPeriodsForRoute = async (startingpoint, destination) => {
 }
 
 // Replace-all: delete existing periods for the route then bulk-insert the new set
-export const saveRoutePeriods = async (startingpoint, destination, periods) => {
+export const saveRoutePeriods = async (startingpoint, destination, periods, originalStartingpoint, originalDestination) => {
+  // When renaming a route the DELETE must target the OLD name; inserts use the NEW name
+  const deleteSp = originalStartingpoint || startingpoint
+  const deleteDest = originalDestination || destination
+
   let client
   try {
     client = await pool.connect()
@@ -652,7 +656,7 @@ export const saveRoutePeriods = async (startingpoint, destination, periods) => {
       `DELETE FROM m5_driver_rate
        WHERE LOWER(TRIM(COALESCE(startingpoint, ''))) = LOWER(TRIM(COALESCE($1, '')))
          AND LOWER(TRIM(COALESCE(destination, ''))) = LOWER(TRIM(COALESCE($2, '')))`,
-      [startingpoint, destination],
+      [deleteSp, deleteDest],
     )
 
     const processRate = (val) => (val === "" || val == null ? null : parseFloat(val))

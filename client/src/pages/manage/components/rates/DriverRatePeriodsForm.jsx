@@ -1,5 +1,6 @@
 "use client"
 
+import { useState } from "react"
 import api from "../../../../api.js"
 import Swal from "sweetalert2"
 
@@ -22,7 +23,14 @@ const DriverRatePeriodsForm = ({
   onRemovePeriod,
   onChangePeriod,
 }) => {
-  const { startingpoint, destination } = route
+  const { startingpoint: originalStartingpoint, destination: originalDestination } = route
+  const [editStartingpoint, setEditStartingpoint] = useState(originalStartingpoint)
+  const [editDestination, setEditDestination] = useState(originalDestination)
+  const [showCoverageModal, setShowCoverageModal] = useState(false)
+
+  const routeChanged =
+    editStartingpoint.trim().toLowerCase() !== originalStartingpoint.trim().toLowerCase() ||
+    editDestination.trim().toLowerCase() !== originalDestination.trim().toLowerCase()
 
   // Compute coverage gaps on every render — fires automatically when periods change
   const uncoveredByInstruction = legDates.reduce((acc, leg) => {
@@ -33,6 +41,9 @@ const DriverRatePeriodsForm = ({
     return acc
   }, {})
   const uncoveredInstructions = Object.entries(uncoveredByInstruction)
+
+  const startingpoint = editStartingpoint
+  const destination = editDestination
 
   const checkOverlap = async (index, card) => {
     if (!card.effective_from) return
@@ -113,7 +124,17 @@ const DriverRatePeriodsForm = ({
   }
 
   const handleSubmit = async () => {
-    await onSave(startingpoint, destination, periods)
+    if (!editStartingpoint.trim() || !editDestination.trim()) {
+      alert("Starting point and destination cannot be empty.")
+      return
+    }
+    await onSave(
+      editStartingpoint.trim(),
+      editDestination.trim(),
+      periods,
+      originalStartingpoint,
+      originalDestination,
+    )
   }
 
   const rateFields = [
@@ -128,9 +149,26 @@ const DriverRatePeriodsForm = ({
       {/* Page header */}
       <div className="drf-page-header">
         <div className="drf-route-badge">
-          <span className="drf-route-point">{startingpoint || "—"}</span>
+          <input
+            type="text"
+            className="drf-route-input"
+            value={editStartingpoint}
+            onChange={(e) => setEditStartingpoint(e.target.value)}
+            placeholder="Starting point"
+            aria-label="Starting point"
+          />
           <span className="drf-route-arrow">→</span>
-          <span className="drf-route-point">{destination || "—"}</span>
+          <input
+            type="text"
+            className="drf-route-input"
+            value={editDestination}
+            onChange={(e) => setEditDestination(e.target.value)}
+            placeholder="Destination"
+            aria-label="Destination"
+          />
+          {routeChanged && (
+            <span className="drf-route-rename-badge">Renaming</span>
+          )}
         </div>
         <div className="drf-header-actions">
           <button className="driver-rate-cancel-button" type="button" onClick={onCancel} disabled={loading}>
@@ -142,20 +180,59 @@ const DriverRatePeriodsForm = ({
         </div>
       </div>
 
-      {/* Coverage gap banner */}
+      {/* Coverage gap banner — compact strip with modal for details */}
       {uncoveredInstructions.length > 0 && (
         <div className="drf-coverage-warning">
           <span className="drf-warning-icon">⚠</span>
-          <div className="drf-coverage-warning-body">
-            <strong>Some legs fall outside all current periods and will have no rate:</strong>
+          <span className="drf-coverage-summary">
+            <strong>{uncoveredInstructions.length}</strong> instruction{uncoveredInstructions.length > 1 ? "s have" : " has"} legs outside the current periods and will have no rate.
+          </span>
+          <button
+            type="button"
+            className="drf-coverage-details-btn"
+            onClick={() => setShowCoverageModal(true)}
+          >
+            View details
+          </button>
+        </div>
+      )}
+
+      {/* Coverage gap modal */}
+      {showCoverageModal && (
+        <div className="drf-modal-overlay" onClick={() => setShowCoverageModal(false)}>
+          <div className="drf-modal" onClick={(e) => e.stopPropagation()}>
+            <div className="drf-modal-header">
+              <span className="drf-warning-icon">⚠</span>
+              <h3 className="drf-modal-title">Uncovered Leg Dates</h3>
+              <button
+                type="button"
+                className="drf-modal-close"
+                onClick={() => setShowCoverageModal(false)}
+                aria-label="Close"
+              >
+                ✕
+              </button>
+            </div>
+            <p className="drf-modal-intro">
+              The following instructions have legs on dates not covered by any period. Ensure you add or extend a period to cover these dates before saving.
+            </p>
             <ul className="drf-coverage-list">
               {uncoveredInstructions.map(([instrNum, dates]) => (
-                <li key={instrNum}>
-                  Instruction <strong>#{instrNum}</strong> — leg date{dates.length > 1 ? "s" : ""}: {dates.join(", ")}
+                <li key={instrNum} className="drf-coverage-list-item">
+                  <span className="drf-coverage-instr">Instruction <strong>#{instrNum}</strong></span>
+                  <span className="drf-coverage-dates">{dates.join(", ")}</span>
                 </li>
               ))}
             </ul>
-            Ensure you add or extend a period to cover these dates before saving.
+            <div className="drf-modal-footer">
+              <button
+                type="button"
+                className="driver-rate-cancel-button"
+                onClick={() => setShowCoverageModal(false)}
+              >
+                Close
+              </button>
+            </div>
           </div>
         </div>
       )}
