@@ -787,6 +787,10 @@ export function useApi(state, actions) {
           ])
 
           if (usageResp.data?.inUse) {
+            // Always collect affected instructions — legs need a refresh any time the
+            // period structure changes (removal, date range shift, new period, rate value).
+            affectedInstructions = usageResp.data.instructions || []
+
             const rateFields = [
               "driver_six_meter_rate",
               "driver_twelve_meter_rate",
@@ -808,16 +812,15 @@ export function useApi(state, actions) {
               if (p.m5ratekey) dbById[p.m5ratekey] = p
             }
 
-            // A rate change exists if any existing period has at least one changed rate field
+            // Only show the rate-change warning when a rate VALUE changed on an existing period
             const hasRateChange = periods.some((card) => {
-              if (!card.m5ratekey) return false // new card — no prior value to compare
+              if (!card.m5ratekey) return false
               const db = dbById[card.m5ratekey]
               if (!db) return false
               return rateFields.some((f) => rateChanged(card[f], db[f]))
             })
 
             if (hasRateChange) {
-              affectedInstructions = usageResp.data.instructions || []
               const instrText = affectedInstructions.join(", ")
               const confirmed = await showConfirmDialog(
                 "Rate Change Warning",
