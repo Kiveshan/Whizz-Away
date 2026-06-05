@@ -129,6 +129,7 @@ export const handleSelectLeg = ({
   setDrivers,
   setEditedFields,
   noRatesRoutes,
+  setNoRatesRoutes,
   setRates,
   fetchRate,
   debugDriverData,
@@ -226,14 +227,16 @@ export const handleSelectLeg = ({
       ? `${baseRouteKey}-${firstDriverDate}`
       : baseRouteKey;
 
-    if (noRatesRoutes.has(routeKey)) {
-      setRates({
-        six_meter: 0,
-        twelve_meter: 0,
-        subbie_six_meter: 0,
-        subbie_twelve_meter: 0,
+    // Evict this route from the no-rates cache so we always hit the server
+    // when entering a leg — a business manager may have added a rate since
+    // the 404 was cached.
+    if (noRatesRoutes.has(routeKey) || noRatesRoutes.has(baseRouteKey)) {
+      setNoRatesRoutes((prev) => {
+        const next = new Set(prev);
+        next.delete(routeKey);
+        next.delete(baseRouteKey);
+        return next;
       });
-      return;
     }
 
     fetchRate(selectedLeg.startingPoint, selectedLeg.destination, index, requestId, firstDriverDate, true);
