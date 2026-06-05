@@ -28,6 +28,7 @@ const DriverRatePeriodsForm = ({
   const [editDestination, setEditDestination] = useState(originalDestination)
   const [showCoverageModal, setShowCoverageModal] = useState(false)
   const [showSaveModal, setShowSaveModal] = useState(false)
+  const [cardErrors, setCardErrors] = useState({})
 
   const routeChanged =
     editStartingpoint.trim().toLowerCase() !== originalStartingpoint.trim().toLowerCase() ||
@@ -63,8 +64,19 @@ const DriverRatePeriodsForm = ({
     }
   }
 
+  const clearCardError = (index) => {
+    if (cardErrors[index]) {
+      setCardErrors((prev) => {
+        const next = { ...prev }
+        delete next[index]
+        return next
+      })
+    }
+  }
+
   const handleDateChange = (index, field, value) => {
     onChangePeriod(index, field, value)
+    clearCardError(index)
     setTimeout(() => {
       const updated = { ...periods[index], [field]: value }
       checkOverlap(index, updated)
@@ -74,6 +86,7 @@ const DriverRatePeriodsForm = ({
   const handleRateChange = (index, field, value) => {
     if (value === "" || (!isNaN(parseFloat(value)) && parseFloat(value) >= 0)) {
       onChangePeriod(index, field, value)
+      clearCardError(index)
     }
   }
 
@@ -129,6 +142,30 @@ const DriverRatePeriodsForm = ({
       alert("Starting point and destination cannot be empty.")
       return
     }
+
+    // Validate every card and collect errors by index
+    const errors = {}
+    periods.forEach((card, index) => {
+      const msgs = []
+      if (!card.effective_from) {
+        msgs.push("Effective From date is required")
+      } else if (card.effective_to && card.effective_to < card.effective_from) {
+        msgs.push("Effective To cannot be before Effective From")
+      }
+      const hasRate =
+        (card.driver_six_meter_rate !== "" && card.driver_six_meter_rate != null) ||
+        (card.driver_twelve_meter_rate !== "" && card.driver_twelve_meter_rate != null) ||
+        (card.subie_six_meter_rate !== "" && card.subie_six_meter_rate != null) ||
+        (card.subie_twelve_meter_rate !== "" && card.subie_twelve_meter_rate != null)
+      if (!hasRate) {
+        msgs.push("At least one rate value is required")
+      }
+      if (msgs.length) errors[index] = msgs
+    })
+
+    setCardErrors(errors)
+    if (Object.keys(errors).length > 0) return
+
     setShowSaveModal(true)
   }
 
@@ -251,7 +288,7 @@ const DriverRatePeriodsForm = ({
       {/* Cards grid */}
       <div className="drf-cards-grid">
         {periods.map((card, index) => (
-          <div key={index} className="drf-card">
+          <div key={index} className={`drf-card${cardErrors[index] ? " drf-card--error" : ""}`}>
             {/* Card header */}
             <div className="drf-card-header">
               <span className="drf-period-label">Period {index + 1}</span>
@@ -314,6 +351,17 @@ const DriverRatePeriodsForm = ({
                   </div>
                 ))}
               </div>
+
+              {/* Validation errors */}
+              {cardErrors[index] && (
+                <div className="drf-card-errors">
+                  {cardErrors[index].map((msg) => (
+                    <div key={msg} className="drf-card-error-msg">
+                      <span className="drf-warning-icon">✕</span> {msg}
+                    </div>
+                  ))}
+                </div>
+              )}
 
               {/* Overlap warning */}
               {card._overlapWarning && (

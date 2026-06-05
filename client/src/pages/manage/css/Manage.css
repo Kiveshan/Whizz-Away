@@ -1761,6 +1761,45 @@ tr:hover {
   box-shadow: 0 4px 12px rgba(65, 105, 225, 0.15);
 }
 
+.drf-card--error {
+  border-color: #e74c3c;
+  box-shadow: 0 0 0 2px rgba(231, 76, 60, 0.18);
+}
+
+.drf-card--error .drf-card-header {
+  background: #fde8e8;
+  border-bottom-color: #f5c6c6;
+}
+
+.drf-card--error .drf-period-label {
+  color: #c0392b;
+}
+
+.drf-card-errors {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-bottom: 8px;
+}
+
+.drf-card-error-msg {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  background: #fde8e8;
+  border: 1px solid #f5c6c6;
+  border-radius: 4px;
+  padding: 5px 10px;
+  font-size: 0.78rem;
+  color: #c0392b;
+  font-weight: 600;
+}
+
+.drf-card-error-msg .drf-warning-icon {
+  font-size: 0.72rem;
+  flex-shrink: 0;
+}
+
 .drf-card-header {
   display: flex;
   justify-content: space-between;
