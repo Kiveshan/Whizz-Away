@@ -549,6 +549,7 @@ const newDriver = {
       setDrivers,
       setEditedFields,
       noRatesRoutes,
+      setNoRatesRoutes,
       setRates,
       fetchRate,
       debugDriverData,
@@ -757,11 +758,15 @@ const newDriver = {
   const handleDriverDateChange = async (driverIndex, newDate) => {
     console.log(`[handleDriverDateChange] Driver ${driverIndex}, new date: ${newDate}`);
     console.log(`[handleDriverDateChange] Route: ${formData.startingPoint} -> ${formData.destination}`);
-    
+
     if (!formData.startingPoint || !formData.destination || !newDate) {
       console.log("[handleDriverDateChange] Missing required data, returning early");
       return;
     }
+
+    // Capture the current leg switch ID so we can discard the response if the
+    // user switches legs before it arrives (bad-connection race condition guard).
+    const requestLegId = legSwitchIdRef.current;
 
     try {
       console.log("[handleDriverDateChange] Making API call...");
@@ -772,6 +777,9 @@ const newDriver = {
           legDate: newDate,
         },
       });
+
+      // Discard if the user has switched to a different leg while this was in flight.
+      if (legSwitchIdRef.current !== requestLegId) return;
 
       const data = response.data;
       console.log("[handleDriverDateChange] Rate fetch success:", data);
@@ -810,12 +818,15 @@ const newDriver = {
         return updated;
       });
     } catch (error) {
+      // Discard if the user has switched to a different leg while this was in flight.
+      if (legSwitchIdRef.current !== requestLegId) return;
+
       console.log("[handleDriverDateChange] CATCH BLOCK ENTERED");
       console.log("[handleDriverDateChange] Error:", error);
       console.log("[handleDriverDateChange] Error.response:", error.response);
       console.log("[handleDriverDateChange] Error.response?.status:", error.response?.status);
       console.log("[handleDriverDateChange] Error.message:", error.message);
-      
+
       if (error.response?.status === 404) {
         console.log("[handleDriverDateChange] 404 DETECTED - setting rate error and zero rate");
         setRateError(
@@ -823,7 +834,7 @@ const newDriver = {
           `There is no active rate effective on ${newDate}. ` +
           `Please check rate configuration or select a different date.`
         );
-        
+
         setDrivers((prevDrivers) => {
           if (!Array.isArray(prevDrivers) || !prevDrivers[driverIndex]) return prevDrivers;
           const updated = [...prevDrivers];
@@ -1119,6 +1130,39 @@ const missingItems = await checkContainersReachDropoff(dropoff);
 
   return () => clearTimeout(timer);
 }, [currentLagIndex]);
+
+  // After a leg switch settles, re-fetch the date-aware rate for each driver that has a
+  // date. This simulates the "reselect container" workaround: if a business manager added
+  // a rate that was previously missing, entering the leg picks it up automatically.
+  // Only runs for in-progress instructions (isCompleted guard) and only when the leg has
+  // a valid route and at least one driver with a date.
+  const lastRateRefreshLegRef = useRef(null);
+  useEffect(() => {
+    if (isLegSwitching) return;
+    if (isCompleted || currentLagIndex === null) return;
+    if (!formData.startingPoint || !formData.destination) return;
+    if (shipmentType === 4) return;
+    if (lastRateRefreshLegRef.current === currentLagIndex) return;
+
+    lastRateRefreshLegRef.current = currentLagIndex;
+
+    // Run sequentially rather than all-at-once to avoid hammering a slow connection
+    // with N parallel requests. Each awaits the previous before firing the next.
+    const refreshSwitchId = legSwitchIdRef.current;
+    (async () => {
+      for (let i = 0; i < drivers.length; i++) {
+        // Abort the loop if the user has already switched to another leg.
+        if (legSwitchIdRef.current !== refreshSwitchId) break;
+        const driver = drivers[i];
+        if (
+          driver.date &&
+          (driver.container_type || "").toLowerCase() !== "abnormal"
+        ) {
+          await handleDriverDateChange(i, driver.date);
+        }
+      }
+    })();
+  }, [isLegSwitching]);
 useEffect(() => {
   // Don't update rates if we're currently switching legs or if instruction is completed
   if (isLegSwitching || drivers.length === 0 || isCompleted) {
