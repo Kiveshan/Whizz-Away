@@ -2,10 +2,10 @@
  * Demo Seed — Premier Freight Solutions (Pty) Ltd
  * company_reg_num: DEMO-ENT-PREMIER
  *
- * Enterprise-tier demo company with comprehensive operational data covering
- * every module: instructions, containers, legs, invoicing, partial payments,
- * aging analysis, statements, payroll, creditors, POs, expenses, and
- * subcontractor statements.
+ * Enterprise-tier demo company with rich operational data covering every
+ * module: instructions, containers, legs, invoicing, payments, aging analysis,
+ * multi-month statements, payroll, creditors, POs, expenses, and subcontractor
+ * statements.
  *
  * Run:
  *   node --env-file=.env server/database/seed_demo_premier.js
@@ -13,8 +13,36 @@
  * Cleanup only:
  *   node --env-file=.env server/database/seed_demo_premier.js --cleanup
  *
- * Demo password for ALL accounts: Demo@1234
+ * Demo password for ALL accounts: Test@1234
  * Primary demo login:             admin@premierfreight.co.za  (Business Manager)
+ *
+ * ─── STATEMENT / AGING MATH ────────────────────────────────────────────────────
+ * All dates are ABSOLUTE so the aging buckets never drift between seed runs.
+ * Reference date: June 6, 2026 ("today").
+ *
+ * Statement generation dates and what they cover:
+ *   2026-03-01  covers February 2026
+ *   2026-04-01  covers March 2026
+ *   2026-05-01  covers April 2026
+ *   2026-06-01  covers May 2026   ← "current" statement
+ *
+ * Aging buckets (as of the last day of the covered month):
+ *   current  = 0–30 days old
+ *   30days   = 31–60 days old   (column name in DB is "30days")
+ *   60days   = 61–90 days old   (column name is "60days")
+ *   90days   = 91+ days old     (column name is "90days")
+ *
+ * Invoice outstanding  = total_cost × (1 + vat/100) − paid_amount
+ * Add-on outstanding   = amount − paid_amount          (NO VAT multiplication)
+ *
+ * June 1 aging (as of May 31, 2026) — all verified:
+ *   Hapag-Lloyd    current  R16,371  = instr4(14571) + add-on(1800)
+ *   Transnet PT    60days   R15,295  + 90days R2,500  = R17,795
+ *   Pick n Pay     30days   R30,682  + 60days R950    = R31,632
+ *   Shoprite       current  R8,869
+ *   ─────────────────────────────────────────────────────────────
+ *   TOTAL OUTSTANDING  R74,667
+ * ────────────────────────────────────────────────────────────────────────────────
  */
 
 import { pool } from "../config/database.js";
@@ -24,13 +52,24 @@ const DEMO_CRN      = "DEMO-ENT-PREMIER";
 const DEMO_PASSWORD = "Test@1234";
 const CLEANUP_FLAG  = process.argv.includes("--cleanup");
 
-// ─── Date helpers ─────────────────────────────────────────────────────────────
+// ─── Absolute historical dates (never drift between seed runs) ─────────────────
 
-const daysAgo = (n) => {
-  const d = new Date();
-  d.setDate(d.getDate() - n);
-  return d.toISOString().split("T")[0];
-};
+const D_INSTR1           = "2026-02-07";  // Hapag instr 1 created + invoice
+const D_ADDON_TRANSNET   = "2026-02-26";  // Transnet dangerous-goods add-on
+const D_PMT_HAPAG_FULL   = "2026-03-07";  // Hapag instr 1 full payment
+const D_INSTR2           = "2026-03-03";  // Transnet instr 2 created + invoice
+const D_ADDON_PNP        = "2026-03-28";  // PnP extended-storage add-on
+const D_INSTR3           = "2026-04-02";  // PnP instr 3 created + invoice
+const D_INSTR4           = "2026-05-02";  // Hapag instr 4 created + invoice
+const D_INSTR6           = "2026-05-17";  // Transnet instr 6 (in progress, sub legs)
+const D_ADDON_HAPAG      = "2026-05-17";  // Hapag port-congestion add-on
+const D_PMT_HAPAG_PART   = "2026-05-22";  // Hapag instr 4 partial payment
+const D_INSTR5           = "2026-05-25";  // Shoprite instr 5 created + invoice
+const D_PMT_SHOPRITE     = "2026-05-29";  // Shoprite instr 5 partial payment (in May!)
+const D_CREDIT_NOTE      = "2026-06-03";  // Credit note (after June 1 statement)
+const D_TODAY            = "2026-06-06";  // Instr 7 new booking
+
+// ─── Relative helpers (fleet expiry, wages — these don't affect statements) ────
 
 const daysFromNow = (n) => {
   const d = new Date();
@@ -38,17 +77,16 @@ const daysFromNow = (n) => {
   return d.toISOString().split("T")[0];
 };
 
-// Returns the last day of the month N months ago as a full ISO timestamp.
-// Used for wages.employee_date — the unique constraint is per employee per month/year.
+// Last day of the month N months ago, as a full ISO timestamp (for wages).
 const lastDayOfMonthAgo = (n) => {
   const d = new Date();
   d.setDate(1);
-  d.setMonth(d.getMonth() - n + 1); // first of next target month
-  d.setDate(0);                       // back one day = last of target month
+  d.setMonth(d.getMonth() - n + 1);
+  d.setDate(0);
   return d.toISOString();
 };
 
-// First day of the current month as a date string (YYYY-MM-DD)
+// First day of the current month as YYYY-MM-DD.
 const firstOfCurrentMonth = () => {
   const d = new Date();
   d.setDate(1);
@@ -62,7 +100,6 @@ async function cleanup(client) {
   console.log(`Cleaning up ${DEMO_CRN}...`);
   const c = DEMO_CRN;
 
-  // Children before parents (FK order)
   await client.query(`DELETE FROM subcontractor_statements    WHERE company_reg_num = $1`, [c]);
   await client.query(`DELETE FROM base_salary_history         WHERE company_reg_num = $1`, [c]);
   await client.query(`DELETE FROM employee_deduction_history  WHERE company_reg_num = $1`, [c]);
@@ -111,7 +148,6 @@ async function seed() {
     console.log("Seeding Premier Freight Solutions (Pty) Ltd...\n");
 
     // ── 1. USERTABLE — company shell ─────────────────────────────────────────
-    // name/surname added so getManagers() (assignmentModel) returns a valid row.
 
     await client.query(
       `INSERT INTO usertable (
@@ -123,7 +159,7 @@ async function seed() {
          plan_approved_by, plan_notes
        ) VALUES (
          'Rajan', 'Naidoo',
-         $1, $2, CURRENT_DATE, 'active', 1,
+         $1, $2, '2026-01-15', 'active', 1,
          '4560123456', '62098765432', 'Premier Freight Solutions (Pty) Ltd',
          'Standard Bank', 'Durban Branch', '045026',
          '14 Harbour Drive', 'Durban',
@@ -160,25 +196,24 @@ async function seed() {
       return r.rows[0].userid;
     };
 
-    // Portal users
-    const adminId      = await insertEmp({ name:"Rajan",   surname:"Naidoo",       email:"admin@premierfreight.co.za",      roleid:1, cell:"0831001001" });
-    const ctrlId       = await insertEmp({ name:"Thabo",   surname:"Mokoena",      email:"controller@premierfreight.co.za", roleid:2, cell:"0831001002" });
-    const financeId    = await insertEmp({ name:"Priya",   surname:"Pillay",       email:"finance@premierfreight.co.za",    roleid:3, cell:"0831001003" });
-    const directorId   = await insertEmp({ name:"Susan",   surname:"van der Berg", email:"director@premierfreight.co.za",   roleid:4, cell:"0831001004" });
-    const creditorsId  = await insertEmp({ name:"Lungelo", surname:"Dlamini",      email:"creditors@premierfreight.co.za",  roleid:8, cell:"0831001005" });
+    const adminId     = await insertEmp({ name:"Rajan",   surname:"Naidoo",       email:"admin@premierfreight.co.za",      roleid:1, cell:"0831001001" });
+    const ctrlId      = await insertEmp({ name:"Thabo",   surname:"Mokoena",      email:"controller@premierfreight.co.za", roleid:2, cell:"0831001002" });
+    /*eslint-disable no-unused-vars*/
+    const financeId   = await insertEmp({ name:"Priya",   surname:"Pillay",       email:"finance@premierfreight.co.za",    roleid:3, cell:"0831001003" });
+    const directorId  = await insertEmp({ name:"Susan",   surname:"van der Berg", email:"director@premierfreight.co.za",   roleid:4, cell:"0831001004" });
+    const creditorsId = await insertEmp({ name:"Lungelo", surname:"Dlamini",      email:"creditors@premierfreight.co.za",  roleid:8, cell:"0831001005" });
+    /*eslint-enable no-unused-vars*/
 
-    // Owned drivers (roleid 5)
     const siphoId  = await insertEmp({ name:"Sipho",  surname:"Khumalo",   email:"sipho.khumalo@premierfreight.co.za",  roleid:5, salary:18500, cell:"0721001001" });
     const mandlaId = await insertEmp({ name:"Mandla", surname:"Zulu",      email:"mandla.zulu@premierfreight.co.za",    roleid:5, salary:17000, cell:"0721001002" });
     const deonId   = await insertEmp({ name:"Deon",   surname:"Potgieter", email:"deon.potgieter@premierfreight.co.za", roleid:5, salary:16500, cell:"0721001003" });
 
-    // Subcontractors (roleid 6) — subei_reg_num is the grouping key for sub statements
-    const sunriseId  = await insertEmp({ name:"Sunrise Haulage", surname:"CC",        email:"dispatch@sunrisehaulage.co.za", roleid:6, subei:"SUBCC-4432", company:"Sunrise Haulage CC",       contact:"Blessing Ndlovu",   location:"Durban" });
+    const sunriseId  = await insertEmp({ name:"Sunrise Haulage", surname:"CC",        email:"dispatch@sunrisehaulage.co.za", roleid:6, subei:"SUBCC-4432", company:"Sunrise Haulage CC",       contact:"Blessing Ndlovu",    location:"Durban" });
     const fastlaneId = await insertEmp({ name:"FastLane",        surname:"Transport", email:"ops@fastlanetransport.co.za",   roleid:6, subei:"SUBCC-8819", company:"FastLane Transport (Pty)", contact:"Gerhard du Plessis", location:"Cape Town" });
 
     console.log("  ✓ 10 employees (5 portal users, 3 drivers, 2 subcontractors)");
 
-    // ── 3. M5_TRUCKS — 4 owned + 2 subcontractor (one owned near expiry) ─────
+    // ── 3. M5_TRUCKS — 4 owned + 2 subcontractor (one near-expiry alert) ─────
 
     const insertTruck = async (f) => {
       const r = await client.query(
@@ -191,8 +226,8 @@ async function seed() {
          RETURNING m5truckskey`,
         [
           f.reg, f.model, f.vin,
-          f.size  ?? "12m",
-          f.year  ?? 2021,
+          f.size     ?? "12m",
+          f.year     ?? 2021,
           f.purchase ?? null,
           f.eval     ?? null,
           f.isSub    ?? false,
@@ -204,12 +239,12 @@ async function seed() {
       return r.rows[0].m5truckskey;
     };
 
-    const truck1Key = await insertTruck({ reg:"ND 45 678 GP", model:"Volvo FH16 2022",      vin:"VIN-PFS-001", year:2022, purchase:1850000, eval:1450000, expiry:daysFromNow(290) });
-    const truck2Key = await insertTruck({ reg:"ND 12 345 GP", model:"MAN TGX 480 2021",     vin:"VIN-PFS-002", year:2021, purchase:1650000, eval:1200000, expiry:daysFromNow(178) });
-    const truck3Key = await insertTruck({ reg:"ND 78 901 GP", model:"Mercedes Actros 2023", vin:"VIN-PFS-003", size:"6m", year:2023, purchase:980000,  eval:860000,  expiry:daysFromNow(77) });
-    const truck4Key = await insertTruck({ reg:"ND 33 100 GP", model:"DAF XF 2018",          vin:"VIN-PFS-004", year:2018, purchase:1200000, eval:680000,  expiry:daysFromNow(24) }); // <30d → alert!
-    await insertTruck(                  { reg:"SRH 4432 CC",  model:"Scania R500 2020",      vin:"VIN-PFS-SUB1", isSub:true, subei:"SUBCC-4432", expiry:daysFromNow(41) });
-    await insertTruck(                  { reg:"FLT 8819 CC",  model:"Volvo FM 460 2019",     vin:"VIN-PFS-SUB2", isSub:true, subei:"SUBCC-8819", expiry:daysFromNow(89) });
+    const truck1Key = await insertTruck({ reg:"ND 45 678 GP", model:"Volvo FH16 2022",       vin:"VIN-PFS-001", year:2022, purchase:1850000, eval:1450000, expiry:daysFromNow(290) });
+    const truck2Key = await insertTruck({ reg:"ND 12 345 GP", model:"MAN TGX 480 2021",      vin:"VIN-PFS-002", year:2021, purchase:1650000, eval:1200000, expiry:daysFromNow(178) });
+    const truck3Key = await insertTruck({ reg:"ND 78 901 GP", model:"Mercedes Actros 2023",  vin:"VIN-PFS-003", size:"6m", year:2023, purchase:980000, eval:860000, expiry:daysFromNow(77) });
+    const truck4Key = await insertTruck({ reg:"ND 33 100 GP", model:"DAF XF 2018",           vin:"VIN-PFS-004", year:2018, purchase:1200000, eval:680000, expiry:daysFromNow(24) }); // <30d → licence alert
+    await insertTruck(                  { reg:"SRH 4432 CC",  model:"Scania R500 2020",       vin:"VIN-PFS-SUB1", isSub:true, subei:"SUBCC-4432", expiry:daysFromNow(41) });
+    await insertTruck(                  { reg:"FLT 8819 CC",  model:"Volvo FM 460 2019",      vin:"VIN-PFS-SUB2", isSub:true, subei:"SUBCC-8819", expiry:daysFromNow(89) });
 
     console.log("  ✓ 6 trucks (4 owned incl. near-expiry alert, 2 subcontractor)");
 
@@ -229,11 +264,9 @@ async function seed() {
     await client.query("COMMIT");
     console.log("\nBase entities committed — seeding operational data...\n");
 
-    // ── Operational data in a fresh transaction ───────────────────────────────
     await client.query("BEGIN");
     await operationalSeed(client, {
-      adminId, ctrlId, financeId, directorId, creditorsId,
-      siphoId, mandlaId, deonId, sunriseId, fastlaneId,
+      adminId, ctrlId, siphoId, mandlaId, deonId, sunriseId, fastlaneId,
       truck1Key, truck2Key, truck3Key, truck4Key,
     });
     await client.query("COMMIT");
@@ -324,8 +357,7 @@ async function operationalSeed(client, ids) {
 
   console.log("  ✓ 4 clients (Hapag-Lloyd, Transnet, Pick n Pay, Shoprite)");
 
-  // ── 8. CLIENT RATES (3 routes × 4 clients = 12 records) ─────────────────
-  // Routes: Durban→Johannesburg | Cape Town→Johannesburg | Durban→Cape Town
+  // ── 8. CLIENT RATES (3 routes × 4 clients) ───────────────────────────────
 
   const crQ = `
     INSERT INTO m5_client_rate
@@ -333,19 +365,15 @@ async function operationalSeed(client, ids) {
        "6m_rate", "12m_rate", surcharges, surcharge12m, hazardous, vgm, set_rate, company_reg_num)
     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)`;
 
-  // Hapag-Lloyd
   await client.query(crQ, [hapagKey,    "Durban",    "Johannesburg", 4200, 7800,  650, null, 950,  380,  null, DEMO_CRN]);
   await client.query(crQ, [hapagKey,    "Cape Town", "Johannesburg", 5100, 9500,  750, null, 1100, 420,  null, DEMO_CRN]);
   await client.query(crQ, [hapagKey,    "Durban",    "Cape Town",    4800, 8900,  700, null, 1000, 400,  null, DEMO_CRN]);
-  // Transnet
   await client.query(crQ, [transnetKey, "Durban",    "Johannesburg", 4500, 8200,  600, null, 900,  350,  null, DEMO_CRN]);
   await client.query(crQ, [transnetKey, "Cape Town", "Johannesburg", 5400, 9900,  800, null, 1200, 450,  null, DEMO_CRN]);
   await client.query(crQ, [transnetKey, "Durban",    "Cape Town",    5000, 9200,  720, null, 1050, 410,  null, DEMO_CRN]);
-  // Pick n Pay (no hazmat)
   await client.query(crQ, [pnpKey,      "Durban",    "Johannesburg", 3900, 7200,  580, null, null, null, null, DEMO_CRN]);
   await client.query(crQ, [pnpKey,      "Cape Town", "Johannesburg", 4700, 8700,  650, null, null, null, null, DEMO_CRN]);
   await client.query(crQ, [pnpKey,      "Durban",    "Cape Town",    4400, 8100,  620, null, null, null, null, DEMO_CRN]);
-  // Shoprite (no hazmat, has VGM)
   await client.query(crQ, [shopriteKey, "Durban",    "Johannesburg", 4100, 7600,  600, null, null, 360,  null, DEMO_CRN]);
   await client.query(crQ, [shopriteKey, "Cape Town", "Johannesburg", 4900, 9100,  700, null, null, 400,  null, DEMO_CRN]);
   await client.query(crQ, [shopriteKey, "Durban",    "Cape Town",    4600, 8500,  650, null, null, 380,  null, DEMO_CRN]);
@@ -353,8 +381,6 @@ async function operationalSeed(client, ids) {
   console.log("  ✓ 12 client rates (3 routes × 4 clients)");
 
   // ── 9. DRIVER RATES ──────────────────────────────────────────────────────
-  // One rate record per route; no driverid (route-level, not driver-specific).
-  // One historical expired record to demonstrate rate history in the UI.
 
   const drQ = `
     INSERT INTO m5_driver_rate
@@ -365,23 +391,23 @@ async function operationalSeed(client, ids) {
     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)
     RETURNING m5ratekey`;
 
-  const rk_dbn_jhb = (await client.query(drQ, ["Durban",    "Johannesburg", 1800, 3200, 3400, 6200, "2024-01-01", null,         DEMO_CRN])).rows[0].m5ratekey;
-  const rk_cpt_jhb = (await client.query(drQ, ["Cape Town", "Johannesburg", 1950, 3500, 3800, 7000, "2024-01-01", null,         DEMO_CRN])).rows[0].m5ratekey;
-  const rk_dbn_cpt = (await client.query(drQ, ["Durban",    "Cape Town",    2100, 3800, 3500, 6400, "2024-01-01", null,         DEMO_CRN])).rows[0].m5ratekey;
-  await client.query(drQ,                     ["Johannesburg","Durban",      1800, 3200, 3400, 6200, "2024-01-01", null,         DEMO_CRN]); // return legs
-  await client.query(drQ,                     ["Durban",    "Johannesburg", 1600, 2900, 3100, 5800, "2023-01-01", "2023-12-31", DEMO_CRN]); // historical expired
+  const rk_dbn_jhb = (await client.query(drQ, ["Durban",     "Johannesburg", 1800, 3200, 3400, 6200, "2024-01-01", null,         DEMO_CRN])).rows[0].m5ratekey;
+  const rk_cpt_jhb = (await client.query(drQ, ["Cape Town",  "Johannesburg", 1950, 3500, 3800, 7000, "2024-01-01", null,         DEMO_CRN])).rows[0].m5ratekey;
+  const rk_dbn_cpt = (await client.query(drQ, ["Durban",     "Cape Town",    2100, 3800, 3500, 6400, "2024-01-01", null,         DEMO_CRN])).rows[0].m5ratekey;
+  await client.query(drQ,                     ["Johannesburg","Durban",       1800, 3200, 3400, 6200, "2024-01-01", null,         DEMO_CRN]);
+  await client.query(drQ,                     ["Durban",     "Johannesburg",  1600, 2900, 3100, 5800, "2023-01-01", "2023-12-31", DEMO_CRN]); // historical expired
 
-  console.log("  ✓ 5 driver rates (active × 3 routes + JHB return + 1 historical expired)");
+  console.log("  ✓ 5 driver rates (3 active routes + JHB return + 1 historical expired)");
 
   // ── 10. INSTRUCTIONS (7) ─────────────────────────────────────────────────
   //
-  //  #1  Hapag    DBN→JHB  2×12m     complete  invoiced  FULLY PAID    (120d ago)
-  //  #2  Transnet DBN→JHB  1×12m+6m  complete  invoiced  UNPAID >90d   (95d ago)
-  //  #3  PnP      CPT→JHB  3×12m     complete  invoiced  UNPAID 60d    (65d ago)
-  //  #4  Hapag    CPT→JHB  2×12m hazmat complete invoiced PARTIAL 30d  (35d ago)
-  //  #5  Shoprite DBN→JHB  1×12m+6m  complete  invoiced  PARTIAL curr  (12d ago)
-  //  #6  Transnet DBN→CPT  2×12m     In Progress (FastLane subbie)      (3d ago)
-  //  #7  PnP      DBN→JHB  1×6m      New                                (today)
+  //  #1  Hapag    DBN→JHB  2×12m          complete  invoiced  FULLY PAID   2026-02-07
+  //  #2  Transnet DBN→JHB  1×12m+1×6m     complete  invoiced  UNPAID >60d  2026-03-03
+  //  #3  PnP      CPT→JHB  3×12m          complete  invoiced  UNPAID ~60d  2026-04-02
+  //  #4  Hapag    CPT→JHB  2×12m hazmat   complete  invoiced  PARTIAL ~30d 2026-05-02
+  //  #5  Shoprite DBN→JHB  1×12m+1×6m     complete  invoiced  PARTIAL curr 2026-05-25
+  //  #6  Transnet DBN→CPT  2×12m          In Progress (FastLane subbie)    2026-05-17
+  //  #7  PnP      DBN→JHB  1×6m           New                              2026-06-06
 
   const m1Q = `
     INSERT INTO m1_controller (
@@ -404,97 +430,96 @@ async function operationalSeed(client, ids) {
       $31,$32
     ) RETURNING m1key`;
 
-  const stack     = daysFromNow(14);
-  const lastFree  = daysFromNow(21);
+  const stack    = daysFromNow(14);
+  const lastFree = daysFromNow(21);
 
-  // Instr 1: 2×12m @ 7800 + 2×VGM(380) = 16,360 → gross 16360×1.15 = 18,814 → PAID
+  // Instr 1: 2×12m(7800) + 2×VGM(380) = 16,360 → gross 18,814 → PAID IN FULL
   const m1k1 = (await client.query(m1Q, [
-    hapagKey,   "PFS-2026-0041", shipkey, "Durban",    "Johannesburg",
+    hapagKey,    "PFS-2026-0041", shipkey, "Durban",    "Johannesburg",
     stack, lastFree, "HLL-2026-0041", "Container",
-    "Hapag-Lloyd 2×12m DBN→JHB — settled", "complete", 15,
+    "Hapag-Lloyd 2×12m DBN→JHB — fully settled", "complete", 15,
     0, 2, 0, 0,
     null, 16360.00, null, 7800.00, null, null,
     null, null, false, null,
     "HLBK-2026-0041", "MSC Soleil", 18814.00, "paid",
-    daysAgo(120), DEMO_CRN,
+    D_INSTR1, DEMO_CRN,
   ])).rows[0].m1key;
 
-  // Instr 2: 1×12m(8200) + 1×6m(4500) + surcharge(600) = 13,300 → gross 15,295 → UNPAID >90d
+  // Instr 2: 1×12m(8200) + 1×6m(4500) + surcharge(600) = 13,300 → gross 15,295 → UNPAID
   const m1k2 = (await client.query(m1Q, [
-    transnetKey,"PFS-2026-0042", shipkey, "Durban",    "Johannesburg",
+    transnetKey, "PFS-2026-0042", shipkey, "Durban",    "Johannesburg",
     stack, lastFree, "TRN-2026-0042", "Container",
-    "Transnet DBN→JHB 1×12m+1×6m — OVERDUE 90+ days", "complete", 15,
+    "Transnet DBN→JHB 1×12m+1×6m — OVERDUE 60+ days", "complete", 15,
     1, 1, 0, 0,
     null, 13300.00, 4500.00, 8200.00, null, null,
     null, null, false, null,
     "TRBK-2026-0042", "MSC Capella", 0, "unpaid",
-    daysAgo(95), DEMO_CRN,
+    D_INSTR2, DEMO_CRN,
   ])).rows[0].m1key;
 
-  // Instr 3: 3×12m(8700) + surcharge(580) = 26,680 → gross 30,682 → UNPAID 60d
+  // Instr 3: 3×12m(8700) + first container surcharge(580) baked in = 26,680 → gross 30,682 → UNPAID
   const m1k3 = (await client.query(m1Q, [
-    pnpKey,     "PFS-2026-0043", shipkey, "Cape Town", "Johannesburg",
+    pnpKey,      "PFS-2026-0043", shipkey, "Cape Town", "Johannesburg",
     stack, lastFree, "PNP-2026-0043", "Container",
-    "Pick n Pay CPT→JHB 3×12m — 60-day overdue", "complete", 15,
+    "Pick n Pay CPT→JHB 3×12m — 31–60 day overdue", "complete", 15,
     0, 3, 0, 0,
     null, 26680.00, null, 8700.00, null, null,
     null, null, false, null,
     "PNPBK-2026-0043", "MSC Flaminia", 0, "unpaid",
-    daysAgo(65), DEMO_CRN,
+    D_INSTR3, DEMO_CRN,
   ])).rows[0].m1key;
 
-  // Instr 4: 2×12m(9500) + 2×hazmat(1100) + 2×vgm(420) + 2×surcharge(750) = 23,540 → gross 27,071 → PARTIAL
+  // Instr 4: 2×12m(9500) + 2×hazmat(1100) + 2×VGM(420) + 2×surcharge(750) = 23,540 → gross 27,071 → PARTIAL
   const m1k4 = (await client.query(m1Q, [
-    hapagKey,   "PFS-2026-0044", shipkey, "Cape Town", "Johannesburg",
+    hapagKey,    "PFS-2026-0044", shipkey, "Cape Town", "Johannesburg",
     stack, lastFree, "HLL-2026-0044", "Container",
-    "Hapag-Lloyd CPT→JHB 2×12m Hazmat — partial payment 30d", "complete", 15,
+    "Hapag-Lloyd CPT→JHB 2×12m hazmat — partial payment received", "complete", 15,
     0, 2, 0, 0,
     null, 23540.00, null, 9500.00, null, null,
     null, null, false, null,
     "HLBK-2026-0044", "MSC Danit", 12500.00, "partial",
-    daysAgo(35), DEMO_CRN,
+    D_INSTR4, DEMO_CRN,
   ])).rows[0].m1key;
 
-  // Instr 5: 1×12m(7600) + 1×6m(4100) + vgm(360) = 12,060 → gross 13,869 → PARTIAL current
+  // Instr 5: 1×12m(7600) + 1×6m(4100) + VGM(360) = 12,060 → gross 13,869 → PARTIAL (current)
   const m1k5 = (await client.query(m1Q, [
-    shopriteKey,"PFS-2026-0045", shipkey, "Durban",    "Johannesburg",
+    shopriteKey, "PFS-2026-0045", shipkey, "Durban",    "Johannesburg",
     stack, lastFree, "SHR-2026-0045", "Container",
     "Shoprite DBN→JHB 1×12m+1×6m — recent partial payment", "complete", 15,
     1, 1, 0, 0,
     null, 12060.00, 4100.00, 7600.00, null, null,
     null, null, false, null,
     "SHBK-2026-0045", "MSC Rossella", 5000.00, "partial",
-    daysAgo(12), DEMO_CRN,
+    D_INSTR5, DEMO_CRN,
   ])).rows[0].m1key;
 
-  // Instr 6: 2×12m(9200) = 18,400 — In Progress, FastLane subbie, VAT=0 (NON_VAT sub statement)
+  // Instr 6: 2×12m(9200) = 18,400 — In Progress, FastLane subbie
   const m1k6 = (await client.query(m1Q, [
-    transnetKey,"PFS-2026-0046", shipkey, "Durban",    "Cape Town",
+    transnetKey, "PFS-2026-0046", shipkey, "Durban",    "Cape Town",
     stack, lastFree, "TRN-2026-0046", "Container",
     "Transnet DBN→CPT 2×12m — in transit via FastLane Transport", "In Progress", 0,
     0, 2, 0, 0,
     null, 18400.00, null, 9200.00, null, null,
     null, null, false, null,
     "TRBK-2026-0046", "MSC Katya", 0, "unpaid",
-    daysAgo(3), DEMO_CRN,
+    D_INSTR6, DEMO_CRN,
   ])).rows[0].m1key;
 
   // Instr 7: 1×6m(3900) — New booking today
   const m1k7 = (await client.query(m1Q, [
-    pnpKey,     "PFS-2026-0047", shipkey, "Durban",    "Johannesburg",
+    pnpKey,      "PFS-2026-0047", shipkey, "Durban",    "Johannesburg",
     stack, lastFree, "PNP-2026-0047", "Container",
     "Pick n Pay DBN→JHB 1×6m — new booking", "New", 15,
     1, 0, 0, 0,
     null, 3900.00, 3900.00, null, null, null,
     null, null, false, null,
     "PNPBK-2026-0047", "MSC Aurora", 0, "unpaid",
-    daysAgo(0), DEMO_CRN,
+    D_TODAY, DEMO_CRN,
   ])).rows[0].m1key;
 
   console.log(`  ✓ 7 instructions (m1keys ${m1k1}–${m1k7})`);
 
   // ── 11. CONTAINERS (14) ──────────────────────────────────────────────────
-  // Column order matches production insertContainerQuery exactly.
 
   const cntQ = `
     INSERT INTO container (
@@ -505,34 +530,31 @@ async function operationalSeed(client, ids) {
     ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15)
     RETURNING containerkey`;
 
-  // Instr 1 — 2×12m, VGM only
-  const ck1 = (await client.query(cntQ, ["HLCU3456781", 28500, m1k1, "12m", "General Merchandise", false, false, 0,   0,    false, 0,   "PFS-0041-A", true,  380, DEMO_CRN])).rows[0].containerkey;
+  // Instr 1 — 2×12m, VGM only (capture ck2 for credit note)
+  await client.query(cntQ, ["HLCU3456781", 28500, m1k1, "12m", "General Merchandise", false, false, 0,   0,    false, 0,   "PFS-0041-A", true,  380, DEMO_CRN]);
   const ck2 = (await client.query(cntQ, ["HLCU3456782", 27200, m1k1, "12m", "General Merchandise", false, false, 0,   0,    false, 0,   "PFS-0041-B", true,  380, DEMO_CRN])).rows[0].containerkey;
   // Instr 2 — 1×12m with surcharge, 1×6m plain
-  await client.query(cntQ,             ["TRNT1234561", 30100, m1k2, "12m", "Steel Coils",          false, true,  0,   0,    true,  600, "PFS-0042-A", false, 0,   DEMO_CRN]);
-  await client.query(cntQ,             ["TRNT1234562", 14800, m1k2, "6m",  "Steel Coils",          false, false, 0,   0,    false, 0,   "PFS-0042-B", false, 0,   DEMO_CRN]);
+  await client.query(cntQ, ["TRNT1234561", 30100, m1k2, "12m", "Steel Coils",         false, true,  0,   0,    true,  600, "PFS-0042-A", false, 0,   DEMO_CRN]);
+  await client.query(cntQ, ["TRNT1234562", 14800, m1k2, "6m",  "Steel Coils",         false, false, 0,   0,    false, 0,   "PFS-0042-B", false, 0,   DEMO_CRN]);
   // Instr 3 — 3×12m (first with 12m surcharge)
-  await client.query(cntQ,             ["PNPD9876541", 29000, m1k3, "12m", "Foodstuffs",           false, true,  0,   0,    true,  580, "PFS-0043-A", false, 0,   DEMO_CRN]);
-  await client.query(cntQ,             ["PNPD9876542", 26500, m1k3, "12m", "Foodstuffs",           false, false, 0,   0,    false, 0,   "PFS-0043-B", false, 0,   DEMO_CRN]);
-  await client.query(cntQ,             ["PNPD9876543", 27800, m1k3, "12m", "Foodstuffs",           false, false, 0,   0,    false, 0,   "PFS-0043-C", false, 0,   DEMO_CRN]);
+  await client.query(cntQ, ["PNPD9876541", 29000, m1k3, "12m", "Foodstuffs",          false, true,  0,   0,    true,  580, "PFS-0043-A", false, 0,   DEMO_CRN]);
+  await client.query(cntQ, ["PNPD9876542", 26500, m1k3, "12m", "Foodstuffs",          false, false, 0,   0,    false, 0,   "PFS-0043-B", false, 0,   DEMO_CRN]);
+  await client.query(cntQ, ["PNPD9876543", 27800, m1k3, "12m", "Foodstuffs",          false, false, 0,   0,    false, 0,   "PFS-0043-C", false, 0,   DEMO_CRN]);
   // Instr 4 — 2×12m hazmat + VGM + surcharge
-  await client.query(cntQ,             ["HLCU7890121", 24000, m1k4, "12m", "Hazardous Chemicals",  true,  true,  0,   1100, true,  750, "PFS-0044-A", true,  420, DEMO_CRN]);
-  await client.query(cntQ,             ["HLCU7890122", 23500, m1k4, "12m", "Hazardous Chemicals",  true,  true,  0,   1100, true,  750, "PFS-0044-B", true,  420, DEMO_CRN]);
+  await client.query(cntQ, ["HLCU7890121", 24000, m1k4, "12m", "Hazardous Chemicals", true,  true,  0,   1100, true,  750, "PFS-0044-A", true,  420, DEMO_CRN]);
+  await client.query(cntQ, ["HLCU7890122", 23500, m1k4, "12m", "Hazardous Chemicals", true,  true,  0,   1100, true,  750, "PFS-0044-B", true,  420, DEMO_CRN]);
   // Instr 5 — 1×12m VGM, 1×6m plain
-  await client.query(cntQ,             ["SHRT5554431", 31200, m1k5, "12m", "Retail Goods",         false, false, 0,   0,    false, 0,   "PFS-0045-A", true,  360, DEMO_CRN]);
-  await client.query(cntQ,             ["SHRT5554432", 16000, m1k5, "6m",  "Retail Goods",         false, false, 0,   0,    false, 0,   "PFS-0045-B", false, 0,   DEMO_CRN]);
+  await client.query(cntQ, ["SHRT5554431", 31200, m1k5, "12m", "Retail Goods",        false, false, 0,   0,    false, 0,   "PFS-0045-A", true,  360, DEMO_CRN]);
+  await client.query(cntQ, ["SHRT5554432", 16000, m1k5, "6m",  "Retail Goods",        false, false, 0,   0,    false, 0,   "PFS-0045-B", false, 0,   DEMO_CRN]);
   // Instr 6 — 2×12m plain (subbie)
-  await client.query(cntQ,             ["TRNT6667771", 28800, m1k6, "12m", "Mining Equipment",     false, false, 0,   0,    false, 0,   "PFS-0046-A", false, 0,   DEMO_CRN]);
-  await client.query(cntQ,             ["TRNT6667772", 27500, m1k6, "12m", "Mining Equipment",     false, false, 0,   0,    false, 0,   "PFS-0046-B", false, 0,   DEMO_CRN]);
+  await client.query(cntQ, ["TRNT6667771", 28800, m1k6, "12m", "Mining Equipment",    false, false, 0,   0,    false, 0,   "PFS-0046-A", false, 0,   DEMO_CRN]);
+  await client.query(cntQ, ["TRNT6667772", 27500, m1k6, "12m", "Mining Equipment",    false, false, 0,   0,    false, 0,   "PFS-0046-B", false, 0,   DEMO_CRN]);
   // Instr 7 — 1×6m plain
-  await client.query(cntQ,             ["PNPD2221111", 15000, m1k7, "6m",  "Foodstuffs",           false, false, 0,   0,    false, 0,   "PFS-0047-A", false, 0,   DEMO_CRN]);
+  await client.query(cntQ, ["PNPD2221111", 15000, m1k7, "6m",  "Foodstuffs",          false, false, 0,   0,    false, 0,   "PFS-0047-A", false, 0,   DEMO_CRN]);
 
   console.log("  ✓ 14 containers across 7 instructions");
 
   // ── 12. LEGS_M2 (13) ─────────────────────────────────────────────────────
-  // Production saveLeg inserts: legnumber, startingpoint, destination, driverrate,
-  // m1key, driverid, truckregnumber, containernumber, vgm, date, company_reg_num
-  // m5ratekey and legstatus are nullable extras — safe to include in seed.
 
   const legQ = `
     INSERT INTO legs_m2 (
@@ -544,26 +566,25 @@ async function operationalSeed(client, ids) {
 
   const leg = async (p) => (await client.query(legQ, p)).rows[0].legkey;
 
-  // Instr 1 — Sipho & Mandla, DBN→JHB 12m
-  await leg([1,"Durban","Johannesburg",3200, m1k1,siphoId, "ND 45 678 GP","HLCU3456781",0,daysAgo(120),rk_dbn_jhb,DEMO_CRN]);
-  await leg([2,"Durban","Johannesburg",3200, m1k1,mandlaId,"ND 12 345 GP","HLCU3456782",0,daysAgo(120),rk_dbn_jhb,DEMO_CRN]);
-  // Instr 2 — Deon, DBN→JHB (12m truck + 6m truck)
-  await leg([1,"Durban","Johannesburg",3200, m1k2,deonId,  "ND 12 345 GP","TRNT1234561",0,daysAgo(95), rk_dbn_jhb,DEMO_CRN]);
-  await leg([2,"Durban","Johannesburg",1800, m1k2,deonId,  "ND 78 901 GP","TRNT1234562",0,daysAgo(95), rk_dbn_jhb,DEMO_CRN]);
-  // Instr 3 — Mandla ×2, Sipho ×1, CPT→JHB 12m
-  await leg([1,"Cape Town","Johannesburg",3500, m1k3,mandlaId,"ND 45 678 GP","PNPD9876541",0,daysAgo(65),rk_cpt_jhb,DEMO_CRN]);
-  await leg([2,"Cape Town","Johannesburg",3500, m1k3,mandlaId,"ND 12 345 GP","PNPD9876542",0,daysAgo(65),rk_cpt_jhb,DEMO_CRN]);
-  await leg([3,"Cape Town","Johannesburg",3500, m1k3,siphoId, "ND 45 678 GP","PNPD9876543",0,daysAgo(65),rk_cpt_jhb,DEMO_CRN]);
-  // Instr 4 — Sunrise Haulage, CPT→JHB subie 12m rate = 7000
-  const legSunrise1 = await leg([1,"Cape Town","Johannesburg",7000, m1k4,sunriseId,"SRH 4432 CC","HLCU7890121",0,daysAgo(35),rk_cpt_jhb,DEMO_CRN]);
-  const legSunrise2 = await leg([2,"Cape Town","Johannesburg",7000, m1k4,sunriseId,"SRH 4432 CC","HLCU7890122",0,daysAgo(35),rk_cpt_jhb,DEMO_CRN]);
-  // Instr 5 — Sipho 12m, Deon 6m, DBN→JHB
-  await leg([1,"Durban","Johannesburg",3200, m1k5,siphoId,"ND 45 678 GP","SHRT5554431",0,daysAgo(12),rk_dbn_jhb,DEMO_CRN]);
-  await leg([2,"Durban","Johannesburg",1800, m1k5,deonId, "ND 78 901 GP","SHRT5554432",0,daysAgo(12),rk_dbn_jhb,DEMO_CRN]);
-  // Instr 6 — FastLane Transport, DBN→CPT subie 12m rate = 6400
-  // Dated 20 days ago so they fall in last month's sub statement window
-  const legFast1 = await leg([1,"Durban","Cape Town",6400, m1k6,fastlaneId,"FLT 8819 CC","TRNT6667771",0,daysAgo(20),rk_dbn_cpt,DEMO_CRN]);
-  const legFast2 = await leg([2,"Durban","Cape Town",6400, m1k6,fastlaneId,"FLT 8819 CC","TRNT6667772",0,daysAgo(20),rk_dbn_cpt,DEMO_CRN]);
+  // Instr 1 — Sipho & Mandla, DBN→JHB 12m  (Feb 7)
+  await leg([1,"Durban","Johannesburg",3200, m1k1,siphoId, "ND 45 678 GP","HLCU3456781",0,D_INSTR1,   rk_dbn_jhb,DEMO_CRN]);
+  await leg([2,"Durban","Johannesburg",3200, m1k1,mandlaId,"ND 12 345 GP","HLCU3456782",0,D_INSTR1,   rk_dbn_jhb,DEMO_CRN]);
+  // Instr 2 — Deon, DBN→JHB  (Mar 3)
+  await leg([1,"Durban","Johannesburg",3200, m1k2,deonId,  "ND 12 345 GP","TRNT1234561",0,D_INSTR2,   rk_dbn_jhb,DEMO_CRN]);
+  await leg([2,"Durban","Johannesburg",1800, m1k2,deonId,  "ND 78 901 GP","TRNT1234562",0,D_INSTR2,   rk_dbn_jhb,DEMO_CRN]);
+  // Instr 3 — Mandla ×2, Sipho ×1, CPT→JHB 12m  (Apr 2)
+  await leg([1,"Cape Town","Johannesburg",3500, m1k3,mandlaId,"ND 45 678 GP","PNPD9876541",0,D_INSTR3,rk_cpt_jhb,DEMO_CRN]);
+  await leg([2,"Cape Town","Johannesburg",3500, m1k3,mandlaId,"ND 12 345 GP","PNPD9876542",0,D_INSTR3,rk_cpt_jhb,DEMO_CRN]);
+  await leg([3,"Cape Town","Johannesburg",3500, m1k3,siphoId, "ND 45 678 GP","PNPD9876543",0,D_INSTR3,rk_cpt_jhb,DEMO_CRN]);
+  // Instr 4 — Sunrise Haulage, CPT→JHB subie 12m  (May 2)
+  const legSunrise1 = await leg([1,"Cape Town","Johannesburg",7000, m1k4,sunriseId,"SRH 4432 CC","HLCU7890121",0,D_INSTR4,rk_cpt_jhb,DEMO_CRN]);
+  const legSunrise2 = await leg([2,"Cape Town","Johannesburg",7000, m1k4,sunriseId,"SRH 4432 CC","HLCU7890122",0,D_INSTR4,rk_cpt_jhb,DEMO_CRN]);
+  // Instr 5 — Sipho 12m, Deon 6m, DBN→JHB  (May 25)
+  await leg([1,"Durban","Johannesburg",3200, m1k5,siphoId,"ND 45 678 GP","SHRT5554431",0,D_INSTR5,rk_dbn_jhb,DEMO_CRN]);
+  await leg([2,"Durban","Johannesburg",1800, m1k5,deonId, "ND 78 901 GP","SHRT5554432",0,D_INSTR5,rk_dbn_jhb,DEMO_CRN]);
+  // Instr 6 — FastLane Transport, DBN→CPT subie 12m  (May 17 — in May for sub statement)
+  const legFast1 = await leg([1,"Durban","Cape Town",6400, m1k6,fastlaneId,"FLT 8819 CC","TRNT6667771",0,D_INSTR6,rk_dbn_cpt,DEMO_CRN]);
+  const legFast2 = await leg([2,"Durban","Cape Town",6400, m1k6,fastlaneId,"FLT 8819 CC","TRNT6667772",0,D_INSTR6,rk_dbn_cpt,DEMO_CRN]);
 
   console.log("  ✓ 13 legs (9 owned driver + 2 Sunrise Haulage + 2 FastLane Transport)");
 
@@ -573,16 +594,21 @@ async function operationalSeed(client, ids) {
     INSERT INTO invoice (clientid, m1key, invoice_num, groupid, date, company_reg_num)
     VALUES ($1,$2,$3,NULL,$4,$5) RETURNING ikey`;
 
-  const inv1 = (await client.query(invQ, [hapagKey,    m1k1, "PFS-INV-0041", daysAgo(120), DEMO_CRN])).rows[0].ikey;
-  const inv2 = (await client.query(invQ, [transnetKey, m1k2, "PFS-INV-0042", daysAgo(95),  DEMO_CRN])).rows[0].ikey;
-  const inv3 = (await client.query(invQ, [pnpKey,      m1k3, "PFS-INV-0043", daysAgo(65),  DEMO_CRN])).rows[0].ikey;
-  const inv4 = (await client.query(invQ, [hapagKey,    m1k4, "PFS-INV-0044", daysAgo(35),  DEMO_CRN])).rows[0].ikey;
-  const inv5 = (await client.query(invQ, [shopriteKey, m1k5, "PFS-INV-0045", daysAgo(12),  DEMO_CRN])).rows[0].ikey;
+  const inv1 = (await client.query(invQ, [hapagKey,    m1k1, "PFS-INV-0041", D_INSTR1, DEMO_CRN])).rows[0].ikey;
+  const inv2 = (await client.query(invQ, [transnetKey, m1k2, "PFS-INV-0042", D_INSTR2, DEMO_CRN])).rows[0].ikey; // eslint-disable-line no-unused-vars
+  const inv3 = (await client.query(invQ, [pnpKey,      m1k3, "PFS-INV-0043", D_INSTR3, DEMO_CRN])).rows[0].ikey; // eslint-disable-line no-unused-vars
+  const inv4 = (await client.query(invQ, [hapagKey,    m1k4, "PFS-INV-0044", D_INSTR4, DEMO_CRN])).rows[0].ikey;
+  const inv5 = (await client.query(invQ, [shopriteKey, m1k5, "PFS-INV-0045", D_INSTR5, DEMO_CRN])).rows[0].ikey;
 
   console.log("  ✓ 5 invoices (PFS-INV-0041 to 0045)");
 
   // ── 14. PAYMENTS (3) ─────────────────────────────────────────────────────
-  // line_items JSONB structure matches what statementGenerator reads.
+  //
+  // IMPORTANT: payment line_date must fall within the statement period (previous
+  // calendar month) for the payment to appear on the statement.
+  //   Hapag full (March 7)    → appears on April 1 statement (covers March)
+  //   Hapag partial (May 22)  → appears on June 1 statement (covers May)
+  //   Shoprite partial (May 29) → appears on June 1 statement (covers May)
 
   const payInsert = async (clientid, invoiceid, invNum, amount, ref, date) => {
     const li = JSON.stringify([{
@@ -601,13 +627,24 @@ async function operationalSeed(client, ids) {
     );
   };
 
-  await payInsert(hapagKey,    inv1, "PFS-INV-0041", 18814.00, "EFT-PFS-REF-0041", daysAgo(90)); // full
-  await payInsert(hapagKey,    inv4, "PFS-INV-0044", 12500.00, "EFT-PFS-REF-0044", daysAgo(15)); // partial
-  await payInsert(shopriteKey, inv5, "PFS-INV-0045",  5000.00, "EFT-PFS-REF-0045", daysAgo(5));  // partial
+  await payInsert(hapagKey,    inv1, "PFS-INV-0041", 18814.00, "EFT-PFS-REF-0041", D_PMT_HAPAG_FULL);   // full
+  await payInsert(hapagKey,    inv4, "PFS-INV-0044", 12500.00, "EFT-PFS-REF-0044", D_PMT_HAPAG_PART);   // partial
+  await payInsert(shopriteKey, inv5, "PFS-INV-0045",  5000.00, "EFT-PFS-REF-0045", D_PMT_SHOPRITE);     // partial (in May!)
 
-  console.log("  ✓ 3 payments (Instr 1 fully paid, Instr 4 + 5 partial)");
+  console.log("  ✓ 3 payments (Instr 1 fully paid Mar 7; Instr 4 partial May 22; Instr 5 partial May 29)");
 
   // ── 15. ADD-ONS (3) ──────────────────────────────────────────────────────
+  //
+  // All add-ons have paid_amount=0, status='unpaid'.
+  //
+  // The aging calculator does: outstanding = amount − paid_amount  (NO VAT)
+  // The statement includes add-on amount directly (no VAT multiplication either).
+  // This keeps the amounts consistent between the statement and the aging total.
+  //
+  // Add-on dates are chosen so each falls in a specific statement period:
+  //   Hapag add-on   (May 17)  → in May → appears on June 1 statement
+  //   Transnet add-on (Feb 26) → in Feb → appears on March 1 statement
+  //   PnP add-on     (Mar 28)  → in Mar → appears on April 1 statement
 
   const aoQ = `
     INSERT INTO add_ons
@@ -616,36 +653,40 @@ async function operationalSeed(client, ids) {
        paid_amount, status, company_reg_num)
     VALUES ($1,$2,$3,$4,$5,NULL,$6,$7,$8,$9,$10,$11,$12,$13)`;
 
-  // Hapag — Port Congestion Surcharge (20d ago → current bucket), partial R800 paid
+  // Hapag — Port Congestion Surcharge  outstanding R1,800 → current bucket
   await client.query(aoQ, [
     hapagKey,
     JSON.stringify({ description: "Port Congestion Surcharge — Durban June 2026" }),
-    1800.00, daysAgo(20), "PFS-AO-0051", daysAgo(20),
+    1800.00, D_ADDON_HAPAG, "PFS-AO-0051", D_ADDON_HAPAG,
     true, "HLBK-2026-0044", "HLL-2026-0044", "MSC Danit",
-    800.00, "partial", DEMO_CRN,
+    0, "unpaid", DEMO_CRN,
   ]);
 
-  // Transnet — Dangerous Goods Declaration (100d ago → >90d bucket), unpaid
+  // Transnet — Dangerous Goods Declaration  outstanding R2,500 → 90+ days bucket
   await client.query(aoQ, [
     transnetKey,
     JSON.stringify({ description: "Dangerous Goods Declaration Fee — Class 3 Flammable" }),
-    2500.00, daysAgo(100), "PFS-AO-0052", daysAgo(100),
+    2500.00, D_ADDON_TRANSNET, "PFS-AO-0052", D_ADDON_TRANSNET,
     true, "TRBK-2026-0042", "TRN-2026-0042", "MSC Capella",
     0, "unpaid", DEMO_CRN,
   ]);
 
-  // Pick n Pay — Extended Storage Fee (70d ago → 60d bucket), unpaid
+  // Pick n Pay — Extended Storage Fee  outstanding R950 → 61-90 days bucket
   await client.query(aoQ, [
     pnpKey,
     JSON.stringify({ description: "Extended Storage Fee — CPT Depot 14 days" }),
-    950.00, daysAgo(70), "PFS-AO-0053", daysAgo(70),
+    950.00, D_ADDON_PNP, "PFS-AO-0053", D_ADDON_PNP,
     true, "PNPBK-2026-0043", "PNP-2026-0043", "MSC Flaminia",
     0, "unpaid", DEMO_CRN,
   ]);
 
-  console.log("  ✓ 3 add-ons (Hapag partial, Transnet unpaid, PnP unpaid)");
+  console.log("  ✓ 3 add-ons (Hapag R1,800 | Transnet R2,500 | PnP R950 — all unpaid)");
 
-  // ── 16. CREDIT NOTE (1) ──────────────────────────────────────────────────
+  // ── 16. CREDIT NOTE ──────────────────────────────────────────────────────
+  //
+  // Dated June 3 — AFTER the June 1 statement period — so it does not create a
+  // mismatch between balance-due and aging-total on the current statements.
+  // It will appear as a credit in the next (July 1) statement generation.
 
   await client.query(
     `INSERT INTO credit_notes
@@ -653,56 +694,106 @@ async function operationalSeed(client, ids) {
         m1key, description, account_no, company_reg_num)
      VALUES ($1,$2,$3::double precision[],$4::integer[],$5,$6,$7,$8,$9)`,
     [
-      hapagKey, daysAgo(110),
+      hapagKey, D_CREDIT_NOTE,
       [760.00], [ck2],
       "PFS-CN-0001", m1k1,
       "Rate correction — VGM charge incorrectly applied twice on HLCU3456782",
       "62098765432", DEMO_CRN,
     ]
   );
-  console.log("  ✓ Credit note PFS-CN-0001 (R760 against HLCU3456782)");
+  console.log("  ✓ Credit note PFS-CN-0001 (R760 against HLCU3456782, dated after June 1 statement)");
 
-  // ── 17. AGING ANALYSIS (4) + STATEMENTS (4) ──────────────────────────────
+  // ── 17. AGING ANALYSIS + STATEMENTS (multi-month) ────────────────────────
   //
-  //  All amounts derived from: (total_cost × 1.vat) − paid + (add-on × 1.15) − ao_paid
+  // Four generation dates: March 1, April 1, May 1, June 1.
+  // Each statement's opening_balance = sum of the PREVIOUS statement's aging buckets.
+  // Each statement's balance due = opening_balance + invoicedInPeriod − creditsInPeriod.
+  // The aging total (current+30+60+90) ALWAYS equals the balance due.
   //
-  //  Hapag   current R1,270   = add-on R1,800×1.15 − R800 paid
-  //          30days  R14,571  = Instr 4: R23,540×1.15 − R12,500
-  //  Transnet 90days R18,170  = Instr 2: R13,300×1.15 + add-on R2,500×1.15
-  //  PnP     60days  R31,774.50 = Instr 3: R26,680×1.15 + add-on R950×1.15
-  //  Shoprite current R8,869  = Instr 5: R12,060×1.15 − R5,000
+  // Verified arithmetic (see file header for formulas):
+  //
+  //  ── March 1 statements (cover February 2026) ────────────────────────────
+  //  Hapag:   opening=0      + instr1 R18,814 − 0        = R18,814
+  //           aging Feb 28:  current=18814  (instr1 21d old)
+  //  Transnet: opening=0     + addon  R2,500  − 0         = R2,500
+  //           aging Feb 28:  current=2500   (addon 2d old)
+  //
+  //  ── April 1 statements (cover March 2026) ───────────────────────────────
+  //  Hapag:   opening=18814 + 0 − payment(Mar7) R18,814  = R0
+  //           aging Mar 31:  all zeros           (instr1 paid)
+  //  Transnet: opening=2500  + instr2 R15,295   − 0       = R17,795
+  //           aging Mar 31:  current=15295(instr2 28d) 30days=2500(addon 33d)
+  //  PnP:     opening=0      + addon   R950      − 0       = R950
+  //           aging Mar 31:  current=950         (addon 3d old)
+  //
+  //  ── May 1 statements (cover April 2026) ─────────────────────────────────
+  //  Transnet: opening=17795 + 0                − 0        = R17,795
+  //           aging Apr 30:  30days=15295(instr2 58d)  60days=2500(addon 63d)
+  //  PnP:     opening=950    + instr3 R30,682   − 0        = R31,632
+  //           aging Apr 30:  current=30682(instr3 28d)  30days=950(addon 33d)
+  //
+  //  ── June 1 statements (cover May 2026) ──────────────────────────────────
+  //  Hapag:   opening=0      + instr4(27071)+addon(1800) − pmt(12500) = R16,371
+  //           aging May 31:  current=16371 (instr4 14571 + addon 1800)
+  //  Transnet: opening=17795 + 0                − 0        = R17,795
+  //           aging May 31:  60days=15295(instr2 89d)  90days=2500(addon 94d)
+  //  PnP:     opening=31632  + 0                − 0        = R31,632
+  //           aging May 31:  30days=30682(instr3 59d)  60days=950(addon 64d)
+  //  Shoprite: opening=0     + instr5(13869)    − pmt(5000) = R8,869
+  //           aging May 31:  current=8869        (instr5 6d old)
 
   const agQ = `
     INSERT INTO aging_analysis
       (clientid, current, "30days", "60days", "90days", company_reg_num)
     VALUES ($1,$2,$3,$4,$5,$6) RETURNING aging_key`;
 
-  const agHapag    = (await client.query(agQ, [hapagKey,    1270.00,  14571.00, 0,          0,        DEMO_CRN])).rows[0].aging_key;
-  const agTransnet = (await client.query(agQ, [transnetKey, 0,        0,        0,          18170.00, DEMO_CRN])).rows[0].aging_key;
-  const agPnP      = (await client.query(agQ, [pnpKey,      0,        0,        31774.50,   0,        DEMO_CRN])).rows[0].aging_key;
-  const agShoprite = (await client.query(agQ, [shopriteKey, 8869.00,  0,        0,          0,        DEMO_CRN])).rows[0].aging_key;
+  const stQ = `
+    INSERT INTO statements
+      (clientid, agingid, groupid, generation_date, opening_balance, insurance_amount, company_reg_num)
+    VALUES ($1,$2,NULL,$3,$4,0,$5)`;
 
-  const genDate = firstOfCurrentMonth();
+  // ── March 1 statements ───────────────────────────────────────────────────
+  const ag_mar_hapag    = (await client.query(agQ, [hapagKey,    18814, 0,     0, 0, DEMO_CRN])).rows[0].aging_key;
+  const ag_mar_transnet = (await client.query(agQ, [transnetKey,  2500, 0,     0, 0, DEMO_CRN])).rows[0].aging_key;
 
-  await client.query(
-    `INSERT INTO statements (clientid, agingid, groupid, generation_date, opening_balance, insurance_amount, company_reg_num)
-     VALUES ($1,$2,NULL,$5,0,0,$6), ($3,$4,NULL,$5,0,0,$6)`,
-    [hapagKey, agHapag, transnetKey, agTransnet, genDate, DEMO_CRN]
-  );
-  await client.query(
-    `INSERT INTO statements (clientid, agingid, groupid, generation_date, opening_balance, insurance_amount, company_reg_num)
-     VALUES ($1,$2,NULL,$5,0,0,$6), ($3,$4,NULL,$5,0,0,$6)`,
-    [pnpKey, agPnP, shopriteKey, agShoprite, genDate, DEMO_CRN]
-  );
+  await client.query(stQ, [hapagKey,    ag_mar_hapag,    "2026-03-01", 0,    DEMO_CRN]);
+  await client.query(stQ, [transnetKey, ag_mar_transnet, "2026-03-01", 0,    DEMO_CRN]);
 
-  console.log("  ✓ 4 aging analysis records + 4 statements");
+  // ── April 1 statements ───────────────────────────────────────────────────
+  const ag_apr_hapag    = (await client.query(agQ, [hapagKey,    0,     0,     0, 0, DEMO_CRN])).rows[0].aging_key;
+  const ag_apr_transnet = (await client.query(agQ, [transnetKey, 15295, 2500,  0, 0, DEMO_CRN])).rows[0].aging_key;
+  const ag_apr_pnp      = (await client.query(agQ, [pnpKey,      950,   0,     0, 0, DEMO_CRN])).rows[0].aging_key;
+
+  await client.query(stQ, [hapagKey,    ag_apr_hapag,    "2026-04-01", 18814, DEMO_CRN]);
+  await client.query(stQ, [transnetKey, ag_apr_transnet, "2026-04-01", 2500,  DEMO_CRN]);
+  await client.query(stQ, [pnpKey,      ag_apr_pnp,      "2026-04-01", 0,     DEMO_CRN]);
+
+  // ── May 1 statements ─────────────────────────────────────────────────────
+  const ag_may_transnet = (await client.query(agQ, [transnetKey, 0,     15295, 2500, 0, DEMO_CRN])).rows[0].aging_key;
+  const ag_may_pnp      = (await client.query(agQ, [pnpKey,      30682, 950,   0,    0, DEMO_CRN])).rows[0].aging_key;
+
+  await client.query(stQ, [transnetKey, ag_may_transnet, "2026-05-01", 17795, DEMO_CRN]);
+  await client.query(stQ, [pnpKey,      ag_may_pnp,      "2026-05-01", 950,   DEMO_CRN]);
+
+  // ── June 1 statements (current) ──────────────────────────────────────────
+  const ag_jun_hapag    = (await client.query(agQ, [hapagKey,    16371, 0,     0,     0,    DEMO_CRN])).rows[0].aging_key;
+  const ag_jun_transnet = (await client.query(agQ, [transnetKey, 0,     0,     15295, 2500, DEMO_CRN])).rows[0].aging_key;
+  const ag_jun_pnp      = (await client.query(agQ, [pnpKey,      0,     30682, 950,   0,    DEMO_CRN])).rows[0].aging_key;
+  const ag_jun_shoprite = (await client.query(agQ, [shopriteKey, 8869,  0,     0,     0,    DEMO_CRN])).rows[0].aging_key;
+
+  await client.query(stQ, [hapagKey,    ag_jun_hapag,    "2026-06-01", 0,     DEMO_CRN]);
+  await client.query(stQ, [transnetKey, ag_jun_transnet, "2026-06-01", 17795, DEMO_CRN]);
+  await client.query(stQ, [pnpKey,      ag_jun_pnp,      "2026-06-01", 31632, DEMO_CRN]);
+  await client.query(stQ, [shopriteKey, ag_jun_shoprite, "2026-06-01", 0,     DEMO_CRN]);
+
+  console.log("  ✓ 11 statements + 11 aging records (March→June history, all amounts verified)");
 
   // ── 18. WAGES (9 = 3 drivers × 3 months) ─────────────────────────────────
 
   const wageRows = [
-    [siphoId,  1, 21300.00, 3790.00, 17510.00],  // May
-    [siphoId,  2, 20700.00, 3655.00, 17045.00],  // April
-    [siphoId,  3, 21800.00, 3905.00, 17895.00],  // March
+    [siphoId,  1, 21300.00, 3790.00, 17510.00],
+    [siphoId,  2, 20700.00, 3655.00, 17045.00],
+    [siphoId,  3, 21800.00, 3905.00, 17895.00],
     [mandlaId, 1, 19700.00, 3480.00, 16220.00],
     [mandlaId, 2, 19000.00, 3310.00, 15690.00],
     [mandlaId, 3, 20200.00, 3620.00, 16580.00],
@@ -724,7 +815,7 @@ async function operationalSeed(client, ids) {
       [empid, earnings, deductions, net, lastDayOfMonthAgo(monthsAgo), DEMO_CRN]
     );
   }
-  console.log("  ✓ 9 wage slips (Sipho, Mandla, Deon — March / April / May 2026)");
+  console.log("  ✓ 9 wage slips (Sipho, Mandla, Deon — March, April, May 2026)");
 
   // ── 19. EMPLOYEE DEDUCTION HISTORY ───────────────────────────────────────
 
@@ -760,10 +851,10 @@ async function operationalSeed(client, ids) {
        quantity, unit_price, description, subbie, date, ponum, total, truckid, company_reg_num)
     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14)`;
 
-  await client.query(poQ, [etFuelId,  sup1Id, "ND 45 678 GP", "Sipho Khumalo",  "Rajan Naidoo",    0, 0,      "Diesel fill-up — Durban depot",            false, daysAgo(15), "PFS-PO-0021", 4850.00,  truck1Key, DEMO_CRN]);
-  await client.query(poQ, [etFuelId,  sup1Id, "ND 12 345 GP", "Mandla Zulu",    "Rajan Naidoo",    0, 0,      "Diesel fill-up — Johannesburg depot",       false, daysAgo(10), "PFS-PO-0022", 5120.00,  truck2Key, DEMO_CRN]);
-  await client.query(poQ, [etTyresId, sup2Id, "ND 78 901 GP", "Deon Potgieter", "Thabo Mokoena",   4, 3100.00,"Bridgestone 315/80R22.5 tyres set ×4",      false, daysAgo(20), "PFS-PO-0023", 12400.00, truck3Key, DEMO_CRN]);
-  await client.query(poQ, [etMaintId, sup3Id, null,           "Priya Pillay",   "Rajan Naidoo",    1, 3200.00,"General service + filters — ND 45 678 GP",  false, daysAgo(5),  "PFS-PO-0024", 3200.00,  truck1Key, DEMO_CRN]);
+  await client.query(poQ, [etFuelId,  sup1Id, "ND 45 678 GP", "Sipho Khumalo",  "Rajan Naidoo",  0, 0,       "Diesel fill-up — Durban depot",              false, daysFromNow(-15), "PFS-PO-0021", 4850.00,  truck1Key, DEMO_CRN]);
+  await client.query(poQ, [etFuelId,  sup1Id, "ND 12 345 GP", "Mandla Zulu",    "Rajan Naidoo",  0, 0,       "Diesel fill-up — Johannesburg depot",         false, daysFromNow(-10), "PFS-PO-0022", 5120.00,  truck2Key, DEMO_CRN]);
+  await client.query(poQ, [etTyresId, sup2Id, "ND 78 901 GP", "Deon Potgieter", "Thabo Mokoena", 4, 3100.00, "Bridgestone 315/80R22.5 tyres set ×4",       false, daysFromNow(-20), "PFS-PO-0023", 12400.00, truck3Key, DEMO_CRN]);
+  await client.query(poQ, [etMaintId, sup3Id, null,           "Priya Pillay",   "Rajan Naidoo",  1, 3200.00, "General service + filters — ND 45 678 GP",   false, daysFromNow(-5),  "PFS-PO-0024", 3200.00,  truck1Key, DEMO_CRN]);
 
   console.log("  ✓ 4 purchase orders (2 fuel, 1 tyres, 1 maintenance)");
 
@@ -775,18 +866,20 @@ async function operationalSeed(client, ids) {
        truckid, driverid, orderno, company_reg_num)
     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)`;
 
-  await client.query(expQ, ["fuel",        "BP Durban Harbour",    4850.00,  "Diesel — ND 45 678 GP",           "slip_pfs_0021.jpg", daysAgo(15), truck1Key, siphoId,  "ORD-PFS-0021", DEMO_CRN]);
-  await client.query(expQ, ["fuel",        "BP Johannesburg South", 5120.00,  "Diesel — ND 12 345 GP",           "slip_pfs_0022.jpg", daysAgo(10), truck2Key, mandlaId, "ORD-PFS-0022", DEMO_CRN]);
-  await client.query(expQ, ["maintenance", "Bridgestone Durban",   12400.00, "Tyres ×4 — ND 78 901 GP",         "slip_pfs_0023.jpg", daysAgo(20), truck3Key, deonId,   "ORD-PFS-0023", DEMO_CRN]);
-  await client.query(expQ, ["maintenance", "NTK Truck Parts",       3200.00,  "Full service + filters — ND 45 678 GP","slip_pfs_0024.jpg",daysAgo(5),truck1Key, siphoId, "ORD-PFS-0024", DEMO_CRN]);
+  await client.query(expQ, ["fuel",        "BP Durban Harbour",     4850.00,  "Diesel — ND 45 678 GP",              "slip_pfs_0021.jpg", daysFromNow(-15), truck1Key, siphoId,  "ORD-PFS-0021", DEMO_CRN]);
+  await client.query(expQ, ["fuel",        "BP Johannesburg South",  5120.00,  "Diesel — ND 12 345 GP",              "slip_pfs_0022.jpg", daysFromNow(-10), truck2Key, mandlaId, "ORD-PFS-0022", DEMO_CRN]);
+  await client.query(expQ, ["maintenance", "Bridgestone Durban",    12400.00, "Tyres ×4 — ND 78 901 GP",            "slip_pfs_0023.jpg", daysFromNow(-20), truck3Key, deonId,   "ORD-PFS-0023", DEMO_CRN]);
+  await client.query(expQ, ["maintenance", "NTK Truck Parts",        3200.00,  "Full service + filters — ND 45 678 GP", "slip_pfs_0024.jpg", daysFromNow(-5), truck1Key, siphoId, "ORD-PFS-0024", DEMO_CRN]);
 
   console.log("  ✓ 4 expense records (2 fuel, 1 tyres, 1 maintenance)");
 
   // ── 23. SUBCONTRACTOR STATEMENTS (2) ─────────────────────────────────────
   //  Sunrise Haulage  (VAT):     2 legs × R7,000 × 1.15 = R16,100
   //  FastLane Transport (NON_VAT): 2 legs × R6,400 × 1.0  = R12,800
+  //
+  // Both sub statements dated June 1 — covers May legs (D_INSTR6 = May 17).
 
-  const subDate = firstOfCurrentMonth(); // June 1 — covers May legs
+  const subDate = firstOfCurrentMonth();
 
   await client.query(
     `INSERT INTO subcontractor_statements
@@ -818,22 +911,20 @@ async function operationalSeed(client, ids) {
 
   console.log("  ✓ 2 subcontractor statements (Sunrise VAT R16,100 | FastLane NON-VAT R12,800)");
 
-  // ── 24. BILLING EVENTS (3) ───────────────────────────────────────────────
+  // ── 24. BILLING EVENTS ───────────────────────────────────────────────────
 
   await client.query(
     `INSERT INTO billing_events
        (company_reg_num, event_type, old_value, new_value, performed_by, notes)
      VALUES
-       ($1,'plan_assigned',    NULL,      'enterprise','seed@whizzaway.test','Enterprise plan assigned at onboarding'),
-       ($1,'setup_fee_recorded',NULL,     'R25000',    'seed@whizzaway.test','Setup fee paid — EFT confirmed'),
-       ($1,'monthly_fee_recorded','R10500','R10500',   'system',            'June 2026 monthly billing')`,
+       ($1,'plan_assigned',      NULL,      'enterprise','seed@whizzaway.test','Enterprise plan assigned at onboarding'),
+       ($1,'setup_fee_recorded', NULL,      'R25000',    'seed@whizzaway.test','Setup fee paid — EFT confirmed'),
+       ($1,'monthly_fee_recorded','R10500', 'R10500',    'system',            'June 2026 monthly billing')`,
     [DEMO_CRN]
   );
   console.log("  ✓ 3 billing events");
 
   // ── 25. COMPANY USAGE SNAPSHOT ────────────────────────────────────────────
-  // 5 portal users + 3 drivers = 8 counted staff; subcontractor employees excluded.
-  // 4 owned trucks; subcontractor trucks excluded from count.
 
   const snapMonth = new Date();
   snapMonth.setDate(1);
@@ -853,7 +944,7 @@ async function operationalSeed(client, ids) {
        overage_amount = EXCLUDED.overage_amount`,
     [DEMO_CRN, snapMonth, 8, 4, 0, 0, 0]
   );
-  console.log("  ✓ Company usage snapshot (8 staff, 4 owned trucks — within Enterprise limits)");
+  console.log("  ✓ Company usage snapshot (8 staff, 4 owned trucks)");
   console.log("\nOperational seed complete.\n");
 }
 
@@ -862,7 +953,7 @@ async function operationalSeed(client, ids) {
 function printSummary() {
   console.log(`
 ╔══════════════════════════════════════════════════════════════════════════════╗
-║          PREMIER FREIGHT SOLUTIONS — DEMO COMPANY CREDENTIALS                ║
+║         PREMIER FREIGHT SOLUTIONS — DEMO COMPANY CREDENTIALS                 ║
 ║                       Password for all: Test@1234                            ║
 ╠══════════════════╦════════════════╦══════════════════════════════════════════╣
 ║ Name             ║ Role           ║ Email                                    ║
@@ -876,35 +967,39 @@ function printSummary() {
 ║  company_reg_num: DEMO-ENT-PREMIER   Plan: Enterprise / Active               ║
 ╠══════════════════════════════════════════════════════════════════════════════╣
 ║  FLEET                                                                       ║
-║    ND 45 678 GP  Volvo FH16 2022        expiry: +290 days                    ║
-║    ND 12 345 GP  MAN TGX 480 2021       expiry: +178 days                    ║
-║    ND 78 901 GP  Mercedes Actros 2023   expiry: +77 days                     ║
-║    ND 33 100 GP  DAF XF 2018            expiry: +24 days  ← LICENCE ALERT   ║
+║    ND 45 678 GP  Volvo FH16 2022        expiry: ~+290 days                   ║
+║    ND 12 345 GP  MAN TGX 480 2021       expiry: ~+178 days                   ║
+║    ND 78 901 GP  Mercedes Actros 2023   expiry: ~+77 days                    ║
+║    ND 33 100 GP  DAF XF 2018            expiry: ~+24 days  ← LICENCE ALERT  ║
 ║    SRH 4432 CC   Scania R500 (subbie)   Sunrise Haulage CC   SUBCC-4432      ║
 ║    FLT 8819 CC   Volvo FM 460 (subbie)  FastLane Transport   SUBCC-8819      ║
 ╠══════════════════════════════════════════════════════════════════════════════╣
-║  CLIENT OUTSTANDING                                                          ║
-║    Hapag-Lloyd SA     R15,841  current R1,270 + 30d R14,571                  ║
-║    Transnet PT        R18,170  >90 days — RED                                ║
-║    Pick n Pay Dist    R31,775  60 days — AMBER                               ║
+║  CLIENT OUTSTANDING (June 1 statement — all amounts verified)                ║
+║    Hapag-Lloyd SA     R16,371  current (instr4 R14,571 + add-on R1,800)      ║
+║    Transnet PT        R17,795  61-90d R15,295 + 90d+ R2,500  — RED          ║
+║    Pick n Pay Dist    R31,632  31-60d R30,682 + 61-90d R950   — AMBER       ║
 ║    Shoprite Holdings   R8,869  current                                       ║
-║    ─────────────────────────────────                                         ║
-║    TOTAL OUTSTANDING  R74,655                                                ║
+║    ─────────────────────────────────────────────────────                     ║
+║    TOTAL OUTSTANDING  R74,667                                                ║
+║                                                                              ║
+║  Balance Due = Opening Balance + Invoiced − Payments (all statements ✓)     ║
 ╠══════════════════════════════════════════════════════════════════════════════╣
 ║  INSTRUCTIONS                                                                ║
-║    PFS-INV-0041  Hapag  DBN→JHB  2×12m     PAID        R18,814              ║
-║    PFS-INV-0042  Trans  DBN→JHB  1×12m+6m  UNPAID      R15,295  >90d !!     ║
-║    PFS-INV-0043  PnP    CPT→JHB  3×12m     UNPAID      R30,682  60d         ║
-║    PFS-INV-0044  Hapag  CPT→JHB  2×12m haz PARTIAL     R14,571  30d         ║
-║    PFS-INV-0045  Shop   DBN→JHB  1×12m+6m  PARTIAL      R8,869  current     ║
-║    (no inv)      Trans  DBN→CPT  2×12m     IN PROGRESS (FastLane)            ║
-║    (no inv)      PnP    DBN→JHB  1×6m      NEW                              ║
+║    PFS-INV-0041  Hapag  DBN→JHB  2×12m     PAID        R18,814  (Mar 7)     ║
+║    PFS-INV-0042  Trans  DBN→JHB  1×12m+6m  UNPAID      R15,295  61-90d !!  ║
+║    PFS-INV-0043  PnP    CPT→JHB  3×12m     UNPAID      R30,682  31-60d     ║
+║    PFS-INV-0044  Hapag  CPT→JHB  2×12m haz PARTIAL     R14,571  current    ║
+║    PFS-INV-0045  Shop   DBN→JHB  1×12m+6m  PARTIAL      R8,869  current    ║
+║    (no inv)      Trans  DBN→CPT  2×12m     IN PROGRESS (FastLane)           ║
+║    (no inv)      PnP    DBN→JHB  1×6m      NEW                             ║
 ╠══════════════════════════════════════════════════════════════════════════════╣
-║  PAYROLL    Sipho / Mandla / Deon — March, April, May 2026 wage slips        ║
-║  EXPENSES   2 fuel (BP) | 1 tyres (Bridgestone) | 1 maintenance (NTK)       ║
-║  POs        PFS-PO-0021/0022 fuel | 0023 tyres | 0024 maintenance           ║
-║  SUBBIES    Sunrise Haulage VAT R16,100 | FastLane NON-VAT R12,800           ║
-║  CREDIT     PFS-CN-0001 R760 against HLCU3456782 (Hapag Instr 1)            ║
+║  STATEMENTS  4-month history: Mar 1 | Apr 1 | May 1 | Jun 1 per client      ║
+║  ADD-ONS     Hapag R1,800 | Transnet R2,500 | PnP R950 (all unpaid)         ║
+║  CREDIT NOTE PFS-CN-0001 R760 (June 3 — shows in next statement)            ║
+║  PAYROLL     Sipho / Mandla / Deon — March, April, May 2026 wage slips      ║
+║  EXPENSES    2 fuel (BP) | 1 tyres (Bridgestone) | 1 maintenance (NTK)     ║
+║  POs         PFS-PO-0021/22 fuel | 0023 tyres | 0024 maintenance            ║
+║  SUBBIES     Sunrise Haulage VAT R16,100 | FastLane NON-VAT R12,800         ║
 ╚══════════════════════════════════════════════════════════════════════════════╝
 
   Run:     node --env-file=.env server/database/seed_demo_premier.js
