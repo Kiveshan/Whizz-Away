@@ -75,6 +75,254 @@
   border-radius: 50%;
 }
 
+.user-name-block {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  line-height: 1.2;
+}
+
+.user-plan {
+  font-size: 11px;
+  color: #888;
+  font-weight: 400;
+  text-transform: capitalize;
+}
+
+.user-plan--clickable {
+  background: none;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+  text-decoration: underline dotted;
+  color: #555;
+  font-size: 11px;
+  font-weight: 400;
+  text-transform: capitalize;
+  transition: color 0.15s;
+}
+
+.user-plan--clickable:hover {
+  color: #0369a1;
+}
+
+/* Plans modal */
+.plans-modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.5);
+  backdrop-filter: blur(3px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1rem;
+  z-index: 1000;
+}
+
+.plans-modal {
+  background: #fff;
+  border-radius: 1.25rem;
+  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.15);
+  width: 100%;
+  max-width: 900px;
+  max-height: 90vh;
+  overflow-y: auto;
+  padding: 2rem;
+  position: relative;
+  animation: popup-in 0.25s ease-out forwards;
+}
+
+.plans-modal-close {
+  position: absolute;
+  top: 1rem;
+  right: 1rem;
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: #6b7280;
+  padding: 0.25rem;
+  transition: color 0.15s;
+}
+
+.plans-modal-close:hover {
+  color: #111;
+}
+
+.plans-modal-title {
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: #111;
+  margin: 0 0 0.25rem;
+  text-align: center;
+}
+
+.plans-modal-subtitle {
+  font-size: 0.9rem;
+  color: #6b7280;
+  text-align: center;
+  margin: 0 0 1.75rem;
+}
+
+.plans-modal-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 1rem;
+}
+
+@media (max-width: 768px) {
+  .plans-modal-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (max-width: 480px) {
+  .plans-modal-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.plans-card {
+  border: 2px solid #e5e7eb;
+  border-radius: 0.875rem;
+  padding: 1.25rem 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  position: relative;
+  transition: border-color 0.2s;
+}
+
+.plans-card--current {
+  border-color: #0ea5e9;
+  background: #f0f9ff;
+}
+
+.plans-card-badge {
+  position: absolute;
+  top: -0.65rem;
+  left: 50%;
+  transform: translateX(-50%);
+  background: #0ea5e9;
+  color: #fff;
+  font-size: 0.7rem;
+  font-weight: 700;
+  padding: 0.15rem 0.6rem;
+  border-radius: 9999px;
+  white-space: nowrap;
+}
+
+.plans-card-title {
+  font-size: 1.05rem;
+  font-weight: 700;
+  color: #111;
+  margin: 0.5rem 0 0;
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  flex-wrap: wrap;
+}
+
+.plans-card-tag {
+  font-size: 0.65rem;
+  font-weight: 500;
+  color: #6b7280;
+  background: #f3f4f6;
+  border-radius: 9999px;
+  padding: 0.1rem 0.45rem;
+}
+
+.plans-card-pricing {
+  margin: 0.6rem 0 0.25rem;
+}
+
+.plans-card-price {
+  display: flex;
+  align-items: baseline;
+  gap: 0.2rem;
+}
+
+.plans-card-price-amount {
+  font-size: 1.3rem;
+  font-weight: 800;
+  color: #0ea5e9;
+}
+
+.plans-card-price-period {
+  font-size: 0.75rem;
+  color: #6b7280;
+}
+
+.plans-card-setup {
+  font-size: 0.72rem;
+  color: #6b7280;
+  margin-top: 0.15rem;
+}
+
+.plans-card-meta {
+  display: flex;
+  gap: 0.35rem;
+  font-size: 0.73rem;
+  color: #6b7280;
+  margin-bottom: 0.5rem;
+}
+
+.plans-card-features {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.plans-card-features li {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.8rem;
+  color: #374151;
+}
+
+.plans-card-features li svg {
+  color: #16a34a;
+  flex-shrink: 0;
+}
+
+.plans-card-cta {
+  display: block;
+  margin-top: 1rem;
+  background: #0ea5e9;
+  color: #fff;
+  text-align: center;
+  padding: 0.5rem 0.75rem;
+  border-radius: 0.5rem;
+  font-size: 0.78rem;
+  font-weight: 600;
+  text-decoration: none;
+  transition: background 0.15s;
+}
+
+.plans-card-cta:hover {
+  background: #0284c7;
+}
+
+.plans-modal-footer {
+  margin-top: 1.5rem;
+  text-align: center;
+  font-size: 0.82rem;
+  color: #6b7280;
+}
+
+.plans-modal-footer a {
+  color: #0ea5e9;
+  text-decoration: none;
+}
+
+.plans-modal-footer a:hover {
+  text-decoration: underline;
+}
+
 h1 {
   font-size: 24px;
   color: #333;

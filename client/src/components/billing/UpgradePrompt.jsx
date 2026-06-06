@@ -1,7 +1,7 @@
 import { X, Lock } from "lucide-react"
 import { useAuth } from "../../context/AuthContext"
 
-const SUPPORT_EMAIL = process.env.REACT_APP_SUPPORT_EMAIL || "support@whizzaway.co.za"
+const SUPPORT_EMAIL = "info@smart-builders.co.za"
 
 const PLAN_DISPLAY = {
   lite:         "Lite",

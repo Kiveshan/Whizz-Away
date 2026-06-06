@@ -352,7 +352,7 @@ const startTrial = async (req, res) => {
   }
 
   const trialEndsAt = new Date();
-  trialEndsAt.setDate(trialEndsAt.getDate() + 14);
+  trialEndsAt.setDate(trialEndsAt.getDate() + 90);
 
   const client = await pool.connect();
   try {
@@ -395,7 +395,7 @@ const startTrial = async (req, res) => {
       event_type:   "trial_started",
       new_value:    plan,
       performed_by: adminEmail,
-      notes:        `14-day ${plan} trial — ends ${trialEndsAt.toISOString().split("T")[0]}`,
+      notes:        `90-day ${plan} trial — ends ${trialEndsAt.toISOString().split("T")[0]}`,
     });
 
     await client.query("COMMIT");
