@@ -132,8 +132,8 @@ const createDriverRate = async (driverRateData, company_reg_num) => {
     }
 
     // Process effective dates - default to today if not provided
-    const effectiveFrom = effective_from ? new Date(effective_from) : new Date()
-    const effectiveTo = effective_to ? new Date(effective_to) : null
+    const effectiveFrom = effective_from || new Date().toISOString().split('T')[0]
+    const effectiveTo = effective_to || null
 
     const result = await client.query(
       `INSERT INTO m5_driver_rate (
@@ -237,14 +237,12 @@ const updateDriverRate = async (id, driverRateData, company_reg_num) => {
     }
     if (effective_from !== undefined) {
       updateFields.push(`effective_from = $${paramCounter}`)
-      const effectiveFromDate = effective_from ? new Date(effective_from) : new Date()
-      queryParams.push(effectiveFromDate)
+      queryParams.push(effective_from || new Date().toISOString().split('T')[0])
       paramCounter++
     }
     if (effective_to !== undefined) {
       updateFields.push(`effective_to = $${paramCounter}`)
-      const effectiveToDate = effective_to ? new Date(effective_to) : null
-      queryParams.push(effectiveToDate)
+      queryParams.push(effective_to || null)
       paramCounter++
     }
 
@@ -578,6 +576,262 @@ export const checkRateDateOverlaps = async (startingpoint, destination, effectiv
 }
 
 export { getAllDriverRates, getDriverRateById, createDriverRate, updateDriverRate, deleteDriverRate, getDriverRateUsage }
+
+// ─── Route-grouped functions (new UX) ───────────────────────────────────────
+
+// Return one row per distinct (startingpoint, destination) pair with a period count
+export const getDistinctRoutes = async (options = {}) => {
+  let client
+  try {
+    client = await pool.connect()
+    const { offset = 0, limit = 10, search = "" } = options
+
+    let whereClause = "WHERE 1=1"
+    const queryParams = []
+    let paramIndex = 1
+
+    if (search && search.trim() !== "") {
+      whereClause += ` AND (LOWER(startingpoint) LIKE LOWER($${paramIndex}) OR LOWER(destination) LIKE LOWER($${paramIndex}))`
+      queryParams.push(`%${search.trim()}%`)
+      paramIndex++
+    }
+
+    const countQuery = `
+      SELECT COUNT(*) FROM (
+        SELECT startingpoint, destination
+        FROM m5_driver_rate
+        ${whereClause}
+        GROUP BY startingpoint, destination
+      ) AS routes
+    `
+    const countResult = await client.query(countQuery, queryParams)
+    const totalCount = parseInt(countResult.rows[0].count)
+
+    const dataQuery = `
+      SELECT
+        startingpoint,
+        destination,
+        COUNT(*) AS period_count,
+        MAX(effective_from) AS latest_from
+      FROM m5_driver_rate
+      ${whereClause}
+      GROUP BY startingpoint, destination
+      ORDER BY startingpoint ASC, destination ASC
+      LIMIT $${paramIndex} OFFSET $${paramIndex + 1}
+    `
+    queryParams.push(limit, offset)
+    const dataResult = await client.query(dataQuery, queryParams)
+
+    return { routes: dataResult.rows, totalCount }
+  } catch (err) {
+    console.error("Error fetching distinct routes:", err)
+    throw err
+  } finally {
+    if (client) client.release()
+  }
+}
+
+// Return all rate periods for a specific route, ordered oldest → newest
+export const getPeriodsForRoute = async (startingpoint, destination) => {
+  let client
+  try {
+    client = await pool.connect()
+    const result = await client.query(
+      `SELECT * FROM m5_driver_rate
+       WHERE LOWER(TRIM(COALESCE(startingpoint, ''))) = LOWER(TRIM(COALESCE($1, '')))
+         AND LOWER(TRIM(COALESCE(destination, ''))) = LOWER(TRIM(COALESCE($2, '')))
+       ORDER BY effective_from ASC, m5ratekey ASC`,
+      [startingpoint, destination],
+    )
+    return { success: true, data: result.rows }
+  } catch (err) {
+    console.error("Error fetching periods for route:", err)
+    throw err
+  } finally {
+    if (client) client.release()
+  }
+}
+
+// Replace-all: delete existing periods for the route then bulk-insert the new set
+// Collapse any sequence of whitespace to a single space and strip leading/trailing
+// whitespace so "Cape Town " and "Cape  Town" both normalize to "Cape Town".
+const normalizeName = (s) => (s || "").trim().replace(/\s+/g, " ")
+
+export const saveRoutePeriods = async (startingpoint, destination, periods, originalStartingpoint, originalDestination) => {
+  // Normalize before anything touches the DB so misspaced names can never
+  // create phantom duplicate routes.
+  startingpoint = normalizeName(startingpoint)
+  destination   = normalizeName(destination)
+  if (originalStartingpoint) originalStartingpoint = normalizeName(originalStartingpoint)
+  if (originalDestination)   originalDestination   = normalizeName(originalDestination)
+
+  const deleteSp = originalStartingpoint || startingpoint
+  const deleteDest = originalDestination || destination
+  const isRename =
+    originalStartingpoint &&
+    originalDestination &&
+    (startingpoint.trim().toLowerCase() !== originalStartingpoint.trim().toLowerCase() ||
+      destination.trim().toLowerCase() !== originalDestination.trim().toLowerCase())
+
+  let client
+  try {
+    client = await pool.connect()
+    await client.query("BEGIN")
+
+    await client.query(
+      `DELETE FROM m5_driver_rate
+       WHERE LOWER(TRIM(COALESCE(startingpoint, ''))) = LOWER(TRIM(COALESCE($1, '')))
+         AND LOWER(TRIM(COALESCE(destination, ''))) = LOWER(TRIM(COALESCE($2, '')))`,
+      [deleteSp, deleteDest],
+    )
+
+    // When renaming, update legs_m2 for in-progress instructions so legs stay in sync
+    let renamedInstructions = []
+    if (isRename) {
+      const legUpdateResult = await client.query(
+        `UPDATE legs_m2 l
+         SET startingpoint = $3, destination = $4
+         FROM m1_controller c
+         WHERE c.m1key = l.m1key
+           AND LOWER(COALESCE(c.status, '')) = 'in progress'
+           AND LOWER(TRIM(COALESCE(l.startingpoint, ''))) = LOWER(TRIM(COALESCE($1, '')))
+           AND LOWER(TRIM(COALESCE(l.destination, ''))) = LOWER(TRIM(COALESCE($2, '')))
+         RETURNING l.m1key`,
+        [deleteSp, deleteDest, startingpoint, destination],
+      )
+      renamedInstructions = [...new Set(legUpdateResult.rows.map((r) => r.m1key))]
+    }
+
+    const processRate = (val) => (val === "" || val == null ? null : parseFloat(val))
+    const insertedPeriods = []
+
+    for (const period of periods) {
+      // Use string split to avoid UTC-midnight timezone shift on UTC+ servers
+      const effectiveFrom = period.effective_from
+        ? period.effective_from.toString().split("T")[0]
+        : new Date().toISOString().split("T")[0]
+      const effectiveTo = period.effective_to ? period.effective_to.toString().split("T")[0] : null
+
+      const result = await client.query(
+        `INSERT INTO m5_driver_rate (
+          startingpoint, destination,
+          driver_six_meter_rate, driver_twelve_meter_rate,
+          subie_six_meter_rate, subie_twelve_meter_rate,
+          effective_from, effective_to
+        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+        RETURNING *`,
+        [
+          startingpoint,
+          destination,
+          processRate(period.driver_six_meter_rate),
+          processRate(period.driver_twelve_meter_rate),
+          processRate(period.subie_six_meter_rate),
+          processRate(period.subie_twelve_meter_rate),
+          effectiveFrom,
+          effectiveTo,
+        ],
+      )
+      insertedPeriods.push(result.rows[0])
+    }
+
+    await client.query("COMMIT")
+    return { success: true, data: insertedPeriods, renamedInstructions }
+  } catch (err) {
+    if (client) await client.query("ROLLBACK")
+    console.error("Error saving route periods:", err)
+    throw err
+  } finally {
+    if (client) client.release()
+  }
+}
+
+// Check if any in-progress instruction legs reference this route
+export const getRouteUsage = async (startingpoint, destination) => {
+  let client
+  try {
+    client = await pool.connect()
+    const legsResult = await client.query(
+      `SELECT DISTINCT l.m1key
+       FROM legs_m2 l
+       INNER JOIN m1_controller c ON c.m1key = l.m1key
+       WHERE LOWER(COALESCE(c.status, '')) = 'in progress'
+         AND LOWER(TRIM(COALESCE(l.startingpoint, ''))) = LOWER(TRIM(COALESCE($1, '')))
+         AND LOWER(TRIM(COALESCE(l.destination, ''))) = LOWER(TRIM(COALESCE($2, '')))`,
+      [startingpoint, destination],
+    )
+    const instructions = legsResult.rows.map((r) => r.m1key)
+    return { success: true, data: { inUse: instructions.length > 0, instructions } }
+  } catch (err) {
+    console.error("Error checking route usage:", err)
+    throw err
+  } finally {
+    if (client) client.release()
+  }
+}
+
+// Delete all periods for a route (caller must check usage first)
+export const deleteRoute = async (startingpoint, destination) => {
+  let client
+  try {
+    client = await pool.connect()
+    await client.query(
+      `DELETE FROM m5_driver_rate
+       WHERE LOWER(TRIM(COALESCE(startingpoint, ''))) = LOWER(TRIM(COALESCE($1, '')))
+         AND LOWER(TRIM(COALESCE(destination, ''))) = LOWER(TRIM(COALESCE($2, '')))`,
+      [startingpoint, destination],
+    )
+    return { success: true }
+  } catch (err) {
+    console.error("Error deleting route:", err)
+    throw err
+  } finally {
+    if (client) client.release()
+  }
+}
+
+// Distinct startingpoint + destination values for autocomplete in the create form
+export const getRouteOptions = async () => {
+  let client
+  try {
+    client = await pool.connect()
+    const result = await client.query(
+      `SELECT DISTINCT startingpoint, destination
+       FROM m5_driver_rate
+       ORDER BY startingpoint ASC, destination ASC`,
+    )
+    return { success: true, data: result.rows }
+  } catch (err) {
+    console.error("Error fetching route options:", err)
+    throw err
+  } finally {
+    if (client) client.release()
+  }
+}
+
+// All leg dates for in-progress instructions that use this route — used to check coverage gaps
+export const getRouteLegDates = async (startingpoint, destination) => {
+  let client
+  try {
+    client = await pool.connect()
+    const result = await client.query(
+      `SELECT l.m1key, l.date::text AS date
+       FROM legs_m2 l
+       INNER JOIN m1_controller c ON c.m1key = l.m1key
+       WHERE LOWER(COALESCE(c.status, '')) = 'in progress'
+         AND LOWER(TRIM(COALESCE(l.startingpoint, ''))) = LOWER(TRIM(COALESCE($1, '')))
+         AND LOWER(TRIM(COALESCE(l.destination, ''))) = LOWER(TRIM(COALESCE($2, '')))
+         AND l.date IS NOT NULL
+       ORDER BY l.date ASC`,
+      [startingpoint, destination],
+    )
+    return { success: true, data: result.rows }
+  } catch (err) {
+    console.error("Error fetching route leg dates:", err)
+    throw err
+  } finally {
+    if (client) client.release()
+  }
+}
 
 // Refresh legs_m2.driverrate for a set of instructions, respecting effective dates.
 // For each leg, the rate is looked up using the leg's own date so that legs in different

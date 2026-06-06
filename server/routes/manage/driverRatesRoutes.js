@@ -8,11 +8,28 @@ import {
   getDriverRateUsageHandler,
   refreshDriverRateLegsHandler,
   checkRateDateOverlapsHandler,
+  getDistinctRoutesHandler,
+  getPeriodsForRouteHandler,
+  saveRoutePeriodsHandler,
+  deleteRouteHandler,
+  getRouteLegDatesHandler,
+  getRouteUsageCheckHandler,
+  getRouteOptionsHandler,
 } from "../../controllers/manage/driverRatesController.js";
 import { verifyToken } from "../../middleware/auth.js";
 
 const router = express.Router();
 
+// ── Route-grouped endpoints (must be before /:id to avoid param conflicts) ──
+router.get("/api/driver-rates/routes", verifyToken, getDistinctRoutesHandler);
+router.get("/api/driver-rates/route-periods", verifyToken, getPeriodsForRouteHandler);
+router.post("/api/driver-rates/route-periods", verifyToken, saveRoutePeriodsHandler);
+router.delete("/api/driver-rates/route", verifyToken, deleteRouteHandler);
+router.get("/api/driver-rates/route-leg-dates", verifyToken, getRouteLegDatesHandler);
+router.get("/api/driver-rates/route-usage", verifyToken, getRouteUsageCheckHandler);
+router.get("/api/driver-rates/route-options", verifyToken, getRouteOptionsHandler);
+
+// ── Existing endpoints ───────────────────────────────────────────────────────
 router.get("/api/driver-rates", verifyToken, getAllDriverRatesHandler);
 router.get("/api/driver-rates/check-overlaps", verifyToken, checkRateDateOverlapsHandler);
 router.get("/api/driver-rates/:id", verifyToken, getDriverRateByIdHandler);

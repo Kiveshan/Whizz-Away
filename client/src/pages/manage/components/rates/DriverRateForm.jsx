@@ -1,6 +1,40 @@
 "use client"
 
+import { useState, useEffect } from "react"
+import api from "../../../../api.js"
+
 const DriverRateForm = ({ driverRate, loading, isEditing, onSave, onCancel, onChange }) => {
+  const [routeOptions, setRouteOptions] = useState([])
+  const [duplicateWarning, setDuplicateWarning] = useState("")
+
+  // Load existing routes for autocomplete once on mount
+  useEffect(() => {
+    api.get("/api/driver-rates/route-options")
+      .then((res) => setRouteOptions(Array.isArray(res.data) ? res.data : []))
+      .catch(() => setRouteOptions([]))
+  }, [])
+
+  // Warn if the typed route already exists
+  useEffect(() => {
+    if (!driverRate.startingpoint || !driverRate.destination) {
+      setDuplicateWarning("")
+      return
+    }
+    const normalize = (s) => (s || "").trim().replace(/\s+/g, " ").toLowerCase()
+    const sp = normalize(driverRate.startingpoint)
+    const dest = normalize(driverRate.destination)
+    const exists = routeOptions.some(
+      (r) =>
+        normalize(r.startingpoint) === sp &&
+        normalize(r.destination) === dest,
+    )
+    setDuplicateWarning(
+      exists
+        ? "This route already exists. Use Edit on the route to add a new period instead."
+        : "",
+    )
+  }, [driverRate.startingpoint, driverRate.destination, routeOptions])
+
   const hasOverlap = Boolean(driverRate?._overlapWarning)
 
   const handleSubmit = async (e) => {
@@ -39,7 +73,7 @@ const DriverRateForm = ({ driverRate, loading, isEditing, onSave, onCancel, onCh
 
   return (
     <form onSubmit={handleSubmit} className="manage-driver-rate-form" noValidate>
-      <h2 className="manage-form-title">{isEditing ? "Edit Rate" : "Add Rate"}</h2>
+      <h2 className="manage-form-title">{isEditing ? "Edit Rate" : "New Route"}</h2>
 
       <div className="manage-form-group">
         <div className="form-row">
@@ -68,6 +102,21 @@ const DriverRateForm = ({ driverRate, loading, isEditing, onSave, onCancel, onCh
             />
           </div>
         </div>
+
+        {duplicateWarning && (
+          <div
+            style={{
+              padding: "10px",
+              backgroundColor: "#fff3cd",
+              border: "1px solid #ffc107",
+              borderRadius: "4px",
+              marginBottom: "10px",
+              color: "#856404",
+            }}
+          >
+            <strong>⚠ Note:</strong> {duplicateWarning}
+          </div>
+        )}
 
         <div className="form-row">
           <div className="form-field">
@@ -174,7 +223,7 @@ const DriverRateForm = ({ driverRate, loading, isEditing, onSave, onCancel, onCh
       </div>
 
       <div className="driver-rate-button-container">
-        <button type="submit" className="driver-rate-save-button" disabled={loading || hasOverlap}>
+        <button type="submit" className="driver-rate-save-button" disabled={loading || hasOverlap || !!duplicateWarning}>
           {loading ? "Saving..." : "Save"}
         </button>
         <button type="button" className="driver-rate-cancel-button" onClick={onCancel}>

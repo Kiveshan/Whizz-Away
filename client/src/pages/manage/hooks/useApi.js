@@ -14,7 +14,7 @@ export function useApi(state, actions) {
           clients: "/api/m5Clients",
           trucks: "/api/trucks",
           trailers: "/api/trailers",
-          driverRates: "/api/driver-rates",
+          driverRates: "/api/driver-rates/routes",
           subcontractors: "/api/subcontractors",
           clientRates: "/api/client-rates",
           suppliers: "/api/suppliers",
@@ -676,6 +676,280 @@ export function useApi(state, actions) {
     },
     [state.editingRateId],
   )
+
+  // ─── Route-grouped driver rate functions (new UX) ──────────────────────────
+
+  const loadRouteForEdit = useCallback(
+    async (startingpoint, destination) => {
+      actions.setLoading(true)
+      try {
+        const params = new URLSearchParams({ startingpoint, destination })
+
+        // Fetch periods and leg dates in parallel
+        const [periodsResp, legDatesResp] = await Promise.all([
+          api.get(`/api/driver-rates/route-periods?${params}`),
+          api.get(`/api/driver-rates/route-leg-dates?${params}`).catch(() => ({ data: [] })),
+        ])
+        const periods = periodsResp.data
+        const legDates = Array.isArray(legDatesResp.data) ? legDatesResp.data : []
+
+        // Attach overlap warnings to each existing period
+        const periodsWithWarnings = await Promise.all(
+          periods.map(async (period) => {
+            const formatted = {
+              m5ratekey: period.m5ratekey,
+              effective_from: period.effective_from ? period.effective_from.toString().split("T")[0] : "",
+              effective_to: period.effective_to ? period.effective_to.toString().split("T")[0] : "",
+              driver_six_meter_rate: period.driver_six_meter_rate ?? "",
+              driver_twelve_meter_rate: period.driver_twelve_meter_rate ?? "",
+              subie_six_meter_rate: period.subie_six_meter_rate ?? "",
+              subie_twelve_meter_rate: period.subie_twelve_meter_rate ?? "",
+              _overlapWarning: null,
+            }
+            try {
+              const overlapParams = new URLSearchParams({
+                startingpoint,
+                destination,
+                effective_from: formatted.effective_from,
+                ...(formatted.effective_to && { effective_to: formatted.effective_to }),
+                ...(period.m5ratekey && { exclude_id: period.m5ratekey.toString() }),
+              })
+              const overlapRes = await api.get(`/api/driver-rates/check-overlaps?${overlapParams}`)
+              if (overlapRes.data?.hasOverlaps) {
+                formatted._overlapWarning = overlapRes.data.message
+              }
+            } catch (_) { /* overlap check is non-blocking */ }
+            return formatted
+          }),
+        )
+
+        actions.showPeriods(startingpoint, destination, periodsWithWarnings, legDates)
+      } catch (err) {
+        console.error("Error loading route for edit:", err)
+        actions.showAlert("Failed to load rate periods for this route")
+      } finally {
+        actions.setLoading(false)
+      }
+    },
+    [actions],
+  )
+
+  const saveRoutePeriods = useCallback(
+    async (startingpoint, destination, periods, originalStartingpoint, originalDestination) => {
+      actions.setLoading(true)
+      try {
+        // Client-side validation
+        for (const period of periods) {
+          if (!period.effective_from) {
+            actions.showAlert("Each period must have an Effective From date.")
+            return false
+          }
+          if (period.effective_to && period.effective_to < period.effective_from) {
+            actions.showAlert("Effective To cannot be before Effective From.")
+            return false
+          }
+          const hasRate =
+            (period.driver_six_meter_rate !== "" && period.driver_six_meter_rate != null) ||
+            (period.driver_twelve_meter_rate !== "" && period.driver_twelve_meter_rate != null) ||
+            (period.subie_six_meter_rate !== "" && period.subie_six_meter_rate != null) ||
+            (period.subie_twelve_meter_rate !== "" && period.subie_twelve_meter_rate != null)
+          if (!hasRate) {
+            actions.showAlert("Each period must have at least one rate value.")
+            return false
+          }
+        }
+
+        // If the route name changed, check the new name doesn't already exist in DB
+        const isRename =
+          originalStartingpoint &&
+          originalDestination &&
+          (startingpoint.trim().toLowerCase() !== originalStartingpoint.trim().toLowerCase() ||
+            destination.trim().toLowerCase() !== originalDestination.trim().toLowerCase())
+
+        if (isRename) {
+          try {
+            const newRouteParams = new URLSearchParams({ startingpoint, destination })
+            const conflictResp = await api.get(`/api/driver-rates/route-periods?${newRouteParams}`)
+            if (Array.isArray(conflictResp.data) && conflictResp.data.length > 0) {
+              await showAlert(
+                "Route Already Exists",
+                `A route "${startingpoint} → ${destination}" already exists. Choose a different name or delete the existing route first.`,
+                "error",
+              )
+              return false
+            }
+          } catch (_) {
+            // Network or server error — block the save rather than proceeding
+            // blind and potentially creating a duplicate route.
+            await showAlert(
+              "Conflict Check Failed",
+              "Could not verify the new route name. Please check your connection and try again.",
+              "error",
+            )
+            return false
+          }
+        }
+
+        // Check if any in-progress instructions are using this route AND a rate value changed
+        let affectedInstructions = []
+        try {
+          // When renaming, usage is on the original route name
+          const lookupSp = (isRename ? originalStartingpoint : startingpoint)
+          const lookupDest = (isRename ? originalDestination : destination)
+          const routeParams = new URLSearchParams({ startingpoint: lookupSp, destination: lookupDest })
+
+          // Fetch current DB periods and usage check in parallel
+          const [dbPeriodsResp, usageResp] = await Promise.all([
+            api.get(`/api/driver-rates/route-periods?${routeParams}`),
+            api.get(`/api/driver-rates/route-usage?${routeParams}`),
+          ])
+
+          if (usageResp.data?.inUse) {
+            // Always collect affected instructions — legs need a refresh any time the
+            // period structure changes (removal, date range shift, new period, rate value).
+            affectedInstructions = usageResp.data.instructions || []
+
+            const rateFields = [
+              "driver_six_meter_rate",
+              "driver_twelve_meter_rate",
+              "subie_six_meter_rate",
+              "subie_twelve_meter_rate",
+            ]
+
+            const rateChanged = (a, b) => {
+              const na = a === "" || a == null ? null : Number(a)
+              const nb = b === "" || b == null ? null : Number(b)
+              if (na === null && nb === null) return false
+              if (na === null || nb === null) return true
+              return Math.abs(na - nb) >= 0.005
+            }
+
+            // Build a lookup of DB periods by m5ratekey
+            const dbById = {}
+            for (const p of dbPeriodsResp.data) {
+              if (p.m5ratekey) dbById[p.m5ratekey] = p
+            }
+
+            // Only show the rate-change warning when a rate VALUE changed on an existing period
+            const hasRateChange = periods.some((card) => {
+              if (!card.m5ratekey) return false
+              const db = dbById[card.m5ratekey]
+              if (!db) return false
+              return rateFields.some((f) => rateChanged(card[f], db[f]))
+            })
+
+            if (hasRateChange) {
+              const instrText = affectedInstructions.join(", ")
+              const confirmed = await showConfirmDialog(
+                "Rate Change Warning",
+                `<div style="text-align:left;">
+                  <div style="margin-bottom:10px;"><strong>Changing these rates will update the following in-progress instructions:</strong></div>
+                  <div style="margin-bottom:10px;"><strong>Instruction no:</strong> ${instrText}</div>
+                  <div>The driver rate on their legs will be recalculated to match the new periods.</div>
+                </div>`,
+                "Continue",
+                { html: true },
+              )
+              if (!confirmed) return false
+            }
+          }
+        } catch (usageErr) {
+          console.error("Error checking route usage before save:", usageErr)
+        }
+
+        const saveResp = await api.post("/api/driver-rates/route-periods", {
+          startingpoint,
+          destination,
+          periods,
+          ...(isRename && { originalStartingpoint, originalDestination }),
+        })
+
+        const savedPeriods = Array.isArray(saveResp.data?.periods) ? saveResp.data.periods : []
+        const firstId = savedPeriods[0]?.m5ratekey
+
+        // Refresh leg rates for all affected instructions. Merge both sets
+        // (rate-change affected + rename affected) so instructions that appear
+        // in both are only refreshed once.
+        const renamedInstructions = saveResp.data?.renamedInstructions || []
+        const allAffected = [...new Set([...affectedInstructions, ...renamedInstructions])]
+        if (allAffected.length > 0 && firstId) {
+          try {
+            await api.post(`/api/driver-rates/${firstId}/refresh-legs`, {
+              instructions: allAffected,
+            })
+          } catch (refreshErr) {
+            console.error("Error refreshing legs after route period save:", refreshErr)
+          }
+        }
+
+        await fetchPaginatedData(
+          "driverRates",
+          state.pagination.driverRates.currentPage,
+          state.pagination.driverRates.itemsPerPage,
+          state.filters.driverRates,
+        )
+
+        actions.hidePeriods()
+        actions.showAlert("Driver rates saved!")
+        return true
+      } catch (err) {
+        console.error("Error saving route periods:", err)
+        actions.showAlert(`Error saving rates: ${err.response?.data?.error || err.message}`)
+        return false
+      } finally {
+        actions.setLoading(false)
+      }
+    },
+    [state, actions, fetchPaginatedData],
+  )
+
+  const deleteRoute = useCallback(
+    async (startingpoint, destination) => {
+      actions.setLoading(true)
+      try {
+        // Check usage before attempting delete so we can show affected instructions upfront
+        const usageParams = new URLSearchParams({ startingpoint, destination })
+        const usageResp = await api.get(`/api/driver-rates/route-usage?${usageParams}`)
+        const usageData = usageResp.data
+
+        if (usageData?.inUse) {
+          const instructions = usageData.instructions || []
+          const instrText = instructions.length ? instructions.join(", ") : "unknown"
+          await showAlert(
+            "Cannot Delete Route",
+            `This route is currently used by in-progress instruction(s): ${instrText}.\n\nClose or complete those instructions before deleting this route.`,
+            "error",
+          )
+          return
+        }
+
+        // Not in use — confirm then delete
+        const confirmed = await showConfirmDialog(
+          "Delete Route?",
+          `Delete all rate periods for "${startingpoint} → ${destination}"? This cannot be undone.`,
+          "Delete",
+        )
+        if (!confirmed) return
+
+        await api.delete(`/api/driver-rates/route?${usageParams}`)
+        await fetchPaginatedData(
+          "driverRates",
+          state.pagination.driverRates.currentPage,
+          state.pagination.driverRates.itemsPerPage,
+          state.filters.driverRates,
+        )
+        actions.showAlert("Route deleted successfully")
+      } catch (err) {
+        console.error("Error deleting route:", err)
+        actions.showAlert("Failed to delete route")
+      } finally {
+        actions.setLoading(false)
+      }
+    },
+    [state, actions, fetchPaginatedData],
+  )
+
+  // ───────────────────────────────────────────────────────────────────────────
 
   const saveSubcontractor = useCallback(
     async (subcontractorData) => {
@@ -1661,6 +1935,9 @@ export function useApi(state, actions) {
     saveTrailer,
     saveDriverRate,
     checkDriverRateOverlap,
+    loadRouteForEdit,
+    saveRoutePeriods,
+    deleteRoute,
     saveSubcontractor,
     saveClientRates,
     saveSupplier,

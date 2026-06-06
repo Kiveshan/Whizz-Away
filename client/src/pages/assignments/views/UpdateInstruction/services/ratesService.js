@@ -70,12 +70,15 @@ export const fetchRate = async ({
   };
 
   try {
-    setRateError("");
-
     if (noRatesRoutes.has(routeKey)) {
       applyNoRate();
       return Promise.resolve();
     }
+
+    // When skipDriverUpdate is true (leg-switch context) fetchRate's only job is
+    // to refresh the shared rates state. Error banner ownership belongs to
+    // handleDriverDateChange in that context — don't touch it here.
+    if (!skipDriverUpdate) setRateError("");
 
     const response = await api.get("/api/driver-rates-with-subbie", {
       params: { startingpoint: startingPoint, destination, legDate },
@@ -167,7 +170,7 @@ export const fetchRate = async ({
   } catch (error) {
     // 404 means no rate exists for this route+date — treat as valid "no rate" scenario
     if (error.response?.status === 404) {
-      setRateError("Driver rate not available for this route");
+      if (!skipDriverUpdate) setRateError("Driver rate not available for this route");
       setNoRatesRoutes((prev) => {
         const newSet = new Set(prev);
         newSet.add(routeKey);
@@ -181,7 +184,7 @@ export const fetchRate = async ({
       "Unexpected error fetching rate:",
       error.response ? error.response.data : error.message
     );
-    setRateError("Unexpected error fetching driver rate");
+    if (!skipDriverUpdate) setRateError("Unexpected error fetching driver rate");
 
     setRates({ six_meter: 0, twelve_meter: 0, subbie_six_meter: 0, subbie_twelve_meter: 0 });
 
