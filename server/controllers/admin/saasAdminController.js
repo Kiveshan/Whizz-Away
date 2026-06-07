@@ -368,20 +368,6 @@ const startTrial = async (req, res) => {
       return res.status(404).json({ error: "Company not found." });
     }
 
-    // Anti-abuse: block if this company has ever had a trial before
-    const history = await client.query(
-      `SELECT COUNT(*) FROM billing_events
-       WHERE company_reg_num = $1 AND event_type = 'trial_started'`,
-      [company_reg_num]
-    );
-    if (parseInt(history.rows[0].count) > 0) {
-      await client.query("ROLLBACK");
-      return res.status(409).json({
-        error:   "TRIAL_ALREADY_USED",
-        message: "This company has already used a trial and cannot receive another.",
-      });
-    }
-
     await updateSubscriptionTier(client, company_reg_num, {
       subscription_tier:   plan,
       subscription_status: "trial",
@@ -410,6 +396,48 @@ const startTrial = async (req, res) => {
     await client.query("ROLLBACK");
     console.error("startTrial error:", err);
     return res.status(500).json({ error: "Failed to start trial." });
+  } finally {
+    client.release();
+  }
+};
+
+// DELETE /api/admin/companies/:company_reg_num/trial
+// End an active trial — sets status back to inactive and clears trial_ends_at.
+const endTrial = async (req, res) => {
+  const { company_reg_num } = req.params;
+  const adminEmail = req.user.email;
+
+  const client = await pool.connect();
+  try {
+    await client.query("BEGIN");
+
+    const check = await client.query(
+      `SELECT subscription_status FROM usertable WHERE company_reg_num = $1 AND roleid = 1 LIMIT 1`,
+      [company_reg_num]
+    );
+    if (!check.rows[0]) {
+      await client.query("ROLLBACK");
+      return res.status(404).json({ error: "Company not found." });
+    }
+
+    await updateSubscriptionTier(client, company_reg_num, {
+      subscription_status: "inactive",
+      trial_ends_at: null,
+    });
+
+    await recordBillingEvent(client, {
+      company_reg_num,
+      event_type:   "trial_ended",
+      performed_by: adminEmail,
+      notes:        "Trial ended by admin",
+    });
+
+    await client.query("COMMIT");
+    return res.json({ success: true, company_reg_num, status: "inactive" });
+  } catch (err) {
+    await client.query("ROLLBACK");
+    console.error("endTrial error:", err);
+    return res.status(500).json({ error: "Failed to end trial." });
   } finally {
     client.release();
   }
@@ -522,6 +550,7 @@ export {
   suspendCompany,
   reactivateCompany,
   startTrial,
+  endTrial,
   listBillingEvents,
   listPlans,
   updateLimits,

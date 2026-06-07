@@ -24,6 +24,8 @@ function CompanyManagement() {
   const [showLimitsModal, setShowLimitsModal] = useState(false);
   const [limitsUsersOverride, setLimitsUsersOverride] = useState("");
   const [limitsTrucksOverride, setLimitsTrucksOverride] = useState("");
+  const [showTrialModal, setShowTrialModal] = useState(false);
+  const [trialModalPlan, setTrialModalPlan] = useState("professional");
 
   useEffect(() => {
     fetchCompanies();
@@ -94,12 +96,29 @@ function CompanyManagement() {
     }
   };
 
-  const handleStartTrial = async (company_reg_num) => {
+  const openTrialModal = (company) => {
+    setSelectedCompany(company);
+    setTrialModalPlan(company.subscription_tier || "professional");
+    setShowTrialModal(true);
+  };
+
+  const handleStartTrial = async (company_reg_num, plan) => {
     try {
-      await api.post(`/api/admin/companies/${encodeURIComponent(company_reg_num)}/trial`);
+      await api.post(`/api/admin/companies/${encodeURIComponent(company_reg_num)}/trial`, { plan });
       fetchCompanies();
+      setShowTrialModal(false);
     } catch (err) {
-      setError(err.message);
+      alert(err.response?.data?.message || err.message);
+    }
+  };
+
+  const handleEndTrial = async (company_reg_num) => {
+    try {
+      await api.delete(`/api/admin/companies/${encodeURIComponent(company_reg_num)}/trial`);
+      fetchCompanies();
+      setShowTrialModal(false);
+    } catch (err) {
+      alert(err.response?.data?.message || err.message);
     }
   };
 
@@ -260,15 +279,13 @@ function CompanyManagement() {
                           Suspend
                         </button>
                       )}
-                      {!company.subscription_tier || company.subscription_tier === "none" ? (
-                        <button
-                          className="trial-button"
-                          onClick={() => handleStartTrial(company.company_reg_num)}
-                          title="Start Trial"
-                        >
-                          Start Trial
-                        </button>
-                      ) : null}
+                      <button
+                        className="trial-button"
+                        onClick={() => openTrialModal(company)}
+                        title="Manage Trial"
+                      >
+                        {company.subscription_status === "trial" ? "Trial ✓" : "Trial"}
+                      </button>
                     </div>
                   </td>
                 </tr>
@@ -435,6 +452,68 @@ function CompanyManagement() {
               </button>
               <button className="confirm-button" onClick={handleUpdateLimits}>
                 Save Limits
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Trial Modal */}
+      {showTrialModal && selectedCompany && (
+        <div className="modal-overlay">
+          <div className="modal-content">
+            <div className="modal-header">
+              <h3>Manage Trial</h3>
+            </div>
+            <div className="modal-body">
+              <div className="modal-company-info">
+                <span className="modal-company-name">{selectedCompany.companyname}</span>
+                <span className={`status-badge ${selectedCompany.subscription_status || "inactive"}`}>
+                  {selectedCompany.subscription_status || "inactive"}
+                </span>
+              </div>
+
+              {selectedCompany.subscription_status === "trial" && (
+                <div className="form-group">
+                  <p style={{ margin: "0 0 4px", fontSize: 13, color: "#94a3b8" }}>
+                    Currently on <strong>{selectedCompany.subscription_tier}</strong> trial
+                    {selectedCompany.trial_ends_at && (
+                      <> · ends {new Date(selectedCompany.trial_ends_at).toLocaleDateString()}</>
+                    )}
+                  </p>
+                </div>
+              )}
+
+              <div className="form-group">
+                <label>Trial Plan</label>
+                <select
+                  value={trialModalPlan}
+                  onChange={(e) => setTrialModalPlan(e.target.value)}
+                >
+                  <option value="lite">Lite</option>
+                  <option value="professional">Professional</option>
+                  <option value="growth">Growth</option>
+                  <option value="enterprise">Enterprise</option>
+                </select>
+              </div>
+            </div>
+            <div className="modal-actions">
+              <button className="cancel-button" onClick={() => setShowTrialModal(false)}>
+                Cancel
+              </button>
+              {selectedCompany.subscription_status === "trial" && (
+                <button
+                  className="suspend-confirm suspend-button"
+                  onClick={() => handleEndTrial(selectedCompany.company_reg_num)}
+                >
+                  End Trial
+                </button>
+              )}
+              <button
+                className="confirm-button"
+                onClick={() => handleStartTrial(selectedCompany.company_reg_num, trialModalPlan)}
+              >
+                {selectedCompany.subscription_status === "trial" ? "Change Trial Plan" : "Start 3-Month Trial"}
               </button>
             </div>
           </div>

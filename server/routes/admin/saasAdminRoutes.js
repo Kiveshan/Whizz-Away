@@ -7,6 +7,7 @@ import {
   suspendCompany,
   reactivateCompany,
   startTrial,
+  endTrial,
   listBillingEvents,
   listPlans,
   updateLimits,
@@ -26,6 +27,7 @@ router.put("/api/admin/companies/:company_reg_num/upgrade-plan",          ...adm
 router.put("/api/admin/companies/:company_reg_num/suspend",               ...adminGuard, suspendCompany);
 router.put("/api/admin/companies/:company_reg_num/reactivate",            ...adminGuard, reactivateCompany);
 router.post("/api/admin/companies/:company_reg_num/trial",                ...adminGuard, startTrial);
+router.delete("/api/admin/companies/:company_reg_num/trial",              ...adminGuard, endTrial);
 router.put("/api/admin/companies/:company_reg_num/limits",                ...adminGuard, updateLimits);
 router.get("/api/admin/billing-events",                                   ...adminGuard, listBillingEvents);
 router.get("/api/admin/plans",                                            ...adminGuard, listPlans);

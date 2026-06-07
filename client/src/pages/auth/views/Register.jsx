@@ -641,7 +641,7 @@ const Register = ({ switchToLogin, closePopup }) => {
                 className={styles.trialCheckbox}
               />
               <span className={styles.trialToggleLabel}>
-                Start with a <strong>14-day free trial</strong> of my chosen plan
+                Start with a <strong>3-month free trial</strong> of my chosen plan
                 <span className={styles.trialToggleHint}> — no payment required during the trial</span>
               </span>
             </label>
