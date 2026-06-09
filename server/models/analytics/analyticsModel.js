@@ -440,28 +440,32 @@ const getTurnoverVsDieselCost = async (numericMonth, year) => {
 const getTurnoverPerTruck = async (client, month, year) => {
   const params = [month, year]
   const query = `
-    WITH DistinctLegs AS (
-      SELECT 
+    WITH DeduplicatedLegs AS (
+      SELECT DISTINCT m1key, legnumber, truckregnumber
+      FROM legs_m2
+    ),
+    DistinctLegs AS (
+      SELECT
         m1key,
         COUNT(DISTINCT legnumber) AS num_legs
-      FROM legs_m2
+      FROM DeduplicatedLegs
       GROUP BY m1key
     ),
     TruckCountsPerLeg AS (
-      SELECT 
+      SELECT
         m1key,
         legnumber,
         COUNT(DISTINCT truckregnumber) AS trucks_per_leg
-      FROM legs_m2
+      FROM DeduplicatedLegs
       GROUP BY m1key, legnumber
     ),
     TurnoverPerTruck AS (
-      SELECT 
+      SELECT
         l.truckregnumber,
         SUM(m.total_cost / dl.num_legs / tcpl.trucks_per_leg) AS total_turnover,
         TO_CHAR(m.created_at, 'Month') AS month_name,
         EXTRACT(YEAR FROM m.created_at)::TEXT AS year
-      FROM legs_m2 l
+      FROM DeduplicatedLegs l
       JOIN m1_controller m ON l.m1key = m.m1key
       JOIN DistinctLegs dl ON l.m1key = dl.m1key
       JOIN TruckCountsPerLeg tcpl ON l.m1key = tcpl.m1key AND l.legnumber = tcpl.legnumber
