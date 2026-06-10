@@ -207,7 +207,8 @@ Troubleshooting tips:
     ? instructions.filter(
         (i) =>
           i.file_no?.toLowerCase().includes(sq) ||
-          i.m1key?.toString().includes(sq)
+          i.m1key?.toString().includes(sq) ||
+          i.invoice_num?.toLowerCase().includes(sq)
       )
     : instructions;
 
@@ -237,7 +238,7 @@ Troubleshooting tips:
               <div className="dropdown-container">
                 <input
                   type="text"
-                  placeholder="Search by file no. or instruction no."
+                  placeholder="Search by file no., instruction no. or invoice no."
                   value={searchQuery}
                   onChange={handleSearchChange}
                   style={{
