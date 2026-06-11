@@ -2,10 +2,17 @@
 
 import { useState, useEffect } from "react"
 import api from "../../../../api.js"
+import { normalize, findClosestRoute } from "./routeSimilarity.js"
+import RouteAutocompleteInput from "./RouteAutocompleteInput.jsx"
 
 const DriverRateForm = ({ driverRate, loading, isEditing, onSave, onCancel, onChange }) => {
   const [routeOptions, setRouteOptions] = useState([])
   const [duplicateWarning, setDuplicateWarning] = useState("")
+  const [suggestedRoute, setSuggestedRoute] = useState(null)
+
+  // Distinct existing values for autocomplete on the route inputs
+  const startingPointOptions = [...new Set(routeOptions.map((r) => r.startingpoint).filter(Boolean))].sort()
+  const destinationOptions = [...new Set(routeOptions.map((r) => r.destination).filter(Boolean))].sort()
 
   // Load existing routes for autocomplete once on mount
   useEffect(() => {
@@ -14,13 +21,14 @@ const DriverRateForm = ({ driverRate, loading, isEditing, onSave, onCancel, onCh
       .catch(() => setRouteOptions([]))
   }, [])
 
-  // Warn if the typed route already exists
+  // Warn if the typed route already exists (exact match), otherwise suggest the
+  // closest existing route so misspellings don't create phantom duplicates.
   useEffect(() => {
     if (!driverRate.startingpoint || !driverRate.destination) {
       setDuplicateWarning("")
+      setSuggestedRoute(null)
       return
     }
-    const normalize = (s) => (s || "").trim().replace(/\s+/g, " ").toLowerCase()
     const sp = normalize(driverRate.startingpoint)
     const dest = normalize(driverRate.destination)
     const exists = routeOptions.some(
@@ -32,6 +40,10 @@ const DriverRateForm = ({ driverRate, loading, isEditing, onSave, onCancel, onCh
       exists
         ? "This route already exists. Use Edit on the route to add a new period instead."
         : "",
+    )
+    // Only offer a "did you mean?" suggestion when it isn't already an exact match.
+    setSuggestedRoute(
+      exists ? null : findClosestRoute(driverRate.startingpoint, driverRate.destination, routeOptions),
     )
   }, [driverRate.startingpoint, driverRate.destination, routeOptions])
 
@@ -81,11 +93,10 @@ const DriverRateForm = ({ driverRate, loading, isEditing, onSave, onCancel, onCh
             <label>
               <strong>Starting Point *</strong>
             </label>
-            <input
-              type="text"
-              className="form-input"
+            <RouteAutocompleteInput
               value={driverRate.startingpoint || ""}
-              onChange={(e) => onChange("startingpoint", e.target.value)}
+              onChange={(val) => onChange("startingpoint", val)}
+              options={startingPointOptions}
               required
             />
           </div>
@@ -93,11 +104,10 @@ const DriverRateForm = ({ driverRate, loading, isEditing, onSave, onCancel, onCh
             <label>
               <strong>Destination *</strong>
             </label>
-            <input
-              type="text"
-              className="form-input"
+            <RouteAutocompleteInput
               value={driverRate.destination || ""}
-              onChange={(e) => onChange("destination", e.target.value)}
+              onChange={(val) => onChange("destination", val)}
+              options={destinationOptions}
               required
             />
           </div>
@@ -115,6 +125,41 @@ const DriverRateForm = ({ driverRate, loading, isEditing, onSave, onCancel, onCh
             }}
           >
             <strong>⚠ Note:</strong> {duplicateWarning}
+          </div>
+        )}
+
+        {!duplicateWarning && suggestedRoute && (
+          <div
+            style={{
+              padding: "10px",
+              backgroundColor: "#fff3cd",
+              border: "1px solid #ffc107",
+              borderRadius: "4px",
+              marginBottom: "10px",
+              color: "#856404",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "space-between",
+              gap: "10px",
+              flexWrap: "wrap",
+            }}
+          >
+            <span>
+              <strong>Did you mean:</strong> {suggestedRoute.startingpoint} → {suggestedRoute.destination}? This looks
+              like an existing route — using a different spelling will create a duplicate.
+            </span>
+            <button
+              type="button"
+              className="driver-rate-save-button"
+              style={{ whiteSpace: "nowrap" }}
+              onClick={() => {
+                onChange("startingpoint", suggestedRoute.startingpoint)
+                onChange("destination", suggestedRoute.destination)
+                setSuggestedRoute(null)
+              }}
+            >
+              Use this route
+            </button>
           </div>
         )}
 
