@@ -865,8 +865,31 @@ export const refreshInstructionLegRates = async (instructionId) => {
 };
 
 export const completeInstruction = async (instructionId, status) => {
-  const query = `UPDATE m1_controller SET status = $1 WHERE m1key = $2`;
   try {
+    // Hard block: an add-on instruction (shipment type 5) cannot be marked
+    // Completed unless it is linked to an existing add-on invoice.
+    if (status === "Completed") {
+      const checkResult = await pool.query(
+        `SELECT shipment_type, addon_id FROM m1_controller WHERE m1key = $1`,
+        [instructionId]
+      );
+      if (checkResult.rows.length === 0) {
+        throw new Error(`Instruction with ID ${instructionId} not found`);
+      }
+      const { shipment_type, addon_id } = checkResult.rows[0];
+      if (
+        String(shipment_type) === "5" &&
+        (addon_id === null || addon_id === undefined)
+      ) {
+        const err = new Error(
+          "This add-on instruction must be linked to an add-on invoice before it can be completed."
+        );
+        err.code = "ADDON_LINK_REQUIRED";
+        throw err;
+      }
+    }
+
+    const query = `UPDATE m1_controller SET status = $1 WHERE m1key = $2`;
     await pool.query(query, [status, instructionId]);
   } catch (error) {
     throw error;

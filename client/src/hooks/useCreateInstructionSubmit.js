@@ -160,6 +160,11 @@ export function useCreateInstructionSubmit({
         rateweight: formData.rateWeight,
         status: "New",
         vat: formData.vat,
+        addon_id: isAddOn
+          ? formData.addon_id
+            ? Number(formData.addon_id)
+            : null
+          : null,
       };
 
       const currentContainers = containersRef.current || [];

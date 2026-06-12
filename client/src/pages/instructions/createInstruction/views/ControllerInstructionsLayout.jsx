@@ -1,6 +1,7 @@
 ﻿import { ErrorTooltip as SharedErrorTooltip } from "../../../../components/instructions/ErrorTooltip"
 import { ConfirmationModal } from "../../../../components/instructions/ConfirmationModal"
 import { InstructionLoadingGate } from "../../../../components/instructions/InstructionLoadingGate"
+import { AddonInvoicePicker } from "../../../../components/instructions/AddonInvoicePicker"
 
 const ErrorTooltip = (props) => <SharedErrorTooltip {...props} disabled />
 
@@ -43,6 +44,7 @@ export function ControllerInstructionsLayout({
   isImport,
   isExport,
   isAddOn,
+  instructionId,
   lastFreeDateRef,
   etaDateRef,
   today,
@@ -838,6 +840,20 @@ export function ControllerInstructionsLayout({
                       <ErrorTooltip message={fieldErrors.bookingRef} />
                     </div>
                   </div>
+
+                  {/* Add-On Invoice link (add-on shipment type only) */}
+                  {isAddOn && (
+                    <AddonInvoicePicker
+                      clientId={formData.clientId}
+                      instructionId={instructionId}
+                      value={formData.addon_id}
+                      onChange={(val) => {
+                        setFormData((prev) => ({ ...prev, addon_id: val }))
+                        setFieldErrors((prev) => ({ ...prev, addon_id: "" }))
+                      }}
+                      error={fieldErrors.addon_id}
+                    />
+                  )}
 
                   {/* File Ref */}
                   <div className="controller-instructions-form-field" style={{ flex: "1 1 120px" }}>
