@@ -14,6 +14,8 @@ export default function DriversSection({
   weightUnit,
   isCompleted,
   rates,
+  shipmentType,
+  dnOptions = [],
   formData,
   addDriverButtonRef,
   addDriver,
@@ -749,6 +751,81 @@ export default function DriversSection({
                         </button>
                       </div>
                     </div>
+
+                    {shipmentType === 4 && (
+                      <div
+                        style={{
+                          width: "16.666%",
+                          padding: "0 0.5rem",
+                          marginBottom: "0.75rem",
+                        }}
+                      >
+                        <label
+                          style={{
+                            display: "block",
+                            color: "#374151",
+                            fontWeight: "500",
+                            marginBottom: "0.25rem",
+                          }}
+                        >
+                          DN
+                        </label>
+                        <Select
+                          classNamePrefix="select"
+                          isClearable
+                          isDisabled={isCompleted}
+                          placeholder="Select DN"
+                          styles={{
+                            control: (base) => ({
+                              ...base,
+                              minHeight: "38px",
+                              backgroundColor: isCompleted ? "#f3f4f6" : "white",
+                              borderColor: "#d1d5db",
+                            }),
+                            menu: (base) => ({
+                              ...base,
+                              zIndex: 20,
+                            }),
+                          }}
+                          value={
+                            entry.dn
+                              ? { value: entry.dn, label: entry.dn }
+                              : null
+                          }
+                          options={[
+                            // Merge any DN values already saved on the drivers in
+                            // this leg into the list so that opening an in-progress
+                            // or completed instruction always shows the saved DN,
+                            // even if it's no longer present in the weight table.
+                            ...new Set([
+                              ...dnOptions,
+                              ...drivers
+                                .map((d) => d.dn)
+                                .filter((dn) => dn && dn.toString().trim() !== ""),
+                            ]),
+                          ].map((dn) => ({
+                            value: dn,
+                            label: dn,
+                          }))}
+                          onChange={(option) => {
+                            if (isCompleted) return;
+                            const dnValue = option ? option.value : "";
+                            const updatedDrivers = [...drivers];
+                            updatedDrivers[entry.originalIndex].dn = dnValue;
+
+                            setEditedFields((prev) => ({
+                              ...prev,
+                              drivers: {
+                                ...prev.drivers,
+                                [updatedDrivers[entry.originalIndex].id]: true,
+                              },
+                            }));
+
+                            setDrivers(updatedDrivers);
+                          }}
+                        />
+                      </div>
+                    )}
                   </div>
                 </div>
               ))}

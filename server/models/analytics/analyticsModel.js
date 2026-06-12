@@ -462,11 +462,17 @@ const getTurnoverPerTruck = async (client, month, year) => {
     TurnoverPerTruck AS (
       SELECT
         l.truckregnumber,
-        SUM(m.total_cost / dl.num_legs / tcpl.trucks_per_leg) AS total_turnover,
+        -- For add-on instructions (shipment type 5) total_cost is 0; use the
+        -- linked add-on invoice amount instead, then split per leg/truck as usual.
+        SUM(
+          (CASE WHEN m.shipment_type = 5 THEN COALESCE(ao.amount, 0) ELSE m.total_cost END)
+          / dl.num_legs / tcpl.trucks_per_leg
+        ) AS total_turnover,
         TO_CHAR(m.created_at, 'Month') AS month_name,
         EXTRACT(YEAR FROM m.created_at)::TEXT AS year
       FROM DeduplicatedLegs l
       JOIN m1_controller m ON l.m1key = m.m1key
+      LEFT JOIN add_ons ao ON m.addon_id = ao.addon_id
       JOIN DistinctLegs dl ON l.m1key = dl.m1key
       JOIN TruckCountsPerLeg tcpl ON l.m1key = tcpl.m1key AND l.legnumber = tcpl.legnumber
       JOIN m5_trucks t ON l.truckregnumber = t.truckregnum

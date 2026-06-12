@@ -183,6 +183,7 @@ export const handleSelectLeg = ({
             ? driver.containernumber.toString()
             : "",
         container_type: driver.container_type || "",
+        dn: driver.dn || "",
         driverRate: driver.driverRate ?? driver.driverate ?? "",
         _rateNullInManage: driver._rateNullInManage,
         _rateExplicitlyZero: driver._rateExplicitlyZero,
