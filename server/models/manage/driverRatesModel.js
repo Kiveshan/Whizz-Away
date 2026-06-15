@@ -833,6 +833,205 @@ export const getRouteLegDates = async (startingpoint, destination) => {
   }
 }
 
+// ─── Month audit: find/fix legs with the wrong driverrate ───────────────────
+//
+// Re-derives the correct driverrate for every leg on instructions CREATED in a
+// given month, using the SAME resolution rules as getRateForLegDate but in a
+// single SQL pass (a per-leg LATERAL lookup) so the whole month resolves in one
+// round-trip instead of thousands. The classification mirrors the CLI script
+// scripts/fixAprilDriverRates.js exactly:
+//   MISMATCH      stored rate differs from the correct rate -> fixable
+//   MATCH         already correct
+//   ROUTE_MISSING no rate period covers this route on the leg's date -> NEVER touched
+//   NO_FIELD_RATE the period exists but the needed field (subbie/driver × 6m/12m) is blank
+//   SKIPPED       leg has no date or no driver -> cannot resolve
+//
+// The LATERAL subquery replicates getRateForLegDate:
+//   - same trimmed/lowercased route match
+//   - effective_from <= leg.date <= (effective_to or open)
+//   - ORDER BY effective_from DESC, m5ratekey DESC LIMIT 1  (newest applicable version)
+// and the CASE replicates its field selection (roleid 6 = subbie, '12m' vs 6m).
+const MONTH_AUDIT_CTE = `
+  WITH leg_rates AS (
+    SELECT
+      l.legkey,
+      l.m1key,
+      l.driverid,
+      l.startingpoint,
+      l.destination,
+      l.date::text                                   AS leg_date,
+      l.driverrate                                   AS stored_rate,
+      COALESCE(e.roleid, 5)                          AS roleid,
+      LOWER(TRIM(COALESCE(c.container_type, '6m')))  AS container_type,
+      r.m5ratekey                                    AS rate_id,
+      CASE
+        WHEN l.date IS NULL OR l.driverid IS NULL THEN NULL
+        WHEN COALESCE(e.roleid, 5) = 6
+             AND LOWER(TRIM(COALESCE(c.container_type, '6m'))) = '12m' THEN r.subie_twelve_meter_rate
+        WHEN COALESCE(e.roleid, 5) = 6                              THEN r.subie_six_meter_rate
+        WHEN LOWER(TRIM(COALESCE(c.container_type, '6m'))) = '12m'  THEN r.driver_twelve_meter_rate
+        ELSE r.driver_six_meter_rate
+      END                                            AS expected_rate
+    FROM legs_m2 l
+    JOIN m1_controller mc ON mc.m1key = l.m1key
+    LEFT JOIN shipment sh ON sh.shipkey = mc.shipment_type
+    LEFT JOIN m5_employee e ON e.userid = l.driverid
+    LEFT JOIN container c
+      ON LOWER(TRIM(COALESCE(c.containernum::text, ''))) = LOWER(TRIM(COALESCE(l.containernumber, '')))
+     AND c.m1key = l.m1key
+    LEFT JOIN LATERAL (
+      SELECT dr.*
+      FROM m5_driver_rate dr
+      WHERE LOWER(TRIM(COALESCE(dr.startingpoint, ''))) = LOWER(TRIM(COALESCE(l.startingpoint, '')))
+        AND LOWER(TRIM(COALESCE(dr.destination, '')))   = LOWER(TRIM(COALESCE(l.destination, '')))
+        AND dr.effective_from <= l.date
+        AND (dr.effective_to IS NULL OR dr.effective_to >= l.date)
+      ORDER BY dr.effective_from DESC, dr.m5ratekey DESC
+      LIMIT 1
+    ) r ON l.date IS NOT NULL
+    WHERE EXTRACT(YEAR  FROM mc.created_at) = $1
+      AND EXTRACT(MONTH FROM mc.created_at) = $2
+      -- Breakbulk instructions are rated differently (per-unit weight), not via
+      -- the route driver-rate table, so they are excluded from this audit.
+      AND COALESCE(sh.shipmenttype, '') NOT ILIKE '%break%bulk%'
+  ),
+  classified AS (
+    SELECT
+      lr.*,
+      CASE
+        WHEN lr.leg_date IS NULL OR lr.driverid IS NULL THEN 'SKIPPED'
+        WHEN lr.rate_id IS NULL                         THEN 'ROUTE_MISSING'
+        WHEN lr.expected_rate IS NULL                   THEN 'NO_FIELD_RATE'
+        WHEN ABS(lr.expected_rate - COALESCE(lr.stored_rate, 0)) < 0.005 THEN 'MATCH'
+        ELSE 'MISMATCH'
+      END AS category
+    FROM leg_rates lr
+  )
+`
+
+// Read-only audit. Returns every leg classified, a per-category summary, and the
+// total Rand delta that applying the MISMATCH fixes would produce.
+export const auditDriverRatesForMonth = async (year, month) => {
+  let client
+  try {
+    client = await pool.connect()
+    const { rows } = await client.query(
+      `${MONTH_AUDIT_CTE}
+       SELECT legkey, m1key, startingpoint, destination, leg_date,
+              roleid, container_type, stored_rate, expected_rate, rate_id, category
+       FROM classified
+       ORDER BY category, m1key, legkey`,
+      [Number(year), Number(month)],
+    )
+
+    // A mismatch is only worth showing if it's BIG (|Δ| >= R500) or NEGATIVE
+    // (stored higher than the looked-up correct rate). Small positive drifts are
+    // counted in the summary but hidden from the detail table.
+    const BIG_DELTA = 500
+
+    const summary = { MISMATCH: 0, MATCH: 0, ROUTE_MISSING: 0, NO_FIELD_RATE: 0, SKIPPED: 0 }
+    let totalDelta = 0
+    let mismatchShown = 0
+    const byCategory = { MISMATCH: [], MATCH: [], ROUTE_MISSING: [], NO_FIELD_RATE: [], SKIPPED: [] }
+
+    // A subbie leg with a stored rate below R500 is suspiciously low. This only
+    // matters for route-missing legs (no rate period covers the route on the
+    // leg's date), where we can't re-derive a correct value to compare against.
+    const LOW_SUBBIE = 500
+    let routeMissingSubbieLow = 0
+
+    for (const row of rows) {
+      const cat = row.category
+      summary[cat] = (summary[cat] || 0) + 1
+      const stored = row.stored_rate == null ? null : Number(row.stored_rate)
+      const expected = row.expected_rate == null ? null : Number(row.expected_rate)
+      const delta = cat === "MISMATCH" ? Number((expected - (stored || 0)).toFixed(2)) : null
+      const role = Number(row.roleid) === 6 ? "subbie" : "driver"
+      const entry = {
+        legkey: row.legkey,
+        m1key: row.m1key,
+        route: `${row.startingpoint} → ${row.destination}`,
+        date: row.leg_date,
+        role,
+        container: row.container_type,
+        stored_rate: stored,
+        expected_rate: expected,
+        delta,
+      }
+
+      if (cat === "MISMATCH") {
+        const isNegative = delta < 0
+        const isBig = Math.abs(delta) >= BIG_DELTA
+        if (isNegative || isBig) {
+          entry.flag = [isNegative ? "NEGATIVE" : null, isBig ? "BIG" : null].filter(Boolean).join("+")
+          totalDelta += delta
+          mismatchShown++
+          byCategory.MISMATCH.push(entry)
+        }
+        // small positive drifts: counted in summary, not shown
+        continue
+      }
+
+      if (cat === "ROUTE_MISSING") {
+        if (role === "subbie" && stored != null && stored < LOW_SUBBIE) {
+          entry.flag = "SUBBIE < R500"
+          routeMissingSubbieLow++
+        }
+        byCategory.ROUTE_MISSING.push(entry)
+        continue
+      }
+
+      // MATCH rows are the bulk and not interesting to display — keep only a count.
+      if (cat !== "MATCH") byCategory[cat].push(entry)
+    }
+
+    return {
+      success: true,
+      year: Number(year),
+      month: Number(month),
+      totalLegs: rows.length,
+      summary,
+      mismatchShown,
+      mismatchHidden: summary.MISMATCH - mismatchShown,
+      routeMissingSubbieLow,
+      totalDelta: Number(totalDelta.toFixed(2)),
+      mismatch: byCategory.MISMATCH,
+      routeMissing: byCategory.ROUTE_MISSING,
+      noFieldRate: byCategory.NO_FIELD_RATE,
+      skipped: byCategory.SKIPPED,
+    }
+  } catch (err) {
+    console.error("Error auditing driver rates for month:", err)
+    throw err
+  } finally {
+    if (client) client.release()
+  }
+}
+
+// Apply the fixes: set driverrate = expected for every MISMATCH leg, in one
+// atomic statement. ROUTE_MISSING / NO_FIELD_RATE / SKIPPED / MATCH are untouched.
+export const applyDriverRateFixesForMonth = async (year, month) => {
+  let client
+  try {
+    client = await pool.connect()
+    const result = await client.query(
+      `${MONTH_AUDIT_CTE}
+       UPDATE legs_m2 t
+       SET driverrate = c.expected_rate
+       FROM classified c
+       WHERE t.legkey = c.legkey
+         AND c.category = 'MISMATCH'`,
+      [Number(year), Number(month)],
+    )
+    return { success: true, updated: result.rowCount }
+  } catch (err) {
+    console.error("Error applying driver rate fixes for month:", err)
+    throw err
+  } finally {
+    if (client) client.release()
+  }
+}
+
 // Refresh legs_m2.driverrate for a set of instructions, respecting effective dates.
 // For each leg, the rate is looked up using the leg's own date so that legs in different
 // rate periods within the same instruction each receive the correct rate version.

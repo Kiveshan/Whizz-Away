@@ -53,6 +53,8 @@ const InvoicesList = () => {
   // Skip initial render to prevent auto-filtering on page load
   const [isInitialRender, setIsInitialRender] = useState(true);
 
+  const [searchQuery, setSearchQuery] = useState("");
+
   // Fetch instructions when component mounts or filters change
   useEffect(() => {
     let isMounted = true;
@@ -172,6 +174,11 @@ Troubleshooting tips:
     setCurrentPage(1); // Reset to first page when filter changes
   }, []);
 
+  const handleSearchChange = useCallback((e) => {
+    setSearchQuery(e.target.value);
+    setCurrentPage(1);
+  }, []);
+
   // Handle pagination
   const handlePageChange = useCallback((pageNumber) => {
     setCurrentPage(pageNumber);
@@ -195,11 +202,22 @@ Troubleshooting tips:
     yearOptions.push(y);
   }
 
+  // Apply client-side search filter on top of the API-filtered results
+  const sq = searchQuery.trim().toLowerCase();
+  const filteredInstructions = sq
+    ? instructions.filter(
+        (i) =>
+          i.file_no?.toLowerCase().includes(sq) ||
+          i.m1key?.toString().includes(sq) ||
+          i.invoice_num?.toLowerCase().includes(sq)
+      )
+    : instructions;
+
   // Calculate pagination data
-  const totalRecords = instructions.length;
+  const totalRecords = filteredInstructions.length;
   const startIndex = (currentPage - 1) * recordsPerPage;
   const endIndex = startIndex + recordsPerPage;
-  const currentInstructions = instructions.slice(startIndex, endIndex);
+  const currentInstructions = filteredInstructions.slice(startIndex, endIndex);
 
   return (
     <div className="invoices-list-wrapper">
@@ -219,6 +237,20 @@ Troubleshooting tips:
           >
             <div className="filter-section6">
               <div className="dropdown-container">
+                <input
+                  type="text"
+                  placeholder="Search by file no., instruction no. or invoice no."
+                  value={searchQuery}
+                  onChange={handleSearchChange}
+                  style={{
+                    minWidth: "240px",
+                    padding: "8px",
+                    borderRadius: "5px",
+                    border: "1px solid #ccc",
+                    fontFamily: "inherit",
+                    backgroundColor: "white",
+                  }}
+                />
                 <select
                   className="dropdown"
                   name="year"

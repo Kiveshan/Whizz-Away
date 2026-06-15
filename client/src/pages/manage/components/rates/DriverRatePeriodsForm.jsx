@@ -47,23 +47,22 @@ const DriverRatePeriodsForm = ({
   const startingpoint = editStartingpoint
   const destination = editDestination
 
-  const checkOverlap = async (index, card) => {
-    if (!card.effective_from) return
-    try {
-      const params = new URLSearchParams({
-        startingpoint,
-        destination,
-        effective_from: card.effective_from,
-      })
-      if (card.effective_to) params.append("effective_to", card.effective_to)
-      if (card.m5ratekey) params.append("exclude_id", card.m5ratekey.toString())
-      const res = await api.get(`/api/driver-rates/check-overlaps?${params}`)
-      const hasOverlap = res.data?.hasOverlaps
-      onChangePeriod(index, "_overlapWarning", hasOverlap ? res.data.message : null)
-      if (!hasOverlap) clearCardError(index)
-    } catch (_) {
-      onChangePeriod(index, "_overlapWarning", null)
-    }
+  const periodsOverlap = (a, b) => {
+    if (!a.effective_from || !b.effective_from) return false
+    const aEndsBeforeB = a.effective_to && a.effective_to < b.effective_from
+    const bEndsBeforeA = b.effective_to && b.effective_to < a.effective_from
+    return !aEndsBeforeB && !bEndsBeforeA
+  }
+
+  const recheckAllOverlaps = (updatedPeriods) => {
+    updatedPeriods.forEach((card, index) => {
+      const overlaps = updatedPeriods.some((other, i) => i !== index && periodsOverlap(card, other))
+      const warning = overlaps ? "This period's dates overlap with another period in this rate" : null
+      if (card._overlapWarning !== warning) {
+        onChangePeriod(index, "_overlapWarning", warning)
+        if (!warning) clearCardError(index)
+      }
+    })
   }
 
   const clearCardError = (index) => {
@@ -77,12 +76,10 @@ const DriverRatePeriodsForm = ({
   }
 
   const handleDateChange = (index, field, value) => {
+    const updatedPeriods = periods.map((p, i) => (i === index ? { ...p, [field]: value } : p))
     onChangePeriod(index, field, value)
     clearCardError(index)
-    setTimeout(() => {
-      const updated = { ...periods[index], [field]: value }
-      checkOverlap(index, updated)
-    }, 0)
+    recheckAllOverlaps(updatedPeriods)
   }
 
   const handleRateChange = (index, field, value) => {

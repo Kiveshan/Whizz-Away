@@ -27,6 +27,36 @@ export const checkIfWeightBased = async ({
   }
 };
 
+// Pulls the KSM DN Numbers (ksm_dm_no) from the instruction's weight table rows.
+// Used to populate the per-driver DN dropdown for cross-haul break bulk (shipment type 4).
+export const fetchDnOptions = async ({ api, instructionId, setDnOptions }) => {
+  if (!instructionId) return;
+
+  try {
+    const response = await api.get(`/api/instructions/instruction/${instructionId}`);
+    const weightRows = response.data?.weight_rows;
+
+    if (!Array.isArray(weightRows)) {
+      setDnOptions([]);
+      return;
+    }
+
+    const dnNumbers = [
+      ...new Set(
+        weightRows
+          .map((row) => (row.ksm_dm_no != null ? row.ksm_dm_no.toString().trim() : ""))
+          .filter((dn) => dn !== "")
+      ),
+    ];
+
+    console.log("DN options from weight rows:", dnNumbers);
+    setDnOptions(dnNumbers);
+  } catch (error) {
+    console.error("Error fetching DN options:", error);
+    setDnOptions([]);
+  }
+};
+
 export const fetchShipmentType = async ({ API_BASE_URL, instructionId, setShipmentType }) => {
   if (instructionId) {
     try {

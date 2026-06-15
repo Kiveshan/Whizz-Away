@@ -6,7 +6,6 @@ import {
   getClientRates,
   getInstructions,
   getInstructionById,
-  updateInstruction,
   updateContainersByInstructionId,
   getActiveClients,
   getClientStartingPoints,
@@ -670,32 +669,6 @@ export const getFCInstructionByIdHandler = async (req, res) => {
   } catch (error) {
     console.error(`[${new Date().toISOString()}] [FC] Error in getFCInstructionByIdHandler:`, error)
     res.status(500).json({ error: "Failed to fetch instruction" })
-  }
-}
-
-export const updateFCInstructionHandler = async (req, res) => {
-  try {
-    const { id } = req.params
-    const updateData = req.body
-
-    // Calculate total cost based on rate weight type
-    const calculatedTotalCost = calculateTotalCost(updateData)
-    const updatedDataWithCost = {
-      ...updateData,
-      total_cost: calculatedTotalCost,
-    }
-
-    console.log(`[${new Date().toISOString()}] [FC] updateFCInstructionHandler: Updating instruction ${id}`)
-
-    const updatedInstruction = await updateInstruction(id, updatedDataWithCost)
-    if (!updatedInstruction) {
-      return res.status(404).json({ error: "Instruction not found" })
-    }
-
-    res.json(updatedInstruction)
-  } catch (error) {
-    console.error(`[${new Date().toISOString()}] [FC] Error in updateFCInstructionHandler:`, error)
-    res.status(500).json({ error: "Failed to update instruction" })
   }
 }
 

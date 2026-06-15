@@ -9,12 +9,17 @@ import {
   getCompanyInfoHandler,
   getClientByIdHandler,
   checkInvoiceNumberHandler,
+  getUnlinkedAddonsHandler,
 } from "../../controllers/add-ons/addonController.js";
 
 const router = express.Router();
 
 // Get all add-ons for a specific client
 router.get("/api/addons/client/:clientId", verifyToken, getClientAddonsHandler);
+
+// Get add-on invoices for a client that are not yet linked to an instruction
+// (optionally include the one currently linked to ?instructionId= for editing)
+router.get("/api/addons/unlinked/client/:clientId", verifyToken, getUnlinkedAddonsHandler);
 
 // Create a new add-on
 router.post("/api/addons", verifyToken, createAddonHandler);
