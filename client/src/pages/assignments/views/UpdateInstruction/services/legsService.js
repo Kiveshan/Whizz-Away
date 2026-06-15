@@ -40,7 +40,6 @@ export const refreshLegData = async ({
             drivers: (leg.drivers || []).map((driver) => ({
               ...driver,
               container_type: driver.container_type || "",
-              dn: driver.dn || "",
               driverRate: driver.driverRate != null ? driver.driverRate.toString() : (driver.driverate != null ? driver.driverate.toString() : "0"),
               _rateNullInManage: driver._rateNullInManage,
               _rateExplicitlyZero: driver._rateExplicitlyZero,
@@ -229,7 +228,6 @@ export const fetchLegsForInstruction = async ({
                 ? driver.containernumber.toString()
                 : "",
             container_type: containerType,
-            dn: driver.dn || "",
             date: driver.date || "",
             driver_name: driver.driver_name || "",
             driver_surname: driver.driver_surname || "",

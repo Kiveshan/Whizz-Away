@@ -473,50 +473,6 @@ const checkInvoiceNumberExists = async (invoiceNumber, excludeAddonId = null, co
   }
 };
 
-// Returns add-on invoices for a client that are NOT yet linked to any
-// instruction (m1_controller.addon_id). Used to populate the invoice picker
-// on the add-on instruction form. When instructionId is provided, the invoice
-// currently linked to that instruction is also included so it shows as the
-// selected option while editing.
-const getUnlinkedAddonsByClient = async (clientId, instructionId = null) => {
-  try {
-    if (!pool) {
-      throw new Error(
-        "Database connection not established. Please try again later."
-      );
-    }
-
-    const queryText = `
-      SELECT
-        a.addon_id,
-        a.client_id,
-        a.amount,
-        a.date,
-        a.invoice_number,
-        a.booking_ref,
-        a.client_ref,
-        a.vessel_number
-      FROM public.add_ons a
-      WHERE a.client_id = $1
-        AND (
-          NOT EXISTS (
-            SELECT 1 FROM public.m1_controller m WHERE m.addon_id = a.addon_id
-          )
-          OR a.addon_id = (
-            SELECT m2.addon_id FROM public.m1_controller m2 WHERE m2.m1key = $2
-          )
-        )
-      ORDER BY a.date DESC
-    `;
-
-    const result = await query(queryText, [clientId, instructionId || null]);
-    return { success: true, data: result.rows };
-  } catch (error) {
-    console.error("Error fetching unlinked add-ons:", error);
-    throw error;
-  }
-};
-
 const getClientById = async (clientId, company_reg_num) => {
   try {
     if (!pool) {
@@ -555,5 +511,4 @@ export {
   getCompanyInfo,
   getClientById,
   checkInvoiceNumberExists,
-  getUnlinkedAddonsByClient,
 };

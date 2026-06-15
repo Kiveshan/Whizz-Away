@@ -207,8 +207,6 @@ REACT_APP_API_URL=http://localhost:5000
 ```bash
 psql -U your_db_user -d your_db_name -f server/migrations/001_add_effective_dates_to_driver_rates.sql
 psql -U your_db_user -d your_db_name -f server/migrations/002_add_unique_orderno_to_expenses_m2.sql
-psql -U your_db_user -d your_db_name -f server/migrations/003_link_addon_instruction_to_invoice.sql
-psql -U your_db_user -d your_db_name -f server/migrations/004_add_dn_to_legs_m2.sql
 ```
 
 ### Run

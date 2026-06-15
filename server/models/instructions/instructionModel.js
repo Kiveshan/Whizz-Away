@@ -2252,24 +2252,7 @@ export const updateFCInstructionAndContainers = async (
         currentInstruction.created_at,
         "string"
       ),
-      // Link to the add-on invoice (add_ons.addon_id). Only meaningful for
-      // add-on instructions; null for everything else.
-      addon_id: preserveExistingValue(
-        instructionData.addon_id,
-        currentInstruction.addon_id,
-        "number"
-      ),
     };
-
-    // 2b. Guard: an add-on instruction cannot be marked Completed unless it is
-    // linked to an existing add-on invoice (enforced front- and back-end).
-    if (isAddOnType && updateData.status === "Completed") {
-      if (updateData.addon_id === null || updateData.addon_id === undefined) {
-        throw new Error(
-          "An add-on instruction must be linked to an add-on invoice before it can be completed."
-        );
-      }
-    }
 
     // 3. Check if instruction needs updating
     let instructionNeedsUpdate = false;
@@ -2305,7 +2288,6 @@ export const updateFCInstructionAndContainers = async (
       { field: "is_set_rate", type: "boolean" },
       { field: "historical_set_rate", type: "number" },
       { field: "created_at", type: "date" },
-      { field: "addon_id", type: "number" },
     ];
 
     for (const { field, type } of fieldsToCheck) {
@@ -2333,8 +2315,8 @@ export const updateFCInstructionAndContainers = async (
           stackdate = $6, "lastFreeDate" = $7, "clientFileRef" = $8, rateweight = $9, description = $10,
           status = $11, vat = $12, num_six_meters = $13, num_twelve_meters = $14, num_abnormal = $15,
           num_breakbulk = $16, weight = $17, total_cost = $18, booking_ref = $19, vessel_name = $20,
-          rateper_6 = $21, rateper_12 = $22, rateper_abnormal = $23, rateper_breakbulk = $24, unitrate = $25, is_set_rate = $26, historical_set_rate = $27, created_at = $28, addon_id = $29
-        WHERE m1key = $30 AND company_reg_num = $31
+          rateper_6 = $21, rateper_12 = $22, rateper_abnormal = $23, rateper_breakbulk = $24, unitrate = $25, is_set_rate = $26, historical_set_rate = $27, created_at = $28
+        WHERE m1key = $29 AND company_reg_num = $30
         RETURNING *
       `;
 
@@ -2368,7 +2350,6 @@ export const updateFCInstructionAndContainers = async (
         updateData.is_set_rate,
         updateData.historical_set_rate,
         updateData.created_at,
-        updateData.addon_id,
         instructionId,
         company_reg_num,
       ];
@@ -2875,10 +2856,10 @@ export const saveInstructionAndContainers = async (
         stackdate, "lastFreeDate", "clientFileRef", rateweight, description,
         status, vat, num_six_meters, num_twelve_meters, num_abnormal, num_breakbulk,
         weight, total_cost, booking_ref, vessel_name, rateper_6, rateper_12,
-        rateper_abnormal, rateper_breakbulk, unitrate, addon_id, company_reg_num
+        rateper_abnormal, rateper_breakbulk, unitrate, company_reg_num
       ) VALUES (
         $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14,
-        $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25, $26, $27, $28, $29
+        $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25, $26, $27, $28
       ) RETURNING m1key
     `;
 
@@ -2910,7 +2891,6 @@ export const saveInstructionAndContainers = async (
       controllerData.rateper_abnormal,
       controllerData.rateper_breakbulk,
       controllerData.unitrate,
-      controllerData.addon_id ?? null,
       company_reg_num,
     ];
 

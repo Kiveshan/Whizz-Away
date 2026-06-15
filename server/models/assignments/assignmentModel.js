@@ -407,19 +407,17 @@ export const saveLeg = async ({
 
           const date = driver.date ? new Date(driver.date) : null;
           const driverSpecificRate = driver.driverRate || driverrate;
-          const dn = driver.dn || null;
 
           if (!isNewLeg && legId && index === 0) {
             await client.query(
-              `UPDATE legs_m2 SET
-                driverid = $1,
-                truckregnumber = $2,
-                containernumber = $3,
+              `UPDATE legs_m2 SET 
+                driverid = $1, 
+                truckregnumber = $2, 
+                containernumber = $3, 
                 vgm = $4,
-                date = $5,
-                driverrate = $6,
-                dn = $7
-              WHERE legkey = $8`,
+                date = $5, 
+                driverrate = $6 
+              WHERE legkey = $7`,
               [
                 driverId,
                 truckRegNumber,
@@ -427,7 +425,6 @@ export const saveLeg = async ({
                 vgmValue,
                 date,
                 driverSpecificRate,
-                dn,
                 legId,
               ]
             );
@@ -444,9 +441,8 @@ export const saveLeg = async ({
                 containernumber,
                 vgm,
                 date,
-                dn,
                 company_reg_num
-              ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12) RETURNING legkey`,
+              ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11) RETURNING legkey`,
               [
                 legnumber,
                 startingpoint,
@@ -458,7 +454,6 @@ export const saveLeg = async ({
                 containerNumber,
                 vgmValue,
                 date,
-                dn,
                 company_reg_num,
               ]
             );
@@ -475,7 +470,6 @@ export const saveLeg = async ({
           containernumber = NULL,
           vgm = NULL,
           date = NULL,
-          dn = NULL,
           driverrate = $1
         WHERE legkey = $2 AND company_reg_num = $3`,
         [driverrate, legkey, company_reg_num]
@@ -618,7 +612,6 @@ export const getLegsByInstructionId = async (instructionId, company_reg_num) => 
       l.containernumber,
       l.vgm,
       l.date,
-      l.dn,
       e.name AS driver_name,
       e.surname AS driver_surname,
       e.roleid,
@@ -685,7 +678,6 @@ export const getLegsByInstructionId = async (instructionId, company_reg_num) => 
           ? row.vgm.toString() 
           : (row.containernumber ? row.containernumber.toString() : ""),
         container_type: row.container_type || "",
-        dn: row.dn || "",
         driverRate: row.driverrate ? row.driverrate.toString() : "0",
         _rateNullInManage: row.applicable_manage_rate === null,
         _debugManageRate: row.applicable_manage_rate,
@@ -884,31 +876,8 @@ export const refreshInstructionLegRates = async (instructionId, company_reg_num)
 };
 
 export const completeInstruction = async (instructionId, status, company_reg_num) => {
+  const query = `UPDATE m1_controller SET status = $1 WHERE m1key = $2 AND company_reg_num = $3`;
   try {
-    // Hard block: an add-on instruction (shipment type 5) cannot be marked
-    // Completed unless it is linked to an existing add-on invoice.
-    if (status === "Completed") {
-      const checkResult = await pool.query(
-        `SELECT shipment_type, addon_id FROM m1_controller WHERE m1key = $1 AND company_reg_num = $2`,
-        [instructionId, company_reg_num]
-      );
-      if (checkResult.rows.length === 0) {
-        throw new Error(`Instruction with ID ${instructionId} not found`);
-      }
-      const { shipment_type, addon_id } = checkResult.rows[0];
-      if (
-        String(shipment_type) === "5" &&
-        (addon_id === null || addon_id === undefined)
-      ) {
-        const err = new Error(
-          "This add-on instruction must be linked to an add-on invoice before it can be completed."
-        );
-        err.code = "ADDON_LINK_REQUIRED";
-        throw err;
-      }
-    }
-
-    const query = `UPDATE m1_controller SET status = $1 WHERE m1key = $2 AND company_reg_num = $3`;
     await pool.query(query, [status, instructionId, company_reg_num]);
   } catch (error) {
     throw error;

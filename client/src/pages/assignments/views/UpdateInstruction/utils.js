@@ -15,7 +15,6 @@ export const dedupeDrivers = (drivers) => {
       d.truckregnumber || "",
       d.containernumber || "",
       d.date || "",
-      d.dn || "",
     ].join("|");
 
     if (!seen.has(key)) {

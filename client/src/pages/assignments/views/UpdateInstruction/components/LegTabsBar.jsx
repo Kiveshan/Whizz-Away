@@ -1,4 +1,5 @@
 import { FaTruckFast } from "react-icons/fa6";
+
 import Plus from "./Plus";
 
 export default function LegTabsBar({
@@ -19,16 +20,13 @@ export default function LegTabsBar({
   instructionId,
   shipmentType,
 }) {
-  const indexedLegs = legs.map((leg, i) => ({ ...leg, originalIndex: i }));
-
   return (
     <>
       <div className="flex gap-4 mb-4" style={{ marginLeft: "15px" }}>
-        {indexedLegs.map((leg) => {
-          const origIdx = leg.originalIndex;
+        {legs.map((leg, index) => {
           let buttonClass = "px-4 py-2 rounded-md ";
 
-          if (currentLagIndex === origIdx) {
+          if (currentLagIndex === index) {
             buttonClass += "bg-green-500 text-white";
           } else if (leg.isNew || leg.id?.toString().startsWith("temp-")) {
             buttonClass += "bg-yellow-200 text-gray-800";
@@ -38,13 +36,13 @@ export default function LegTabsBar({
 
           return (
             <div
-              key={leg.id || origIdx}
+              key={leg.id || index}
               className="relative"
               draggable={!isCompleted}
               onDragStart={(e) => {
                 if (isCompleted) return;
                 e.dataTransfer.effectAllowed = "move";
-                e.dataTransfer.setData("text/plain", String(origIdx));
+                e.dataTransfer.setData("text/plain", String(index));
               }}
               onDragOver={(e) => {
                 if (isCompleted) return;
@@ -58,15 +56,15 @@ export default function LegTabsBar({
                 const fromIndex = Number.parseInt(fromRaw, 10);
                 if (!Number.isFinite(fromIndex)) return;
                 if (typeof onMoveLeg === "function") {
-                  onMoveLeg(fromIndex, origIdx);
+                  onMoveLeg(fromIndex, index);
                 }
               }}
             >
               <button
                 className={buttonClass}
-                onClick={() => handleSelectLeg(origIdx)}
+                onClick={() => handleSelectLeg(index)}
               >
-                Leg {leg.legnumber || origIdx + 1}
+                Leg {index + 1}
                 {leg.isNew || leg.id?.toString().startsWith("temp-") ? " *" : ""}
                 {leg.drivers && leg.drivers.length > 0 && (
                   <span className="ml-2 text-xs flex items-center">
@@ -78,7 +76,7 @@ export default function LegTabsBar({
               {legs.length > 1 && !isCompleted && (
                 <div
                   className="bin-icon-wrapper"
-                  onClick={() => handleRemoveLeg(origIdx, leg.id)}
+                  onClick={() => handleRemoveLeg(index, legs[index].id)}
                 >
                   <svg
                     xmlns="http://www.w3.org/2000/svg"
@@ -105,7 +103,7 @@ export default function LegTabsBar({
       </div>
 
       {legs.length > 0 && (
-        <div className="finalise-btn" style={{ display: "flex", gap: 8, alignItems: "center" }}>
+        <div className="finalise-btn" style={{ display: "flex", gap: 8 }}>
           <button
             className="summary-btn"
             onClick={() => setShowSummaryModal(true)}

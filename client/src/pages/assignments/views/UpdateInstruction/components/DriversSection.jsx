@@ -1,4 +1,3 @@
-import { useState, useEffect } from "react";
 import Select from "react-select";
 
 export default function DriversSection({
@@ -14,8 +13,6 @@ export default function DriversSection({
   weightUnit,
   isCompleted,
   rates,
-  shipmentType,
-  dnOptions = [],
   formData,
   addDriverButtonRef,
   addDriver,
@@ -35,40 +32,13 @@ export default function DriversSection({
   rateError,
 }) {
   console.log("DriversSection received rateError:", rateError);
-
-  const [driverSearch, setDriverSearch] = useState("");
-
-  useEffect(() => {
-    setDriverSearch("");
-  }, [currentLagIndex]);
-
+  
   const selectableEmployeeDrivers = employeeDrivers.filter((driver) => {
     if (driver?.roleid === 6) {
       return driver?.status === true && driver?.driverstatus === true;
     }
     return driver?.status !== false;
   });
-
-  const sq = driverSearch.trim().toLowerCase();
-  const filteredDrivers = sq
-    ? drivers
-        .map((d, i) => ({ ...d, originalIndex: i }))
-        .filter((d) => {
-          const ed = employeeDrivers.find(
-            (e) => e.userid.toString() === d.driverid
-          );
-          const fullName = ed ? `${ed.name} ${ed.surname}`.toLowerCase() : (d.full_name || "").toLowerCase();
-          const truck = (d.truckregnumber || "").toLowerCase();
-          const container = (d.containernumber || "").toString().toLowerCase();
-          const date = (d.date ? d.date.toString().split("T")[0] : "").toLowerCase();
-          return (
-            fullName.includes(sq) ||
-            truck.includes(sq) ||
-            container.includes(sq) ||
-            date.includes(sq)
-          );
-        })
-    : drivers.map((d, i) => ({ ...d, originalIndex: i }));
 
   return (
     <>
@@ -92,29 +62,11 @@ export default function DriversSection({
             </div>
           )}
 
-          {drivers.length > 1 && (
-            <div style={{ marginBottom: "1rem" }}>
-              <input
-                type="text"
-                placeholder="Search by driver, truck, container or date..."
-                value={driverSearch}
-                onChange={(e) => setDriverSearch(e.target.value)}
-                style={{
-                  padding: "0.375rem 0.75rem",
-                  border: "1px solid #d1d5db",
-                  borderRadius: "0.375rem",
-                  fontSize: "0.875rem",
-                  width: "300px",
-                }}
-              />
-            </div>
-          )}
-
           {drivers && drivers.length > 0 ? (
             <>
-              {filteredDrivers.map((entry) => (
+              {drivers.map((entry, index) => (
                 <div
-                  key={entry.id || entry.originalIndex}
+                  key={entry.id || index}
                   style={{
                     marginBottom: "1rem",
                     padding: "1rem",
@@ -166,7 +118,7 @@ export default function DriversSection({
                           if (isCompleted) return;
                           const driverId = e.target.value;
                           const updatedDrivers = [...drivers];
-                          updatedDrivers[entry.originalIndex].driverid = e.target.value;
+                          updatedDrivers[index].driverid = e.target.value;
 
                           if (e.target.value) {
                             const selectedDriver = employeeDrivers.find(
@@ -174,7 +126,7 @@ export default function DriversSection({
                             );
                             if (selectedDriver) {
                               updatedDrivers[
-                                entry.originalIndex
+                                index
                               ].full_name = `${selectedDriver.name} ${selectedDriver.surname}`;
 
                               const isSubcontractor = selectedDriver.roleid === 6;
@@ -182,10 +134,10 @@ export default function DriversSection({
                                 `Selected driver ${driverId} is subcontractor: ${isSubcontractor}`
                               );
 
-                              if (updatedDrivers[entry.originalIndex].container_type) {
-                                const ct = (updatedDrivers[entry.originalIndex].container_type || "").toLowerCase().trim();
+                              if (updatedDrivers[index].container_type) {
+                                const ct = (updatedDrivers[index].container_type || "").toLowerCase().trim();
                                 if (ct === "12m") {
-                                  updatedDrivers[entry.originalIndex].driverRate =
+                                  updatedDrivers[index].driverRate =
                                     isSubcontractor
                                       ? rates.subbie_twelve_meter
                                         ? rates.subbie_twelve_meter.toString()
@@ -194,12 +146,12 @@ export default function DriversSection({
                                       ? rates.twelve_meter.toString()
                                       : "0";
                                 } else if (ct === "abnormal") {
-                                  if (!updatedDrivers[entry.originalIndex].driverRate) {
-                                    updatedDrivers[entry.originalIndex].driverRate = "0";
+                                  if (!updatedDrivers[index].driverRate) {
+                                    updatedDrivers[index].driverRate = "0";
                                   }
-                                  updatedDrivers[entry.originalIndex].isAbnormal = true;
+                                  updatedDrivers[index].isAbnormal = true;
                                 } else {
-                                  updatedDrivers[entry.originalIndex].driverRate =
+                                  updatedDrivers[index].driverRate =
                                     isSubcontractor
                                       ? rates.subbie_six_meter
                                         ? rates.subbie_six_meter.toString()
@@ -209,33 +161,35 @@ export default function DriversSection({
                                       : "0";
                                 }
                                 console.log(
-                                  `Updated rate for driver ${driverId} to ${updatedDrivers[entry.originalIndex].driverRate}`
+                                  `Updated rate for driver ${driverId} to ${updatedDrivers[index].driverRate}`
                                 );
                               }
                             } else {
-                              updatedDrivers[entry.originalIndex].full_name = "";
+                              updatedDrivers[index].full_name = "";
                             }
 
                             setEditedFields((prev) => ({
                               ...prev,
                               drivers: {
                                 ...prev.drivers,
-                                [updatedDrivers[entry.originalIndex].id]: true,
+                                [updatedDrivers[index].id]: true,
                               },
                             }));
 
                             setDrivers(updatedDrivers);
                             console.log(
-                              `Updated driver at index ${entry.originalIndex}:`,
-                              updatedDrivers[entry.originalIndex]
+                              `Updated driver at index ${index}:`,
+                              updatedDrivers[index]
                             );
 
+                            // Re-fetch a date-aware rate using this driver's existing date
+                            // so changing the driver picks up the correct rate period.
                             if (
-                              updatedDrivers[entry.originalIndex].date &&
-                              (updatedDrivers[entry.originalIndex].container_type || "").toLowerCase().trim() !== "abnormal" &&
+                              updatedDrivers[index].date &&
+                              (updatedDrivers[index].container_type || "").toLowerCase().trim() !== "abnormal" &&
                               onDateChange
                             ) {
-                              onDateChange(entry.originalIndex, updatedDrivers[entry.originalIndex].date);
+                              onDateChange(index, updatedDrivers[index].date);
                             }
                           }
                         }}
@@ -293,19 +247,19 @@ export default function DriversSection({
                         onChange={(e) => {
                           if (isCompleted) return;
                           const updatedDrivers = [...drivers];
-                          updatedDrivers[entry.originalIndex].truckregnumber = e.target.value;
+                          updatedDrivers[index].truckregnumber = e.target.value;
 
                           setEditedFields((prev) => ({
                             ...prev,
                             drivers: {
                               ...prev.drivers,
-                              [updatedDrivers[entry.originalIndex].id]: true,
+                              [updatedDrivers[index].id]: true,
                             },
                           }));
 
                           setDrivers(updatedDrivers);
                           console.log(
-                            `Updated truck reg for driver at index ${entry.originalIndex}:`,
+                            `Updated truck reg for driver at index ${index}:`,
                             e.target.value
                           );
                         }}
@@ -355,22 +309,22 @@ export default function DriversSection({
                             const weightValue = e.target.value;
 
                             const updatedDrivers = [...drivers];
-                            updatedDrivers[entry.originalIndex].containernumber = weightValue;
+                            updatedDrivers[index].containernumber = weightValue;
 
-                            updatedDrivers[entry.originalIndex].container_type = "";
-                            updatedDrivers[entry.originalIndex].driverRate = formData.driverRate || "0";
+                            updatedDrivers[index].container_type = "";
+                            updatedDrivers[index].driverRate = formData.driverRate || "0";
 
                             setEditedFields((prev) => ({
                               ...prev,
                               drivers: {
                                 ...prev.drivers,
-                                [updatedDrivers[entry.originalIndex].id]: true,
+                                [updatedDrivers[index].id]: true,
                               },
                             }));
 
                             setDrivers(updatedDrivers);
                             console.log(
-                              `Updated weight for driver at index ${entry.originalIndex}:`,
+                              `Updated weight for driver at index ${index}:`,
                               weightValue
                             );
                           }}
@@ -410,7 +364,7 @@ export default function DriversSection({
                               .filter((container) => {
                                 const usedByAnotherDriver = drivers.some(
                                   (d, i) =>
-                                    i !== entry.originalIndex &&
+                                    i !== index &&
                                     d.containernumber &&
                                     d.containernumber.toString() === container
                                 );
@@ -431,7 +385,7 @@ export default function DriversSection({
                             console.log("Current rates:", rates);
                             console.log(
                               "Current driver data before update:",
-                              drivers[entry.originalIndex]
+                              drivers[index]
                             );
 
                             if (containerValue) {
@@ -467,22 +421,22 @@ export default function DriversSection({
                             }
 
                             const updatedDrivers = [...drivers];
-                            updatedDrivers[entry.originalIndex].containernumber = containerValue;
+                            updatedDrivers[index].containernumber = containerValue;
 
                             if (containerValue && containerDetailsMap[containerValue]) {
                               const containerType = (
                                 containerDetailsMap[containerValue].type || ""
                               ).trim();
-                              updatedDrivers[entry.originalIndex].container_type = containerType;
+                              updatedDrivers[index].container_type = containerType;
 
                               const isSubcontractor =
                                 employeeDrivers.find(
                                   (d) =>
                                     d.userid.toString() ===
-                                    updatedDrivers[entry.originalIndex].driverid
+                                    updatedDrivers[index].driverid
                                 )?.roleid === 6;
                               console.log(
-                                `Driver ${updatedDrivers[entry.originalIndex].driverid} is subcontractor: ${isSubcontractor}`
+                                `Driver ${updatedDrivers[index].driverid} is subcontractor: ${isSubcontractor}`
                               );
 
                               const sixMeterRate = isSubcontractor
@@ -509,53 +463,56 @@ export default function DriversSection({
                               );
 
                               if (containerType.toLowerCase() === "abnormal") {
-                                updatedDrivers[entry.originalIndex].driverRate =
-                                  updatedDrivers[entry.originalIndex].driverRate || twelveMeterRate;
-                                updatedDrivers[entry.originalIndex].isAbnormal = true;
+                                updatedDrivers[index].driverRate =
+                                  updatedDrivers[index].driverRate || twelveMeterRate;
+                                updatedDrivers[index].isAbnormal = true;
                                 console.log(
                                   "Setting abnormal rate (editable):",
-                                  updatedDrivers[entry.originalIndex].driverRate
+                                  updatedDrivers[index].driverRate
                                 );
                               } else if (containerType.toLowerCase() === "12m") {
-                                updatedDrivers[entry.originalIndex].driverRate = twelveMeterRate;
-                                updatedDrivers[entry.originalIndex].isAbnormal = false;
+                                updatedDrivers[index].driverRate = twelveMeterRate;
+                                updatedDrivers[index].isAbnormal = false;
                                 console.log("Setting 12m rate:", twelveMeterRate);
                               } else {
-                                updatedDrivers[entry.originalIndex].driverRate = sixMeterRate;
-                                updatedDrivers[entry.originalIndex].isAbnormal = false;
+                                updatedDrivers[index].driverRate = sixMeterRate;
+                                updatedDrivers[index].isAbnormal = false;
                                 console.log("Setting 6m rate:", sixMeterRate);
                               }
                             } else {
-                              updatedDrivers[entry.originalIndex].container_type = "";
-                              updatedDrivers[entry.originalIndex].driverRate = "";
-                              updatedDrivers[entry.originalIndex].isAbnormal = false;
+                              updatedDrivers[index].container_type = "";
+                              updatedDrivers[index].driverRate = "";
+                              updatedDrivers[index].isAbnormal = false;
                             }
 
                             setEditedFields((prev) => ({
                               ...prev,
                               drivers: {
                                 ...prev.drivers,
-                                [updatedDrivers[entry.originalIndex].id]: true,
+                                [updatedDrivers[index].id]: true,
                               },
                             }));
 
                             setDrivers(updatedDrivers);
                             console.log(
-                              `Updated container for driver at index ${entry.originalIndex}:`,
+                              `Updated container for driver at index ${index}:`,
                               containerValue
                             );
                             console.log(
                               "Updated driver data:",
-                              updatedDrivers[entry.originalIndex]
+                              updatedDrivers[index]
                             );
 
+                            // If the driver already has a date, re-fetch the date-aware rate
+                            // so the container type change picks up the correct rate version.
+                            // Skip for abnormal — those rates are manually entered.
                             if (
                               containerValue &&
-                              updatedDrivers[entry.originalIndex].date &&
-                              updatedDrivers[entry.originalIndex].container_type?.toLowerCase() !== "abnormal" &&
+                              updatedDrivers[index].date &&
+                              updatedDrivers[index].container_type?.toLowerCase() !== "abnormal" &&
                               onDateChange
                             ) {
-                              onDateChange(entry.originalIndex, updatedDrivers[entry.originalIndex].date);
+                              onDateChange(index, updatedDrivers[index].date);
                             }
                           }}
                         />
@@ -630,13 +587,13 @@ export default function DriversSection({
                           const value = e.target.value;
                           if (value === "" || /^[0-9]*\.?[0-9]*$/.test(value)) {
                             const updatedDrivers = [...drivers];
-                            updatedDrivers[entry.originalIndex].driverRate = value;
+                            updatedDrivers[index].driverRate = value;
 
                             setEditedFields((prev) => ({
                               ...prev,
                               drivers: {
                                 ...prev.drivers,
-                                [updatedDrivers[entry.originalIndex].id]: true,
+                                [updatedDrivers[index].id]: true,
                               },
                             }));
 
@@ -689,24 +646,25 @@ export default function DriversSection({
                             if (isCompleted) return;
                             const newDate = e.target.value;
                             const updatedDrivers = [...drivers];
-                            updatedDrivers[entry.originalIndex].date = newDate;
+                            updatedDrivers[index].date = newDate;
 
                             setEditedFields((prev) => ({
                               ...prev,
                               drivers: {
                                 ...prev.drivers,
-                                [updatedDrivers[entry.originalIndex].id]: true,
+                                [updatedDrivers[index].id]: true,
                               },
                             }));
 
                             setDrivers(updatedDrivers);
                             console.log(
-                              `Updated date for driver at index ${entry.originalIndex}:`,
+                              `Updated date for driver at index ${index}:`,
                               newDate
                             );
 
+                            // Trigger rate refetch with new date
                             if (onDateChange) {
-                              onDateChange(entry.originalIndex, newDate);
+                              onDateChange(index, newDate);
                             }
                           }}
                           disabled={isCompleted}
@@ -726,9 +684,9 @@ export default function DriversSection({
                               entry.full_name ||
                               (entry.driverid
                                 ? `Driver ID: ${entry.driverid}`
-                                : `Driver #${entry.originalIndex + 1}`);
+                                : `Driver #${index + 1}`);
 
-                            setDriverToRemove({ index: entry.originalIndex, name: driverName });
+                            setDriverToRemove({ index, name: driverName });
                             setShowRemoveDriverModal(true);
                           }}
                           disabled={isCompleted}
@@ -751,81 +709,6 @@ export default function DriversSection({
                         </button>
                       </div>
                     </div>
-
-                    {shipmentType === 4 && (
-                      <div
-                        style={{
-                          width: "16.666%",
-                          padding: "0 0.5rem",
-                          marginBottom: "0.75rem",
-                        }}
-                      >
-                        <label
-                          style={{
-                            display: "block",
-                            color: "#374151",
-                            fontWeight: "500",
-                            marginBottom: "0.25rem",
-                          }}
-                        >
-                          DN
-                        </label>
-                        <Select
-                          classNamePrefix="select"
-                          isClearable
-                          isDisabled={isCompleted}
-                          placeholder="Select DN"
-                          styles={{
-                            control: (base) => ({
-                              ...base,
-                              minHeight: "38px",
-                              backgroundColor: isCompleted ? "#f3f4f6" : "white",
-                              borderColor: "#d1d5db",
-                            }),
-                            menu: (base) => ({
-                              ...base,
-                              zIndex: 20,
-                            }),
-                          }}
-                          value={
-                            entry.dn
-                              ? { value: entry.dn, label: entry.dn }
-                              : null
-                          }
-                          options={[
-                            // Merge any DN values already saved on the drivers in
-                            // this leg into the list so that opening an in-progress
-                            // or completed instruction always shows the saved DN,
-                            // even if it's no longer present in the weight table.
-                            ...new Set([
-                              ...dnOptions,
-                              ...drivers
-                                .map((d) => d.dn)
-                                .filter((dn) => dn && dn.toString().trim() !== ""),
-                            ]),
-                          ].map((dn) => ({
-                            value: dn,
-                            label: dn,
-                          }))}
-                          onChange={(option) => {
-                            if (isCompleted) return;
-                            const dnValue = option ? option.value : "";
-                            const updatedDrivers = [...drivers];
-                            updatedDrivers[entry.originalIndex].dn = dnValue;
-
-                            setEditedFields((prev) => ({
-                              ...prev,
-                              drivers: {
-                                ...prev.drivers,
-                                [updatedDrivers[entry.originalIndex].id]: true,
-                              },
-                            }));
-
-                            setDrivers(updatedDrivers);
-                          }}
-                        />
-                      </div>
-                    )}
                   </div>
                 </div>
               ))}

@@ -528,9 +528,7 @@ const handleUpload = async (e) => {
       }, 2000);
     } catch (error) {
       console.error("Error completing instruction:", error);
-      setSubmitMessage(
-        `Error: ${error.response?.data?.message || error.message}`
-      );
+      setSubmitMessage(`Error: ${error.message}`);
     } finally {
       // Close the confirmation modal
       setShowFinishConfirmModal(false);

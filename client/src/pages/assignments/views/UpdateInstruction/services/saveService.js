@@ -223,7 +223,6 @@ export const handleSave = async ({
           containernumber: isWeightBased ? null : (driver.containernumber || null),
           vgm: isWeightBased ? (parseFloat(driver.containernumber) || null) : null,
           container_type: driver.container_type || null,
-          dn: driver.dn || null,
           driverRate: driverRateToSave,
           date: driver.date || null,
         };

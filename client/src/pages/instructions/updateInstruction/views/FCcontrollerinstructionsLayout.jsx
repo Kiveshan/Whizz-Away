@@ -10,7 +10,6 @@ import { UnitPerSection } from "../../../../components/instructions/UnitPerSecti
 import { BookingDetailsSection } from "../../../../components/instructions/BookingDetailsSection";
 import { WeightDetailsTable } from "../../../../components/instructions/WeightDetailsTable";
 import { ContainerDetailsTable } from "../../../../components/instructions/ContainerDetailsTable";
-import { AddonInvoicePicker } from "../../../../components/instructions/AddonInvoicePicker";
 
 export function FCcontrollerinstructionsLayout({
   // Loading gate
@@ -31,9 +30,7 @@ export function FCcontrollerinstructionsLayout({
   formData,
   setFormData,
   fieldErrors,
-  setFieldErrors,
   fieldRefs,
-  instructionId,
   clients,
   shipmentTypes,
   startingPoints,
@@ -503,23 +500,6 @@ export function FCcontrollerinstructionsLayout({
                     setFormData((prev) => ({ ...prev, vat: val }))
                   }
                 />
-
-                {/* Add-On Invoice link (add-on shipment type only) */}
-                {isAddOn && (
-                  <AddonInvoicePicker
-                    clientId={formData.clientId}
-                    instructionId={instructionId}
-                    value={formData.addon_id}
-                    onChange={(val) => {
-                      setFormData((prev) => ({ ...prev, addon_id: val }));
-                      if (setFieldErrors) {
-                        setFieldErrors((prev) => ({ ...prev, addon_id: "" }));
-                      }
-                    }}
-                    disabled={isReadOnly}
-                    error={fieldErrors.addon_id}
-                  />
-                )}
               </div>
             </div>
           </div>
