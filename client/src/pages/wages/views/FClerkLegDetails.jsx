@@ -89,7 +89,7 @@ const FClerkLegDetails = () => {
     });
 
     // Title row
-    worksheet.mergeCells("A1:I1");
+    worksheet.mergeCells("A1:J1");
     const titleCell = worksheet.getCell("A1");
     titleCell.value = `${driverName || `Driver ${driverId}`} — Leg Details: ${selectedMonth} ${selectedYear}`;
     titleCell.font = { bold: true, size: 14, color: { argb: "FF1F3864" } };
@@ -106,6 +106,7 @@ const FClerkLegDetails = () => {
       { header: "Leg Number", key: "legNumber", width: 14 },
       { header: "Truck Reg", key: "truckReg", width: 14 },
       { header: "Container Number", key: "containerNumber", width: 22 },
+      { header: "DN", key: "dn", width: 16 },
       { header: "Starting Point", key: "startingPoint", width: 22 },
       { header: "Ending Point", key: "endingPoint", width: 22 },
       { header: "Date", key: "date", width: 14 },
@@ -140,6 +141,7 @@ const FClerkLegDetails = () => {
         legNumber: leg.legnumber || "N/A",
         truckReg: leg.truckregnumber || "N/A",
         containerNumber: leg.containernumber || "N/A",
+        dn: leg.dn || "N/A",
         startingPoint: leg.startingpoint || "N/A",
         endingPoint: leg.destination || "N/A",
         date: formatDate(leg.date),
@@ -154,7 +156,7 @@ const FClerkLegDetails = () => {
       row.eachCell((cell, colNumber) => {
         cell.fill = rowFill;
         cell.font = { size: 11 };
-        cell.alignment = { vertical: "middle", horizontal: colNumber === 8 ? "right" : "left" };
+        cell.alignment = { vertical: "middle", horizontal: colNumber === 9 ? "right" : "left" };
         cell.border = {
           top: { style: "hair", color: { argb: "FFCCCCCC" } },
           bottom: { style: "hair", color: { argb: "FFCCCCCC" } },
@@ -164,7 +166,7 @@ const FClerkLegDetails = () => {
       });
 
       // Format amount cell as currency
-      row.getCell(8).numFmt = '"R"#,##0.00';
+      row.getCell(9).numFmt = '"R"#,##0.00';
       row.height = 18;
     });
 
@@ -174,6 +176,7 @@ const FClerkLegDetails = () => {
       legNumber: "",
       truckReg: "",
       containerNumber: "",
+      dn: "",
       startingPoint: "",
       endingPoint: "",
       date: "TOTAL",
@@ -184,13 +187,13 @@ const FClerkLegDetails = () => {
     totalRow.eachCell((cell, colNumber) => {
       cell.font = { bold: true, size: 11, color: { argb: "FF1F3864" } };
       cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFD9E1F2" } };
-      cell.alignment = { vertical: "middle", horizontal: colNumber === 8 ? "right" : colNumber === 7 ? "right" : "left" };
+      cell.alignment = { vertical: "middle", horizontal: colNumber === 9 ? "right" : colNumber === 8 ? "right" : "left" };
       cell.border = {
         top: { style: "medium", color: { argb: "FF1F3864" } },
         bottom: { style: "medium", color: { argb: "FF1F3864" } },
       };
     });
-    totalRow.getCell(8).numFmt = '"R"#,##0.00';
+    totalRow.getCell(9).numFmt = '"R"#,##0.00';
 
     const buffer = await workbook.xlsx.writeBuffer();
     const blob = new Blob([buffer], {
@@ -269,6 +272,7 @@ const FClerkLegDetails = () => {
               <th>Leg Number</th>
               <th>Truck Reg</th>
               <th>Container Number</th>
+              <th>DN</th>
               <th>Starting Point</th>
               <th>Ending Point</th>
               <th>Date</th>
@@ -280,7 +284,7 @@ const FClerkLegDetails = () => {
             {legs.length === 0 ? (
               <tr>
                 <td
-                  colSpan="8"
+                  colSpan="10"
                   style={{ textAlign: "center", padding: "15px" }}
                 >
                   No leg details found for {selectedMonth} {selectedYear}
@@ -300,6 +304,7 @@ const FClerkLegDetails = () => {
                   <td>{leg.legnumber || "N/A"}</td>
                   <td>{leg.truckregnumber || "N/A"}</td>
                   <td>{leg.containernumber || "N/A"}</td>
+                  <td>{leg.dn || "N/A"}</td>
                   <td>{leg.startingpoint || "N/A"}</td>
                   <td>{leg.destination || "N/A"}</td>
                   <td>{formatDate(leg.date)}</td>
