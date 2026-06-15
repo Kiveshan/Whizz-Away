@@ -73,6 +73,11 @@ export function buildUpdatePayload(
     is_set_rate: isSetRate,
     historical_set_rate: isSetRate ? setRateValue : null,
     created_at: formData.createdAt || null,
+    addon_id: isAddOn
+      ? formData.addon_id
+        ? Number(formData.addon_id)
+        : null
+      : null,
   };
 
   const containerData = isWeightUnit

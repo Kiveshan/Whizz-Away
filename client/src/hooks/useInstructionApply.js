@@ -79,6 +79,7 @@ export function useInstructionApply({
           rateper_breakbulk: data.rateper_breakbulk || 0,
           status: data.status || "",
           createdAt: formatDateForInput(data.created_at) || "",
+          addon_id: data.addon_id != null ? data.addon_id.toString() : "",
         };
 
         setFormData(newFormData);

@@ -34,6 +34,7 @@ import {
 import {
   checkIfWeightBased as checkIfWeightBasedData,
   fetchShipmentType as fetchShipmentTypeData,
+  fetchDnOptions as fetchDnOptionsData,
 } from "./UpdateInstruction/data/instruction";
 import { fetchRate as fetchRateService } from "./UpdateInstruction/services/ratesService";
 import {
@@ -117,6 +118,9 @@ function UpdateInstruction() {
   const [initialDataLoaded, setInitialDataLoaded] = useState(false);
   const [isCompleted, setIsCompleted] = useState(location.state?.isCompleted ?? false);
   const [shipmentType, setShipmentType] = useState(null);
+  // KSM DN Numbers (from the weight table) for the per-driver DN dropdown on
+  // cross-haul break bulk (shipment type 4).
+  const [dnOptions, setDnOptions] = useState([]);
   // New state for container validation
   const [showContainerModal, setShowContainerModal] = useState(false);
   const [containerValidationDetails, setContainerValidationDetails] = useState({
@@ -323,6 +327,7 @@ useEffect(() => {
       await fetchTruckRegNums();
       await fetchShipmentType();
       await checkIfWeightBased();
+      await fetchDnOptions();
       if (instructionId) {
         await fetchContainersForInstruction(instructionId);
         await fetchLegsForInstruction(instructionId);
@@ -501,6 +506,7 @@ const newDriver = {
   containernumber: "",
   container_type: "",
   date: "",
+  dn: "",
   driverRate: isWeightBased ? "0" : "",
   isAbnormal: false,
 };
@@ -982,6 +988,10 @@ const navigateBack = () => {
     return fetchShipmentTypeData({ API_BASE_URL, instructionId, setShipmentType });
   };
 
+  const fetchDnOptions = async () => {
+    return fetchDnOptionsData({ api, instructionId, setDnOptions });
+  };
+
   // Function to validate driver fields
   const validateDriverFields = () => {
     if (!drivers || drivers.length === 0) return true;
@@ -1364,6 +1374,8 @@ useEffect(() => {
           weightUnit={weightUnit}
           isCompleted={isCompleted}
           rates={rates}
+          shipmentType={shipmentType}
+          dnOptions={dnOptions}
           formData={formData}
           addDriverButtonRef={addDriverButtonRef}
           addDriver={addDriver}
@@ -1462,6 +1474,7 @@ useEffect(() => {
                     truckregnumber: driver.truckregnumber || null,
                     containernumber: driver.containernumber || null,
                     container_type: driver.container_type || null,
+                    dn: driver.dn || null,
                     driverRate: driverRateToSave,
                     date: driver.date || null,
                   };

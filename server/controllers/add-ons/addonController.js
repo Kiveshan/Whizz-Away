@@ -7,6 +7,7 @@ import {
   getCompanyInfo,
   getClientById,
   checkInvoiceNumberExists,
+  getUnlinkedAddonsByClient,
 } from "../../models/add-ons/addonModel.js";
 
 const getClientAddonsHandler = async (req, res) => {
@@ -361,6 +362,34 @@ const getClientByIdHandler = async (req, res) => {
   }
 };
 
+const getUnlinkedAddonsHandler = async (req, res) => {
+  try {
+    const { clientId } = req.params;
+    const { instructionId } = req.query;
+
+    if (!clientId) {
+      return res.status(400).json({
+        success: false,
+        message: "Client ID is required",
+      });
+    }
+
+    const result = await getUnlinkedAddonsByClient(clientId, instructionId);
+
+    res.json({
+      success: true,
+      data: result.data,
+    });
+  } catch (error) {
+    console.error("Error fetching unlinked add-ons:", error);
+    res.status(500).json({
+      success: false,
+      message: error.message,
+      stack: process.env.NODE_ENV === "production" ? null : error.stack,
+    });
+  }
+};
+
 const checkInvoiceNumberHandler = async (req, res) => {
   try {
     console.log("Checking invoice number:", req.params.invoiceNumber);
@@ -400,4 +429,5 @@ export {
   getCompanyInfoHandler,
   getClientByIdHandler,
   checkInvoiceNumberHandler,
+  getUnlinkedAddonsHandler,
 };

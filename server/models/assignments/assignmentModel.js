@@ -400,17 +400,19 @@ export const saveLeg = async ({
 
           const date = driver.date ? new Date(driver.date) : null;
           const driverSpecificRate = driver.driverRate || driverrate;
+          const dn = driver.dn || null;
 
           if (!isNewLeg && legId && index === 0) {
             await client.query(
-              `UPDATE legs_m2 SET 
-                driverid = $1, 
-                truckregnumber = $2, 
-                containernumber = $3, 
+              `UPDATE legs_m2 SET
+                driverid = $1,
+                truckregnumber = $2,
+                containernumber = $3,
                 vgm = $4,
-                date = $5, 
-                driverrate = $6 
-              WHERE legkey = $7`,
+                date = $5,
+                driverrate = $6,
+                dn = $7
+              WHERE legkey = $8`,
               [
                 driverId,
                 truckRegNumber,
@@ -418,23 +420,25 @@ export const saveLeg = async ({
                 vgmValue,
                 date,
                 driverSpecificRate,
+                dn,
                 legId,
               ]
             );
           } else {
             const insertResult = await client.query(
               `INSERT INTO legs_m2 (
-                legnumber, 
-                startingpoint, 
-                destination, 
-                driverrate, 
-                m1key, 
-                driverid, 
-                truckregnumber, 
-                containernumber, 
+                legnumber,
+                startingpoint,
+                destination,
+                driverrate,
+                m1key,
+                driverid,
+                truckregnumber,
+                containernumber,
                 vgm,
-                date
-              ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10) RETURNING legkey`,
+                date,
+                dn
+              ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11) RETURNING legkey`,
               [
                 legnumber,
                 startingpoint,
@@ -446,6 +450,7 @@ export const saveLeg = async ({
                 containerNumber,
                 vgmValue,
                 date,
+                dn,
               ]
             );
             if (isNewLeg && index === 0) legId = insertResult.rows[0].legkey;
@@ -455,12 +460,13 @@ export const saveLeg = async ({
     } else if (!isNewLeg && (!drivers || drivers.length === 0)) {
       // Existing leg saved with no drivers: clear any persisted driver assignment data
       await client.query(
-        `UPDATE legs_m2 SET 
+        `UPDATE legs_m2 SET
           driverid = NULL,
           truckregnumber = NULL,
           containernumber = NULL,
           vgm = NULL,
           date = NULL,
+          dn = NULL,
           driverrate = $1
         WHERE legkey = $2`,
         [driverrate, legkey]
@@ -603,6 +609,7 @@ export const getLegsByInstructionId = async (instructionId) => {
       l.containernumber,
       l.vgm,
       l.date,
+      l.dn,
       e.name AS driver_name,
       e.surname AS driver_surname,
       e.roleid,
@@ -667,6 +674,7 @@ export const getLegsByInstructionId = async (instructionId) => {
           ? row.vgm.toString() 
           : (row.containernumber ? row.containernumber.toString() : ""),
         container_type: row.container_type || "",
+        dn: row.dn || "",
         driverRate: row.driverrate ? row.driverrate.toString() : "0",
         _rateNullInManage: row.applicable_manage_rate === null,
         _debugManageRate: row.applicable_manage_rate,
@@ -865,8 +873,31 @@ export const refreshInstructionLegRates = async (instructionId) => {
 };
 
 export const completeInstruction = async (instructionId, status) => {
-  const query = `UPDATE m1_controller SET status = $1 WHERE m1key = $2`;
   try {
+    // Hard block: an add-on instruction (shipment type 5) cannot be marked
+    // Completed unless it is linked to an existing add-on invoice.
+    if (status === "Completed") {
+      const checkResult = await pool.query(
+        `SELECT shipment_type, addon_id FROM m1_controller WHERE m1key = $1`,
+        [instructionId]
+      );
+      if (checkResult.rows.length === 0) {
+        throw new Error(`Instruction with ID ${instructionId} not found`);
+      }
+      const { shipment_type, addon_id } = checkResult.rows[0];
+      if (
+        String(shipment_type) === "5" &&
+        (addon_id === null || addon_id === undefined)
+      ) {
+        const err = new Error(
+          "This add-on instruction must be linked to an add-on invoice before it can be completed."
+        );
+        err.code = "ADDON_LINK_REQUIRED";
+        throw err;
+      }
+    }
+
+    const query = `UPDATE m1_controller SET status = $1 WHERE m1key = $2`;
     await pool.query(query, [status, instructionId]);
   } catch (error) {
     throw error;

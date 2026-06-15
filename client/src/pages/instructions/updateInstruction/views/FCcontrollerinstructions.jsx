@@ -561,6 +561,8 @@ const FCcontrollerinstructions = () => {
       formData={formData}
       setFormData={setFormData}
       fieldErrors={fieldErrors}
+      setFieldErrors={setFieldErrors}
+      instructionId={instructionId}
       fieldRefs={fieldRefs}
       clients={clients}
       shipmentTypes={shipmentTypes}

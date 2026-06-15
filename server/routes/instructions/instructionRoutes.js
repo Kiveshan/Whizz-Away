@@ -7,7 +7,6 @@ import {
   getInstructionsHandler,
   searchInstructionsHandler,
   getInstructionByIdHandler,
-  updateInstructionHandler,
   updateContainersHandler,
   getActiveClientsHandler,
   getClientStartingPointsHandler,
@@ -19,7 +18,6 @@ import {
   getFCContainersHandler,
   saveFCInstructionHandler,
   getFCInstructionByIdHandler,
-  updateFCInstructionHandler,
   updateFCContainersHandler,
   updateFCInstructionAndContainersHandler,
   checkFCContainerLegsHandler,
@@ -46,14 +44,12 @@ router.get("/client-instruction-stats", getClientInstructionStatsHandler)
 router.get("/instructions", getInstructionsHandler)
 router.get("/search", searchInstructionsHandler)
 router.get("/instruction/:id", getInstructionByIdHandler)
-router.put("/instruction/:id", updateInstructionHandler)
 router.post("/containers/:instructionId", updateContainersHandler)
 
 // ========== FC Controller Instructions Endpoints ==========
 router.get("/fc/containers/:instructionId", getFCContainersHandler);
 router.post("/fc/save-instruction", verifyToken, saveFCInstructionHandler)
 router.get("/fc/instruction/:id", getFCInstructionByIdHandler)
-router.put("/fc/instruction/:id", updateFCInstructionHandler)
 router.put("/fc/containers/:instructionId", updateFCContainersHandler)
 // New unified endpoint for updating both instruction and containers
 router.put("/fc/update/:id", updateFCInstructionAndContainersHandler)

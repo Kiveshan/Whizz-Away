@@ -1253,97 +1253,6 @@ export const getInstructionById = async (instructionId) => {
     : null;
 };
 
-export const updateInstruction = async (instructionId, updatedData) => {
-  const client = await pool.connect();
-  try {
-    await client.query("BEGIN");
-
-    // Calculate total cost if not provided
-    const totalCost =
-      updatedData.total_cost !== undefined
-        ? updatedData.total_cost
-        : calculateTotalCost(updatedData);
-
-    const queryText = `
-      UPDATE public.m1_controller
-      SET 
-        client = $1,
-        "ksmFileRef" = $2, -- renamed from task
-        shipment_type = $3,
-        pickup = $4,
-        dropoff = $5,
-        -- pickuptime and pickupdate fields removed
-        stackdate = $6,
-        "lastFreeDate" = $7, -- renamed from deadline
-        "clientFileRef" = $8, -- renamed from fileref, adjusted parameter numbers due to removed fields
-        rateweight = $9,
-        description = $10,
-        vat = $11,
-        num_six_meters = $12,
-        num_twelve_meters = $13,
-        num_abnormal = $14,
-        num_breakbulk = $15,
-        total_cost = $16, -- adjusted parameter numbers due to removed fields
-        weight = $17,
-        status = $18,
-        booking_ref = $19,
-        vessel_name = $20,
-        rateper_6 = $21,
-        rateper_12 = $22,
-        rateper_abnormal = $23,
-        rateper_breakbulk = $24,
-        unitrate = $25,
-        
-      WHERE m1key = $29 -- adjusted parameter number
-      RETURNING *
-    `;
-
-    const values = [
-      updatedData.client,
-      updatedData.ksmFileRef || updatedData.task, // Use ksmFileRef if available, fall back to task
-      updatedData.shipment_type,
-      updatedData.pickup,
-      updatedData.dropoff,
-      updatedData.hazardous,
-      updatedData.surchages,
-      // pickuptime and pickupdate fields removed
-      updatedData.stackdate,
-      updatedData.lastFreeDate ||
-        updatedData.lastfreedate ||
-        updatedData.deadline, // renamed from deadline
-      updatedData.clientFileRef || updatedData.fileref, // renamed from fileref
-      updatedData.rateweight,
-      updatedData.description,
-      updatedData.vat || 15,
-      updatedData.num_six_meters || 0,
-      updatedData.num_twelve_meters || 0,
-      updatedData.num_abnormal || 0,
-      updatedData.num_breakbulk || 0,
-      totalCost,
-      updatedData.weight,
-      updatedData.status,
-      updatedData.booking_ref,
-      updatedData.vessel_name,
-      updatedData.rateper_6,
-      updatedData.rateper_12,
-      updatedData.rateper_abnormal,
-      updatedData.rateper_breakbulk,
-      updatedData.unitrate,
-      updatedData.surcharge,
-      instructionId,
-    ];
-
-    const result = await client.query(queryText, values);
-    await client.query("COMMIT");
-    return result.rows.length > 0 ? result.rows[0] : null;
-  } catch (error) {
-    await client.query("ROLLBACK");
-    throw error;
-  } finally {
-    client.release();
-  }
-};
-
 export const updateContainersByInstructionId = async (
   instructionId,
   containers,
@@ -2217,7 +2126,24 @@ export const updateFCInstructionAndContainers = async (
         currentInstruction.created_at,
         "string"
       ),
+      // Link to the add-on invoice (add_ons.addon_id). Only meaningful for
+      // add-on instructions; null for everything else.
+      addon_id: preserveExistingValue(
+        instructionData.addon_id,
+        currentInstruction.addon_id,
+        "number"
+      ),
     };
+
+    // 2b. Guard: an add-on instruction cannot be marked Completed unless it is
+    // linked to an existing add-on invoice (enforced front- and back-end).
+    if (isAddOnType && updateData.status === "Completed") {
+      if (updateData.addon_id === null || updateData.addon_id === undefined) {
+        throw new Error(
+          "An add-on instruction must be linked to an add-on invoice before it can be completed."
+        );
+      }
+    }
 
     // 3. Check if instruction needs updating
     let instructionNeedsUpdate = false;
@@ -2253,6 +2179,7 @@ export const updateFCInstructionAndContainers = async (
       { field: "is_set_rate", type: "boolean" },
       { field: "historical_set_rate", type: "number" },
       { field: "created_at", type: "date" },
+      { field: "addon_id", type: "number" },
     ];
 
     for (const { field, type } of fieldsToCheck) {
@@ -2280,8 +2207,8 @@ export const updateFCInstructionAndContainers = async (
           stackdate = $6, "lastFreeDate" = $7, "clientFileRef" = $8, rateweight = $9, description = $10,
           status = $11, vat = $12, num_six_meters = $13, num_twelve_meters = $14, num_abnormal = $15,
           num_breakbulk = $16, weight = $17, total_cost = $18, booking_ref = $19, vessel_name = $20,
-          rateper_6 = $21, rateper_12 = $22, rateper_abnormal = $23, rateper_breakbulk = $24, unitrate = $25, is_set_rate = $26, historical_set_rate = $27, created_at = $28
-        WHERE m1key = $29
+          rateper_6 = $21, rateper_12 = $22, rateper_abnormal = $23, rateper_breakbulk = $24, unitrate = $25, is_set_rate = $26, historical_set_rate = $27, created_at = $28, addon_id = $29
+        WHERE m1key = $30
         RETURNING *
       `;
 
@@ -2315,6 +2242,7 @@ export const updateFCInstructionAndContainers = async (
         updateData.is_set_rate,
         updateData.historical_set_rate,
         updateData.created_at,
+        updateData.addon_id,
         instructionId,
       ];
 
@@ -3004,10 +2932,10 @@ export const saveInstructionAndContainers = async (
         stackdate, "lastFreeDate", "clientFileRef", rateweight, description,
         status, vat, num_six_meters, num_twelve_meters, num_abnormal, num_breakbulk,
         weight, total_cost, booking_ref, vessel_name, rateper_6, rateper_12,
-        rateper_abnormal, rateper_breakbulk, unitrate
+        rateper_abnormal, rateper_breakbulk, unitrate, addon_id
       ) VALUES (
         $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14,
-        $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25, $26, $27
+        $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25, $26, $27, $28
       ) RETURNING m1key
     `;
 
@@ -3039,6 +2967,7 @@ export const saveInstructionAndContainers = async (
       controllerData.rateper_abnormal,
       controllerData.rateper_breakbulk,
       controllerData.unitrate,
+      controllerData.addon_id ?? null,
     ];
 
     const instructionResult = await client.query(
