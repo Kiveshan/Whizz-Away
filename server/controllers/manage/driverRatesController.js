@@ -301,7 +301,7 @@ const getDistinctRoutesHandler = async (req, res) => {
     const limitNum = parseInt(limit)
     const offset = (pageNum - 1) * limitNum
 
-    const result = await getDistinctRoutes({ offset, limit: limitNum, search })
+    const result = await getDistinctRoutes({ offset, limit: limitNum, search }, req.user.company_reg_num)
 
     res.json({
       items: result.routes,
@@ -322,7 +322,7 @@ const getPeriodsForRouteHandler = async (req, res) => {
     if (!startingpoint || !destination) {
       return res.status(400).json({ error: "startingpoint and destination are required" })
     }
-    const result = await getPeriodsForRoute(startingpoint, destination)
+    const result = await getPeriodsForRoute(startingpoint, destination, req.user.company_reg_num)
     if (!result.success) return res.status(500).json({ error: "Failed to fetch periods" })
     res.json(result.data)
   } catch (err) {
@@ -356,7 +356,7 @@ const saveRoutePeriodsHandler = async (req, res) => {
       }
     }
 
-    const result = await saveRoutePeriods(startingpoint, destination, periods, originalStartingpoint, originalDestination)
+    const result = await saveRoutePeriods(startingpoint, destination, periods, originalStartingpoint, originalDestination, req.user.company_reg_num)
     res.json({ periods: result.data, renamedInstructions: result.renamedInstructions || [] })
   } catch (err) {
     console.error("Error saving route periods:", err)
@@ -372,7 +372,7 @@ const deleteRouteHandler = async (req, res) => {
       return res.status(400).json({ error: "startingpoint and destination are required" })
     }
 
-    const usageResult = await getRouteUsage(startingpoint, destination)
+    const usageResult = await getRouteUsage(startingpoint, destination, req.user.company_reg_num)
     if (usageResult.success && usageResult.data.inUse) {
       return res.status(409).json({
         error: "This route cannot be deleted while it is being used in instructions",
@@ -380,7 +380,7 @@ const deleteRouteHandler = async (req, res) => {
       })
     }
 
-    await deleteRoute(startingpoint, destination)
+    await deleteRoute(startingpoint, destination, req.user.company_reg_num)
     res.json({ message: "Route deleted successfully" })
   } catch (err) {
     console.error("Error deleting route:", err)
@@ -394,7 +394,7 @@ const getRouteLegDatesHandler = async (req, res) => {
     if (!startingpoint || !destination) {
       return res.status(400).json({ error: "startingpoint and destination are required" })
     }
-    const result = await getRouteLegDates(startingpoint, destination)
+    const result = await getRouteLegDates(startingpoint, destination, req.user.company_reg_num)
     res.json(result.data)
   } catch (err) {
     console.error("Error fetching route leg dates:", err)
@@ -408,7 +408,7 @@ const getRouteUsageCheckHandler = async (req, res) => {
     if (!startingpoint || !destination) {
       return res.status(400).json({ error: "startingpoint and destination are required" })
     }
-    const result = await getRouteUsage(startingpoint, destination)
+    const result = await getRouteUsage(startingpoint, destination, req.user.company_reg_num)
     res.json(result.data)
   } catch (err) {
     console.error("Error checking route usage:", err)
@@ -418,7 +418,7 @@ const getRouteUsageCheckHandler = async (req, res) => {
 
 const getRouteOptionsHandler = async (req, res) => {
   try {
-    const result = await getRouteOptions()
+    const result = await getRouteOptions(req.user.company_reg_num)
     res.json(result.data)
   } catch (err) {
     console.error("Error fetching route options:", err)

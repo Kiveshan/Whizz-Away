@@ -580,15 +580,15 @@ export { getAllDriverRates, getDriverRateById, createDriverRate, updateDriverRat
 // ─── Route-grouped functions (new UX) ───────────────────────────────────────
 
 // Return one row per distinct (startingpoint, destination) pair with a period count
-export const getDistinctRoutes = async (options = {}) => {
+export const getDistinctRoutes = async (options = {}, company_reg_num) => {
   let client
   try {
     client = await pool.connect()
     const { offset = 0, limit = 10, search = "" } = options
 
-    let whereClause = "WHERE 1=1"
-    const queryParams = []
-    let paramIndex = 1
+    let whereClause = "WHERE company_reg_num = $1"
+    const queryParams = [company_reg_num]
+    let paramIndex = 2
 
     if (search && search.trim() !== "") {
       whereClause += ` AND (LOWER(startingpoint) LIKE LOWER($${paramIndex}) OR LOWER(destination) LIKE LOWER($${paramIndex}))`
@@ -632,7 +632,7 @@ export const getDistinctRoutes = async (options = {}) => {
 }
 
 // Return all rate periods for a specific route, ordered oldest → newest
-export const getPeriodsForRoute = async (startingpoint, destination) => {
+export const getPeriodsForRoute = async (startingpoint, destination, company_reg_num) => {
   let client
   try {
     client = await pool.connect()
@@ -640,8 +640,9 @@ export const getPeriodsForRoute = async (startingpoint, destination) => {
       `SELECT * FROM m5_driver_rate
        WHERE LOWER(TRIM(COALESCE(startingpoint, ''))) = LOWER(TRIM(COALESCE($1, '')))
          AND LOWER(TRIM(COALESCE(destination, ''))) = LOWER(TRIM(COALESCE($2, '')))
+         AND company_reg_num = $3
        ORDER BY effective_from ASC, m5ratekey ASC`,
-      [startingpoint, destination],
+      [startingpoint, destination, company_reg_num],
     )
     return { success: true, data: result.rows }
   } catch (err) {
@@ -657,7 +658,7 @@ export const getPeriodsForRoute = async (startingpoint, destination) => {
 // whitespace so "Cape Town " and "Cape  Town" both normalize to "Cape Town".
 const normalizeName = (s) => (s || "").trim().replace(/\s+/g, " ")
 
-export const saveRoutePeriods = async (startingpoint, destination, periods, originalStartingpoint, originalDestination) => {
+export const saveRoutePeriods = async (startingpoint, destination, periods, originalStartingpoint, originalDestination, company_reg_num) => {
   // Normalize before anything touches the DB so misspaced names can never
   // create phantom duplicate routes.
   startingpoint = normalizeName(startingpoint)
@@ -681,8 +682,9 @@ export const saveRoutePeriods = async (startingpoint, destination, periods, orig
     await client.query(
       `DELETE FROM m5_driver_rate
        WHERE LOWER(TRIM(COALESCE(startingpoint, ''))) = LOWER(TRIM(COALESCE($1, '')))
-         AND LOWER(TRIM(COALESCE(destination, ''))) = LOWER(TRIM(COALESCE($2, '')))`,
-      [deleteSp, deleteDest],
+         AND LOWER(TRIM(COALESCE(destination, ''))) = LOWER(TRIM(COALESCE($2, '')))
+         AND company_reg_num = $3`,
+      [deleteSp, deleteDest, company_reg_num],
     )
 
     // When renaming, update legs_m2 for in-progress instructions so legs stay in sync
@@ -696,8 +698,9 @@ export const saveRoutePeriods = async (startingpoint, destination, periods, orig
            AND LOWER(COALESCE(c.status, '')) = 'in progress'
            AND LOWER(TRIM(COALESCE(l.startingpoint, ''))) = LOWER(TRIM(COALESCE($1, '')))
            AND LOWER(TRIM(COALESCE(l.destination, ''))) = LOWER(TRIM(COALESCE($2, '')))
+           AND l.company_reg_num = $5
          RETURNING l.m1key`,
-        [deleteSp, deleteDest, startingpoint, destination],
+        [deleteSp, deleteDest, startingpoint, destination, company_reg_num],
       )
       renamedInstructions = [...new Set(legUpdateResult.rows.map((r) => r.m1key))]
     }
@@ -717,8 +720,9 @@ export const saveRoutePeriods = async (startingpoint, destination, periods, orig
           startingpoint, destination,
           driver_six_meter_rate, driver_twelve_meter_rate,
           subie_six_meter_rate, subie_twelve_meter_rate,
-          effective_from, effective_to
-        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+          effective_from, effective_to,
+          company_reg_num
+        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
         RETURNING *`,
         [
           startingpoint,
@@ -729,6 +733,7 @@ export const saveRoutePeriods = async (startingpoint, destination, periods, orig
           processRate(period.subie_twelve_meter_rate),
           effectiveFrom,
           effectiveTo,
+          company_reg_num,
         ],
       )
       insertedPeriods.push(result.rows[0])
@@ -746,7 +751,7 @@ export const saveRoutePeriods = async (startingpoint, destination, periods, orig
 }
 
 // Check if any in-progress instruction legs reference this route
-export const getRouteUsage = async (startingpoint, destination) => {
+export const getRouteUsage = async (startingpoint, destination, company_reg_num) => {
   let client
   try {
     client = await pool.connect()
@@ -756,8 +761,9 @@ export const getRouteUsage = async (startingpoint, destination) => {
        INNER JOIN m1_controller c ON c.m1key = l.m1key
        WHERE LOWER(COALESCE(c.status, '')) = 'in progress'
          AND LOWER(TRIM(COALESCE(l.startingpoint, ''))) = LOWER(TRIM(COALESCE($1, '')))
-         AND LOWER(TRIM(COALESCE(l.destination, ''))) = LOWER(TRIM(COALESCE($2, '')))`,
-      [startingpoint, destination],
+         AND LOWER(TRIM(COALESCE(l.destination, ''))) = LOWER(TRIM(COALESCE($2, '')))
+         AND l.company_reg_num = $3`,
+      [startingpoint, destination, company_reg_num],
     )
     const instructions = legsResult.rows.map((r) => r.m1key)
     return { success: true, data: { inUse: instructions.length > 0, instructions } }
@@ -770,15 +776,16 @@ export const getRouteUsage = async (startingpoint, destination) => {
 }
 
 // Delete all periods for a route (caller must check usage first)
-export const deleteRoute = async (startingpoint, destination) => {
+export const deleteRoute = async (startingpoint, destination, company_reg_num) => {
   let client
   try {
     client = await pool.connect()
     await client.query(
       `DELETE FROM m5_driver_rate
        WHERE LOWER(TRIM(COALESCE(startingpoint, ''))) = LOWER(TRIM(COALESCE($1, '')))
-         AND LOWER(TRIM(COALESCE(destination, ''))) = LOWER(TRIM(COALESCE($2, '')))`,
-      [startingpoint, destination],
+         AND LOWER(TRIM(COALESCE(destination, ''))) = LOWER(TRIM(COALESCE($2, '')))
+         AND company_reg_num = $3`,
+      [startingpoint, destination, company_reg_num],
     )
     return { success: true }
   } catch (err) {
@@ -790,14 +797,16 @@ export const deleteRoute = async (startingpoint, destination) => {
 }
 
 // Distinct startingpoint + destination values for autocomplete in the create form
-export const getRouteOptions = async () => {
+export const getRouteOptions = async (company_reg_num) => {
   let client
   try {
     client = await pool.connect()
     const result = await client.query(
       `SELECT DISTINCT startingpoint, destination
        FROM m5_driver_rate
+       WHERE company_reg_num = $1
        ORDER BY startingpoint ASC, destination ASC`,
+      [company_reg_num],
     )
     return { success: true, data: result.rows }
   } catch (err) {
@@ -809,7 +818,7 @@ export const getRouteOptions = async () => {
 }
 
 // All leg dates for in-progress instructions that use this route — used to check coverage gaps
-export const getRouteLegDates = async (startingpoint, destination) => {
+export const getRouteLegDates = async (startingpoint, destination, company_reg_num) => {
   let client
   try {
     client = await pool.connect()
@@ -820,9 +829,10 @@ export const getRouteLegDates = async (startingpoint, destination) => {
        WHERE LOWER(COALESCE(c.status, '')) = 'in progress'
          AND LOWER(TRIM(COALESCE(l.startingpoint, ''))) = LOWER(TRIM(COALESCE($1, '')))
          AND LOWER(TRIM(COALESCE(l.destination, ''))) = LOWER(TRIM(COALESCE($2, '')))
+         AND l.company_reg_num = $3
          AND l.date IS NOT NULL
        ORDER BY l.date ASC`,
-      [startingpoint, destination],
+      [startingpoint, destination, company_reg_num],
     )
     return { success: true, data: result.rows }
   } catch (err) {
