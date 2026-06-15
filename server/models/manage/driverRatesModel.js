@@ -913,27 +913,63 @@ export const auditDriverRatesForMonth = async (year, month) => {
       [Number(year), Number(month)],
     )
 
+    // A mismatch is only worth showing if it's BIG (|Δ| >= R500) or NEGATIVE
+    // (stored higher than the looked-up correct rate). Small positive drifts are
+    // counted in the summary but hidden from the detail table.
+    const BIG_DELTA = 500
+
     const summary = { MISMATCH: 0, MATCH: 0, ROUTE_MISSING: 0, NO_FIELD_RATE: 0, SKIPPED: 0 }
     let totalDelta = 0
+    let mismatchShown = 0
     const byCategory = { MISMATCH: [], MATCH: [], ROUTE_MISSING: [], NO_FIELD_RATE: [], SKIPPED: [] }
+
+    // A subbie leg with a stored rate below R500 is suspiciously low. This only
+    // matters for route-missing legs (no rate period covers the route on the
+    // leg's date), where we can't re-derive a correct value to compare against.
+    const LOW_SUBBIE = 500
+    let routeMissingSubbieLow = 0
 
     for (const row of rows) {
       const cat = row.category
       summary[cat] = (summary[cat] || 0) + 1
       const stored = row.stored_rate == null ? null : Number(row.stored_rate)
       const expected = row.expected_rate == null ? null : Number(row.expected_rate)
+      const delta = cat === "MISMATCH" ? Number((expected - (stored || 0)).toFixed(2)) : null
+      const role = Number(row.roleid) === 6 ? "subbie" : "driver"
       const entry = {
         legkey: row.legkey,
         m1key: row.m1key,
         route: `${row.startingpoint} → ${row.destination}`,
         date: row.leg_date,
-        role: Number(row.roleid) === 6 ? "subbie" : "driver",
+        role,
         container: row.container_type,
         stored_rate: stored,
         expected_rate: expected,
-        delta: cat === "MISMATCH" ? Number((expected - (stored || 0)).toFixed(2)) : null,
+        delta,
       }
-      if (cat === "MISMATCH") totalDelta += entry.delta
+
+      if (cat === "MISMATCH") {
+        const isNegative = delta < 0
+        const isBig = Math.abs(delta) >= BIG_DELTA
+        if (isNegative || isBig) {
+          entry.flag = [isNegative ? "NEGATIVE" : null, isBig ? "BIG" : null].filter(Boolean).join("+")
+          totalDelta += delta
+          mismatchShown++
+          byCategory.MISMATCH.push(entry)
+        }
+        // small positive drifts: counted in summary, not shown
+        continue
+      }
+
+      if (cat === "ROUTE_MISSING") {
+        if (role === "subbie" && stored != null && stored < LOW_SUBBIE) {
+          entry.flag = "SUBBIE < R500"
+          routeMissingSubbieLow++
+        }
+        byCategory.ROUTE_MISSING.push(entry)
+        continue
+      }
+
       // MATCH rows are the bulk and not interesting to display — keep only a count.
       if (cat !== "MATCH") byCategory[cat].push(entry)
     }
@@ -944,6 +980,9 @@ export const auditDriverRatesForMonth = async (year, month) => {
       month: Number(month),
       totalLegs: rows.length,
       summary,
+      mismatchShown,
+      mismatchHidden: summary.MISMATCH - mismatchShown,
+      routeMissingSubbieLow,
       totalDelta: Number(totalDelta.toFixed(2)),
       mismatch: byCategory.MISMATCH,
       routeMissing: byCategory.ROUTE_MISSING,

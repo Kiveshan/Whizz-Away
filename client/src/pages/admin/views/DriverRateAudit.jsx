@@ -13,14 +13,13 @@ const fmtRand = (n) =>
   n == null ? "—" : "R " + Number(n).toLocaleString("en-ZA", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
 // Audit driver rates for every leg on instructions CREATED in a chosen month.
-// Read-only "Run Audit" first; "Apply Fixes" only writes the MISMATCH legs.
+// Read-only report: it never changes data. Rate corrections are done manually
+// in Manage → Driver Rates after the boss confirms the correct values.
 function DriverRateAudit() {
   const [month, setMonth] = useState(4); // default April
   const [year, setYear] = useState(currentYear);
   const [running, setRunning] = useState(false);
-  const [applying, setApplying] = useState(false);
   const [audit, setAudit] = useState(null);
-  const [applied, setApplied] = useState(null);
   const [error, setError] = useState(null);
 
   const years = Array.from({ length: 6 }, (_, i) => currentYear - 4 + i);
@@ -28,7 +27,6 @@ function DriverRateAudit() {
   const runAudit = async () => {
     setRunning(true);
     setAudit(null);
-    setApplied(null);
     setError(null);
     try {
       const res = await api.get("/api/driver-rates/month-audit", {
@@ -43,33 +41,6 @@ function DriverRateAudit() {
     }
   };
 
-  const applyFixes = async () => {
-    if (!audit || audit.summary.MISMATCH === 0) return;
-    const ok = window.confirm(
-      `Update ${audit.summary.MISMATCH} leg(s) for ${months[month - 1]} ${year}?\n\n` +
-        `This sets each wrong leg's driverrate to the correct rate. ` +
-        `Route-missing, blank-rate and skipped legs are NOT touched.`,
-    );
-    if (!ok) return;
-
-    setApplying(true);
-    setError(null);
-    try {
-      const res = await api.post(
-        "/api/driver-rates/month-audit/apply",
-        { year, month },
-        { timeout: 60000 },
-      );
-      setApplied(res.data);
-      // Re-run the audit so the tables reflect the new state (MISMATCH should be 0).
-      await runAudit();
-    } catch (err) {
-      setError(err.response?.data?.error || err.message || "Apply failed");
-    } finally {
-      setApplying(false);
-    }
-  };
-
   const s = audit?.summary;
 
   return (
@@ -78,8 +49,9 @@ function DriverRateAudit() {
       <p style={{ color: "#666", marginBottom: 20, fontSize: 14 }}>
         Re-derives the correct <code>driverrate</code> for every leg on instructions
         <strong> created in the chosen month</strong>, using the same rules the app uses
-        (effective-dated route rate × subbie/driver × 6m/12m). Run the audit to preview
-        changes, then apply to fix only the wrong legs.
+        (effective-dated route rate × subbie/driver × 6m/12m), and flags only the
+        <strong> big or negative</strong> discrepancies plus <strong>subbie rates under R500</strong>.
+        Read-only — review these with the boss and correct the values manually in Manage → Driver Rates.
       </p>
 
       <div style={{ display: "flex", gap: 12, alignItems: "flex-end", marginBottom: 20, flexWrap: "wrap" }}>
@@ -97,22 +69,13 @@ function DriverRateAudit() {
             {years.map((y) => <option key={y} value={y}>{y}</option>)}
           </select>
         </div>
-        <button onClick={runAudit} disabled={running || applying} style={buttonStyle(running || applying, "#2e7d32")}>
+        <button onClick={runAudit} disabled={running} style={buttonStyle(running, "#2e7d32")}>
           {running ? "Running audit…" : "Run Audit"}
         </button>
-        {audit && audit.summary.MISMATCH > 0 && (
-          <button onClick={applyFixes} disabled={applying || running} style={buttonStyle(applying || running, "#c0392b")}>
-            {applying ? "Applying…" : `Apply ${audit.summary.MISMATCH} Fix${audit.summary.MISMATCH === 1 ? "" : "es"}`}
-          </button>
-        )}
       </div>
 
       {error && (
         <div style={bannerStyle("#fff0f0", "#f5c2c2", "#c0392b")}>{error}</div>
-      )}
-
-      {applied && (
-        <div style={bannerStyle("#f0fff4", "#a8e6bb", "#1a7a3f")}>{applied.message}</div>
       )}
 
       {audit && (
@@ -120,26 +83,34 @@ function DriverRateAudit() {
           {/* Summary cards */}
           <div style={{ display: "flex", gap: 12, flexWrap: "wrap", margin: "8px 0 20px" }}>
             <SummaryCard label="Total legs" value={audit.totalLegs} color="#34495e" />
-            <SummaryCard label="Mismatch (fixable)" value={s.MISMATCH} color="#c0392b" />
+            <SummaryCard label="Big / negative" value={audit.mismatchShown} color="#c0392b" />
+            <SummaryCard label="Route-missing subbie < R500" value={audit.routeMissingSubbieLow ?? 0} color="#d35400" />
             <SummaryCard label="Already correct" value={s.MATCH} color="#1a7a3f" />
             <SummaryCard label="Route missing" value={s.ROUTE_MISSING} color="#b9770e" />
             <SummaryCard label="No field rate" value={s.NO_FIELD_RATE} color="#8e44ad" />
             <SummaryCard label="Skipped" value={s.SKIPPED} color="#7f8c8d" />
-            <SummaryCard label="Δ if applied" value={fmtRand(audit.totalDelta)} color="#2c3e50" />
           </div>
 
-          {/* Mismatch table */}
-          <Section title={`Mismatch — will be fixed (${audit.mismatch.length})`} color="#c0392b">
-            <DiffTable rows={audit.mismatch} showExpected />
+          {/* Mismatch table — only big or negative discrepancies */}
+          <Section title={`Big / negative discrepancies (${audit.mismatch.length})`} color="#c0392b">
+            <p style={hintStyle}>
+              Routes where the stored leg rate differs from the looked-up correct rate by
+              ≥ R500, or is higher than it (negative). {audit.mismatchHidden} smaller
+              discrepancy{audit.mismatchHidden === 1 ? " is" : "s are"} hidden. Take these to
+              the boss for the corrected values — nothing is changed automatically.
+            </p>
+            <DiffTable rows={audit.mismatch} showExpected showFlag />
           </Section>
 
-          {/* Route missing */}
-          <Section title={`Route missing — not touched (${audit.routeMissing.length})`} color="#b9770e">
+          {/* Route missing — subbie legs under R500 flagged */}
+          <Section title={`Route does not exist — not touched (${audit.routeMissing.length})`} color="#b9770e">
             <p style={hintStyle}>
               No rate period covers this route on the leg's date (route renamed/deleted, or a
-              date gap). These are never overwritten — review them manually.
+              date gap), so the correct rate can't be re-derived. Subbie legs with a stored
+              rate under R500 ({audit.routeMissingSubbieLow ?? 0}) are flagged
+              <strong> SUBBIE &lt; R500</strong> — review these with the boss.
             </p>
-            <DiffTable rows={audit.routeMissing} />
+            <DiffTable rows={audit.routeMissing} showFlag />
           </Section>
 
           {/* No field rate */}
@@ -186,7 +157,7 @@ function Section({ title, color, children }) {
   );
 }
 
-function DiffTable({ rows, showExpected }) {
+function DiffTable({ rows, showExpected, showFlag }) {
   if (!rows || rows.length === 0) {
     return <p style={{ color: "#999", fontSize: 14, fontStyle: "italic" }}>None.</p>;
   }
@@ -204,6 +175,7 @@ function DiffTable({ rows, showExpected }) {
             <th style={{ ...thStyle, textAlign: "right" }}>Stored</th>
             {showExpected && <th style={{ ...thStyle, textAlign: "right" }}>Correct</th>}
             {showExpected && <th style={{ ...thStyle, textAlign: "right" }}>Δ</th>}
+            {showFlag && <th style={thStyle}>Flag</th>}
           </tr>
         </thead>
         <tbody>
@@ -222,6 +194,15 @@ function DiffTable({ rows, showExpected }) {
               {showExpected && (
                 <td style={{ ...tdStyle, textAlign: "right", color: r.delta >= 0 ? "#1a7a3f" : "#c0392b" }}>
                   {r.delta >= 0 ? "+" : ""}{fmtRand(r.delta)}
+                </td>
+              )}
+              {showFlag && (
+                <td style={tdStyle}>
+                  {r.flag && (
+                    <span style={{ fontSize: 11, fontWeight: 700, color: r.flag.includes("NEGATIVE") ? "#c0392b" : "#b9770e" }}>
+                      {r.flag}
+                    </span>
+                  )}
                 </td>
               )}
             </tr>
