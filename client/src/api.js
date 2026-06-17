@@ -9,7 +9,7 @@ const api = axios.create({
     "Content-Type": "application/json",
   },
   withCredentials: true, // Include credentials (cookies) with requests
-  timeout: 10000, // 10 second timeout
+  timeout: 30000, // 30s — tolerate backend/DB cold starts instead of failing
 })
 
 // Global token expiration handler
