@@ -57,18 +57,18 @@ export const fetchDnOptions = async ({ api, instructionId, setDnOptions }) => {
   }
 };
 
-export const fetchShipmentType = async ({ API_BASE_URL, instructionId, setShipmentType }) => {
+export const fetchShipmentType = async ({ api, instructionId, setShipmentType }) => {
   if (instructionId) {
     try {
-      const response = await fetch(
-        `${API_BASE_URL}/instructions/${instructionId}/shipment-type`
+      // Use the authenticated `api` axios instance (not raw fetch) so the JWT
+      // Bearer token is attached — the SaaS route requires verifyToken, and a
+      // raw fetch would 401 and leave shipmentType unset (hiding the break-bulk
+      // DN picker, which is gated on shipmentType === 4).
+      const response = await api.get(
+        `/instructions/${instructionId}/shipment-type`
       );
-      if (!response.ok) {
-        throw new Error("Failed to fetch shipment type");
-      }
-      const data = await response.json();
-      setShipmentType(data.shipment_type);
-      console.log("Shipment type:", data.shipment_type);
+      setShipmentType(response.data.shipment_type);
+      console.log("Shipment type:", response.data.shipment_type);
     } catch (error) {
       console.error("Error fetching shipment type:", error);
     }

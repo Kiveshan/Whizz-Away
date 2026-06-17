@@ -985,7 +985,7 @@ const navigateBack = () => {
     });
   };
   const fetchShipmentType = async () => {
-    return fetchShipmentTypeData({ API_BASE_URL, instructionId, setShipmentType });
+    return fetchShipmentTypeData({ api, instructionId, setShipmentType });
   };
 
   const fetchDnOptions = async () => {
