@@ -1022,15 +1022,18 @@ export const getInstructions = async (clientId) => {
         FROM public.container cn
         WHERE cn.m1key = m.m1key
       ) AS has_valid_containers,
-      i.invoice_num
-    FROM 
+      i.invoice_num,
+      ao.invoice_number AS addon_invoice_number
+    FROM
       public.m1_controller m
-    JOIN 
+    JOIN
       public.m5_client c ON m.client = c.m5clientkey
     LEFT JOIN
       public.shipment s ON m.shipment_type = s.shipkey
     LEFT JOIN
       public.invoice i ON m.m1key = i.m1key
+    LEFT JOIN
+      public.add_ons ao ON m.addon_id = ao.addon_id
   `;
   const queryParams = [];
   if (clientId) {
@@ -1157,14 +1160,17 @@ export const getInstructionById = async (instructionId) => {
         c.representative,
         c.cellnum,
         c.email,
-        s.shipmenttype
-      FROM 
+        s.shipmenttype,
+        ao.invoice_number AS addon_invoice_number
+      FROM
         public.m1_controller m
-      JOIN 
+      JOIN
         public.m5_client c ON m.client = c.m5clientkey
       JOIN
         public.shipment s ON m.shipment_type = s.shipkey
-      WHERE 
+      LEFT JOIN
+        public.add_ons ao ON m.addon_id = ao.addon_id
+      WHERE
         m.m1key = $1
     ),
     container_data AS (

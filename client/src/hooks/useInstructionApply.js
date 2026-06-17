@@ -80,6 +80,7 @@ export function useInstructionApply({
           status: data.status || "",
           createdAt: formatDateForInput(data.created_at) || "",
           addon_id: data.addon_id != null ? data.addon_id.toString() : "",
+          addon_invoice_number: data.addon_invoice_number || "",
         };
 
         setFormData(newFormData);
