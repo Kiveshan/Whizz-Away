@@ -11,7 +11,10 @@ import jwt from "jsonwebtoken";
 import { secretKey } from "../../config/secrets.js";
 
 const login = async (req, res, next) => {
+  const loginStart = Date.now();
   passport.authenticate("local", async (err, user, info) => {
+    // Time spent in passport (findUserByEmail queries + bcrypt.compare).
+    console.log(`[login] auth phase: ${Date.now() - loginStart}ms`);
     if (err) {
       console.error("Authentication error:", err);
       return res.status(500).json({ message: "Internal server error" });
@@ -64,7 +67,11 @@ const login = async (req, res, next) => {
       }
 
       if (user.company_reg_num) {
+        const companyCheckStart = Date.now();
         const companyActive = await checkCompanyStatus(user.company_reg_num);
+        console.log(
+          `[login] company status check: ${Date.now() - companyCheckStart}ms`
+        );
         if (!companyActive) {
           console.log(
             `No active company admin found for company_reg_num: ${user.company_reg_num}`
@@ -111,6 +118,7 @@ const login = async (req, res, next) => {
     else if (roleid === 7) redirectUrl = "/AdminDashboard";
     else if (roleid === 8) redirectUrl = "/CreditorsDashboard";
 
+    console.log(`[login] total: ${Date.now() - loginStart}ms for ${user.email}`);
     return res.json({
       message: "Login successful",
       redirectUrl,

@@ -171,6 +171,12 @@ passport.deserializeUser(async (sessionUser, done) => {
   }
 });
 
+// Lightweight health check (no DB) — point an uptime pinger here to keep the
+// instance warm and avoid cold-start latency on the first login after idle.
+app.get("/health", (req, res) => {
+  res.status(200).json({ status: "ok", uptime: process.uptime() });
+});
+
 // Routes
 app.use("/", routes);
 
