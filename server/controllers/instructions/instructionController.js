@@ -396,55 +396,6 @@ export const getInstructionByIdHandler = async (req, res) => {
   }
 }
 
-export const updateInstructionHandler = async (req, res) => {
-  try {
-    const instructionId = req.params.id
-    const updatedData = req.body
-
-    // Calculate total cost based on rate weight type
-    const calculatedTotalCost = calculateTotalCost(updatedData)
-    const updatedDataWithCost = {
-      ...updatedData,
-      total_cost: calculatedTotalCost,
-    }
-
-    console.log(`Updating instruction with ID: ${instructionId}`)
-    console.log("Update data received:", {
-      ...updatedDataWithCost,
-      description: updatedDataWithCost.description ? updatedDataWithCost.description.substring(0, 20) + "..." : null,
-      total_cost: updatedDataWithCost.total_cost,
-      weight: updatedDataWithCost.weight,
-      booking_ref: updatedDataWithCost.booking_ref,
-      vessel_name: updatedDataWithCost.vessel_name,
-      rateper_6: updatedDataWithCost.rateper_6,
-      rateper_12: updatedDataWithCost.rateper_12,
-      rateper_abnormal: updatedDataWithCost.rateper_abnormal,
-      rateper_breakbulk: updatedDataWithCost.rateper_breakbulk,
-      rateweight: updatedDataWithCost.rateweight,
-      unitrate: updatedDataWithCost.unitrate,
-    })
-    const result = await updateInstruction(instructionId, updatedDataWithCost, req.user.company_reg_num)
-    if (!result) {
-      return res.status(404).json({ error: "Instruction not found" })
-    }
-    console.log(`Updated instruction with ID: ${instructionId}`)
-    console.log("Updated data:", {
-      total_cost: result.total_cost,
-      weight: result.weight,
-      booking_ref: result.booking_ref,
-      vessel_name: result.vessel_name,
-      rateper_6: result.rateper_6,
-      rateper_12: result.rateper_12,
-      rateper_abnormal: result.rateper_abnormal,
-      rateper_breakbulk: result.rateper_breakbulk,
-    })
-    res.json({ success: true, data: result })
-  } catch (error) {
-    console.error("Error updating instruction:", error)
-    res.status(500).json({ error: error.message })
-  }
-}
-
 export const updateContainersHandler = async (req, res) => {
   try {
     const instructionId = req.params.instructionId

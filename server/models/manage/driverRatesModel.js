@@ -894,12 +894,15 @@ const MONTH_AUDIT_CTE = `
       FROM m5_driver_rate dr
       WHERE LOWER(TRIM(COALESCE(dr.startingpoint, ''))) = LOWER(TRIM(COALESCE(l.startingpoint, '')))
         AND LOWER(TRIM(COALESCE(dr.destination, '')))   = LOWER(TRIM(COALESCE(l.destination, '')))
+        AND dr.company_reg_num = $3
         AND dr.effective_from <= l.date
         AND (dr.effective_to IS NULL OR dr.effective_to >= l.date)
       ORDER BY dr.effective_from DESC, dr.m5ratekey DESC
       LIMIT 1
     ) r ON l.date IS NOT NULL
-    WHERE EXTRACT(YEAR  FROM mc.created_at) = $1
+    WHERE l.company_reg_num = $3
+      AND mc.company_reg_num = $3
+      AND EXTRACT(YEAR  FROM mc.created_at) = $1
       AND EXTRACT(MONTH FROM mc.created_at) = $2
       -- Breakbulk instructions are rated differently (per-unit weight), not via
       -- the route driver-rate table, so they are excluded from this audit.
@@ -921,7 +924,7 @@ const MONTH_AUDIT_CTE = `
 
 // Read-only audit. Returns every leg classified, a per-category summary, and the
 // total Rand delta that applying the MISMATCH fixes would produce.
-export const auditDriverRatesForMonth = async (year, month) => {
+export const auditDriverRatesForMonth = async (year, month, company_reg_num) => {
   let client
   try {
     client = await pool.connect()
@@ -931,7 +934,7 @@ export const auditDriverRatesForMonth = async (year, month) => {
               roleid, container_type, stored_rate, expected_rate, rate_id, category
        FROM classified
        ORDER BY category, m1key, legkey`,
-      [Number(year), Number(month)],
+      [Number(year), Number(month), company_reg_num],
     )
 
     // A mismatch is only worth showing if it's BIG (|Δ| >= R500) or NEGATIVE
@@ -1020,7 +1023,7 @@ export const auditDriverRatesForMonth = async (year, month) => {
 
 // Apply the fixes: set driverrate = expected for every MISMATCH leg, in one
 // atomic statement. ROUTE_MISSING / NO_FIELD_RATE / SKIPPED / MATCH are untouched.
-export const applyDriverRateFixesForMonth = async (year, month) => {
+export const applyDriverRateFixesForMonth = async (year, month, company_reg_num) => {
   let client
   try {
     client = await pool.connect()
@@ -1030,8 +1033,9 @@ export const applyDriverRateFixesForMonth = async (year, month) => {
        SET driverrate = c.expected_rate
        FROM classified c
        WHERE t.legkey = c.legkey
+         AND t.company_reg_num = $3
          AND c.category = 'MISMATCH'`,
-      [Number(year), Number(month)],
+      [Number(year), Number(month), company_reg_num],
     )
     return { success: true, updated: result.rowCount }
   } catch (err) {

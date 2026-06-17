@@ -435,7 +435,7 @@ const auditDriverRatesHandler = async (req, res) => {
     const parsed = parseYearMonth(req.query)
     if (parsed.error) return res.status(400).json({ error: parsed.error })
 
-    const result = await auditDriverRatesForMonth(parsed.year, parsed.month)
+    const result = await auditDriverRatesForMonth(parsed.year, parsed.month, req.user.company_reg_num)
     res.json(result)
   } catch (err) {
     console.error("Error running driver rate audit:", err)
@@ -449,7 +449,7 @@ const applyDriverRateFixesHandler = async (req, res) => {
     const parsed = parseYearMonth(req.body)
     if (parsed.error) return res.status(400).json({ error: parsed.error })
 
-    const result = await applyDriverRateFixesForMonth(parsed.year, parsed.month)
+    const result = await applyDriverRateFixesForMonth(parsed.year, parsed.month, req.user.company_reg_num)
     res.json({
       success: true,
       updated: result.updated,

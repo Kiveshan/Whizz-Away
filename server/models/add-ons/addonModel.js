@@ -478,7 +478,7 @@ const checkInvoiceNumberExists = async (invoiceNumber, excludeAddonId = null, co
 // on the add-on instruction form. When instructionId is provided, the invoice
 // currently linked to that instruction is also included so it shows as the
 // selected option while editing.
-const getUnlinkedAddonsByClient = async (clientId, instructionId = null) => {
+const getUnlinkedAddonsByClient = async (clientId, instructionId = null, company_reg_num) => {
   try {
     if (!pool) {
       throw new Error(
@@ -498,18 +498,21 @@ const getUnlinkedAddonsByClient = async (clientId, instructionId = null) => {
         a.vessel_number
       FROM public.add_ons a
       WHERE a.client_id = $1
+        AND a.company_reg_num = $3
         AND (
           NOT EXISTS (
-            SELECT 1 FROM public.m1_controller m WHERE m.addon_id = a.addon_id
+            SELECT 1 FROM public.m1_controller m
+            WHERE m.addon_id = a.addon_id AND m.company_reg_num = $3
           )
           OR a.addon_id = (
-            SELECT m2.addon_id FROM public.m1_controller m2 WHERE m2.m1key = $2
+            SELECT m2.addon_id FROM public.m1_controller m2
+            WHERE m2.m1key = $2 AND m2.company_reg_num = $3
           )
         )
       ORDER BY a.date DESC
     `;
 
-    const result = await query(queryText, [clientId, instructionId || null]);
+    const result = await query(queryText, [clientId, instructionId || null, company_reg_num]);
     return { success: true, data: result.rows };
   } catch (error) {
     console.error("Error fetching unlinked add-ons:", error);

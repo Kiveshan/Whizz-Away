@@ -374,7 +374,7 @@ const getUnlinkedAddonsHandler = async (req, res) => {
       });
     }
 
-    const result = await getUnlinkedAddonsByClient(clientId, instructionId);
+    const result = await getUnlinkedAddonsByClient(clientId, instructionId, req.user.company_reg_num);
 
     res.json({
       success: true,
