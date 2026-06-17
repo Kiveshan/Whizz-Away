@@ -14,7 +14,18 @@ import {
   deleteRoute,
   getRouteLegDates,
   getRouteOptions,
+  auditDriverRatesForMonth,
+  applyDriverRateFixesForMonth,
 } from "../../models/manage/driverRatesModel.js"
+
+// Validate year/month query/body params for the month audit endpoints.
+const parseYearMonth = (src) => {
+  const year = Number.parseInt(src.year, 10)
+  const month = Number.parseInt(src.month, 10)
+  if (!Number.isInteger(year) || year < 2000 || year > 2100) return { error: "Invalid year" }
+  if (!Number.isInteger(month) || month < 1 || month > 12) return { error: "Invalid month (1-12)" }
+  return { year, month }
+}
 
 const getAllDriverRatesHandler = async (req, res) => {
   try {
@@ -416,6 +427,40 @@ const getRouteUsageCheckHandler = async (req, res) => {
   }
 }
 
+// ─── Month driver-rate audit (admin tool) ───────────────────────────────────
+
+// Read-only: classify every leg on instructions created in the given month.
+const auditDriverRatesHandler = async (req, res) => {
+  try {
+    const parsed = parseYearMonth(req.query)
+    if (parsed.error) return res.status(400).json({ error: parsed.error })
+
+    const result = await auditDriverRatesForMonth(parsed.year, parsed.month)
+    res.json(result)
+  } catch (err) {
+    console.error("Error running driver rate audit:", err)
+    res.status(500).json({ error: "Failed to run driver rate audit" })
+  }
+}
+
+// Write: apply the MISMATCH fixes for the given month.
+const applyDriverRateFixesHandler = async (req, res) => {
+  try {
+    const parsed = parseYearMonth(req.body)
+    if (parsed.error) return res.status(400).json({ error: parsed.error })
+
+    const result = await applyDriverRateFixesForMonth(parsed.year, parsed.month)
+    res.json({
+      success: true,
+      updated: result.updated,
+      message: `Updated ${result.updated} leg(s) for ${parsed.month}/${parsed.year}`,
+    })
+  } catch (err) {
+    console.error("Error applying driver rate fixes:", err)
+    res.status(500).json({ error: "Failed to apply driver rate fixes" })
+  }
+}
+
 const getRouteOptionsHandler = async (req, res) => {
   try {
     const result = await getRouteOptions(req.user.company_reg_num)
@@ -442,4 +487,6 @@ export {
   getRouteLegDatesHandler,
   getRouteUsageCheckHandler,
   getRouteOptionsHandler,
+  auditDriverRatesHandler,
+  applyDriverRateFixesHandler,
 }

@@ -506,6 +506,13 @@ export const completeInstructionHandler = async (req, res) => {
     });
   } catch (err) {
     console.error(`Error completing instruction ${instructionId}:`, err);
+    // Validation failure (e.g. add-on instruction not linked to an invoice)
+    if (err.code === "ADDON_LINK_REQUIRED") {
+      return res.status(400).json({
+        success: false,
+        message: err.message,
+      });
+    }
     res.status(500).json({
       success: false,
       message: "Failed to complete instruction",
