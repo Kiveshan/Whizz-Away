@@ -272,11 +272,11 @@ export const saveInstruction = async ({
         num_six_meters, num_twelve_meters, num_abnormal, num_breakbulk,
         weight, total_cost, booking_ref, vessel_name,
         rateper_6, rateper_12, rateper_abnormal, rateper_breakbulk, unitrate,
-        is_set_rate, historical_set_rate, created_at, company_reg_num
+        is_set_rate, historical_set_rate, created_at, addon_id, company_reg_num
       ) VALUES (
         $1, $2, $3, $4, $5,
         $6, $7, $8, $9, $10, $11, $12, $13, $14, $15,
-        $16, $17, $18, $19, $20, $21, $22, $23, $24, $25, $26, $27, $28, $29
+        $16, $17, $18, $19, $20, $21, $22, $23, $24, $25, $26, $27, $28, $29, $30
       ) RETURNING m1key
     `;
 
@@ -375,6 +375,7 @@ export const saveInstruction = async ({
       rateper_12: controllerData.rateper_12,
       rateper_abnormal: controllerData.rateper_abnormal,
       rateper_breakbulk: controllerData.rateper_breakbulk,
+      addon_id: controllerData.addon_id != null ? Number(controllerData.addon_id) : null,
     };
 
     if (String(fields.shipmentType) === "4") {
@@ -458,6 +459,7 @@ export const saveInstruction = async ({
       fields.is_set_rate, // Set rate flag
       fields.historical_set_rate, // Historical set rate value
       formatDate(new Date()), // Current date for created_at
+      fields.addon_id, // Link to add-on invoice (null for non-add-on instructions)
       company_reg_num,
     ];
 
@@ -1037,7 +1039,8 @@ export const getInstructions = async (clientId, company_reg_num) => {
         FROM public.container cn
         WHERE cn.m1key = m.m1key
       ) AS has_valid_containers,
-      i.invoice_num
+      i.invoice_num,
+      ao.invoice_number AS addon_invoice_number
     FROM
       public.m1_controller m
     JOIN
@@ -1046,6 +1049,8 @@ export const getInstructions = async (clientId, company_reg_num) => {
       public.shipment s ON m.shipment_type = s.shipkey
     LEFT JOIN
       public.invoice i ON m.m1key = i.m1key
+    LEFT JOIN
+      public.add_ons ao ON m.addon_id = ao.addon_id
     WHERE m.company_reg_num = $1
   `;
   const queryParams = [company_reg_num];
@@ -1178,13 +1183,16 @@ export const getInstructionById = async (instructionId, company_reg_num) => {
         c.representative,
         c.cellnum,
         c.email,
-        s.shipmenttype
+        s.shipmenttype,
+        ao.invoice_number AS addon_invoice_number
       FROM
         public.m1_controller m
       JOIN
         public.m5_client c ON m.client = c.m5clientkey
       JOIN
         public.shipment s ON m.shipment_type = s.shipkey
+      LEFT JOIN
+        public.add_ons ao ON m.addon_id = ao.addon_id
       WHERE
         m.m1key = $1
         AND m.company_reg_num = $2

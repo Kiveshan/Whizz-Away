@@ -568,7 +568,7 @@ const CompanyInstructions = () => {
                         <td>Instruction {item.m1controllerkey || item.m1key}</td>
                         <td>
                           {item.shipment_type === 5 || item.shipment_type === "5" || (item.type_text || "").toLowerCase() === "add-on" || (item.type_text || "").toLowerCase() === "add on"
-                            ? ""
+                            ? (item.addon_invoice_number || "N/A")
                             : (item.invoice_num || "N/A")}
                         </td>
                         <td>{item.booking_ref || "N/A"}</td>

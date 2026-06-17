@@ -64,6 +64,7 @@ const Viewcontrollerinstructions = () => {
     rateper_abnormal: 0,
     surchages: false,
     surcharge: 0,
+    addon_invoice_number: "",
   })
 
   const [formData, setFormData] = useState(() => ({
@@ -336,6 +337,7 @@ const Viewcontrollerinstructions = () => {
         unitrate: data.unitrate || "",
         is_set_rate: Boolean(data.is_set_rate) || false,
         historical_set_rate: data.historical_set_rate || null,
+        addon_invoice_number: data.addon_invoice_number || "",
         // Break bulk fields removed
       }
 
@@ -1226,6 +1228,20 @@ const Viewcontrollerinstructions = () => {
                         />
                       </div>
                     </div>
+                    {isAddOn && (
+                      <div className="controller-instructions-form-field">
+                        <label>Add-On Invoice</label>
+                        <div className="controller-instructions-input-wrapper">
+                          <input
+                            type="text"
+                            className="controller-instructions-form-input"
+                            value={formData.addon_invoice_number || "N/A"}
+                            readOnly
+                            style={nonEditableStyle}
+                          />
+                        </div>
+                      </div>
+                    )}
                     <div className="controller-instructions-form-field">
                       <label>Description</label>
                       <div className="controller-instructions-input-wrapper" ref={fieldRefs.description}>

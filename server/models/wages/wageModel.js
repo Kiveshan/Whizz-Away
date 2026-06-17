@@ -678,6 +678,7 @@ const getDriverLegsByMonth = async (driverId, month, year, company_reg_num) => {
         l.driverrate,
         l.truckregnumber,
         l.containernumber,
+        l.dn,
         l.legstatus,
         l.m1key,
         m.status as instruction_status
