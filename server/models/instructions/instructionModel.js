@@ -254,17 +254,17 @@ export const saveInstruction = async ({
 
     const controllerQuery = `
       INSERT INTO public.m1_controller (
-        client, "ksmFileRef", shipment_type, pickup, dropoff, 
-        stackdate, "lastFreeDate", "clientFileRef", rateweight, 
+        client, "ksmFileRef", shipment_type, pickup, dropoff,
+        stackdate, "lastFreeDate", "clientFileRef", rateweight,
         description, status, vat,
         num_six_meters, num_twelve_meters, num_abnormal, num_breakbulk,
         weight, total_cost, booking_ref, vessel_name,
         rateper_6, rateper_12, rateper_abnormal, rateper_breakbulk, unitrate,
-        is_set_rate, historical_set_rate, created_at
+        is_set_rate, historical_set_rate, created_at, addon_id
       ) VALUES (
-        $1, $2, $3, $4, $5, 
+        $1, $2, $3, $4, $5,
         $6, $7, $8, $9, $10, $11, $12, $13, $14, $15,
-        $16, $17, $18, $19, $20, $21, $22, $23, $24, $25, $26, $27, $28
+        $16, $17, $18, $19, $20, $21, $22, $23, $24, $25, $26, $27, $28, $29
       ) RETURNING m1key
     `;
 
@@ -363,6 +363,7 @@ export const saveInstruction = async ({
       rateper_12: controllerData.rateper_12,
       rateper_abnormal: controllerData.rateper_abnormal,
       rateper_breakbulk: controllerData.rateper_breakbulk,
+      addon_id: controllerData.addon_id != null ? Number(controllerData.addon_id) : null,
     };
 
     if (String(fields.shipmentType) === "4") {
@@ -446,6 +447,7 @@ export const saveInstruction = async ({
       fields.is_set_rate, // Set rate flag
       fields.historical_set_rate, // Historical set rate value
       formatDate(new Date()), // Current date for created_at
+      fields.addon_id, // Link to add-on invoice (null for non-add-on instructions)
     ];
 
     const controllerResult = await client.query(
