@@ -5,6 +5,7 @@ import styles from "../css/login.module.css"; // Updated to CSS Module
 import { useNavigate } from "react-router-dom";
 import { Eye, EyeOff } from "lucide-react";
 import api from "../../../api";
+import { useAuth } from "../../../context/AuthContext";
 
 const Login = ({ switchToRegister, closePopup }) => {
   const [email, setEmail] = useState("");
@@ -12,6 +13,7 @@ const Login = ({ switchToRegister, closePopup }) => {
   const [error, setError] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const navigate = useNavigate();
+  const { login } = useAuth();
 
   const togglePasswordVisibility = () => {
     setShowPassword(!showPassword);
@@ -36,9 +38,12 @@ const Login = ({ switchToRegister, closePopup }) => {
 
       if (response.status === 200) {
         const data = response.data;
-        console.log("Login successful. Token:", data.token);
 
-        localStorage.setItem("token", data.token);
+        // Persist BOTH the token and the user (incl. roleid) via the auth
+        // context. Storing only the token left localStorage.user stale, which
+        // made role-based routing read the wrong role. login() updates
+        // localStorage + context state in one place.
+        login(data.user, data.token);
         navigate(data.redirectUrl);
       } else {
         console.log("Error from server:", response.data);

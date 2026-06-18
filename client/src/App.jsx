@@ -13,6 +13,7 @@ import Header from "./components/Header";
 import Footer from "./components/Footer"; // Import the Footer component
 import LogoutButton from "./components/LogoutButton";
 import LandingPage from "./pages/user_menus/views/LandingPage";
+import { RequireAuth, RoleGuard } from "./components/ProtectedRoute";
 
 // Import pages
 import {
@@ -292,6 +293,15 @@ function ContentWrapper() {
         )
       )}
       <Routes>
+        {/* ---------- Public (pre-auth) routes ---------- */}
+        <Route path="/" element={<LandingPage />} />
+        <Route path="/login" element={<Login />} />
+        <Route path="/register" element={<Register />} />
+
+        {/* ---------- Authenticated routes (require a valid session) ---------- */}
+        {/* RequireAuth = logged in; RoleGuard = enforces the ROUTE_ROLES matrix. */}
+        <Route element={<RequireAuth />}>
+        <Route element={<RoleGuard />}>
         <Route
           path="/view-credit-note/:clientName/:creditNoteId"
           element={<CreditNoteView />}
@@ -299,7 +309,6 @@ function ContentWrapper() {
         <Route path="/credit-note-form" element={<CreditNoteForm />} />
         <Route path="/credit-note-list" element={<CreditNoteList />} />
         <Route path="/CredClientList" element={<CredClientList />} />
-        <Route path="/" element={<LandingPage />} />
         <Route path="/client-payments" element={<ClientPayments />} />
         <Route path="/client-list-payments" element={<ClientListPay />} />
         <Route
@@ -315,9 +324,7 @@ function ContentWrapper() {
         <Route path="/debtors" element={<Debtors />} />
         <Route path="/debtors-age-analysis" element={<DebtorsAgeAnalysis />} />
         <Route path="/manage" element={<Manage />} />
-        <Route path="/login" element={<Login />} />
         <Route path="/Dashboard" element={<Dashboard />} />
-        <Route path="/register" element={<Register />} />
         <Route path="/ControllerDashboard" element={<ControllerDashboard />} />
         <Route path="/DirectorDashboard" element={<DirectorDashboard />} />
         <Route
@@ -380,6 +387,7 @@ function ContentWrapper() {
           path="/ViewcontrollerInstructionDetails"
           element={<ViewcontrollerInstructionDetails />}
         />
+        {/* Admin-only (gated by ROUTE_ROLES via RoleGuard) */}
         <Route path="/AdminDashboard" element={<AdminDashboard />} />
         {/* Finance Clerk Routes */}
         <Route path="/instructions" element={<InstructionsList />} />
@@ -471,6 +479,8 @@ function ContentWrapper() {
           path="/vat-recon-reports"
           element={<VatReconReportPage />}
         />
+        </Route>
+        </Route>
       </Routes>
       {shouldShowFooter && <Footer />} {/* Conditionally render footer */}
     </div>

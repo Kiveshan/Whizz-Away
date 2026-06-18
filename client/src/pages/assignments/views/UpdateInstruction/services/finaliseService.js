@@ -1,3 +1,5 @@
+import { authFetch } from "../../../../../utils/authFetch.js";
+
 export const navigateToDocuments = ({
   instructionId,
   setHasProcessedSelectedLeg,
@@ -55,7 +57,7 @@ export const handleFinaliseClick = async ({
   }
 
   try {
-    const response = await fetch(
+    const response = await authFetch(
       `${API_BASE_URL}/instructions/${instructionId}/details`
     );
     if (!response.ok) {

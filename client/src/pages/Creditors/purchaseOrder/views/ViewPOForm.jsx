@@ -1,6 +1,7 @@
 "use client"
 import { useRef, useState,useEffect } from "react"
 import { useNavigate, useLocation } from "react-router-dom"
+import { authFetch } from "../../../../utils/authFetch.js"
 import html2pdf from "html2pdf.js"
 import { Upload } from "lucide-react"
 import "../css/PO.css"
@@ -24,7 +25,7 @@ useEffect(() => {
   const fetchCompletePOData = async () => {
     if (ponum) {
       try {
-        const response = await fetch(`/api/po-form/details/${ponum}`);
+        const response = await authFetch(`/api/po-form/details/${ponum}`);
         const data = await response.json();
         setCompletePOData(data);
         console.log("Complete PO Data:", data);
@@ -40,7 +41,7 @@ useEffect(() => {
   const checkSlipStatus = async () => {
     if (ponum) {
       try {
-        const response = await fetch(`/api/po-form/slip-status/${ponum}`);
+        const response = await authFetch(`/api/po-form/slip-status/${ponum}`);
         const data = await response.json();
         setSlipStatus({ ...data, loading: false });
       } catch (error) {
@@ -76,7 +77,7 @@ useEffect(() => {
   }
 const handleViewSlip = async () => {
   try {
-    const response = await fetch(`/api/po-form/view-slip/${ponum}`);
+    const response = await authFetch(`/api/po-form/view-slip/${ponum}`);
     const data = await response.json();
     
     if (data.success && data.url) {
