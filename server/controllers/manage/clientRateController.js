@@ -95,6 +95,15 @@ const saveClientRatesHandler = async (req, res) => {
       if (rate.vgm !== undefined && rate.vgm !== "" && (isNaN(rate.vgm) || Number.parseFloat(rate.vgm) < 0)) {
         return res.status(400).json({ error: "VGM must be a non-negative number" })
       }
+
+      // Validate fuel surcharge if provided (percentage, non-negative)
+      if (
+        rate.fuel_surcharge !== undefined &&
+        rate.fuel_surcharge !== "" &&
+        (isNaN(rate.fuel_surcharge) || Number.parseFloat(rate.fuel_surcharge) < 0)
+      ) {
+        return res.status(400).json({ error: "Fuel surcharge must be a non-negative percentage" })
+      }
     }
 
     const result = await saveClientRates(clientId, rates)

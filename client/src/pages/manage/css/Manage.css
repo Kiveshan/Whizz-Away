@@ -660,6 +660,65 @@ tr:hover {
   color: #111827;
 }
 
+.fuel-surcharge-all {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 12px;
+  background-color: #f0f4ff;
+  border: 1px solid #c7d2fe;
+  border-radius: 6px;
+}
+
+.fuel-surcharge-all label {
+  font-size: 14px;
+  font-weight: 600;
+  color: #333;
+  white-space: nowrap;
+}
+
+.fuel-surcharge-all input {
+  width: 100px;
+  padding: 10px;
+  height: 40px;
+  font-size: 14px;
+  box-sizing: border-box;
+  border: 1px solid #ddd;
+  border-radius: 5px;
+  outline: none;
+  transition: border-color 0.3s, box-shadow 0.3s;
+}
+
+.fuel-surcharge-all input:focus {
+  border-color: #4169e1;
+  box-shadow: 0 0 0 2px rgba(65, 105, 225, 0.2);
+}
+
+.fuel-surcharge-all .fuel-surcharge-apply-btn {
+  padding: 10px 16px;
+  height: 40px;
+  background-color: #4169e1;
+  color: #ffffff;
+  border: none;
+  border-radius: 5px;
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 500;
+  white-space: nowrap;
+  transition: background-color 0.3s, transform 0.2s, box-shadow 0.3s;
+}
+
+.fuel-surcharge-all .fuel-surcharge-apply-btn:hover {
+  background-color: #3457c8;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 10px rgba(65, 105, 225, 0.3);
+}
+
+.fuel-surcharge-all .fuel-surcharge-apply-btn:active {
+  transform: translateY(0);
+  box-shadow: none;
+}
+
 .add-rate-button {
   padding: 6px 12px;
   background-color: #2563eb;

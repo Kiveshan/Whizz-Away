@@ -1538,13 +1538,24 @@ export const checkClientHasRates = async (clientId) => {
   }
 };
 
+// Uplift a base rate by a fuel surcharge percentage. Returns the value
+// unchanged when either input is missing/zero so existing rates are untouched
+// for clients that have not configured a fuel surcharge.
+const applyFuelSurcharge = (value, fuelSurchargePct) => {
+  if (value === null || value === undefined || value === "") return value;
+  const base = Number(value);
+  const pct = Number(fuelSurchargePct);
+  if (Number.isNaN(base) || Number.isNaN(pct) || pct === 0) return value;
+  return Number((base * (1 + pct / 100)).toFixed(2));
+};
+
 export const getClientRates = async (clientId, start, destination) => {
   if (!clientId || !start || !destination) {
     throw new Error("clientId, start, and destination are required");
   }
 
   const sql = `
-    SELECT 
+    SELECT
       "6m_rate" as "sixMeterRate",
       "12m_rate" as "twelveMeterRate",
       set_rate as "setRate",
@@ -1552,6 +1563,7 @@ export const getClientRates = async (clientId, start, destination) => {
       surcharge12m,
       hazardous,
       vgm,
+      fuel_surcharge as "fuelSurcharge",
       starting_point as "startingPoint",
       destination
     FROM public.m5_client_rate
@@ -1588,6 +1600,15 @@ export const getClientRates = async (clientId, start, destination) => {
     }
 
     const rateData = rates[0];
+
+    // Apply the fuel surcharge percentage to the base route rates so the
+    // instruction form (and the persisted rateper_* values) already reflect
+    // the uplift. Surcharge/hazardous/VGM line items are left untouched.
+    const fuelSurcharge = rateData.fuelSurcharge;
+    rateData.sixMeterRate = applyFuelSurcharge(rateData.sixMeterRate, fuelSurcharge);
+    rateData.twelveMeterRate = applyFuelSurcharge(rateData.twelveMeterRate, fuelSurcharge);
+    rateData.setRate = applyFuelSurcharge(rateData.setRate, fuelSurcharge);
+
     console.log(`[getClientRates] Retrieved rates:`, {
       rawRow: rateData,
       sixMeterRate: rateData.sixMeterRate,
@@ -1597,6 +1618,7 @@ export const getClientRates = async (clientId, start, destination) => {
       hazardous: rateData.hazardous,
       vgm: rateData.vgm,
       vgmRate: rateData.vgmRate, // Return the VGM rate
+      fuelSurcharge: rateData.fuelSurcharge, // Percentage applied to base rates
       startingPoint: rateData.startingPoint,
       destination: rateData.destination,
     });
@@ -3300,7 +3322,7 @@ export const deleteInstruction = async (instructionId) => {
 
 export const getClientSetRate = async (clientId, starting_point, destination) => {
   const sql = `
-    SELECT set_rate
+    SELECT set_rate, fuel_surcharge
     FROM public.m5_client_rate
     WHERE clientid = $1 AND starting_point = $2 AND destination = $3
     ORDER BY client_rate_id DESC
@@ -3317,7 +3339,7 @@ export const getClientSetRate = async (clientId, starting_point, destination) =>
     console.log(`[${new Date().toISOString()}] getClientSetRate: Query completed, found ${rows.length} rates`);
 
     if (rows.length > 0) {
-      const setRate = rows[0].set_rate;
+      const setRate = applyFuelSurcharge(rows[0].set_rate, rows[0].fuel_surcharge);
       console.log(`[${new Date().toISOString()}] getClientSetRate: Found set_rate: ${setRate}`);
       return { set_rate: setRate };
     } else {

@@ -84,7 +84,8 @@ const getClientRatesByClientId = async (clientId) => {
             'surcharges', cr.surcharges,
             'hazardous', cr.hazardous,
             'vgm', cr.vgm,
-            'set_rate', cr.set_rate
+            'set_rate', cr.set_rate,
+            'fuel_surcharge', cr.fuel_surcharge
           ) ORDER BY cr.client_rate_id
         ) FILTER (WHERE cr.client_rate_id IS NOT NULL) as rates
       FROM m5_client c
@@ -132,8 +133,8 @@ const saveClientRates = async (clientId, rates) => {
       const surcharge12m = rate.surcharge12m
 
       return client.query(
-        `INSERT INTO m5_client_rate (clientid, starting_point, destination, "6m_rate", "12m_rate", surcharges, surcharge12m, hazardous, vgm, set_rate)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+        `INSERT INTO m5_client_rate (clientid, starting_point, destination, "6m_rate", "12m_rate", surcharges, surcharge12m, hazardous, vgm, set_rate, fuel_surcharge)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
          RETURNING *`,
         [
           clientId,
@@ -146,6 +147,7 @@ const saveClientRates = async (clientId, rates) => {
           rate.hazardous === "" || rate.hazardous === undefined ? null : Number(rate.hazardous),
           rate.vgm === "" || rate.vgm === undefined ? null : Number(rate.vgm),
           rate.set_rate === "" || rate.set_rate === undefined ? null : Number(rate.set_rate),
+          rate.fuel_surcharge === "" || rate.fuel_surcharge === undefined ? null : Number(rate.fuel_surcharge),
         ],
       )
     })

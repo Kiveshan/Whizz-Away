@@ -15,9 +15,11 @@ const ClientRatesForm = ({ clientData, loading, onSave, onCancel }) => {
       hazardous: "",
       vgm: "",
       set_rate: "",
+      fuel_surcharge: "",
     },
   ])
   const [isFormValid, setIsFormValid] = useState(false)
+  const [fuelSurchargeAll, setFuelSurchargeAll] = useState("")
 
   useEffect(() => {
     console.log("ClientRatesForm received clientData:", clientData)
@@ -40,6 +42,8 @@ const ClientRatesForm = ({ clientData, loading, onSave, onCancel }) => {
             hazardous: rate.hazardous !== null && rate.hazardous !== undefined ? rate.hazardous : "",
             vgm: rate.vgm !== null && rate.vgm !== undefined ? rate.vgm : "",
             set_rate: rate.set_rate !== null && rate.set_rate !== undefined ? rate.set_rate : "",
+            fuel_surcharge:
+              rate.fuel_surcharge !== null && rate.fuel_surcharge !== undefined ? rate.fuel_surcharge : "",
           })),
         )
 
@@ -55,6 +59,7 @@ const ClientRatesForm = ({ clientData, loading, onSave, onCancel }) => {
             hazardous: "",
             vgm: "",
             set_rate: "",
+            fuel_surcharge: "",
           },
         ])
       }
@@ -101,8 +106,14 @@ const ClientRatesForm = ({ clientData, loading, onSave, onCancel }) => {
         hazardous: "",
         vgm: "",
         set_rate: "",
+        fuel_surcharge: "",
       },
     ])
+  }
+
+  // Apply a single fuel surcharge percentage to every rate at once.
+  const applyFuelSurchargeToAll = (value) => {
+    setRates((prev) => prev.map((rate) => ({ ...rate, fuel_surcharge: value })))
   }
 
   const removeRate = (index) => {
@@ -152,6 +163,26 @@ const ClientRatesForm = ({ clientData, loading, onSave, onCancel }) => {
         <div className="rates-section">
           <div className="rates-header">
             <h3>Client Rates</h3>
+            <div className="fuel-surcharge-all">
+              <label>
+                <strong>Fuel Surcharge (%)</strong>
+              </label>
+              <input
+                type="number"
+                min="0"
+                step="0.01"
+                value={fuelSurchargeAll}
+                onChange={(e) => setFuelSurchargeAll(e.target.value)}
+                placeholder="e.g., 10"
+              />
+              <button
+                type="button"
+                className="fuel-surcharge-apply-btn"
+                onClick={() => applyFuelSurchargeToAll(fuelSurchargeAll)}
+              >
+                Apply to all rates
+              </button>
+            </div>
           </div>
 
           {rateRows.map((row, rowIndex) => (
@@ -294,6 +325,20 @@ const ClientRatesForm = ({ clientData, loading, onSave, onCancel }) => {
                         value={rate.set_rate}
                         onChange={(e) => handleRateChange(rowIndex * 5 + index, "set_rate", e.target.value)}
                         placeholder="0.00"
+                      />
+                    </div>
+
+                    <div className="manage-form-group">
+                      <label>
+                        <strong>Fuel Surcharge (%)</strong>
+                      </label>
+                      <input
+                        type="number"
+                        min="0"
+                        step="0.01"
+                        value={rate.fuel_surcharge}
+                        onChange={(e) => handleRateChange(rowIndex * 5 + index, "fuel_surcharge", e.target.value)}
+                        placeholder="0"
                       />
                     </div>
                   </div>
