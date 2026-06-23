@@ -301,43 +301,12 @@ const getLegsWithVAT = async (client, legIds, subeiRegNum) => {
   try {
     console.log(`Getting leg details with VAT for ${legIds.length} legs`);
 
-    // First, check if we should get rates from existing statement
-    const existingStatementQuery = `
-      SELECT legids 
-      FROM subcontractor_statements 
-      WHERE subbie_reg_num = $1 
-      ORDER BY date DESC 
-      LIMIT 1
-    `;
-
-    const existingResult = await client.query(existingStatementQuery, [
-      subeiRegNum,
-    ]);
-    let useExistingRates = false;
-    const existingLegRates = new Map();
-
-    if (existingResult.rows.length > 0 && existingResult.rows[0].legids) {
-      try {
-        const existingLegids = existingResult.rows[0].legids;
-        if (Array.isArray(existingLegids)) {
-          useExistingRates = true;
-          existingLegids.forEach((leg) => {
-            existingLegRates.set(leg.legkey, leg.driverrate);
-          });
-          console.log(
-            `Found existing statement with ${existingLegids.length} legs, using existing rates`
-          );
-        }
-      } catch (e) {
-        console.log(
-          "Could not parse existing legids, will calculate fresh rates"
-        );
-      }
-    }
-
-    // Get leg details with instruction VAT
+    // Always recompute rates from the current legs_m2.driverrate + instruction VAT.
+    // We deliberately do NOT reuse rates stored on a prior statement: doing so froze
+    // the VAT-inclusive amount at first generation, so any later correction to a
+    // leg's driverrate would never flow through to regenerated statements.
     const legDetailsQuery = `
-      SELECT 
+      SELECT
         l.legkey,
         l.driverrate as original_rate,
         l.m1key,
@@ -352,27 +321,19 @@ const getLegsWithVAT = async (client, legIds, subeiRegNum) => {
     let totalAmount = 0;
 
     for (const leg of legDetailsResult.rows) {
-      let finalRate;
+      // Calculate rate with VAT from the current leg rate
+      const originalRate = Number.parseFloat(leg.original_rate) || 0;
+      const vatPercentage = Number.parseFloat(leg.vat_percentage) || 0;
+      const vatAmount = (originalRate * vatPercentage) / 100;
+      const finalRate = originalRate + vatAmount;
 
-      if (useExistingRates && existingLegRates.has(leg.legkey)) {
-        // Use rate from existing statement
-        finalRate = existingLegRates.get(leg.legkey);
-        console.log(`Leg ${leg.legkey}: Using existing rate R${finalRate}`);
-      } else {
-        // Calculate new rate with VAT
-        const originalRate = Number.parseFloat(leg.original_rate) || 0;
-        const vatPercentage = Number.parseFloat(leg.vat_percentage) || 0;
-        const vatAmount = (originalRate * vatPercentage) / 100;
-        finalRate = originalRate + vatAmount;
-
-        console.log(
-          `Leg ${
-            leg.legkey
-          }: Original R${originalRate} + VAT ${vatPercentage}% (R${vatAmount.toFixed(
-            2
-          )}) = R${finalRate.toFixed(2)}`
-        );
-      }
+      console.log(
+        `Leg ${
+          leg.legkey
+        }: Original R${originalRate} + VAT ${vatPercentage}% (R${vatAmount.toFixed(
+          2
+        )}) = R${finalRate.toFixed(2)}`
+      );
 
       legDetails.push({
         legkey: leg.legkey,
