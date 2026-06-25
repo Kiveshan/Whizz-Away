@@ -239,8 +239,18 @@ const AddOnList = () => {
                 placeholder="Search booking ref..."
                 value={bookingRefSearch}
                 onChange={(e) => {
-                  setBookingRefSearch(e.target.value);
+                  const value = e.target.value;
+                  setBookingRefSearch(value);
                   setCurrentPage(1);
+                  // When searching, clear the month/year filters so the
+                  // search runs across all add-ons for this client.
+                  if (value.trim()) {
+                    setFilters((prev) =>
+                      prev.year || prev.month
+                        ? { ...prev, year: "", month: "" }
+                        : prev
+                    );
+                  }
                 }}
                 style={{
                   backgroundImage: "none",
