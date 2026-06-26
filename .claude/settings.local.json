@@ -6,7 +6,8 @@
       "Bash(node --check models/manage/clientRateModel.js)",
       "Bash(node --check controllers/manage/clientRateController.js)",
       "Bash(cd /c/Users/22122564/Documents/GitHub/Whizz-Away/server && ls .env 2>/dev/null && echo \"---env found---\")",
-      "Bash(node _tmp_verify_subbie.js)"
+      "Bash(node _tmp_verify_subbie.js)",
+      "Bash(node scripts/tmp_lookup_clients.js)"
     ]
   }
 }

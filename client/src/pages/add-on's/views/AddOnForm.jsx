@@ -579,7 +579,7 @@ const AddOnForm = () => {
           fontSize: fonts.small,
           cellPadding: 1.2,
           lineWidth: 0.1,
-          overflow: 'ellipsize',
+          overflow: 'linebreak',
           lineColor: brand.gray,
         },
         columnStyles: {
