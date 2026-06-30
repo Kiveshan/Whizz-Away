@@ -1210,25 +1210,25 @@ const getClientSubbieCommissionReport = async (client, month, year, clientId) =>
       AND EXTRACT(YEAR FROM ao.date)::text = $3
   `
 
+  // Subbie earnings are bucketed by LEG date (when the trip was driven), the same
+  // basis the subcontractor statements use, and scoped to the client via the
+  // instruction (m1_controller.client). Amounts are VAT-inclusive (driverrate +
+  // instruction VAT) so this total reconciles to the subbie statements rather than
+  // the invoice-date / ex-VAT figure that previously under-reported earnings.
   const subcontractorQuery = `
-    WITH filtered_invoices AS (
-      SELECT 
-        i.m1key
-      FROM invoice i
-      WHERE i.clientid = $1
-        AND TRIM(TO_CHAR(i.date, 'Month')) = $2
-        AND EXTRACT(YEAR FROM i.date)::text = $3
-    )
-    SELECT 
+    SELECT
       MIN(e.userid) AS subcontractor_id,
       COALESCE(e.companyname, 'Unknown') AS companyname,
       e.subei_reg_num,
       COUNT(DISTINCT l.legkey) AS leg_count,
-      COALESCE(SUM(l.driverrate), 0) AS total_earned
+      COALESCE(SUM(l.driverrate * (1 + COALESCE(m.vat, 0)::numeric / 100)), 0) AS total_earned
     FROM legs_m2 l
+    JOIN m1_controller m ON l.m1key = m.m1key
     JOIN m5_employee e ON l.driverid = e.userid
-    JOIN filtered_invoices fi ON l.m1key = fi.m1key
-    WHERE e.roleid = 6
+    WHERE m.client = $1
+      AND TRIM(TO_CHAR(l.date, 'Month')) = $2
+      AND EXTRACT(YEAR FROM l.date)::text = $3
+      AND e.roleid = 6
     GROUP BY e.companyname, e.subei_reg_num
     ORDER BY total_earned DESC
   `
