@@ -14,7 +14,10 @@
       "PowerShell(git push saas kiveshan-saas:main 2>&1)",
       "PowerShell(git push saas kiveshan-saas:main --force 2>&1)",
       "Read(//c/c/Users/22122564/Documents/GitHub/Whizz-Away/server/**)",
-      "Bash(node scripts/_tmp_verifyAGL.js)"
+      "Bash(node scripts/_tmp_verifyAGL.js)",
+      "Bash(python -c ' *)",
+      "Bash(npm root *)",
+      "Bash(node gen.js)"
     ]
   }
 }
