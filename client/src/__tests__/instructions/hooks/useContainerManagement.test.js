@@ -482,3 +482,104 @@ describe("containersRef sync", () => {
     expect(result.current.containersRef.current[0].weight).toBe(1000);
   });
 });
+
+// ── in-place container type change (6m ↔ 12m) ─────────────────────────────────
+
+describe("handleContainerChange — containerType (in-place switch)", () => {
+  it("switches a container's type in place while preserving its data", async () => {
+    const onUpdateFormCounts = jest.fn();
+    const { result } = renderContainerHook({ isImport: true, onUpdateFormCounts });
+    act(() => result.current.initializeContainers([], COUNTS_1)); // one 6m
+    const id = result.current.containers[0].id;
+    // Enter data on the 6m row
+    act(() => {
+      result.current.setContainers((prev) =>
+        prev.map((c) =>
+          c.id === id
+            ? { ...c, containerNum: "ABCD1234567", weight: "5000", cargoDescription: "Steel" }
+            : c
+        )
+      );
+    });
+    // Switch it to 12m
+    await act(async () => {
+      await result.current.handleContainerChange(id, "containerType", "12m");
+    });
+    const row = result.current.containersRef.current[0];
+    expect(row.containerType).toBe("12m");
+    expect(row.id).toBe(id); // identity is stable — no renumbering
+    expect(row.containerNum).toBe("ABCD1234567");
+    expect(row.weight).toBe("5000");
+    expect(row.cargoDescription).toBe("Steel");
+  });
+
+  it("re-derives form counts after a type switch (6m-- / 12m++)", async () => {
+    const onUpdateFormCounts = jest.fn();
+    const { result } = renderContainerHook({ onUpdateFormCounts });
+    act(() => result.current.initializeContainers([], COUNTS_2)); // 2×6m, 1×12m
+    const sixId = result.current.containers.find((c) => c.containerType === "6m").id;
+    await act(async () => {
+      await result.current.handleContainerChange(sixId, "containerType", "12m");
+    });
+    expect(onUpdateFormCounts).toHaveBeenLastCalledWith(
+      expect.objectContaining({ num_six_meters: 1, num_twelve_meters: 2 })
+    );
+  });
+
+  it("ignores invalid container types", async () => {
+    const { result } = renderContainerHook();
+    act(() => result.current.initializeContainers([], COUNTS_1));
+    const id = result.current.containers[0].id;
+    await act(async () => {
+      await result.current.handleContainerChange(id, "containerType", "99m");
+    });
+    expect(result.current.containersRef.current[0].containerType).toBe("6m");
+  });
+});
+
+// ── changeContainersType (mass edit) ──────────────────────────────────────────
+
+describe("changeContainersType", () => {
+  it("switches multiple selected containers to a type in one call, preserving data", () => {
+    const onUpdateFormCounts = jest.fn();
+    const { result } = renderContainerHook({ onUpdateFormCounts });
+    act(() => result.current.initializeContainers([], COUNTS_2)); // 2×6m, 1×12m
+    // Tag the two 6m rows with data
+    act(() => {
+      result.current.setContainers((prev) =>
+        prev.map((c, i) =>
+          c.containerType === "6m" ? { ...c, containerNum: `NUM${i}` } : c
+        )
+      );
+    });
+    const sixIds = result.current.containers
+      .filter((c) => c.containerType === "6m")
+      .map((c) => c.id);
+    act(() => result.current.changeContainersType(sixIds, "12m"));
+    const list = result.current.containersRef.current;
+    // All three are now 12m and data is preserved on the switched rows
+    expect(list.filter((c) => c.containerType === "12m")).toHaveLength(3);
+    expect(list.filter((c) => c.containerType === "6m")).toHaveLength(0);
+    sixIds.forEach((id) => {
+      const row = list.find((c) => c.id === id);
+      expect(row.containerNum).toMatch(/^NUM/);
+    });
+    expect(onUpdateFormCounts).toHaveBeenLastCalledWith(
+      expect.objectContaining({ num_six_meters: 0, num_twelve_meters: 3 })
+    );
+  });
+
+  it("ignores invalid types and does nothing when read-only", () => {
+    const { result: ro } = renderContainerHook({ isReadOnly: true });
+    act(() => ro.current.initializeContainers([], COUNTS_1));
+    const id = ro.current.containers[0].id;
+    act(() => ro.current.changeContainersType([id], "12m"));
+    expect(ro.current.containersRef.current[0].containerType).toBe("6m");
+
+    const { result } = renderContainerHook();
+    act(() => result.current.initializeContainers([], COUNTS_1));
+    const id2 = result.current.containers[0].id;
+    act(() => result.current.changeContainersType([id2], "99m"));
+    expect(result.current.containersRef.current[0].containerType).toBe("6m");
+  });
+});
