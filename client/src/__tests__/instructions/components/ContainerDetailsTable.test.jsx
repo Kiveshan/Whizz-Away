@@ -59,10 +59,63 @@ describe("ContainerDetailsTable — rendering", () => {
     expect(screen.getByText("VGM")).toBeInTheDocument();
   });
 
-  it("renders container type labels", () => {
+  it("renders each container type as a selected dropdown value", () => {
     render(<ContainerDetailsTable {...defaultProps} />);
-    expect(screen.getByText("6m")).toBeInTheDocument();
-    expect(screen.getByText("12m")).toBeInTheDocument();
+    // Each row's type is an editable <select> whose current value is the type.
+    expect(screen.getByDisplayValue("6m")).toBeInTheDocument();
+    expect(screen.getByDisplayValue("12m")).toBeInTheDocument();
+  });
+
+  it("changing a row's type dropdown calls onContainerChange with containerType", () => {
+    render(<ContainerDetailsTable {...defaultProps} />);
+    const typeSelect = screen.getByDisplayValue("6m");
+    fireEvent.change(typeSelect, { target: { value: "12m" } });
+    expect(defaultProps.onContainerChange).toHaveBeenCalledWith(1, "containerType", "12m");
+  });
+
+  it("shows the mass-edit toolbar only after rows are selected", () => {
+    const onChangeContainersType = jest.fn();
+    render(
+      <ContainerDetailsTable
+        {...defaultProps}
+        onChangeContainersType={onChangeContainersType}
+      />
+    );
+    // Nothing selected yet → no toolbar
+    expect(screen.queryByText(/set type to:/i)).not.toBeInTheDocument();
+    // Select the first row
+    fireEvent.click(screen.getByLabelText("Select container 1"));
+    expect(screen.getByText(/1 selected/i)).toBeInTheDocument();
+  });
+
+  it("mass-sets selected rows to a type via the toolbar", () => {
+    const onChangeContainersType = jest.fn();
+    render(
+      <ContainerDetailsTable
+        {...defaultProps}
+        onChangeContainersType={onChangeContainersType}
+      />
+    );
+    // Select all, then set to 12m
+    fireEvent.click(screen.getByLabelText("Select all containers"));
+    fireEvent.click(screen.getByRole("button", { name: "12m" }));
+    expect(onChangeContainersType).toHaveBeenCalledWith([1, 2], "12m");
+  });
+
+  it("does not render selection checkboxes when read-only", () => {
+    render(
+      <ContainerDetailsTable
+        {...defaultProps}
+        isReadOnly={true}
+        onChangeContainersType={jest.fn()}
+      />
+    );
+    expect(screen.queryByLabelText("Select all containers")).not.toBeInTheDocument();
+  });
+
+  it("does not render selection checkboxes without onChangeContainersType", () => {
+    render(<ContainerDetailsTable {...defaultProps} />);
+    expect(screen.queryByLabelText("Select all containers")).not.toBeInTheDocument();
   });
 
   it("renders container number values", () => {

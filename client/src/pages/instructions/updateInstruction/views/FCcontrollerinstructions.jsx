@@ -239,6 +239,7 @@ const FCcontrollerinstructions = () => {
     setContainerSuccessMessage,
     initializeContainers,
     handleContainerChange,
+    changeContainersType,
     handleRequestDeleteContainer,
     confirmDeleteContainer,
     cancelDeleteContainer,
@@ -611,6 +612,7 @@ const FCcontrollerinstructions = () => {
       addWeightRow={addWeightRow}
       // Handlers — containers
       handleContainerChange={handleContainerChange}
+      changeContainersType={changeContainersType}
       handleRequestDeleteContainer={handleRequestDeleteContainer}
       // Handlers — actions
       handleSaveChanges={handleSaveChanges}
