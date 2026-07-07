@@ -17,7 +17,8 @@
       "Bash(node scripts/_tmp_verifyAGL.js)",
       "Bash(python -c ' *)",
       "Bash(npm root *)",
-      "Bash(node gen.js)"
+      "Bash(node gen.js)",
+      "Bash(node scripts/findFebCompletedNoLegs.js February 2026)"
     ]
   }
 }

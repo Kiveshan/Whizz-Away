@@ -1280,9 +1280,9 @@ const getClientSubbieCommissionReport = async (client, month, year, clientId) =>
   })
 
   const invoiceDetails = [...instructionInvoiceDetails, ...addOnDetails].sort((a, b) => {
-    const dateA = a.invoiceDate ? new Date(a.invoiceDate).getTime() : 0
-    const dateB = b.invoiceDate ? new Date(b.invoiceDate).getTime() : 0
-    return dateA - dateB
+    const numA = a.invoiceNumber || ""
+    const numB = b.invoiceNumber || ""
+    return numA.localeCompare(numB, undefined, { numeric: true, sensitivity: "base" })
   })
 
   const totalInvoiceAmount = invoiceDetails.reduce(
