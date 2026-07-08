@@ -19,7 +19,7 @@ import statementRoutes from "./statements/statementRoutes.js";
 import statementInvoiceRoutes from "./statement-invoice/clientInstructionRoutes.js";
 import wagesRoutes from "./wages/wageRoutes.js";
 import analyticsRoutes from "./analytics/analyticsRoutes.js";
-import employeeRoutes from "./empoloyees/employeeRoutes.js";
+import employeeRoutes from "./employees/employeeRoutes.js";
 import driverRoutes from "./drivers/driverRoutes.js";
 import documentRoutes from "./assignments/documentRoutes.js";
 import fuelSlipRoutes from "./fuel/expensesRoutes.js";

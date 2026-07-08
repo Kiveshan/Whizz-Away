@@ -107,7 +107,7 @@ import {
   CreditNoteView,
 } from "./pages/Creditors";
 
-import { ClientList, AddOnList, AddOnForm } from "./pages/add-on's";
+import { ClientList, AddOnList, AddOnForm } from "./pages/add-ons";
 import DebtorsAgeAnalysis from "./pages/debtors/views/DebtorsAgeAnalysis";
 import {
   WageReports,
