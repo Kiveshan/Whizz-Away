@@ -107,7 +107,6 @@ const login = async (req, res, next) => {
       table: user.table,
       company_reg_num: user.company_reg_num,
     };
-    console.log("User stored in session:", req.session.user);
 
     const { roleid } = user;
     let redirectUrl = "/";
@@ -150,11 +149,6 @@ const logout = (req, res) => {
 };
 
 const getUserInfo = (req, res) => {
-  console.log("User info endpoint hit");
-  console.log("Current user session:", req.session);
-  console.log("Session user:", req.session.user);
-  console.log("Token user:", req.user);
-
   const user = req.user || req.session.user;
   if (!user) {
     return res.status(401).json({ error: "Please log in first" });

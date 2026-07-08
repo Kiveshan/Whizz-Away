@@ -3,23 +3,7 @@ import {
   getStatementDetails,
 } from "../../models/statements/statementModel.js";
 import { generateMonthlyStatements } from "../../utils/statementGenerator.js";
-import { verifyToken } from "../../middleware/auth.js";
-
-const authenticateScheduledJob = (req, res, next) => {
-  // Check if it's a scheduled job first (API_SECRET)
-  const authHeader = req.headers.authorization;
-  const token = authHeader && authHeader.split(" ")[1];
-
-  if (token === process.env.API_SECRET) {
-    console.log("Authenticated scheduled job request");
-    req.isScheduledJob = true;
-    return next();
-  }
-
-  // If not API_SECRET, use existing verifyToken middleware
-  req.isScheduledJob = false;
-  return verifyToken(req, res, next);
-};
+import { authenticateScheduledJob } from "../../middleware/auth.js";
 
 const getClientStatementsHandler = async (req, res) => {
   try {

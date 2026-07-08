@@ -206,15 +206,17 @@ export const saveInstructionHandler = async (req, res) => {
 
     const shipmentTypeStr = String(controllerData.shipmentTypeId || controllerData.shipment_type || "")
 
-    // Use the frontend's total cost if available, otherwise calculate it.
-    // Treat 0 as a valid value (do not recalc when total_cost === 0).
-    let finalTotalCost = controllerData.total_cost
-    if (finalTotalCost === undefined || finalTotalCost === null || isNaN(Number(finalTotalCost))) {
-      finalTotalCost = calculateTotalCost(controllerData, containerData || [])
-      console.log("CONTROLLER: Had to calculate total_cost in backend:", finalTotalCost)
-    } else {
-      finalTotalCost = Number(Number(finalTotalCost).toFixed(2))
-      console.log("CONTROLLER: Using frontend total_cost:", finalTotalCost)
+    // The server is authoritative on pricing: always recompute the total from
+    // the submitted rate/container/weight inputs rather than trusting a
+    // client-precomputed figure (set-rate mode still uses the entered rate by
+    // design, inside calculateTotalCost). Warn when the client's figure
+    // disagrees so any frontend/backend calculation drift is visible.
+    const finalTotalCost = calculateTotalCost(controllerData, containerData || [], weightData || [])
+    const clientTotalCost = Number(controllerData.total_cost)
+    if (!Number.isNaN(clientTotalCost) && Math.abs(clientTotalCost - finalTotalCost) > 0.01) {
+      console.warn(
+        `save-instruction: client total_cost ${clientTotalCost} differs from server-calculated ${finalTotalCost}; using server value`
+      )
     }
 
     let updatedControllerData = {
@@ -699,14 +701,16 @@ export const getClientRatesController = async (req, res) => {
 export const saveInstructionController = async (req, res) => {
   const { controllerData, containerData } = req.body
   try {
-    // Use the frontend's total cost if available, otherwise calculate it
-    let finalTotalCost = controllerData.total_cost;
-    if (!finalTotalCost || isNaN(Number(finalTotalCost))) {
-      finalTotalCost = calculateTotalCost(controllerData, containerData || []);
-    } else {
-      finalTotalCost = Number(Number(finalTotalCost).toFixed(2));
+    // Server-authoritative pricing: recompute from submitted inputs, never
+    // trust a client-precomputed total (see saveInstructionHandler).
+    const finalTotalCost = calculateTotalCost(controllerData, containerData || []);
+    const clientTotalCost = Number(controllerData.total_cost);
+    if (!Number.isNaN(clientTotalCost) && Math.abs(clientTotalCost - finalTotalCost) > 0.01) {
+      console.warn(
+        `save-instruction: client total_cost ${clientTotalCost} differs from server-calculated ${finalTotalCost}; using server value`
+      );
     }
-    
+
     const updatedControllerData = {
       ...controllerData,
       total_cost: finalTotalCost,
