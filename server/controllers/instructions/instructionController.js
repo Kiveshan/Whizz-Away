@@ -19,6 +19,7 @@ import {
   getClientSetRate,
   searchInstructions,
 } from "../../models/instructions/instructionModel.js"
+import { auditFromReq } from "../../utils/auditLogger.js"
 
 // Helper function to calculate total cost based on rate weight type
 // Supports FC shipment type 4 using weight rows + unit rate
@@ -275,6 +276,15 @@ export const saveInstructionHandler = async (req, res) => {
       containerData: containersToSave,
       weightData: Array.isArray(weightData) ? weightData : [],
     })
+
+    auditFromReq(req, {
+      actionType: "INSTRUCTION_CREATED",
+      entityType: "instruction",
+      targetId: result.m1key,
+      targetName: `client ${updatedControllerData.client_id ?? updatedControllerData.clientId ?? "?"}`,
+      details: `Instruction ${result.m1key} created (total_cost: ${updatedControllerData.total_cost})`,
+    })
+
     res.json({ success: true, m1key: result.m1key })
   } catch (error) {
     console.error("Error in save-instruction endpoint:", error)
@@ -811,6 +821,13 @@ export const deleteInstructionHandler = async (req, res) => {
     const result = await deleteInstruction(id)
 
     console.log(`[${new Date().toISOString()}] [CONTROLLER] deleteInstructionHandler: Delete successful for instruction ${id}`)
+
+    auditFromReq(req, {
+      actionType: "INSTRUCTION_DELETED",
+      entityType: "instruction",
+      targetId: id,
+      details: `Instruction ${id} and its containers deleted`,
+    })
 
     res.status(200).json({
       success: true,
