@@ -1,6 +1,7 @@
 import jwt from "jsonwebtoken"
 import crypto from "crypto"
 import { secretKey } from "../config/secrets.js"
+import { ROLES } from "../config/roles.js"
 
 // Strict JWT verification. Every request reaching this middleware MUST present a
 // valid token (Authorization: Bearer <jwt>, or ?token=<jwt> for download links).
@@ -54,8 +55,7 @@ const verifyAdminAccess = (req, res, next) => {
     })
   }
 
-  const ADMIN_ROLE_ID = 7
-  if (req.user.roleid !== ADMIN_ROLE_ID) {
+  if (req.user.roleid !== ROLES.ADMIN) {
     return res.status(403).json({
       error: "Unauthorized",
       message: "You do not have permission to access this resource",
