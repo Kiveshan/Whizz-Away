@@ -6,6 +6,7 @@ import {
   getCompanyList,
   deactivateCompany,
   reactivateCompany,
+  getAuditLog,
 } from "../../models/admin/adminModel.js";
 import { ROLES } from "../../config/roles.js";
 
@@ -155,6 +156,17 @@ const reactivateCompanyHandler = async (req, res) => {
   }
 };
 
+const getAuditLogHandler = async (req, res) => {
+  try {
+    const { page, limit, actionType, entityType, search, from, to } = req.query;
+    const result = await getAuditLog({ page, limit, actionType, entityType, search, from, to });
+    res.json(result);
+  } catch (err) {
+    console.error("Error fetching audit log:", err);
+    res.status(500).json({ error: "Failed to fetch audit log" });
+  }
+};
+
 export {
   verifyAdmin,
   getPendingUsersAdmin,
@@ -164,4 +176,5 @@ export {
   getCompanyListHandler,
   deactivateCompanyHandler,
   reactivateCompanyHandler,
+  getAuditLogHandler,
 };
