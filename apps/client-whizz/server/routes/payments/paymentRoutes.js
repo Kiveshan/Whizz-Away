@@ -1,6 +1,6 @@
 import express from "express";
 import { verifyToken } from "../../middleware/auth.js";
-import { validate } from "../../middleware/validate.js";
+import { validate } from "@whizz/core";
 import { paymentCreateSchema } from "../../validation/financialSchemas.js";
 import {
   createPaymentHandler,

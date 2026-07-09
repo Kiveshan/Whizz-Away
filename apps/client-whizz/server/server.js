@@ -12,8 +12,8 @@ import {
   findUserById,
 } from "./models/userModel.js";
 import { requestLogger } from "./middleware/sessionDebug.js";
-import { errorHandler, notFoundHandler } from "./middleware/errorHandler.js";
-import { secretKey } from "./config/secrets.js";
+import { errorHandler, notFoundHandler } from "@whizz/core";
+import { secretKey } from "@whizz/core/secrets";
 import routes from "./routes/index.js";
 import fs from "fs";
 import multer from "multer";

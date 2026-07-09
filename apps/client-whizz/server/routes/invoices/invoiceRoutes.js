@@ -1,7 +1,7 @@
 // Add this to your invoice routes file (invoiceRoutes.js)
 import express from "express";
 import { verifyToken } from "../../middleware/auth.js";
-import { validate } from "../../middleware/validate.js";
+import { validate } from "@whizz/core";
 import { invoiceCreateSchema } from "../../validation/financialSchemas.js";
 import {
   getCompletedInvoicesHandler,

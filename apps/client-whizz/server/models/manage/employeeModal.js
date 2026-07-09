@@ -1,6 +1,6 @@
 import { pool } from "../../config/database.js"
 import bcrypt from "bcrypt"
-import { validatePassword } from "../../utils/passwordValidator.js"
+import { validatePassword } from "@whizz/core"
 import { logPasswordChange, logEmployeeCreation } from "../../utils/auditLogger.js"
 
 const getEmployeeBasic = async (id) => {

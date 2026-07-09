@@ -6,6 +6,10 @@
   "description": "Shared skeleton: models, controllers, services, UI components and business rules used by every Whizz variant.",
   "main": "index.js",
   "exports": {
-    ".": "./index.js"
+    ".": "./index.js",
+    "./secrets": "./config/secrets.js"
+  },
+  "dependencies": {
+    "dotenv": "^16.4.7"
   }
 }

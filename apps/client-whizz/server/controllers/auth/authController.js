@@ -8,7 +8,7 @@ import {
 } from "../../models/auth/authModel.js";
 import passport from "passport";
 import jwt from "jsonwebtoken";
-import { secretKey } from "../../config/secrets.js";
+import { secretKey } from "@whizz/core/secrets";
 import { ROLES, dashboardForRole } from "@whizz/core";
 
 const login = async (req, res, next) => {

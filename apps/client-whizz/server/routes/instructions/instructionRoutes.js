@@ -25,7 +25,7 @@ import {
   deleteInstructionHandler,
 } from "../../controllers/instructions/instructionController.js"
 import { verifyToken } from "../../middleware/auth.js"
-import { validate } from "../../middleware/validate.js"
+import { validate } from "@whizz/core"
 import { instructionSaveSchema } from "../../validation/financialSchemas.js"
 
 const router = express.Router()

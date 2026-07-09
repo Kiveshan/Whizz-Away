@@ -1,6 +1,6 @@
 import jwt from "jsonwebtoken"
 import crypto from "crypto"
-import { secretKey } from "../config/secrets.js"
+import { secretKey } from "@whizz/core/secrets"
 import { ROLES } from "@whizz/core"
 
 // Strict JWT verification. Every request reaching this middleware MUST present a
