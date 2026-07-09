@@ -6,6 +6,7 @@ import {
   updateInstructionDetails,
   getInstructionDetailsForPreview,
 } from "../../models/invoices/invoiceModel.js";
+import { auditFromReq } from "../../utils/auditLogger.js";
 
 const getCompletedInvoicesHandler = async (req, res) => {
   try {
@@ -134,6 +135,14 @@ const createInvoiceHandler = async (req, res) => {
       });
     }
 
+    auditFromReq(req, {
+      actionType: "INVOICE_CREATED",
+      entityType: "invoice",
+      targetId: m1key,
+      targetName: `client ${clientId}`,
+      details: `Invoice created for instruction ${m1key}, client ${clientId}`,
+    });
+
     res.json({
       success: true,
       data: result.data,
@@ -228,6 +237,14 @@ const updateInstructionDetailsHandler = async (req, res) => {
         message: result.message,
       });
     }
+
+    auditFromReq(req, {
+      actionType: "INVOICE_UPDATED",
+      entityType: "invoice",
+      targetId: m1key,
+      targetName: invoice_num || `instruction ${m1key}`,
+      details: `Invoice/instruction ${m1key} updated${rate !== undefined ? ` (rate: ${rate})` : ""}${invoice_num ? ` (invoice_num: ${invoice_num})` : ""}`,
+    });
 
     res.json({
       success: true,

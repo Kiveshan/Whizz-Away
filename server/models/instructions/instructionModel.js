@@ -1,15 +1,9 @@
 import { pool, query } from "../../config/database.js";
 
-// Helper function to calculate total cost based on rate weight type
+// Fallback total-cost calculation, used only when the controller did not
+// supply a server-calculated total_cost. Derives the total from the submitted
+// rate inputs — never from a client-precomputed total.
 const calculateTotalCost = (instructionData) => {
-  // If the frontend has already calculated the total cost, use that value
-  if (
-    instructionData.total_cost &&
-    !isNaN(Number(instructionData.total_cost))
-  ) {
-    return Number(Number(instructionData.total_cost).toFixed(2));
-  }
-
   const rateWeight =
     instructionData.rateweight || instructionData.rateWeight || "Container";
 
@@ -1568,6 +1562,17 @@ export const checkClientHasRates = async (clientId, company_reg_num) => {
   }
 };
 
+// Uplift a base rate by a fuel surcharge percentage. Returns the value
+// unchanged when either input is missing/zero so existing rates are untouched
+// for clients that have not configured a fuel surcharge.
+const applyFuelSurcharge = (value, fuelSurchargePct) => {
+  if (value === null || value === undefined || value === "") return value;
+  const base = Number(value);
+  const pct = Number(fuelSurchargePct);
+  if (Number.isNaN(base) || Number.isNaN(pct) || pct === 0) return value;
+  return Number((base * (1 + pct / 100)).toFixed(2));
+};
+
 export const getClientRates = async (clientId, start, destination, company_reg_num) => {
   if (!clientId || !start || !destination) {
     throw new Error("clientId, start, and destination are required");
@@ -1582,6 +1587,7 @@ export const getClientRates = async (clientId, start, destination, company_reg_n
       surcharge12m,
       hazardous,
       vgm,
+      fuel_surcharge as "fuelSurcharge",
       starting_point as "startingPoint",
       destination
     FROM public.m5_client_rate
@@ -1620,6 +1626,15 @@ export const getClientRates = async (clientId, start, destination, company_reg_n
     }
 
     const rateData = rates[0];
+
+    // Apply the fuel surcharge percentage to the base route rates so the
+    // instruction form (and the persisted rateper_* values) already reflect
+    // the uplift. Surcharge/hazardous/VGM line items are left untouched.
+    const fuelSurcharge = rateData.fuelSurcharge;
+    rateData.sixMeterRate = applyFuelSurcharge(rateData.sixMeterRate, fuelSurcharge);
+    rateData.twelveMeterRate = applyFuelSurcharge(rateData.twelveMeterRate, fuelSurcharge);
+    rateData.setRate = applyFuelSurcharge(rateData.setRate, fuelSurcharge);
+
     console.log(`[getClientRates] Retrieved rates:`, {
       rawRow: rateData,
       sixMeterRate: rateData.sixMeterRate,
@@ -1629,6 +1644,7 @@ export const getClientRates = async (clientId, start, destination, company_reg_n
       hazardous: rateData.hazardous,
       vgm: rateData.vgm,
       vgmRate: rateData.vgmRate, // Return the VGM rate
+      fuelSurcharge: rateData.fuelSurcharge, // Percentage applied to base rates
       startingPoint: rateData.startingPoint,
       destination: rateData.destination,
     });
@@ -3151,7 +3167,7 @@ export const deleteInstruction = async (instructionId, company_reg_num) => {
 
 export const getClientSetRate = async (clientId, starting_point, destination, company_reg_num) => {
   const sql = `
-    SELECT set_rate
+    SELECT set_rate, fuel_surcharge
     FROM public.m5_client_rate
     WHERE clientid = $1 AND starting_point = $2 AND destination = $3 AND company_reg_num = $4
     ORDER BY client_rate_id DESC
@@ -3168,7 +3184,7 @@ export const getClientSetRate = async (clientId, starting_point, destination, co
     console.log(`[${new Date().toISOString()}] getClientSetRate: Query completed, found ${rows.length} rates`);
 
     if (rows.length > 0) {
-      const setRate = rows[0].set_rate;
+      const setRate = applyFuelSurcharge(rows[0].set_rate, rows[0].fuel_surcharge);
       console.log(`[${new Date().toISOString()}] getClientSetRate: Found set_rate: ${setRate}`);
       return { set_rate: setRate };
     } else {

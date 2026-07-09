@@ -4,6 +4,7 @@ import {
   saveClientRates,
   deleteClientRate,
 } from "../../models/manage/clientRateModel.js"
+import { auditFromReq } from "../../utils/auditLogger.js"
 
 const getAllClientsForRatesHandler = async (req, res) => {
   try {
@@ -95,6 +96,15 @@ const saveClientRatesHandler = async (req, res) => {
       if (rate.vgm !== undefined && rate.vgm !== "" && (isNaN(rate.vgm) || Number.parseFloat(rate.vgm) < 0)) {
         return res.status(400).json({ error: "VGM must be a non-negative number" })
       }
+
+      // Validate fuel surcharge if provided (percentage, non-negative)
+      if (
+        rate.fuel_surcharge !== undefined &&
+        rate.fuel_surcharge !== "" &&
+        (isNaN(rate.fuel_surcharge) || Number.parseFloat(rate.fuel_surcharge) < 0)
+      ) {
+        return res.status(400).json({ error: "Fuel surcharge must be a non-negative percentage" })
+      }
     }
 
     const result = await saveClientRates(clientId, rates, req.user.company_reg_num)
@@ -102,6 +112,16 @@ const saveClientRatesHandler = async (req, res) => {
     if (!result.success) {
       return res.status(400).json({ error: result.message })
     }
+
+    auditFromReq(req, {
+      actionType: "CLIENT_RATES_SAVED",
+      entityType: "client_rate",
+      targetId: clientId,
+      targetName: `client ${clientId}`,
+      details: `${rates.length} rate(s) saved for client ${clientId}: ${rates
+        .map((r) => `${r.starting_point}->${r.destination}`)
+        .join(", ")}`,
+    })
 
     res.json({
       message: "Client rates saved successfully",
@@ -123,6 +143,13 @@ const deleteClientRateHandler = async (req, res) => {
     if (!result.success) {
       return res.status(404).json({ message: result.message })
     }
+
+    auditFromReq(req, {
+      actionType: "CLIENT_RATE_DELETED",
+      entityType: "client_rate",
+      targetId: rateId,
+      details: `Client rate ${rateId} deleted`,
+    })
 
     res.json({ message: result.message })
   } catch (err) {

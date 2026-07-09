@@ -1800,6 +1800,7 @@ export function useApi(state, actions) {
                   hazardous: "",
                   vgm: "",
                   set_rate: "",
+                  fuel_surcharge: "",
                 },
               ],
           })

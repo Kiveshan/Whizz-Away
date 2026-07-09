@@ -25,6 +25,8 @@ import {
   deleteInstructionHandler,
 } from "../../controllers/instructions/instructionController.js"
 import { verifyToken } from "../../middleware/auth.js"
+import { validate } from "../../middleware/validate.js"
+import { instructionSaveSchema } from "../../validation/financialSchemas.js"
 
 const router = express.Router()
 
@@ -39,7 +41,7 @@ router.get('/test-containers/:id', (req, res) => {
 
 // Containers routes
 router.get('/containers/:instructionId', verifyToken, getContainersHandler);
-router.post("/save-instruction", verifyToken, saveInstructionHandler)
+router.post("/save-instruction", verifyToken, validate(instructionSaveSchema), saveInstructionHandler)
 router.get("/client-instruction-stats", verifyToken, getClientInstructionStatsHandler)
 router.get("/instructions", verifyToken, getInstructionsHandler)
 router.get("/search", verifyToken, searchInstructionsHandler)

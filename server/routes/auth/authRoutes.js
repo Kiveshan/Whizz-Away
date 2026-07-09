@@ -13,20 +13,27 @@ import { verifyToken } from "../../middleware/auth.js";
 
 const router = express.Router();
 
-const loginLimiter = rateLimit({
+// Brute-force protection on the pre-auth endpoints. Successful logins don't
+// count against the limit, so legitimate users are unaffected.
+const authLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
-  max: 20,
+  limit: 20,
+  skipSuccessfulRequests: true,
   standardHeaders: true,
   legacyHeaders: false,
-  message: { error: "Too many login attempts. Please try again in 15 minutes.", code: "RATE_LIMITED" },
+  message: {
+    error: "Too many attempts",
+    message: "Too many attempts from this address. Please try again in 15 minutes.",
+    code: "RATE_LIMITED",
+  },
 });
 
-router.post("/login", loginLimiter, login);
+router.post("/login", authLimiter, login);
 router.post("/logout", logout);
 router.get("/user-info", verifyToken, getUserInfo);
 router.get("/api/user-role", verifyToken, getUserRole);
-router.get("/check-email", checkEmail);
-router.get("/check-company-reg", checkCompanyReg);
-router.post("/register", register);
+router.get("/check-email", authLimiter, checkEmail);
+router.get("/check-company-reg", authLimiter, checkCompanyReg);
+router.post("/register", authLimiter, register);
 
 export default router;

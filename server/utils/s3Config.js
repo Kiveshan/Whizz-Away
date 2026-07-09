@@ -1,3 +1,7 @@
+// S3 config for FLEET/HR documents (employee, truck, trailer PDFs) — two
+// buckets with separate credentials (Employee_* / Trucks_* env vars).
+// NOT the same as ./s3-config.js, which handles operational docs in a single
+// bucket. Exports an async getSignedUrl(key, expires, bucketName).
 import AWS from "aws-sdk"
 import multer from "multer"
 import multerS3 from "multer-s3"

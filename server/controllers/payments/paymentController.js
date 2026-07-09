@@ -5,6 +5,7 @@ import {
   getClientInvoices,
   deletePayment,
 } from "../../models/payments/paymentModel.js";
+import { auditFromReq } from "../../utils/auditLogger.js";
 
 const createPaymentHandler = async (req, res) => {
   try {
@@ -25,6 +26,14 @@ const createPaymentHandler = async (req, res) => {
       reference: reference ? reference.trim() : null,
       line_items,
     }, req.user.company_reg_num);
+
+    auditFromReq(req, {
+      actionType: "PAYMENT_CREATED",
+      entityType: "payment",
+      targetId: payment.data?.paymentId,
+      targetName: `client ${clientId}`,
+      details: `Payment created for client ${clientId} (${line_items.length} line item(s), ref: ${reference || "none"})`,
+    });
 
     res.json({
       success: true,
@@ -131,9 +140,16 @@ const getClientInvoicesHandler = async (req, res) => {
 const deletePaymentHandler = async (req, res) => {
   try {
     const { clientId, paymentId } = req.params;
-    console.log(`Deleting payment ${paymentId} for client ${clientId}`);
 
     await deletePayment(clientId, paymentId, req.user.company_reg_num);
+
+    auditFromReq(req, {
+      actionType: "PAYMENT_DELETED",
+      entityType: "payment",
+      targetId: paymentId,
+      targetName: `client ${clientId}`,
+      details: `Payment ${paymentId} deleted for client ${clientId}`,
+    });
 
     res.json({
       success: true,

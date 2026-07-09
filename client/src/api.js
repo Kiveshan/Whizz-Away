@@ -1,6 +1,6 @@
 import axios from "axios"
 
-const API_BASE_URL = process.env.REACT_APP_API_URL || "http://localhost:5000"
+export const API_BASE_URL = process.env.REACT_APP_API_URL || "http://localhost:5000"
 
 // Create axios instance
 const api = axios.create({
@@ -9,7 +9,7 @@ const api = axios.create({
     "Content-Type": "application/json",
   },
   withCredentials: true, // Include credentials (cookies) with requests
-  timeout: 10000, // 10 second timeout
+  timeout: 30000, // 30s — tolerate backend/DB cold starts instead of failing
 })
 
 // Global token expiration handler

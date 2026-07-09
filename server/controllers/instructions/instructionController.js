@@ -19,6 +19,7 @@ import {
   getClientSetRate,
   searchInstructions,
 } from "../../models/instructions/instructionModel.js"
+import { auditFromReq } from "../../utils/auditLogger.js"
 
 // Helper function to calculate total cost based on rate weight type
 // Supports FC shipment type 4 using weight rows + unit rate
@@ -206,15 +207,17 @@ export const saveInstructionHandler = async (req, res) => {
 
     const shipmentTypeStr = String(controllerData.shipmentTypeId || controllerData.shipment_type || "")
 
-    // Use the frontend's total cost if available, otherwise calculate it.
-    // Treat 0 as a valid value (do not recalc when total_cost === 0).
-    let finalTotalCost = controllerData.total_cost
-    if (finalTotalCost === undefined || finalTotalCost === null || isNaN(Number(finalTotalCost))) {
-      finalTotalCost = calculateTotalCost(controllerData, containerData || [])
-      console.log("CONTROLLER: Had to calculate total_cost in backend:", finalTotalCost)
-    } else {
-      finalTotalCost = Number(Number(finalTotalCost).toFixed(2))
-      console.log("CONTROLLER: Using frontend total_cost:", finalTotalCost)
+    // The server is authoritative on pricing: always recompute the total from
+    // the submitted rate/container/weight inputs rather than trusting a
+    // client-precomputed figure (set-rate mode still uses the entered rate by
+    // design, inside calculateTotalCost). Warn when the client's figure
+    // disagrees so any frontend/backend calculation drift is visible.
+    const finalTotalCost = calculateTotalCost(controllerData, containerData || [], weightData || [])
+    const clientTotalCost = Number(controllerData.total_cost)
+    if (!Number.isNaN(clientTotalCost) && Math.abs(clientTotalCost - finalTotalCost) > 0.01) {
+      console.warn(
+        `save-instruction: client total_cost ${clientTotalCost} differs from server-calculated ${finalTotalCost}; using server value`
+      )
     }
 
     let updatedControllerData = {
@@ -274,6 +277,15 @@ export const saveInstructionHandler = async (req, res) => {
       weightData: Array.isArray(weightData) ? weightData : [],
       company_reg_num: req.user.company_reg_num,
     })
+
+    auditFromReq(req, {
+      actionType: "INSTRUCTION_CREATED",
+      entityType: "instruction",
+      targetId: result.m1key,
+      targetName: `client ${updatedControllerData.client_id ?? updatedControllerData.clientId ?? "?"}`,
+      details: `Instruction ${result.m1key} created (total_cost: ${updatedControllerData.total_cost})`,
+    })
+
     res.json({ success: true, m1key: result.m1key })
   } catch (error) {
     console.error("Error in save-instruction endpoint:", error)
@@ -703,14 +715,16 @@ export const getClientRatesController = async (req, res) => {
 export const saveInstructionController = async (req, res) => {
   const { controllerData, containerData } = req.body
   try {
-    // Use the frontend's total cost if available, otherwise calculate it
-    let finalTotalCost = controllerData.total_cost;
-    if (!finalTotalCost || isNaN(Number(finalTotalCost))) {
-      finalTotalCost = calculateTotalCost(controllerData, containerData || []);
-    } else {
-      finalTotalCost = Number(Number(finalTotalCost).toFixed(2));
+    // Server-authoritative pricing: recompute from submitted inputs, never
+    // trust a client-precomputed total (see saveInstructionHandler).
+    const finalTotalCost = calculateTotalCost(controllerData, containerData || []);
+    const clientTotalCost = Number(controllerData.total_cost);
+    if (!Number.isNaN(clientTotalCost) && Math.abs(clientTotalCost - finalTotalCost) > 0.01) {
+      console.warn(
+        `save-instruction: client total_cost ${clientTotalCost} differs from server-calculated ${finalTotalCost}; using server value`
+      );
     }
-    
+
     const updatedControllerData = {
       ...controllerData,
       total_cost: finalTotalCost,
@@ -812,6 +826,13 @@ export const deleteInstructionHandler = async (req, res) => {
     const result = await deleteInstruction(id, req.user.company_reg_num)
 
     console.log(`[${new Date().toISOString()}] [CONTROLLER] deleteInstructionHandler: Delete successful for instruction ${id}`)
+
+    auditFromReq(req, {
+      actionType: "INSTRUCTION_DELETED",
+      entityType: "instruction",
+      targetId: id,
+      details: `Instruction ${id} and its containers deleted`,
+    })
 
     res.status(200).json({
       success: true,

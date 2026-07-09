@@ -62,7 +62,6 @@ const Login = ({ switchToRegister, closePopup }) => {
 
       if (response.status === 200) {
         const data = response.data;
-        console.log("Login successful. Token:", data.token);
 
         // Check if user is creditor (roleid 8) without enterprise plan
         // If so, treat as failed login and show upgrade modal

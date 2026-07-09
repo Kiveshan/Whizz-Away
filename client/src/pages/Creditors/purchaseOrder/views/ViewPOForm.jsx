@@ -79,7 +79,7 @@ const handleViewSlip = async () => {
   try {
     const response = await api.get(`/api/po-form/view-slip/${ponum}`);
     const data = response.data;
-    
+
     if (data.success && data.url) {
       window.open(data.url, '_blank');
     } else {

@@ -18,7 +18,10 @@
  * @param {object}   [props.sectionStyle]         Extra style for the outer form-section div
  * @param {function} props.onContainerChange      (id, field, value) => void
  * @param {function} props.onDeleteContainer      (container) => void — opens confirmation
+ * @param {function} [props.onChangeContainersType] (ids[], type) => void — bulk type switch
  */
+import { useState } from "react";
+
 export function ContainerDetailsTable({
   containers,
   containerFieldErrors,
@@ -31,12 +34,40 @@ export function ContainerDetailsTable({
   sectionStyle,
   onContainerChange,
   onDeleteContainer,
+  onChangeContainersType,
 }) {
   const showFileRef = String(shipmentTypeId) === "2";
   const showWeight =
     isImport ||
     String(shipmentTypeId) === "2" ||
     String(shipmentTypeId) === "3";
+
+  // Selectable container types. BreakBulk is managed separately (its own
+  // section) and cross-haul hides this table entirely, so only offer the three
+  // standard sizes here.
+  const typeOptions = ["6m", "12m", "Abnormal"];
+
+  // ── Multi-select state (mass edit) ──
+  const [selectedIds, setSelectedIds] = useState([]);
+  const enableSelect = !isReadOnly && Boolean(onChangeContainersType);
+  // Keep only ids that still exist, so deleting a selected row can't leave a
+  // stale selection.
+  const selected = selectedIds.filter((id) =>
+    containers.some((c) => c.id === id)
+  );
+  const allSelected = containers.length > 0 && selected.length === containers.length;
+
+  const toggleOne = (id) =>
+    setSelectedIds((prev) =>
+      prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]
+    );
+  const toggleAll = () =>
+    setSelectedIds(allSelected ? [] : containers.map((c) => c.id));
+  const applyType = (type) => {
+    if (selected.length === 0) return;
+    onChangeContainersType(selected, type);
+    setSelectedIds([]);
+  };
 
   return (
     <div
@@ -48,6 +79,59 @@ export function ContainerDetailsTable({
         {successMessage && (
           <div className="controller-instructions-success-message">
             {successMessage}
+          </div>
+        )}
+        {enableSelect && selected.length > 0 && (
+          <div
+            className="controller-instructions-mass-edit-toolbar"
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: "8px",
+              padding: "8px 10px",
+              marginBottom: "10px",
+              backgroundColor: "#eef4ff",
+              border: "1px solid #b6d0ff",
+              borderRadius: "4px",
+            }}
+          >
+            <span style={{ fontSize: "13px", fontWeight: 500 }}>
+              {selected.length} selected — set type to:
+            </span>
+            {typeOptions.map((type) => (
+              <button
+                key={type}
+                type="button"
+                onClick={() => applyType(type)}
+                style={{
+                  padding: "3px 12px",
+                  fontSize: "12px",
+                  borderRadius: "4px",
+                  border: "1px solid #0d6efd",
+                  backgroundColor: "#fff",
+                  color: "#0d6efd",
+                  cursor: "pointer",
+                }}
+              >
+                {type}
+              </button>
+            ))}
+            <button
+              type="button"
+              onClick={() => setSelectedIds([])}
+              style={{
+                marginLeft: "auto",
+                padding: "3px 10px",
+                fontSize: "12px",
+                borderRadius: "4px",
+                border: "1px solid #adb5bd",
+                backgroundColor: "#fff",
+                color: "#6c757d",
+                cursor: "pointer",
+              }}
+            >
+              Clear
+            </button>
           </div>
         )}
         <div
@@ -64,6 +148,24 @@ export function ContainerDetailsTable({
           >
             <thead>
               <tr>
+                {enableSelect && (
+                  <th
+                    style={{
+                      padding: "12px 8px",
+                      textAlign: "center",
+                      borderBottom: "2px solid #ddd",
+                      width: "36px",
+                    }}
+                  >
+                    <input
+                      type="checkbox"
+                      aria-label="Select all containers"
+                      checked={allSelected}
+                      onChange={toggleAll}
+                      style={{ transform: "scale(1.2)", cursor: "pointer" }}
+                    />
+                  </th>
+                )}
                 <th
                   style={{
                     padding: "12px 8px",
@@ -154,7 +256,34 @@ export function ContainerDetailsTable({
             <tbody>
               {containers.map((container) => (
                 <tr key={container.id}>
-                  <td>{container.containerType}</td>
+                  {enableSelect && (
+                    <td style={{ textAlign: "center" }}>
+                      <input
+                        type="checkbox"
+                        aria-label={`Select container ${container.id}`}
+                        checked={selected.includes(container.id)}
+                        onChange={() => toggleOne(container.id)}
+                        style={{ transform: "scale(1.2)", cursor: "pointer" }}
+                      />
+                    </td>
+                  )}
+                  <td>
+                    <select
+                      className="controller-instructions-form-input"
+                      value={container.containerType}
+                      onChange={(e) =>
+                        onContainerChange(container.id, "containerType", e.target.value)
+                      }
+                      disabled={isReadOnly}
+                      style={isReadOnly ? readOnlyStyle : {}}
+                    >
+                      {typeOptions.map((type) => (
+                        <option key={type} value={type}>
+                          {type}
+                        </option>
+                      ))}
+                    </select>
+                  </td>
 
                   {/* Container Number */}
                   <td>

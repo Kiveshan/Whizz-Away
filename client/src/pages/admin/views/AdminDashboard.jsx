@@ -5,6 +5,7 @@ import UserApprovalList from "./UserApprovalList";
 import CompanyManagement from "./CompanyManagement";
 import SubcontractorBackfill from "./SubcontractorBackfill";
 import DriverRateAudit from "./DriverRateAudit";
+import AuditLogViewer from "./AuditLogViewer";
 import "../css/AdminDashboard.css";
 // Import the TestConnection component
 // import TestConnection from "./TestConnection"
@@ -47,6 +48,14 @@ function AdminDashboard() {
           >
             Driver Rate Audit
           </button>
+          <button
+            className={`tab-button ${
+              activeTab === "audit-log" ? "active" : ""
+            }`}
+            onClick={() => setActiveTab("audit-log")}
+          >
+            Audit Log
+          </button>
         </div>
 
         <div className="admin-content">
@@ -54,6 +63,7 @@ function AdminDashboard() {
           {activeTab === "companies" && <CompanyManagement />}
           {activeTab === "backfill" && <SubcontractorBackfill />}
           {activeTab === "rate-audit" && <DriverRateAudit />}
+          {activeTab === "audit-log" && <AuditLogViewer />}
         </div>
       </div>
     </div>

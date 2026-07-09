@@ -81,6 +81,7 @@ export function FCcontrollerinstructionsLayout({
   addWeightRow,
   // Handlers — containers
   handleContainerChange,
+  changeContainersType,
   handleRequestDeleteContainer,
   // Handlers — actions
   handleSaveChanges,
@@ -555,6 +556,7 @@ export function FCcontrollerinstructionsLayout({
               }
               onContainerChange={handleContainerChange}
               onDeleteContainer={handleRequestDeleteContainer}
+              onChangeContainersType={changeContainersType}
             />
           )}
           <ActionButtons

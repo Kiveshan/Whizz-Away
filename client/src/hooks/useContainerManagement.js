@@ -52,6 +52,20 @@ import {
   checkContainerLegsExist as checkContainerLegsExistService,
 } from "../services/instructionService.js";
 
+// Valid container types, and a pure helper to derive form counts from the
+// container rows. In the row-as-source-of-truth model the counts are always a
+// projection of the container list, never edited directly.
+const CONTAINER_TYPES = ["6m", "12m", "Abnormal", "BreakBulk"];
+
+export function deriveCounts(list = []) {
+  return {
+    num_six_meters: list.filter((c) => c.containerType === "6m").length,
+    num_twelve_meters: list.filter((c) => c.containerType === "12m").length,
+    num_abnormal: list.filter((c) => c.containerType === "Abnormal").length,
+    num_breakbulk: list.filter((c) => c.containerType === "BreakBulk").length,
+  };
+}
+
 export function useContainerManagement({
   isImport = false,
   isExport = false,
@@ -255,6 +269,49 @@ export function useContainerManagement({
     [clientId, pickup, dropoff, setContainersAndRef, onRecalculateTotalCost]
   );
 
+  // ── changeContainersType ────────────────────────────────────────────────────
+  // Switch one or more containers to a new type in place, preserving each row's
+  // data (number, weight, cargo, hazardous, VGM) and its stable id. Counts are
+  // re-derived from the rows. Shared by the per-row type dropdown and the
+  // multi-select "set selected to type" action.
+
+  const changeContainersType = useCallback(
+    (ids, newType) => {
+      if (isReadOnly) return;
+      if (!CONTAINER_TYPES.includes(newType)) return;
+      const idSet = new Set(Array.isArray(ids) ? ids : [ids]);
+      if (idSet.size === 0) return;
+      const surchargedIds = [];
+      setContainersAndRef((prev) => {
+        const next = prev.map((c) => {
+          if (!idSet.has(c.id)) return c;
+          if (c.addSurcharges) surchargedIds.push(c.id);
+          return {
+            ...c,
+            containerType: newType,
+            // 12m surcharge only applies to 12m rows; re-fetched below if needed
+            is_12m_surcharge: newType === "12m" ? c.is_12m_surcharge : false,
+            surcharge_12m_amount: newType === "12m" ? c.surcharge_12m_amount : 0,
+          };
+        });
+        onUpdateFormCounts?.(deriveCounts(next));
+        return next;
+      });
+      setIsContainerDataModified(true);
+      // Surcharge amounts can differ by type, so re-fetch affected surcharged
+      // rows; otherwise just recalculate the total.
+      if (surchargedIds.length > 0) {
+        surchargedIds.forEach((cid) => fetchSurchargeForContainer(cid));
+      } else {
+        onRecalculateTotalCost?.();
+      }
+    },
+    [
+      isReadOnly, setContainersAndRef, onUpdateFormCounts,
+      fetchSurchargeForContainer, onRecalculateTotalCost,
+    ]
+  );
+
   // ── handleContainerChange ───────────────────────────────────────────────────
 
   const handleContainerChange = useCallback(
@@ -369,6 +426,14 @@ export function useContainerManagement({
         return;
       }
 
+      // ── containerType (in-place 6m ↔ 12m ↔ Abnormal switch) ──
+      // Delegates to the batch helper so single-row and multi-row (mass edit)
+      // switches share one code path.
+      if (field === "containerType") {
+        changeContainersType([id], value);
+        return;
+      }
+
       // ── default field update ──
       setContainersAndRef((prev) =>
         prev.map((c) => (c.id === id ? { ...c, [field]: value } : c))
@@ -379,7 +444,7 @@ export function useContainerManagement({
       isImport, shipmentTypeId, clientId, pickup, dropoff,
       clearContainerFieldError, setContainersAndRef,
       fetchSurchargeForContainer, fetchVgmForContainer,
-      onRecalculateTotalCost,
+      changeContainersType, onRecalculateTotalCost,
     ]
   );
 
@@ -422,14 +487,7 @@ export function useContainerManagement({
     if (!containerToDelete) return;
     setContainersAndRef((prev) => {
       const updated = prev.filter((c) => c.id !== containerToDelete.id);
-      // Recalculate counts for form sync
-      const counts = {
-        num_six_meters: updated.filter((c) => c.containerType === "6m").length,
-        num_twelve_meters: updated.filter((c) => c.containerType === "12m").length,
-        num_abnormal: updated.filter((c) => c.containerType === "Abnormal").length,
-        num_breakbulk: updated.filter((c) => c.containerType === "BreakBulk").length,
-      };
-      onUpdateFormCounts?.(counts);
+      onUpdateFormCounts?.(deriveCounts(updated));
       return updated;
     });
     setIsContainerDataModified(true);
@@ -455,6 +513,7 @@ export function useContainerManagement({
     containerToDelete,
     initializeContainers,
     handleContainerChange,
+    changeContainersType,
     validateContainerUniqueness,
     handleRequestDeleteContainer,
     confirmDeleteContainer,

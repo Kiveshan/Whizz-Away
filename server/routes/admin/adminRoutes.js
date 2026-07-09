@@ -8,6 +8,7 @@ import {
   getCompanyListHandler,
   deactivateCompanyHandler,
   reactivateCompanyHandler,
+  getAuditLogHandler,
 } from "../../controllers/admin/adminController.js";
 import { verifyToken, verifyAdminAccess } from "../../middleware/auth.js";
 
@@ -50,6 +51,13 @@ router.post(
   verifyToken,
   verifyAdminAccess,
   reactivateCompanyHandler
+);
+
+router.get(
+  "/api/admin/audit-log",
+  verifyToken,
+  verifyAdminAccess,
+  getAuditLogHandler
 );
 
 // Legacy API route for backward compatibility

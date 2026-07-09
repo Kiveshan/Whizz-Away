@@ -21,7 +21,24 @@
       "Bash(node -e \"require\\('express-rate-limit'\\); console.log\\('installed'\\)\")",
       "Bash(npm install *)",
       "Bash(npm list *)",
-      "Bash(git checkout *)"
+      "Bash(git checkout *)",
+      "Bash(node --check models/instructions/instructionModel.js)",
+      "Bash(node --check models/manage/clientRateModel.js)",
+      "Bash(node --check controllers/manage/clientRateController.js)",
+      "Bash(cd /c/Users/22122564/Documents/GitHub/Whizz-Away/server && ls .env 2>/dev/null && echo \"---env found---\")",
+      "Bash(node _tmp_verify_subbie.js)",
+      "Bash(node scripts/tmp_lookup_clients.js)",
+      "Bash(gh auth *)",
+      "PowerShell(gh auth status 2>&1)",
+      "PowerShell(git remote add saas https://github.com/Kiveshan/Whizz-Away-SAAS.git 2>&1)",
+      "PowerShell(git push saas kiveshan-saas:main 2>&1)",
+      "PowerShell(git push saas kiveshan-saas:main --force 2>&1)",
+      "Read(//c/c/Users/22122564/Documents/GitHub/Whizz-Away/server/**)",
+      "Bash(node scripts/_tmp_verifyAGL.js)",
+      "Bash(python -c ' *)",
+      "Bash(npm root *)",
+      "Bash(node gen.js)",
+      "Bash(node scripts/findFebCompletedNoLegs.js February 2026)"
     ]
   }
 }

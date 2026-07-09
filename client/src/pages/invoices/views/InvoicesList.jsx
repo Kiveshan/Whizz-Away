@@ -140,8 +140,9 @@ Troubleshooting tips:
       }
     };
 
-    // Only fetch if at least one filter is set (year, month, or clientId)
-    if (filters.year || filters.month || filters.clientId) {
+    // Only fetch if at least one filter is set (year, month, clientId) or a
+    // search is active (so search spans all invoices without month/year).
+    if (filters.year || filters.month || filters.clientId || searchQuery.trim()) {
       fetchInstructions();
     } else {
       // If no filters are set, clear the instructions and show a message
@@ -175,8 +176,16 @@ Troubleshooting tips:
   }, []);
 
   const handleSearchChange = useCallback((e) => {
-    setSearchQuery(e.target.value);
+    const value = e.target.value;
+    setSearchQuery(value);
     setCurrentPage(1);
+    // When searching, clear the month/year filters so the search runs
+    // across all invoices rather than only the selected month/year.
+    if (value.trim()) {
+      setFilters((prev) =>
+        prev.year || prev.month ? { ...prev, year: "", month: "" } : prev
+      );
+    }
   }, []);
 
   // Handle pagination

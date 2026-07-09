@@ -382,7 +382,12 @@ export function useUpdateFormHandlers({
             const ofType = containers.filter(
               (c) => c.containerType === containerType
             );
-            const toRemove = ofType.slice(ofType.length - difference);
+            // Remove the last `difference` rows of this type, capped at how many
+            // actually exist (guards against a count/row desync producing a
+            // negative slice index that would under-remove).
+            const toRemove = ofType.slice(
+              Math.max(0, ofType.length - difference)
+            );
             setContainers(
               containers.filter((c) => !toRemove.includes(c))
             );
@@ -411,7 +416,9 @@ export function useUpdateFormHandlers({
 
         updatedFormData.total_cost = totalCost;
         setFormData(updatedFormData);
-        updatePreservedContainers(name, isIncreasing, difference);
+        // Note: preservedContainers is updated once, inside the `if
+        // (containerType)` block above — do not call it again here or the delta
+        // is applied twice.
         setFieldErrors((prev) => ({ ...prev, containers: "" }));
       } else if (name === "rateWeight") {
         setFormData({ ...formData, [name]: value, total_cost: 0 });

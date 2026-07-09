@@ -1,4 +1,5 @@
 import { getClientCreditNotes, getInstructions, getContainers,getCompanyDetails,getClientDetails,getLatestDocumentNumber,getInstructionDetails,createCreditNote,getCreditNoteById } from "../../models/creditNote/creditNoteModel.js";
+import { auditFromReq } from "../../utils/auditLogger.js";
 
 const getClientCreditNotesHandler = async (req, res) => {
   try {
@@ -145,6 +146,15 @@ const createCreditNoteHandler = async (req, res) => {
     console.log(`Creating credit note for client ${creditNoteData.client_id}`);
 
     const result = await createCreditNote(creditNoteData, req.user.company_reg_num);
+
+    auditFromReq(req, {
+      actionType: "CREDIT_NOTE_CREATED",
+      entityType: "credit_note",
+      targetId: result.data?.credit_note_id ?? result.data?.id,
+      targetName: creditNoteData.document_number || `client ${creditNoteData.client_id}`,
+      details: `Credit note created for client ${creditNoteData.client_id} (total: ${creditNoteData.total ?? "n/a"})`,
+    });
+
     res.status(201).json({
       success: true,
       data: result.data,

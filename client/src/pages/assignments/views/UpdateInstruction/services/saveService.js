@@ -1,3 +1,4 @@
+
 // Helper to fetch rate for a specific driver date
 const fetchRateForDriverDate = async (api, startingpoint, destination, date, isSubcontractor, containerType) => {
   if (!startingpoint || !destination || !date) return null;
