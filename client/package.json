@@ -31,8 +31,7 @@
     "recharts": "^2.15.1",
     "sweetalert2": "^11.22.2",
     "tailwindcss": "^4.0.14",
-    "web-vitals": "^2.1.4",
-    "whizz": "file:../../.."
+    "web-vitals": "^2.1.4"
   },
   "scripts": {
     "start": "react-scripts start",
