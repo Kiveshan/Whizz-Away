@@ -31,28 +31,28 @@ jobs:
           key: ${{ runner.os }}-node-${{ hashFiles('**/package-lock.json') }}
 
       - name: Install client dependencies
-        run: cd client && npm install
+        run: cd apps/client-whizz/client && npm install
 
       - name: Set React environment variables
         run: |
-          cd client
+          cd apps/client-whizz/client
           echo "REACT_APP_API_URL=https://ksm-whizz-away.co.za" > .env
 
       - name: Build React app
-        run: cd client && CI=false npm run build
+        run: cd apps/client-whizz/client && CI=false npm run build
 
       - name: Install server dependencies
-        run: cd server && npm install
+        run: cd apps/client-whizz/server && npm install
 
       - name: Move React build to server
         run: |
-          rm -rf server/public
-          mkdir -p server/public
-          mv client/build server/public
-          mv .platform server/
+          rm -rf apps/client-whizz/server/public
+          mkdir -p apps/client-whizz/server/public
+          mv apps/client-whizz/client/build apps/client-whizz/server/public
+          mv apps/client-whizz/.platform apps/client-whizz/server/
 
       - name: Generate deployment package
-        run: cd server && zip -r ../${{ env.DEPLOYMENT_PACKAGE }} . -x '*.git*' *.env* '*.log' '*.md' 'node_modules/*' 'client/node_modules/*'
+        run: cd apps/client-whizz/server && zip -r ../../../${{ env.DEPLOYMENT_PACKAGE }} . -x '*.git*' *.env* '*.log' '*.md' 'node_modules/*' 'client/node_modules/*'
 
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v1

@@ -1,13 +1,18 @@
 {
-  "name": "trucking_app",
+  "name": "whizz",
   "version": "0.1.7",
   "private": true,
   "type": "module",
+  "workspaces": [
+    "packages/*"
+  ],
   "scripts": {
-    "start": "concurrently \"npm run server --prefix server\" \"npm run start --prefix client\"",
-    "build": "npm run build --prefix client",
-    "test": "npm run test --prefix client",
-    "server": "npm run server --prefix server"
+    "bootstrap": "npm install && npm install --prefix apps/client-whizz/client && npm install --prefix apps/client-whizz/server",
+    "dev": "concurrently \"npm run server --prefix apps/client-whizz/server\" \"npm start --prefix apps/client-whizz/client\"",
+    "dev:client-whizz": "concurrently \"npm run server --prefix apps/client-whizz/server\" \"npm start --prefix apps/client-whizz/client\"",
+    "build:client-whizz": "npm run build --prefix apps/client-whizz/client",
+    "test": "npm test --prefix apps/client-whizz/client",
+    "server:client-whizz": "npm run server --prefix apps/client-whizz/server"
   },
   "devDependencies": {
     "concurrently": "^9.1.2"
