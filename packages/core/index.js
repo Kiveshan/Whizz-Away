@@ -1,8 +1,10 @@
-// @whizz/core — shared skeleton entry point.
+// @whizz/core — shared skeleton barrel.
 //
-// This package is intentionally empty for now. In step 2 of the monorepo
-// migration, shared logic currently living in apps/client-whizz (models,
-// controllers, services, shared React components, business rules) is extracted
-// here so every variant consumes ONE source of truth. A fix here reaches every
-// app on the next build — no cherry-picking between branches.
-export {};
+// Re-exports every shared module so consumers import from a single specifier:
+//
+//   import { ROLES, dashboardForRole } from "@whizz/core";
+//
+// As more shared logic is extracted out of apps/client-whizz (step 2), add its
+// re-export here. A fix in any of these reaches every variant on next build —
+// no cherry-picking between the OG and SaaS branches.
+export * from "./config/roles.js";

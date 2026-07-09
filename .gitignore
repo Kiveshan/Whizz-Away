@@ -4,6 +4,9 @@
 /node_modules
 **/node_modules
 tempifle.js
+
+# CI-vendored shared packages copied into a deploy bundle (see deploy-*.yaml)
+**/_packages
 /.pnp
 .pnp.js
 .env

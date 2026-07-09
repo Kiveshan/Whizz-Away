@@ -8,7 +8,7 @@ import {
   reactivateCompany,
   getAuditLog,
 } from "../../models/admin/adminModel.js";
-import { ROLES } from "../../config/roles.js";
+import { ROLES } from "@whizz/core";
 
 const verifyAdmin = (req, res) => {
   const isAdmin = req.user.roleid === ROLES.ADMIN;

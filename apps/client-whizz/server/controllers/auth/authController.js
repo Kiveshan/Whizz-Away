@@ -9,7 +9,7 @@ import {
 import passport from "passport";
 import jwt from "jsonwebtoken";
 import { secretKey } from "../../config/secrets.js";
-import { ROLES, dashboardForRole } from "../../config/roles.js";
+import { ROLES, dashboardForRole } from "@whizz/core";
 
 const login = async (req, res, next) => {
   const loginStart = Date.now();

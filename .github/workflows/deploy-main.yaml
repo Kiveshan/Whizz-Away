@@ -41,6 +41,16 @@ jobs:
       - name: Build React app
         run: cd apps/client-whizz/client && CI=false npm run build
 
+      - name: Vendor shared workspace packages into server bundle
+        run: |
+          # EB reinstalls the server bundle in isolation and cannot see packages/*
+          # that live outside apps/client-whizz/server, so copy the shared packages
+          # in and repoint the file: dependency at the vendored path (inside the zip).
+          rm -rf apps/client-whizz/server/_packages
+          mkdir -p apps/client-whizz/server/_packages
+          cp -r packages/core apps/client-whizz/server/_packages/core
+          cd apps/client-whizz/server && npm pkg set 'dependencies.@whizz/core=file:./_packages/core'
+
       - name: Install server dependencies
         run: cd apps/client-whizz/server && npm install
 
