@@ -265,6 +265,16 @@ const deleteClient = async (id) => {
 
     return { success: true, message: "Client deleted successfully" }
   } catch (err) {
+    // FK RESTRICT (migration 007): the client has instructions, payments or
+    // credit notes — history must be preserved. Deactivate instead.
+    if (err.code === "23503") {
+      return {
+        success: false,
+        code: "IN_USE",
+        message:
+          "This client has instructions, payments or credit notes on record and cannot be deleted. Deactivate the client instead.",
+      }
+    }
     console.error(`Error deleting client ${id}:`, err)
     throw err
   } finally {

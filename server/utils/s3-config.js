@@ -1,3 +1,7 @@
+// S3 config for OPERATIONAL documents (instruction docs, fuel slips, payment
+// proofs, purchase orders) — single bucket via AWS_ACCESS_KEY_ID/S3_BUCKET_NAME.
+// NOT the same as ./s3Config.js, which handles employee/truck/trailer document
+// buckets with their own credentials. Exports a sync getSignedUrl(key, expires).
 import AWS from "aws-sdk";
 import multer from "multer";
 import path from "path";

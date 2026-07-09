@@ -1,15 +1,9 @@
 import { pool, query } from "../../config/database.js";
 
-// Helper function to calculate total cost based on rate weight type
+// Fallback total-cost calculation, used only when the controller did not
+// supply a server-calculated total_cost. Derives the total from the submitted
+// rate inputs — never from a client-precomputed total.
 const calculateTotalCost = (instructionData) => {
-  // If the frontend has already calculated the total cost, use that value
-  if (
-    instructionData.total_cost &&
-    !isNaN(Number(instructionData.total_cost))
-  ) {
-    return Number(Number(instructionData.total_cost).toFixed(2));
-  }
-
   const rateWeight =
     instructionData.rateweight || instructionData.rateWeight || "Container";
 

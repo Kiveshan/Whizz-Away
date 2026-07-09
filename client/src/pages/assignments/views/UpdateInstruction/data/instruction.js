@@ -1,3 +1,5 @@
+import { authFetch } from "../../../../../utils/authFetch.js";
+
 export const checkIfWeightBased = async ({
   api,
   instructionId,
@@ -60,7 +62,7 @@ export const fetchDnOptions = async ({ api, instructionId, setDnOptions }) => {
 export const fetchShipmentType = async ({ API_BASE_URL, instructionId, setShipmentType }) => {
   if (instructionId) {
     try {
-      const response = await fetch(
+      const response = await authFetch(
         `${API_BASE_URL}/instructions/${instructionId}/shipment-type`
       );
       if (!response.ok) {

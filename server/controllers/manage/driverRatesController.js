@@ -17,6 +17,7 @@ import {
   auditDriverRatesForMonth,
   applyDriverRateFixesForMonth,
 } from "../../models/manage/driverRatesModel.js"
+import { auditFromReq } from "../../utils/auditLogger.js"
 
 // Validate year/month query/body params for the month audit endpoints.
 const parseYearMonth = (src) => {
@@ -173,6 +174,15 @@ const createDriverRateHandler = async (req, res) => {
       effective_from,
       effective_to,
     })
+
+    auditFromReq(req, {
+      actionType: "DRIVER_RATE_CREATED",
+      entityType: "driver_rate",
+      targetId: newDriverRate?.driverratekey ?? newDriverRate?.id,
+      targetName: `${startingpoint} -> ${destination}`,
+      details: `Driver rate created for ${startingpoint} -> ${destination} (effective ${effective_from || "always"})`,
+    })
+
     res.status(201).json(newDriverRate)
   } catch (err) {
     console.error("Error creating driver rate:", err)
@@ -239,6 +249,15 @@ const updateDriverRateHandler = async (req, res) => {
     if (!result.success) {
       return res.status(404).json({ message: result.message })
     }
+
+    auditFromReq(req, {
+      actionType: "DRIVER_RATE_UPDATED",
+      entityType: "driver_rate",
+      targetId: id,
+      targetName: `${startingpoint || "?"} -> ${destination || "?"}`,
+      details: `Driver rate ${id} updated`,
+    })
+
     res.json(result.data)
   } catch (err) {
     console.error(`Error updating driver rate ${req.params.id}:`, err)
@@ -252,8 +271,17 @@ const deleteDriverRateHandler = async (req, res) => {
     console.log(`Deleting driver rate ID ${id}`)
     const result = await deleteDriverRate(id)
     if (!result.success) {
-      return res.status(404).json({ message: result.message })
+      const status = result.code === "IN_USE" ? 409 : 404
+      return res.status(status).json({ message: result.message })
     }
+
+    auditFromReq(req, {
+      actionType: "DRIVER_RATE_DELETED",
+      entityType: "driver_rate",
+      targetId: id,
+      details: `Driver rate ${id} deleted`,
+    })
+
     res.json({ message: result.message })
   } catch (err) {
     console.error(`Error deleting driver rate ${req.params.id}:`, err)
@@ -391,7 +419,10 @@ const deleteRouteHandler = async (req, res) => {
       })
     }
 
-    await deleteRoute(startingpoint, destination)
+    const deleteResult = await deleteRoute(startingpoint, destination)
+    if (!deleteResult.success) {
+      return res.status(409).json({ error: deleteResult.message })
+    }
     res.json({ message: "Route deleted successfully" })
   } catch (err) {
     console.error("Error deleting route:", err)

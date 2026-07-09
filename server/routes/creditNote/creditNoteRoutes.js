@@ -1,5 +1,7 @@
 import express from "express";
 import { verifyToken } from "../../middleware/auth.js";
+import { validate } from "../../middleware/validate.js";
+import { creditNoteCreateSchema } from "../../validation/financialSchemas.js";
 import {
   getClientCreditNotesHandler,
   getInstructionsHandler,
@@ -37,7 +39,7 @@ router.get(
   verifyToken,
   getInstructionDetailsHandler
 );
-router.post("/api/credit-notes", verifyToken, createCreditNoteHandler);
+router.post("/api/credit-notes", verifyToken, validate(creditNoteCreateSchema), createCreditNoteHandler);
 router.get(
   "/api/credit-notes/by-id/:creditNoteId",
   verifyToken,

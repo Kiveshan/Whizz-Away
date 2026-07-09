@@ -5,6 +5,7 @@ import { useState, useEffect, useRef, useCallback } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import "../css/UpdateInstruction.css";
 import api from "../../../api";
+import { authFetch } from "../../../utils/authFetch.js";
 import InvoicePreviewModal from "../../invoices/views/InviewPreviewModal.jsx";
 import { API_BASE_URL, modalAnimation } from "./UpdateInstruction/constants";
 import {
@@ -1075,7 +1076,7 @@ const shouldDisableAddLeg = async () => {
   if (legs.length === 0) return false;
 
   try {
-    const response = await fetch(`${API_BASE_URL}/instructions/${instructionId}/details`);
+    const response = await authFetch(`${API_BASE_URL}/instructions/${instructionId}/details`);
     if (!response.ok) return false;
 
     const instructionDetails = await response.json();
@@ -1103,7 +1104,7 @@ const checkContainersDestination = async () => {
 
   try {
     // Fetch the instruction details to get the dropoff location
-    const response = await fetch(
+    const response = await authFetch(
       `${API_BASE_URL}/instructions/${instructionId}/details`
     );
     if (!response.ok) {
@@ -1488,7 +1489,7 @@ useEffect(() => {
                 return;
               }
               lastSavedLegRef.current = currentPayload;
-              const response = await fetch(`${API_BASE_URL}/legs/save`, {
+              const response = await authFetch(`${API_BASE_URL}/legs/save`, {
                 method: "POST",
                 headers: {
                   "Content-Type": "application/json",

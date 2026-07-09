@@ -209,6 +209,9 @@ psql -U your_db_user -d your_db_name -f server/migrations/001_add_effective_date
 psql -U your_db_user -d your_db_name -f server/migrations/002_add_unique_orderno_to_expenses_m2.sql
 psql -U your_db_user -d your_db_name -f server/migrations/003_link_addon_instruction_to_invoice.sql
 psql -U your_db_user -d your_db_name -f server/migrations/004_add_dn_to_legs_m2.sql
+psql -U your_db_user -d your_db_name -f server/migrations/005_add_fuel_surcharge_to_client_rate.sql
+psql -U your_db_user -d your_db_name -f server/migrations/006_extend_audit_log.sql
+psql -U your_db_user -d your_db_name -f server/migrations/007_cascade_repair_and_fk_indexes.sql
 ```
 
 ### Run

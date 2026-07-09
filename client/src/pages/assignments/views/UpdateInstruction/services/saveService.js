@@ -1,3 +1,5 @@
+import { authFetch } from "../../../../../utils/authFetch.js";
+
 // Helper to fetch rate for a specific driver date
 const fetchRateForDriverDate = async (api, startingpoint, destination, date, isSubcontractor, containerType) => {
   if (!startingpoint || !destination || !date) return null;
@@ -77,14 +79,14 @@ export const handleSave = async ({
   }
   if (instructionId) {
     try {
-      const instructionResponse = await fetch(
+      const instructionResponse = await authFetch(
         `${API_BASE_URL}/instructions/${instructionId}`
       );
       if (instructionResponse.ok) {
         const instructionData = await instructionResponse.json();
 
         if (instructionData.status === "New") {
-          const updateStatusResponse = await fetch(
+          const updateStatusResponse = await authFetch(
             `${API_BASE_URL}/instructions/${instructionId}/status`,
             {
               method: "PUT",
@@ -266,7 +268,7 @@ export const handleSave = async ({
       JSON.stringify(legData, null, 2)
     );
 
-    const response = await fetch(`${API_BASE_URL}/legs/save`, {
+    const response = await authFetch(`${API_BASE_URL}/legs/save`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",

@@ -24,7 +24,7 @@ const DebtorsAgeAnalysis = () => {
   const years = Array.from({ length: 6 }, (_, i) => (now.getFullYear() - i).toString());
 
   useEffect(() => {
-    const fetch = async () => {
+    const loadAgeAnalysis = async () => {
       setLoading(true);
       setError(null);
       try {
@@ -36,7 +36,7 @@ const DebtorsAgeAnalysis = () => {
         setLoading(false);
       }
     };
-    fetch();
+    loadAgeAnalysis();
   }, [month, year]);
 
   const totals = data.reduce(

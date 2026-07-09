@@ -19,7 +19,7 @@ import statementRoutes from "./statements/statementRoutes.js";
 import statementInvoiceRoutes from "./statement-invoice/clientInstructionRoutes.js";
 import wagesRoutes from "./wages/wageRoutes.js";
 import analyticsRoutes from "./analytics/analyticsRoutes.js";
-import employeeRoutes from "./empoloyees/employeeRoutes.js";
+import employeeRoutes from "./employees/employeeRoutes.js";
 import driverRoutes from "./drivers/driverRoutes.js";
 import documentRoutes from "./assignments/documentRoutes.js";
 import fuelSlipRoutes from "./fuel/expensesRoutes.js";
@@ -33,13 +33,33 @@ import creditNoteRoutes from "./creditNote/creditNoteRoutes.js";
 import profitLossRoutes from "./profit-loss/profitLossRoutes.js";
 import vatReconRoutes from "./vat-recon/vat-reconRoutes.js";
 import landingRoutes from "./landing/landingRoutes.js";
+import { verifyToken } from "../middleware/auth.js";
 
 const router = express.Router();
 
-router.use(creditNoteRoutes);
+// ---------------------------------------------------------------------------
+// Public / self-authenticating routes — mounted BEFORE the global auth guard.
+// ---------------------------------------------------------------------------
+// authRoutes: /login, /register, /check-email, /logout are public;
+//             /user-info and /api/user-role self-guard with verifyToken.
 router.use(authroutes);
-router.use(adminroutes);
+// landingRoutes: /api/landing/stats powers the public (pre-login) landing page.
+router.use(landingRoutes);
+// testRoutes: /test-connection health check.
 router.use(testroutes);
+// statementRoutes: /api/statements/generate authenticates the scheduled job via
+//   API_SECRET (and falls back to verifyToken for UI users); its GET routes
+//   self-guard with verifyToken. Must sit before the global guard so the
+//   non-JWT API_SECRET token is not rejected by it.
+router.use(statementRoutes);
+
+// ---------------------------------------------------------------------------
+// Global authentication guard — every route mounted below requires a valid JWT.
+// ---------------------------------------------------------------------------
+router.use(verifyToken);
+
+router.use(creditNoteRoutes);
+router.use(adminroutes);
 router.use(manageEmployeeRoutes);
 router.use(manageClientRoutes);
 router.use(manageTruckRoutes);
@@ -53,7 +73,6 @@ router.use(expenseTypeRoutes);
 router.use(invoiceRoutes);
 router.use(paymentRoutes);
 router.use(clientRoutes);
-router.use(statementRoutes);
 router.use(statementInvoiceRoutes);
 router.use(wagesRoutes);
 router.use(analyticsRoutes);
@@ -69,6 +88,5 @@ router.use(subcontractorsRoutes);
 router.use(addonRoutes);
 router.use(profitLossRoutes);
 router.use(vatReconRoutes);
-router.use(landingRoutes);
 
 export default router;
