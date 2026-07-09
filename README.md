@@ -211,6 +211,7 @@ psql -U your_db_user -d your_db_name -f server/migrations/003_link_addon_instruc
 psql -U your_db_user -d your_db_name -f server/migrations/004_add_dn_to_legs_m2.sql
 psql -U your_db_user -d your_db_name -f server/migrations/005_add_fuel_surcharge_to_client_rate.sql
 psql -U your_db_user -d your_db_name -f server/migrations/006_extend_audit_log.sql
+psql -U your_db_user -d your_db_name -f server/migrations/007_cascade_repair_and_fk_indexes.sql
 ```
 
 ### Run

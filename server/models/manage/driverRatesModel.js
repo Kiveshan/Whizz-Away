@@ -278,6 +278,16 @@ const deleteDriverRate = async (id) => {
     await client.query("DELETE FROM m5_driver_rate WHERE m5ratekey = $1", [id])
     return { success: true, message: "Driver rate deleted successfully" }
   } catch (err) {
+    // FK RESTRICT (migration 007): legs reference this rate — deleting it
+    // would orphan work records. End-date it (effective_to) instead.
+    if (err.code === "23503") {
+      return {
+        success: false,
+        code: "IN_USE",
+        message:
+          "This rate is used by existing legs and cannot be deleted. Set an end date (effective to) instead.",
+      }
+    }
     console.error(`Error deleting driver rate ${id}:`, err)
     throw err
   } finally {
@@ -771,6 +781,16 @@ export const deleteRoute = async (startingpoint, destination) => {
     )
     return { success: true }
   } catch (err) {
+    // FK RESTRICT (migration 007): safety net behind the controller's usage
+    // pre-check — legs still reference a rate on this route.
+    if (err.code === "23503") {
+      return {
+        success: false,
+        code: "IN_USE",
+        message:
+          "This route's rates are used by existing legs and cannot be deleted.",
+      }
+    }
     console.error("Error deleting route:", err)
     throw err
   } finally {

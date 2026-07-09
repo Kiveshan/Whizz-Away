@@ -207,7 +207,8 @@ const deleteClientHandler = async (req, res) => {
     const result = await deleteClient(id)
 
     if (!result.success) {
-      return res.status(404).json({ message: result.message })
+      const status = result.code === "IN_USE" ? 409 : 404
+      return res.status(status).json({ message: result.message })
     }
 
     res.json({ message: result.message })

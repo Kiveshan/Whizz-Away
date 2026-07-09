@@ -271,7 +271,8 @@ const deleteDriverRateHandler = async (req, res) => {
     console.log(`Deleting driver rate ID ${id}`)
     const result = await deleteDriverRate(id)
     if (!result.success) {
-      return res.status(404).json({ message: result.message })
+      const status = result.code === "IN_USE" ? 409 : 404
+      return res.status(status).json({ message: result.message })
     }
 
     auditFromReq(req, {
@@ -418,7 +419,10 @@ const deleteRouteHandler = async (req, res) => {
       })
     }
 
-    await deleteRoute(startingpoint, destination)
+    const deleteResult = await deleteRoute(startingpoint, destination)
+    if (!deleteResult.success) {
+      return res.status(409).json({ error: deleteResult.message })
+    }
     res.json({ message: "Route deleted successfully" })
   } catch (err) {
     console.error("Error deleting route:", err)
