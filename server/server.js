@@ -177,17 +177,31 @@ app.get("/health", (req, res) => {
   res.status(200).json({ status: "ok", uptime: process.uptime() });
 });
 
-// Routes
-app.use("/", routes);
-
+// Static SPA assets + client-side routing MUST be handled before the API
+// router. The API router mounts a global verifyToken guard (routes/index.js),
+// which answers every non-public request with a 401 JSON body. If the SPA were
+// served after it, browser navigations (including the root URL) would be
+// rejected with {"code":"NO_TOKEN"} instead of receiving the React shell.
 if (process.env.NODE_ENV == "deployed") {
-  app.use(express.static(path.join(__dirname, "public", "build")));
+  const buildDir = path.join(__dirname, "public", "build");
 
-  // Handle all routes by serving index.html from 'public/build' (for React Router)
-  app.get("*", (req, res) => {
-    res.sendFile(path.join(__dirname, "public", "build", "index.html"));
+  // Serve built assets (index.html at "/", /static/*, favicon, manifest…).
+  app.use(express.static(buildDir));
+
+  // SPA history fallback: browser navigations (Accept: text/html) — the root
+  // URL and client-side deep links like /Dashboard — get index.html so React
+  // Router can take over. XHR/API requests (axios sends Accept:
+  // application/json, not text/html) fall through to the API router below.
+  app.get("*", (req, res, next) => {
+    if (req.headers.accept && req.headers.accept.includes("text/html")) {
+      return res.sendFile(path.join(buildDir, "index.html"));
+    }
+    next();
   });
 }
+
+// API routes (contains the global authentication guard).
+app.use("/", routes);
 
 app.use(notFoundHandler);
 app.use(errorHandler);
