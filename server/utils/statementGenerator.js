@@ -1,10 +1,21 @@
 import { pool, query } from "../config/database.js";
 
 // ==================== DATE UTILITIES ====================
-function calculateStatementDates() {
+// coveredYear/coveredMonth (1-12), if given, identify the month a statement covers
+// (e.g. "May") rather than the month it's generated in. Statements are generated on
+// the 1st of the month *after* the one they cover, so we shift forward one month to
+// get generationDate/agingAsOfDate — mirroring the normal current-month behavior,
+// where generation always trails the covered month by one.
+function calculateStatementDates(coveredYear = null, coveredMonth = null) {
   const today = new Date();
-  const currentMonth = today.getMonth();
-  const currentYear = today.getFullYear();
+  let currentMonth, currentYear;
+  if (coveredYear && coveredMonth) {
+    currentMonth = coveredMonth % 12; // 0-indexed month *after* the covered month
+    currentYear = coveredMonth === 12 ? coveredYear + 1 : coveredYear;
+  } else {
+    currentMonth = today.getMonth();
+    currentYear = today.getFullYear();
+  }
   const generationDate = new Date(currentYear, currentMonth, 1, 12, 0, 0);
   const formattedGenDate = generationDate.toISOString().split("T")[0];
 
@@ -308,10 +319,12 @@ async function processClient(dbClient, clientId, clientInsurance, dates, payment
 }
 
 // ==================== MAIN FUNCTION ====================
-async function generateMonthlyStatements(specificClientId = null) {
+// coveredYear/coveredMonth (1-12), if given, regenerate the statement covering that
+// past month instead of the current month (see calculateStatementDates).
+async function generateMonthlyStatements(specificClientId = null, coveredYear = null, coveredMonth = null) {
   console.log("Starting monthly statement generation process...");
 
-  const dates = calculateStatementDates();
+  const dates = calculateStatementDates(coveredYear, coveredMonth);
   logDateInfo(dates);
 
   let dbClient;

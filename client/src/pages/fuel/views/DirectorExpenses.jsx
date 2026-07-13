@@ -1,7 +1,7 @@
 "use client";
 import { useState, useEffect } from "react";
 import { useNavigate, useParams, useLocation } from "react-router-dom";
-import api from "../../../api"; // Import the configured Axios instance
+import api, { API_BASE_URL } from "../../../api"; // Import the configured Axios instance
 import "../css/Expenses1.css";
 
 const DirectorExpenses = () => {
@@ -112,7 +112,7 @@ const DirectorExpenses = () => {
       if (expense.slipurl) {
         window.open(expense.slipurl, "_blank");
       } else if (expense.slipname) {
-        const url = `http://localhost:5000/uploads/${expense.slipname}`;
+        const url = `${API_BASE_URL}/uploads/${expense.slipname}`;
         window.open(url, "_blank");
       } else {
         alert("No document available to view");
@@ -164,7 +164,7 @@ const DirectorExpenses = () => {
       if (expense.slipurl || expense.slipname) {
         const docUrl =
           expense.slipurl ||
-          `http://localhost:5000/uploads/${expense.slipname}`;
+          `${API_BASE_URL}/uploads/${expense.slipname}`;
         const filename = expense.slipname || "document";
 
         // Fetch the file content first, then create a blob URL

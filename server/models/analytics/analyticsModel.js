@@ -27,6 +27,70 @@ const getDateRange = (month, year) => {
   return { dateFrom, dateTo }
 }
 
+// True when the requested month name + year is the current (or a future) calendar
+// month. Aging for the current month must be computed live as-of today rather than
+// read from the frozen aging_analysis snapshot, which only reflects the outstanding
+// items at the moment the statement was generated (see calculateAgingBucketsFromOutstanding).
+const isCurrentOrFutureMonth = (month, year) => {
+  const requested = new Date(`${String(month).trim()} 1, ${year}`)
+  if (Number.isNaN(requested.getTime())) return false
+  const now = new Date()
+  const currentMonthStart = new Date(now.getFullYear(), now.getMonth(), 1)
+  return requested >= currentMonthStart
+}
+
+// Computes aging buckets per client from *live* outstanding invoices and add-ons
+// as of `asOfDate` (defaults to today). Mirrors the bucket logic in
+// server/utils/statementGenerator.js calculateAgingBucketsFromOutstanding, but in
+// pure SQL so it can aggregate across all clients in one round-trip. This is the
+// source of truth for the live debtors/aging dashboards, so a client that misses
+// the monthly generation window still sees up-to-date aging.
+const getLiveAgingBuckets = async (client, asOfDate = null, clientId = null) => {
+  const asOf = asOfDate || new Date().toISOString().split("T")[0]
+  const params = [asOf]
+  let clientFilter = ""
+  if (clientId) {
+    params.push(clientId)
+    clientFilter = ` AND client_id = $2`
+  }
+
+  const query = `
+    WITH outstanding AS (
+      SELECT
+        i.clientid AS client_id,
+        (m1.total_cost * (1 + COALESCE(m1.vat, 0) / 100.0)) - COALESCE(m1.paid_amount, 0) AS remaining,
+        ($1::date - i.date::date) AS age_days
+      FROM invoice i
+      JOIN m1_controller m1 ON i.m1key = m1.m1key
+      WHERE i.date <= $1::date
+        AND m1.payment_status IN ('unpaid', 'partial')
+      UNION ALL
+      SELECT
+        a.client_id,
+        a.amount - COALESCE(a.paid_amount, 0) AS remaining,
+        ($1::date - a.date::date) AS age_days
+      FROM add_ons a
+      WHERE a.date <= $1::date
+        AND a.status IN ('unpaid', 'partial')
+    )
+    SELECT
+      c.m5clientkey AS client_id,
+      c.client      AS client_name,
+      SUM(CASE WHEN o.age_days <= 30 THEN o.remaining ELSE 0 END)                        AS current_amount,
+      SUM(CASE WHEN o.age_days > 30 AND o.age_days <= 60 THEN o.remaining ELSE 0 END)     AS thirty_days,
+      SUM(CASE WHEN o.age_days > 60 AND o.age_days <= 90 THEN o.remaining ELSE 0 END)     AS sixty_days,
+      SUM(CASE WHEN o.age_days > 90 THEN o.remaining ELSE 0 END)                          AS ninety_days
+    FROM outstanding o
+    JOIN m5_client c ON o.client_id = c.m5clientkey
+    WHERE o.remaining > 0${clientFilter}
+    GROUP BY c.m5clientkey, c.client
+    HAVING SUM(o.remaining) > 0
+    ORDER BY c.client
+  `
+  const result = await client.query(query, params)
+  return result.rows
+}
+
 const getFuelExpenses = async (client, month, year) => {
   const query = `
     SELECT t.truckregnum, 
@@ -327,6 +391,43 @@ const getAllTrucks = async (client) => {
 }
 
 const getAgingAnalysis = async (client, month, year, clientId = null) => {
+  // Current/future month: compute live so aging never gets stuck on a stale snapshot.
+  if (isCurrentOrFutureMonth(month, year)) {
+    const rows = await getLiveAgingBuckets(client, null, clientId)
+    if (clientId) {
+      return rows.map((row) => ({
+        client: row.client_name,
+        current: Number.parseFloat(row.current_amount) || 0,
+        thirtyDays: Number.parseFloat(row.thirty_days) || 0,
+        sixtyDays: Number.parseFloat(row.sixty_days) || 0,
+        ninetyDays: Number.parseFloat(row.ninety_days) || 0,
+        month: String(month).trim(),
+        year: String(year),
+      }))
+    }
+    // Aggregate all clients into a single "Total Aging" row (matches the snapshot path).
+    const totals = rows.reduce(
+      (acc, row) => ({
+        current: acc.current + (Number.parseFloat(row.current_amount) || 0),
+        thirtyDays: acc.thirtyDays + (Number.parseFloat(row.thirty_days) || 0),
+        sixtyDays: acc.sixtyDays + (Number.parseFloat(row.sixty_days) || 0),
+        ninetyDays: acc.ninetyDays + (Number.parseFloat(row.ninety_days) || 0),
+      }),
+      { current: 0, thirtyDays: 0, sixtyDays: 0, ninetyDays: 0 }
+    )
+    return [
+      {
+        client: "Total Aging",
+        current: totals.current,
+        thirtyDays: totals.thirtyDays,
+        sixtyDays: totals.sixtyDays,
+        ninetyDays: totals.ninetyDays,
+        month: String(month).trim(),
+        year: String(year),
+      },
+    ]
+  }
+
   const params = [month, year]
   let query = `
     SELECT 
@@ -366,6 +467,20 @@ const getAgingAnalysis = async (client, month, year, clientId = null) => {
 }
 
 const getDebtorAgeAnalysisPerClient = async (client, month, year) => {
+  // Current/future month: compute live so the debtors dashboard reflects today's
+  // outstanding balances, not the snapshot frozen at statement-generation time.
+  if (isCurrentOrFutureMonth(month, year)) {
+    const rows = await getLiveAgingBuckets(client, null, null)
+    return rows.map((row) => ({
+      clientId: row.client_id,
+      client: row.client_name,
+      current: parseFloat(row.current_amount) || 0,
+      thirtyDays: parseFloat(row.thirty_days) || 0,
+      sixtyDays: parseFloat(row.sixty_days) || 0,
+      ninetyDays: parseFloat(row.ninety_days) || 0,
+    }))
+  }
+
   const query = `
     SELECT
       c.m5clientkey  AS client_id,
@@ -1280,9 +1395,9 @@ const getClientSubbieCommissionReport = async (client, month, year, clientId) =>
   })
 
   const invoiceDetails = [...instructionInvoiceDetails, ...addOnDetails].sort((a, b) => {
-    const dateA = a.invoiceDate ? new Date(a.invoiceDate).getTime() : 0
-    const dateB = b.invoiceDate ? new Date(b.invoiceDate).getTime() : 0
-    return dateA - dateB
+    const numA = a.invoiceNumber || ""
+    const numB = b.invoiceNumber || ""
+    return numA.localeCompare(numB, undefined, { numeric: true, sensitivity: "base" })
   })
 
   const totalInvoiceAmount = invoiceDetails.reduce(

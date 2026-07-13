@@ -4,7 +4,9 @@ import { useState } from "react";
 import UserApprovalList from "./UserApprovalList";
 import CompanyManagement from "./CompanyManagement";
 import SubcontractorBackfill from "./SubcontractorBackfill";
+import RegenerateStatement from "./RegenerateStatement";
 import DriverRateAudit from "./DriverRateAudit";
+import AuditLogViewer from "./AuditLogViewer";
 import "../css/AdminDashboard.css";
 // Import the TestConnection component
 // import TestConnection from "./TestConnection"
@@ -41,11 +43,27 @@ function AdminDashboard() {
           </button>
           <button
             className={`tab-button ${
+              activeTab === "regenerate-statement" ? "active" : ""
+            }`}
+            onClick={() => setActiveTab("regenerate-statement")}
+          >
+            Regenerate Statement
+          </button>
+          <button
+            className={`tab-button ${
               activeTab === "rate-audit" ? "active" : ""
             }`}
             onClick={() => setActiveTab("rate-audit")}
           >
             Driver Rate Audit
+          </button>
+          <button
+            className={`tab-button ${
+              activeTab === "audit-log" ? "active" : ""
+            }`}
+            onClick={() => setActiveTab("audit-log")}
+          >
+            Audit Log
           </button>
         </div>
 
@@ -53,7 +71,9 @@ function AdminDashboard() {
           {activeTab === "users" && <UserApprovalList />}
           {activeTab === "companies" && <CompanyManagement />}
           {activeTab === "backfill" && <SubcontractorBackfill />}
+          {activeTab === "regenerate-statement" && <RegenerateStatement />}
           {activeTab === "rate-audit" && <DriverRateAudit />}
+          {activeTab === "audit-log" && <AuditLogViewer />}
         </div>
       </div>
     </div>

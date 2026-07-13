@@ -1,9 +1,10 @@
 import express from "express";
-import { verifyToken } from "../../middleware/auth.js";
+import { verifyToken, verifyAdminAccess } from "../../middleware/auth.js";
 import {
   getClientStatementsHandler,
   getStatementDetailsHandler,
   generateStatementsHandler,
+  regenerateStatementHandler,
   authenticateScheduledJob, // Add this import
 } from "../../controllers/statements/statementController.js";
 
@@ -26,6 +27,15 @@ router.post(
   "/api/statements/generate",
   authenticateScheduledJob,
   generateStatementsHandler
+);
+
+// Admin-only: regenerate a statement for a specific past month, to correct
+// aging snapshots that have drifted from live invoice/add-on data.
+router.post(
+  "/api/statements/regenerate",
+  verifyToken,
+  verifyAdminAccess,
+  regenerateStatementHandler
 );
 
 export default router;

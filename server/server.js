@@ -1,5 +1,5 @@
 import express from "express";
-import cors from "cors";
+import helmet from "helmet";
 import expressSession from "express-session";
 import passport from "passport";
 import { Strategy as LocalStrategy } from "passport-local";
@@ -11,14 +11,12 @@ import {
   comparePassword,
   findUserById,
 } from "./models/userModel.js";
-import { requestLogger, sessionDebugger } from "./middleware/sessionDebug.js";
+import { requestLogger } from "./middleware/sessionDebug.js";
+import { errorHandler, notFoundHandler } from "./middleware/errorHandler.js";
 import { secretKey } from "./config/secrets.js";
 import routes from "./routes/index.js";
-import "./utils/statementGenerator.js"; // Added to start cron job
 import fs from "fs";
 import multer from "multer";
-import "./utils/subcontractorStatementGeneration.js";
-import { generateMonthlyStatements } from "./utils/statementGenerator.js";
 
 // Get __dirname equivalent in ES modules
 const __filename = fileURLToPath(import.meta.url);
@@ -26,6 +24,16 @@ const __dirname = path.dirname(__filename);
 
 const app = express();
 const PORT = process.env.PORT || 5000;
+
+// Security headers. CSP is disabled because the deployed server serves the CRA
+// build, which inlines its runtime chunk; cross-origin resource policy is
+// relaxed so the dev client on :3000 can load /uploads images.
+app.use(
+  helmet({
+    contentSecurityPolicy: false,
+    crossOriginResourcePolicy: { policy: "cross-origin" },
+  })
+);
 
 // Enhanced CORS configuration
 app.use((req, res, next) => {
@@ -82,7 +90,6 @@ if (process.env.NODE_ENV === "production") {
 }
 
 app.use(expressSession(sessionConfig));
-app.use(sessionDebugger);
 app.use(passport.initialize());
 app.use(passport.session());
 
@@ -124,13 +131,10 @@ passport.use(
       try {
         const user = await findUserByEmail(email);
         if (!user) {
-          console.log("No user found in both tables with email:", email);
           return done(null, false, { message: "Invalid email or password" });
         }
-        console.log("Fetched user:", user);
         const passwordMatch = await comparePassword(password, user.password);
         if (!passwordMatch) {
-          console.log("Password mismatch for user:", email);
           return done(null, false, { message: "Invalid email or password" });
         }
         return done(null, user);
@@ -143,7 +147,6 @@ passport.use(
 );
 
 passport.serializeUser((user, done) => {
-  console.log("Serializing user:", user);
   done(null, {
     userid: user.userid,
     name: user.name,
@@ -156,14 +159,11 @@ passport.serializeUser((user, done) => {
 
 passport.deserializeUser(async (sessionUser, done) => {
   try {
-    console.log("Deserializing user:", sessionUser);
     const { userid, table } = sessionUser;
     const user = await findUserById(userid, table);
     if (!user) {
-      console.log("User session not found in database");
       return done(null, false);
     }
-    console.log("Session user fetched:", user);
     done(null, user);
   } catch (err) {
     console.error("Error deserializing user:", err);
@@ -177,17 +177,35 @@ app.get("/health", (req, res) => {
   res.status(200).json({ status: "ok", uptime: process.uptime() });
 });
 
-// Routes
-app.use("/", routes);
-
+// Static SPA assets + client-side routing MUST be handled before the API
+// router. The API router mounts a global verifyToken guard (routes/index.js),
+// which answers every non-public request with a 401 JSON body. If the SPA were
+// served after it, browser navigations (including the root URL) would be
+// rejected with {"code":"NO_TOKEN"} instead of receiving the React shell.
 if (process.env.NODE_ENV == "deployed") {
-  app.use(express.static(path.join(__dirname, "public", "build")));
+  const buildDir = path.join(__dirname, "public", "build");
 
-  // Handle all routes by serving index.html from 'public/build' (for React Router)
-  app.get("*", (req, res) => {
-    res.sendFile(path.join(__dirname, "public", "build", "index.html"));
+  // Serve built assets (index.html at "/", /static/*, favicon, manifest…).
+  app.use(express.static(buildDir));
+
+  // SPA history fallback: browser navigations (Accept: text/html) — the root
+  // URL and client-side deep links like /Dashboard — get index.html so React
+  // Router can take over. XHR/API requests (axios sends Accept:
+  // application/json, not text/html) fall through to the API router below.
+  app.get("*", (req, res, next) => {
+    if (req.headers.accept && req.headers.accept.includes("text/html")) {
+      return res.sendFile(path.join(buildDir, "index.html"));
+    }
+    next();
   });
 }
+
+// API routes (contains the global authentication guard).
+app.use("/", routes);
+
+app.use(notFoundHandler);
+app.use(errorHandler);
+
 // Start server
 app.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);

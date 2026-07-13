@@ -1,128 +1,53 @@
 import jwt from "jsonwebtoken"
+import crypto from "crypto"
 import { secretKey } from "../config/secrets.js"
+import { ROLES } from "../config/roles.js"
 
+// Strict JWT verification. Every request reaching this middleware MUST present a
+// valid token (Authorization: Bearer <jwt>, or ?token=<jwt> for download links).
+// Public/pre-auth endpoints are NOT handled here — they are mounted ahead of the
+// global guard in routes/index.js. There is intentionally no NODE_ENV-based bypass.
 const verifyToken = (req, res, next) => {
   const authHeader = req.headers.authorization
-  const publicEndpoints = [
-    "/api/clients",
-    "/api/shipment-types",
-    "/api/check-auth",
-    "/test-connection",
-    "/check-email",
-    "/api/instructions",
-    "/api/client-instruction-stats",
-  ]
+  const headerToken = authHeader ? authHeader.split(" ")[1] : null
+  const token = headerToken || req.query.token
 
-  const isPublicEndpoint =
-    publicEndpoints.some((endpoint) => req.url === endpoint || req.url.startsWith(`${endpoint}?`)) ||
-    req.url.match(/^\/api\/instruction\/\d+$/) ||
-    req.url.match(/^\/api\/containers\/\d+$/)
-
-  if (!authHeader) {
-    console.log("No Authorization header for:", req.url)
-    if (isPublicEndpoint) {
-      console.log("Allowing unauthenticated access to public endpoint:", req.url)
-      req.user = null
-      return next()
-    }
-
-    if (
-      (req.url === "/api/client-instruction-stats" ||
-        req.url.startsWith("/api/instructions") ||
-        req.url.match(/^\/api\/instruction\/\d+$/) ||
-        req.url.match(/^\/api\/containers\/\d+$/)) &&
-      process.env.NODE_ENV !== "production"
-    ) {
-      console.log("DEV MODE: Allowing unauthenticated access to:", req.url)
-      req.user = {
-        name: "Development",
-        surname: "User",
-        roleid: 1,
-        userid: 0,
-        email: "dev@example.com",
-      }
-      return next()
-    }
-
-    if (req.url === "/api/client-instruction-stats" && process.env.NODE_ENV !== "production") {
-      console.log("DEV MODE: Allowing unauthenticated access to:", req.url)
-      req.user = {
-        name: "Development",
-        surname: "User",
-        roleid: 1,
-        userid: 0,
-        email: "dev@example.com",
-      }
-      return next()
-    }
-
-    if (req.query.token) {
-      req.headers.authorization = `Bearer ${req.query.token}`
-    } else {
-      return res.status(401).json({
-        error: "Authentication required",
-        message: "No token provided",
-        code: "NO_TOKEN",
-      })
-    }
+  if (!token) {
+    return res.status(401).json({
+      error: "Authentication required",
+      message: "No token provided",
+      code: "NO_TOKEN",
+    })
   }
 
-  if (req.headers.authorization) {
-    const token = req.headers.authorization.split(" ")[1]
-    if (!token) {
-      console.log("No token provided")
+  try {
+    const decoded = jwt.verify(token, secretKey)
+    req.user = decoded
+    return next()
+  } catch (err) {
+    if (err.name === "TokenExpiredError") {
       return res.status(401).json({
-        error: "Authentication required",
-        message: "No token provided",
-        code: "NO_TOKEN",
+        error: "Token expired",
+        message: "Your session has expired. Please log in again.",
+        code: "TOKEN_EXPIRED",
+      })
+    } else if (err.name === "JsonWebTokenError") {
+      return res.status(401).json({
+        error: "Invalid token",
+        message: "Invalid authentication token. Please log in again.",
+        code: "INVALID_TOKEN",
       })
     }
-
-    try {
-      const decoded = jwt.verify(token, secretKey)
-      console.log("Token verified for user:", decoded.name, decoded.email)
-      req.user = decoded
-      next()
-    } catch (err) {
-      console.error("Token verification failed:", err)
-
-      if (process.env.NODE_ENV !== "production" && isPublicEndpoint) {
-        console.log("DEV MODE: Allowing access with invalid token for public endpoint")
-        req.user = null
-        return next()
-      }
-
-      // Handle specific JWT errors
-      if (err.name === "TokenExpiredError") {
-        console.log("Token has expired")
-        return res.status(401).json({
-          error: "Token expired",
-          message: "Your session has expired. Please log in again.",
-          code: "TOKEN_EXPIRED",
-        })
-      } else if (err.name === "JsonWebTokenError") {
-        console.log("Invalid token")
-        return res.status(401).json({
-          error: "Invalid token",
-          message: "Invalid authentication token. Please log in again.",
-          code: "INVALID_TOKEN",
-        })
-      } else {
-        console.log("Token verification failed")
-        return res.status(401).json({
-          error: "Authentication failed",
-          message: "Failed to authenticate token. Please log in again.",
-          code: "AUTH_FAILED",
-        })
-      }
-    }
+    return res.status(401).json({
+      error: "Authentication failed",
+      message: "Failed to authenticate token. Please log in again.",
+      code: "AUTH_FAILED",
+    })
   }
 }
 
 const verifyAdminAccess = (req, res, next) => {
-  console.log("Verifying admin access with token...")
   if (!req.user) {
-    console.log("No user data in request")
     return res.status(401).json({
       error: "Authentication required",
       message: "You must be logged in to access this resource",
@@ -130,10 +55,7 @@ const verifyAdminAccess = (req, res, next) => {
     })
   }
 
-  const ADMIN_ROLE_ID = 7
-  console.log(`User has roleid ${req.user.roleid}`)
-  if (req.user.roleid !== ADMIN_ROLE_ID) {
-    console.log(`User has roleid ${req.user.roleid}, which is not admin`)
+  if (req.user.roleid !== ROLES.ADMIN) {
     return res.status(403).json({
       error: "Unauthorized",
       message: "You do not have permission to access this resource",
@@ -141,8 +63,33 @@ const verifyAdminAccess = (req, res, next) => {
     })
   }
 
-  console.log("Admin access verified")
-  next()
+  return next()
 }
 
-export { verifyToken, verifyAdminAccess }
+// Authenticates the EventBridge/Lambda statement-generation jobs via a shared
+// API_SECRET bearer token, falling back to normal JWT auth for UI users.
+// Fail-closed: if API_SECRET is not configured, the job path is disabled rather
+// than matching an undefined token. Constant-time compare to avoid timing leaks.
+const authenticateScheduledJob = (req, res, next) => {
+  const authHeader = req.headers.authorization
+  const token = authHeader && authHeader.split(" ")[1]
+  const apiSecret = process.env.API_SECRET
+
+  if (token && apiSecret) {
+    const tokenBuf = Buffer.from(token)
+    const secretBuf = Buffer.from(apiSecret)
+    if (
+      tokenBuf.length === secretBuf.length &&
+      crypto.timingSafeEqual(tokenBuf, secretBuf)
+    ) {
+      req.isScheduledJob = true
+      return next()
+    }
+  }
+
+  // Not the scheduled job — require a normal user JWT.
+  req.isScheduledJob = false
+  return verifyToken(req, res, next)
+}
+
+export { verifyToken, verifyAdminAccess, authenticateScheduledJob }

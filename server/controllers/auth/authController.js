@@ -9,6 +9,7 @@ import {
 import passport from "passport";
 import jwt from "jsonwebtoken";
 import { secretKey } from "../../config/secrets.js";
+import { ROLES, dashboardForRole } from "../../config/roles.js";
 
 const login = async (req, res, next) => {
   const loginStart = Date.now();
@@ -47,7 +48,7 @@ const login = async (req, res, next) => {
         .json({ message: "Access denied. Please contact an administrator." });
     }
 
-    if (user.roleid !== 7) {
+    if (user.roleid !== ROLES.ADMIN) {
       if (user.table === "usertable" && user.status !== "active") {
         console.log(
           `User ${user.email} is not active (status: ${user.status})`
@@ -107,16 +108,8 @@ const login = async (req, res, next) => {
       table: user.table,
       company_reg_num: user.company_reg_num,
     };
-    console.log("User stored in session:", req.session.user);
 
-    const { roleid } = user;
-    let redirectUrl = "/";
-    if (roleid === 1) redirectUrl = "/Dashboard";
-    else if (roleid === 2) redirectUrl = "/ControllerDashboard";
-    else if (roleid === 3) redirectUrl = "/FDashboard";
-    else if (roleid === 4) redirectUrl = "/DirectorDashboard";
-    else if (roleid === 7) redirectUrl = "/AdminDashboard";
-    else if (roleid === 8) redirectUrl = "/CreditorsDashboard";
+    const redirectUrl = dashboardForRole(user.roleid);
 
     console.log(`[login] total: ${Date.now() - loginStart}ms for ${user.email}`);
     return res.json({
@@ -150,11 +143,6 @@ const logout = (req, res) => {
 };
 
 const getUserInfo = (req, res) => {
-  console.log("User info endpoint hit");
-  console.log("Current user session:", req.session);
-  console.log("Session user:", req.session.user);
-  console.log("Token user:", req.user);
-
   const user = req.user || req.session.user;
   if (!user) {
     return res.status(401).json({ error: "Please log in first" });

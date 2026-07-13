@@ -6,13 +6,12 @@ import {
   getCompanyList,
   deactivateCompany,
   reactivateCompany,
+  getAuditLog,
 } from "../../models/admin/adminModel.js";
+import { ROLES } from "../../config/roles.js";
 
 const verifyAdmin = (req, res) => {
-  console.log("Admin verify endpoint hit");
-  const ADMIN_ROLE_ID = 7;
-  const isAdmin = req.user.roleid === ADMIN_ROLE_ID;
-  console.log(`User roleid: ${req.user.roleid}, isAdmin: ${isAdmin}`);
+  const isAdmin = req.user.roleid === ROLES.ADMIN;
   res.json({ isAdmin });
 };
 
@@ -62,7 +61,7 @@ const rejectUserHandler = async (req, res) => {
 const updateUserStatusHandler = async (req, res) => {
   const { userid, action, roleid } = req.body;
   console.log(`Updating user ${userid} with action ${action}`);
-  if (req.user.roleid !== 7) {
+  if (req.user.roleid !== ROLES.ADMIN) {
     console.log("Access denied - user is not admin");
     return res.status(403).json({ message: "Access denied" });
   }
@@ -83,7 +82,7 @@ const updateUserStatusHandler = async (req, res) => {
 
 const getCompanyListHandler = async (req, res) => {
   try {
-    if (req.user.roleid !== 7) {
+    if (req.user.roleid !== ROLES.ADMIN) {
       return res
         .status(403)
         .json({ message: "You don't have permission to view all companies" });
@@ -105,7 +104,7 @@ const deactivateCompanyHandler = async (req, res) => {
         .status(400)
         .json({ error: "Company registration number is required" });
     }
-    if (req.user.roleid !== 7) {
+    if (req.user.roleid !== ROLES.ADMIN) {
       return res
         .status(403)
         .json({ message: "You don't have permission to deactivate companies" });
@@ -135,7 +134,7 @@ const reactivateCompanyHandler = async (req, res) => {
         .status(400)
         .json({ error: "Company registration number is required" });
     }
-    if (req.user.roleid !== 7) {
+    if (req.user.roleid !== ROLES.ADMIN) {
       return res
         .status(403)
         .json({ message: "You don't have permission to reactivate companies" });
@@ -157,6 +156,17 @@ const reactivateCompanyHandler = async (req, res) => {
   }
 };
 
+const getAuditLogHandler = async (req, res) => {
+  try {
+    const { page, limit, actionType, entityType, search, from, to } = req.query;
+    const result = await getAuditLog({ page, limit, actionType, entityType, search, from, to });
+    res.json(result);
+  } catch (err) {
+    console.error("Error fetching audit log:", err);
+    res.status(500).json({ error: "Failed to fetch audit log" });
+  }
+};
+
 export {
   verifyAdmin,
   getPendingUsersAdmin,
@@ -166,4 +176,5 @@ export {
   getCompanyListHandler,
   deactivateCompanyHandler,
   reactivateCompanyHandler,
+  getAuditLogHandler,
 };

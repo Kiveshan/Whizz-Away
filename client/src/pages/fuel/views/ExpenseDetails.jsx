@@ -1,7 +1,7 @@
 "use client";
 import { useState, useEffect } from "react";
 import { useNavigate, useParams, useLocation } from "react-router-dom";
-import api from "../../../api"; // Import the configured Axios instance
+import api, { API_BASE_URL } from "../../../api"; // Import the configured Axios instance
 import "../css/Expenses1.css";
 import Pagination from "../../../components/Pagination"
 
@@ -124,7 +124,7 @@ const handleViewDocument = async (expense) => {
 
     // Fallback methods
     if (expense.slipname) {
-      const url = `http://localhost:5000/uploads/${expense.slipname}`;
+      const url = `${API_BASE_URL}/uploads/${expense.slipname}`;
       window.open(url, "_blank");
     } else {
       alert("No document available to view");
@@ -158,7 +158,7 @@ const handleViewDocument = async (expense) => {
           return;
         }
       } else if (expense.slipname) {
-        const docUrl = `http://localhost:5000/uploads/${expense.slipname}`;
+        const docUrl = `${API_BASE_URL}/uploads/${expense.slipname}`;
         const filename = expense.slipname;
 
         fetch(docUrl)

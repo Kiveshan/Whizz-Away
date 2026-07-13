@@ -72,7 +72,10 @@ async function query(text, params) {
     const start = Date.now();
     const res = await pool.query(text, params);
     const duration = Date.now() - start;
-    console.log("Executed query", { text, duration, rows: res.rowCount });
+    // Only surface slow queries — logging every statement drowns the logs.
+    if (duration > 500) {
+      console.warn("Slow query", { duration, rows: res.rowCount, text: text.slice(0, 120) });
+    }
     return res;
   } catch (error) {
     console.error("Error executing query", { text, error });
