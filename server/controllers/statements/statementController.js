@@ -156,9 +156,63 @@ const generateStatementsHandler = async (req, res) => {
   }
 };
 
+// year/month identify the covered month (e.g. 2026-05 for "May"), not the
+// statement's generation date — generateMonthlyStatements shifts that forward
+// internally, same as the normal current-month flow.
+const regenerateStatementHandler = async (req, res) => {
+  try {
+    const { clientId, specificClient, year, month } = req.body;
+
+    const yearNum = Number(year);
+    const monthNum = Number(month);
+
+    if (!year || !month || !Number.isInteger(monthNum) || monthNum < 1 || monthNum > 12) {
+      return res.status(400).json({
+        success: false,
+        message: "A valid year and month (1-12) are required",
+      });
+    }
+
+    if (specificClient && !clientId) {
+      return res.status(400).json({
+        success: false,
+        message: "Client ID is required for specific client generation",
+      });
+    }
+
+    console.log(
+      `Admin statement regeneration requested for ${yearNum}-${monthNum
+        .toString()
+        .padStart(2, "0")}${specificClient ? ` (client ${clientId})` : " (all clients)"}`
+    );
+
+    const result = await generateMonthlyStatements(
+      specificClient ? clientId : null,
+      yearNum,
+      monthNum
+    );
+
+    console.log(`Statement regeneration completed: ${result.message}`);
+
+    res.json(result);
+  } catch (error) {
+    console.error("Error in admin statement regeneration:", error);
+    res.status(500).json({
+      success: false,
+      message: "Internal server error during statement regeneration",
+      error:
+        process.env.NODE_ENV === "production"
+          ? "Internal server error"
+          : error.message,
+      stack: process.env.NODE_ENV === "production" ? null : error.stack,
+    });
+  }
+};
+
 export {
   getClientStatementsHandler,
   getStatementDetailsHandler,
   generateStatementsHandler,
+  regenerateStatementHandler,
   authenticateScheduledJob,
 };
