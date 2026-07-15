@@ -27,83 +27,6 @@ const getDateRange = (month, year) => {
   return { dateFrom, dateTo }
 }
 
-// True when no statement (and therefore no frozen aging_analysis snapshot) has been
-// generated yet for the requested generation month + year. Statements are created
-// automatically on the 1st of each month, so this is only true for months that are
-// still fully in the future (e.g. the generation run hasn't happened yet) — NOT for
-// the current calendar month, which already has a snapshot from this month's run.
-// Only in that "no snapshot exists" case do we fall back to a live computation from
-// outstanding invoices/add-ons (see calculateAgingBucketsFromOutstanding), so the
-// dashboard never silently disagrees with the real generated statement.
-const hasNoAgingSnapshot = async (client, month, year, clientId = null) => {
-  const params = [String(month).trim(), String(year)]
-  let query = `
-    SELECT 1
-    FROM statements s
-    WHERE TRIM(to_char(s.generation_date, 'Month')) = $1
-      AND EXTRACT(YEAR FROM s.generation_date)::text = $2
-  `
-  if (clientId) {
-    params.push(clientId)
-    query += ` AND s.clientid = $3`
-  }
-  query += ` LIMIT 1`
-  const result = await client.query(query, params)
-  return result.rows.length === 0
-}
-
-// Computes aging buckets per client from *live* outstanding invoices and add-ons
-// as of `asOfDate` (defaults to today). Mirrors the bucket logic in
-// server/utils/statementGenerator.js calculateAgingBucketsFromOutstanding, but in
-// pure SQL so it can aggregate across all clients in one round-trip. This is the
-// source of truth for the live debtors/aging dashboards, so a client that misses
-// the monthly generation window still sees up-to-date aging.
-const getLiveAgingBuckets = async (client, asOfDate = null, clientId = null) => {
-  const asOf = asOfDate || new Date().toISOString().split("T")[0]
-  const params = [asOf]
-  let clientFilter = ""
-  if (clientId) {
-    params.push(clientId)
-    clientFilter = ` AND client_id = $2`
-  }
-
-  const query = `
-    WITH outstanding AS (
-      SELECT
-        i.clientid AS client_id,
-        (m1.total_cost * (1 + COALESCE(m1.vat, 0) / 100.0)) - COALESCE(m1.paid_amount, 0) AS remaining,
-        ($1::date - i.date::date) AS age_days
-      FROM invoice i
-      JOIN m1_controller m1 ON i.m1key = m1.m1key
-      WHERE i.date <= $1::date
-        AND m1.payment_status IN ('unpaid', 'partial')
-      UNION ALL
-      SELECT
-        a.client_id,
-        a.amount - COALESCE(a.paid_amount, 0) AS remaining,
-        ($1::date - a.date::date) AS age_days
-      FROM add_ons a
-      WHERE a.date <= $1::date
-        AND a.status IN ('unpaid', 'partial')
-    )
-    SELECT
-      c.m5clientkey AS client_id,
-      c.client      AS client_name,
-      SUM(CASE WHEN o.age_days <= 30 THEN o.remaining ELSE 0 END)                        AS current_amount,
-      SUM(CASE WHEN o.age_days > 30 AND o.age_days <= 60 THEN o.remaining ELSE 0 END)     AS thirty_days,
-      SUM(CASE WHEN o.age_days > 60 AND o.age_days <= 90 THEN o.remaining ELSE 0 END)     AS sixty_days,
-      SUM(CASE WHEN o.age_days > 90 THEN o.remaining ELSE 0 END)                          AS ninety_days
-    FROM outstanding o
-    JOIN m5_client c ON o.client_id = c.m5clientkey
-    WHERE o.remaining > 0${clientFilter}
-    GROUP BY c.m5clientkey, c.client
-    HAVING SUM(o.remaining) > 0
-    ORDER BY c.client
-  `
-  const result = await client.query(query, params)
-  return result.rows
-}
-
 const getFuelExpenses = async (client, month, year) => {
   const query = `
     SELECT t.truckregnum, 
@@ -404,45 +327,6 @@ const getAllTrucks = async (client) => {
 }
 
 const getAgingAnalysis = async (client, month, year, clientId = null) => {
-  // No statement generated for this month yet: compute live so aging never gets
-  // stuck showing nothing. If a snapshot already exists, always prefer it — it's
-  // what the actual generated statement shows.
-  if (await hasNoAgingSnapshot(client, month, year, clientId)) {
-    const rows = await getLiveAgingBuckets(client, null, clientId)
-    if (clientId) {
-      return rows.map((row) => ({
-        client: row.client_name,
-        current: Number.parseFloat(row.current_amount) || 0,
-        thirtyDays: Number.parseFloat(row.thirty_days) || 0,
-        sixtyDays: Number.parseFloat(row.sixty_days) || 0,
-        ninetyDays: Number.parseFloat(row.ninety_days) || 0,
-        month: String(month).trim(),
-        year: String(year),
-      }))
-    }
-    // Aggregate all clients into a single "Total Aging" row (matches the snapshot path).
-    const totals = rows.reduce(
-      (acc, row) => ({
-        current: acc.current + (Number.parseFloat(row.current_amount) || 0),
-        thirtyDays: acc.thirtyDays + (Number.parseFloat(row.thirty_days) || 0),
-        sixtyDays: acc.sixtyDays + (Number.parseFloat(row.sixty_days) || 0),
-        ninetyDays: acc.ninetyDays + (Number.parseFloat(row.ninety_days) || 0),
-      }),
-      { current: 0, thirtyDays: 0, sixtyDays: 0, ninetyDays: 0 }
-    )
-    return [
-      {
-        client: "Total Aging",
-        current: totals.current,
-        thirtyDays: totals.thirtyDays,
-        sixtyDays: totals.sixtyDays,
-        ninetyDays: totals.ninetyDays,
-        month: String(month).trim(),
-        year: String(year),
-      },
-    ]
-  }
-
   const params = [month, year]
   let query = `
     SELECT 
@@ -482,21 +366,6 @@ const getAgingAnalysis = async (client, month, year, clientId = null) => {
 }
 
 const getDebtorAgeAnalysisPerClient = async (client, month, year) => {
-  // No statement generated for this month yet: compute live so the debtors
-  // dashboard isn't empty. If a snapshot already exists, always prefer it — it's
-  // what the actual generated statements show.
-  if (await hasNoAgingSnapshot(client, month, year)) {
-    const rows = await getLiveAgingBuckets(client, null, null)
-    return rows.map((row) => ({
-      clientId: row.client_id,
-      client: row.client_name,
-      current: parseFloat(row.current_amount) || 0,
-      thirtyDays: parseFloat(row.thirty_days) || 0,
-      sixtyDays: parseFloat(row.sixty_days) || 0,
-      ninetyDays: parseFloat(row.ninety_days) || 0,
-    }))
-  }
-
   const query = `
     SELECT
       c.m5clientkey  AS client_id,
