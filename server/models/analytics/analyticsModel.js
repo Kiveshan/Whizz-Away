@@ -27,16 +27,29 @@ const getDateRange = (month, year) => {
   return { dateFrom, dateTo }
 }
 
-// True when the requested month name + year is the current (or a future) calendar
-// month. Aging for the current month must be computed live as-of today rather than
-// read from the frozen aging_analysis snapshot, which only reflects the outstanding
-// items at the moment the statement was generated (see calculateAgingBucketsFromOutstanding).
-const isCurrentOrFutureMonth = (month, year) => {
-  const requested = new Date(`${String(month).trim()} 1, ${year}`)
-  if (Number.isNaN(requested.getTime())) return false
-  const now = new Date()
-  const currentMonthStart = new Date(now.getFullYear(), now.getMonth(), 1)
-  return requested >= currentMonthStart
+// True when no statement (and therefore no frozen aging_analysis snapshot) has been
+// generated yet for the requested generation month + year. Statements are created
+// automatically on the 1st of each month, so this is only true for months that are
+// still fully in the future (e.g. the generation run hasn't happened yet) — NOT for
+// the current calendar month, which already has a snapshot from this month's run.
+// Only in that "no snapshot exists" case do we fall back to a live computation from
+// outstanding invoices/add-ons (see calculateAgingBucketsFromOutstanding), so the
+// dashboard never silently disagrees with the real generated statement.
+const hasNoAgingSnapshot = async (client, month, year, clientId = null) => {
+  const params = [String(month).trim(), String(year)]
+  let query = `
+    SELECT 1
+    FROM statements s
+    WHERE TRIM(to_char(s.generation_date, 'Month')) = $1
+      AND EXTRACT(YEAR FROM s.generation_date)::text = $2
+  `
+  if (clientId) {
+    params.push(clientId)
+    query += ` AND s.clientid = $3`
+  }
+  query += ` LIMIT 1`
+  const result = await client.query(query, params)
+  return result.rows.length === 0
 }
 
 // Computes aging buckets per client from *live* outstanding invoices and add-ons
@@ -391,8 +404,10 @@ const getAllTrucks = async (client) => {
 }
 
 const getAgingAnalysis = async (client, month, year, clientId = null) => {
-  // Current/future month: compute live so aging never gets stuck on a stale snapshot.
-  if (isCurrentOrFutureMonth(month, year)) {
+  // No statement generated for this month yet: compute live so aging never gets
+  // stuck showing nothing. If a snapshot already exists, always prefer it — it's
+  // what the actual generated statement shows.
+  if (await hasNoAgingSnapshot(client, month, year, clientId)) {
     const rows = await getLiveAgingBuckets(client, null, clientId)
     if (clientId) {
       return rows.map((row) => ({
@@ -467,9 +482,10 @@ const getAgingAnalysis = async (client, month, year, clientId = null) => {
 }
 
 const getDebtorAgeAnalysisPerClient = async (client, month, year) => {
-  // Current/future month: compute live so the debtors dashboard reflects today's
-  // outstanding balances, not the snapshot frozen at statement-generation time.
-  if (isCurrentOrFutureMonth(month, year)) {
+  // No statement generated for this month yet: compute live so the debtors
+  // dashboard isn't empty. If a snapshot already exists, always prefer it — it's
+  // what the actual generated statements show.
+  if (await hasNoAgingSnapshot(client, month, year)) {
     const rows = await getLiveAgingBuckets(client, null, null)
     return rows.map((row) => ({
       clientId: row.client_id,
