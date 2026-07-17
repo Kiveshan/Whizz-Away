@@ -1,4 +1,5 @@
 import { useState } from "react";
+import ExcelJS from "exceljs";
 import api from "../../../api.js";
 
 const now = new Date();
@@ -21,6 +22,7 @@ function DriverRateAudit() {
   const [running, setRunning] = useState(false);
   const [audit, setAudit] = useState(null);
   const [error, setError] = useState(null);
+  const [exporting, setExporting] = useState(false);
 
   const years = Array.from({ length: 6 }, (_, i) => currentYear - 4 + i);
 
@@ -42,6 +44,119 @@ function DriverRateAudit() {
   };
 
   const s = audit?.summary;
+
+  const addDiffSheet = (workbook, name, rows, { showExpected, showFlag } = {}) => {
+    const sheet = workbook.addWorksheet(name);
+    const columns = [
+      { header: "Leg", key: "legkey", width: 10 },
+      { header: "Instr.", key: "m1key", width: 12 },
+      { header: "Route", key: "route", width: 24 },
+      { header: "Date", key: "date", width: 14 },
+      { header: "Role", key: "role", width: 10 },
+      { header: "Cont.", key: "container", width: 12 },
+      { header: "Stored", key: "stored_rate", width: 14 },
+    ];
+    if (showExpected) {
+      columns.push({ header: "Correct", key: "expected_rate", width: 14 });
+      columns.push({ header: "Delta", key: "delta", width: 14 });
+    }
+    if (showFlag) {
+      columns.push({ header: "Flag", key: "flag", width: 18 });
+    }
+    sheet.columns = columns;
+    (rows || []).forEach((r) => sheet.addRow(r));
+    sheet.getColumn("stored_rate").numFmt = "R #,##0.00";
+    if (showExpected) {
+      sheet.getColumn("expected_rate").numFmt = "R #,##0.00";
+      sheet.getColumn("delta").numFmt = "R #,##0.00";
+    }
+    sheet.getRow(1).font = { bold: true };
+  };
+
+  const handleExportToExcel = async () => {
+    if (!audit) return;
+    setExporting(true);
+    try {
+      const workbook = new ExcelJS.Workbook();
+      workbook.created = new Date();
+      workbook.modified = new Date();
+
+      const readMeSheet = workbook.addWorksheet("Read Me");
+      readMeSheet.columns = [
+        { header: "Sheet", key: "sheet", width: 28 },
+        { header: "What it means", key: "description", width: 90 },
+      ];
+      readMeSheet.addRow({
+        sheet: "Summary",
+        description: `Headline counts for the ${months[month - 1]} ${year} audit — how many legs were checked and how they were bucketed.`,
+      });
+      readMeSheet.addRow({
+        sheet: "Big-Negative Discrepancies",
+        description:
+          "Legs where the stored driverrate differs from the correct (re-derived) rate by at least R500, or is higher than it (a negative discrepancy). These are the ones to take to the boss for correction — nothing is changed automatically.",
+      });
+      readMeSheet.addRow({
+        sheet: "Route Missing",
+        description:
+          "Legs where no rate period covers that route on the leg's date (route renamed/deleted, or a date gap), so the correct rate can't be re-derived. Subbie legs with a stored rate under R500 are flagged SUBBIE < R500 for review.",
+      });
+      if (audit.noFieldRate.length > 0) {
+        readMeSheet.addRow({
+          sheet: "No Field Rate",
+          description:
+            "A rate period exists for the route and date, but the specific field needed (subbie/driver × 6m/12m) is blank, so no rate could be resolved.",
+        });
+      }
+      if (audit.skipped.length > 0) {
+        readMeSheet.addRow({
+          sheet: "Skipped",
+          description: "Leg has no date or no driver assigned, so a rate can't be resolved at all.",
+        });
+      }
+      readMeSheet.getRow(1).font = { bold: true };
+      readMeSheet.eachRow((row) => {
+        row.alignment = { wrapText: true, vertical: "top" };
+      });
+
+      const summarySheet = workbook.addWorksheet("Summary");
+      summarySheet.columns = [
+        { header: "Metric", key: "metric", width: 32 },
+        { header: "Value", key: "value", width: 16 },
+      ];
+      summarySheet.addRow({ metric: "Period", value: `${months[month - 1]} ${year}` });
+      summarySheet.addRow({});
+      summarySheet.addRow({ metric: "Total legs", value: audit.totalLegs });
+      summarySheet.addRow({ metric: "Big / negative discrepancies", value: audit.mismatchShown });
+      summarySheet.addRow({ metric: "Route-missing subbie < R500", value: audit.routeMissingSubbieLow ?? 0 });
+      summarySheet.addRow({ metric: "Already correct", value: s.MATCH });
+      summarySheet.addRow({ metric: "Route missing", value: s.ROUTE_MISSING });
+      summarySheet.addRow({ metric: "No field rate", value: s.NO_FIELD_RATE });
+      summarySheet.addRow({ metric: "Skipped", value: s.SKIPPED });
+      summarySheet.getRow(1).font = { bold: true };
+
+      addDiffSheet(workbook, "Big-Negative Discrepancies", audit.mismatch, { showExpected: true, showFlag: true });
+      addDiffSheet(workbook, "Route Missing", audit.routeMissing, { showFlag: true });
+      if (audit.noFieldRate.length > 0) addDiffSheet(workbook, "No Field Rate", audit.noFieldRate);
+      if (audit.skipped.length > 0) addDiffSheet(workbook, "Skipped", audit.skipped);
+
+      const buffer = await workbook.xlsx.writeBuffer();
+      const blob = new Blob([buffer], {
+        type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+      });
+      const downloadUrl = window.URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = downloadUrl;
+      link.download = `driver-rate-audit-${months[month - 1]}-${year}.xlsx`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      window.URL.revokeObjectURL(downloadUrl);
+    } catch (err) {
+      setError(err.message || "Failed to export to Excel");
+    } finally {
+      setExporting(false);
+    }
+  };
 
   return (
     <div style={{ maxWidth: 1100 }}>
@@ -72,6 +187,11 @@ function DriverRateAudit() {
         <button onClick={runAudit} disabled={running} style={buttonStyle(running, "#2e7d32")}>
           {running ? "Running audit…" : "Run Audit"}
         </button>
+        {audit && (
+          <button onClick={handleExportToExcel} disabled={exporting} style={buttonStyle(exporting, "#1a5276")}>
+            {exporting ? "Exporting…" : "Export to Excel"}
+          </button>
+        )}
       </div>
 
       {error && (
