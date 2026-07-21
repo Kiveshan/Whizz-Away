@@ -56,6 +56,10 @@ EventBridge fires a Lambda on the 1st of each month. Lambda calls `POST /api/sta
 | Backend framework | Express.js | Minimal, well-understood; appropriate for a structured REST API without GraphQL complexity |
 | Authentication | Passport.js (LocalStrategy) + JWT | Passport handles interactive session login; JWT middleware handles stateless API calls from the SPA |
 | Password hashing | bcrypt (cost 10) | Industry-standard adaptive hashing; cost factor configurable |
+| Security headers | Helmet | Sensible header defaults in one line; CSP disabled because the server serves the CRA build with an inlined runtime chunk |
+| Rate limiting | express-rate-limit | Applied to the auth routes specifically — brute-force protection where it matters, without throttling normal API use |
+| Request validation | Zod | Schema validation on the financially material write endpoints; coerces the string-typed numbers browsers send |
+| CI/CD | GitHub Actions → AWS Elastic Beanstalk | Push-to-deploy per branch (`staging`, `main`), building client and server into a single versioned artifact |
 | Database | PostgreSQL | Strong support for JSONB, array types, and window functions required by the analytics queries |
 | Database client | node-postgres (`pg`) — raw SQL | Complex CTEs and lateral joins in the analytics layer are easier to write and reason about in raw SQL than in a query builder |
 | File storage | AWS S3 (af-south-1) | Durable object storage for compliance documents; presigned URLs keep credentials server-side |
@@ -66,7 +70,27 @@ EventBridge fires a Lambda on the 1st of each month. Lambda calls `POST /api/sta
 
 ---
 
-## 4. Key Technical Decisions
+## 4. Architecture Decisions
+
+Each decision below states what was chosen, what else was on the table, the reason, and what it costs. Where a choice has a known downside still live in the codebase, it is written down rather than omitted.
+
+---
+
+**Decision:** PostgreSQL as the system of record, rather than DynamoDB or another NoSQL store.
+
+**Alternatives considered:** DynamoDB (the default choice given the rest of the stack is AWS), MongoDB.
+
+**Why this approach:** The access patterns here are the ones relational databases exist for, and they are not known in advance:
+
+- **The domain is inherently relational.** The schema is 31 tables with 33 foreign-key relationships. An instruction has legs, legs have trucks and drivers, trucks have documents, an instruction produces an invoice, invoices are partially settled by payments, payments roll into statements. Modelling that in DynamoDB means either duplicating data across item collections or doing the joins in application code.
+- **Analytics queries are ad-hoc and aggregate-heavy.** `models/analytics/analyticsModel.js` is ~1,500 lines of SQL using CTEs, lateral joins, and window functions (42 occurrences of `WITH` / `JOIN LATERAL` / `OVER (` / `GROUP BY` in that one file). Revenue attribution across multi-leg instructions divides `total_cost` by a leg count and a per-leg truck count computed in sibling CTEs. DynamoDB has no joins, no aggregation, and no ad-hoc query capability — this would become a second analytics pipeline (stream → warehouse) to answer questions the database already answers directly.
+- **Money requires multi-row transactions.** Statement generation writes an aging-analysis row and a statement row per client across the entire client list inside a single `BEGIN`/`COMMIT`, rolling back the whole run on any failure (`utils/statementGenerator.js:337`). DynamoDB transactions cap at 100 items and cannot span an unbounded client list.
+- **Financial correctness needs exact numerics.** `NUMERIC(12,2)` for currency, with `pg` type parsers overridden in `config/database.js` so values do not silently become floats. DynamoDB stores numbers as strings with its own precision rules and no server-side decimal arithmetic.
+- **Date arithmetic runs in the query.** Aging buckets, point-in-time rate lookups (`effective_from <= :date ORDER BY effective_date DESC LIMIT 1`), and VAT-period reporting are all date-range predicates the database evaluates against indexes.
+
+The scale argument that usually favours DynamoDB does not apply: this is an internal tool for one logistics operator with tens of users and a query volume a single `db.t3` instance absorbs without effort. Choosing DynamoDB would have traded away everything above to solve a scaling problem the system does not have.
+
+**Trade-offs:** A relational database is a vertical-scaling bottleneck and a single point of failure — the connection pool is capped at 20 and would need pgBouncer or a read replica before horizontal scaling. Schema changes require migrations (seven applied so far in `server/migrations/`), where DynamoDB would have absorbed new attributes without one. Operationally, RDS costs more at idle than DynamoDB's on-demand pricing at this volume.
 
 ---
 
@@ -100,13 +124,21 @@ EventBridge fires a Lambda on the 1st of each month. Lambda calls `POST /api/sta
 
 ---
 
-**Decision:** AWS Lambda + EventBridge Scheduler triggers statement generation via an authenticated HTTP endpoint rather than an in-process cron job.
+**Decision:** Month-end statement generation is triggered by EventBridge Scheduler → Lambda → an authenticated HTTP endpoint, rather than by an in-process cron job.
 
-**Alternatives considered:** `node-cron` scheduled task inside the Express process (the dependency remains in `package.json` as a leftover).
+**Alternatives considered:** `node-cron` inside the Express process (this was the original implementation; the dependency has since been removed); a manual "generate statements" button in the finance UI.
 
-**Why this approach:** An in-process cron would miss its schedule if the server was restarted or redeployed on the 1st of the month. Moving the trigger outside the process means the Lambda fires reliably regardless of application restarts. The endpoint authenticates the Lambda call with a shared `API_SECRET` header, checked before the normal JWT path, so no user session is needed.
+**Why this approach:** The trigger is the one part of this feature that must not depend on the application being alive at a specific instant.
 
-**Trade-offs:** Adds an external AWS resource to maintain. The `API_SECRET` is a symmetric shared secret — if leaked, an attacker can trigger arbitrary statement regeneration. The `node-cron` package is still listed as a dependency despite not being used.
+- **In-process cron misses the run if the process is not up at that moment.** Statement generation fires once a month, on the 1st. A deploy, a crash, an Elastic Beanstalk instance replacement, or an autoscaling event at that moment silently skips the run — and nothing surfaces the miss until a client asks where their statement is. EventBridge holds the schedule outside the application entirely, so the application's uptime at 00:00 on the 1st stops being a correctness dependency.
+- **A cron inside the app breaks the moment there is more than one instance.** With `node-cron`, every running instance fires its own timer, so scaling to two instances means generating every statement twice. EventBridge fires once regardless of how many instances are behind the load balancer — the schedule stops being coupled to the deployment topology.
+- **It gets retries and failure visibility for free.** EventBridge retries the Lambda on failure and can route exhausted attempts to a dead-letter queue; the run is observable in CloudWatch without building any of that into the app.
+- **The work stays in the application.** The Lambda is a trigger, not an implementation — it calls `POST /api/statements/generate` and the generation logic lives in `utils/statementGenerator.js`, next to the models and the pool it depends on. The same endpoint backs the manual regeneration path in the finance UI, so the scheduled and manual routes exercise identical code rather than drifting apart.
+- **Re-firing is safe.** `processClient()` looks up an existing statement for the period and updates it in place instead of inserting a duplicate, and the whole run is wrapped in one transaction that rolls back on any error. A retry, a duplicate delivery, or an operator regenerating a past month all converge on the same result rather than compounding.
+
+The endpoint authenticates the Lambda with a shared `API_SECRET` bearer token, checked before the JWT path — which is why `statementRoutes` is mounted *above* the global `verifyToken` guard in `routes/index.js:54`, so a non-JWT token is not rejected before reaching its own check.
+
+**Trade-offs:** Adds AWS resources that live outside the repo — the schedule and the Lambda are not version-controlled with the application, so the deployment is no longer fully described by this codebase. `API_SECRET` is a symmetric shared secret: anyone holding it can trigger arbitrary statement regeneration, and rotating it requires a coordinated change in both the Lambda's environment and the server's. Local development cannot exercise the scheduled path end-to-end; it is tested by calling the endpoint directly.
 
 ---
 
@@ -127,6 +159,56 @@ EventBridge fires a Lambda on the 1st of each month. Lambda calls `POST /api/sta
 **Why this approach:** This was likely an early development choice to avoid committing a real secret. The effect is that every server restart issues a new signing secret and all previously issued JWTs become invalid immediately.
 
 **Trade-offs:** Every deployment or crash invalidates all active user sessions, requiring users to log in again. This is a known limitation. The `.env` `JWT_SECRET` key is currently dead code — switching to it would require one line change in `secrets.js` and would make sessions survive restarts.
+
+---
+
+**Decision:** Authentication is enforced by a single global guard mounted in the central router, with public routes deliberately mounted above it.
+
+**Alternatives considered:** Applying `verifyToken` per route or per router module.
+
+**Why this approach:** Per-route middleware fails open — a new route added without the middleware is public, and nothing catches it. Mounting `router.use(verifyToken)` once in `routes/index.js` after the public block inverts that: a newly added route module is authenticated by default, and making something public requires a deliberate edit above the guard line with a comment explaining why. There are four such exceptions (auth, landing stats, the health check, and the statement generation route with its own `API_SECRET` check), each annotated in place. The frontend mirrors this with `RequireAuth` / `RequireRole` wrappers, but the server guard is the enforcement point — the client-side check is a UX affordance, not a security control.
+
+**Trade-offs:** Ordering in `routes/index.js` is now load-bearing. Moving a `router.use()` line across the guard silently changes the security posture of every route in that module, and nothing in the type system or tests catches it. The guard also forces the SPA's static assets to be served *before* the API router in `server.js:185`, since otherwise browser navigations would receive a `401 NO_TOKEN` JSON body instead of the React shell.
+
+---
+
+**Decision:** Zod validation applied selectively to financially material write endpoints, using `.passthrough()`, rather than full schema coverage of every request.
+
+**Alternatives considered:** Validating every endpoint with strict schemas; no validation beyond parameterised SQL.
+
+**Why this approach:** The endpoints where a malformed payload causes real damage are a small, identifiable set — payment creation, invoice creation, credit notes, and the pricing fields on instruction save. Those get schemas in `validation/financialSchemas.js`, with coercion for the string-typed numbers browsers actually send and rejection of non-positive amounts. `.passthrough()` is deliberate: the instruction payload is large and mostly non-financial, and a strict schema would have to enumerate every field the models read, turning validation into a maintenance burden that grows with every UI change. The intent is a safety net over the fields where correctness is money, not a whitelist over the whole API.
+
+**Trade-offs:** Endpoints outside this set rely on parameterised SQL and database constraints alone — SQL injection is prevented, but a type-confused or out-of-range value can still reach a table. `.passthrough()` means unrecognised fields are not rejected, so a client typo in a field name fails silently rather than erroring.
+
+---
+
+**Decision:** PDF and Excel documents are generated in the browser (jsPDF, ExcelJS), not on the server.
+
+**Alternatives considered:** A server-side rendering service (Puppeteer/headless Chrome, or a PDF microservice) producing documents on demand.
+
+**Why this approach:** Tax invoices, wage slips, and financial exports are generated interactively, one at a time, by a user looking at the data on screen. Rendering client-side means the document is built from the exact view state already loaded — no second serialisation path that can drift from what the user saw — and it keeps headless Chrome, its memory footprint, and its cold-start latency off an Elastic Beanstalk instance that is also serving the API. The document never round-trips, so there is no temporary file to store or clean up, and no generation queue to operate.
+
+**Trade-offs:** Documents cannot be produced without a browser session, which rules out emailing a statement PDF from a scheduled job or the Lambda path — that is why statement generation writes rows to the database rather than producing files. Output fidelity depends on the client's browser, and large exports are bounded by the user's machine. Bulk generation (every wage slip for a month) is not possible in one operation.
+
+---
+
+**Decision:** Documents in S3 are read through short-lived presigned URLs generated server-side, rather than proxied through the API or served from a public bucket.
+
+**Alternatives considered:** Streaming the object through an authenticated Express route; making the bucket publicly readable with unguessable keys.
+
+**Why this approach:** Compliance documents (driver licences, truck roadworthy certificates, fuel slips) are personal and regulatory records — a public bucket is not an option regardless of key entropy. Proxying through Express would work but puts every document byte through the application process and the 50 MB Nginx body limit, consuming request capacity on an instance sized for JSON traffic. Presigned URLs let the browser fetch directly from S3 while the authorisation decision stays server-side: the API checks the user's role, then mints a time-limited URL. AWS credentials never reach the client.
+
+**Trade-offs:** A presigned URL is a bearer token for that object until it expires — if a user forwards one, the recipient needs no login. Access to the object itself is therefore not audited; only the URL issuance is visible to the application. Buckets use separate IAM credential pairs per purpose (employee docs, truck docs, ops docs), which limits blast radius but means three sets of keys to rotate.
+
+---
+
+**Decision:** The React build is folded into the Express server and shipped as one Elastic Beanstalk artifact per environment, deployed by GitHub Actions on push.
+
+**Alternatives considered:** Static frontend on S3 + CloudFront with the API deployed separately; containerised deployment.
+
+**Why this approach:** One artifact means the frontend and the API it talks to are always the same version — there is no window where a newly deployed client calls an endpoint the server does not have yet, which is the standard failure mode of independently deployed frontends. It also removes CORS from production entirely (same origin), leaving it as a development-only concern for the `localhost:3000` dev server. The `staging` and `main` branches map to separate Elastic Beanstalk environments with their own workflow files, so staging is a genuine pre-production rehearsal of the same artifact shape.
+
+**Trade-offs:** Static assets are served by the application instance rather than a CDN, so there is no edge caching and a frontend-only change requires a full application redeploy. Push-to-deploy on `staging` and `main` means those branches are live by definition — there is no approval gate between merge and deploy. Because the deployed server serves the CRA build with its inlined runtime chunk, `helmet`'s Content-Security-Policy is disabled (`server.js:33`), giving up CSP protection that a separately hosted frontend could have kept.
 
 ---
 
