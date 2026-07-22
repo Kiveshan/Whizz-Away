@@ -242,7 +242,6 @@ const ControllerInstructions = () => {
     shipmentTypes,
     initializeContainers,
     containersRef,
-    setWeightRows,
     setFieldErrors,
     setRateLockStatus,
     setClientStartingPoints,
@@ -345,10 +344,19 @@ const ControllerInstructions = () => {
   }, [formData.rateWeight, formData.shipmentTypeId, isWeightBased, isCrossHaul, isImport, isExport, isSetRateMode])
 
   useEffect(() => {
-    if (formData.shipmentTypeId === "5" && formData.rateWeight !== "Container") {
-      setFormData((prev) => ({ ...prev, rateWeight: "Container" }))
+    const usesWeightTable =
+      formData.shipmentTypeId === "4" ||
+      (formData.shipmentTypeId === "5" && isWeightBased)
+    if (usesWeightTable) {
+      setWeightRows((prev) =>
+        prev.length > 0
+          ? prev
+          : [{ id: 1, ksmDmNo: "", ticketNo: "", receiptBookNo: "", weight: "" }]
+      )
+    } else {
+      setWeightRows((prev) => (prev.length > 0 ? [] : prev))
     }
-  }, [formData.shipmentTypeId, formData.rateWeight])
+  }, [formData.shipmentTypeId, isWeightBased, setWeightRows])
 
   useEffect(() => {
     const fetchSetRate = async () => {

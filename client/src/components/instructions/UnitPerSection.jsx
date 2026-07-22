@@ -66,10 +66,11 @@ export function UnitPerSection({
               ...(isReadOnly ? readOnlyStyle : {}),
             }}
             ref={fieldRefs?.rateWeight}
-            disabled={isReadOnly || isAddOn}
+            disabled={isReadOnly}
           >
-            {/* kg and ton only for Cross-haul (break bulk) - type 4 */}
-            {formData.shipmentTypeId === "4" && (
+            {/* kg and ton for Cross-haul (break bulk) - type 4, and Add-On - type 5 */}
+            {(formData.shipmentTypeId === "4" ||
+              String(formData.shipmentTypeId) === "5") && (
               <>
                 <option value="kg">kg</option>
                 <option value="ton">ton</option>
@@ -137,8 +138,9 @@ export function UnitPerSection({
               </div>
             </div>
 
-            {/* Weight Field — not shown for type 4 (break bulk uses weight rows table) */}
-            {String(formData.shipmentTypeId) !== "4" && (
+            {/* Weight Field — not shown for type 4 or weight-mode type 5 (both use the weight rows table) */}
+            {String(formData.shipmentTypeId) !== "4" &&
+              String(formData.shipmentTypeId) !== "5" && (
               <div
                 className="controller-instructions-form-field"
                 style={{ flex: 1, minWidth: "150px" }}

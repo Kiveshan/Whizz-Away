@@ -8,6 +8,7 @@ export const fetchRate = async ({
   requestId,
   currentLagIndex,
   shipmentType,
+  isWeightBased,
   isCompleted,
   noRatesRoutes,
   setNoRatesRoutes,
@@ -24,7 +25,7 @@ export const fetchRate = async ({
   legDate = null,
   skipDriverUpdate = false,
 }) => {
-  if (shipmentType === 4) return Promise.resolve();
+  if (shipmentType === 4 || isWeightBased) return Promise.resolve();
   if (!startingPoint || !destination) return Promise.resolve();
 
   const resolvedTargetLegIndex =

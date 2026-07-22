@@ -104,7 +104,11 @@ export function validateForm(formData, containers = [], flags = {}) {
     }
 
     if (isWeightBased) {
-      if (String(formData.shipmentTypeId) !== "4" && (!formData.weight || formData.weight === "")) {
+      if (
+        String(formData.shipmentTypeId) !== "4" &&
+        String(formData.shipmentTypeId) !== "5" &&
+        (!formData.weight || formData.weight === "")
+      ) {
         fail("weight", "Weight is required for weight-based calculations");
       }
       const isCrossHaulSetRate = String(formData.shipmentTypeId) === "4" && isSetRate;
@@ -150,7 +154,7 @@ export function validateForm(formData, containers = [], flags = {}) {
     }
 
     if (formData.rateWeight === "ton" || formData.rateWeight === "kg") {
-      if (String(formData.shipmentTypeId) !== "4") {
+      if (String(formData.shipmentTypeId) !== "4" && String(formData.shipmentTypeId) !== "5") {
         if (!formData.weight) fail("weight", `Weight (${formData.rateWeight}) is required`);
       }
       if (!isSetRate && !formData.unitRate) {
