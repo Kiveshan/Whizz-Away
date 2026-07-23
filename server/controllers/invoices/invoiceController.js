@@ -46,8 +46,17 @@ const getInvoiceDetailsHandler = async (req, res) => {
       });
     }
 
+    // Weight-based instructions (cross-haul break bulk, or an add-on in weight
+    // mode) legitimately have no containers — they bill off weight rows — so
+    // never fabricate placeholder containers for them.
+    const WEIGHT_UNITS = ["kg", "ton", "m³"];
+    const usesWeightRows =
+      result.data.shipment_type_key === 4 ||
+      (result.data.shipment_type_key === 5 &&
+        WEIGHT_UNITS.includes(result.data.rateweight));
+
     let containers = result.data.containers;
-    if (containers.length === 0 && result.data.num_containers > 0) {
+    if (!usesWeightRows && containers.length === 0 && result.data.num_containers > 0) {
       console.log(
         `Creating ${result.data.num_containers} dummy containers for invoice ID ${id}`
       );

@@ -53,12 +53,12 @@ export const debugDriverData = (drivers) => {
   });
 };
 
-export const calculateLegDriverRate = (drivers, rates, shipmentType) => {
+export const calculateLegDriverRate = (drivers, rates, shipmentType, isWeightBased = false) => {
   if (!drivers || drivers.length === 0) {
     return 0;
   }
 
-  if (shipmentType === 4) {
+  if (shipmentType === 4 || isWeightBased) {
     const first = drivers.find(
       (d) => d.driverRate !== undefined && d.driverRate !== null && d.driverRate !== ""
     );

@@ -31,6 +31,25 @@ const debug = (message, data) => {
   }
 };
 
+// Which line-item table an invoice renders. Cross-haul break bulk (shipment
+// type 4) and an add-on (type 5) that is in weight mode both bill off
+// m1_controller_weight rows and have no containers, so both show the weight
+// table instead of the container table.
+const WEIGHT_UNITS = ["kg", "ton", "m³"];
+const usesWeightTable = (invoiceData) => {
+  const typeKey = Number(invoiceData?.shipment_type_key);
+  return (
+    typeKey === 4 ||
+    (typeKey === 5 && WEIGHT_UNITS.includes(invoiceData?.rateweight))
+  );
+};
+
+// Whether the weight rows roll up into the invoice total. Only break bulk does;
+// add-on totals are unchanged (they come from the linked add-on invoice, and the
+// instruction's own total_cost stays 0), so their weight rows are detail only.
+const weightRowsFormTotal = (invoiceData) =>
+  Number(invoiceData?.shipment_type_key) === 4;
+
 // Utility function to compute correct surcharge amount per container type
 const getSurchargeAmount = (container) => {
   if (!container.add_surcharges) return 0;
@@ -316,7 +335,7 @@ const ClientInvoice = forwardRef(({
     try {
       const pdfContainers = finalInvoiceData.containers || [];
       const weightItems = finalInvoiceData.weightItems || [];
-      const isWeightBased = Number(finalInvoiceData.shipment_type_key) === 4;
+      const isWeightBased = usesWeightTable(finalInvoiceData);
       const isCompactLayout = true;
 
       // Create new PDF document
@@ -491,7 +510,7 @@ const ClientInvoice = forwardRef(({
         currentY = doc.lastAutoTable.finalY + (isCompactLayout ? 5 : 7);
       }
 
-      // Table for items: weight items when shipment_type_key=4, otherwise containers
+      // Table for items: weight items for weight-based instructions, otherwise containers
       let tableHeaders = [];
       let tableData = [];
       const isSetRate = finalInvoiceData.is_set_rate === true || finalInvoiceData.rateweight === "SetRate";
@@ -675,7 +694,7 @@ const ClientInvoice = forwardRef(({
       // Calculate invoice values - FIXED
       const amount = isSetRate
         ? (finalInvoiceData.total_cost || 0)
-        : isWeightBased
+        : weightRowsFormTotal(finalInvoiceData)
         ? (weightItems || []).reduce((sum, wi) => sum + Number(wi.price || 0), 0)
         : (finalInvoiceData.total_cost || 0);
       const vatRate = finalInvoiceData.vat ? (Number(finalInvoiceData.vat) / 100) : 0;
@@ -884,12 +903,12 @@ const ClientInvoice = forwardRef(({
     );
   }
 
-  const isWeightBasedView = Number(finalInvoiceData.shipment_type_key) === 4;
+  const isWeightBasedView = usesWeightTable(finalInvoiceData);
   const isSetRateView = finalInvoiceData.is_set_rate === true || finalInvoiceData.rateweight === "SetRate";
   const weightItemsView = finalInvoiceData.weightItems || [];
   const amount = isSetRateView
     ? (finalInvoiceData.invoice?.amount || finalInvoiceData.total_cost || 0)
-    : isWeightBasedView
+    : weightRowsFormTotal(finalInvoiceData)
     ? weightItemsView.reduce((sum, wi) => sum + Number(wi.price || 0), 0)
     : (finalInvoiceData.invoice?.amount || finalInvoiceData.total_cost || 0);
   const vat = calculateVAT(amount);

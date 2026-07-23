@@ -143,13 +143,11 @@ export function useCreateInstructionSubmit({
               ? null
               : Number.parseFloat(formData.weight || 0)
             : null,
-        unitrate: isAddOnType
-          ? 0
-          : isWeightBased
-            ? formData.unitrate === ""
-              ? null
-              : Number.parseFloat(formData.unitrate || 0)
-            : null,
+        unitrate: isWeightBased
+          ? formData.unitrate === ""
+            ? null
+            : Number.parseFloat(formData.unitrate || 0)
+          : null,
         client: formData.clientId,
         shipment_type: formData.shipmentTypeId,
         pickuptime: formData.pickupTime,
@@ -193,7 +191,10 @@ export function useCreateInstructionSubmit({
           : [];
 
       let weightData = [];
-      if (formData.shipmentTypeId === "4") {
+      const usesWeightTable =
+        formData.shipmentTypeId === "4" ||
+        (formData.shipmentTypeId === "5" && isWeightBased);
+      if (usesWeightTable) {
         weightData = currentWeightRows.map((row) => {
           let numericWeight = null;
           if (row.weight !== null && row.weight !== undefined && row.weight !== "") {

@@ -270,13 +270,19 @@ const getInvoiceDetails = async (id) => {
       leg_rate: c.leg_rate
     })));
 
-    // If shipment type is 4 (weight-based), fetch weight items
+    // Fetch weight items for weight-based instructions: cross-haul break bulk
+    // (type 4), or an add-on (type 5) that is in weight mode rather than
+    // container mode. Both store their detail in m1_controller_weight rows.
     const shipmentTypeKey = result.rows[0].shipment_type_key;
+    const WEIGHT_UNITS = ["kg", "ton", "m³"];
+    const usesWeightRows =
+      shipmentTypeKey === 4 ||
+      (shipmentTypeKey === 5 && WEIGHT_UNITS.includes(result.rows[0].rateweight));
     const isSetRate = result.rows[0].is_set_rate === true || result.rows[0].rateweight === "SetRate";
     const historicalSetRate = Number(result.rows[0].historical_set_rate || 0);
     let weightItems = [];
     const unitrate = Number(result.rows[0].unitrate || 0);
-    if (shipmentTypeKey === 4) {
+    if (usesWeightRows) {
       const weightQuery = `
         SELECT 
           w.ksm_dm_no,
@@ -687,6 +693,7 @@ const getInstructionDetailsForPreview = async (instructionId) => {
           m1.rateper_12,
           m1.rateper_abnormal,
           m1.shipment_type as shipment_type_key,
+          m1.rateweight,
           m1.unitrate,
           m1.is_set_rate,
           m1.historical_set_rate,
@@ -840,12 +847,18 @@ const getInstructionDetailsForPreview = async (instructionId) => {
 
       const containers = Array.from(containerMap.values());
 
-      // Weight-based items for preview when shipment_type_key = 4
+      // Weight-based items for preview: cross-haul break bulk (type 4), or an
+      // add-on (type 5) in weight mode rather than container mode.
       let weightItems = [];
       const unitratePrev = Number(m1Result.rows[0].unitrate || 0);
       const isSetRatePrev = m1Result.rows[0].is_set_rate === true;
       const historicalSetRatePrev = Number(m1Result.rows[0].historical_set_rate || 0);
-      if (m1Result.rows[0].shipment_type_key === 4) {
+      const PREVIEW_WEIGHT_UNITS = ["kg", "ton", "m³"];
+      const previewUsesWeightRows =
+        m1Result.rows[0].shipment_type_key === 4 ||
+        (m1Result.rows[0].shipment_type_key === 5 &&
+          PREVIEW_WEIGHT_UNITS.includes(m1Result.rows[0].rateweight));
+      if (previewUsesWeightRows) {
         const weightQuery = `
           SELECT 
             w.ksm_dm_no,

@@ -358,7 +358,11 @@ const Viewcontrollerinstructions = () => {
         setSetRateValue(Number(data.historical_set_rate))
       }
 
-      if (String(data.shipment_type) === "4" && Array.isArray(data.weight_rows)) {
+      const dataUsesWeightTable =
+        String(data.shipment_type) === "4" ||
+        (String(data.shipment_type) === "5" &&
+          ["kg", "ton", "m³"].includes(data.rateweight))
+      if (dataUsesWeightTable && Array.isArray(data.weight_rows)) {
         const mappedRows = data.weight_rows.map((row, index) => ({
           id: row.weight_pk || index + 1,
           ksmDmNo: row.ksm_dm_no || "",
@@ -1056,8 +1060,9 @@ const Viewcontrollerinstructions = () => {
                               </div>
                             </div>
 
-                            {/* Weight Field for non-type-4 shipments, or legacy type-4 instructions without weightRows */}
-                            {(formData.shipmentTypeId !== "4" || weightRows.length === 0) && (
+                            {/* Weight Field for non-table shipments, or legacy weight-table instructions without weightRows */}
+                            {((formData.shipmentTypeId !== "4" && formData.shipmentTypeId !== "5") ||
+                              weightRows.length === 0) && (
                               <div className="controller-instructions-form-field" style={{ flex: 1, minWidth: "150px" }}>
                                 <label>{`Weight (${formData.rateWeight})`}</label>
                                 <div
@@ -1285,7 +1290,8 @@ const Viewcontrollerinstructions = () => {
               </div>
             </div>
 
-            {formData.shipmentTypeId === "4" && weightRows.length > 0 && (
+            {(formData.shipmentTypeId === "4" || formData.shipmentTypeId === "5") &&
+              weightRows.length > 0 && (
               <div
                 className="controller-instructions-form-section"
                 style={{ marginTop: "-100px", paddingTop: "0" }}

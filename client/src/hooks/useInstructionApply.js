@@ -93,10 +93,12 @@ export function useInstructionApply({
           setHistoricalSetRate(null);
         }
 
-        if (
-          String(data.shipment_type) === "4" &&
-          Array.isArray(data.weight_rows)
-        ) {
+        const dataUsesWeightTable =
+          String(data.shipment_type) === "4" ||
+          (String(data.shipment_type) === "5" &&
+            ["kg", "ton", "m³"].includes(data.rateweight));
+
+        if (dataUsesWeightTable && Array.isArray(data.weight_rows)) {
           const mappedRows = data.weight_rows.map((row, index) => ({
             id: row.weight_pk || index + 1,
             ksmDmNo: row.ksm_dm_no || "",

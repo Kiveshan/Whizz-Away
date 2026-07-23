@@ -479,6 +479,7 @@ useEffect(() => {
       requestId,
       currentLagIndex,
       shipmentType,
+      isWeightBased,
       isCompleted,
       noRatesRoutes,
       setNoRatesRoutes,
@@ -584,8 +585,9 @@ const newDriver = {
     }));
 
     // If both starting point and destination are selected, fetch the rate
-    // Skip automatic rate logic for shipment type 4 (cross-haul break bulk)
-    if (shipmentType !== 4 && startingPoint && formData.destination) {
+    // Skip automatic rate logic for weight-based instructions (cross-haul break
+    // bulk, or a weight-mode Add-On) — they use a flat per-leg rate, not route rates
+    if (!isWeightBased && startingPoint && formData.destination) {
       // Force a fresh rate fetch when route changes
       console.log("Route changed, fetching new rates...");
 
@@ -681,8 +683,9 @@ const newDriver = {
     }));
 
     // If both starting point and destination are selected, fetch the rate
-    // Skip automatic rate logic for shipment type 4 (cross-haul break bulk)
-    if (shipmentType !== 4 && formData.startingPoint && destination) {
+    // Skip automatic rate logic for weight-based instructions (cross-haul break
+    // bulk, or a weight-mode Add-On) — they use a flat per-leg rate, not route rates
+    if (!isWeightBased && formData.startingPoint && destination) {
       // Force a fresh rate fetch when route changes
       console.log("Route changed, fetching new rates...");
 
@@ -771,6 +774,13 @@ const newDriver = {
 
     if (!formData.startingPoint || !formData.destination || !newDate) {
       console.log("[handleDriverDateChange] Missing required data, returning early");
+      return { hadError: false };
+    }
+
+    // Weight-based instructions (cross-haul break bulk, or a weight-mode Add-On)
+    // use a flat per-driver rate entered manually — there's no date-effective
+    // 6m/12m route rate to look up, so skip this entirely.
+    if (isWeightBased) {
       return { hadError: false };
     }
 
@@ -866,7 +876,7 @@ const newDriver = {
     }
   // Deps: re-create only when the route or driver-role data changes so the
   // useEffect([isLegSwitching]) refresh loop always closes over current values.
-  }, [formData.startingPoint, formData.destination, employeeDrivers]);
+  }, [formData.startingPoint, formData.destination, employeeDrivers, isWeightBased]);
 
   // Replace the handleBackClick function with this version
 const handleBackClick = () => {
@@ -1083,7 +1093,7 @@ const shouldDisableAddLeg = async () => {
     const dropoff = instructionDetails.dropoff;
 
     if (!dropoff) return false;
-    const missingItems = await checkContainersReachDropoff(dropoff);
+    const { missingItems } = await checkContainersReachDropoff(dropoff);
     return missingItems.length === 0;
   } catch (error) {
     console.error("Error in shouldDisableAddLeg:", error);
@@ -1118,7 +1128,7 @@ const checkContainersDestination = async () => {
           setShouldHideAddLegButton(false);
           return;
         }
-const missingItems = await checkContainersReachDropoff(dropoff);
+const { missingItems } = await checkContainersReachDropoff(dropoff);
 
       console.log("Destination check result (missing items):", missingItems);
       setShouldHideAddLegButton(missingItems.length === 0);
@@ -1158,7 +1168,7 @@ const missingItems = await checkContainersReachDropoff(dropoff);
     if (isLegSwitching) return;
     if (isCompleted || currentLagIndex === null) return;
     if (!formData.startingPoint || !formData.destination) return;
-    if (shipmentType === 4) return;
+    if (isWeightBased) return;
 
     // Re-fetch date-aware rates for each driver when entering a leg.
     // Simulates the "reselect container" workaround — picks up any rate
@@ -1190,7 +1200,7 @@ useEffect(() => {
   if (isLegSwitching || drivers.length === 0 || isCompleted) {
     return;
   }
-  if (shipmentType === 4) {
+  if (isWeightBased) {
     return;
   }
 
@@ -1458,7 +1468,7 @@ useEffect(() => {
                 legnumber: currentLeg.legnumber || currentLagIndex + 1,
                 startingpoint: formData.startingPoint,
                 destination: formData.destination,
-                driverrate: calculateLegDriverRate(updatedDrivers, rates, shipmentType),
+                driverrate: calculateLegDriverRate(updatedDrivers, rates, shipmentType, isWeightBased),
                 m1key: instructionId,
                 drivers: updatedDrivers.map((driver) => {
                   // Use the per-driver rate already on the object (set via

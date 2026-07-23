@@ -501,8 +501,14 @@ const Instructions = () => {
     </tr>
   ) : (
     currentInstructions.map((item) => {
-      // Check if the instruction has any containers with non-empty/non-null containernum
-      const disableAssignment = (item.has_valid_containers !== true) && (item.shipment_type !== 4);
+      // Check if the instruction has any containers with non-empty/non-null containernum.
+      // Weight-based instructions (Break Bulk type 4, or a weight-mode Add-On type 5)
+      // never have containers, so they're exempt from the container check.
+      const isWeightBasedItem =
+        String(item.shipment_type) === "4" ||
+        (String(item.shipment_type) === "5" &&
+          ["kg", "ton", "m³"].includes(item.rateweight));
+      const disableAssignment = (item.has_valid_containers !== true) && !isWeightBasedItem;
 
       return (
         <tr key={item.m1controllerkey || item.m1key}>

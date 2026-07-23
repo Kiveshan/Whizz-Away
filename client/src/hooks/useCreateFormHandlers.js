@@ -15,7 +15,6 @@ export function useCreateFormHandlers({
   shipmentTypes,
   initializeContainers,
   containersRef,
-  setWeightRows,
   setFieldErrors,
   setRateLockStatus,
   setClientStartingPoints,
@@ -161,9 +160,10 @@ export function useCreateFormHandlers({
       const isImportType = shipmentTypeId === "1";
       const isExportType = shipmentTypeId === "2";
       const isRegularCrossHaulType = shipmentTypeId === "3";
+      const isAddOnType = shipmentTypeId === "5";
 
       let newRateWeight = (prev) => prev.rateWeight;
-      if (isImportType || isExportType || isRegularCrossHaulType) {
+      if (isImportType || isExportType || isRegularCrossHaulType || isAddOnType) {
         newRateWeight = "Container";
       } else if (isBreakBulkType) {
         newRateWeight = "ton";
@@ -179,16 +179,6 @@ export function useCreateFormHandlers({
         }),
         rateWeight: newRateWeight,
       }));
-
-      if (isBreakBulkType) {
-        setWeightRows((prev) =>
-          prev.length > 0
-            ? prev
-            : [{ id: 1, ksmDmNo: "", ticketNo: "", receiptBookNo: "", weight: "" }]
-        );
-      } else {
-        setWeightRows([]);
-      }
 
       setFieldErrors((prev) => {
         const newErrors = { ...prev };

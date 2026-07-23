@@ -68,13 +68,13 @@ export const handleFinaliseClick = async ({
     const pickup = instructionDetails.pickup;
     const dropoff = instructionDetails.dropoff;
 
-    const missingItems = await checkContainersReachDropoff(dropoff);
+    const { missingItems, totalWeight } = await checkContainersReachDropoff(dropoff);
 
     if (missingItems.length > 0) {
       if (isWeightBased) {
         setContainerValidationDetails({
           missingWeight: missingItems[0],
-          totalWeight: parseFloat(instructionDetails.weight) || 0,
+          totalWeight,
           weightUnit,
           dropoff,
           isWeightBased: true,

@@ -89,6 +89,32 @@ describe("UnitPerSection — rendering", () => {
     );
     expect(screen.queryByText(/Weight \(ton\)/)).not.toBeInTheDocument();
   });
+
+  it("shows kg, ton, and Container options for shipmentTypeId=5 (Add-On)", () => {
+    render(
+      <UnitPerSection
+        {...defaultProps}
+        formData={{ ...BASE_FORM, shipmentTypeId: "5" }}
+        isAddOn={true}
+      />
+    );
+    const select = screen.getByRole("combobox");
+    const options = Array.from(select.options).map((o) => o.value);
+    expect(options).toContain("kg");
+    expect(options).toContain("ton");
+    expect(options).toContain("Container");
+  });
+
+  it("hides weight field for shipmentTypeId=5 even when weight-based (uses weight rows table instead)", () => {
+    render(
+      <UnitPerSection
+        {...defaultProps}
+        formData={{ ...BASE_FORM, shipmentTypeId: "5", rateWeight: "ton" }}
+        isAddOn={true}
+      />
+    );
+    expect(screen.queryByText(/Weight \(ton\)/)).not.toBeInTheDocument();
+  });
 });
 
 describe("UnitPerSection — Set Rate (type 4)", () => {
@@ -152,9 +178,9 @@ describe("UnitPerSection — disabled states", () => {
     expect(screen.getByRole("combobox")).toBeDisabled();
   });
 
-  it("dropdown is disabled when isAddOn=true", () => {
+  it("dropdown is NOT disabled when isAddOn=true (Add-On can pick Container or weight-based)", () => {
     render(<UnitPerSection {...defaultProps} isAddOn={true} />);
-    expect(screen.getByRole("combobox")).toBeDisabled();
+    expect(screen.getByRole("combobox")).not.toBeDisabled();
   });
 
   it("unit rate input is disabled when isReadOnly=true", () => {

@@ -224,6 +224,10 @@ const FCcontrollerinstructions = () => {
   })();
 
   const allowVgmUI = String(formData.shipmentTypeId) !== "4";
+  const isWeightBased = ["kg", "ton", "m³"].includes(formData.rateWeight);
+  const usesWeightTable =
+    String(formData.shipmentTypeId) === "4" ||
+    (String(formData.shipmentTypeId) === "5" && isWeightBased);
 
   const {
     containers,
@@ -249,7 +253,7 @@ const FCcontrollerinstructions = () => {
     isCrossHaul:
       String(formData.shipmentTypeId) === "3" ||
       String(formData.shipmentTypeId) === "4",
-    isWeightBased: false,
+    isWeightBased,
     clientId: formData.clientId,
     pickup: formData.pickup,
     dropoff: formData.dropoff,
@@ -486,10 +490,16 @@ const FCcontrollerinstructions = () => {
   }, [instructionRecord]);
 
   useEffect(() => {
-    if (String(formData.shipmentTypeId) === "5" && formData.rateWeight !== "Container") {
-      setFormData((prev) => ({ ...prev, rateWeight: "Container" }));
+    if (usesWeightTable) {
+      setWeightRows((prev) =>
+        prev.length > 0
+          ? prev
+          : [{ id: 1, ksmDmNo: "", ticketNo: "", receiptBookNo: "", weight: "" }]
+      );
+    } else {
+      setWeightRows((prev) => (prev.length > 0 ? [] : prev));
     }
-  }, [formData.shipmentTypeId, formData.rateWeight]);
+  }, [usesWeightTable, setWeightRows]);
 
   useEffect(() => {
     if (String(formData.shipmentTypeId) === "4" && !isAddOn) {
@@ -579,6 +589,8 @@ const FCcontrollerinstructions = () => {
       setIsSetRate={setIsSetRate}
       isAddOn={isAddOn}
       isImport={isImport}
+      isWeightBased={isWeightBased}
+      usesWeightTable={usesWeightTable}
       historicalSetRate={historicalSetRate}
       setRateValue={setRateValue}
       showSetRateWarning={showSetRateWarning}

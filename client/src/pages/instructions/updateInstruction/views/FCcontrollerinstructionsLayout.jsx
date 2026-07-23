@@ -48,6 +48,8 @@ export function FCcontrollerinstructionsLayout({
   setIsSetRate,
   isAddOn,
   isImport,
+  isWeightBased,
+  usesWeightTable,
   historicalSetRate,
   setRateValue,
   showSetRateWarning,
@@ -525,8 +527,8 @@ export function FCcontrollerinstructionsLayout({
             </div>
           </div>
 
-          {/* Weight Details Table for shipment type 4 */}
-          {String(formData.shipmentTypeId) === "4" && weightRows.length > 0 && (
+          {/* Weight Details Table for shipment type 4, and weight-mode Add-On (type 5) */}
+          {usesWeightTable && weightRows.length > 0 && (
             <WeightDetailsTable
               rows={weightRows}
               rateWeight={formData.rateWeight}
@@ -538,8 +540,8 @@ export function FCcontrollerinstructionsLayout({
           )}
 
           {/* Container Details Table */}
-          {/* Only show when shipment type is NOT cross-haul (break bulk) (type 4) */}
-          {containers.length > 0 && formData.shipmentTypeId !== "4" && (
+          {/* Only show when not weight-based (cross-haul/break bulk type 4, or weight-mode Add-On) */}
+          {containers.length > 0 && !isWeightBased && (
             <ContainerDetailsTable
               containers={containers}
               containerFieldErrors={containerFieldErrors}

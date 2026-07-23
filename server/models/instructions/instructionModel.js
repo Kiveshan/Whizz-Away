@@ -1008,6 +1008,7 @@ export const getInstructions = async (clientId) => {
       m.client,
       c.client AS companyname,
       m.created_at as startingdate,
+      m.rateweight,
       COALESCE(m.num_six_meters, 0) AS num_six_meters,
       COALESCE(m.num_twelve_meters, 0) AS num_twelve_meters,
       COALESCE(m.num_abnormal, 0) AS num_abnormal,
@@ -1118,6 +1119,7 @@ export const searchInstructions = async ({ q, clientId } = {}) => {
       c.client AS companyname,
       c.m5clientkey,
       m.created_at AS startingdate,
+      m.rateweight,
       COALESCE(m.num_six_meters, 0) AS num_six_meters,
       COALESCE(m.num_twelve_meters, 0) AS num_twelve_meters,
       COALESCE(m.num_abnormal, 0) AS num_abnormal,
@@ -2298,8 +2300,18 @@ export const updateFCInstructionAndContainers = async (
       );
     }
 
-    // 5. Handle weight rows for shipment type 4 (cross-haul/break bulk)
-    if (newShipmentType === "4") {
+    // 5. Handle weight rows for shipment type 4 (cross-haul/break bulk),
+    // and for shipment type 5 (add-on) when it's currently in weight-based mode.
+    const WEIGHT_UNITS = ["kg", "ton", "m³"];
+    const newUsesWeightRows =
+      newShipmentType === "4" ||
+      (isAddOnType && WEIGHT_UNITS.includes(updateData.rateweight));
+    const oldUsesWeightRows =
+      String(currentInstruction.shipment_type) === "4" ||
+      (String(currentInstruction.shipment_type) === "5" &&
+        WEIGHT_UNITS.includes(currentInstruction.rateweight));
+
+    if (newUsesWeightRows) {
       const deleteWeightsQuery =
         "DELETE FROM public.m1_controller_weight WHERE m1_key = $1";
       await client.query(deleteWeightsQuery, [instructionId]);
@@ -2344,7 +2356,7 @@ export const updateFCInstructionAndContainers = async (
           await client.query(insertWeightQuery, weightValues);
         }
       }
-    } else if (String(currentInstruction.shipment_type) === "4") {
+    } else if (oldUsesWeightRows) {
       const deleteWeightsQuery =
         "DELETE FROM public.m1_controller_weight WHERE m1_key = $1";
       await client.query(deleteWeightsQuery, [instructionId]);

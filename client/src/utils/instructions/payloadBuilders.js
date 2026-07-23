@@ -51,7 +51,8 @@ export function buildUpdatePayload(
     num_breakbulk: 0,
     weight:
       formData.rateWeight !== "Container" &&
-      String(formData.shipmentTypeId) !== "4"
+      String(formData.shipmentTypeId) !== "4" &&
+      String(formData.shipmentTypeId) !== "5"
         ? formData.weight
           ? Number(formData.weight)
           : null
@@ -63,9 +64,8 @@ export function buildUpdatePayload(
     rateper_12: isAddOn ? 0 : isWeightUnit ? 0 : ratePer12,
     rateper_abnormal: isAddOn ? 0 : isWeightUnit ? 0 : ratePerAbnormal,
     rateper_breakbulk: 0,
-    unitrate: isAddOn
-      ? 0
-      : formData.rateWeight !== "Container"
+    unitrate:
+      formData.rateWeight !== "Container"
         ? formData.unitRate
           ? Number(formData.unitRate)
           : null
@@ -122,7 +122,10 @@ export function buildUpdatePayload(
       });
 
   let weightData = [];
-  if (String(formData.shipmentTypeId) === "4") {
+  const usesWeightTable =
+    String(formData.shipmentTypeId) === "4" ||
+    (String(formData.shipmentTypeId) === "5" && isWeightUnit);
+  if (usesWeightTable) {
     weightData = weightRows.map((row) => {
       let numericWeight = null;
       if (row.weight !== null && row.weight !== undefined && row.weight !== "") {

@@ -752,7 +752,7 @@ export default function DriversSection({
                       </div>
                     </div>
 
-                    {shipmentType === 4 && (
+                    {(shipmentType === 4 || isWeightBased) && (
                       <div
                         style={{
                           width: "16.666%",

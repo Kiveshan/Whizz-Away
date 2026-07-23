@@ -42,8 +42,17 @@ export const checkContainersReachDropoff = async ({
 
   if (isWeightBased) {
     try {
-      const response = await api.get(`/instructions/${instructionId}/details`);
-      const totalInstructionWeight = parseFloat(response.data.weight) || 0;
+      // The instruction's own `weight` column is intentionally null for
+      // weight-table instructions (Break Bulk, and a weight-mode Add-On) —
+      // the real total lives in the weight rows table, so sum that instead.
+      const response = await api.get(`/api/instructions/instruction/${instructionId}`);
+      const weightRows = Array.isArray(response.data?.weight_rows)
+        ? response.data.weight_rows
+        : [];
+      const totalInstructionWeight = weightRows.reduce(
+        (sum, row) => sum + (parseFloat(row.weight) || 0),
+        0
+      );
 
       console.log("Weight check:", {
         totalInstructionWeight,
@@ -52,10 +61,13 @@ export const checkContainersReachDropoff = async ({
         weightUnit,
       });
       const missingWeight = totalInstructionWeight - totalWeightReachingDropoff;
-      return missingWeight > 0 ? [missingWeight] : [];
+      return {
+        missingItems: missingWeight > 0 ? [missingWeight] : [],
+        totalWeight: totalInstructionWeight,
+      };
     } catch (error) {
       console.error("Error checking weight:", error);
-      return [];
+      return { missingItems: [], totalWeight: 0 };
     }
   } else {
     const allInstructionContainers = instructionContainers.map((c) =>
@@ -81,7 +93,7 @@ export const checkContainersReachDropoff = async ({
       missingContainers,
     });
 
-    return missingContainers;
+    return { missingItems: missingContainers, totalWeight: 0 };
   }
 };
 

@@ -570,8 +570,7 @@ export function ControllerInstructionsLayout({
                             disabled={
                               formData.shipmentTypeId === "1" ||
                               formData.shipmentTypeId === "2" ||
-                              formData.shipmentTypeId === "3" ||
-                              formData.shipmentTypeId === "5"
+                              formData.shipmentTypeId === "3"
                             }
                             style={{
                               width: "100%",
@@ -592,16 +591,14 @@ export function ControllerInstructionsLayout({
                               cursor:
                                 formData.shipmentTypeId === "1" ||
                                 formData.shipmentTypeId === "2" ||
-                                formData.shipmentTypeId === "3" ||
-                                formData.shipmentTypeId === "5"
+                                formData.shipmentTypeId === "3"
                                   ? "not-allowed"
                                   : "pointer",
                             }}
                           >
                             {formData.shipmentTypeId === "1" ||
                             formData.shipmentTypeId === "2" ||
-                            formData.shipmentTypeId === "3" ||
-                            formData.shipmentTypeId === "5" ? (
+                            formData.shipmentTypeId === "3" ? (
                               <option value="Container">Container</option>
                             ) : formData.shipmentTypeId === "4" ? (
                               <>
@@ -619,7 +616,9 @@ export function ControllerInstructionsLayout({
                         </div>
                       </div>
                     </div>
-                    {isWeightBased && formData.shipmentTypeId !== "4" && (
+                    {isWeightBased &&
+                      formData.shipmentTypeId !== "4" &&
+                      formData.shipmentTypeId !== "5" && (
                       <div
                         className="controller-instructions-weight-input-group"
                         ref={fieldRefs.current.weight}
@@ -682,7 +681,9 @@ export function ControllerInstructionsLayout({
                         <ErrorTooltip message={fieldErrors.unitrate} />
                       </div>
                     )}
-                    {isWeightBased && formData.shipmentTypeId === "4" && (
+                    {isWeightBased &&
+                      (formData.shipmentTypeId === "4" ||
+                        formData.shipmentTypeId === "5") && (
                       <div>
                         <div
                           className="controller-instructions-weight-input-group"
@@ -967,7 +968,8 @@ export function ControllerInstructionsLayout({
                         </div>
                       </div>
                     </div>
-                    {formData.shipmentTypeId === "4" && (
+                    {(formData.shipmentTypeId === "4" ||
+                      (formData.shipmentTypeId === "5" && isWeightBased)) && (
                       <div
                         className="controller-instructions-form-row"
                         style={{ margin: "24px 0 8px", padding: "0 10px" }}
@@ -1369,7 +1371,8 @@ export function ControllerInstructionsLayout({
                         </div>
                       </div>
                     </div>
-                    {formData.shipmentTypeId === "4" && (
+                    {(formData.shipmentTypeId === "4" ||
+                      (formData.shipmentTypeId === "5" && isWeightBased)) && (
                       <div
                         className="controller-instructions-form-row"
                         style={{ margin: "24px 0 8px", padding: "0 10px" }}
