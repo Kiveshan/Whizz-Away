@@ -1093,7 +1093,7 @@ const shouldDisableAddLeg = async () => {
     const dropoff = instructionDetails.dropoff;
 
     if (!dropoff) return false;
-    const missingItems = await checkContainersReachDropoff(dropoff);
+    const { missingItems } = await checkContainersReachDropoff(dropoff);
     return missingItems.length === 0;
   } catch (error) {
     console.error("Error in shouldDisableAddLeg:", error);
@@ -1128,7 +1128,7 @@ const checkContainersDestination = async () => {
           setShouldHideAddLegButton(false);
           return;
         }
-const missingItems = await checkContainersReachDropoff(dropoff);
+const { missingItems } = await checkContainersReachDropoff(dropoff);
 
       console.log("Destination check result (missing items):", missingItems);
       setShouldHideAddLegButton(missingItems.length === 0);

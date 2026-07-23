@@ -61,10 +61,13 @@ export const checkContainersReachDropoff = async ({
         weightUnit,
       });
       const missingWeight = totalInstructionWeight - totalWeightReachingDropoff;
-      return missingWeight > 0 ? [missingWeight] : [];
+      return {
+        missingItems: missingWeight > 0 ? [missingWeight] : [],
+        totalWeight: totalInstructionWeight,
+      };
     } catch (error) {
       console.error("Error checking weight:", error);
-      return [];
+      return { missingItems: [], totalWeight: 0 };
     }
   } else {
     const allInstructionContainers = instructionContainers.map((c) =>
@@ -90,7 +93,7 @@ export const checkContainersReachDropoff = async ({
       missingContainers,
     });
 
-    return missingContainers;
+    return { missingItems: missingContainers, totalWeight: 0 };
   }
 };
 
