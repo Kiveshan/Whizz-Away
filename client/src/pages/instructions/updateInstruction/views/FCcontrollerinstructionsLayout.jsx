@@ -125,6 +125,7 @@ export function FCcontrollerinstructionsLayout({
             showSetRateWarning={showSetRateWarning}
             historicalSetRate={historicalSetRate}
             setRateValue={setRateValue}
+            successMessage={containerSuccessMessage || rateUpdateMessage}
           />
           <ClientInfoSection
             formData={formData}
@@ -550,7 +551,6 @@ export function FCcontrollerinstructionsLayout({
               isReadOnly={isReadOnly}
               readOnlyStyle={readOnlyStyle}
               isLoading={isContainerLoading}
-              successMessage={containerSuccessMessage || rateUpdateMessage}
               sectionStyle={
                 String(formData.shipmentTypeId) === "2"
                   ? { marginTop: "-40px", paddingTop: "0" }
