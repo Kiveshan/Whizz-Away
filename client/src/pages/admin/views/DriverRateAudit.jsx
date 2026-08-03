@@ -50,6 +50,7 @@ function DriverRateAudit() {
     const columns = [
       { header: "Leg", key: "legkey", width: 10 },
       { header: "Instr.", key: "m1key", width: 12 },
+      { header: "Client", key: "client", width: 20 },
       { header: "Route", key: "route", width: 24 },
       { header: "Date", key: "date", width: 14 },
       { header: "Role", key: "role", width: 10 },
@@ -288,6 +289,7 @@ function DiffTable({ rows, showExpected, showFlag }) {
           <tr style={{ background: "#f5f5f5", position: "sticky", top: 0 }}>
             <th style={thStyle}>Leg</th>
             <th style={thStyle}>Instr.</th>
+            <th style={thStyle}>Client</th>
             <th style={thStyle}>Route</th>
             <th style={thStyle}>Date</th>
             <th style={thStyle}>Role</th>
@@ -303,6 +305,7 @@ function DiffTable({ rows, showExpected, showFlag }) {
             <tr key={r.legkey} style={{ borderBottom: "1px solid #f0f0f0" }}>
               <td style={tdStyle}>{r.legkey}</td>
               <td style={tdStyle}>{r.m1key}</td>
+              <td style={tdStyle}>{r.client}</td>
               <td style={tdStyle}>{r.route}</td>
               <td style={tdStyle}>{r.date}</td>
               <td style={tdStyle}>
