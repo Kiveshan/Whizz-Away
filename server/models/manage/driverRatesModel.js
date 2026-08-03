@@ -87,8 +87,6 @@ const createDriverRate = async (driverRateData) => {
   try {
     client = await pool.connect()
     const {
-      startingpoint,
-      destination,
       driver_six_meter_rate,
       driver_twelve_meter_rate,
       subie_six_meter_rate,
@@ -96,6 +94,12 @@ const createDriverRate = async (driverRateData) => {
       effective_from,
       effective_to,
     } = driverRateData
+
+    // Normalize on the way in. This path previously inserted the route text raw,
+    // which is how misspaced names ('Cape  Town', NBSP from a paste) entered the
+    // table and split a route in two.
+    const startingpoint = normalizeName(driverRateData.startingpoint)
+    const destination = normalizeName(driverRateData.destination)
 
     // Validate required fields (only starting point and destination)
     if (!startingpoint || !destination) {
@@ -186,14 +190,15 @@ const updateDriverRate = async (id, driverRateData) => {
     const queryParams = []
     let paramCounter = 1
 
+    // Normalize route text on write so this path cannot reintroduce a split route.
     if (startingpoint !== undefined) {
       updateFields.push(`startingpoint = $${paramCounter}`)
-      queryParams.push(startingpoint)
+      queryParams.push(normalizeName(startingpoint))
       paramCounter++
     }
     if (destination !== undefined) {
       updateFields.push(`destination = $${paramCounter}`)
-      queryParams.push(destination)
+      queryParams.push(normalizeName(destination))
       paramCounter++
     }
     if (driver_six_meter_rate !== undefined) {
@@ -314,8 +319,8 @@ const getDriverRateUsage = async (id) => {
         FROM legs_m2 l
         INNER JOIN m1_controller c ON c.m1key = l.m1key
         WHERE LOWER(COALESCE(c.status, '')) = LOWER($2)
-          AND LOWER(TRIM(COALESCE(l.startingpoint, ''))) = LOWER(TRIM(COALESCE($3, '')))
-          AND LOWER(TRIM(COALESCE(l.destination, ''))) = LOWER(TRIM(COALESCE($4, '')))
+          AND lower(public.norm_route(l.startingpoint)) = lower(public.norm_route($3))
+          AND lower(public.norm_route(l.destination)) = lower(public.norm_route($4))
           AND (
             l.m5ratekey = $1
             OR (
@@ -421,10 +426,15 @@ const getDriverRateUsage = async (id) => {
 
 // Get the appropriate rate for a leg based on its date and route
 // This function respects effective dates to determine which rate version applies
-export const getRateForLegDate = async (startingpoint, destination, legDate, isSubcontractor = false, containerType = '6m') => {
+// `dbClient` lets a caller that already holds a connection (and possibly an open
+// transaction) reuse it. Acquiring a second connection per leg from inside a
+// transaction serialises against the pool and can starve it outright.
+export const getRateForLegDate = async (startingpoint, destination, legDate, isSubcontractor = false, containerType = '6m', dbClient = null) => {
   let client
+  let ownsClient = false
   try {
-    client = await pool.connect()
+    client = dbClient || (await pool.connect())
+    ownsClient = !dbClient
 
     // Use the date value directly — passing a JS Date object for a 'YYYY-MM-DD' string
     // causes UTC-midnight → local-date shift on UTC+ servers. Let PostgreSQL cast the
@@ -447,8 +457,8 @@ export const getRateForLegDate = async (startingpoint, destination, legDate, isS
         effective_from,
         effective_to
       FROM m5_driver_rate
-      WHERE LOWER(TRIM(COALESCE(startingpoint, ''))) = LOWER(TRIM(COALESCE($1, '')))
-        AND LOWER(TRIM(COALESCE(destination, ''))) = LOWER(TRIM(COALESCE($2, '')))
+      WHERE lower(public.norm_route(startingpoint)) = lower(public.norm_route($1))
+        AND lower(public.norm_route(destination)) = lower(public.norm_route($2))
         AND effective_from <= $3::date
         AND (effective_to IS NULL OR effective_to >= $3::date)
       ORDER BY effective_from DESC, m5ratekey DESC
@@ -514,7 +524,8 @@ export const getRateForLegDate = async (startingpoint, destination, legDate, isS
     console.error(`Error fetching rate for leg date ${legDate}:`, err)
     throw err
   } finally {
-    if (client) client.release()
+    // Only release what we acquired -- a borrowed client belongs to the caller.
+    if (client && ownsClient) client.release()
   }
 }
 
@@ -537,8 +548,8 @@ export const checkRateDateOverlaps = async (startingpoint, destination, effectiv
         subie_six_meter_rate,
         subie_twelve_meter_rate
       FROM m5_driver_rate
-      WHERE LOWER(TRIM(COALESCE(startingpoint, ''))) = LOWER(TRIM(COALESCE($1, '')))
-        AND LOWER(TRIM(COALESCE(destination, ''))) = LOWER(TRIM(COALESCE($2, '')))
+      WHERE lower(public.norm_route(startingpoint)) = lower(public.norm_route($1))
+        AND lower(public.norm_route(destination)) = lower(public.norm_route($2))
         AND ($5::int IS NULL OR m5ratekey != $5)
         AND (
           -- Standard overlap check: two ranges overlap if
@@ -595,27 +606,34 @@ export const getDistinctRoutes = async (options = {}) => {
       paramIndex++
     }
 
+    // Group on the normalized route -- the same identity every other query in this
+    // file matches on. Grouping on the raw columns was what let 'Cape  Town' and
+    // 'Cape Town' render as two separate routes that no lookup could distinguish.
+    const routeKey = `lower(public.norm_route(startingpoint)), lower(public.norm_route(destination))`
+
     const countQuery = `
       SELECT COUNT(*) FROM (
-        SELECT startingpoint, destination
+        SELECT 1
         FROM m5_driver_rate
         ${whereClause}
-        GROUP BY startingpoint, destination
+        GROUP BY ${routeKey}
       ) AS routes
     `
     const countResult = await client.query(countQuery, queryParams)
     const totalCount = parseInt(countResult.rows[0].count)
 
+    // MIN() picks a stable display spelling for the group. Any member spelling
+    // resolves correctly on Edit, since the periods lookup normalizes too.
     const dataQuery = `
       SELECT
-        startingpoint,
-        destination,
+        MIN(startingpoint) AS startingpoint,
+        MIN(destination)   AS destination,
         COUNT(*) AS period_count,
         MAX(effective_from) AS latest_from
       FROM m5_driver_rate
       ${whereClause}
-      GROUP BY startingpoint, destination
-      ORDER BY startingpoint ASC, destination ASC
+      GROUP BY ${routeKey}
+      ORDER BY 1 ASC, 2 ASC
       LIMIT $${paramIndex} OFFSET $${paramIndex + 1}
     `
     queryParams.push(limit, offset)
@@ -637,8 +655,8 @@ export const getPeriodsForRoute = async (startingpoint, destination) => {
     client = await pool.connect()
     const result = await client.query(
       `SELECT * FROM m5_driver_rate
-       WHERE LOWER(TRIM(COALESCE(startingpoint, ''))) = LOWER(TRIM(COALESCE($1, '')))
-         AND LOWER(TRIM(COALESCE(destination, ''))) = LOWER(TRIM(COALESCE($2, '')))
+       WHERE lower(public.norm_route(startingpoint)) = lower(public.norm_route($1))
+         AND lower(public.norm_route(destination)) = lower(public.norm_route($2))
        ORDER BY effective_from ASC, m5ratekey ASC`,
       [startingpoint, destination],
     )
@@ -654,23 +672,34 @@ export const getPeriodsForRoute = async (startingpoint, destination) => {
 // Replace-all: delete existing periods for the route then bulk-insert the new set
 // Collapse any sequence of whitespace to a single space and strip leading/trailing
 // whitespace so "Cape Town " and "Cape  Town" both normalize to "Cape Town".
-const normalizeName = (s) => (s || "").trim().replace(/\s+/g, " ")
+// JS \s already covers NBSP and the other unicode spaces; keep this in sync with
+// public.norm_route() in migration 008, which is the SQL side of the same rule.
+export const normalizeName = (s) => (s || "").trim().replace(/\s+/g, " ")
 
 export const saveRoutePeriods = async (startingpoint, destination, periods, originalStartingpoint, originalDestination) => {
-  // Normalize before anything touches the DB so misspaced names can never
-  // create phantom duplicate routes.
+  // Normalize the INCOMING name so misspaced input can never create a phantom
+  // duplicate route.
+  //
+  // Do NOT normalize originalStartingpoint/originalDestination: those are the
+  // values as they exist in the DB and are used as the DELETE lookup key.
+  // Normalizing them was the duplication bug -- 'Cape  Town' became 'Cape Town',
+  // the delete matched nothing, and the insert below then created a second row
+  // alongside the one it was meant to replace, every single save.
   startingpoint = normalizeName(startingpoint)
   destination   = normalizeName(destination)
-  if (originalStartingpoint) originalStartingpoint = normalizeName(originalStartingpoint)
-  if (originalDestination)   originalDestination   = normalizeName(originalDestination)
 
   const deleteSp = originalStartingpoint || startingpoint
   const deleteDest = originalDestination || destination
+
+  // Compare on the normalized form so that merely tidying whitespace is not
+  // mistaken for a rename. Route identity is the normalized name -- if that is
+  // unchanged, the DELETE below still resolves the old row and the INSERT simply
+  // rewrites it under the clean spelling.
   const isRename =
     originalStartingpoint &&
     originalDestination &&
-    (startingpoint.trim().toLowerCase() !== originalStartingpoint.trim().toLowerCase() ||
-      destination.trim().toLowerCase() !== originalDestination.trim().toLowerCase())
+    (startingpoint.toLowerCase() !== normalizeName(originalStartingpoint).toLowerCase() ||
+      destination.toLowerCase() !== normalizeName(originalDestination).toLowerCase())
 
   let client
   try {
@@ -679,8 +708,8 @@ export const saveRoutePeriods = async (startingpoint, destination, periods, orig
 
     await client.query(
       `DELETE FROM m5_driver_rate
-       WHERE LOWER(TRIM(COALESCE(startingpoint, ''))) = LOWER(TRIM(COALESCE($1, '')))
-         AND LOWER(TRIM(COALESCE(destination, ''))) = LOWER(TRIM(COALESCE($2, '')))`,
+       WHERE lower(public.norm_route(startingpoint)) = lower(public.norm_route($1))
+         AND lower(public.norm_route(destination)) = lower(public.norm_route($2))`,
       [deleteSp, deleteDest],
     )
 
@@ -693,8 +722,8 @@ export const saveRoutePeriods = async (startingpoint, destination, periods, orig
          FROM m1_controller c
          WHERE c.m1key = l.m1key
            AND LOWER(COALESCE(c.status, '')) = 'in progress'
-           AND LOWER(TRIM(COALESCE(l.startingpoint, ''))) = LOWER(TRIM(COALESCE($1, '')))
-           AND LOWER(TRIM(COALESCE(l.destination, ''))) = LOWER(TRIM(COALESCE($2, '')))
+           AND lower(public.norm_route(l.startingpoint)) = lower(public.norm_route($1))
+           AND lower(public.norm_route(l.destination)) = lower(public.norm_route($2))
          RETURNING l.m1key`,
         [deleteSp, deleteDest, startingpoint, destination],
       )
@@ -754,8 +783,8 @@ export const getRouteUsage = async (startingpoint, destination) => {
        FROM legs_m2 l
        INNER JOIN m1_controller c ON c.m1key = l.m1key
        WHERE LOWER(COALESCE(c.status, '')) = 'in progress'
-         AND LOWER(TRIM(COALESCE(l.startingpoint, ''))) = LOWER(TRIM(COALESCE($1, '')))
-         AND LOWER(TRIM(COALESCE(l.destination, ''))) = LOWER(TRIM(COALESCE($2, '')))`,
+         AND lower(public.norm_route(l.startingpoint)) = lower(public.norm_route($1))
+         AND lower(public.norm_route(l.destination)) = lower(public.norm_route($2))`,
       [startingpoint, destination],
     )
     const instructions = legsResult.rows.map((r) => r.m1key)
@@ -775,8 +804,8 @@ export const deleteRoute = async (startingpoint, destination) => {
     client = await pool.connect()
     await client.query(
       `DELETE FROM m5_driver_rate
-       WHERE LOWER(TRIM(COALESCE(startingpoint, ''))) = LOWER(TRIM(COALESCE($1, '')))
-         AND LOWER(TRIM(COALESCE(destination, ''))) = LOWER(TRIM(COALESCE($2, '')))`,
+       WHERE lower(public.norm_route(startingpoint)) = lower(public.norm_route($1))
+         AND lower(public.norm_route(destination)) = lower(public.norm_route($2))`,
       [startingpoint, destination],
     )
     return { success: true }
@@ -804,9 +833,14 @@ export const getRouteOptions = async () => {
   try {
     client = await pool.connect()
     const result = await client.query(
-      `SELECT DISTINCT startingpoint, destination
+      // DISTINCT ON the normalized route so the autocomplete/typo-suggestion list
+      // never offers two spellings of the same route.
+      `SELECT DISTINCT ON (lower(public.norm_route(startingpoint)), lower(public.norm_route(destination)))
+              startingpoint, destination
        FROM m5_driver_rate
-       ORDER BY startingpoint ASC, destination ASC`,
+       ORDER BY lower(public.norm_route(startingpoint)) ASC,
+                lower(public.norm_route(destination)) ASC,
+                startingpoint ASC, destination ASC`,
     )
     return { success: true, data: result.rows }
   } catch (err) {
@@ -827,8 +861,8 @@ export const getRouteLegDates = async (startingpoint, destination) => {
        FROM legs_m2 l
        INNER JOIN m1_controller c ON c.m1key = l.m1key
        WHERE LOWER(COALESCE(c.status, '')) = 'in progress'
-         AND LOWER(TRIM(COALESCE(l.startingpoint, ''))) = LOWER(TRIM(COALESCE($1, '')))
-         AND LOWER(TRIM(COALESCE(l.destination, ''))) = LOWER(TRIM(COALESCE($2, '')))
+         AND lower(public.norm_route(l.startingpoint)) = lower(public.norm_route($1))
+         AND lower(public.norm_route(l.destination)) = lower(public.norm_route($2))
          AND l.date IS NOT NULL
        ORDER BY l.date ASC`,
       [startingpoint, destination],
@@ -893,8 +927,8 @@ const MONTH_AUDIT_CTE = `
     LEFT JOIN LATERAL (
       SELECT dr.*
       FROM m5_driver_rate dr
-      WHERE LOWER(TRIM(COALESCE(dr.startingpoint, ''))) = LOWER(TRIM(COALESCE(l.startingpoint, '')))
-        AND LOWER(TRIM(COALESCE(dr.destination, '')))   = LOWER(TRIM(COALESCE(l.destination, '')))
+      WHERE lower(public.norm_route(dr.startingpoint)) = lower(public.norm_route(l.startingpoint))
+        AND lower(public.norm_route(dr.destination))   = lower(public.norm_route(l.destination))
         AND dr.effective_from <= l.date
         AND (dr.effective_to IS NULL OR dr.effective_to >= l.date)
       ORDER BY dr.effective_from DESC, dr.m5ratekey DESC
@@ -1083,8 +1117,8 @@ export const refreshDriverRateLegsForInstructions = async (rateId, instructionId
          AND c.m1key = l.m1key
        WHERE l.m1key = ANY($1::int[])
          AND LOWER(COALESCE(mc.status, '')) = 'in progress'
-         AND LOWER(TRIM(COALESCE(l.startingpoint, ''))) = LOWER(TRIM($2))
-         AND LOWER(TRIM(COALESCE(l.destination, ''))) = LOWER(TRIM($3))
+         AND lower(public.norm_route(l.startingpoint)) = lower(public.norm_route($2))
+         AND lower(public.norm_route(l.destination)) = lower(public.norm_route($3))
          AND l.date IS NOT NULL`,
       [instructionIds.map((v) => Number(v)), startingpoint, destination]
     )
@@ -1101,7 +1135,8 @@ export const refreshDriverRateLegsForInstructions = async (rateId, instructionId
       const containerType = leg.container_type || '6m'
 
       try {
-        const rateResult = await getRateForLegDate(startingpoint, destination, legDate, isSubcontractor, containerType)
+        // Reuse the transaction's connection instead of taking a new one per leg.
+        const rateResult = await getRateForLegDate(startingpoint, destination, legDate, isSubcontractor, containerType, client)
         if (rateResult.success && rateResult.data?.applicable_rate != null) {
           await client.query(
             'UPDATE legs_m2 SET driverrate = $1 WHERE legkey = $2',

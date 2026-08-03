@@ -159,6 +159,19 @@ const createDriverRateHandler = async (req, res) => {
       return res.status(400).json({ error: "All rates must be valid numbers if provided" })
     }
 
+    // Require at least one rate, matching saveRoutePeriodsHandler. Without this
+    // check the endpoint happily inserted rows with all four rate columns NULL,
+    // which is what surfaced in the route UI as a period with blank rates.
+    const hasAtLeastOneRate = [
+      driver_six_meter_rate,
+      driver_twelve_meter_rate,
+      subie_six_meter_rate,
+      subie_twelve_meter_rate,
+    ].some((v) => v !== "" && v != null)
+    if (!hasAtLeastOneRate) {
+      return res.status(400).json({ error: "At least one rate value is required" })
+    }
+
     if (effective_from && effective_to && effective_to < effective_from) {
       return res.status(400).json({ error: "effective_to must be on or after effective_from" })
     }

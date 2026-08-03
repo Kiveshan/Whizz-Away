@@ -2,6 +2,7 @@
 import { useCallback } from "react"
 import api from "../../../api.js"
 import { showConfirmDialog, showAlert } from '../utils/alertUtils.js';
+import { normalize as normalizeRoute } from '../components/rates/routeSimilarity.js';
 
 export function useApi(state, actions) {
   const fetchPaginatedData = useCallback(
@@ -750,12 +751,15 @@ export function useApi(state, actions) {
           }
         }
 
-        // If the route name changed, check the new name doesn't already exist in DB
+        // If the route name changed, check the new name doesn't already exist in DB.
+        // Compare on the normalized form (same rule as the server): tidying
+        // whitespace is not a rename, and treating it as one would make the
+        // conflict check below match the route's own row and block the save.
         const isRename =
           originalStartingpoint &&
           originalDestination &&
-          (startingpoint.trim().toLowerCase() !== originalStartingpoint.trim().toLowerCase() ||
-            destination.trim().toLowerCase() !== originalDestination.trim().toLowerCase())
+          (normalizeRoute(startingpoint) !== normalizeRoute(originalStartingpoint) ||
+            normalizeRoute(destination) !== normalizeRoute(originalDestination))
 
         if (isRename) {
           try {
@@ -848,11 +852,16 @@ export function useApi(state, actions) {
           console.error("Error checking route usage before save:", usageErr)
         }
 
+        // Always send the original name, not just on rename. The server needs it
+        // as the DELETE lookup key for the row being replaced; withholding it on a
+        // whitespace-only difference made the server fall back to the new
+        // (normalized) name, miss the stored row, and insert a duplicate.
         const saveResp = await api.post("/api/driver-rates/route-periods", {
           startingpoint,
           destination,
           periods,
-          ...(isRename && { originalStartingpoint, originalDestination }),
+          ...(originalStartingpoint &&
+            originalDestination && { originalStartingpoint, originalDestination }),
         })
 
         const savedPeriods = Array.isArray(saveResp.data?.periods) ? saveResp.data.periods : []
