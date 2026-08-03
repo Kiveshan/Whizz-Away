@@ -870,6 +870,7 @@ const MONTH_AUDIT_CTE = `
       l.destination,
       l.date::text                                   AS leg_date,
       l.driverrate                                   AS stored_rate,
+      cl.client                                      AS client_name,
       COALESCE(e.roleid, 5)                          AS roleid,
       LOWER(TRIM(COALESCE(c.container_type, '6m')))  AS container_type,
       r.m5ratekey                                    AS rate_id,
@@ -884,6 +885,7 @@ const MONTH_AUDIT_CTE = `
     FROM legs_m2 l
     JOIN m1_controller mc ON mc.m1key = l.m1key
     LEFT JOIN shipment sh ON sh.shipkey = mc.shipment_type
+    LEFT JOIN m5_client cl ON cl.m5clientkey = mc.client
     LEFT JOIN m5_employee e ON e.userid = l.driverid
     LEFT JOIN container c
       ON LOWER(TRIM(COALESCE(c.containernum::text, ''))) = LOWER(TRIM(COALESCE(l.containernumber, '')))
@@ -926,7 +928,7 @@ export const auditDriverRatesForMonth = async (year, month) => {
     client = await pool.connect()
     const { rows } = await client.query(
       `${MONTH_AUDIT_CTE}
-       SELECT legkey, m1key, startingpoint, destination, leg_date,
+       SELECT legkey, m1key, startingpoint, destination, leg_date, client_name,
               roleid, container_type, stored_rate, expected_rate, rate_id, category
        FROM classified
        ORDER BY category, m1key, legkey`,
@@ -959,6 +961,7 @@ export const auditDriverRatesForMonth = async (year, month) => {
       const entry = {
         legkey: row.legkey,
         m1key: row.m1key,
+        client: row.client_name || "—",
         route: `${row.startingpoint} → ${row.destination}`,
         date: row.leg_date,
         role,
