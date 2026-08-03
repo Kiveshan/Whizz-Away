@@ -3,6 +3,7 @@
 import { useState } from "react"
 import api from "../../../../api.js"
 import Swal from "sweetalert2"
+import { normalize } from "./routeSimilarity.js"
 
 const isCoveredByPeriods = (dateStr, periods) =>
   periods.some((card) => {
@@ -30,9 +31,11 @@ const DriverRatePeriodsForm = ({
   const [showSaveModal, setShowSaveModal] = useState(false)
   const [cardErrors, setCardErrors] = useState({})
 
+  // Normalized comparison, matching the server: fixing whitespace is not a rename,
+  // so it should not raise the "renaming this route" banner.
   const routeChanged =
-    editStartingpoint.trim().toLowerCase() !== originalStartingpoint.trim().toLowerCase() ||
-    editDestination.trim().toLowerCase() !== originalDestination.trim().toLowerCase()
+    normalize(editStartingpoint) !== normalize(originalStartingpoint) ||
+    normalize(editDestination) !== normalize(originalDestination)
 
   // Compute coverage gaps on every render — fires automatically when periods change
   const uncoveredByInstruction = legDates.reduce((acc, leg) => {
