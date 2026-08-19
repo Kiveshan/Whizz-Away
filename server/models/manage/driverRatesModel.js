@@ -918,7 +918,6 @@ const MONTH_AUDIT_CTE = `
       END                                            AS expected_rate
     FROM legs_m2 l
     JOIN m1_controller mc ON mc.m1key = l.m1key
-    LEFT JOIN shipment sh ON sh.shipkey = mc.shipment_type
     LEFT JOIN m5_client cl ON cl.m5clientkey = mc.client
     LEFT JOIN m5_employee e ON e.userid = l.driverid
     LEFT JOIN container c
@@ -936,9 +935,14 @@ const MONTH_AUDIT_CTE = `
     ) r ON l.date IS NOT NULL
     WHERE EXTRACT(YEAR  FROM mc.created_at) = $1
       AND EXTRACT(MONTH FROM mc.created_at) = $2
-      -- Breakbulk instructions are rated differently (per-unit weight), not via
-      -- the route driver-rate table, so they are excluded from this audit.
-      AND COALESCE(sh.shipmenttype, '') NOT ILIKE '%break%bulk%'
+      -- Breakbulk instructions (shipment_type 4) and weight-based add-ons
+      -- (shipment_type 5 in kg/ton/m³ mode -- e.g. "Add on Break Bulk") are
+      -- rated per-unit-weight, not via the route driver-rate table: the driver
+      -- rate autofill is skipped for them client-side (see fetchRate's
+      -- "shipmentType === 4 || isWeightBased" guard) and the rate is entered
+      -- manually, so they are excluded from this audit.
+      AND mc.shipment_type != 4
+      AND NOT (mc.shipment_type = 5 AND LOWER(TRIM(COALESCE(mc.rateweight, ''))) IN ('kg', 'ton', 'm³'))
   ),
   classified AS (
     SELECT
