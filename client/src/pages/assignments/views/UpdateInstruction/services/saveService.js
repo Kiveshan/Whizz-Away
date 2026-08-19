@@ -51,79 +51,82 @@ export const handleSave = async ({
   setDrivers,
   api,
 }) => {
-  // Prevent concurrent saves
+  // Prevent concurrent saves. Armed synchronously, before any await, so that
+  // rapid duplicate Save clicks can't both slip through while the
+  // instruction-status-check request below is in flight — that race is what
+  // caused leg-assignment rows to be inserted multiple times per click.
   if (isSavingRef.current) return;
-
-  const legIndexToSave =
-    currentLegIndexRef.current !== null &&
-    currentLegIndexRef.current !== undefined
-      ? currentLegIndexRef.current
-      : currentLagIndex;
-
-  if (legIndexToSave === null || legIndexToSave === undefined) {
-    return;
-  }
-
-  if (isCompleted || saving || isSavingRef.current) return;
-
-  if (legIndexToSave === null || legIndexToSave === undefined) {
-    setSavedMessage("Please select a leg first");
-    setTimeout(() => setSavedMessage(""), 3000);
-    return;
-  }
-
-  if (!instructionId) {
-    setSavedMessage("Missing instruction ID");
-    setTimeout(() => setSavedMessage(""), 5000);
-    return;
-  }
-  if (instructionId) {
-    try {
-      const instructionResponse = await authFetch(
-        `${API_BASE_URL}/instructions/${instructionId}`
-      );
-      if (instructionResponse.ok) {
-        const instructionData = await instructionResponse.json();
-
-        if (instructionData.status === "New") {
-          const updateStatusResponse = await authFetch(
-            `${API_BASE_URL}/instructions/${instructionId}/status`,
-            {
-              method: "PUT",
-              headers: {
-                "Content-Type": "application/json",
-              },
-              body: JSON.stringify({ status: "In Progress" }),
-            }
-          );
-
-          if (updateStatusResponse.ok) {
-            console.log(
-              `Updated instruction ${instructionId} status from New to In Progress`
-            );
-            setInstructionStatus("In Progress");
-          }
-        }
-      }
-    } catch (statusError) {
-      console.error("Error updating instruction status:", statusError);
-    }
-  }
-  // Validate required fields
-  if (!formData.startingPoint || !formData.destination) {
-    setSavedMessage("Starting point and destination are required");
-    setTimeout(() => setSavedMessage(""), 3000);
-    return;
-  }
-
-  // Validate driver fields
-  if (!validateDriverFields()) {
-    return;
-  }
+  isSavingRef.current = true;
+  setSaving(true);
 
   try {
-    setSaving(true);
-    isSavingRef.current = true;
+    const legIndexToSave =
+      currentLegIndexRef.current !== null &&
+      currentLegIndexRef.current !== undefined
+        ? currentLegIndexRef.current
+        : currentLagIndex;
+
+    if (legIndexToSave === null || legIndexToSave === undefined) {
+      return;
+    }
+
+    if (isCompleted || saving) return;
+
+    if (legIndexToSave === null || legIndexToSave === undefined) {
+      setSavedMessage("Please select a leg first");
+      setTimeout(() => setSavedMessage(""), 3000);
+      return;
+    }
+
+    if (!instructionId) {
+      setSavedMessage("Missing instruction ID");
+      setTimeout(() => setSavedMessage(""), 5000);
+      return;
+    }
+    if (instructionId) {
+      try {
+        const instructionResponse = await authFetch(
+          `${API_BASE_URL}/instructions/${instructionId}`
+        );
+        if (instructionResponse.ok) {
+          const instructionData = await instructionResponse.json();
+
+          if (instructionData.status === "New") {
+            const updateStatusResponse = await authFetch(
+              `${API_BASE_URL}/instructions/${instructionId}/status`,
+              {
+                method: "PUT",
+                headers: {
+                  "Content-Type": "application/json",
+                },
+                body: JSON.stringify({ status: "In Progress" }),
+              }
+            );
+
+            if (updateStatusResponse.ok) {
+              console.log(
+                `Updated instruction ${instructionId} status from New to In Progress`
+              );
+              setInstructionStatus("In Progress");
+            }
+          }
+        }
+      } catch (statusError) {
+        console.error("Error updating instruction status:", statusError);
+      }
+    }
+    // Validate required fields
+    if (!formData.startingPoint || !formData.destination) {
+      setSavedMessage("Starting point and destination are required");
+      setTimeout(() => setSavedMessage(""), 3000);
+      return;
+    }
+
+    // Validate driver fields
+    if (!validateDriverFields()) {
+      return;
+    }
+
     const updatedLegs = [...legs];
     const cleanDrivers = dedupeDrivers(drivers);
 
