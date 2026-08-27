@@ -92,4 +92,28 @@ const authenticateScheduledJob = (req, res, next) => {
   return verifyToken(req, res, next)
 }
 
-export { verifyToken, verifyAdminAccess, authenticateScheduledJob }
+// Driver rate audit report: read-only, so Manager/Director (who own the Reports
+// section) and Admin can all view it — writes still go through the ordinary
+// driver-rates CRUD endpoints, which have their own auth.
+const verifyDriverRateAuditAccess = (req, res, next) => {
+  if (!req.user) {
+    return res.status(401).json({
+      error: "Authentication required",
+      message: "You must be logged in to access this resource",
+      code: "NO_USER",
+    })
+  }
+
+  const allowedRoles = [ROLES.MANAGER, ROLES.DIRECTOR, ROLES.ADMIN]
+  if (!allowedRoles.includes(req.user.roleid)) {
+    return res.status(403).json({
+      error: "Unauthorized",
+      message: "You do not have permission to access this resource",
+      code: "INSUFFICIENT_PERMISSIONS",
+    })
+  }
+
+  return next()
+}
+
+export { verifyToken, verifyAdminAccess, verifyDriverRateAuditAccess, authenticateScheduledJob }

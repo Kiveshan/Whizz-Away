@@ -111,6 +111,7 @@ import { ClientList, AddOnList, AddOnForm } from "./pages/add-ons";
 import DebtorsAgeAnalysis from "./pages/debtors/views/DebtorsAgeAnalysis";
 import {
   WageReports,
+  DriverRateAuditReport,
   ProfitLossReportsPage,
   ProfitLossDetailPage,
   ClientSubbieCommissionReport,
@@ -194,6 +195,7 @@ function DynamicHeader() {
     "/analytics-reports": "Insights",
     "/reports": "Reports",
     "/wage-reports": "Wage Reports",
+    "/driver-rate-audit": "Driver Rate Audit",
     "/view-client-list": "Add On's",
     "/view-add-on-list": "Add On's",
     "/add-on-form": "Add On's",
@@ -460,6 +462,7 @@ function ContentWrapper() {
         <Route path="/analytics-reports" element={<AnalyticsReportsPage />} />
         <Route path="/reports" element={<ReportsPage />} />
         <Route path="/wage-reports" element={<WageReports />} />
+        <Route path="/driver-rate-audit" element={<DriverRateAuditReport />} />
         <Route
           path="/client-subbie-commission"
           element={<ClientSubbieCommissionReport />}
@@ -502,6 +505,7 @@ function App() {
     "/ViewcontrollerInstructionDetails": "ViewcontrollerInstructionDetails",
     "/reports": "Reports",
     "/wage-reports": "Wage Reports",
+    "/driver-rate-audit": "Driver Rate Audit",
     "/profit-loss-reports": "Income & Expenditure Reports",
     "/income-expenditure-reports/:month/:year": "Income & Expenditure Report",
     "/vat-recon-reports": "VAT Reconciliation Report",

@@ -5,7 +5,7 @@ import UserApprovalList from "./UserApprovalList";
 import CompanyManagement from "./CompanyManagement";
 import SubcontractorBackfill from "./SubcontractorBackfill";
 import RegenerateStatement from "./RegenerateStatement";
-import DriverRateAudit from "./DriverRateAudit";
+import DriverRateAudit from "../../Reports/views/DriverRateAuditReport";
 import AuditLogViewer from "./AuditLogViewer";
 import "../css/AdminDashboard.css";
 // Import the TestConnection component

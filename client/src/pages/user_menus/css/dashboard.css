@@ -49,6 +49,15 @@
   align-items: stretch;
 }
 
+.dashboard-section-title {
+  font-size: 1.1rem;
+  color: #444;
+  text-align: center;
+  margin: 0;
+  padding-bottom: 4px;
+  border-bottom: 1px solid #e5e7eb;
+}
+
 .top-row {
   justify-content: space-between;
 }

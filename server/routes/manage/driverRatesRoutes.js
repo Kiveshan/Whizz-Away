@@ -18,12 +18,13 @@ import {
   auditDriverRatesHandler,
   applyDriverRateFixesHandler,
 } from "../../controllers/manage/driverRatesController.js";
-import { verifyToken, verifyAdminAccess } from "../../middleware/auth.js";
+import { verifyToken, verifyAdminAccess, verifyDriverRateAuditAccess } from "../../middleware/auth.js";
 
 const router = express.Router();
 
-// ── Month driver-rate audit (admin tool) — before /:id to avoid param conflicts ──
-router.get("/api/driver-rates/month-audit", verifyToken, verifyAdminAccess, auditDriverRatesHandler);
+// ── Month driver-rate audit — read-only report, viewable by Manager/Director/Admin.
+// The apply-fixes endpoint stays admin-only since it writes data.
+router.get("/api/driver-rates/month-audit", verifyToken, verifyDriverRateAuditAccess, auditDriverRatesHandler);
 router.post("/api/driver-rates/month-audit/apply", verifyToken, verifyAdminAccess, applyDriverRateFixesHandler);
 
 // ── Route-grouped endpoints (must be before /:id to avoid param conflicts) ──
