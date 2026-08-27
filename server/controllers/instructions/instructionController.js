@@ -14,12 +14,14 @@ import {
   saveInstructionAndContainers,
   updateFCInstructionAndContainers,
   deleteInstruction,
+  reopenInstruction,
   checkContainerHasLegs,
   deleteContainerAndLegs,
   getClientSetRate,
   searchInstructions,
 } from "../../models/instructions/instructionModel.js"
 import { auditFromReq } from "../../utils/auditLogger.js"
+import { ROLES } from "../../config/roles.js"
 
 // Helper function to calculate total cost based on rate weight type
 // Supports FC shipment type 4 using weight rows + unit rate
@@ -857,6 +859,64 @@ export const deleteInstructionHandler = async (req, res) => {
       error: "Failed to delete instruction and containers",
       message: error.message,
       details: error.stack,
+    })
+  }
+}
+
+// Handler for reopening a Completed instruction so it can be edited again.
+// Restricted to Admin/Director — this is a supervisory override, not a
+// day-to-day ops action.
+export const reopenInstructionHandler = async (req, res) => {
+  try {
+    const { instructionId } = req.params
+    const { reason } = req.body || {}
+
+    if (![ROLES.ADMIN, ROLES.DIRECTOR].includes(req.user?.roleid)) {
+      return res.status(403).json({
+        success: false,
+        error: "Only an Admin or Director can reopen a completed instruction",
+      })
+    }
+
+    if (!instructionId) {
+      return res.status(400).json({ success: false, error: "Missing instruction ID" })
+    }
+
+    const result = await reopenInstruction(instructionId)
+
+    const actorLabel = req.user
+      ? [req.user.name, req.user.surname].filter(Boolean).join(" ") || `User ${req.user.userid}`
+      : "Unknown user"
+
+    auditFromReq(req, {
+      actionType: "INSTRUCTION_REOPENED",
+      entityType: "instruction",
+      targetId: instructionId,
+      details:
+        `${actorLabel} reopened instruction ${instructionId} (was Completed, now ${result.newStatus}), ` +
+        `paid_amount=R${result.paidAmount.toFixed(2)}` +
+        (reason ? `; reason: ${reason}` : ""),
+    })
+
+    res.status(200).json({
+      success: true,
+      message: "Instruction reopened successfully",
+      status: result.newStatus,
+      paidAmount: result.paidAmount,
+    })
+  } catch (error) {
+    console.error(`[${new Date().toISOString()}] [CONTROLLER] Error in reopenInstructionHandler:`, error)
+
+    if (error.message === "Instruction not found") {
+      return res.status(404).json({ success: false, error: "Instruction not found" })
+    } else if (error.message === "Only completed instructions can be reopened") {
+      return res.status(400).json({ success: false, error: error.message })
+    }
+
+    res.status(500).json({
+      success: false,
+      error: "Failed to reopen instruction",
+      message: error.message,
     })
   }
 }

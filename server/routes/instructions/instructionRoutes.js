@@ -23,6 +23,7 @@ import {
   checkFCContainerLegsHandler,
   deleteFCContainerAndLegsHandler,
   deleteInstructionHandler,
+  reopenInstructionHandler,
 } from "../../controllers/instructions/instructionController.js"
 import { verifyToken } from "../../middleware/auth.js"
 import { validate } from "../../middleware/validate.js"
@@ -57,6 +58,8 @@ router.put("/fc/containers/:instructionId", updateFCContainersHandler)
 router.put("/fc/update/:id", updateFCInstructionAndContainersHandler)
 // Delete instruction and its containers
 router.delete("/fc/instruction/:id", deleteInstructionHandler)
+// Reopen a Completed instruction (Admin/Director only, enforced in the handler)
+router.post("/:instructionId/reopen", verifyToken, reopenInstructionHandler)
 // Check and delete specific containers (and their legs) for FC
 router.get(
   "/fc/container/:instructionId/:containerNum/legs-exists",

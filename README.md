@@ -212,6 +212,24 @@ The endpoint authenticates the Lambda with a shared `API_SECRET` bearer token, c
 
 ---
 
+**Decision:** The audit trail is produced by one global middleware that records every state-changing request, rather than by an audit call inside each controller.
+
+**Alternatives considered:** Hand-written `auditFromReq()` calls in every handler; database triggers on each audited table.
+
+**Why this approach:** Per-controller calls only cover the handlers someone remembered to instrument, and the gaps are invisible — an audit log that is silently partial is worse than none, because absence of a row reads as absence of an action. `server/middleware/auditTrail.js` sits ahead of the auth guard in `routes/index.js` and hooks `res.on("finish")`, so it captures the actor, target, request payload, status and outcome for every POST/PUT/PATCH/DELETE, including the ones that were rejected with a 401/403 or failed with a 500. `server/config/auditActions.js` maps routes to business action names; a route that is not mapped is still recorded, under `UNMAPPED_<METHOD>`, so adding an endpoint can never quietly drop it out of the trail. Database triggers would cover writes from any source but see rows, not intent — no actor, no IP, no request context, and no record of an attempt that was denied before it reached SQL.
+
+**Trade-offs:** One extra INSERT per mutating request (fire-and-forget: an audit failure logs and is swallowed rather than failing the user's operation). Request payloads are stored, so `sanitise()` in the middleware redacts anything key-matching `password|token|secret|…` and clips long values — a new secret-bearing field name has to be added to that pattern. Reads are only audited where explicitly registered as `sensitive` (payroll, document downloads, financial reports, the audit log itself); auditing all reads was rejected as volume without forensic value. Where a controller writes its own richer entry it sets `req.auditLogged`, and the middleware stands down for that request's success path.
+
+**Keeping the viewer fast as the table grows.** Full coverage means the table grows without bound — roughly 355 MB per million rows (244 MB heap, 111 MB indexes). The page query itself is never the problem; the queries wrapped around it are. Three things keep a page load flat rather than linear in table size:
+
+- **No `SELECT DISTINCT` per request.** The filter dropdowns are served from `config/auditActions.js`, with a 15-minute cached scan only to pick up action types in old rows that the registry no longer lists. Measured at 1M rows, the two DISTINCT scans cost 271 ms on every page load before this.
+- **Capped count.** The pager counts at most 20 000 matching rows (`LIMIT` inside a subquery) and the viewer renders "more than 20 000 — narrow the date range". An exact `COUNT(*)` is a full scan that costs the same on page 1 as on page 400: 87 ms at 1M rows, 1 ms capped.
+- **A default 30-day window** in the viewer, so every query rides a `(filter, timestamp)` index instead of scanning history. Clearing the from-date still searches everything. At 1M rows all four filtered views are backward index scans under 0.3 ms; the unindexable `ILIKE` search drops from 459 ms to 49 ms inside the window.
+
+Retention is a deliberate operator decision rather than an automatic one — `server/scripts/pruneAuditLog.js` reports what a horizon would remove and only deletes with `--apply`, keeping login failures and password changes regardless of age unless asked otherwise.
+
+---
+
 ## 5. System Design Highlights
 
 - **Proportional revenue attribution across multi-leg instructions.** The analytics queries compute per-truck and per-subcontractor turnover by splitting `m1_controller.total_cost` using two CTEs: one to count distinct legs per instruction, one to count distinct trucks per leg. The final division (`total_cost / num_legs / trucks_per_leg`) distributes revenue without double-counting when multiple trucks share a single leg or a single instruction spans multiple legs. This runs as a single query over the `legs_m2` join with `m1_controller`.
@@ -294,6 +312,7 @@ psql -U your_db_user -d your_db_name -f server/migrations/004_add_dn_to_legs_m2.
 psql -U your_db_user -d your_db_name -f server/migrations/005_add_fuel_surcharge_to_client_rate.sql
 psql -U your_db_user -d your_db_name -f server/migrations/006_extend_audit_log.sql
 psql -U your_db_user -d your_db_name -f server/migrations/007_cascade_repair_and_fk_indexes.sql
+psql -U your_db_user -d your_db_name -f server/migrations/008_audit_log_full_coverage.sql
 ```
 
 ### Run
@@ -356,12 +375,13 @@ npm start --prefix client
 │   │   ├── wagesUtils.js                   # Tax bracket lookup, deduction history
 │   │   ├── s3Config.js                     # multer-s3 config for employee/truck docs
 │   │   ├── dbUtils.js                      # S3 path helpers for ops docs
-│   │   └── auditLogger.js                  # Audit log writes (password change, creation)
+│   │   └── auditLogger.js                  # Audit log writes (generic + transactional)
 │   ├── migrations/
 │   │   ├── 001_add_effective_dates_to_driver_rates.sql
 │   │   └── 002_add_unique_orderno_to_expenses_m2.sql
 │   └── scripts/
-│       └── backfillSubcontractorStatements.js  # CLI backfill — single month or --range
+│       ├── backfillSubcontractorStatements.js  # CLI backfill — single month or --range
+│       └── pruneAuditLog.js                 # Audit retention — dry run unless --apply
 │
 └── .platform/
     └── nginx/conf.d/

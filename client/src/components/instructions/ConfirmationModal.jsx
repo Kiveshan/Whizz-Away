@@ -14,6 +14,7 @@
  * @param {string}   [props.confirmText]   Defaults to "Yes, Continue"
  * @param {string}   [props.cancelText]    Defaults to "No, Let Me Edit"
  * @param {string}   [props.variant]       "default" | "warning" — controls confirm button colour
+ * @param {node}     [props.extraContent]  Extra content rendered between the message and the buttons
  */
 export function ConfirmationModal({
   isOpen,
@@ -24,6 +25,7 @@ export function ConfirmationModal({
   confirmText = "Yes, Continue",
   cancelText = "No, Let Me Edit",
   variant = "default",
+  extraContent = null,
 }) {
   if (!isOpen) return null;
 
@@ -66,6 +68,7 @@ export function ConfirmationModal({
         >
           {message}
         </p>
+        {extraContent}
         <div
           style={{
             display: "flex",

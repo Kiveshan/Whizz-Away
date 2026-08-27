@@ -9,6 +9,8 @@
  * @param {function} props.onSave
  * @param {function} props.onDelete
  * @param {function} props.onInvoice
+ * @param {boolean}  [props.canReopen]  Whether the signed-in user may reopen a Completed instruction
+ * @param {function} [props.onReopen]
  */
 export function ActionButtons({
   isReadOnly,
@@ -17,12 +19,14 @@ export function ActionButtons({
   onSave,
   onDelete,
   onInvoice,
+  canReopen,
+  onReopen,
 }) {
   if (isReadOnly) {
     return (
       <div
         className="controller-instructions-form-actions"
-        style={{ display: "flex", justifyContent: "center", gap: "15px" }}
+        style={{ display: "flex", justifyContent: "center", alignItems: "center", gap: "15px" }}
       >
         <div
           style={{
@@ -37,6 +41,24 @@ export function ActionButtons({
         >
           This instruction is {status} and cannot be edited
         </div>
+        {canReopen && (
+          <button
+            className="controller-instructions-reopen-button"
+            onClick={onReopen}
+            style={{
+              backgroundColor: "#e67e22",
+              color: "white",
+              padding: "12px 24px",
+              border: "none",
+              borderRadius: "4px",
+              cursor: "pointer",
+              fontSize: "16px",
+              fontWeight: "bold",
+            }}
+          >
+            Reopen Instruction
+          </button>
+        )}
       </div>
     );
   }

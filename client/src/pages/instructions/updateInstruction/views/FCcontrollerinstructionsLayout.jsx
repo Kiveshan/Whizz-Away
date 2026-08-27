@@ -69,6 +69,11 @@ export function FCcontrollerinstructionsLayout({
   rateUpdateMessage,
   // Invoice
   isInvoiced,
+  // Reopen
+  canReopen,
+  handleReopenInstruction,
+  reopenReason,
+  setReopenReason,
   // Handlers — form
   handleClientChange,
   handleInputChange,
@@ -568,6 +573,8 @@ export function FCcontrollerinstructionsLayout({
             onSave={handleSaveChanges}
             onDelete={handleDeleteInstruction}
             onInvoice={handleCreateInvoice}
+            canReopen={canReopen}
+            onReopen={handleReopenInstruction}
           />
         </div>
         {/* Confirmation Modal */}
@@ -579,11 +586,32 @@ export function FCcontrollerinstructionsLayout({
             confirmationModal.action === "delete-container" ? "Delete Container" :
             confirmationModal.action === "delete-weight" ? "Delete Weight Row" :
             confirmationModal.action === "unlock-route" ? "Unlock Route" :
+            confirmationModal.action === "reopen" ? "Reopen Instruction" :
             "Confirm"
           }
           message={confirmationModal.message}
           onConfirm={handleConfirmAction}
           onCancel={handleCancelAction}
+          extraContent={
+            confirmationModal.action === "reopen" ? (
+              <div style={{ marginBottom: "20px" }}>
+                <label
+                  htmlFor="reopen-reason"
+                  style={{ display: "block", marginBottom: "6px", color: "#666", fontSize: "14px" }}
+                >
+                  Reason for reopening (optional)
+                </label>
+                <textarea
+                  id="reopen-reason"
+                  value={reopenReason}
+                  onChange={(e) => setReopenReason(e.target.value)}
+                  rows={2}
+                  style={{ width: "100%", padding: "8px", borderRadius: "4px", border: "1px solid #ddd" }}
+                  placeholder="e.g. Client requested a rate correction"
+                />
+              </div>
+            ) : null
+          }
         />
         {/* Warning Modal (shipment type change) */}
         <ConfirmationModal

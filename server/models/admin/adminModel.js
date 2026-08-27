@@ -1,4 +1,5 @@
 import { pool } from "../../config/database.js";
+import { AUDIT_ACTION_TYPES, AUDIT_ENTITY_TYPES } from "../../config/auditActions.js";
 
 const getPendingUsers = async () => {
   let client;
@@ -223,43 +224,116 @@ const reactivateCompany = async (company_reg_num) => {
   }
 };
 
+// The pager stops counting here. See the count query in getAuditLog.
+const COUNT_CAP = 20000;
+
+// Filter dropdowns are served from the action/entity registry, which is exact
+// for anything written by the current code and costs nothing. Older rows can
+// still hold action types the registry no longer lists (renamed or retired
+// actions), so the table is scanned for those too — but at most once every
+// FILTER_CACHE_MS, because DISTINCT over an audit table is a full scan.
+const FILTER_CACHE_MS = 15 * 60 * 1000;
+let filterCache = { expiresAt: 0, actionTypes: [], entityTypes: [] };
+
+const getAuditFilterValues = async () => {
+  if (Date.now() < filterCache.expiresAt) return filterCache;
+
+  let historicActions = [];
+  let historicEntities = [];
+  try {
+    const [actions, entities] = await Promise.all([
+      pool.query(`SELECT DISTINCT action_type FROM audit_log ORDER BY action_type`),
+      pool.query(
+        `SELECT DISTINCT entity_type FROM audit_log
+          WHERE entity_type IS NOT NULL ORDER BY entity_type`
+      ),
+    ]);
+    historicActions = actions.rows.map((r) => r.action_type);
+    historicEntities = entities.rows.map((r) => r.entity_type);
+  } catch (err) {
+    // A slow or failed scan must not take the viewer down — the registry
+    // values alone are enough to filter everything written by current code.
+    console.error("Audit filter scan failed, falling back to registry:", err.message);
+  }
+
+  filterCache = {
+    expiresAt: Date.now() + FILTER_CACHE_MS,
+    actionTypes: [...new Set([...AUDIT_ACTION_TYPES, ...historicActions])].sort(),
+    entityTypes: [...new Set([...AUDIT_ENTITY_TYPES, ...historicEntities])].sort(),
+  };
+  return filterCache;
+};
+
 // Paginated, filterable read of the audit trail. Filters are all optional:
-// actionType/entityType exact-match, search does a case-insensitive scan over
-// target name and details, from/to bound the timestamp.
-const getAuditLog = async ({ page = 1, limit = 25, actionType, entityType, search, from, to }) => {
+// actionType/entityType/outcome/actorId exact-match, search does a
+// case-insensitive scan over target name, actor, details and request path,
+// from/to bound the timestamp.
+const getAuditLog = async ({
+  page = 1,
+  limit = 25,
+  actionType,
+  entityType,
+  outcome,
+  actorId,
+  search,
+  from,
+  to,
+}) => {
   const conditions = [];
   const params = [];
 
+  // Conditions are written against the "a" alias so the same WHERE clause can
+  // be reused by the count query and the joined page query.
   if (actionType) {
     params.push(actionType);
-    conditions.push(`action_type = $${params.length}`);
+    conditions.push(`a.action_type = $${params.length}`);
   }
   if (entityType) {
     params.push(entityType);
-    conditions.push(`entity_type = $${params.length}`);
+    conditions.push(`a.entity_type = $${params.length}`);
+  }
+  if (outcome) {
+    params.push(outcome);
+    conditions.push(`a.outcome = $${params.length}`);
+  }
+  if (actorId) {
+    params.push(Number(actorId));
+    conditions.push(`a.admin_id = $${params.length}`);
   }
   if (search) {
     params.push(`%${search}%`);
     conditions.push(
-      `(target_employee_name ILIKE $${params.length} OR details ILIKE $${params.length})`
+      `(a.target_employee_name ILIKE $${params.length}
+        OR a.details ILIKE $${params.length}
+        OR a.actor_name ILIKE $${params.length}
+        OR a.request_path ILIKE $${params.length}
+        OR a.action_type ILIKE $${params.length})`
     );
   }
   if (from) {
     params.push(from);
-    conditions.push(`timestamp >= $${params.length}`);
+    conditions.push(`a.timestamp >= $${params.length}`);
   }
   if (to) {
     params.push(to);
-    conditions.push(`timestamp < ($${params.length}::date + INTERVAL '1 day')`);
+    conditions.push(`a.timestamp < ($${params.length}::date + INTERVAL '1 day')`);
   }
 
   const whereClause = conditions.length ? `WHERE ${conditions.join(" AND ")}` : "";
 
+  // The pager needs a total, but an exact COUNT(*) over an audit table is a
+  // full scan that gets slower every day and is the same cost on page 1 as on
+  // page 400. Stop counting at COUNT_CAP rows: below the cap the number is
+  // exact, above it the UI shows "20 000+". Callers narrow the window with the
+  // date filters when they need to know precisely how many.
   const countResult = await pool.query(
-    `SELECT COUNT(*) AS total FROM audit_log ${whereClause}`,
+    `SELECT COUNT(*) AS total
+       FROM (SELECT 1 FROM audit_log a ${whereClause} LIMIT ${COUNT_CAP + 1}) capped`,
     params
   );
-  const totalItems = Number(countResult.rows[0].total);
+  const rawCount = Number(countResult.rows[0].total);
+  const countIsCapped = rawCount > COUNT_CAP;
+  const totalItems = countIsCapped ? COUNT_CAP : rawCount;
 
   const pageNum = Math.max(1, Number(page) || 1);
   const limitNum = Math.min(100, Math.max(1, Number(limit) || 25));
@@ -268,35 +342,51 @@ const getAuditLog = async ({ page = 1, limit = 25, actionType, entityType, searc
   const result = await pool.query(
     `SELECT
        a.id AS audit_id,
-       action_type,
-       entity_type,
-       admin_id,
-       target_employee_id AS target_id,
-       target_employee_name AS target_name,
-       timestamp,
-       details,
-       user_agent,
-       COALESCE(u.name || ' ' || u.surname, e.name || ' ' || e.surname) AS actor_name
+       a.action_type,
+       a.entity_type,
+       a.admin_id,
+       a.target_employee_id AS target_id,
+       a.target_employee_name AS target_name,
+       a.timestamp,
+       a.details,
+       a.metadata,
+       a.http_method,
+       a.request_path,
+       a.status_code,
+       a.outcome,
+       a.duration_ms,
+       a.actor_role,
+       a.ip_address,
+       a.user_agent,
+       -- Prefer the name captured at the time of the action; fall back to the
+       -- current user record for rows written before actor_name existed.
+       COALESCE(
+         a.actor_name,
+         u.name || ' ' || u.surname,
+         e.name || ' ' || e.surname
+       ) AS actor_name
      FROM audit_log a
      LEFT JOIN usertable u ON u.userid = a.admin_id
      LEFT JOIN m5_employee e ON e.userid = a.admin_id
      ${whereClause}
-     ORDER BY timestamp DESC
+     ORDER BY a.timestamp DESC
      LIMIT $${params.length - 1} OFFSET $${params.length}`,
     params
   );
 
-  // Distinct values for the filter dropdowns.
-  const typesResult = await pool.query(
-    `SELECT DISTINCT action_type FROM audit_log ORDER BY action_type`
-  );
+  // Filter values come from the (cached) legacy scan plus the static registry —
+  // see getAuditFilterValues.
+  const { actionTypes, entityTypes } = await getAuditFilterValues();
 
   return {
     items: result.rows,
     totalItems,
+    countIsCapped,
+    countCap: COUNT_CAP,
     totalPages: Math.max(1, Math.ceil(totalItems / limitNum)),
     currentPage: pageNum,
-    actionTypes: typesResult.rows.map((r) => r.action_type),
+    actionTypes,
+    entityTypes,
   };
 };
 

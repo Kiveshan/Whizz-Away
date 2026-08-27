@@ -78,6 +78,7 @@ export function useInstructionApply({
           rateper_abnormal: data.rateper_abnormal || 0,
           rateper_breakbulk: data.rateper_breakbulk || 0,
           status: data.status || "",
+          paid_amount: data.paid_amount != null ? Number(data.paid_amount) : 0,
           createdAt: formatDateForInput(data.created_at) || "",
           addon_id: data.addon_id != null ? data.addon_id.toString() : "",
           addon_invoice_number: data.addon_invoice_number || "",

@@ -158,8 +158,19 @@ const reactivateCompanyHandler = async (req, res) => {
 
 const getAuditLogHandler = async (req, res) => {
   try {
-    const { page, limit, actionType, entityType, search, from, to } = req.query;
-    const result = await getAuditLog({ page, limit, actionType, entityType, search, from, to });
+    const { page, limit, actionType, entityType, outcome, actorId, search, from, to } =
+      req.query;
+    const result = await getAuditLog({
+      page,
+      limit,
+      actionType,
+      entityType,
+      outcome,
+      actorId,
+      search,
+      from,
+      to,
+    });
     res.json(result);
   } catch (err) {
     console.error("Error fetching audit log:", err);
