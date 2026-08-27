@@ -864,17 +864,17 @@ export const deleteInstructionHandler = async (req, res) => {
 }
 
 // Handler for reopening a Completed instruction so it can be edited again.
-// Restricted to Admin/Director — this is a supervisory override, not a
+// Restricted to Manager/Director — this is a supervisory override, not a
 // day-to-day ops action.
 export const reopenInstructionHandler = async (req, res) => {
   try {
     const { instructionId } = req.params
     const { reason } = req.body || {}
 
-    if (![ROLES.ADMIN, ROLES.DIRECTOR].includes(req.user?.roleid)) {
+    if (![ROLES.MANAGER, ROLES.DIRECTOR].includes(req.user?.roleid)) {
       return res.status(403).json({
         success: false,
-        error: "Only an Admin or Director can reopen a completed instruction",
+        error: "Only a Manager or Director can reopen a completed instruction",
       })
     }
 

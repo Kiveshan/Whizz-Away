@@ -58,7 +58,7 @@ router.put("/fc/containers/:instructionId", updateFCContainersHandler)
 router.put("/fc/update/:id", updateFCInstructionAndContainersHandler)
 // Delete instruction and its containers
 router.delete("/fc/instruction/:id", deleteInstructionHandler)
-// Reopen a Completed instruction (Admin/Director only, enforced in the handler)
+// Reopen a Completed instruction (Manager/Director only, enforced in the handler)
 router.post("/:instructionId/reopen", verifyToken, reopenInstructionHandler)
 // Check and delete specific containers (and their legs) for FC
 router.get(

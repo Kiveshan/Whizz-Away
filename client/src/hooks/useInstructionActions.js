@@ -5,7 +5,6 @@ import {
   deleteInstruction as deleteInstructionService,
   generateInvoice as generateInvoiceService,
   checkInvoiceStatus as checkInvoiceStatusService,
-  reopenInstruction as reopenInstructionService,
 } from "../services/instructionService.js";
 import { resolveBaseCost } from "../utils/instructions/costCalculation.js";
 import { buildUpdatePayload } from "../utils/instructions/payloadBuilders.js";
@@ -42,7 +41,6 @@ export function useInstructionActions({
   selectedMonth,
   selectedYear,
   activeFilter,
-  setFormData,
 }) {
   const [isInvoiced, setIsInvoiced] = useState(false);
 
@@ -310,42 +308,6 @@ export function useInstructionActions({
     setErrorModal,
   ]);
 
-  // ─── reopen (Completed → In Progress) ───────────────────────────────────────
-
-  const [reopenReason, setReopenReason] = useState("");
-
-  const handleReopenInstruction = useCallback(() => {
-    setReopenReason("");
-    setConfirmationModal({
-      isOpen: true,
-      message:
-        formData.paid_amount > 0
-          ? `This instruction has R${Number(formData.paid_amount).toFixed(2)} paid against it. ` +
-            "Reopening will let you change amounts that a payment has already been made against. Continue?"
-          : "Reopen this completed instruction for editing?",
-      action: "reopen",
-    });
-  }, [setConfirmationModal, formData.paid_amount]);
-
-  const performReopen = useCallback(async () => {
-    try {
-      setIsContainerLoading(true);
-      const result = await reopenInstructionService(instructionId, reopenReason);
-      setFormData((prev) => ({ ...prev, status: result.status }));
-      setContainerSuccessMessage("Instruction reopened — you can now edit it.");
-    } catch (error) {
-      console.error("Error reopening instruction:", error);
-      setErrorModal({
-        isOpen: true,
-        message:
-          error.response?.data?.error ||
-          "Failed to reopen instruction. Please try again.",
-      });
-    } finally {
-      setIsContainerLoading(false);
-    }
-  }, [instructionId, reopenReason, setFormData, setIsContainerLoading, setContainerSuccessMessage, setErrorModal]);
-
   return {
     isInvoiced,
     checkIfInvoiced,
@@ -355,9 +317,5 @@ export function useInstructionActions({
     performDelete,
     handleCreateInvoice,
     performInvoiceCreation,
-    handleReopenInstruction,
-    performReopen,
-    reopenReason,
-    setReopenReason,
   };
 }

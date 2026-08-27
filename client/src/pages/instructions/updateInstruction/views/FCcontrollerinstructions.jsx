@@ -3,7 +3,6 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import "../../css/controllerinstruction.css";
 import { useNavigate, useLocation } from "react-router-dom";
-import { useAuth } from "../../../../context/AuthContext";
 import { useInstructionData } from "../../../../hooks/useInstructionData";
 import { useContainerManagement } from "../../../../hooks/useContainerManagement";
 import { useRateManagement } from "../../../../hooks/useRateManagement";
@@ -15,14 +14,9 @@ import { validateForm as validateFormUtil } from "../../../../utils/instructions
 import { checkRateCountMismatch as checkRateCountMismatchUtil } from "../../../../utils/instructions/rateCountMismatch";
 import { FCcontrollerinstructionsLayout } from "./FCcontrollerinstructionsLayout";
 
-// Reopening a Completed instruction is a supervisory override — restrict it
-// to the same roles the backend enforces (server/config/roles.js).
-const REOPEN_ROLES = [7, 4]; // ADMIN, DIRECTOR
-
 const FCcontrollerinstructions = () => {
   const navigate = useNavigate();
   const location = useLocation();
-  const { user } = useAuth();
 
   const preservedFormData = location.state?.preservedFormData;
   const containerCounts = location.state?.containerCounts;
@@ -343,10 +337,6 @@ const FCcontrollerinstructions = () => {
     performDelete,
     handleCreateInvoice,
     performInvoiceCreation,
-    handleReopenInstruction,
-    performReopen,
-    reopenReason,
-    setReopenReason,
   } = useInstructionActions({
     formData,
     containers,
@@ -375,10 +365,7 @@ const FCcontrollerinstructions = () => {
     selectedMonth,
     selectedYear,
     activeFilter,
-    setFormData,
   });
-
-  const canReopen = REOPEN_ROLES.includes(user?.roleid);
 
   const {
     handleClientChange,
@@ -458,8 +445,6 @@ const FCcontrollerinstructions = () => {
       performDelete();
     } else if (confirmationModal.action === "invoice") {
       performInvoiceCreation();
-    } else if (confirmationModal.action === "reopen") {
-      performReopen();
     }
     setConfirmationModal({ isOpen: false, message: "", action: null });
   }, [
@@ -471,7 +456,6 @@ const FCcontrollerinstructions = () => {
     performSave,
     performDelete,
     performInvoiceCreation,
-    performReopen,
   ]);
 
   const handleCancelAction = useCallback(() => {
@@ -626,11 +610,6 @@ const FCcontrollerinstructions = () => {
       rateUpdateMessage={rateUpdateMessage}
       // Invoice
       isInvoiced={isInvoiced}
-      // Reopen
-      canReopen={canReopen}
-      handleReopenInstruction={handleReopenInstruction}
-      reopenReason={reopenReason}
-      setReopenReason={setReopenReason}
       // Handlers — form
       handleClientChange={handleClientChange}
       handleInputChange={handleInputChange}
