@@ -9,7 +9,7 @@
  *     than the generic request-level one. An explicit call marks the request so
  *     the middleware does not write a second row for it.
  *
- * Requires migration 008_audit_log_full_coverage.sql.
+ * Requires migration 010_audit_log_full_coverage.sql.
  */
 
 import { pool } from "../config/database.js";
