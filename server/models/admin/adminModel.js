@@ -1,5 +1,6 @@
 import { pool } from "../../config/database.js";
 import { AUDIT_ACTION_TYPES, AUDIT_ENTITY_TYPES } from "../../config/auditActions.js";
+import { ROLES } from "../../config/roles.js";
 
 const getPendingUsers = async () => {
   let client;
@@ -256,10 +257,17 @@ const getAuditFilterValues = async () => {
     console.error("Audit filter scan failed, falling back to registry:", err.message);
   }
 
+  // AUDIT_LOG_VIEWED rows are excluded from every query (see getAuditLog), so
+  // offering them — or their otherwise-unused "audit" entity — as filters
+  // would just be dead options that always return nothing.
   filterCache = {
     expiresAt: Date.now() + FILTER_CACHE_MS,
-    actionTypes: [...new Set([...AUDIT_ACTION_TYPES, ...historicActions])].sort(),
-    entityTypes: [...new Set([...AUDIT_ENTITY_TYPES, ...historicEntities])].sort(),
+    actionTypes: [...new Set([...AUDIT_ACTION_TYPES, ...historicActions])]
+      .filter((type) => type !== "AUDIT_LOG_VIEWED")
+      .sort(),
+    entityTypes: [...new Set([...AUDIT_ENTITY_TYPES, ...historicEntities])]
+      .filter((type) => type !== "audit")
+      .sort(),
   };
   return filterCache;
 };
@@ -278,9 +286,16 @@ const getAuditLog = async ({
   search,
   from,
   to,
+  hideAdminActors = false,
 }) => {
   const conditions = [];
   const params = [];
+
+  // Viewing the audit log is itself a tracked (sensitive) GET, but showing
+  // those rows in the viewer is just self-referential noise — every page
+  // load/filter change would add another "viewed the audit log" entry to the
+  // page being looked at. Still recorded in the table, just never displayed.
+  conditions.push(`a.action_type != 'AUDIT_LOG_VIEWED'`);
 
   // Conditions are written against the "a" alias so the same WHERE clause can
   // be reused by the count query and the joined page query.
@@ -317,6 +332,13 @@ const getAuditLog = async ({
   if (to) {
     params.push(to);
     conditions.push(`a.timestamp < ($${params.length}::date + INTERVAL '1 day')`);
+  }
+  // Reports-page callers (Manager/Director) hide System Admin's own actions —
+  // rows with no captured actor_role (older rows) are kept, since we can't
+  // tell they were an admin.
+  if (hideAdminActors) {
+    params.push(ROLES.ADMIN);
+    conditions.push(`a.actor_role IS DISTINCT FROM $${params.length}`);
   }
 
   const whereClause = conditions.length ? `WHERE ${conditions.join(" AND ")}` : "";

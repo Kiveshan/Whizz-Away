@@ -10,7 +10,11 @@ import {
   reactivateCompanyHandler,
   getAuditLogHandler,
 } from "../../controllers/admin/adminController.js";
-import { verifyToken, verifyAdminAccess } from "../../middleware/auth.js";
+import {
+  verifyToken,
+  verifyAdminAccess,
+  verifyAuditLogAccess,
+} from "../../middleware/auth.js";
 
 const router = express.Router();
 
@@ -53,10 +57,12 @@ router.post(
   reactivateCompanyHandler
 );
 
+// Widened beyond Admin: Manager/Director own the Reports section and this is
+// read-only, same reasoning as the driver rate audit report.
 router.get(
   "/api/admin/audit-log",
   verifyToken,
-  verifyAdminAccess,
+  verifyAuditLogAccess,
   getAuditLogHandler
 );
 

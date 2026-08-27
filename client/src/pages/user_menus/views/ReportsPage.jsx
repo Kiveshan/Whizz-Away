@@ -33,6 +33,11 @@ const maintenanceData = [
     image: "/images/reports.jpg",
     path: "/driver-rate-audit",
   },
+  {
+    title: "Audit Log",
+    image: "/images/reports.jpg",
+    path: "/audit-log",
+  },
 ]
 
 const ReportsPage = () => {

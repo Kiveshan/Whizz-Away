@@ -6,7 +6,7 @@ import CompanyManagement from "./CompanyManagement";
 import SubcontractorBackfill from "./SubcontractorBackfill";
 import RegenerateStatement from "./RegenerateStatement";
 import DriverRateAudit from "../../Reports/views/DriverRateAuditReport";
-import AuditLogViewer from "./AuditLogViewer";
+import AuditLogReport from "../../Reports/views/AuditLogReport";
 import "../css/AdminDashboard.css";
 // Import the TestConnection component
 // import TestConnection from "./TestConnection"
@@ -73,7 +73,7 @@ function AdminDashboard() {
           {activeTab === "backfill" && <SubcontractorBackfill />}
           {activeTab === "regenerate-statement" && <RegenerateStatement />}
           {activeTab === "rate-audit" && <DriverRateAudit />}
-          {activeTab === "audit-log" && <AuditLogViewer />}
+          {activeTab === "audit-log" && <AuditLogReport embedded />}
         </div>
       </div>
     </div>

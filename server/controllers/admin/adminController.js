@@ -158,7 +158,7 @@ const reactivateCompanyHandler = async (req, res) => {
 
 const getAuditLogHandler = async (req, res) => {
   try {
-    const { page, limit, actionType, entityType, outcome, actorId, search, from, to } =
+    const { page, limit, actionType, entityType, outcome, actorId, search, from, to, hideAdminActors } =
       req.query;
     const result = await getAuditLog({
       page,
@@ -170,6 +170,7 @@ const getAuditLogHandler = async (req, res) => {
       search,
       from,
       to,
+      hideAdminActors: hideAdminActors === "true",
     });
     res.json(result);
   } catch (err) {

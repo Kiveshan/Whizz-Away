@@ -15,6 +15,7 @@
 
 import { resolveAuditRoute } from "../config/auditActions.js";
 import { logAudit, clientIp } from "../utils/auditLogger.js";
+import { pool } from "../config/database.js";
 
 // Anything whose key looks like a secret never reaches the database.
 const REDACTED_KEY = /pass(word)?|token|secret|jwt|authorization|apikey|api_key|otp|cvv|card_?num|pin\b|account_num|name_of_acc|\bbank\b|\bbranch\b|swift_code|base_salary/i;
@@ -101,13 +102,122 @@ const actorLabel = (user) => {
   return name ? `${name} (user ${user.userid})` : `User ${user.userid}`;
 };
 
-export const auditTrail = () => (req, res, next) => {
+// Generic routes only have an id from the URL, so without this the trail
+// reads "client 41" / "truck 9" — technically correct, meaningless to a
+// human. One lookup per action_type turns that id into the record's own
+// name. Deliberately resolved BEFORE the handler runs (not in the
+// res.on("finish") write below): for a delete, the row is already gone by
+// the time the response finishes, so resolving after the fact would always
+// come back empty.
+const NAME_LOOKUPS = {
+  EMPLOYEE_UPDATED: { table: "m5_employee", idColumn: "userid", nameExpr: "TRIM(name || ' ' || surname)" },
+  EMPLOYEE_STATUS_TOGGLED: { table: "m5_employee", idColumn: "userid", nameExpr: "TRIM(name || ' ' || surname)" },
+  EMPLOYEE_DETAILS_VIEWED: { table: "m5_employee", idColumn: "userid", nameExpr: "TRIM(name || ' ' || surname)" },
+  EMPLOYEE_DEDUCTIONS_UPDATED: { table: "m5_employee", idColumn: "userid", nameExpr: "TRIM(name || ' ' || surname)" },
+  EMPLOYEE_DEDUCTIONS_VIEWED: { table: "m5_employee", idColumn: "userid", nameExpr: "TRIM(name || ' ' || surname)" },
+  WAGE_DATA_VIEWED: { table: "m5_employee", idColumn: "userid", nameExpr: "TRIM(name || ' ' || surname)" },
+  BASE_SALARY_HISTORY_VIEWED: { table: "m5_employee", idColumn: "userid", nameExpr: "TRIM(name || ' ' || surname)" },
+
+  CLIENT_UPDATED: { table: "m5_client", idColumn: "m5clientkey", nameExpr: "client" },
+  CLIENT_DELETED: { table: "m5_client", idColumn: "m5clientkey", nameExpr: "client" },
+  CLIENT_STATUS_TOGGLED: { table: "m5_client", idColumn: "m5clientkey", nameExpr: "client" },
+
+  TRUCK_UPDATED: { table: "m5_trucks", idColumn: "m5truckskey", nameExpr: "truckregnum" },
+  TRUCK_STATUS_TOGGLED: { table: "m5_trucks", idColumn: "m5truckskey", nameExpr: "truckregnum" },
+  TRUCK_DELETED: { table: "m5_trucks", idColumn: "m5truckskey", nameExpr: "truckregnum" },
+  SUBCONTRACTOR_TRUCK_DELETED: { table: "m5_trucks", idColumn: "m5truckskey", nameExpr: "truckregnum" },
+
+  TRAILER_UPDATED: { table: "m5_trailers", idColumn: "m5trailerskey", nameExpr: "trailerregnum" },
+  TRAILER_STATUS_TOGGLED: { table: "m5_trailers", idColumn: "m5trailerskey", nameExpr: "trailerregnum" },
+
+  SUBCONTRACTOR_UPDATED: { table: "m5_employee", idColumn: "userid", nameExpr: "COALESCE(NULLIF(companyname, ''), TRIM(name || ' ' || surname))" },
+  SUBCONTRACTOR_STATUS_TOGGLED: { table: "m5_employee", idColumn: "userid", nameExpr: "COALESCE(NULLIF(companyname, ''), TRIM(name || ' ' || surname))" },
+  SUBCONTRACTOR_DRIVER_STATUS_TOGGLED: { table: "m5_employee", idColumn: "userid", nameExpr: "TRIM(name || ' ' || surname)" },
+  SUBCONTRACTOR_DRIVER_DELETED: { table: "m5_employee", idColumn: "userid", nameExpr: "TRIM(name || ' ' || surname)" },
+
+  SUPPLIER_UPDATED: { table: "suppliers", idColumn: "supplier_id", nameExpr: "supplier" },
+  SUPPLIER_STATUS_TOGGLED: { table: "suppliers", idColumn: "supplier_id", nameExpr: "supplier" },
+  SUPPLIER_DELETED: { table: "suppliers", idColumn: "supplier_id", nameExpr: "supplier" },
+
+  EXPENSE_TYPE_UPDATED: { table: "expense_types", idColumn: "id", nameExpr: "expense" },
+  EXPENSE_TYPE_DELETED: { table: "expense_types", idColumn: "id", nameExpr: "expense" },
+
+  DOCUMENT_DELETED: { table: "documents", idColumn: "document_id", nameExpr: "name" },
+
+  LEG_NUMBER_UPDATED: { table: "legs_m2", idColumn: "legkey", nameExpr: "'Leg ' || legnumber || ' (Instr ' || m1key || ')'" },
+  LEG_DELETED: { table: "legs_m2", idColumn: "legkey", nameExpr: "'Leg ' || legnumber || ' (Instr ' || m1key || ')'" },
+
+  ADDON_UPDATED: {
+    query: `SELECT COALESCE(c.client || ' — ', '') || COALESCE(a.invoice_number, 'Addon ' || a.addon_id) AS name
+              FROM add_ons a LEFT JOIN m5_client c ON c.m5clientkey = a.client_id WHERE a.addon_id = $1`,
+  },
+  ADDON_DELETED: {
+    query: `SELECT COALESCE(c.client || ' — ', '') || COALESCE(a.invoice_number, 'Addon ' || a.addon_id) AS name
+              FROM add_ons a LEFT JOIN m5_client c ON c.m5clientkey = a.client_id WHERE a.addon_id = $1`,
+  },
+
+  INSTRUCTION_CONTAINERS_UPDATED: {
+    query: `SELECT m.m1key || ' — ' || COALESCE(c.client, 'unknown client') AS name
+              FROM m1_controller m LEFT JOIN m5_client c ON c.m5clientkey = m.client WHERE m.m1key = $1`,
+  },
+  FC_CONTAINERS_UPDATED: {
+    query: `SELECT m.m1key || ' — ' || COALESCE(c.client, 'unknown client') AS name
+              FROM m1_controller m LEFT JOIN m5_client c ON c.m5clientkey = m.client WHERE m.m1key = $1`,
+  },
+  FC_INSTRUCTION_UPDATED: {
+    query: `SELECT m.m1key || ' — ' || COALESCE(c.client, 'unknown client') AS name
+              FROM m1_controller m LEFT JOIN m5_client c ON c.m5clientkey = m.client WHERE m.m1key = $1`,
+  },
+  FC_CONTAINER_DELETED: {
+    query: `SELECT m.m1key || ' — ' || COALESCE(c.client, 'unknown client') AS name
+              FROM m1_controller m LEFT JOIN m5_client c ON c.m5clientkey = m.client WHERE m.m1key = $1`,
+  },
+  INSTRUCTION_STATUS_UPDATED: {
+    query: `SELECT m.m1key || ' — ' || COALESCE(c.client, 'unknown client') AS name
+              FROM m1_controller m LEFT JOIN m5_client c ON c.m5clientkey = m.client WHERE m.m1key = $1`,
+  },
+  INSTRUCTION_COMPLETED: {
+    query: `SELECT m.m1key || ' — ' || COALESCE(c.client, 'unknown client') AS name
+              FROM m1_controller m LEFT JOIN m5_client c ON c.m5clientkey = m.client WHERE m.m1key = $1`,
+  },
+  INVOICE_PREVIEW_GENERATED: {
+    query: `SELECT m.m1key || ' — ' || COALESCE(c.client, 'unknown client') AS name
+              FROM m1_controller m LEFT JOIN m5_client c ON c.m5clientkey = m.client WHERE m.m1key = $1`,
+  },
+  INVOICE_GENERATED: {
+    query: `SELECT m.m1key || ' — ' || COALESCE(c.client, 'unknown client') AS name
+              FROM m1_controller m LEFT JOIN m5_client c ON c.m5clientkey = m.client WHERE m.m1key = $1`,
+  },
+};
+
+const resolveTargetName = async (descriptor) => {
+  if (!descriptor?.target) return null;
+  const lookup = NAME_LOOKUPS[descriptor.action];
+  if (!lookup) return null;
+
+  const idNum = Number(descriptor.target);
+  if (!Number.isInteger(idNum)) return null;
+
+  try {
+    const sql = lookup.query || `SELECT ${lookup.nameExpr} AS name FROM ${lookup.table} WHERE ${lookup.idColumn} = $1`;
+    const result = await pool.query(sql, [idNum]);
+    const name = result.rows[0]?.name;
+    return name ? String(name).trim() : null;
+  } catch (err) {
+    console.error(`Audit target-name lookup failed for ${descriptor.action}:`, err.message);
+    return null;
+  }
+};
+
+export const auditTrail = () => async (req, res, next) => {
   const startedAt = Date.now();
   const descriptor = resolveAuditRoute(req.method, req.path);
 
   if (!descriptor || (descriptor.sensitive === false && req.method === "GET")) {
     return next();
   }
+
+  const resolvedTargetName = await resolveTargetName(descriptor);
 
   res.on("finish", () => {
     // A controller already wrote a richer, business-level entry for this
@@ -129,7 +239,7 @@ export const auditTrail = () => (req, res, next) => {
       actorName: scheduledJob ? "Scheduled job" : actorLabel(user),
       actorRole: user?.roleid ?? null,
       targetId: descriptor.target,
-      targetName: descriptor.target ? `${descriptor.entity} ${descriptor.target}` : null,
+      targetName: resolvedTargetName || (descriptor.target ? `${descriptor.entity} ${descriptor.target}` : null),
       details:
         `${scheduledJob ? "Scheduled job" : actorLabel(user)} — ${descriptor.action} ` +
         `(${req.method} ${req.originalUrl.split("?")[0]}) → ${res.statusCode} ${outcome}` +

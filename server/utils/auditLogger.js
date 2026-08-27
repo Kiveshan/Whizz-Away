@@ -127,6 +127,42 @@ const requestContext = (req) => ({
   userAgent: req.headers?.["user-agent"] || null,
 });
 
+// Best-effort display names for hand-written audit calls, so a controller can
+// write "Acme Logistics" instead of a bare "client 41" without needing its own
+// SQL. Never throw — audit trail quality is never worth failing the request
+// over, so callers just get null back and fall back to their own label.
+const isNumericId = (value) => Number.isInteger(Number(value)) && value !== "" && value !== null;
+
+export const getClientName = async (clientId) => {
+  if (!isNumericId(clientId)) return null;
+  try {
+    const result = await pool.query(
+      "SELECT client FROM m5_client WHERE m5clientkey = $1",
+      [Number(clientId)]
+    );
+    return result.rows[0]?.client?.trim() || null;
+  } catch (err) {
+    console.error("Audit client-name lookup failed:", err.message);
+    return null;
+  }
+};
+
+export const getInstructionLabel = async (m1key) => {
+  if (!isNumericId(m1key)) return null;
+  try {
+    const result = await pool.query(
+      `SELECT m.m1key || ' — ' || COALESCE(c.client, 'unknown client') AS name
+         FROM m1_controller m LEFT JOIN m5_client c ON c.m5clientkey = m.client
+        WHERE m.m1key = $1`,
+      [Number(m1key)]
+    );
+    return result.rows[0]?.name || null;
+  } catch (err) {
+    console.error("Audit instruction-label lookup failed:", err.message);
+    return null;
+  }
+};
+
 /**
  * Convenience wrapper for controllers.
  * Usage: auditFromReq(req, { actionType: "PAYMENT_CREATED", entityType: "payment", ... })

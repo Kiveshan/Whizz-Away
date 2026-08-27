@@ -20,7 +20,7 @@ import {
   getClientSetRate,
   searchInstructions,
 } from "../../models/instructions/instructionModel.js"
-import { auditFromReq } from "../../utils/auditLogger.js"
+import { auditFromReq, getClientName } from "../../utils/auditLogger.js"
 import { ROLES } from "../../config/roles.js"
 
 // Helper function to calculate total cost based on rate weight type
@@ -279,11 +279,12 @@ export const saveInstructionHandler = async (req, res) => {
       weightData: Array.isArray(weightData) ? weightData : [],
     })
 
+    const createdClientId = updatedControllerData.client_id ?? updatedControllerData.clientId ?? null
     auditFromReq(req, {
       actionType: "INSTRUCTION_CREATED",
       entityType: "instruction",
       targetId: result.m1key,
-      targetName: `client ${updatedControllerData.client_id ?? updatedControllerData.clientId ?? "?"}`,
+      targetName: (await getClientName(createdClientId)) || `client ${createdClientId ?? "?"}`,
       details: `Instruction ${result.m1key} created (total_cost: ${updatedControllerData.total_cost})`,
     })
 

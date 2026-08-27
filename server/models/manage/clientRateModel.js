@@ -176,9 +176,10 @@ const deleteClientRate = async (rateId) => {
   try {
     client = await pool.connect()
 
-    const checkResult = await client.query("SELECT client_rate_id FROM m5_client_rate WHERE client_rate_id = $1", [
-      rateId,
-    ])
+    const checkResult = await client.query(
+      "SELECT client_rate_id, starting_point, destination FROM m5_client_rate WHERE client_rate_id = $1",
+      [rateId],
+    )
 
     if (!checkResult.rows.length) {
       return { success: false, message: "Rate not found" }
@@ -186,7 +187,7 @@ const deleteClientRate = async (rateId) => {
 
     await client.query("DELETE FROM m5_client_rate WHERE client_rate_id = $1", [rateId])
 
-    return { success: true, message: "Rate deleted successfully" }
+    return { success: true, message: "Rate deleted successfully", data: checkResult.rows[0] }
   } catch (err) {
     console.error(`Error deleting client rate ${rateId}:`, err)
     throw err
