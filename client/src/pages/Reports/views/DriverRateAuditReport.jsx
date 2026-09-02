@@ -118,7 +118,6 @@ function DriverRateAuditReport() {
   const addDiffSheet = (workbook, name, rows, { showExpected, showFlag } = {}) => {
     const sheet = workbook.addWorksheet(name);
     const columns = [
-      { header: "Leg", key: "legkey", width: 10 },
       { header: "Instr.", key: "m1key", width: 12 },
       { header: "Client", key: "client", width: 20 },
       { header: "Route", key: "route", width: 24 },
@@ -229,7 +228,6 @@ function DriverRateAuditReport() {
       </div>
 
       <div className="dra-header">
-        <h1>Driver Rate Audit</h1>
         <p className="dra-subtitle">
           Re-derives the correct driver rate for every leg on instructions created in the chosen
           month, using the same rules the app uses, and flags the discrepancies worth reviewing.
@@ -403,7 +401,6 @@ function DiffTable({ rows, showExpected, showFlag, sort, onSort }) {
       <table className="dra-table">
         <thead>
           <tr>
-            <SortHeader label="Leg" sortKey="legkey" sort={sort} onSort={onSort} />
             <SortHeader label="Instr." sortKey="m1key" sort={sort} onSort={onSort} />
             <SortHeader label="Client" sortKey="client" sort={sort} onSort={onSort} />
             <SortHeader label="Route" sortKey="route" sort={sort} onSort={onSort} />
@@ -419,7 +416,6 @@ function DiffTable({ rows, showExpected, showFlag, sort, onSort }) {
         <tbody>
           {rows.map((r) => (
             <tr key={r.legkey} className="dra-row">
-              <td className="dra-td">{r.legkey}</td>
               <td className="dra-td">{r.m1key}</td>
               <td className="dra-td">{r.client}</td>
               <td className="dra-td">{r.route}</td>
