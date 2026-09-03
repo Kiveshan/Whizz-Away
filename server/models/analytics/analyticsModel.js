@@ -31,16 +31,16 @@ const getFuelExpenses = async (client, month, year) => {
   const query = `
     SELECT t.truckregnum, 
            SUM(e.expensecost) as total_cost, 
-           to_char(e.slipuploaddate, 'Month') as month_name,
-           EXTRACT(YEAR FROM e.slipuploaddate) as year
-    FROM expenses_m2 e
+           to_char(e.expense_date, 'Month') as month_name,
+           EXTRACT(YEAR FROM e.expense_date) as year
+    FROM expenses_with_po_v e
     JOIN m5_trucks t ON e.truckid = t.m5truckskey
     WHERE e.type = 'fuel'
-    AND TRIM(to_char(e.slipuploaddate, 'Month')) = $1
-    AND EXTRACT(YEAR FROM e.slipuploaddate)::text = $2
+    AND TRIM(to_char(e.expense_date, 'Month')) = $1
+    AND EXTRACT(YEAR FROM e.expense_date)::text = $2
     AND t.is_subcontractor = false
     AND t.status = true
-    GROUP BY t.truckregnum, to_char(e.slipuploaddate, 'Month'), EXTRACT(YEAR FROM e.slipuploaddate)
+    GROUP BY t.truckregnum, to_char(e.expense_date, 'Month'), EXTRACT(YEAR FROM e.expense_date)
     ORDER BY total_cost DESC
   `
   const result = await client.query(query, [month, year])
@@ -400,9 +400,9 @@ const getTurnoverVsDieselCost = async (numericMonth, year) => {
     calculateMonthlyTurnover(pool, dateFrom, dateTo),
     pool.query(
       `SELECT COALESCE(SUM(expensecost), 0) AS total_diesel_cost
-       FROM expenses_m2
-       WHERE slipuploaddate >= $1
-         AND slipuploaddate < $2
+       FROM expenses_with_po_v
+       WHERE expense_date >= $1
+         AND expense_date < $2
          AND type = 'fuel'`,
       [dateFrom, dateTo]
     ),
@@ -805,16 +805,16 @@ const getTurnoverVsFuelPerTruck = async (client, month, year, truckId = null) =>
       FuelPerTruck AS (
         SELECT 
           COALESCE(SUM(e.expensecost), 0) AS total_fuel_cost,
-          to_char(e.slipuploaddate, 'Month') AS month_name,
-          EXTRACT(YEAR FROM e.slipuploaddate)::TEXT AS year
-        FROM expenses_m2 e
+          to_char(e.expense_date, 'Month') AS month_name,
+          EXTRACT(YEAR FROM e.expense_date)::TEXT AS year
+        FROM expenses_with_po_v e
         JOIN m5_trucks t ON e.truckid = t.m5truckskey
         WHERE e.type = 'fuel'
           AND t.is_subcontractor = false
-          AND TRIM(to_char(e.slipuploaddate, 'Month')) = $1
-          AND EXTRACT(YEAR FROM e.slipuploaddate)::text = $2
+          AND TRIM(to_char(e.expense_date, 'Month')) = $1
+          AND EXTRACT(YEAR FROM e.expense_date)::text = $2
           AND t.status = true
-        GROUP BY to_char(e.slipuploaddate, 'Month'), EXTRACT(YEAR FROM e.slipuploaddate)
+        GROUP BY to_char(e.expense_date, 'Month'), EXTRACT(YEAR FROM e.expense_date)
       )
       SELECT 
         'Total' AS truckregnumber,
@@ -865,17 +865,17 @@ const getTurnoverVsFuelPerTruck = async (client, month, year, truckId = null) =>
         SELECT 
           t.truckregnum,
           COALESCE(SUM(e.expensecost), 0) AS total_fuel_cost,
-          to_char(e.slipuploaddate, 'Month') AS month_name,
-          EXTRACT(YEAR FROM e.slipuploaddate)::TEXT AS year
-        FROM expenses_m2 e
+          to_char(e.expense_date, 'Month') AS month_name,
+          EXTRACT(YEAR FROM e.expense_date)::TEXT AS year
+        FROM expenses_with_po_v e
         JOIN m5_trucks t ON e.truckid = t.m5truckskey
         WHERE e.type = 'fuel'
           AND t.is_subcontractor = false
-          AND TRIM(to_char(e.slipuploaddate, 'Month')) = $1
-          AND EXTRACT(YEAR FROM e.slipuploaddate)::text = $2
+          AND TRIM(to_char(e.expense_date, 'Month')) = $1
+          AND EXTRACT(YEAR FROM e.expense_date)::text = $2
           AND t.m5truckskey = $3
           AND t.status = true
-        GROUP BY t.truckregnum, to_char(e.slipuploaddate, 'Month'), EXTRACT(YEAR FROM e.slipuploaddate)
+        GROUP BY t.truckregnum, to_char(e.expense_date, 'Month'), EXTRACT(YEAR FROM e.expense_date)
       )
       SELECT 
         COALESCE(tp.truckregnumber, fp.truckregnum) AS truckregnumber,
@@ -928,13 +928,13 @@ const getAllExpenses = async (client, month, year) => {
   const fuelQuery = `
     SELECT 
       COALESCE(SUM(e.expensecost), 0) as total_fuel_cost,
-      to_char(e.slipuploaddate, 'Month') as month_name,
-      EXTRACT(YEAR FROM e.slipuploaddate) as year
-    FROM expenses_m2 e
+      to_char(e.expense_date, 'Month') as month_name,
+      EXTRACT(YEAR FROM e.expense_date) as year
+    FROM expenses_with_po_v e
     WHERE e.type = 'fuel'
-      AND TRIM(to_char(e.slipuploaddate, 'Month')) = $1
-      AND EXTRACT(YEAR FROM e.slipuploaddate)::text = $2
-    GROUP BY to_char(e.slipuploaddate, 'Month'), EXTRACT(YEAR FROM e.slipuploaddate)
+      AND TRIM(to_char(e.expense_date, 'Month')) = $1
+      AND EXTRACT(YEAR FROM e.expense_date)::text = $2
+    GROUP BY to_char(e.expense_date, 'Month'), EXTRACT(YEAR FROM e.expense_date)
   `
 
   const purchaseOrderQuery = `
@@ -1044,13 +1044,13 @@ const getWagesVsExpenses = async (client, month, year) => {
   const fuelQuery = `
     SELECT 
       COALESCE(SUM(e.expensecost), 0) as total_fuel_cost,
-      to_char(e.slipuploaddate, 'Month') as month_name,
-      EXTRACT(YEAR FROM e.slipuploaddate) as year
-    FROM expenses_m2 e
+      to_char(e.expense_date, 'Month') as month_name,
+      EXTRACT(YEAR FROM e.expense_date) as year
+    FROM expenses_with_po_v e
     WHERE e.type = 'fuel'
-      AND TRIM(to_char(e.slipuploaddate, 'Month')) = $1
-      AND EXTRACT(YEAR FROM e.slipuploaddate)::text = $2
-    GROUP BY to_char(e.slipuploaddate, 'Month'), EXTRACT(YEAR FROM e.slipuploaddate)
+      AND TRIM(to_char(e.expense_date, 'Month')) = $1
+      AND EXTRACT(YEAR FROM e.expense_date)::text = $2
+    GROUP BY to_char(e.expense_date, 'Month'), EXTRACT(YEAR FROM e.expense_date)
   `
 
   const purchaseOrderQuery = `
