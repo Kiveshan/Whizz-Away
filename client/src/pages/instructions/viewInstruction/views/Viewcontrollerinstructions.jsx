@@ -4,8 +4,15 @@ import { useState, useEffect, useRef } from "react"
 import "../../css/viewcontrollerinstructions.css"
 import { useNavigate, useLocation } from "react-router-dom"
 import ErrorModal from "../../../../components/ErrorModal"
+import { ConfirmationModal } from "../../../../components/instructions/ConfirmationModal"
+import { useAuth } from "../../../../context/AuthContext"
+import { reopenInstruction as reopenInstructionService } from "../../../../services/instructionService"
 import api from "../../../../api"
 import "../../../../css/components.css"
+
+// Reopening a Completed instruction is a supervisory override — restrict it
+// to the same roles the backend enforces (server/config/roles.js).
+const REOPEN_ROLES = [1, 4] // MANAGER, DIRECTOR
 
 // ErrorTooltip component for displaying validation errors
 const ErrorTooltip = ({ message }) => {
@@ -22,6 +29,7 @@ const ErrorTooltip = ({ message }) => {
 const Viewcontrollerinstructions = () => {
   const navigate = useNavigate()
   const location = useLocation()
+  const { user } = useAuth()
   const isMounted = useRef(true)
   const instructionId = location.state?.instructionId
   const preservedFormData = location.state?.preservedFormData || {}
@@ -65,6 +73,7 @@ const Viewcontrollerinstructions = () => {
     surchages: false,
     surcharge: 0,
     addon_invoice_number: "",
+    paid_amount: 0,
   })
 
   const [formData, setFormData] = useState(() => ({
@@ -124,6 +133,59 @@ const Viewcontrollerinstructions = () => {
 
   // State for success message
   const [successMessage, setSuccessMessage] = useState("")
+
+  // Reopen (Completed -> In Progress) — Manager/Director only
+  const canReopen = REOPEN_ROLES.includes(user?.roleid)
+  const [confirmationModal, setConfirmationModal] = useState({
+    isOpen: false,
+    message: "",
+    action: null,
+  })
+  const [reopenReason, setReopenReason] = useState("")
+  const [isReopening, setIsReopening] = useState(false)
+
+  const handleReopenInstruction = () => {
+    setReopenReason("")
+    setConfirmationModal({
+      isOpen: true,
+      message:
+        formData.paid_amount > 0
+          ? `This instruction has R${Number(formData.paid_amount).toFixed(2)} paid against it. ` +
+            "Reopening will let it be edited again even though a payment has already been made against it. Continue?"
+          : "Reopen this completed instruction for editing?",
+      action: "reopen",
+    })
+  }
+
+  const performReopen = async () => {
+    try {
+      setIsReopening(true)
+      const result = await reopenInstructionService(instructionId, reopenReason)
+      setFormData((prev) => ({ ...prev, status: result.status }))
+      setSuccessMessage("Instruction reopened successfully. Open it from the instructions list to edit.")
+    } catch (error) {
+      console.error("Error reopening instruction:", error)
+      setErrorModal({
+        isOpen: true,
+        message:
+          error.response?.data?.error ||
+          "Failed to reopen instruction. Please try again.",
+      })
+    } finally {
+      setIsReopening(false)
+    }
+  }
+
+  const handleConfirmAction = () => {
+    if (confirmationModal.action === "reopen") {
+      performReopen()
+    }
+    setConfirmationModal({ isOpen: false, message: "", action: null })
+  }
+
+  const handleCancelAction = () => {
+    setConfirmationModal({ isOpen: false, message: "", action: null })
+  }
 
   // State to track if shipment type is Import
   const [isImport, setIsImport] = useState(false)
@@ -338,6 +400,7 @@ const Viewcontrollerinstructions = () => {
         is_set_rate: Boolean(data.is_set_rate) || false,
         historical_set_rate: data.historical_set_rate || null,
         addon_invoice_number: data.addon_invoice_number || "",
+        paid_amount: Number(data.paid_amount) || 0,
         // Break bulk fields removed
       }
 
@@ -1493,6 +1556,33 @@ const Viewcontrollerinstructions = () => {
                 </div>
               </div>
             )}
+
+            {/* Reopen (Manager/Director only, Completed instructions) */}
+            {canReopen && formData.status === "Completed" && (
+              <div
+                className="controller-instructions-form-actions"
+                style={{ display: "flex", justifyContent: "center", marginTop: "24px" }}
+              >
+                <button
+                  className="controller-instructions-reopen-button"
+                  onClick={handleReopenInstruction}
+                  disabled={isReopening}
+                  style={{
+                    backgroundColor: "#e67e22",
+                    color: "white",
+                    padding: "12px 24px",
+                    border: "none",
+                    borderRadius: "4px",
+                    cursor: isReopening ? "not-allowed" : "pointer",
+                    fontSize: "16px",
+                    fontWeight: "bold",
+                    opacity: isReopening ? 0.7 : 1,
+                  }}
+                >
+                  {isReopening ? "Reopening…" : "Reopen Instruction"}
+                </button>
+              </div>
+            )}
           </div>
         )}
 
@@ -1501,6 +1591,35 @@ const Viewcontrollerinstructions = () => {
           isOpen={errorModal.isOpen}
           message={errorModal.message}
           onClose={() => setErrorModal({ isOpen: false, message: "" })}
+        />
+
+        {/* Reopen Confirmation Modal */}
+        <ConfirmationModal
+          isOpen={confirmationModal.isOpen}
+          title={confirmationModal.action === "reopen" ? "Reopen Instruction" : "Confirm"}
+          message={confirmationModal.message}
+          onConfirm={handleConfirmAction}
+          onCancel={handleCancelAction}
+          extraContent={
+            confirmationModal.action === "reopen" ? (
+              <div style={{ marginBottom: "20px" }}>
+                <label
+                  htmlFor="reopen-reason"
+                  style={{ display: "block", marginBottom: "6px", color: "#666", fontSize: "14px" }}
+                >
+                  Reason for reopening (optional)
+                </label>
+                <textarea
+                  id="reopen-reason"
+                  value={reopenReason}
+                  onChange={(e) => setReopenReason(e.target.value)}
+                  rows={2}
+                  style={{ width: "100%", padding: "8px", borderRadius: "4px", border: "1px solid #ddd" }}
+                  placeholder="e.g. Client requested a rate correction"
+                />
+              </div>
+            ) : null
+          }
         />
       </div>
     </div>

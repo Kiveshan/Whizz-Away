@@ -30,12 +30,12 @@ const queryText = `
       END,
       e.documentfrom
     ) AS documentfrom_display
-  FROM expenses_m2 e
+  FROM expenses_with_po_v e
   JOIN m5_trucks t ON e.truckid = t.m5truckskey
   LEFT JOIN m5_employee emp ON e.driverid = emp.userid AND e.documentfrom = 'Driver'
   WHERE e.truckid = $1
     AND (e.type ILIKE 'fuel' OR e.type ILIKE 'diesel' OR e.type ILIKE 'petrol')
-  ORDER BY e.slipuploaddate DESC
+  ORDER BY e.expense_date DESC
 `;
   const result = await pool.query(queryText, [truckId]);
   return result.rows;

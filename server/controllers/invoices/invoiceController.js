@@ -6,7 +6,7 @@ import {
   updateInstructionDetails,
   getInstructionDetailsForPreview,
 } from "../../models/invoices/invoiceModel.js";
-import { auditFromReq } from "../../utils/auditLogger.js";
+import { auditFromReq, getClientName } from "../../utils/auditLogger.js";
 
 const getCompletedInvoicesHandler = async (req, res) => {
   try {
@@ -148,7 +148,7 @@ const createInvoiceHandler = async (req, res) => {
       actionType: "INVOICE_CREATED",
       entityType: "invoice",
       targetId: m1key,
-      targetName: `client ${clientId}`,
+      targetName: (await getClientName(clientId)) || `client ${clientId}`,
       details: `Invoice created for instruction ${m1key}, client ${clientId}`,
     });
 

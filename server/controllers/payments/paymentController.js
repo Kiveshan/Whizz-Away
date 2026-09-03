@@ -5,7 +5,7 @@ import {
   getClientInvoices,
   deletePayment,
 } from "../../models/payments/paymentModel.js";
-import { auditFromReq } from "../../utils/auditLogger.js";
+import { auditFromReq, getClientName } from "../../utils/auditLogger.js";
 
 const createPaymentHandler = async (req, res) => {
   try {
@@ -31,7 +31,7 @@ const createPaymentHandler = async (req, res) => {
       actionType: "PAYMENT_CREATED",
       entityType: "payment",
       targetId: payment.data?.paymentId,
-      targetName: `client ${clientId}`,
+      targetName: (await getClientName(clientId)) || `client ${clientId}`,
       details: `Payment created for client ${clientId} (${line_items.length} line item(s), ref: ${reference || "none"})`,
     });
 
@@ -147,7 +147,7 @@ const deletePaymentHandler = async (req, res) => {
       actionType: "PAYMENT_DELETED",
       entityType: "payment",
       targetId: paymentId,
-      targetName: `client ${clientId}`,
+      targetName: (await getClientName(clientId)) || `client ${clientId}`,
       details: `Payment ${paymentId} deleted for client ${clientId}`,
     });
 

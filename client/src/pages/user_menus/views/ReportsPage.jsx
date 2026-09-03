@@ -4,11 +4,11 @@ import Card from "../../../components/Card"
 import "../css/card.css"
 import "../css/dashboard.css"
 
-const reportsData = [
+const insightsData = [
   {
     title: "Wage Reports",
-    image: "/images/reports.jpg", // Update with the correct image path
-    path: "/wage-reports", // Define the path for Wage Reports
+    image: "/images/reports.jpg",
+    path: "/wage-reports",
   },
   {
     title: "Income & Expenditure",
@@ -24,6 +24,19 @@ const reportsData = [
     title: "VAT Recon",
     image: "/images/reports.jpg",
     path: "/vat-recon-reports",
+  },
+]
+
+const maintenanceData = [
+  {
+    title: "Driver Rate Audit",
+    image: "/images/reports.jpg",
+    path: "/driver-rate-audit",
+  },
+  {
+    title: "Audit Log",
+    image: "/images/reports.jpg",
+    path: "/audit-log",
   },
 ]
 
@@ -47,8 +60,21 @@ const ReportsPage = () => {
         </button>
       </div>
 
+      <h2 className="dashboard-section-title">Business Insights</h2>
       <div className="dashboard-row">
-        {reportsData.map((item) => (
+        {insightsData.map((item) => (
+          <Card
+            key={item.title}
+            title={item.title}
+            image={item.image}
+            onClick={() => handleNavigation(item.path)}
+          />
+        ))}
+      </div>
+
+      <h2 className="dashboard-section-title">Maintenance & Audits</h2>
+      <div className="dashboard-row">
+        {maintenanceData.map((item) => (
           <Card
             key={item.title}
             title={item.title}

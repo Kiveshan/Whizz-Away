@@ -24,6 +24,18 @@ const formatCurrency = (amount) => {
   })}`;
 };
 
+// Utility function for formatting plain (non-currency) numbers - weights and
+// percentages - so every figure printed on an invoice carries exactly two
+// decimal places, matching formatCurrency.
+const formatNumber = (value) => {
+  const num = Number(value);
+  if (!Number.isFinite(num)) return "0.00";
+  return num.toLocaleString("en-ZA", {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  });
+};
+
 // Debug utility
 const debug = (message, data) => {
   if (process.env.NODE_ENV !== "production") {
@@ -528,7 +540,7 @@ const ClientInvoice = forwardRef(({
               wi.ksm_dm_no || "",
               wi.ticket_no || "",
               wi.receipt_book_no || "",
-              (Number(wi.weight || 0)).toFixed(2),
+              formatNumber(wi.weight),
               formatCurrency(Number(wi.unitrate || 0)),
             ])
           : [["No weight items", "", "", "", ""]];
@@ -546,8 +558,8 @@ const ClientInvoice = forwardRef(({
               wi.ksm_dm_no || "",
               wi.ticket_no || "",
               wi.receipt_book_no || "",
-              (Number(wi.weight || 0)).toFixed(2),
-              formatCurrency(Number(wi.unitrate || 0).toFixed ? Number(wi.unitrate || 0) : wi.unitrate || 0),
+              formatNumber(wi.weight),
+              formatCurrency(Number(wi.unitrate || 0)),
               formatCurrency(Number(wi.price || 0)),
             ])
           : [["No weight items", "", "", "", "", ""]];
@@ -592,7 +604,7 @@ const ClientInvoice = forwardRef(({
                 ];
 
                 if (hasWeights && container.weight && container.weight !== "N/A") {
-                  row.push(`${container.weight} kg`);
+                  row.push(`${formatNumber(container.weight)} kg`);
                 } else if (hasWeights) {
                   row.push("-");
                 }
@@ -705,7 +717,7 @@ const ClientInvoice = forwardRef(({
       const summaryHeaders = ["Description", "Amount"];
       const summaryData = [
         ["Amount (excl. VAT)", formatCurrency(amount)],
-        ...(vat > 0 ? [["VAT (" + finalInvoiceData.vat + "%)", formatCurrency(vat)]] : []),
+        ...(vat > 0 ? [["VAT (" + formatNumber(finalInvoiceData.vat) + "%)", formatCurrency(vat)]] : []),
         ["Total Amount", formatCurrency(total)],
       ];
 
@@ -1059,7 +1071,7 @@ const ClientInvoice = forwardRef(({
                           <td>{wi.ksm_dm_no || ''}</td>
                           <td>{wi.ticket_no || ''}</td>
                           <td>{wi.receipt_book_no || ''}</td>
-                          <td>{Number(wi.weight || 0).toFixed(2)}</td>
+                          <td>{formatNumber(wi.weight)}</td>
                           <td>{formatCurrency(Number(wi.unitrate || 0))}</td>
                         </tr>
                       ))
@@ -1089,7 +1101,7 @@ const ClientInvoice = forwardRef(({
                           <td>{wi.ksm_dm_no || ''}</td>
                           <td>{wi.ticket_no || ''}</td>
                           <td>{wi.receipt_book_no || ''}</td>
-                          <td>{Number(wi.weight || 0).toFixed(2)}</td>
+                          <td>{formatNumber(wi.weight)}</td>
                           <td>{formatCurrency(Number(wi.unitrate || 0))}</td>
                           <td>{formatCurrency(Number(wi.price || 0))}</td>
                         </tr>
@@ -1162,7 +1174,7 @@ const ClientInvoice = forwardRef(({
                               (c) => c.weight && c.weight !== "N/A"
                             ) && (
                               <td className="weight">
-                                {hasWeight ? `${container.weight} kg` : "N/A"}
+                                {hasWeight ? `${formatNumber(container.weight)} kg` : "N/A"}
                               </td>
                             )}
                             {containers.some((c) => c.truckregnumber) && (
@@ -1249,7 +1261,7 @@ const ClientInvoice = forwardRef(({
                     {vat > 0 && (
                       <tr>
                         <td className="summary-label">
-                          VAT ({finalInvoiceData.vat}%)
+                          VAT ({formatNumber(finalInvoiceData.vat)}%)
                         </td>
                         <td className="summary-value">{formatCurrency(vat)}</td>
                       </tr>

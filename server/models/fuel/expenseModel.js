@@ -128,17 +128,13 @@ const getPOExpensesByTruckId = async (truckId) => {
   const queryText = `
     SELECT 
       e.*,
-      po.ponum,
-      po.slip_s3key as po_slip_s3key,
-      po.invoice_number,
       CASE 
-        WHEN po.ponum IS NOT NULL THEN CONCAT(e.documentfrom, ' (PO: ', po.ponum, ')')
+        WHEN e.ponum IS NOT NULL THEN CONCAT(e.documentfrom, ' (PO: ', e.ponum, ')')
         ELSE e.documentfrom
       END as documentfrom_display
-    FROM public.expenses_m2 e
-    LEFT JOIN public.purchase_orders po ON e.orderno::text = po.ponum
+    FROM public.expenses_with_po_v e
     WHERE e.truckid = $1
-    ORDER BY e.slipuploaddate DESC
+    ORDER BY e.expense_date DESC
   `;
   const result = await pool.query(queryText, [truckId]);
   return result.rows;

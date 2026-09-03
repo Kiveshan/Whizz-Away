@@ -56,6 +56,11 @@ export async function deleteInstruction(instructionId) {
   return response.data;
 }
 
+export async function reopenInstruction(instructionId, reason) {
+  const response = await api.post(`/api/instructions/${instructionId}/reopen`, { reason });
+  return response.data;
+}
+
 export async function generateInvoice(m1key) {
   const response = await api.post(`/generate-invoice/${m1key}`);
   return response.data;

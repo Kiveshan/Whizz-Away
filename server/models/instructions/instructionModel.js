@@ -3326,6 +3326,39 @@ export const deleteInstruction = async (instructionId) => {
   }
 };
 
+// Reopen a Completed instruction so it can be edited again via the normal
+// update path. Only flips status; updateFCInstructionAndContainers has no
+// status guard, so once status is no longer "Completed" the instruction is
+// editable through the existing save flow with no extra plumbing.
+export const reopenInstruction = async (instructionId) => {
+  const checkQuery = `
+    SELECT status, paid_amount FROM public.m1_controller
+    WHERE m1key = $1
+  `;
+  const checkResult = await pool.query(checkQuery, [instructionId]);
+
+  if (checkResult.rows.length === 0) {
+    throw new Error("Instruction not found");
+  }
+
+  const { status, paid_amount } = checkResult.rows[0];
+  if (status !== "Completed") {
+    throw new Error("Only completed instructions can be reopened");
+  }
+
+  const newStatus = "In Progress";
+  await pool.query(
+    `UPDATE public.m1_controller SET status = $1 WHERE m1key = $2`,
+    [newStatus, instructionId]
+  );
+
+  return {
+    previousStatus: status,
+    newStatus,
+    paidAmount: Number(paid_amount) || 0,
+  };
+};
+
 export const getClientSetRate = async (clientId, starting_point, destination) => {
   const sql = `
     SELECT set_rate, fuel_surcharge

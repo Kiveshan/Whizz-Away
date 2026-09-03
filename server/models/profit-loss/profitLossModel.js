@@ -146,10 +146,10 @@ const getProfitLossData = async (month, year) => {
     // === EXPENSES === (unchanged)
     const fuel = Number((await client.query(
       `SELECT COALESCE(SUM(expensecost), 0) AS total
-       FROM expenses_m2
+       FROM expenses_with_po_v
        WHERE type = 'fuel'
-         AND TRIM(TO_CHAR(slipuploaddate, 'Month')) = $1
-         AND EXTRACT(YEAR FROM slipuploaddate)::text = $2`,
+         AND TRIM(TO_CHAR(expense_date, 'Month')) = $1
+         AND EXTRACT(YEAR FROM expense_date)::text = $2`,
       [month, year]
     )).rows[0].total || 0);
 

@@ -48,14 +48,14 @@ const DirectorExpenses = () => {
 
         if (year !== "all") {
           filteredData = filteredData.filter((expense) => {
-            const expenseDate = new Date(expense.slipuploaddate);
+            const expenseDate = new Date(expense.expense_date);
             return expenseDate.getFullYear() === Number.parseInt(year);
           });
         }
 
         if (month !== "all") {
           filteredData = filteredData.filter((expense) => {
-            const expenseDate = new Date(expense.slipuploaddate);
+            const expenseDate = new Date(expense.expense_date);
             return expenseDate.getMonth() + 1 === Number.parseInt(month);
           });
         }
@@ -232,10 +232,11 @@ const DirectorExpenses = () => {
               onChange={handleYearChange}
             >
               <option value="all">All Years</option>
-              <option value="2025">2025</option>
-              <option value="2024">2024</option>
-              <option value="2023">2023</option>
-              <option value="2022">2022</option>
+              {Array.from({ length: 5 }, (_, i) => new Date().getFullYear() - i).map((y) => (
+                <option key={y} value={y}>
+                  {y}
+                </option>
+              ))}
             </select>
             <select
               className="dropdown"
@@ -286,7 +287,7 @@ const DirectorExpenses = () => {
                       : expense.expensecost}
                   </td>
                   <td>{expense.documentfrom}</td>
-                  <td>{formatDate(expense.slipuploaddate)}</td>
+                  <td>{formatDate(expense.expense_date)}</td>
                   <td>
                     <button
                       className="view-button"

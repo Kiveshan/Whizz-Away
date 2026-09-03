@@ -41,6 +41,8 @@ export const ROUTE_ROLES = [
   { pattern: "/reports", roles: [1, 4] },
   { pattern: "/DirectorAnalytics", roles: [4, 1] },
   { pattern: "/wage-reports", roles: [1, 4] },
+  { pattern: "/driver-rate-audit", roles: [1, 4] },
+  { pattern: "/audit-log", roles: [1, 4] },
   { pattern: "/client-subbie-commission", roles: [1, 4] },
   { pattern: "/profit-loss-reports", roles: [1, 4] },
   { pattern: "/income-expenditure-reports/:month/:year", roles: [1, 4] },

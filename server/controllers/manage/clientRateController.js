@@ -4,7 +4,7 @@ import {
   saveClientRates,
   deleteClientRate,
 } from "../../models/manage/clientRateModel.js"
-import { auditFromReq } from "../../utils/auditLogger.js"
+import { auditFromReq, getClientName } from "../../utils/auditLogger.js"
 
 const getAllClientsForRatesHandler = async (req, res) => {
   try {
@@ -117,7 +117,7 @@ const saveClientRatesHandler = async (req, res) => {
       actionType: "CLIENT_RATES_SAVED",
       entityType: "client_rate",
       targetId: clientId,
-      targetName: `client ${clientId}`,
+      targetName: (await getClientName(clientId)) || `client ${clientId}`,
       details: `${rates.length} rate(s) saved for client ${clientId}: ${rates
         .map((r) => `${r.starting_point}->${r.destination}`)
         .join(", ")}`,
@@ -148,6 +148,9 @@ const deleteClientRateHandler = async (req, res) => {
       actionType: "CLIENT_RATE_DELETED",
       entityType: "client_rate",
       targetId: rateId,
+      targetName: result.data
+        ? `${result.data.starting_point} -> ${result.data.destination}`
+        : `rate ${rateId}`,
       details: `Client rate ${rateId} deleted`,
     })
 
